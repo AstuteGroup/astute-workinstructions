@@ -5,7 +5,7 @@ Creating a Work Instruction consists of two main steps:
 
 ### Filling out Template 
 All work instructions should follow the template below 
-
+---------------------------------------------------------------------------------------------
 
 ###### Overview
 - Description of the purpose of this role and any context needed to perform role
@@ -23,6 +23,7 @@ All work instructions should follow the template below
 
 ###### Notes
 - Add any additional context or special use-cases that will affect this role
-```
+
+  ---------------------------------------------------------------------------------------------
 
 ### Uploading to GitHub
