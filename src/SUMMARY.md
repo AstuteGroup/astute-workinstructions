@@ -1,7 +1,7 @@
 # Summary
 [Overview]
   [Introduction](./overview.md)
-  [How To Write a Work Instruction](./CreateworkInstructions)
+  [How To Write a Work Instruction](./CreateworkInstructions.md)
   [Writing Tickets](./logilite_ticket_creation.md)
 [Roles]
   [Consignment Reporting](./ConsignmentReporting.md)
