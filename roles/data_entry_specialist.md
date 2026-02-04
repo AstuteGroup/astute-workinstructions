@@ -1,0 +1,1 @@
+Data Entry Specialist. The role of Data Entry Specialist is to structure data received into a format that can be uploaded/added into Orange Tsunami (OT) for larger consumption. The Specialist must be able to recognize specific data points and extract them such as differentiating between a manufacturers part number (MPN) and a description of the component
