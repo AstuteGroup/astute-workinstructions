@@ -1,0 +1,2 @@
+rfq_search_key,rfq_date,rfq_type,customer_name,rfq_mpn,rfq_qty,rfq_target_price,stock_offer_key,stock_date,stock_location,stock_partner,stock_mpn,stock_qty,stock_price,date_code,lead_time,qty_coverage_pct,vq_count,avg_vq_cost,min_vq_cost,max_vq_cost,latest_vq_date,rfq_count_90d,total_rfq_qty_90d,est_opportunity_value,match_type
+1129863,2026-02-11,Shortage,Plexus Corp.,5207719-3,0,,1019249,2024-05-01,Stock - Austin Warehouse,Astute Electronics Inc,5207719-3,5,,,,,,,,,,1,0,,EXACT
