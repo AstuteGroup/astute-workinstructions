@@ -18,7 +18,7 @@ RFQ Search Key,Buyer,Business Partner Search Key,Contact,MPN,MFR Text,Quoted Qua
 1129840,Jake Harris,1003102,,LTC2977IUP#PBF,,1150,29.55,USD,19+,1150,,,Stock 1-2 days,Sweden,,"FLAG SUSPICIOUS: Email flagged by mail system (DKIM/DMARC failed). MPN MISMATCH: quoted IUP vs requested CUP (different temp grade). Non-cancellable. 30-day warranty."
 1129840,Jake Harris,1003550,,EN5319QI,Intel,5000,28.5,USD,2226,,,,Stock,,,"NO-BID: Supplier cannot compete with franchise pricing."
 1129840,Jake Harris,1005290,,EN5319QI,Intel,230,6,USD,2235,,,,Stock in US,Malaysia,,
-1129840,Jake Harris,,,EN5319QI,Intel,15,33.34,USD,1744,,,,In stock,Malaysia,Y,"SUPPLIER NOT FOUND IN DATABASE. +3.5% CC surcharge. Non-cancellable/non-returnable. Quotes valid 24 hours."
+1129840,Jake Harris,1003290,,EN5319QI,Intel,15,33.34,USD,1744,,,,In stock,Malaysia,Y,"+3.5% CC surcharge. Non-cancellable/non-returnable. Quotes valid 24 hours."
 1129840,Jake Harris,1002911,,IRFS3107-7PPBF,,138,0,,,,,,,,,NO QUOTE. Supplier only asked for target price.
 1129840,Jake Harris,1011079,,,,0,0,,,,,,,,,"NO PRICING - PDF quote unreadable. Requires manual review."
 1129840,Jake Harris,1009996,,BCM84728AIFSBG,Broadcom,54,0,,,,,,,,,"NO PRICING - pricing only in embedded PDF attachment. Requires signed/stamped RFQ module to proceed."
