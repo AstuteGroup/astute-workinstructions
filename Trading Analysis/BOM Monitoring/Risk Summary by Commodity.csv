@@ -1,0 +1,20 @@
+Rank,Commodity,Total Parts,HIGH Count,HIGH %,MID Count,MID %,LOW Count,LOW %,OBS Count,OBS %,NRND Count,NRND %,Worsened,Improved,Net Worsened,Worsen Rate %,Risk Tier,Action Summary
+1,ICs - FPGAs/PLDs,866,319,36.8%,104,12.0%,431,49.8%,251,29.0%,0,0.0%,157,21,136,18.1%,CRITICAL,"Immediate LTB assessment and redesign planning; legacy Xilinx/Altera/Lattice/Microsemi families"
+2,ICs - Memory,1089,320,29.4%,82,7.5%,668,61.3%,193,17.7%,0,0.0%,119,16,103,10.9%,CRITICAL,"Cross-reference against current-gen replacements; secure allocation for legacy NOR Flash/SRAM/DRAM"
+3,Transistors/MOSFETs,2909,709,24.4%,135,4.6%,1997,68.6%,593,20.4%,32,1.1%,144,36,108,5.0%,CRITICAL,"Focus on mil-spec and automotive-grade discretes (JANTX/IR series); highest obsolescence rate"
+4,Diodes/TVS/ESD,1744,370,21.2%,79,4.5%,1271,72.9%,299,17.1%,16,0.9%,150,17,133,8.6%,CRITICAL,"Identify critical protection circuit parts for proactive cross-referencing"
+5,Electromechanical,146,29,19.9%,10,6.8%,101,69.2%,9,6.2%,0,0.0%,28,1,27,19.2%,ELEVATED,"Small sample but highest worsening rate; relays have long replacement lead times"
+6,ICs - Interface/Logic,3036,327,10.8%,104,3.4%,2549,84.0%,239,7.9%,1,0.0%,178,20,158,5.9%,ELEVATED,"Watch parallel-to-serial bus technology transitions; legacy SN74/SN65 families"
+7,Connectors,8887,821,9.2%,847,9.5%,6970,78.4%,257,2.9%,6,0.1%,1082,153,929,12.2%,MODERATE,"Long replacement qualification cycles; start alternates early for Amphenol/TE/Molex"
+8,Inductors/Ferrites,1318,118,9.0%,157,11.9%,1019,77.3%,58,4.4%,7,0.5%,198,19,179,15.0%,MODERATE,"15% worsening rate signals rapid deterioration; track MID-risk ferrite beads closely"
+9,Capacitors,17254,1420,8.2%,1100,6.4%,14173,82.1%,829,4.8%,323,1.9%,1393,132,1261,8.1%,MODERATE,"Focus on tantalum and specialty caps; MLCC alternatives usually available"
+10,RF/Microwave,645,52,8.1%,91,14.1%,498,77.2%,31,4.8%,3,0.5%,90,16,74,14.0%,MODERATE,"Highest MID% (14.1%) = largest risk pipeline; sole-sourced RF parts from ADI/Qorvo"
+11,ICs - Analog/Mixed Signal,12042,901,7.5%,1109,9.2%,9864,81.9%,740,6.1%,50,0.4%,958,170,788,8.0%,MODERATE,"ADI post-acquisition rationalization ongoing; large absolute HIGH count (901 parts)"
+12,LEDs/Optoelectronics,709,50,7.1%,54,7.6%,596,84.1%,27,3.8%,18,2.5%,49,10,39,6.9%,MODERATE,"Highest NRND rate (2.5%); plan optocoupler-to-digital-isolator migration"
+13,ICs - MCU/Processors,1049,68,6.5%,136,13.0%,821,78.3%,31,3.0%,43,4.1%,92,14,78,8.8%,MODERATE,"4.1% NRND + 13% MID = strong emerging risk pipeline; qualify next-gen MCUs"
+14,ICs - Power Management,3320,154,4.6%,210,6.3%,2887,87.0%,112,3.4%,24,0.7%,195,53,142,5.9%,LOW,"Routine monitoring; active TI/ADI development supports this category"
+15,Resistors,13166,240,1.8%,851,6.5%,11855,90.0%,147,1.1%,21,0.2%,907,78,829,6.9%,LOW,"Lowest risk profile; commodity passives with many alternatives"
+16,Crystals/Oscillators,51,0,0.0%,6,11.8%,45,88.2%,0,0.0%,0,0.0%,6,0,6,11.8%,LOW,"No immediate concern; small sample"
+,,,,,,,,,,,,,,,,,
+,GRAND TOTAL,116360,11041,9.5%,9489,8.2%,93335,80.2%,6355,5.5%,,,,,,,,
+,WORSEN/IMPROVE TOTAL,,,,,,,,,,,,10880,1424,9456,,,"7.6:1 worsening-to-improving ratio"
