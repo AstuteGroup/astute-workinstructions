@@ -1,0 +1,18 @@
+MPN,Manufacturer (BOM),Customer Program(s),Life Cycle Status,Stock Qty,Stock Date Code,Stock Description,Stock Manufacturer
+CL21C330JBANNNC,"Samsung Electro-Mechanics","Sonardyne Master Active Part List; Asica - BOM Health",OBS,48404,N/A,,Samsung Electro-Mechanics
+CY7C1019DV33-10ZSXI,Infineon,"Edinburgh Instruments - Master BOM List",OBS,6605,1919,"Ic, Sram, Smt, 128K X 8Bit",Cypress Semiconductor Corp
+EPM3064ATC44-10N,Altera,"Astute PPV Exercise",OBS,50,1031,ELECTRICAL X2804ADMB,Altera
+FDS6982AS,ON Semiconductor,"Edinburgh Instruments - Final Master BOM; Edinburgh Instruments - Master BOM List; Edinburgh Instruments - PL034 00700",OBS,80564,"1717; 2241; 3082018; 43265",,FAIRCHILD / ONSEMI
+IRF7341PBF,International Rectifier HiRel Products,"INGETEAM BOM Health Analysis",OBS,25,,XSTR N-FET SO-8,
+JANTX2N4856,"Solitron / VPT Components","DE Customer Quotes - USD",OBS,360,1530,"TRANSISTOR,SILICON,MOS FET N,CHANNEL,1.",Vishay Dale
+LQP15MN1N5B02D,Murata Electronics,"Rapid Assembly - EAS24987 & EAS24989",OBS,50000,,"IC  FPGA  FLASH  REV ZY",Murata Manufacturing Co Ltd
+SC18IS602BIPW/S8HP,NXP,"020525 GBP QCS2604 IMV Imaging",OBS,2497,2112,IC BRIDGE SPI/I2C 16TSSOP,NXP Semiconductors
+SKY13286-359LF,SKYWORKS SOLUTIONS,"Complete Obsolescence Management (MBDACOMM2024)",OBS,3000,1715,SKY13286-359LF,Skyworks
+THS3202DGNR,Texas Instruments,"Pico - MPN list; Pico Technology - Adapt 07.05.2025",NRND,850,,"IC OPAMP CFA 2 CIRCUIT 8HVSSOP",Texas Instruments
+TLE6250GV33,Infineon Technologies,"Electronics - Semiconductors and Passives",OBS,17988,"2202; 2316",L,infineon
+TLF35584QVVS1,Infineon Technologies,"Electronics - Semiconductors and Passives",OBS,10000,"2307; 2308",L,infineon
+UWF1V470MCL1GS,Nichicon,"MKS Capacitor RFQ",OBS,3444,N/A,,Nichicon Corp
+XC18V01SO20C,AMD,"OT RFQ 19.05.2025 - 23.05.2025",OBS,117,,,XILINX
+XC3S400-4PQG208C,AMD / Xilinx,"Pico - MPN list; Pico Technology - Adapt 07.05.2025",OBS,759,,,XILINX
+XC3S500E-4FTG256C,AMD / Xilinx,"Scioteq Critical Part List",OBS,232,,,XILINX
+XCF04SVOG20C,Xilinx,"DE Customer Quotes - Euro; EMS Elektronik - ASELSAN SSt 24Y0098A60",OBS,180,,,XILINX
