@@ -1,0 +1,364 @@
+rfq_number,created_date,customer,rfq_type,resolution,line_count,vq_count,cq_count,rfq_description
+1130041,2026-02-17,Universal Avionics Systems Corp.,EOL/LTB,,2,0,0,2-767004-6 and 2-5767004-6   Qty 200 pcs.
+1129969,2026-02-13,RTX,EOL/LTB,,1,0,0,"MVME51105E-2263
+"
+1129965,2026-02-13,RTX,EOL/LTB,,4,0,0,"RFQ 6000918839
+-------------- NOTES PERTAINING TO THE ITEM ABOVE ---------------
+G3-6 , AG-14 , UK-12 , LY-3 , WE-9 , SA-3 , HU-12 , EZ-2 , GP"
+1129940,2026-02-12,Elbit Systems Ltd.,EOL/LTB,,1,3,1,"***APAC 2/12/2026***
+
+00094095N   XCR3256XL-10FT256I    Qty 45
+1,23,24,38,4"
+1129935,2026-02-12,RTX,EOL/LTB,,1,0,0,"***NB Crystal Oscillator 2/12/2026*** 
+RFQ 10216 - SR 158536
+567174-1   Qty 18"
+1129922,2026-02-12,RTX,EOL/LTB,,4,0,0,"RFQ JD-02112026-XXX-RDA bundle - NFD Broker Bundle (due 2/20/2026) [RTXSecure]
+
+qty 71	MC100ELT20DTG, MC100ELT20DTR2G	GP-13 SPIA1000-A EZ-2 MA-8 MR-4 WF-12 WE-9 UK-12 MV-4 G3-6 CC-9	3S19CH062-A001, 3S25CM001-A100, INTERNAL_PROJECT, N00024-20-C-5405
+qty 770	ISO7240ADWR	GP-13 P-1111A-15 G3-6 UK-11 AG-14 CC-9 MV-4 MR-4 SI-0	N00024-20-C-5405
+qty 1422	S29GL256P90FAIR10	GP-13 AG-14 G3-6 UK-11 MA-8 MV-4 MW-1	N00024-20-C-5405
+qty 1000	LM4040BIM3-3.0	GP-13 P-1111A-15 AN-10 B6-7 G3-6 HR-8 NJ-5 SA-3 UK-11 CC-9	N00024-20-C-5405
+
+"
+1129915,2026-02-12,Universal Avionics Systems Corp.,EOL/LTB,,1,0,0,PI7C8150BMAE   Qty 300   Rebuy
+1129910,2026-02-12,RTX,EOL/LTB,,8,1,0,2026.02 RFP Tomahawk Astute
+1129902,2026-02-12,BAE SYSTEMS,EOL/LTB,,1,0,0,SGA-2486Z  qty 300 (5 destruct included)
+1129881,2026-02-11,RTX,EOL/LTB,,8,0,0,Need a quick turn on current market availability only for the following.  No pricing or lead times needed at this time.  Looking at several production ramp up scenarios with MDA customer and this market information is helpful insight for production strategies.
+1129876,2026-02-11,RTX,EOL/LTB,,1,0,0,"RFQ 1-20260211-0001-ASTUTE - DUE 2/19/2026
+A1280A-PG176M-MAS-NFD   Qty 401   Actel"
+1129857,2026-02-11,BAE SYSTEMS,EOL/LTB,,1,0,0,634052-01 
+1129816,2026-02-10,Elbit Systems Ltd.,EOL/LTB,,1,1,4,"00044648N  LQP15MN5N6B02D  QTY 14
+***QUOTED 2/11/2026 2500GP Opp*** 
+Plenty of stock. 10K SPQ or 1K SPQ.
+***$2750 GP without electrical testing***
+$0.455 ea. / 10K MOQ.  Full reel/new & unused packaging."
+1129747,2026-02-09,RTX,EOL/LTB,,1,0,0,
+1129744,2026-02-09,RTX,EOL/LTB,,11,1,0,Checking availability
+1129599,2026-02-05,RTX,EOL/LTB,,1,0,0,***NSNB 2/5/2026***   H489318-10-NFD   QHDZ-2Z-5.5G  Qty 
+1129588,2026-02-05,RTX,EOL/LTB,,1,0,0,"***NS/NB 2/5/2026***
+CMM2306-AJ-0G0T                                                       1248
+CMM2306-AJ-000                                                          1248                                                     
+"
+1129532,2026-02-04,RTX,EOL/LTB,,1,2,1,"***QUOTED 2/6/2026*** 
+***2/4/2026 APAC***
+RFQ 18063426   R20005179-0001-MAS-NFD"
+1129529,2026-02-04,RTX,EOL/LTB,,1,0,1,"***QUOTED 2/6/2026***
+***2/4/2026 APAC***
+RFQ 18063420   R20003759-0001-MAS-NFD"
+1129526,2026-02-04,RTX,EOL/LTB,,1,0,0,"***2/4/2026 APAC***
+13779125-1   S29AL008J70BFN010"
+1129406,2026-02-02,RTX,EOL/LTB,,1,3,1,"QUOTED 2/3/2026 ***$2750 GP***
+***APAC 02/02/26***
+PEX8632-BB50RBC-G   Qty 30"
+1129398,2026-02-02,RTX,EOL/LTB,,1,0,1,"***QUOTED 02/04/2026 $38K GP Opp***
+***APAC 2/3/2026***
+Request for Quotation 6000916504.
+Enterprise Procurement Services RAY Collins#Largo FL.
+Quotation deadline: 02/09/2026.
+Delivery date 03/02/2026.
+PI3109-00-HVMZ/RAD-NFD   PI3109-00-HVMZ   Vicor Corporation  Quantity 62.
+-------------- NOTES PERTAINING TO THE ITEM ABOVE ---------------
+AG-14 , UK-12 , WE-9 , SA-3 , EZ-2"
+1129397,2026-02-02,RTX,EOL/LTB,,1,1,1,"***QUOTED 2/3/2026 $7950.97GP***
+***02/02/26 PUSHED TO AMER BUYER***   ***REBUY OT#1126409   SO505036/COV0019749***
+[RTXSecure] Request for Quotation 6000916519.
+Enterprise Procurement Services RAY Collins#Largo FL.
+Quotation deadline: 02/09/2026.
+Delivery date 03/31/2026.
+4093465-0701-NFD   AS186-302LF   Skyworks Solutions, Inc.   Quantity 626.
+-------------- NOTES PERTAINING TO THE ITEM ABOVE ---------------
+AG-14 , UK-12 , EZ-2 , BUYER PROVIDED DWG"
+1129394,2026-02-02,RTX,EOL/LTB,,1,1,1,"***QUOTED 2/3/2026 $2500 GP***
+***02/02/26 PUSHED TO AMER BUYER***
+[RTXSecure] Request for Quotation 6000916531.
+Enterprise Procurement Services RAY Collins#Largo FL.
+Quotation deadline: 02/09/2026.
+Delivery date 06/24/2026.
+4090661-0701-NFD   RF2484   RF Micro Devices, Inc.   Quantity 372.
+FA2330-24-F-B006   DOA7.
+-------------- NOTES PERTAINING TO THE ITEM ABOVE ---------------
+AG-14 , UK-12 , EZ-2 , BUYER PROVIDED DWG"
+1129335,2026-01-30,Teledyne Technologies International Corp.,EOL/LTB,,1,0,0,"***NS/NB 02/02/26***   6300-45SX/02   or   1618403-8   Qty 21   TE Conn.
+In support of Teledyne Advanced Electronic Solutions (TAES). "
+1129263,2026-01-29,RTX,EOL/LTB,,1,1,1,"***QUOTED 01/29/26 $2500K GP Opp***   In support of Collins Largo, FL.   PN 560-5302 Req 17959724."
+1129215,2026-01-28,BAE SYSTEMS,EOL/LTB,,1,1,0,"***NSNB 2/4/2026***
+***2/3/2026 AMER***
+***01/28/26 EMAE***
+In support of Hudson, NH.
+54+ pcs of PN M7793/1-008 ."
+1129035,2026-01-23,RTX,EOL/LTB,,1,0,0,"**01/23/26 Not enough info NS/NB***
+Astute RFQ 6000915112
+Quotation deadline: 02/04/2026
+Delivery date: 04/28/2026
+Prime Contract Number: W31P4Q-24-C-0024   DPAS: DOA2
+-------------- NOTES PERTAINING TO THE ITEM ABOVE ---------------
+SPIA1000_1 , UK-12 , G3-6 , AG-14 , B6-7 , MR-4
+
+Raytheon
+An RTX Business
+333 Harvey Road
+MANCHESTER NH 03103"
+1129030,2026-01-23,RTX,EOL/LTB,,1,0,0,"RFQ 18024091 Microcontroller due COB January 27,2026
+Proposal Effort Name: SM-3 BLK IIA FY23-25 Production
+Prime Solicitation/Contract Number(s): HQ0851-24-C-0001   DPAS RATING: DXA2   Prime Customer Type: USG.
+TN87C5224-MAS-NFD   TN87C5224   Qty 32   Intel
+Quality Notes: AG-14, G3-6, HU-12, UK-12, GP-13.
+Previously quoted 1126205."
+1129028,2026-01-23,RTX,EOL/LTB,,2,5,0,"***Buyers Queue 01/28/26***
+RFQ No. 6000915060
+Quotation deadline: 01/30/2026
+Delivery date: 03/02/2026
+
+R20005250-0003   MT40A512M16LY-062E AIT:E   Quantity 27,951
+
+-------------- NOTES PERTAINING TO THE ITEM ABOVE ---------------
+SPIA1000-A , AG-10 , G3-6 , UK-12 , GP-13
+
+R20006535-0001   MTFC64GAPALNA-AIT   Quantity   8,743
+
+-------------- NOTES PERTAINING TO THE ITEM ABOVE ---------------
+AG-14 , G3-6 , UK-12 , GP-13
+
+Missiles & Defense
+RMD-Andover MA
+350 LOWELL ST
+ANDOVER MA 01810"
+1128989,2026-01-22,RTX,EOL/LTB,,16,2,0,Stock inquiry for obsolete components
+1128979,2026-01-22,Universal Avionics Systems Corp.,EOL/LTB,,1,0,0,***APAC NO STOCK 01/23/25***   U101727-000   XCV100-4PQ240I   Qty 50
+1128965,2026-01-22,BAE SYSTEMS,EOL/LTB,,1,1,1,"***QUOTED 01/22/2026   $750 GP Opp***   In support of ES Endicott NY
+AT29C256-12JI   Microchip Technology / formerly Atmel   AT29C256-12JI   Qty 50pcs
+"
+1128910,2026-01-21,BAE SYSTEMS,EOL/LTB,,1,4,1,"***QUOTED 01/22/26 $25K GP Opp***   In support of ES Endicott, NY
+637669-52 , need ~30pcs but if we can find more let them know and he will present to the program.
+637669-52  CYPRESS SEMICONDUCTOR / INFINEON TECHNOLOGIES   CY37512P352-100BGI, CY37512P352-83BGI
+Qty 30pcs."
+1128906,2026-01-21,RTX,EOL/LTB,,1,0,0,"[RTXSECURE] Part 13779125-1.pdf
+
+Part # 13779125-1 , any material with an older date code than 2011 that has gold bond wires.  In 2011 is when the MFR started making this material with copper bond wires that Patriot cannot use.  Check in the market to see if we can allocate material with gold bond wires built before 2011.  Currently need 10K+"
+1128894,2026-01-21,RTX,EOL/LTB,,1,1,1,"***QUOTED 02/02/26  not 01/22/26 $2500 GP Opp***
+***01/21/26 AMER/APAC BUYER QUEUE***
+In support of Enterprise Procurement Services RAY Collins#Largo FL
+Request for Quotation 6000913929.
+Quotation deadline: 01/26/2026.
+Delivery Date: 02/03/2026.
+-------------- NOTES PERTAINING TO THE ITEM ABOVE ---------------
+AG-14 , EZ-2 , MA-8 , G3-6 , UK-12 , HU-12 , BUYER PROVIDED DWG
+H488864-5-LTB-NFD   EL7554IREZ   Renesas   Qty 33
+Also on the drawing H488864-2   EL7554IRE   Lead finish Tin-Lead (SnPb), obsolete.  Not called out in the RFQ."
+1128827,2026-01-20,RTX,EOL/LTB,,1,1,0,"***01/21/26 1 QUOTE/EDGAR TO UPDATE WITH LT***   ***NS APAC 01/21/26***   In support of Naval Power / Naval Airborne Systems / Advanced Sensor Programs Plano, TX.
+PN T982C2-F-SL-015   Eaton ~131 pcs."
+1128709,2026-01-16,RTX,EOL/LTB,,17,3,0,Astute Part Inventory Request
+1128708,2026-01-16,RTX,EOL/LTB,,0,0,0,"RFQ 18024091 Microcontroller due COB January 22,2026"
+1128707,2026-01-16,RTX,EOL/LTB,,1,50,0,"***APAC 01/16/26***
+RFQ 1-20260116-0001-ASTUTE - DUE 1/22/2026"
+1128702,2026-01-16,BAE SYSTEMS,EOL/LTB,,1,0,0,***AMER QUEUE 01/21/26***   449-S-H-FN-500A   E-T-A Engineering Technology   Qty 198
+1128617,2026-01-15,RTX,EOL/LTB,,1,5,1,"***QUOTED 01/15/2026 63pts ~$5K+ GP Opp***
+In support of Collins Aerospace Largo FL
+Request for Quotation 6000913401
+Quotation deadline: 01/22/2026
+Delivery date: 01/15/2027
+H489358-6-LTB-NFD   XCF32PVOG48C   Qty 61.
+RoHS Compliant.
+Per Xilinx PCN09030 (v1.1) dated December 28, 2009, part is being supplied as NiPdAu termination finish since Q3 of 2010.
+-------------- NOTES PERTAINING TO THE ITEM ABOVE ---------------
+MZ-8 , AN-10 , B6-7 , DC-2 , DX-25 , G3-6 , HR-8 , HU-12 , NJ-5, A-3 , UK-12 , EZ-2 , BUYER PROVIDED DWG"
+1128581,2026-01-14,RTX,EOL/LTB,,3,0,1,"Astute RFQ 6000914665
+
+Part #                             Qty
+
+R20004849-0001           160
+
+H423621-1-LTB               16   M1B-0618NEZ-1
+Not on the RFQ but a possible alternate H423621-2   M1B-0618NEZ-2.        
+MIXER STAGE, FREQUENCY - 
+RF MIXER, SURFACE MOUNT
+
+R10005520-0001              9
+
+DRAWING NO. H423621 and R10005520
+"
+1128441,2026-01-12,RTX,EOL/LTB,,1,4,0,"***NB Authorized can support***   In support of Tucson, AZ.  SI2337DS-T1-E3   Qty 7770   Vishay.
+The request was made on behalf of their suppliers who informed Raytheon that they could not locate these parts."
+1128440,2026-01-12,BAE SYSTEMS,EOL/LTB,,1,5,3,***QUOTED 01/14/25***   SKY12343-364LF   qty 1500
+1128429,2026-01-12,RTX,EOL/LTB,,1,4,1,"***QUOTED 01/16/2026***
+Request for Quotation 6000912640
+Enterprise Procurement Services RIS-SAS-El Segundo/EWGoleta CA
+Quotation deadline: 01/19/2026
+Delivery deadline: 04/03/2026  SANTA FE SPRINGS CA 90670
+-------------- NOTES PERTAINING TO THE ITEM ABOVE ---------------
+AG-14 , G3-6 , HU-12 , UK-12 , EZ-2"
+1128366,2026-01-09,RTX,EOL/LTB,,1,0,0,"NS/NB 01/09/2026***   In support of Enterprise Procurement Services RIS-SAS-El Segundo/EWGoleta CA
+RFQ No. 6000912577
+Quotation deadline: 01/16/2026
+Delivery Date: 03/24/2026
+ACF451832-222-TD01-NFD   ACF451832-222-TD01   Qty 1822
+-------------- NOTES PERTAINING TO THE ITEM ABOVE ---------------
+AG-14 , G3-6 , UK-12"
+1128343,2026-01-09,RTX,EOL/LTB,,6,0,11,"***QUOTED 01/16/2026***
+In support of SM-3 Tucson, AZ.  RFQ 1-20260108-0001-ASTUTE - DUE 1/16/2026.
+GP required."
+1128338,2026-01-09,RTX,EOL/LTB,,1,3,2,"***CUSTOMER PO NO 4203242267***
+***2/4/2026 AMER***
+QUOTED 01/09/2026 - In support of Naval Power SBU Shipboard Missiles – SM-3 & Ultra Programs.  SM-3 BLK IIA FY23-25 Production.
+RFQ 18034245 Transistors due COB January 13, 2026.
+Delivery Date: ASAP.
+R20005503-001-MAS-NFD   IRFE130   Qty 36"
+1128337,2026-01-09,RTX,EOL/LTB,,1,1,0,"NB PARTS AVAILABLE THROUGH AUTHORIZED 01/09/26 - In support of Naval Power SBU Shipboard Missiles – SM-3 & Ultra Programs.  SM-3 BLK IIA FY23-25 Production.
+RFQ 18034246 Transistors due COB January 13, 2026.
+R20005504-001-MAS-NFD   IRFE9130   Qty 14"
+1128288,2026-01-08,RTX,EOL/LTB,,1,0,0,"In support of El Segundo CA   Part Number: NX-i385  Qty: 1
+"
+1128281,2026-01-08,RTX,EOL/LTB,,1,0,1,"QUOTED 01/08/26 - In support of Largo FL [RTXSecure] Request for Quotation 6000912221.
+Quotation deadline: 01/15/2026.
+Delivery Date: 02/14/2026.
+***Quoted 01/08/2026 $1250 GP Opp*** 
+CPC: H327928-1-NFD  MPN: XC95144XL-7TQ144I  MFR: Xilinx Inc  Quantity: 13."
+1128243,2026-01-07,RTX,EOL/LTB,,1,2,3,"***CUSTOMER PO NO 4203242265***
+QUOTED 01/08/26 - In support of Naval Power SBU Shipboard Missiles – SM-3 & Ultra Programs. SM-3 BLK IIA FY23-25 Production.
+RFQ 18036193 Microcircuit due COB January 12, 2026.
+***QUOTED 01/08/2026 $750 - 1500 GP Opp***"
+1128241,2026-01-07,RTX,EOL/LTB,,1,0,2,"***AMER and Micross 02/02/26***
+
+NS/NB 01/07/2026 - In support of Naval Power SBU Shipboard Missiles – SM-3 & Ultra Programs. SM-3 BLK IIA FY23-25 Production.
+Previous RFQ 1126468."
+1128217,2026-01-07,RTX,EOL/LTB,,9,15,9,***QUOTED 01/09/2026***   [RTXSecure] NFD PN's availability   In support of Collins Aerospace Largo FL.   
+1128120,2026-01-05,RTX,EOL/LTB,,1,0,1,"QUOTED 01/05/26 - In support of RTX Collins Largo FL   MVI56DFCM   Qty 4  Pro soft.
+***QUOTED 01/05/2025 $8K GP Opp***
+
+"
+1128107,2026-01-05,BAE SYSTEMS,EOL/LTB,,1,1,1,"QUOTED 01/05/26 - In support of Endicott NY   XC95144XL-10TQ100I   Qty 620
+***QUOTED 01/05/2025 $12,500K GP , 27Pts Opp***
+RTX Collins in Largo uses this part."
+1128092,2026-01-05,RTX,EOL/LTB,,1,1,1,"QUOTED 01/05/26 - In support of Enterprise Procurement Services RAY Collins#Largo FL.
+RFQ No. 6000911457.
+***QUOTED 01/05/2026 $2250 GP Opp***
+Quotation deadline: 01/12/2026.
+Delivery Date:  06/23/2026.
+H489331-2-LTB-NFD   DS26LV32ATMX/NOPB   Qty 33   Matte Sn
+Prime Contract Number: SUPPRESSED.
+
+-------------- NOTES PERTAINING TO THE ITEM ABOVE ---------------
+AG-14 , G3-6 , HU-12 , UK-12 , BUYER PROVIDED DWG"
+1127865,2025-12-22,BAE SYSTEMS,EOL/LTB,,4,0,0,In support of Endicott NY
+1127844,2025-12-22,BAE SYSTEMS,EOL/LTB,,1,1,1,"In support of Endicott NY ***Customer PO No. PO#: 534399 PO Date***
+***QUOTED 12/22/25 $11K GP Opp***"
+1127738,2025-12-18,RTX,EOL/LTB,,1,0,0,"In support of Largo FL [RTXSecure] Request for Quotation 6000910858.
+***12/18/25 NS/NB***
+"
+1127734,2025-12-18,RTX,EOL/LTB,,1,0,1,"I support of Largo FL [RTXSecure] Request for Quotation 6000910862.
+***Quoted 12/18/25 $3K GP Potential***
+"
+1127731,2025-12-18,RTX,EOL/LTB,,2,0,2,"QUOTED - In support of Fullerton, CA Connected Aviation Solutions (CAS).   RFI # 18007900.
+***QUOTED $5K GP Potential***
+5R6CX – Qty. 20 – Condition: New (Preferred) or Refurbished.
+CPC7G – Qty. 8 – Condition: New (Preferred) or Refurbished.
+"
+1127646,2025-12-16,RTX,Shortage,,1,0,0,In support of Indianapolis IN LADS   RFQ 18023699 DUE 12/16/202.   ***NS/NB 12/16/25***
+1127564,2025-12-15,RTX,EOL/LTB,,1,0,0,"In support of Largo FL   H488880-4-NFD   SC-A144B-100.000MHz   SC-A1449-100.000MHZ.
+***NS/NB 12/15/25***"
+1127466,2025-12-11,RTX,EOL/LTB,,1,4,1,"In support of Largo FL
+***Quoted 12/12/25 22Pts $1K GP***
+RTX PN H490199-2
+OEM MTFC8GLDEA-4M IT
+Qty 10
+"
+1127460,2025-12-11,BAE SYSTEMS,Astute Franchised,,1,1,1,"***Customer PO No PO 535378***
+In support of Endicott NY   RFQ#: 154507
+***QUOTED 12/23/25 $2K GP Opp 27Pts*** 
+***UK Representative 12/11/25***"
+1127455,2025-12-11,BAE SYSTEMS,Hot Parts,,1,3,0,"In support of Fort Wayne Controls & Avionics Solutions.
+***NB Rochester (authorized) with 652 pcs and ~100 pcs in the Mkt. They need the 4K to move the needle*** 
+***APAC 12/11/25***
+RFQ 356A1100P59   MC68040FE33A   Qty 4000."
+1127454,2025-12-11,RTX,EOL/LTB,,7,5,0,"In support of Space System Operations Tucson AZ.
+***APAC 12/11/25***
+P/N	                                Part Description	                                        QTY Needed
+XC4VLX25-11FF668I	MICROCIRCUIT, GATE ARRAY	                        820
+R20005523-0001	        MICROCIRCUIT, TRANSISTOR ARRAY, PIND	  20
+R20005270-0001	        MICROCIRCUIT, DC-DC CONVERTER, PIND	  20
+106812258	                Connector, MILST	                                        100
+RT2000PT-155STL	        Receiver, Lightwave	                                        100
+MWDM131500RAY02	MWDM, Fiber Optic	                                100
+107259673		                                                                                100"
+1127399,2025-12-10,RTX,EOL/LTB,,1,1,1,"RTX PN H488864-5-LTB-NFD   MPN EL7554IREZ   Qty 33.
+***QUOTED 12/12/25 94 Pts $1K GP*** 
+***APAC 12/11/25***"
+1127397,2025-12-10,BAE SYSTEMS,EOL/LTB,,1,6,1,"EPM7128AETC100-7N.   Qty 150 ***QUOTED 12/12/25 $9K GP Opp***
+***12/10/25 APAC***"
+1127395,2025-12-10,RTX,EOL/LTB,,4,18,4,"***APAC 12/11/25***
+
+R20002371-0001	HMC716LP3 / HMC716LP3TR / HMC716LP3ETR-COR	AMPLIFIER, RF/MICROWAVE NARROW BAND LOW POWER AMPLIFIER	400	Solder dip leads needed
+
+R20003766-0001	SGC2463Z / SGC2463ZSR	RF Wide Band Low Power Amplifier  50 MHz - 4000 MHz RF/MICROWAVE 	400
+	 
+R20003970-0001	SIR838DP-T1-GE3-COR	TRANSISTOR, MOSFET, N-CHANNEL	2310	Solder dip leads needed
+
+R10002119-0002	HSMS-2822-TR1G	DIODE, SCHOTTKY BARRIER, RF	8100	 
+"
+1127390,2025-12-10,RTX,EOL/LTB,,1,0,0,"uOLED-160-G2   4D Systems
+***NS/NB 12/12/25***
+***APAC 12/11/25***"
+1127389,2025-12-10,RTX,EOL/LTB,,2,2,1,"QUOTED 12/12/25 Line 2 only $7K GP 33Pts***
+
+***APAC 12/11/25***
+ACF451832-222-TD01-NFD   Qty 1819   03/24/2026.
+49FCT3805SOGI-NFD   Qty 368   04/03/2026."
+1127376,2025-12-10,RTX,EOL/LTB,,2,6,2,RFQ PR 17615961 RFQ   ***APAC 12/11/25***
+1127291,2025-12-08,RTX,EOL/LTB,,13,9,0,***QUOTED 3 lines 01/09/26***   List of parts needs a quote ASAP.  ***NS/NB 12/10/25***
+1127170,2025-12-04,BAE SYSTEMS,EOL/LTB,Bid/market check only,3,4,2,In support of Endicott NY ***$88K GP Potential***
+1127108,2025-12-03,BAE SYSTEMS,Hot Parts,,1,0,0,"In support of Greenlawn, NY   Microsemi   8481103-1   P/N 61138H   NSN: 5961016273615"
+1127052,2025-12-02,RTX,EOL/LTB,,1,0,0,"In support of Raytheon's DLA Spares Program MJC RFQ 10135 SR-188622 IDIQ 12/1/25.
+***NS/NB 12/02/25***
+A competitive RFQ for Raytheon part: 952519-1 Quantity 4 and quote by 12/15/25. 5962-01-151-4335.
+Please provide range pricing for quantity range, 1-5, 6-10, 11-15, 16-20, 21-25."
+1126987,2025-12-01,RTX,EOL/LTB,,1,0,1,"SUPPORT COLLINS LARGO FL   RFQ 6000908181.
+***QUOTED 12/01/2025 Est $9K GP***
+***Previous RFQ 1115215 from June was AWARDED to ANOTHER BROKER 07/07/25***|
+Same suppliers showing stock. 4 lots , parts will require a blank check.
+XC18V512SO20C-NFD  XC18V512SO20C   Qty 202.
+AG-14 , G3-6 , HU-12 , UK-12 , EZ-2.
+Quotation deadline: 12/08/2025.
+Delivery date: 04/02/2026."
+1126737,2025-11-24,BAE SYSTEMS,EOL/LTB,,5,0,0,"In support of Endicott NY.   End Customer: Boeing.
+***NS/NB 11/25/25***"
+1126682,2025-11-23,RTX,EOL/LTB,,1,0,0,"PN 2699429-1001
+***NS/NB 11/24/25***
+Qty: 1pc, 5-10pcs, 20pcs
+Gavin working to confirm the MFG PN if nothing pops up for the PN above.
+P/N: 5962-88615013X and 5962-88615013A."
+1126681,2025-11-23,RTX,EOL/LTB,,1,3,2,"RFQ 6000905957
+***Quoted 11/25/25 slim chance the part are good***
+***APAC 11/25/25***
+XC9572-15PCG44I-LTB-NFD   XC9572-15PCG44I   Qty 223pcs.
+ 
+Qty 223pcs
+
+"
+1126680,2025-11-23,RTX,EOL/LTB,,1,9,2,"***RFQ - 1-20251111-0003-ASTUTE   ***QUOTED 11/25/25 $8K GP Opp***   XC2S200-5FG456I-MAS-NFD   XC2S200-5FG456I   Qty 160.
+***APAC 11/23/25 quote low pts and $2250 for GP*** "
+1126669,2025-11-21,BAE SYSTEMS,EOL/LTB,,26,31,0,"***In support of Endicott NY for Paladin program.
+***Sent over to APAC 12/01/2025 , not much to be supported.  Some hard to finds , a good majority at authorized***"
+1126643,2025-11-20,Elbit Systems Ltd.,EOL/LTB,,6,0,0,"RFQ E-25-02986 ASTUTE for Material Analyst.  Low priority. Do not ever see orders from these requests.
+SI7540DP-T1-GE3 
+574MILFT
+EPCS64SI16N
+MAX6033AAUT30#G16
+HOCTAX3811NSJ-02SW-PCB-1
+WSC0001-6R040FTA (LEADED)
+"
+1126641,2025-11-20,BAE SYSTEMS,EOL/LTB,,1,1,1,"In support of Endicott NY 7025S35FB   IDT7025S35FB   Qty 100
+***NB 12/01/25 green test dots on the parts***"
+1126638,2025-11-20,RTX,EOL/LTB,,1,3,2,"RFQ for 17920132 Microcircuit due COB November 21, 2025
+***QUOTED 11/24/25 $198K GP Opp availability for parts is not great *** 
+***APAC 11/20/25***"
+1126637,2025-11-20,RTX,EOL/LTB,,1,0,0,"RFQ 18008764 Transistor due COB November 24, 2025
+***NB 11/24/25 no source/parts available.***
+Make from NPTB00004DR or NPTB00004DRT and alter  NPTB00004DR-COR or NPTB00004DRT-COR.
+All bids must include the following information:
+ 
+1. Testing plan and a line item for testing costs
+2. Can you please confirm the date code of material quotes? If not available before purchase please state this in your email.
+3. Confirm the Country of Origin (COO), Country items are being shipped from, and a line item for any potential tariffs.
+4. Confirm if the quoted material is new, used, or refurbished?
+5. Confirmation of if the material is in its original packaging or if it has been repackaged?
+"
