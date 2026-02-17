@@ -4,9 +4,10 @@
 Match new RFQs against Customer Excess inventory to identify fulfillment opportunities. Output is a tiered CSV with estimated values and validation flags.
 
 ## Tracking
-- **Last RFQ processed:** 1130062
-- **Next run starts from:** 1130063
 - **File naming:** `Excess_Match_MM-DD_RFQ_[start]-[end].csv`
+- **Determine starting RFQ:** Parse the **filename** (not contents) of the most recent output file to get the end RFQ, then start from +1
+
+Example: Latest file is `Excess_Match_02-17_RFQ_1129934-1130062.csv` → next run starts from **1130063**
 
 ## Criteria
 
@@ -68,10 +69,10 @@ flag_datecode_risk, flag_no_pricing, flag_self_match
 
 ## Running the Workflow
 1. User selects "Market Offer Analysis" (option 2)
-2. Query starts from last RFQ processed + 1
-3. Match against 90-day Customer Excess
-4. Apply deduplication and exclusions
-5. Calculate values and assign tiers
-6. Export to CSV in this folder
-7. Commit and push to git
-8. Update "Last RFQ processed" above
+2. Parse latest filename to get last end RFQ, start from +1
+3. Query max RFQ from database to get end of range
+4. Match against 90-day Customer Excess
+5. Apply deduplication and exclusions
+6. Calculate values and assign tiers
+7. Export to CSV with filename `Excess_Match_MM-DD_RFQ_[start]-[end].csv`
+8. Commit and push to git
