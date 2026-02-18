@@ -1,0 +1,679 @@
+customer_code,customer_name,city,address1,postal,category,bp_salesperson
+1007317,A and M Electronics,Valencia,25018 Ave Kearny,91355,Has BP rep but no location rep,William Robinson
+1005092,ABX Engineering,Burlingame,875 Stanton Road,94010,Has BP rep but no location rep,Matt Tanner
+1002888,ABX Engineering,,570 Haverty Ct,,Has BP rep but no location rep,Chad Swygert
+1003327,AED Inc.,Rancho Santa Margarita,"Alliance Electronics Distributor, Inc.", 92688,Has BP rep but no location rep,Thomas Haynes
+1011096,AEVEX Aerospace,,"440 Stevens Ave # 150, Solana Beach, CA 92075, Estados Unido",,Has BP rep but no location rep,Jessica Garcia
+1008945,AJA VIDEO SYSTEMS INC,Grass Valley,180 Litton Drive,95945 ,Has BP rep but no location rep,Alison Williams
+1007944,ALPS ALPINE,Santa Clara,3151 Jay Street  Suite 101,95054,Has BP rep but no location rep,Gabriel Cisneros
+1007640,ANRITSU,Morgan Hill,490 Jarvis Drive,95037-2809,Has BP rep but no location rep,Romey Kelso
+1008168,AQS,Fremont,47817 Fremont Blvd.,94538,Has BP rep but no location rep,Thomas Haynes
+1002929,ASAP Semiconductor,Irvine,"Peters Canyon, Building 100",92606,Has BP rep but no location rep,Steven Elam
+1007266,ASML,san diego, 17082 Thornmint Ct,92127,Has BP rep but no location rep,Mahmoud Fakhran
+1008546,ASRock,Chino,13848 Magnolia Ave,91710,Has BP rep but no location rep,Nicholas Tyler
+1009486,ATX Networks,Carlsbad,2800 Whiptail Loop,92010,Has BP rep but no location rep,Will Hawk
+1001063,Abaco Systems,Goleta,"26 Castilian Drive, Suite B",93117,Has BP rep but no location rep,Jake Mcaloose
+1003568,Absolute EMS,Santa Clara,55 Aldo Avenue,95054,Has BP rep but no location rep,Danielle Slaughter
+1007974,Accele Electronics Inc,Sante Fe Springs,9130 Norwalk Blvd,90670,Has BP rep but no location rep,William Robinson
+1011103,Accu-sembly Inc.,Duarte,1835 Huntington Drive,91010,Has BP rep but no location rep,Paul Maxwell
+1004404,Accurate Electronics,Chatsworth,20700 Lassen St. ,91311,Has BP rep but no location rep,Will Hawk
+1002370,Acuity Brands,Sacramento,6201 27th St # C,95822,Has BP rep but no location rep,Omar Zamora
+1010489,Adams Rite Aerospace Inc.,Fullerton,4141 North Palm Street,92835,Has BP rep but no location rep,Sara Shelby
+1001237,Advanced MP Technology Inc,San Clemente,1010 Calle Sombra,92673,Has BP rep but no location rep,Tim Premo
+1004663,Advanced Technology Co.,Pasadena,2858 East Walnut Street ,91107,Has BP rep but no location rep,Will Hawk
+1005916,"Advantech Co., LTD",Irvine,Silicon Valley/Pac NW 13 Whatney,92618,Has BP rep but no location rep,Joel Flores
+1010400,AeroVironment ,Simi Valley ,900 Innovators Way ,93065,Has BP rep but no location rep,Elena Wilfong
+1006187,Aethercomm,Carlsbad,3205 Lionshead Ave,92010,Has BP rep but no location rep,Colton Hammond
+1003458,"Agilent Technologies, Inc.",Santa Clara,5301 Stevens Creek Blvd.,95051,Has BP rep but no location rep,Justin Oberhofer
+1004653,Aitech,Chatsworth,19756 Prairie Street,91311,Has BP rep but no location rep,Leah Griffin
+1008261,Aixtron,Santa Clara,1700 Wyatt Dr #15,95054,Has BP rep but no location rep,William Robinson
+1007632,Alcon,Irvine,15800 Alton Pkwy,92618,Has BP rep but no location rep,William Robinson
+1009667,Alkira Inc,San Jose,2001 Gateway Pl #610W,95110,Has BP rep but no location rep,Anthoney Bramante
+1006156,Allegion,Chino,14575 - 14585 Yorba Avenue,91710,Has BP rep but no location rep,Pablo Hernandez
+1003271,"Alliance Electronics Distributor, Inc.",Rancho Santa Margarita,22412 Gilberto,92688,Has BP rep but no location rep,Steven Elam
+1012067,Alta Manufacturing ,Fremont,47650 Westinghouse Drive,94539,Has BP rep but no location rep,JeanPaul Chevrier
+1004988,Altest Corporation,San Jose,898 Faulstich Court,95112,Has BP rep but no location rep,Leah Griffin
+1009874,Ambarella Inc.,Santa Clara,3101 Jay Street,95054,Has BP rep but no location rep,William Robinson
+1012935,"American Honda Motor Company, Inc.",Torrance,700 Van Ness Ave. ,90501,Has BP rep but no location rep,Michael Stifter
+1012159,American Reliance,Pasedena,789 N Fair Oaks Ave,91103,Has BP rep but no location rep,James Diaz
+1008846,Americhip,Los Angelos ,19032 S Vermont Ave,90248,Has BP rep but no location rep,Alison Williams
+1001142,Ametek Inc, San Diego,9250 Brown Deer Road,92121-226,Has BP rep but no location rep,Steven Elam
+1001142,Ametek Inc,Baldwin Park,4750 Littlejohn Street,91706,Has BP rep but no location rep,Steven Elam
+1001142,Ametek Inc,Goleta,59 South La Patera Ln.,93117,Has BP rep but no location rep,Steven Elam
+1001142,Ametek Inc,Irivne,2031 Main St.,92614,Has BP rep but no location rep,Steven Elam
+1001142,Ametek Inc,Pleasanton,5794 W. Las Positas Blvd.,94588,Has BP rep but no location rep,Steven Elam
+1007713,Amigo Tecnologia,San Diego,9476 CUSTOMHOUSE PLAZA,92154,Has BP rep but no location rep,Colton Hammond
+1004022,"Ampro ADLINK Technology, Inc.",San Jose,6450 via Del Oro,95119,Has BP rep but no location rep,Carolin Zeller
+1004022,"Ampro ADLINK Technology, Inc.",San Jose,"5215 Hellyer Avenue, #110,",95138,Has BP rep but no location rep,Carolin Zeller
+1008855,Anduril Industries,Costa Mesa,1375 Sunflower Ave.,92626,Has BP rep but no location rep,William Robinson
+1008855,Anduril Industries,Irvine,2722 Michelson Drive,92612,Has BP rep but no location rep,William Robinson
+1008372,Apollo Manufacturing,San Diego,10360 Sorrento Valley Rd,92121,Has BP rep but no location rep,Oscar Medina
+1007441,Apple,Cupertino,One Apple Park Way,95014,Has BP rep but no location rep,William Robinson
+1002728,Applied Materials,Fremont,940 Auburn Court,94538,Has BP rep but no location rep,Bac Nguyen
+1002728,Applied Materials,San Jose,2243 Lundy Ave,95131,Has BP rep but no location rep,Bac Nguyen
+1002728,Applied Materials,San Jose,6190 San Ignacio Avenue,95119,Has BP rep but no location rep,Bac Nguyen
+1002728,Applied Materials,San Jose,2120 Bering Dr,95131-2013,Has BP rep but no location rep,Bac Nguyen
+1002728,Applied Materials,Santa Clara,3050 Bowers Avenue,95054,Has BP rep but no location rep,Bac Nguyen
+1002728,Applied Materials,Santa Clara,ATTN: Henry Barandica,95050,Has BP rep but no location rep,Bac Nguyen
+1002728,Applied Materials,Santa Clara,"Building 21, 1285 Walsh Ave",95050,Has BP rep but no location rep,Bac Nguyen
+1002728,Applied Materials,Santa Clara,3101 Scott Blvd,95054-3318,Has BP rep but no location rep,Bac Nguyen
+1002728,Applied Materials,Sunnyvale,990 Benecia Ave.,94085,Has BP rep but no location rep,Bac Nguyen
+1002728,Applied Materials,Tracy,Applied Material Inc P5252,95304,Has BP rep but no location rep,Bac Nguyen
+1002728,Applied Materials,Tracy,Applied Material Inc. NACDC P5250,95304,Has BP rep but no location rep,Bac Nguyen
+1010642,Aqua Marine,Newport Beach,28 Tide Watch,92657,Has BP rep but no location rep,Justin Goodwin
+1009065,Archer Aviation,San Jose,190 W Tasman Dr,,Has BP rep but no location rep,Colton Hammond
+1002404,Arista,San Francisco,1390 Market St. #800,94102,Has BP rep but no location rep,Bac Nguyen
+1002404,Arista,Santa Clara,5453 Great America Parkway,95054,Has BP rep but no location rep,Bac Nguyen
+1012829,Arista Corporation,Fremont,48460 Lakeview Blvd,94538,Has BP rep but no location rep,Josh Syre
+1006573,Ark Electronics,Irvine,400 Spectrum Center Drive,92618,Has BP rep but no location rep,Juan Santana
+1009872,"Armacorp, Inc.",Anaheim,1191 N. Patt St.,92801,Has BP rep but no location rep,Nicholas Tyler
+1004008,Asteelflash,Fremont,Asteelflash USA Corp,94538,Has BP rep but no location rep,Hugo Ogalde
+1004008,Asteelflash,Milpitas,1940 Milmont Drive,95035,Has BP rep but no location rep,Hugo Ogalde
+1008626,Astranis Space Technologies,San Francisco,575 20th St,94107,Has BP rep but no location rep,William Robinson
+1010732,"Astro Geo Marine, Inc.",Ventura,"2186 Knoll Drive, Unit B",93003,Has BP rep but no location rep,Michael Lopez
+1004442,AstroGeo Marine,ventura,2186 Knoll Dr ,93003,Has BP rep but no location rep,Will Hawk
+1008477,Astrodyne TDI,Santa Clara,3508 Bassett St.,95054,Has BP rep but no location rep,Josh Syre
+1009018,Aurora Innovation Inc.,Mountain View,280 N Bernardo Ave,94043,Has BP rep but no location rep,William Robinson
+1009670,Aviatrix,Santa Clara,2901 Tasman Dr #109,95054,Has BP rep but no location rep,Anthoney Bramante
+1005116,Axxcss Wireless Solutions,Santa Barbara,82 Coromar Dr,93117,Has BP rep but no location rep,Colton Hammond
+1012355,Azbil Corporation,Redding,2032 Waldon Street,96001,Has BP rep but no location rep,Josh Syre
+1012355,Azbil Corporation,Santa Clara,2334 Walsh Ave.,95051,Has BP rep but no location rep,Josh Syre
+1011437,B & B ELECTRONIC DISTRIBUTORS,BUENA PARK,B & B ELECTRONIC DISTRIBUTORS,90620,Has BP rep but no location rep,Edgar Santana
+1011437,B & B ELECTRONIC DISTRIBUTORS,Long Beach,6635 Minnesota Ave,90805,Has BP rep but no location rep,Edgar Santana
+1001074,BAE SYSTEMS,Chula Vista,1650 Industrial Blvd,91911,Has BP rep but no location rep,Garrett Smith
+1001074,BAE SYSTEMS,Los Angeles,"5140 W. Goldleaf Circle, Suite G-100",90056,Has BP rep but no location rep,Garrett Smith
+1001074,BAE SYSTEMS,Los Angeles,"5140 W. Goldleaf Circle, Suite G-100",90056,Has BP rep but no location rep,Garrett Smith
+1001074,BAE SYSTEMS,MD,122810 Notch Road,20619,Has BP rep but no location rep,Garrett Smith
+1001074,BAE SYSTEMS,San Diego,2205 Belt St,92113,Has BP rep but no location rep,Garrett Smith
+1001074,BAE SYSTEMS,San Diego,10920 Technology Pl,92127,Has BP rep but no location rep,Garrett Smith
+1001074,BAE SYSTEMS,San Diego,10920 Technology Place,92127,Has BP rep but no location rep,Garrett Smith
+1001074,BAE SYSTEMS,San Diego,3990 Old Town Ave.,92110,Has BP rep but no location rep,Garrett Smith
+1001074,BAE SYSTEMS,San Jose,"1841 Zanker Rd., Ste. 50",95112,Has BP rep but no location rep,Garrett Smith
+1001074,BAE SYSTEMS,San Jose,6331 San Ignacio Ave.,95119,Has BP rep but no location rep,Garrett Smith
+1002705,BCP SYSTEMS,Anaheim,1560 S. Sinclair St.,92806,Has BP rep but no location rep,Kellen Ford
+1001020,BENCHMARK ELECTRONICS,Santa Ana,1740 E Willshire Ave,92705,Has BP rep but no location rep,Chad Swygert
+1007115,BTC Power (Broadband),Santa Ana,1719 South Grand Avenue,92705,Has BP rep but no location rep,Silvia Munoz
+1007775,Balboa Water Group,Costa Mesa,3030 Airway Avenue ,92626,Has BP rep but no location rep,William Robinson
+1009265,Becton Dickinson (BD),San Diego,3750 Torrey View Ct,92130,Has BP rep but no location rep,Justin Goodwin
+1007593,"Bema Electronics, Inc",Fremont,4545 Cushing Parkway,94538,Has BP rep but no location rep,William Robinson
+1008981,Bendix Commercial Vehicle,Irvine,18022 Cowan,92614,Has BP rep but no location rep,William Robinson
+1007688,Benley Electronics,,"1421 N. Wanda Rd Bldg 120K Orange,",,Has BP rep but no location rep,Vicky Ma
+1001197,Bestronics,san jose,2090 Fortune Drive,95131,Has BP rep but no location rep,Garrett Smith
+1008801,Bio-Techne,Newark,7707 Gateway Blvd,94560,Has BP rep but no location rep,William Robinson
+1008801,Bio-Techne,San Jose,3001 Orchard Parkway,95134,Has BP rep but no location rep,William Robinson
+1007592,Biosense Webster,Irvine,31 Technology Dr,92618,Has BP rep but no location rep,William Robinson
+1009163,Boingo Wireless,Los Angeles,10960 Wilshire Blvd,90024,Has BP rep but no location rep,William Robinson
+1007218,Boyd Corporation,Chatsworth ,9959 Canoga Avenue ,91311,Has BP rep but no location rep,Josh Syre
+1007218,Boyd Corporation,Pleasanton,5960 Inglewood Dr.,94588,Has BP rep but no location rep,Josh Syre
+1003739,"Braemac Pty., Ltd",Fremont,43134 Osgood Road,94539,Has BP rep but no location rep,Josh Syre
+1012076,Broadata Communications Inc (BCI),Torrance ,"21061 S Western Ave, Suite 110 and 350",,Has BP rep but no location rep,JeanPaul Chevrier
+1012076,Broadata Communications Inc (BCI),"Torrance, ",1827 W 208th St,,Has BP rep but no location rep,JeanPaul Chevrier
+1002405,"Brooks Automation, Inc.",Fremont,46702 Bayside Parkway,94538,Has BP rep but no location rep,Thomas Haynes
+1002405,"Brooks Automation, Inc.",Livermore,201 Lindbergh Avenue,94551,Has BP rep but no location rep,Thomas Haynes
+1007248,"Buchanan Automation, Inc.",Fremont,940 Auburn Court,94538,Has BP rep but no location rep,Josh Syre
+1003280,Burrana,Calexico,1778 Zinetta Rd,92231,Has BP rep but no location rep,Edith Arizmendi
+1006389,CALEX Mfg. Co. Inc. ,Concord,2401 Stanwell Drive,94520,Has BP rep but no location rep,Juan Santana
+1007631,CARRIERCOMM,,82 Coromar Dr,93117,Has BP rep but no location rep,Romey Kelso
+1008501,"CCM Assembly & Manufacturing, Inc",San Diego,"2275 Michael Faraday, Dr. Suite 6",92154,Has BP rep but no location rep,Oscar Medina
+1007855,CHARGEPOINT ,Campbell,240 E Hacienda Ave,95008,Has BP rep but no location rep,Ricardo Morales
+1012082,CMRSummit Technologies,Santa Clara,473 Sapena Ct Suite 11,95054,Has BP rep but no location rep,JeanPaul Chevrier
+1006761,COMET Group,San Jose,541 E. Trimble Road,95131,Has BP rep but no location rep,Clement Liao
+1005914,CPI,San Jose ,2205 Fortune Drive,95131,Has BP rep but no location rep,Joel Flores
+1001028,CTDI,Fontana,14597 Baseline Ave,92336,Has BP rep but no location rep,Thomas Haynes
+1001028,CTDI,Lincoln,1401 Aviation Blvd.,95648,Has BP rep but no location rep,Thomas Haynes
+1001028,CTDI,Livermore,7150 Patterson Pass Road,94550,Has BP rep but no location rep,Thomas Haynes
+1001028,CTDI,Rialto,1543 N. Alder Ave,92376,Has BP rep but no location rep,Thomas Haynes
+1001028,CTDI,Tracy,25201 South Schulte Road,95377,Has BP rep but no location rep,Thomas Haynes
+1001028,CTDI,,"1552 N. Alder Ave Rialto,",92377 ,Has BP rep but no location rep,Thomas Haynes
+1008655,CUBIC,San Diego,9233 Balboa Avenue,92123,Has BP rep but no location rep,Gabriel Cisneros
+1005254,CableConn,San Diego,7198 Convoy Court,92111,Has BP rep but no location rep,Matt Tanner
+1009441,Cadence Design Systems,San Jose,2655 Seely Avenue,95134,Has BP rep but no location rep,William Robinson
+1005224,Cal-Comp USA,Carlsbad,1940 Camino Vida Roble,92008,Has BP rep but no location rep,Colton Hammond
+1007626,Cal/Amp,Irvine,"15635 Alton Parkway, Suite 250",92618,Has BP rep but no location rep,Nicholas Tyler
+1010648,CalAmp,Carlsbad ,2200 Faraday Ave ,92008,Has BP rep but no location rep,Thomas Nelson
+1012078,California Integration Coordinators,Diamond Springs,6048 Enterprise Dr,95619,Has BP rep but no location rep,JeanPaul Chevrier
+1009167,Calix,Petaluma,1435 N. McDowell Blvd.,94954,Has BP rep but no location rep,Justin Goodwin
+1009167,Calix,San Jose,2777 Orchard Parkway,95134,Has BP rep but no location rep,Justin Goodwin
+1007373,Calnetix Technologies,Cerritos,16323 Shoemaker Ave,90703,Has BP rep but no location rep,Jake Mcaloose
+1008677,Canoo,Torrance, 19951 Mariner Ave,,Has BP rep but no location rep,Israel Barba
+1010021,Carl Zeiss AG,Dublin,5300 Central Parkway,94568,Has BP rep but no location rep,Kevin Wrobel
+1001118,Celestica,Fremont,49235 Milmont Drive,94538,Has BP rep but no location rep,Hugo Ogalde
+1007449,"Celestron, LLC.",Torrance,2835 Columbia St #3877,90503,Has BP rep but no location rep,Romey Kelso
+1012083,Centon Electronics ,Aliso Viejo,27 Journey Ste. 100,92656,Has BP rep but no location rep,JeanPaul Chevrier
+1006175,Charge Point,Campbell,240 East Hacienda Avenue ,95008,Has BP rep but no location rep,Pablo Hernandez
+1007824,Christie Digital,Cypress,10550 Camden Drive,90630,Has BP rep but no location rep,Josh Syre
+1007105,"Circomp Electronics, Inc",Rancho Cucamong,8816 W. Foothill Blvd,91730,Has BP rep but no location rep,Jake Harris
+1009808,Cirexx International,Santa Clara,791 Nuttman Street,95054,Has BP rep but no location rep,William Robinson
+1007815,Cisco,San Jose,300 East Tasman Dr.,95134,Has BP rep but no location rep,Juan Santana
+1001031,Cobham Ltd.,Huntington Beach,17831 Jamestown Lane,92647,Has BP rep but no location rep,Danielle Slaughter
+1001031,Cobham Ltd.,San DIego,9404 Chesapeake Drive,92123,Has BP rep but no location rep,Danielle Slaughter
+1007294,Coherent Inc.,Freemont,"48800 Milmont Drive, Fremont, CA, 94538 – United States",94538,Has BP rep but no location rep,Sally Goh
+1009802,Cohu Inc,Poway,12367 Crosthwaite Circle,92064,Has BP rep but no location rep,William Robinson
+1003016,Collins Aerospace,Carlsbad,2752 Loker Ave W,92010,Has BP rep but no location rep,Chad Swygert
+1003016,Collins Aerospace,Chula Vista,850 Lagoon Dr,91910,Has BP rep but no location rep,Chad Swygert
+1003016,Collins Aerospace,Riverside,8200 Arlington Ave,92503,Has BP rep but no location rep,Chad Swygert
+1003016,Collins Aerospace,San Dimas,936 Overland Ct.,91773,Has BP rep but no location rep,Chad Swygert
+1003016,Collins Aerospace,Santa Ana,,,Has BP rep but no location rep,Chad Swygert
+1003016,Collins Aerospace,Sante Fe Springs,9948 Freeman Ave,90670,Has BP rep but no location rep,Chad Swygert
+1011335,Communications and Power Industries,Torrance,3111 Fujita Street,90505,Has BP rep but no location rep,Justin Goodwin
+1012096,Continuous Computing ,San Diego,9450 Carroll Park Drive,92121,Has BP rep but no location rep,JeanPaul Chevrier
+1013114,Core Systems,Poway,13000 Danielson St Suite Q,92064,Has BP rep but no location rep,Michael Stifter
+1009248,Core-Systems,Poway,13000 Danielson St,92064,Has BP rep but no location rep,Anthoney Bramante
+1002384,Corestaff Co Ltd,Santa Clara,"2065 Martin Ave, STE108",95050,Has BP rep but no location rep,Joseph Gonzales
+1009094,Cosasco ,Santa Fe Springs,11841 Smith Avenue,90670 ,Has BP rep but no location rep,Alison Williams
+1005614,Crane Aerospace & Electronics,Burbank,300 Winona Avenue,91504,Has BP rep but no location rep,Steven Elam
+1001187,Creation Technologies,Calexico,1778 Zinetta Road - Suite F,92231,Has BP rep but no location rep,Danielle Slaughter
+1011202,Crown Technical Systems,Fontana,13470 Philadelphia Avenue,92337,Has BP rep but no location rep,Carlos Moreno
+1007567,"Ctcoa,LLc.",,16818 Marquardt Ave.,,Has BP rep but no location rep,Vicky Ma
+1002760,Curtiss-Wright,Palmdale,190 Sierra Court,93550,Has BP rep but no location rep,Shannon Contreras
+1002760,Curtiss-Wright,Santa Clarita,28965 Avenue Penn,91355,Has BP rep but no location rep,Shannon Contreras
+1002760,Curtiss-Wright,Santa Clarita,28965 Avenue Penn,91355,Has BP rep but no location rep,Shannon Contreras
+1005166,Cyber Switching,San Jose,1921 Ringwood Ave,95131,Has BP rep but no location rep,Colton Hammond
+1005291,Cypress Semiconductor,San Jose,198 Champion Court,95134,Has BP rep but no location rep,Colton Hammond
+1011765,D-Wave Systems ,Palo Alto,2650 E Bayshore Rd,94303,Has BP rep but no location rep,JeanPaul Chevrier
+1007697,D3 LED LLC,Rancho Cordova,11370 Sunrise Park Dr.,95742,Has BP rep but no location rep,William Robinson
+1010396,DJI,Cerritos,17301 Edwards Rd,90703,Has BP rep but no location rep,William Robinson
+1007596,DK Engineering,Walnut Creek,1931 San Miguel Dr #100,94596,Has BP rep but no location rep,Romey Kelso
+1011849,"DTS, Inc.",Seal Beach,1720 Apollo Ct,90740,Has BP rep but no location rep,James Diaz
+1009169,Dasan Zhone (DZSI),Redwood City,203 Redwood Shores Parkway,94065,Has BP rep but no location rep,Justin Goodwin
+1007057,"Datron World Communications, Inc",Vista,995 Joshua Way,92081,Has BP rep but no location rep,Colton Hammond
+1004260,Dawn VME Products,Fremont,47915 Westinghouse Dr,94539,Has BP rep but no location rep,Leah Griffin
+1008088,De Leon Enterprises,Sun Valley,11934 Allegheny St,91352,Has BP rep but no location rep,William Robinson
+1004919,"Delta Electronics, Inc.",Fremont,46101 Fremont Blvd,94538,Has BP rep but no location rep,Josh Syre
+1005240,Delta Group Inc,San Diego,10180 Scripps Ranch Blvd,92131,Has BP rep but no location rep,Matt Tanner
+1012929,Delta Star Inc.,San Carlos,270 Industrial Rd,94070,Has BP rep but no location rep,William Robinson
+1011734,"Design West Technologies, Inc.",Tustin ,2701 Dow Ave,92780,Has BP rep but no location rep,Conner Curtis
+1009333,Dex,Camarillo, 3600 Via Pescador,93012,Has BP rep but no location rep,Vicky Ma
+1012819,Dexcom,,"6340 Sequence Dr, San Diego, CA 92121, Estados Unidos",92121,Has BP rep but no location rep,Estefania Valladares
+1008326,Diamond Systems Corporation,Sunnyvale,158 Commercial St.,94086,Has BP rep but no location rep,Romey Kelso
+1008694,Digital Force Technologies,san diego,"6779 Mesa Ridge Rd. Suite 150,",92121,Has BP rep but no location rep,Pablo Hernandez
+1007216,"Doorking, INC",Inglewood,120 S. Glasgow Avenue,90301,Has BP rep but no location rep,William Robinson
+1004176,Dot Comps Electronics Inc,,14711 Clark Ave.,91745,Has BP rep but no location rep,Steven Elam
+1003189,Dover Corporation,Cypress,10800 Valley View Street,90630,Has BP rep but no location rep,Edith Arizmendi
+1003189,Dover Corporation,Grand Terrace,22069 Van Buren Street,92313,Has BP rep but no location rep,Edith Arizmendi
+1005296,"Drobo, Inc",Sunnyvale,1289 Anvilwood Ave,94089,Has BP rep but no location rep,Colton Hammond
+1001205,DuCommun Incorported,Carson,23301 Wilmington Avenue,90745,Has BP rep but no location rep,Steven Elam
+1004122,Duco Inc, Cerritos,17316 Edwards Road #155,90703,Has BP rep but no location rep,Justin Oberhofer
+1012095,"Dutek, Inc. ",Vista,2228 Oak Ridge Way,92081,Has BP rep but no location rep,JeanPaul Chevrier
+1002952,Dytran Instruments Inc.,Chatsworth,21592 Marilla St.,91311,Has BP rep but no location rep,Bac Nguyen
+1005117,E-Band Communications LLC,San Diego,17034 Camino San Bernardo,92127,Has BP rep but no location rep,Colton Hammond
+1009032,E-Defense Incorporated ,San Clemente,717 Via Presa,,Has BP rep but no location rep,Sarah Colley
+1005838,"EMLinQ, LLC",Simi Valley,2125C Madera Road,93065,Has BP rep but no location rep,Julie White
+1009204,EXPRESS MANUFACTURING                                  ,"Santa Ana,",3519 W. Warner Ave,92704,Has BP rep but no location rep,Sara Shelby
+1004167,Eagle-High International (AEHI),Chino,15298 El Prado Road,91710,Has BP rep but no location rep,Leah Griffin
+1002517,Eaton,Irvine,9650 Jeronimo Road,92618,Has BP rep but no location rep,Danielle Slaughter
+1002517,Eaton,Irvine,9650 Jeronimo Road,92618,Has BP rep but no location rep,Danielle Slaughter
+1002517,Eaton,Los Angeles,4690 Colorado Blvd.,90039,Has BP rep but no location rep,Danielle Slaughter
+1002517,Eaton,Los Angeles,4690 Colorado Blvd,90039,Has BP rep but no location rep,Danielle Slaughter
+1002517,Eaton,San Diego,"Tijuana, MX (CBU)",92154,Has BP rep but no location rep,Danielle Slaughter
+1002517,Eaton,Torrance,1111 Knox Street,90502,Has BP rep but no location rep,Danielle Slaughter
+1002517,Eaton,Torrance,1111 Knox Street,90502,Has BP rep but no location rep,Danielle Slaughter
+1007982,Ecolink Intelligent Technologies,Carlsbad,2055 Corte Del Nogal,92011,Has BP rep but no location rep,Romey Kelso
+1010586,Econolite,Anaheim,1250 N Tustin Ave,92807,Has BP rep but no location rep,Will Hawk
+1008398,Edwards Vacuum ,City of Industry,14750 Nelson Ave Unit D,91744,Has BP rep but no location rep,Vicky Ma
+1002643,"Electromax, Inc.",San Jose,1960 Concourse Dr.,95131,Has BP rep but no location rep,Kellen Ford
+1007852,Electronic Theatre Controls (ETC),Burbank,1120 Scott Rd.,91504,Has BP rep but no location rep,William Robinson
+1006356,"Electronic Treasures, LLC",Woodland Hills,"20969 Ventura Blvd, Suite 5 ",91364,Has BP rep but no location rep,Pablo Hernandez
+1008324,Elematec USA Corporation,San diego,4909 Murphy Canyon Rd,92123,Has BP rep but no location rep,William Robinson
+1004086,Elma Electronic AG,Fremont,44350 S. Grimmer Blvd,94538,Has BP rep but no location rep,Steven Elam
+1006333,Emcore,Concord,2700 Systron Drive,94518,Has BP rep but no location rep,Thomas Haynes
+1009192,Emerald EMS,San Jose ,2243 Lundy Avenue ,95131,Has BP rep but no location rep,Anthoney Bramante
+1010287,EnPro,Costa Mesa, 225 Paularino Avenue,92626,Has BP rep but no location rep,Thomas Nelson
+1005821,"Energy Labs, Inc.",San Diego,1695 Cactus Road,92154,Has BP rep but no location rep,Pablo Hernandez
+1010613,Enlighted,Santa Clara,3979 Freedom Cir.,95054,Has BP rep but no location rep,Katrina Riobuya
+1006875,Enphase Energy ,Fremont,47281 Bayside Pkwy,94538,Has BP rep but no location rep,Spring Tu
+1003044,Ensign-Bickford Aerospace,Moorpark,,,Has BP rep but no location rep,Chad Swygert
+1009194,Entegris,Fremont,46716 Lakeview Blvd,94538,Has BP rep but no location rep,Josh Syre
+1009194,Entegris,San Luis Obispo,4175 Santa Fe Road,93401,Has BP rep but no location rep,Josh Syre
+1009175,Epson America,Los Alamitos,3131 Katella Avenue,90720,Has BP rep but no location rep,Anthoney Bramante
+1009432,Excelitas,Pleasanton,6701 Koll Center Parkway,94566,Has BP rep but no location rep,Justin Goodwin
+1009662,Extreme Networks,San Jose,6480 Via Del Oro,95119,Has BP rep but no location rep,Anthoney Bramante
+1007268,Extron Electronics,Anaheim,1025 E. Ball Road,92805,Has BP rep but no location rep,William Robinson
+1012992,FARADAY FUTURE INTELLIGENT ELECTRIC INC.,Gardena,8455 S. Figueroa Street,90248,Has BP rep but no location rep,Michael Stifter
+1008823,FUJITSU,Sunnyvale,1270 East Arques Avenue,94085,Has BP rep but no location rep,Gabriel Cisneros
+1008493,Festo Corporation USA,Livermore,550 Commerce Way,94551,Has BP rep but no location rep,William Robinson
+1009260,Fetch Robotics,San Jose,2811 Orchard Pkwy,95134,Has BP rep but no location rep,Justin Goodwin
+1012625,Finisar (Subsidiary of Coherent Corp.),Fremont,41762 Christy Street,94538,Has BP rep but no location rep,James Diaz
+1009191,Firan Technology Group Corp.,Chatsworth,20750 Marilla St,91311,Has BP rep but no location rep,Sara Shelby
+1003329,First Choice Components,Irvine,18242 Mc Durmott W. Suite D.,92614,Has BP rep but no location rep,Steven Elam
+1004816,"Fitbit, Inc",San Francisco,199 Fremont St,94105,Has BP rep but no location rep,Nathan Matt
+1001024,Flex ,MILPITAS,FLEXTRONICS INTERNATIONAL USA INC,95035,Has BP rep but no location rep,Cynthia Mozqueda
+1001024,Flex ,,1665 MacArthur Blvd Costa Mesa,92626,Has BP rep but no location rep,Cynthia Mozqueda
+1008454,Flock Safety,Fremont,47951 Westinghouse Dr,94539,Has BP rep but no location rep,Sarah Colley
+1008454,Flock Safety,San Francisco,1501 Vermont St,94107,Has BP rep but no location rep,Sarah Colley
+1005076,Flux Power,Vista,2685 S. Melrose Drive,92081,Has BP rep but no location rep,Colton Hammond
+1008697,FormFactor Inc.,Livermore,7005 Southfront Road,94551,Has BP rep but no location rep,Gabriel Cisneros
+1009011,Forte Technologies,Dana Point,Forte Technologies LLC,92629,Has BP rep but no location rep,Jake Harris
+1009011,Forte Technologies,Laguna Niguel,"30011 Ivy Glenn Dr, Suite 123",92677-5014,Has BP rep but no location rep,Jake Harris
+1005071,Fortinet,Sunnyvale,899 Kifer Rd,94086,Has BP rep but no location rep,Colton Hammond
+1007869,Fortive,Irvine,"33 Technology Dr, Irvine",92618,Has BP rep but no location rep,Laurel Kee
+1009892,Full Swing Golf,Carlsbad,1905 Aston Ave,92008,Has BP rep but no location rep,Mark Pollard
+1002736,GE Healthcare,San Diego,750 11th Avenue,92101,Has BP rep but no location rep,Danielle Slaughter
+1006367,GET Engineering Corp.,El Cajon,9350 Bond Avenue              ,92021,Has BP rep but no location rep,Thomas Haynes
+1007646,GarrettCom,Fremont,255 Fourier Avenue,94539,Has BP rep but no location rep,Romey Kelso
+1009453,Gener8,San Jose,2560 Junction Ave,95134,Has BP rep but no location rep,Carolina Hinestroza
+1001121,General Atomics,Poway,13840 Stowe Dr.,92064,Has BP rep but no location rep,Thomas Haynes
+1001121,General Atomics,Poway,14040 Danielson St,92064,Has BP rep but no location rep,Thomas Haynes
+1001121,General Atomics,Poway,14200 Kirkham Way,92064,Has BP rep but no location rep,Thomas Haynes
+1001121,General Atomics,San Diego,P.O.Box 85608,92186-5608,Has BP rep but no location rep,Thomas Haynes
+1001121,General Atomics,San Diego,3550 General Atomics Court,92121-1122,Has BP rep but no location rep,Thomas Haynes
+1001121,General Atomics,San Diego,16761 Via Del Campo Ct.,92127,Has BP rep but no location rep,Thomas Haynes
+1001121,General Atomics,San Diego,16969 Mesamint Street,92127-2407,Has BP rep but no location rep,Thomas Haynes
+1001121,General Atomics,San Diego,16530 Via Esprillo,92127,Has BP rep but no location rep,Thomas Haynes
+1005314,General Dynamics,Healdsburg,,95448,Has BP rep but no location rep,Colton Hammond
+1005314,General Dynamics,San Diego,,92108,Has BP rep but no location rep,Colton Hammond
+1005314,General Dynamics,San Jose,2688 Orchard Parkway,95134,Has BP rep but no location rep,Colton Hammond
+1005314,General Dynamics,San Leandro,2950 Merced St #131,94577,Has BP rep but no location rep,Colton Hammond
+1005314,General Dynamics,folsom,950 Iron Point Road,95630,Has BP rep but no location rep,Colton Hammond
+1001246,Gentex,Rancho Cucamonga,9859 7th Street,91730,Has BP rep but no location rep,Steven Elam
+1004223,Global IC Trading Group,Laguna Hills,26051 Merit Circle,92653,Has BP rep but no location rep,Steven Elam
+1011457,Golden West Technology,Fullerton,1180 E Valencia Dr,92831,Has BP rep but no location rep,Josh Syre
+1008908,Google,Mountain View,"Google Building 40, 1600 Amphitheatre Pkwy, ",94043,Has BP rep but no location rep,Pablo Hernandez
+1005075,Gorilla Circuits,San Jose,1445 Oakland Rd,95112,Has BP rep but no location rep,Colton Hammond
+1012148,Green Circuits,"San Jose,",1130 Ringwood Ct.  CA ,95131,Has BP rep but no location rep,Mahdi Ezzekmi
+1006999,"HM Electronics, Inc",Carlsbad,2848 Whiptail Loop,92010,Has BP rep but no location rep,Juan Santana
+1008441,HTF Aerospace,Encinitas,543 Encinitas Blvd.,92024,Has BP rep but no location rep,Tim Premo
+1007187,Hologic,San Diego,10210 Genetic Center Dr,92121,Has BP rep but no location rep,Nicholas Tyler
+1003034,Honeybee Robotics,Pasadena,,91103,Has BP rep but no location rep,Chad Swygert
+1002387,Honeywell,San Jose,300 East Tasman Dr,95134,Has BP rep but no location rep,Joseph Gonzales
+1010778,Honeywell Aerospace Technologies,"Mexicali, Baja","Cll Industria de La Electrónica 44, 21600 Mexicali, Baja Cal",,Has BP rep but no location rep,Colton Hammond
+1012125,Horiba,Irvine,9755 Research Dr,92618,Has BP rep but no location rep,James Diaz
+1006068,Hughes Circuits,San Marcos,544 S. Pacific St,92078,Has BP rep but no location rep,Josh Syre
+1012909,Huupe,Irvine,17875 Von Karman Ave,92614,Has BP rep but no location rep,William Robinson
+1005090,I/O Controls Corporation,Azusa,1357 W. Foothill Blvd,91702,Has BP rep but no location rep,Matt Tanner
+1005433,ICOP Technology Inc,Walnut,177 S Brent Cir,91789,Has BP rep but no location rep,Stefan Chubb
+1005124,IED Group,Santa Ana,2630 S. Shannon Street,92704,Has BP rep but no location rep,Colton Hammond
+1005622,II-VI Incorporated,Fremont,4545 Cushing Parkway,94538,Has BP rep but no location rep,Wing Zhang
+1005622,II-VI Incorporated,,1830 Bering Dr,95112,Has BP rep but no location rep,Wing Zhang
+1010001,IPG Photonics ,Anaheim,3150 La Palma,92806,Has BP rep but no location rep,William Robinson
+1006749,IPS Group Inc.,San Diego,7737 Kenamar Ct,92121,Has BP rep but no location rep,Colton Hammond
+1003941,IPT,Goleta,7230 Hollister Avenue,93117,Has BP rep but no location rep,Tim Premo
+1008388,ITRON,San Jose,230 W Tasman Drive,95134,Has BP rep but no location rep,Karina Ruvalcaba
+1005356,Iceberg Technology Corporation,Napa,19 Maidu Ct,94558,Has BP rep but no location rep,Josh Syre
+1009942,Ichor Systems,Fremont,3185 Laurelview Ct.,94538,Has BP rep but no location rep,Josh Syre
+1009942,Ichor Systems,Fremont,4302/4308 Solar Way,94538,Has BP rep but no location rep,Josh Syre
+1009186,Iconn Technologies,Irvine,8909 Irvine Center Dr,92618,Has BP rep but no location rep,Anthoney Bramante
+1012066,InTest Corp (INTT),Fremont,48860 Milmont Dr Suite 105C,94538 ,Has BP rep but no location rep,JeanPaul Chevrier
+1012066,InTest Corp (INTT),Lake Forest,"20992 Bake Parkway, Unit 112",92630,Has BP rep but no location rep,JeanPaul Chevrier
+1009492,Infinera,San Jose,6373 San Ignacio Avenue,95119,Has BP rep but no location rep,William Robinson
+1009492,Infinera,Sunnyvale,1322 Bordeaux Dr,94089,Has BP rep but no location rep,William Robinson
+1005088,Infinitum Electric,Fremont,6600 Stevenson Blvd,94538,Has BP rep but no location rep,Dane Reynolds
+1011015,Innoflight,San Diego,9985 Pacific Heights Blvd,92121,Has BP rep but no location rep,Sara Shelby
+1004899,Innova Electronic Corporation,Irvine,17352 Von Karman Avenue,92614,Has BP rep but no location rep,Josh Syre
+1007432,Inolux Corporation,Santa Clara,3350 Scott Blvd #41-02,95054,Has BP rep but no location rep,Romey Kelso
+1008756,Inseego,San Diego,9710 Scranton Rd,92121,Has BP rep but no location rep,Gabriel Cisneros
+1004195,Integra Electronics,Fullerton,1009 S. Placentia Ave,92831,Has BP rep but no location rep,Steven Elam
+1002320,"Integrated Micro-Electronics, Inc. (IMI)",Tustin,14312 Franklin Ave,92780,Has BP rep but no location rep,Edith Arizmendi
+1009357,Intelligent Memory,Irvine, 1 Venture,92618,Has BP rep but no location rep,Justin Goodwin
+1007474,Interconnect Solutions Company,Fountain Valley,17595 Mt. Herrmann,92708,Has BP rep but no location rep,Colton Hammond
+1007712,Interface Masters Technologies,San Jose ,"150 E Brokaw Rd, San Jose",95112,Has BP rep but no location rep,Israel Barba
+1011720,Intuitive,Sunnyvale,"1020 Kifer Rd, Sunnyvale, CA 94086",94086,Has BP rep but no location rep,James Diaz
+1007943,Irvine Electronics LLC,Irvine,"1601 Alton Pkwy, Suite A",92606,Has BP rep but no location rep,William Robinson
+1011838,Iteris,Los Angeles,801 S. Grand Ave. Suite 750,90017-4633,Has BP rep but no location rep,JeanPaul Chevrier
+1011838,Iteris,Oakland,1999 Harrison Street Suite 1675,95405,Has BP rep but no location rep,JeanPaul Chevrier
+1011838,Iteris,Santa Ana,1700 Carnegie Avenue,92705-5551,Has BP rep but no location rep,JeanPaul Chevrier
+1001139,Jabil Inc,San Jose,30 Great Oaks Blvd,95119,Has BP rep but no location rep,Jake Mcaloose
+1001139,Jabil Inc,san jose,6212 Hellyer Ave,95138,Has BP rep but no location rep,Jake Mcaloose
+1005483,Janteq,Irvine,9975 Toledo Way,92618,Has BP rep but no location rep,Colton Hammond
+1002284,Javad,San Jose,900 Rock Avenue,95131,Has BP rep but no location rep,Thomas Haynes
+1002284,Javad,San Jose,900 Rock Avenue,95131,Has BP rep but no location rep,Thomas Haynes
+1002284,Javad,San Jose,900 Rock Avenue,95131,Has BP rep but no location rep,Thomas Haynes
+1009726,Joby Aviation,Santa Cruz,333 Encinal St,95060,Has BP rep but no location rep,William Robinson
+1009726,Joby Aviation,Santa Cruz,2155 Delaware Avenue,95060,Has BP rep but no location rep,William Robinson
+1007847,Juniper Networks,Sunnyvale,1133 Innovation Way,94089,Has BP rep but no location rep,Joel Flores
+1007582,Jupiter Systems,Hayward,31015 Huntwood Avenue,94544-7007,Has BP rep but no location rep,Romey Kelso
+1002733,KLA,Fremont,41707 Christy Street,94538,Has BP rep but no location rep,Bac Nguyen
+1002733,KLA,Milpitas,1 Technology Drive,95035,Has BP rep but no location rep,Bac Nguyen
+1002733,KLA,Milpitas,3 Technology Drive,95035,Has BP rep but no location rep,Bac Nguyen
+1002733,KLA,,"TECAN CDMO SOLUTIONS MH, CORP",95037,Has BP rep but no location rep,Bac Nguyen
+1008748,Karma Automotive,Irvine,9950 Jeronimo Rd,92618,Has BP rep but no location rep,Alison Williams
+1012920,Kateeva,Newark,7015 Gateway Blvd,94560,Has BP rep but no location rep,William Robinson
+1003146,Keysight Technologies,Santa Rosa,1400 Fountaingrove Parkway,95403-1738,Has BP rep but no location rep,Tim Premo
+1007430,Kinetic Technologies,San Jose,"6399 San Ignacio Ave, Suite 250",95119,Has BP rep but no location rep,Romey Kelso
+1008063,King Nutronics Corporation,Woodland Hills,6421 Independence Avenue,91367,Has BP rep but no location rep,William Robinson
+1003455,KollMorgen,Goleta,33 S La Patera Ln,93117,Has BP rep but no location rep,Danielle Slaughter
+1007442,Kontron,San Diego,9477 Waples Street,92121,Has BP rep but no location rep,William Robinson
+1007379,Krypton Solutions LLC,San Jose,198 Stauffer Boulevard,95125,Has BP rep but no location rep,William Robinson
+1002345,L3Harris Corp.,Anaheim,901 E. Ball Rd,92805,Has BP rep but no location rep,Shannon Contreras
+1002345,L3Harris Corp.,San Diego,9020 Balboa Ave,92123,Has BP rep but no location rep,Shannon Contreras
+1002734,Lam Research,Fremont,4405 Cushing Pkwy - CA10,94538,Has BP rep but no location rep,Bac Nguyen
+1002734,Lam Research,Fremont,4650 Crushing Parkway,94538,Has BP rep but no location rep,Bac Nguyen
+1002734,Lam Research,Livermore,1 Portola Avenue,94551,Has BP rep but no location rep,Bac Nguyen
+1005185,Lantronix,Irvine,"48 Discovery, Suite 250", 92618 ,Has BP rep but no location rep,Josh Syre
+1006718,"Laritech, Inc",Moorpark,5898 Condor Dr,93021,Has BP rep but no location rep,Colton Hammond
+1005083,LeeMAH Electronics,Brisbane,155 South Hill Drive,94005,Has BP rep but no location rep,Colton Hammond
+1006966,Libertia Corp,Torrance,2421 W 205th St,90501-1462,Has BP rep but no location rep,Jake Harris
+1002357,Liebherr,Lodi,880 South Beckman Road,95240,Has BP rep but no location rep,Chad Swygert
+1009452,Lifeward,Fremont,48368 Milmont Dr.,94538,Has BP rep but no location rep,William Robinson
+1009035,Lindsay Corporation,Rio Vista,180 River Road,94571,Has BP rep but no location rep,William Robinson
+1006927,Lion Electric,Sacremento,"4522 Parker Avenue, McClellan Park,  Suite 350",95652,Has BP rep but no location rep,Romey Kelso
+1001189,Lockheed Martin,Palmdale,,93599,Has BP rep but no location rep,Chad Swygert
+1001189,Lockheed Martin,Sunnyvale,,94089,Has BP rep but no location rep,Chad Swygert
+1005962,Lucix Corporation,CAMARILLO,800 Avenida Acaso,93012,Has BP rep but no location rep,Justin Oberhofer
+1007870,Lumentum,San Jose,1717 Fox Drive,95131,Has BP rep but no location rep,Laurel Kee
+1007870,Lumentum,San Jose,1001 Ridder Park Drive,95131,Has BP rep but no location rep,Laurel Kee
+1007870,Lumentum,San Jose,3081 Zanker Road,95134,Has BP rep but no location rep,Laurel Kee
+1007870,Lumentum,San Jose,80 Rose Orchard Way,95134,Has BP rep but no location rep,Laurel Kee
+1006969,"Luminar Technologies, Inc",Palo Alto,1891 Page Mill Rd,"94304,",Has BP rep but no location rep,Karina Ruvalcaba
+1007630,Lytx (DRIVE CAM),San Diego,9785 Towne Centre Dr,92121,Has BP rep but no location rep,Romey Kelso
+1002889,"MEDTRONIC, INC.",Irvine,9775 Toledo Way,92618,Has BP rep but no location rep,Danielle Slaughter
+1002889,"MEDTRONIC, INC.",Northridge,18000 Devonshire Street,91325,Has BP rep but no location rep,Danielle Slaughter
+1002889,"MEDTRONIC, INC.",San Diego,8830 Siempre Viva Rd,92154,Has BP rep but no location rep,Danielle Slaughter
+1002889,"MEDTRONIC, INC.",Santa Rosa,3576 Unocal Place,95403,Has BP rep but no location rep,Danielle Slaughter
+1002816,"MKS Instruments, Inc.",Irvine,1791 Deere Avenue,92606,Has BP rep but no location rep,Danielle Slaughter
+1002816,"MKS Instruments, Inc.",Irvine,1791 Deere Avenue,92606,Has BP rep but no location rep,Danielle Slaughter
+1002816,"MKS Instruments, Inc.",Milpitas,1565 Barber Lane,95035-7409,Has BP rep but no location rep,Danielle Slaughter
+1002816,"MKS Instruments, Inc.",Sunnyvale,740 Kifer Road,94086,Has BP rep but no location rep,Danielle Slaughter
+1002867,"MagTek, Inc.",Seal Beach,1710 Apollo Court,90740,Has BP rep but no location rep,Danielle Slaughter
+1001198,Masterwork Electronics,CALEXICO,"RL.JONES/MASTERWORK ELECT. M 1778 ZINETTA ROAD, SUITE A",92231,Has BP rep but no location rep,Jonathan Cabrera
+1001198,Masterwork Electronics,Rohnert Park,630 Martin Ave. ,94928,Has BP rep but no location rep,Jonathan Cabrera
+1007148,Mattel,El Segundo,333 Continental Blvd,90245,Has BP rep but no location rep,William Robinson
+1009500,Maxar Technologies,Palo Alto,3875 Fabian Way,94303,Has BP rep but no location rep,William Robinson
+1007931,McCain Traffic,Vista,2365 Ridge Way,92081,Has BP rep but no location rep,William Robinson
+Mccrometer,Mccrometer,Hemet,3255 West Stetson Avenue,92545,Has BP rep but no location rep,William Robinson
+1001011,Mercury Systems ,Cypress,10855 Business Center Dr.,90630,Has BP rep but no location rep,Thomas Haynes
+1001011,Mercury Systems ,Fremont,47200 Bayside Parkway,94538,Has BP rep but no location rep,Thomas Haynes
+1001011,Mercury Systems ,Oxnard,300 Del Norte Blvd.,93030,Has BP rep but no location rep,Thomas Haynes
+1001011,Mercury Systems ,Oxnard,400 Del Norte Blvd.,93030,Has BP rep but no location rep,Thomas Haynes
+1001011,Mercury Systems ,Torrance,20701 Manhattan Pl.,90501,Has BP rep but no location rep,Thomas Haynes
+1009300,Meta (Facebook) APAC,Menlo Park,1 Hacker Wy,94025,Has BP rep but no location rep,Renald Ng
+1008237,"Meta Platforms, Inc.​​​",,"1 Hacker Way, Menlo Park, California",,Has BP rep but no location rep,Israel Barba
+1003140,Micro Systems (Kratos Defense),,"5381 Raley Boulevard,  Sacramento, CA 95838",,Has BP rep but no location rep,Garrett Smith
+1004707,"Micron Technology, Inc.",San Jose,110 Holger Way,95134,Has BP rep but no location rep,Nathan Matt
+1009632,Microsoft,San Francisco,1355 market st,94103,Has BP rep but no location rep,Justin Goodwin
+1009632,Microsoft,Sunnyvale,755 N mathilda ave,94085,Has BP rep but no location rep,Justin Goodwin
+1002725,Milwaukee Electronics,Tecate,451 Tecate Road PO Box 411 Tecate,,Has BP rep but no location rep,Shannon Contreras
+1008892,Mistral Solutions ,Fremont,43092 Christy Street,94538,Has BP rep but no location rep,Alison Williams
+1008153,Mitsubishi Electric,Cypress,5900-A Katella Avenue,90630,Has BP rep but no location rep,Nicholas Tyler
+1006903,"Molecular Devices, LLC.",San Jose,3860 N First Street,95134 ,Has BP rep but no location rep,Spring Tu
+1009075,Monarch Tractor ,Livermore,"203 Lawrence Dr Suite A,",94551,Has BP rep but no location rep,Alison Williams
+1005436,Moog Inc.,Torrance,20263 S Western Ave,90501,Has BP rep but no location rep,Josh Syre
+1005120,Moseley Associates,San Diego,82 Coromar Drive,93117,Has BP rep but no location rep,Colton Hammond
+1008896,Motion AI,Anaheim,4975 East Landon Drive,92807,Has BP rep but no location rep,Alison Williams
+1008896,Motion AI,Los Angeles,7915 Ajay Drive,91352,Has BP rep but no location rep,Alison Williams
+1008896,Motion AI,Milpitas,1141 Cadillac Court,95035,Has BP rep but no location rep,Alison Williams
+1008481,Motional ,Milpitas,699 South Milpitas,,Has BP rep but no location rep,Sarah Colley
+1008481,Motional ,Venice,1625 Electric Ave,,Has BP rep but no location rep,Sarah Colley
+1001211,Motorola Solutions,,625 W Alluvial Ave,93711,Has BP rep but no location rep,Edith Arizmendi
+1006965,Multilayer Prototypes Inc,Newbury Park,2513 Teller Road,91320,Has BP rep but no location rep,Karina Ruvalcaba
+1006159,Murata Manufacturing,San Jose,1732 N First St Ste 500,95112,Has BP rep but no location rep,Pablo Hernandez
+1006159,Murata Manufacturing,San Jose,1732 N First St,96112,Has BP rep but no location rep,Pablo Hernandez
+1008292,NEO Technology Solutions,Carlsabad,6350 Palomar Oaks Court,92011,Has BP rep but no location rep,Alina Lehle
+1008292,NEO Technology Solutions,Chatsworth,9340 Owensmouth Avenue,91311,Has BP rep but no location rep,Alina Lehle
+1008292,NEO Technology Solutions,Fremont, 6600 Stevenson Blvd.,94538,Has BP rep but no location rep,Alina Lehle
+1007186,NOV,Fillmore,1020 B Street,93015,Has BP rep but no location rep,Nicholas Tyler
+1005201,NPI Services Inc,Costa Mesa,1580 Corporate Drive,92626,Has BP rep but no location rep,Colton Hammond
+1010542,Nanotronics,Hollister,777 Flynn Road,95023,Has BP rep but no location rep,William Robinson
+1010102,Naprotek,San Jose,90 Rose Orchard Way,95134,Has BP rep but no location rep,Josh Syre
+1010102,Naprotek,San Jose,2085 Zanker Road,95131,Has BP rep but no location rep,Josh Syre
+1007000,National Microchip,Irvine,15375 Barranca Parkway,92618,Has BP rep but no location rep,Jake Harris
+1012939,National Signal LLC,La Mirada,14489 Industry Circle,90638,Has BP rep but no location rep,Michael Stifter
+1005819,Navico Inc,SAN DIEGO,"C/O NORMAN KRIEGER, INC.",92154,Has BP rep but no location rep,Pablo Hernandez
+1006905,Netapp,San Jose,3060 Olsen Drive,95128,Has BP rep but no location rep,Spring Tu
+1010119,Netgear,City of Industry,408 S Brea Canyon Rd,91789,Has BP rep but no location rep,Colton Hammond
+1005997,Nextracker,Fremont,6200 Paseo Padre Pkwy,,Has BP rep but no location rep,Pablo Hernandez
+1004285,Nidec Corporation,Rancho Cordova,11380 White Rock Rd,95742,Has BP rep but no location rep,Will Hawk
+1012237,NightHawk Flight Systems,Vista,1370 Decision St.,92081,Has BP rep but no location rep,Aaron Mendoza
+1009672,Nile,San Jose,3590 N First St Suite 300,95134,Has BP rep but no location rep,Anthoney Bramante
+1008780,Noah Medical ,San Carlos,1501 Industrial Rd,94070,Has BP rep but no location rep,Alison Williams
+1002827,Northrop Grumman,"Northridge, CA",9401 Corbin Ave.,91324,Has BP rep but no location rep,Chad Swygert
+1002827,Northrop Grumman,San Diego,,,Has BP rep but no location rep,Chad Swygert
+1007097,Northwest Circuits Corp.,San Diego,8660 Avenida Costa Blanca,92154,Has BP rep but no location rep,Romey Kelso
+1004339,Nulite Global Technology,Milpitas,741 Ames Ave,95035,Has BP rep but no location rep,Leah Griffin
+1007439,Nvidia ,Santa Clara,2788 San Tomas Expressway,95051,Has BP rep but no location rep,William Robinson
+1008916,OSI Optoelectronics,,12525 Chadron Ave Hawthorne,90250,Has BP rep but no location rep,Winnie Lee
+1003719,Omega EMS,San Jose,5400 Hellyer Ave.,95138,Has BP rep but no location rep,Thomas Haynes
+1003719,Omega EMS,Santa Barbara,300 E. Canon Perdido St.,93101,Has BP rep but no location rep,Thomas Haynes
+1002833,Omega GTI,Morgan Hill,18434 Technology Dr,95037,Has BP rep but no location rep,Tim Premo
+1002833,Omega GTI,Morgan Hill,220 Vineyard Ct. Ste 150,95037,Has BP rep but no location rep,Tim Premo
+1002833,Omega GTI,san jose,19 Great Oaks Blvd,95119,Has BP rep but no location rep,Tim Premo
+1007512,Omnicell,Santa Clara,2625 Augustine Drive Suite 301,95054,Has BP rep but no location rep,Gabriel Cisneros
+1001073,OnCore Manufacturing,Chatsworth,9340 Owensmouth Avenue ,91311,Has BP rep but no location rep,Joseph Gonzales
+1001073,OnCore Manufacturing,Fremont,6600 Stevenson Blvd,94538,Has BP rep but no location rep,Joseph Gonzales
+1001073,OnCore Manufacturing,"SAN DIEGO,","OnCore Manufacturing, LLC",92154,Has BP rep but no location rep,Joseph Gonzales
+1001073,OnCore Manufacturing,San Marcos,237 Via Vera Cruz,92078,Has BP rep but no location rep,Joseph Gonzales
+1013033,One Stop Systems,Escondido,2235 Enterprise Street #110,92029,Has BP rep but no location rep,Michael Stifter
+1002303,Ontic,Chatsworth,Ontic Engineering & Manufacturing,91311,Has BP rep but no location rep,Kellen Ford
+1012915,Optoma Technology,Fremont,47697 Westinghouse Dr #100,94539,Has BP rep but no location rep,William Robinson
+1008451,Ossur,Irvine,"200 Spectrum Center Drive, Ste 700",92618,Has BP rep but no location rep,Romey Kelso
+1009105,Ouster,San Fransisco ,350 Treat Ave Ste 1,94110,Has BP rep but no location rep,Alison Williams
+1002634,"Pacific Component Xchange, Inc.",Huntington Beach,7755 Center Ave,92647,Has BP rep but no location rep,Thomas Haynes
+1002634,"Pacific Component Xchange, Inc.",Huntington Beach,18281 Enterprise Ln,92648,Has BP rep but no location rep,Thomas Haynes
+1008097,Palo Alto Networks,Santa Clara ,HQ Palo Alto Networks 3000 Tannery Way Santa Clara,95054,Has BP rep but no location rep,Israel Barba
+1004179,"Palomar Display Products, Inc. ",Carlsbad,5803 Newton Dr. ,92008,Has BP rep but no location rep,Garrett Smith
+1012149,Panasonic Avionics Corp.,Irvine,3323 Michelson Dr STE 100,92612,Has BP rep but no location rep,James Diaz
+1006431,"Paragon Products, LLC.",El Dorado Hills,4475 Golden Foothill Parkway,95762,Has BP rep but no location rep,Colton Hammond
+1006431,"Paragon Products, LLC.",Folsom,625 Coolidge Drive,95630,Has BP rep but no location rep,Colton Hammond
+1001131,Paramit Corporation,Morgan Hill,18735 Madrone Parkway,95037,Has BP rep but no location rep,Steven Elam
+1006365,Parker Hannifin,Irvine,16666 Von Karman Ave,92606-4997,Has BP rep but no location rep,Will Hawk
+1006365,Parker Hannifin,Irvine,14300 Alton Parkway,92618,Has BP rep but no location rep,Will Hawk
+1006365,Parker Hannifin,San Diego,11661 Sorrento Valley Road,92121,Has BP rep but no location rep,Will Hawk
+1006365,Parker Hannifin,Sonoma,5500 Business Park Dr,94928,Has BP rep but no location rep,Will Hawk
+1001230,Parker Meggitt,IRVINE,14300 ALTON PARKWAY,92618,Has BP rep but no location rep,Kellen Ford
+1001230,Parker Meggitt,Irvine,4 Marconi,92618,Has BP rep but no location rep,Kellen Ford
+1001230,Parker Meggitt,Irvine,16666 Von Karman Ave,92606-4997,Has BP rep but no location rep,Kellen Ford
+1001230,Parker Meggitt,Irvine,14600 Myford Road,92606,Has BP rep but no location rep,Kellen Ford
+1001230,Parker Meggitt,North Hollywood,12838 Saticoy St.,91605,Has BP rep but no location rep,Kellen Ford
+1001230,Parker Meggitt,San Diego,11661 Sorrento Valley Road,92121 ,Has BP rep but no location rep,Kellen Ford
+1001230,Parker Meggitt,San Diego,11661 Sorrento Valley Road,92121,Has BP rep but no location rep,Kellen Ford
+1001230,Parker Meggitt,Simi Valley,1785 Voyager Avenue,93063,Has BP rep but no location rep,Kellen Ford
+1001230,Parker Meggitt,Simi Valley,1915 Surveyor Avenue,93063,Has BP rep but no location rep,Kellen Ford
+1001230,Parker Meggitt,Simi Valley,1955 Surveyor Ave,93063,Has BP rep but no location rep,Kellen Ford
+1001230,Parker Meggitt,Sonoma,5500 Business Park Dr,94928,Has BP rep but no location rep,Kellen Ford
+1004920,Part Target,Northridge,19354 Londelius St.,91324,Has BP rep but no location rep,Leah Griffin
+1011548,Penguin Solutions,West Fremont,45800 Northport Loop,94538,Has BP rep but no location rep,Michael Lopez
+1008090,"Phase 3 Technologies, Inc",San Jose,1864 Hartog Drive,95131,Has BP rep but no location rep,William Robinson
+1006799,Philips,San Jose,370 W Trimble Rd.,95131,Has BP rep but no location rep,Rafael Morales
+1009630,Phison Electronics,San Jose,2860 Zanker Road,95134,Has BP rep but no location rep,Stephanie Hill
+1002308,Pioneer Circuits ,Santa Ana,3000 S. Shannon Street,92704,Has BP rep but no location rep,Justin Oberhofer
+1007322,Pioneer Power Solutions,Sante Fe Springs,10640 Springdale Ave,90670,Has BP rep but no location rep,William Robinson
+1008485,Plantronics,Santa Cruz,345 Encinal St ,95060,Has BP rep but no location rep,Gabriel Cisneros
+1005196,Platinum Simulators Inc,Carlsbad,1945 Camino Vida Roble Ste L,20089,Has BP rep but no location rep,Matt Tanner
+1007918,Pony AI,Fremont,3501 Gateway Blvd,94538,Has BP rep but no location rep,William Robinson
+1011836,Power Integrations ,San Jose,5245 Hellyer Avenue,95138,Has BP rep but no location rep,JeanPaul Chevrier
+1010221,Premio Inc.,City of Industry,918 Radecki Ct,91748,Has BP rep but no location rep,Josh Syre
+1005169,ProCAT,Calabasas,5115 Douglas Fir Road,91302,Has BP rep but no location rep,Colton Hammond
+1005566,Production Automation Corporation,el monte,Production Automation Corporation,91731-1133,Has BP rep but no location rep,Pablo Hernandez
+1009671,Prosimo.io,San Jose,1735 Technology Dr #100,95110,Has BP rep but no location rep,Anthoney Bramante
+1008371,Protech Design Manufacturing Solutions,San Diego,8451 Miralani Dr,92126,Has BP rep but no location rep,Oscar Medina
+1006455,Proterra Operating Company,Burlingame,1815 Rollins Road,94010,Has BP rep but no location rep,Juan Santana
+1006455,Proterra Operating Company,City of Industry,383 Cheryl Lane,91789,Has BP rep but no location rep,Juan Santana
+1009214,Pure Storage,Santa Clara,2555 Augustine Dr,95054,Has BP rep but no location rep,Justin Goodwin
+1008741,QUALCOMM,San Diego,5775 Morehouse Dr.,92121,Has BP rep but no location rep,Gabriel Cisneros
+1006835,QUANTA COMPUTER INC.,Fremont,45630 Northport Loop East,94538,Has BP rep but no location rep,Spring Tu
+1013017,Qbit Labs Pvt Ltd,Milpitas,"Suite No. 6,",95035,Has BP rep but no location rep,Nandhini
+1001226,Qual-Pro Corporation,Gardena,18510 S Figueroa Street,90248,Has BP rep but no location rep,Kellen Ford
+1002381,Quest Components,Industry,14711 Clark Ave.,91745,Has BP rep but no location rep,Joseph Gonzales
+1008262,QuidelOrtho Corp,San Diego,9975 Summers Ridge Road,92121,Has BP rep but no location rep,William Robinson
+1005118,REMEC Broadband,San Diego,17034 Camino San Bernardo,92127,Has BP rep but no location rep,Colton Hammond
+1011834,RF Industries,San Diego,16868 Via Del Campo Court Suite 200,92127,Has BP rep but no location rep,JeanPaul Chevrier
+1007624,RGB Networks,Sunnyvale,390 West Java Drive,94089,Has BP rep but no location rep,Romey Kelso
+1001070,RTX,EL Segundo,1921 E.Mariposa AVE,90245,Has BP rep but no location rep,Garrett Smith
+1001070,RTX,El Segundo,2222 E. Imperial HWY.,90245,Has BP rep but no location rep,Garrett Smith
+1001070,RTX,El Segundo,2000 E El Segundo BLVD,90245,Has BP rep but no location rep,Garrett Smith
+1001070,RTX,Fullerton,1801 Hughes Dr. ,92833,Has BP rep but no location rep,Garrett Smith
+1001070,RTX,Fullerton,1801 Hughes Dr.,92833,Has BP rep but no location rep,Garrett Smith
+1001070,RTX,Goleta,6300 Lindmar Drive,93177,Has BP rep but no location rep,Garrett Smith
+1001070,RTX,Goleta,6300 Lindmar Drive,93117,Has BP rep but no location rep,Garrett Smith
+1001070,RTX,Goleta,"26 Castilian Dr., Ste. E",93117,Has BP rep but no location rep,Garrett Smith
+1001070,RTX,San Diego,8680 Balboa Ave,92133,Has BP rep but no location rep,Garrett Smith
+1001070,RTX,Santa Fe Springs,9400 Santa Fe Springs Rd,90670,Has BP rep but no location rep,Garrett Smith
+1001070,RTX,Sunnyvale,460 W. California Ave,94086,Has BP rep but no location rep,Garrett Smith
+1001070,RTX,Tucson,Building M09,85706,Has BP rep but no location rep,Garrett Smith
+1001070,RTX,Yuba,BEALE AFB,95903,Has BP rep but no location rep,Garrett Smith
+1002738,RainBird,Azusa,970 West Sierra Madre Avenue,91702,Has BP rep but no location rep,Danielle Slaughter
+1002738,RainBird,San Diego,"9355 Airway Drive, Suite 4",92154,Has BP rep but no location rep,Danielle Slaughter
+1002738,RainBird,san diego,"2660 Sarnen Street, Suite 220",92154,Has BP rep but no location rep,Danielle Slaughter
+1002738,RainBird,,2475-A PASEO DE LAS AMERICAS #1318,92154,Has BP rep but no location rep,Danielle Slaughter
+1004634,Rapid Manufacturing,Anaheim,8080 Crystal Dr.,92807,Has BP rep but no location rep,Justin Oberhofer
+1002813,Rapiscan Systems | AS&E,Torrance,2805 Columbia Street,90503,Has BP rep but no location rep,Danielle Slaughter
+1008064,Raptor Scientific,Livermore,7950 National Dr,94550,Has BP rep but no location rep,William Robinson
+1006811,Razer Inc.,Irvine,9 Pasteur Suite #100,92618,Has BP rep but no location rep,Romey Kelso
+1009066,Redwire Space,Goleta,7418 Hollister Ave.,93117,Has BP rep but no location rep,Alison Williams
+1006699,Rheem Manufacturing Company,Oxnard,2151 Eastman Ave,93030,Has BP rep but no location rep,Erika Turrubiate
+1012901,Rhombus,Sacramento,1610 R Street,95811,Has BP rep but no location rep,William Robinson
+1006043,Ricardo Inc.,,3264 Grey Hawk Ct.,92010,Has BP rep but no location rep,Jake Mcaloose
+1007473,"Rivian Automotive, Inc.",Irvine,"15770 Laguna Canyon Rd, Suite 100",92618,Has BP rep but no location rep,Romey Kelso
+1007068,RoGar Manufacturing Inc.,El Centro, 866 Ross Ave,92243,Has BP rep but no location rep,Romey Kelso
+1002282,"Rocket EMS, Inc.",Santa Clara,2950 Patrick Henry Dr.,95054,Has BP rep but no location rep,Thomas Haynes
+1012635,Roger Industry LLC,Garden Grove,11552 Knott St,92841,Has BP rep but no location rep,Jake Harris
+1007531,SMA-America,Rocklin,3925 Atherton Rd,95765,Has BP rep but no location rep,William Robinson
+1006308,SMD (Surface Mount Depot),Gardena,18726 S Western Ave #305,,Has BP rep but no location rep,Dane Reynolds
+1002280,SMTC,Fremont,431 Kato Terrace,94539,Has BP rep but no location rep,Danielle Slaughter
+1007627,SPIRENTCOM,Calabasas,27349 Agoura Rd,91301,Has BP rep but no location rep,Romey Kelso
+1007660,SS8,Milpitas,750 Tasman Drive,95035,Has BP rep but no location rep,Romey Kelso
+1008625,Saildrone Inc,Alameda,1050 W Tower Ave,94501,Has BP rep but no location rep,William Robinson
+1007265,Samsara,San Francisco,1 De Haro St,94107,Has BP rep but no location rep,Nicholas Tyler
+1008796,San Francisco Circuits,san mateo,1660 South Amphlett Blvd,94402,Has BP rep but no location rep,Hugo Ogalde
+1002322,Sandel Avionics,Vista,2401 Dogwood Way,92081,Has BP rep but no location rep,Jake Mcaloose
+1012489,Sciton,Palo Alto ,925 Commercial Street ,94303,Has BP rep but no location rep,Madison Fischl
+1010416,Seacomp,Carlsbad,1525 Faraday Ave. Suite 200,92008,Has BP rep but no location rep,Romey Kelso
+1009217,Second Order Effects,El Segundo,711 Hawaii St.,90245,Has BP rep but no location rep,William Robinson
+1005280,Sensata Technologies,Thousand Oaks,1461 Lawrence Drive,91320,Has BP rep but no location rep,Will Hawk
+1008066,Sensor Concepts. LLC,Livermore,7950 National Drive,94550,Has BP rep but no location rep,William Robinson
+1007149,SharkNinja Operating LLC,Chino,16300 Fern Ave,91708,Has BP rep but no location rep,Nicholas Tyler
+1013002,"Shinko Electric America, Inc.",San Jose,"2077 Gateway Place, Suite 250",95110,Has BP rep but no location rep,Josh Syre
+1004796,Sienna Group,Freemont,41758 Christy Street,94538,Has BP rep but no location rep,Stefan Chubb
+1003281,Sierra Circuits,Sunnyvale,1108 W Evelyn Ave,94086,Has BP rep but no location rep,Bac Nguyen
+1002485,SigmaTron International ,Union City,30000 Eigenbrodt Way,94587,Has BP rep but no location rep,Omar Zamora
+1002485,SigmaTron International ,san diego,"2055 DUBLIN DRIVE, SUITE 300,SAN DIEGO, CA 92154",92154,Has BP rep but no location rep,Omar Zamora
+1003004,Skurka Aerospace,Camarillo,4600 Calle Bolero,,Has BP rep but no location rep,Chad Swygert
+1010395,Skydio,San Mateo,300 Clearview Way,94402,Has BP rep but no location rep,William Robinson
+1009580,Smart Manufacturing,Stockton,462 Hudson Bay Lane,95203,Has BP rep but no location rep,Karina Ruvalcaba
+1001086,Snap-On Tools Corp.,San Jose,5500 Hellyer Ave,95138,Has BP rep but no location rep,Danielle Slaughter
+1001087,Snap-On Tools Corp. (USE C000210),San Jose,5500 Hellyer Ave,95138,Has BP rep but no location rep,Danielle Slaughter
+1012927,Solventum,Monrovia,2724 Peck Rd,91016,Has BP rep but no location rep,William Robinson
+1002271,Sonic Manufacturing Technologies,Fremont,47951 Westinghouse Drive,94539,Has BP rep but no location rep,Thomas Haynes
+1008706,Sonos Inc. ,HQ Santa Barbara,614 Chapala Street,93101,Has BP rep but no location rep,Israel Barba
+1008706,Sonos Inc. ,San Francisco,255 California Street Suite 1300,94111,Has BP rep but no location rep,Israel Barba
+1004808,Sony,San Diego,16535 Via Esprillo,92127,Has BP rep but no location rep,Nathan Matt
+1005266,Southwest Antennas,San Diego,10939 Technology Place,92127,Has BP rep but no location rep,Colton Hammond
+1003025,SpaceX,Hawthorne,1 Rocket Rd,90250,Has BP rep but no location rep,Chad Swygert
+1005099,Sparqtron,Fremont,5079 Brandin Court,94538,Has BP rep but no location rep,Matt Tanner
+1005099,Sparqtron,Fremont,5079 Brandin Court,94538,Has BP rep but no location rep,Matt Tanner
+1005037,Spartronics,Milpitas ,1940 Milmont Drive,95035,Has BP rep but no location rep,Juan Santana
+1006103,Stellant Systems Inc.,Torrance,3100 Lomita Blvd,90505,Has BP rep but no location rep,Colton Hammond
+1010432,Steren Solutions LLC,San Diego,8445 Camino Santa Fe Suite #203,92121,Has BP rep but no location rep,Romey Kelso
+1011785,"Stracon, Inc",Irvine,1672 Kaiser Ave,92614,Has BP rep but no location rep,JeanPaul Chevrier
+1011024,Streamline Electronics Manufacturing (SEM),Fremont ,4285 Technology Dr,94538,Has BP rep but no location rep,Elena Wilfong
+1008977,Strike Technology Inc,Carson,24311 S. Wilmington Ave,90731,Has BP rep but no location rep,Tim Premo
+1007091,Stryker Corporation,San Jose,5900 Optical Ct,95138,Has BP rep but no location rep,Mahmoud Fakhran
+1007103,Subinitial LLC,Santee,10160 Three Oaks Way,92071,Has BP rep but no location rep,Romey Kelso
+1006144,Sunnytech,san jose,C003556- 2243 Ringwood Ave,95131,Has BP rep but no location rep,Pablo Hernandez
+1008470,Sunrise Medical,Fresno,2842 N Business Park Avenue,93727,Has BP rep but no location rep,Vera Montero
+1007951,"Super Micro Computer, Inc.",san jose,980 Rock Avenue,95131,Has BP rep but no location rep,Hugo Ogalde
+1009320,Supermicro,San Jose,980 Rock Avenue,95131,Has BP rep but no location rep,Josh Syre
+1011110,"Swarco McCain, Inc.",San Diego,"Baja Freight Forwarders, Inc",92154,Has BP rep but no location rep,Aaron Mendoza
+1011110,"Swarco McCain, Inc.",Vista,2365 Oak Ridge Way,92081,Has BP rep but no location rep,Aaron Mendoza
+1005123,Synopsys,Mountain View,690 East Middlefield Road,94043,Has BP rep but no location rep,Colton Hammond
+1004602,TAXAN,San Jose,780 Montague Expressway,95131,Has BP rep but no location rep,Josh Syre
+1004602,TAXAN,san diego,9250 brown deer road,92121-2294,Has BP rep but no location rep,Josh Syre
+1002272,THALES,Irvine,53 Discovery,92618,Has BP rep but no location rep,Garrett Smith
+1003001,THALES Avionics,irvine,58 discovery,92618,Has BP rep but no location rep,Garrett Smith
+1004476,TTM Technologies,Santa Ana,200 East Sandpointe,92707,Has BP rep but no location rep,Garrett Smith
+1005080,Tandem Diabetes,,11075 Roselle Street,92121,Has BP rep but no location rep,Colton Hammond
+1008591,Tecan,Morgan Hill,18735 Madrone Parkway,95037,Has BP rep but no location rep,Romey Kelso
+1008591,Tecan,Redwood City,900 Chesapeake Drive,94063,Has BP rep but no location rep,Romey Kelso
+1012480,Tech Data Corporation (TD SYNNEX),Fremont,44201 Nobel Drive  ,94538,Has BP rep but no location rep,Jasper Kee
+1007004,TechnipFMC,Davis,201 Cousteau Pl.,95618,Has BP rep but no location rep,Romey Kelso
+1004683,Teledyne Technologies International Corp.,Mountain View,1274 Terra Bella Avenue,94043,Has BP rep but no location rep,Will Hawk
+1004683,Teledyne Technologies International Corp.,Rancho Cordova,11361 Sunrise Park Drive,95742,Has BP rep but no location rep,Will Hawk
+1004683,Teledyne Technologies International Corp.,San Diego,9970 Carroll Canyon Road,92131,Has BP rep but no location rep,Will Hawk
+1004683,Teledyne Technologies International Corp.,Thousand Oaks,1049 Camino Dos Rios,91360,Has BP rep but no location rep,Will Hawk
+1008267,Telefunken Semiconductors,Roseville,7501 Foothills Boulevard,95747,Has BP rep but no location rep,William Robinson
+1010246,Telestream,Nevada City,848 Gold Flat Rd,95959,Has BP rep but no location rep,Romey Kelso
+1008725,Tempo Automation Holdings Inc,San Francisco,2460 Alameda Street,94103,Has BP rep but no location rep,Gabriel Cisneros
+1012094,Tempo Communications,Vista,1390 Aspen Way,92081,Has BP rep but no location rep,JeanPaul Chevrier
+1008856,Teradek,Burbank,2504 N Ontario St,91504,Has BP rep but no location rep,Alison Williams
+1008856,Teradek,Irvine,8 Mason,92618,Has BP rep but no location rep,Alison Williams
+1004555,Teradyne,Agoura Hills,30701 Agoura Road,91301,Has BP rep but no location rep,Leah Griffin
+1004555,Teradyne,San Jose,875 Embedded Way,95138,Has BP rep but no location rep,Leah Griffin
+1006483,Tesla,California ,Fremont Boulevard Fremont,94538,Has BP rep but no location rep,Joel Flores
+1006483,Tesla,Palo Alto,3500 Deer Creek Rd,94304,Has BP rep but no location rep,Joel Flores
+1003052,The Aerospace Corporation,El Segundo,2310 E. El Segundo Blvd,90245,Has BP rep but no location rep,Chad Swygert
+1003415,The Marvin Group,Inglewood,261 W Beach Ave,90302,Has BP rep but no location rep,Thomas Haynes
+1003415,The Marvin Group,Inglewood,490 N. Oak St,90302,Has BP rep but no location rep,Thomas Haynes
+1003415,The Marvin Group,Inglewood,498 N. Oak St,90302,Has BP rep but no location rep,Thomas Haynes
+1003415,The Marvin Group,Irvine,1770 Kettering Street, 92614,Has BP rep but no location rep,Thomas Haynes
+1012150,Topcon Positioning Systems,Livermore,7400 National Drive,94551,Has BP rep but no location rep,JeanPaul Chevrier
+1005122,"Trantronics, Inc",Irvine,1822 Langley Ave,92614,Has BP rep but no location rep,Colton Hammond
+1005275,Trimble Inc.,Sunnyvale,510 De Guigne Dr,94085,Has BP rep but no location rep,Colton Hammond
+1002342,USI Global,Fremont,Asteelflash USA Corp,94538,Has BP rep but no location rep,Jonathan Cabrera
+1002258,Ultra Electronics,San Diego,"8799 Balboa Avenue, Suite 105",92123,Has BP rep but no location rep,Chad Swygert
+1009188,Unigen Corporation,Newark,39730 Eureka Drive,94560,Has BP rep but no location rep,Anthoney Bramante
+1002257,Unigen-USA,Newark,39730 Eureka Drive,94560,Has BP rep but no location rep,Thomas Haynes
+1007566,"Unixo, Inc.",Westlake Village,31328 Via Colinas,91362,Has BP rep but no location rep,Tim Premo
+1012874,VAS Engineering,San Diego,4750 Viewridge Ave ,92123,Has BP rep but no location rep,Daniel Reiser
+1005596,VCC LITE,Carlsbad,(Billing Address),92008,Has BP rep but no location rep,Juan Santana
+1005596,VCC LITE,San Diego,"Visual Communications Company, LLC",92154,Has BP rep but no location rep,Juan Santana
+1009103,VELODYNE LIDAR INC,San Jose ,5521 Hellyer Ave,95138,Has BP rep but no location rep,Alison Williams
+1010256,"VM Services, Inc.",Milpitas,1621 Barber Lane,95035,Has BP rep but no location rep,Josh Syre
+1011586,"Vallen Integrated Supply, Inc.",los angeles,4690 COLORADO BLVD.,90039,Has BP rep but no location rep,Hugo Ogalde
+1006460,Valley Services Electronics,San Jose,6190 San Ignacio Avenue,95119,Has BP rep but no location rep,Josh Syre
+1010035,Varian,Palo Alto,3100 Hansen Way,94304-1030,Has BP rep but no location rep,Justin Goodwin
+1006986,Veeco,San Jose,355 East Trimble Road,95131,Has BP rep but no location rep,Josh Syre
+1004999,Venture Corporation Ltd,Milpitas,1621 Barber Ln,95035,Has BP rep but no location rep,Josh Syre
+1004999,Venture Corporation Ltd,Milpitas,1621 Barber Lane,95035,Has BP rep but no location rep,Josh Syre
+1002649,Veris Manufacturing,Brea,285 Gemini Ave. ,92821,Has BP rep but no location rep,Kellen Ford
+1009120,Verkada ,San Mateo,406 E. 3rd Ave,94401,Has BP rep but no location rep,William Robinson
+1006430,Vertex,El Segundo,1921 E Mariposa Ave.,90245,Has BP rep but no location rep,Thomas Haynes
+1009185,Viasat,Carlsbad,2501 Gateway,92009-1699,Has BP rep but no location rep,Anthoney Bramante
+1002321,Viavi Solutions Inc,San Jose,6001 America Center Drive,95002,Has BP rep but no location rep,Steven Elam
+1005335,"View, Inc.",Milpitas,195 S. Milpitas Blvd,95035,Has BP rep but no location rep,Pablo Hernandez
+1010610,ViewSonic Corporation,Brea,10 Pointe Dr.,92821,Has BP rep but no location rep,Katrina Riobuya
+1012136,Visionary Solutions,Santa Barbara,2060 Alameda Padre Serra UNIT 100,93103,Has BP rep but no location rep,James Diaz
+1008946,Vista Outdoor Inc,San Diego,9955 Black Mountain Rd,92126,Has BP rep but no location rep,William Robinson
+1009444,Voler Systems,Sunnyvale,1021 S. Wolfe Rd,94086,Has BP rep but no location rep,William Robinson
+1006902,WKK Technology Limited,San Jose,175 Bernal Road Suite 200,95119,Has BP rep but no location rep,Romey Kelso
+1007594,Watlow Electric Mfg Co Inc,San Jose,6781 Via Del Oro,95119,Has BP rep but no location rep,William Robinson
+1005102,Wellex Corporation,Fremont,551 Brown Road,94539,Has BP rep but no location rep,Matt Tanner
+1010319,Wycom,San Diego,6010 Cornerstone Ct. West Suite 201,92121,Has BP rep but no location rep,Sara Shelby
+1012122,XLR8,San Clemente,1020 Calle Negocio,92673,Has BP rep but no location rep,James Diaz
+1002363,ZODIAC AEROSPACE/ SAFRAN,Costa Mesa,3184 Pullman Street,92626,Has BP rep but no location rep,TsuUser
+1002363,ZODIAC AEROSPACE/ SAFRAN,Cypress,12240 Warland Drive,90630,Has BP rep but no location rep,TsuUser
+1002363,ZODIAC AEROSPACE/ SAFRAN,Garden Grove,7330 Lincoln Way,92841,Has BP rep but no location rep,TsuUser
+1002363,ZODIAC AEROSPACE/ SAFRAN,Ontario,1945 South Grove Avenue,91761,Has BP rep but no location rep,TsuUser
+1002363,ZODIAC AEROSPACE/ SAFRAN,Santa Maria,2850 Skyway Drive,93455,Has BP rep but no location rep,TsuUser
+1002363,ZODIAC AEROSPACE/ SAFRAN,Santa Maria,2641 Airpark Drive,93455,Has BP rep but no location rep,TsuUser
+1002363,ZODIAC AEROSPACE/ SAFRAN,,17311 Nichols Lane,92647,Has BP rep but no location rep,TsuUser
+1008980,ZT Systems,Santa Clara,2933 Bunker Hill Ln.,95054,Has BP rep but no location rep,Romey Kelso
+1002472,Zebra Technologies,Agoura Hills,30601 West Agoura Road,91301,Has BP rep but no location rep,Joseph Gonzales
+1002472,Zebra Technologies,San Diego,1440 Innovative Drive A,92154,Has BP rep but no location rep,Joseph Gonzales
+1002472,Zebra Technologies,San Jose,2940 N. First Street,95134-2021,Has BP rep but no location rep,Joseph Gonzales
+1006921,Zeiss Meditec Inc.,Dublin,5300 Central Parkway,94568,Has BP rep but no location rep,Romey Kelso
+1012092,Zoll Medical Corporation,San Jose,2000 Ringwood Ave.,95131,Has BP rep but no location rep,JeanPaul Chevrier
+1004121,Zollner Electronics,Milpitas,Milpitas Plant ,95035 ,Has BP rep but no location rep,Justin Oberhofer
+1005287,dB Control,Fremont,1120 Auburn St.,94539,Has BP rep but no location rep,Colton Hammond
+1011208,iRhythm Technologies,San Francisco ,699 8th Street Suite 600,94103,Has BP rep but no location rep,Elena Wilfong
+1002497,4 Star Electronics,Irvine,9671 Irvine Center Drive,92618,No rep at BP or location level,""
+1002497,4 Star Electronics,San Clemente,930 Calle Negocio,92673,No rep at BP or location level,""
+1002788,Abbott Labs,Pleasanton,"Abbott, 6101 Stoneridge Dr",94588,No rep at BP or location level,""
+1002788,Abbott Labs,Santa Clara,3200 Lakeside Drive,95054,No rep at BP or location level,""
+1002743,Beckman Coulter,Brea,250 South Kraemer Blvd,92821,No rep at BP or location level,""
+1002494,Chip 1 Exchange,Laguna Hills,23422 Mill Creek Dr,92653,No rep at BP or location level,""
+1002494,Chip 1 Exchange,Lake Forest,25652 Commercentre Dr.,92630,No rep at BP or location level,""
+1002575,Green Light Electronics,Anaheim,5401 E Estate Ridge Rd,92807,No rep at BP or location level,""
+1002575,Green Light Electronics,Corona,1101 California Ave,92881,No rep at BP or location level,""
+1002581,"IBS Electronics, Inc. ",Santa Ana,"3506-D, Lake Center Drive",92704,No rep at BP or location level,""
+1002374,J & M Aircraft,North Hollywood,7021 Radford Ave,91605,No rep at BP or location level,""
+1001203,Merit Aerospace,Pasadena,3425 Huntington Dr.,91107,No rep at BP or location level,""
+1001239,Microchip,,,,No rep at BP or location level,""
+1002489,Micross Components ,Milpitas,1804 McCarthy Boulevard,95035,No rep at BP or location level,""
+1002653,NASA - Jet Propulsion Laboratory,Pasadena ,4800 Oak Grove Dr,91109,No rep at BP or location level,""
+1002789,National Instruments (NI),Santa Clara,4600 Patrick Henry Dr A,95054,No rep at BP or location level,""
+1003193,Newport Corporation,Irvine,1791 Deere Avenue,92606,No rep at BP or location level,""
+1002718,OSI Electronics,Hawthorne,12525 Chadron Ave,90250,No rep at BP or location level,""
+1002718,OSI Electronics,Hawthorne,12533 Chadron Avenue,90250,No rep at BP or location level,""
+1002723,ParPro Technologies Inc,Santa Ana,2700 S Fairview Street,92704,No rep at BP or location level,""
+1002723,ParPro Technologies Inc,Tijuana,Blvd. Francisco Zarco No. 6201,,No rep at BP or location level,""
+1002723,ParPro Technologies Inc,Vista,2811 La Mirada Drive,92081,No rep at BP or location level,""
+1001068,Sanmina Corporation,Costa Mesa,2945 Airway Avenue,92626,No rep at BP or location level,""
+1001068,Sanmina Corporation,San Jose,60 East Plumeria Drive,95134,No rep at BP or location level,""
+1001068,Sanmina Corporation,San Jose,"590 Brennan Street, Dock 7",95131,No rep at BP or location level,""
+1001068,Sanmina Corporation,San Jose,2050 Bering Drive,95131,No rep at BP or location level,""
+1001068,Sanmina Corporation,San Jose,"540 East Trimble RD,",95131,No rep at BP or location level,""
+1001068,Sanmina Corporation,San Jose,2701 Zanker Rd,95134,No rep at BP or location level,""
+1001068,Sanmina Corporation,San Jose,"2700 N. First St., Bldg 4.",95134,No rep at BP or location level,""
+1001068,Sanmina Corporation,San Jose,30 E Plumeria Drive,95134,No rep at BP or location level,""
+1001218,TPS Aviation,Hayward,1515 Crocker Avenue,94544,No rep at BP or location level,""
+1002776,Val Technologies - C002079,Riverside,6665 Doolittle Avenue,92503,No rep at BP or location level,""
