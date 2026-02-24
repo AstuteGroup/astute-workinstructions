@@ -1,0 +1,6 @@
+Chuboe_Offer_ID[Value],Chuboe_MPN,Chuboe_MFR_ID[Value],Chuboe_MFR_Text,Qty,Chuboe_Lead_Time,Chuboe_Package_Desc,C_Country_ID[Name],Chuboe_Date_Code,C_Currency_ID[ISO_Code],Description,IsActive,Chuboe_MPN_Clean,Chuboe_CPC,PriceEntered,Chuboe_MOQ,Chuboe_SPQ
+,500X14N101MV4T,,Johanson,17389.000,,US2511190000008;QC INSPECT,,,,500X14N101MV4T,,,,,,
+,PBO-3C-5,,CUI Inc,480.000,,US2602050000035;QC INSPECT,,,,"AC-DC Regulated Power Supply Module, 1 O",,,,,,
+,PMV450ENEAR,,Microchip Technology Inc,22471.000,,US2512300000034;F04C02,,,,Inverter 2-Element CMOS,,,,,,
+,SX1509BIULTRT,,Semtech,1730.000,,US2602200000008;0060,,2246,,I2C Interface 5.5V 28-Pin QFN-UT EP T/R,,,,,,
+,VOM452T,,Texas Instruments,56287.000,,US2511190000003;QC INSPECT,,,,MCU 16-bit MSP430 RISC 6,,,,,,

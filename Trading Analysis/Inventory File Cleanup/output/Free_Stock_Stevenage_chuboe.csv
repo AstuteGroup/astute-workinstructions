@@ -1,0 +1,8 @@
+Chuboe_Offer_ID[Value],Chuboe_MPN,Chuboe_MFR_ID[Value],Chuboe_MFR_Text,Qty,Chuboe_Lead_Time,Chuboe_Package_Desc,C_Country_ID[Name],Chuboe_Date_Code,C_Currency_ID[ISO_Code],Description,IsActive,Chuboe_MPN_Clean,Chuboe_CPC,PriceEntered,Chuboe_MOQ,Chuboe_SPQ
+,88E6321-A0-NAZ2I000,,Marvell Semiconductor Inc,500.000,,US2602190000037;QC INSPECT,,,,7 Port Gigabit AVB,,,,6.90000,,
+,ISL84051IAZ,,Intersil Corp,704.000,,US2311170000002;QCH210,,,,IC MUX/DEMUX 8X1 16QSOP,,,,0.00000,,
+,NC7SZ58P6X,,On Semiconductor,9000.000,,US2401250000004;QC INSPECT,,,,IC LOGIC GATE UHS 2-INP SC70-6,,,,0.00000,,
+,"PCA9518PW,118",,NXP Semiconductors,2500.000,,US2011090001-02;S0115B,,2036,,,,,,0.00000,,
+,"PCA9518PW,118",,NXP Semiconductors,2500.000,,US2011090001-03;S0115B,,2039,,,,,,0.00000,,
+,"PCA9518PW,118",,NXP Semiconductors,2500.000,,US2011090001-04;S0115B,,2040,,,,,,0.00000,,
+,TARIFF,,Charge,1.000,,US2602160000016;QC INSPECT,,,,TARIFF,,,,286.20000,,
