@@ -115,8 +115,8 @@ def save_results_to_excel(results: list[dict], output_dir: Path, filename: str =
     ws.title = "RFQ Results"
 
     # Headers - RFQ Number first for easy traceability back to source system
-    headers = ["RFQ Number", "Part Number", "Supplier", "Country", "Region", "Quantity",
-               "Price", "Success", "Message", "Timestamp"]
+    headers = ["RFQ Number", "Part Number", "Supplier", "Country", "Quantity",
+               "Sent", "Status", "Timestamp"]
     ws.append(headers)
 
     # Data rows
@@ -126,9 +126,7 @@ def save_results_to_excel(results: list[dict], output_dir: Path, filename: str =
             result.get("part_number", ""),
             result.get("supplier", ""),
             result.get("country", ""),
-            result.get("region", ""),
             result.get("quantity", ""),
-            result.get("price", ""),
             "Yes" if result.get("success") else "No",
             result.get("message", ""),
             result.get("timestamp", ""),
@@ -192,9 +190,7 @@ async def process_part(
             "part_number": part_number,
             "supplier": rfq_result.supplier,
             "country": supplier_info.country if supplier_info else "",
-            "region": supplier_info.region if supplier_info else "",
             "quantity": quantity,
-            "price": supplier_info.price if supplier_info else "",
             "success": rfq_result.success,
             "message": rfq_result.message,
             "timestamp": rfq_result.timestamp.isoformat(),
