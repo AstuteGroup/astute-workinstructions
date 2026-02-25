@@ -105,8 +105,23 @@ def load_parts_from_file(filepath: str) -> list[dict]:
 def save_results_to_excel(results: list[dict], output_dir: Path, filename: str = None):
     """Save RFQ results to Excel file."""
     if filename is None:
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        filename = f"rfq_results_{timestamp}.xlsx"
+        # Build filename from RFQ range and date
+        date_str = datetime.now().strftime("%Y-%m-%d")
+
+        # Get unique RFQ numbers (filter out None/empty)
+        rfq_numbers = sorted(set(
+            str(r.get("rfq_number")) for r in results
+            if r.get("rfq_number")
+        ))
+
+        if rfq_numbers:
+            if len(rfq_numbers) == 1:
+                rfq_range = rfq_numbers[0]
+            else:
+                rfq_range = f"{rfq_numbers[0]}-{rfq_numbers[-1]}"
+            filename = f"nc_rfq_{rfq_range}_{date_str}.xlsx"
+        else:
+            filename = f"nc_rfq_{date_str}.xlsx"
 
     output_path = output_dir / filename
 
