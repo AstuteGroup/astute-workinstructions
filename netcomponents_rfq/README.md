@@ -185,10 +185,19 @@ RFQ_1130292/
 - Supplier
 - Region
 - Supplier Qty
+- Qualifying (total qualifying suppliers found for this part)
+- Qual Amer (qualifying suppliers in Americas)
+- Qual Eur (qualifying suppliers in Europe)
+- Selected (how many suppliers were selected/used)
 - Status (SENT/FAILED/NO_SUPPLIERS - color coded)
 - Timestamp
 - Error (if any)
 - Worker (which browser instance processed it)
+
+**Batch Summary** (printed at end of run):
+- Total parts processed, RFQs sent, failed, no suppliers
+- Timing metrics (total time, avg per part)
+- Supplier distribution: unique suppliers used, top 10 by RFQ count
 
 #### `analyze_no_suppliers.py` - Post-Batch Analysis
 
