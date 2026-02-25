@@ -98,7 +98,7 @@ def create_output_excel(results, rfq_number, output_path):
     ws.title = f'RFQ {rfq_number} Results'
 
     headers = ['RFQ Line', 'CPC', 'Part Number', 'Qty Requested', 'Qty Sent', 'Supplier', 'Region',
-               'Supplier Qty', 'Status', 'Timestamp', 'Error', 'Worker']
+               'Supplier Qty', 'Qualifying', 'Qual Amer', 'Qual Eur', 'Selected', 'Status', 'Timestamp', 'Error', 'Worker']
 
     header_font = Font(bold=True, color='FFFFFF')
     header_fill = PatternFill(start_color='4472C4', end_color='4472C4', fill_type='solid')
@@ -129,23 +129,27 @@ def create_output_excel(results, rfq_number, output_path):
         ws.cell(row=row_num, column=6, value=r.get('supplier', ''))
         ws.cell(row=row_num, column=7, value=r.get('region', ''))
         ws.cell(row=row_num, column=8, value=r.get('supplier_qty', ''))
-        ws.cell(row=row_num, column=9, value=r.get('status', ''))
-        ws.cell(row=row_num, column=10, value=r.get('timestamp', ''))
-        ws.cell(row=row_num, column=11, value=r.get('error', ''))
-        ws.cell(row=row_num, column=12, value=r.get('worker_id', ''))
+        ws.cell(row=row_num, column=9, value=r.get('qualifying_total', ''))
+        ws.cell(row=row_num, column=10, value=r.get('qualifying_americas', ''))
+        ws.cell(row=row_num, column=11, value=r.get('qualifying_europe', ''))
+        ws.cell(row=row_num, column=12, value=r.get('selected_count', ''))
+        ws.cell(row=row_num, column=13, value=r.get('status', ''))
+        ws.cell(row=row_num, column=14, value=r.get('timestamp', ''))
+        ws.cell(row=row_num, column=15, value=r.get('error', ''))
+        ws.cell(row=row_num, column=16, value=r.get('worker_id', ''))
 
-        status_cell = ws.cell(row=row_num, column=9)
+        status_cell = ws.cell(row=row_num, column=13)
         if r.get('status') == 'SENT':
             status_cell.fill = success_fill
         elif r.get('status') == 'FAILED':
             status_cell.fill = fail_fill
 
-        for col in range(1, 13):
+        for col in range(1, 17):
             ws.cell(row=row_num, column=col).border = thin_border
 
         row_num += 1
 
-    for col in range(1, 13):
+    for col in range(1, 17):
         max_length = max(len(str(cell.value or '')) for cell in ws[get_column_letter(col)])
         ws.column_dimensions[get_column_letter(col)].width = min(max_length + 2, 40)
 
@@ -263,6 +267,11 @@ async def process_part(page, part_number, quantity, line_number, worker_id, cpc=
     americas.sort(key=lambda x: config.supplier_priority_score(x, quantity), reverse=True)
     europe.sort(key=lambda x: config.supplier_priority_score(x, quantity), reverse=True)
 
+    # Track qualifying supplier counts (before selection)
+    qualifying_americas = len(americas)
+    qualifying_europe = len(europe)
+    qualifying_total = qualifying_americas + qualifying_europe
+
     # Select suppliers (add +1 if unknown DCs present)
     americas_count = config.MAX_SUPPLIERS_PER_REGION
     europe_count = config.MAX_SUPPLIERS_PER_REGION
@@ -276,6 +285,7 @@ async def process_part(page, part_number, quantity, line_number, worker_id, cpc=
         selected_europe = europe[:europe_count + 1]
 
     all_selected = selected_americas + selected_europe
+    selected_count = len(all_selected)
 
     if not all_selected:
         print(f'    [W{worker_id}] No qualifying suppliers found')
@@ -288,6 +298,10 @@ async def process_part(page, part_number, quantity, line_number, worker_id, cpc=
             'supplier': '',
             'region': '',
             'supplier_qty': '',
+            'qualifying_total': 0,
+            'qualifying_americas': 0,
+            'qualifying_europe': 0,
+            'selected_count': 0,
             'status': 'NO_SUPPLIERS',
             'timestamp': datetime.now().isoformat(),
             'error': 'No qualifying suppliers found',
@@ -295,7 +309,7 @@ async def process_part(page, part_number, quantity, line_number, worker_id, cpc=
         })
         return results
 
-    print(f'    [W{worker_id}] Found {len(all_selected)} suppliers')
+    print(f'    [W{worker_id}] Found {qualifying_total} qualifying, selected {selected_count}')
 
     for supplier in all_selected:
         supplier_start = time.time()
@@ -324,6 +338,10 @@ async def process_part(page, part_number, quantity, line_number, worker_id, cpc=
                     'supplier': supplier['name'],
                     'region': supplier['region'],
                     'supplier_qty': supplier['total_qty'],
+                    'qualifying_total': qualifying_total,
+                    'qualifying_americas': qualifying_americas,
+                    'qualifying_europe': qualifying_europe,
+                    'selected_count': selected_count,
                     'status': 'FAILED',
                     'timestamp': datetime.now().isoformat(),
                     'error': 'Supplier not found on re-search',
@@ -345,6 +363,10 @@ async def process_part(page, part_number, quantity, line_number, worker_id, cpc=
                     'supplier': supplier['name'],
                     'region': supplier['region'],
                     'supplier_qty': supplier['total_qty'],
+                    'qualifying_total': qualifying_total,
+                    'qualifying_americas': qualifying_americas,
+                    'qualifying_europe': qualifying_europe,
+                    'selected_count': selected_count,
                     'status': 'FAILED',
                     'timestamp': datetime.now().isoformat(),
                     'error': 'No RFQ option',
@@ -394,6 +416,10 @@ async def process_part(page, part_number, quantity, line_number, worker_id, cpc=
                     'supplier': supplier['name'],
                     'region': supplier['region'],
                     'supplier_qty': supplier['total_qty'],
+                    'qualifying_total': qualifying_total,
+                    'qualifying_americas': qualifying_americas,
+                    'qualifying_europe': qualifying_europe,
+                    'selected_count': selected_count,
                     'status': 'SENT',
                     'timestamp': datetime.now().isoformat(),
                     'error': '',
@@ -409,6 +435,10 @@ async def process_part(page, part_number, quantity, line_number, worker_id, cpc=
                     'supplier': supplier['name'],
                     'region': supplier['region'],
                     'supplier_qty': supplier['total_qty'],
+                    'qualifying_total': qualifying_total,
+                    'qualifying_americas': qualifying_americas,
+                    'qualifying_europe': qualifying_europe,
+                    'selected_count': selected_count,
                     'status': 'FAILED',
                     'timestamp': datetime.now().isoformat(),
                     'error': 'Send button not found or disabled',
@@ -428,6 +458,10 @@ async def process_part(page, part_number, quantity, line_number, worker_id, cpc=
                 'supplier': supplier['name'],
                 'region': supplier['region'],
                 'supplier_qty': supplier['total_qty'],
+                'qualifying_total': qualifying_total,
+                'qualifying_americas': qualifying_americas,
+                'qualifying_europe': qualifying_europe,
+                'selected_count': selected_count,
                 'status': 'FAILED',
                 'timestamp': datetime.now().isoformat(),
                 'error': str(e),
@@ -510,6 +544,10 @@ async def worker(worker_id, parts_queue, results_list, results_lock):
                             'supplier': '',
                             'region': '',
                             'supplier_qty': '',
+                            'qualifying_total': '',
+                            'qualifying_americas': '',
+                            'qualifying_europe': '',
+                            'selected_count': '',
                             'status': 'FAILED',
                             'timestamp': datetime.now().isoformat(),
                             'error': str(e),
@@ -595,6 +633,16 @@ async def main():
     failed_count = len([r for r in results_list if r['status'] == 'FAILED'])
     no_suppliers = len([r for r in results_list if r['status'] == 'NO_SUPPLIERS'])
 
+    # Supplier distribution analysis
+    supplier_counts = {}
+    for r in results_list:
+        if r['status'] == 'SENT':
+            supplier = r.get('supplier', 'Unknown')
+            supplier_counts[supplier] = supplier_counts.get(supplier, 0) + 1
+
+    # Sort by count descending
+    top_suppliers = sorted(supplier_counts.items(), key=lambda x: x[1], reverse=True)
+
     print('\n' + '=' * 60)
     print('BATCH SUMMARY')
     print('=' * 60)
@@ -605,6 +653,14 @@ async def main():
     print(f'Total time: {total_time:.1f}s ({total_time/60:.1f} min)')
     print(f'Avg time per part: {total_time/len(parts):.1f}s')
     print(f'Results saved to: {output_file}')
+    print('-' * 60)
+    print('SUPPLIER DISTRIBUTION')
+    print(f'Unique suppliers used: {len(supplier_counts)}')
+    if top_suppliers:
+        print('Top 10 suppliers:')
+        for supplier, count in top_suppliers[:10]:
+            pct = count / sent_count * 100 if sent_count > 0 else 0
+            print(f'  {supplier}: {count} RFQs ({pct:.1f}%)')
     print('=' * 60)
 
 
