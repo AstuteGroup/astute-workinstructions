@@ -53,7 +53,8 @@ def get_rfq_lines_from_db(rfq_number):
         COALESCE(m.chuboe_mpn_clean, m.chuboe_mpn) as part_number,
         COALESCE(m.qty, l.qty) as quantity,
         COALESCE(m.chuboe_mfr_text, l.chuboe_mfr_text) as manufacturer,
-        l.line as line_number
+        l.line as line_number,
+        COALESCE(l.chuboe_cpc_clean, l.chuboe_cpc) as cpc
     FROM adempiere.chuboe_rfq r
     JOIN adempiere.chuboe_rfq_line l ON r.chuboe_rfq_id = l.chuboe_rfq_id
     JOIN adempiere.chuboe_rfq_line_mpn m ON l.chuboe_rfq_line_id = m.chuboe_rfq_line_id
@@ -83,7 +84,8 @@ def get_rfq_lines_from_db(rfq_number):
                     'part_number': fields[0].strip(),
                     'quantity': int(float(fields[1])),
                     'manufacturer': fields[2].strip() if len(fields) > 2 else '',
-                    'line_number': int(fields[3]) if len(fields) > 3 and fields[3] else 0
+                    'line_number': int(fields[3]) if len(fields) > 3 and fields[3] else 0,
+                    'cpc': fields[4].strip() if len(fields) > 4 else ''
                 })
 
     return parts
@@ -95,7 +97,7 @@ def create_output_excel(results, rfq_number, output_path):
     ws = wb.active
     ws.title = f'RFQ {rfq_number} Results'
 
-    headers = ['RFQ Line', 'Part Number', 'Qty Requested', 'Qty Sent', 'Supplier', 'Region',
+    headers = ['RFQ Line', 'CPC', 'Part Number', 'Qty Requested', 'Qty Sent', 'Supplier', 'Region',
                'Supplier Qty', 'Status', 'Timestamp', 'Error', 'Worker']
 
     header_font = Font(bold=True, color='FFFFFF')
@@ -120,29 +122,30 @@ def create_output_excel(results, rfq_number, output_path):
     row_num = 2
     for r in results:
         ws.cell(row=row_num, column=1, value=r.get('line_number', ''))
-        ws.cell(row=row_num, column=2, value=r.get('part_number', ''))
-        ws.cell(row=row_num, column=3, value=r.get('qty_requested', ''))
-        ws.cell(row=row_num, column=4, value=r.get('qty_sent', ''))
-        ws.cell(row=row_num, column=5, value=r.get('supplier', ''))
-        ws.cell(row=row_num, column=6, value=r.get('region', ''))
-        ws.cell(row=row_num, column=7, value=r.get('supplier_qty', ''))
-        ws.cell(row=row_num, column=8, value=r.get('status', ''))
-        ws.cell(row=row_num, column=9, value=r.get('timestamp', ''))
-        ws.cell(row=row_num, column=10, value=r.get('error', ''))
-        ws.cell(row=row_num, column=11, value=r.get('worker_id', ''))
+        ws.cell(row=row_num, column=2, value=r.get('cpc', ''))
+        ws.cell(row=row_num, column=3, value=r.get('part_number', ''))
+        ws.cell(row=row_num, column=4, value=r.get('qty_requested', ''))
+        ws.cell(row=row_num, column=5, value=r.get('qty_sent', ''))
+        ws.cell(row=row_num, column=6, value=r.get('supplier', ''))
+        ws.cell(row=row_num, column=7, value=r.get('region', ''))
+        ws.cell(row=row_num, column=8, value=r.get('supplier_qty', ''))
+        ws.cell(row=row_num, column=9, value=r.get('status', ''))
+        ws.cell(row=row_num, column=10, value=r.get('timestamp', ''))
+        ws.cell(row=row_num, column=11, value=r.get('error', ''))
+        ws.cell(row=row_num, column=12, value=r.get('worker_id', ''))
 
-        status_cell = ws.cell(row=row_num, column=8)
+        status_cell = ws.cell(row=row_num, column=9)
         if r.get('status') == 'SENT':
             status_cell.fill = success_fill
         elif r.get('status') == 'FAILED':
             status_cell.fill = fail_fill
 
-        for col in range(1, 12):
+        for col in range(1, 13):
             ws.cell(row=row_num, column=col).border = thin_border
 
         row_num += 1
 
-    for col in range(1, 12):
+    for col in range(1, 13):
         max_length = max(len(str(cell.value or '')) for cell in ws[get_column_letter(col)])
         ws.column_dimensions[get_column_letter(col)].width = min(max_length + 2, 40)
 
@@ -150,7 +153,7 @@ def create_output_excel(results, rfq_number, output_path):
     wb.close()
 
 
-async def process_part(page, part_number, quantity, line_number, worker_id):
+async def process_part(page, part_number, quantity, line_number, worker_id, cpc=''):
     """Process a single part number and return results"""
     results = []
 
@@ -278,6 +281,7 @@ async def process_part(page, part_number, quantity, line_number, worker_id):
         print(f'    [W{worker_id}] No qualifying suppliers found')
         results.append({
             'line_number': line_number,
+            'cpc': cpc,
             'part_number': part_number,
             'qty_requested': quantity,
             'qty_sent': '',
@@ -313,6 +317,7 @@ async def process_part(page, part_number, quantity, line_number, worker_id):
             if not supplier_link:
                 results.append({
                     'line_number': line_number,
+                    'cpc': cpc,
                     'part_number': part_number,
                     'qty_requested': quantity,
                     'qty_sent': rfq_qty,
@@ -333,6 +338,7 @@ async def process_part(page, part_number, quantity, line_number, worker_id):
             if not rfq_link:
                 results.append({
                     'line_number': line_number,
+                    'cpc': cpc,
                     'part_number': part_number,
                     'qty_requested': quantity,
                     'qty_sent': rfq_qty,
@@ -381,6 +387,7 @@ async def process_part(page, part_number, quantity, line_number, worker_id):
                 print(f'      [W{worker_id}] SENT ({supplier_time:.1f}s)')
                 results.append({
                     'line_number': line_number,
+                    'cpc': cpc,
                     'part_number': part_number,
                     'qty_requested': quantity,
                     'qty_sent': rfq_qty,
@@ -395,6 +402,7 @@ async def process_part(page, part_number, quantity, line_number, worker_id):
             else:
                 results.append({
                     'line_number': line_number,
+                    'cpc': cpc,
                     'part_number': part_number,
                     'qty_requested': quantity,
                     'qty_sent': rfq_qty,
@@ -413,6 +421,7 @@ async def process_part(page, part_number, quantity, line_number, worker_id):
         except Exception as e:
             results.append({
                 'line_number': line_number,
+                'cpc': cpc,
                 'part_number': part_number,
                 'qty_requested': quantity,
                 'qty_sent': rfq_qty,
@@ -480,7 +489,8 @@ async def worker(worker_id, parts_queue, results_list, results_lock):
                         part['part_number'],
                         part['quantity'],
                         part['line_number'],
-                        worker_id
+                        worker_id,
+                        part.get('cpc', '')
                     )
 
                     # Thread-safe append to results
@@ -493,6 +503,7 @@ async def worker(worker_id, parts_queue, results_list, results_lock):
                     async with results_lock:
                         results_list.append({
                             'line_number': part['line_number'],
+                            'cpc': part.get('cpc', ''),
                             'part_number': part['part_number'],
                             'qty_requested': part['quantity'],
                             'qty_sent': '',
