@@ -47,20 +47,21 @@ async def sleep_with_jitter(base_seconds):
 
 
 def get_rfq_lines_from_db(rfq_number):
-    """Query database for RFQ line items"""
+    """Query database for RFQ line items (pulls from chuboe_rfq_line_mpn)"""
     query = f"""
     SELECT
-        l.chuboe_mpn as part_number,
-        l.qty as quantity,
-        l.chuboe_mfr_text as manufacturer,
+        COALESCE(m.chuboe_mpn_clean, m.chuboe_mpn) as part_number,
+        COALESCE(m.qty, l.qty) as quantity,
+        COALESCE(m.chuboe_mfr_text, l.chuboe_mfr_text) as manufacturer,
         l.line as line_number
     FROM adempiere.chuboe_rfq r
     JOIN adempiere.chuboe_rfq_line l ON r.chuboe_rfq_id = l.chuboe_rfq_id
+    JOIN adempiere.chuboe_rfq_line_mpn m ON l.chuboe_rfq_line_id = m.chuboe_rfq_line_id
     WHERE r.value = '{rfq_number}'
       AND l.isactive = 'Y'
-      AND length(coalesce(l.chuboe_mpn,'')) > 0
-      AND coalesce(l.qty, 0) > 0
-    ORDER BY l.line;
+      AND m.isactive = 'Y'
+      AND COALESCE(m.qty, l.qty) > 0
+    ORDER BY l.line, m.chuboe_rfq_line_mpn_id;
     """
 
     result = subprocess.run(
@@ -153,12 +154,16 @@ async def process_part(page, part_number, quantity, line_number, worker_id):
     """Process a single part number and return results"""
     results = []
 
-    print(f'  [W{worker_id}] Searching for {part_number}...')
+    print(f'  [W{worker_id}] Searching for {part_number}...', flush=True)
     search_start = time.time()
+
+    # Search box should already be ready (worker navigated here)
     await page.fill('#PartsSearched_0__PartNumber', part_number)
+    # Wait for search button to be visible before clicking
+    await page.wait_for_selector('#btnSearch', state='visible', timeout=15000)
     await page.click('#btnSearch')
     await sleep_with_jitter(7)  # Base 7 sec with jitter
-    print(f'    [W{worker_id}] Search complete ({time.time() - search_start:.1f}s)')
+    print(f'    [W{worker_id}] Search complete ({time.time() - search_start:.1f}s)', flush=True)
 
     rows = await page.query_selector_all('table#trv_0 tbody tr')
 
@@ -436,17 +441,24 @@ async def worker(worker_id, parts_queue, results_list, results_lock):
 
         try:
             # Login
-            print(f'[Worker {worker_id}] Logging in...')
+            print(f'[Worker {worker_id}] Logging in...', flush=True)
             await page.goto(config.BASE_URL)
+            await page.wait_for_selector('a:has-text("Login")', state='visible', timeout=15000)
             await sleep_with_jitter(2)
             await page.click('a:has-text("Login")')
-            await sleep_with_jitter(2)
+            await page.wait_for_selector('#AccountNumber', state='visible', timeout=15000)
+            await sleep_with_jitter(1)
             await page.fill('#AccountNumber', config.NETCOMPONENTS_ACCOUNT)
             await page.fill('#UserName', config.NETCOMPONENTS_USERNAME)
             await page.fill('#Password', config.NETCOMPONENTS_PASSWORD)
             await page.press('#Password', 'Enter')
-            await sleep_with_jitter(4)
-            print(f'[Worker {worker_id}] Logged in')
+            await sleep_with_jitter(5)
+
+            # Navigate to search page and wait for both search box AND button
+            await page.goto(config.BASE_URL)
+            await page.wait_for_selector('#PartsSearched_0__PartNumber', state='visible', timeout=30000)
+            await page.wait_for_selector('#btnSearch', state='visible', timeout=15000)
+            print(f'[Worker {worker_id}] Logged in and ready', flush=True)
 
             # Process parts from queue
             while True:
@@ -455,19 +467,43 @@ async def worker(worker_id, parts_queue, results_list, results_lock):
                 except asyncio.QueueEmpty:
                     break
 
-                print(f'\n[Worker {worker_id}] Processing Line {part["line_number"]}: {part["part_number"]} x {part["quantity"]:,}')
+                print(f'\n[Worker {worker_id}] Processing Line {part["line_number"]}: {part["part_number"]} x {part["quantity"]:,}', flush=True)
 
-                results = await process_part(
-                    page,
-                    part['part_number'],
-                    part['quantity'],
-                    part['line_number'],
-                    worker_id
-                )
+                try:
+                    # Navigate to search page before each part (ensures clean state)
+                    await page.goto(config.BASE_URL)
+                    await page.wait_for_selector('#PartsSearched_0__PartNumber', state='visible', timeout=15000)
+                    await page.wait_for_selector('#btnSearch', state='visible', timeout=10000)
 
-                # Thread-safe append to results
-                async with results_lock:
-                    results_list.extend(results)
+                    results = await process_part(
+                        page,
+                        part['part_number'],
+                        part['quantity'],
+                        part['line_number'],
+                        worker_id
+                    )
+
+                    # Thread-safe append to results
+                    async with results_lock:
+                        results_list.extend(results)
+
+                except Exception as e:
+                    print(f'[Worker {worker_id}] ERROR on {part["part_number"]}: {e}', flush=True)
+                    # Record the error but continue processing
+                    async with results_lock:
+                        results_list.append({
+                            'line_number': part['line_number'],
+                            'part_number': part['part_number'],
+                            'qty_requested': part['quantity'],
+                            'qty_sent': '',
+                            'supplier': '',
+                            'region': '',
+                            'supplier_qty': '',
+                            'status': 'FAILED',
+                            'timestamp': datetime.now().isoformat(),
+                            'error': str(e),
+                            'worker_id': worker_id
+                        })
 
                 # Brief pause between parts (with jitter)
                 await sleep_with_jitter(1.5)
