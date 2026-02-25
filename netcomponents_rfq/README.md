@@ -104,7 +104,28 @@ python3 batch_rfqs.py <input_excel>
 python3 batch_rfqs.py rfq_input.xlsx
 ```
 
-**Output:** `RFQ_Results_YYYY-MM-DD_HHMMSS.xlsx` with columns:
+**Output:** `RFQ_Results_YYYY-MM-DD_HHMMSS.xlsx`
+
+#### `batch_rfqs_from_system.py` - Batch Processing from System RFQ
+
+Process all line items from an RFQ in iDempiere and output results to Excel.
+
+```bash
+cd python
+python3 batch_rfqs_from_system.py <rfq_number>
+
+# Example
+python3 batch_rfqs_from_system.py 1008627
+```
+
+**What it does:**
+1. Queries `chuboe_rfq` and `chuboe_rfq_line` tables for the RFQ
+2. Extracts part numbers (MPN) and quantities for each line item
+3. Submits NetComponents RFQs for each part
+4. Outputs results to `RFQ_<number>_Results_YYYY-MM-DD_HHMMSS.xlsx`
+
+**Output Excel columns:**
+- RFQ Line
 - Part Number
 - Qty Requested
 - Supplier
@@ -212,7 +233,8 @@ The search results table has a hierarchical structure:
 
 ## Future Enhancements
 
-- [x] Batch processing (multiple parts from RFQ)
+- [x] Batch processing (multiple parts from Excel)
+- [x] Batch processing from system RFQ number
 - [x] Excel output with RFQ tracking
 - [x] Python port for production use
-- [ ] Database integration for RFQ input
+- [x] Database integration for RFQ input
