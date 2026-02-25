@@ -4,27 +4,31 @@ This file tracks recent work sessions and provides quick context for continuing 
 
 ## Recent Sessions
 
-1. **RFQ Sourcing - CPC Analysis & Stability Fixes** (2026-02-25)
+1. **RFQ Sourcing - Lock File & Supplier Tracking** (2026-02-25)
+   - Added lock file to prevent duplicate batch runs (`.lock` in RFQ folder)
+   - Added qualifying supplier tracking columns (Qualifying, Qual Amer/Eur, Selected)
+   - Added supplier distribution summary at end of batch
+   - RFQ subfolders now organize all output files per RFQ number
+   - Identified 370 duplicate RFQs sent to 183 suppliers (damage control files created)
+   - Location: `netcomponents_rfq/`
+
+2. **RFQ Sourcing - CPC Analysis & Stability Fixes** (2026-02-25)
    - Added CPC column to batch results for line-level tracking
    - Created `analyze_no_suppliers.py` - standalone tool to identify CPCs needing manual work
    - Fixed timeout crashes with proper `wait_for_selector` calls
    - Ran RFQ 1130292: 400 RFQs sent, 29 CPCs need attention
    - Location: `netcomponents_rfq/`
 
-2. **RFQ Sourcing - Parallel Processing** (2026-02-25)
+3. **RFQ Sourcing - Parallel Processing** (2026-02-25)
    - Added 3 parallel browser workers for batch RFQs
    - Added timing jitter (±40%) to appear natural
    - 138-part batch runs in ~49 min vs 140 min sequential
    - Location: `netcomponents_rfq/`
 
-3. **RFQ Sourcing - Core Features** (2026-02-25)
+4. **RFQ Sourcing - Core Features** (2026-02-25)
    - Date code prioritization (Fresh > Unknown > Old)
    - Quantity adjustment to encourage supplier quoting
    - Location: `netcomponents_rfq/`
-
-4. **LAM Billings Review** (2026-02-25)
-   - Created LAM revenue/margin analysis queries
-   - Location: `Trading Analysis/LAM Billings Review/`
 
 ---
 
@@ -66,6 +70,10 @@ This file tracks recent work sessions and provides quick context for continuing 
 - `JITTER_RANGE = 0.4` - ±40% timing variation
 - `MAX_SUPPLIERS_PER_REGION = 3` - Suppliers per region
 - `DC_PREFERRED_WINDOW_YEARS = 2` - Date code freshness (2024+)
+
+**Safety Features:**
+- Lock file (`.lock`) prevents duplicate batch runs
+- Stale lock detection (auto-removes if process crashed)
 
 ### Database Access
 - Connection: `psql` (no password needed)
