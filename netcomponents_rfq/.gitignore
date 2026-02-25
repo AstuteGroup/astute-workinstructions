@@ -29,3 +29,4 @@ output/
 
 # Screenshots (keep node/screenshots for documentation)
 /screenshots/
+python/screenshots/*.png
