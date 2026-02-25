@@ -566,6 +566,57 @@ async def worker(worker_id, parts_queue, results_list, results_lock):
             print(f'[Worker {worker_id}] Finished')
 
 
+def check_lock_file(rfq_number):
+    """Check if a lock file exists for this RFQ. Returns True if safe to proceed."""
+    lock_file = Path(f'RFQ_{rfq_number}/.lock')
+
+    if not lock_file.exists():
+        return True
+
+    # Lock file exists - check if it's stale
+    try:
+        with open(lock_file, 'r') as f:
+            content = f.read().strip()
+            pid = int(content.split('\n')[0]) if content else 0
+
+        # Check if process is still running
+        import os
+        try:
+            os.kill(pid, 0)  # Doesn't kill, just checks if process exists
+            # Process is still running
+            print(f'ERROR: Batch already running for RFQ {rfq_number} (PID {pid})')
+            print(f'Lock file: {lock_file}')
+            print('If you believe this is stale, delete the lock file and retry.')
+            return False
+        except OSError:
+            # Process not running - stale lock file
+            print(f'Warning: Stale lock file found (PID {pid} not running). Removing...')
+            lock_file.unlink()
+            return True
+    except Exception as e:
+        print(f'Warning: Could not read lock file: {e}. Removing...')
+        lock_file.unlink()
+        return True
+
+
+def create_lock_file(rfq_number):
+    """Create a lock file for this RFQ."""
+    import os
+    lock_file = Path(f'RFQ_{rfq_number}/.lock')
+    lock_file.parent.mkdir(exist_ok=True)
+    with open(lock_file, 'w') as f:
+        f.write(f'{os.getpid()}\n')
+        f.write(f'Started: {datetime.now().isoformat()}\n')
+    return lock_file
+
+
+def remove_lock_file(rfq_number):
+    """Remove the lock file for this RFQ."""
+    lock_file = Path(f'RFQ_{rfq_number}/.lock')
+    if lock_file.exists():
+        lock_file.unlink()
+
+
 async def main():
     if len(sys.argv) < 2:
         print('Usage: python batch_rfqs_from_system.py <rfq_number>')
@@ -574,94 +625,109 @@ async def main():
 
     rfq_number = sys.argv[1]
 
-    print(f'Fetching RFQ {rfq_number} from database...')
-    parts = get_rfq_lines_from_db(rfq_number)
-
-    if not parts:
-        print(f'No line items found for RFQ {rfq_number}')
+    # Check for existing lock file (prevent duplicate runs)
+    if not check_lock_file(rfq_number):
         sys.exit(1)
 
-    print(f'Found {len(parts)} line items:\n')
-    for p in parts:
-        print(f"  Line {p['line_number']}: {p['part_number']} x {p['quantity']:,}")
+    # Create lock file
+    lock_file = create_lock_file(rfq_number)
+    print(f'Lock file created: {lock_file}')
 
-    # Create RFQ subfolder
-    rfq_folder = Path(f'RFQ_{rfq_number}')
-    rfq_folder.mkdir(exist_ok=True)
+    try:
+        print(f'Fetching RFQ {rfq_number} from database...')
+        parts = get_rfq_lines_from_db(rfq_number)
 
-    timestamp = datetime.now().strftime('%Y-%m-%d_%H%M%S')
-    output_file = rfq_folder / f'Results_{timestamp}.xlsx'
+        if not parts:
+            print(f'No line items found for RFQ {rfq_number}')
+            remove_lock_file(rfq_number)
+            sys.exit(1)
 
-    print('\n' + '=' * 60)
-    print(f'NetComponents Batch RFQ Submission')
-    print(f'RFQ: {rfq_number}')
-    print(f'Parts to process: {len(parts)}')
-    print(f'Parallel workers: {config.NUM_WORKERS}')
-    print(f'Timing jitter: ±{int(config.JITTER_RANGE * 100)}%')
-    print(f'Output folder: {rfq_folder}/')
-    print(f'Output file: {output_file}')
-    print('=' * 60)
+        print(f'Found {len(parts)} line items:\n')
+        for p in parts:
+            print(f"  Line {p['line_number']}: {p['part_number']} x {p['quantity']:,}")
 
-    # Create queue and populate with parts
-    parts_queue = asyncio.Queue()
-    for part in parts:
-        await parts_queue.put(part)
+        # Create RFQ subfolder
+        rfq_folder = Path(f'RFQ_{rfq_number}')
+        rfq_folder.mkdir(exist_ok=True)
 
-    # Shared results list with lock
-    results_list = []
-    results_lock = asyncio.Lock()
+        timestamp = datetime.now().strftime('%Y-%m-%d_%H%M%S')
+        output_file = rfq_folder / f'Results_{timestamp}.xlsx'
 
-    start_time = time.time()
+        print('\n' + '=' * 60)
+        print(f'NetComponents Batch RFQ Submission')
+        print(f'RFQ: {rfq_number}')
+        print(f'Parts to process: {len(parts)}')
+        print(f'Parallel workers: {config.NUM_WORKERS}')
+        print(f'Timing jitter: ±{int(config.JITTER_RANGE * 100)}%')
+        print(f'Output folder: {rfq_folder}/')
+        print(f'Output file: {output_file}')
+        print('=' * 60)
 
-    # Launch workers
-    workers = [
-        worker(i + 1, parts_queue, results_list, results_lock)
-        for i in range(config.NUM_WORKERS)
-    ]
+        # Create queue and populate with parts
+        parts_queue = asyncio.Queue()
+        for part in parts:
+            await parts_queue.put(part)
 
-    # Wait for all workers to complete
-    await asyncio.gather(*workers)
+        # Shared results list with lock
+        results_list = []
+        results_lock = asyncio.Lock()
 
-    # Sort results by line number for output
-    results_list.sort(key=lambda x: (x.get('line_number', 0), x.get('timestamp', '')))
+        start_time = time.time()
 
-    print(f'\n\nWriting results to {output_file}...')
-    create_output_excel(results_list, rfq_number, output_file)
+        # Launch workers
+        workers = [
+            worker(i + 1, parts_queue, results_list, results_lock)
+            for i in range(config.NUM_WORKERS)
+        ]
 
-    total_time = time.time() - start_time
-    sent_count = len([r for r in results_list if r['status'] == 'SENT'])
-    failed_count = len([r for r in results_list if r['status'] == 'FAILED'])
-    no_suppliers = len([r for r in results_list if r['status'] == 'NO_SUPPLIERS'])
+        # Wait for all workers to complete
+        await asyncio.gather(*workers)
 
-    # Supplier distribution analysis
-    supplier_counts = {}
-    for r in results_list:
-        if r['status'] == 'SENT':
-            supplier = r.get('supplier', 'Unknown')
-            supplier_counts[supplier] = supplier_counts.get(supplier, 0) + 1
+        # Sort results by line number for output
+        results_list.sort(key=lambda x: (x.get('line_number', 0), x.get('timestamp', '')))
 
-    # Sort by count descending
-    top_suppliers = sorted(supplier_counts.items(), key=lambda x: x[1], reverse=True)
+        print(f'\n\nWriting results to {output_file}...')
+        create_output_excel(results_list, rfq_number, output_file)
 
-    print('\n' + '=' * 60)
-    print('BATCH SUMMARY')
-    print('=' * 60)
-    print(f'Total parts processed: {len(parts)}')
-    print(f'RFQs sent: {sent_count}')
-    print(f'Failed: {failed_count}')
-    print(f'No suppliers found: {no_suppliers}')
-    print(f'Total time: {total_time:.1f}s ({total_time/60:.1f} min)')
-    print(f'Avg time per part: {total_time/len(parts):.1f}s')
-    print(f'Results saved to: {output_file}')
-    print('-' * 60)
-    print('SUPPLIER DISTRIBUTION')
-    print(f'Unique suppliers used: {len(supplier_counts)}')
-    if top_suppliers:
-        print('Top 10 suppliers:')
-        for supplier, count in top_suppliers[:10]:
-            pct = count / sent_count * 100 if sent_count > 0 else 0
-            print(f'  {supplier}: {count} RFQs ({pct:.1f}%)')
-    print('=' * 60)
+        total_time = time.time() - start_time
+        sent_count = len([r for r in results_list if r['status'] == 'SENT'])
+        failed_count = len([r for r in results_list if r['status'] == 'FAILED'])
+        no_suppliers = len([r for r in results_list if r['status'] == 'NO_SUPPLIERS'])
+
+        # Supplier distribution analysis
+        supplier_counts = {}
+        for r in results_list:
+            if r['status'] == 'SENT':
+                supplier = r.get('supplier', 'Unknown')
+                supplier_counts[supplier] = supplier_counts.get(supplier, 0) + 1
+
+        # Sort by count descending
+        top_suppliers = sorted(supplier_counts.items(), key=lambda x: x[1], reverse=True)
+
+        print('\n' + '=' * 60)
+        print('BATCH SUMMARY')
+        print('=' * 60)
+        print(f'Total parts processed: {len(parts)}')
+        print(f'RFQs sent: {sent_count}')
+        print(f'Failed: {failed_count}')
+        print(f'No suppliers found: {no_suppliers}')
+        print(f'Total time: {total_time:.1f}s ({total_time/60:.1f} min)')
+        print(f'Avg time per part: {total_time/len(parts):.1f}s')
+        print(f'Results saved to: {output_file}')
+        print('-' * 60)
+        print('SUPPLIER DISTRIBUTION')
+        print(f'Unique suppliers used: {len(supplier_counts)}')
+        if top_suppliers:
+            print('Top 10 suppliers:')
+            for supplier, count in top_suppliers[:10]:
+                pct = count / sent_count * 100 if sent_count > 0 else 0
+                print(f'  {supplier}: {count} RFQs ({pct:.1f}%)')
+        print('=' * 60)
+
+    finally:
+        # Always remove lock file when done
+        remove_lock_file(rfq_number)
+        print(f'Lock file removed.')
 
 
 if __name__ == '__main__':

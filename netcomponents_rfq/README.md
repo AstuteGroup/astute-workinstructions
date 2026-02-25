@@ -165,10 +165,17 @@ python3 batch_rfqs_from_system.py 1008627
 **Output folder structure:**
 ```
 RFQ_1130292/
+├── .lock                                # Lock file (prevents duplicate runs)
 ├── Results_2026-02-25_212623.xlsx      # Main results
 ├── NoSuppliers_Analysis.xlsx            # CPC analysis (run separately)
 └── Results_Combined.xlsx                # If multiple batches combined
 ```
+
+**Lock File Protection:**
+- A `.lock` file is created when a batch starts
+- Prevents running the same RFQ twice concurrently
+- Automatically removed when batch completes
+- If a batch crashes, the lock file detects stale PIDs and auto-removes
 
 **Parallel Processing:**
 - 3 headless browser instances run concurrently
