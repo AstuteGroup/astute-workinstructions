@@ -112,6 +112,16 @@ async def main():
                 if auth_icon:
                     continue
 
+                # Get date code from column 4
+                dc_text = ''
+                dc_year = None
+                dc_ambiguous = False
+                try:
+                    dc_text = (await cells[4].inner_text()).strip()
+                    dc_year, dc_ambiguous = config.parse_date_code(dc_text)
+                except Exception:
+                    pass
+
                 # Get quantity from column 8
                 qty = 0
                 try:
@@ -127,26 +137,50 @@ async def main():
                 # Aggregate by supplier
                 key = f"{supplier_name}|{current_region}"
                 if key not in supplier_data:
-                    supplier_data[key] = {'name': supplier_name, 'region': current_region, 'total_qty': 0}
+                    supplier_data[key] = {
+                        'name': supplier_name,
+                        'region': current_region,
+                        'total_qty': 0,
+                        'best_dc_year': None,
+                        'best_dc_text': '',
+                        'dc_ambiguous': False
+                    }
                 supplier_data[key]['total_qty'] += qty
 
-            # Convert to list and sort by qty
-            all_suppliers = sorted(supplier_data.values(), key=lambda x: x['total_qty'], reverse=True)
+                # Keep the best (freshest) date code
+                if dc_year is not None:
+                    if supplier_data[key]['best_dc_year'] is None or dc_year > supplier_data[key]['best_dc_year']:
+                        supplier_data[key]['best_dc_year'] = dc_year
+                        supplier_data[key]['best_dc_text'] = dc_text
+                        supplier_data[key]['dc_ambiguous'] = dc_ambiguous
+
+            # Determine date code status for each supplier
+            for s in supplier_data.values():
+                s['dc_status'] = config.get_dc_status(s.get('best_dc_year'), s.get('dc_ambiguous', False))
 
             # Split by region
-            americas = [s for s in all_suppliers if s['region'] == 'Americas']
-            europe = [s for s in all_suppliers if s['region'] == 'Europe']
+            americas = [s for s in supplier_data.values() if s['region'] == 'Americas']
+            europe = [s for s in supplier_data.values() if s['region'] == 'Europe']
 
-            # Filter by quantity
+            # Sort by priority score (fresh DC + qty prioritized, unknown DC given benefit of doubt)
+            americas.sort(key=lambda x: config.supplier_priority_score(x, min_qty), reverse=True)
+            europe.sort(key=lambda x: config.supplier_priority_score(x, min_qty), reverse=True)
+
+            # Filter by quantity for display grouping
             americas_meet_qty = [s for s in americas if s['total_qty'] >= min_qty]
             europe_meet_qty = [s for s in europe if s['total_qty'] >= min_qty]
+
+            def format_supplier(s):
+                dc_info = f" DC:{s['best_dc_text']}" if s.get('best_dc_text') else " (no DC)"
+                status = f" [{s['dc_status'].upper()}]" if s.get('dc_status') else ""
+                return f"  {s['name']}: {s['total_qty']:,}{dc_info}{status}"
 
             # Display results
             print('=' * 50)
             print(f'AMERICAS - Meeting qty ({min_qty:,}+): {len(americas_meet_qty)}')
             print('=' * 50)
             for s in americas_meet_qty:
-                print(f"  {s['name']}: {s['total_qty']:,}")
+                print(format_supplier(s))
             if not americas_meet_qty:
                 print('  (none)')
             print()
@@ -155,7 +189,7 @@ async def main():
             print(f'EUROPE - Meeting qty ({min_qty:,}+): {len(europe_meet_qty)}')
             print('=' * 50)
             for s in europe_meet_qty:
-                print(f"  {s['name']}: {s['total_qty']:,}")
+                print(format_supplier(s))
             if not europe_meet_qty:
                 print('  (none)')
             print()

@@ -144,6 +144,16 @@ async def main():
                 if auth_icon:
                     continue
 
+                # Get date code from column 4
+                dc_text = ''
+                dc_year = None
+                dc_ambiguous = False
+                try:
+                    dc_text = (await cells[4].inner_text()).strip()
+                    dc_year, dc_ambiguous = config.parse_date_code(dc_text)
+                except Exception:
+                    pass
+
                 # Get quantity from column 8
                 qty = 0
                 try:
@@ -158,36 +168,63 @@ async def main():
                 # Aggregate by supplier
                 key = f"{supplier_name}|{current_region}"
                 if key not in supplier_data:
-                    supplier_data[key] = {'name': supplier_name, 'region': current_region, 'total_qty': 0, 'link': link}
+                    supplier_data[key] = {
+                        'name': supplier_name,
+                        'region': current_region,
+                        'total_qty': 0,
+                        'link': link,
+                        'best_dc_year': None,
+                        'best_dc_text': '',
+                        'dc_ambiguous': False
+                    }
                 supplier_data[key]['total_qty'] += qty
+
+                # Keep the best (freshest) date code
+                if dc_year is not None:
+                    if supplier_data[key]['best_dc_year'] is None or dc_year > supplier_data[key]['best_dc_year']:
+                        supplier_data[key]['best_dc_year'] = dc_year
+                        supplier_data[key]['best_dc_text'] = dc_text
+                        supplier_data[key]['dc_ambiguous'] = dc_ambiguous
+
                 # Keep the link with highest qty
                 if qty > 0:
                     supplier_data[key]['link'] = link
 
-            # Convert to list and sort by qty
-            all_suppliers = sorted(supplier_data.values(), key=lambda x: x['total_qty'], reverse=True)
+            # Determine date code status for each supplier
+            for s in supplier_data.values():
+                s['dc_status'] = config.get_dc_status(s.get('best_dc_year'), s.get('dc_ambiguous', False))
 
-            # Split by region and filter by qty
-            americas = [s for s in all_suppliers if s['region'] == 'Americas']
-            europe = [s for s in all_suppliers if s['region'] == 'Europe']
+            # Split by region
+            americas = [s for s in supplier_data.values() if s['region'] == 'Americas']
+            europe = [s for s in supplier_data.values() if s['region'] == 'Europe']
 
-            # Select suppliers: prefer those meeting qty, fallback to largest
-            americas_meet_qty = [s for s in americas if s['total_qty'] >= quantity]
-            europe_meet_qty = [s for s in europe if s['total_qty'] >= quantity]
+            # Sort by priority score (fresh DC + qty prioritized, unknown DC given benefit of doubt)
+            americas.sort(key=lambda x: config.supplier_priority_score(x, quantity), reverse=True)
+            europe.sort(key=lambda x: config.supplier_priority_score(x, quantity), reverse=True)
 
-            selected_americas = (americas_meet_qty[:config.MAX_SUPPLIERS_PER_REGION]
-                                if americas_meet_qty
-                                else americas[:config.MAX_SUPPLIERS_PER_REGION])
-            selected_europe = (europe_meet_qty[:config.MAX_SUPPLIERS_PER_REGION]
-                              if europe_meet_qty
-                              else europe[:config.MAX_SUPPLIERS_PER_REGION])
+            # Select top suppliers per region (add +1 if unknown DCs present)
+            americas_count = config.MAX_SUPPLIERS_PER_REGION
+            europe_count = config.MAX_SUPPLIERS_PER_REGION
+
+            selected_americas = americas[:americas_count]
+            selected_europe = europe[:europe_count]
+
+            # Add extra supplier if any selected have unknown DC
+            if config.should_add_extra_supplier(selected_americas) and len(americas) > americas_count:
+                selected_americas = americas[:americas_count + 1]
+            if config.should_add_extra_supplier(selected_europe) and len(europe) > europe_count:
+                selected_europe = europe[:europe_count + 1]
 
             print(f'   Americas: {len(selected_americas)} suppliers selected')
             for s in selected_americas:
-                print(f"     - {s['name']} ({s['total_qty']:,})")
+                dc_info = f", DC:{s['best_dc_text']}" if s.get('best_dc_text') else " (no DC)"
+                status = f" [{s['dc_status'].upper()}]" if s.get('dc_status') else ""
+                print(f"     - {s['name']} ({s['total_qty']:,}{dc_info}){status}")
             print(f'   Europe: {len(selected_europe)} suppliers selected')
             for s in selected_europe:
-                print(f"     - {s['name']} ({s['total_qty']:,})")
+                dc_info = f", DC:{s['best_dc_text']}" if s.get('best_dc_text') else " (no DC)"
+                status = f" [{s['dc_status'].upper()}]" if s.get('dc_status') else ""
+                print(f"     - {s['name']} ({s['total_qty']:,}{dc_info}){status}")
             print()
 
             all_selected = selected_americas + selected_europe

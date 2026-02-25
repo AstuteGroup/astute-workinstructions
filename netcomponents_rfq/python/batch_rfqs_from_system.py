@@ -186,6 +186,16 @@ async def process_part(page, part_number, quantity, line_number, timing_data):
         if auth_icon:
             continue
 
+        # Get date code from column 4
+        dc_text = ''
+        dc_year = None
+        dc_ambiguous = False
+        try:
+            dc_text = (await cells[4].inner_text()).strip()
+            dc_year, dc_ambiguous = config.parse_date_code(dc_text)
+        except Exception:
+            pass
+
         qty = 0
         try:
             qty_text = (await cells[8].inner_text()).strip()
@@ -197,18 +207,45 @@ async def process_part(page, part_number, quantity, line_number, timing_data):
 
         key = f"{supplier_name}|{current_region}"
         if key not in supplier_data:
-            supplier_data[key] = {'name': supplier_name, 'region': current_region, 'total_qty': 0}
+            supplier_data[key] = {
+                'name': supplier_name,
+                'region': current_region,
+                'total_qty': 0,
+                'best_dc_year': None,
+                'best_dc_text': '',
+                'dc_ambiguous': False
+            }
         supplier_data[key]['total_qty'] += qty
 
-    all_suppliers = sorted(supplier_data.values(), key=lambda x: x['total_qty'], reverse=True)
-    americas = [s for s in all_suppliers if s['region'] == 'Americas']
-    europe = [s for s in all_suppliers if s['region'] == 'Europe']
+        # Keep the best (freshest) date code
+        if dc_year is not None:
+            if supplier_data[key]['best_dc_year'] is None or dc_year > supplier_data[key]['best_dc_year']:
+                supplier_data[key]['best_dc_year'] = dc_year
+                supplier_data[key]['best_dc_text'] = dc_text
+                supplier_data[key]['dc_ambiguous'] = dc_ambiguous
 
-    americas_meet_qty = [s for s in americas if s['total_qty'] >= quantity]
-    europe_meet_qty = [s for s in europe if s['total_qty'] >= quantity]
+    # Determine date code status for each supplier
+    for s in supplier_data.values():
+        s['dc_status'] = config.get_dc_status(s.get('best_dc_year'), s.get('dc_ambiguous', False))
 
-    selected_americas = americas_meet_qty[:config.MAX_SUPPLIERS_PER_REGION] if americas_meet_qty else americas[:config.MAX_SUPPLIERS_PER_REGION]
-    selected_europe = europe_meet_qty[:config.MAX_SUPPLIERS_PER_REGION] if europe_meet_qty else europe[:config.MAX_SUPPLIERS_PER_REGION]
+    # Split by region and sort by priority score
+    americas = [s for s in supplier_data.values() if s['region'] == 'Americas']
+    europe = [s for s in supplier_data.values() if s['region'] == 'Europe']
+
+    americas.sort(key=lambda x: config.supplier_priority_score(x, quantity), reverse=True)
+    europe.sort(key=lambda x: config.supplier_priority_score(x, quantity), reverse=True)
+
+    # Select suppliers (add +1 if unknown DCs present)
+    americas_count = config.MAX_SUPPLIERS_PER_REGION
+    europe_count = config.MAX_SUPPLIERS_PER_REGION
+
+    selected_americas = americas[:americas_count]
+    selected_europe = europe[:europe_count]
+
+    if config.should_add_extra_supplier(selected_americas) and len(americas) > americas_count:
+        selected_americas = americas[:americas_count + 1]
+    if config.should_add_extra_supplier(selected_europe) and len(europe) > europe_count:
+        selected_europe = europe[:europe_count + 1]
 
     all_selected = selected_americas + selected_europe
 
