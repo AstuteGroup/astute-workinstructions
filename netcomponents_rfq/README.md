@@ -169,16 +169,49 @@ python3 batch_rfqs_from_system.py 1008627
 
 **Output Excel columns:**
 - RFQ Line
+- CPC (Customer Part Code)
 - Part Number
 - Qty Requested
 - Qty Sent (may be adjusted if supplier has less)
 - Supplier
 - Region
 - Supplier Qty
-- Status (SENT/FAILED - color coded)
+- Status (SENT/FAILED/NO_SUPPLIERS - color coded)
 - Timestamp
 - Error (if any)
 - Worker (which browser instance processed it)
+
+#### `analyze_no_suppliers.py` - Post-Batch Analysis
+
+Analyze batch results to identify CPCs that need manual sourcing attention.
+
+```bash
+cd python
+python3 analyze_no_suppliers.py <results_excel> [rfq_number]
+
+# Example
+python3 analyze_no_suppliers.py RFQ_1130292_Results_2026-02-25_212623.xlsx 1130292
+```
+
+**What it does:**
+1. Reads batch results Excel file
+2. Groups MPNs by CPC (Customer Part Code)
+3. For each "NO_SUPPLIERS" MPN, checks if other MPNs under same CPC got quotes
+4. Outputs analysis file highlighting CPCs that truly need attention
+
+**Output columns:**
+- RFQ Line
+- CPC
+- MPN (No Suppliers)
+- Qty
+- CPC Has Other Quotes? (Yes = covered, NO = needs attention)
+- Other MPNs Quoted (which alternatives got quotes)
+
+**Color coding:**
+- **Green** = CPC is covered by another MPN that got quotes
+- **Red** = CPC has NO quotes from any MPN (needs manual work)
+
+**Note:** If CPC column is missing from results (older batch runs), provide the RFQ number as second argument to look up CPC from database.
 
 ### Output (all implementations)
 

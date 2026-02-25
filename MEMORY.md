@@ -4,24 +4,27 @@ This file tracks recent work sessions and provides quick context for continuing 
 
 ## Recent Sessions
 
-1. **RFQ Sourcing - Parallel Processing** (2026-02-25)
-   - Added 3 parallel browser workers for batch RFQs
-   - Added timing jitter (±40%) to appear natural
-   - 70-part batch now runs in ~45 min vs 140 min sequential
+1. **RFQ Sourcing - CPC Analysis & Stability Fixes** (2026-02-25)
+   - Added CPC column to batch results for line-level tracking
+   - Created `analyze_no_suppliers.py` - standalone tool to identify CPCs needing manual work
+   - Fixed timeout crashes with proper `wait_for_selector` calls
+   - Ran RFQ 1130292: 400 RFQs sent, 29 CPCs need attention
    - Location: `netcomponents_rfq/`
 
-2. **RFQ Sourcing - Core Features** (2026-02-25)
+2. **RFQ Sourcing - Parallel Processing** (2026-02-25)
+   - Added 3 parallel browser workers for batch RFQs
+   - Added timing jitter (±40%) to appear natural
+   - 138-part batch runs in ~49 min vs 140 min sequential
+   - Location: `netcomponents_rfq/`
+
+3. **RFQ Sourcing - Core Features** (2026-02-25)
    - Date code prioritization (Fresh > Unknown > Old)
    - Quantity adjustment to encourage supplier quoting
    - Location: `netcomponents_rfq/`
 
-3. **LAM Billings Review** (2026-02-25)
+4. **LAM Billings Review** (2026-02-25)
    - Created LAM revenue/margin analysis queries
    - Location: `Trading Analysis/LAM Billings Review/`
-
-4. **VQ Loading Workflow** (2026-02-24)
-   - Supplier quote email processing to VQ template
-   - Location: `Trading Analysis/VQ Loading/`
 
 ---
 
@@ -52,6 +55,7 @@ This file tracks recent work sessions and provides quick context for continuing 
 ### RFQ Sourcing (`netcomponents_rfq/`)
 - `python/submit_rfqs.py` - Single part RFQ submission
 - `python/batch_rfqs_from_system.py` - Batch RFQ with 3 parallel workers
+- `python/analyze_no_suppliers.py` - Analyze results for CPCs needing manual work
 - `python/list_suppliers.py` - Preview suppliers without submitting
 - `python/config.py` - Settings: workers, jitter, DC window, max suppliers
 - `node/.env` - NetComponents credentials (shared)
