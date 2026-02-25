@@ -20,7 +20,28 @@ This automation:
 | **Supplier Type** | Skip franchised/authorized distributors (detected via `ncauth` class in DOM) |
 | **Regions** | Americas and Europe only (Asia/Other excluded - handled by separate purchasing group) |
 | **Quantity** | Supplier must have qty >= requested qty (fallback: largest available if none qualify) |
-| **Max per Region** | 3 suppliers per region |
+| **Date Code** | Fresh DC (2024+) prioritized, but never rules out suppliers |
+| **Max per Region** | 3 suppliers per region (+1 if unknown DCs in selection) |
+
+### Date Code Prioritization
+
+Suppliers are prioritized by date code freshness (2-year window preferred), but **no supplier is ruled out** based on date code:
+
+| Priority | Criteria |
+|----------|----------|
+| 1 (highest) | Fresh DC (24+) + meets qty |
+| 2 | Unknown/No DC + meets qty |
+| 3 | Fresh DC + below qty |
+| 4 | Unknown/No DC + below qty |
+| 5 | Old DC + meets qty |
+| 6 (lowest) | Old DC + below qty |
+
+**Date Code Status:**
+- **FRESH**: Confirmed 2024+ (e.g., `2532`, `25`)
+- **UNKNOWN**: No DC, ambiguous format (e.g., `2022`), or "+" suffix (e.g., `20+`)
+- **OLD**: Confirmed older than 2024 (e.g., `2237`, `1507`)
+
+When unknown DCs are in the selected suppliers, **+1 extra supplier** is added per region as a buffer.
 
 ### Part Number Variants
 
