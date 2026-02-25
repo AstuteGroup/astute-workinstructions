@@ -1,0 +1,12 @@
+# RFQ output folders (data files, not code)
+RFQ_*/
+
+# Debug scripts
+debug_*.py
+
+# Python cache
+__pycache__/
+*.pyc
+
+# Virtual environment
+venv/

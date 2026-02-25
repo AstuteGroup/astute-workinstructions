@@ -11,6 +11,13 @@ node_modules/
 # Output files
 output/
 
+# Debug scripts (development artifacts)
+debug_*.js
+find_*.js
+list_*.js
+screenshot_*.js
+screenshots/
+
 # IDE
 .vscode/
 .idea/
