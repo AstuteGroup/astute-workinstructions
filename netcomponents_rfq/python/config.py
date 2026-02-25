@@ -19,7 +19,8 @@ NETCOMPONENTS_PASSWORD = os.getenv('NETCOMPONENTS_PASSWORD', '')
 MAX_SUPPLIERS_PER_REGION = 3
 FRANCHISED_NAMES = [
     'mouser', 'digikey', 'arrow', 'avnet', 'newark',
-    'element14', 'farnell', 'future', 'rochester', 'tti', 'symmetry'
+    'element14', 'farnell', 'future', 'rochester', 'tti', 'symmetry',
+    'ebv', 'anglia'
 ]
 
 # Paths

@@ -46,7 +46,7 @@ async function main() {
         await delay(8000);
 
         // 3. Parse all suppliers from results
-        const franchisedNames = ['mouser', 'digikey', 'arrow', 'avnet', 'newark', 'element14', 'farnell', 'future', 'rochester', 'tti', 'symmetry'];
+        const franchisedNames = ['mouser', 'digikey', 'arrow', 'avnet', 'newark', 'element14', 'farnell', 'future', 'rochester', 'tti', 'symmetry', 'ebv', 'anglia'];
         const rows = await page.$$('table#trv_0 tbody tr');
 
         let inStockSection = false;

@@ -19,7 +19,7 @@ const SCREENSHOTS_DIR = path.join(__dirname, 'screenshots');
 if (!fs.existsSync(SCREENSHOTS_DIR)) fs.mkdirSync(SCREENSHOTS_DIR, { recursive: true });
 
 const MAX_SUPPLIERS_PER_REGION = 3;
-const FRANCHISED_NAMES = ['mouser', 'digikey', 'arrow', 'avnet', 'newark', 'element14', 'farnell', 'future', 'rochester', 'tti', 'symmetry'];
+const FRANCHISED_NAMES = ['mouser', 'digikey', 'arrow', 'avnet', 'newark', 'element14', 'farnell', 'future', 'rochester', 'tti', 'symmetry', 'ebv', 'anglia'];
 
 async function delay(ms) {
     return new Promise(resolve => setTimeout(resolve, ms));
