@@ -1,0 +1,41 @@
+LAM Billings Review - Resume Notes
+===================================
+Last updated: 2026-02-25
+
+STATUS: In Progress
+
+RESUME PROMPT:
+--------------
+Continue LAM Billings Review in `Trading Analysis/LAM Billings Review/`. We matched the program file against 4 billing exports (VM Services, Naprotek, Plexus + data (60).xlsx for 2024). GP by Buyer summary is done ($16,797.88). The 4 unmatched 2024 lines were resolved (typos/alternates). Remaining: 20 buyer issues - 17 lines need buyer assignment ($61.58 GP), 1 line has multiple buyers (DM / ES), 2 are 2026 pending. Show me the buyer issues to continue.
+
+COMPLETED:
+----------
+- Matched program file (LAM Program billings.csv) against billing exports
+- GP by Buyer Summary: $16,797.88 total
+  - Jake Harris: $7,354.12
+  - TX: $6,864.61
+  - Stephanie Hill: $1,262.18
+  - ES: $869.15
+  - DM: $386.23
+  - UNKNOWN: $61.58
+
+- 4 unmatched 2024 lines resolved:
+  - COV0015937: Typo (557969-1 should be 5557969-1)
+  - COV0016073: Alternate part (EXTTZ vs TZ-ADJ)
+  - COV0016254: Wrong MPN in program file (had PO# instead)
+  - COV0016257: Alternate ordering code (RTJT vs RTJR)
+
+REMAINING:
+----------
+- 20 buyer issues total:
+  - 1 line with multiple buyers (COV0016503, DM / ES)
+  - 17 lines need buyer assignment ($61.58 GP)
+  - 2 lines are 2026 pending (not yet billed)
+
+FILES:
+------
+- GP_by_Buyer_Summary.csv - Ready for finance
+- 2024_Unmatched_Lines.csv - 4 lines (resolved, needs cleanup)
+- 2026_Pending_Lines.csv - 243 lines (expected, not yet billed)
+- Buyer_Issues.csv - 20 lines to review
+- Unmatched_Program_Lines.csv - Full detail
