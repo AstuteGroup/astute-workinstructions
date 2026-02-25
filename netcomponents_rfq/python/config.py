@@ -150,6 +150,54 @@ def should_add_extra_supplier(selected_suppliers):
     return False
 
 
+def adjust_rfq_quantity(requested_qty, supplier_qty):
+    """
+    Adjust RFQ quantity when supplier has less than requested.
+
+    If supplier can fulfill the full request, use requested qty.
+    If supplier has less, use a "nice" whole number close to their stock.
+    This encourages suppliers to quote (they feel they can win the order).
+
+    Returns: (adjusted_qty, was_adjusted)
+    """
+    if supplier_qty >= requested_qty:
+        return requested_qty, False
+
+    # Supplier has less than we need - adjust to encourage quoting
+    # Use a round number close to their stock
+    target = supplier_qty
+
+    # Round down to nearest "nice" number based on magnitude
+    if target >= 1000:
+        # Round to nearest 100
+        adjusted = (target // 100) * 100
+    elif target >= 100:
+        # Round to nearest 25
+        adjusted = (target // 25) * 25
+    elif target >= 50:
+        # Round to nearest 10
+        adjusted = (target // 10) * 10
+    elif target >= 10:
+        # Round to nearest 5
+        adjusted = (target // 5) * 5
+    else:
+        # Small qty - use as-is
+        adjusted = target
+
+    # Ensure we stay within 10% of their stock (don't round too aggressively)
+    min_qty = int(supplier_qty * 0.9)
+    if adjusted < min_qty:
+        adjusted = target  # Just use their exact qty
+
+    # Never request more than they have
+    adjusted = min(adjusted, supplier_qty)
+
+    # Ensure at least 1
+    adjusted = max(adjusted, 1)
+
+    return adjusted, True
+
+
 # Need re for date code parsing
 import re
 

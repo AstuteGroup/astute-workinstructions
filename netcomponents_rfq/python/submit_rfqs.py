@@ -238,6 +238,11 @@ async def main():
 
             for i, supplier in enumerate(all_selected):
                 supplier_start = time.time()
+
+                # Adjust quantity if supplier has less than requested
+                rfq_qty, qty_adjusted = config.adjust_rfq_quantity(quantity, supplier['total_qty'])
+                qty_note = f" (adjusted from {quantity})" if qty_adjusted else ""
+
                 print(f"   [{i + 1}/{len(all_selected)}] {supplier['name']} ({supplier['region']})...")
 
                 try:
@@ -311,8 +316,8 @@ async def main():
 
                     if qty_input:
                         await qty_input.click()
-                        await qty_input.fill(str(quantity))
-                        print(f'    Entered quantity: {quantity}')
+                        await qty_input.fill(str(rfq_qty))
+                        print(f'    Entered quantity: {rfq_qty}{qty_note}')
                     else:
                         print('    WARNING: Quantity input not found')
 

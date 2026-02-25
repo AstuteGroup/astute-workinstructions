@@ -255,6 +255,7 @@ async def process_part(page, part_number, quantity, line_number, timing_data):
             'line_number': line_number,
             'part_number': part_number,
             'qty_requested': quantity,
+            'qty_sent': '',
             'supplier': '',
             'region': '',
             'supplier_qty': '',
@@ -268,7 +269,12 @@ async def process_part(page, part_number, quantity, line_number, timing_data):
 
     for supplier in all_selected:
         supplier_start = time.time()
-        print(f'    Submitting to {supplier["name"]}...')
+
+        # Adjust quantity if supplier has less than requested
+        rfq_qty, qty_adjusted = config.adjust_rfq_quantity(quantity, supplier['total_qty'])
+        qty_note = f" (adjusted from {quantity})" if qty_adjusted else ""
+
+        print(f'    Submitting to {supplier["name"]} qty:{rfq_qty}{qty_note}...')
 
         try:
             await page.goto(config.BASE_URL)
@@ -283,6 +289,7 @@ async def process_part(page, part_number, quantity, line_number, timing_data):
                     'line_number': line_number,
                     'part_number': part_number,
                     'qty_requested': quantity,
+                    'qty_sent': rfq_qty,
                     'supplier': supplier['name'],
                     'region': supplier['region'],
                     'supplier_qty': supplier['total_qty'],
@@ -301,6 +308,7 @@ async def process_part(page, part_number, quantity, line_number, timing_data):
                     'line_number': line_number,
                     'part_number': part_number,
                     'qty_requested': quantity,
+                    'qty_sent': rfq_qty,
                     'supplier': supplier['name'],
                     'region': supplier['region'],
                     'supplier_qty': supplier['total_qty'],
@@ -323,7 +331,7 @@ async def process_part(page, part_number, quantity, line_number, timing_data):
             qty_input = await page.query_selector('#Parts_0__Quantity')
             if qty_input:
                 await qty_input.click()
-                await qty_input.fill(str(quantity))
+                await qty_input.fill(str(rfq_qty))
 
             if supplier['region'] == 'Europe':
                 comments_field = await page.query_selector('#Comments')
@@ -348,6 +356,7 @@ async def process_part(page, part_number, quantity, line_number, timing_data):
                     'line_number': line_number,
                     'part_number': part_number,
                     'qty_requested': quantity,
+                    'qty_sent': rfq_qty,
                     'supplier': supplier['name'],
                     'region': supplier['region'],
                     'supplier_qty': supplier['total_qty'],
@@ -360,6 +369,7 @@ async def process_part(page, part_number, quantity, line_number, timing_data):
                     'line_number': line_number,
                     'part_number': part_number,
                     'qty_requested': quantity,
+                    'qty_sent': rfq_qty,
                     'supplier': supplier['name'],
                     'region': supplier['region'],
                     'supplier_qty': supplier['total_qty'],
@@ -376,6 +386,7 @@ async def process_part(page, part_number, quantity, line_number, timing_data):
                 'line_number': line_number,
                 'part_number': part_number,
                 'qty_requested': quantity,
+                'qty_sent': rfq_qty,
                 'supplier': supplier['name'],
                 'region': supplier['region'],
                 'supplier_qty': supplier['total_qty'],

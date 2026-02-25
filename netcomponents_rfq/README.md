@@ -43,6 +43,21 @@ Suppliers are prioritized by date code freshness (2-year window preferred), but 
 
 When unknown DCs are in the selected suppliers, **+1 extra supplier** is added per region as a buffer.
 
+### Quantity Adjustment
+
+When a supplier has **less than the requested quantity**, the RFQ quantity is automatically adjusted to encourage quoting:
+
+- Suppliers are more likely to respond when they feel they can win the order
+- Adjusted qty is rounded to a "nice" number (nearest 5, 10, 25, or 100 depending on magnitude)
+- Stays within 10% of supplier's actual stock
+
+| Requested | Supplier Stock | RFQ Qty |
+|-----------|----------------|---------|
+| 100 | 150 | 100 (supplier has enough) |
+| 100 | 32 | 30 (rounded to nearest 5) |
+| 500 | 480 | 475 (rounded to nearest 25) |
+| 500 | 123 | 123 (rounding would exceed 10%) |
+
 ### Part Number Variants
 
 The automation aggregates quantities across part number variants from the same supplier:
