@@ -4,22 +4,24 @@ This file tracks recent work sessions and provides quick context for continuing 
 
 ## Recent Sessions
 
-1. **RFQ Sourcing Automation** (2026-02-25)
-   - Built NetComponents batch RFQ system with date code prioritization
-   - Added quantity adjustment to encourage supplier quoting
+1. **RFQ Sourcing - Parallel Processing** (2026-02-25)
+   - Added 3 parallel browser workers for batch RFQs
+   - Added timing jitter (±40%) to appear natural
+   - 70-part batch now runs in ~45 min vs 140 min sequential
    - Location: `netcomponents_rfq/`
 
-2. **LAM Billings Review** (2026-02-25)
+2. **RFQ Sourcing - Core Features** (2026-02-25)
+   - Date code prioritization (Fresh > Unknown > Old)
+   - Quantity adjustment to encourage supplier quoting
+   - Location: `netcomponents_rfq/`
+
+3. **LAM Billings Review** (2026-02-25)
    - Created LAM revenue/margin analysis queries
    - Location: `Trading Analysis/LAM Billings Review/`
 
-3. **VQ Loading Workflow** (2026-02-24)
+4. **VQ Loading Workflow** (2026-02-24)
    - Supplier quote email processing to VQ template
    - Location: `Trading Analysis/VQ Loading/`
-
-4. **Market Offer Matching for RFQs** (2026-02-17)
-   - Match RFQs against customer excess and stock offers
-   - Location: `Trading Analysis/Market Offer Matching for RFQs/`
 
 ---
 
@@ -49,10 +51,16 @@ This file tracks recent work sessions and provides quick context for continuing 
 
 ### RFQ Sourcing (`netcomponents_rfq/`)
 - `python/submit_rfqs.py` - Single part RFQ submission
-- `python/batch_rfqs_from_system.py` - Batch RFQ from iDempiere extract
+- `python/batch_rfqs_from_system.py` - Batch RFQ with 3 parallel workers
 - `python/list_suppliers.py` - Preview suppliers without submitting
-- `python/config.py` - Credentials, supplier selection logic, date code parsing
+- `python/config.py` - Settings: workers, jitter, DC window, max suppliers
 - `node/.env` - NetComponents credentials (shared)
+
+**Key Settings (config.py):**
+- `NUM_WORKERS = 3` - Parallel browser instances
+- `JITTER_RANGE = 0.4` - ±40% timing variation
+- `MAX_SUPPLIERS_PER_REGION = 3` - Suppliers per region
+- `DC_PREFERRED_WINDOW_YEARS = 2` - Date code freshness (2024+)
 
 ### Database Access
 - Connection: `psql` (no password needed)

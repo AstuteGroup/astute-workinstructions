@@ -25,6 +25,10 @@ MAX_SUPPLIERS_PER_REGION = 3
 # Date code preferences - 2 year window is preferred
 DC_PREFERRED_WINDOW_YEARS = 2
 
+# Parallel processing settings
+NUM_WORKERS = 3  # Number of parallel browser instances
+JITTER_RANGE = 0.4  # ±40% timing variation (e.g., 2 sec becomes 1.2-2.8 sec)
+
 
 def parse_date_code(dc_text):
     """

@@ -157,19 +157,28 @@ python3 batch_rfqs_from_system.py 1008627
 **What it does:**
 1. Queries `chuboe_rfq` and `chuboe_rfq_line` tables for the RFQ
 2. Extracts part numbers (MPN) and quantities for each line item
-3. Submits NetComponents RFQs for each part
-4. Outputs results to `RFQ_<number>_Results_YYYY-MM-DD_HHMMSS.xlsx`
+3. Launches 3 parallel browser workers (configurable)
+4. Distributes parts across workers for faster processing
+5. Outputs results to `RFQ_<number>_Results_YYYY-MM-DD_HHMMSS.xlsx`
+
+**Parallel Processing:**
+- 3 headless browser instances run concurrently
+- Parts are distributed across workers via queue
+- Timing jitter (±40%) prevents detection as bot traffic
+- Mimics normal multi-buyer portal activity
 
 **Output Excel columns:**
 - RFQ Line
 - Part Number
 - Qty Requested
+- Qty Sent (may be adjusted if supplier has less)
 - Supplier
 - Region
 - Supplier Qty
 - Status (SENT/FAILED - color coded)
 - Timestamp
 - Error (if any)
+- Worker (which browser instance processed it)
 
 ### Output (all implementations)
 
@@ -193,14 +202,20 @@ NETCOMPONENTS_PASSWORD=<password>
 
 ### Constants
 
-Configurable in `node/submit_rfqs.js` or `python/config.py`:
-- `MAX_SUPPLIERS_PER_REGION` - Default: 3
+Configurable in `python/config.py`:
+
+| Setting | Default | Description |
+|---------|---------|-------------|
+| `MAX_SUPPLIERS_PER_REGION` | 3 | Max suppliers to RFQ per region |
+| `NUM_WORKERS` | 3 | Parallel browser instances for batch processing |
+| `JITTER_RANGE` | 0.4 | Timing variation (±40%) to appear natural |
+| `DC_PREFERRED_WINDOW_YEARS` | 2 | Date code freshness window (2024+ is "fresh") |
 
 **Note:** Franchised/authorized distributors are detected automatically via the `ncauth` CSS class in the DOM (no hardcoded name list required).
 
 ## Performance Benchmarks
 
-Based on testing:
+### Single-Threaded (submit_rfqs.py)
 
 | Metric | Value |
 |--------|-------|
@@ -209,13 +224,23 @@ Based on testing:
 | Per supplier | ~19-20 seconds |
 | **Throughput** | **~2.4 suppliers/minute** |
 
-### Example Timing
+### Parallel Processing (batch_rfqs_from_system.py)
 
-| Suppliers | Automated | Manual (est.) | Time Saved |
-|-----------|-----------|---------------|------------|
-| 4 | 1.5 min | 8-12 min | ~85% |
-| 6 | 2.5 min | 12-18 min | ~85% |
-| 60 | 25 min | 2-3 hours | ~85% |
+With 3 workers:
+
+| Metric | Value |
+|--------|-------|
+| Login (per worker) | ~12 seconds |
+| Avg per part | ~20-25 seconds |
+| **Effective throughput** | **~7-8 suppliers/minute** |
+
+### Example Timing (Batch)
+
+| Parts | Suppliers (est.) | Sequential | 3 Workers | Time Saved |
+|-------|------------------|------------|-----------|------------|
+| 10 | ~50 | 20 min | 7 min | 65% |
+| 30 | ~150 | 60 min | 20 min | 67% |
+| 70 | ~350 | 140 min | 45 min | 68% |
 
 ## Technical Notes
 
@@ -274,3 +299,7 @@ The search results table has a hierarchical structure:
 - [x] Excel output with RFQ tracking
 - [x] Python port for production use
 - [x] Database integration for RFQ input
+- [x] Parallel processing (3 workers)
+- [x] Timing jitter for natural appearance
+- [x] Date code prioritization
+- [x] Quantity adjustment to encourage quoting

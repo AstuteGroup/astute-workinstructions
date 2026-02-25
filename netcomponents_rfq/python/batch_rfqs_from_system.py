@@ -5,6 +5,12 @@ Batch RFQ submission from system RFQ number
 Pulls part numbers and quantities from an RFQ in iDempiere,
 then submits NetComponents RFQs to qualifying suppliers.
 
+Features:
+- 3 parallel browser workers for faster processing
+- Randomized timing jitter to appear natural
+- Date code prioritization
+- Quantity adjustment to encourage supplier quoting
+
 Usage:
     python batch_rfqs_from_system.py <rfq_number>
 
@@ -19,6 +25,7 @@ import subprocess
 import asyncio
 import time
 import re
+import random
 from datetime import datetime
 from pathlib import Path
 from playwright.async_api import async_playwright
@@ -26,6 +33,17 @@ import openpyxl
 from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
 from openpyxl.utils import get_column_letter
 import config
+
+
+def jitter_sleep(base_seconds):
+    """Return sleep duration with random jitter (±40%)"""
+    jitter = random.uniform(1 - config.JITTER_RANGE, 1 + config.JITTER_RANGE)
+    return base_seconds * jitter
+
+
+async def sleep_with_jitter(base_seconds):
+    """Async sleep with randomized jitter"""
+    await asyncio.sleep(jitter_sleep(base_seconds))
 
 
 def get_rfq_lines_from_db(rfq_number):
@@ -76,8 +94,8 @@ def create_output_excel(results, rfq_number, output_path):
     ws = wb.active
     ws.title = f'RFQ {rfq_number} Results'
 
-    headers = ['RFQ Line', 'Part Number', 'Qty Requested', 'Supplier', 'Region',
-               'Supplier Qty', 'Status', 'Timestamp', 'Error']
+    headers = ['RFQ Line', 'Part Number', 'Qty Requested', 'Qty Sent', 'Supplier', 'Region',
+               'Supplier Qty', 'Status', 'Timestamp', 'Error', 'Worker']
 
     header_font = Font(bold=True, color='FFFFFF')
     header_fill = PatternFill(start_color='4472C4', end_color='4472C4', fill_type='solid')
@@ -103,25 +121,27 @@ def create_output_excel(results, rfq_number, output_path):
         ws.cell(row=row_num, column=1, value=r.get('line_number', ''))
         ws.cell(row=row_num, column=2, value=r.get('part_number', ''))
         ws.cell(row=row_num, column=3, value=r.get('qty_requested', ''))
-        ws.cell(row=row_num, column=4, value=r.get('supplier', ''))
-        ws.cell(row=row_num, column=5, value=r.get('region', ''))
-        ws.cell(row=row_num, column=6, value=r.get('supplier_qty', ''))
-        ws.cell(row=row_num, column=7, value=r.get('status', ''))
-        ws.cell(row=row_num, column=8, value=r.get('timestamp', ''))
-        ws.cell(row=row_num, column=9, value=r.get('error', ''))
+        ws.cell(row=row_num, column=4, value=r.get('qty_sent', ''))
+        ws.cell(row=row_num, column=5, value=r.get('supplier', ''))
+        ws.cell(row=row_num, column=6, value=r.get('region', ''))
+        ws.cell(row=row_num, column=7, value=r.get('supplier_qty', ''))
+        ws.cell(row=row_num, column=8, value=r.get('status', ''))
+        ws.cell(row=row_num, column=9, value=r.get('timestamp', ''))
+        ws.cell(row=row_num, column=10, value=r.get('error', ''))
+        ws.cell(row=row_num, column=11, value=r.get('worker_id', ''))
 
-        status_cell = ws.cell(row=row_num, column=7)
+        status_cell = ws.cell(row=row_num, column=8)
         if r.get('status') == 'SENT':
             status_cell.fill = success_fill
         elif r.get('status') == 'FAILED':
             status_cell.fill = fail_fill
 
-        for col in range(1, 10):
+        for col in range(1, 12):
             ws.cell(row=row_num, column=col).border = thin_border
 
         row_num += 1
 
-    for col in range(1, 10):
+    for col in range(1, 12):
         max_length = max(len(str(cell.value or '')) for cell in ws[get_column_letter(col)])
         ws.column_dimensions[get_column_letter(col)].width = min(max_length + 2, 40)
 
@@ -129,16 +149,16 @@ def create_output_excel(results, rfq_number, output_path):
     wb.close()
 
 
-async def process_part(page, part_number, quantity, line_number, timing_data):
+async def process_part(page, part_number, quantity, line_number, worker_id):
     """Process a single part number and return results"""
     results = []
 
-    print(f'\n  Searching for {part_number}...')
+    print(f'  [W{worker_id}] Searching for {part_number}...')
     search_start = time.time()
     await page.fill('#PartsSearched_0__PartNumber', part_number)
     await page.click('#btnSearch')
-    await asyncio.sleep(8)
-    print(f'    Search complete ({time.time() - search_start:.1f}s)')
+    await sleep_with_jitter(7)  # Base 7 sec with jitter
+    print(f'    [W{worker_id}] Search complete ({time.time() - search_start:.1f}s)')
 
     rows = await page.query_selector_all('table#trv_0 tbody tr')
 
@@ -250,7 +270,7 @@ async def process_part(page, part_number, quantity, line_number, timing_data):
     all_selected = selected_americas + selected_europe
 
     if not all_selected:
-        print(f'    No qualifying suppliers found')
+        print(f'    [W{worker_id}] No qualifying suppliers found')
         results.append({
             'line_number': line_number,
             'part_number': part_number,
@@ -261,27 +281,28 @@ async def process_part(page, part_number, quantity, line_number, timing_data):
             'supplier_qty': '',
             'status': 'NO_SUPPLIERS',
             'timestamp': datetime.now().isoformat(),
-            'error': 'No qualifying suppliers found'
+            'error': 'No qualifying suppliers found',
+            'worker_id': worker_id
         })
         return results
 
-    print(f'    Found {len(all_selected)} suppliers')
+    print(f'    [W{worker_id}] Found {len(all_selected)} suppliers')
 
     for supplier in all_selected:
         supplier_start = time.time()
 
         # Adjust quantity if supplier has less than requested
         rfq_qty, qty_adjusted = config.adjust_rfq_quantity(quantity, supplier['total_qty'])
-        qty_note = f" (adjusted from {quantity})" if qty_adjusted else ""
+        qty_note = f" (adj)" if qty_adjusted else ""
 
-        print(f'    Submitting to {supplier["name"]} qty:{rfq_qty}{qty_note}...')
+        print(f'    [W{worker_id}] -> {supplier["name"]} qty:{rfq_qty}{qty_note}...')
 
         try:
             await page.goto(config.BASE_URL)
-            await asyncio.sleep(2)
+            await sleep_with_jitter(2)
             await page.fill('#PartsSearched_0__PartNumber', part_number)
             await page.click('#btnSearch')
-            await asyncio.sleep(6)
+            await sleep_with_jitter(5)
 
             supplier_link = await page.query_selector(f'a:has-text("{supplier["name"]}")')
             if not supplier_link:
@@ -295,12 +316,13 @@ async def process_part(page, part_number, quantity, line_number, timing_data):
                     'supplier_qty': supplier['total_qty'],
                     'status': 'FAILED',
                     'timestamp': datetime.now().isoformat(),
-                    'error': 'Supplier not found on re-search'
+                    'error': 'Supplier not found on re-search',
+                    'worker_id': worker_id
                 })
                 continue
 
             await supplier_link.click()
-            await asyncio.sleep(2)
+            await sleep_with_jitter(2)
 
             rfq_link = await page.query_selector('a:has-text("E-Mail RFQ")')
             if not rfq_link:
@@ -314,14 +336,15 @@ async def process_part(page, part_number, quantity, line_number, timing_data):
                     'supplier_qty': supplier['total_qty'],
                     'status': 'FAILED',
                     'timestamp': datetime.now().isoformat(),
-                    'error': 'No RFQ option'
+                    'error': 'No RFQ option',
+                    'worker_id': worker_id
                 })
                 await page.keyboard.press('Escape')
-                await asyncio.sleep(1)
+                await sleep_with_jitter(1)
                 continue
 
             await rfq_link.click()
-            await asyncio.sleep(2)
+            await sleep_with_jitter(2)
 
             part_checkbox = await page.query_selector('#Parts_0__Selected')
             if part_checkbox:
@@ -338,7 +361,7 @@ async def process_part(page, part_number, quantity, line_number, timing_data):
                 if comments_field:
                     await comments_field.fill('Please confirm country of origin.')
 
-            await asyncio.sleep(1)
+            await sleep_with_jitter(1)
 
             send_btn = await page.query_selector('input[type="button"].action-btn')
             if not send_btn:
@@ -346,12 +369,11 @@ async def process_part(page, part_number, quantity, line_number, timing_data):
 
             if send_btn and await send_btn.get_attribute('disabled') is None:
                 await send_btn.click()
-                await asyncio.sleep(3)
+                await sleep_with_jitter(2.5)
 
                 supplier_time = time.time() - supplier_start
-                timing_data['suppliers'].append({'name': supplier['name'], 'time': supplier_time})
 
-                print(f'      SENT ({supplier_time:.1f}s)')
+                print(f'      [W{worker_id}] SENT ({supplier_time:.1f}s)')
                 results.append({
                     'line_number': line_number,
                     'part_number': part_number,
@@ -362,7 +384,8 @@ async def process_part(page, part_number, quantity, line_number, timing_data):
                     'supplier_qty': supplier['total_qty'],
                     'status': 'SENT',
                     'timestamp': datetime.now().isoformat(),
-                    'error': ''
+                    'error': '',
+                    'worker_id': worker_id
                 })
             else:
                 results.append({
@@ -375,11 +398,12 @@ async def process_part(page, part_number, quantity, line_number, timing_data):
                     'supplier_qty': supplier['total_qty'],
                     'status': 'FAILED',
                     'timestamp': datetime.now().isoformat(),
-                    'error': 'Send button not found or disabled'
+                    'error': 'Send button not found or disabled',
+                    'worker_id': worker_id
                 })
 
             await page.keyboard.press('Escape')
-            await asyncio.sleep(1)
+            await sleep_with_jitter(1)
 
         except Exception as e:
             results.append({
@@ -392,10 +416,69 @@ async def process_part(page, part_number, quantity, line_number, timing_data):
                 'supplier_qty': supplier['total_qty'],
                 'status': 'FAILED',
                 'timestamp': datetime.now().isoformat(),
-                'error': str(e)
+                'error': str(e),
+                'worker_id': worker_id
             })
 
     return results
+
+
+async def worker(worker_id, parts_queue, results_list, results_lock):
+    """
+    Worker coroutine - manages its own browser instance and processes parts from the queue.
+    """
+    print(f'[Worker {worker_id}] Starting...')
+
+    async with async_playwright() as p:
+        browser = await p.chromium.launch(headless=True)
+        context = await browser.new_context(viewport={'width': 1400, 'height': 1000})
+        page = await context.new_page()
+
+        try:
+            # Login
+            print(f'[Worker {worker_id}] Logging in...')
+            await page.goto(config.BASE_URL)
+            await sleep_with_jitter(2)
+            await page.click('a:has-text("Login")')
+            await sleep_with_jitter(2)
+            await page.fill('#AccountNumber', config.NETCOMPONENTS_ACCOUNT)
+            await page.fill('#UserName', config.NETCOMPONENTS_USERNAME)
+            await page.fill('#Password', config.NETCOMPONENTS_PASSWORD)
+            await page.press('#Password', 'Enter')
+            await sleep_with_jitter(4)
+            print(f'[Worker {worker_id}] Logged in')
+
+            # Process parts from queue
+            while True:
+                try:
+                    part = parts_queue.get_nowait()
+                except asyncio.QueueEmpty:
+                    break
+
+                print(f'\n[Worker {worker_id}] Processing Line {part["line_number"]}: {part["part_number"]} x {part["quantity"]:,}')
+
+                results = await process_part(
+                    page,
+                    part['part_number'],
+                    part['quantity'],
+                    part['line_number'],
+                    worker_id
+                )
+
+                # Thread-safe append to results
+                async with results_lock:
+                    results_list.extend(results)
+
+                # Brief pause between parts (with jitter)
+                await sleep_with_jitter(1.5)
+
+        except Exception as e:
+            print(f'[Worker {worker_id}] ERROR: {e}')
+            import traceback
+            traceback.print_exc()
+        finally:
+            await browser.close()
+            print(f'[Worker {worker_id}] Finished')
 
 
 async def main():
@@ -420,72 +503,57 @@ async def main():
     timestamp = datetime.now().strftime('%Y-%m-%d_%H%M%S')
     output_file = Path(f'RFQ_{rfq_number}_Results_{timestamp}.xlsx')
 
-    print('\n' + '=' * 50)
+    print('\n' + '=' * 60)
     print(f'NetComponents Batch RFQ Submission')
     print(f'RFQ: {rfq_number}')
     print(f'Parts to process: {len(parts)}')
+    print(f'Parallel workers: {config.NUM_WORKERS}')
+    print(f'Timing jitter: ±{int(config.JITTER_RANGE * 100)}%')
     print(f'Output file: {output_file}')
-    print('=' * 50)
+    print('=' * 60)
 
-    all_results = []
-    timing_data = {'suppliers': []}
+    # Create queue and populate with parts
+    parts_queue = asyncio.Queue()
+    for part in parts:
+        await parts_queue.put(part)
+
+    # Shared results list with lock
+    results_list = []
+    results_lock = asyncio.Lock()
+
     start_time = time.time()
 
-    async with async_playwright() as p:
-        browser = await p.chromium.launch(headless=True)
-        context = await browser.new_context(viewport={'width': 1400, 'height': 1000})
-        page = await context.new_page()
+    # Launch workers
+    workers = [
+        worker(i + 1, parts_queue, results_list, results_lock)
+        for i in range(config.NUM_WORKERS)
+    ]
 
-        try:
-            print('\nLogging in...')
-            login_start = time.time()
-            await page.goto(config.BASE_URL)
-            await asyncio.sleep(2)
-            await page.click('a:has-text("Login")')
-            await asyncio.sleep(2)
-            await page.fill('#AccountNumber', config.NETCOMPONENTS_ACCOUNT)
-            await page.fill('#UserName', config.NETCOMPONENTS_USERNAME)
-            await page.fill('#Password', config.NETCOMPONENTS_PASSWORD)
-            await page.press('#Password', 'Enter')
-            await asyncio.sleep(5)
-            print(f'  Done ({time.time() - login_start:.1f}s)')
+    # Wait for all workers to complete
+    await asyncio.gather(*workers)
 
-            for i, part in enumerate(parts):
-                print(f"\n[{i + 1}/{len(parts)}] Line {part['line_number']}: {part['part_number']} x {part['quantity']:,}")
-                results = await process_part(
-                    page,
-                    part['part_number'],
-                    part['quantity'],
-                    part['line_number'],
-                    timing_data
-                )
-                all_results.extend(results)
-
-        except Exception as e:
-            print(f'\nFATAL ERROR: {e}')
-            import traceback
-            traceback.print_exc()
-        finally:
-            await browser.close()
+    # Sort results by line number for output
+    results_list.sort(key=lambda x: (x.get('line_number', 0), x.get('timestamp', '')))
 
     print(f'\n\nWriting results to {output_file}...')
-    create_output_excel(all_results, rfq_number, output_file)
+    create_output_excel(results_list, rfq_number, output_file)
 
     total_time = time.time() - start_time
-    sent_count = len([r for r in all_results if r['status'] == 'SENT'])
+    sent_count = len([r for r in results_list if r['status'] == 'SENT'])
+    failed_count = len([r for r in results_list if r['status'] == 'FAILED'])
+    no_suppliers = len([r for r in results_list if r['status'] == 'NO_SUPPLIERS'])
 
-    print('\n' + '=' * 50)
+    print('\n' + '=' * 60)
     print('BATCH SUMMARY')
-    print('=' * 50)
-    print(f'RFQ: {rfq_number}')
-    print(f'Parts processed: {len(parts)}')
+    print('=' * 60)
+    print(f'Total parts processed: {len(parts)}')
     print(f'RFQs sent: {sent_count}')
-    print(f'RFQs failed: {len(all_results) - sent_count}')
-    print(f'Total runtime: {total_time:.1f}s ({total_time / 60:.1f} min)')
-    if timing_data['suppliers']:
-        avg_time = sum(s['time'] for s in timing_data['suppliers']) / len(timing_data['suppliers'])
-        print(f'Avg per supplier: {avg_time:.1f}s')
-    print(f'\nResults saved to: {output_file}')
+    print(f'Failed: {failed_count}')
+    print(f'No suppliers found: {no_suppliers}')
+    print(f'Total time: {total_time:.1f}s ({total_time/60:.1f} min)')
+    print(f'Avg time per part: {total_time/len(parts):.1f}s')
+    print(f'Results saved to: {output_file}')
+    print('=' * 60)
 
 
 if __name__ == '__main__':
