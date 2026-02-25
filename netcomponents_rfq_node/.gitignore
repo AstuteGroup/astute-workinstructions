@@ -1,0 +1,17 @@
+# Environment and credentials
+.env
+
+# Session data
+.session/
+cookies.json
+
+# Node
+node_modules/
+
+# Output files
+output/
+screenshots/
+
+# IDE
+.vscode/
+.idea/

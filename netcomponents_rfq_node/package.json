@@ -1,0 +1,15 @@
+{
+  "name": "netcomponents-rfq",
+  "version": "0.1.0",
+  "description": "NetComponents RFQ automation tool (Node.js)",
+  "main": "main.js",
+  "scripts": {
+    "explore": "node explore.js",
+    "start": "node main.js",
+    "test": "node main.js --dry-run"
+  },
+  "dependencies": {
+    "dotenv": "^17.3.1",
+    "playwright": "^1.40.0"
+  }
+}
