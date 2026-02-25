@@ -19,7 +19,8 @@ const SCREENSHOTS_DIR = path.join(__dirname, 'screenshots');
 if (!fs.existsSync(SCREENSHOTS_DIR)) fs.mkdirSync(SCREENSHOTS_DIR, { recursive: true });
 
 const MAX_SUPPLIERS_PER_REGION = 3;
-const FRANCHISED_NAMES = ['mouser', 'digikey', 'arrow', 'avnet', 'newark', 'element14', 'farnell', 'future', 'rochester', 'tti', 'symmetry', 'ebv', 'anglia'];
+// Franchised/authorized distributors are identified by 'ncauth' class in DOM
+// Independent distributors have 'ncnoauth' class - no hardcoded name list needed
 
 async function delay(ms) {
     return new Promise(resolve => setTimeout(resolve, ms));
@@ -130,13 +131,15 @@ async function main() {
             if (cells.length < 16) continue;
 
             // Get supplier name
-            const link = await cells[15].$('a');
+            const supplierCell = cells[15];
+            const link = await supplierCell.$('a');
             if (!link) continue;
             const supplierName = (await link.innerText()).trim();
             if (!supplierName) continue;
 
-            // Skip franchised distributors
-            if (FRANCHISED_NAMES.some(f => supplierName.toLowerCase().includes(f))) continue;
+            // Skip franchised/authorized distributors (marked with 'ncauth' class)
+            const authIcon = await supplierCell.$('.ncauth');
+            if (authIcon) continue;
 
             // Get quantity from column 8
             let qty = 0;

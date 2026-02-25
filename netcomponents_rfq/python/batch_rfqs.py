@@ -190,14 +190,17 @@ async def process_part(page, part_number, quantity, timing_data):
         if len(cells) < 16:
             continue
 
-        link = await cells[15].query_selector('a')
+        supplier_cell = cells[15]
+        link = await supplier_cell.query_selector('a')
         if not link:
             continue
         supplier_name = (await link.inner_text()).strip()
         if not supplier_name:
             continue
 
-        if any(f in supplier_name.lower() for f in config.FRANCHISED_NAMES):
+        # Skip franchised/authorized distributors (marked with 'ncauth' class)
+        auth_icon = await supplier_cell.query_selector('.ncauth')
+        if auth_icon:
             continue
 
         qty = 0

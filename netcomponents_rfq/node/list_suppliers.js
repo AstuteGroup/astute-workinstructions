@@ -46,7 +46,7 @@ async function main() {
         await delay(8000);
 
         // 3. Parse all suppliers from results
-        const franchisedNames = ['mouser', 'digikey', 'arrow', 'avnet', 'newark', 'element14', 'farnell', 'future', 'rochester', 'tti', 'symmetry', 'ebv', 'anglia'];
+        // Franchised/authorized distributors are identified by 'ncauth' class in DOM
         const rows = await page.$$('table#trv_0 tbody tr');
 
         let inStockSection = false;
@@ -87,10 +87,15 @@ async function main() {
             const cells = await row.$$('td');
             if (cells.length < 16) continue;
 
-            const link = await cells[15].$('a');
+            const supplierCell = cells[15];
+            const link = await supplierCell.$('a');
             if (!link) continue;
             const supplierName = (await link.innerText()).trim();
             if (!supplierName) continue;
+
+            // Check if franchised/authorized (marked with 'ncauth' class)
+            const authIcon = await supplierCell.$('.ncauth');
+            const isFranchised = authIcon !== null;
 
             // Get quantity from column 8 (the "Qty" column)
             let qtyText = '';
@@ -117,9 +122,6 @@ async function main() {
                 qtyText: qtyText,
                 partNum: partNum
             };
-
-            // Check if franchised
-            const isFranchised = franchisedNames.some(f => supplierName.toLowerCase().includes(f));
 
             if (isFranchised) {
                 skippedFranchised.push(supplierInfo);

@@ -17,11 +17,10 @@ NETCOMPONENTS_PASSWORD = os.getenv('NETCOMPONENTS_PASSWORD', '')
 
 # Supplier filtering
 MAX_SUPPLIERS_PER_REGION = 3
-FRANCHISED_NAMES = [
-    'mouser', 'digikey', 'arrow', 'avnet', 'newark',
-    'element14', 'farnell', 'future', 'rochester', 'tti', 'symmetry',
-    'ebv', 'anglia'
-]
+
+# Franchised/authorized distributors are identified by 'ncauth' class in DOM
+# Independent distributors have 'ncnoauth' class
+# No need for hardcoded name list - the page marks them
 
 # Paths
 SCREENSHOTS_DIR = Path(__file__).parent / 'screenshots'

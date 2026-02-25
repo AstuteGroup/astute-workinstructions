@@ -17,7 +17,7 @@ This automation:
 | Criteria | Rule |
 |----------|------|
 | **Inventory Type** | In-Stock only (skip Brokered Inventory Listings) |
-| **Supplier Type** | Skip franchised/authorized distributors (Mouser, DigiKey, Arrow, Avnet, Newark, etc.) |
+| **Supplier Type** | Skip franchised/authorized distributors (detected via `ncauth` class in DOM) |
 | **Regions** | Americas and Europe only (Asia/Other excluded - handled by separate purchasing group) |
 | **Quantity** | Supplier must have qty >= requested qty (fallback: largest available if none qualify) |
 | **Max per Region** | 3 suppliers per region |
@@ -138,7 +138,8 @@ NETCOMPONENTS_PASSWORD=<password>
 
 Configurable in `node/submit_rfqs.js` or `python/config.py`:
 - `MAX_SUPPLIERS_PER_REGION` - Default: 3
-- `FRANCHISED_NAMES` - List of franchised distributor names to skip
+
+**Note:** Franchised/authorized distributors are detected automatically via the `ncauth` CSS class in the DOM (no hardcoded name list required).
 
 ## Performance Benchmarks
 
@@ -205,7 +206,7 @@ The search results table has a hierarchical structure:
 - Ensure part checkbox is checked
 
 ### Supplier not appearing in results
-- Check if they're being filtered as franchised
+- Check if they're being filtered as franchised (has `ncauth` class)
 - Check if they're in the brokered section (skipped)
 - Check if they're in Asia/Other region (excluded)
 

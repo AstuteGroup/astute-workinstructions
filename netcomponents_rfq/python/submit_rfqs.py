@@ -131,15 +131,17 @@ async def main():
                     continue
 
                 # Get supplier name from column 15
-                link = await cells[15].query_selector('a')
+                supplier_cell = cells[15]
+                link = await supplier_cell.query_selector('a')
                 if not link:
                     continue
                 supplier_name = (await link.inner_text()).strip()
                 if not supplier_name:
                     continue
 
-                # Skip franchised distributors
-                if any(f in supplier_name.lower() for f in config.FRANCHISED_NAMES):
+                # Skip franchised/authorized distributors (marked with 'ncauth' class)
+                auth_icon = await supplier_cell.query_selector('.ncauth')
+                if auth_icon:
                     continue
 
                 # Get quantity from column 8
