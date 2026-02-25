@@ -58,6 +58,7 @@ This file tracks recent work sessions and provides quick context for continuing 
 - `python/analyze_no_suppliers.py` - Analyze results for CPCs needing manual work
 - `python/list_suppliers.py` - Preview suppliers without submitting
 - `python/config.py` - Settings: workers, jitter, DC window, max suppliers
+- `python/RFQ_<number>/` - Output subfolders created per RFQ batch
 - `node/.env` - NetComponents credentials (shared)
 
 **Key Settings (config.py):**

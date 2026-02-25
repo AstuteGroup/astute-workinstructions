@@ -547,8 +547,12 @@ async def main():
     for p in parts:
         print(f"  Line {p['line_number']}: {p['part_number']} x {p['quantity']:,}")
 
+    # Create RFQ subfolder
+    rfq_folder = Path(f'RFQ_{rfq_number}')
+    rfq_folder.mkdir(exist_ok=True)
+
     timestamp = datetime.now().strftime('%Y-%m-%d_%H%M%S')
-    output_file = Path(f'RFQ_{rfq_number}_Results_{timestamp}.xlsx')
+    output_file = rfq_folder / f'Results_{timestamp}.xlsx'
 
     print('\n' + '=' * 60)
     print(f'NetComponents Batch RFQ Submission')
@@ -556,6 +560,7 @@ async def main():
     print(f'Parts to process: {len(parts)}')
     print(f'Parallel workers: {config.NUM_WORKERS}')
     print(f'Timing jitter: ±{int(config.JITTER_RANGE * 100)}%')
+    print(f'Output folder: {rfq_folder}/')
     print(f'Output file: {output_file}')
     print('=' * 60)
 

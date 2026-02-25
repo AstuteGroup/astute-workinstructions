@@ -155,11 +155,20 @@ python3 batch_rfqs_from_system.py 1008627
 ```
 
 **What it does:**
-1. Queries `chuboe_rfq` and `chuboe_rfq_line` tables for the RFQ
-2. Extracts part numbers (MPN) and quantities for each line item
-3. Launches 3 parallel browser workers (configurable)
-4. Distributes parts across workers for faster processing
-5. Outputs results to `RFQ_<number>_Results_YYYY-MM-DD_HHMMSS.xlsx`
+1. Creates subfolder `RFQ_<number>/` for all output files
+2. Queries `chuboe_rfq` and `chuboe_rfq_line` tables for the RFQ
+3. Extracts part numbers (MPN) and quantities for each line item
+4. Launches 3 parallel browser workers (configurable)
+5. Distributes parts across workers for faster processing
+6. Outputs results to `RFQ_<number>/Results_YYYY-MM-DD_HHMMSS.xlsx`
+
+**Output folder structure:**
+```
+RFQ_1130292/
+├── Results_2026-02-25_212623.xlsx      # Main results
+├── NoSuppliers_Analysis.xlsx            # CPC analysis (run separately)
+└── Results_Combined.xlsx                # If multiple batches combined
+```
 
 **Parallel Processing:**
 - 3 headless browser instances run concurrently
@@ -189,9 +198,11 @@ Analyze batch results to identify CPCs that need manual sourcing attention.
 cd python
 python3 analyze_no_suppliers.py <results_excel> [rfq_number]
 
-# Example
-python3 analyze_no_suppliers.py RFQ_1130292_Results_2026-02-25_212623.xlsx 1130292
+# Example (run from RFQ subfolder)
+python3 analyze_no_suppliers.py RFQ_1130292/Results_2026-02-25_212623.xlsx 1130292
 ```
+
+Output is saved in the same folder as the input file.
 
 **What it does:**
 1. Reads batch results Excel file
