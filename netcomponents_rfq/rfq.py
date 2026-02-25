@@ -18,6 +18,7 @@ class RFQRequest:
     """Represents an RFQ to be submitted."""
     part_number: str
     quantity: int
+    rfq_number: Optional[str] = None  # Internal RFQ reference from source system
     target_price: Optional[float] = None
     suppliers: list[SearchResult] = field(default_factory=list)
 
@@ -28,6 +29,7 @@ class RFQResult:
     part_number: str
     supplier: str
     success: bool
+    rfq_number: Optional[str] = None  # Internal RFQ reference from source system
     message: str = ""
     timestamp: datetime = field(default_factory=datetime.now)
     screenshot_path: Optional[str] = None

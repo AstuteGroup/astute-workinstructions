@@ -6,14 +6,14 @@ Automates searching NetComponents, filtering suppliers by region,
 and submitting RFQs for electronic components.
 
 Usage:
-    # Single part search
-    python main.py -p "LM358N" --quantity 1000
+    # Single part search with internal RFQ reference
+    python main.py -p "LM358N" --quantity 1000 --rfq 1129851
 
-    # Multiple parts from file
+    # Multiple parts from file (with rfq_number column)
     python main.py -f parts.xlsx --quantity 500 --workers 3
 
     # Dry run (no actual submissions)
-    python main.py -p "NE555P" --quantity 100 --dry-run
+    python main.py -p "NE555P" --quantity 100 --rfq 1130062 --dry-run
 
     # Review mode (single worker, step by step)
     python main.py -p "MAX232" --quantity 250 --review
@@ -41,7 +41,7 @@ from rfq import submit_rfqs_for_part, RFQResult, summarize_rfq_results
 def load_parts_from_file(filepath: str) -> list[dict]:
     """
     Load part numbers from Excel file.
-    Expects columns: part_number, quantity (optional), target_price (optional)
+    Expects columns: rfq_number (optional), part_number, quantity (optional), target_price (optional)
     """
     parts = []
     path = Path(filepath)
@@ -58,12 +58,15 @@ def load_parts_from_file(filepath: str) -> list[dict]:
         headers = [cell.value.lower() if cell.value else "" for cell in ws[1]]
 
         # Find column indices
+        rfq_idx = None
         pn_idx = None
         qty_idx = None
         price_idx = None
 
         for i, header in enumerate(headers):
-            if "part" in header or "mpn" in header:
+            if "rfq" in header:
+                rfq_idx = i
+            elif "part" in header or "mpn" in header:
                 pn_idx = i
             elif "qty" in header or "quantity" in header:
                 qty_idx = i
@@ -78,6 +81,7 @@ def load_parts_from_file(filepath: str) -> list[dict]:
         for row in ws.iter_rows(min_row=2, values_only=True):
             if row[pn_idx]:
                 part = {
+                    "rfq_number": str(row[rfq_idx]).strip() if rfq_idx is not None and row[rfq_idx] else None,
                     "part_number": str(row[pn_idx]).strip(),
                     "quantity": int(row[qty_idx]) if qty_idx and row[qty_idx] else None,
                     "target_price": float(row[price_idx]) if price_idx and row[price_idx] else None,
@@ -92,7 +96,7 @@ def load_parts_from_file(filepath: str) -> list[dict]:
             for line in f:
                 line = line.strip()
                 if line and not line.startswith("#"):
-                    parts.append({"part_number": line, "quantity": None, "target_price": None})
+                    parts.append({"rfq_number": None, "part_number": line, "quantity": None, "target_price": None})
 
     print(f"Loaded {len(parts)} parts from {filepath}")
     return parts
@@ -110,14 +114,15 @@ def save_results_to_excel(results: list[dict], output_dir: Path, filename: str =
     ws = wb.active
     ws.title = "RFQ Results"
 
-    # Headers
-    headers = ["Part Number", "Supplier", "Country", "Region", "Quantity",
+    # Headers - RFQ Number first for easy traceability back to source system
+    headers = ["RFQ Number", "Part Number", "Supplier", "Country", "Region", "Quantity",
                "Price", "Success", "Message", "Timestamp"]
     ws.append(headers)
 
     # Data rows
     for result in results:
         ws.append([
+            result.get("rfq_number", ""),
             result.get("part_number", ""),
             result.get("supplier", ""),
             result.get("country", ""),
@@ -145,6 +150,7 @@ async def process_part(
     target_price: Optional[float],
     max_suppliers: int,
     dry_run: bool,
+    rfq_number: Optional[str] = None,
     page=None
 ) -> list[dict]:
     """
@@ -182,6 +188,7 @@ async def process_part(
     for i, rfq_result in enumerate(rfq_results):
         supplier_info = selected[i] if i < len(selected) else None
         results.append({
+            "rfq_number": rfq_number,
             "part_number": part_number,
             "supplier": rfq_result.supplier,
             "country": supplier_info.country if supplier_info else "",
@@ -221,8 +228,9 @@ async def worker(
         part_number = part["part_number"]
         part_qty = part.get("quantity") or quantity
         part_price = part.get("target_price") or target_price
+        part_rfq = part.get("rfq_number")
 
-        print(f"[{worker_id}] Processing: {part_number}")
+        print(f"[{worker_id}] Processing: {part_number}" + (f" (RFQ #{part_rfq})" if part_rfq else ""))
 
         try:
             results = await process_part(
@@ -232,6 +240,7 @@ async def worker(
                 target_price=part_price,
                 max_suppliers=max_suppliers,
                 dry_run=dry_run,
+                rfq_number=part_rfq,
                 page=page
             )
             all_results.extend(results)
@@ -262,6 +271,7 @@ async def main_async(args):
 
     if args.part:
         parts.append({
+            "rfq_number": args.rfq,
             "part_number": args.part,
             "quantity": args.quantity,
             "target_price": args.price
@@ -302,6 +312,10 @@ async def main_async(args):
                 part_number = part["part_number"]
                 part_qty = part.get("quantity") or args.quantity
                 part_price = part.get("target_price") or args.price
+                part_rfq = part.get("rfq_number")
+
+                if part_rfq:
+                    print(f"Processing: {part_number} (RFQ #{part_rfq})")
 
                 results = await process_part(
                     session=session,
@@ -309,7 +323,8 @@ async def main_async(args):
                     quantity=part_qty,
                     target_price=part_price,
                     max_suppliers=args.max_suppliers,
-                    dry_run=args.dry_run
+                    dry_run=args.dry_run,
+                    rfq_number=part_rfq
                 )
                 all_results.extend(results)
 
@@ -374,9 +389,9 @@ def main():
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
-  %(prog)s -p "LM358N" --quantity 1000
+  %(prog)s -p "LM358N" -q 1000 --rfq 1129851
   %(prog)s -f parts.xlsx -q 500 -w 3
-  %(prog)s -p "NE555P" -q 100 --dry-run
+  %(prog)s -p "NE555P" -q 100 --rfq 1130062 --dry-run
   %(prog)s -p "MAX232" -q 250 --review
         """
     )
@@ -390,6 +405,10 @@ Examples:
     input_group.add_argument(
         "-f", "--file",
         help="Excel/text file with part numbers"
+    )
+    input_group.add_argument(
+        "--rfq",
+        help="Internal RFQ number reference (for single-part mode with -p)"
     )
 
     # RFQ options
