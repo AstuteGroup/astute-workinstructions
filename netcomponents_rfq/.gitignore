@@ -27,6 +27,5 @@ output/
 *.swp
 *.swo
 
-# Screenshots
-screenshots/
-*.png
+# Screenshots (keep node/screenshots for documentation)
+/screenshots/
