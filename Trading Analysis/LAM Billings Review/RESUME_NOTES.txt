@@ -1,12 +1,12 @@
 LAM Billings Review - Resume Notes
 ===================================
-Last updated: 2026-02-25
+Last updated: 2026-02-26
 
 STATUS: In Progress
 
 RESUME PROMPT:
 --------------
-Continue LAM Billings Review in `Trading Analysis/LAM Billings Review/`. We matched the program file against 4 billing exports (VM Services, Naprotek, Plexus + data (60).xlsx for 2024). GP by Buyer summary is done ($16,797.88). The 4 unmatched 2024 lines were resolved (typos/alternates). Remaining: 20 buyer issues - 17 lines need buyer assignment ($61.58 GP), 1 line has multiple buyers (DM / ES), 2 are 2026 pending. Show me the buyer issues to continue.
+Continue LAM Billings Review in `Trading Analysis/LAM Billings Review/`. GP by Buyer summary done ($16,797.88). Buyer issues: 17 lines need buyer assignment ($61.58 GP), 1 line multiple buyers (DM/ES), 3 lines shipped but awaiting billing confirmation. Cross-referenced against LAM OPEN ORDERS - all 2026 pending lines have shipped. 4 new open orders (COV0020603, COV0020648, COV0020995, COV0020996) not yet in program file.
 
 COMPLETED:
 ----------
@@ -25,17 +25,28 @@ COMPLETED:
   - COV0016254: Wrong MPN in program file (had PO# instead)
   - COV0016257: Alternate ordering code (RTJT vs RTJR)
 
+- Cross-referenced 2026_Pending_Lines against LAM OPEN ORDERS.xlsx (2026-02-26):
+  - All 243 pending lines (30 COVs) have shipped - not in open orders
+  - 4 new open orders not yet in program file tracking
+
 REMAINING:
 ----------
 - 20 buyer issues total:
-  - 1 line with multiple buyers (COV0016503, DM / ES)
-  - 17 lines need buyer assignment ($61.58 GP)
-  - 2 lines are 2026 pending (not yet billed)
+  - 1 line with multiple buyers (COV0016503, DM / ES) - needs split
+  - 17 lines need buyer assignment ($61.58 GP) - all Naprotek 2024/2025
+  - 3 lines shipped but awaiting billing confirmation (COV0020439 x2, COV0020718)
+
+- 4 new open orders to add to tracking when ready:
+  - COV0020603 (Plexus)
+  - COV0020648 (Plexus)
+  - COV0020995 (VM Services)
+  - COV0020996 (Naprotek)
 
 FILES:
 ------
 - GP_by_Buyer_Summary.csv - Ready for finance
 - 2024_Unmatched_Lines.csv - 4 lines (resolved, needs cleanup)
-- 2026_Pending_Lines.csv - 243 lines (expected, not yet billed)
+- 2026_Pending_Lines.csv - 243 lines (all shipped per open orders check)
 - Buyer_Issues.csv - 20 lines to review
 - Unmatched_Program_Lines.csv - Full detail
+- LAM OPEN ORDERS.xlsx - Current open orders (4 COVs)
