@@ -4,30 +4,32 @@ This file tracks recent work sessions and provides quick context for continuing 
 
 ## Recent Sessions
 
-1. **RFQ Sourcing - Lock File & Supplier Tracking** (2026-02-25)
+1. **Franchise Screening Workflow** (2026-02-26)
+   - Built FindChips scraper to screen RFQs before broker sourcing
+   - Filters low-value opportunities (OV < threshold) where franchise has stock
+   - Fixed MPN matching (normalize dashes, handle suffixes like -TR500)
+   - Fixed session state issues (fresh browser context per search)
+   - Tested on RFQ 1130410 and 11 single-line RFQs
+   - Location: `rfq_sourcing/franchise_check/`
+
+2. **RFQ Sourcing - Lock File & Supplier Tracking** (2026-02-25)
    - Added lock file to prevent duplicate batch runs (`.lock` in RFQ folder)
    - Added qualifying supplier tracking columns (Qualifying, Qual Amer/Eur, Selected)
    - Added supplier distribution summary at end of batch
    - RFQ subfolders now organize all output files per RFQ number
-   - Identified 370 duplicate RFQs sent to 183 suppliers (damage control files created)
    - Location: `netcomponents_rfq/`
 
-2. **RFQ Sourcing - CPC Analysis & Stability Fixes** (2026-02-25)
+3. **RFQ Sourcing - CPC Analysis & Stability Fixes** (2026-02-25)
    - Added CPC column to batch results for line-level tracking
    - Created `analyze_no_suppliers.py` - standalone tool to identify CPCs needing manual work
    - Fixed timeout crashes with proper `wait_for_selector` calls
    - Ran RFQ 1130292: 400 RFQs sent, 29 CPCs need attention
    - Location: `netcomponents_rfq/`
 
-3. **RFQ Sourcing - Parallel Processing** (2026-02-25)
+4. **RFQ Sourcing - Parallel Processing** (2026-02-25)
    - Added 3 parallel browser workers for batch RFQs
    - Added timing jitter (±40%) to appear natural
    - 138-part batch runs in ~49 min vs 140 min sequential
-   - Location: `netcomponents_rfq/`
-
-4. **RFQ Sourcing - Core Features** (2026-02-25)
-   - Date code prioritization (Fresh > Unknown > Old)
-   - Quantity adjustment to encourage supplier quoting
    - Location: `netcomponents_rfq/`
 
 ---
@@ -38,6 +40,7 @@ This file tracks recent work sessions and provides quick context for continuing 
 
 | Workflow | Location | Description |
 |----------|----------|-------------|
+| **Franchise Screening** | `rfq_sourcing/franchise_check/` | Pre-screen RFQs via FindChips before broker sourcing |
 | **RFQ Sourcing** | `netcomponents_rfq/` | Automated supplier RFQ submission via NetComponents |
 | **VQ Loading** | `Trading Analysis/VQ Loading/` | Process supplier quotes into VQ template |
 | **Market Offer Matching** | `Trading Analysis/Market Offer Matching for RFQs/` | Match RFQs to customer excess/stock |
@@ -55,6 +58,34 @@ This file tracks recent work sessions and provides quick context for continuing 
 ---
 
 ## Key Files
+
+### Franchise Screening (`rfq_sourcing/franchise_check/`)
+- `main.js` - Entry point: screen parts from RFQ, file, or single part
+- `search.js` - FindChips scraper with MPN validation
+- `config.js` - Settings: threshold, delays, data source
+
+**Usage:**
+```bash
+# Screen from iDempiere RFQ
+node main.js --rfq 1130410 --threshold 100
+
+# Single part check
+node main.js -p "LM358N" -q 100
+
+# From Excel file
+node main.js -f parts.xlsx --threshold 50
+```
+
+**Key Settings (config.js):**
+- `OPPORTUNITY_THRESHOLD = 50` - Skip broker if OV below this
+- `DATA_SOURCE = 'findchips'` - Data source (findchips or trustedparts)
+- `SEARCH_DELAY = 1500` - Delay between searches (ms)
+
+**Decision Logic:**
+- Skip broker if: franchise_qty >= customer_qty AND opportunity_value < threshold
+- OV = lowest_franchise_price × customer_qty
+
+---
 
 ### RFQ Sourcing (`netcomponents_rfq/`)
 - `python/submit_rfqs.py` - Single part RFQ submission
