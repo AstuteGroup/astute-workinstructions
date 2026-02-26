@@ -2,51 +2,43 @@ LAM Billings Review - Resume Notes
 ===================================
 Last updated: 2026-02-26
 
-STATUS: In Progress
+STATUS: Complete (pending 2026 billing data)
 
 RESUME PROMPT:
 --------------
-Continue LAM Billings Review in `Trading Analysis/LAM Billings Review/`. GP by Buyer summary done ($16,797.88). Buyer issues: 17 lines need buyer assignment ($61.58 GP), 1 line multiple buyers (DM/ES), 3 lines shipped but awaiting billing confirmation. Cross-referenced against LAM OPEN ORDERS - all 2026 pending lines have shipped. 4 new open orders (COV0020603, COV0020648, COV0020995, COV0020996) not yet in program file.
+LAM Billings Review complete. All 20 buyer issues resolved. GP by Buyer summary finalized ($16,797.88). 243 lines from 2026 awaiting billing confirmation from logistics - not yet completed in system. 4 new open orders (COV0020603, COV0020648, COV0020995, COV0020996) to track when ready.
 
 COMPLETED:
 ----------
 - Matched program file (LAM Program billings.csv) against billing exports
 - GP by Buyer Summary: $16,797.88 total
-  - Jake Harris: $7,354.12
+  - Jake Harris: $7,388.88
   - TX: $6,864.61
-  - Stephanie Hill: $1,262.18
+  - Stephanie Hill: $1,289.00
   - ES: $869.15
   - DM: $386.23
-  - UNKNOWN: $61.58
 
-- 4 unmatched 2024 lines resolved:
-  - COV0015937: Typo (557969-1 should be 5557969-1)
-  - COV0016073: Alternate part (EXTTZ vs TZ-ADJ)
-  - COV0016254: Wrong MPN in program file (had PO# instead)
-  - COV0016257: Alternate ordering code (RTJT vs RTJR)
+- All 20 buyer issues resolved (2026-02-26):
+  - RUEF500 → Stephanie Hill (5 lines)
+  - LM7812SX/NOPB → Jake Harris (1 line)
+  - RC1206FR-07100KL → Stephanie Hill (4 lines)
+  - K66X-B44S-N → Jake Harris (2 lines)
+  - 7466004R → Jake Harris (1 line)
+  - TGHHV50R0JE → ES (1 line)
+  - RUEF400 → Stephanie Hill (3 lines)
+  - CRCW12060000Z0EBC → ES (1 line)
+  - RC1206FR-0720KL → DM (2 lines)
 
-- Cross-referenced 2026_Pending_Lines against LAM OPEN ORDERS.xlsx (2026-02-26):
-  - All 243 pending lines (30 COVs) have shipped - not in open orders
-  - 4 new open orders not yet in program file tracking
+- 4 unmatched 2024 lines resolved (typos/alternates)
 
-REMAINING:
-----------
-- 20 buyer issues total:
-  - 1 line with multiple buyers (COV0016503, DM / ES) - needs split
-  - 17 lines need buyer assignment ($61.58 GP) - all Naprotek 2024/2025
-  - 3 lines shipped but awaiting billing confirmation (COV0020439 x2, COV0020718)
-
-- 4 new open orders to add to tracking when ready:
-  - COV0020603 (Plexus)
-  - COV0020648 (Plexus)
-  - COV0020995 (VM Services)
-  - COV0020996 (Naprotek)
+PENDING:
+--------
+- 243 lines from 2026 awaiting billing data (logistics to confirm completion in system)
+- 4 new open orders to add to tracking when ready
 
 FILES:
 ------
-- GP_by_Buyer_Summary.csv - Ready for finance
-- 2024_Unmatched_Lines.csv - 4 lines (resolved, needs cleanup)
-- 2026_Pending_Lines.csv - 243 lines (all shipped per open orders check)
-- Buyer_Issues.csv - 20 lines to review
-- Unmatched_Program_Lines.csv - Full detail
+- GP_by_Buyer_Summary.csv - Final
+- Buyer_Issues.csv - All resolved
+- 2026_Pending_Lines.csv - 243 lines awaiting billing
 - LAM OPEN ORDERS.xlsx - Current open orders (4 COVs)
