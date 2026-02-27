@@ -4,14 +4,14 @@ This file tracks recent work sessions and provides quick context for continuing 
 
 ## Recent Sessions
 
-1. **RFQ Sourcing - Min Order Value Filter Design** (2026-02-27)
-   - Designed supplier filter based on min order value vs opportunity value
-   - Uses franchise bulk pricing (last column/lowest price) from FindChips
-   - Logic: `est_value = franchise_bulk_price × supplier_qty × multiplier`
-   - Multiplier = 0.2 if franchise_qty >= customer_rfq_qty (abundant), 0.7 if scarce
+1. **RFQ Sourcing - Min Order Value Filter** (2026-02-27) - **IMPLEMENTED**
+   - Franchise Screening now captures bulk price (last column) from FindChips
+   - RFQ Sourcing extracts min order value from NetComponents supplier popup
+   - Filter: `est_value = franchise_bulk_price × supplier_qty × multiplier`
+   - Multiplier = 0.2 (abundant) or 0.7 (scarce)
    - Skip supplier if min_order_value > est_value
-   - Output: Include omitted suppliers with reasons for iteration/refinement
-   - **TODO**: Update franchise_check to output bulk pricing, update netcomponents_rfq to consume it, create READMEs
+   - Omitted suppliers shown in output with yellow highlighting
+   - READMEs updated for both workflows
 
 2. **Franchise Screening Workflow** (2026-02-26)
    - Built FindChips scraper to screen RFQs before broker sourcing

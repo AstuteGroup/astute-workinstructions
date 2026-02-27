@@ -270,8 +270,34 @@ Configurable in `python/config.py`:
 | `NUM_WORKERS` | 3 | Parallel browser instances for batch processing |
 | `JITTER_RANGE` | 0.4 | Timing variation (±40%) to appear natural |
 | `DC_PREFERRED_WINDOW_YEARS` | 2 | Date code freshness window (2024+ is "fresh") |
+| `MIN_ORDER_VALUE_MULTIPLIER_ABUNDANT` | 0.2 | Multiplier when franchise can meet demand |
+| `MIN_ORDER_VALUE_MULTIPLIER_SCARCE` | 0.7 | Multiplier when franchise cannot meet demand |
 
 **Note:** Franchised/authorized distributors are detected automatically via the `ncauth` CSS class in the DOM (no hardcoded name list required).
+
+### Min Order Value Filtering
+
+When franchise pricing data is available (from Franchise Screening), suppliers can be filtered based on their minimum order value:
+
+```
+if franchise_qty >= customer_rfq_qty:
+    multiplier = 0.2  (abundant - broker must offer big savings to compete)
+else:
+    multiplier = 0.7  (scarce - secondary market has leverage)
+
+est_value = franchise_bulk_price × supplier_qty × multiplier
+
+Skip supplier if: min_order_value > est_value
+```
+
+**Example:**
+- Franchise bulk price: $1.00
+- Supplier qty: 500
+- Franchise qty: 1000 (abundant) → multiplier = 0.2
+- Est value: $1.00 × 500 × 0.2 = **$100**
+- If supplier's min order is $150, they are **OMITTED**
+
+Omitted suppliers appear in the output with yellow highlighting and the reason for omission.
 
 ## Performance Benchmarks
 
