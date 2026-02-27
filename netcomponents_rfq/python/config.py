@@ -97,14 +97,11 @@ def get_dc_status(dc_year, is_ambiguous, window_years=DC_PREFERRED_WINDOW_YEARS)
     """
     Determine date code status: 'fresh', 'old', or 'unknown'.
 
-    - fresh: Confirmed within 2-year window (24+)
+    - fresh: Within 2-year window (24+), including "24+" format (guaranteed fresh)
     - old: Confirmed older than window
-    - unknown: No DC, ambiguous, or unparseable
+    - unknown: No DC or unparseable
     """
     if dc_year is None:
-        return 'unknown'
-
-    if is_ambiguous:
         return 'unknown'
 
     from datetime import datetime
@@ -115,7 +112,11 @@ def get_dc_status(dc_year, is_ambiguous, window_years=DC_PREFERRED_WINDOW_YEARS)
         cutoff_year += 100
 
     if dc_year >= cutoff_year:
+        # Fresh - even if ambiguous (e.g., "24+"), since the minimum is within window
         return 'fresh'
+    elif is_ambiguous:
+        # Ambiguous and below cutoff (e.g., "20+") - could be fresher, treat as unknown
+        return 'unknown'
     else:
         return 'old'
 
@@ -133,8 +134,9 @@ def supplier_priority_score(supplier, requested_qty):
     5. Old DC + meets qty: 2
     6. Old DC + below qty: 1 (still included, just lower priority)
 
-    Within each tier, sort by quantity descending.
-    Score formula: tier * 1_000_000_000 + quantity
+    For suppliers meeting qty: all equal within tier (qty doesn't matter)
+    For suppliers below qty: sort by quantity descending (maximize piecing)
+    Score formula: tier * 1_000_000_000 + (quantity if below qty else 0)
     """
     dc_status = supplier.get('dc_status', 'unknown')
     meets_qty = supplier.get('total_qty', 0) >= requested_qty
@@ -153,7 +155,10 @@ def supplier_priority_score(supplier, requested_qty):
     else:  # old and not meets_qty
         tier = 1
 
-    return tier * 1_000_000_000 + qty
+    # Quantity only matters for tiebreaking when below requested qty
+    # If meets qty, all are equal within tier
+    tiebreaker = qty if not meets_qty else 0
+    return tier * 1_000_000_000 + tiebreaker
 
 
 def should_add_extra_supplier(selected_suppliers):
