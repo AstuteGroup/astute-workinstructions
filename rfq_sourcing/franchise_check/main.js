@@ -101,8 +101,8 @@ function saveResults(results, outputPath) {
   const wsData = [
     [
       'RFQ Number', 'MPN', 'CPC', 'Qty', 'Target Price', 'Customer',
-      'Franchise Avail', 'Franchise Qty', 'Franchise Price', 'Opportunity Value',
-      'Send to Broker', 'Reason', 'Distributor Count'
+      'Franchise Avail', 'Franchise Qty', 'Franchise Price', 'Franchise Bulk Price',
+      'Opportunity Value', 'Send to Broker', 'Reason', 'Distributor Count'
     ],
   ];
 
@@ -117,6 +117,7 @@ function saveResults(results, outputPath) {
       r.franchise_available ? 'Yes' : 'No',
       r.franchise_qty,
       r.franchise_price || '',
+      r.franchise_bulk_price || '',  // Last column / bulk pricing
       r.opportunity_value || '',
       r.send_to_broker ? 'Yes' : 'No',
       r.reason,
@@ -133,10 +134,14 @@ function saveResults(results, outputPath) {
 
 function saveBrokerList(results, outputPath) {
   // Save only parts that should go to brokers, with all needed fields
+  // Includes franchise data needed by RFQ Sourcing for min order value filtering
   const brokerParts = results.filter(r => r.send_to_broker);
 
   const wsData = [
-    ['RFQ Number', 'MPN', 'CPC', 'Qty', 'Target Price', 'Customer', 'Opportunity Value'],
+    [
+      'RFQ Number', 'MPN', 'CPC', 'Qty', 'Target Price', 'Customer',
+      'Franchise Qty', 'Franchise Bulk Price', 'Opportunity Value'
+    ],
   ];
 
   for (const r of brokerParts) {
@@ -147,6 +152,8 @@ function saveBrokerList(results, outputPath) {
       r.qty,
       r.target_price || '',
       r.customer || '',
+      r.franchise_qty || 0,
+      r.franchise_bulk_price || '',  // Needed by RFQ Sourcing for min order value filter
       r.opportunity_value || '',
     ]);
   }
@@ -168,14 +175,16 @@ function evaluatePart(part, searchResult, threshold) {
     franchise_available: searchResult.found,
     franchise_qty: searchResult.totalQty,
     franchise_price: searchResult.lowestPrice,
+    franchise_bulk_price: searchResult.bulkPrice,  // Last column / bulk pricing for secondary market valuation
     distributor_count: searchResult.distributorCount,
     opportunity_value: null,
     send_to_broker: true,
     reason: '',
   };
 
-  // Calculate opportunity value
-  const price = searchResult.lowestPrice || part.target_price;
+  // Calculate opportunity value using BULK price (last column) for realistic secondary market valuation
+  // Fall back to lowest price, then target price if no bulk price available
+  const price = searchResult.bulkPrice || searchResult.lowestPrice || part.target_price;
   if (price && part.qty) {
     result.opportunity_value = Math.round(price * part.qty * 100) / 100;
   }

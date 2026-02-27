@@ -98,7 +98,8 @@ def create_output_excel(results, rfq_number, output_path):
     ws.title = f'RFQ {rfq_number} Results'
 
     headers = ['RFQ Line', 'CPC', 'Part Number', 'Qty Requested', 'Qty Sent', 'Supplier', 'Region',
-               'Supplier Qty', 'Qualifying', 'Qual Amer', 'Qual Eur', 'Selected', 'Status', 'Timestamp', 'Error', 'Worker']
+               'Supplier Qty', 'Min Order $', 'Est Value $', 'Qualifying', 'Qual Amer', 'Qual Eur', 'Selected',
+               'Status', 'Timestamp', 'Error', 'Worker']
 
     header_font = Font(bold=True, color='FFFFFF')
     header_fill = PatternFill(start_color='4472C4', end_color='4472C4', fill_type='solid')
@@ -119,6 +120,8 @@ def create_output_excel(results, rfq_number, output_path):
     success_fill = PatternFill(start_color='C6EFCE', end_color='C6EFCE', fill_type='solid')
     fail_fill = PatternFill(start_color='FFC7CE', end_color='FFC7CE', fill_type='solid')
 
+    omitted_fill = PatternFill(start_color='FFE699', end_color='FFE699', fill_type='solid')  # Yellow for omitted
+
     row_num = 2
     for r in results:
         ws.cell(row=row_num, column=1, value=r.get('line_number', ''))
@@ -129,27 +132,31 @@ def create_output_excel(results, rfq_number, output_path):
         ws.cell(row=row_num, column=6, value=r.get('supplier', ''))
         ws.cell(row=row_num, column=7, value=r.get('region', ''))
         ws.cell(row=row_num, column=8, value=r.get('supplier_qty', ''))
-        ws.cell(row=row_num, column=9, value=r.get('qualifying_total', ''))
-        ws.cell(row=row_num, column=10, value=r.get('qualifying_americas', ''))
-        ws.cell(row=row_num, column=11, value=r.get('qualifying_europe', ''))
-        ws.cell(row=row_num, column=12, value=r.get('selected_count', ''))
-        ws.cell(row=row_num, column=13, value=r.get('status', ''))
-        ws.cell(row=row_num, column=14, value=r.get('timestamp', ''))
-        ws.cell(row=row_num, column=15, value=r.get('error', ''))
-        ws.cell(row=row_num, column=16, value=r.get('worker_id', ''))
+        ws.cell(row=row_num, column=9, value=r.get('min_order_value', ''))
+        ws.cell(row=row_num, column=10, value=r.get('est_value', ''))
+        ws.cell(row=row_num, column=11, value=r.get('qualifying_total', ''))
+        ws.cell(row=row_num, column=12, value=r.get('qualifying_americas', ''))
+        ws.cell(row=row_num, column=13, value=r.get('qualifying_europe', ''))
+        ws.cell(row=row_num, column=14, value=r.get('selected_count', ''))
+        ws.cell(row=row_num, column=15, value=r.get('status', ''))
+        ws.cell(row=row_num, column=16, value=r.get('timestamp', ''))
+        ws.cell(row=row_num, column=17, value=r.get('error', '') or r.get('reason', ''))
+        ws.cell(row=row_num, column=18, value=r.get('worker_id', ''))
 
-        status_cell = ws.cell(row=row_num, column=13)
+        status_cell = ws.cell(row=row_num, column=15)
         if r.get('status') == 'SENT':
             status_cell.fill = success_fill
         elif r.get('status') == 'FAILED':
             status_cell.fill = fail_fill
+        elif r.get('status') == 'OMITTED':
+            status_cell.fill = omitted_fill
 
-        for col in range(1, 17):
+        for col in range(1, 19):
             ws.cell(row=row_num, column=col).border = thin_border
 
         row_num += 1
 
-    for col in range(1, 17):
+    for col in range(1, 19):
         max_length = max(len(str(cell.value or '')) for cell in ws[get_column_letter(col)])
         ws.column_dimensions[get_column_letter(col)].width = min(max_length + 2, 40)
 
@@ -157,9 +164,14 @@ def create_output_excel(results, rfq_number, output_path):
     wb.close()
 
 
-async def process_part(page, part_number, quantity, line_number, worker_id, cpc=''):
-    """Process a single part number and return results"""
+async def process_part(page, part_number, quantity, line_number, worker_id, cpc='', franchise_data=None):
+    """Process a single part number and return results
+
+    Args:
+        franchise_data: Optional dict with 'franchise_qty', 'franchise_bulk_price' for min order filtering
+    """
     results = []
+    omitted_suppliers = []  # Track suppliers filtered out by min order value
 
     print(f'  [W{worker_id}] Searching for {part_number}...', flush=True)
     search_start = time.time()
@@ -350,7 +362,42 @@ async def process_part(page, part_number, quantity, line_number, worker_id, cpc=
                 continue
 
             await supplier_link.click()
-            await sleep_with_jitter(2)
+            await sleep_with_jitter(3)  # Wait for supplier detail popup
+
+            # Extract min order value from supplier detail popup
+            min_order_value = await config.extract_min_order_value(page)
+            supplier['min_order_value'] = min_order_value
+
+            # Apply min order value filter if franchise data is provided
+            if franchise_data and min_order_value:
+                # Add customer_qty to franchise_data for the filter
+                franchise_data_with_qty = {**franchise_data, 'customer_qty': quantity}
+                should_skip, skip_reason, filter_details = config.should_skip_for_min_order_value(
+                    supplier, franchise_data_with_qty
+                )
+                if should_skip:
+                    print(f'      [W{worker_id}] OMITTED: {skip_reason}')
+                    omitted_suppliers.append({
+                        'line_number': line_number,
+                        'cpc': cpc,
+                        'part_number': part_number,
+                        'qty_requested': quantity,
+                        'supplier': supplier['name'],
+                        'region': supplier['region'],
+                        'supplier_qty': supplier['total_qty'],
+                        'min_order_value': min_order_value,
+                        'franchise_bulk_price': filter_details.get('franchise_bulk_price'),
+                        'est_value': filter_details.get('est_value'),
+                        'multiplier': filter_details.get('multiplier'),
+                        'availability': filter_details.get('availability'),
+                        'reason': skip_reason,
+                        'status': 'OMITTED',
+                        'timestamp': datetime.now().isoformat(),
+                        'worker_id': worker_id
+                    })
+                    await page.keyboard.press('Escape')
+                    await sleep_with_jitter(1)
+                    continue
 
             rfq_link = await page.query_selector('a:has-text("E-Mail RFQ")')
             if not rfq_link:
@@ -467,6 +514,9 @@ async def process_part(page, part_number, quantity, line_number, worker_id, cpc=
                 'error': str(e),
                 'worker_id': worker_id
             })
+
+    # Add omitted suppliers to results for reporting
+    results.extend(omitted_suppliers)
 
     return results
 
@@ -693,6 +743,7 @@ async def main():
         sent_count = len([r for r in results_list if r['status'] == 'SENT'])
         failed_count = len([r for r in results_list if r['status'] == 'FAILED'])
         no_suppliers = len([r for r in results_list if r['status'] == 'NO_SUPPLIERS'])
+        omitted_count = len([r for r in results_list if r['status'] == 'OMITTED'])
 
         # Supplier distribution analysis
         supplier_counts = {}
@@ -710,6 +761,7 @@ async def main():
         print(f'Total parts processed: {len(parts)}')
         print(f'RFQs sent: {sent_count}')
         print(f'Failed: {failed_count}')
+        print(f'Omitted (min order filter): {omitted_count}')
         print(f'No suppliers found: {no_suppliers}')
         print(f'Total time: {total_time:.1f}s ({total_time/60:.1f} min)')
         print(f'Avg time per part: {total_time/len(parts):.1f}s')

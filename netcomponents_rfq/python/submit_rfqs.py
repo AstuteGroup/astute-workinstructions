@@ -59,6 +59,7 @@ async def main():
     }
 
     results = []
+    omitted_suppliers = []  # Track suppliers filtered out by min order value
 
     async with async_playwright() as p:
         browser = await p.chromium.launch(headless=True)
@@ -266,7 +267,17 @@ async def main():
                         continue
 
                     await supplier_link.click()
-                    await asyncio.sleep(2)
+                    await asyncio.sleep(3)  # Wait for supplier detail popup
+
+                    # Extract min order value from supplier detail popup
+                    min_order_value = await config.extract_min_order_value(page)
+                    supplier['min_order_value'] = min_order_value
+                    if min_order_value:
+                        print(f'    Min order value: ${min_order_value:.2f}')
+
+                    # TODO: Apply min order value filter when franchise_data is available
+                    # This will be integrated when called from batch_rfqs_from_system.py
+                    # with franchise screening data
 
                     # Click E-Mail RFQ link
                     rfq_link = await page.query_selector('a:has-text("E-Mail RFQ")')

@@ -16,7 +16,8 @@ async function searchPart(page, partNumber, debug = false) {
     partNumber,
     found: false,
     totalQty: 0,
-    lowestPrice: null,
+    lowestPrice: null,   // First tier (small qty price)
+    bulkPrice: null,     // Last tier (highest qty price break) - used for secondary market valuation
     distributorCount: 0,
     distributors: [],
     error: null,
@@ -91,15 +92,17 @@ async function searchPart(page, partNumber, debug = false) {
         }
 
         const qty = parseInt(instock, 10) || 0;
-        let price = null;
+        let firstTierPrice = null;
+        let lastTierPrice = null;  // Bulk price - last column
 
-        // Parse price from JSON array: [[qty, "USD", "0.123"], ...]
+        // Parse price from JSON array: [[qty, "USD", "0.123"], [qty2, "USD", "0.115"], ...]
+        // First tier = small qty price, Last tier = bulk price (what we need for valuation)
         if (priceData) {
           try {
             const prices = JSON.parse(priceData);
             if (prices.length > 0) {
-              // Get the first price tier
-              price = parseFloat(prices[0][2]) || null;
+              firstTierPrice = parseFloat(prices[0][2]) || null;
+              lastTierPrice = parseFloat(prices[prices.length - 1][2]) || null;
             }
           } catch (e) {
             // Price parsing failed
@@ -107,11 +110,21 @@ async function searchPart(page, partNumber, debug = false) {
         }
 
         if (qty > 0) {
-          result.distributors.push({ name: distName || 'Unknown', qty, price });
+          result.distributors.push({
+            name: distName || 'Unknown',
+            qty,
+            price: firstTierPrice,
+            bulkPrice: lastTierPrice,
+          });
           result.totalQty += qty;
 
-          if (price && (result.lowestPrice === null || price < result.lowestPrice)) {
-            result.lowestPrice = price;
+          // Track lowest first-tier price across all distributors
+          if (firstTierPrice && (result.lowestPrice === null || firstTierPrice < result.lowestPrice)) {
+            result.lowestPrice = firstTierPrice;
+          }
+          // Track lowest bulk price across all distributors (for secondary market valuation)
+          if (lastTierPrice && (result.bulkPrice === null || lastTierPrice < result.bulkPrice)) {
+            result.bulkPrice = lastTierPrice;
           }
         }
       } catch (e) {
@@ -124,7 +137,7 @@ async function searchPart(page, partNumber, debug = false) {
     result.found = result.distributorCount > 0;
 
     if (debug && result.found) {
-      console.log(`    [DEBUG] Total qty: ${result.totalQty}, Lowest price: $${result.lowestPrice}`);
+      console.log(`    [DEBUG] Total qty: ${result.totalQty}, Lowest price: $${result.lowestPrice}, Bulk price: $${result.bulkPrice}`);
     }
 
   } catch (error) {

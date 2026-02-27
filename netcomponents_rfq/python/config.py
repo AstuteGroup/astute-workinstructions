@@ -25,6 +25,13 @@ MAX_SUPPLIERS_PER_REGION = 3
 # Date code preferences - 2 year window is preferred
 DC_PREFERRED_WINDOW_YEARS = 2
 
+# Min order value filtering (uses franchise pricing from FindChips)
+# Multiplier depends on franchise availability:
+#   - ABUNDANT: franchise_qty >= customer_qty → broker must offer big savings to compete
+#   - SCARCE: franchise_qty < customer_qty → secondary market has leverage
+MIN_ORDER_VALUE_MULTIPLIER_ABUNDANT = 0.2  # When franchise can fully meet demand
+MIN_ORDER_VALUE_MULTIPLIER_SCARCE = 0.7    # When franchise cannot meet demand
+
 # Parallel processing settings
 NUM_WORKERS = 3  # Number of parallel browser instances
 JITTER_RANGE = 0.4  # ±40% timing variation (e.g., 2 sec becomes 1.2-2.8 sec)
@@ -154,6 +161,68 @@ def should_add_extra_supplier(selected_suppliers):
     return False
 
 
+def should_skip_for_min_order_value(supplier, franchise_data):
+    """
+    Determine if supplier should be skipped based on min order value.
+
+    Logic:
+      est_value = franchise_bulk_price × supplier_qty × multiplier
+      Skip if: min_order_value > est_value
+
+    Args:
+        supplier: dict with 'total_qty', 'min_order_value'
+        franchise_data: dict with 'franchise_qty', 'franchise_bulk_price', 'customer_qty'
+
+    Returns:
+        (should_skip: bool, reason: str, details: dict)
+    """
+    # If no franchise data provided, don't filter
+    if not franchise_data:
+        return False, None, {}
+
+    franchise_bulk_price = franchise_data.get('franchise_bulk_price')
+    franchise_qty = franchise_data.get('franchise_qty', 0)
+    customer_qty = franchise_data.get('customer_qty', 0)
+
+    # If no bulk price, can't calculate - don't filter
+    if not franchise_bulk_price or franchise_bulk_price <= 0:
+        return False, None, {}
+
+    supplier_qty = supplier.get('total_qty', 0)
+    min_order_value = supplier.get('min_order_value')
+
+    # If no min order value on supplier, don't filter
+    if min_order_value is None or min_order_value <= 0:
+        return False, None, {}
+
+    # Determine multiplier based on franchise availability
+    if franchise_qty >= customer_qty:
+        multiplier = MIN_ORDER_VALUE_MULTIPLIER_ABUNDANT  # 0.2
+        availability = 'abundant'
+    else:
+        multiplier = MIN_ORDER_VALUE_MULTIPLIER_SCARCE    # 0.7
+        availability = 'scarce'
+
+    # Calculate estimated opportunity value
+    est_value = franchise_bulk_price * supplier_qty * multiplier
+
+    details = {
+        'min_order_value': min_order_value,
+        'franchise_bulk_price': franchise_bulk_price,
+        'supplier_qty': supplier_qty,
+        'multiplier': multiplier,
+        'est_value': round(est_value, 2),
+        'availability': availability
+    }
+
+    # Skip if min order value exceeds estimated opportunity value
+    if min_order_value > est_value:
+        reason = f"Min order ${min_order_value:.2f} > est value ${est_value:.2f} ({availability}, mult={multiplier})"
+        return True, reason, details
+
+    return False, None, details
+
+
 def adjust_rfq_quantity(requested_qty, supplier_qty):
     """
     Adjust RFQ quantity when supplier has less than requested.
@@ -200,6 +269,34 @@ def adjust_rfq_quantity(requested_qty, supplier_qty):
     adjusted = max(adjusted, 1)
 
     return adjusted, True
+
+
+async def extract_min_order_value(page):
+    """
+    Extract minimum order value from supplier detail popup.
+
+    Looks for "Minimum Order:" text followed by a dollar amount.
+    Returns: float or None
+    """
+    try:
+        # Look for the supplier-offices popup which contains min order info
+        supplier_info = await page.query_selector('.supplier-offices, .supplier-office')
+        if not supplier_info:
+            return None
+
+        text = await supplier_info.inner_text()
+
+        # Look for "Minimum Order:" followed by dollar amount
+        # Pattern: "Minimum Order:\n$25.00USD" or "Minimum Order: $100.00"
+        import re
+        match = re.search(r'Minimum Order[:\s]*\$?([\d,]+\.?\d*)', text, re.IGNORECASE)
+        if match:
+            value_str = match.group(1).replace(',', '')
+            return float(value_str)
+
+        return None
+    except Exception:
+        return None
 
 
 # Need re for date code parsing
