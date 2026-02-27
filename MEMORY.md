@@ -93,6 +93,16 @@ node main.js -f parts.xlsx --threshold 50
 ### RFQ Sourcing (`netcomponents_rfq/`)
 - `ROADMAP.md` - Future enhancements roadmap (in `rfq_sourcing/`)
 - `python/submit_rfqs.py` - Single part RFQ submission
+
+**Roadmap Quick Reference:**
+| # | Feature | What it means |
+|---|---------|---------------|
+| 1 | Alternate Packaging | When MPN not found, try without -TR/-TRL suffixes |
+| 2 | LLM Description Scanning | Auto-detect "OEM only", "No resellers" in supplier descriptions |
+| 3 | Capture Franchise Details | Save DigiKey/Mouser prices & qtys for negotiation leverage |
+| 4 | Memory Product Handling | Different sourcing rules for DRAM/Flash (Micron, Samsung, Hynix) |
+| 5 | Cross-Region Duplicates | Detect when Americas + Europe listings are same inventory |
+| 6 | Supplier Fatigue | Track RFQ history, avoid over-contacting picky suppliers |
 - `python/batch_rfqs_from_system.py` - Batch RFQ with 3 parallel workers
 - `python/analyze_no_suppliers.py` - Analyze results for CPCs needing manual work
 - `python/list_suppliers.py` - Preview suppliers without submitting
