@@ -12,7 +12,9 @@ When suppliers respond to RFQs, their quotes arrive via email to `vq@orangetsuna
 
 ## Automated VQ Parser
 
-The `vq-parser` tool automatically processes supplier quote emails from the VQ inbox.
+The `vq-parser` tool automatically processes supplier quote emails **directly from the VQ inbox** via Himalaya CLI.
+
+> **Process Change**: Previously, quote emails were manually downloaded as .msg files to a GitHub folder for parsing. The new process connects directly to `vq@orangetsunami.com` via IMAP - no manual download required.
 
 ### Location
 
@@ -22,7 +24,7 @@ The `vq-parser` tool automatically processes supplier quote emails from the VQ i
 
 ### Features
 
-- **Email Integration**: Connects to VQ inbox via Himalaya CLI
+- **Direct Inbox Access**: Reads emails directly from VQ inbox via Himalaya CLI (no .msg download needed)
 - **Multi-Source Extraction**: Parses quotes from:
   - Email body text/tables
   - PDF attachments
