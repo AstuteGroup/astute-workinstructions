@@ -144,37 +144,43 @@ This document tracks planned enhancements for full automation of the RFQ sourcin
 
 ---
 
-## 6. Capture Franchise Line Details
+## 6. Franchise Pricing & Availability via API
 
 **Status:** Planned
 
-**Problem:** When franchise screening finds stock, we only use it for pass/fail filtering. We lose valuable pricing and availability data that could inform quoting and negotiations.
+**Problem:** Currently scraping FindChips for franchise data - fragile, rate-limited, and we discard the detail after screening.
 
 **Solution:**
-- Store full franchise results when found:
-  - Distributor names (DigiKey, Mouser, Arrow, etc.)
-  - Quantities per distributor
-  - Price tiers (1pc, 100pc, 1000pc, bulk)
-  - Lead times if available
-- Link to RFQ/CPC record for later reference
-- Use for:
-  - Quick Quote baseline pricing
-  - Supplier negotiation leverage ("franchise has it at $X")
-  - Market price validation
+- Replace FindChips scraping with direct API feeds from authorized distributors
+- Capture full pricing and availability data per distributor
+- Store for downstream use (Quick Quote, negotiation leverage, market validation)
+
+**Target APIs:**
+- **Octopart API** - Aggregated pricing across distributors
+- **DigiKey API** - Direct pricing and stock
+- **Mouser API** - Direct pricing and stock
+- **Arrow API** - Direct pricing and stock
+- **Newark/Farnell API** - Direct pricing and stock
 
 **Data to Capture:**
 ```json
 {
   "mpn": "LM358N",
-  "franchise_results": [
-    {"distributor": "DigiKey", "qty": 5000, "price_1": 0.45, "price_100": 0.38, "price_1000": 0.32},
-    {"distributor": "Mouser", "qty": 3200, "price_1": 0.44, "price_100": 0.37, "price_1000": 0.31}
+  "queried_at": "2026-02-27T15:30:00Z",
+  "distributors": [
+    {"name": "DigiKey", "qty": 5000, "price_1": 0.45, "price_100": 0.38, "price_1000": 0.32, "lead_time": "In Stock"},
+    {"name": "Mouser", "qty": 3200, "price_1": 0.44, "price_100": 0.37, "price_1000": 0.31, "lead_time": "In Stock"}
   ],
-  "lowest_price": 0.31,
-  "total_franchise_qty": 8200,
-  "screened_at": "2026-02-27T15:30:00Z"
+  "lowest_bulk_price": 0.31,
+  "total_franchise_qty": 8200
 }
 ```
+
+**Benefits:**
+- Eliminates FindChips scraping entirely
+- Real-time pricing (no stale cache)
+- Higher rate limits / no blocking
+- Richer data (lead times, MOQs, packaging options)
 
 ---
 
@@ -184,7 +190,7 @@ This document tracks planned enhancements for full automation of the RFQ sourcin
 |---|---------|--------|--------|----------|
 | 1 | Alternate Packaging | High | Low | **Now** (basic done) |
 | 2 | LLM Description Scanning | High | Medium | **Next** |
-| 3 | Capture Franchise Details | Medium | Low | Q2 |
+| 3 | Franchise Pricing via API | High | Medium | Q2 |
 | 4 | Memory Product Handling | Medium | Medium | Q2 |
 | 5 | Cross-Region Duplicates | Medium | Low | Q2 |
 | 6 | Supplier Fatigue | High | High | Q3 |
