@@ -56,35 +56,31 @@ async function main() {
         const skippedFranchised = [];
 
         for (const row of rows) {
+            const cells = await row.$$('td');
             const rowText = (await row.innerText().catch(() => '')).toLowerCase();
 
-            // Check for region headers
-            if (rowText.includes('americas') && !rowText.includes('inventory')) {
-                currentRegion = 'Americas';
-                continue;
-            }
-            if (rowText.includes('europe') && !rowText.includes('inventory')) {
-                currentRegion = 'Europe';
-                continue;
-            }
-            if ((rowText.includes('asia') || rowText.includes('other')) && !rowText.includes('inventory')) {
-                currentRegion = 'Asia/Other';
+            // Header rows have few cells (1-3), data rows have 16+
+            const isHeaderRow = cells.length < 5;
+
+            if (isHeaderRow) {
+                // Region headers
+                if (rowText.includes('americas')) {
+                    currentRegion = 'Americas';
+                } else if (rowText.includes('europe')) {
+                    currentRegion = 'Europe';
+                } else if (rowText.includes('asia') || rowText.includes('other')) {
+                    currentRegion = 'Asia/Other';
+                }
+                // Section headers
+                if (rowText.includes('in stock') || rowText.includes('in-stock')) {
+                    inStockSection = true;
+                } else if (rowText.includes('brokered')) {
+                    inStockSection = false;
+                }
                 continue;
             }
 
-            // Check for section headers - must start with the section text (not contain it in description)
-            // Section headers are short rows that just contain the section name
-            if ((rowText.startsWith('in stock') || rowText.startsWith('in-stock')) && rowText.length < 100) {
-                inStockSection = true;
-                continue;
-            }
-            if ((rowText.startsWith('brokered inventory') || rowText.startsWith('brokered')) && rowText.length < 100) {
-                inStockSection = false;
-                continue;
-            }
-
-            // Get supplier info from cells
-            const cells = await row.$$('td');
+            // Data rows - must have 16+ cells
             if (cells.length < 16) continue;
 
             const supplierCell = cells[15];

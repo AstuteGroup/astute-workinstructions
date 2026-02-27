@@ -67,35 +67,35 @@ async def main():
             current_region = 'Unknown'
 
             for row in rows:
+                cells = await row.query_selector_all('td')
                 row_text = (await row.inner_text() or '').lower()
 
-                # Track region headers
-                if 'americas' in row_text and 'inventory' not in row_text and len(row_text) < 50:
-                    current_region = 'Americas'
-                    continue
-                if 'europe' in row_text and 'inventory' not in row_text and len(row_text) < 50:
-                    current_region = 'Europe'
-                    continue
-                if ('asia' in row_text or 'other' in row_text) and 'inventory' not in row_text and len(row_text) < 50:
-                    current_region = 'Asia/Other'
+                # Header rows have few cells (1-3), data rows have 16+
+                is_header_row = len(cells) < 5
+
+                if is_header_row:
+                    # Region headers
+                    if 'americas' in row_text:
+                        current_region = 'Americas'
+                    elif 'europe' in row_text:
+                        current_region = 'Europe'
+                    elif 'asia' in row_text or 'other' in row_text:
+                        current_region = 'Asia/Other'
+                    # Section headers
+                    if 'in stock' in row_text or 'in-stock' in row_text:
+                        in_stock_section = True
+                    elif 'brokered' in row_text:
+                        in_stock_section = False
                     continue
 
-                # Check for section subheader rows
-                if (row_text.startswith('in stock') or row_text.startswith('in-stock')) and len(row_text) < 100:
-                    in_stock_section = True
-                    continue
-                if (row_text.startswith('brokered inventory') or row_text.startswith('brokered')) and len(row_text) < 100:
-                    in_stock_section = False
+                # Data rows - must have 16+ cells
+                if len(cells) < 16:
                     continue
 
                 # Skip if not in-stock or Asia/Other
                 if not in_stock_section:
                     continue
                 if current_region == 'Asia/Other':
-                    continue
-
-                cells = await row.query_selector_all('td')
-                if len(cells) < 16:
                     continue
 
                 # Get supplier name from column 15
