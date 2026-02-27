@@ -205,7 +205,7 @@ async function main() {
                 await delay(2000);
                 await page.fill('#PartsSearched_0__PartNumber', partNumber);
                 await page.click('#btnSearch');
-                await delay(6000);
+                await delay(8000);
 
                 // Find supplier link in the results table (column 15 is supplier column)
                 let supplierLink = null;
