@@ -1,85 +1,98 @@
 /**
- * Find the Send RFQ button
+ * Find the Send RFQ button in the form
  */
 const { chromium } = require('playwright');
 const config = require('./config');
 
-(async () => {
+async function delay(ms) {
+    return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+async function main() {
     const browser = await chromium.launch({ headless: true });
-    const page = await browser.newPage();
+    const page = await browser.newPage({ viewport: { width: 1400, height: 1000 } });
 
-    // Login
-    await page.goto('https://www.netcomponents.com');
-    await new Promise(r => setTimeout(r, 2000));
-    await page.click('a:has-text("Login")');
-    await new Promise(r => setTimeout(r, 2000));
-    await page.fill('#AccountNumber', config.NETCOMPONENTS_ACCOUNT);
-    await page.fill('#UserName', config.NETCOMPONENTS_USERNAME);
-    await page.fill('#Password', config.NETCOMPONENTS_PASSWORD);
-    await page.press('#Password', 'Enter');
-    await new Promise(r => setTimeout(r, 5000));
+    try {
+        console.log('Logging in...');
+        await page.goto(config.BASE_URL);
+        await delay(2000);
+        await page.click('a:has-text("Login")');
+        await delay(2000);
+        await page.fill('#AccountNumber', config.NETCOMPONENTS_ACCOUNT);
+        await page.fill('#UserName', config.NETCOMPONENTS_USERNAME);
+        await page.fill('#Password', config.NETCOMPONENTS_PASSWORD);
+        await page.press('#Password', 'Enter');
+        await delay(5000);
 
-    // Search
-    await page.fill('#PartsSearched_0__PartNumber', 'SI5341B-D-GMR');
-    await page.click('#btnSearch');
-    await new Promise(r => setTimeout(r, 8000));
+        console.log('Searching...');
+        await page.fill('#PartsSearched_0__PartNumber', 'DS3231SN#');
+        await page.click('#btnSearch');
+        await delay(6000);
 
-    // Click first non-Mouser supplier
-    const rows = await page.$$('table#trv_0 tbody tr');
-    for (const row of rows) {
-        const cells = await row.$$('td');
-        if (cells.length < 15) continue;
-        const link = await cells[15].$('a');
-        if (!link) continue;
-        const name = await link.innerText();
-        if (name && !name.toLowerCase().includes('mouser')) {
-            await link.click();
-            break;
+        console.log('Clicking supplier...');
+        const supplierLink = await page.$('a:has-text("Diverse Electronics")');
+        await supplierLink.click();
+        await delay(2000);
+
+        console.log('Opening RFQ form...');
+        const rfqLink = await page.$('a:has-text("E-Mail RFQ")');
+        await rfqLink.click();
+        await delay(3000);
+
+        // Fill form
+        const checkbox = await page.$('#Parts_0__Selected');
+        if (checkbox) await checkbox.check();
+        const qtyInput = await page.$('#Parts_0__Quantity');
+        if (qtyInput) await qtyInput.fill('1000');
+        await delay(1000);
+
+        // Search for ALL elements containing "Send RFQ"
+        console.log('\nSearching for Send RFQ elements...\n');
+
+        const sendElements = await page.evaluate(() => {
+            const results = [];
+            document.querySelectorAll('*').forEach(el => {
+                const text = el.textContent || '';
+                if (text.includes('Send RFQ') && el.children.length === 0) {
+                    results.push({
+                        tag: el.tagName,
+                        text: el.textContent.trim(),
+                        class: el.className,
+                        id: el.id,
+                        type: el.type,
+                        onclick: el.onclick ? 'yes' : 'no',
+                        html: el.outerHTML
+                    });
+                }
+            });
+            return results;
+        });
+
+        console.log('Elements with exact "Send RFQ" text (no children):');
+        sendElements.forEach((el, i) => {
+            console.log(`\n[${i}] ${el.tag}`);
+            console.log(`    text: "${el.text}"`);
+            console.log(`    class: "${el.class}"`);
+            console.log(`    id: "${el.id}"`);
+            console.log(`    onclick: ${el.onclick}`);
+            console.log(`    HTML: ${el.html}`);
+        });
+
+        // Also check for any btn-success buttons
+        console.log('\n\nAll btn-success buttons:');
+        const successBtns = await page.$$('.btn-success');
+        for (const btn of successBtns) {
+            const text = (await btn.innerText().catch(() => '')).trim();
+            const tag = await btn.evaluate(el => el.tagName);
+            const visible = await btn.isVisible();
+            console.log(`  ${tag}: "${text}" visible=${visible}`);
         }
+
+    } catch (error) {
+        console.error('Error:', error.message);
+    } finally {
+        await browser.close();
     }
-    await new Promise(r => setTimeout(r, 3000));
+}
 
-    // Click E-Mail RFQ
-    const rfqBtn = await page.$('button:has-text("E-Mail RFQ")');
-    if (rfqBtn) await rfqBtn.click();
-    await new Promise(r => setTimeout(r, 3000));
-
-    // Find ALL buttons with send/rfq/submit text
-    console.log('=== SEARCHING FOR SEND RFQ BUTTON ===\n');
-
-    const allButtons = await page.$$('button, input[type="submit"], a.btn');
-    console.log(`Total buttons/links: ${allButtons.length}\n`);
-
-    for (const btn of allButtons) {
-        const text = (await btn.innerText().catch(() => '')).trim();
-        const value = await btn.getAttribute('value') || '';
-        const id = await btn.getAttribute('id') || '';
-        const cls = await btn.getAttribute('class') || '';
-        const visible = await btn.isVisible();
-
-        const searchText = (text + value).toLowerCase();
-        if (searchText.includes('send') || searchText.includes('submit') || id.toLowerCase().includes('send')) {
-            console.log(`MATCH: text="${text}" value="${value}" id="${id}" visible=${visible}`);
-            console.log(`       class="${cls.substring(0, 60)}"`);
-        }
-    }
-
-    // Also look for the form and its submit
-    console.log('\n=== FORMS ===\n');
-    const forms = await page.$$('form');
-    for (let i = 0; i < forms.length; i++) {
-        const form = forms[i];
-        const id = await form.getAttribute('id');
-        const action = await form.getAttribute('action');
-        console.log(`Form ${i}: id="${id}" action="${action}"`);
-
-        const formSubmits = await form.$$('button[type="submit"], input[type="submit"]');
-        for (const s of formSubmits) {
-            const sText = (await s.innerText().catch(() => '')).trim();
-            const sVal = await s.getAttribute('value');
-            console.log(`  Submit: text="${sText}" value="${sVal}"`);
-        }
-    }
-
-    await browser.close();
-})();
+main().catch(console.error);
