@@ -19,6 +19,10 @@ NETCOMPONENTS_PASSWORD = os.getenv('NETCOMPONENTS_PASSWORD', '')
 MAX_SUPPLIERS_PER_REGION = 3
 TOTAL_SUPPLIERS_TARGET = 6  # Flexible across regions via cross-region balancing
 
+# Coverage-based selection thresholds
+GOOD_COVERAGE_THRESHOLD = 0.80  # 80% cumulative = good coverage achieved
+MIN_INDIVIDUAL_QTY_PERCENT = 0.10  # 10% minimum for suppliers after good coverage reached
+
 # Franchised/authorized distributors are identified by 'ncauth' class in DOM
 # Independent distributors have 'ncnoauth' class
 # No need for hardcoded name list - the page marks them
@@ -160,6 +164,55 @@ def should_add_extra_supplier(selected_suppliers):
         if s.get('dc_status') == 'unknown':
             return True
     return False
+
+
+def filter_by_coverage(suppliers, requested_qty):
+    """
+    Filter suppliers using coverage-based selection logic.
+
+    Logic:
+    1. Sort suppliers by qty (descending)
+    2. Calculate cumulative coverage as we add suppliers
+    3. Once we reach GOOD_COVERAGE_THRESHOLD (80%):
+       - Only add more suppliers if they have >= MIN_INDIVIDUAL_QTY_PERCENT (10%) of request
+       - We have good coverage, no need for tiny quantities
+    4. If coverage is sparse (< 80%), include all suppliers to maximize piecing potential
+
+    Args:
+        suppliers: List of supplier dicts with 'total_qty' key
+        requested_qty: Customer's requested quantity
+
+    Returns:
+        Filtered list of suppliers
+    """
+    if not suppliers or requested_qty <= 0:
+        return suppliers
+
+    # Sort by quantity descending
+    sorted_suppliers = sorted(suppliers, key=lambda x: x.get('total_qty', 0), reverse=True)
+
+    selected = []
+    cumulative_qty = 0
+    good_coverage_reached = False
+
+    for supplier in sorted_suppliers:
+        supplier_qty = supplier.get('total_qty', 0)
+
+        # Check if we've reached good coverage
+        if cumulative_qty >= requested_qty * GOOD_COVERAGE_THRESHOLD:
+            good_coverage_reached = True
+
+        # If good coverage reached, only add meaningful contributors
+        if good_coverage_reached:
+            individual_percent = supplier_qty / requested_qty if requested_qty > 0 else 0
+            if individual_percent < MIN_INDIVIDUAL_QTY_PERCENT:
+                # Skip - too small to matter when we already have good coverage
+                continue
+
+        selected.append(supplier)
+        cumulative_qty += supplier_qty
+
+    return selected
 
 
 def calculate_region_slots(americas_available, europe_available):

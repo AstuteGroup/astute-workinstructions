@@ -279,7 +279,16 @@ async def process_part(page, part_number, quantity, line_number, worker_id, cpc=
     americas.sort(key=lambda x: config.supplier_priority_score(x, quantity), reverse=True)
     europe.sort(key=lambda x: config.supplier_priority_score(x, quantity), reverse=True)
 
-    # Track qualifying supplier counts (before selection)
+    # Apply coverage-based filtering to remove tiny-qty suppliers when good coverage exists
+    # Combine all suppliers first to assess overall coverage, then split back
+    all_suppliers = americas + europe
+    filtered_all = config.filter_by_coverage(all_suppliers, quantity)
+    filtered_names = {s['name'] for s in filtered_all}
+
+    americas = [s for s in americas if s['name'] in filtered_names]
+    europe = [s for s in europe if s['name'] in filtered_names]
+
+    # Track qualifying supplier counts (after coverage filter)
     qualifying_americas = len(americas)
     qualifying_europe = len(europe)
     qualifying_total = qualifying_americas + qualifying_europe

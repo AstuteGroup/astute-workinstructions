@@ -203,6 +203,14 @@ async def main():
             americas.sort(key=lambda x: config.supplier_priority_score(x, quantity), reverse=True)
             europe.sort(key=lambda x: config.supplier_priority_score(x, quantity), reverse=True)
 
+            # Apply coverage-based filtering to remove tiny-qty suppliers when good coverage exists
+            all_suppliers = americas + europe
+            filtered_all = config.filter_by_coverage(all_suppliers, quantity)
+            filtered_names = {s['name'] for s in filtered_all}
+
+            americas = [s for s in americas if s['name'] in filtered_names]
+            europe = [s for s in europe if s['name'] in filtered_names]
+
             # Use cross-region balancing: if one region is short, give extra slots to the other
             americas_slots, europe_slots = config.calculate_region_slots(len(americas), len(europe))
 
