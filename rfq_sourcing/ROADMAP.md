@@ -144,15 +144,50 @@ This document tracks planned enhancements for full automation of the RFQ sourcin
 
 ---
 
+## 6. Capture Franchise Line Details
+
+**Status:** Planned
+
+**Problem:** When franchise screening finds stock, we only use it for pass/fail filtering. We lose valuable pricing and availability data that could inform quoting and negotiations.
+
+**Solution:**
+- Store full franchise results when found:
+  - Distributor names (DigiKey, Mouser, Arrow, etc.)
+  - Quantities per distributor
+  - Price tiers (1pc, 100pc, 1000pc, bulk)
+  - Lead times if available
+- Link to RFQ/CPC record for later reference
+- Use for:
+  - Quick Quote baseline pricing
+  - Supplier negotiation leverage ("franchise has it at $X")
+  - Market price validation
+
+**Data to Capture:**
+```json
+{
+  "mpn": "LM358N",
+  "franchise_results": [
+    {"distributor": "DigiKey", "qty": 5000, "price_1": 0.45, "price_100": 0.38, "price_1000": 0.32},
+    {"distributor": "Mouser", "qty": 3200, "price_1": 0.44, "price_100": 0.37, "price_1000": 0.31}
+  ],
+  "lowest_price": 0.31,
+  "total_franchise_qty": 8200,
+  "screened_at": "2026-02-27T15:30:00Z"
+}
+```
+
+---
+
 ## Implementation Priority
 
 | # | Feature | Impact | Effort | Priority |
 |---|---------|--------|--------|----------|
 | 1 | Alternate Packaging | High | Low | **Now** (basic done) |
 | 2 | LLM Description Scanning | High | Medium | **Next** |
-| 3 | Memory Product Handling | Medium | Medium | Q2 |
-| 4 | Cross-Region Duplicates | Medium | Low | Q2 |
-| 5 | Supplier Fatigue | High | High | Q3 |
+| 3 | Capture Franchise Details | Medium | Low | Q2 |
+| 4 | Memory Product Handling | Medium | Medium | Q2 |
+| 5 | Cross-Region Duplicates | Medium | Low | Q2 |
+| 6 | Supplier Fatigue | High | High | Q3 |
 
 ---
 
