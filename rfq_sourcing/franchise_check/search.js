@@ -104,15 +104,29 @@ async function searchPart(page, partNumber, debug = false) {
           }
         }
 
-        // Validate MPN matches (normalize: remove dashes, spaces, #, case-insensitive)
-        const normalize = (s) => s.toLowerCase().replace(/[-\s#]/g, '');
-        const normalizedSearch = normalize(partNumber);
-        const normalizedResult = normalize(mfrPartNumber || '');
+        // Validate MPN matches with packaging suffix normalization
+        // Common packaging suffixes: TR (tape reel), TRL (tape reel left), TR500, TR750, etc.
+        const stripPackaging = (s) => {
+          let result = s.toLowerCase().replace(/[-\s#]/g, '');
+          // Strip tape & reel suffixes: tr, trl, tr500, tr750, tr3k, etc.
+          result = result.replace(/tr[l0-9k]*$/, '');
+          // Strip packaging variants: pbf (lead-free) vs trpbf (tape reel lead-free)
+          // "trpbf" → "pbf", but keep "pbf" as is
+          result = result.replace(/trpbf$/, 'pbf');
+          return result;
+        };
 
-        // Must be exact match after normalization, or result starts with search term
-        // (to handle suffixes like -TR500, -TR750)
-        if (normalizedResult !== normalizedSearch && !normalizedResult.startsWith(normalizedSearch)) {
-          if (debug) console.log(`    [DEBUG] Skipping non-match: ${mfrPartNumber}`);
+        const normalizedSearch = stripPackaging(partNumber);
+        const normalizedResult = stripPackaging(mfrPartNumber || '');
+
+        // Match if base parts are equal, or one is prefix of the other
+        // (handles remaining suffix variations we didn't anticipate)
+        const isMatch = normalizedResult === normalizedSearch ||
+                        normalizedResult.startsWith(normalizedSearch) ||
+                        normalizedSearch.startsWith(normalizedResult);
+
+        if (!isMatch) {
+          if (debug) console.log(`    [DEBUG] Skipping non-match: ${mfrPartNumber} (normalized: ${normalizedResult} vs ${normalizedSearch})`);
           continue;
         }
 
