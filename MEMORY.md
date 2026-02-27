@@ -4,7 +4,16 @@ This file tracks recent work sessions and provides quick context for continuing 
 
 ## Recent Sessions
 
-1. **RFQ Sourcing - Min Order Value Filter** (2026-02-27) - **IMPLEMENTED**
+1. **VQ Loading - Enhanced Parser** (2026-02-27) - **COMPLETE**
+   - Added Himalaya email integration for direct inbox access (`vq@orangetsunami.com`)
+   - Multi-source extraction: PDF (pdf.js-extract), Excel/CSV (xlsx), hyperlinks (Playwright)
+   - RFQ resolution by MPN database lookup (not supplier ref numbers)
+   - Fuzzy MPN matching with progressive character trimming
+   - Partial data flagging: `[PARTIAL - needs: price, qty]`
+   - MPN mismatch notes when quoted MPN differs from RFQ
+   - Location: `~/workspace/vq-parser/`, `Trading Analysis/VQ Loading/`
+
+2. **RFQ Sourcing - Min Order Value Filter** (2026-02-27) - **IMPLEMENTED**
    - Franchise Screening now captures bulk price (last column) from FindChips
    - RFQ Sourcing extracts min order value from NetComponents supplier popup
    - Filter: `est_value = franchise_bulk_price × supplier_qty × multiplier`
@@ -13,23 +22,17 @@ This file tracks recent work sessions and provides quick context for continuing 
    - Omitted suppliers shown in output with yellow highlighting
    - READMEs updated for both workflows
 
-2. **Franchise Screening Workflow** (2026-02-26)
+3. **Franchise Screening Workflow** (2026-02-26)
    - Built FindChips scraper to screen RFQs before broker sourcing
    - Filters low-value opportunities (OV < threshold) where franchise has stock
    - Fixed MPN matching (normalize dashes, handle suffixes like -TR500)
    - Location: `rfq_sourcing/franchise_check/`
 
-3. **LAM Billings Review - Complete** (2026-02-26)
+4. **LAM Billings Review - Complete** (2026-02-26)
    - Resolved all 20 buyer issues (assignments from ERP)
    - GP by Buyer finalized: $16,797.88 (Jake $7,389, TX $6,865, Stephanie $1,289, ES $869, DM $386)
    - 2025 fully reconciled; 2026 pending (30 COVs / $40,131 awaiting billing data)
    - Location: `Trading Analysis/LAM Billings Review/`
-
-4. **RFQ Sourcing - Lock File & Supplier Tracking** (2026-02-25)
-   - Added lock file to prevent duplicate batch runs (`.lock` in RFQ folder)
-   - Added qualifying supplier tracking columns (Qualifying, Qual Amer/Eur, Selected)
-   - Added supplier distribution summary at end of batch
-   - Location: `netcomponents_rfq/`
 
 ---
 
