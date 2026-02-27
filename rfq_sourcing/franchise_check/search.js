@@ -51,15 +51,18 @@ async function searchPart(page, partNumber, debug = false) {
       console.log(`    [DEBUG] Saved screenshot and HTML to ${debugDir}`);
     }
 
-    // FindChips organizes results into tabs: #authorized (franchise) and others (independent/broker)
-    // First, get the list of authorized distributor names from the #authorized section
+    // FindChips shows "Authorized Distributor" text in each distributor's header section
+    // Build a set of authorized distributor names by checking for this text
     const authorizedDistributors = new Set();
-    const authListItems = await page.$$('#authorized li[data-name]');
-    for (const item of authListItems) {
-      const name = await item.getAttribute('data-name');
-      if (name) authorizedDistributors.add(name.toLowerCase());
+    const distributorDivs = await page.$$('div.distributor-results');
+    for (const div of distributorDivs) {
+      const distName = await div.getAttribute('data-distributor_name');
+      const divText = await div.innerText();
+      if (divText && divText.includes('Authorized Distributor')) {
+        if (distName) authorizedDistributors.add(distName.toLowerCase());
+      }
     }
-    if (debug) console.log(`    [DEBUG] Authorized distributors: ${[...authorizedDistributors].join(', ')}`);
+    if (debug) console.log(`    [DEBUG] Authorized distributors (${authorizedDistributors.size}): ${[...authorizedDistributors].join(', ')}`);
 
     // Now get all rows, but we'll filter to only include authorized distributors
     const distributorRows = await page.$$('tr.row[data-instock]');
@@ -89,8 +92,7 @@ async function searchPart(page, partNumber, debug = false) {
         const priceData = await row.getAttribute('data-price');
 
         // Skip non-authorized distributors (brokers/independent resellers)
-        // Use partial matching since authorized list has short names (e.g., "arrow")
-        // but row data has full names (e.g., "Arrow Electronics")
+        // Use partial matching to handle sponsored rows with short names (e.g., "Arrow" vs "Arrow Electronics")
         if (authorizedDistributors.size > 0 && distName) {
           const distNameLower = distName.toLowerCase();
           const isAuthorized = [...authorizedDistributors].some(auth =>
