@@ -17,6 +17,7 @@ NETCOMPONENTS_PASSWORD = os.getenv('NETCOMPONENTS_PASSWORD', '')
 
 # Supplier filtering
 MAX_SUPPLIERS_PER_REGION = 3
+TOTAL_SUPPLIERS_TARGET = 6  # Flexible across regions via cross-region balancing
 
 # Franchised/authorized distributors are identified by 'ncauth' class in DOM
 # Independent distributors have 'ncnoauth' class
@@ -159,6 +160,54 @@ def should_add_extra_supplier(selected_suppliers):
         if s.get('dc_status') == 'unknown':
             return True
     return False
+
+
+def calculate_region_slots(americas_available, europe_available):
+    """
+    Calculate how many suppliers to select from each region using cross-region balancing.
+
+    Logic:
+    - Target TOTAL_SUPPLIERS_TARGET (6) suppliers total
+    - Default MAX_SUPPLIERS_PER_REGION (3) per region
+    - If one region has fewer suppliers, give extra slots to the other region
+
+    Args:
+        americas_available: Number of qualifying Americas suppliers
+        europe_available: Number of qualifying Europe suppliers
+
+    Returns:
+        (americas_slots, europe_slots): Tuple of how many to select from each region
+    """
+    target = TOTAL_SUPPLIERS_TARGET
+    default_per_region = MAX_SUPPLIERS_PER_REGION
+
+    # Start with default allocation
+    americas_slots = min(americas_available, default_per_region)
+    europe_slots = min(europe_available, default_per_region)
+
+    # If Americas is short, give extra slots to Europe
+    americas_shortfall = default_per_region - americas_slots
+    if americas_shortfall > 0:
+        extra_europe = min(americas_shortfall, europe_available - europe_slots)
+        europe_slots += extra_europe
+
+    # If Europe is short, give extra slots to Americas
+    europe_shortfall = default_per_region - europe_slots
+    if europe_shortfall > 0:
+        extra_americas = min(europe_shortfall, americas_available - americas_slots)
+        americas_slots += extra_americas
+
+    # Ensure we don't exceed target total
+    total = americas_slots + europe_slots
+    if total > target:
+        # Trim from the region with more slots
+        excess = total - target
+        if europe_slots > americas_slots:
+            europe_slots -= excess
+        else:
+            americas_slots -= excess
+
+    return americas_slots, europe_slots
 
 
 def should_skip_for_min_order_value(supplier, franchise_data):

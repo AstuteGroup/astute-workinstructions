@@ -284,17 +284,17 @@ async def process_part(page, part_number, quantity, line_number, worker_id, cpc=
     qualifying_europe = len(europe)
     qualifying_total = qualifying_americas + qualifying_europe
 
-    # Select suppliers (add +1 if unknown DCs present)
-    americas_count = config.MAX_SUPPLIERS_PER_REGION
-    europe_count = config.MAX_SUPPLIERS_PER_REGION
+    # Use cross-region balancing: if one region is short, give extra slots to the other
+    americas_slots, europe_slots = config.calculate_region_slots(qualifying_americas, qualifying_europe)
 
-    selected_americas = americas[:americas_count]
-    selected_europe = europe[:europe_count]
+    selected_americas = americas[:americas_slots]
+    selected_europe = europe[:europe_slots]
 
-    if config.should_add_extra_supplier(selected_americas) and len(americas) > americas_count:
-        selected_americas = americas[:americas_count + 1]
-    if config.should_add_extra_supplier(selected_europe) and len(europe) > europe_count:
-        selected_europe = europe[:europe_count + 1]
+    # Add +1 extra if unknown DCs present (buffer for uncertainty)
+    if config.should_add_extra_supplier(selected_americas) and len(americas) > americas_slots:
+        selected_americas = americas[:americas_slots + 1]
+    if config.should_add_extra_supplier(selected_europe) and len(europe) > europe_slots:
+        selected_europe = europe[:europe_slots + 1]
 
     all_selected = selected_americas + selected_europe
     selected_count = len(all_selected)

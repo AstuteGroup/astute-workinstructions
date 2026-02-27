@@ -203,18 +203,17 @@ async def main():
             americas.sort(key=lambda x: config.supplier_priority_score(x, quantity), reverse=True)
             europe.sort(key=lambda x: config.supplier_priority_score(x, quantity), reverse=True)
 
-            # Select top suppliers per region (add +1 if unknown DCs present)
-            americas_count = config.MAX_SUPPLIERS_PER_REGION
-            europe_count = config.MAX_SUPPLIERS_PER_REGION
+            # Use cross-region balancing: if one region is short, give extra slots to the other
+            americas_slots, europe_slots = config.calculate_region_slots(len(americas), len(europe))
 
-            selected_americas = americas[:americas_count]
-            selected_europe = europe[:europe_count]
+            selected_americas = americas[:americas_slots]
+            selected_europe = europe[:europe_slots]
 
-            # Add extra supplier if any selected have unknown DC
-            if config.should_add_extra_supplier(selected_americas) and len(americas) > americas_count:
-                selected_americas = americas[:americas_count + 1]
-            if config.should_add_extra_supplier(selected_europe) and len(europe) > europe_count:
-                selected_europe = europe[:europe_count + 1]
+            # Add +1 extra if unknown DCs present (buffer for uncertainty)
+            if config.should_add_extra_supplier(selected_americas) and len(americas) > americas_slots:
+                selected_americas = americas[:americas_slots + 1]
+            if config.should_add_extra_supplier(selected_europe) and len(europe) > europe_slots:
+                selected_europe = europe[:europe_slots + 1]
 
             print(f'   Americas: {len(selected_americas)} suppliers selected')
             for s in selected_americas:
