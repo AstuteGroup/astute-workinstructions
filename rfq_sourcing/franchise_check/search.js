@@ -51,8 +51,17 @@ async function searchPart(page, partNumber, debug = false) {
       console.log(`    [DEBUG] Saved screenshot and HTML to ${debugDir}`);
     }
 
-    // FindChips uses tr.row elements with data attributes
-    // Look for rows that have data-instock attribute - check this FIRST
+    // FindChips organizes results into tabs: #authorized (franchise) and others (independent/broker)
+    // First, get the list of authorized distributor names from the #authorized section
+    const authorizedDistributors = new Set();
+    const authListItems = await page.$$('#authorized li[data-name]');
+    for (const item of authListItems) {
+      const name = await item.getAttribute('data-name');
+      if (name) authorizedDistributors.add(name.toLowerCase());
+    }
+    if (debug) console.log(`    [DEBUG] Authorized distributors: ${[...authorizedDistributors].join(', ')}`);
+
+    // Now get all rows, but we'll filter to only include authorized distributors
     const distributorRows = await page.$$('tr.row[data-instock]');
 
 
@@ -79,8 +88,22 @@ async function searchPart(page, partNumber, debug = false) {
         const distName = await row.getAttribute('data-distributor_name');
         const priceData = await row.getAttribute('data-price');
 
-        // Validate MPN matches (normalize: remove dashes, spaces, case-insensitive)
-        const normalize = (s) => s.toLowerCase().replace(/[-\s]/g, '');
+        // Skip non-authorized distributors (brokers/independent resellers)
+        // Use partial matching since authorized list has short names (e.g., "arrow")
+        // but row data has full names (e.g., "Arrow Electronics")
+        if (authorizedDistributors.size > 0 && distName) {
+          const distNameLower = distName.toLowerCase();
+          const isAuthorized = [...authorizedDistributors].some(auth =>
+            distNameLower.includes(auth) || auth.includes(distNameLower)
+          );
+          if (!isAuthorized) {
+            if (debug) console.log(`    [DEBUG] Skipping non-authorized: ${distName}`);
+            continue;
+          }
+        }
+
+        // Validate MPN matches (normalize: remove dashes, spaces, #, case-insensitive)
+        const normalize = (s) => s.toLowerCase().replace(/[-\s#]/g, '');
         const normalizedSearch = normalize(partNumber);
         const normalizedResult = normalize(mfrPartNumber || '');
 
@@ -96,13 +119,17 @@ async function searchPart(page, partNumber, debug = false) {
         let lastTierPrice = null;  // Bulk price - last column
 
         // Parse price from JSON array: [[qty, "USD", "0.123"], [qty2, "USD", "0.115"], ...]
-        // First tier = small qty price, Last tier = bulk price (what we need for valuation)
+        // Different distributors order tiers differently, so find min/max explicitly
         if (priceData) {
           try {
             const prices = JSON.parse(priceData);
             if (prices.length > 0) {
-              firstTierPrice = parseFloat(prices[0][2]) || null;
-              lastTierPrice = parseFloat(prices[prices.length - 1][2]) || null;
+              // Find the highest and lowest prices in the array
+              const allPrices = prices.map(p => parseFloat(p[2])).filter(p => !isNaN(p) && p > 0);
+              if (allPrices.length > 0) {
+                firstTierPrice = Math.max(...allPrices);  // Highest price (small qty / 1pc)
+                lastTierPrice = Math.min(...allPrices);   // Lowest price (bulk qty)
+              }
             }
           } catch (e) {
             // Price parsing failed
