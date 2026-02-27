@@ -4,12 +4,14 @@ This file tracks recent work sessions and provides quick context for continuing 
 
 ## Recent Sessions
 
-1. **LAM Billings Review - Complete** (2026-02-26)
-   - Resolved all 20 buyer issues (assignments from ERP)
-   - GP by Buyer finalized: $16,797.88 (Jake $7,389, TX $6,865, Stephanie $1,289, ES $869, DM $386)
-   - 2025 fully reconciled; 2026 pending (30 COVs / $40,131 awaiting billing data)
-   - Cross-referenced open orders - confirmed clean year-end cutoff
-   - Location: `Trading Analysis/LAM Billings Review/`
+1. **RFQ Sourcing - Min Order Value Filter Design** (2026-02-27)
+   - Designed supplier filter based on min order value vs opportunity value
+   - Uses franchise bulk pricing (last column/lowest price) from FindChips
+   - Logic: `est_value = franchise_bulk_price × supplier_qty × multiplier`
+   - Multiplier = 0.2 if franchise_qty >= customer_rfq_qty (abundant), 0.7 if scarce
+   - Skip supplier if min_order_value > est_value
+   - Output: Include omitted suppliers with reasons for iteration/refinement
+   - **TODO**: Update franchise_check to output bulk pricing, update netcomponents_rfq to consume it, create READMEs
 
 2. **Franchise Screening Workflow** (2026-02-26)
    - Built FindChips scraper to screen RFQs before broker sourcing
@@ -17,16 +19,16 @@ This file tracks recent work sessions and provides quick context for continuing 
    - Fixed MPN matching (normalize dashes, handle suffixes like -TR500)
    - Location: `rfq_sourcing/franchise_check/`
 
-3. **RFQ Sourcing - Lock File & Supplier Tracking** (2026-02-25)
+3. **LAM Billings Review - Complete** (2026-02-26)
+   - Resolved all 20 buyer issues (assignments from ERP)
+   - GP by Buyer finalized: $16,797.88 (Jake $7,389, TX $6,865, Stephanie $1,289, ES $869, DM $386)
+   - 2025 fully reconciled; 2026 pending (30 COVs / $40,131 awaiting billing data)
+   - Location: `Trading Analysis/LAM Billings Review/`
+
+4. **RFQ Sourcing - Lock File & Supplier Tracking** (2026-02-25)
    - Added lock file to prevent duplicate batch runs (`.lock` in RFQ folder)
    - Added qualifying supplier tracking columns (Qualifying, Qual Amer/Eur, Selected)
    - Added supplier distribution summary at end of batch
-   - Location: `netcomponents_rfq/`
-
-4. **RFQ Sourcing - CPC Analysis & Stability Fixes** (2026-02-25)
-   - Added CPC column to batch results for line-level tracking
-   - Created `analyze_no_suppliers.py` - standalone tool to identify CPCs needing manual work
-   - Fixed timeout crashes with proper `wait_for_selector` calls
    - Location: `netcomponents_rfq/`
 
 ---
