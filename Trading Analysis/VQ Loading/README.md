@@ -32,7 +32,9 @@ The `vq-parser` tool automatically processes supplier quote emails **directly fr
   - Hyperlinks to quote portals (GREENCHIPS, etc.)
 - **Field Mapping**: Automatically maps to VQ template columns
 - **Vendor Lookup**: Matches suppliers to Business Partner records in DB
-- **RFQ Resolution**: Extracts RFQ number from subject/body
+- **RFQ Resolution**: Looks up RFQ by MPN in database (see details below)
+- **Partial Data Flagging**: Flags quotes missing price or quantity for manual review
+- **MPN Mismatch Detection**: Notes when quoted MPN differs from RFQ MPN
 
 ### Commands
 
@@ -59,6 +61,54 @@ CSVs are written to `~/workspace/vq-parser/output/` with naming:
 ```
 VQ_{RFQ#}_{Sender}_{Timestamp}.csv
 ```
+
+### RFQ Resolution Logic
+
+The parser resolves RFQ numbers by looking up MPNs in the database (not by parsing supplier reference numbers from email text, which are the supplier's internal references).
+
+**Resolution Strategy (in order):**
+
+1. **Exact MPN Match**: Query `chuboe_rfq_line_mpn` table for the quoted MPN
+2. **NetComponents Format Parsing**: Extract the original RFQ MPN from NetComponents email body format (the MPN Astute originally requested)
+3. **Fuzzy MPN Matching**: Progressively trim characters from the quoted MPN to find a partial match (handles suffix variations like `-ND`, `-TR`, etc.)
+4. **Subject Line Fallback**: Try extracting MPN from email subject
+
+**Database Query:**
+```sql
+SELECT rl.chuboe_rfq_id, rlm.mpn
+FROM adempiere.chuboe_rfq_line_mpn rlm
+JOIN adempiere.chuboe_rfq_line rl ON rl.chuboe_rfq_line_id = rlm.chuboe_rfq_line_id
+WHERE UPPER(REPLACE(rlm.mpn, '-', '')) = $normalizedMPN
+ORDER BY rl.created DESC
+LIMIT 1;
+```
+
+### MPN Mismatch Handling
+
+When the quoted MPN differs from the RFQ MPN (e.g., supplier quotes a different suffix or package variant), the parser:
+
+1. Uses the **quoted MPN** in the `chuboe_mpn` field (what the supplier is actually offering)
+2. Adds a note to `chuboe_note_public`: `Quoted MPN: TG110-S050N2RLTR (RFQ MPN: TG110-S050N2)`
+
+This ensures the data reflects what was actually quoted while maintaining traceability to the original RFQ.
+
+### Partial Data Flags
+
+When a quote is missing critical pricing data, the parser flags it for manual review rather than discarding it:
+
+| Missing Fields | Vendor Notes Flag |
+|----------------|-------------------|
+| Price only | `[PARTIAL - needs: price]` |
+| Quantity only | `[PARTIAL - needs: qty]` |
+| Both | `[PARTIAL - needs: price, qty]` |
+
+**Example Output:**
+```csv
+chuboe_mpn,qty,cost,chuboe_note_public
+TG110-S050N2RLTR,,,Tape&Reel,options,,,"[PARTIAL - needs: price, qty]"
+```
+
+Partial quotes are still written to the output CSV so they can be manually completed when follow-up information is available.
 
 ---
 
