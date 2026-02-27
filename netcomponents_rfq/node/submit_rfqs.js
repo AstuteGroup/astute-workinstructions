@@ -97,38 +97,36 @@ async function main() {
         let currentRegion = 'Unknown';
 
         for (const row of rows) {
+            const cells = await row.$$('td');
             const rowText = (await row.innerText().catch(() => '')).toLowerCase();
 
-            // Track region headers
-            if (rowText.includes('americas') && !rowText.includes('inventory') && rowText.length < 50) {
-                currentRegion = 'Americas';
-                continue;
-            }
-            if (rowText.includes('europe') && !rowText.includes('inventory') && rowText.length < 50) {
-                currentRegion = 'Europe';
-                continue;
-            }
-            if ((rowText.includes('asia') || rowText.includes('other')) && !rowText.includes('inventory') && rowText.length < 50) {
-                currentRegion = 'Asia/Other';
+            // Header rows have few cells (1-3), data rows have 16+
+            const isHeaderRow = cells.length < 5;
+
+            if (isHeaderRow) {
+                // Region headers
+                if (rowText.includes('americas')) {
+                    currentRegion = 'Americas';
+                } else if (rowText.includes('europe')) {
+                    currentRegion = 'Europe';
+                } else if (rowText.includes('asia') || rowText.includes('other')) {
+                    currentRegion = 'Asia/Other';
+                }
+                // Section headers
+                if (rowText.includes('in stock') || rowText.includes('in-stock')) {
+                    inStockSection = true;
+                } else if (rowText.includes('brokered')) {
+                    inStockSection = false;
+                }
                 continue;
             }
 
-            // Check for section subheader rows
-            if ((rowText.startsWith('in stock') || rowText.startsWith('in-stock')) && rowText.length < 100) {
-                inStockSection = true;
-                continue;
-            }
-            if ((rowText.startsWith('brokered inventory') || rowText.startsWith('brokered')) && rowText.length < 100) {
-                inStockSection = false;
-                continue;
-            }
+            // Data rows - must have 16+ cells
+            if (cells.length < 16) continue;
 
             // Skip if not in-stock section or Asia/Other
             if (!inStockSection) continue;
             if (currentRegion === 'Asia/Other') continue;
-
-            const cells = await row.$$('td');
-            if (cells.length < 16) continue;
 
             // Get supplier name
             const supplierCell = cells[15];
@@ -209,10 +207,24 @@ async function main() {
                 await page.click('#btnSearch');
                 await delay(6000);
 
-                // Find and click the supplier
-                const supplierLink = await page.$(`a:has-text("${supplier.name}")`);
+                // Find supplier link in the results table (column 15 is supplier column)
+                let supplierLink = null;
+                const rows = await page.$$('table#trv_0 tbody tr');
+                for (const row of rows) {
+                    const cells = await row.$$('td');
+                    if (cells.length < 16) continue;
+                    const supplierCell = cells[15];
+                    const link = await supplierCell.$('a');
+                    if (!link) continue;
+                    const linkText = (await link.innerText()).trim();
+                    if (linkText === supplier.name) {
+                        supplierLink = link;
+                        break;
+                    }
+                }
+
                 if (!supplierLink) {
-                    console.log(`    ERROR: Could not find supplier link`);
+                    console.log(`    ERROR: Could not find supplier link in results table`);
                     results.push({ supplier: supplier.name, region: supplier.region, status: 'FAILED', error: 'Supplier not found' });
                     continue;
                 }
