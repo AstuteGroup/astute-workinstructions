@@ -12,11 +12,37 @@ At the start of every new conversation, before addressing anything else, always 
 > **Available Workflows:**
 > 1. **Franchise Screening** - Screen RFQs against FindChips to filter low-value parts before broker sourcing
 > 2. **RFQ Sourcing** - Submit RFQs to NetComponents suppliers (single part or batch from iDempiere RFQ)
-> 3. **VQ Loading** - Process supplier quote emails into a VQ template
+> 3. **VQ Loading** - Process supplier quote emails into ERP-ready CSV (see `~/workspace/vq-parser/`)
 > 4. **Market Offer Analysis for RFQs** - Match new RFQs against customer excess and stock offers (includes pricing & valuation logic)
 > 5. **Quick Quote** - Generate baseline quotes from recent VQs (0-30 days) with margin/GP/rebate pricing logic
 > 6. **Seller Quoting Activity** - VQ→CQ→SO funnel analysis by seller (snapshot + 6-month trend)
 > 7. **Order/Shipment Tracking** - Look up tracking by COV, SO, MPN, customer PO, or salesperson (see `saved-queries/order-shipment-tracking.md`)
+
+---
+
+## VQ Parser Quick Reference
+
+**Location:** `~/workspace/vq-parser/`
+
+**Commands:**
+```bash
+# Fetch new emails from INBOX and process
+node vq-parser/src/index.js fetch
+
+# Reprocess all emails in Processed folder (uses current IDs)
+node vq-parser/scripts/batch-reprocess.js --folder Processed
+
+# Consolidate CSVs into upload-ready files
+node vq-parser/src/index.js consolidate
+```
+
+**Vendor Matching Strategy:**
+1. Exact email match in `ad_user.email`
+2. Domain-based lookup (e.g., velocityelec.com → Velocity Electronics)
+3. Sender name fuzzy match in `c_bpartner.name`
+4. LLM inference (requires `ANTHROPIC_API_KEY` in `.env`)
+
+**Output:** `vq-parser/output/uploads/VQ_UPLOAD_*.csv`
 
 Then proceed to address the user's message if they included one.
 
