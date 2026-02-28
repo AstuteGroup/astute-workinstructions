@@ -1,0 +1,29 @@
+{
+  "name": "vq-parser",
+  "version": "1.0.0",
+  "description": "VQ Email Parser - Fetches vendor quotes from email and generates ERP-ready CSVs",
+  "main": "src/index.js",
+  "bin": {
+    "vq-parser": "src/index.js"
+  },
+  "scripts": {
+    "start": "node src/index.js",
+    "test": "jest"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "cheerio": "^1.0.0",
+    "commander": "^12.0.0",
+    "csv-parse": "^6.1.0",
+    "csv-stringify": "^6.5.0",
+    "dotenv": "^16.4.0",
+    "pdf-parse": "^2.4.5",
+    "pdf.js-extract": "^0.2.1",
+    "xlsx": "^0.18.5"
+  },
+  "devDependencies": {
+    "jest": "^29.7.0"
+  }
+}

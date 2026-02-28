@@ -1,0 +1,7 @@
+node_modules/
+data/processed-ids.json
+data/vendor-cache.json
+data/mfr-cache.json
+data/cron.log
+output/*.csv
+.env

@@ -22,8 +22,8 @@ This file tracks recent work sessions and provides quick context for continuing 
    - Added Himalaya email integration for direct inbox access (`vq@orangetsunami.com`)
    - Multi-source extraction: PDF (pdf.js-extract), Excel/CSV (xlsx), hyperlinks (Playwright)
    - RFQ resolution by MPN database lookup (not supplier ref numbers)
-   - Fuzzy MPN matching with progressive character trimming
-   - Location: `~/workspace/vq-parser/`, `Trading Analysis/VQ Loading/`
+   - Fuzzy MPN matching with progressive character trimming - **93% success rate**
+   - Location: `vq_parser/` (code tracked in git)
 
 4. **RFQ Sourcing - Min Order Value Filter** (2026-02-27) - **IMPLEMENTED**
    - Franchise Screening captures bulk price (last column) from FindChips
@@ -41,7 +41,7 @@ This file tracks recent work sessions and provides quick context for continuing 
 |----------|----------|-------------|
 | **Franchise Screening** | `rfq_sourcing/franchise_check/` | Pre-screen RFQs via FindChips before broker sourcing |
 | **RFQ Sourcing** | `netcomponents_rfq/` | Automated supplier RFQ submission via NetComponents |
-| **VQ Loading** | `Trading Analysis/VQ Loading/` | Process supplier quotes into VQ template |
+| **VQ Loading** | `vq_parser/` | Process supplier quote emails into VQ template (93% match rate) |
 | **Market Offer Matching** | `Trading Analysis/Market Offer Matching for RFQs/` | Match RFQs to customer excess/stock |
 | **Quick Quote** | `Trading Analysis/Quick Quote/` | Generate baseline quotes from recent VQs |
 | **Order/Shipment Tracking** | `Trading Analysis/saved-queries/` | Look up tracking by various identifiers |
@@ -115,6 +115,37 @@ node main.js -f parts.xlsx --threshold 50
 **Safety Features:**
 - Lock file (`.lock`) prevents duplicate batch runs
 - Stale lock detection (auto-removes if process crashed)
+
+### VQ Parser (`vq_parser/`)
+- `index.js` - CLI entry point: fetch, parse, consolidate commands
+- `mapper/field-mapper.js` - MPN validation, field mapping to VQ columns
+- `mapper/rfq-resolver.js` - Multi-strategy RFQ lookup with fuzzy matching
+- `parser/multi-source-extractor.js` - PDF/Excel/hyperlink extraction
+- `email/fetcher.js` - Himalaya IMAP integration
+
+**Usage:**
+```bash
+# Fetch and process emails (run from ~/workspace/vq-parser)
+node index.js fetch --limit 50
+
+# Consolidate into upload files
+node index.js consolidate
+
+# Check status
+node index.js status
+```
+
+**RFQ Resolution Strategies:**
+1. Exact MPN match in database
+2. Extract original MPN from NetComponents email format
+3. Fuzzy matching (progressive character trimming, min 5 chars)
+4. Subject line MPN extraction
+
+**Output:**
+- `output/uploads/VQ_UPLOAD_*.csv` - Ready for ERP import
+- `output/uploads/VQ_UNKNOWN_*.csv` - Needs manual RFQ assignment
+
+---
 
 ### Database Access
 - Connection: `psql` (no password needed)
