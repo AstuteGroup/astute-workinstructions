@@ -1,6 +1,6 @@
 const { VQ_COLUMNS, BUYER_EMAIL_MAP } = require('../../config/columns');
 const { resolveRFQ } = require('./rfq-resolver');
-const { lookupVendor, lookupVendorByEmail } = require('./vendor-lookup');
+const { resolveVendor, lookupVendorByEmail } = require('./vendor-lookup');
 const { normalizeMfr } = require('./mfr-lookup');
 const { cleanString, stripCurrency, normalizePartNumber, extractNumber, normalizeRoHS } = require('../utils/sanitize');
 const logger = require('../utils/logger');
@@ -87,6 +87,9 @@ function extractMPNFromSubject(subject) {
   return null;
 }
 
+/**
+ * Resolve buyer from envelope or email body
+ */
 function resolveBuyer(envelope, emailBody) {
   if (envelope.from) {
     const fromAddr = typeof envelope.from === 'string' ? envelope.from : envelope.from.addr || '';
@@ -117,30 +120,35 @@ function resolveBuyer(envelope, emailBody) {
   return '';
 }
 
-function resolveVendorFromBody(emailBody) {
+/**
+ * Extract vendor email/name from forwarded email body
+ * Looks for "From:" lines that aren't from known buyers
+ */
+function extractVendorFromBody(emailBody) {
   const fromPatterns = [
-    /From:\s*([^<\n]+?)\s*<([^>]+)>/m,
+    /From:\s*([^<\n]+?)\s*<([^>]+)>/gm,
+    /From:\s*"?([^"<\n]+)"?\s*<([^>]+)>/gm,
   ];
 
   const fromMatches = [];
-  let searchText = emailBody;
+
   for (const pattern of fromPatterns) {
-    const regex = new RegExp(pattern.source, 'gm');
     let match;
-    while ((match = regex.exec(searchText)) !== null) {
+    while ((match = pattern.exec(emailBody)) !== null) {
       fromMatches.push({
-        name: match[1] ? match[1].trim() : '',
+        name: match[1] ? match[1].trim().replace(/^["']|["']$/g, '') : '',
         addr: match[2].trim()
       });
     }
   }
 
+  // Return the last non-buyer "From:" (original sender in forwarded chain)
   for (let i = fromMatches.length - 1; i >= 0; i--) {
     const fm = fromMatches[i];
     const isBuyer = Object.keys(BUYER_EMAIL_MAP).some(e =>
       fm.addr.toLowerCase().includes(e.toLowerCase())
     );
-    if (!isBuyer && fm.addr) {
+    if (!isBuyer && fm.addr && !fm.addr.includes('netcomponents.com')) {
       return fm;
     }
   }
@@ -166,7 +174,11 @@ const FIELD_TO_DB = {
   'Contact': 'ad_user_id',
 };
 
-function mapFields(parsedData, envelope, emailBody = '') {
+/**
+ * Map parsed quote data to VQ upload format
+ * Now async to support LLM vendor inference
+ */
+async function mapFields(parsedData, envelope, emailBody = '') {
   const { lines, flags, noBid } = parsedData;
   const subject = envelope.subject || '';
   const buyer = resolveBuyer(envelope, emailBody);
@@ -189,36 +201,30 @@ function mapFields(parsedData, envelope, emailBody = '') {
   }
 
   // Resolve RFQ by looking up the MPN in the database
-  // Returns { rfq, rfqMPN, mismatch } - mismatch=true if quoted MPN differs from RFQ MPN
   const rfqResult = resolveRFQ(firstMPN, subject, emailBody);
   const rfq = rfqResult.rfq;
   const mpnMismatch = rfqResult.mismatch;
   const rfqMPN = rfqResult.rfqMPN;
 
-  let bpSearchKey = '';
-  const vendorFromBody = resolveVendorFromBody(emailBody);
+  // Extract vendor info from forwarded email body
+  const vendorFromBody = extractVendorFromBody(emailBody);
+  const vendorEmail = vendorFromBody ? vendorFromBody.addr : '';
+  const vendorName = vendorFromBody ? vendorFromBody.name : '';
 
-  if (vendorFromBody) {
-    bpSearchKey = lookupVendorByEmail(vendorFromBody.addr);
-    if (!bpSearchKey && vendorFromBody.name) {
-      bpSearchKey = lookupVendor(vendorFromBody.name);
-    }
-  }
+  // Resolve vendor using multi-strategy approach (DB lookup + LLM inference)
+  const vendorResult = await resolveVendor(emailBody, vendorEmail, vendorName);
 
-  if (!bpSearchKey) {
-    const fromAddr = envelope.from ? (typeof envelope.from === 'string' ? envelope.from : (envelope.from.addr || '')) : '';
-    const fromName = envelope.from ? (typeof envelope.from === 'string' ? '' : (envelope.from.name || '')) : '';
+  // Extract vendor fields
+  const bpId = vendorResult.c_bpartner_id || '';
+  const resolvedVendorName = vendorResult.name || vendorName || '';
+  const contactName = vendorResult.contact_name || '';
+  const contactEmail = vendorResult.contact_email || vendorEmail || '';
+  const needsAssignment = vendorResult.needs_assignment || false;
 
-    const isBuyer = fromAddr && Object.keys(BUYER_EMAIL_MAP).some(e =>
-      fromAddr.toLowerCase().includes(e.toLowerCase())
-    );
-
-    if (!isBuyer) {
-      bpSearchKey = lookupVendorByEmail(fromAddr);
-      if (!bpSearchKey && fromName) {
-        bpSearchKey = lookupVendor(fromName);
-      }
-    }
+  // Build vendor note if not matched to DB
+  let vendorNote = '';
+  if (needsAssignment && resolvedVendorName) {
+    vendorNote = `[VENDOR NOT IN DB: ${resolvedVendorName}${contactEmail ? ' <' + contactEmail + '>' : ''}] `;
   }
 
   if (noBid) {
@@ -226,8 +232,8 @@ function mapFields(parsedData, envelope, emailBody = '') {
     return [{
       'chuboe_rfq_id': rfq,
       'chuboe_buyer_id': buyer,
-      'c_bpartner_id': bpSearchKey,
-      'ad_user_id': '',
+      'c_bpartner_id': bpId,
+      'ad_user_id': contactName,
       'chuboe_mpn': '',
       'chuboe_mfr_text': '',
       'qty': '0',
@@ -240,7 +246,7 @@ function mapFields(parsedData, envelope, emailBody = '') {
       'chuboe_lead_time': '',
       'c_country_id': '',
       'chuboe_rohs': '',
-      'chuboe_note_public': flagText || 'NO-BID'
+      'chuboe_note_public': vendorNote + (flagText || 'NO-BID')
     }];
   }
 
@@ -298,13 +304,13 @@ function mapFields(parsedData, envelope, emailBody = '') {
       logger.debug(`Partial data flagged: missing ${missingFields.join(', ')}`);
     }
 
-    const vendorNotes = (partialDataNote + mismatchNote + flagNotes + existingNotes).trim();
+    const allNotes = (vendorNote + partialDataNote + mismatchNote + flagNotes + existingNotes).trim();
 
     return {
       'chuboe_rfq_id': rfq,
       'chuboe_buyer_id': buyer,
-      'c_bpartner_id': bpSearchKey,
-      'ad_user_id': cleanString(line['Contact'] || line['ad_user_id'] || ''),
+      'c_bpartner_id': bpId,
+      'ad_user_id': cleanString(line['Contact'] || line['ad_user_id'] || contactName || ''),
       'chuboe_mpn': quotedMPN,
       'chuboe_mfr_text': normalizeMfr(line['MFR Text'] || line['chuboe_mfr_text'] || ''),
       'qty': qty,
@@ -317,11 +323,11 @@ function mapFields(parsedData, envelope, emailBody = '') {
       'chuboe_lead_time': cleanString(line['Lead Time'] || line['chuboe_lead_time'] || ''),
       'c_country_id': cleanString(line['COO'] || line['c_country_id'] || ''),
       'chuboe_rohs': normalizeRoHS(line['RoHS'] || line['chuboe_rohs'] || ''),
-      'chuboe_note_public': vendorNotes
+      'chuboe_note_public': allNotes
     };
   });
 
   return rows;
 }
 
-module.exports = { mapFields, resolveBuyer, resolveVendorFromBody };
+module.exports = { mapFields, resolveBuyer, extractVendorFromBody, isValidMPN, extractMPNFromSubject };

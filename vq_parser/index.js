@@ -81,8 +81,8 @@ program
             continue;
           }
 
-          // Map fields
-          const rows = mapFields(parsed, envelope, body);
+          // Map fields (async - uses LLM for vendor inference)
+          const rows = await mapFields(parsed, envelope, body);
           logger.info(`  Mapped ${rows.length} rows`);
 
           if (opts.dryRun) {
@@ -133,7 +133,7 @@ program
   .description('Parse a single .eml/.txt file (for testing)')
   .option('--verbose', 'Detailed parsing output')
   .option('--output-dir <path>', 'Override output directory')
-  .action((file, opts) => {
+  .action(async (file, opts) => {
     if (opts.verbose) process.env.VERBOSE = '1';
 
     const filePath = path.resolve(file);
@@ -162,7 +162,7 @@ program
       date: new Date().toISOString()
     };
 
-    const rows = mapFields(parsed, fakeEnvelope, body);
+    const rows = await mapFields(parsed, fakeEnvelope, body);
     logger.info(`Mapped ${rows.length} rows`);
 
     if (rows.length > 0) {
@@ -234,7 +234,7 @@ program
     );
     logger.info(`Source: ${parsed.source}, Strategy: ${parsed.strategy}, Confidence: ${parsed.confidence}, Lines: ${parsed.lines.length}`);
 
-    const rows = mapFields(parsed, envelope, body);
+    const rows = await mapFields(parsed, envelope, body);
     if (rows.length > 0) {
       const outputDir = opts.outputDir || process.env.OUTPUT_DIR || path.join(__dirname, '..', 'output');
       const rfq = rows[0]['chuboe_rfq_id'] || 'UNKNOWN';
