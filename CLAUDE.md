@@ -20,38 +20,59 @@ At the start of every new conversation, before addressing anything else, always 
 
 ---
 
-## VQ Parser Quick Reference
+## VQ Parser Workflow
 
 **Location:** `~/workspace/vq-parser/`
 **Repo:** https://github.com/AstuteGroup/vq-parser (private)
 
-**Commands:**
-```bash
-# Fetch new emails from INBOX and process
-node vq-parser/src/index.js fetch
+### Full Workflow (follow these steps in order)
 
-# Reprocess all emails in Processed folder (uses current IDs)
+**Step 1: Fetch & Parse**
+```bash
+node vq-parser/src/index.js fetch
+```
+
+**Step 2: Review & Fix Partials** ← CRITICAL STEP
+After parsing, review output CSVs for `[PARTIAL]` and `[HIGH_COST]` flags:
+```bash
+grep -l "PARTIAL\|HIGH_COST" ~/workspace/vq-parser/output/VQ_*.csv
+```
+For each flagged file:
+1. Read the CSV to see what's missing (price, qty, or both)
+2. Read the corresponding email from `needs-review.json` (search by MPN or RFQ ID)
+3. Extract the correct values from the email body
+4. Update the CSV with corrected data, remove the flag
+
+**Priority order for review:**
+1. `[HIGH_COST]` items - usually MPN bleeding errors (e.g., $2105 for NUP2105)
+2. `[PARTIAL - needs: qty]` - price exists, just need quantity
+3. `[PARTIAL - needs: price]` - qty exists, just need price
+4. `[PARTIAL - needs: price, qty]` - need both (lower priority)
+
+**Step 3: Consolidate**
+```bash
+node vq-parser/src/index.js consolidate
+```
+
+**Step 4: Verify & Deliver**
+- Check final upload for remaining issues: `grep "PARTIAL\|HIGH_COST" output/uploads/VQ_UPLOAD_*.csv`
+- Copy to VQ Loading folder and commit
+
+### Commands Reference
+```bash
+# Reprocess all emails in Processed folder
 node vq-parser/scripts/batch-reprocess.js --folder Processed
 
-# Consolidate CSVs into upload-ready files
-node vq-parser/src/index.js consolidate
-
-# Second-pass extraction on queued partials
-node vq-parser/scripts/extract-pass2.js
-
-# Apply vendor cache and merge to upload
+# Apply vendor cache and merge
 node vq-parser/scripts/apply-vendor-cache.js
 node vq-parser/scripts/merge-to-upload.js
 ```
 
-**Vendor Matching Strategy:**
+### Vendor Matching
 1. Exact email match in `ad_user.email`
-2. Vendor cache lookup (`data/vendor-cache.json` - auto-learns from processing)
+2. Vendor cache lookup (`data/vendor-cache.json`)
 3. Domain-based lookup (e.g., velocityelec.com → Velocity Electronics)
 4. Sender name fuzzy match in `c_bpartner.name`
-5. LLM inference (requires `ANTHROPIC_API_KEY` in `.env`)
-
-**NeedsReview Queue:** Partial extractions stored in `output/needs-review.json` with raw email body for later extraction passes.
 
 **Output:** `vq-parser/output/uploads/VQ_UPLOAD_*.csv`
 
