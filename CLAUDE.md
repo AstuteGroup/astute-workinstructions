@@ -23,6 +23,7 @@ At the start of every new conversation, before addressing anything else, always 
 ## VQ Parser Quick Reference
 
 **Location:** `~/workspace/vq-parser/`
+**Repo:** https://github.com/AstuteGroup/vq-parser (private)
 
 **Commands:**
 ```bash
@@ -34,13 +35,23 @@ node vq-parser/scripts/batch-reprocess.js --folder Processed
 
 # Consolidate CSVs into upload-ready files
 node vq-parser/src/index.js consolidate
+
+# Second-pass extraction on queued partials
+node vq-parser/scripts/extract-pass2.js
+
+# Apply vendor cache and merge to upload
+node vq-parser/scripts/apply-vendor-cache.js
+node vq-parser/scripts/merge-to-upload.js
 ```
 
 **Vendor Matching Strategy:**
 1. Exact email match in `ad_user.email`
-2. Domain-based lookup (e.g., velocityelec.com → Velocity Electronics)
-3. Sender name fuzzy match in `c_bpartner.name`
-4. LLM inference (requires `ANTHROPIC_API_KEY` in `.env`)
+2. Vendor cache lookup (`data/vendor-cache.json` - auto-learns from processing)
+3. Domain-based lookup (e.g., velocityelec.com → Velocity Electronics)
+4. Sender name fuzzy match in `c_bpartner.name`
+5. LLM inference (requires `ANTHROPIC_API_KEY` in `.env`)
+
+**NeedsReview Queue:** Partial extractions stored in `output/needs-review.json` with raw email body for later extraction passes.
 
 **Output:** `vq-parser/output/uploads/VQ_UPLOAD_*.csv`
 
