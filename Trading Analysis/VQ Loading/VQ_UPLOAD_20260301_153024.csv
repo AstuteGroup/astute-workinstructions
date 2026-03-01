@@ -1,0 +1,275 @@
+chuboe_rfq_id,chuboe_buyer_id,c_bpartner_id,ad_user_id,chuboe_mpn,chuboe_mfr_text,qty,cost,c_currency_id,chuboe_date_code,chuboe_moq,chuboe_spq,chuboe_packaging_id,chuboe_lead_time,c_country_id,chuboe_rohs,chuboe_note_public
+1011238,Jake Harris,1003646,,LM7805CT/NOPB,Broadcom,,,,QTY PRICE TOTAL PRIC,,,,,,,"[PARTIAL - needs: price, qty]"
+1011238,Jake Harris,1003646,,LM7805CT/NOPB,,,,,,,,,,,,"[PARTIAL - needs: price, qty]"
+1011238,Jake Harris,1003646,,LM7805CT/NOPB,,,,,,,,,STOCK,,,"[PARTIAL - needs: price, qty]"
+1011238,Jake Harris,1003646,,LM7805CT/NOPB,,,,,,,,,,,,"[PARTIAL - needs: price, qty]"
+1011238,Jake Harris,1003646,,STS-26020353,,1392,,,,,,,,MY Thank you,,[PARTIAL - needs: price]
+1011238,Jake Harris,1003646,,LM7805CT/NOPB,,,8,USD,,,,,,,,[PARTIAL - needs: qty]
+1061160,Jake Harris,1003601,,BSP77E6433HUMA1,Infineon,,0.9517,USD,,,,Tape&Reel,options,,,[PARTIAL - needs: qty]
+1061160,Jake Harris,1003601,,BSP77E6433HUMA1,Infineon,,0.9517,USD,,,,Tape&Reel,options,,,[PARTIAL - needs: qty]
+1061160,Jake Harris,1003601,,BSP77E6433HUMA1,Infineon,,0.9517,USD,,,,Tape&Reel,options,,,[PARTIAL - needs: qty]
+1061482,Jake Harris,1002457,,LM2903AVQDRG4Q1,Communications & Ear Protection Inc,60,3.34,USD,/ Rohs,,,,building a more resilient worl,,,
+1061482,Jake Harris,1013055,,A2GLOBALELECTRONICS.COM,,22,10.00,USD,,,,,,ated from outside of,,Quoted MPN: A2GLOBALELECTRONICS.COM (RFQ MPN: LM2903AVQDRG4).
+1061489,Jake Harris,1003646,,LM2901AVQDRG4Q1,Broadcom,,,,QTY PRICE TOTAL PRIC,,,,,,,"[PARTIAL - needs: price, qty]"
+1061489,Jake Harris,1003646,,LM2901AVQDRG4Q1,,,,,,,,,,,,"[PARTIAL - needs: price, qty]"
+1061489,Jake Harris,1003646,,LM2901AVQDRG4Q1,,,,,,,,,STOCK,,,"[PARTIAL - needs: price, qty]"
+1061489,Jake Harris,1003646,,LM2901AVQDRG4Q1,,,,,,,,,,,,"[PARTIAL - needs: price, qty]"
+1061489,Jake Harris,1003646,,STS-26020362,,3329,,,,,,,,,,[PARTIAL - needs: price]
+1061489,Jake Harris,1003646,,LM2901AVQDRG4Q1,,,,,968,,,,,,,"[PARTIAL - needs: price, qty]"
+1098364,Jake Harris,1002426,,200PCS,,200,6.00,USD,Best,,,,,,,
+1124549,Jake Harris,1001094,,BAS16-235,,,01,USD,A704,,,,in Stock,,,[PARTIAL - needs: qty] Quoted MPN: BAS16-235 (RFQ MPN: BAS16215).
+1124623,Jake Harris,1002855,,STM32F103C8T6,,,,,,,,,,,,"[PARTIAL - needs: price, qty]"
+1124623,Jake Harris,1002855,,STM32F103C8T6,,,,,,,,,,,,"[PARTIAL - needs: price, qty]"
+1124623,Jake Harris,1002855,,STM32F103C8T6,,,,,12+,,,,,,,"[PARTIAL - needs: price, qty]"
+1124623,Jake Harris,1002855,,STM32F103C8T6,,,,,,,,,,,,"[PARTIAL - needs: price, qty]"
+1124623,Jake Harris,1002855,,STM32F103C8T6,,,,,,,,Tray,,,,"[PARTIAL - needs: price, qty]"
+1124623,Jake Harris,1002855,,STM32F103C8T6,,,,,,,,,,,,"[PARTIAL - needs: price, qty]"
+1124623,Jake Harris,1002564,,STM32F103C8T6,,,,,,,,,,,,"[PARTIAL - needs: price, qty]"
+1124623,Jake Harris,1002564,,STM32F103C8T6,,,,,,,,,,,,"[PARTIAL - needs: price, qty]"
+1127038,Jake Harris,1002948,,FZT751TA,Broadcom,,,,Descripci,,,,Stock,,,"[PARTIAL - needs: price, qty]"
+1127038,Jake Harris,1002948,,FZT751TA,,,,,,,,,,,,"[PARTIAL - needs: price, qty]"
+1127038,Jake Harris,1002948,,FZT751TA,,3700,,,,,,,stock,al parts,,[PARTIAL - needs: price]
+1127038,Jake Harris,1002948,,FZT751TA,,,,,,,,,,,,"[PARTIAL - needs: price, qty]"
+1128015,Jake Harris,1001036,,NUP2105LT1G,,153000,0.08,USD,,,,,,,,
+1128015,Jake Harris,1004176,,NUP2105LT1G,,,0.05,USD,21,,,,1G),,,[PARTIAL - needs: qty]
+1128015,Jake Harris,1005154,,NUP2105LT1G,,2541,,,,,,,,,,[PARTIAL - needs: price]
+1128015,Jake Harris,1005154,,NUP2105LT1G,,2541,,,,,,,s),peration,,[PARTIAL - needs: price]
+1128015,Jake Harris,1002863,,NUP2105LT1-G,,,0.03,USD,,,,,,,,
+1128015,Jake Harris,1002863,,NUP2105LT1-G,,,0.03,USD,,,,,,,,
+1128746,Jake Harris,1000943,,LM2901AVQDRG4,,,,,200318,,,,"Shelf Life UOM CVC Components Ltd Scatterbrook Farm Rectory Lane Latchingdon Essex CM3 6HB NCAGE: U9372 www.cvc-components.com +44 (0)1621 745450 600 02.50 $1,500.00 594D127X0020R2T (VISHAY CAPACITORS) 1 NS STOCK EA PASSIVE CAPACITOR MILSPEC AXIAL CONDUCTORS SEPERATED BY INSULATION (DC 200318) $0.00 USD Condition FN Factory New NS New Surplus US Used Surplus AR As Removed OH Over Hauled SV Serviceable MINIMUM ORDER VALUE 50 $/£/ € All Prices Quoted Ex-Works, supplied with a CVC Company C of C only unless otherwise stated. We, CVC Components Ltd, As a distributor/agent of the original manufacturer, hereby confirm that, all the part numbers of items offered are 100% fit, size, form, function with the Tender Part numbers in above mentioned RFQ Please note that all these items are fully interchangeable, in fit, form and function. Signed & Sealed Ellie O Connell $1,500.00 Page 1 of 1",,,"[PARTIAL - needs: price, qty]"
+1128746,Jake Harris,1003448,,LM2901AVQDRG4,,,,,,,,,,,,"[PARTIAL - needs: price, qty]"
+1128746,Jake Harris,1003448,,PH-714-312-0201,,,,,,,,,,,,"[PARTIAL - needs: price, qty]"
+1128746,Jake Harris,1003448,,FAX-714-644-8224,,,,,,,,,,,,"[PARTIAL - needs: price, qty]"
+1128746,Jake Harris,1003448,,LM2901AVQDRG4,,,,,,,,,,al Message,,"[PARTIAL - needs: price, qty]"
+1128746,Jake Harris,1003448,,LM2901AVQDRG4,,,,,,,,,,,,"[PARTIAL - needs: price, qty]"
+1128746,Jake Harris,1003448,,PH-714-312-0201,,,,,,,,,,,,"[PARTIAL - needs: price, qty]"
+1128746,Jake Harris,1003448,,FAX-714-644-8224,,,,,,,,,,,,"[PARTIAL - needs: price, qty]"
+1128746,Jake Harris,1003448,,LM2901AVQDRG4,,,,,,,,,,al Message,,"[PARTIAL - needs: price, qty]"
+1129768,Jake Harris,1003406,,DC/13+,,,3,USD,/13+,,,,,,,[PARTIAL - needs: qty] Quoted MPN: DC/13+ (RFQ MPN: MSP430F149IPMR).
+1129833,Jake Harris,1001118,,T405-600H,STMicroelectronics,2775,0.31000,USD,18+,,3000,,2,,,"lot code removed, EXW Oradea. no F/S, Site approval is required."
+1129855,Jake Harris,1001118,,LCMXO3LF-2100C-5BG256C,Lattice Semiconductor Corp,476,5.80000,USD,2241+ COO MY,,119,,2,,,"EXW TH, Lot code removed, Site approval is required"
+1130292,Jake Harris,1006047,,H4S-1P7,,300,70,USD,stock / rohs,,,,s Tony Stratopoulos,al Message,,Quoted MPN: H4S-1P7 (RFQ MPN: SPP11N80C3).
+1130292,Jake Harris,1002638,,DG403DYZT,,,01,USD,A734,,,,,perman Sent,,[PARTIAL - needs: qty]
+1130292,Jake Harris,1004406,,HCF4093M013TR,,50,0.50,USD,A72A,,,,Stock,,,
+1130292,Jake Harris,1003019,,,,0,0,,,,,,,,,NO-BID
+1130292,Jake Harris,1003019,,ISO7742DWR,,,2.50,USD,23+ MFG,,,,zell ( Chip 1 USA ),TAIWAN,,[PARTIAL - needs: qty]
+1130292,Jake Harris,1002571,,IXDD609SI,,160,0.89,USD,,,,,Stock,of destination,,
+1130292,Jake Harris,1002612,,TG110-S050N2LF-TR,,,0.75,USD,,,,,stock,al RoHS parts from m,,[PARTIAL - needs: qty]
+1130292,Jake Harris,1003082,,MPZ2012S101AT000,,8580,0.025,USD,18+/19+ Thank you,,,,son Ct,,,that all quotes are subject to change based on stock availability and may applicable tariffs at the time of sale.
+1130292,Jake Harris,,,BCP53-16TX,,17,0.22,USD,,,,,STOCK,,,[VENDOR NOT IN DB: Philip Humphrey <philip.humphrey@vantageairsupport.com>]
+1130292,Jake Harris,,,BCP53-16TX,,,250.,USD,,,,,sville,,,[VENDOR NOT IN DB: Philip Humphrey <philip.humphrey@vantageairsupport.com>] [PARTIAL - needs: qty] as listed online there is a $250. line min order.
+1130292,Jake Harris,,,BAT54S-7-F,Diodes Inc,300,0.01608 each,USD,1530,,,CUT TAPE,Stock ships same day,,,[VENDOR NOT IN DB: Bitia Rosas <bitiar@akiragi.com>]
+1130292,Jake Harris,,,B340-13-F,Diodes Inc,1774,0.14 each,USD,N/A,,,REEL,Stock ships same day,,,[VENDOR NOT IN DB: Bitia Rosas <bitiar@akiragi.com>]
+1130292,Jake Harris,,,B340-13-F,Diodes Inc,1774,0.14 each,USD,N/A,,,REEL,Stock ships same day,,,[VENDOR NOT IN DB: Bitia Rosas <bitiar@akiragi.com>]
+1130292,Jake Harris,,,IXDD609SIA,IXYS Corp,32000,0.80 each,USD,,,,,Stock ships same day,,,[VENDOR NOT IN DB: Bitia Rosas <bitiar@akiragi.com>]
+1130292,Jake Harris,,,IXDD609SIA,IXYS Corp,32000,0.80 each,USD,,,,,Stock ships same day,,,[VENDOR NOT IN DB: Bitia Rosas <bitiar@akiragi.com>]
+1130292,Jake Harris,1004875,,LM2591HVSX-5.0/NOPB,,152,0.95 STG EACH,USD,0706,,,TO263-5,,,,
+1130292,Jake Harris,,,BAT54S-7-F,Diodes Inc,300,0.01608 each,USD,1530,,,CUT TAPE,Stock ships same day,,,[VENDOR NOT IN DB: Bitia Rosas <bitiar@akiragi.com>]
+1130292,Jake Harris,1002557,,SBAS16LT1G,,,Currency,USD,,,,,,Total Stock QTY,,[PARTIAL - needs: qty] Supplier group
+1130292,Jake Harris,1006806,,IXDD609SIATR,,,2.00,USD,stock,,,,| ANAB] [A blue and white,,,[PARTIAL - needs: qty]
+1130292,Jake Harris,1006806,,P600M-E3/54,,,2.00,USD,stock,,,,stock,,,[PARTIAL - needs: qty]
+1130292,Jake Harris,1006806,,P600M-E3/54,,,,,,,,,| ANAB] [A blue and white,,,"[PARTIAL - needs: price, qty]"
+1130292,Jake Harris,,,IXDD609SIATR,Littelfuse Inc,,,,,246,,,Stock ships same day,,,"[VENDOR NOT IN DB: Bitia Rosas <bitiar@akiragi.com>] [PARTIAL - needs: price, qty]"
+1130292,Jake Harris,1006806,,CPCF0582K00JE32,,,1.00,USD,stock no fact label,,,,stock,,,[PARTIAL - needs: qty]
+1130292,Jake Harris,1006806,,CPCF0582K00JE32,,,,,,,,,| ANAB] [A blue and white,,,"[PARTIAL - needs: price, qty]"
+1130292,Jake Harris,,,IXDD609SIATR,Littelfuse Inc,,,,,246,,,Stock ships same day,,,"[VENDOR NOT IN DB: Bitia Rosas <bitiar@akiragi.com>] [PARTIAL - needs: price, qty]"
+1130292,Jake Harris,1003092,,LM2591HVS-5.0/NOPB,,5,10.00,USD,5pcs,,,,Stock,,,
+1130292,Jake Harris,1002399,,594D127X0020R2T,,410,,,,04,,,stock,,,[PARTIAL - needs: price]
+1130292,Jake Harris,1002399,,594D127X0020R2T,,,2.00,USD,,,,,,,,[PARTIAL - needs: qty]
+1130292,Jake Harris,1004090,,BCP53-16TX,,,0.73,USD,25+,,,,stock,,,[PARTIAL - needs: qty]
+1130292,Jake Harris,1006806,,ISO7740QDWRQ1,,,5.00,USD,stock,,,,| ANAB] [A blue and white,,,[PARTIAL - needs: qty]
+1130292,Jake Harris,1003181,,80CPQ150PBF,,,,,,,,,,,,"[PARTIAL - needs: price, qty]"
+1130292,Jake Harris,1003181,,80CPQ150PBF,,,,,,,,,,,,"[PARTIAL - needs: price, qty]"
+1130292,Jake Harris,1003181,,80CPQ150PBF,,,,,,,,,,,,"[PARTIAL - needs: price, qty]"
+1130292,Jake Harris,1003601,,TG110-S050N2RLTR,Halo Electronics,,,,,,,Tape&Reel,options,,,"[PARTIAL - needs: price, qty]"
+1130292,Jake Harris,1003601,,TG110-S050N2RLTR,Halo Electronics,,,,,,,Tape&Reel,options,,,"[PARTIAL - needs: price, qty]"
+1130292,Jake Harris,1002981,,P600M-E3/73,,,,,,,,,d.,,,"[PARTIAL - needs: price, qty]"
+1130292,Jake Harris,1003059,,DG403DY-T1-E3,,,,,,,,,,,,"[PARTIAL - needs: price, qty]"
+1130292,Jake Harris,1003059,,DG403DY-T1-E3,,30,1.45,USD,Partial reel COO,,,,stock,Philippines,,All quotes/orders may be subject to Tariffs/import costs **
+1130292,Jake Harris,1002557,,BCP53-16TX,,,Currency,USD,,,,,,Total Stock QTY,,[PARTIAL - needs: qty] Supplier group
+1130292,Jake Harris,1004383,,SP12-SN,,,,,18+,,,,,,,"[PARTIAL - needs: price, qty]"
+1130292,Jake Harris,1002611,,RMCP2010FT22R0,,10,10,USD,NA but is ROHS with,,,,,,,
+1130292,Jake Harris,1005513,,DG403DY-T1-E3,,2,2,USD,new,,,,,,,
+1130292,Jake Harris,1002999,,TG110-S050N2LFTR,,,0.595,USD,,,,,stock,,,[PARTIAL - needs: qty]
+1130292,Jake Harris,1002611,,NTCS0603E3103FHT,,425,0.3,USD,NA but it is ROHS Be,,,,,,,
+1130292,Jake Harris,1006806,,P600M-E3/54,,,2.00,USD,stock,,,,| ANAB] [A blue and white,,,[PARTIAL - needs: qty]
+1130292,Jake Harris,1004888,,1722DC,,,0.50,USD,Take all 460,,,,,,,[PARTIAL - needs: qty] Quoted MPN: 1722DC (RFQ MPN: TG110-S050N2LFTR).
+1130292,Jake Harris,1002457,,2220YA250472KXTB16,Communications & Ear Protection Inc,3000,2,USD,,,,,building a more resilient worl,,,
+1130292,Jake Harris,,,PCL037-0,,,1.80,USD,,,,,Supply Electronics,,,[VENDOR NOT IN DB: Denise Hicks <hicks@standardsupply.com>] [PARTIAL - needs: qty] Quoted MPN: PCL037-0 (RFQ MPN: PCL03).
+1130292,Jake Harris,1004279,,SPP11N80C3IN,,,,,,,,,,,,"[PARTIAL - needs: price, qty] Quoted MPN: SPP11N80C3IN (RFQ MPN: SPP11N80C3). OUR NEW ADDRESS:"
+1130292,Jake Harris,1004279,,SPP11N80C3IN,,,,,,,,,,,,"[PARTIAL - needs: price, qty] Quoted MPN: SPP11N80C3IN (RFQ MPN: SPP11N80C3)."
+1130292,Jake Harris,1002457,,MPZ2012S101AT000,,5400,0.04,USD,,,,,,,,
+1130292,Jake Harris,1002457,,2407PCS./,Communications & Ear Protection Inc,2407,,,1142pc,,,,building a more resilient worl,,,[PARTIAL - needs: price]
+1130292,Jake Harris,1002553,,J0011D21BNL,Kopin Targeting Corporation,,,,,,,,,,,"[PARTIAL - needs: price, qty]"
+1130292,Jake Harris,1002498,,BTS723GW,,,,,,,,,,,,"[PARTIAL - needs: price, qty]"
+1130292,Jake Harris,1002498,,BTS723GW,All Labels,35,2.35,USD,0814 RoHS unknown Cu,,,,,,,
+1130292,Jake Harris,1002498,,BTS723GW,,,,,,,,,,,,"[PARTIAL - needs: price, qty]"
+1130292,Jake Harris,1003324,,FWH-125B,,7,95,USD,,,,,In stock,,,
+1130292,Jake Harris,1002999,,TG110-S050N2LFTR,,,0.595,USD,,,,,stock,,,[PARTIAL - needs: qty]
+1130292,Jake Harris,1004574,,P600M,,,,,200/BOX BULK at,,,,STOCK,,,"[PARTIAL - needs: price, qty]"
+1130292,Jake Harris,1004574,,P600M,,,,,,,,,,,,"[PARTIAL - needs: price, qty]"
+1130292,Jake Harris,1003102,,TG110-S050N2RLTR,,725,,,,,,,,,,[PARTIAL - needs: price]
+1130292,Jake Harris,1003646,,J0011D21BNL,Broadcom,775,1.95,USD,,,,,,,,
+1130292,Jake Harris,1003646,,LM2903AVQDR,Broadcom,,,,QTY PRICE TOTAL PRIC,,,,,,,"[PARTIAL - needs: price, qty]"
+1130292,Jake Harris,1003646,,LM2903AVQDR,,,,,,,,,,,,"[PARTIAL - needs: price, qty]"
+1130292,Jake Harris,1003646,,LM2903AVQDR,,,,,,,,,STOCK,,,"[PARTIAL - needs: price, qty]"
+1130292,Jake Harris,1003646,,LM2903AVQDR,,,,,,,,,,,,"[PARTIAL - needs: price, qty]"
+1130292,Jake Harris,1003646,,STS-08090103,,2495,,,,,,,,,,[PARTIAL - needs: price]
+1130292,Jake Harris,1003646,,LM2903AVQDR,,,,,,,,,,,,"[PARTIAL - needs: price, qty]"
+1130292,Jake Harris,1005154,,BCP53-16TX,,700,,,,,,,,,,[PARTIAL - needs: price]
+1130292,Jake Harris,1005154,,BCP53-16TX,,700,,,,,,,s),peration,,[PARTIAL - needs: price]
+1130292,Jake Harris,1000942,,DG403DY-T1-E3,,2,,,16+ br,,,,Stock,,,[PARTIAL - needs: price]
+1130292,Jake Harris,1000942,,DG403DY-T1-E3,,,,,,,,,Stock,,,"[PARTIAL - needs: price, qty]"
+1130292,Jake Harris,1000942,,DG403DY-T1-E3,,2,,,16+ br,,,,Stock,,,[PARTIAL - needs: price]
+1130292,Jake Harris,1000942,,DG403DY-T1-E3,,,,,,,,,Stock,,,"[PARTIAL - needs: price, qty]"
+1130292,Jake Harris,1000942,,HCF4093M013TR,,935,,,12+ reel packaging r,,,,in stock,,,[PARTIAL - needs: price]
+1130292,Jake Harris,1000942,,HCF4093M013TR,,,,,,,,,Stock,,,"[PARTIAL - needs: price, qty]"
+1130292,Jake Harris,1000942,,LM2585S-5.0/NOPB,,135,,,08 tube packaging ro,,,,Stock,,,[PARTIAL - needs: price]
+1130292,Jake Harris,1000942,,LM2585S-5.0/NOPB,,,,,,,,,Stock,,,"[PARTIAL - needs: price, qty]"
+1130292,Jake Harris,1000942,,0251002.MRT1L,,570,,,17+ tr packaging roh,,,,Stock,,,[PARTIAL - needs: price]
+1130292,Jake Harris,1000942,,0251002.MRT1L,,,,,,,,,Stock,,,"[PARTIAL - needs: price, qty]"
+1130292,Jake Harris,1000942,,IXDD609SIATR,,,,,22+ reel packaging r,,,,Stock,,,"[PARTIAL - needs: price, qty]"
+1130292,Jake Harris,1000942,,IXDD609SIATR,,,,,0dec6,,,,Stock,,,"[PARTIAL - needs: price, qty]"
+1130292,Jake Harris,1000942,,TG110-S050N2LFTR,,23,,,12+ tr packaging br,,,,in stock,,,[PARTIAL - needs: price]
+1130292,Jake Harris,1000942,,TG110-S050N2LFTR,,,,,,,,,Stock,,,"[PARTIAL - needs: price, qty]"
+1130292,Jake Harris,1002519,,SM24CANB02HTG,,,,,,,,,,,,"[PARTIAL - needs: price, qty] Quoted MPN: SM24CANB02HTG (RFQ MPN: SM24CANB02HTG)."
+1130292,Jake Harris,1002519,,LITT/1720/NEW,Communications & Ear Protection Inc,,,,,,,,building a more resilient worl,of origin,,"[PARTIAL - needs: price, qty] Quoted MPN: LITT/1720/NEW (RFQ MPN: SM24CANB02HTG)."
+1130292,Jake Harris,1005154,,B72510E300K62,,3000,,,,,,,,,,[PARTIAL - needs: price]
+1130292,Jake Harris,1005154,,B72510E300K62,,3000,,,,,,,s),peration,,[PARTIAL - needs: price]
+1130292,Jake Harris,1005154,,BCP53-16TX,,700,,,,,,,,,,[PARTIAL - needs: price]
+1130292,Jake Harris,1005154,,BCP53-16TX,,700,,,,,,,s),peration,,[PARTIAL - needs: price]
+1130292,Jake Harris,1005735,,MPZ2012S101AT000,Date Code,,,,,,,,,,,"[PARTIAL - needs: price, qty]"
+1130292,Jake Harris,1005735,,MPZ2012S101AT000,,,,,,,,,,,,"[PARTIAL - needs: price, qty]"
+1130292,Jake Harris,1005735,,MPZ2012S101AT000,Communications & Ear Protection Inc,,234.63,USD,,,,,EXW Israel terms.,,,[PARTIAL - needs: qty] Terms & Conditions
+1130292,Jake Harris,1005735,,B72510E300K62,Date Code,,,,,,,,,,,"[PARTIAL - needs: price, qty]"
+1130292,Jake Harris,1005735,,B72510E300K62,,,,,,,,,,,,"[PARTIAL - needs: price, qty]"
+1130292,Jake Harris,1005735,,B72510E300K62,Communications & Ear Protection Inc,,240.00,USD,,,,,EXW Israel terms.,,,[PARTIAL - needs: qty] Terms & Conditions
+1130292,Jake Harris,1005977,,0251002.MRT1L,,40,70.,USD,,,,,,ated from outside of,,
+1130292,Jake Harris,1005154,,B72510E300K62,,3000,,,,,,,,,,[PARTIAL - needs: price]
+1130292,Jake Harris,1005154,,B72510E300K62,,3000,,,,,,,s),peration,,[PARTIAL - needs: price]
+1130292,Jake Harris,1005735,,TPS73801DCQR,Date Code,,,,,,,,,,,"[PARTIAL - needs: price, qty]"
+1130292,Jake Harris,1005735,,TPS73801DCQR,,,,,,,,,,,,"[PARTIAL - needs: price, qty]"
+1130292,Jake Harris,1005735,,TPS73801DCQR,Communications & Ear Protection Inc,,405.00,USD,QR TI 18+ 300 1,,,,EXW Israel terms.,,,[PARTIAL - needs: qty] Terms & Conditions
+1130292,Jake Harris,1005735,,MPZ2012S101AT000,Date Code,,,,,,,,,,,"[PARTIAL - needs: price, qty]"
+1130292,Jake Harris,1005735,,MPZ2012S101AT000,,,,,,,,,,,,"[PARTIAL - needs: price, qty]"
+1130292,Jake Harris,1005735,,MPZ2012S101AT000,Communications & Ear Protection Inc,,234.63,USD,,,,,EXW Israel terms.,,,[PARTIAL - needs: qty] Terms & Conditions
+1130292,Jake Harris,1002948,,SBAS16LT3G,,32600,,,,,,,3G),al parts,,[PARTIAL - needs: price]
+1130292,Jake Harris,1005735,,B72510E300K62,Date Code,,,,,,,,,,,"[PARTIAL - needs: price, qty]"
+1130292,Jake Harris,1005735,,B72510E300K62,,,,,,,,,,,,"[PARTIAL - needs: price, qty]"
+1130292,Jake Harris,1005735,,B72510E300K62,Communications & Ear Protection Inc,,240.00,USD,,,,,EXW Israel terms.,,,[PARTIAL - needs: qty] Terms & Conditions
+1130292,Jake Harris,1002948,,HCF4093M013TR,Broadcom,,,,Descripci,,,,Stock,,,"[PARTIAL - needs: price, qty]"
+1130292,Jake Harris,1002948,,HCF4093M013TR,,21400,,,,,,,stock,al parts,,[PARTIAL - needs: price]
+1130292,Jake Harris,1002948,,HCF4093M013TR,,,,,,,,,,,,"[PARTIAL - needs: price, qty]"
+1130292,Jake Harris,1005541,,0251002.MRT1L,,,,,,,,,D.,,,"[PARTIAL - needs: price, qty]"
+1130292,Jake Harris,1002457,,MPZ2012S101AT000,Communications & Ear Protection Inc,0,0,USD,,,,,building a more resilient worl,,,
+1130292,Jake Harris,1000943,,594D127X0020R2T,,,,,200318,,,,"Shelf Life UOM CVC Components Ltd Scatterbrook Farm Rectory Lane Latchingdon Essex CM3 6HB NCAGE: U9372 www.cvc-components.com +44 (0)1621 745450 600 02.50 $1,500.00 594D127X0020R2T (VISHAY CAPACITORS) 1 NS STOCK EA PASSIVE CAPACITOR MILSPEC AXIAL CONDUCTORS SEPERATED BY INSULATION (DC 200318) $0.00 USD Condition FN Factory New NS New Surplus US Used Surplus AR As Removed OH Over Hauled SV Serviceable MINIMUM ORDER VALUE 50 $/£/ € All Prices Quoted Ex-Works, supplied with a CVC Company C of C only unless otherwise stated. We, CVC Components Ltd, As a distributor/agent of the original manufacturer, hereby confirm that, all the part numbers of items offered are 100% fit, size, form, function with the Tender Part numbers in above mentioned RFQ Please note that all these items are fully interchangeable, in fit, form and function. Signed & Sealed Ellie O Connell $1,500.00 Page 1 of 1",,,"[PARTIAL - needs: price, qty]"
+1130292,Jake Harris,1002981,,DG403DY-E3,,,,,,,,,d.,,,"[PARTIAL - needs: price, qty]"
+1130292,Jake Harris,1000546,,DG403DY-T1-E3,,,,,,,,,,,,"[PARTIAL - needs: price, qty]"
+1130292,Jake Harris,1000546,,DG403DY-T1-E3,,,01,USD,A6F3,,,,,,,[PARTIAL - needs: qty]
+1130292,Jake Harris,1002669,,TG110S050N2RLTR,,2000,0.55,USD,Qty,,,,"Price/Unit RoHS Phone: +49 89 45 248 235 +49 89 45 248 235 | www.electronic-direct.de | Fax +49 89 45 248 290 ELECTRONIC DIRECT GmbH | Wernher-von-Braun-Str. 10a 85640 Putzbrunn, Germany E-Mail: jyimez@electronic-direct.de Astute Electronics Inc. Jake Harris 500 Center Ridge Dr., Suite 600 US-78753 Austin Texas Our quotation: 235556 Your Contact: Julia Yimez 2000 0618 USD 0,55 / 1 Reel own stock 1.1 TG110S050N2RLTR, Halo Electronics Yes COO: CHINA Julia Yimez ELECTRONIC DIRECT GmbH Thank you Minimumorder: USD 250,00 Payment: T/T in advance Shipment: FedEx Intl. Priority, 423363045, FCA Putzbr Subject to prior sale NCNR (Non-cancellable, Non-returnable) Page 1 of 1",CHINA,,
+1130292,Jake Harris,1004411,,594D127X0020R2T,,,,,,,,,d.,al,,"[PARTIAL - needs: price, qty]"
+1130292,Jake Harris,1004411,,594D127X0020R2T,,,,,,,,,d.,al,,"[PARTIAL - needs: price, qty]"
+1130292,Jake Harris,1004411,,594D127X0020R2T,,,,,,,,,d.,al,,"[PARTIAL - needs: price, qty]"
+1130292,Jake Harris,1004411,,594D127X0020R2T,,,,,,,,,d.,al,,"[PARTIAL - needs: price, qty]"
+1130292,Jake Harris,,,P600M,"Gilgen, Muller & Weigert",,0.059 USD / EA,USD,25+,,,BOX 500pcs weight 1kg,our own stock,CHINA,,[VENDOR NOT IN DB: Netcomponents - <Prodel Distribuzione <netcomponents@prodeldistribuzione.it>] [PARTIAL - needs: qty]
+1130292,Jake Harris,1002457,,B82793S513N201,Communications & Ear Protection Inc,1455,0.3,USD,NOT UPDATED UNTIL TO,,,,building a more resilient worl,,,
+1130292,Jake Harris,1003743,,B82793-S513-N201,,310,0.40,USD,9826 NON ROHS LEAD T,,,,In stock,,,
+1130292,Jake Harris,1003743,,B82793-S513-N201,Communications & Ear Protection Inc,310,,,,,,,building a more resilient worl,,,[PARTIAL - needs: price]
+1130292,Jake Harris,1001094,,80CPQ150PBF,,,3.50,USD,09 Rohs factorybox,,,,,MY Kind Regards Zil,,[PARTIAL - needs: qty]
+1130292,Jake Harris,1009528,,MPZ2012S101AT000,,,,,,,,,,,,"[PARTIAL - needs: price, qty]"
+1130292,Jake Harris,1009528,,MPZ2012S101AT000,,,01,USD,A705,,,,,,,[PARTIAL - needs: qty]
+1130292,Jake Harris,1000491,,0251002.MRT1L,Littelfuse Inc,531,0.310,USD,N/A,,,,STOCK,,Y,1 part mfr reel x 981pcs.
+1130292,Jake Harris,1000491,,J0011D21BNL,Pulse Engineering,25,2.000,USD,07+/09+/10+/15+/17+,,,,,,N,25 pcs per FULL tube.
+1130292,Jake Harris,1000491,,0251002.MRT1L,,13827,,,,,,,STOCK,,,[PARTIAL - needs: price]
+1130292,Jake Harris,1000491,,FZT751TA,,3000,0.090,USD,MIXED,,,,STOCK,,Y,oldest dc 97+
+1130292,Jake Harris,1000491,,BAT54S-7-F,Diodes Inc,72,0.034,USD,1707,,,,STOCK,,Y,Full reel
+1130292,Jake Harris,1000491,,DG403DYZ,Intersil Corp,504,1.389,USD,N/A,,,,STOCK,,N,"2 tubes (24,48)."
+1130292,Jake Harris,1000491,,P600M/4,GEN SEMI,100,0.200,USD,0412,,,,STOCK,al reel MSL,N,parts on original reel
+1130292,Jake Harris,1000491,,MAX3086ESD+,Analog Devices,3000,1.533,USD,15+,,,,d reserve the right to renegot,Thailand,Y,"6 packs: x 3000pcs & 233pcs (DC 1613), 1099pcs (DC 1525), 1896pcs (DC 1517), 1500pcs (DC 1623) & 1105pcs (DC 1544)."
+1130292,Jake Harris,1002855,,J0011D21BNL,,,,,,,,,,,Y,"[PARTIAL - needs: price, qty]"
+1130292,Jake Harris,1002855,,J0011D21BNL,Pulse Engineering,,,,05+,,,,,,,"[PARTIAL - needs: price, qty]"
+1130292,Jake Harris,1002855,,J0011D21BNL,,,,,,,,,,,,"[PARTIAL - needs: price, qty]"
+1130292,Jake Harris,1002855,,J0011D21BNL,,,,,,,,Tube,,,,"[PARTIAL - needs: price, qty]"
+1130292,Jake Harris,1002855,,J0011D21BNL,,,,,,,,,,,,"[PARTIAL - needs: price, qty]"
+1130292,Jake Harris,1002855,,J0011D21BNL,,,,,,,,,,,,"[PARTIAL - needs: price, qty]"
+1130292,Jake Harris,1002274,,175PCS,,175,1.35,USD,tube,,,,stock,,,Quoted MPN: 175PCS (RFQ MPN: VS-80CPQ150-N3).
+1130292,Jake Harris,1002274,,4000PCS,,4000,,,T,,,,stock,,,[PARTIAL - needs: price] Quoted MPN: 4000PCS (RFQ MPN: NTCS0603E3103FHT).
+1130292,Jake Harris,1004090,,TPS73801DCQR,,,,,,,,,,,,"[PARTIAL - needs: price, qty]"
+1130292,Jake Harris,1004090,,TPS73801DCQR,,,,,,,,,,,,"[PARTIAL - needs: price, qty]"
+1130292,Jake Harris,1003019,,J0011D21BNL,Pulse Engineering,135,3.50,USD,07+ MFG,,,,zell ( Chip 1 USA ),CHINA,,
+1130292,Jake Harris,,,P600M-E3/54,,,01,USD,,,,,iple franchise have stock on t,,,"[VENDOR NOT IN DB: Emporium Broker Sales <rfq@emporiumpartners.com>] [PARTIAL - needs: qty] NO-BID. that all sales of goods made the Emporium Partners group entities are made exclusively by Emporium Partners ApS, Denmark (Reg: DK27174892), and that all such sales are subject to Emporium Partners ApS' explicit order confirmation and Terms and Conditions of Sales (emporiumpartners.com/tc)"
+1130292,Jake Harris,1005611,,B72510E300K62,,4100,05,USD,14,,,,,,,
+1130292,Jake Harris,1004201,,2220YA250472KXTB16,,,,,,,,,,,,"[PARTIAL - needs: price, qty]"
+1130292,Jake Harris,1004201,,2220YA250472KXTB16,,,,,,,,,,,,"[PARTIAL - needs: price, qty]"
+1130292,Jake Harris,1002863,,FSM4JSMATR,,,13,USD,,,,,180 days,al Parts,,[PARTIAL - needs: qty]
+1130292,Jake Harris,1001036,,BCP53-16TX,,,,,,,,,,,,"[PARTIAL - needs: price, qty]"
+1130292,Jake Harris,1001036,,BCP53-16TX,,,,,,,,,,,,"[PARTIAL - needs: price, qty] S"
+1130292,Jake Harris,1001036,,BCP53-16TX,,,,,,,,,,,,"[PARTIAL - needs: price, qty]"
+1130292,Jake Harris,1001036,,BCP53-16TX,,,,,,,,,,,,"[PARTIAL - needs: price, qty]"
+1130292,Jake Harris,1001036,,BCP53-16TX,,,,,,,,,Stock,,,"[PARTIAL - needs: price, qty]"
+1130292,Jake Harris,1001036,,BCP53-16TX,,,,,,,,,Terms & Conditions - a copy of,,,"[PARTIAL - needs: price, qty]"
+1130292,Jake Harris,,,SBAS16LT3G,,,,,,,,,3G),,,"[VENDOR NOT IN DB: RFQ Request <rfq@braunec.com<mailto:rfq@braunec.com>] [PARTIAL - needs: price, qty]"
+1130292,Jake Harris,,,BCP53-16TX,,29,0.29,USD,,,,,sville,,,[VENDOR NOT IN DB: Philip Humphrey <philip.humphrey@vantageairsupport.com>] as listed online there is a $250. line min order.
+1130292,Jake Harris,1003092,,LM2585S-5.0/NOPB,,20,5.00,USD,20pcs,,,,Stock,,,
+1130292,Jake Harris,,,SBAS16LT1G,,,,,,,,,1G),,,"[VENDOR NOT IN DB: RFQ Request <rfq@braunec.com<mailto:rfq@braunec.com>] [PARTIAL - needs: price, qty]"
+1130292,Jake Harris,1003110,,80CPQ150PBF,,,100,USD,A664,,,,,,,[PARTIAL - needs: qty]
+1130292,Jake Harris,1002553,,P600M/4,Kopin Targeting Corporation,,,,,,,,,,,"[PARTIAL - needs: price, qty] Quoted MPN: P600M/4 (RFQ MPN: P600M-E3/73)."
+1130292,Jake Harris,1002553,,TG110-S050N2RLTR,Kopin Targeting Corporation,,,,,,,,,,,"[PARTIAL - needs: price, qty]"
+1130292,Jake Harris,1008005,,BCP53-16TX,,1,0.49,USD,900 pcs are 1809 d/c,,,,ered original factory traceabl,al factory traceable,,
+1130292,Jake Harris,1008005,,BCP53-16TF,,4,01,USD,RoHS,,,,ered original factory traceabl,al factory traceable,,
+1130292,Jake Harris,1008005,,BCP53-16TX,,,01,USD,A671,,,,,,,[PARTIAL - needs: qty]
+1130292,Jake Harris,1008005,,BCP53-16TX,,,01,USD,A671,,,,,,,[PARTIAL - needs: qty]
+1130292,Jake Harris,1003059,,DG403DY-T1-E3,,,,,,,,,,,,"[PARTIAL - needs: price, qty]"
+1130292,Jake Harris,1003059,,DG403DY-T1-E3,,30,1.45,USD,Partial reel COO,,,,stock,Philippines,,All quotes/orders may be subject to Tariffs/import costs **
+1130292,Jake Harris,1002426,,2018PCS,,,1.45,USD,CCI Shanghai stock,,,,stock,PH Best,,[PARTIAL - needs: qty] Quoted MPN: 2018PCS (RFQ MPN: DG403DY-E3).
+1130292,Jake Harris,1003092,,LM2585S-5.0/NOPB,,20,5.00,USD,20pcs,,,,Stock,,,
+1130292,Jake Harris,1000455,,9906-DC,,,,,,,,,,,,"[PARTIAL - needs: price, qty] Quoted MPN: 9906-DC (RFQ MPN: HCF4093M013TR)."
+1130292,Jake Harris,1000455,,HCF4093M013TR,,14,0.14,USD,,,,,,,,Quoted MPN: HCF4093M013TR (RFQ MPN: HCF4093M013TR).
+1130292,Jake Harris,1003098,,FSM4JSMATR,,550,0.100,USD,06+,,,,In Stock Terms Net 1 Manufacturer TE CONN Date Code 06+ Total $55.00 Phone: (440) 647-9118 Fax: (440) 647-5469 E-Mail: sales@emsnetonline.com Website: www.emsnetonline.com Quote No 498186 All Parts are Quoted in US Dollars!!! Quote Valid for 10 Days!!! Warranty/Return Policy 30 days from date of delivery unless otherwise specified Contact Jake RoHs Unknown Packaging 13 INCH REEL Country of Origin Unknown,Unknown,,
+1130292,Jake Harris,1002948,,80CPQ150PBF,Broadcom,,,,Descripci,,,,Stock,,,"[PARTIAL - needs: price, qty]"
+1130292,Jake Harris,1002948,,80CPQ150PBF,,,,,,,,,,,,"[PARTIAL - needs: price, qty]"
+1130292,Jake Harris,1002948,,80CPQ150PBF,,90,,,,,,,stock,al parts,,[PARTIAL - needs: price]
+1130292,Jake Harris,1002948,,80CPQ150PBF,,,,,,,,,,,,"[PARTIAL - needs: price, qty]"
+1130292,Jake Harris,1002595,,B340-13-F,,15400,0.02,USD,/ ROHS / PBF 15400 p,,,,,,,
+1130292,Jake Harris,1002948,,HCF4093M013TR,Broadcom,,,,Descripci,,,,Stock,,,"[PARTIAL - needs: price, qty]"
+1130292,Jake Harris,1002948,,HCF4093M013TR,,21400,,,,,,,stock,al parts,,[PARTIAL - needs: price]
+1130292,Jake Harris,1002948,,HCF4093M013TR,,,,,,,,,,,,"[PARTIAL - needs: price, qty]"
+1130292,Jake Harris,1002595,,594D127X0020R2T,,,,,,,,,,,,"[PARTIAL - needs: price, qty]"
+1130292,Jake Harris,1002595,,594D127X0020R2T,,316,,,,,,,,,,[PARTIAL - needs: price]
+1130292,Jake Harris,1002595,,594D127X0020R2T,,316,0.80,USD,/ ROHS / PBF 316 pcs,,,,,,,
+1130292,Jake Harris,1008005,,DG403DY-T1-E3,,,01,USD,RoHS,1,,,in stock,,,[PARTIAL - needs: qty] NO-BID.
+1130292,Jake Harris,1008005,,DG403DY-T1-E3,,,01,USD,A66E,,,,,,,[PARTIAL - needs: qty] NO-BID.
+1130292,Jake Harris,1008005,,DG403DY-T1-E3,,,01,USD,A66E,,,,,,,[PARTIAL - needs: qty] NO-BID.
+1130292,Jake Harris,1002948,,TPS73801DCQR,,70,,,QR,,,,stock,al parts,,[PARTIAL - needs: price]
+1130292,Jake Harris,1008005,,LM2591HVS-5.0/NOPB,,190,01,USD,1x Reel of 500 pcs,1,,,in stock,,,
+1130292,Jake Harris,1008005,,LM2591HVS-5.0/NOPB,,,01,USD,A66E,,,,,,,[PARTIAL - needs: qty]
+1130292,Jake Harris,1008005,,LM2591HVS-5.0/NOPB,,,01,USD,A66E,,,,,,,[PARTIAL - needs: qty]
+1130292,Jake Harris,1002595,,80CPQ150PBF,,,,,,,,,,,,"[PARTIAL - needs: price, qty]"
+1130292,Jake Harris,1002595,,80CPQ150PBF,,16,7.82,USD,/ PBF / ROHS 16 pc m,,,,,,,
+1130292,Jake Harris,1003092,,LM2591HVS-5.0/NOPB,,5,10.00,USD,5pcs,,,,Stock,,,
+1130292,Jake Harris,1003110,,80CPQ150PBF,,,5.00,USD,,,,,in stock,,,[PARTIAL - needs: qty]
+1130292,Jake Harris,1002595,,SN74HC573AQDWRQ1,,30,50.00,USD,/ ROHS / PBF 5 pcs,,,,,,,
+1130292,Jake Harris,1006806,,ISO7740QDWRQ1,,,5.00,USD,stock,,,,| ANAB] [A blue and white,,,[PARTIAL - needs: qty]
+1130292,Jake Harris,1000455,,07+-DC,,07,3.55,USD,Rohs,,,,Stock,,,Quoted MPN: 07+-DC (RFQ MPN: LM2591HVSX-5.0/NOPB).
+1130292,Jake Harris,1002571,,IXDD609SI,,160,0.89,USD,,,,,Stock,of destination,,
+1130292,Jake Harris,1002457,,LM2591HVS-5.0NOPB,Communications & Ear Protection Inc,35,5,USD,,,,,building a more resilient worl,,,
+1130292,Jake Harris,,,594D127X0020R2T,,410,,,0424,,,,stock,,,[VENDOR NOT IN DB: Tim Tashjian <tim@inventorymp.com<mailto:tim@inventorymp.com>] [PARTIAL - needs: price]
+1130292,Jake Harris,,,594D127X0020R2T,,,2.00,USD,A677,,,,Inventory Management Partners,,,[VENDOR NOT IN DB: Tim Tashjian <tim@inventorymp.com<mailto:tim@inventorymp.com>] [PARTIAL - needs: qty]
+1130292,Jake Harris,1002457,,80CPQ150PBF,Communications & Ear Protection Inc,38,5.25,USD,,,,,building a more resilient worl,,,
+1130292,Jake Harris,1002948,,P600M,Broadcom,,,,Descripci,,,,Stock,,,"[PARTIAL - needs: price, qty]"
+1130292,Jake Harris,1002948,,P600M-LF,,,,,,,,,,,,"[PARTIAL - needs: price, qty]"
+1130292,Jake Harris,1002948,,B57213P600M301,,,,,,,,,,,N,"[PARTIAL - needs: price, qty]"
+1130292,Jake Harris,1002948,,P600MTR,,5500,,,,,,,stock,al parts,,[PARTIAL - needs: price]
+1130292,Jake Harris,1002948,,P600M,,,,,,,,,,,,"[PARTIAL - needs: price, qty]"
+1130292,Jake Harris,1002948,,P600M,Broadcom,,,,Descripci,,,,Stock,,,"[PARTIAL - needs: price, qty]"
+1130292,Jake Harris,1002948,,P600M-LF,,,,,,,,,,,,"[PARTIAL - needs: price, qty]"
+1130292,Jake Harris,1002948,,B57213P600M301,,,,,,,,,,,N,"[PARTIAL - needs: price, qty]"
+1130292,Jake Harris,1002948,,P600MTR,,5500,,,,,,,stock,al parts,,[PARTIAL - needs: price]
+1130292,Jake Harris,1002948,,P600M,,,,,,,,,,,,"[PARTIAL - needs: price, qty]"
+1130350,Jake Harris,1002855,,DS3231SN#,,,,,,,,,,,Y,"[PARTIAL - needs: price, qty]"
+1130350,Jake Harris,1001208,,BCM5221A4KPTG,Texas Instruments,200,4.93,USD,Broadcom with trace,,,,In Stock,,,
+1130350,Jake Harris,1006806,,MSP430F149IPM,,,5.45,USD,stock,,,,| ANAB] [A blue and white,,,[PARTIAL - needs: qty]
+1130350,Jake Harris,1003102,,BCM5221A4KPTG,,200,,,,,,,,,,[PARTIAL - needs: price]
+1130350,Jake Harris,1003102,,MSP430F149IPM,,100,,,,,,,,,,[PARTIAL - needs: price]
+1130462,Jake Harris,1001036,,TPS63020DSJR,,,,,84c16720,,,,Terms & Conditions - a copy of,,,"[PARTIAL - needs: price, qty] NO-BID."
+1130462,Jake Harris,1002469,,ADS1115IDGSR,,1131,1,USD,2328 NON FACTORY REE,,,,o:messagesend@netcomponents.co,,,
