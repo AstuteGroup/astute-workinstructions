@@ -65,22 +65,21 @@ chuboe_rfq_id,chuboe_buyer_id,c_bpartner_id,ad_user_id,chuboe_mpn,chuboe_mfr_tex
 1130292,Jake Harris,,,IXDD609SIA,IXYS Corp,32000,0.80 each,USD,,,,,Stock ships same day,,,[VENDOR NOT IN DB: Bitia Rosas <bitiar@akiragi.com>]
 1130292,Jake Harris,1004875,,LM2591HVSX-5.0/NOPB,,152,0.95 STG EACH,USD,0706,,,TO263-5,,,,
 1130292,Jake Harris,,,BAT54S-7-F,Diodes Inc,300,0.01608 each,USD,1530,,,CUT TAPE,Stock ships same day,,,[VENDOR NOT IN DB: Bitia Rosas <bitiar@akiragi.com>]
-1130292,Jake Harris,1002557,,SBAS16LT1G,,,Currency,USD,,,,,,Total Stock QTY,,[PARTIAL - needs: qty] Supplier group
-1130292,Jake Harris,1006806,,IXDD609SIATR,,,2.00,USD,stock,,,,| ANAB] [A blue and white,,,[PARTIAL - needs: qty]
+1130292,Jake Harris,1002557,,SBAS16LT1G,ONSEMI,53000,0.10,USD,22+,,,,stock,CN,Y,
+1130292,Jake Harris,1004810,,IXDD609SIATR,IXYS,44,2.00,USD,15,,,,stock,,,
 1130292,Jake Harris,1006806,,P600M-E3/54,,,2.00,USD,stock,,,,stock,,,[PARTIAL - needs: qty]
 1130292,Jake Harris,1006806,,P600M-E3/54,,,,,,,,,| ANAB] [A blue and white,,,"[PARTIAL - needs: price, qty]"
 1130292,Jake Harris,,,IXDD609SIATR,Littelfuse Inc,,,,,246,,,Stock ships same day,,,"[VENDOR NOT IN DB: Bitia Rosas <bitiar@akiragi.com>] [PARTIAL - needs: price, qty]"
-1130292,Jake Harris,1006806,,CPCF0582K00JE32,,,1.00,USD,stock no fact label,,,,stock,,,[PARTIAL - needs: qty]
+1130292,Jake Harris,1004810,,CPCF0582K00JE32,Vishay,30,1.00,USD,,,,,stock,,,no factory label
 1130292,Jake Harris,1006806,,CPCF0582K00JE32,,,,,,,,,| ANAB] [A blue and white,,,"[PARTIAL - needs: price, qty]"
 1130292,Jake Harris,,,IXDD609SIATR,Littelfuse Inc,,,,,246,,,Stock ships same day,,,"[VENDOR NOT IN DB: Bitia Rosas <bitiar@akiragi.com>] [PARTIAL - needs: price, qty]"
 1130292,Jake Harris,1003092,,LM2591HVS-5.0/NOPB,,5,10.00,USD,5pcs,,,,Stock,,,
-1130292,Jake Harris,1002399,,594D127X0020R2T,,410,,,,04,,,stock,,,[PARTIAL - needs: price]
-1130292,Jake Harris,1002399,,594D127X0020R2T,,,2.00,USD,,,,,,,,[PARTIAL - needs: qty]
+1130292,Jake Harris,1002399,,594D127X0020R2T,Vishay,410,2.00,USD,04+,,,,stock,,N,
 1130292,Jake Harris,1004090,,BCP53-16TX,,,0.73,USD,25+,,,,stock,,,[PARTIAL - needs: qty]
-1130292,Jake Harris,1006806,,ISO7740QDWRQ1,,,5.00,USD,stock,,,,| ANAB] [A blue and white,,,[PARTIAL - needs: qty]
-1130292,Jake Harris,1003181,,80CPQ150PBF,,,,,,,,,,,,"[PARTIAL - needs: price, qty]"
-1130292,Jake Harris,1003181,,80CPQ150PBF,,,,,,,,,,,,"[PARTIAL - needs: price, qty]"
-1130292,Jake Harris,1003181,,80CPQ150PBF,,,,,,,,,,,,"[PARTIAL - needs: price, qty]"
+1130292,Jake Harris,1004810,,ISO7740QDWRQ1,TI,10,5.00,USD,16,,,,stock,,,
+1130292,Jake Harris,1003181,,80CPQ150PBF,IRF,50,3.13,USD,06+,,,Tube,stock,,Y,
+1130292,Jake Harris,1003181,,80CPQ150PBF,IRF,50,3.13,USD,06+,,,Tube,stock,,Y,
+1130292,Jake Harris,1003181,,80CPQ150PBF,IRF,50,3.13,USD,06+,,,Tube,stock,,Y,
 1130292,Jake Harris,1003601,,TG110-S050N2RLTR,Halo Electronics,,,,,,,Tape&Reel,options,,,"[PARTIAL - needs: price, qty]"
 1130292,Jake Harris,1003601,,TG110-S050N2RLTR,Halo Electronics,,,,,,,Tape&Reel,options,,,"[PARTIAL - needs: price, qty]"
 1130292,Jake Harris,1002981,,P600M-E3/73,,,,,,,,,d.,,,"[PARTIAL - needs: price, qty]"
@@ -249,7 +248,7 @@ chuboe_rfq_id,chuboe_buyer_id,c_bpartner_id,ad_user_id,chuboe_mpn,chuboe_mfr_tex
 1130292,Jake Harris,1003092,,LM2591HVS-5.0/NOPB,,5,10.00,USD,5pcs,,,,Stock,,,
 1130292,Jake Harris,1003110,,80CPQ150PBF,,,5.00,USD,,,,,in stock,,,[PARTIAL - needs: qty]
 1130292,Jake Harris,1002595,,SN74HC573AQDWRQ1,,30,50.00,USD,/ ROHS / PBF 5 pcs,,,,,,,
-1130292,Jake Harris,1006806,,ISO7740QDWRQ1,,,5.00,USD,stock,,,,| ANAB] [A blue and white,,,[PARTIAL - needs: qty]
+1130292,Jake Harris,1004810,,ISO7740QDWRQ1,TI,10,5.00,USD,16,,,,stock,,,
 1130292,Jake Harris,1000455,,07+-DC,,07,3.55,USD,Rohs,,,,Stock,,,Quoted MPN: 07+-DC (RFQ MPN: LM2591HVSX-5.0/NOPB).
 1130292,Jake Harris,1002571,,IXDD609SI,,160,0.89,USD,,,,,Stock,of destination,,
 1130292,Jake Harris,1002457,,LM2591HVS-5.0NOPB,Communications & Ear Protection Inc,35,5,USD,,,,,building a more resilient worl,,,
@@ -275,3 +274,23 @@ chuboe_rfq_id,chuboe_buyer_id,c_bpartner_id,ad_user_id,chuboe_mpn,chuboe_mfr_tex
 1130462,Jake Harris,1002469,,ADS1115IDGSR,,1131,1,USD,2328 NON FACTORY REE,,,,o:messagesend@netcomponents.co,,,
 1130292,Jake Harris,1007595,,MPZ2012S101AT000,TDK,8000,0.00897,USD,1640/1730,,,,US stock,,,
 1130292,Jake Harris,1000994,,BCP53-16TX,Nexperia,26000,0.22,USD,17+,,,,stock,,,Franchise Cert/trace
+1130292,Jake Harris,1005947,,IXDD609SIA,IXYS,32000,0.80,USD,,,,,stock,,,
+1130292,Jake Harris,1005947,,BAT54S-7-F,Diodes Inc,5430,0.01608,USD,,,,,stock,,,
+1130292,Jake Harris,1005947,,B340-13-F,Diodes Inc,1774,0.14,USD,N/A,,,Reel,stock,,,
+1130292,Jake Harris,1005947,,IXDD609SIATR,Littelfuse,246,0.843,USD,,,,,stock,,,
+1130292,Jake Harris,1003059,,DG403DY-T1-E3,Vishay,1069,1.45,USD,1544,,,Partial Reel,stock,PH,,
+1130292,Jake Harris,1002557,,BCP53-16TX,Nexperia,11000,0.12,USD,25+,,,,stock,CN,Y,
+1130292,Jake Harris,1004383,,SP12-SN,Anderson,85,17.00,USD,18+,,,,stock,,,
+1130292,Jake Harris,1002999,,TG110-S050N2LFTR,Halo,1000,0.595,USD,22+,,,,stock,,,
+1130292,Jake Harris,1004888,,TG110-S050N2LFTR,Halo,460,0.50,USD,1722,,,,stock,,,
+1130292,Jake Harris,1004810,,P600M-E3/54,Vishay,6,2.00,USD,15,,,,stock,,,
+1130292,Jake Harris,1004279,,SPP11N80C3IN,,50,2.00,USD,stock,,,,stock,,,
+1130292,Jake Harris,1000453,,MPZ2012S101AT000,TDK,5400,0.04,USD,19+/21+,,,,stock,,,
+1130292,Jake Harris,1000549,,J0011D21BNL,Yageo,700,2.344,USD,,,,,stock,,,
+1130292,Jake Harris,1004574,,P600M,ESP,18500,0.15,USD,2601,,,Bulk,stock,,,
+1130292,Jake Harris,1001098,,TG110-S050N2RLTR,Halo,725,2.37,USD,09+,,,,stock,SE,,
+1130292,Jake Harris,1001637,,LM2903AVQDR,Texas Instruments,2400,0.19,USD,22,,,,FCA,,,
+1061489,Jake Harris,1001637,,LM2901AVQDRG4Q1,Texas Instruments,3300,0.45,USD,22,,,,FCA,,,OBSOLETE
+1130292,Jake Harris,1003155,,BCP53-16TX,NXP,700,0.383,USD,2022,,,,stock,PL,Y,
+1128015,Jake Harris,1004176,,NUP2105LT1G,ON Semiconductor,2541,0.05,USD,21,,,,stock,,,
+1130292,Jake Harris,1000942,,DG403DY-T1-E3,Vishay,2,75.00,USD,16+,,,,stock,SE,,
