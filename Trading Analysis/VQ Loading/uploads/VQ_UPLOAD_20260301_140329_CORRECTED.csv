@@ -1,0 +1,207 @@
+chuboe_rfq_id,chuboe_buyer_id,c_bpartner_id,ad_user_id,chuboe_mpn,chuboe_mfr_text,qty,cost,c_currency_id,chuboe_date_code,chuboe_moq,chuboe_spq,chuboe_packaging_id,chuboe_lead_time,c_country_id,chuboe_rohs,chuboe_note_public
+1011238,Jake Harris,1003646,,LM7805CT/NOPB,Texas Instruments,1392,,,QTY PRICE TOTAL PRIC,,,,building a more resilient worl,MY Thank you,,"[NO-BID] LM7805CT/NOPB Only gave PO min, no unit price"
+1060125,Jake Harris,,,BTS723GWXUMA1,Texas Instruments,,,,,,,,building a more resilient worl,of origin,,[VENDOR NOT IN DB: GaleraTech RFQ <order@galeratech.com>] [NO-BID] Cannot compete with franchise
+1061160,Jake Harris,1003601,,BSP77E6433HUMA1,Infineon,,0.9517,USD,,,,Tape&Reel,options,,,[NO-BID] Quote on external website link
+1061160,Jake Harris,1003601,,BSP77E6433HUMA1,Infineon,,0.9517,USD,,,,Tape&Reel,options,,,[NO-BID] Quote on external website link
+1061482,Jake Harris,1002457,,LM2903AVQDRG4Q1,Texas Instruments,60,3.34,USD,/ Rohs,,,,building a more resilient worl,,,
+1061482,Jake Harris,1013055,,LM2903AVQDRG4,Texas Instruments,22,.,USD,,,,,ry,ated from outside of,,
+1061489,Jake Harris,1003646,,LM2901AVQDRG4Q1,Texas Instruments,3329,0.45,USD,QTY PRICE TOTAL PRIC,,,,building a more resilient worl,of origin,,LM2901AVQDRG4Q1 [Claude: Özdisan table]
+1061489,Jake Harris,1002611,,LM2901AVQDRQ1,Texas Instruments,325,2.1,USD,15+ 325pcs IC TR,,,,building a more resilient worl,,,
+1108679,Jake Harris,1002482,,IMZ120R030M1HXKSA1,Texas Instruments,2149,4.50,USD,ROHS -,,,,building a more resilient worl,,,
+1108686,Jake Harris,1003800,,LM7805CT,Texas Instruments,,200,USD,,,,,building a more resilient worl,,,"[NO-BID] Only gave PO min ($200), no unit price"
+1108686,Jake Harris,1004926,,LM7805CT,Texas Instruments,250,1.10,USD,RoHs Price,,,,building a more resilient worl,of origin,," Only gave PO min ($200), no unit price"
+1124549,Jake Harris,1006704,,BAS16215,Texas Instruments,,0.07,USD,A70D,,,,building a more resilient worl,China,,[Claude: $.07 each - Converge]
+1124549,Jake Harris,1001094,,BAS16-235,Texas Instruments,,,,A704,,,,building a more resilient worl,,,[NO-BID] Quoted MPN: BAS16-235 (RFQ MPN: BAS16215). Quote in PDF attachment - not in email
+1124623,Jake Harris,1002564,,STM32F103C8T6,Texas Instruments,4936,1.250,USD,,,,,building a more resilient worl,,,[Claude: Rebound]
+1124623,Jake Harris,1002855,,STM32F103C8T6,STMicroelectronics,4936,2.00,USD,12+ Product Package,,,Tray,,,,[Claude: Rebound]
+1124623,Jake Harris,1002855,,STM32F103C8T6,Communications & Ear Protection Inc,4936,2.00,USD,,,,,building a more resilient worl,of origin,,[Claude: Rebound]
+1124982,Jake Harris,1002482,,ISO7740DWR,Texas Instruments,5,12.00,USD,-,,,,building a more resilient worl,,,
+1124982,Jake Harris,1002482,,ISO7740DWR,Texas Instruments,2020,12.00,USD,5 PCS-ROHS-,,,,building a more resilient worl,,,
+1124982,Jake Harris,1006725,,ISO7740DWR,Texas Instruments,1200,12.00,USD,,1200,,,building a more resilient worl,of origin,,[Claude: Prism]
+1127038,Jake Harris,1003165,,FZT751TA,Texas Instruments,,,,,,,,building a more resilient worl,,,[NO-BID] Not taking orders
+1128015,Jake Harris,1001036,,NUP2105LT1G,,153000,2105,USD,,,,,1G,,,S [Claude: Velocity]
+1128015,Jake Harris,1001036,,NUP2105LT1G,Communications & Ear Protection Inc,153000,2105,USD,,,,,1G,,,[Claude: Velocity]
+1128015,Jake Harris,1004176,,NUP2105LT1G,Texas Instruments,153000,2105,USD,21,,,,1G),,,[Claude: Velocity]
+1128015,Jake Harris,1005154,,NUP2105LT1G,Texas Instruments,2541,2105,USD,,,,,1G),peration,,
+1128746,Jake Harris,1000943,,LM2901AVQDRG4,Texas Instruments,3300,0.45,USD,,,,,to hearing from you with your,of origin,,THE MOV IS 50 £ / $ / € [Claude: Özdisan]
+1128746,Jake Harris,1003448,,LM2901AVQDRG4,Texas Instruments,2200,0.36,USD,1627 COMPARATOR,,,,building a more resilient worl,al Message,,SPECIAL CONDITION - SOME MINOR DAMAGE TO 1 SECTION OF TAPE
+1129768,Jake Harris,1010445,,MSP430F149IPMR,Texas Instruments,,,,A669,,,,ry,of origin,,[NO-BID] No target price provided
+1129768,Jake Harris,1003406,,MSP430F149IPMR,Texas Instruments,1865,3,USD,/13+,,,,building a more resilient worl,,, No target price provided
+1129833,Jake Harris,1001118,,T405-600H,STMicroelectronics,2775,0.31000,USD,18+,,3000,,2,,,"lot code removed, EXW Oradea. no F/S, Site approval is required."
+1129855,Jake Harris,1001118,,LCMXO3LF-2100C-5BG256C,Lattice Semiconductor Corp,476,5.80000,USD,2241+ COO MY,,119,,2,,,"EXW TH, Lot code removed, Site approval is required"
+1130292,Jake Harris,1006047,,SPP11N80C3,Texas Instruments,300,0.70,USD,stock / rohs,,,,s Tony Stratopoulos,al Message,,[Claude: Zilex]
+1130292,Jake Harris,1002638,,DG403DYZT,Texas Instruments,133,,,A734,,,,building a more resilient worl,perman Sent,,[NO-BID] Higher than franchise
+1130292,Jake Harris,1004406,,HCF4093M013TR,Texas Instruments,95,0.50,USD,,,,,building a more resilient worl,,,
+1130292,Jake Harris,1003019,,BTS723GW,Texas Instruments,,,,,,,,zell ( Chip 1 USA ),,,[NO-BID] NO-BID. Cannot compete with franchise
+1130292,Jake Harris,1003019,,ISO7742DWR,Texas Instruments,6000,2.50,USD,23+ MFG,,,,zell ( Chip 1 USA ),TAIWAN,,[Claude: Chip1]
+1130292,Jake Harris,1002571,,IXDD609SI,Texas Instruments,160,0.89,USD,,,,,+ $3 or 3% whichever is greate,of destination,,
+1130292,Jake Harris,1002612,,TG110-S050N2LF-TR,Texas Instruments,750,0.75,USD,,,,,building a more resilient worl,al RoHS parts from m,,[Claude: Integrated]
+1130292,Jake Harris,1003082,,MPZ2012S101AT000,Texas Instruments,8580,0.025,USD,18+/19+ Thank you,,,,son Ct,,,that all quotes are subject to change based on stock availability and may applicable tariffs at the time of sale.
+1130292,Jake Harris,,,BCP53-16TX,Texas Instruments,17,250.,USD,,,,,sville,,,[VENDOR NOT IN DB: Philip Humphrey <philip.humphrey@vantageairsupport.com>] as listed online there is a $250. line min order.
+1130292,Jake Harris,1003800,,ECS-200-20-5PXDU-TR,Texas Instruments,181,200,USD,,,,,building a more resilient worl,,,
+1130292,Jake Harris,,,B340-13-F,Diodes Inc,1774,0.14 each,USD,N/A,,,REEL,Stock ships same day,,,[VENDOR NOT IN DB: Bitia Rosas <bitiar@akiragi.com>]
+1130292,Jake Harris,,,B340-13-F,Diodes Inc,1774,0.14 each,USD,N/A,,,REEL,Stock ships same day,,,[VENDOR NOT IN DB: Bitia Rosas <bitiar@akiragi.com>]
+1130292,Jake Harris,,,IXDD609SIA,IXYS Corp,32000,0.80 each,USD,,,,,Stock ships same day,,,[VENDOR NOT IN DB: Bitia Rosas <bitiar@akiragi.com>]
+1130292,Jake Harris,,,IXDD609SIA,IXYS Corp,32000,0.80 each,USD,,,,,Stock ships same day,,,[VENDOR NOT IN DB: Bitia Rosas <bitiar@akiragi.com>]
+1130292,Jake Harris,1004875,,LM2591HVSX-5.0/NOPB,,152,0.95 STG EACH,USD,0706,,,TO263-5,,,,
+1130292,Jake Harris,,,BAT54S-7-F,Diodes Inc,300,0.01608 each,USD,1530,,,CUT TAPE,Stock ships same day,,,[VENDOR NOT IN DB: Bitia Rosas <bitiar@akiragi.com>]
+1130292,Jake Harris,1006806,,IXDD609SIATR,Texas Instruments,,7500.00,USD,stock,,,,| ANAB] [A blue and white,,,[PARTIAL - needs: qty]
+1130292,Jake Harris,1006806,,P600M-E3/54,Texas Instruments,,7500.00,USD,stock,,,,| ANAB] [A blue and white,,,[PARTIAL - needs: qty]
+1130292,Jake Harris,,,IXDD609SIATR,Littelfuse Inc,,,,,246,,,Stock ships same day,,,"[VENDOR NOT IN DB: Bitia Rosas <bitiar@akiragi.com>] [PARTIAL - needs: price, qty]"
+1130292,Jake Harris,1006806,,CPCF0582K00JE32,Texas Instruments,,7500.00,USD,stock no fact label,,,,| ANAB] [A blue and white,,,[PARTIAL - needs: qty]
+1130292,Jake Harris,,,IXDD609SIATR,Littelfuse Inc,,,,,246,,,Stock ships same day,,,"[VENDOR NOT IN DB: Bitia Rosas <bitiar@akiragi.com>] [PARTIAL - needs: price, qty]"
+1130292,Jake Harris,,,L50QS125,Texas Instruments,3,209.99,USD,,,,,building a more resilient worl,,,[VENDOR NOT IN DB: Accord Technologies <accordtec@gmail.com>]
+1130292,Jake Harris,,,FWH-125B,Texas Instruments,30,119.99,USD,,,,,building a more resilient worl,,,[VENDOR NOT IN DB: Accord Technologies <accordtec@gmail.com>]
+1130292,Jake Harris,1004888,,0251002.MXL,Texas Instruments,118,0251002.,USD,LISTED,,,,building a more resilient worl,,,[Claude: SemiSource]
+1130292,Jake Harris,1003092,,LM2591HVS-5.0/NOPB,Texas Instruments,5,10.00,USD,5pcs,,,,building a more resilient worl,,,
+1130292,Jake Harris,1002399,,594D127X0020R2T,Texas Instruments,410,594,USD,NON-ROHS,04,,,building a more resilient worl,,,
+1130292,Jake Harris,1004090,,BCP53-16TX,Texas Instruments,79000,0.22,USD,25+,,,,building a more resilient worl,of origin,,[Claude: Vantage]
+1130292,Jake Harris,1006806,,ISO7740QDWRQ1,Texas Instruments,,7500.00,USD,stock,,,,| ANAB] [A blue and white,,,[PARTIAL - needs: qty]
+1130292,Jake Harris,1003181,,80CPQ150PBF,Texas Instruments,50,80,USD,06+,,,,ex Stock Werder/Havel,of origin,Y,
+1130292,Jake Harris,1003601,,TG110-S050N2RLTR,Halo Electronics,750,0.75,USD,,,,Tape&Reel,options,,,[Claude: Integrated]
+1130292,Jake Harris,1003601,,TG110-S050N2RLTR,Halo Electronics,750,0.75,USD,,,,Tape&Reel,options,,,[Claude: Integrated]
+1130292,Jake Harris,1002981,,P600M-E3/73,,,,,,,,,terms will be attached to any,,,"[PARTIAL - needs: price, qty]"
+1130292,Jake Harris,1002981,,P600M-E3/73,Communications & Ear Protection Inc,,,,,,,,terms will be attached to any,of origin,,"[PARTIAL - needs: price, qty]"
+1130292,Jake Harris,1002482,,PCL037-4,Texas Instruments,,1.50,USD,-,,,,building a more resilient worl,,,[PARTIAL - needs: qty] Quoted MPN: PCL037-4 (RFQ MPN: PCL03).
+1130292,Jake Harris,1003059,,DG403DY-T1-E3,Texas Instruments,30,1.45,USD,Partial reel COO,,,,building a more resilient worl,Philippines,,All quotes/orders may be subject to Tariffs/import costs **
+1130292,Jake Harris,1002482,,SM24CANB-02HTG,Texas Instruments,10,6.00,USD,-,,,,building a more resilient worl,,,
+1130292,Jake Harris,1002557,,BCP53-16TX,,26000,0.22,USD,,,,,,Total Stock QTY,,Supplier group [Claude: Vantage]
+1130292,Jake Harris,1002482,,0251002.MRT1L,Texas Instruments,100,0251002.,USD,-,,,,building a more resilient worl,,,
+1130292,Jake Harris,1004148,,SPP11N80C3,Texas Instruments,300,0.70,USD,,,,,uket,,,[Claude: Zilex]
+1130292,Jake Harris,1004383,,SP12-SN,Texas Instruments,,17.00,USD,18+,,,,building a more resilient worl,,,[Claude: Shore Point]
+1130292,Jake Harris,1002482,,MPZ2012S101AT000,Texas Instruments,8580,0.025,USD,-,,,,building a more resilient worl,,,[Claude: email table]
+1130292,Jake Harris,1002611,,RMCP2010FT22R0,Texas Instruments,10,10,USD,NA but is ROHS with,,,,building a more resilient worl,,,
+1130292,Jake Harris,1005513,,DG403DY-T1-E3,Texas Instruments,4945,2,USD,new,,,,building a more resilient worl,,,
+1130292,Jake Harris,1002999,,TG110-S050N2LFTR,Texas Instruments,,0.595,USD,,,,,building a more resilient worl,,,[PARTIAL - needs: qty]
+1130292,Jake Harris,1002611,,NTCS0603E3103FHT,Texas Instruments,425,0.3,USD,NA but it is ROHS Be,,,,building a more resilient worl,,,
+1130292,Jake Harris,1002615,,SM24CANB-02HTG,Texas Instruments,3000,0.15,USD,A678,,,,s | Mit freundlichen Grüssen |,TH REEL,,
+1130292,Jake Harris,1006806,,CPCF0582K00JE32,Texas Instruments,,7500.00,USD,stock no fact label,,,,| ANAB] [A blue and white,,,[PARTIAL - needs: qty]
+1130292,Jake Harris,1002482,,SM24CANB-02HTG,Texas Instruments,12,5.00,USD,LITTLE FUSE - ROHS 1,,,,building a more resilient worl,,,
+1130292,Jake Harris,1006806,,P600M-E3/54,Texas Instruments,,7500.00,USD,stock,,,,| ANAB] [A blue and white,,,[PARTIAL - needs: qty]
+1130292,Jake Harris,1003098,,FSM4JSMATR,Texas Instruments,,0.10,USD,A675,,,,building a more resilient worl,,,[Claude: Ultron]
+1130292,Jake Harris,1004888,,TG110-S050N2LFTR,Texas Instruments,,460,USD,Take all 460,,,,building a more resilient worl,,,[PARTIAL - needs: qty]
+1130292,Jake Harris,1002948,,80CPQ150PBF,Broadcom,80,3.13,USD,Descripci,,,,Stock,al parts,,[Claude: Tautec]
+1130292,Jake Harris,1002948,,80CPQ150PBF,Communications & Ear Protection Inc,50,80,USD,,,,,building a more resilient worl,of origin,,[Claude: Tautec]
+1130292,Jake Harris,1002457,,2220YA250472KXTB16,Texas Instruments,3000,2,USD,,,,,building a more resilient worl,,,
+1130292,Jake Harris,1002595,,B340-13-F,Texas Instruments,15400,0.14,USD,/ ROHS / PBF 15400 p,,,,building a more resilient worl,,,[Claude: Akira]
+1130292,Jake Harris,1002482,,MPZ2012S101AT000,Texas Instruments,7773,0.025,USD,ROHS-,,,,building a more resilient worl,,,[Claude: email table]
+1130292,Jake Harris,,,HCF4093M013TR,Texas Instruments,2015,0.50,USD,,,,,building a more resilient worl,ated from outside of,,[VENDOR NOT IN DB: Chad Roberts <chad.r@sonicaresolutions.com>] [Claude: ZDI]
+1130292,Jake Harris,1002948,,HCF4093M013TR,Broadcom,21400,0.50,USD,Descripci,,,,Stock,al parts,,[Claude: ZDI]
+1130292,Jake Harris,1002948,,HCF4093M013TR,Communications & Ear Protection Inc,,0.50,USD,,,,,building a more resilient worl,of origin,,[Claude: ZDI]
+1130292,Jake Harris,1002595,,594D127X0020R2T,Texas Instruments,289,594,USD,/ ROHS / PBF 316 pcs,,,,building a more resilient worl,,,
+1130292,Jake Harris,1008005,,DG403DY-T1-E3,Texas Instruments,1069,1.45,USD,RoHS,1,,,building a more resilient worl,al Pkg,,NO-BID. [Claude: Scientific Devices]
+1130292,Jake Harris,,,PCL037-0,Texas Instruments,2,1.80,USD,,,,,Supply Electronics,,,[VENDOR NOT IN DB: Denise Hicks <hicks@standardsupply.com>]  Quoted MPN: PCL037-0 (RFQ MPN: PCL03). [Claude: Standard Supply]
+1130292,Jake Harris,1002833,,B340Q-13-F,Texas Instruments,,,,,,,,building a more resilient worl,,,[NO-BID] Parts sold - no longer available
+1130292,Jake Harris,1002948,,TPS73801DCQR,Texas Instruments,70,,,QR,,,,building a more resilient worl,al parts,,"[NO-BID] Asked for target price, no quote"
+1130292,Jake Harris,1008005,,LM2591HVS-5.0/NOPB,Texas Instruments,190,14.90,USD,1x Reel of 500 pcs,1,,,building a more resilient worl,al Pkg,,
+1130292,Jake Harris,1002595,,80CPQ150PBF,Texas Instruments,16,80,USD,/ PBF / ROHS 16 pc m,,,,building a more resilient worl,,,
+1130292,Jake Harris,1004279,,SPP11N80C3IN,Texas Instruments,300,0.70,USD,,,,,building a more resilient worl,,,Quoted MPN: SPP11N80C3IN (RFQ MPN: SPP11N80C3). OUR NEW ADDRESS: [Claude: Zilex]
+1130292,Jake Harris,1003092,,LM2591HVS-5.0/NOPB,Texas Instruments,5,10.00,USD,5pcs,,,,building a more resilient worl,,,
+1130292,Jake Harris,1002457,,MPZ2012S101AT000,Texas Instruments,5400,0.04,USD,1142pc,,,,building a more resilient worl,,,
+1130292,Jake Harris,1002482,,FSM4JSMATR,Texas Instruments,7500,0.10,USD,ROHS-,,,,building a more resilient worl,,,[Claude: Ultron]
+1130292,Jake Harris,1002612,,TG110-S050N2LF-TR,Texas Instruments,750,,,600 pcs 2024 date co,,,,building a more resilient worl,,,[PARTIAL - needs: price]
+1130292,Jake Harris,1003110,,80CPQ150PBF,Texas Instruments,50,80,USD,,,,,building a more resilient worl,,,[Claude: Tautec]
+1130292,Jake Harris,1002595,,SN74HC573AQDWRQ1,Texas Instruments,5,4.17,USD,/ ROHS / PBF 5 pcs,,,,building a more resilient worl,,,[Claude: SVT - 30 pcs @ $4.17]
+1130292,Jake Harris,1002553,,J0011D21BNL,Texas Instruments,700,0,USD,Ship Days 700,,,,ils,who have restriction,,d. [Claude: PC Components]
+1130292,Jake Harris,1006806,,ISO7740QDWRQ1,Texas Instruments,,7500.00,USD,stock,,,,| ANAB] [A blue and white,,,[PARTIAL - needs: qty]
+1130292,Jake Harris,1002482,,0251002.MRT1L,Texas Instruments,100,0251002.,USD,ROHS -OEM REEL-,,,,building a more resilient worl,,,
+1130292,Jake Harris,1000455,,LM2591HVSX-5.0/NOPB,Texas Instruments,07,3.55,USD,Rohs,,,,building a more resilient worl,,,
+1130292,Jake Harris,1002482,,LM2591HVS-5.0/NOPB,Texas Instruments,3,20.00,USD,,,,,building a more resilient worl,,,
+1130292,Jake Harris,1002457,,LM2591HVS-5.0NOPB,Texas Instruments,35,5,USD,,,,,building a more resilient worl,,,
+1130292,Jake Harris,1002457,,80CPQ150PBF,Texas Instruments,38,5.25,USD,,,,,building a more resilient worl,,,
+1130292,Jake Harris,1002948,,P600M,Broadcom,5500,,,Descripci,,,,Stock,al parts,N,[PARTIAL - needs: price]
+1130292,Jake Harris,1002948,,P600M,Communications & Ear Protection Inc,,,,,,,,building a more resilient worl,of origin,,"[PARTIAL - needs: price, qty]"
+1130292,Jake Harris,1002948,,P600M,Broadcom,5500,,,Descripci,,,,Stock,al parts,N,[PARTIAL - needs: price]
+1130292,Jake Harris,1002948,,P600M,Communications & Ear Protection Inc,,,,,,,,building a more resilient worl,of origin,,"[PARTIAL - needs: price, qty]"
+1130292,Jake Harris,1003127,,TPS73801DCQR,Texas Instruments,,,,QR,,,,building a more resilient worl,,,"[NO-BID] Asked for target price, no quote"
+1130292,Jake Harris,1002498,,BTS723GW,Texas Instruments,35,2.35,USD,0814 RoHS unknown Cu,,,,building a more resilient worl,,, Cannot compete with franchise
+1130292,Jake Harris,,,LM2591HVSX-5.0/NOPB,Texas Instruments,152,1.21,USD,,,,,building a more resilient worl,mb Sent,,[VENDOR NOT IN DB: Dan McCoomb <dmac10575@gmail.com>] [Claude: AG Electronics (£0.95 converted)]
+1130292,Jake Harris,1003324,,FWH-125B,Texas Instruments,7,95,USD,,,,,building a more resilient worl,,,
+1130292,Jake Harris,1002999,,TG110-S050N2LFTR,Texas Instruments,,0.595,USD,,,,,building a more resilient worl,,,[PARTIAL - needs: qty]
+1130292,Jake Harris,1004574,,P600M,,,,,200/BOX BULK at,,,,STOCK,,,"[PARTIAL - needs: price, qty]"
+1130292,Jake Harris,1004574,,P600M,Communications & Ear Protection Inc,,,,,,,,building a more resilient worl,,,"[PARTIAL - needs: price, qty]"
+1130292,Jake Harris,1003165,,P600M,Texas Instruments,,,,,,,,building a more resilient worl,,,"[PARTIAL - needs: price, qty]"
+1130292,Jake Harris,1001167,,ADUM4400BRWZ,Texas Instruments,2,50.00,USD,,,,,building a more resilient worl,,,[Claude: JC Electronics]
+1130292,Jake Harris,1003102,,TG110-S050N2RLTR,Texas Instruments,725,0.75,USD,749 pcs Mfg,725,,,ils:,ated outside your or,,that we can only process two (2) email addresses in our system. So be extremely careful to specify which two email addresses you want the order to reach. [Claude: Integrated]
+1130292,Jake Harris,1003646,,J0011D21BNL,Texas Instruments,700,2.344,USD,QTY PRICE TOTAL PRIC,,,,building a more resilient worl,of origin,,[Claude: PC Components]
+1130292,Jake Harris,1003646,,LM2903AVQDR,Texas Instruments,2495,0.19,USD,QTY PRICE TOTAL PRIC,,,,building a more resilient worl,of origin,,[Claude: Özdisan table]
+1130292,Jake Harris,1005154,,BCP53-16TX,Texas Instruments,700,0.383,USD,,,,,s),peration,,
+1130292,Jake Harris,1004137,,DG403DYZ,Texas Instruments,22,3,USD,10+ 22 PCS PRICE,,,,d.,al parts Best Regar,,
+1130292,Jake Harris,1004137,,DG403DYZ,Texas Instruments,22,3,USD,10+ 22 PCS PRICE,,,,d.,al parts Best Rega,,
+1130292,Jake Harris,1000942,,DG403DY-T1-E3,Texas Instruments,2,1.45,USD,16+ br,,,,building a more resilient worl,of origin,,[Claude: Scientific Devices]
+1130292,Jake Harris,1000942,,DG403DY-T1-E3,Texas Instruments,2,1.45,USD,16+ br,,,,building a more resilient worl,of origin,,[Claude: Scientific Devices]
+1130292,Jake Harris,1000942,,HCF4093M013TR,Texas Instruments,935,0.50,USD,12+ reel packaging r,,,,building a more resilient worl,of origin,,[Claude: ZDI]
+1130292,Jake Harris,1000942,,LM2585S-5.0/NOPB,Texas Instruments,135,4.35,USD,08 tube packaging ro,,,,building a more resilient worl,of origin,,[Claude: J2 Sourcing]
+1130292,Jake Harris,1000942,,0251002.MRT1L,Texas Instruments,570,0251002.,USD,17+ tr packaging roh,,,,building a more resilient worl,of origin,,
+1130292,Jake Harris,1000942,,IXDD609SIATR,Texas Instruments,,,,22+ reel packaging r,,,,building a more resilient worl,of origin,,"[PARTIAL - needs: price, qty]"
+1130292,Jake Harris,1000942,,TG110-S050N2LFTR,Texas Instruments,23,,,12+ tr packaging br,,,,building a more resilient worl,of origin,,[PARTIAL - needs: price]
+1130292,Jake Harris,1005154,,BCP53-16TX,Texas Instruments,700,0.383,USD,,,,,s),peration,,
+1130292,Jake Harris,1003936,,NTCS0603E3103FHT,Texas Instruments,425,0.30,USD,A6F4,,,,building a more resilient worl,of origin,,[Claude: IC-Tronix]
+1130292,Jake Harris,1005735,,MPZ2012S101AT000,Texas Instruments,8580,234.63,USD,Qty/MOQ Unit Price T,,,,EXW Israel terms.,ated outside your or,,Terms & Conditions [Claude: email table]
+1130292,Jake Harris,1005735,,B72510E300K62,Texas Instruments,3000,240.00,USD,Qty/MOQ Unit Price T,,,,EXW Israel terms.,ated outside your or,,Terms & Conditions [Claude: Micros]
+1130292,Jake Harris,1005977,,0251002.MRT1L,Texas Instruments,40,0251002.,USD,,,,,d. The Fleming Centre,ated from outside of,,
+1130292,Jake Harris,1005154,,B72510E300K62,Texas Instruments,3000,0.0567,USD,,,,,s),peration,,
+1130292,Jake Harris,1005735,,MPZ2012S101AT000,Texas Instruments,8580,234.63,USD,Qty/MOQ Unit Price T,,,,EXW Israel terms.,ated outside your or,,Terms & Conditions [Claude: email table]
+1130292,Jake Harris,1002948,,SBAS16LT3G,Texas Instruments,32600,0.10,USD,,,,,3G),al parts,,[Claude: Rotakorn]
+1130292,Jake Harris,1005735,,B72510E300K62,Texas Instruments,3000,240.00,USD,Qty/MOQ Unit Price T,,,,EXW Israel terms.,ated outside your or,,Terms & Conditions [Claude: Micros]
+1130292,Jake Harris,1002948,,HCF4093M013TR,Broadcom,21400,0.50,USD,Descripci,,,,Stock,al parts,,[Claude: ZDI]
+1130292,Jake Harris,1002948,,HCF4093M013TR,Communications & Ear Protection Inc,,0.50,USD,,,,,building a more resilient worl,of origin,,[Claude: ZDI]
+1130292,Jake Harris,1005541,,0251002.MRT1L,Texas Instruments,118,0251002.,USD,,,,,D.,of origin,,[Claude: SemiSource]
+1130292,Jake Harris,1002457,,MPZ2012S101AT000,Texas Instruments,0,0,USD,,,,,building a more resilient worl,,,
+1130292,Jake Harris,1002981,,DG403DY-E3,,,,,,,,,terms will be attached to any,,,"[PARTIAL - needs: price, qty]"
+1130292,Jake Harris,1002981,,DG403DY-E3,Communications & Ear Protection Inc,,,,,,,,terms will be attached to any,of origin,,"[PARTIAL - needs: price, qty]"
+1130292,Jake Harris,1002855,,DG403DYZ,Texas Instruments,,,,,,,,building a more resilient worl,of origin,,"[PARTIAL - needs: price, qty]"
+1130292,Jake Harris,1002573,,DG403DYZ,Texas Instruments,,7,USD,A6F4,,,,building a more resilient worl,,,[PARTIAL - needs: qty]
+1130292,Jake Harris,1002669,,TG110S050N2RLTR,,2000,0.55,USD,Qty,,,,"Price/Unit RoHS Phone: +49 89 45 248 235 +49 89 45 248 235 | www.electronic-direct.de | Fax +49 89 45 248 290 ELECTRONIC DIRECT GmbH | Wernher-von-Braun-Str. 10a 85640 Putzbrunn, Germany E-Mail: jyimez@electronic-direct.de Astute Electronics Inc. Jake Harris 500 Center Ridge Dr., Suite 600 US-78753 Austin Texas Our quotation: 235556 Your Contact: Julia Yimez 2000 0618 USD 0,55 / 1 Reel own stock 1.1 TG110S050N2RLTR, Halo Electronics Yes COO: CHINA Julia Yimez ELECTRONIC DIRECT GmbH Thank you Minimumorder: USD 250,00 Payment: T/T in advance Shipment: FedEx Intl. Priority, 423363045, FCA Putzbr Subject to prior sale NCNR (Non-cancellable, Non-returnable) Page 1 of 1",CHINA,,
+1130292,Jake Harris,1002410,,0251002.MXL,Texas Instruments,118,0.45,USD,,,,,TL/Fuse 2A Very Fast-Acting Ax,ated from outside of,,[Claude: SemiSource]
+1130292,Jake Harris,1004411,,594D127X0020R2T,Texas Instruments,,594,USD,,,,,d.,al,,[PARTIAL - needs: qty]
+1130292,Jake Harris,1004411,,594D127X0020R2T,Texas Instruments,,594,USD,,,,,d.,al,,[PARTIAL - needs: qty]
+1130292,Jake Harris,,,P600M,"Gilgen, Muller & Weigert",,0.059 USD / EA,USD,25+,,,BOX 500pcs weight 1kg,our own stock,CHINA,,[VENDOR NOT IN DB: Netcomponents - <Prodel Distribuzione <netcomponents@prodeldistribuzione.it>] [PARTIAL - needs: qty]
+1130292,Jake Harris,1004926,,VS80CPQ150N3,Texas Instruments,120,4,USD,RoHs Price,,,,building a more resilient worl,of origin,,
+1130292,Jake Harris,1002457,,B82793S513N201,Texas Instruments,1455,0.3,USD,NOT UPDATED UNTIL TO,,,,building a more resilient worl,,,
+1130292,Jake Harris,1003743,,B82793-S513-N201,Texas Instruments,310,0.40,USD,9826 NON ROHS LEAD T,,,,In stock,,,
+1130292,Jake Harris,1006714,,0251002.MXL,Texas Instruments,994,0251002.,USD,,,,,building a more resilient worl,Philippines New part,,
+1130292,Jake Harris,1001094,,80CPQ150PBF,Texas Instruments,50,80,USD,09 Rohs factorybox,,,,building a more resilient worl,MY Kind Regards Zil,,[Claude: Tautec]
+1130292,Jake Harris,1011575,,ISO7742DWR,Texas Instruments,1500,1.32,USD,is 2242,,,,building a more resilient worl,of origin,,
+1130292,Jake Harris,,,FSM4JSMATR,Texas Instruments,,0.10,USD,,,,,building a more resilient worl,ated from outside yo,,[VENDOR NOT IN DB: Julia Wu <julia.wu@ultrontech.co.uk>] [Claude: Ultron]
+1130292,Jake Harris,1011575,,ISO7742DWR,Texas Instruments,1500,1.32,USD,is 2242,,,,building a more resilient worl,of origin,,
+1130292,Jake Harris,1009528,,MPZ2012S101AT000,Texas Instruments,00897,0.0089,USD,1640,,,,SHIRE,of origin,,
+1130292,Jake Harris,1003776,,P600M-E3/54,Texas Instruments,5010,2.00,USD,,,,,building a more resilient worl,of origin,,[Claude: Semitech]
+1130292,Jake Harris,1000491,,0251002.MRT1L,Littelfuse Inc,531,0.310,USD,N/A,,,,STOCK,,Y,1 part mfr reel x 981pcs.
+1130292,Jake Harris,1000491,,J0011D21BNL,Pulse Engineering,25,2.000,USD,07+/09+/10+/15+/17+,,,,,,N,25 pcs per FULL tube.
+1130292,Jake Harris,1000491,,0251002.MRT1L,,13827,1.00,USD,,,,,STOCK,,,[Claude: SemiSource]
+1130292,Jake Harris,1000491,,FZT751TA,,3000,0.090,USD,MIXED,,,,STOCK,,Y,oldest dc 97+ Not taking orders
+1130292,Jake Harris,1000491,,BAT54S-7-F,Diodes Inc,72,0.034,USD,1707,,,,STOCK,,Y,Full reel
+1130292,Jake Harris,1000491,,DG403DYZ,Intersil Corp,504,1.389,USD,N/A,,,,STOCK,,N,"2 tubes (24,48)."
+1130292,Jake Harris,1000491,,P600M/4,GEN SEMI,100,0.200,USD,0412,,,,STOCK,al reel MSL,N,parts on original reel
+1130292,Jake Harris,1000491,,MAX3086ESD+,Analog Devices,3000,1.533,USD,15+,,,,d reserve the right to renegot,Thailand,Y,"6 packs: x 3000pcs & 233pcs (DC 1613), 1099pcs (DC 1525), 1896pcs (DC 1517), 1500pcs (DC 1623) & 1105pcs (DC 1544)."
+1130292,Jake Harris,1002855,,J0011D21BNL,Pulse Engineering,700,2.344,USD,05+ Product CON - CO,,,Tube,,,Y,[Claude: PC Components]
+1130292,Jake Harris,1002855,,J0011D21BNL,Communications & Ear Protection Inc,700,2.344,USD,,,,,building a more resilient worl,of origin,,[Claude: PC Components]
+1130292,Jake Harris,1002274,,LM2585SX-5.0/NOPB,Texas Instruments,37,4,USD,cut tape,,,,building a more resilient worl,,,
+1130292,Jake Harris,1002274,,VS-80CPQ150-N3,Texas Instruments,175,1.35,USD,tube,,,,building a more resilient worl,,,
+1130292,Jake Harris,1002274,,NTCS0603E3103FHT,Texas Instruments,4000,0.30,USD,T,,,,building a more resilient worl,,,[Claude: IC-Tronix]
+1130292,Jake Harris,1004090,,TPS73801DCQR,Texas Instruments,,,,QR,,,,building a more resilient worl,al,,"[NO-BID] Asked for target price, no quote"
+1130292,Jake Harris,,,SBAS16LT3G,Texas Instruments,53000,0.10,USD,,,,,3G),,,[VENDOR NOT IN DB: RFQ Request <rfq@braunec.com<mailto:rfq@braunec.com>] [Claude: Rotakorn]
+1130292,Jake Harris,,,BCP53-16TX,Texas Instruments,29,250.,USD,,,,,sville,,,[VENDOR NOT IN DB: Philip Humphrey <philip.humphrey@vantageairsupport.com>] as listed online there is a $250. line min order.
+1130292,Jake Harris,1003092,,LM2585S-5.0/NOPB,Texas Instruments,20,5.00,USD,20pcs,,,,building a more resilient worl,,,
+1130292,Jake Harris,,,SBAS16LT1G,Texas Instruments,53000,0.10,USD,,,,,1G),,,[VENDOR NOT IN DB: RFQ Request <rfq@braunec.com<mailto:rfq@braunec.com>] [Claude: Rotakorn]
+1130292,Jake Harris,,,B340-13-F,Texas Instruments,69,0.14,USD,Thank you Chris Las,,,,| NAC Online Store |AS9120:2,al message,,[VENDOR NOT IN DB: Chris Lassise <chris.l@nacsemi.com>] [Claude: Akira]
+1130292,Jake Harris,1003110,,80CPQ150PBF,Texas Instruments,50,80,USD,A664,,,,building a more resilient worl,,,[Claude: Tautec]
+1130292,Jake Harris,1002553,,P600M/4,Texas Instruments,,0,USD,Packs Quantity Pcs O,,,,ils,al Reels,,[PARTIAL - needs: qty] Quoted MPN: P600M/4 (RFQ MPN: P600M-E3/73). d.
+1130292,Jake Harris,1002553,,TG110-S050N2RLTR,Texas Instruments,750,0,USD,Ship Days 725,,,,R requested from PC Components,who have restriction,,d. [Claude: Integrated]
+1130292,Jake Harris,1008005,,BCP53-16TX,Texas Instruments,1,0.49,USD,900 pcs are 1809 d/c,,,,ered original factory traceabl,al factory traceable,,
+1130292,Jake Harris,1003059,,DG403DY-T1-E3,Texas Instruments,30,1.45,USD,Partial reel COO,,,,building a more resilient worl,Philippines,,All quotes/orders may be subject to Tariffs/import costs **
+1130292,Jake Harris,1002426,,DG403DY-E3,Texas Instruments,,1.45,USD,CCI Shanghai stock,,,,stock,PH Best,,[PARTIAL - needs: qty]
+1130292,Jake Harris,1003092,,LM2585S-5.0/NOPB,Texas Instruments,20,5.00,USD,20pcs,,,,building a more resilient worl,,,
+1130292,Jake Harris,1004148,,SPP11N80C3,Texas Instruments,300,0.70,USD,,,,,uket,,,[Claude: Zilex]
+1130292,Jake Harris,1000455,,HCF4093M013TR,Texas Instruments,9906,0.14,USD,Non-Rohs,,,,building a more resilient worl,,,
+1130292,Jake Harris,1002571,,IXDD609SI,Texas Instruments,160,0.89,USD,,,,,+ $3 or 3% whichever is greate,of destination,,
+1130350,Jake Harris,1002426,,BCM5221A4KPTG,Texas Instruments,200,6.00,USD,Best,,,,,,,
+1130350,Jake Harris,1001208,,BCM5221A4KPTG,Texas Instruments,,4.93,USD,Broadcom with trace,,,,building a more resilient worl,,,[PARTIAL - needs: qty]
+1130350,Jake Harris,1006806,,MSP430F149IPM,Texas Instruments,100,7500.00,USD,stock,,,,| ANAB] [A blue and white,,,[Claude: Eurodis]
+1130350,Jake Harris,1006704,,BCM5221A4KPTG,Texas Instruments,,4,USD,A65D,,,,building a more resilient worl,ated from outside of,,[PARTIAL - needs: qty]
+1130350,Jake Harris,1003102,,MSP430F149IPM,Texas Instruments,100,10.34,USD,02+ Price,100,,,ils:,ated outside your or,,that we can only process two (2) email addresses in our system. So be extremely careful to specify which two email addresses you want the order to reach. [Claude: Eurodis]
+1130350,Jake Harris,1002855,,DS3231SN#,Maxim Integrated Products Inc,2713,5,USD,21+ Package Tubed T,,,Tube,,,Y,[Claude: Rebound]
+1130462,Jake Harris,1001036,,TPS63020DSJR,Texas Instruments,,,,84c16720,,,,Terms & Conditions - a copy of,,,"[PARTIAL - needs: price, qty] NO-BID."
+1130462,Jake Harris,1002482,,ADS1115IDGSR,Texas Instruments,2020,1.35,USD,-,,,,building a more resilient worl,,,
+1130462,Jake Harris,1002469,,ADS1115IDGSR,Texas Instruments,1131,1,USD,2328 NON FACTORY REE,,,,o:messagesend@netcomponents.co,,,
