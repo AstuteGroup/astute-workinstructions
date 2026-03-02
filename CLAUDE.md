@@ -58,6 +58,20 @@ node vq-parser/src/index.js consolidate
 - Check final upload for remaining issues: `grep "PARTIAL\|HIGH_COST" output/uploads/VQ_UPLOAD_*.csv`
 - Copy to VQ Loading folder and commit
 
+**Step 5: NoBid Management (Periodic)**
+After parser improvements, reprocess NoBid folder to recover failed parses:
+```bash
+# Check actual count in NoBid folder
+node vq-parser/scripts/check-nobid-folder.js
+
+# Reprocess all NoBid emails (limit 1000 = process all)
+node vq-parser/scripts/batch-reprocess.js --folder NoBid --limit 1000
+```
+- Successfully parsed emails automatically move to Processed folder
+- Failed emails remain in NoBid for next improvement cycle
+- Typical recovery rate: 70-80% after parser improvements
+- See `vq-parser/docs/NOBID-MANAGEMENT.md` for full workflow
+
 ### Commands Reference
 ```bash
 # Reprocess all emails in Processed folder
