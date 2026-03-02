@@ -58,19 +58,36 @@ node vq-parser/src/index.js consolidate
 - Check final upload for remaining issues: `grep "PARTIAL\|HIGH_COST" output/uploads/VQ_UPLOAD_*.csv`
 - Copy to VQ Loading folder and commit
 
-**Step 5: NoBid Management (Periodic)**
-After parser improvements, reprocess NoBid folder to recover failed parses:
+**Step 5: NeedsReview Reprocessing (After Parser Improvements)**
+After making parser improvements, reprocess NeedsReview folder to recover failed parses:
 ```bash
-# Check actual count in NoBid folder
-node vq-parser/scripts/check-nobid-folder.js
-
-# Reprocess all NoBid emails (limit 1000 = process all)
-node vq-parser/scripts/batch-reprocess.js --folder NoBid --limit 1000
+# Reprocess all NeedsReview emails with improved parser
+node vq-parser/scripts/batch-reprocess.js --folder NeedsReview --limit 100
 ```
-- Successfully parsed emails automatically move to Processed folder
-- Failed emails remain in NoBid for next improvement cycle
-- Typical recovery rate: 70-80% after parser improvements
-- See `vq-parser/docs/NOBID-MANAGEMENT.md` for full workflow
+- Emails that parse successfully get written to CSVs (stay in NeedsReview)
+- Failed emails remain in NeedsReview for manual extraction
+- Typical automatic recovery rate: 50-60% on first reprocess
+
+**Step 6: Manual Extraction (Remaining Failures)**
+For emails that can't be parsed automatically, manually extract quote data:
+```bash
+# Categorize remaining failures
+node vq-parser/scripts/categorize-failures.js
+
+# Review HIGH and MEDIUM priority emails
+# Create manual CSV files: VQ_MANUAL_[ID]_[MPN]_[DATE].csv
+
+# Merge manual extractions
+node vq-parser/scripts/merge-manual-extractions.js
+
+# Re-run consolidate to include manual data
+node vq-parser/src/index.js consolidate
+```
+- **HIGH Priority:** Emails with price AND quantity - always extract
+- **MEDIUM Priority:** Emails with price OR quantity - review and extract if viable
+- **LOW Priority:** Target price requests, no-bids - skip
+- Typical manual extraction: 10-15% additional recovery
+- **Total recovery rate:** 65-75% (automatic + manual)
 
 ### Commands Reference
 ```bash
