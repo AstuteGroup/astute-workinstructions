@@ -11,8 +11,8 @@ astute-workinstructions/
 ├── tasks/                    # Explicit task instructions (canonical)
 ├── roles/                    # Role definitions
 ├── Trading Analysis/         # Workflow folders with descriptive docs
-├── rfq_sourcing/            # Tool code + workflow doc
-├── netcomponents_rfq/       # Tool code + workflow doc
+├── rfq_sourcing/            # RFQ sourcing (franchise_check + netcomponents)
+├── vq_parser/               # VQ Loading automation
 ├── src/                     # Legacy work instructions
 ├── CLAUDE.md                # Claude Code session instructions
 ├── MEMORY.md                # Session tracking (recent work)
@@ -82,7 +82,7 @@ astute-workinstructions/
 
 **Purpose:** Contain automation code plus workflow documentation.
 
-**Location:** Root level (e.g., `rfq_sourcing/`, `netcomponents_rfq/`)
+**Location:** Root level (e.g., `rfq_sourcing/`, `vq_parser/`)
 
 **Structure:**
 ```
