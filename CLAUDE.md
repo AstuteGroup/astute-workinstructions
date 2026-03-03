@@ -17,6 +17,45 @@ At the start of every new conversation, before addressing anything else, always 
 > 5. **Quick Quote** - Generate baseline quotes from recent VQs (0-30 days) with margin/GP/rebate pricing logic
 > 6. **Seller Quoting Activity** - VQ→CQ→SO funnel analysis by seller (snapshot + 6-month trend)
 > 7. **Order/Shipment Tracking** - Look up tracking by COV, SO, MPN, customer PO, or salesperson (see `saved-queries/order-shipment-tracking.md`)
+> 8. **Inventory File Cleanup** - Process Infor inventory exports into Chuboe format for iDempiere import (see `Trading Analysis/Inventory File Cleanup/`)
+
+---
+
+## Inventory File Cleanup Workflow
+
+**Location:** `~/workspace/astute-workinstructions/Trading Analysis/Inventory File Cleanup/`
+
+Processes Infor ERP inventory exports (AST Item Lots Report) for loading into iDempiere and industry portals.
+
+### Quick Start
+```bash
+python inventory_cleanup.py "ASTItemLotsReportInputs_*.csv" ./output
+```
+
+### What It Does
+1. **Clean** - Removes header rows (1-7) and footer (Page x of y, username)
+2. **Dedupe** - Removes duplicates based on Item+Lot+Location+Warehouse Name+Site+Date Lot
+3. **Split** - Groups by warehouse (W103, W104, W105, etc.) into 14 warehouse groups
+4. **Export Chuboe** - Creates `*_chuboe.csv` files for iDempiere import (one per warehouse group)
+5. **Export Portal** - Creates consolidated file for NetComponents/IC Source *(template TBD)*
+
+### Output Files
+| File | Description |
+|------|-------------|
+| `*_chuboe.csv` | Chuboe format for iDempiere import (one per warehouse group) |
+| `consolidated_portal_*.csv` | Combined file for portal upload *(format TBD)* |
+| `inventory_cleaned_*.csv` | Full cleaned/deduped master file |
+| `duplicates_*.csv` | Duplicate rows removed (for review) |
+
+### Warehouse Groups
+- **Free Stock:** Austin (W104/W112), Stevenage (W102), Hong Kong (W108/W113), Philippines (W109/W114)
+- **Consignment:** GE (W103), Taxan (W106), Spartronics (W107), LAM (W118), Eaton (W117) - prices blanked
+- **Other:** Franchise Stock (W104+Positronic), LAM Dead (W115), LAM 3PL (W111), Main (MAIN), HK (W105)
+
+### TODO
+- [ ] Define NetComponents upload template format
+- [ ] Define IC Source upload template format
+- [ ] Add portal-specific export transformations
 
 ---
 
