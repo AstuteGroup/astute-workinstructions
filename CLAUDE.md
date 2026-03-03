@@ -17,7 +17,7 @@ At the start of every new conversation, before addressing anything else, always 
 > 5. **Quick Quote** - Generate baseline quotes from recent VQs (0-30 days) with margin/GP/rebate pricing logic
 > 6. **Seller Quoting Activity** - VQ→CQ→SO funnel analysis by seller (snapshot + 6-month trend)
 > 7. **Order/Shipment Tracking** - Look up tracking by COV, SO, MPN, customer PO, or salesperson (see `saved-queries/order-shipment-tracking.md`)
-> 8. **Inventory File Cleanup** - Process Infor inventory exports into Chuboe format for iDempiere import (see `Trading Analysis/Inventory File Cleanup/`)
+> 8. **Inventory File Cleanup** - Process Infor inventory exports into Chuboe format for iDempiere import (see `Trading Analysis/Inventory File Cleanup/inventory-file-cleanup.md`)
 
 ---
 
