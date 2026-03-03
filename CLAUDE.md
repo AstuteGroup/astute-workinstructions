@@ -162,6 +162,12 @@ NeedsReview → [batch extract success] → Processed
            → [skip/no-bid] → stays in NeedsReview
 ```
 
+### Vendor Identification
+**IMPORTANT:** Always use `search_key` (c_bpartner.value) for vendor identification, NOT `c_bpartner_id`.
+- `search_key` is the business-facing identifier used for all lookups in iDempiere
+- `c_bpartner_id` is the internal database primary key (different number)
+- Output CSV column: `vendor_search_key`
+
 ### Vendor Matching
 1. Exact email match in `ad_user.email`
 2. Vendor cache lookup (`data/vendor-cache.json`)
@@ -171,7 +177,7 @@ NeedsReview → [batch extract success] → Processed
 ### Parser Failure Tracking
 **File:** `data/parser-failure-tracker.json`
 
-Tracks cumulative rigid parser failures by vendor to prioritize improvements:
+Tracks cumulative rigid parser failures by vendor (keyed by search_key) to prioritize improvements:
 - Increments on every PARTIAL (even if later recovered via batch extraction)
 - Review weekly/bi-weekly to identify high-failure vendors
 - When vendor has significant failures, create vendor-specific template
