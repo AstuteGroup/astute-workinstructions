@@ -11,7 +11,7 @@ At the start of every new conversation, before addressing anything else, always 
 
 > **Available Workflows:**
 > 1. **Franchise Screening** - Screen RFQs against FindChips to filter low-value parts before broker sourcing (see `rfq_sourcing/franchise_check/franchise-screening.md`)
-> 2. **RFQ Sourcing** - Submit RFQs to NetComponents suppliers (see `netcomponents_rfq/rfq-sourcing-netcomponents.md`)
+> 2. **RFQ Sourcing** - Submit RFQs to NetComponents suppliers (see `rfq_sourcing/netcomponents/rfq-sourcing-netcomponents.md`)
 > 3. **VQ Loading** - Process supplier quote emails into ERP-ready CSV (see `~/workspace/vq-parser/`)
 > 4. **Market Offer Analysis for RFQs** - Match new RFQs against customer excess and stock offers (see `Trading Analysis/Market Offer Matching for RFQs/market-offer-matching.md`)
 > 5. **Quick Quote** - Generate baseline quotes from recent VQs (0-30 days) with margin/GP/rebate pricing logic
