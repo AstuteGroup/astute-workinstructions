@@ -80,6 +80,8 @@ Consolidated roadmap for RFQ Sourcing and VQ Processing workflows, organized by 
 | B5 | Cross-Region Duplicate Detection | Later | Planned |
 | B6 | Alternate Packaging Analysis | Later | In Progress |
 | B7 | Memory Product Handling | Later | Planned |
+| B8 | BrokerBin RFQ Automation | Later | Planned |
+| B9 | PartsBase RFQ Automation | Later | Planned |
 
 ---
 
@@ -261,6 +263,32 @@ IF (Supplier + MPN) requested within last 60 days → SKIP
 - Check memory spot pricing sources (DRAMeXchange)
 - Query memory-specific broker networks
 - Different scoring (date code less critical)
+
+---
+
+## B8. BrokerBin RFQ Automation
+
+**Status:** Planned | **Priority:** Later
+
+**Problem:** Currently only sourcing from NetComponents. BrokerBin has different supplier networks.
+
+**Solution:**
+- Extend RFQ automation to BrokerBin platform
+- Adapt supplier selection logic for BrokerBin listings
+- Integrate responses into VQ Parser workflow
+
+---
+
+## B9. PartsBase RFQ Automation
+
+**Status:** Planned | **Priority:** Later
+
+**Problem:** PartsBase has unique supplier coverage not available on NetComponents or BrokerBin.
+
+**Solution:**
+- Extend RFQ automation to PartsBase platform
+- Adapt supplier selection logic for PartsBase listings
+- Integrate responses into VQ Parser workflow
 
 ---
 
