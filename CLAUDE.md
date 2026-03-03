@@ -21,6 +21,16 @@ At the start of every new conversation, before addressing anything else, always 
 
 ---
 
+## Documentation Standards
+
+When creating or updating workflow documentation, follow the conventions in `CONVENTIONS.md`:
+- Workflow docs use descriptive `kebab-case.md` names (e.g., `inventory-file-cleanup.md`, NOT `README.md`)
+- Task files go in `tasks/` with `snake_case.md` names
+- Keep workflow docs brief; detailed step-by-step instructions belong in `tasks/`
+- Session history goes in `MEMORY.md` (4 most recent entries)
+
+---
+
 ## Inventory File Cleanup Workflow
 
 **Location:** `~/workspace/astute-workinstructions/Trading Analysis/Inventory File Cleanup/`
