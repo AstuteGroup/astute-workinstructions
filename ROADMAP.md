@@ -46,13 +46,13 @@ Consolidated roadmap for RFQ Sourcing and VQ Processing workflows, organized by 
 
 | # | Feature | Priority | Status |
 |---|---------|----------|--------|
-| A1 | Franchise Pricing via API | Q2 | Planned |
+| A1 | Franchise Pricing via API | Later | Planned |
 
 ---
 
 ## A1. Franchise Pricing via API
 
-**Status:** Planned | **Priority:** Q2
+**Status:** Planned | **Priority:** Later
 
 **Problem:** Currently scraping FindChips — fragile, rate-limited.
 
@@ -76,10 +76,10 @@ Consolidated roadmap for RFQ Sourcing and VQ Processing workflows, organized by 
 | B1 | Supplier Selection Deduplication | **Now** | Not implemented |
 | B2 | No-Bid Filtering | **Now** | Planned |
 | B3 | Supplier Fatigue Tracking | **Next** | Planned |
-| B4 | LLM Description Scanning | Q2 | Planned |
-| B5 | Cross-Region Duplicate Detection | Q2 | Planned |
-| B6 | Alternate Packaging Analysis | Q2 | In Progress |
-| B7 | Memory Product Handling | Q3 | Planned |
+| B4 | LLM Description Scanning | Later | Planned |
+| B5 | Cross-Region Duplicate Detection | Later | Planned |
+| B6 | Alternate Packaging Analysis | Later | In Progress |
+| B7 | Memory Product Handling | Later | Planned |
 
 ---
 
@@ -186,7 +186,7 @@ IF (Supplier + MPN) requested within last X days → SKIP
 
 ## B4. LLM Description Scanning
 
-**Status:** Planned | **Priority:** Q2
+**Status:** Planned | **Priority:** Later
 
 **Problem:** Some NetComponents suppliers include restrictions in listing descriptions:
 - "RFQs for OEM & EMS only. NO Resellers!"
@@ -210,7 +210,7 @@ IF (Supplier + MPN) requested within last X days → SKIP
 
 ## B5. Cross-Region Duplicate Detection
 
-**Status:** Planned | **Priority:** Q2
+**Status:** Planned | **Priority:** Later
 
 **Problem:** Same supplier inventory appears in multiple regions (e.g., Silicon Solutions Americas + Silicon Solutions Europe), leading to duplicate RFQs.
 
@@ -228,7 +228,7 @@ IF (Supplier + MPN) requested within last X days → SKIP
 
 ## B6. Alternate Packaging Analysis
 
-**Status:** In Progress | **Priority:** Q2
+**Status:** In Progress | **Priority:** Later
 
 **Problem:** Parts with different packaging suffixes are often interchangeable:
 - `LTC2446IUHF#TRPBF` (tape & reel, lead-free)
@@ -248,7 +248,7 @@ IF (Supplier + MPN) requested within last X days → SKIP
 
 ## B7. Memory Product Handling
 
-**Status:** Planned | **Priority:** Q3
+**Status:** Planned | **Priority:** Later
 
 **Problem:** Memory ICs (DRAM, Flash, SRAM) have unique market dynamics:
 - Higher price volatility
@@ -270,11 +270,11 @@ IF (Supplier + MPN) requested within last X days → SKIP
 |---|---------|----------|--------|
 | C1 | RFQ Matching Window | — | ✅ Done |
 | C2 | No-Bid Detection | — | ✅ Done |
-| C3 | Parser Bug Fixes | Q2 | In Progress |
-| C4 | Vendor-Specific Templates | Q2 | Planned |
-| C5 | Attachment Handling | Q2 | Planned |
-| C6 | Retry Tracking | Q2 | Planned |
-| C7 | LLM Fallback | Q3 | Planned |
+| C3 | Parser Bug Fixes | Later | In Progress |
+| C4 | Vendor-Specific Templates | Later | Planned |
+| C5 | Attachment Handling | Later | Planned |
+| C6 | Retry Tracking | Later | Planned |
+| C7 | LLM Fallback | Later | Planned |
 
 ---
 
@@ -307,7 +307,7 @@ IF (Supplier + MPN) requested within last X days → SKIP
 
 ## C3. Parser Bug Fixes
 
-**Status:** In Progress | **Priority:** Q2
+**Status:** In Progress | **Priority:** Later
 
 **Known Issues:**
 - [ ] Multi-row table header extraction bug (Galco, OzDizan)
@@ -322,7 +322,7 @@ IF (Supplier + MPN) requested within last X days → SKIP
 
 ## C4. Vendor-Specific Templates
 
-**Status:** Planned | **Priority:** Q2
+**Status:** Planned | **Priority:** Later
 
 **Target Vendors (high failure rates):**
 - OzDizan
@@ -339,7 +339,7 @@ IF (Supplier + MPN) requested within last X days → SKIP
 
 ## C5. Attachment Handling
 
-**Status:** Planned | **Priority:** Q2
+**Status:** Planned | **Priority:** Later
 
 **Issues:**
 - 15-second PDF timeout causes failures
@@ -355,7 +355,7 @@ IF (Supplier + MPN) requested within last X days → SKIP
 
 ## C6. Retry Tracking
 
-**Status:** Planned | **Priority:** Q2
+**Status:** Planned | **Priority:** Later
 
 **Problem:** No tracking of how many times an email has been attempted.
 
@@ -384,7 +384,7 @@ IF (Supplier + MPN) requested within last X days → SKIP
 
 ## C7. LLM Fallback
 
-**Status:** Planned | **Priority:** Q3
+**Status:** Planned | **Priority:** Later
 
 **Use Cases:**
 - Low-confidence parses (< 0.6)
@@ -403,9 +403,9 @@ IF (Supplier + MPN) requested within last X days → SKIP
 | # | Feature | Priority | Status |
 |---|---------|----------|--------|
 | D1 | No-Bid Database | **Now** | Planned |
-| D2 | iDempiere Integration | Q3 | Planned |
-| D3 | Scheduling & Automation | Q4 | Planned |
-| D4 | Reporting & Analytics | Q4 | Planned |
+| D2 | iDempiere Integration | Later | Planned |
+| D3 | Scheduling & Automation | Backlog | Planned |
+| D4 | Reporting & Analytics | Backlog | Planned |
 
 ---
 
@@ -440,7 +440,7 @@ IF (Supplier + MPN) requested within last X days → SKIP
 
 ## D2. iDempiere Integration
 
-**Status:** Planned | **Priority:** Q3
+**Status:** Planned | **Priority:** Later
 
 **Features:**
 - Direct VQ upload via API
@@ -451,7 +451,7 @@ IF (Supplier + MPN) requested within last X days → SKIP
 
 ## D3. Scheduling & Automation
 
-**Status:** Planned | **Priority:** Q4
+**Status:** Planned | **Priority:** Backlog
 
 **Schedule:**
 - Daily: Fetch emails, parse, consolidate
@@ -462,7 +462,7 @@ IF (Supplier + MPN) requested within last X days → SKIP
 
 ## D4. Reporting & Analytics
 
-**Status:** Planned | **Priority:** Q4
+**Status:** Planned | **Priority:** Backlog
 
 **Parse Rate Dashboard:**
 - Daily/weekly trends
