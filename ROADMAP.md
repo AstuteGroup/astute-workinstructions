@@ -2,6 +2,11 @@
 
 Consolidated roadmap for RFQ Sourcing and VQ Processing workflows.
 
+**Workflow Tags:**
+- `[RFQ]` — RFQ Sourcing (franchise screening, supplier selection, NetComponents submission)
+- `[VQ]` — VQ Processing (quote email parsing, RFQ matching, ERP upload)
+- `[BOTH]` — Spans both workflows
+
 ---
 
 ## Process Overview
@@ -15,6 +20,7 @@ Consolidated roadmap for RFQ Sourcing and VQ Processing workflows.
 │  │  Franchise   │───▶│    RFQ       │───▶│     VQ       │───▶│   ERP     │ │
 │  │  Screening   │    │   Sourcing   │    │   Parsing    │    │  Upload   │ │
 │  └──────────────┘    └──────────────┘    └──────────────┘    └───────────┘ │
+│       [RFQ]              [RFQ]               [VQ]               [VQ]        │
 │                                                                              │
 │  FindChips check     NetComponents       Email parsing      iDempiere VQ    │
 │  Filter low-value    Submit RFQs         Extract quotes     Mass upload     │
@@ -23,31 +29,31 @@ Consolidated roadmap for RFQ Sourcing and VQ Processing workflows.
 ```
 
 **Repos:**
-- `rfq_sourcing/` - Franchise screening + NetComponents RFQ submission
-- `vq-parser/` (separate repo) - Quote email parsing
+- `rfq_sourcing/` — Franchise screening + NetComponents RFQ submission
+- `vq-parser/` (separate repo) — Quote email parsing
 
 ---
 
 ## Current State (2026-03-03)
 
-| Metric | Value |
-|--------|-------|
-| VQ Parse rate | 87% |
-| VQ Vendor match rate | 96% |
-| VQ NoBid recovery rate | 83% |
-| Franchise screening | Operational |
-| NetComponents RFQ submission | Operational |
+| Metric | Value | Workflow |
+|--------|-------|----------|
+| VQ Parse rate | 87% | [VQ] |
+| VQ Vendor match rate | 96% | [VQ] |
+| VQ NoBid recovery rate | 83% | [VQ] |
+| Franchise screening | Operational | [RFQ] |
+| NetComponents RFQ submission | Operational | [RFQ] |
 
 ---
 
-## 1. RFQ Deduplication (NEW)
+## 1. Supplier Selection Deduplication `[RFQ]`
 
 **Status:** Not implemented
 
-**Problem:** We sometimes request the same MPN from the same supplier multiple times within a short window:
-- Wastes supplier time (fatigue)
-- Clogs our inbox with duplicate quotes
-- Annoys suppliers who already responded
+**Problem:** We sometimes send RFQs to the same supplier for the same MPN multiple times within a short window:
+- Wastes supplier time
+- Annoys suppliers who already quoted or declined
+- Contributes to supplier fatigue
 
 **Solution:**
 
@@ -82,12 +88,34 @@ IF (Supplier + MPN) requested within last X days → SKIP
 
 ### 1.3 Integration Points
 - NetComponents RFQ submission (check before sending)
-- VQ Parser (update response status when quote received)
+- VQ Parser (update `response` status when quote received)
 - No-Bid tracking (update when no-bid detected)
 
 ---
 
-## 2. Supplier Fatigue Tracking
+## 2. RFQ Matching Window `[VQ]`
+
+**Status:** ✅ Implemented (2026-03-03)
+
+**Problem:** Old RFQs with thousands of parts were catching unrelated quotes. A quote for MPN "ABC123" might match an RFQ from 6 months ago instead of the recent one.
+
+**Solution Implemented:**
+- 14-day date window for RFQ matching
+- Exact MPN match → fuzzy match → flag as `[NEEDS_RFQ]`
+- Output uses RFQ's MPN (not vendor's quoted MPN)
+- Differences noted in `chuboe_note_public`
+
+**Logic:**
+```
+IF quote received for MPN
+  → Find RFQs containing that MPN from last 14 days
+  → If multiple matches, use most recent
+  → If no match, flag for manual RFQ assignment
+```
+
+---
+
+## 3. Supplier Fatigue Tracking `[RFQ]`
 
 **Status:** Planned
 
@@ -98,14 +126,14 @@ IF (Supplier + MPN) requested within last X days → SKIP
 
 **Solution:**
 
-### 2.1 Fatigue Scoring
+### 3.1 Fatigue Scoring
 Track per supplier:
 - Total RFQs sent (30/60/90 day windows)
 - Response rate (quotes received / RFQs sent)
 - Conversion rate (orders / quotes)
 - Average response time
 
-### 2.2 Fatigue Actions
+### 3.2 Fatigue Actions
 | Fatigue Level | Action |
 |---------------|--------|
 | Low (healthy) | Normal RFQ flow |
@@ -113,13 +141,13 @@ Track per supplier:
 | High | Skip or flag for manual review |
 | Blocked | Supplier requested no more RFQs |
 
-### 2.3 Supplier Preferences
+### 3.3 Supplier Preferences
 Track known preferences:
-- "Chip 1 Exchange" - picky, send only high-value
-- "Commodity Components" - limit to 5/week
-- "OEM-only suppliers" - skip for resale RFQs
+- "Chip 1 Exchange" — picky, send only high-value
+- "Commodity Components" — limit to 5/week
+- "OEM-only suppliers" — skip for resale RFQs
 
-### 2.4 Cooldown Periods
+### 3.4 Cooldown Periods
 - After no-response: 7-day cooldown
 - After no-bid: 14-day cooldown for same MPN
 - After complaint: Manual review required
@@ -131,20 +159,18 @@ Track known preferences:
 
 ---
 
-## 3. No-Bid Tracking
+## 4. No-Bid Tracking `[BOTH]`
 
-**Status:** Planned (partially implemented in VQ Parser)
+**Status:** Partially implemented
 
 **Problem:** We repeatedly request quotes from suppliers who can't provide certain parts.
 
-**Solution:**
-
-### 3.1 No-Bid Detection (VQ Parser)
+### 4.1 No-Bid Detection `[VQ]`
 - ✅ Detects: "out of stock", "cannot quote", "not available"
 - ✅ Creates CSV with NO-BID flag
 - ✅ Moves to Processed folder
 
-### 3.2 No-Bid Database
+### 4.2 No-Bid Database `[BOTH]`
 ```json
 {
   "noBids": [
@@ -161,14 +187,14 @@ Track known preferences:
 }
 ```
 
-### 3.3 Integration
+### 4.3 No-Bid Filtering `[RFQ]`
 - Before sending RFQ: check no-bid history
 - If vendor said "no" to MPN within 90 days → skip or flag
 - Quarterly cleanup: expire old no-bids (suppliers restock)
 
 ---
 
-## 4. LLM Description Scanning
+## 5. LLM Description Scanning `[RFQ]`
 
 **Status:** Planned
 
@@ -192,7 +218,7 @@ Track known preferences:
 
 ---
 
-## 5. Cross-Region Duplicate Detection
+## 6. Cross-Region Duplicate Detection `[RFQ]`
 
 **Status:** Planned
 
@@ -210,7 +236,7 @@ Track known preferences:
 
 ---
 
-## 6. Alternate Packaging Analysis
+## 7. Alternate Packaging Analysis `[RFQ]`
 
 **Status:** In Progress (basic normalization implemented)
 
@@ -230,7 +256,7 @@ Track known preferences:
 
 ---
 
-## 7. Memory Product Handling
+## 8. Memory Product Handling `[RFQ]`
 
 **Status:** Planned
 
@@ -248,11 +274,11 @@ Track known preferences:
 
 ---
 
-## 8. Franchise Pricing via API
+## 9. Franchise Pricing via API `[RFQ]`
 
 **Status:** Planned
 
-**Problem:** Currently scraping FindChips - fragile, rate-limited.
+**Problem:** Currently scraping FindChips — fragile, rate-limited.
 
 **Solution:**
 - Replace with direct API feeds (Octopart, DigiKey, Mouser, Arrow)
@@ -261,32 +287,32 @@ Track known preferences:
 
 ---
 
-## 9. VQ Parser Improvements
+## 10. VQ Parser Improvements `[VQ]`
 
-### 9.1 Parser Bugs
+### 10.1 Parser Bugs
 - [ ] Multi-row table header extraction bug
 - [ ] MPN bleeding into price field (NUP2105 → $2105)
 
-### 9.2 Vendor-Specific Templates
+### 10.2 Vendor-Specific Templates
 Target vendors with high failure rates:
 - OzDizan
 - Inelco
 - Galco
 - ECOMAL (CID image references in emails)
 
-### 9.3 Attachment Handling
+### 10.3 Attachment Handling
 - [ ] Increase PDF timeout (15s → 30s)
 - [ ] Detect "see attachment" and skip body parsing
 - [ ] Better pdf.js-extract for complex tables
 
-### 9.4 Retry Tracking
+### 10.4 Retry Tracking
 - Track parse attempts per email
 - Skip if already tried with current parser version
 - Move to ParseFailed after 3 failures
 
 ---
 
-## 10. LLM Fallback for VQ Parsing
+## 11. LLM Fallback for VQ Parsing `[VQ]`
 
 **Status:** Planned (currently disabled)
 
@@ -302,19 +328,19 @@ Target vendors with high failure rates:
 
 ---
 
-## 11. Integration & Automation
+## 12. Integration & Automation `[BOTH]`
 
-### 11.1 iDempiere Integration
+### 12.1 iDempiere Integration `[VQ]`
 - Direct VQ upload via API
 - Validate before upload
 - Error handling and rollback
 
-### 11.2 Scheduling
+### 12.2 Scheduling `[BOTH]`
 - Daily: Fetch emails, parse, consolidate
 - Weekly: Reprocess NeedsReview folder
 - Monthly: Review ParseFailed, expire old no-bids
 
-### 11.3 Notifications
+### 12.3 Notifications `[BOTH]`
 - HIGH_COST items (> $1000)
 - High partial rate (> 30%)
 - Parsing failure spikes
@@ -322,20 +348,20 @@ Target vendors with high failure rates:
 
 ---
 
-## 12. Reporting & Analytics
+## 13. Reporting & Analytics `[BOTH]`
 
-### 12.1 Parse Rate Dashboard
+### 13.1 Parse Rate Dashboard `[VQ]`
 - Daily/weekly trends
 - Vendor-specific rates
 - Strategy success (HTML vs regex vs PDF)
 
-### 12.2 Vendor Performance
+### 13.2 Vendor Performance `[BOTH]`
 - Response time
 - Quote completeness
 - No-bid rate
 - Price competitiveness
 
-### 12.3 RFQ Efficiency
+### 13.3 RFQ Efficiency `[RFQ]`
 - RFQs sent vs quotes received
 - Conversion to orders
 - Supplier fatigue trends
@@ -344,26 +370,27 @@ Target vendors with high failure rates:
 
 ## Implementation Priority
 
-| # | Feature | Impact | Effort | Priority |
-|---|---------|--------|--------|----------|
-| 1 | RFQ Deduplication | High | Medium | **Now** |
-| 2 | No-Bid Tracking | High | Low | **Now** |
-| 3 | Supplier Fatigue | High | High | **Next** |
-| 4 | LLM Description Scanning | High | Medium | Q2 |
-| 5 | Parser Bug Fixes | Medium | Low | Q2 |
-| 6 | Vendor Templates | Medium | Medium | Q2 |
-| 7 | Franchise API | High | Medium | Q2 |
-| 8 | Cross-Region Duplicates | Medium | Low | Q2 |
-| 9 | Memory Handling | Medium | Medium | Q3 |
-| 10 | LLM VQ Fallback | Medium | Low | Q3 |
-| 11 | iDempiere Integration | High | High | Q3 |
-| 12 | Scheduling/Automation | Medium | Medium | Q4 |
+| # | Feature | Workflow | Impact | Effort | Priority |
+|---|---------|----------|--------|--------|----------|
+| 1 | Supplier Selection Deduplication | [RFQ] | High | Medium | **Now** |
+| 2 | RFQ Matching Window | [VQ] | High | Low | ✅ Done |
+| 3 | No-Bid Tracking (full) | [BOTH] | High | Low | **Now** |
+| 4 | Supplier Fatigue | [RFQ] | High | High | **Next** |
+| 5 | LLM Description Scanning | [RFQ] | High | Medium | Q2 |
+| 6 | Parser Bug Fixes | [VQ] | Medium | Low | Q2 |
+| 7 | Vendor Templates | [VQ] | Medium | Medium | Q2 |
+| 8 | Franchise API | [RFQ] | High | Medium | Q2 |
+| 9 | Cross-Region Duplicates | [RFQ] | Medium | Low | Q2 |
+| 10 | Memory Handling | [RFQ] | Medium | Medium | Q3 |
+| 11 | LLM VQ Fallback | [VQ] | Medium | Low | Q3 |
+| 12 | iDempiere Integration | [VQ] | High | High | Q3 |
+| 13 | Scheduling/Automation | [BOTH] | Medium | Medium | Q4 |
 
 ---
 
 ## Completed
 
-### RFQ Sourcing
+### RFQ Sourcing `[RFQ]`
 - [x] Header row detection fix
 - [x] Supplier link finding (table column 15)
 - [x] "24+" date codes scored as fresh
@@ -373,13 +400,15 @@ Target vendors with high failure rates:
 - [x] Min order value filtering
 - [x] Basic MPN packaging normalization
 
-### VQ Parser
+### VQ Processing `[VQ]`
 - [x] NoBid folder cleanup
 - [x] Flag validation fix
 - [x] Simple quote extraction
 - [x] Domain-based vendor lookup
 - [x] Fuzzy name matching
 - [x] Automatic flag stripping in consolidate
+- [x] 14-day RFQ matching window
+- [x] Vendor ID correction (search_key vs c_bpartner_id)
 
 ---
 
@@ -387,10 +416,11 @@ Target vendors with high failure rates:
 
 | Date | Component | Changes |
 |------|-----------|---------|
-| 2026-02-28 | VQ Parser | Initial release (70% parse rate) |
-| 2026-03-01 | VQ Parser | Flag validation fix (78%) |
-| 2026-03-02 | VQ Parser | Simple quote extraction, NoBid management (87%) |
-| 2026-03-03 | Docs | Consolidated roadmaps |
+| 2026-02-28 | [VQ] | Initial release (70% parse rate) |
+| 2026-03-01 | [VQ] | Flag validation fix (78%) |
+| 2026-03-02 | [VQ] | Simple quote extraction, NoBid management (87%) |
+| 2026-03-03 | [VQ] | RFQ matching window, vendor ID fix |
+| 2026-03-03 | [BOTH] | Consolidated roadmaps |
 
 ---
 
