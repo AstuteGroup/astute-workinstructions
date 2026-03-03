@@ -10,9 +10,9 @@ How to organize tasks, markdowns, and work instructions in this repository.
 astute-workinstructions/
 ├── tasks/                    # Explicit task instructions (canonical)
 ├── roles/                    # Role definitions
-├── Trading Analysis/         # Workflow folders with READMEs
-├── rfq_sourcing/            # Tool code + workflow README
-├── netcomponents_rfq/       # Tool code + workflow README
+├── Trading Analysis/         # Workflow folders with descriptive docs
+├── rfq_sourcing/            # Tool code + workflow doc
+├── netcomponents_rfq/       # Tool code + workflow doc
 ├── src/                     # Legacy work instructions
 ├── CLAUDE.md                # Claude Code session instructions
 ├── MEMORY.md                # Session tracking (recent work)
@@ -44,11 +44,19 @@ astute-workinstructions/
 
 ---
 
-### Workflow READMEs (`*/README.md`)
+### Workflow Documentation (`*/workflow-name.md`)
 
 **Purpose:** High-level overview that references the canonical task file.
 
-**Location:** Inside workflow folder (e.g., `Trading Analysis/VQ Loading/README.md`)
+**Location:** Inside workflow folder (e.g., `Trading Analysis/Inventory File Cleanup/inventory-file-cleanup.md`)
+
+**Naming:** Use descriptive `kebab-case.md` names that reflect the workflow, NOT generic `README.md`. This ensures files are identifiable when moved, searched, or viewed outside folder context.
+
+**Examples:**
+- `inventory-file-cleanup.md` (not `README.md`)
+- `market-offer-matching.md` (not `README.md`)
+- `franchise-screening.md` (not `README.md`)
+- `rfq-sourcing-netcomponents.md` (not `README.md`)
 
 **Contents:**
 - Quick start command
@@ -72,14 +80,14 @@ astute-workinstructions/
 
 ### Tool Folders (with code)
 
-**Purpose:** Contain automation code plus a README.
+**Purpose:** Contain automation code plus workflow documentation.
 
 **Location:** Root level (e.g., `rfq_sourcing/`, `netcomponents_rfq/`)
 
 **Structure:**
 ```
 tool_folder/
-├── README.md           # Tool documentation
+├── workflow-name.md    # Descriptive workflow doc (not README.md)
 ├── src/ or python/     # Source code
 ├── config.js           # Configuration
 └── output/             # Generated files
@@ -107,8 +115,8 @@ tool_folder/
 | Situation | Create |
 |-----------|--------|
 | New repeatable task with specific steps | `tasks/task_name.md` |
-| New workflow with automation | Folder + `README.md` referencing task |
-| New workflow without automation | `Trading Analysis/Name/README.md` referencing task |
+| New workflow with automation | Folder + `workflow-name.md` referencing task |
+| New workflow without automation | `Trading Analysis/Name/workflow-name.md` referencing task |
 | New role | `roles/role_name.md` |
 | Ad-hoc analysis or one-time work | Don't document (or note in MEMORY.md) |
 
@@ -131,9 +139,12 @@ Task files should be self-contained and not require reading other files.
 | Type | Convention | Example |
 |------|------------|---------|
 | Task files | `snake_case.md` | `vq_loading.md` |
+| Workflow docs | `kebab-case.md` (descriptive) | `inventory-file-cleanup.md` |
 | Workflow folders | Title Case | `VQ Loading/` |
 | Tool folders | `snake_case` | `rfq_sourcing/` |
 | Role files | `snake_case.md` | `data_entry_specialist.md` |
+
+**Important:** Never name workflow docs `README.md`. Use descriptive names that identify the content without relying on folder context.
 
 ---
 
@@ -141,6 +152,6 @@ Task files should be self-contained and not require reading other files.
 
 When modifying a workflow:
 1. Update `tasks/*.md` with instruction changes
-2. Update workflow `README.md` if overview changes
+2. Update the workflow doc (`workflow-name.md`) if overview changes
 3. Update `MEMORY.md` with session summary
 4. Commit and push to GitHub

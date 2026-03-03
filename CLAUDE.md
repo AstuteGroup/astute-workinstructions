@@ -10,10 +10,10 @@ At the start of every new conversation, before addressing anything else, always 
 2. **Available Workflows:**
 
 > **Available Workflows:**
-> 1. **Franchise Screening** - Screen RFQs against FindChips to filter low-value parts before broker sourcing
-> 2. **RFQ Sourcing** - Submit RFQs to NetComponents suppliers (single part or batch from iDempiere RFQ)
+> 1. **Franchise Screening** - Screen RFQs against FindChips to filter low-value parts before broker sourcing (see `rfq_sourcing/franchise_check/franchise-screening.md`)
+> 2. **RFQ Sourcing** - Submit RFQs to NetComponents suppliers (see `netcomponents_rfq/rfq-sourcing-netcomponents.md`)
 > 3. **VQ Loading** - Process supplier quote emails into ERP-ready CSV (see `~/workspace/vq-parser/`)
-> 4. **Market Offer Analysis for RFQs** - Match new RFQs against customer excess and stock offers (includes pricing & valuation logic)
+> 4. **Market Offer Analysis for RFQs** - Match new RFQs against customer excess and stock offers (see `Trading Analysis/Market Offer Matching for RFQs/market-offer-matching.md`)
 > 5. **Quick Quote** - Generate baseline quotes from recent VQs (0-30 days) with margin/GP/rebate pricing logic
 > 6. **Seller Quoting Activity** - VQ→CQ→SO funnel analysis by seller (snapshot + 6-month trend)
 > 7. **Order/Shipment Tracking** - Look up tracking by COV, SO, MPN, customer PO, or salesperson (see `saved-queries/order-shipment-tracking.md`)
