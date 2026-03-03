@@ -162,6 +162,22 @@ NeedsReview → [batch extract success] → Processed
            → [skip/no-bid] → stays in NeedsReview
 ```
 
+### RFQ Matching (14-Day Window)
+When a vendor quote comes in, the parser matches it to an RFQ in the system:
+
+1. **Exact MPN match** - Search recent RFQs (last 14 days) for exact MPN
+2. **Email extraction** - Extract original MPN from NetComponents email format
+3. **Fuzzy match** - Progressively trim MPN characters to find partial match
+4. **Subject line** - Extract MPN from email subject as last resort
+5. **No match** → Flag as `[NEEDS_RFQ - no match in 14 days]` for manual review
+
+**Output format:**
+- `chuboe_mpn` = RFQ's MPN (what's in the system)
+- `chuboe_note_public` = "Quoted MPN: xxx" if vendor quoted different part
+- `chuboe_rfq_id` = RFQ number (the `value` field, not database ID)
+
+**Why 14 days?** Vendor responses typically arrive within 1-2 weeks. Old RFQs with thousands of parts would otherwise catch unrelated quotes via partial matching.
+
 ### Vendor Identification
 **IMPORTANT:** Always use `search_key` (c_bpartner.value) for vendor identification, NOT `c_bpartner_id`.
 - `search_key` is the business-facing identifier used for all lookups in iDempiere
