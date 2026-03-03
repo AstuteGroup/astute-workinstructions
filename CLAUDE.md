@@ -80,72 +80,86 @@ python inventory_cleanup.py "ASTItemLotsReportInputs_*.csv" ./output
 ```bash
 node vq-parser/src/index.js fetch
 ```
+- Pulls emails from INBOX via IMAP
+- Rigid parser attempts auto-extraction (MPN, qty, price, vendor)
+- Successful parses → individual VQ_*.csv files → emails move to Processed
+- Failed parses → stay in INBOX
 
-**Step 2: Review & Fix Partials** ← CRITICAL STEP
-After parsing, review output CSVs for `[PARTIAL]` and `[HIGH_COST]` flags:
-```bash
-grep -l "PARTIAL\|HIGH_COST" ~/workspace/vq-parser/output/VQ_*.csv
-```
-For each flagged file:
-1. Read the CSV to see what's missing (price, qty, or both)
-2. Read the corresponding email from `needs-review.json` (search by MPN or RFQ ID)
-3. Extract the correct values from the email body
-4. Update the CSV with corrected data, remove the flag
-
-**Priority order for review:**
-1. `[HIGH_COST]` items - usually MPN bleeding errors (e.g., $2105 for NUP2105)
-2. `[PARTIAL - needs: qty]` - price exists, just need quantity
-3. `[PARTIAL - needs: price]` - qty exists, just need price
-4. `[PARTIAL - needs: price, qty]` - need both (lower priority)
-
-**Step 3: Consolidate**
+**Step 2: Consolidate**
 ```bash
 node vq-parser/src/index.js consolidate
 ```
+- Merges all VQ_*.csv into single upload file
+- Flags incomplete records: `[PARTIAL - needs: qty/price/both]`, `[HIGH_COST]`
+- Failed emails → move to NeedsReview folder
+- Output: `VQ_UPLOAD_[timestamp].csv`
 
-**Step 4: Verify & Deliver**
-- Check final upload for remaining issues: `grep "PARTIAL\|HIGH_COST" output/uploads/VQ_UPLOAD_*.csv`
-- Copy to VQ Loading folder and commit
+**Step 3: Update Parser Failure Tracker** ← IMPORTANT
+After consolidation, update `data/parser-failure-tracker.json`:
+- For each PARTIAL record, increment that vendor's `failureCount`
+- Note failure type (garbage_mpn, missing_fields, etc.)
+- This tracks **rigid parser failures** to prioritize future parser improvements
+- Review tracker weekly/bi-weekly to identify template opportunities
 
-**Step 5: NeedsReview Reprocessing (After Parser Improvements)**
-After making parser improvements, reprocess NeedsReview folder to recover failed parses:
+**Step 4: Generate NeedsReview JSON**
 ```bash
-# Reprocess all NeedsReview emails with improved parser
-node vq-parser/scripts/batch-reprocess.js --folder NeedsReview --limit 100
+node vq-parser/src/index.js needs-review-export
 ```
-- Emails that parse successfully get written to CSVs (stay in NeedsReview)
-- Failed emails remain in NeedsReview for manual extraction
-- Typical automatic recovery rate: 50-60% on first reprocess
+- Dumps NeedsReview folder emails to `needs-review.json` with full bodies
+- **Created once per session** - all batch extraction reads from this file
 
-**Step 6: Manual Extraction (Remaining Failures)**
-For emails that can't be parsed automatically, manually extract quote data:
+**Step 5: Batch Extraction (Manual Recovery)**
+For each batch:
+1. Identify remaining partials in upload CSV
+2. Match to emails in `needs-review.json` by MPN
+3. Extract missing qty/price using regex patterns
+4. Append extracted records to upload file
+5. Repeat until diminishing returns
+
+**Extraction filters:**
+- Skip if qty appears in MPN (MPN bleeding)
+- Skip if price > $200 (likely error)
+- Skip garbage MPNs (UUIDs, random alphanumeric strings)
+
+**Step 6: Categorize Remaining Failures**
+After batch extraction plateaus, categorize what's left:
+
+| Category | Action |
+|----------|--------|
+| RFQ Forwards | SKIP - outbound RFQs, not quotes |
+| Target Price Requests | SKIP - no quote data |
+| NO-BID Responses | SKIP - vendor declined |
+| Attachment-Only | CHECK PDF/Excel if time permits |
+| Legitimate Partials | Leave for manual review |
+
+**Step 7: NeedsReview Folder Validation**
 ```bash
-# Categorize remaining failures
-node vq-parser/scripts/categorize-failures.js
-
-# Review HIGH and MEDIUM priority emails
-# Create manual CSV files: VQ_MANUAL_[ID]_[MPN]_[DATE].csv
-
-# Merge manual extractions
-node vq-parser/scripts/merge-manual-extractions.js
-
-# Re-run consolidate to include manual data
-node vq-parser/src/index.js consolidate
+himalaya envelope list --account vq --folder NeedsReview
 ```
-- **HIGH Priority:** Emails with price AND quantity - always extract
-- **MEDIUM Priority:** Emails with price OR quantity - review and extract if viable
-- **LOW Priority:** Target price requests, no-bids - skip
-- Typical manual extraction: 10-15% additional recovery
-- **Total recovery rate:** 65-75% (automatic + manual)
+- Cross-reference remaining emails against extracted records
+- Move successfully extracted emails → Processed folder
+- Final pass on any missed quotes
 
-### Commands Reference
+**Step 8: Split Output Files**
+Create two separate files:
+- **READY** - Complete records (no PARTIAL flags) → ERP import
+- **PARTIALS_REVIEW** - Incomplete records → manual review
+
+**Step 9: Final Export**
 ```bash
-# Reprocess all emails in Processed folder
-node vq-parser/scripts/batch-reprocess.js --folder Processed
+cp VQ_UPLOAD_*_READY.csv ~/workspace/astute-workinstructions/Trading\ Analysis/
+git add && git commit && git push
+```
 
-# Apply vendor cache and merge
-node vq-parser/scripts/apply-vendor-cache.js
-node vq-parser/scripts/merge-to-upload.js
+### IMAP Folder Flow
+```
+INBOX → [fetch] → Success → Processed
+              → Fail → stays in INBOX
+
+INBOX → [consolidate] → Failed emails → NeedsReview
+
+NeedsReview → [batch extract success] → Processed
+           → [skip/no-bid] → stays in NeedsReview
 ```
 
 ### Vendor Matching
@@ -154,7 +168,28 @@ node vq-parser/scripts/merge-to-upload.js
 3. Domain-based lookup (e.g., velocityelec.com → Velocity Electronics)
 4. Sender name fuzzy match in `c_bpartner.name`
 
-**Output:** `vq-parser/output/uploads/VQ_UPLOAD_*.csv`
+### Parser Failure Tracking
+**File:** `data/parser-failure-tracker.json`
+
+Tracks cumulative rigid parser failures by vendor to prioritize improvements:
+- Increments on every PARTIAL (even if later recovered via batch extraction)
+- Review weekly/bi-weekly to identify high-failure vendors
+- When vendor has significant failures, create vendor-specific template
+
+**Failure types:**
+- `garbage_mpn` - Parser extracts random strings instead of MPNs
+- `missing_fields` - Could not extract qty and/or price
+- `table_parsing` - HTML table structure not parsed correctly
+- `mpn_bleeding` - Numbers from MPN bleed into qty/price
+- `attachment_only` - Quote data only in PDF/Excel attachment
+- `missing_vendor` - Sender email not matched to vendor in DB
+
+### Future Enhancements (Not Yet Implemented)
+- **Vendor-specific templates** - Custom parsing for high-failure vendors
+- **Attachment parsing** - PDF/Excel quote extraction
+- **LLM fallback** - AI extraction for low-confidence parses
+
+**Output:** `vq-parser/output/uploads/VQ_UPLOAD_*_READY.csv`
 
 Then proceed to address the user's message if they included one.
 
