@@ -73,7 +73,7 @@ Consolidated roadmap for RFQ Sourcing and VQ Processing workflows, organized by 
 
 | # | Feature | Priority | Status |
 |---|---------|----------|--------|
-| B1 | Supplier Selection Deduplication | **Now** | Not implemented |
+| B1 | Same Part / Same Supplier Cooldown (60 days) | **Now** | Not implemented |
 | B2 | No-Bid Filtering | **Now** | Planned |
 | B3 | Supplier Fatigue Tracking | **Next** | Planned |
 | B4 | LLM Description Scanning | Later | Planned |
@@ -83,7 +83,7 @@ Consolidated roadmap for RFQ Sourcing and VQ Processing workflows, organized by 
 
 ---
 
-## B1. Supplier Selection Deduplication
+## B1. Supplier Selection Deduplication (Same Part / Same Supplier Cooldown)
 
 **Status:** Not implemented | **Priority:** Now
 
@@ -92,20 +92,20 @@ Consolidated roadmap for RFQ Sourcing and VQ Processing workflows, organized by 
 - Annoys suppliers who already quoted or declined
 - Contributes to supplier fatigue
 
-**Solution:**
+**Rule:** Don't request the same MPN from the same supplier within 60 days.
 
 Before sending RFQ to supplier, check:
 ```
-IF (Supplier + MPN) requested within last X days → SKIP
+IF (Supplier + MPN) requested within last 60 days → SKIP
 ```
 
-**Configurable windows:**
+**Exceptions:**
 | Scenario | Window |
 |----------|--------|
-| Default | 14 days |
-| Supplier responded with quote | 30 days |
-| Supplier said no-bid | 90 days |
-| Urgent/override | 0 (always send) |
+| Default | 60 days |
+| Memory products (DRAM, Flash, SRAM) | 14 days (prices change frequently) |
+| Supplier said no-bid | 90 days (longer cooldown) |
+| Urgent/override flag | 0 (always send) |
 
 **Data Structure:**
 ```json
