@@ -11,7 +11,8 @@ The `vq-parser` tool processes supplier quote emails directly from the VQ inbox 
 ### Location
 
 ```
-~/workspace/vq-parser/
+Code: ~/workspace/vq-parser/
+Docs: rfq_sourcing/vq_loading/
 ```
 
 ### Commands
@@ -119,7 +120,7 @@ Missing price or quantity triggers a flag for manual review:
 1. **Retrieve quote** from `vq@orangetsunami.com` inbox
 2. **Identify supplier** from email sender/signature
 3. **Look up supplier** in OT Business Partner window, note Search Key
-4. **Open template**: `Trading Analysis/VQ Mass Upload Template.csv`
+4. **Open template**: `rfq_sourcing/vq_loading/VQ Mass Upload Template.csv`
 5. **Map fields** per table above
 6. **Save as**: `VQ {RFQ#} {DATE}.csv`
 7. **Upload** via OT VQ Mass Upload function

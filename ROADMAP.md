@@ -25,8 +25,8 @@ Consolidated roadmap for RFQ Sourcing and VQ Processing workflows, organized by 
 ```
 
 **Repos:**
-- `rfq_sourcing/` — Franchise screening + NetComponents RFQ submission
-- `vq-parser/` (separate repo) — Quote email parsing
+- `rfq_sourcing/` — Franchise screening + NetComponents RFQ submission + VQ Loading
+- `vq-parser/` (code at ~/workspace/vq-parser/, docs at rfq_sourcing/vq_loading/)
 
 ---
 

@@ -11,8 +11,7 @@ astute-workinstructions/
 ├── tasks/                    # Explicit task instructions (canonical)
 ├── roles/                    # Role definitions
 ├── Trading Analysis/         # Workflow folders with descriptive docs
-├── rfq_sourcing/            # RFQ sourcing (franchise_check + netcomponents)
-├── (vq-parser is a separate repo: AstuteGroup/vq-parser)
+├── rfq_sourcing/            # RFQ sourcing (franchise_check + netcomponents + vq_loading)
 ├── src/                     # Legacy work instructions
 ├── CLAUDE.md                # Claude Code session instructions
 ├── MEMORY.md                # Session tracking (recent work)

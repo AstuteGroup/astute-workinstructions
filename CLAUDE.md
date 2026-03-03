@@ -12,7 +12,7 @@ At the start of every new conversation, before addressing anything else, always 
 > **Available Workflows:**
 > 1. **Franchise Screening** - Screen RFQs against FindChips to filter low-value parts before broker sourcing (see `rfq_sourcing/franchise_check/franchise-screening.md`)
 > 2. **RFQ Sourcing** - Submit RFQs to NetComponents suppliers (see `rfq_sourcing/netcomponents/rfq-sourcing-netcomponents.md`)
-> 3. **VQ Loading** - Process supplier quote emails into ERP-ready CSV (see `~/workspace/vq-parser/`)
+> 3. **VQ Loading** - Process supplier quote emails into ERP-ready CSV (see `rfq_sourcing/vq_loading/`)
 > 4. **Market Offer Analysis for RFQs** - Match new RFQs against customer excess and stock offers (see `Trading Analysis/Market Offer Matching for RFQs/market-offer-matching.md`)
 > 5. **Quick Quote** - Generate baseline quotes from recent VQs (0-30 days) with margin/GP/rebate pricing logic
 > 6. **Seller Quoting Activity** - VQ→CQ→SO funnel analysis by seller (snapshot + 6-month trend)
@@ -71,7 +71,8 @@ python inventory_cleanup.py "ASTItemLotsReportInputs_*.csv" ./output
 
 ## VQ Parser Workflow
 
-**Location:** `~/workspace/vq-parser/`
+**Documentation:** `rfq_sourcing/vq_loading/`
+**Code:** `~/workspace/vq-parser/` (to be migrated to rfq_sourcing/vq_loading/)
 **Repo:** https://github.com/AstuteGroup/vq-parser (private)
 
 ### Full Workflow (follow these steps in order)
