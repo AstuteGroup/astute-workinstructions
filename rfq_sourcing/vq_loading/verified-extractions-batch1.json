@@ -1,0 +1,59 @@
+{
+  "extractedAt": "2026-03-04",
+  "extractedBy": "two-agent-process",
+  "verificationStatus": "all_verified",
+  "stats": {
+    "emailsProcessed": 40,
+    "extracted": 27,
+    "verified": 25,
+    "skipped": 6,
+    "needsReview": 9,
+    "discrepancies": 0
+  },
+  "records": [
+    {"emailId": "6973", "mpn": "S1J-HE3/61T", "qty": 84000, "price": 0.07, "dc": "0651", "vendor_email": "sales@zilex.ca", "vendor_name": "Zilex electronics Inc.", "source_quote": "84000 S1J-HE3/61T .07/each vish / 0651dc stock / original fob: montreal", "verified": true},
+    {"emailId": "6963", "mpn": "IXDD609SI", "qty": 160, "price": 0.89, "dc": "", "vendor_email": "sales@voyagercomponents.com", "vendor_name": "Voyager Components", "source_quote": "IXDD609SI Qty: 160 moq @ $0.89 each", "verified": true},
+    {"emailId": "6974", "mpn": "TG110-S050N2LF-TR", "qty": 750, "price": 0.75, "dc": "18+", "vendor_email": "mike@integratedelec.com", "vendor_name": "Integrated Electronics Company", "source_quote": "I can offer 750 pcs, factory new and original RoHS parts from my stock, 18+ date code, at $0.75 each", "verified": true},
+    {"emailId": "6994", "mpn": "J0011D21BNL", "qty": 20, "price": 4.00, "dc": "", "vendor_email": "amy.g@hybridelectronics.com", "vendor_name": "Hybrid Electronics Corporation", "source_quote": "Qty 20@4.ea", "verified": true},
+    {"emailId": "6992", "mpn": "L50QS125", "qty": 3, "price": 209.99, "dc": "", "vendor_email": "accordtec@gmail.com", "vendor_name": "Accord Technologies", "source_quote": "We can get 3pcs to our warehouse in 3-4 business days. Price is $209.99/pc", "verified": true},
+    {"emailId": "6991", "mpn": "FWH-125B", "qty": 30, "price": 119.99, "dc": "", "vendor_email": "accordtec@gmail.com", "vendor_name": "Accord Technologies", "source_quote": "30pcs to our warehouse in 2-3 business days. Price is $119.99/pc", "verified": true},
+    {"emailId": "7003", "mpn": "SM24CANB-02HTG", "qty": 10, "price": 6.00, "dc": "2014", "vendor_email": "sal@prismelectronics.net", "vendor_name": "Prism Electronics", "source_quote": "10 PCS- CUT-TAPE -2014' D/C- $6.00 EACH", "verified": true},
+    {"emailId": "6953", "mpn": "BCP53-16TX", "qty": 700, "price": 0.383, "dc": "2022", "vendor_email": "mmichnik@micros.com.pl", "vendor_name": "Micros sp.j.", "source_quote": "BCP53-16TX RoHS SOT223t/r 2022/37w Qty : 700 Price: 0,383 USD/Unit", "verified": true},
+    {"emailId": "6987", "mpn": "HCF4093M013TR", "qty": 14935, "price": 0.15, "dc": "12+", "vendor_email": "linus.jonsson@j2sourcing.com", "vendor_name": "J2 Sourcing", "source_quote": "HCF4093M013TR 14 935 pcs left in stock at 0.15 usd each dc12+", "verified": true},
+    {"emailId": "6960", "mpn": "LM2585S-5.0/NOPB", "qty": 135, "price": 4.35, "dc": "08", "vendor_email": "linus.jonsson@j2sourcing.com", "vendor_name": "J2 Sourcing", "source_quote": "LM2585S-5.0/NOPB 135 pcs at 4,35 usd each dc08", "verified": true},
+    {"emailId": "6969", "mpn": "B72510E300K62", "qty": 3000, "price": 0.06, "dc": "2022", "vendor_email": "mmichnik@micros.com.pl", "vendor_name": "Micros sp.j.", "source_quote": "B72510E300K62 RoHS Rys.WAsmd0805 2022 Qty : 3000 Price: 0,06 USD/Unit", "verified": true},
+    {"emailId": "6971", "mpn": "BCP53-16TX", "qty": 700, "price": 0.383, "dc": "2022", "vendor_email": "mmichnik@micros.com.pl", "vendor_name": "Micros sp.j.", "source_quote": "BCP53-16TX RoHS SOT223t/r 2022/37w Qty : 700 Price: 0,383 USD/Unit", "verified": true},
+    {"emailId": "6976", "mpn": "0251002.MRT1L", "qty": 40, "price": 1.75, "dc": "", "vendor_email": "morgan.snell@chemigraphic.co.uk", "vendor_name": "Chemigraphic Ltd.", "source_quote": "Therefore, the unit price on 40 pieces is USD $1.75.", "verified": true},
+    {"emailId": "6977", "mpn": "B72510E300K62", "qty": 3000, "price": 0.0567, "dc": "2022", "vendor_email": "mmichnik@micros.com.pl", "vendor_name": "Micros sp.j.", "source_quote": "B72510E300K62 RoHS Rys.WAsmd0805 2022 Qty : 3000 Price: 0,0567 USD/Unit", "verified": true},
+    {"emailId": "6985", "mpn": "TPS73801DCQR", "qty": 300, "price": 1.35, "dc": "18+", "vendor_email": "sales@flychips.com", "vendor_name": "Fly Chips Electronics", "source_quote": "TPS73801DCQR TI 18+ 300 1.35$", "verified": true},
+    {"emailId": "6979", "mpn": "SBAS16LT3G", "qty": 32600, "price": 0.009, "dc": "0809", "vendor_email": "sales@inelcocomponents.com", "vendor_name": "INELCO Components", "source_quote": "SBAS16LT3G, ON, 0809, PBF SOT23 REEL 32600 pcs x 0.009 usd", "verified": true},
+    {"emailId": "6984", "mpn": "MAX3086ESD+", "qty": 100, "price": 3.72, "dc": "", "vendor_email": "anna.sandri@eas.it", "vendor_name": "EAS S.p.A.", "source_quote": "MAX3086ESD+ 100 pcs $ 3,72 each + $ 36,00 for HF", "verified": true},
+    {"emailId": "6986", "mpn": "DG403DY-T1-E3", "qty": 24, "price": 5.00, "dc": "18+", "vendor_email": "distysales@northshorecomponents.com", "vendor_name": "North Shore Components", "source_quote": "24PCS VISH 18+ $5.00", "verified": true},
+    {"emailId": "6968", "mpn": "594D127X0020R2T", "qty": 410, "price": 0.98, "dc": "0926", "vendor_email": "shai@speedc.co.il", "vendor_name": "Speed Components Ltd.", "source_quote": "400-410Pcs total @ 0.98$ Each VISHAY 0926 PB Free", "verified": true},
+    {"emailId": "6962", "mpn": "MPZ2012S101AT000", "qty": 3860, "price": 0.06, "dc": "1025", "vendor_email": "orderdesk@components.se", "vendor_name": "ECAB", "source_quote": "MPZ2012S101AT000 TDK 1025 3860 $0.06", "verified": true},
+    {"emailId": "6964", "mpn": "P600M", "qty": 23500, "price": 0.059, "dc": "25+", "vendor_email": "netcomponents@prodeldistribuzione.it", "vendor_name": "Prod.El. Distribuzione srl", "source_quote": "P/N: P600M Brand: KINGTRONICS Date Code: 25+ Q.ty: 23.500 pcs Price: 0.059 USD / EA", "verified": true},
+    {"emailId": "6997", "mpn": "S1JHE3_A/H", "qty": 9800, "price": 0.03, "dc": "15+", "vendor_email": "cory@tcxmicro.com", "vendor_name": "TCX MICRO S.L.", "source_quote": "15+ 9800 pcs at 0.03$ ea Bought at franchise", "verified": true},
+    {"emailId": "6961", "mpn": "LM2903AVQDRG4Q1", "qty": 2400, "price": 0.10, "dc": "1119", "vendor_email": "ernst.ruth@micro-components.eu", "vendor_name": "Micro Components H. GmbH", "source_quote": "2400 pcs LM2903AVQDRG4Q1 TI $ 0.10 ea DC'1119", "verified": true},
+    {"emailId": "6955", "mpn": "LM7805CT", "qty": 250, "price": 1.10, "dc": "07+", "vendor_email": "sales@chanetech.com", "vendor_name": "CHANETECH", "source_quote": "250pcs in our stock Mfg: FSC 07+dc RoHs Price: 1.10$", "verified": true},
+    {"emailId": "6954", "mpn": "DG403DYE3", "qty": 6, "price": 8.00, "dc": "07+", "vendor_email": "sales@chanetech.com", "vendor_name": "CHANETECH", "source_quote": "6pcs in our stock Mfg: SILICON 07+dc Price: 8$", "verified": true}
+  ],
+  "skipped": [
+    {"emailId": "6965", "reason": "No-bid - vendor declined (higher than franchise)"},
+    {"emailId": "6990", "reason": "Duplicate of 6994"},
+    {"emailId": "6982", "reason": "Target price request only"},
+    {"emailId": "6999", "reason": "Duplicate of 7001"},
+    {"emailId": "6966", "reason": "Duplicate of 6968"},
+    {"emailId": "6978", "reason": "Duplicate of 6975"}
+  ],
+  "needsReview": [
+    {"emailId": "6959", "reason": "Missing qty - only price $0.50 provided (ZD Integrated)"},
+    {"emailId": "7007", "reason": "Quote in external GREENCHIPS link only"},
+    {"emailId": "7006", "reason": "Quote in external GREENCHIPS link only (duplicate)"},
+    {"emailId": "7005", "reason": "Quote in PDF attachment (LIBRA Elektronik)"},
+    {"emailId": "7004", "reason": "Missing qty - price $1.50, DC 2009 (Prism Electronics)"},
+    {"emailId": "7001", "reason": "Quote in PDF attachment (IBH)"},
+    {"emailId": "6975", "reason": "Quote in PDF attachment (Euro Chip)"},
+    {"emailId": "6972", "reason": "Quote in PDF attachment (Electronic Direct)"},
+    {"emailId": "6970", "reason": "Missing qty - price $0.45 (AERCO)"}
+  ]
+}
