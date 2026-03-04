@@ -1,7 +1,7 @@
 emailId,mpn,qty,price,dc,mfr,vendor_email,vendorName,vendor_search_key,rfq_number
 6911,MMA8451QR1,5000,0.7,2022+,,es@sebacomp.com,SEBA Components,1004090,1130462
 6863,ADS1115IDGSR,1868,1.03,,,anna.sandri@eas.it,EAS S.p.A.,1007364,1130462
-6860,TPS63020DSJR,5000,0.68,2024,,excess@vital.global,Vital Global,NOT_FOUND,1130462
+6860,TPS63020DSJR,5000,0.68,2024,,excess@vital.global,Vital Electronics Ltd,1006213,1130462
 6865,ADS1115IDGSR,80,1.35,2024+,,sal@prismelectronics.net,Prism Electronics,1002482,1130462
 6866,ADS1115IDGSR,1131,1,2328,,sales@huskyintl.com,Husky Intl,1002469,1130462
 6963,IXDD609SI,160,4.25,2018+,,sales@voyagercomponents.com,Voyager Components,1002571,1130577
