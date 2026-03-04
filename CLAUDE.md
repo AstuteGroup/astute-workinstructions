@@ -94,109 +94,106 @@ python inventory_cleanup.py "ASTItemLotsReportInputs_*.csv" ./output
 **Current forwarders:** Jake Harris
 **Future:** Other team members may forward quotes - parser handles any forwarder
 
+### Extraction Philosophy
+
+**CRITICAL: NO EXTRACTION SCRIPTS**
+
+We do NOT use regex-based extraction scripts. They produce garbage data that looks complete but is wrong:
+- Wrong manufacturers assigned to parts
+- Quantities extracted from zip codes or phone numbers
+- Prices extracted from minimum order values
+- MPNs extracted from random alphanumeric strings
+
+**Only two extraction methods are allowed:**
+1. **Templates** - Pre-built extractors for known vendor formats (high confidence, structured)
+2. **Manual extraction in Claude session** - Claude reads emails with human-level understanding and extracts data
+
+The difference: Claude understands that "26k @ .22ea" means qty=26,000 and price=$0.22, not qty=22 and price=$250 (from "$250 min order" later in email). Scripts cannot make these judgments.
+
 ### Full Workflow (follow these steps in order)
 
-**Step 1: Fetch & Parse**
+**Step 1: Fetch**
 ```bash
 node vq-parser/src/index.js fetch
 ```
 - Pulls emails from INBOX via IMAP
-- **Templates first** - known vendor formats auto-extracted (trusted)
-- **No template match** → queued for LLM/manual extraction
-- No rigid parser - it produces garbage data that looks complete but is wrong
+- **Templates** - known vendor formats auto-extracted (trusted)
+- **No template match** → stays in INBOX for manual extraction
+- No-bids detected and recorded (qty=0, price=0)
+- Fetch report generated with metrics
 
-**Step 2: Consolidate**
+**Step 2: Export for Manual Extraction**
 ```bash
-node vq-parser/src/index.js consolidate
+node vq-parser/scripts/export-all-emails.js
 ```
-- Merges all VQ_*.csv into single upload file
-- Flags incomplete records: `[PARTIAL - needs: qty/price/both]`, `[HIGH_COST]`
-- Failed emails → move to NeedsReview folder
-- Output: `VQ_UPLOAD_[timestamp].csv`
+- Exports all INBOX emails to `data/all-emails-export.json`
+- This file is read by Claude for manual extraction
 
-**Step 3: Update Parser Failure Tracker** ← IMPORTANT
-After consolidation, update `data/parser-failure-tracker.json`:
-- For each PARTIAL record, increment that vendor's `failureCount`
-- Note failure type (garbage_mpn, missing_fields, etc.)
-- This tracks **rigid parser failures** to prioritize future parser improvements
-- Review tracker weekly/bi-weekly to identify template opportunities
+**Step 3: Manual Extraction in Claude Session**
 
-**Step 4: Generate NeedsReview JSON**
-```bash
-node vq-parser/src/index.js needs-review-export
-```
-- Dumps NeedsReview folder emails to `needs-review.json` with full bodies
-- **Created once per session** - all batch extraction reads from this file
+Claude reads emails from the export file and extracts:
+- MPN, Qty, Price, Date Code, Manufacturer
+- Vendor name and email
+- Notes (lead time, MOQ, conditions)
 
-**Step 5: Batch Extraction (Manual Recovery)**
-For each batch:
-1. Identify remaining partials in upload CSV
-2. Match to emails in `needs-review.json` by MPN
-3. Extract missing qty/price using regex patterns
-4. Append extracted records to upload file
-5. Repeat until diminishing returns
+Process:
+1. Claude reads batches of 20-30 emails
+2. Presents extracted data in table format for user review
+3. User approves or corrects
+4. Claude writes approved records to VQ_MASTER.csv
+5. Repeat until all emails processed
 
-**Extraction filters:**
-- Skip if qty appears in MPN (MPN bleeding)
-- Skip if price > $200 (likely error)
-- Skip garbage MPNs (UUIDs, random alphanumeric strings)
+**What to skip during extraction:**
+- RFQ forwards (outbound, no quote)
+- Target price requests (no quote data)
+- Empty forwards (no vendor response)
+- Duplicates (same vendor, same part, same quote)
 
-**Step 6: Categorize Remaining Failures**
-After batch extraction plateaus, categorize what's left:
+**Step 4: Categorize Remaining**
 
 | Category | Action |
 |----------|--------|
-| RFQ Forwards | SKIP - outbound RFQs, not quotes |
-| Target Price Requests | SKIP - no quote data |
-| NO-BID Responses | SKIP - vendor declined |
-| Attachment-Only | CHECK PDF/Excel if time permits |
-| Legitimate Partials | Leave for manual review |
+| NO-BID responses | Record with qty=0, reason in notes |
+| Attachment-only (PDF) | Queue for PDF review |
+| Incomplete quotes | Flag as PARTIAL |
+| Spam/irrelevant | Skip |
 
-**Step 7: NeedsReview Folder Validation**
+**Step 5: Final Export**
 ```bash
-himalaya envelope list --account vq --folder NeedsReview
+node vq-parser/src/index.js export --exclude-partials
 ```
-- Cross-reference remaining emails against extracted records
-- Move successfully extracted emails → Processed folder
-- Final pass on any missed quotes
-
-**Step 8: Split Output Files**
-Create two separate files:
-- **READY** - Complete records (no PARTIAL flags) → ERP import
-- **PARTIALS_REVIEW** - Incomplete records → manual review
-
-**Step 9: Final Export**
-```bash
-cp VQ_UPLOAD_*_READY.csv ~/workspace/astute-workinstructions/Trading\ Analysis/
-git add && git commit && git push
-```
+- Exports clean records (no PARTIAL flags) for ERP import
+- Copy to `astute-workinstructions/Trading Analysis/`
+- Commit and push
 
 ### IMAP Folder Flow
 ```
-INBOX → [fetch] → Success → Processed
-              → Fail → stays in INBOX
+INBOX → [fetch] → Template match → Processed
+              → No-bid detected → Processed
+              → No template → stays in INBOX (for manual extraction)
 
-INBOX → [consolidate] → Failed emails → NeedsReview
+INBOX → [manual extraction in Claude] → Extracted → Processed
+                                      → Skip/spam → delete or leave
 
-NeedsReview → [batch extract success] → Processed
-           → [skip/no-bid] → stays in NeedsReview
+NeedsReview → only used for emails that need human decision
 ```
 
-### RFQ Matching (14-Day Window)
+### RFQ Matching (30-Day Window)
 When a vendor quote comes in, the parser matches it to an RFQ in the system:
 
-1. **Exact MPN match** - Search recent RFQs (last 14 days) for exact MPN
+1. **Exact MPN match** - Search recent RFQs (last 30 days) for exact MPN
 2. **Email extraction** - Extract original MPN from NetComponents email format
-3. **Fuzzy match** - Progressively trim MPN characters to find partial match
+3. **Fuzzy match** - Progressively trim MPN suffix characters (up to 4) to find partial match
 4. **Subject line** - Extract MPN from email subject as last resort
-5. **No match** → Flag as `[NEEDS_RFQ - no match in 14 days]` for manual review
+5. **No match** → Flag as `[NEEDS_RFQ - no match in 30 days]` for manual review
+6. **Fallback** - 60-day window if no match in 30 days
 
 **Output format:**
 - `chuboe_mpn` = RFQ's MPN (what's in the system)
 - `chuboe_note_public` = "Quoted MPN: xxx" if vendor quoted different part
 - `chuboe_rfq_id` = RFQ number (the `value` field, not database ID)
 
-**Why 14 days?** Vendor responses typically arrive within 1-2 weeks. Old RFQs with thousands of parts would otherwise catch unrelated quotes via partial matching.
+**Why 30 days?** Vendor responses can take 2-4 weeks. The 60-day fallback catches slower responses.
 
 ### Vendor Identification
 **IMPORTANT:** Always use `search_key` (c_bpartner.value) for vendor identification, NOT `c_bpartner_id`.
@@ -210,28 +207,32 @@ When a vendor quote comes in, the parser matches it to an RFQ in the system:
 3. Domain-based lookup (e.g., velocityelec.com → Velocity Electronics)
 4. Sender name fuzzy match in `c_bpartner.name`
 
-### Parser Failure Tracking
-**File:** `data/parser-failure-tracker.json`
+### Fetch Reporting
+**File:** `data/fetch-report.json`
 
-Tracks cumulative rigid parser failures by vendor (keyed by search_key) to prioritize improvements:
-- Increments on every PARTIAL (even if later recovered via batch extraction)
-- Review weekly/bi-weekly to identify high-failure vendors
-- When vendor has significant failures, create vendor-specific template
+Tracks metrics for each fetch run:
+- Total emails processed
+- Template matches (auto-extracted)
+- No-bids detected
+- Needs manual review
+- Vendor not matched (emails from unknown vendors)
+- RFQ not matched (quotes for parts not in recent RFQs)
 
-**Failure types:**
-- `garbage_mpn` - Parser extracts random strings instead of MPNs
-- `missing_fields` - Could not extract qty and/or price
-- `table_parsing` - HTML table structure not parsed correctly
-- `mpn_bleeding` - Numbers from MPN bleed into qty/price
-- `attachment_only` - Quote data only in PDF/Excel attachment
-- `missing_vendor` - Sender email not matched to vendor in DB
+History kept in `data/fetch-history.json` (last 20 runs).
 
-### Future Enhancements (Not Yet Implemented)
-- **Vendor-specific templates** - Custom parsing for high-failure vendors
-- **Attachment parsing** - PDF/Excel quote extraction
-- **LLM fallback** - AI extraction for low-confidence parses
+### Template Development
+When a vendor sends many quotes with consistent format, create a template:
+- Templates live in `vq-parser/src/parser/templates/`
+- Each template extracts MPN, Qty, Price, Date Code from that vendor's format
+- Templates are high-confidence, trusted extractions
 
-**Output:** `vq-parser/output/uploads/VQ_UPLOAD_*_READY.csv`
+### PDF Review Queue
+PDFs that can't be auto-processed are queued for manual review:
+- Queue file: `data/pdf-review-queue.json`
+- In Claude session, read PDF content and extract data manually
+- No OCR scripts - Claude reads the PDF directly
+
+**Output:** `vq-parser/output/VQ_MASTER.csv`
 
 Then proceed to address the user's message if they included one.
 

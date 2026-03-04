@@ -1,0 +1,172 @@
+{
+  "_description": "Observed vendor quote formats for template development",
+  "_updated": "2026-03-04",
+  "vendors": {
+    "akiragi.com": {
+      "name": "Akira Global",
+      "email": "bitiar@akiragi.com",
+      "count": 6,
+      "pattern": "MPN / Qty pcs @ $Price / DC YYYY+",
+      "example": "BAT54S-7-F / 5430 pcs @ $0.01608 / DC 2023",
+      "notes": "Consistent format, high volume - TEMPLATE CANDIDATE",
+      "fields": {
+        "mpn": "before first /",
+        "qty": "number before 'pcs'",
+        "price": "after @ $",
+        "dc": "after 'DC '"
+      }
+    },
+    "sebacomp.com": {
+      "name": "SEBA Components",
+      "email": "es@sebacomp.com",
+      "count": 1,
+      "pattern": "Qty pieces @ Price usd DC+ description",
+      "example": "5000pieces @ 0.7usd 2022+ full label",
+      "notes": "No spaces around @, European sender",
+      "fields": {
+        "qty": "number before 'pieces'",
+        "price": "number after @ before 'usd'",
+        "dc": "4-digit year with +"
+      }
+    },
+    "eas.it": {
+      "name": "EAS S.p.A.",
+      "email": "anna.sandri@eas.it",
+      "count": 1,
+      "pattern": "Multi-line with reference number, European decimals",
+      "example": "ADS1115IDGSR\n1868 pcs\n$ 1,03 each + $ 36,00 Handling",
+      "notes": "European format: comma as decimal (1,03 = $1.03)",
+      "fields": {
+        "qty": "number before 'pcs'",
+        "price": "after $ before 'each', comma=decimal"
+      }
+    },
+    "huskyintl.com": {
+      "name": "Husky International",
+      "email": "sales@huskyintl.com",
+      "count": 1,
+      "pattern": "Freeform, each field on own line",
+      "example": "ADS1115IDGSR\nDC 2328\nNON FACTORY REEL\nQTY 1131\nPrice$ 1/each",
+      "notes": "No space between 'Price' and '$'",
+      "fields": {
+        "mpn": "first line after CAUTION block",
+        "dc": "after 'DC '",
+        "qty": "after 'QTY '",
+        "price": "after 'Price$' or 'Price$ '"
+      }
+    },
+    "rotakorn.se": {
+      "name": "Rotakorn",
+      "email": "anna@rotakorn.se",
+      "count": 1,
+      "pattern": "Text table with headers",
+      "example": "MPN | Quantity | Price total | Unit price | Currency | Lead time | Date code | Manufacturer",
+      "notes": "Well-structured table, includes manufacturer and COO",
+      "fields": {
+        "headers": "MPN, Quantity, Unit price, Date code, Manufacturer"
+      }
+    },
+    "zdi.com": {
+      "name": "ZDI",
+      "email": "daniels@zdi.com",
+      "count": 1,
+      "pattern": "Minimal - price only",
+      "example": "Stock @ $0.50ea.",
+      "notes": "Often missing qty - just 'Stock' with price",
+      "fields": {
+        "price": "after @ $ before 'ea'"
+      }
+    },
+    "vantageairsupport.com": {
+      "name": "Vantage IC",
+      "email": "philip.humphrey@vantageairsupport.com",
+      "count": 1,
+      "pattern": "Freeform list",
+      "example": "BCP53-16TX\n26k @ .22ea\nSTOCK\n17+\nNexperion",
+      "notes": "'26k' = 26000, price without leading 0 (.22 = $0.22)",
+      "fields": {
+        "mpn": "first line",
+        "qty": "number with 'k' multiplier before @",
+        "price": "after @ before 'ea'",
+        "dc": "line with just year+",
+        "mfr": "line after dc"
+      }
+    },
+    "questcomp.com": {
+      "name": "Quest Components",
+      "email": "jessica.chung@questcomp.com",
+      "count": 1,
+      "pattern": "Inline with qty/price/dc",
+      "example": "4800 pcs @ $0.019 DC 2020+",
+      "notes": "Standard inline format"
+    },
+    "vital.global": {
+      "name": "Vital Global",
+      "email": "excess@vital.global",
+      "count": 1,
+      "pattern": "Inline simple",
+      "example": "5000 pcs @ $0.68 2024",
+      "notes": "Standard inline"
+    },
+    "prismelectronics.net": {
+      "name": "Prism Electronics",
+      "email": "sal@prismelectronics.net",
+      "count": 1,
+      "pattern": "Inline simple",
+      "example": "80 pcs @ $1.35 2024+",
+      "notes": "Standard inline"
+    },
+    "kentzy.com": {
+      "name": "Kentzy",
+      "email": "evon.fore@kentzy.com",
+      "count": 1,
+      "pattern": "Inline simple",
+      "example": "8580 pcs @ $0.025 2024+",
+      "notes": "Low prices (fractions of cent)"
+    },
+    "nusourcetech.com": {
+      "name": "NuSource",
+      "email": "dannyb@nusourcetech.com",
+      "count": 1,
+      "pattern": "Inline simple",
+      "example": "181 pcs @ $0.50 DC 2023",
+      "notes": "Standard inline"
+    },
+    "integratedelec.com": {
+      "name": "Integrated Electronics",
+      "email": "mike@integratedelec.com",
+      "count": 1,
+      "pattern": "Inline simple",
+      "example": "750 pcs @ $0.75 2024+",
+      "notes": "Standard inline"
+    },
+    "voyagercomponents.com": {
+      "name": "Voyager Components",
+      "email": "sales@voyagercomponents.com",
+      "count": 1,
+      "pattern": "Freeform labeled",
+      "example": "Qty: 160\nPrice: $4.25\nDC: 2018+",
+      "notes": "Each field labeled on own line"
+    },
+    "briocean-tech.com": {
+      "name": "Briocean",
+      "email": "sales@briocean-tech.com",
+      "count": 1,
+      "pattern": "Partial - often missing price",
+      "example": "133 pcs DC 2123",
+      "notes": "Tends to send incomplete quotes"
+    }
+  },
+  "template_candidates": [
+    {
+      "domain": "akiragi.com",
+      "reason": "6 quotes in batch 1, consistent inline-structured format",
+      "priority": "high"
+    }
+  ],
+  "common_patterns": {
+    "inline_simple": "Qty pcs @ $Price DC",
+    "inline_k_notation": "Qtyk @ .Price ea (26k = 26000, .22 = $0.22)",
+    "european_decimal": "$ 1,03 = $1.03 (comma as decimal separator)"
+  }
+}
