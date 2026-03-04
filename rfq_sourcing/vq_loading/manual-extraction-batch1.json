@@ -33,7 +33,6 @@
     {"emailId": "6960", "mpn": "DG403DYZT", "qty": 4900, "price": 0.28, "dc": "2301", "vendor": "bitiar@akiragi.com", "vendorName": "Akira Global"},
     {"emailId": "6977", "mpn": "LM2903AVQDRG4", "qty": 12400, "price": 0.085, "dc": "2024+", "vendor": "bitiar@akiragi.com", "vendorName": "Akira Global"},
     {"emailId": "6983", "mpn": "LM2901AVQDRG4", "qty": 16000, "price": 0.095, "dc": "2024+", "vendor": "bitiar@akiragi.com", "vendorName": "Akira Global"},
-    {"emailId": "6980", "mpn": "SPP11N80C3", "qty": 300, "price": 3.30, "dc": "0913", "vendor": "sales@worldic.net", "vendorName": "World IC"},
     {"emailId": "6981", "mpn": "LM2901AVQDRG4", "qty": 2200, "price": 0.36, "dc": "1627", "mfr": "TI", "vendor": "gcorti@mistersprockets.com", "vendorName": "MisterSprockets"},
     {"emailId": "6950", "mpn": "BCP53-16TF", "qty": 44000, "price": 0.30, "dc": "18+", "mfr": "Nexperia", "vendor": "dave.pinho@flipelectronics.com", "vendorName": "Flip Electronics"},
     {"emailId": "6951", "mpn": "BCP53-16TX", "qty": 26000, "price": 0.29, "dc": "18+", "vendor": "philip.humphrey@vantageairsupport.com", "vendorName": "Vantage IC"},
