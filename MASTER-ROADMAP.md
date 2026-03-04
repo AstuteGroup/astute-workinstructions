@@ -16,6 +16,7 @@ High-level view of all initiatives and projects. Each major area links to its de
 
 ### Now
 - [ ] **Sourcing Automation** — Supplier deduplication, no-bid filtering, VQ parsing improvements ([details](rfq_sourcing/sourcing-roadmap.md))
+- [ ] **PPV Analysis (Vortex Rebuild)** — Purchase price variance analysis tooling
 
 ### Next
 - *(add initiatives here)*
