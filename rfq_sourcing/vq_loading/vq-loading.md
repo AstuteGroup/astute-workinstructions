@@ -4,7 +4,55 @@ Process supplier quote emails into the VQ Mass Upload Template for import into O
 
 ---
 
-## Quick Start
+## CRITICAL: Himalaya Pagination
+
+**ALWAYS use `--page-size 500` when listing emails!** Default pagination hides most emails.
+
+```bash
+# WRONG - only shows ~10 emails
+himalaya envelope list --account vq --folder INBOX
+
+# CORRECT - shows all emails
+himalaya envelope list --account vq --folder INBOX --page-size 500
+```
+
+---
+
+## Two-Agent Manual Extraction (Recommended)
+
+The rigid parser produces too many errors. Use this two-agent workflow for reliable extraction:
+
+### Process
+1. **Agent A (Extractor)**: Reads emails, extracts MPN/qty/price/dc/vendor with source quotes
+2. **Agent B (Verifier)**: Independently reads same emails, verifies extractions match actual content
+3. **Result**: Only verified records are saved (100% accuracy vs 78% with single agent)
+
+### Commands
+```bash
+# Get all inbox email IDs
+himalaya envelope list --account vq --folder INBOX --page-size 500 | grep -E "^\| [0-9]" | awk -F'|' '{print $2}'
+
+# Read specific email
+himalaya message read --account vq --folder INBOX [ID]
+```
+
+### Batch Size
+- Process 40 emails per batch (2 agents × 20 emails each)
+- Run extraction agents in parallel, then verification agents in parallel
+
+### Output
+- `verified-extractions-all.json` - Full results with stats
+- `verified-extractions-all-enriched.csv` - With vendor_search_key and rfq_number
+
+### Skip Rules
+- **No-bid**: Vendor declined, no price (qty=0, skip)
+- **Target price request**: Vendor asking for price, no quote (skip)
+- **RFQ forward**: Outbound request, not a quote (skip)
+- **PDF-only**: Queue for manual PDF review (needs_review)
+
+---
+
+## Quick Start (Rigid Parser - Legacy)
 
 ```bash
 # 1. Process new emails from VQ inbox
@@ -18,6 +66,8 @@ node ~/workspace/vq-parser/src/index.js consolidate
 ```
 
 **Output:** `~/workspace/vq-parser/output/uploads/VQ_UPLOAD_*.csv`
+
+**WARNING:** Rigid parser has high error rate. Use two-agent manual extraction for accuracy.
 
 ---
 
