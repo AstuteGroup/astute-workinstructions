@@ -1,7 +1,5 @@
 # RFQ Sourcing Roadmap
 
-**This file has been consolidated into the main roadmap.**
+**See: [sourcing-roadmap.md](sourcing-roadmap.md)**
 
-See: **[/ROADMAP.md](../ROADMAP.md)**
-
-The consolidated roadmap covers both RFQ Sourcing and VQ Processing workflows.
+This stub exists for backwards compatibility. The full sourcing automation roadmap is in `sourcing-roadmap.md` in this directory.
