@@ -114,6 +114,8 @@ Top vendors by quote volume:
 
 ### Vendor Frequency Tracking
 
+**Cumulative tracking** - counts are ongoing totals across all sessions, not per-session.
+
 Track which vendors respond most frequently to identify:
 - **High-volume vendors** → Prioritize for template development
 - **New vendors** → Add to iDempiere if missing
@@ -121,11 +123,11 @@ Track which vendors respond most frequently to identify:
 
 After consolidation, review vendor frequency:
 ```bash
-# Get vendor quote counts from tracking file
+# Get vendor quote counts from tracking file (cumulative)
 cut -d',' -f7 vq-upload-ready-tracking.csv | sort | uniq -c | sort -rn | head -20
 ```
 
-Document high-frequency vendors that don't have templates yet as candidates for future automation.
+Update `template-candidates.md` with current counts. High-frequency vendors without templates are priority candidates for automation.
 
 ### Output
 - `vq-upload-ready.csv` - VQ Mass Upload Template format, ready for iDempiere import

@@ -1,7 +1,12 @@
 # Vendor Template Candidates
 
-Generated: 2026-03-05
-Source: vq-upload-ready-tracking.csv (231 records)
+**Last updated:** 2026-03-05
+**Cumulative data** - updated each session, counts are ongoing totals (not per-session)
+
+To refresh counts:
+```bash
+cut -d',' -f7 vq-upload-ready-tracking.csv | tail -n +2 | sort | uniq -c | sort -rn | head -20
+```
 
 ## Existing Templates
 
