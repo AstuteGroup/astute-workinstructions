@@ -115,7 +115,7 @@ emailId,mpn,qty,price,dc,vendor_email,vendor_name,vendor_search_key,rfq_number,n
 6891,SBAS16LT1G,53000,0.1,22+,anna@rotakorn.se,Rotakorn Electronics,1002557,1130292,,,USD,,,,,,
 6896,SBAS16LT1G,53000,0.1,22+,Anna@rotakorn.se,Rotakorn Electronics AB,1002557,1130292,,,USD,,,,,,
 6897,BAS16,235,10000,0.02,0505,jw@4source.de,4Source Electronics AG,1003723,,,USD,,,,,,
-6897,BAS16,235,10000,0.02,0505,jw@4source.de,4Source Electronics AG,1003723,1130292,PDF quote,,USD,,,,,,
+6897,"BAS16,235",10000,0.02,0505,jw@4source.de,4Source Electronics AG,1003723,1130292,PDF quote,,USD,,,,,,
 6903,MPZ2012S101AT000,7821,0.03,13+,sales@flychips.com,FlyChips,1005735,1129117,,,USD,,,,,,
 6904,B340-13-F,3000,0.06,17,info@tronicpool.de,TronicPool GmbH,1006423,1128746,,,USD,,,,,,
 6905,STM32F103C8T6,4936,2,12+,sales@reboundeu.com,Rebound EU,1002855,NOT_FOUND,,,USD,,,,,,

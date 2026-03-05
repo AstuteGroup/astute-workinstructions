@@ -442,20 +442,20 @@ function formatVqLine(r) {
   return [
     r.rfq_number === 'NOT_FOUND' ? 'NEEDS_RFQ' : r.rfq_number,  // RFQ Search Key
     'Jake Harris',                                               // Buyer (all emails forwarded by Jake)
-    r.vendor_search_key,                                         // Business Partner Search Key
+    escapeCsvField(r.vendor_search_key),                         // Business Partner Search Key
     '',                                                          // Contact (not captured)
-    r.mpn,                                                       // MPN
-    r.mfr || '',                                                 // MFR Text (not captured - blank)
+    escapeCsvField(r.mpn),                                       // MPN (escape commas)
+    escapeCsvField(r.mfr || ''),                                 // MFR Text
     r.qty,                                                       // Quoted Quantity
     r.price,                                                     // Cost
     currency,                                                    // Currency (blank = USD)
-    r.dc || '',                                                  // Date Code
-    r.moq || '',                                                 // MOQ (not captured)
-    r.spq || '',                                                 // SPQ (not captured)
-    r.packaging || '',                                           // Packaging (not captured)
-    leadTime,                                                    // Lead Time (default: stock)
-    r.coo || '',                                                 // COO (not captured)
-    r.rohs || '',                                                // RoHS (not captured)
+    escapeCsvField(r.dc || ''),                                  // Date Code (may contain commas)
+    r.moq || '',                                                 // MOQ
+    r.spq || '',                                                 // SPQ
+    escapeCsvField(r.packaging || ''),                           // Packaging
+    escapeCsvField(leadTime),                                    // Lead Time
+    r.coo || '',                                                 // COO
+    r.rohs || '',                                                // RoHS
     escapeCsvField(vendorNotes)                                  // Vendor Notes
   ].join(',');
 }
@@ -465,11 +465,24 @@ const TRACKING_HEADER = 'emailId,mpn,qty,price,dc,vendor_email,vendor_name,vendo
 
 function formatTrackingLine(r) {
   return [
-    r.emailId, r.mpn, r.qty, r.price, r.dc || '',
-    r.vendor_email, r.vendor_name, r.vendor_search_key, r.rfq_number,
-    escapeCsvField(r.notes || ''), r.mfr || '', r.currency || 'USD',
-    r.moq || '', r.spq || '', r.packaging || '', r.lead_time || '',
-    r.coo || '', r.rohs || ''
+    r.emailId,
+    escapeCsvField(r.mpn),
+    r.qty,
+    r.price,
+    escapeCsvField(r.dc || ''),
+    escapeCsvField(r.vendor_email),
+    escapeCsvField(r.vendor_name),
+    r.vendor_search_key,
+    r.rfq_number,
+    escapeCsvField(r.notes || ''),
+    escapeCsvField(r.mfr || ''),
+    r.currency || 'USD',
+    r.moq || '',
+    r.spq || '',
+    escapeCsvField(r.packaging || ''),
+    escapeCsvField(r.lead_time || ''),
+    r.coo || '',
+    r.rohs || ''
   ].join(',');
 }
 

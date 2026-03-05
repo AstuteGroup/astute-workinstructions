@@ -115,7 +115,7 @@ NEEDS_RFQ,Jake Harris,1002491,,RS1JHE3AI,,2280,0.25,,1820,,,,stock,,,
 1130292,Jake Harris,1002557,,SBAS16LT1G,,53000,0.1,,22+,,,,stock,,,
 1130292,Jake Harris,1002557,,SBAS16LT1G,,53000,0.1,,22+,,,,stock,,,
 1003723,Jake Harris,4Source Electronics AG,,BAS16,,235,10000,,0.02,,,,stock,,,
-1130292,Jake Harris,1003723,,BAS16,235,,10000,0.02,,0505,,,,stock,,,PDF quote
+1130292,Jake Harris,1003723,,"BAS16,235",,10000,0.02,,0505,,,,stock,,,PDF quote
 1129117,Jake Harris,1005735,,MPZ2012S101AT000,,7821,0.03,,13+,,,,stock,,,
 1128746,Jake Harris,1006423,,B340-13-F,,3000,0.06,,17,,,,stock,,,
 NEEDS_RFQ,Jake Harris,1002855,,STM32F103C8T6,,4936,2,,12+,,,,stock,,,
