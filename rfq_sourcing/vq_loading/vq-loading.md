@@ -41,12 +41,12 @@ Extract ALL available fields from each quote. Required fields must be present; o
 | **Manufacturer** | `MFR Text` | No | Manufacturer name (TI, Infineon, etc.) |
 | **Quantity** | `Quoted Quantity` | Yes | Quoted quantity available |
 | **Cost** | `Cost` | Yes | Unit price |
-| **Currency** | `Currency` | Yes | USD, EUR, GBP (default USD if not specified) |
+| **Currency** | `Currency` | No | Blank = USD. Only specify for EUR, GBP, other |
 | **Date Code** | `Date Code` | No | Manufacturing date code (e.g., 2024, 24+) |
 | **MOQ** | `MOQ` | No | Minimum order quantity |
 | **SPQ** | `SPQ` | No | Standard pack quantity |
 | **Packaging** | `Packaging` | No | Reel, Tube, Tray, Bulk, Cut Tape |
-| **Lead Time** | `Lead Time` | No | Delivery time (e.g., "stock", "2-3 weeks") |
+| **Lead Time** | `Lead Time` | No | Default: "stock". Only specify if vendor quotes specific lead time |
 | **COO** | `COO` | No | Country of origin (CN, TW, MY, US, etc.) |
 | **RoHS** | `RoHS` | No | Y/N - RoHS compliance status |
 | **Vendor Notes** | `Vendor Notes` | No | Alternate MPNs, no-bid reasons, conditions |
