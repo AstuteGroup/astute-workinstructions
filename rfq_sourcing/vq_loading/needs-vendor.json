@@ -1,0 +1,305 @@
+{
+  "generatedAt": "2026-03-05",
+  "totalRecords": 33,
+  "uniqueVendors": 26,
+  "action": "Add these vendors to iDempiere, then re-run consolidation. Move emails to NeedsVendor folder.",
+  "records": [
+    {
+      "emailId": "2239",
+      "mpn": "FSM4JSMATR",
+      "qty": "3925",
+      "price": "0.1",
+      "vendor_email": "julia.wu@ultrontech.co.uk",
+      "vendor_name": "Ultron Tech",
+      "rfq_number": "1130292"
+    },
+    {
+      "emailId": "3667",
+      "mpn": "NTCS0603E3103FHT",
+      "qty": "9000",
+      "price": "0.25",
+      "vendor_email": "ben@vectr.global",
+      "vendor_name": "Vectr Limited",
+      "rfq_number": "1130292"
+    },
+    {
+      "emailId": "5733",
+      "mpn": "4-1437565-2",
+      "qty": "3000",
+      "price": "0.13",
+      "vendor_email": "Quotes@Jameco.com",
+      "vendor_name": "Jameco Electronics",
+      "rfq_number": "1130292"
+    },
+    {
+      "emailId": "5734",
+      "mpn": "0251002.MRT1L",
+      "qty": "1300",
+      "price": "0.32",
+      "vendor_email": "stock-us@cyclops-group.com",
+      "vendor_name": "Lantek Corporation",
+      "rfq_number": "1130292"
+    },
+    {
+      "emailId": "5735",
+      "mpn": "TPS73801DCQR",
+      "qty": "1699",
+      "price": "0.84",
+      "vendor_email": "stock-us@cyclops-group.com",
+      "vendor_name": "Lantek Corporation",
+      "rfq_number": "1130292"
+    },
+    {
+      "emailId": "5738",
+      "mpn": "PCL037-0",
+      "qty": "2",
+      "price": "1.8",
+      "vendor_email": "hicks@standardsupply.com",
+      "vendor_name": "Standard Supply Electronics",
+      "rfq_number": "1130292"
+    },
+    {
+      "emailId": "6804",
+      "mpn": "TG110-S050N2RLTR",
+      "qty": "725",
+      "price": "2.37",
+      "vendor_email": "sales@eurodis.nu",
+      "vendor_name": "Eurodis Components",
+      "rfq_number": "1130292"
+    },
+    {
+      "emailId": "6805",
+      "mpn": "ISO7740DWR",
+      "qty": "1200",
+      "price": "1",
+      "vendor_email": "b.isikgoz@koel.com.tr",
+      "vendor_name": "KOEL",
+      "rfq_number": "1130292"
+    },
+    {
+      "emailId": "6836",
+      "mpn": "MSP430F149IPM",
+      "qty": "119",
+      "price": "10.34",
+      "vendor_email": "sales@eurodis.nu",
+      "vendor_name": "Eurodis Components",
+      "rfq_number": "1130350"
+    },
+    {
+      "emailId": "6838",
+      "mpn": "BCM5221A4KPTG",
+      "qty": "827",
+      "price": "17.72",
+      "vendor_email": "sales@eurodis.nu",
+      "vendor_name": "Eurodis Components",
+      "rfq_number": "1130350"
+    },
+    {
+      "emailId": "6842",
+      "mpn": "BCP53-16TX",
+      "qty": "26000",
+      "price": "0.22",
+      "vendor_email": "philip.humphrey@vantageairsupport.com",
+      "vendor_name": "Vantage IC LLC",
+      "rfq_number": "1130292"
+    },
+    {
+      "emailId": "6844",
+      "mpn": "BCP53-16TX",
+      "qty": "26000",
+      "price": "0.22",
+      "vendor_email": "philip.humphrey@vantageairsupport.com",
+      "vendor_name": "Vantage IC",
+      "rfq_number": "1130292"
+    },
+    {
+      "emailId": "6860",
+      "mpn": "TPS63020DSJR",
+      "qty": "5000",
+      "price": "0.68",
+      "vendor_email": "excess@vital.global",
+      "vendor_name": "Vital Electronics Ltd",
+      "rfq_number": "1130462"
+    },
+    {
+      "emailId": "6863",
+      "mpn": "ADS1115IDGSR",
+      "qty": "1868",
+      "price": "1.03",
+      "vendor_email": "anna.sandri@eas.it",
+      "vendor_name": "EAS S.p.A.",
+      "rfq_number": "1130462"
+    },
+    {
+      "emailId": "6900",
+      "mpn": "ISO7742DWR",
+      "qty": "9900",
+      "price": "1.81",
+      "vendor_email": "sales@componentsearch.com",
+      "vendor_name": "Component Search",
+      "rfq_number": "1130292"
+    },
+    {
+      "emailId": "6907",
+      "mpn": "P600M-E3/54",
+      "qty": "4000",
+      "price": "0.6",
+      "vendor_email": "info@devran.com.tr",
+      "vendor_name": "Devran Elektronik",
+      "rfq_number": "1128746"
+    },
+    {
+      "emailId": "6912",
+      "mpn": "SM24CANB02HTG",
+      "qty": "3000",
+      "price": "0.05",
+      "vendor_email": "info@demotronic.de",
+      "vendor_name": "demotronic GmbH",
+      "rfq_number": "1130292"
+    },
+    {
+      "emailId": "6914",
+      "mpn": "P600M-E3/54",
+      "qty": "800",
+      "price": "0.35",
+      "vendor_email": "info@ame-gmbh.de",
+      "vendor_name": "AME GmbH",
+      "rfq_number": "1128746"
+    },
+    {
+      "emailId": "6916",
+      "mpn": "ISO7742DWR",
+      "qty": "1500",
+      "price": "1.32",
+      "vendor_email": "sales@rifinvestments.com",
+      "vendor_name": "RIF Investments",
+      "rfq_number": "1130292"
+    },
+    {
+      "emailId": "6921",
+      "mpn": "VS-80CPQ150-N3",
+      "qty": "175",
+      "price": "1.35",
+      "vendor_email": "sales@danmarcomponents.com",
+      "vendor_name": "Dan-Mar Components",
+      "rfq_number": "1130292"
+    },
+    {
+      "emailId": "6922",
+      "mpn": "NTCS0603E3103FHT",
+      "qty": "4000",
+      "price": "0.15",
+      "vendor_email": "sales@danmarcomponents.com",
+      "vendor_name": "Dan-Mar Components",
+      "rfq_number": "1130292"
+    },
+    {
+      "emailId": "6923",
+      "mpn": "NUP2105LT1G",
+      "qty": "2541",
+      "price": "0.05",
+      "vendor_email": "sales@dotcomps.com",
+      "vendor_name": "Dot Comps Electronics",
+      "rfq_number": "1130292"
+    },
+    {
+      "emailId": "6930",
+      "mpn": "B82793S513N201Z97",
+      "qty": "9000",
+      "price": "0.3",
+      "vendor_email": "sales@tomarkelectronics.com",
+      "vendor_name": "Tomark Electronics",
+      "rfq_number": "1130292"
+    },
+    {
+      "emailId": "6931",
+      "mpn": "ISO7742DWR",
+      "qty": "1500",
+      "price": "1.32",
+      "vendor_email": "laura@rif.investments",
+      "vendor_name": "RIF Investments",
+      "rfq_number": "1130292"
+    },
+    {
+      "emailId": "6932",
+      "mpn": "BAT54S-7-F",
+      "qty": "28992",
+      "price": "0.034",
+      "vendor_email": "sales@partner4chips.com",
+      "vendor_name": "Partner4Chips",
+      "rfq_number": "1128746"
+    },
+    {
+      "emailId": "6936",
+      "mpn": "B72510E300K62",
+      "qty": "4100",
+      "price": "0.05",
+      "vendor_email": "info@hzd-gmbh.de",
+      "vendor_name": "HZD GmbH",
+      "rfq_number": "1130292"
+    },
+    {
+      "emailId": "6938",
+      "mpn": "HCF4093M013TR",
+      "qty": "14980",
+      "price": "0.08",
+      "vendor_email": "info@bsr-elektronik.de",
+      "vendor_name": "BSR-elektronik",
+      "rfq_number": "1130292"
+    },
+    {
+      "emailId": "6951",
+      "mpn": "BCP53-16TX",
+      "qty": "26000",
+      "price": "0.29",
+      "vendor_email": "philip.humphrey@vantageairsupport.com",
+      "vendor_name": "Vantage IC LLC",
+      "rfq_number": "1130577"
+    },
+    {
+      "emailId": "6962",
+      "mpn": "MPZ2012S101AT000",
+      "qty": "3860",
+      "price": "0.06",
+      "vendor_email": "orderdesk@components.se",
+      "vendor_name": "ECAB",
+      "rfq_number": "1130292"
+    },
+    {
+      "emailId": "6975",
+      "mpn": "LM2585S-5.0/NOPB",
+      "qty": "270",
+      "price": "5.7",
+      "vendor_email": "info@chipdistribution.com",
+      "vendor_name": "Euro Chip Distribution",
+      "rfq_number": "1130292"
+    },
+    {
+      "emailId": "6984",
+      "mpn": "MAX3086ESD+",
+      "qty": "100",
+      "price": "3.72",
+      "vendor_email": "anna.sandri@eas.it",
+      "vendor_name": "EAS S.p.A.",
+      "rfq_number": "NOT_FOUND"
+    },
+    {
+      "emailId": "6996",
+      "mpn": "SM24CANB-02HTG",
+      "qty": "50",
+      "price": "0.65",
+      "vendor_email": "iuliana.vlad@euroconnectors.de",
+      "vendor_name": "Lacon Electronic GmbH",
+      "rfq_number": "1130292"
+    },
+    {
+      "emailId": "7038",
+      "mpn": "ADUM4400BRWZ",
+      "qty": "2",
+      "price": "50.00",
+      "vendor_email": "jack@jc-electronics.net",
+      "vendor_name": "JC Electronics",
+      "rfq_number": "1130577"
+    }
+  ]
+}
