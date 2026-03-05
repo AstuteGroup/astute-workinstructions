@@ -78,7 +78,7 @@ Consolidated roadmap for RFQ Sourcing and VQ Processing workflows, organized by 
 | B3 | Supplier Fatigue Tracking | **Next** | Planned |
 | B4 | LLM Description Scanning | Later | Planned |
 | B5 | Cross-Region Duplicate Detection | Later | Planned |
-| B6 | Alternate Packaging Analysis | Later | In Progress |
+| B6 | MPN Variant Prioritization | **Now** | In Progress |
 | B7 | Memory Product Handling | Later | Planned |
 | B8 | BrokerBin RFQ Automation | Later | Planned |
 | B9 | PartsBase RFQ Automation | Later | Planned |
@@ -228,23 +228,95 @@ IF (Supplier + MPN) requested within last 60 days → SKIP
 
 ---
 
-## B6. Alternate Packaging Analysis
+## B6. MPN Variant Prioritization
 
-**Status:** In Progress | **Priority:** Later
+**Status:** In Progress | **Priority:** Now
 
-**Problem:** Parts with different packaging suffixes are often interchangeable:
-- `LTC2446IUHF#TRPBF` (tape & reel, lead-free)
-- `LTC2446IUHF#PBF` (tube/tray, lead-free)
+**Problem:** NetComponents returns MPN variants that may not be acceptable substitutes:
+- Customer requests `NUP2105L`, system sources `NUP2105LT1G`
+- The `T1` (tape & reel) is usually fine
+- The `G` (RoHS/green) is a **specification change** — may NOT be acceptable
 
-**Current Implementation:**
-- Packaging suffix stripping in MPN normalization
-- `-TR`, `-TRL`, `-TR500`, `-TR750` handling
-- `#TRPBF` → `#PBF` normalization
+**Current behavior:** All variants treated equally. No prioritization or flagging.
 
-**Planned:**
-- When exact MPN not found, search packaging variants
-- Present alternatives to user
-- Track packaging preferences per customer
+### Suffix Classification
+
+| Category | Suffixes | Risk Level | Notes |
+|----------|----------|------------|-------|
+| **Packaging** | T&R, TR, T1, TUBE, TRAY, REEL, BULK | Context-dependent | See packaging logic below |
+| **RoHS/Compliance** | G, G4, PBF, LF, NOPB, -Z | **Risky** | Lead-free vs leaded — customer may require either |
+| **Temperature** | E, I, M, C, -40, -55 | **Risky** | Different operating range |
+| **Automotive** | Q, Q1, AEC | **Risky** | AEC-Q100 qualification |
+| **Military** | M, /883, JAN | **Risky** | MIL-spec qualification |
+
+### Packaging Logic (Bidirectional)
+
+Packaging acceptability depends on what the customer requested:
+
+| Customer Requests | Supplier Offers | Match Type | Action |
+|-------------------|-----------------|------------|--------|
+| Base part (no packaging) | T&R variant | SAFE | Accept — T&R almost always OK |
+| Base part (no packaging) | Tube/Tray | SAFE | Accept |
+| **T&R explicitly** | Tube/Tray | **PACKAGING_MISMATCH** | Flag — harder sell |
+| Tube/Tray explicitly | T&R | PACKAGING_REVIEW | May work, but cost/handling different |
+
+### Prioritization Order
+
+When selecting suppliers, rank by MPN match quality:
+
+| Priority | Match Type | Example | Action |
+|----------|------------|---------|--------|
+| 1 | EXACT | Request `NUP2105L`, offer `NUP2105L` | Always select |
+| 2 | PACKAGING_SAFE | Request `NUP2105L`, offer `NUP2105LT1` | Select (T&R OK when not specified) |
+| 3 | PACKAGING_MISMATCH | Request `NUP2105LT1`, offer `NUP2105L` | Flag, may skip |
+| 4 | COMPLIANCE_VARIANT | Request `NUP2105L`, offer `NUP2105LG` | **Flag for review** — RoHS change |
+| 5 | SPEC_VARIANT | Temp range, qualification changes | **Flag for review** |
+
+### Output Columns
+
+Add to batch results Excel:
+
+| Column | Values | Color |
+|--------|--------|-------|
+| `MPN Match Type` | EXACT, PACKAGING_SAFE, PACKAGING_MISMATCH, COMPLIANCE, SPEC | — |
+| `Offered MPN` | What supplier is actually listing | — |
+| `Variant Flags` | G=RoHS, T1=T&R, Q=Auto, etc. | Yellow if risky |
+
+### Implementation Steps
+
+1. **Parse customer MPN** — extract base part + packaging indicator (if any)
+2. **Parse supplier MPN** — extract base part + all suffixes
+3. **Classify suffixes** — packaging vs compliance vs spec
+4. **Determine match type** — apply bidirectional packaging logic
+5. **Prioritize suppliers** — exact matches first, then packaging-safe, flag others
+6. **Output flags** — add columns to results Excel
+
+### Detection Patterns
+
+```javascript
+// Packaging suffixes (generally safe when not specified)
+const PACKAGING_SUFFIXES = /[-#]?(T&?R|TR\d*|T1|TUBE|TRAY|REEL|BULK|CUT)$/i;
+
+// RoHS/Compliance suffixes (risky - spec change)
+const COMPLIANCE_SUFFIXES = /[-#]?(G|G4|PBF|LF|NOPB|ROHS|-Z)$/i;
+
+// Temperature grade suffixes (risky - different spec)
+const TEMP_SUFFIXES = /[-#]?(E|I|M|C)$/i;  // Extended, Industrial, Military, Commercial
+
+// Automotive qualification (risky - different qualification)
+const AUTO_SUFFIXES = /[-#]?(Q|Q1|AEC)$/i;
+```
+
+### Example: NUP2105L
+
+| Offered MPN | Suffix Parse | Match Type | Action |
+|-------------|--------------|------------|--------|
+| NUP2105L | (none) | EXACT | ✓ Select |
+| NUP2105LT1 | T1 = T&R | PACKAGING_SAFE | ✓ Select |
+| NUP2105LT1G | T1 = T&R, G = RoHS | COMPLIANCE | ⚠ Flag |
+| NUP2105LG | G = RoHS | COMPLIANCE | ⚠ Flag |
+
+**Why this matters:** If customer needs leaded parts (military/aerospace, legacy manufacturing), RoHS alternatives are not viable. Current automation doesn't catch this.
 
 ---
 
