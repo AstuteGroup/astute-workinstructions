@@ -202,12 +202,14 @@ When a vendor quote comes in, the parser matches it to an RFQ in the system:
 - `search_key` is the business-facing identifier used for all lookups in iDempiere
 - `c_bpartner_id` is the internal database primary key (different number)
 - Output CSV column: `vendor_search_key`
+- **Only use ACTIVE vendors** (`bp.isactive = 'Y'`) - inactive search_keys won't import
 
 ### Vendor Matching
 1. Exact email match in `ad_user.email`
 2. Vendor cache lookup (`data/vendor-cache.json`)
 3. Domain-based lookup (e.g., velocityelec.com → Velocity Electronics)
 4. Sender name fuzzy match in `c_bpartner.name`
+5. **Filter:** Only return active vendors (`isactive = 'Y'`)
 
 ### Fetch Reporting
 **File:** `data/fetch-report.json`

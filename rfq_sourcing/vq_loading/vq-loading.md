@@ -310,12 +310,15 @@ const bpId = vendorResult.search_key || vendorResult.c_bpartner_id || '';
 
 **IMPORTANT: Use domain-based matching, NOT exact email matching.**
 
+**IMPORTANT: Only match ACTIVE vendors (`bp.isactive = 'Y'`).** Inactive vendor search_keys will not be recognized by iDempiere on import.
+
 Vendor contacts change frequently. A quote from `sal@prismelectronics.net` should match Prism Electronics even if only `salessupport@prismelectronics.net` is in the database. The database typically has `sales@`, `rfq@`, or specific contacts registered, but vendors often send quotes from other personal emails at the same domain.
 
 ### Matching Order (consolidate-extractions.js)
 1. **Exact email match** in `ad_user.email` (fast path)
 2. **Domain-based fallback** - extract `@domain.com` and find any vendor with that domain
-3. Return `NOT_FOUND` only if no domain match exists
+3. **Active filter** - only return vendors where `bp.isactive = 'Y'`
+4. Return `NOT_FOUND` only if no active domain match exists
 
 ### Database Query (Domain-Based)
 ```sql
