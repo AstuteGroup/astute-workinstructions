@@ -100,6 +100,7 @@ function queryVendorSearchKeys() {
     JOIN adempiere.c_bpartner bp ON au.c_bpartner_id = bp.c_bpartner_id
     WHERE LOWER(au.email) IN (${emailList})
     AND bp.value NOT LIKE 'USE %'
+    AND bp.isactive = 'Y'
   `;
 
   try {
@@ -131,6 +132,7 @@ function queryVendorsByDomain() {
     FROM adempiere.ad_user au
     JOIN adempiere.c_bpartner bp ON au.c_bpartner_id = bp.c_bpartner_id
     WHERE bp.value NOT LIKE 'USE %'
+    AND bp.isactive = 'Y'
     AND LOWER(SUBSTRING(au.email FROM POSITION('@' IN au.email) + 1)) IN (${domainList})
   `;
 
