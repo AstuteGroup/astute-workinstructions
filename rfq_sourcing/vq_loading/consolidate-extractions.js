@@ -22,7 +22,7 @@ const existingRecords = existingLines.map(line => {
 
 console.log(`Loaded ${existingRecords.length} existing records`);
 
-// Load new extractions
+// Load new extractions (6774-6943)
 const newExtractionsJson = JSON.parse(fs.readFileSync('/home/analytics_user/workspace/astute-workinstructions/rfq_sourcing/vq_loading/new-extractions-6774-6943.json', 'utf8'));
 
 // Flatten all sections
@@ -33,12 +33,23 @@ const newRecords = [
   ...newExtractionsJson.agent3_6901_6943
 ];
 
-console.log(`Loaded ${newRecords.length} new records`);
+console.log(`Loaded ${newRecords.length} new records (6774-6943)`);
+
+// Load old extractions (2xxx-5xxx)
+let oldRecords = [];
+try {
+  const oldExtractionsJson = JSON.parse(fs.readFileSync('/home/analytics_user/workspace/astute-workinstructions/rfq_sourcing/vq_loading/old-extractions-2xxx-5xxx.json', 'utf8'));
+  oldRecords = oldExtractionsJson.extracted_quotes || [];
+  console.log(`Loaded ${oldRecords.length} old records (2xxx-5xxx)`);
+} catch (e) {
+  console.log('No old extractions file found, skipping');
+}
 
 // Get all unique vendor emails
 const allEmails = [...new Set([
   ...existingRecords.map(r => r.vendor_email?.toLowerCase()),
-  ...newRecords.map(r => r.vendor_email?.toLowerCase())
+  ...newRecords.map(r => r.vendor_email?.toLowerCase()),
+  ...oldRecords.map(r => r.vendor_email?.toLowerCase())
 ].filter(Boolean))];
 
 console.log(`${allEmails.length} unique vendor emails to lookup`);
@@ -74,7 +85,8 @@ function queryVendorSearchKeys() {
 function queryRfqNumbers() {
   const allMpns = [...new Set([
     ...existingRecords.map(r => r.mpn?.toUpperCase()),
-    ...newRecords.map(r => r.mpn?.toUpperCase())
+    ...newRecords.map(r => r.mpn?.toUpperCase()),
+    ...oldRecords.map(r => r.mpn?.toUpperCase())
   ].filter(Boolean))];
 
   // Create patterns for fuzzy matching (remove trailing characters)
@@ -187,6 +199,19 @@ const enrichedNew = newRecords.map(r => ({
   rfq_number: findRfq(r.mpn)
 }));
 
+// Enrich old records
+const enrichedOld = oldRecords.map(r => ({
+  emailId: r.emailId,
+  mpn: r.mpn,
+  qty: r.qty,
+  price: r.price,
+  dc: r.dc || '',
+  vendor_email: r.vendor_email,
+  vendor_name: r.vendor_name,
+  vendor_search_key: vendorMap[r.vendor_email?.toLowerCase()] || 'NOT_FOUND',
+  rfq_number: findRfq(r.mpn)
+}));
+
 // Update existing records that had NOT_FOUND for vendor_search_key
 const updatedExisting = existingRecords.map(r => ({
   ...r,
@@ -199,7 +224,7 @@ const updatedExisting = existingRecords.map(r => ({
 }));
 
 // Combine all records, sort by emailId
-const allRecords = [...updatedExisting, ...enrichedNew]
+const allRecords = [...updatedExisting, ...enrichedNew, ...enrichedOld]
   .sort((a, b) => parseInt(a.emailId) - parseInt(b.emailId));
 
 // Remove exact duplicates (same emailId, mpn, qty, price, vendor_email)

@@ -1,0 +1,84 @@
+{
+  "extractedAt": "2026-03-05",
+  "source": "emails 2xxx-5xxx (old emails)",
+  "totalEmails": 39,
+  "extracted_quotes": [
+    {
+      "emailId": "2195",
+      "mpn": "MPZ2012S101AT000",
+      "qty": 7000,
+      "price": 0.01,
+      "dc": "2204+",
+      "vendor_email": "sal@prismelectronics.net",
+      "vendor_name": "Prism Electronics",
+      "source_quote": "7K PCS- OEM REELS- 2204'+ D/C- .01 CENTS EACH"
+    },
+    {
+      "emailId": "2239",
+      "mpn": "FSM4JSMATR",
+      "qty": 3925,
+      "price": 0.10,
+      "dc": "",
+      "vendor_email": "julia.wu@ultrontech.co.uk",
+      "vendor_name": "Ultron Tech",
+      "source_quote": "Unite cost USD0.1/PC"
+    },
+    {
+      "emailId": "4168",
+      "mpn": "DG403DYZ",
+      "qty": 7,
+      "price": 14.29,
+      "dc": "",
+      "vendor_email": "sales@sierraic.com",
+      "vendor_name": "Sierra IC Inc",
+      "source_quote": "$100.00 min (calculated: $100/7 = $14.29/ea)"
+    },
+    {
+      "emailId": "5738",
+      "mpn": "PCL037-0",
+      "qty": 2,
+      "price": 1.80,
+      "dc": "",
+      "vendor_email": "hicks@standardsupply.com",
+      "vendor_name": "Standard Supply Electronics",
+      "source_quote": "1.80/ea + freight. 2 stock"
+    }
+  ],
+  "partial_records": [
+    {
+      "emailId": "2292",
+      "mpn": "ADUM4400BRWZ",
+      "qty": 50,
+      "price": null,
+      "vendor_email": "jack@jc-electronics.net",
+      "vendor_name": "JC Electronics",
+      "missing": "price"
+    }
+  ],
+  "needs_review_pdf": [
+    {"emailId": "3667", "mpn": "NTCS0603E3103FHT", "vendor_name": "Vectr", "attachment": "26 February 2026 - Astute - 363.pdf"},
+    {"emailId": "4463", "mpn": "FWH-125B", "vendor_name": "Semic Trade Company", "attachment": "offer R-N2600604.pdf"},
+    {"emailId": "4472", "mpn": "SS26HE3_A/H", "vendor_name": "ECOMAL UK", "attachment": "Offer1336485.0.pdf"},
+    {"emailId": "4475", "mpn": "DG403DY-E3", "vendor_name": "ECOMAL UK", "attachment": "Offer1336486.0.pdf"},
+    {"emailId": "5733", "mpn": "unknown", "vendor_name": "Jameco Electronics", "attachment": "Quote-21135180.pdf"},
+    {"emailId": "5734", "mpn": "0251002.MRT1L", "vendor_name": "Lantek Corporation", "attachment": "QuoteNumber1624.pdf"},
+    {"emailId": "5735", "mpn": "TPS73801DCQR", "vendor_name": "Lantek Corporation", "attachment": "QuoteNumber1623.pdf"},
+    {"emailId": "5736", "mpn": "P600M-E3/73", "vendor_name": "ECOMAL UK", "attachment": "Offer1336488.0.pdf"},
+    {"emailId": "5740", "mpn": "S1JHE3_A/H", "vendor_name": "Elcom Components", "attachment": "191002.pdf"},
+    {"emailId": "5744", "mpn": "S1JHE3_A/H", "vendor_name": "ECOMAL UK", "attachment": "Offer1336483.0.pdf"},
+    {"emailId": "5746", "mpn": "P600M", "vendor_name": "Gocar Electronic", "attachment": "QUOTATION 19040F.PDF"},
+    {"emailId": "6068", "mpn": "594D127X0020R2T", "vendor_name": "CVC Components", "attachment": "Quotation 29952.pdf"},
+    {"emailId": "6069", "mpn": "LM2901AVQDRG4", "vendor_name": "CVC Components", "attachment": "Quotation 29954.pdf"}
+  ],
+  "skipped": {
+    "no_bid": ["2194", "2212", "2248", "4452", "4533", "5739", "5741", "5747"],
+    "target_price_request": ["2206", "2208", "2223", "3576", "3780", "5737"],
+    "duplicates": ["4473", "4474", "4476", "4477", "5742", "5743", "5745"]
+  },
+  "stats": {
+    "valid_quotes": 4,
+    "partial_records": 1,
+    "needs_review_pdf": 13,
+    "skipped_total": 21
+  }
+}
