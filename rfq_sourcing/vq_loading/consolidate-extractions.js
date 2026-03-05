@@ -400,16 +400,80 @@ const rfqFound = deduped.filter(r => r.rfq_number !== 'NOT_FOUND').length;
 console.log(`Vendor search_key found: ${vendorFound}/${deduped.length}`);
 console.log(`RFQ number found: ${rfqFound}/${deduped.length}`);
 
-// Split records: upload-ready vs needs-vendor
-const csvHeader = 'emailId,mpn,qty,price,dc,vendor_email,vendor_name,vendor_search_key,rfq_number,notes';
-const formatCsvLine = r =>
-  `${r.emailId},${r.mpn},${r.qty},${r.price},${r.dc || ''},${r.vendor_email},${r.vendor_name},${r.vendor_search_key},${r.rfq_number},${r.notes || ''}`;
+// ============================================================================
+// OUTPUT: VQ Mass Upload Template format (friendly column names)
+// ============================================================================
+// Template: RFQ Search Key,Buyer,Business Partner Search Key,Contact,MPN,
+//           MFR Text,Quoted Quantity,Cost,Currency,Date Code,MOQ,SPQ,
+//           Packaging,Lead Time,COO,RoHS,Vendor Notes
 
-// Upload-ready: has vendor_search_key
+const VQ_HEADER = 'RFQ Search Key,Buyer,Business Partner Search Key,Contact,MPN,MFR Text,Quoted Quantity,Cost,Currency,Date Code,MOQ,SPQ,Packaging,Lead Time,COO,RoHS,Vendor Notes';
+
+// Escape CSV field (quote if contains comma, quote, or newline)
+function escapeCsvField(val) {
+  if (val === null || val === undefined) return '';
+  const str = String(val);
+  if (str.includes(',') || str.includes('"') || str.includes('\n')) {
+    return '"' + str.replace(/"/g, '""') + '"';
+  }
+  return str;
+}
+
+// Format record to VQ Mass Upload Template format
+function formatVqLine(r) {
+  // Build vendor notes
+  // - Alternate MPN goes here as "Quoted MPN: xxx"
+  // - Other notes from extraction
+  let vendorNotes = r.notes || '';
+
+  return [
+    r.rfq_number === 'NOT_FOUND' ? 'NEEDS_RFQ' : r.rfq_number,  // RFQ Search Key
+    'Jake Harris',                                               // Buyer (all emails forwarded by Jake)
+    r.vendor_search_key,                                         // Business Partner Search Key
+    '',                                                          // Contact (not captured)
+    r.mpn,                                                       // MPN
+    r.mfr || '',                                                 // MFR Text (not captured - blank)
+    r.qty,                                                       // Quoted Quantity
+    r.price,                                                     // Cost
+    r.currency || 'USD',                                         // Currency (default USD)
+    r.dc || '',                                                  // Date Code
+    r.moq || '',                                                 // MOQ (not captured)
+    r.spq || '',                                                 // SPQ (not captured)
+    r.packaging || '',                                           // Packaging (not captured)
+    r.lead_time || '',                                           // Lead Time (not captured)
+    r.coo || '',                                                 // COO (not captured)
+    r.rohs || '',                                                // RoHS (not captured)
+    escapeCsvField(vendorNotes)                                  // Vendor Notes
+  ].join(',');
+}
+
+// Tracking header for internal use (includes source info for debugging)
+const TRACKING_HEADER = 'emailId,mpn,qty,price,dc,vendor_email,vendor_name,vendor_search_key,rfq_number,notes,mfr,currency,moq,spq,packaging,lead_time,coo,rohs';
+
+function formatTrackingLine(r) {
+  return [
+    r.emailId, r.mpn, r.qty, r.price, r.dc || '',
+    r.vendor_email, r.vendor_name, r.vendor_search_key, r.rfq_number,
+    escapeCsvField(r.notes || ''), r.mfr || '', r.currency || 'USD',
+    r.moq || '', r.spq || '', r.packaging || '', r.lead_time || '',
+    r.coo || '', r.rohs || ''
+  ].join(',');
+}
+
+// Split records: upload-ready vs needs-vendor
+// Upload-ready: has vendor_search_key AND has RFQ (or explicitly NEEDS_RFQ)
 const uploadReady = deduped.filter(r => r.vendor_search_key !== 'NOT_FOUND');
+
+// Write VQ Mass Upload format (ready for iDempiere import)
 fs.writeFileSync(
   '/home/analytics_user/workspace/astute-workinstructions/rfq_sourcing/vq_loading/vq-upload-ready.csv',
-  [csvHeader, ...uploadReady.map(formatCsvLine)].join('\n')
+  [VQ_HEADER, ...uploadReady.map(formatVqLine)].join('\n')
+);
+
+// Write tracking format (for reference/debugging)
+fs.writeFileSync(
+  '/home/analytics_user/workspace/astute-workinstructions/rfq_sourcing/vq_loading/vq-upload-ready-tracking.csv',
+  [TRACKING_HEADER, ...uploadReady.map(formatTrackingLine)].join('\n')
 );
 
 // Needs-vendor: complete quotes (qty>0, price>0) missing vendor
@@ -420,9 +484,18 @@ const needsVendor = deduped.filter(r =>
 );
 fs.writeFileSync(
   '/home/analytics_user/workspace/astute-workinstructions/rfq_sourcing/vq_loading/needs-vendor.csv',
-  [csvHeader, ...needsVendor.map(formatCsvLine)].join('\n')
+  [TRACKING_HEADER, ...needsVendor.map(formatTrackingLine)].join('\n')
 );
 
 console.log('\nFinal outputs:');
-console.log(`  - vq-upload-ready.csv (${uploadReady.length} records)`);
+console.log(`  - vq-upload-ready.csv (${uploadReady.length} records) - VQ Mass Upload Template format`);
+console.log(`  - vq-upload-ready-tracking.csv - Source tracking info`);
 console.log(`  - needs-vendor.csv (${needsVendor.length} records, ${[...new Set(needsVendor.map(r => r.vendor_email))].length} vendors to add)`);
+
+// Warn about missing data
+console.log('\n⚠️  MISSING DATA (not captured during extraction):');
+console.log('  - chuboe_mfr_text (manufacturer)');
+console.log('  - c_currency_id (defaults to USD - EUR/GBP vendors need manual fix)');
+console.log('  - c_country_id (COO)');
+console.log('  - chuboe_rohs');
+console.log('  - chuboe_lead_time');

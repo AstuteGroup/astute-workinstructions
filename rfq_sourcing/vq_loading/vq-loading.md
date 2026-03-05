@@ -23,9 +23,38 @@ himalaya envelope list --account vq --folder INBOX --page-size 500
 The rigid parser produces too many errors. Use this two-agent workflow for reliable extraction:
 
 ### Process
-1. **Agent A (Extractor)**: Reads emails, extracts MPN/qty/price/dc/vendor with source quotes
+1. **Agent A (Extractor)**: Reads emails, extracts all quote fields (see Field Reference below)
 2. **Agent B (Verifier)**: Independently reads same emails, verifies extractions match actual content
-3. **Result**: Only verified records are saved (100% accuracy vs 78% with single agent)
+3. **Result**: Only verified records are saved
+
+### Field Reference (VQ Mass Upload Template)
+
+Extract ALL available fields from each quote. Required fields must be present; optional fields capture when available.
+
+| Field | Column Name | Required | Description |
+|-------|-------------|----------|-------------|
+| **RFQ Search Key** | `RFQ Search Key` | Yes | Matched via MPN lookup (30-day window) |
+| **Buyer** | `Buyer` | Yes | Person who sent RFQ (usually Jake Harris) |
+| **Vendor** | `Business Partner Search Key` | Yes | Vendor search_key from domain-based lookup |
+| **Contact** | `Contact` | No | Vendor contact name |
+| **MPN** | `MPN` | Yes | Part number being quoted |
+| **Manufacturer** | `MFR Text` | No | Manufacturer name (TI, Infineon, etc.) |
+| **Quantity** | `Quoted Quantity` | Yes | Quoted quantity available |
+| **Cost** | `Cost` | Yes | Unit price |
+| **Currency** | `Currency` | Yes | USD, EUR, GBP (default USD if not specified) |
+| **Date Code** | `Date Code` | No | Manufacturing date code (e.g., 2024, 24+) |
+| **MOQ** | `MOQ` | No | Minimum order quantity |
+| **SPQ** | `SPQ` | No | Standard pack quantity |
+| **Packaging** | `Packaging` | No | Reel, Tube, Tray, Bulk, Cut Tape |
+| **Lead Time** | `Lead Time` | No | Delivery time (e.g., "stock", "2-3 weeks") |
+| **COO** | `COO` | No | Country of origin (CN, TW, MY, US, etc.) |
+| **RoHS** | `RoHS` | No | Y/N - RoHS compliance status |
+| **Vendor Notes** | `Vendor Notes` | No | Alternate MPNs, no-bid reasons, conditions |
+
+**Vendor Notes field usage:**
+- Alternate part numbers: "Quoted MPN: ABC123" (when vendor quotes different MPN)
+- No-bid reason: "No-bid - out of stock"
+- Special conditions: Lead time details, MOQ notes, pricing tiers
 
 ### Commands
 ```bash
@@ -41,8 +70,9 @@ himalaya message read --account vq --folder INBOX [ID]
 - Run extraction agents in parallel, then verification agents in parallel
 
 ### Output
-- `verified-extractions-all.json` - Full results with stats
-- `verified-extractions-all-enriched.csv` - With vendor_search_key and rfq_number
+- `vq-upload-ready.csv` - VQ Mass Upload Template format, ready for iDempiere import
+- `needs-vendor.csv` - Complete quotes missing vendor setup (add vendor first, then re-consolidate)
+- `vq-upload-ready-tracking.csv` - Source tracking info (emailId, vendor_email for debugging)
 
 ### Post-Extraction: Move to Processed
 After extracting quotes from emails, move them to Processed folder:
@@ -152,12 +182,17 @@ Applies learned vendor mappings and merges to final upload.
 
 ## Output Files
 
+| File | Location | Description |
+|------|----------|-------------|
+| `vq-upload-ready.csv` | `vq_loading/` | VQ Mass Upload Template format, ready for iDempiere |
+| `needs-vendor.csv` | `vq_loading/` | Complete quotes needing vendor setup first |
+| `vq-upload-ready-tracking.csv` | `vq_loading/` | Source tracking (emailId, vendor_email) |
+
+**Legacy (vq-parser):**
 | File | Description |
 |------|-------------|
-| `output/uploads/VQ_UPLOAD_*.csv` | Ready for iDempiere import |
-| `output/uploads/VQ_UNKNOWN_*.csv` | Records missing RFQ assignment |
+| `output/uploads/VQ_UPLOAD_*.csv` | Rigid parser output (legacy) |
 | `output/needs-review.json` | Queue of partials & high-cost items |
-| `output/archive/` | Processed source CSVs |
 | `data/vendor-cache.json` | Learned email→vendor mappings |
 
 ---
