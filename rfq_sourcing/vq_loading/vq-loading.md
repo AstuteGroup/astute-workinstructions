@@ -52,9 +52,14 @@ Extract ALL available fields from each quote. Required fields must be present; o
 | **Vendor Notes** | `Vendor Notes` | No | Alternate MPNs, no-bid reasons, conditions |
 
 **Vendor Notes field usage:**
+- **No-bid reasons** (IMPORTANT): When qty=0 and price=0, capture why: "No-bid - out of stock", "No-bid - cannot source", "No-bid - price too high"
 - Alternate part numbers: "Quoted MPN: ABC123" (when vendor quotes different MPN)
-- No-bid reason: "No-bid - out of stock"
 - Special conditions: Lead time details, MOQ notes, pricing tiers
+
+**No-bid records:**
+- Set Quantity = 0, Cost = 0
+- Leave Lead Time blank (not "stock")
+- Capture reason in Vendor Notes
 
 ### Commands
 ```bash
