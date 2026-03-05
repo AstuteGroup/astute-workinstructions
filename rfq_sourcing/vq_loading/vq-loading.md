@@ -74,6 +74,28 @@ himalaya message read --account vq --folder INBOX [ID]
 - Process 40 emails per batch (2 agents × 20 emails each)
 - Run extraction agents in parallel, then verification agents in parallel
 
+### Batch Summary & Timing
+At the end of each extraction batch, record:
+```
+Batch: [batch number]
+Emails processed: [count]
+Records extracted: [count]
+No-bids: [count]
+Skipped: [count] (duplicates, empty forwards, etc.)
+Start time: [HH:MM]
+End time: [HH:MM]
+Duration: [X minutes]
+```
+
+At end of session, summarize total:
+```
+Session Summary:
+Total emails: [count]
+Total records: [count]
+Total no-bids: [count]
+Total processing time: [X minutes]
+```
+
 ### Output
 - `vq-upload-ready.csv` - VQ Mass Upload Template format, ready for iDempiere import
 - `needs-vendor.csv` - Complete quotes missing vendor setup (add vendor first, then re-consolidate)
