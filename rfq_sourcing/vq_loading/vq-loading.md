@@ -45,10 +45,13 @@ himalaya message read --account vq --folder INBOX [ID]
 - `verified-extractions-all-enriched.csv` - With vendor_search_key and rfq_number
 
 ### Skip Rules
-- **No-bid**: Vendor declined, no price (qty=0, skip)
-- **Target price request**: Vendor asking for price, no quote (skip)
-- **RFQ forward**: Outbound request, not a quote (skip)
-- **PDF-only**: Queue for manual PDF review (needs_review)
+- **No-bid**: Vendor explicitly declined to quote (skip)
+- **Target price request**: Vendor asking for price, no actual quote (skip)
+- **Empty forward**: No vendor response in the body (skip)
+- **PDF-only**: Quote data only in attachment, queue for PDF review (needs_review)
+- **Duplicate**: Same vendor/part/price already extracted (skip)
+
+**IMPORTANT:** All emails are forwards from team members. The vendor response is BELOW the signature block at the top. Always read to the bottom of the email to find the actual quote data.
 
 ---
 

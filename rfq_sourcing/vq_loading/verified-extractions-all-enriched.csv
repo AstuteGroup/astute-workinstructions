@@ -1,47 +1,135 @@
 emailId,mpn,qty,price,dc,vendor_email,vendor_name,vendor_search_key,rfq_number
-6973,S1J-HE3/61T,84000,0.07,0651,sales@zilex.ca,Zilex electronics Inc.,1006047,NOT_FOUND
-6963,IXDD609SI,160,0.89,,sales@voyagercomponents.com,Voyager Components,1002571,1130577
-6974,TG110-S050N2LF-TR,750,0.75,18+,mike@integratedelec.com,Integrated Electronics Company,1002612,NOT_FOUND
-6994,J0011D21BNL,20,4.00,,amy.g@hybridelectronics.com,Hybrid Electronics Corporation,NOT_FOUND,1130292
-6992,L50QS125,3,209.99,,accordtec@gmail.com,Accord Technologies,NOT_FOUND,1130292
-6991,FWH-125B,30,119.99,,accordtec@gmail.com,Accord Technologies,NOT_FOUND,1130292
-7003,SM24CANB-02HTG,10,6.00,2014,sal@prismelectronics.net,Prism Electronics,NOT_FOUND,1130577
-6953,BCP53-16TX,700,0.383,2022,mmichnik@micros.com.pl,Micros sp.j.,NOT_FOUND,1130577
-6987,HCF4093M013TR,14935,0.15,12+,linus.jonsson@j2sourcing.com,J2 Sourcing,1002946,1130577
-6960,LM2585S-5.0/NOPB,135,4.35,08,linus.jonsson@j2sourcing.com,J2 Sourcing,1002946,1130577
-6969,B72510E300K62,3000,0.06,2022,mmichnik@micros.com.pl,Micros sp.j.,NOT_FOUND,1130577
-6971,BCP53-16TX,700,0.383,2022,mmichnik@micros.com.pl,Micros sp.j.,NOT_FOUND,1130577
-6976,0251002.MRT1L,40,1.75,,morgan.snell@chemigraphic.co.uk,Chemigraphic Ltd.,NOT_FOUND,1130292
-6977,B72510E300K62,3000,0.0567,2022,mmichnik@micros.com.pl,Micros sp.j.,NOT_FOUND,1130577
-6985,TPS73801DCQR,300,1.35,18+,sales@flychips.com,Fly Chips Electronics,1005735,1130577
-6979,SBAS16LT3G,32600,0.009,0809,sales@inelcocomponents.com,INELCO Components,1002948,1130292
-6984,MAX3086ESD+,100,3.72,,anna.sandri@eas.it,EAS S.p.A.,NOT_FOUND,NOT_FOUND
-6986,DG403DY-T1-E3,24,5.00,18+,distysales@northshorecomponents.com,North Shore Components,NOT_FOUND,1130292
-6968,594D127X0020R2T,410,0.98,0926,shai@speedc.co.il,Speed Components Ltd.,1004411,1130292
-6962,MPZ2012S101AT000,3860,0.06,1025,orderdesk@components.se,ECAB,NOT_FOUND,1130292
-6964,P600M,23500,0.059,25+,netcomponents@prodeldistribuzione.it,Prod.El. Distribuzione srl,NOT_FOUND,1130577
-6997,S1JHE3_A/H,9800,0.03,15+,cory@tcxmicro.com,TCX MICRO S.L.,1002568,1130292
-6961,LM2903AVQDRG4Q1,2400,0.10,1119,ernst.ruth@micro-components.eu,Micro Components H. GmbH,1003294,NOT_FOUND
-6955,LM7805CT,250,1.10,07+,sales@chanetech.com,CHANETECH,1004926,NOT_FOUND
-6954,DG403DYE3,6,8.00,07+,sales@chanetech.com,CHANETECH,1004926,NOT_FOUND
-6993,FZT751TA,888,0.099,99,victoria.abt@derf.com,DERF ELECTRONICS CORP,1002452,NOT_FOUND
-6993,FZT751TA,632,0.099,02,victoria.abt@derf.com,DERF ELECTRONICS CORP,1002452,NOT_FOUND
+6774,1393280-5,14,7.15,,pweitz@semisourceinc.com,Semi Source Inc.,NOT_FOUND,NOT_FOUND
+6777,LM2591HVS-5.0/NOPB,5,10,,sales@componentonline.com,Component Electronics Inc.,1003092,1128099
+6779,BCP53-16TX,26000,0.73,25+,es@sebacomp.com,SEBACOMP,1004090,NOT_FOUND
+6788,80CPQ150PBF,50,3.13,06+,info@tautec-electronics.de,Tautec Electronics,1003181,NOT_FOUND
+6794,DG403DYZ,22,3,10+,igal@electrion.co.il,Electrion Ltd.,1004137,NOT_FOUND
+6797,80CPQ150PBF,261,2,08+,pbrasme@holdelec.fr,HOLDELEC,1003216,NOT_FOUND
+6798,LM2901AVQDRQ1,325,2.1,15+,benedek@ic-tronix.com,IC TRONIX INC,NOT_FOUND,1128746
+6805,ISO7740DWR,1200,1,,b.isikgoz@koel.com.tr,KOEL,NOT_FOUND,NOT_FOUND
+6806,P600M,18500,0.15,2601,bob@elitesemi.com,Elite Semiconductor Products,1004574,NOT_FOUND
+6807,TG110-S050N2LFTR,1000,0.595,22+,agiovan@carlinsystems.com,Carlin Systems Inc,1002999,NOT_FOUND
+6808,FWH-125B,7,95,,gust@electronicsurplus.com,Electronic Surplus,1003324,NOT_FOUND
+6809,BTS723GW,379,2.35,0814,sara@rightpartsonline.com,Right Parts Inc,1002498,1128746
+6811,DG403DY-E3,60,1.25,,juan@dfsales.com,DF Sales Co,1002276,NOT_FOUND
+6812,TG110-S050N2LFTR,252,0.87,2020,justin@braunec.com,Braun Electronic Components,1002892,NOT_FOUND
+6816,J0011D21BNL,700,2.344,,JamesB@pccomponents.com,PC Components Company,1002553,NOT_FOUND
+6817,MPZ2012S101AT000,5400,0.04,18+,stockcheck@atlanticsemi.com,Atlantic Semiconductor,1002457,1129117
+6819,SPP11N80C3IN,50,2,,sales@eptix.com,Eptix Electronics Inc,NOT_FOUND,1128746
+6820,MPZ2012S101AT000,7773,0.01,2204,sal@prismelectronics.net,Prism Electronics,NOT_FOUND,1129117
+6822,2220YA250472KXTB16,3000,2,20+,stockcheck@atlanticsemi.com,Atlantic Semiconductor,1002457,NOT_FOUND
+6823,TG110-S050N2LFTR,460,0.5,1722,pweitz@semisourceinc.com,Semi Source Inc,NOT_FOUND,NOT_FOUND
+6825,SM24CANB-02HTG,12,5,2014,sal@prismelectronics.net,Prism Electronics,NOT_FOUND,NOT_FOUND
+6827,SM24CANB-02HTG,3000,0.15,1818,brian@microram.com,MicroRam,1002615,NOT_FOUND
+6828,NTCS0603E3103FHT,425,0.3,,shirley@ic-tronix.com,IC-Tronix Inc,1002611,NOT_FOUND
+6830,IMZ120R030M1HXKSA1,720,4.5,2149,sal@prismelectronics.net,Prism Electronics,NOT_FOUND,NOT_FOUND
+6831,DG403DY-T1-E3,4945,2,2022,sales@gsshome.com,GSS,1005513,NOT_FOUND
+6832,T405-600H,2775,0.31,18+,betrinid@celestica.com,Celestica Global Limited,1001118,NOT_FOUND
+6833,RMCP2010FT22R0,10,10,,shirley@ic-tronix.com,IC-Tronix Inc,1002611,NOT_FOUND
+6835,LCMXO3LF-2100C-5BG256C,476,5.8,2241+,betrinid@celestica.com,Celestica Global Limited,1001118,1129855
+6836,MSP430F149IPM,119,10.34,02+,sales@eurodis.nu,Eurodis Components,NOT_FOUND,NOT_FOUND
+6837,MPZ2012S101AT000,8580,0.025,18+,evon.fore@kentzy.com,Kentzy International Inc,1003082,1129117
+6838,BCM5221A4KPTG,827,17.72,08+,sales@eurodis.nu,Eurodis Components,NOT_FOUND,NOT_FOUND
+6839,BCM5221A4KPTG,120,4,23+,michelle.dewitt@converge.com,Converge,1006704,NOT_FOUND
+6840,ISO7740DWR,5,12,2020+,sal@prismelectronics.net,Prism Electronics,NOT_FOUND,NOT_FOUND
+6842,BCP53-16TX,26000,0.22,17+,philip.humphrey@vantageairsupport.com,Vantage IC LLC,NOT_FOUND,NOT_FOUND
+6843,BCM5221A4KPTG,200,4.93,22+,DistiSalesR2@flipelectronics.com,Flip Electronics,NOT_FOUND,NOT_FOUND
+6845,BCM5221A4KPTG,200,6,21,ttasker@cci-inc.com,CCI Inc,1002426,NOT_FOUND
+6846,STM32F103C8T6,500,1.25,22+,joemar@sensiblemicro.com,Sensible Micro Corporation,1002564,NOT_FOUND
+6847,SP12-SN,85,17,18+,GRaso@sptllc.com,Shore Point Technology,1004383,NOT_FOUND
+6848,0251002.MRT1L,100,0.6,2011+,sal@prismelectronics.net,Prism Electronics,NOT_FOUND,NOT_FOUND
+6850,MSP430F149IPMR,100,3,13+,sales@aes-online.com,AES Online,1003406,1129768
+6851,SPP11N80C3,300,0.7,1205,sales@zilex.ca,Zilex Electronics Inc.,1006047,1128746
+6857,BCP53-16TX,11000,0.12,25+,Anna@rotakorn.se,Rotakorn Electronics AB,1002557,NOT_FOUND
+6858,MAX3086ESD+,23,6.52,0711,sal@prismelectronics.net,Prism Electronics,NOT_FOUND,NOT_FOUND
+6859,P600M,5500,0.17,,sales@inelcocomponents.com,Inelco Components,1002948,NOT_FOUND
+6860,TPS63020DSJR,5000,0.68,,excess@vital.global,Vital Electronics Ltd,NOT_FOUND,1130462
+6862,80CPQ150PBF,38,5.25,07+,stockcheck@atlanticsemi.com,Atlantic Semi,1002457,NOT_FOUND
+6863,ADS1115IDGSR,1868,1.03,,anna.sandri@eas.it,EAS S.p.A.,NOT_FOUND,1130462
+6865,ADS1115IDGSR,80,1.35,2020+,sal@prismelectronics.net,Prism Electronics,NOT_FOUND,1130462
+6866,ADS1115IDGSR,1131,1,2328,Sales@HuskyINTL.com,Husky International Electronics,NOT_FOUND,1130462
+6876,B72510E300K62,1600,0.15,15+,sales@flychips.com,Fly Chips,1005735,NOT_FOUND
+6877,MPZ2012S101AT000,7821,0.03,13+,sales@flychips.com,Fly Chips,1005735,1129117
+6882,HCF4093M013TR,21400,0.3,,sales@inelcocomponents.com,Inelco Components,1002948,NOT_FOUND
+6896,SBAS16LT1G,53000,0.1,22+,Anna@rotakorn.se,Rotakorn Electronics AB,1002557,NOT_FOUND
+6903,MPZ2012S101AT000,7821,0.03,13+,sales@flychips.com,FlyChips,1005735,1129117
+6904,B340-13-F,3000,0.06,17,info@tronicpool.de,TronicPool GmbH,NOT_FOUND,1128746
+6905,STM32F103C8T6,4936,2,12+,sales@reboundeu.com,Rebound EU,NOT_FOUND,NOT_FOUND
+6906,HCF4093M013TR,17500,0.5,,daniels@zdi.com,ZD Integrated Circuits,1004406,NOT_FOUND
+6907,P600M-E3/54,4000,0.6,,info@devran.com.tr,Devran Elektronik,NOT_FOUND,1128746
+6910,MPZ2012S101AT000,8000,0.00897,1640,sales@tencell.com,Tencell,1009528,1129117
+6911,MMA8451QR1,5000,0.7,2022+,es@sebacomp.com,Seba Components,1004090,1130462
+6912,SM24CANB02HTG,3000,0.05,1720,info@demotronic.de,demotronic GmbH,NOT_FOUND,NOT_FOUND
+6913,TG110-S050N2LFTR,23,6,12+,linus.jonsson@j2sourcing.com,J2 Sourcing,1002946,NOT_FOUND
+6914,P600M-E3/54,800,0.35,17+,info@ame-gmbh.de,AME GmbH,NOT_FOUND,1128746
+6916,ISO7742DWR,1500,1.32,2242,sales@rifinvestments.com,RIF Investments,NOT_FOUND,NOT_FOUND
+6918,DS3231SN#,2713,5,21+,sales@reboundeu.com,Rebound EU,NOT_FOUND,NOT_FOUND
+6920,J0011D21BNL,2213,3.5,05+,sales@reboundeu.com,Rebound EU,NOT_FOUND,NOT_FOUND
+6921,VS-80CPQ150-N3,175,1.35,22,sales@danmarcomponents.com,Dan-Mar Components,NOT_FOUND,NOT_FOUND
+6922,NTCS0603E3103FHT,4000,0.15,1931,sales@danmarcomponents.com,Dan-Mar Components,NOT_FOUND,NOT_FOUND
+6923,NUP2105LT1G,2541,0.05,21,sales@dotcomps.com,Dot Comps Electronics,NOT_FOUND,NOT_FOUND
+6924,NUP2105LT1G,2541,0.11,2022,mmichnik@micros.com.pl,Micros,NOT_FOUND,NOT_FOUND
+6925,TPS73801DCQR,250,1.6,12+,es@sebacomp.com,Seba Components,1004090,NOT_FOUND
+6927,0251002.MRT1L,981,0.31,,sales@cyclops-electronics.com,Cyclops Electronics,NOT_FOUND,NOT_FOUND
+6927,J0011D21BNL,531,2,07+,sales@cyclops-electronics.com,Cyclops Electronics,NOT_FOUND,NOT_FOUND
+6927,FZT751TA,13827,0.09,,sales@cyclops-electronics.com,Cyclops Electronics,NOT_FOUND,NOT_FOUND
+6927,BAT54S-7-F,3000,0.034,1707,sales@cyclops-electronics.com,Cyclops Electronics,NOT_FOUND,1128746
+6927,DG403DYZ,72,1.389,,sales@cyclops-electronics.com,Cyclops Electronics,NOT_FOUND,NOT_FOUND
+6927,P600M/4,504,0.2,0412,sales@cyclops-electronics.com,Cyclops Electronics,NOT_FOUND,NOT_FOUND
+6927,MAX3086ESD+,100,1.533,15+,sales@cyclops-electronics.com,Cyclops Electronics,NOT_FOUND,NOT_FOUND
+6928,B72510E300K62,1600,0.15,15+,sales@flychips.com,FlyChips,1005735,NOT_FOUND
+6930,B82793S513N201Z97,9000,0.3,21+,sales@tomarkelectronics.com,Tomark Electronics,NOT_FOUND,NOT_FOUND
+6932,BAT54S-7-F,28992,0.034,22+,sales@partner4chips.com,Partner4Chips,NOT_FOUND,1128746
+6934,80CPQ150PBF,500,3.5,09,sales@zilex.ca,Zilex Electronics,1006047,NOT_FOUND
+6936,B72510E300K62,4100,0.05,14,info@hzd-gmbh.de,HZD GmbH,NOT_FOUND,NOT_FOUND
+6937,2220YA250472KXTB16,284,0.7,,sales@npimaterials.com,NPI Materials,1004201,NOT_FOUND
+6938,HCF4093M013TR,14980,0.08,,info@bsr-elektronik.de,BSR-elektronik,NOT_FOUND,NOT_FOUND
+6940,NUP2105LT1-G,7948,0.03,17+,avi@flex-com.com,Flex-Com International,1002863,NOT_FOUND
+6941,BCP53-16TF,24000,0.3,18+,dave.pinho@flipelectronics.com,Flip Electronics,1001208,NOT_FOUND
+6942,NUP2105LT1-G,7948,0.03,21+,avi@flex-com.com,Flex-Com International,1002863,NOT_FOUND
+6943,0251002.MXL,994,0.2,0947,sales@milcraft.com,Milcraft,NOT_FOUND,NOT_FOUND
 6944,RMCP2010FT22R0,10,10.00,,benedek@ic-tronix.com,IC TRONIX INC,NOT_FOUND,1130292
-7013,NTCS0603E3103FHT,425,0.30,,benedek@ic-tronix.com,IC TRONIX INC,NOT_FOUND,1130577
-6981,LM2901AVQDRG4,2200,0.36,1627,gcorti@mistersprockets.com,MISTERSPROCKETS,1003448,NOT_FOUND
 6950,BCP53-16TF,44000,0.30,18+,dave.pinho@flipelectronics.com,Flip Electronics,1001208,1130577
 6951,BCP53-16TX,26000,0.29,18+,philip.humphrey@vantageairsupport.com,Vantage IC LLC,NOT_FOUND,1130577
-7052,LM2585S-5.0/NOPB,20,5.00,,sales@componentonline.com,Component Electronics Inc.,1003092,1130577
+6953,BCP53-16TX,700,0.383,2022,mmichnik@micros.com.pl,Micros sp.j.,NOT_FOUND,1130577
+6954,DG403DYE3,6,8.00,07+,sales@chanetech.com,CHANETECH,1004926,NOT_FOUND
+6955,LM7805CT,250,1.10,07+,sales@chanetech.com,CHANETECH,1004926,NOT_FOUND
+6960,LM2585S-5.0/NOPB,135,4.35,08,linus.jonsson@j2sourcing.com,J2 Sourcing,1002946,1130577
+6961,LM2903AVQDRG4Q1,2400,0.10,1119,ernst.ruth@micro-components.eu,Micro Components H. GmbH,1003294,NOT_FOUND
+6962,MPZ2012S101AT000,3860,0.06,1025,orderdesk@components.se,ECAB,NOT_FOUND,1130292
+6963,IXDD609SI,160,0.89,,sales@voyagercomponents.com,Voyager Components,1002571,1130577
+6964,P600M,23500,0.059,25+,netcomponents@prodeldistribuzione.it,Prod.El. Distribuzione srl,NOT_FOUND,1130577
+6968,594D127X0020R2T,410,0.98,0926,shai@speedc.co.il,Speed Components Ltd.,1004411,1130292
+6969,B72510E300K62,3000,0.06,2022,mmichnik@micros.com.pl,Micros sp.j.,NOT_FOUND,1130577
+6971,BCP53-16TX,700,0.383,2022,mmichnik@micros.com.pl,Micros sp.j.,NOT_FOUND,1130577
+6973,S1J-HE3/61T,84000,0.07,0651,sales@zilex.ca,Zilex electronics Inc.,1006047,NOT_FOUND
+6974,TG110-S050N2LF-TR,750,0.75,18+,mike@integratedelec.com,Integrated Electronics Company,1002612,NOT_FOUND
+6976,0251002.MRT1L,40,1.75,,morgan.snell@chemigraphic.co.uk,Chemigraphic Ltd.,NOT_FOUND,1130292
+6977,B72510E300K62,3000,0.0567,2022,mmichnik@micros.com.pl,Micros sp.j.,NOT_FOUND,1130577
+6979,SBAS16LT3G,32600,0.009,0809,sales@inelcocomponents.com,INELCO Components,1002948,1130292
+6981,LM2901AVQDRG4,2200,0.36,1627,gcorti@mistersprockets.com,MISTERSPROCKETS,1003448,1128746
+6984,MAX3086ESD+,100,3.72,,anna.sandri@eas.it,EAS S.p.A.,NOT_FOUND,NOT_FOUND
+6985,TPS73801DCQR,300,1.35,18+,sales@flychips.com,Fly Chips Electronics,1005735,1130577
+6986,DG403DY-T1-E3,24,5.00,18+,distysales@northshorecomponents.com,North Shore Components,NOT_FOUND,1130292
+6987,HCF4093M013TR,14935,0.15,12+,linus.jonsson@j2sourcing.com,J2 Sourcing,1002946,1130577
 6988,B340-13-F,69000,0.11,22+,chris.l@nacsemi.com,NAC Semi,NOT_FOUND,1130577
+6991,FWH-125B,30,119.99,,accordtec@gmail.com,Accord Technologies,NOT_FOUND,1130292
+6992,L50QS125,3,209.99,,accordtec@gmail.com,Accord Technologies,NOT_FOUND,1130292
+6993,FZT751TA,888,0.099,99,victoria.abt@derf.com,DERF ELECTRONICS CORP,1002452,NOT_FOUND
+6993,FZT751TA,632,0.099,02,victoria.abt@derf.com,DERF ELECTRONICS CORP,1002452,NOT_FOUND
+6994,J0011D21BNL,20,4.00,,amy.g@hybridelectronics.com,Hybrid Electronics Corporation,NOT_FOUND,1130292
+6997,S1JHE3_A/H,9800,0.03,15+,cory@tcxmicro.com,TCX MICRO S.L.,1002568,1130292
+7003,SM24CANB-02HTG,10,6.00,2014,sal@prismelectronics.net,Prism Electronics,NOT_FOUND,1130577
 7008,P600M/4,1400,0.621,03+,JamesB@pccomponents.com,PC Components Company,1002553,NOT_FOUND
 7009,TG110-S050N2RLTR,725,0.695,,JamesB@pccomponents.com,PC Components Company,1002553,NOT_FOUND
+7013,NTCS0603E3103FHT,425,0.30,,benedek@ic-tronix.com,IC TRONIX INC,NOT_FOUND,1130577
 7015,BCP53-16TX,48900,0.49,,PaulRoberts@SolidTechnologySolutions.com,Solid Technology Solutions Inc.,1008005,1130577
 7015,BCP53-16TF,72000,0.49,1803,PaulRoberts@SolidTechnologySolutions.com,Solid Technology Solutions Inc.,1008005,1130577
 7017,MAX3086ESD+,15,10.00,1036,victoria.abt@derf.com,DERF ELECTRONICS CORP,1002452,NOT_FOUND
-7019,DG403DY-T1-E3,1069,1.45,1544,michael@scidev.com,Scientific Devices Inc.,1003059,1130292
 7018,PCL037-4,25,1.25,2008+,sal@prismelectronics.net,Prism Electronics,NOT_FOUND,NOT_FOUND
+7019,DG403DY-T1-E3,1069,1.45,1544,michael@scidev.com,Scientific Devices Inc.,1003059,1130292
 7020,DG403DY-E3,2018,1.45,22+,ttasker@cci-inc.com,CCI,1002426,1130292
-7021,LM2901AVQDRG4,2200,0.36,1627,gcorti@mistersprockets.com,MISTERSPROCKETS,1003448,NOT_FOUND
+7021,LM2901AVQDRG4,2200,0.36,1627,gcorti@mistersprockets.com,MISTERSPROCKETS,1003448,1128746
 7022,LM2585S-5.0/NOPB,20,5.00,,sales@componentonline.com,Component Electronics Inc.,1003092,1130577
 7023,4-1437565-2,1906,0.05,1216,Sales@HuskyINTL.com,Husky International Electronics,NOT_FOUND,1130577
 7024,FZT751TA,3700,0.12,,sales@inelcocomponents.com,INELCO,1002948,NOT_FOUND
@@ -65,3 +153,4 @@ emailId,mpn,qty,price,dc,vendor_email,vendor_name,vendor_search_key,rfq_number
 7049,IXDD609SI,100,5.00,2209,danny.heslin@blueravencorp.com,Crestwood Technology Group,1004598,1130577
 7050,LM2591HVS-5.0NOPB,35,5.00,,stockcheck@atlanticsemi.com,Atlantic Semiconductor,1002457,NOT_FOUND
 7051,594D127X0020R2T,410,2.00,0424,eric@inventorymp.com,Inventory Management Partners,NOT_FOUND,1130292
+7052,LM2585S-5.0/NOPB,20,5.00,,sales@componentonline.com,Component Electronics Inc.,1003092,1130577

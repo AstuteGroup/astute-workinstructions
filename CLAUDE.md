@@ -144,10 +144,12 @@ Process:
 5. Repeat until all emails processed
 
 **What to skip during extraction:**
-- RFQ forwards (outbound, no quote)
-- Target price requests (no quote data)
-- Empty forwards (no vendor response)
-- Duplicates (same vendor, same part, same quote)
+- No-bids (vendor explicitly declined to quote)
+- Target price requests (vendor asking for price, no quote data)
+- Empty forwards (no vendor response in the body)
+- Duplicates (same vendor, same part, same quote already extracted)
+
+**IMPORTANT:** All emails are forwards from team members. The vendor response is BELOW Jake's signature block. Always read to the bottom of the email to find the actual quote.
 
 **Step 4: Categorize Remaining**
 
