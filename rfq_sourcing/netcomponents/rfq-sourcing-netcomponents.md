@@ -19,6 +19,7 @@ This automation:
 | **Inventory Type** | In-Stock only (skip Brokered Inventory Listings) |
 | **Supplier Type** | Skip franchised/authorized distributors (detected via `ncauth` class in DOM) |
 | **Regions** | Americas and Europe only (Asia/Other excluded - handled by separate purchasing group) |
+| **MPN Match** | EXACT matches prioritized > PACKAGING_SAFE > COMPLIANCE/SPEC (flagged) |
 | **Quantity** | Supplier must have qty >= requested qty (fallback: largest available if none qualify) |
 | **Date Code** | Fresh DC (2024+) prioritized, but never rules out suppliers |
 | **Max per Region** | 3 suppliers per region (+1 if unknown DCs in selection) |
@@ -58,12 +59,60 @@ When a supplier has **less than the requested quantity**, the RFQ quantity is au
 | 500 | 480 | 475 (rounded to nearest 25) |
 | 500 | 123 | 123 (rounding would exceed 10%) |
 
-### Part Number Variants
+### MPN Variant Prioritization
 
-The automation aggregates quantities across part number variants from the same supplier:
-- Base part (e.g., `DS3231SN#`)
-- Tape & Reel variants (`DS3231SN#T&R`, `DS3231SN#TR`)
-- Other packaging suffixes
+When searching for a part, NetComponents may return variants with different suffixes. The automation classifies these variants and prioritizes suppliers accordingly.
+
+**Suffix Categories:**
+
+| Category | Suffixes | Risk Level |
+|----------|----------|------------|
+| **Packaging (T&R)** | T&R, TR, T1, REEL, TAPE | Context-dependent |
+| **Packaging (Other)** | TUBE, TRAY, BULK, CUT, RAIL | Context-dependent |
+| **RoHS/Compliance** | G, G4, PBF, LF, NOPB, ROHS, Z | **Risky** — spec change |
+| **Temperature** | E, I, M, C | **Risky** — different operating range |
+| **Automotive** | Q, Q1, AEC | **Risky** — different qualification |
+| **Military** | 883, JAN, MIL, JANTX | **Risky** — different qualification |
+
+**Match Types:**
+
+| Match Type | Description | Priority | Action |
+|------------|-------------|----------|--------|
+| `EXACT` | MPN matches exactly | Highest | Select |
+| `PACKAGING_SAFE` | T&R variant when customer didn't specify packaging | High | Select |
+| `PACKAGING_MISMATCH` | Tubes/trays when customer requested T&R (or vice versa) | Medium | Flag (harder sell) |
+| `COMPLIANCE` | RoHS/lead-free variant (G, G4, PBF) | Low | **Flag for review** |
+| `SPEC` | Temperature, automotive, or military variant | Low | **Flag for review** |
+
+**Bidirectional Packaging Logic:**
+
+| Customer Requests | Supplier Offers | Match Type |
+|-------------------|-----------------|------------|
+| Base part (no packaging) | T&R variant | `PACKAGING_SAFE` — T&R almost always OK |
+| Base part (no packaging) | Tube/Tray | `PACKAGING_SAFE` — generally OK |
+| **T&R explicitly** | Tube/Tray | `PACKAGING_MISMATCH` — harder sell |
+| Tube/Tray explicitly | T&R | `PACKAGING_MISMATCH` — cost/handling different |
+
+**Example: Customer requests `NUP2105L`**
+
+| Offered MPN | Match Type | Flags | Action |
+|-------------|------------|-------|--------|
+| NUP2105L | EXACT | | ✓ Select (highest priority) |
+| NUP2105LT1 | PACKAGING_SAFE | T1=T&R | ✓ Select |
+| NUP2105LT1G | COMPLIANCE | T1=T&R, G=RoHS | ⚠ Flag — RoHS variant |
+| NUP2105LG | COMPLIANCE | G=RoHS | ⚠ Flag — RoHS variant |
+
+**Why this matters:** If a customer needs leaded parts (military/aerospace, legacy manufacturing), RoHS alternatives are **not acceptable**. The automation flags these so you can review before quoting.
+
+**Output columns added:**
+- `Offered MPN` — The actual MPN the supplier is listing
+- `Match Type` — EXACT, PACKAGING_SAFE, PACKAGING_MISMATCH, COMPLIANCE, SPEC
+- `Variant Flags` — Human-readable suffix descriptions (e.g., "T1=T&R, G=RoHS")
+
+**Color coding in Excel:**
+- `COMPLIANCE` — Light red background
+- `SPEC` — Orange background
+- `PACKAGING_MISMATCH` — Light yellow background
 
 ### Europe Suppliers
 
@@ -186,17 +235,22 @@ RFQ_1130292/
 **Output Excel columns:**
 - RFQ Line
 - CPC (Customer Part Code)
-- Part Number
+- Part Number — What the customer requested
+- **Offered MPN** — What the supplier is actually listing
+- **Match Type** — EXACT, PACKAGING_SAFE, PACKAGING_MISMATCH, COMPLIANCE, SPEC
+- **Variant Flags** — Human-readable suffix descriptions (e.g., "T1=T&R, G=RoHS")
 - Qty Requested
 - Qty Sent (may be adjusted if supplier has less)
 - Supplier
 - Region
 - Supplier Qty
+- Min Order $ — Supplier's minimum order value (if detected)
+- Est Value $ — Estimated opportunity value (for min order filtering)
 - Qualifying (total qualifying suppliers found for this part)
 - Qual Amer (qualifying suppliers in Americas)
 - Qual Eur (qualifying suppliers in Europe)
 - Selected (how many suppliers were selected/used)
-- Status (SENT/FAILED/NO_SUPPLIERS - color coded)
+- Status (SENT/FAILED/NO_SUPPLIERS/OMITTED - color coded)
 - Timestamp
 - Error (if any)
 - Worker (which browser instance processed it)
@@ -389,3 +443,7 @@ The search results table has a hierarchical structure:
 - [x] Timing jitter for natural appearance
 - [x] Date code prioritization
 - [x] Quantity adjustment to encourage quoting
+- [x] MPN variant prioritization (EXACT > PACKAGING_SAFE > COMPLIANCE/SPEC)
+- [ ] Same part / same supplier cooldown (60 days)
+- [ ] No-bid filtering (skip vendor+MPN if no-bid within 90 days)
+- [ ] Supplier fatigue tracking

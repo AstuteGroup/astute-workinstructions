@@ -78,7 +78,7 @@ Consolidated roadmap for RFQ Sourcing and VQ Processing workflows, organized by 
 | B3 | Supplier Fatigue Tracking | **Next** | Planned |
 | B4 | LLM Description Scanning | Later | Planned |
 | B5 | Cross-Region Duplicate Detection | Later | Planned |
-| B6 | MPN Variant Prioritization | **Now** | In Progress |
+| B6 | MPN Variant Prioritization | **Now** | ✅ Done |
 | B7 | Memory Product Handling | Later | Planned |
 | B8 | BrokerBin RFQ Automation | Later | Planned |
 | B9 | PartsBase RFQ Automation | Later | Planned |
@@ -230,7 +230,7 @@ IF (Supplier + MPN) requested within last 60 days → SKIP
 
 ## B6. MPN Variant Prioritization
 
-**Status:** In Progress | **Priority:** Now
+**Status:** ✅ Done | **Priority:** Now
 
 **Problem:** NetComponents returns MPN variants that may not be acceptable substitutes:
 - Customer requests `NUP2105L`, system sources `NUP2105LT1G`
@@ -596,6 +596,7 @@ const AUTO_SUFFIXES = /[-#]?(Q|Q1|AEC)$/i;
 - [x] Cross-region balancing
 - [x] Min order value filtering
 - [x] Basic MPN packaging normalization
+- [x] **MPN Variant Prioritization (B6)** — Suffix classification (packaging/compliance/spec), bidirectional packaging logic, match type in priority scoring, Excel output with color coding
 
 ## Section C: VQ Processing
 - [x] NoBid folder cleanup
