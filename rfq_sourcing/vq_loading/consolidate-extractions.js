@@ -45,11 +45,33 @@ try {
   console.log('No old extractions file found, skipping');
 }
 
+// Load no-bid records
+let noBidRecords = [];
+try {
+  const noBidJson = JSON.parse(fs.readFileSync('/home/analytics_user/workspace/astute-workinstructions/rfq_sourcing/vq_loading/nobid-extractions.json', 'utf8'));
+  noBidRecords = noBidJson.records || [];
+  console.log(`Loaded ${noBidRecords.length} no-bid records`);
+} catch (e) {
+  console.log('No no-bid extractions file found, skipping');
+}
+
+// Load PDF extractions
+let pdfRecords = [];
+try {
+  const pdfJson = JSON.parse(fs.readFileSync('/home/analytics_user/workspace/astute-workinstructions/rfq_sourcing/vq_loading/pdf-extractions.json', 'utf8'));
+  pdfRecords = pdfJson.records || [];
+  console.log(`Loaded ${pdfRecords.length} PDF records`);
+} catch (e) {
+  console.log('No PDF extractions file found, skipping');
+}
+
 // Get all unique vendor emails
 const allEmails = [...new Set([
   ...existingRecords.map(r => r.vendor_email?.toLowerCase()),
   ...newRecords.map(r => r.vendor_email?.toLowerCase()),
-  ...oldRecords.map(r => r.vendor_email?.toLowerCase())
+  ...oldRecords.map(r => r.vendor_email?.toLowerCase()),
+  ...noBidRecords.map(r => r.vendor_email?.toLowerCase()),
+  ...pdfRecords.map(r => r.vendor_email?.toLowerCase())
 ].filter(Boolean))];
 
 console.log(`${allEmails.length} unique vendor emails to lookup`);
@@ -86,7 +108,9 @@ function queryRfqNumbers() {
   const allMpns = [...new Set([
     ...existingRecords.map(r => r.mpn?.toUpperCase()),
     ...newRecords.map(r => r.mpn?.toUpperCase()),
-    ...oldRecords.map(r => r.mpn?.toUpperCase())
+    ...oldRecords.map(r => r.mpn?.toUpperCase()),
+    ...noBidRecords.map(r => r.mpn?.toUpperCase()),
+    ...pdfRecords.map(r => r.mpn?.toUpperCase())
   ].filter(Boolean))];
 
   // Create patterns for fuzzy matching (remove trailing characters)
@@ -222,6 +246,34 @@ const enrichedOld = oldRecords.map(r => ({
   rfq_number: findRfq(r.mpn)
 }));
 
+// Enrich no-bid records
+const enrichedNoBid = noBidRecords.map(r => ({
+  emailId: r.emailId,
+  mpn: r.mpn,
+  qty: 0,
+  price: 0,
+  dc: '',
+  vendor_email: r.vendor_email,
+  vendor_name: r.vendor_name,
+  vendor_search_key: vendorMap[r.vendor_email?.toLowerCase()] || 'NOT_FOUND',
+  rfq_number: findRfq(r.mpn),
+  notes: r.notes || 'No-bid'
+}));
+
+// Enrich PDF records
+const enrichedPdf = pdfRecords.map(r => ({
+  emailId: r.emailId,
+  mpn: r.mpn,
+  qty: r.qty,
+  price: r.price,
+  dc: r.dc || '',
+  vendor_email: r.vendor_email,
+  vendor_name: r.vendor_name,
+  vendor_search_key: vendorMap[r.vendor_email?.toLowerCase()] || 'NOT_FOUND',
+  rfq_number: findRfq(r.mpn),
+  notes: r.notes || ''
+}));
+
 // Update existing records that had NOT_FOUND for vendor_search_key
 const updatedExisting = existingRecords.map(r => ({
   ...r,
@@ -234,7 +286,7 @@ const updatedExisting = existingRecords.map(r => ({
 }));
 
 // Combine all records, sort by emailId
-const allRecords = [...updatedExisting, ...enrichedNew, ...enrichedOld]
+const allRecords = [...updatedExisting, ...enrichedNew, ...enrichedOld, ...enrichedNoBid, ...enrichedPdf]
   .sort((a, b) => parseInt(a.emailId) - parseInt(b.emailId));
 
 // Remove exact duplicates (same emailId, mpn, qty, price, vendor_email)
@@ -255,9 +307,9 @@ console.log(`Vendor search_key found: ${vendorFound}/${deduped.length}`);
 console.log(`RFQ number found: ${rfqFound}/${deduped.length}`);
 
 // Write CSV
-const csvHeader = 'emailId,mpn,qty,price,dc,vendor_email,vendor_name,vendor_search_key,rfq_number';
+const csvHeader = 'emailId,mpn,qty,price,dc,vendor_email,vendor_name,vendor_search_key,rfq_number,notes';
 const csvLines = deduped.map(r =>
-  `${r.emailId},${r.mpn},${r.qty},${r.price},${r.dc || ''},${r.vendor_email},${r.vendor_name},${r.vendor_search_key},${r.rfq_number}`
+  `${r.emailId},${r.mpn},${r.qty},${r.price},${r.dc || ''},${r.vendor_email},${r.vendor_name},${r.vendor_search_key},${r.rfq_number},${r.notes || ''}`
 );
 
 const csvOutput = [csvHeader, ...csvLines].join('\n');
