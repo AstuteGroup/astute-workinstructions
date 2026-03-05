@@ -426,6 +426,12 @@ function formatVqLine(r) {
   // - Other notes from extraction
   let vendorNotes = r.notes || '';
 
+  // Currency: blank if USD, only specify for EUR/GBP/other
+  const currency = (r.currency && r.currency !== 'USD') ? r.currency : '';
+
+  // Lead Time: default to "stock" if not specified
+  const leadTime = r.lead_time || 'stock';
+
   return [
     r.rfq_number === 'NOT_FOUND' ? 'NEEDS_RFQ' : r.rfq_number,  // RFQ Search Key
     'Jake Harris',                                               // Buyer (all emails forwarded by Jake)
@@ -435,12 +441,12 @@ function formatVqLine(r) {
     r.mfr || '',                                                 // MFR Text (not captured - blank)
     r.qty,                                                       // Quoted Quantity
     r.price,                                                     // Cost
-    r.currency || 'USD',                                         // Currency (default USD)
+    currency,                                                    // Currency (blank = USD)
     r.dc || '',                                                  // Date Code
     r.moq || '',                                                 // MOQ (not captured)
     r.spq || '',                                                 // SPQ (not captured)
     r.packaging || '',                                           // Packaging (not captured)
-    r.lead_time || '',                                           // Lead Time (not captured)
+    leadTime,                                                    // Lead Time (default: stock)
     r.coo || '',                                                 // COO (not captured)
     r.rohs || '',                                                // RoHS (not captured)
     escapeCsvField(vendorNotes)                                  // Vendor Notes
