@@ -164,13 +164,13 @@ himalaya message move --account vq --folder NeedsVendor Processed [IDs...]
 
 ## Quick Start
 
-**Current workflow is 100% manual extraction.** No automated templates exist.
-
 ```bash
-# 1. Read emails manually via himalaya
-himalaya envelope list --account vq --folder INBOX --page-size 500
+# 1. Fetch emails and run template extraction (for known vendors)
+node ~/workspace/vq-parser/src/index.js fetch
 
-# 2. Extract in Claude session → save to JSON files
+# 2. Manual extraction in Claude session for remaining emails
+himalaya envelope list --account vq --folder INBOX --page-size 500
+# Extract → save to JSON files in vq_loading/
 
 # 3. Consolidate all extractions into upload-ready CSV
 node ~/workspace/astute-workinstructions/rfq_sourcing/vq_loading/consolidate-extractions.js
@@ -178,7 +178,31 @@ node ~/workspace/astute-workinstructions/rfq_sourcing/vq_loading/consolidate-ext
 
 **Output:** `vq-upload-ready.csv` (231 records as of 2026-03-05)
 
-**Note:** Vendor templates were planned but never implemented. The rigid parser (`vq-parser/`) is legacy and not used.
+---
+
+## Vendor Templates
+
+Templates auto-extract quotes from known vendor formats. Located in `~/workspace/vq-parser/templates/`:
+
+| Template | Vendor | Domains |
+|----------|--------|---------|
+| `velocity.js` | Velocity Electronics | velocityelec.com |
+| `chip1.js` | Chip 1 Stop | chip1.com |
+| `j2-sourcing.js` | J2 Sourcing | j2sourcing.com |
+| `semitech.js` | Semitech Semiconductor | semitech.net |
+| `akira-global.js` | Akira Global | akiraglobal.com |
+
+**Template flow:**
+1. `fetch` command runs template engine on incoming emails
+2. Template matches by sender domain + content patterns
+3. Matched emails → auto-extracted → moved to Processed
+4. Unmatched emails → stay in INBOX for manual extraction
+
+**Adding new templates:** When a vendor sends many quotes with consistent format, create a new template in `~/workspace/vq-parser/templates/`. Each template exports:
+- `TEMPLATE_ID` - unique identifier
+- `VENDOR_DOMAINS` - array of email domains
+- `matches(emailBody)` - returns true if email matches this vendor
+- `extract(emailBody)` - extracts MPN, qty, price, date code, etc.
 
 ---
 
