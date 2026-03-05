@@ -1,0 +1,11 @@
+# Intermediate extraction data (session-specific)
+*-extractions*.json
+*-extractions*.csv
+verified-extractions-batch*
+verified-extractions-all*
+
+# Keep final outputs tracked:
+# - vq-upload-ready.csv
+# - needs-vendor.csv
+!vq-upload-ready.csv
+!needs-vendor.csv

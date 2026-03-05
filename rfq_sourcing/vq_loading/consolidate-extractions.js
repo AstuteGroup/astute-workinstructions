@@ -400,49 +400,29 @@ const rfqFound = deduped.filter(r => r.rfq_number !== 'NOT_FOUND').length;
 console.log(`Vendor search_key found: ${vendorFound}/${deduped.length}`);
 console.log(`RFQ number found: ${rfqFound}/${deduped.length}`);
 
-// Write CSV
+// Split records: upload-ready vs needs-vendor
 const csvHeader = 'emailId,mpn,qty,price,dc,vendor_email,vendor_name,vendor_search_key,rfq_number,notes';
-const csvLines = deduped.map(r =>
-  `${r.emailId},${r.mpn},${r.qty},${r.price},${r.dc || ''},${r.vendor_email},${r.vendor_name},${r.vendor_search_key},${r.rfq_number},${r.notes || ''}`
+const formatCsvLine = r =>
+  `${r.emailId},${r.mpn},${r.qty},${r.price},${r.dc || ''},${r.vendor_email},${r.vendor_name},${r.vendor_search_key},${r.rfq_number},${r.notes || ''}`;
+
+// Upload-ready: has vendor_search_key
+const uploadReady = deduped.filter(r => r.vendor_search_key !== 'NOT_FOUND');
+fs.writeFileSync(
+  '/home/analytics_user/workspace/astute-workinstructions/rfq_sourcing/vq_loading/vq-upload-ready.csv',
+  [csvHeader, ...uploadReady.map(formatCsvLine)].join('\n')
 );
 
-const csvOutput = [csvHeader, ...csvLines].join('\n');
-fs.writeFileSync('/home/analytics_user/workspace/astute-workinstructions/rfq_sourcing/vq_loading/verified-extractions-all-enriched.csv', csvOutput);
-
-// Write JSON
-const jsonOutput = {
-  extractedAt: new Date().toISOString().split('T')[0],
-  totalRecords: deduped.length,
-  vendorFoundCount: vendorFound,
-  rfqFoundCount: rfqFound,
-  records: deduped
-};
-fs.writeFileSync('/home/analytics_user/workspace/astute-workinstructions/rfq_sourcing/vq_loading/verified-extractions-all.json', JSON.stringify(jsonOutput, null, 2));
-
-// Generate needs-vendor report (complete quotes missing vendor)
+// Needs-vendor: complete quotes (qty>0, price>0) missing vendor
 const needsVendor = deduped.filter(r =>
   r.vendor_search_key === 'NOT_FOUND' &&
   parseFloat(r.qty) > 0 &&
   parseFloat(r.price) > 0
 );
-const needsVendorReport = {
-  generatedAt: new Date().toISOString().split('T')[0],
-  totalRecords: needsVendor.length,
-  uniqueVendors: [...new Set(needsVendor.map(r => r.vendor_email))].length,
-  action: 'Add these vendors to iDempiere, then re-run consolidation. Move emails to NeedsVendor folder.',
-  records: needsVendor.map(r => ({
-    emailId: r.emailId,
-    mpn: r.mpn,
-    qty: r.qty,
-    price: r.price,
-    vendor_email: r.vendor_email,
-    vendor_name: r.vendor_name,
-    rfq_number: r.rfq_number
-  }))
-};
-fs.writeFileSync('/home/analytics_user/workspace/astute-workinstructions/rfq_sourcing/vq_loading/needs-vendor.json', JSON.stringify(needsVendorReport, null, 2));
+fs.writeFileSync(
+  '/home/analytics_user/workspace/astute-workinstructions/rfq_sourcing/vq_loading/needs-vendor.csv',
+  [csvHeader, ...needsVendor.map(formatCsvLine)].join('\n')
+);
 
-console.log('\nFiles written:');
-console.log('  - verified-extractions-all-enriched.csv');
-console.log('  - verified-extractions-all.json');
-console.log(`  - needs-vendor.json (${needsVendor.length} records, ${needsVendorReport.uniqueVendors} vendors to add)`);
+console.log('\nFinal outputs:');
+console.log(`  - vq-upload-ready.csv (${uploadReady.length} records)`);
+console.log(`  - needs-vendor.csv (${needsVendor.length} records, ${[...new Set(needsVendor.map(r => r.vendor_email))].length} vendors to add)`);
