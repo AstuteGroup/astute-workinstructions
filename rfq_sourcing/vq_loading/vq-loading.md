@@ -102,7 +102,30 @@ Total emails: [count]
 Total records: [count]
 Total no-bids: [count]
 Total processing time: [X minutes]
+
+Vendor match rate: [X]% ([matched]/[total])
+RFQ match rate: [X]% ([matched]/[total])
+
+Top vendors by quote volume:
+1. [Vendor Name] - [count] quotes
+2. [Vendor Name] - [count] quotes
+3. [Vendor Name] - [count] quotes
 ```
+
+### Vendor Frequency Tracking
+
+Track which vendors respond most frequently to identify:
+- **High-volume vendors** → Prioritize for template development
+- **New vendors** → Add to iDempiere if missing
+- **Response patterns** → Useful for sourcing strategy
+
+After consolidation, review vendor frequency:
+```bash
+# Get vendor quote counts from tracking file
+cut -d',' -f7 vq-upload-ready-tracking.csv | sort | uniq -c | sort -rn | head -20
+```
+
+Document high-frequency vendors that don't have templates yet as candidates for future automation.
 
 ### Output
 - `vq-upload-ready.csv` - VQ Mass Upload Template format, ready for iDempiere import
