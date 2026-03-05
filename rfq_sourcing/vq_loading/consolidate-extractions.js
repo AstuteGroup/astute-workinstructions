@@ -124,15 +124,15 @@ function queryRfqNumbers() {
   }
 }
 
-// Also try RFQ lookup from rfq_line table directly
-function queryRfqFromLines() {
+// Query RFQ from the correct table: chuboe_rfq_line_mpn
+function queryRfqFromLineMpn() {
   const sql = `
-    SELECT UPPER(rl.chuboe_mpn_clean) as mpn, r.value as rfq_number
-    FROM adempiere.chuboe_rfq_line rl
-    JOIN adempiere.chuboe_rfq r ON rl.chuboe_rfq_id = r.chuboe_rfq_id
-    WHERE r.created >= CURRENT_DATE - INTERVAL '30 days'
-    AND rl.chuboe_mpn_clean IS NOT NULL
-    AND rl.chuboe_mpn_clean != ''
+    SELECT UPPER(rlm.chuboe_mpn_clean) as mpn_clean, r.value as rfq_number
+    FROM adempiere.chuboe_rfq_line_mpn rlm
+    JOIN adempiere.chuboe_rfq r ON rlm.chuboe_rfq_id = r.chuboe_rfq_id
+    WHERE r.created >= CURRENT_DATE - INTERVAL '60 days'
+    AND rlm.chuboe_mpn_clean IS NOT NULL
+    AND rlm.chuboe_mpn_clean != ''
   `;
 
   try {
@@ -141,14 +141,20 @@ function queryRfqFromLines() {
     result.trim().split('\n').filter(l => l).forEach(line => {
       const [mpn, rfqNum] = line.split('|');
       if (mpn && rfqNum) {
+        // Store the cleaned MPN format
         rfqMap[mpn.toUpperCase()] = rfqNum;
       }
     });
     return rfqMap;
   } catch (e) {
-    console.error('Error querying RFQ lines:', e.message);
+    console.error('Error querying RFQ line MPNs:', e.message);
     return {};
   }
+}
+
+// Clean MPN to match database format (remove special chars)
+function cleanMpn(mpn) {
+  return mpn.toUpperCase().replace(/[-\/\.\s_#]/g, '');
 }
 
 // Main enrichment
@@ -156,27 +162,31 @@ const vendorMap = queryVendorSearchKeys();
 console.log(`Found ${Object.keys(vendorMap).length} vendor search keys`);
 
 const rfqMap = queryRfqNumbers();
-const rfqLineMap = queryRfqFromLines();
-const combinedRfqMap = { ...rfqLineMap, ...rfqMap };
-console.log(`Found ${Object.keys(combinedRfqMap).length} RFQ mappings`);
+const rfqLineMpnMap = queryRfqFromLineMpn();
+const combinedRfqMap = { ...rfqMap, ...rfqLineMpnMap };
+console.log(`Found ${Object.keys(combinedRfqMap).length} RFQ mappings (${Object.keys(rfqLineMpnMap).length} from rfq_line_mpn)`);
 
 // Helper to find RFQ with fuzzy matching
 function findRfq(mpn) {
   const upperMpn = mpn.toUpperCase();
+  const cleanedMpn = cleanMpn(mpn);
 
-  // Exact match first
+  // Try cleaned MPN first (matches database format)
+  if (combinedRfqMap[cleanedMpn]) return combinedRfqMap[cleanedMpn];
+
+  // Exact match with original format
   if (combinedRfqMap[upperMpn]) return combinedRfqMap[upperMpn];
 
-  // Try without common suffixes
+  // Try variations of cleaned MPN
   const variations = [
-    upperMpn.replace(/-E3$/, ''),
-    upperMpn.replace(/\/NOPB$/, ''),
-    upperMpn.replace(/-T1-E3$/, '-E3'),
-    upperMpn.replace(/-E3\/54$/, ''),
-    upperMpn.replace(/TR$/, ''),
-    upperMpn.replace(/LF$/, ''),
-    upperMpn.slice(0, -1),
-    upperMpn.slice(0, -2)
+    cleanedMpn.replace(/E3$/, ''),
+    cleanedMpn.replace(/NOPB$/, ''),
+    cleanedMpn.replace(/T1E3$/, 'E3'),
+    cleanedMpn.replace(/TR$/, ''),
+    cleanedMpn.replace(/LF$/, ''),
+    cleanedMpn.slice(0, -1),
+    cleanedMpn.slice(0, -2),
+    cleanedMpn.slice(0, -3)
   ];
 
   for (const v of variations) {

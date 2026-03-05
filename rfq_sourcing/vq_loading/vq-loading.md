@@ -44,6 +44,17 @@ himalaya message read --account vq --folder INBOX [ID]
 - `verified-extractions-all.json` - Full results with stats
 - `verified-extractions-all-enriched.csv` - With vendor_search_key and rfq_number
 
+### Post-Extraction: Move to Processed
+After extracting quotes from emails, move them to Processed folder:
+```bash
+# Move specific email IDs to Processed
+himalaya message move --account vq --folder INBOX Processed 6944 6950 6951 ...
+
+# Verify counts
+himalaya envelope list --account vq --folder INBOX --page-size 500 | grep -c "^|"
+himalaya envelope list --account vq --folder Processed --page-size 500 | grep -c "^|"
+```
+
 ### Skip Rules
 - **No-bid**: Vendor explicitly declined to quote (skip)
 - **Target price request**: Vendor asking for price, no actual quote (skip)

@@ -2,13 +2,13 @@
   "extractedAt": "2026-03-05",
   "totalRecords": 159,
   "vendorFoundCount": 86,
-  "rfqFoundCount": 74,
+  "rfqFoundCount": 148,
   "records": [
     {
       "emailId": "2195",
       "mpn": "MPZ2012S101AT000",
-      "qty": 7000,
-      "price": 0.01,
+      "qty": "7000",
+      "price": "0.01",
       "dc": "2204+",
       "vendor_email": "sal@prismelectronics.net",
       "vendor_name": "Prism Electronics",
@@ -18,35 +18,35 @@
     {
       "emailId": "2239",
       "mpn": "FSM4JSMATR",
-      "qty": 3925,
-      "price": 0.1,
+      "qty": "3925",
+      "price": "0.1",
       "dc": "",
       "vendor_email": "julia.wu@ultrontech.co.uk",
       "vendor_name": "Ultron Tech",
       "vendor_search_key": "NOT_FOUND",
-      "rfq_number": "NOT_FOUND"
+      "rfq_number": "1130292"
     },
     {
       "emailId": "4168",
       "mpn": "DG403DYZ",
-      "qty": 7,
-      "price": 14.29,
+      "qty": "7",
+      "price": "14.29",
       "dc": "",
       "vendor_email": "sales@sierraic.com",
       "vendor_name": "Sierra IC Inc",
       "vendor_search_key": "1002573",
-      "rfq_number": "NOT_FOUND"
+      "rfq_number": "1130292"
     },
     {
       "emailId": "5738",
       "mpn": "PCL037-0",
-      "qty": 2,
-      "price": 1.8,
+      "qty": "2",
+      "price": "1.8",
       "dc": "",
       "vendor_email": "hicks@standardsupply.com",
       "vendor_name": "Standard Supply Electronics",
       "vendor_search_key": "NOT_FOUND",
-      "rfq_number": "NOT_FOUND"
+      "rfq_number": "1130292"
     },
     {
       "emailId": "6774",
@@ -57,7 +57,7 @@
       "vendor_email": "pweitz@semisourceinc.com",
       "vendor_name": "Semi Source Inc.",
       "vendor_search_key": "NOT_FOUND",
-      "rfq_number": "NOT_FOUND"
+      "rfq_number": "1130292"
     },
     {
       "emailId": "6777",
@@ -79,7 +79,7 @@
       "vendor_email": "es@sebacomp.com",
       "vendor_name": "SEBACOMP",
       "vendor_search_key": "1004090",
-      "rfq_number": "NOT_FOUND"
+      "rfq_number": "1130292"
     },
     {
       "emailId": "6788",
@@ -90,7 +90,7 @@
       "vendor_email": "info@tautec-electronics.de",
       "vendor_name": "Tautec Electronics",
       "vendor_search_key": "1003181",
-      "rfq_number": "NOT_FOUND"
+      "rfq_number": "1130292"
     },
     {
       "emailId": "6794",
@@ -101,7 +101,7 @@
       "vendor_email": "igal@electrion.co.il",
       "vendor_name": "Electrion Ltd.",
       "vendor_search_key": "1004137",
-      "rfq_number": "NOT_FOUND"
+      "rfq_number": "1130292"
     },
     {
       "emailId": "6797",
@@ -112,7 +112,7 @@
       "vendor_email": "pbrasme@holdelec.fr",
       "vendor_name": "HOLDELEC",
       "vendor_search_key": "1003216",
-      "rfq_number": "NOT_FOUND"
+      "rfq_number": "1130292"
     },
     {
       "emailId": "6798",
@@ -134,7 +134,7 @@
       "vendor_email": "b.isikgoz@koel.com.tr",
       "vendor_name": "KOEL",
       "vendor_search_key": "NOT_FOUND",
-      "rfq_number": "NOT_FOUND"
+      "rfq_number": "1130292"
     },
     {
       "emailId": "6806",
@@ -145,7 +145,7 @@
       "vendor_email": "bob@elitesemi.com",
       "vendor_name": "Elite Semiconductor Products",
       "vendor_search_key": "1004574",
-      "rfq_number": "NOT_FOUND"
+      "rfq_number": "1130292"
     },
     {
       "emailId": "6807",
@@ -156,7 +156,7 @@
       "vendor_email": "agiovan@carlinsystems.com",
       "vendor_name": "Carlin Systems Inc",
       "vendor_search_key": "1002999",
-      "rfq_number": "NOT_FOUND"
+      "rfq_number": "1130292"
     },
     {
       "emailId": "6808",
@@ -167,7 +167,7 @@
       "vendor_email": "gust@electronicsurplus.com",
       "vendor_name": "Electronic Surplus",
       "vendor_search_key": "1003324",
-      "rfq_number": "NOT_FOUND"
+      "rfq_number": "1130292"
     },
     {
       "emailId": "6809",
@@ -189,7 +189,7 @@
       "vendor_email": "juan@dfsales.com",
       "vendor_name": "DF Sales Co",
       "vendor_search_key": "1002276",
-      "rfq_number": "NOT_FOUND"
+      "rfq_number": "1130292"
     },
     {
       "emailId": "6812",
@@ -200,7 +200,7 @@
       "vendor_email": "justin@braunec.com",
       "vendor_name": "Braun Electronic Components",
       "vendor_search_key": "1002892",
-      "rfq_number": "NOT_FOUND"
+      "rfq_number": "1130292"
     },
     {
       "emailId": "6816",
@@ -211,7 +211,7 @@
       "vendor_email": "JamesB@pccomponents.com",
       "vendor_name": "PC Components Company",
       "vendor_search_key": "1002553",
-      "rfq_number": "NOT_FOUND"
+      "rfq_number": "1130292"
     },
     {
       "emailId": "6817",
@@ -255,7 +255,7 @@
       "vendor_email": "stockcheck@atlanticsemi.com",
       "vendor_name": "Atlantic Semiconductor",
       "vendor_search_key": "1002457",
-      "rfq_number": "NOT_FOUND"
+      "rfq_number": "1130292"
     },
     {
       "emailId": "6823",
@@ -266,7 +266,7 @@
       "vendor_email": "pweitz@semisourceinc.com",
       "vendor_name": "Semi Source Inc",
       "vendor_search_key": "NOT_FOUND",
-      "rfq_number": "NOT_FOUND"
+      "rfq_number": "1130292"
     },
     {
       "emailId": "6825",
@@ -277,7 +277,7 @@
       "vendor_email": "sal@prismelectronics.net",
       "vendor_name": "Prism Electronics",
       "vendor_search_key": "NOT_FOUND",
-      "rfq_number": "NOT_FOUND"
+      "rfq_number": "1130292"
     },
     {
       "emailId": "6827",
@@ -288,7 +288,7 @@
       "vendor_email": "brian@microram.com",
       "vendor_name": "MicroRam",
       "vendor_search_key": "1002615",
-      "rfq_number": "NOT_FOUND"
+      "rfq_number": "1130292"
     },
     {
       "emailId": "6828",
@@ -299,7 +299,7 @@
       "vendor_email": "shirley@ic-tronix.com",
       "vendor_name": "IC-Tronix Inc",
       "vendor_search_key": "1002611",
-      "rfq_number": "NOT_FOUND"
+      "rfq_number": "1130292"
     },
     {
       "emailId": "6830",
@@ -321,7 +321,7 @@
       "vendor_email": "sales@gsshome.com",
       "vendor_name": "GSS",
       "vendor_search_key": "1005513",
-      "rfq_number": "NOT_FOUND"
+      "rfq_number": "1130292"
     },
     {
       "emailId": "6832",
@@ -332,7 +332,7 @@
       "vendor_email": "betrinid@celestica.com",
       "vendor_name": "Celestica Global Limited",
       "vendor_search_key": "1001118",
-      "rfq_number": "NOT_FOUND"
+      "rfq_number": "1129833"
     },
     {
       "emailId": "6833",
@@ -343,7 +343,7 @@
       "vendor_email": "shirley@ic-tronix.com",
       "vendor_name": "IC-Tronix Inc",
       "vendor_search_key": "1002611",
-      "rfq_number": "NOT_FOUND"
+      "rfq_number": "1130292"
     },
     {
       "emailId": "6835",
@@ -365,7 +365,7 @@
       "vendor_email": "sales@eurodis.nu",
       "vendor_name": "Eurodis Components",
       "vendor_search_key": "NOT_FOUND",
-      "rfq_number": "NOT_FOUND"
+      "rfq_number": "1130350"
     },
     {
       "emailId": "6837",
@@ -387,7 +387,7 @@
       "vendor_email": "sales@eurodis.nu",
       "vendor_name": "Eurodis Components",
       "vendor_search_key": "NOT_FOUND",
-      "rfq_number": "NOT_FOUND"
+      "rfq_number": "1130350"
     },
     {
       "emailId": "6839",
@@ -398,7 +398,7 @@
       "vendor_email": "michelle.dewitt@converge.com",
       "vendor_name": "Converge",
       "vendor_search_key": "1006704",
-      "rfq_number": "NOT_FOUND"
+      "rfq_number": "1130350"
     },
     {
       "emailId": "6840",
@@ -409,7 +409,7 @@
       "vendor_email": "sal@prismelectronics.net",
       "vendor_name": "Prism Electronics",
       "vendor_search_key": "NOT_FOUND",
-      "rfq_number": "NOT_FOUND"
+      "rfq_number": "1130292"
     },
     {
       "emailId": "6842",
@@ -420,7 +420,7 @@
       "vendor_email": "philip.humphrey@vantageairsupport.com",
       "vendor_name": "Vantage IC LLC",
       "vendor_search_key": "NOT_FOUND",
-      "rfq_number": "NOT_FOUND"
+      "rfq_number": "1130292"
     },
     {
       "emailId": "6843",
@@ -431,7 +431,7 @@
       "vendor_email": "DistiSalesR2@flipelectronics.com",
       "vendor_name": "Flip Electronics",
       "vendor_search_key": "NOT_FOUND",
-      "rfq_number": "NOT_FOUND"
+      "rfq_number": "1130350"
     },
     {
       "emailId": "6845",
@@ -442,7 +442,7 @@
       "vendor_email": "ttasker@cci-inc.com",
       "vendor_name": "CCI Inc",
       "vendor_search_key": "1002426",
-      "rfq_number": "NOT_FOUND"
+      "rfq_number": "1130350"
     },
     {
       "emailId": "6846",
@@ -464,7 +464,7 @@
       "vendor_email": "GRaso@sptllc.com",
       "vendor_name": "Shore Point Technology",
       "vendor_search_key": "1004383",
-      "rfq_number": "NOT_FOUND"
+      "rfq_number": "1130292"
     },
     {
       "emailId": "6848",
@@ -475,7 +475,7 @@
       "vendor_email": "sal@prismelectronics.net",
       "vendor_name": "Prism Electronics",
       "vendor_search_key": "NOT_FOUND",
-      "rfq_number": "NOT_FOUND"
+      "rfq_number": "1130292"
     },
     {
       "emailId": "6850",
@@ -508,7 +508,7 @@
       "vendor_email": "Anna@rotakorn.se",
       "vendor_name": "Rotakorn Electronics AB",
       "vendor_search_key": "1002557",
-      "rfq_number": "NOT_FOUND"
+      "rfq_number": "1130292"
     },
     {
       "emailId": "6858",
@@ -530,7 +530,7 @@
       "vendor_email": "sales@inelcocomponents.com",
       "vendor_name": "Inelco Components",
       "vendor_search_key": "1002948",
-      "rfq_number": "NOT_FOUND"
+      "rfq_number": "1130292"
     },
     {
       "emailId": "6860",
@@ -552,7 +552,7 @@
       "vendor_email": "stockcheck@atlanticsemi.com",
       "vendor_name": "Atlantic Semi",
       "vendor_search_key": "1002457",
-      "rfq_number": "NOT_FOUND"
+      "rfq_number": "1130292"
     },
     {
       "emailId": "6863",
@@ -596,7 +596,7 @@
       "vendor_email": "sales@flychips.com",
       "vendor_name": "Fly Chips",
       "vendor_search_key": "1005735",
-      "rfq_number": "NOT_FOUND"
+      "rfq_number": "1130292"
     },
     {
       "emailId": "6877",
@@ -618,7 +618,7 @@
       "vendor_email": "sales@inelcocomponents.com",
       "vendor_name": "Inelco Components",
       "vendor_search_key": "1002948",
-      "rfq_number": "NOT_FOUND"
+      "rfq_number": "1130292"
     },
     {
       "emailId": "6896",
@@ -629,7 +629,7 @@
       "vendor_email": "Anna@rotakorn.se",
       "vendor_name": "Rotakorn Electronics AB",
       "vendor_search_key": "1002557",
-      "rfq_number": "NOT_FOUND"
+      "rfq_number": "1130292"
     },
     {
       "emailId": "6903",
@@ -673,7 +673,7 @@
       "vendor_email": "daniels@zdi.com",
       "vendor_name": "ZD Integrated Circuits",
       "vendor_search_key": "1004406",
-      "rfq_number": "NOT_FOUND"
+      "rfq_number": "1130292"
     },
     {
       "emailId": "6907",
@@ -717,7 +717,7 @@
       "vendor_email": "info@demotronic.de",
       "vendor_name": "demotronic GmbH",
       "vendor_search_key": "NOT_FOUND",
-      "rfq_number": "NOT_FOUND"
+      "rfq_number": "1130292"
     },
     {
       "emailId": "6913",
@@ -728,7 +728,7 @@
       "vendor_email": "linus.jonsson@j2sourcing.com",
       "vendor_name": "J2 Sourcing",
       "vendor_search_key": "1002946",
-      "rfq_number": "NOT_FOUND"
+      "rfq_number": "1130292"
     },
     {
       "emailId": "6914",
@@ -750,7 +750,7 @@
       "vendor_email": "sales@rifinvestments.com",
       "vendor_name": "RIF Investments",
       "vendor_search_key": "NOT_FOUND",
-      "rfq_number": "NOT_FOUND"
+      "rfq_number": "1130292"
     },
     {
       "emailId": "6918",
@@ -761,7 +761,7 @@
       "vendor_email": "sales@reboundeu.com",
       "vendor_name": "Rebound EU",
       "vendor_search_key": "NOT_FOUND",
-      "rfq_number": "NOT_FOUND"
+      "rfq_number": "1130350"
     },
     {
       "emailId": "6920",
@@ -772,7 +772,7 @@
       "vendor_email": "sales@reboundeu.com",
       "vendor_name": "Rebound EU",
       "vendor_search_key": "NOT_FOUND",
-      "rfq_number": "NOT_FOUND"
+      "rfq_number": "1130292"
     },
     {
       "emailId": "6921",
@@ -783,7 +783,7 @@
       "vendor_email": "sales@danmarcomponents.com",
       "vendor_name": "Dan-Mar Components",
       "vendor_search_key": "NOT_FOUND",
-      "rfq_number": "NOT_FOUND"
+      "rfq_number": "1130292"
     },
     {
       "emailId": "6922",
@@ -794,7 +794,7 @@
       "vendor_email": "sales@danmarcomponents.com",
       "vendor_name": "Dan-Mar Components",
       "vendor_search_key": "NOT_FOUND",
-      "rfq_number": "NOT_FOUND"
+      "rfq_number": "1130292"
     },
     {
       "emailId": "6923",
@@ -805,7 +805,7 @@
       "vendor_email": "sales@dotcomps.com",
       "vendor_name": "Dot Comps Electronics",
       "vendor_search_key": "NOT_FOUND",
-      "rfq_number": "NOT_FOUND"
+      "rfq_number": "1130292"
     },
     {
       "emailId": "6924",
@@ -816,7 +816,7 @@
       "vendor_email": "mmichnik@micros.com.pl",
       "vendor_name": "Micros",
       "vendor_search_key": "NOT_FOUND",
-      "rfq_number": "NOT_FOUND"
+      "rfq_number": "1130292"
     },
     {
       "emailId": "6925",
@@ -827,7 +827,7 @@
       "vendor_email": "es@sebacomp.com",
       "vendor_name": "Seba Components",
       "vendor_search_key": "1004090",
-      "rfq_number": "NOT_FOUND"
+      "rfq_number": "1130292"
     },
     {
       "emailId": "6927",
@@ -838,7 +838,7 @@
       "vendor_email": "sales@cyclops-electronics.com",
       "vendor_name": "Cyclops Electronics",
       "vendor_search_key": "NOT_FOUND",
-      "rfq_number": "NOT_FOUND"
+      "rfq_number": "1130292"
     },
     {
       "emailId": "6927",
@@ -849,7 +849,7 @@
       "vendor_email": "sales@cyclops-electronics.com",
       "vendor_name": "Cyclops Electronics",
       "vendor_search_key": "NOT_FOUND",
-      "rfq_number": "NOT_FOUND"
+      "rfq_number": "1130292"
     },
     {
       "emailId": "6927",
@@ -860,7 +860,7 @@
       "vendor_email": "sales@cyclops-electronics.com",
       "vendor_name": "Cyclops Electronics",
       "vendor_search_key": "NOT_FOUND",
-      "rfq_number": "NOT_FOUND"
+      "rfq_number": "1130292"
     },
     {
       "emailId": "6927",
@@ -882,7 +882,7 @@
       "vendor_email": "sales@cyclops-electronics.com",
       "vendor_name": "Cyclops Electronics",
       "vendor_search_key": "NOT_FOUND",
-      "rfq_number": "NOT_FOUND"
+      "rfq_number": "1130292"
     },
     {
       "emailId": "6927",
@@ -893,7 +893,7 @@
       "vendor_email": "sales@cyclops-electronics.com",
       "vendor_name": "Cyclops Electronics",
       "vendor_search_key": "NOT_FOUND",
-      "rfq_number": "NOT_FOUND"
+      "rfq_number": "1130292"
     },
     {
       "emailId": "6927",
@@ -915,7 +915,7 @@
       "vendor_email": "sales@flychips.com",
       "vendor_name": "FlyChips",
       "vendor_search_key": "1005735",
-      "rfq_number": "NOT_FOUND"
+      "rfq_number": "1130292"
     },
     {
       "emailId": "6930",
@@ -926,7 +926,7 @@
       "vendor_email": "sales@tomarkelectronics.com",
       "vendor_name": "Tomark Electronics",
       "vendor_search_key": "NOT_FOUND",
-      "rfq_number": "NOT_FOUND"
+      "rfq_number": "1130292"
     },
     {
       "emailId": "6932",
@@ -948,7 +948,7 @@
       "vendor_email": "sales@zilex.ca",
       "vendor_name": "Zilex Electronics",
       "vendor_search_key": "1006047",
-      "rfq_number": "NOT_FOUND"
+      "rfq_number": "1130292"
     },
     {
       "emailId": "6936",
@@ -959,7 +959,7 @@
       "vendor_email": "info@hzd-gmbh.de",
       "vendor_name": "HZD GmbH",
       "vendor_search_key": "NOT_FOUND",
-      "rfq_number": "NOT_FOUND"
+      "rfq_number": "1130292"
     },
     {
       "emailId": "6937",
@@ -970,7 +970,7 @@
       "vendor_email": "sales@npimaterials.com",
       "vendor_name": "NPI Materials",
       "vendor_search_key": "1004201",
-      "rfq_number": "NOT_FOUND"
+      "rfq_number": "1130292"
     },
     {
       "emailId": "6938",
@@ -981,7 +981,7 @@
       "vendor_email": "info@bsr-elektronik.de",
       "vendor_name": "BSR-elektronik",
       "vendor_search_key": "NOT_FOUND",
-      "rfq_number": "NOT_FOUND"
+      "rfq_number": "1130292"
     },
     {
       "emailId": "6940",
@@ -992,7 +992,7 @@
       "vendor_email": "avi@flex-com.com",
       "vendor_name": "Flex-Com International",
       "vendor_search_key": "1002863",
-      "rfq_number": "NOT_FOUND"
+      "rfq_number": "1130292"
     },
     {
       "emailId": "6941",
@@ -1003,7 +1003,7 @@
       "vendor_email": "dave.pinho@flipelectronics.com",
       "vendor_name": "Flip Electronics",
       "vendor_search_key": "1001208",
-      "rfq_number": "NOT_FOUND"
+      "rfq_number": "1130292"
     },
     {
       "emailId": "6942",
@@ -1014,7 +1014,7 @@
       "vendor_email": "avi@flex-com.com",
       "vendor_name": "Flex-Com International",
       "vendor_search_key": "1002863",
-      "rfq_number": "NOT_FOUND"
+      "rfq_number": "1130292"
     },
     {
       "emailId": "6943",
@@ -1025,7 +1025,7 @@
       "vendor_email": "sales@milcraft.com",
       "vendor_name": "Milcraft",
       "vendor_search_key": "NOT_FOUND",
-      "rfq_number": "NOT_FOUND"
+      "rfq_number": "1130292"
     },
     {
       "emailId": "6944",
@@ -1080,7 +1080,7 @@
       "vendor_email": "sales@chanetech.com",
       "vendor_name": "CHANETECH",
       "vendor_search_key": "1004926",
-      "rfq_number": "NOT_FOUND"
+      "rfq_number": "1130292"
     },
     {
       "emailId": "6955",
@@ -1201,7 +1201,7 @@
       "vendor_email": "mike@integratedelec.com",
       "vendor_name": "Integrated Electronics Company",
       "vendor_search_key": "1002612",
-      "rfq_number": "NOT_FOUND"
+      "rfq_number": "1130292"
     },
     {
       "emailId": "6976",
@@ -1333,7 +1333,7 @@
       "vendor_email": "victoria.abt@derf.com",
       "vendor_name": "DERF ELECTRONICS CORP",
       "vendor_search_key": "1002452",
-      "rfq_number": "NOT_FOUND"
+      "rfq_number": "1130292"
     },
     {
       "emailId": "6993",
@@ -1344,7 +1344,7 @@
       "vendor_email": "victoria.abt@derf.com",
       "vendor_name": "DERF ELECTRONICS CORP",
       "vendor_search_key": "1002452",
-      "rfq_number": "NOT_FOUND"
+      "rfq_number": "1130292"
     },
     {
       "emailId": "6994",
@@ -1388,7 +1388,7 @@
       "vendor_email": "JamesB@pccomponents.com",
       "vendor_name": "PC Components Company",
       "vendor_search_key": "1002553",
-      "rfq_number": "NOT_FOUND"
+      "rfq_number": "1130292"
     },
     {
       "emailId": "7009",
@@ -1399,7 +1399,7 @@
       "vendor_email": "JamesB@pccomponents.com",
       "vendor_name": "PC Components Company",
       "vendor_search_key": "1002553",
-      "rfq_number": "NOT_FOUND"
+      "rfq_number": "1130292"
     },
     {
       "emailId": "7013",
@@ -1454,7 +1454,7 @@
       "vendor_email": "sal@prismelectronics.net",
       "vendor_name": "Prism Electronics",
       "vendor_search_key": "NOT_FOUND",
-      "rfq_number": "NOT_FOUND"
+      "rfq_number": "1130292"
     },
     {
       "emailId": "7019",
@@ -1520,7 +1520,7 @@
       "vendor_email": "sales@inelcocomponents.com",
       "vendor_name": "INELCO",
       "vendor_search_key": "1002948",
-      "rfq_number": "NOT_FOUND"
+      "rfq_number": "1130292"
     },
     {
       "emailId": "7025",
@@ -1652,7 +1652,7 @@
       "vendor_email": "hcruz@a2globalelectronics.com",
       "vendor_name": "A2 Global Electronics",
       "vendor_search_key": "NOT_FOUND",
-      "rfq_number": "NOT_FOUND"
+      "rfq_number": "1130292"
     },
     {
       "emailId": "7044",
@@ -1729,7 +1729,7 @@
       "vendor_email": "stockcheck@atlanticsemi.com",
       "vendor_name": "Atlantic Semiconductor",
       "vendor_search_key": "1002457",
-      "rfq_number": "NOT_FOUND"
+      "rfq_number": "1130292"
     },
     {
       "emailId": "7051",
