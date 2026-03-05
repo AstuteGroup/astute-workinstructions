@@ -126,39 +126,54 @@ def supplier_priority_score(supplier, requested_qty):
     Calculate priority score for supplier selection.
     Higher score = higher priority.
 
-    Scoring tiers (date code should not rule out, just prioritize):
-    1. Fresh DC + meets qty: 6 (best)
-    2. Unknown/No DC + meets qty: 5 (benefit of the doubt)
-    3. Fresh DC + below qty: 4
-    4. Unknown/No DC + below qty: 3
-    5. Old DC + meets qty: 2
-    6. Old DC + below qty: 1 (still included, just lower priority)
+    Scoring incorporates:
+    1. MPN match type (EXACT > PACKAGING_SAFE > PACKAGING_MISMATCH > COMPLIANCE/SPEC)
+    2. Date code freshness (fresh > unknown > old)
+    3. Quantity availability (meets qty > below qty)
 
-    For suppliers meeting qty: all equal within tier (qty doesn't matter)
-    For suppliers below qty: sort by quantity descending (maximize piecing)
-    Score formula: tier * 1_000_000_000 + (quantity if below qty else 0)
+    Score formula:
+      match_type_multiplier * 10_000_000_000 + dc_tier * 1_000_000_000 + qty_tiebreaker
+
+    This ensures:
+    - Exact MPN matches always rank above packaging variants
+    - Within same match type, fresh DC ranks above old DC
+    - Within same match type and DC, higher qty ranks above lower qty
     """
     dc_status = supplier.get('dc_status', 'unknown')
     meets_qty = supplier.get('total_qty', 0) >= requested_qty
     qty = supplier.get('total_qty', 0)
 
+    # MPN match type scoring (higher = better)
+    match_type = supplier.get('match_type', 'EXACT')
+    match_type_scores = {
+        'EXACT': 100,
+        'PACKAGING_SAFE': 90,
+        'UNKNOWN': 50,           # Unknown suffix - middle ground
+        'PACKAGING_MISMATCH': 40,  # Still viable but lower
+        'COMPLIANCE': 30,        # RoHS variant - flag for review
+        'SPEC': 20,              # Temp/auto/mil variant - flag for review
+    }
+    match_score = match_type_scores.get(match_type, 50)
+
+    # Date code tier (same as before)
     if dc_status == 'fresh' and meets_qty:
-        tier = 6
+        dc_tier = 6
     elif dc_status == 'unknown' and meets_qty:
-        tier = 5
+        dc_tier = 5
     elif dc_status == 'fresh' and not meets_qty:
-        tier = 4
+        dc_tier = 4
     elif dc_status == 'unknown' and not meets_qty:
-        tier = 3
+        dc_tier = 3
     elif dc_status == 'old' and meets_qty:
-        tier = 2
+        dc_tier = 2
     else:  # old and not meets_qty
-        tier = 1
+        dc_tier = 1
 
     # Quantity only matters for tiebreaking when below requested qty
-    # If meets qty, all are equal within tier
     tiebreaker = qty if not meets_qty else 0
-    return tier * 1_000_000_000 + tiebreaker
+
+    # Combined score: match_type is most important, then DC, then qty
+    return match_score * 10_000_000_000 + dc_tier * 1_000_000_000 + tiebreaker
 
 
 def should_add_extra_supplier(selected_suppliers):

@@ -33,6 +33,7 @@ import openpyxl
 from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
 from openpyxl.utils import get_column_letter
 import config
+import mpn_variants
 
 
 def jitter_sleep(base_seconds):
@@ -97,7 +98,9 @@ def create_output_excel(results, rfq_number, output_path):
     ws = wb.active
     ws.title = f'RFQ {rfq_number} Results'
 
-    headers = ['RFQ Line', 'CPC', 'Part Number', 'Qty Requested', 'Qty Sent', 'Supplier', 'Region',
+    # Added MPN variant columns: Offered MPN, Match Type, Variant Flags
+    headers = ['RFQ Line', 'CPC', 'Part Number', 'Offered MPN', 'Match Type', 'Variant Flags',
+               'Qty Requested', 'Qty Sent', 'Supplier', 'Region',
                'Supplier Qty', 'Min Order $', 'Est Value $', 'Qualifying', 'Qual Amer', 'Qual Eur', 'Selected',
                'Status', 'Timestamp', 'Error', 'Worker']
 
@@ -119,31 +122,39 @@ def create_output_excel(results, rfq_number, output_path):
 
     success_fill = PatternFill(start_color='C6EFCE', end_color='C6EFCE', fill_type='solid')
     fail_fill = PatternFill(start_color='FFC7CE', end_color='FFC7CE', fill_type='solid')
-
     omitted_fill = PatternFill(start_color='FFE699', end_color='FFE699', fill_type='solid')  # Yellow for omitted
+
+    # Match type colors
+    compliance_fill = PatternFill(start_color='FFCCCB', end_color='FFCCCB', fill_type='solid')  # Light red for compliance
+    spec_fill = PatternFill(start_color='FFB366', end_color='FFB366', fill_type='solid')  # Orange for spec
+    pkg_mismatch_fill = PatternFill(start_color='FFFFCC', end_color='FFFFCC', fill_type='solid')  # Light yellow
 
     row_num = 2
     for r in results:
         ws.cell(row=row_num, column=1, value=r.get('line_number', ''))
         ws.cell(row=row_num, column=2, value=r.get('cpc', ''))
         ws.cell(row=row_num, column=3, value=r.get('part_number', ''))
-        ws.cell(row=row_num, column=4, value=r.get('qty_requested', ''))
-        ws.cell(row=row_num, column=5, value=r.get('qty_sent', ''))
-        ws.cell(row=row_num, column=6, value=r.get('supplier', ''))
-        ws.cell(row=row_num, column=7, value=r.get('region', ''))
-        ws.cell(row=row_num, column=8, value=r.get('supplier_qty', ''))
-        ws.cell(row=row_num, column=9, value=r.get('min_order_value', ''))
-        ws.cell(row=row_num, column=10, value=r.get('est_value', ''))
-        ws.cell(row=row_num, column=11, value=r.get('qualifying_total', ''))
-        ws.cell(row=row_num, column=12, value=r.get('qualifying_americas', ''))
-        ws.cell(row=row_num, column=13, value=r.get('qualifying_europe', ''))
-        ws.cell(row=row_num, column=14, value=r.get('selected_count', ''))
-        ws.cell(row=row_num, column=15, value=r.get('status', ''))
-        ws.cell(row=row_num, column=16, value=r.get('timestamp', ''))
-        ws.cell(row=row_num, column=17, value=r.get('error', '') or r.get('reason', ''))
-        ws.cell(row=row_num, column=18, value=r.get('worker_id', ''))
+        ws.cell(row=row_num, column=4, value=r.get('offered_mpn', ''))
+        ws.cell(row=row_num, column=5, value=r.get('match_type', ''))
+        ws.cell(row=row_num, column=6, value=r.get('variant_flags', ''))
+        ws.cell(row=row_num, column=7, value=r.get('qty_requested', ''))
+        ws.cell(row=row_num, column=8, value=r.get('qty_sent', ''))
+        ws.cell(row=row_num, column=9, value=r.get('supplier', ''))
+        ws.cell(row=row_num, column=10, value=r.get('region', ''))
+        ws.cell(row=row_num, column=11, value=r.get('supplier_qty', ''))
+        ws.cell(row=row_num, column=12, value=r.get('min_order_value', ''))
+        ws.cell(row=row_num, column=13, value=r.get('est_value', ''))
+        ws.cell(row=row_num, column=14, value=r.get('qualifying_total', ''))
+        ws.cell(row=row_num, column=15, value=r.get('qualifying_americas', ''))
+        ws.cell(row=row_num, column=16, value=r.get('qualifying_europe', ''))
+        ws.cell(row=row_num, column=17, value=r.get('selected_count', ''))
+        ws.cell(row=row_num, column=18, value=r.get('status', ''))
+        ws.cell(row=row_num, column=19, value=r.get('timestamp', ''))
+        ws.cell(row=row_num, column=20, value=r.get('error', '') or r.get('reason', ''))
+        ws.cell(row=row_num, column=21, value=r.get('worker_id', ''))
 
-        status_cell = ws.cell(row=row_num, column=15)
+        # Color-code status column
+        status_cell = ws.cell(row=row_num, column=18)
         if r.get('status') == 'SENT':
             status_cell.fill = success_fill
         elif r.get('status') == 'FAILED':
@@ -151,12 +162,22 @@ def create_output_excel(results, rfq_number, output_path):
         elif r.get('status') == 'OMITTED':
             status_cell.fill = omitted_fill
 
-        for col in range(1, 19):
+        # Color-code match type column
+        match_type_cell = ws.cell(row=row_num, column=5)
+        match_type = r.get('match_type', '')
+        if match_type == 'COMPLIANCE':
+            match_type_cell.fill = compliance_fill
+        elif match_type == 'SPEC':
+            match_type_cell.fill = spec_fill
+        elif match_type == 'PACKAGING_MISMATCH':
+            match_type_cell.fill = pkg_mismatch_fill
+
+        for col in range(1, 22):
             ws.cell(row=row_num, column=col).border = thin_border
 
         row_num += 1
 
-    for col in range(1, 19):
+    for col in range(1, 22):
         max_length = max(len(str(cell.value or '')) for cell in ws[get_column_letter(col)])
         ws.column_dimensions[get_column_letter(col)].width = min(max_length + 2, 40)
 
@@ -232,6 +253,13 @@ async def process_part(page, part_number, quantity, line_number, worker_id, cpc=
         if auth_icon:
             continue
 
+        # Get offered MPN from column 0
+        offered_mpn = ''
+        try:
+            offered_mpn = (await cells[0].inner_text()).strip()
+        except Exception:
+            pass
+
         # Get date code from column 4
         dc_text = ''
         dc_year = None
@@ -259,7 +287,11 @@ async def process_part(page, part_number, quantity, line_number, worker_id, cpc=
                 'total_qty': 0,
                 'best_dc_year': None,
                 'best_dc_text': '',
-                'dc_ambiguous': False
+                'dc_ambiguous': False,
+                'offered_mpn': offered_mpn,  # Track the MPN being offered
+                'match_type': 'EXACT',       # Default, will be updated
+                'variant_flags': '',
+                'match_details': ''
             }
         supplier_data[key]['total_qty'] += qty
 
@@ -269,6 +301,22 @@ async def process_part(page, part_number, quantity, line_number, worker_id, cpc=
                 supplier_data[key]['best_dc_year'] = dc_year
                 supplier_data[key]['best_dc_text'] = dc_text
                 supplier_data[key]['dc_ambiguous'] = dc_ambiguous
+
+        # Track offered MPN (prefer exact match if multiple listings)
+        if offered_mpn:
+            current_offered = supplier_data[key].get('offered_mpn', '')
+            # Calculate match type for this offering
+            match_result = mpn_variants.get_match_type(part_number, offered_mpn)
+
+            # Prefer better match types (EXACT > PACKAGING_SAFE > others)
+            current_priority = mpn_variants.match_type_priority(supplier_data[key].get('match_type', 'UNKNOWN'))
+            new_priority = mpn_variants.match_type_priority(match_result.match_type)
+
+            if new_priority > current_priority or not current_offered:
+                supplier_data[key]['offered_mpn'] = offered_mpn
+                supplier_data[key]['match_type'] = match_result.match_type
+                supplier_data[key]['variant_flags'] = ', '.join(match_result.variant_flags)
+                supplier_data[key]['match_details'] = match_result.details
 
     # Determine date code status for each supplier
     for s in supplier_data.values():
@@ -316,6 +364,9 @@ async def process_part(page, part_number, quantity, line_number, worker_id, cpc=
             'line_number': line_number,
             'cpc': cpc,
             'part_number': part_number,
+            'offered_mpn': '',
+            'match_type': '',
+            'variant_flags': '',
             'qty_requested': quantity,
             'qty_sent': '',
             'supplier': '',
@@ -341,7 +392,11 @@ async def process_part(page, part_number, quantity, line_number, worker_id, cpc=
         rfq_qty, qty_adjusted = config.adjust_rfq_quantity(quantity, supplier['total_qty'])
         qty_note = f" (adj)" if qty_adjusted else ""
 
-        print(f'    [W{worker_id}] -> {supplier["name"]} qty:{rfq_qty}{qty_note}...')
+        # Get match type info
+        match_type = supplier.get('match_type', 'EXACT')
+        match_note = f" [{match_type}]" if match_type != 'EXACT' else ""
+
+        print(f'    [W{worker_id}] -> {supplier["name"]} qty:{rfq_qty}{qty_note}{match_note}...')
 
         try:
             await page.goto(config.BASE_URL)
@@ -356,6 +411,9 @@ async def process_part(page, part_number, quantity, line_number, worker_id, cpc=
                     'line_number': line_number,
                     'cpc': cpc,
                     'part_number': part_number,
+                    'offered_mpn': supplier.get('offered_mpn', ''),
+                    'match_type': supplier.get('match_type', ''),
+                    'variant_flags': supplier.get('variant_flags', ''),
                     'qty_requested': quantity,
                     'qty_sent': rfq_qty,
                     'supplier': supplier['name'],
@@ -392,6 +450,9 @@ async def process_part(page, part_number, quantity, line_number, worker_id, cpc=
                         'line_number': line_number,
                         'cpc': cpc,
                         'part_number': part_number,
+                        'offered_mpn': supplier.get('offered_mpn', ''),
+                        'match_type': supplier.get('match_type', ''),
+                        'variant_flags': supplier.get('variant_flags', ''),
                         'qty_requested': quantity,
                         'supplier': supplier['name'],
                         'region': supplier['region'],
@@ -416,6 +477,9 @@ async def process_part(page, part_number, quantity, line_number, worker_id, cpc=
                     'line_number': line_number,
                     'cpc': cpc,
                     'part_number': part_number,
+                    'offered_mpn': supplier.get('offered_mpn', ''),
+                    'match_type': supplier.get('match_type', ''),
+                    'variant_flags': supplier.get('variant_flags', ''),
                     'qty_requested': quantity,
                     'qty_sent': rfq_qty,
                     'supplier': supplier['name'],
@@ -469,6 +533,9 @@ async def process_part(page, part_number, quantity, line_number, worker_id, cpc=
                     'line_number': line_number,
                     'cpc': cpc,
                     'part_number': part_number,
+                    'offered_mpn': supplier.get('offered_mpn', ''),
+                    'match_type': supplier.get('match_type', ''),
+                    'variant_flags': supplier.get('variant_flags', ''),
                     'qty_requested': quantity,
                     'qty_sent': rfq_qty,
                     'supplier': supplier['name'],
@@ -488,6 +555,9 @@ async def process_part(page, part_number, quantity, line_number, worker_id, cpc=
                     'line_number': line_number,
                     'cpc': cpc,
                     'part_number': part_number,
+                    'offered_mpn': supplier.get('offered_mpn', ''),
+                    'match_type': supplier.get('match_type', ''),
+                    'variant_flags': supplier.get('variant_flags', ''),
                     'qty_requested': quantity,
                     'qty_sent': rfq_qty,
                     'supplier': supplier['name'],
@@ -511,6 +581,9 @@ async def process_part(page, part_number, quantity, line_number, worker_id, cpc=
                 'line_number': line_number,
                 'cpc': cpc,
                 'part_number': part_number,
+                'offered_mpn': supplier.get('offered_mpn', ''),
+                'match_type': supplier.get('match_type', ''),
+                'variant_flags': supplier.get('variant_flags', ''),
                 'qty_requested': quantity,
                 'qty_sent': rfq_qty,
                 'supplier': supplier['name'],
@@ -600,6 +673,9 @@ async def worker(worker_id, parts_queue, results_list, results_lock):
                             'line_number': part['line_number'],
                             'cpc': part.get('cpc', ''),
                             'part_number': part['part_number'],
+                            'offered_mpn': '',
+                            'match_type': '',
+                            'variant_flags': '',
                             'qty_requested': part['quantity'],
                             'qty_sent': '',
                             'supplier': '',
