@@ -55,12 +55,43 @@ himalaya envelope list --account vq --folder INBOX --page-size 500 | grep -c "^|
 himalaya envelope list --account vq --folder Processed --page-size 500 | grep -c "^|"
 ```
 
+### Folder Routing
+| Condition | Folder | Action |
+|-----------|--------|--------|
+| Complete quote + vendor found | `Processed` | Ready for upload |
+| Complete quote + vendor NOT_FOUND | `NeedsVendor` | Add vendor to iDempiere first |
+| No-bid / target price request | `NoBid` | Record with qty=0, price=0 |
+| Incomplete quote (missing data) | `NeedsReview` | Fix data issues, then re-route |
+| Skip (auto-ack, web-link only) | `INBOX` or delete | No action needed |
+
+### Vendor-Missing Workflow
+
+**During extraction (going forward):**
+1. After extracting a complete quote, check if vendor exists in database (domain-based lookup)
+2. If vendor NOT_FOUND → Move email to `NeedsVendor` folder (not Processed)
+3. Add record to `needs-vendor.json` report
+
+**After extraction session:**
+```bash
+# View vendor-missing report
+cat vq_loading/needs-vendor.json | jq '.records[] | {vendor_email, vendor_name, mpn}'
+
+# After adding vendors to iDempiere:
+# 1. Re-run consolidation to update vendor_search_key
+node consolidate-extractions.js
+
+# 2. Move resolved emails from NeedsVendor → Processed
+himalaya message move --account vq --folder NeedsVendor Processed [IDs...]
+```
+
+**Report file:** `needs-vendor.json` - Lists all complete quotes missing vendor setup. High priority for review since quote data is complete.
+
 ### Skip Rules
-- **No-bid**: Vendor explicitly declined to quote (skip)
-- **Target price request**: Vendor asking for price, no actual quote (skip)
-- **Empty forward**: No vendor response in the body (skip)
-- **PDF-only**: Quote data only in attachment, queue for PDF review (needs_review)
-- **Duplicate**: Same vendor/part/price already extracted (skip)
+- **No-bid**: Vendor explicitly declined to quote
+- **Target price request**: Vendor asking for price, no actual quote
+- **Empty forward**: No vendor response in the body
+- **PDF-only**: Quote data only in attachment, queue for PDF review
+- **Duplicate**: Same vendor/part/price already extracted
 
 **IMPORTANT:** All emails are forwards from team members. The vendor response is BELOW the signature block at the top. Always read to the bottom of the email to find the actual quote data.
 
@@ -133,11 +164,29 @@ Applies learned vendor mappings and merges to final upload.
 
 ## Vendor Matching Strategy
 
-1. **Exact email match** in `ad_user.email`
-2. **Vendor cache lookup** (`data/vendor-cache.json`)
-3. **Domain-based lookup** (e.g., velocityelec.com → Velocity Electronics)
-4. **Sender name fuzzy match** in `c_bpartner.name`
-5. **LLM inference** (requires `ANTHROPIC_API_KEY` in `.env`)
+**IMPORTANT: Use domain-based matching, NOT exact email matching.**
+
+Vendor contacts change frequently - a quote from `sal@prismelectronics.net` should match Prism Electronics even if only `salessupport@prismelectronics.net` is in the database. Exact email matching produces ~60% match rate; domain-based produces ~87%.
+
+### Matching Order (consolidate-extractions.js)
+1. **Exact email match** in `ad_user.email` (fast path)
+2. **Domain-based fallback** - extract `@domain.com` and find any vendor with that domain
+3. Return `NOT_FOUND` only if no domain match exists
+
+### Database Query (Domain-Based)
+```sql
+SELECT DISTINCT
+  LOWER(SUBSTRING(au.email FROM POSITION('@' IN au.email) + 1)) as domain,
+  bp.value as search_key
+FROM adempiere.ad_user au
+JOIN adempiere.c_bpartner bp ON au.c_bpartner_id = bp.c_bpartner_id
+WHERE bp.value NOT LIKE 'USE %'
+```
+
+### Why This Matters
+- Vendors often use personal emails (`sal@`, `john@`) not registered in DB
+- DB typically has `sales@`, `rfq@`, or specific contacts
+- Same company = same vendor_search_key, regardless of which employee emailed
 
 ---
 

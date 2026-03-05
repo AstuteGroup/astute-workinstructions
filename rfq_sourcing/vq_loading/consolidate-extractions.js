@@ -55,14 +55,27 @@ try {
   console.log('No no-bid extractions file found, skipping');
 }
 
-// Load PDF extractions
+// Load PDF extractions (new comprehensive file)
 let pdfRecords = [];
 try {
-  const pdfJson = JSON.parse(fs.readFileSync('/home/analytics_user/workspace/astute-workinstructions/rfq_sourcing/vq_loading/pdf-extractions.json', 'utf8'));
+  const pdfJson = JSON.parse(fs.readFileSync('/home/analytics_user/workspace/astute-workinstructions/rfq_sourcing/vq_loading/pdf-extractions-new.json', 'utf8'));
   pdfRecords = pdfJson.records || [];
   console.log(`Loaded ${pdfRecords.length} PDF records`);
 } catch (e) {
   console.log('No PDF extractions file found, skipping');
+}
+
+// Load remaining extractions (quotes + no-bids + target price)
+let remainingQuotes = [];
+let remainingNoBids = [];
+try {
+  const remainingJson = JSON.parse(fs.readFileSync('/home/analytics_user/workspace/astute-workinstructions/rfq_sourcing/vq_loading/remaining-extractions.json', 'utf8'));
+  remainingQuotes = remainingJson.quotes || [];
+  // Combine no_bids and target_price as they both have qty=0, price=0
+  remainingNoBids = [...(remainingJson.no_bids || []), ...(remainingJson.target_price || [])];
+  console.log(`Loaded ${remainingQuotes.length} remaining quotes, ${remainingNoBids.length} remaining no-bids/target-price`);
+} catch (e) {
+  console.log('No remaining extractions file found, skipping');
 }
 
 // Get all unique vendor emails
@@ -71,12 +84,14 @@ const allEmails = [...new Set([
   ...newRecords.map(r => r.vendor_email?.toLowerCase()),
   ...oldRecords.map(r => r.vendor_email?.toLowerCase()),
   ...noBidRecords.map(r => r.vendor_email?.toLowerCase()),
-  ...pdfRecords.map(r => r.vendor_email?.toLowerCase())
+  ...pdfRecords.map(r => r.vendor_email?.toLowerCase()),
+  ...remainingQuotes.map(r => r.vendor_email?.toLowerCase()),
+  ...remainingNoBids.map(r => r.vendor_email?.toLowerCase())
 ].filter(Boolean))];
 
 console.log(`${allEmails.length} unique vendor emails to lookup`);
 
-// Query vendor search keys from database
+// Query vendor search keys from database (exact email match)
 function queryVendorSearchKeys() {
   const emailList = allEmails.map(e => `'${e.replace(/'/g, "''")}'`).join(',');
   const sql = `
@@ -103,6 +118,54 @@ function queryVendorSearchKeys() {
   }
 }
 
+// Query vendor search keys by domain (fallback for unmatched emails)
+function queryVendorsByDomain() {
+  // Get all unique domains from emails
+  const allDomains = [...new Set(allEmails.map(e => e.split('@')[1]?.toLowerCase()).filter(Boolean))];
+  const domainList = allDomains.map(d => `'${d.replace(/'/g, "''")}'`).join(',');
+
+  const sql = `
+    SELECT DISTINCT
+      LOWER(SUBSTRING(au.email FROM POSITION('@' IN au.email) + 1)) as domain,
+      bp.value as search_key
+    FROM adempiere.ad_user au
+    JOIN adempiere.c_bpartner bp ON au.c_bpartner_id = bp.c_bpartner_id
+    WHERE bp.value NOT LIKE 'USE %'
+    AND LOWER(SUBSTRING(au.email FROM POSITION('@' IN au.email) + 1)) IN (${domainList})
+  `;
+
+  try {
+    const result = execSync(`psql -t -A -c "${sql.replace(/\n/g, ' ')}"`, { encoding: 'utf8' });
+    const domainMap = {};
+    result.trim().split('\n').filter(l => l).forEach(line => {
+      const [domain, searchKey] = line.split('|');
+      if (domain && searchKey && !domainMap[domain]) {
+        // Only store first match per domain (avoid duplicates)
+        domainMap[domain] = searchKey;
+      }
+    });
+    return domainMap;
+  } catch (e) {
+    console.error('Error querying vendors by domain:', e.message);
+    return {};
+  }
+}
+
+// Helper to find vendor search key with fallback to domain
+function findVendorSearchKey(email, vendorMap, domainMap) {
+  if (!email) return 'NOT_FOUND';
+  const lowerEmail = email.toLowerCase();
+
+  // Try exact match first
+  if (vendorMap[lowerEmail]) return vendorMap[lowerEmail];
+
+  // Fallback to domain match
+  const domain = lowerEmail.split('@')[1];
+  if (domain && domainMap[domain]) return domainMap[domain];
+
+  return 'NOT_FOUND';
+}
+
 // Query RFQ numbers by MPN
 function queryRfqNumbers() {
   const allMpns = [...new Set([
@@ -110,7 +173,9 @@ function queryRfqNumbers() {
     ...newRecords.map(r => r.mpn?.toUpperCase()),
     ...oldRecords.map(r => r.mpn?.toUpperCase()),
     ...noBidRecords.map(r => r.mpn?.toUpperCase()),
-    ...pdfRecords.map(r => r.mpn?.toUpperCase())
+    ...pdfRecords.map(r => r.mpn?.toUpperCase()),
+    ...remainingQuotes.map(r => r.mpn?.toUpperCase()),
+    ...remainingNoBids.map(r => r.mpn?.toUpperCase())
   ].filter(Boolean))];
 
   // Create patterns for fuzzy matching (remove trailing characters)
@@ -183,7 +248,8 @@ function cleanMpn(mpn) {
 
 // Main enrichment
 const vendorMap = queryVendorSearchKeys();
-console.log(`Found ${Object.keys(vendorMap).length} vendor search keys`);
+const domainMap = queryVendorsByDomain();
+console.log(`Found ${Object.keys(vendorMap).length} vendor search keys (exact), ${Object.keys(domainMap).length} domain mappings`);
 
 const rfqMap = queryRfqNumbers();
 const rfqLineMpnMap = queryRfqFromLineMpn();
@@ -229,7 +295,7 @@ const enrichedNew = newRecords.map(r => ({
   dc: r.dc || '',
   vendor_email: r.vendor_email,
   vendor_name: r.vendor_name,
-  vendor_search_key: vendorMap[r.vendor_email?.toLowerCase()] || 'NOT_FOUND',
+  vendor_search_key: findVendorSearchKey(r.vendor_email, vendorMap, domainMap),
   rfq_number: findRfq(r.mpn)
 }));
 
@@ -242,7 +308,7 @@ const enrichedOld = oldRecords.map(r => ({
   dc: r.dc || '',
   vendor_email: r.vendor_email,
   vendor_name: r.vendor_name,
-  vendor_search_key: vendorMap[r.vendor_email?.toLowerCase()] || 'NOT_FOUND',
+  vendor_search_key: findVendorSearchKey(r.vendor_email, vendorMap, domainMap),
   rfq_number: findRfq(r.mpn)
 }));
 
@@ -255,7 +321,7 @@ const enrichedNoBid = noBidRecords.map(r => ({
   dc: '',
   vendor_email: r.vendor_email,
   vendor_name: r.vendor_name,
-  vendor_search_key: vendorMap[r.vendor_email?.toLowerCase()] || 'NOT_FOUND',
+  vendor_search_key: findVendorSearchKey(r.vendor_email, vendorMap, domainMap),
   rfq_number: findRfq(r.mpn),
   notes: r.notes || 'No-bid'
 }));
@@ -269,16 +335,44 @@ const enrichedPdf = pdfRecords.map(r => ({
   dc: r.dc || '',
   vendor_email: r.vendor_email,
   vendor_name: r.vendor_name,
-  vendor_search_key: vendorMap[r.vendor_email?.toLowerCase()] || 'NOT_FOUND',
+  vendor_search_key: findVendorSearchKey(r.vendor_email, vendorMap, domainMap),
   rfq_number: findRfq(r.mpn),
   notes: r.notes || ''
+}));
+
+// Enrich remaining quotes
+const enrichedRemainingQuotes = remainingQuotes.map(r => ({
+  emailId: r.emailId,
+  mpn: r.mpn,
+  qty: r.qty,
+  price: r.price,
+  dc: r.dc || '',
+  vendor_email: r.vendor_email,
+  vendor_name: r.vendor_name,
+  vendor_search_key: findVendorSearchKey(r.vendor_email, vendorMap, domainMap),
+  rfq_number: findRfq(r.mpn),
+  notes: r.notes || ''
+}));
+
+// Enrich remaining no-bids (qty=0, price=0)
+const enrichedRemainingNoBids = remainingNoBids.map(r => ({
+  emailId: r.emailId,
+  mpn: r.mpn,
+  qty: 0,
+  price: 0,
+  dc: '',
+  vendor_email: r.vendor_email,
+  vendor_name: r.vendor_name,
+  vendor_search_key: findVendorSearchKey(r.vendor_email, vendorMap, domainMap),
+  rfq_number: findRfq(r.mpn),
+  notes: r.notes || 'No-bid'
 }));
 
 // Update existing records that had NOT_FOUND for vendor_search_key
 const updatedExisting = existingRecords.map(r => ({
   ...r,
   vendor_search_key: r.vendor_search_key === 'NOT_FOUND'
-    ? (vendorMap[r.vendor_email?.toLowerCase()] || 'NOT_FOUND')
+    ? (findVendorSearchKey(r.vendor_email, vendorMap, domainMap))
     : r.vendor_search_key,
   rfq_number: r.rfq_number === 'NOT_FOUND'
     ? findRfq(r.mpn)
@@ -286,7 +380,7 @@ const updatedExisting = existingRecords.map(r => ({
 }));
 
 // Combine all records, sort by emailId
-const allRecords = [...updatedExisting, ...enrichedNew, ...enrichedOld, ...enrichedNoBid, ...enrichedPdf]
+const allRecords = [...updatedExisting, ...enrichedNew, ...enrichedOld, ...enrichedNoBid, ...enrichedPdf, ...enrichedRemainingQuotes, ...enrichedRemainingNoBids]
   .sort((a, b) => parseInt(a.emailId) - parseInt(b.emailId));
 
 // Remove exact duplicates (same emailId, mpn, qty, price, vendor_email)
@@ -325,6 +419,30 @@ const jsonOutput = {
 };
 fs.writeFileSync('/home/analytics_user/workspace/astute-workinstructions/rfq_sourcing/vq_loading/verified-extractions-all.json', JSON.stringify(jsonOutput, null, 2));
 
+// Generate needs-vendor report (complete quotes missing vendor)
+const needsVendor = deduped.filter(r =>
+  r.vendor_search_key === 'NOT_FOUND' &&
+  parseFloat(r.qty) > 0 &&
+  parseFloat(r.price) > 0
+);
+const needsVendorReport = {
+  generatedAt: new Date().toISOString().split('T')[0],
+  totalRecords: needsVendor.length,
+  uniqueVendors: [...new Set(needsVendor.map(r => r.vendor_email))].length,
+  action: 'Add these vendors to iDempiere, then re-run consolidation. Move emails to NeedsVendor folder.',
+  records: needsVendor.map(r => ({
+    emailId: r.emailId,
+    mpn: r.mpn,
+    qty: r.qty,
+    price: r.price,
+    vendor_email: r.vendor_email,
+    vendor_name: r.vendor_name,
+    rfq_number: r.rfq_number
+  }))
+};
+fs.writeFileSync('/home/analytics_user/workspace/astute-workinstructions/rfq_sourcing/vq_loading/needs-vendor.json', JSON.stringify(needsVendorReport, null, 2));
+
 console.log('\nFiles written:');
 console.log('  - verified-extractions-all-enriched.csv');
 console.log('  - verified-extractions-all.json');
+console.log(`  - needs-vendor.json (${needsVendor.length} records, ${needsVendorReport.uniqueVendors} vendors to add)`);

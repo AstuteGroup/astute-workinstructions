@@ -1,8 +1,8 @@
 {
   "extractedAt": "2026-03-05",
-  "totalRecords": 177,
-  "vendorFoundCount": 95,
-  "rfqFoundCount": 164,
+  "totalRecords": 267,
+  "vendorFoundCount": 231,
+  "rfqFoundCount": 246,
   "records": [
     {
       "emailId": "2194",
@@ -12,7 +12,7 @@
       "dc": "",
       "vendor_email": "fpetrone@kcelectronics.com",
       "vendor_name": "KC Electronics",
-      "vendor_search_key": "NOT_FOUND",
+      "vendor_search_key": "1006476",
       "rfq_number": "1130292"
     },
     {
@@ -23,7 +23,7 @@
       "dc": "2204+",
       "vendor_email": "sal@prismelectronics.net",
       "vendor_name": "Prism Electronics",
-      "vendor_search_key": "NOT_FOUND",
+      "vendor_search_key": "1002482",
       "rfq_number": "1129117"
     },
     {
@@ -45,7 +45,7 @@
       "dc": "",
       "vendor_email": "dmac10575@gmail.com",
       "vendor_name": "Dan McCoomb",
-      "vendor_search_key": "NOT_FOUND",
+      "vendor_search_key": "1006191",
       "rfq_number": "1130292"
     },
     {
@@ -89,6 +89,17 @@
       "dc": "",
       "vendor_email": "fpetrone@kcelectronics.com",
       "vendor_name": "KC Electronics",
+      "vendor_search_key": "1006476",
+      "rfq_number": "1130292"
+    },
+    {
+      "emailId": "2292",
+      "mpn": "ADUM4400BRWZ",
+      "qty": "0",
+      "price": "0",
+      "dc": "",
+      "vendor_email": "jack@jc-electronics.net",
+      "vendor_name": "JC Electronics",
       "vendor_search_key": "NOT_FOUND",
       "rfq_number": "1130292"
     },
@@ -102,6 +113,17 @@
       "vendor_name": "Silicon Solutions",
       "vendor_search_key": "NOT_FOUND",
       "rfq_number": "1129675"
+    },
+    {
+      "emailId": "3667",
+      "mpn": "NTCS0603E3103FHT",
+      "qty": "9000",
+      "price": "0.25",
+      "dc": "1921",
+      "vendor_email": "ben@vectr.global",
+      "vendor_name": "Vectr Limited",
+      "vendor_search_key": "NOT_FOUND",
+      "rfq_number": "1130292"
     },
     {
       "emailId": "3780",
@@ -133,8 +155,41 @@
       "dc": "",
       "vendor_email": "nickb@chip1.com",
       "vendor_name": "Chip 1 Exchange USA",
-      "vendor_search_key": "NOT_FOUND",
+      "vendor_search_key": "1002494",
       "rfq_number": "1130350"
+    },
+    {
+      "emailId": "4463",
+      "mpn": "FWH-125B",
+      "qty": "1",
+      "price": "53",
+      "dc": "",
+      "vendor_email": "tomas.pliva@semic.cz",
+      "vendor_name": "Semic Trade",
+      "vendor_search_key": "1004869",
+      "rfq_number": "1130292"
+    },
+    {
+      "emailId": "4472",
+      "mpn": "SS26HE3_A/H",
+      "qty": "6000",
+      "price": "0.19",
+      "dc": "2025",
+      "vendor_email": "jack.staveley@ecomal.com",
+      "vendor_name": "ECOMAL UK Ltd.",
+      "vendor_search_key": "1002981",
+      "rfq_number": "1130292"
+    },
+    {
+      "emailId": "4475",
+      "mpn": "DG403DY-E3",
+      "qty": "2100",
+      "price": "1.17",
+      "dc": "2025",
+      "vendor_email": "jack.staveley@ecomal.com",
+      "vendor_name": "ECOMAL UK Ltd.",
+      "vendor_search_key": "1002981",
+      "rfq_number": "1130292"
     },
     {
       "emailId": "4533",
@@ -150,50 +205,46 @@
     {
       "emailId": "5733",
       "mpn": "4-1437565-2",
-      "qty": 3000,
-      "price": 0.13,
+      "qty": "3000",
+      "price": "0.13",
       "dc": "",
       "vendor_email": "Quotes@Jameco.com",
       "vendor_name": "Jameco Electronics",
       "vendor_search_key": "NOT_FOUND",
-      "rfq_number": "1130292",
-      "notes": "PDF quote 21135180"
+      "rfq_number": "1130292"
     },
     {
       "emailId": "5734",
       "mpn": "0251002.MRT1L",
-      "qty": 1300,
-      "price": 0.32,
+      "qty": "1300",
+      "price": "0.32",
       "dc": "06",
       "vendor_email": "stock-us@cyclops-group.com",
       "vendor_name": "Lantek Corporation",
       "vendor_search_key": "NOT_FOUND",
-      "rfq_number": "1130292",
-      "notes": "PDF quote 1624; 1 mfg box @ 1000 pcs + partial reel of 300"
+      "rfq_number": "1130292"
     },
     {
       "emailId": "5735",
       "mpn": "TPS73801DCQR",
-      "qty": 1699,
-      "price": 0.84,
+      "qty": "1699",
+      "price": "0.84",
       "dc": "16/17/18",
       "vendor_email": "stock-us@cyclops-group.com",
       "vendor_name": "Lantek Corporation",
       "vendor_search_key": "NOT_FOUND",
-      "rfq_number": "1130292",
-      "notes": "PDF quote 1623; mixed DC: 1458 dc16 + 141 dc17 + 100 dc18"
+      "rfq_number": "1130292"
     },
     {
       "emailId": "5736",
       "mpn": "P600M-E3/73",
-      "qty": 300,
-      "price": 0.23,
+      "qty": "300",
+      "price": "0.23",
       "dc": "2025",
       "vendor_email": "jack.staveley@ecomal.com",
       "vendor_name": "ECOMAL UK Ltd.",
       "vendor_search_key": "1002981",
-      "rfq_number": "1130292",
-      "notes": "PDF quote 1336488.0; price £0.1815 GBP converted ~$0.23 USD"
+      "rfq_number": "1130292"
     },
     {
       "emailId": "5737",
@@ -229,6 +280,61 @@
       "rfq_number": "1130292"
     },
     {
+      "emailId": "5740",
+      "mpn": "FSM4JSMATR",
+      "qty": "346",
+      "price": "0.07",
+      "dc": "",
+      "vendor_email": "fred@elcomcomponents.com",
+      "vendor_name": "Elcom Components Inc.",
+      "vendor_search_key": "1002377",
+      "rfq_number": "1130292"
+    },
+    {
+      "emailId": "5740",
+      "mpn": "LM2591HVSX-ADJ/NOPB",
+      "qty": "30",
+      "price": "1.86",
+      "dc": "",
+      "vendor_email": "fred@elcomcomponents.com",
+      "vendor_name": "Elcom Components Inc.",
+      "vendor_search_key": "1002377",
+      "rfq_number": "1130292"
+    },
+    {
+      "emailId": "5740",
+      "mpn": "S1JHE3_A/H",
+      "qty": "36",
+      "price": "0.05",
+      "dc": "",
+      "vendor_email": "fred@elcomcomponents.com",
+      "vendor_name": "Elcom Components Inc.",
+      "vendor_search_key": "1002377",
+      "rfq_number": "1130292"
+    },
+    {
+      "emailId": "5740",
+      "mpn": "ISO7740DWR",
+      "qty": "16",
+      "price": "0.8",
+      "dc": "",
+      "vendor_email": "fred@elcomcomponents.com",
+      "vendor_name": "Elcom Components Inc.",
+      "vendor_search_key": "1002377",
+      "rfq_number": "1130292"
+    },
+    {
+      "emailId": "5740",
+      "mpn": "ISO7742DWR",
+      "qty": "5900",
+      "price": "0.4",
+      "dc": "",
+      "vendor_email": "fred@elcomcomponents.com",
+      "vendor_name": "Elcom Components Inc.",
+      "vendor_search_key": "1002377",
+      "rfq_number": "1130292"
+    },
+    {
       "emailId": "5741",
       "mpn": "BTS723GWXUMA1",
       "qty": "0",
@@ -238,6 +344,28 @@
       "vendor_name": "GaleraTech AB",
       "vendor_search_key": "NOT_FOUND",
       "rfq_number": "NOT_FOUND"
+    },
+    {
+      "emailId": "5744",
+      "mpn": "S1JHE3_A/H",
+      "qty": "34200",
+      "price": "0.029",
+      "dc": "2025",
+      "vendor_email": "jack.staveley@ecomal.com",
+      "vendor_name": "ECOMAL UK Ltd.",
+      "vendor_search_key": "1002981",
+      "rfq_number": "1130292"
+    },
+    {
+      "emailId": "5746",
+      "mpn": "P600M",
+      "qty": "44500",
+      "price": "0.066",
+      "dc": "2533+",
+      "vendor_email": "gocar@gocarelectronic.es",
+      "vendor_name": "Gocar Electronic S.L",
+      "vendor_search_key": "1007365",
+      "rfq_number": "1130292"
     },
     {
       "emailId": "5747",
@@ -251,6 +379,28 @@
       "rfq_number": "1130292"
     },
     {
+      "emailId": "6068",
+      "mpn": "594D127X0020R2T",
+      "qty": "600",
+      "price": "2.5",
+      "dc": "200318",
+      "vendor_email": "sales@cvc-components.com",
+      "vendor_name": "CVC Components Ltd",
+      "vendor_search_key": "1002947",
+      "rfq_number": "1130292"
+    },
+    {
+      "emailId": "6069",
+      "mpn": "LM2901AVQDRG4",
+      "qty": "4",
+      "price": "12.5",
+      "dc": "",
+      "vendor_email": "sales@cvc-components.com",
+      "vendor_name": "CVC Components Ltd",
+      "vendor_search_key": "1002947",
+      "rfq_number": "1128746"
+    },
+    {
       "emailId": "6774",
       "mpn": "1393280-5",
       "qty": "14",
@@ -258,7 +408,29 @@
       "dc": "",
       "vendor_email": "pweitz@semisourceinc.com",
       "vendor_name": "Semi Source Inc.",
-      "vendor_search_key": "NOT_FOUND",
+      "vendor_search_key": "1001041",
+      "rfq_number": "1130292"
+    },
+    {
+      "emailId": "6775",
+      "mpn": "BAS16215",
+      "qty": "81000",
+      "price": "0.07",
+      "dc": "25+",
+      "vendor_email": "michelle.dewitt@converge.com",
+      "vendor_name": "Converge",
+      "vendor_search_key": "1006704",
+      "rfq_number": "NOT_FOUND"
+    },
+    {
+      "emailId": "6776",
+      "mpn": "0251002.MXL",
+      "qty": "118",
+      "price": "1",
+      "dc": "",
+      "vendor_email": "pweitz@semisourceinc.com",
+      "vendor_name": "Semi Source Inc",
+      "vendor_search_key": "1001041",
       "rfq_number": "1130292"
     },
     {
@@ -273,6 +445,17 @@
       "rfq_number": "1128099"
     },
     {
+      "emailId": "6778",
+      "mpn": "LM2591HVS-5.0/NOPB",
+      "qty": "5",
+      "price": "10",
+      "dc": "",
+      "vendor_email": "sales@componentonline.com",
+      "vendor_name": "Component Electronics Inc",
+      "vendor_search_key": "1003092",
+      "rfq_number": "1130292"
+    },
+    {
       "emailId": "6779",
       "mpn": "BCP53-16TX",
       "qty": "26000",
@@ -281,6 +464,39 @@
       "vendor_email": "es@sebacomp.com",
       "vendor_name": "SEBACOMP",
       "vendor_search_key": "1004090",
+      "rfq_number": "1130292"
+    },
+    {
+      "emailId": "6780",
+      "mpn": "594D127X0020R2T",
+      "qty": "410",
+      "price": "2",
+      "dc": "04+",
+      "vendor_email": "tim@inventorymp.com",
+      "vendor_name": "Inventory Management Partners",
+      "vendor_search_key": "1002399",
+      "rfq_number": "1130292"
+    },
+    {
+      "emailId": "6782",
+      "mpn": "BAS16-235",
+      "qty": "1900",
+      "price": "0.027",
+      "dc": "21",
+      "vendor_email": "sales@emsnetonline.com",
+      "vendor_name": "EMS Net Online",
+      "vendor_search_key": "1002514",
+      "rfq_number": "NOT_FOUND"
+    },
+    {
+      "emailId": "6784",
+      "mpn": "IXDD609SI",
+      "qty": "100",
+      "price": "5",
+      "dc": "",
+      "vendor_email": "danny.heslin@blueravencorp.com",
+      "vendor_name": "Crestwood Technology Group",
+      "vendor_search_key": "1004598",
       "rfq_number": "1130292"
     },
     {
@@ -295,6 +511,39 @@
       "rfq_number": "1130292"
     },
     {
+      "emailId": "6789",
+      "mpn": "80CPQ150PBF",
+      "qty": "50",
+      "price": "3.13",
+      "dc": "06+",
+      "vendor_email": "info@tautec-electronics.de",
+      "vendor_name": "TAUTEC ELECTRONICS GmbH",
+      "vendor_search_key": "1003181",
+      "rfq_number": "1130292"
+    },
+    {
+      "emailId": "6790",
+      "mpn": "FWH-125B",
+      "qty": "14",
+      "price": "104.03",
+      "dc": "",
+      "vendor_email": "mbeltran@galco.com",
+      "vendor_name": "Galco",
+      "vendor_search_key": "1002926",
+      "rfq_number": "1130292"
+    },
+    {
+      "emailId": "6792",
+      "mpn": "DG403DY-T1-E3",
+      "qty": "1069",
+      "price": "1.45",
+      "dc": "1544",
+      "vendor_email": "michael@scidev.com",
+      "vendor_name": "Scientific Devices Inc",
+      "vendor_search_key": "1003059",
+      "rfq_number": "1130292"
+    },
+    {
       "emailId": "6794",
       "mpn": "DG403DYZ",
       "qty": "22",
@@ -303,6 +552,28 @@
       "vendor_email": "igal@electrion.co.il",
       "vendor_name": "Electrion Ltd.",
       "vendor_search_key": "1004137",
+      "rfq_number": "1130292"
+    },
+    {
+      "emailId": "6795",
+      "mpn": "DG403DYZ",
+      "qty": "22",
+      "price": "3",
+      "dc": "10+",
+      "vendor_email": "igal@electrion.co.il",
+      "vendor_name": "Electrion Ltd",
+      "vendor_search_key": "1004137",
+      "rfq_number": "1130292"
+    },
+    {
+      "emailId": "6796",
+      "mpn": "FWH-125B",
+      "qty": "6",
+      "price": "85",
+      "dc": "07",
+      "vendor_email": "MThoma@pegasus-components.de",
+      "vendor_name": "Pegasus Components GmbH",
+      "vendor_search_key": "1002636",
       "rfq_number": "1130292"
     },
     {
@@ -324,8 +595,74 @@
       "dc": "15+",
       "vendor_email": "benedek@ic-tronix.com",
       "vendor_name": "IC TRONIX INC",
-      "vendor_search_key": "NOT_FOUND",
+      "vendor_search_key": "1002611",
       "rfq_number": "1128746"
+    },
+    {
+      "emailId": "6799",
+      "mpn": "LM2903AVQDRG4Q1",
+      "qty": "63",
+      "price": "9.5",
+      "dc": "14+",
+      "vendor_email": "benedek@ic-tronix.com",
+      "vendor_name": "IC TRONIX INC",
+      "vendor_search_key": "1002611",
+      "rfq_number": "NOT_FOUND"
+    },
+    {
+      "emailId": "6800",
+      "mpn": "LM2901AVQDRG4Q1",
+      "qty": "3300",
+      "price": "0.45",
+      "dc": "22",
+      "vendor_email": "uyurttas@ozdisan.com",
+      "vendor_name": "Ozdisan",
+      "vendor_search_key": "1003646",
+      "rfq_number": "1128746"
+    },
+    {
+      "emailId": "6801",
+      "mpn": "LM2903AVQDR",
+      "qty": "2400",
+      "price": "0.19",
+      "dc": "22",
+      "vendor_email": "uyurttas@ozdisan.com",
+      "vendor_name": "Ozdisan",
+      "vendor_search_key": "1003646",
+      "rfq_number": "1130292"
+    },
+    {
+      "emailId": "6802",
+      "mpn": "J0011D21BNL",
+      "qty": "775",
+      "price": "1.95",
+      "dc": "23",
+      "vendor_email": "uyurttas@ozdisan.com",
+      "vendor_name": "Ozdisan",
+      "vendor_search_key": "1003646",
+      "rfq_number": "1130292"
+    },
+    {
+      "emailId": "6803",
+      "mpn": "LM7805CT/NOPB",
+      "qty": "250",
+      "price": "0.84",
+      "dc": "24/25",
+      "vendor_email": "uyurttas@ozdisan.com",
+      "vendor_name": "Ozdisan",
+      "vendor_search_key": "1003646",
+      "rfq_number": "NOT_FOUND"
+    },
+    {
+      "emailId": "6804",
+      "mpn": "TG110-S050N2RLTR",
+      "qty": "725",
+      "price": "2.37",
+      "dc": "09+",
+      "vendor_email": "sales@eurodis.nu",
+      "vendor_name": "Eurodis Components",
+      "vendor_search_key": "NOT_FOUND",
+      "rfq_number": "1130292"
     },
     {
       "emailId": "6805",
@@ -405,6 +742,28 @@
       "rfq_number": "1130292"
     },
     {
+      "emailId": "6813",
+      "mpn": "LM2901AVQDRQ1",
+      "qty": "0",
+      "price": "0",
+      "dc": "",
+      "vendor_email": "justin@braunec.com",
+      "vendor_name": "Braun EC",
+      "vendor_search_key": "1002892",
+      "rfq_number": "1130292"
+    },
+    {
+      "emailId": "6815",
+      "mpn": "TG110-S050N2LF-TR",
+      "qty": "0",
+      "price": "0",
+      "dc": "",
+      "vendor_email": "mike@integratedelec.com",
+      "vendor_name": "Integrated Electronics",
+      "vendor_search_key": "1002612",
+      "rfq_number": "1130292"
+    },
+    {
       "emailId": "6816",
       "mpn": "J0011D21BNL",
       "qty": "700",
@@ -434,7 +793,7 @@
       "dc": "",
       "vendor_email": "sales@eptix.com",
       "vendor_name": "Eptix Electronics Inc",
-      "vendor_search_key": "NOT_FOUND",
+      "vendor_search_key": "1004279",
       "rfq_number": "1128746"
     },
     {
@@ -445,7 +804,7 @@
       "dc": "2204",
       "vendor_email": "sal@prismelectronics.net",
       "vendor_name": "Prism Electronics",
-      "vendor_search_key": "NOT_FOUND",
+      "vendor_search_key": "1002482",
       "rfq_number": "1129117"
     },
     {
@@ -467,7 +826,7 @@
       "dc": "1722",
       "vendor_email": "pweitz@semisourceinc.com",
       "vendor_name": "Semi Source Inc",
-      "vendor_search_key": "NOT_FOUND",
+      "vendor_search_key": "1001041",
       "rfq_number": "1130292"
     },
     {
@@ -478,7 +837,7 @@
       "dc": "2014",
       "vendor_email": "sal@prismelectronics.net",
       "vendor_name": "Prism Electronics",
-      "vendor_search_key": "NOT_FOUND",
+      "vendor_search_key": "1002482",
       "rfq_number": "1130292"
     },
     {
@@ -504,6 +863,17 @@
       "rfq_number": "1130292"
     },
     {
+      "emailId": "6829",
+      "mpn": "TG110-S050N2LFTR",
+      "qty": "1000",
+      "price": "0.595",
+      "dc": "22+",
+      "vendor_email": "agiovan@carlinsystems.com",
+      "vendor_name": "Carlin Systems Inc",
+      "vendor_search_key": "1002999",
+      "rfq_number": "1130292"
+    },
+    {
       "emailId": "6830",
       "mpn": "IMZ120R030M1HXKSA1",
       "qty": "720",
@@ -511,7 +881,7 @@
       "dc": "2149",
       "vendor_email": "sal@prismelectronics.net",
       "vendor_name": "Prism Electronics",
-      "vendor_search_key": "NOT_FOUND",
+      "vendor_search_key": "1002482",
       "rfq_number": "NOT_FOUND"
     },
     {
@@ -546,6 +916,17 @@
       "vendor_name": "IC-Tronix Inc",
       "vendor_search_key": "1002611",
       "rfq_number": "1130292"
+    },
+    {
+      "emailId": "6834",
+      "mpn": "88E1510-A0-NNB2C000",
+      "qty": "0",
+      "price": "0",
+      "dc": "",
+      "vendor_email": "betrinid@celestica.com",
+      "vendor_name": "Celestica",
+      "vendor_search_key": "1001118",
+      "rfq_number": "1129832"
     },
     {
       "emailId": "6835",
@@ -610,7 +991,7 @@
       "dc": "2020+",
       "vendor_email": "sal@prismelectronics.net",
       "vendor_name": "Prism Electronics",
-      "vendor_search_key": "NOT_FOUND",
+      "vendor_search_key": "1002482",
       "rfq_number": "1130292"
     },
     {
@@ -632,8 +1013,19 @@
       "dc": "22+",
       "vendor_email": "DistiSalesR2@flipelectronics.com",
       "vendor_name": "Flip Electronics",
-      "vendor_search_key": "NOT_FOUND",
+      "vendor_search_key": "1001208",
       "rfq_number": "1130350"
+    },
+    {
+      "emailId": "6844",
+      "mpn": "BCP53-16TX",
+      "qty": "26000",
+      "price": "0.22",
+      "dc": "17+",
+      "vendor_email": "philip.humphrey@vantageairsupport.com",
+      "vendor_name": "Vantage IC",
+      "vendor_search_key": "NOT_FOUND",
+      "rfq_number": "1130292"
     },
     {
       "emailId": "6845",
@@ -676,7 +1068,18 @@
       "dc": "2011+",
       "vendor_email": "sal@prismelectronics.net",
       "vendor_name": "Prism Electronics",
-      "vendor_search_key": "NOT_FOUND",
+      "vendor_search_key": "1002482",
+      "rfq_number": "1130292"
+    },
+    {
+      "emailId": "6849",
+      "mpn": "ISO7740DWR",
+      "qty": "5",
+      "price": "12",
+      "dc": "2020+",
+      "vendor_email": "sal@prismelectronics.net",
+      "vendor_name": "Prism Electronics",
+      "vendor_search_key": "1002482",
       "rfq_number": "1130292"
     },
     {
@@ -702,6 +1105,28 @@
       "rfq_number": "1128746"
     },
     {
+      "emailId": "6852",
+      "mpn": "ECS-200-20-5PXDU-TR",
+      "qty": "0",
+      "price": "0",
+      "dc": "",
+      "vendor_email": "dannyb@nusourcetech.com",
+      "vendor_name": "NuSource Tech",
+      "vendor_search_key": "1003800",
+      "rfq_number": "1130292"
+    },
+    {
+      "emailId": "6855",
+      "mpn": "LM7805CT",
+      "qty": "0",
+      "price": "0",
+      "dc": "",
+      "vendor_email": "dannyb@nusourcetech.com",
+      "vendor_name": "NuSource Tech",
+      "vendor_search_key": "1003800",
+      "rfq_number": "NOT_FOUND"
+    },
+    {
       "emailId": "6857",
       "mpn": "BCP53-16TX",
       "qty": "11000",
@@ -720,7 +1145,7 @@
       "dc": "0711",
       "vendor_email": "sal@prismelectronics.net",
       "vendor_name": "Prism Electronics",
-      "vendor_search_key": "NOT_FOUND",
+      "vendor_search_key": "1002482",
       "rfq_number": "NOT_FOUND"
     },
     {
@@ -746,6 +1171,17 @@
       "rfq_number": "1130462"
     },
     {
+      "emailId": "6861",
+      "mpn": "P600M",
+      "qty": "5500",
+      "price": "0.17",
+      "dc": "",
+      "vendor_email": "sales@inelcocomponents.com",
+      "vendor_name": "Inelco Components",
+      "vendor_search_key": "1002948",
+      "rfq_number": "1130292"
+    },
+    {
       "emailId": "6862",
       "mpn": "80CPQ150PBF",
       "qty": "38",
@@ -768,6 +1204,17 @@
       "rfq_number": "1130462"
     },
     {
+      "emailId": "6864",
+      "mpn": "MMA8451QR1",
+      "qty": "5000",
+      "price": "1.15",
+      "dc": "15",
+      "vendor_email": "p.fallon@com-sit.com",
+      "vendor_name": "ComS.I.T. Inc.",
+      "vendor_search_key": "1002491",
+      "rfq_number": "1130462"
+    },
+    {
       "emailId": "6865",
       "mpn": "ADS1115IDGSR",
       "qty": "80",
@@ -775,7 +1222,7 @@
       "dc": "2020+",
       "vendor_email": "sal@prismelectronics.net",
       "vendor_name": "Prism Electronics",
-      "vendor_search_key": "NOT_FOUND",
+      "vendor_search_key": "1002482",
       "rfq_number": "1130462"
     },
     {
@@ -786,8 +1233,19 @@
       "dc": "2328",
       "vendor_email": "Sales@HuskyINTL.com",
       "vendor_name": "Husky International Electronics",
-      "vendor_search_key": "NOT_FOUND",
+      "vendor_search_key": "1002469",
       "rfq_number": "1130462"
+    },
+    {
+      "emailId": "6874",
+      "mpn": "LM2591HVSX-5.0/NOPB",
+      "qty": "152",
+      "price": "1.2",
+      "dc": "0706",
+      "vendor_email": "tracey@agelectronicsltd.com",
+      "vendor_name": "AG Electronics Ltd",
+      "vendor_search_key": "1004875",
+      "rfq_number": "1130292"
     },
     {
       "emailId": "6876",
@@ -812,6 +1270,28 @@
       "rfq_number": "1129117"
     },
     {
+      "emailId": "6878",
+      "mpn": "MPZ2012S101AT000",
+      "qty": "7821",
+      "price": "0.03",
+      "dc": "13+",
+      "vendor_email": "sales@flychips.com",
+      "vendor_name": "Fly Chips Electronics",
+      "vendor_search_key": "1005735",
+      "rfq_number": "1130292"
+    },
+    {
+      "emailId": "6879",
+      "mpn": "B72510E300K62",
+      "qty": "1600",
+      "price": "0.15",
+      "dc": "15+",
+      "vendor_email": "sales@flychips.com",
+      "vendor_name": "Fly Chips Electronics",
+      "vendor_search_key": "1005735",
+      "rfq_number": "1130292"
+    },
+    {
       "emailId": "6882",
       "mpn": "HCF4093M013TR",
       "qty": "21400",
@@ -823,6 +1303,149 @@
       "rfq_number": "1130292"
     },
     {
+      "emailId": "6883",
+      "mpn": "MPZ2012S101AT000",
+      "qty": "0",
+      "price": "0",
+      "dc": "",
+      "vendor_email": "stockcheck@atlanticsemi.com",
+      "vendor_name": "Atlantic Semiconductor",
+      "vendor_search_key": "1002457",
+      "rfq_number": "1130292"
+    },
+    {
+      "emailId": "6888",
+      "mpn": "B82793S513N201",
+      "qty": "1500",
+      "price": "0.99",
+      "dc": "11",
+      "vendor_email": "p.fallon@com-sit.com",
+      "vendor_name": "ComS.I.T. Inc.",
+      "vendor_search_key": "1002491",
+      "rfq_number": "1130292"
+    },
+    {
+      "emailId": "6888",
+      "mpn": "IMZ120R030M1HXKSA1",
+      "qty": "19",
+      "price": "33.55",
+      "dc": "2002",
+      "vendor_email": "p.fallon@com-sit.com",
+      "vendor_name": "ComS.I.T. Inc.",
+      "vendor_search_key": "1002491",
+      "rfq_number": "NOT_FOUND"
+    },
+    {
+      "emailId": "6888",
+      "mpn": "LM2903AVQDR",
+      "qty": "1670",
+      "price": "0.49",
+      "dc": "14",
+      "vendor_email": "p.fallon@com-sit.com",
+      "vendor_name": "ComS.I.T. Inc.",
+      "vendor_search_key": "1002491",
+      "rfq_number": "1130292"
+    },
+    {
+      "emailId": "6888",
+      "mpn": "BTS723GW",
+      "qty": "12326",
+      "price": "2.8",
+      "dc": "09",
+      "vendor_email": "p.fallon@com-sit.com",
+      "vendor_name": "ComS.I.T. Inc.",
+      "vendor_search_key": "1002491",
+      "rfq_number": "1130292"
+    },
+    {
+      "emailId": "6888",
+      "mpn": "RS1JHE3AI",
+      "qty": "1670",
+      "price": "0.25",
+      "dc": "1825",
+      "vendor_email": "p.fallon@com-sit.com",
+      "vendor_name": "ComS.I.T. Inc.",
+      "vendor_search_key": "1002491",
+      "rfq_number": "NOT_FOUND"
+    },
+    {
+      "emailId": "6888",
+      "mpn": "RS1JHE3AI",
+      "qty": "2280",
+      "price": "0.25",
+      "dc": "1820",
+      "vendor_email": "p.fallon@com-sit.com",
+      "vendor_name": "ComS.I.T. Inc.",
+      "vendor_search_key": "1002491",
+      "rfq_number": "NOT_FOUND"
+    },
+    {
+      "emailId": "6888",
+      "mpn": "B72510E300K62",
+      "qty": "6000",
+      "price": "0.2",
+      "dc": "16",
+      "vendor_email": "p.fallon@com-sit.com",
+      "vendor_name": "ComS.I.T. Inc.",
+      "vendor_search_key": "1002491",
+      "rfq_number": "1130292"
+    },
+    {
+      "emailId": "6888",
+      "mpn": "LM2591HVS-5.0/NOPB",
+      "qty": "94",
+      "price": "9.2",
+      "dc": "11",
+      "vendor_email": "p.fallon@com-sit.com",
+      "vendor_name": "ComS.I.T. Inc.",
+      "vendor_search_key": "1002491",
+      "rfq_number": "1130292"
+    },
+    {
+      "emailId": "6888",
+      "mpn": "LM2591HVS-5.0/NOPB",
+      "qty": "46",
+      "price": "2.2",
+      "dc": "12",
+      "vendor_email": "p.fallon@com-sit.com",
+      "vendor_name": "ComS.I.T. Inc.",
+      "vendor_search_key": "1002491",
+      "rfq_number": "1130292"
+    },
+    {
+      "emailId": "6888",
+      "mpn": "SPP11N80C3",
+      "qty": "250",
+      "price": "2.6",
+      "dc": "1323",
+      "vendor_email": "p.fallon@com-sit.com",
+      "vendor_name": "ComS.I.T. Inc.",
+      "vendor_search_key": "1002491",
+      "rfq_number": "1130292"
+    },
+    {
+      "emailId": "6888",
+      "mpn": "B82793S513N201",
+      "qty": "2975",
+      "price": "0.85",
+      "dc": "11",
+      "vendor_email": "p.fallon@com-sit.com",
+      "vendor_name": "ComS.I.T. Inc.",
+      "vendor_search_key": "1002491",
+      "rfq_number": "1130292"
+    },
+    {
+      "emailId": "6891",
+      "mpn": "SBAS16LT1G",
+      "qty": "53000",
+      "price": "0.1",
+      "dc": "22+",
+      "vendor_email": "anna@rotakorn.se",
+      "vendor_name": "Rotakorn Electronics",
+      "vendor_search_key": "1002557",
+      "rfq_number": "1130292"
+    },
+    {
       "emailId": "6896",
       "mpn": "SBAS16LT1G",
       "qty": "53000",
@@ -831,6 +1454,40 @@
       "vendor_email": "Anna@rotakorn.se",
       "vendor_name": "Rotakorn Electronics AB",
       "vendor_search_key": "1002557",
+      "rfq_number": "1130292"
+    },
+    {
+      "emailId": "6897",
+      "mpn": "BAS16",
+      "qty": "235",
+      "price": "10000",
+      "dc": "0.02",
+      "vendor_email": "0505",
+      "vendor_name": "jw@4source.de",
+      "vendor_search_key": "4Source Electronics AG",
+      "rfq_number": "1003723"
+    },
+    {
+      "emailId": "6897",
+      "mpn": "BAS16,235",
+      "qty": 10000,
+      "price": 0.02,
+      "dc": "0505",
+      "vendor_email": "jw@4source.de",
+      "vendor_name": "4Source Electronics AG",
+      "vendor_search_key": "1003723",
+      "rfq_number": "1130292",
+      "notes": "PDF quote"
+    },
+    {
+      "emailId": "6900",
+      "mpn": "ISO7742DWR",
+      "qty": "9900",
+      "price": "1.81",
+      "dc": "",
+      "vendor_email": "sales@componentsearch.com",
+      "vendor_name": "Component Search",
+      "vendor_search_key": "NOT_FOUND",
       "rfq_number": "1130292"
     },
     {
@@ -852,7 +1509,7 @@
       "dc": "17",
       "vendor_email": "info@tronicpool.de",
       "vendor_name": "TronicPool GmbH",
-      "vendor_search_key": "NOT_FOUND",
+      "vendor_search_key": "1006423",
       "rfq_number": "1128746"
     },
     {
@@ -863,7 +1520,7 @@
       "dc": "12+",
       "vendor_email": "sales@reboundeu.com",
       "vendor_name": "Rebound EU",
-      "vendor_search_key": "NOT_FOUND",
+      "vendor_search_key": "1002855",
       "rfq_number": "NOT_FOUND"
     },
     {
@@ -962,7 +1619,7 @@
       "dc": "21+",
       "vendor_email": "sales@reboundeu.com",
       "vendor_name": "Rebound EU",
-      "vendor_search_key": "NOT_FOUND",
+      "vendor_search_key": "1002855",
       "rfq_number": "1130350"
     },
     {
@@ -973,7 +1630,7 @@
       "dc": "05+",
       "vendor_email": "sales@reboundeu.com",
       "vendor_name": "Rebound EU",
-      "vendor_search_key": "NOT_FOUND",
+      "vendor_search_key": "1002855",
       "rfq_number": "1130292"
     },
     {
@@ -1017,7 +1674,7 @@
       "dc": "2022",
       "vendor_email": "mmichnik@micros.com.pl",
       "vendor_name": "Micros",
-      "vendor_search_key": "NOT_FOUND",
+      "vendor_search_key": "1005154",
       "rfq_number": "1130292"
     },
     {
@@ -1032,6 +1689,17 @@
       "rfq_number": "1130292"
     },
     {
+      "emailId": "6926",
+      "mpn": "NUP2105LT1G",
+      "qty": "2541",
+      "price": "0.11",
+      "dc": "2022",
+      "vendor_email": "mmichnik@micros.com.pl",
+      "vendor_name": "Micros",
+      "vendor_search_key": "1005154",
+      "rfq_number": "1130292"
+    },
+    {
       "emailId": "6927",
       "mpn": "0251002.MRT1L",
       "qty": "981",
@@ -1039,7 +1707,7 @@
       "dc": "",
       "vendor_email": "sales@cyclops-electronics.com",
       "vendor_name": "Cyclops Electronics",
-      "vendor_search_key": "NOT_FOUND",
+      "vendor_search_key": "1002495",
       "rfq_number": "1130292"
     },
     {
@@ -1050,7 +1718,7 @@
       "dc": "07+",
       "vendor_email": "sales@cyclops-electronics.com",
       "vendor_name": "Cyclops Electronics",
-      "vendor_search_key": "NOT_FOUND",
+      "vendor_search_key": "1002495",
       "rfq_number": "1130292"
     },
     {
@@ -1061,7 +1729,7 @@
       "dc": "",
       "vendor_email": "sales@cyclops-electronics.com",
       "vendor_name": "Cyclops Electronics",
-      "vendor_search_key": "NOT_FOUND",
+      "vendor_search_key": "1002495",
       "rfq_number": "1130292"
     },
     {
@@ -1072,7 +1740,7 @@
       "dc": "1707",
       "vendor_email": "sales@cyclops-electronics.com",
       "vendor_name": "Cyclops Electronics",
-      "vendor_search_key": "NOT_FOUND",
+      "vendor_search_key": "1002495",
       "rfq_number": "1128746"
     },
     {
@@ -1083,7 +1751,7 @@
       "dc": "",
       "vendor_email": "sales@cyclops-electronics.com",
       "vendor_name": "Cyclops Electronics",
-      "vendor_search_key": "NOT_FOUND",
+      "vendor_search_key": "1002495",
       "rfq_number": "1130292"
     },
     {
@@ -1094,7 +1762,7 @@
       "dc": "0412",
       "vendor_email": "sales@cyclops-electronics.com",
       "vendor_name": "Cyclops Electronics",
-      "vendor_search_key": "NOT_FOUND",
+      "vendor_search_key": "1002495",
       "rfq_number": "1130292"
     },
     {
@@ -1105,7 +1773,7 @@
       "dc": "15+",
       "vendor_email": "sales@cyclops-electronics.com",
       "vendor_name": "Cyclops Electronics",
-      "vendor_search_key": "NOT_FOUND",
+      "vendor_search_key": "1002495",
       "rfq_number": "NOT_FOUND"
     },
     {
@@ -1131,6 +1799,17 @@
       "rfq_number": "1130292"
     },
     {
+      "emailId": "6931",
+      "mpn": "ISO7742DWR",
+      "qty": "1500",
+      "price": "1.32",
+      "dc": "2242",
+      "vendor_email": "laura@rif.investments",
+      "vendor_name": "RIF Investments",
+      "vendor_search_key": "NOT_FOUND",
+      "rfq_number": "1130292"
+    },
+    {
       "emailId": "6932",
       "mpn": "BAT54S-7-F",
       "qty": "28992",
@@ -1150,6 +1829,17 @@
       "vendor_email": "sales@zilex.ca",
       "vendor_name": "Zilex Electronics",
       "vendor_search_key": "1006047",
+      "rfq_number": "1130292"
+    },
+    {
+      "emailId": "6935",
+      "mpn": "TG110-S050N2LF-TR",
+      "qty": "0",
+      "price": "0",
+      "dc": "",
+      "vendor_email": "mike@integratedelec.com",
+      "vendor_name": "Integrated Electronics",
+      "vendor_search_key": "1002612",
       "rfq_number": "1130292"
     },
     {
@@ -1226,7 +1916,7 @@
       "dc": "0947",
       "vendor_email": "sales@milcraft.com",
       "vendor_name": "Milcraft",
-      "vendor_search_key": "NOT_FOUND",
+      "vendor_search_key": "1006714",
       "rfq_number": "1130292"
     },
     {
@@ -1237,7 +1927,40 @@
       "dc": "",
       "vendor_email": "benedek@ic-tronix.com",
       "vendor_name": "IC TRONIX INC",
-      "vendor_search_key": "NOT_FOUND",
+      "vendor_search_key": "1002611",
+      "rfq_number": "1130292"
+    },
+    {
+      "emailId": "6945",
+      "mpn": "B82793-S513-N201",
+      "qty": "310",
+      "price": "0.5",
+      "dc": "9826",
+      "vendor_email": "yvesd@clubelec.com",
+      "vendor_name": "Club Electronics",
+      "vendor_search_key": "1003743",
+      "rfq_number": "1130292"
+    },
+    {
+      "emailId": "6946",
+      "mpn": "B82793S513N201",
+      "qty": "1455",
+      "price": "0.3",
+      "dc": "02/11",
+      "vendor_email": "stockcheck@atlanticsemi.com",
+      "vendor_name": "Atlantic Semiconductor",
+      "vendor_search_key": "1002457",
+      "rfq_number": "1130292"
+    },
+    {
+      "emailId": "6947",
+      "mpn": "FSM4JSMATR",
+      "qty": "14400",
+      "price": "0.045",
+      "dc": "13+",
+      "vendor_email": "avi@flex-com.com",
+      "vendor_name": "Flex-Com International",
+      "vendor_search_key": "1002863",
       "rfq_number": "1130292"
     },
     {
@@ -1263,6 +1986,17 @@
       "rfq_number": "1130577"
     },
     {
+      "emailId": "6952",
+      "mpn": "SBAS16LT1G",
+      "qty": "0",
+      "price": "0",
+      "dc": "",
+      "vendor_email": "justin@braunec.com",
+      "vendor_name": "Braun EC",
+      "vendor_search_key": "1002892",
+      "rfq_number": "1130292"
+    },
+    {
       "emailId": "6953",
       "mpn": "BCP53-16TX",
       "qty": "700",
@@ -1270,7 +2004,7 @@
       "dc": "2022",
       "vendor_email": "mmichnik@micros.com.pl",
       "vendor_name": "Micros sp.j.",
-      "vendor_search_key": "NOT_FOUND",
+      "vendor_search_key": "1005154",
       "rfq_number": "1130577"
     },
     {
@@ -1294,6 +2028,17 @@
       "vendor_name": "CHANETECH",
       "vendor_search_key": "1004926",
       "rfq_number": "NOT_FOUND"
+    },
+    {
+      "emailId": "6959",
+      "mpn": "HCF4093M013TR",
+      "qty": "17500",
+      "price": "0.5",
+      "dc": "",
+      "vendor_email": "daniels@zdi.com",
+      "vendor_name": "ZD Integrated Circuits",
+      "vendor_search_key": "1004406",
+      "rfq_number": "1130292"
     },
     {
       "emailId": "6960",
@@ -1347,8 +2092,30 @@
       "dc": "25+",
       "vendor_email": "netcomponents@prodeldistribuzione.it",
       "vendor_name": "Prod.El. Distribuzione srl",
-      "vendor_search_key": "NOT_FOUND",
+      "vendor_search_key": "1005062",
       "rfq_number": "1130577"
+    },
+    {
+      "emailId": "6965",
+      "mpn": "DG403DYZT",
+      "qty": "0",
+      "price": "0",
+      "dc": "",
+      "vendor_email": "heather@amalfi-trading.com",
+      "vendor_name": "Amalfi Trading",
+      "vendor_search_key": "1002638",
+      "rfq_number": "1130292"
+    },
+    {
+      "emailId": "6966",
+      "mpn": "594D127X0020R2T",
+      "qty": "410",
+      "price": "0.98",
+      "dc": "0926",
+      "vendor_email": "shai@speedc.co.il",
+      "vendor_name": "Speed Components",
+      "vendor_search_key": "1004411",
+      "rfq_number": "1130292"
     },
     {
       "emailId": "6968",
@@ -1369,8 +2136,19 @@
       "dc": "2022",
       "vendor_email": "mmichnik@micros.com.pl",
       "vendor_name": "Micros sp.j.",
-      "vendor_search_key": "NOT_FOUND",
+      "vendor_search_key": "1005154",
       "rfq_number": "1130577"
+    },
+    {
+      "emailId": "6970",
+      "mpn": "0251002.MXL",
+      "qty": "670",
+      "price": "0.45",
+      "dc": "",
+      "vendor_email": "gs@aerco.co.uk",
+      "vendor_name": "AERCO",
+      "vendor_search_key": "1002410",
+      "rfq_number": "1130292"
     },
     {
       "emailId": "6971",
@@ -1380,8 +2158,19 @@
       "dc": "2022",
       "vendor_email": "mmichnik@micros.com.pl",
       "vendor_name": "Micros sp.j.",
-      "vendor_search_key": "NOT_FOUND",
+      "vendor_search_key": "1005154",
       "rfq_number": "1130577"
+    },
+    {
+      "emailId": "6972",
+      "mpn": "TG110S050N2RLTR",
+      "qty": "2000",
+      "price": "0.55",
+      "dc": "0618",
+      "vendor_email": "jyimez@electronic-direct.de",
+      "vendor_name": "Electronic Direct GmbH",
+      "vendor_search_key": "1002669",
+      "rfq_number": "1130292"
     },
     {
       "emailId": "6973",
@@ -1406,6 +2195,17 @@
       "rfq_number": "1130292"
     },
     {
+      "emailId": "6975",
+      "mpn": "LM2585S-5.0/NOPB",
+      "qty": "270",
+      "price": "5.7",
+      "dc": "0824",
+      "vendor_email": "info@chipdistribution.com",
+      "vendor_name": "Euro Chip Distribution",
+      "vendor_search_key": "NOT_FOUND",
+      "rfq_number": "1130292"
+    },
+    {
       "emailId": "6976",
       "mpn": "0251002.MRT1L",
       "qty": "40",
@@ -1413,7 +2213,7 @@
       "dc": "",
       "vendor_email": "morgan.snell@chemigraphic.co.uk",
       "vendor_name": "Chemigraphic Ltd.",
-      "vendor_search_key": "NOT_FOUND",
+      "vendor_search_key": "1005977",
       "rfq_number": "1130292"
     },
     {
@@ -1424,7 +2224,7 @@
       "dc": "2022",
       "vendor_email": "mmichnik@micros.com.pl",
       "vendor_name": "Micros sp.j.",
-      "vendor_search_key": "NOT_FOUND",
+      "vendor_search_key": "1005154",
       "rfq_number": "1130577"
     },
     {
@@ -1439,6 +2239,17 @@
       "rfq_number": "1130292"
     },
     {
+      "emailId": "6980",
+      "mpn": "SBAS16LT3G",
+      "qty": "0",
+      "price": "0",
+      "dc": "",
+      "vendor_email": "justin@braunec.com",
+      "vendor_name": "Braun EC",
+      "vendor_search_key": "1002892",
+      "rfq_number": "1130292"
+    },
+    {
       "emailId": "6981",
       "mpn": "LM2901AVQDRG4",
       "qty": "2200",
@@ -1448,6 +2259,28 @@
       "vendor_name": "MISTERSPROCKETS",
       "vendor_search_key": "1003448",
       "rfq_number": "1128746"
+    },
+    {
+      "emailId": "6982",
+      "mpn": "0251002.MRT1L",
+      "qty": "0",
+      "price": "0",
+      "dc": "",
+      "vendor_email": "boaz.fridman@electronic-stock.com",
+      "vendor_name": "Electronic Stock",
+      "vendor_search_key": "1005541",
+      "rfq_number": "1130292"
+    },
+    {
+      "emailId": "6983",
+      "mpn": "LM2585SX-5.0/NOPB",
+      "qty": "37",
+      "price": "2.5",
+      "dc": "13",
+      "vendor_email": "tommy@dan-mar.com",
+      "vendor_name": "Dan-Mar Components",
+      "vendor_search_key": "1005459",
+      "rfq_number": "1130292"
     },
     {
       "emailId": "6984",
@@ -1479,7 +2312,7 @@
       "dc": "18+",
       "vendor_email": "distysales@northshorecomponents.com",
       "vendor_name": "North Shore Components",
-      "vendor_search_key": "NOT_FOUND",
+      "vendor_search_key": "1002550",
       "rfq_number": "1130292"
     },
     {
@@ -1501,8 +2334,30 @@
       "dc": "22+",
       "vendor_email": "chris.l@nacsemi.com",
       "vendor_name": "NAC Semi",
-      "vendor_search_key": "NOT_FOUND",
+      "vendor_search_key": "1004921",
       "rfq_number": "1130577"
+    },
+    {
+      "emailId": "6989",
+      "mpn": "80CPQ150PBF",
+      "qty": "261",
+      "price": "5",
+      "dc": "10",
+      "vendor_email": "quote@qcomponents.com",
+      "vendor_name": "Q Components",
+      "vendor_search_key": "1003110",
+      "rfq_number": "1130292"
+    },
+    {
+      "emailId": "6990",
+      "mpn": "J0011D21BNL",
+      "qty": "20",
+      "price": "4",
+      "dc": "",
+      "vendor_email": "amy.g@hybridelectronics.com",
+      "vendor_name": "Hybrid Electronics",
+      "vendor_search_key": "1002787",
+      "rfq_number": "1130292"
     },
     {
       "emailId": "6991",
@@ -1512,7 +2367,7 @@
       "dc": "",
       "vendor_email": "accordtec@gmail.com",
       "vendor_name": "Accord Technologies",
-      "vendor_search_key": "NOT_FOUND",
+      "vendor_search_key": "1006191",
       "rfq_number": "1130292"
     },
     {
@@ -1523,7 +2378,7 @@
       "dc": "",
       "vendor_email": "accordtec@gmail.com",
       "vendor_name": "Accord Technologies",
-      "vendor_search_key": "NOT_FOUND",
+      "vendor_search_key": "1006191",
       "rfq_number": "1130292"
     },
     {
@@ -1556,6 +2411,17 @@
       "dc": "",
       "vendor_email": "amy.g@hybridelectronics.com",
       "vendor_name": "Hybrid Electronics Corporation",
+      "vendor_search_key": "1002787",
+      "rfq_number": "1130292"
+    },
+    {
+      "emailId": "6996",
+      "mpn": "SM24CANB-02HTG",
+      "qty": "50",
+      "price": "0.65",
+      "dc": "2023+",
+      "vendor_email": "iuliana.vlad@euroconnectors.de",
+      "vendor_name": "Lacon Electronic GmbH",
       "vendor_search_key": "NOT_FOUND",
       "rfq_number": "1130292"
     },
@@ -1571,6 +2437,17 @@
       "rfq_number": "1130292"
     },
     {
+      "emailId": "6999",
+      "mpn": "4-1437565-2",
+      "qty": "168000",
+      "price": "0.094",
+      "dc": "2020/21",
+      "vendor_email": "jsilvester@ibh-elektrotechnik.de",
+      "vendor_name": "IBH Elektrotechnik GmbH",
+      "vendor_search_key": "1006201",
+      "rfq_number": "1130292"
+    },
+    {
       "emailId": "7003",
       "mpn": "SM24CANB-02HTG",
       "qty": "10",
@@ -1578,8 +2455,30 @@
       "dc": "2014",
       "vendor_email": "sal@prismelectronics.net",
       "vendor_name": "Prism Electronics",
-      "vendor_search_key": "NOT_FOUND",
+      "vendor_search_key": "1002482",
       "rfq_number": "1130577"
+    },
+    {
+      "emailId": "7004",
+      "mpn": "PCL037-4",
+      "qty": "55",
+      "price": "1.5",
+      "dc": "2009",
+      "vendor_email": "sal@prismelectronics.net",
+      "vendor_name": "Prism Electronics",
+      "vendor_search_key": "1002482",
+      "rfq_number": "1130292"
+    },
+    {
+      "emailId": "7005",
+      "mpn": "MSP430F149IPMR",
+      "qty": "100",
+      "price": "1.37",
+      "dc": "0936",
+      "vendor_email": "stock@libra-elektronik.com",
+      "vendor_name": "LIBRA Elektronik GmbH",
+      "vendor_search_key": "1002912",
+      "rfq_number": "1129675"
     },
     {
       "emailId": "7008",
@@ -1604,6 +2503,39 @@
       "rfq_number": "1130292"
     },
     {
+      "emailId": "7010",
+      "mpn": "SN74HC573AQDWRQ1",
+      "qty": "30",
+      "price": "4.17",
+      "dc": "1144/1306",
+      "vendor_email": "paul@svtsupplychain.com",
+      "vendor_name": "SVT Supply Chain",
+      "vendor_search_key": "1003063",
+      "rfq_number": "1130292"
+    },
+    {
+      "emailId": "7011",
+      "mpn": "4-1437565-2",
+      "qty": "5677",
+      "price": "0.03",
+      "dc": "12+",
+      "vendor_email": "stockcheck@atlanticsemi.com",
+      "vendor_name": "Atlantic Semiconductor",
+      "vendor_search_key": "1002457",
+      "rfq_number": "1130292"
+    },
+    {
+      "emailId": "7012",
+      "mpn": "VS80CPQ150N3",
+      "qty": "120",
+      "price": "4",
+      "dc": "16+",
+      "vendor_email": "sales@chanetech.com",
+      "vendor_name": "Chanetech",
+      "vendor_search_key": "1004926",
+      "rfq_number": "1130292"
+    },
+    {
       "emailId": "7013",
       "mpn": "NTCS0603E3103FHT",
       "qty": "425",
@@ -1611,7 +2543,7 @@
       "dc": "",
       "vendor_email": "benedek@ic-tronix.com",
       "vendor_name": "IC TRONIX INC",
-      "vendor_search_key": "NOT_FOUND",
+      "vendor_search_key": "1002611",
       "rfq_number": "1130577"
     },
     {
@@ -1655,7 +2587,7 @@
       "dc": "2008+",
       "vendor_email": "sal@prismelectronics.net",
       "vendor_name": "Prism Electronics",
-      "vendor_search_key": "NOT_FOUND",
+      "vendor_search_key": "1002482",
       "rfq_number": "1130292"
     },
     {
@@ -1710,7 +2642,7 @@
       "dc": "1216",
       "vendor_email": "Sales@HuskyINTL.com",
       "vendor_name": "Husky International Electronics",
-      "vendor_search_key": "NOT_FOUND",
+      "vendor_search_key": "1002469",
       "rfq_number": "1130577"
     },
     {
@@ -1732,8 +2664,19 @@
       "dc": "9906",
       "vendor_email": "al.shammah@area51esg.com",
       "vendor_name": "Area51 Electronics",
-      "vendor_search_key": "NOT_FOUND",
+      "vendor_search_key": "1002459",
       "rfq_number": "1130577"
+    },
+    {
+      "emailId": "7026",
+      "mpn": "FSM4JSMATR",
+      "qty": "550",
+      "price": "0.1",
+      "dc": "06+",
+      "vendor_email": "sales@emsnetonline.com",
+      "vendor_name": "EMS Net Online",
+      "vendor_search_key": "1002514",
+      "rfq_number": "1130292"
     },
     {
       "emailId": "7027",
@@ -1754,7 +2697,18 @@
       "dc": "",
       "vendor_email": "pweitz@semisourceinc.com",
       "vendor_name": "Semi Source Inc.",
-      "vendor_search_key": "NOT_FOUND",
+      "vendor_search_key": "1001041",
+      "rfq_number": "1130292"
+    },
+    {
+      "emailId": "7029",
+      "mpn": "HCF4093M013TR",
+      "qty": "0",
+      "price": "0",
+      "dc": "",
+      "vendor_email": "chad.r@sonicaresolutions.com",
+      "vendor_name": "Sonicare Solutions",
+      "vendor_search_key": "1003359",
       "rfq_number": "1130292"
     },
     {
@@ -1846,6 +2800,39 @@
       "rfq_number": "1130577"
     },
     {
+      "emailId": "7039",
+      "mpn": "LM2591HVS-5.0/NOPB",
+      "qty": "5",
+      "price": "10",
+      "dc": "",
+      "vendor_email": "sales@componentonline.com",
+      "vendor_name": "Component Electronics Inc",
+      "vendor_search_key": "1003092",
+      "rfq_number": "1130292"
+    },
+    {
+      "emailId": "7040",
+      "mpn": "FSM4JSMATR",
+      "qty": "7500",
+      "price": "0.1",
+      "dc": "1348",
+      "vendor_email": "sal@prismelectronics.net",
+      "vendor_name": "Prism Electronics",
+      "vendor_search_key": "1002482",
+      "rfq_number": "1130292"
+    },
+    {
+      "emailId": "7041",
+      "mpn": "80CPQ150PBF",
+      "qty": "250",
+      "price": "5",
+      "dc": "10",
+      "vendor_email": "quote@qcomponents.com",
+      "vendor_name": "Q Components",
+      "vendor_search_key": "1003110",
+      "rfq_number": "1130292"
+    },
+    {
       "emailId": "7042",
       "mpn": "LM2903AVQDRG4",
       "qty": "22",
@@ -1853,7 +2840,7 @@
       "dc": "2137",
       "vendor_email": "hcruz@a2globalelectronics.com",
       "vendor_name": "A2 Global Electronics",
-      "vendor_search_key": "NOT_FOUND",
+      "vendor_search_key": "1004753",
       "rfq_number": "1130292"
     },
     {
@@ -1864,7 +2851,7 @@
       "dc": "2011",
       "vendor_email": "sal@prismelectronics.net",
       "vendor_name": "Prism Electronics",
-      "vendor_search_key": "NOT_FOUND",
+      "vendor_search_key": "1002482",
       "rfq_number": "1130292"
     },
     {
@@ -1875,7 +2862,7 @@
       "dc": "07+",
       "vendor_email": "al.shammah@area51esg.com",
       "vendor_name": "Area51 Electronics",
-      "vendor_search_key": "NOT_FOUND",
+      "vendor_search_key": "1002459",
       "rfq_number": "1130577"
     },
     {
@@ -1908,7 +2895,7 @@
       "dc": "2020+",
       "vendor_email": "sal@prismelectronics.net",
       "vendor_name": "Prism Electronics",
-      "vendor_search_key": "NOT_FOUND",
+      "vendor_search_key": "1002482",
       "rfq_number": "1130577"
     },
     {
@@ -1941,7 +2928,7 @@
       "dc": "0424",
       "vendor_email": "eric@inventorymp.com",
       "vendor_name": "Inventory Management Partners",
-      "vendor_search_key": "NOT_FOUND",
+      "vendor_search_key": "1002399",
       "rfq_number": "1130292"
     },
     {
