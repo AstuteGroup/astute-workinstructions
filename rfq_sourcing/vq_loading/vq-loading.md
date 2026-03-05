@@ -37,7 +37,7 @@ Extract ALL available fields from each quote. Required fields must be present; o
 | **Buyer** | `Buyer` | Yes | Person who sent RFQ (usually Jake Harris) |
 | **Vendor** | `Business Partner Search Key` | Yes | Vendor search_key from domain-based lookup |
 | **Contact** | `Contact` | No | Vendor contact name |
-| **MPN** | `MPN` | Yes | Part number being quoted |
+| **MPN** | `MPN` | Yes | **Customer's requested MPN** (from RFQ, NOT vendor's alternate) |
 | **Manufacturer** | `MFR Text` | No | Manufacturer name (TI, Infineon, etc.) |
 | **Quantity** | `Quoted Quantity` | Yes | Quoted quantity available |
 | **Cost** | `Cost` | Yes | Unit price |
@@ -53,8 +53,16 @@ Extract ALL available fields from each quote. Required fields must be present; o
 
 **Vendor Notes field usage:**
 - **No-bid reasons** (IMPORTANT): When qty=0 and price=0, capture why: "No-bid - out of stock", "No-bid - cannot source", "No-bid - price too high"
-- Alternate part numbers: "Quoted MPN: ABC123" (when vendor quotes different MPN)
+- **Alternate MPN** (CRITICAL): When vendor quotes a different MPN than requested, add "Quoted MPN: [vendor's MPN]" to Vendor Notes. The MPN field MUST contain the customer's original requested MPN (what's in the RFQ).
 - Special conditions: Lead time details, MOQ notes, pricing tiers
+
+**Alternate MPN Example:**
+- Customer RFQ requested: `LM2903AVQDR`
+- Vendor quoted: `LM2903AVQDRG4Q1` (with suffix)
+- **MPN field:** `LM2903AVQDR` (customer's request)
+- **Vendor Notes:** `Quoted MPN: LM2903AVQDRG4Q1`
+
+This ensures the VQ links to the correct RFQ and the alternate part info is preserved.
 
 **No-bid records:**
 - Set Quantity = 0, Cost = 0
@@ -154,22 +162,23 @@ himalaya message move --account vq --folder NeedsVendor Processed [IDs...]
 
 ---
 
-## Quick Start (Rigid Parser - Legacy)
+## Quick Start
+
+**Current workflow is 100% manual extraction.** No automated templates exist.
 
 ```bash
-# 1. Process new emails from VQ inbox
-node ~/workspace/vq-parser/src/index.js fetch
+# 1. Read emails manually via himalaya
+himalaya envelope list --account vq --folder INBOX --page-size 500
 
-# 2. Reprocess all emails in Processed folder (fresh run)
-node ~/workspace/vq-parser/scripts/batch-reprocess.js --folder Processed
+# 2. Extract in Claude session → save to JSON files
 
-# 3. Consolidate CSVs into upload-ready files
-node ~/workspace/vq-parser/src/index.js consolidate
+# 3. Consolidate all extractions into upload-ready CSV
+node ~/workspace/astute-workinstructions/rfq_sourcing/vq_loading/consolidate-extractions.js
 ```
 
-**Output:** `~/workspace/vq-parser/output/uploads/VQ_UPLOAD_*.csv`
+**Output:** `vq-upload-ready.csv` (231 records as of 2026-03-05)
 
-**WARNING:** Rigid parser has high error rate. Use two-agent manual extraction for accuracy.
+**Note:** Vendor templates were planned but never implemented. The rigid parser (`vq-parser/`) is legacy and not used.
 
 ---
 
