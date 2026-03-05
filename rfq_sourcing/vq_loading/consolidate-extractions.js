@@ -203,7 +203,9 @@ function queryRfqNumbers() {
     result.trim().split('\n').filter(l => l).forEach(line => {
       const [mpn, rfqNum] = line.split('|');
       if (mpn && rfqNum) {
-        rfqMap[mpn.toUpperCase()] = rfqNum;
+        // Clean the MPN from database too (remove commas, hyphens, etc.)
+        const cleanedDbMpn = mpn.toUpperCase().replace(/[-\/\.\s_#,]/g, '');
+        rfqMap[cleanedDbMpn] = rfqNum;
       }
     });
     return rfqMap;
@@ -230,8 +232,9 @@ function queryRfqFromLineMpn() {
     result.trim().split('\n').filter(l => l).forEach(line => {
       const [mpn, rfqNum] = line.split('|');
       if (mpn && rfqNum) {
-        // Store the cleaned MPN format
-        rfqMap[mpn.toUpperCase()] = rfqNum;
+        // Clean the MPN from database too (remove commas, hyphens, etc.)
+        const cleanedDbMpn = mpn.toUpperCase().replace(/[-\/\.\s_#,]/g, '');
+        rfqMap[cleanedDbMpn] = rfqNum;
       }
     });
     return rfqMap;
@@ -243,7 +246,8 @@ function queryRfqFromLineMpn() {
 
 // Clean MPN to match database format (remove special chars)
 function cleanMpn(mpn) {
-  return mpn.toUpperCase().replace(/[-\/\.\s_#]/g, '');
+  // Remove all common MPN separators: hyphen, slash, dot, space, underscore, hash, comma
+  return mpn.toUpperCase().replace(/[-\/\.\s_#,]/g, '');
 }
 
 // Main enrichment
