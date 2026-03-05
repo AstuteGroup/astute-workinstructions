@@ -166,7 +166,7 @@ Applies learned vendor mappings and merges to final upload.
 
 **IMPORTANT: Use domain-based matching, NOT exact email matching.**
 
-Vendor contacts change frequently - a quote from `sal@prismelectronics.net` should match Prism Electronics even if only `salessupport@prismelectronics.net` is in the database. Exact email matching produces ~60% match rate; domain-based produces ~87%.
+Vendor contacts change frequently. A quote from `sal@prismelectronics.net` should match Prism Electronics even if only `salessupport@prismelectronics.net` is in the database. The database typically has `sales@`, `rfq@`, or specific contacts registered, but vendors often send quotes from other personal emails at the same domain.
 
 ### Matching Order (consolidate-extractions.js)
 1. **Exact email match** in `ad_user.email` (fast path)
