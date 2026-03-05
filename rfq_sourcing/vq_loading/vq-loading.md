@@ -224,6 +224,30 @@ Applies learned vendor mappings and merges to final upload.
 
 ---
 
+## CRITICAL: search_key vs c_bpartner_id
+
+**ALWAYS use `search_key` (c_bpartner.value), NEVER use `c_bpartner_id` (database primary key).**
+
+These are DIFFERENT numbers:
+| Vendor | c_bpartner_id | search_key |
+|--------|---------------|------------|
+| Cyclops Electronics | 1000491 | 1002495 |
+| Atlantic Semiconductor | 1000453 | 1002457 |
+| Velocity Electronics | 1000036 | 1001036 |
+
+The upload template column `Business Partner Search Key` expects the **search_key** value.
+
+**Parser fix (field-mapper.js:304):**
+```javascript
+const bpId = vendorResult.search_key || vendorResult.c_bpartner_id || '';
+```
+
+**Vendor cache stores both:** Check `data/vendor-cache.json` - each entry has both `c_bpartner_id` and `search_key`. Always use `search_key` for output.
+
+**If you see mismatched data:** Old records created before this fix may have c_bpartner_id values. These need to be converted to search_key before upload.
+
+---
+
 ## Vendor Matching Strategy
 
 **IMPORTANT: Use domain-based matching, NOT exact email matching.**
