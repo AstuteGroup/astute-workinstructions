@@ -429,8 +429,11 @@ function formatVqLine(r) {
   // Currency: blank if USD, only specify for EUR/GBP/other
   const currency = (r.currency && r.currency !== 'USD') ? r.currency : '';
 
-  // Lead Time: default to "stock" if not specified
-  const leadTime = r.lead_time || 'stock';
+  // No-bid check: qty=0 and price=0
+  const isNoBid = parseFloat(r.qty) === 0 && parseFloat(r.price) === 0;
+
+  // Lead Time: default to "stock" unless it's a no-bid
+  const leadTime = isNoBid ? '' : (r.lead_time || 'stock');
 
   return [
     r.rfq_number === 'NOT_FOUND' ? 'NEEDS_RFQ' : r.rfq_number,  // RFQ Search Key
