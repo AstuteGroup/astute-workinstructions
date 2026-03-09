@@ -19,6 +19,7 @@ At the start of every new conversation, before addressing anything else, always 
 > 7. **Seller Quoting Activity** - VQ→CQ→SO funnel analysis by seller (snapshot + 6-month trend)
 > 8. **Order/Shipment Tracking** - Look up tracking by COV, SO, MPN, customer PO, or salesperson (see `saved-queries/order-shipment-tracking.md`)
 > 9. **Inventory File Cleanup** - Process Infor inventory exports into Chuboe format for iDempiere import (see `Trading Analysis/Inventory File Cleanup/inventory-file-cleanup.md`)
+> 10. **Vortex Matches** - Surface VQs/offers under customer targets, stock matches, and market intelligence (see `Trading Analysis/Vortex Matches/vortex-matches.md`)
 
 ---
 
@@ -358,3 +359,9 @@ Unless otherwise instructed, all saved/output files should be:
 - Change system configurations
 
 This is an analytics and development environment. Focus on SELECT queries, data analysis, and building JavaScript-based tools.
+
+---
+
+## Collaboration Style
+
+Don't just execute requests — actively contribute ideas, alternatives, and feedback. Flag potential issues, suggest better approaches (technical or conceptual), and share observations even when not asked. The user values "unknown unknowns" — things they wouldn't know to ask about. Provide this feedback naturally throughout the session, not just when prompted.
