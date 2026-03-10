@@ -1,3 +1,24 @@
+# North Star: Read Before Executing
+
+**THE .MD FILE IS THE SOURCE OF TRUTH. YOUR MEMORY IS NOT.**
+
+Before executing ANY workflow:
+1. **USE THE READ TOOL** on the workflow's .md file - do not proceed from memory, context summaries, or prior sessions
+2. **FIND THE NUMBERED STEPS** - execute them in order, do not skip steps
+3. **FIND THE OUTPUT FORMAT** - use the exact column names, field names, and structure defined in the doc
+4. **FIND THE REQUIRED QUERIES** - use the SQL/commands documented, do not improvise
+
+**Why this matters:** Context summaries and memory are lossy. You will forget column names, skip steps, and invent formats that don't match the ERP import template. The .md file has the exact specifications - read it every time.
+
+**This rule applies to:**
+- All numbered workflows below
+- Any multi-step process with documented specs
+- Any output that must match a template or system format
+
+If you catch yourself thinking "I remember how this works" - STOP and read the file instead.
+
+---
+
 # Session Greeting
 
 At the start of every new conversation, before addressing anything else, always display the following:
