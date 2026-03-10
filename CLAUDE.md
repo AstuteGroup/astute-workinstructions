@@ -122,7 +122,7 @@ node vq-parser/src/index.js fetch
 - **No template match** → stays in INBOX for manual extraction
 - No-bids detected and recorded (qty=0, price=0)
 - Fetch report generated with metrics
-- **Session file created** → `data/sessions/YYYY-MM-DD-inbox.json` with all pending emails
+- **Session file created** → `data/sessions/YYYY-MM-DDTHH-MM-SS-inbox.json` with all pending emails
 
 **Step 2: Manual Extraction in Claude Session**
 
@@ -135,11 +135,15 @@ Claude reads the session file and extracts:
 # List available sessions
 node vq-parser/src/index.js sessions --list
 
-# View today's session
+# View latest session
 node vq-parser/src/index.js sessions --latest
 ```
 
-**Session file contents:**
+**Session files (each session has paired input/output):**
+- Input: `data/sessions/2026-03-10T21-24-51-inbox.json` - emails to process
+- Output: `data/sessions/2026-03-10T21-24-51-extracted.csv` - quotes extracted
+
+**Session input contents:**
 - All INBOX emails that need work (new + any still pending from before)
 - Each email has `status` and `reason` (e.g., `needs-extraction`, `vendor-not-matched`, `pdf-needs-review`)
 - Complete snapshot of outstanding work
@@ -148,7 +152,7 @@ Process:
 1. Claude reads batches of 20-30 emails from session file
 2. Presents extracted data in table format for user review
 3. User approves or corrects
-4. Claude writes approved records to VQ_MASTER.csv
+4. Claude writes approved records to session output CSV
 5. Repeat until all emails processed
 
 **What to skip during extraction:**
