@@ -239,7 +239,53 @@ PDFs that can't be auto-processed are queued for manual review:
 
 **Output:** `vq-parser/output/VQ_MASTER.csv`
 
-Then proceed to address the user's message if they included one.
+---
+
+## Quick Quote Workflow
+
+**Documentation:** `Trading Analysis/Quick Quote/quick-quote.md`
+**Output:** `Trading Analysis/Quick Quote/output/`
+
+### When User Requests Quick Quote
+
+**ALWAYS follow these steps in order:**
+
+1. **Read the documentation** - Read `Trading Analysis/Quick Quote/quick-quote.md` to get current pricing parameters
+
+2. **State the defaults** - Confirm with user:
+   > "Quick Quote defaults: 15% min margin, $250 min GP/line, 30% fat margin fallback, 30-day VQ window. Using these for [Customer]?"
+
+3. **Check for overrides** - Ask if customer has special terms:
+   - Different margin requirements?
+   - Rebate arrangements?
+   - Contract pricing rules?
+
+4. **Execute** - Run the SQL query and export to CSV
+
+5. **Summarize results** - Show count of UNDER/OVER/VERIFY QTY lines and highlight best opportunities
+
+### Pricing Parameters (from quick-quote.md)
+
+| Parameter | Default | Formula |
+|-----------|---------|---------|
+| Min Margin | 15% | `cost / 0.85` |
+| Min GP | $250/line | `cost + $250/qty` |
+| Floor Price | Higher of above | `MAX(cost/0.85, cost+$250/qty)` |
+| Fat Margin Threshold | 35% | If target margin > 35%, use fallback |
+| Fat Margin Fallback | 30% | `cost / 0.70` |
+| VQ Window | 30 days | Only recent quotes |
+| Date Code Cutoff | 2022+ | Reject older unless blank/lead time |
+
+### Priority Hierarchy for Suggested Resale
+
+1. Same-customer PPV sale → use that price
+2. Same-customer Shortage sale → use that price
+3. Same-customer losing CQ → undercut by formula
+4. Other-customer sale → split the difference
+5. Target margin ≤35% → use target price
+6. Target margin >35% → use 30% margin fallback
+
+---
 
 ## Session Logging
 
