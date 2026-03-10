@@ -105,7 +105,9 @@ async function fetchRfqDetails(rfqNumber) {
 }
 
 /**
- * Fetch market offers matching the cleaned MPNs (90-day window)
+ * Fetch market offers matching the cleaned MPNs
+ * - Stock (offer_type LIKE 'Stock -%'): No time filter (our inventory, always current)
+ * - Other offers: 90-day window
  */
 async function fetchMarketOffers(cleanMpns) {
   if (cleanMpns.length === 0) return [];
@@ -125,8 +127,11 @@ async function fetchMarketOffers(cleanMpns) {
       'MO' AS record_type
     FROM adempiere.bi_market_offer_line_v mol
     WHERE mol.market_offer_line_mpn_clean = ANY($1)
-      AND mol.market_offer_created >= CURRENT_DATE - INTERVAL '90 days'
       AND mol.market_offer_active = 'Y'
+      AND (
+        mol.offer_type_name LIKE 'Stock -%'  -- Astute stock: no time filter
+        OR mol.market_offer_created >= CURRENT_DATE - INTERVAL '90 days'  -- Others: 90-day window
+      )
     ORDER BY mol.market_offer_created DESC
   `;
 
