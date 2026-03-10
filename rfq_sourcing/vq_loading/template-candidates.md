@@ -1,6 +1,8 @@
 # Template Candidates
 
-Track high-volume vendors for template development. **Cumulative counts** across all VQ loading sessions.
+Track high-volume vendors for template development. **Cumulative counts** across manual extraction sessions only.
+
+**Note:** Historical data from rigid parser sessions (pre-Mar 10) excluded due to bad vendor assignments.
 
 **When a template is created:** Remove vendor from this list and add to Existing Templates.
 
@@ -22,21 +24,12 @@ Track high-volume vendors for template development. **Cumulative counts** across
 
 ## Cumulative Vendor Counts
 
-**Last updated:** 2026-03-10 (includes sessions: 2026-03-02, 2026-03-10)
+**Baseline:** 2026-03-10 (manual extraction sessions only)
 
 | Search Key | Vendor | Cumulative | Priority | Sessions |
 |------------|--------|------------|----------|----------|
-| 1002948 | Inelco Components | 23 | **PRIORITY** | Mar 2 (21), Mar 10 (2) |
-| 1004482 | Cynosure | 23 | **PRIORITY** | Mar 2 (23) |
-| 1003646 | Ozdisan Elektronik | 16 | **PRIORITY** | Mar 2 (16) |
-| 1003040 | Data Device Corp | 13 | **PRIORITY** | Mar 2 (13) |
-| 1007730 | Puking Electronics | 12 | **PRIORITY** | Mar 2 (12) |
-| 1009938 | RioSH Technologies | 10 | **PRIORITY** | Mar 2 (10) |
-| 1005154 | Micros sp j | 10 | **PRIORITY** | Mar 2 (10) |
-| 1005599 | Green Chips | 9 | **PRIORITY** | Mar 2 (9) |
-| 1004912 | PKS Electronic | 8 | **PRIORITY** | Mar 2 (8) |
-| 1002495 | Cyclops Electronics | 8 | **PRIORITY** | Mar 2 (8) |
 | 1002457 | Atlantic Semiconductor | 4 | - | Mar 10 (4) |
+| 1002948 | Inelco Components | 2 | - | Mar 10 (2) |
 | 1002787 | Hybrid Electronics | 2 | - | Mar 10 (2) |
 | 1002612 | Integrated Electronics | 2 | - | Mar 10 (2) |
 | 1003290 | NetSource Technology | 2 | - | Mar 10 (2) |
