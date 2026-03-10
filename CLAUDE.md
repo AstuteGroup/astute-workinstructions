@@ -155,19 +155,23 @@ Process:
 4. Claude writes approved records to session output CSV
 5. Repeat until all emails processed
 
-**What to skip during extraction:**
-- No-bids (vendor explicitly declined to quote)
-- Target price requests (vendor asking for price, no quote data)
+**What to extract:**
+- **QUOTE** - Vendor provided price → record with qty, price, date code, etc.
+- **NO-BID** - Vendor explicitly declined ("not available", "no stock", "NQ") → record with qty=0, price=0, reason in notes
+
+**What to skip (no VQ record):**
+- Target price requests (vendor asking "target?" or "what's your budget?")
+- Clarification requests (vendor asking about specs, no quote given)
 - Empty forwards (no vendor response in the body)
 - Duplicates (same vendor, same part, same quote already extracted)
+- Needs review (compliance questions, incomplete responses requiring follow-up)
 
 **IMPORTANT:** All emails are forwards from team members. The vendor response is BELOW Jake's signature block. Always read to the bottom of the email to find the actual quote.
 
-**Step 4: Categorize Remaining**
+**Other categories:**
 
 | Category | Action |
 |----------|--------|
-| NO-BID responses | Record with qty=0, reason in notes |
 | Attachment-only (PDF) | Queue for PDF review |
 | Incomplete quotes | Flag as PARTIAL |
 | Spam/irrelevant | Skip |
