@@ -1,0 +1,2209 @@
+{
+  "version": "1.0",
+  "description": "RFQ submission history for cooldown tracking and supplier template prioritization",
+  "lastUpdated": "2026-03-10T19:56:16.527Z",
+  "rfqHistory": [
+    {
+      "supplier": "ECR Electronics Ltd.",
+      "mpn": "TPS63060DSCT",
+      "qty": 1950,
+      "rfqDate": "2026-03-10",
+      "rfqId": "1130350",
+      "region": "Europe",
+      "response": "pending"
+    },
+    {
+      "supplier": "Goldney Electronics S.L.",
+      "mpn": "TPS63060DSCT",
+      "qty": 1950,
+      "rfqDate": "2026-03-10",
+      "rfqId": "1130350",
+      "region": "Europe",
+      "response": "pending"
+    },
+    {
+      "supplier": "Avant Electronics Limited",
+      "mpn": "TPS63060DSCT",
+      "qty": 1950,
+      "rfqDate": "2026-03-10",
+      "rfqId": "1130350",
+      "region": "Europe",
+      "response": "pending"
+    },
+    {
+      "supplier": "Sogenti GmbH",
+      "mpn": "ADG734BRUZ",
+      "qty": 1450,
+      "rfqDate": "2026-03-10",
+      "rfqId": "1130350",
+      "region": "Europe",
+      "response": "pending"
+    },
+    {
+      "supplier": "Tectiva",
+      "mpn": "ADG734BRUZ",
+      "qty": 1450,
+      "rfqDate": "2026-03-10",
+      "rfqId": "1130350",
+      "region": "Europe",
+      "response": "pending"
+    },
+    {
+      "supplier": "Component Electronics Inc.",
+      "mpn": "LT1618EDD",
+      "qty": 1250,
+      "rfqDate": "2026-03-10",
+      "rfqId": "1130350",
+      "region": "Americas",
+      "response": "pending"
+    },
+    {
+      "supplier": "CCI Europe GmbH",
+      "mpn": "LT1618EDD",
+      "qty": 600,
+      "rfqDate": "2026-03-10",
+      "rfqId": "1130350",
+      "region": "Europe",
+      "response": "pending"
+    },
+    {
+      "supplier": "Inventory Management Partners",
+      "mpn": "LT3070EUFD",
+      "qty": 148,
+      "rfqDate": "2026-03-10",
+      "rfqId": "1130350",
+      "region": "Americas",
+      "response": "pending"
+    },
+    {
+      "supplier": "Select Technology Inc.",
+      "mpn": "LT3070EUFD",
+      "qty": 275,
+      "rfqDate": "2026-03-10",
+      "rfqId": "1130350",
+      "region": "Americas",
+      "response": "pending"
+    },
+    {
+      "supplier": "Semitech Inc.",
+      "mpn": "LT3070EUFD",
+      "qty": 146,
+      "rfqDate": "2026-03-10",
+      "rfqId": "1130350",
+      "region": "Americas",
+      "response": "pending"
+    },
+    {
+      "supplier": "Atlantic Semiconductor Corp.",
+      "mpn": "LT3080EDD-1",
+      "qty": 1250,
+      "rfqDate": "2026-03-10",
+      "rfqId": "1130350",
+      "region": "Americas",
+      "response": "pending"
+    },
+    {
+      "supplier": "Prism Electronics",
+      "mpn": "LT3080EDD-1",
+      "qty": 525,
+      "rfqDate": "2026-03-10",
+      "rfqId": "1130350",
+      "region": "Americas",
+      "response": "pending"
+    },
+    {
+      "supplier": "Inventory Management Partners",
+      "mpn": "LT3080EDD-1",
+      "qty": 775,
+      "rfqDate": "2026-03-10",
+      "rfqId": "1130350",
+      "region": "Americas",
+      "response": "pending"
+    },
+    {
+      "supplier": "Tomark Electronics Ltd",
+      "mpn": "LT3080EDD-1",
+      "qty": 150,
+      "rfqDate": "2026-03-10",
+      "rfqId": "1130350",
+      "region": "Europe",
+      "response": "pending"
+    },
+    {
+      "supplier": "Ganir Tech Ltd.",
+      "mpn": "LT3080EDD-1",
+      "qty": 1250,
+      "rfqDate": "2026-03-10",
+      "rfqId": "1130350",
+      "region": "Europe",
+      "response": "pending"
+    },
+    {
+      "supplier": "Abstract Electronics",
+      "mpn": "LT3973IMSE",
+      "qty": 200,
+      "rfqDate": "2026-03-10",
+      "rfqId": "1130350",
+      "region": "Americas",
+      "response": "pending"
+    },
+    {
+      "supplier": "ComSIT Distribution GmbH",
+      "mpn": "LT3973IMSE",
+      "qty": 6,
+      "rfqDate": "2026-03-10",
+      "rfqId": "1130350",
+      "region": "Europe",
+      "response": "pending"
+    },
+    {
+      "supplier": "GC Components Ltd",
+      "mpn": "LTC4263IDE",
+      "qty": 171,
+      "rfqDate": "2026-03-10",
+      "rfqId": "1130350",
+      "region": "Europe",
+      "response": "pending"
+    },
+    {
+      "supplier": "ComSIT Distribution GmbH",
+      "mpn": "LTC4263IDE",
+      "qty": 100,
+      "rfqDate": "2026-03-10",
+      "rfqId": "1130350",
+      "region": "Europe",
+      "response": "pending"
+    },
+    {
+      "supplier": "Husky Intl. Electronics, Inc.",
+      "mpn": "LTC4357IMS8",
+      "qty": 300,
+      "rfqDate": "2026-03-10",
+      "rfqId": "1130350",
+      "region": "Americas",
+      "response": "pending"
+    },
+    {
+      "supplier": "Voyager Components",
+      "mpn": "LTC4357IMS8",
+      "qty": 90,
+      "rfqDate": "2026-03-10",
+      "rfqId": "1130350",
+      "region": "Americas",
+      "response": "pending"
+    },
+    {
+      "supplier": "Microfarads",
+      "mpn": "LTC4357IMS8",
+      "qty": 575,
+      "rfqDate": "2026-03-10",
+      "rfqId": "1130350",
+      "region": "Americas",
+      "response": "pending"
+    },
+    {
+      "supplier": "LIBRA Elektronik GmbH",
+      "mpn": "LTM8026IV",
+      "qty": 7,
+      "rfqDate": "2026-03-10",
+      "rfqId": "1130350",
+      "region": "Europe",
+      "response": "pending"
+    },
+    {
+      "supplier": "IC-Tronix Inc.",
+      "mpn": "MAX3221EEAE",
+      "qty": 580,
+      "rfqDate": "2026-03-10",
+      "rfqId": "1130350",
+      "region": "Americas",
+      "response": "pending"
+    },
+    {
+      "supplier": "YBS Enterprises dbElectro-Comm",
+      "mpn": "MAX3221EEAE",
+      "qty": 580,
+      "rfqDate": "2026-03-10",
+      "rfqId": "1130350",
+      "region": "Americas",
+      "response": "pending"
+    },
+    {
+      "supplier": "SVT",
+      "mpn": "MAX3221EEAE",
+      "qty": 580,
+      "rfqDate": "2026-03-10",
+      "rfqId": "1130350",
+      "region": "Americas",
+      "response": "pending"
+    },
+    {
+      "supplier": "Abstract Electronics",
+      "mpn": "MAX3221EEAE",
+      "qty": 525,
+      "rfqDate": "2026-03-10",
+      "rfqId": "1130350",
+      "region": "Americas",
+      "response": "pending"
+    },
+    {
+      "supplier": "Inelco Components S.L.",
+      "mpn": "MAX3221EEAE",
+      "qty": 580,
+      "rfqDate": "2026-03-10",
+      "rfqId": "1130350",
+      "region": "Europe",
+      "response": "pending"
+    },
+    {
+      "supplier": "EXC GmbH",
+      "mpn": "MAX3221EEAE",
+      "qty": 580,
+      "rfqDate": "2026-03-10",
+      "rfqId": "1130350",
+      "region": "Europe",
+      "response": "pending"
+    },
+    {
+      "supplier": "Eurodis Components",
+      "mpn": "MAX3221EEAE",
+      "qty": 580,
+      "rfqDate": "2026-03-10",
+      "rfqId": "1130350",
+      "region": "Europe",
+      "response": "pending"
+    },
+    {
+      "supplier": "CHANETECH",
+      "mpn": "MAX3221EEAE",
+      "qty": 580,
+      "rfqDate": "2026-03-10",
+      "rfqId": "1130350",
+      "region": "Europe",
+      "response": "pending"
+    },
+    {
+      "supplier": "A&K Electronics",
+      "mpn": "MAX3318EIPW",
+      "qty": 1100,
+      "rfqDate": "2026-03-10",
+      "rfqId": "1130350",
+      "region": "Americas",
+      "response": "pending"
+    },
+    {
+      "supplier": "Eptix Inc.",
+      "mpn": "MAX3318EIPW",
+      "qty": 140,
+      "rfqDate": "2026-03-10",
+      "rfqId": "1130350",
+      "region": "Americas",
+      "response": "pending"
+    },
+    {
+      "supplier": "TCX Micro S.L.",
+      "mpn": "MAX3318EIPW",
+      "qty": 775,
+      "rfqDate": "2026-03-10",
+      "rfqId": "1130350",
+      "region": "Europe",
+      "response": "pending"
+    },
+    {
+      "supplier": "PC Components (PCC)",
+      "mpn": "12106D476KAT2A",
+      "qty": 3300,
+      "rfqDate": "2026-03-10",
+      "rfqId": "1130350",
+      "region": "Americas",
+      "response": "pending"
+    },
+    {
+      "supplier": "D.F. Sales Company",
+      "mpn": "12106D476KAT2A",
+      "qty": 2500,
+      "rfqDate": "2026-03-10",
+      "rfqId": "1130350",
+      "region": "Americas",
+      "response": "pending"
+    },
+    {
+      "supplier": "North Shore Components Inc.",
+      "mpn": "12106D476KAT2A",
+      "qty": 14000,
+      "rfqDate": "2026-03-10",
+      "rfqId": "1130350",
+      "region": "Americas",
+      "response": "pending"
+    },
+    {
+      "supplier": "Semi Source Inc.",
+      "mpn": "12106D476KAT2A",
+      "qty": 5100,
+      "rfqDate": "2026-03-10",
+      "rfqId": "1130350",
+      "region": "Americas",
+      "response": "pending"
+    },
+    {
+      "supplier": "New Advantage Corp",
+      "mpn": "BCM5241A1IMLG",
+      "qty": 2000,
+      "rfqDate": "2026-03-10",
+      "rfqId": "1130350",
+      "region": "Americas",
+      "response": "pending"
+    },
+    {
+      "supplier": "Converge LLC",
+      "mpn": "BCM5241A1IMLG",
+      "qty": 2000,
+      "rfqDate": "2026-03-10",
+      "rfqId": "1130350",
+      "region": "Americas",
+      "response": "pending"
+    },
+    {
+      "supplier": "Commodity Components",
+      "mpn": "BCM5241A1IMLG",
+      "qty": 2000,
+      "rfqDate": "2026-03-10",
+      "rfqId": "1130350",
+      "region": "Americas",
+      "response": "pending"
+    },
+    {
+      "supplier": "Nexus Electronics LLC",
+      "mpn": "BCM5241A1IMLG",
+      "qty": 375,
+      "rfqDate": "2026-03-10",
+      "rfqId": "1130350",
+      "region": "Americas",
+      "response": "pending"
+    },
+    {
+      "supplier": "Ganir Tech Ltd.",
+      "mpn": "BCM5241A1IMLG",
+      "qty": 2000,
+      "rfqDate": "2026-03-10",
+      "rfqId": "1130350",
+      "region": "Europe",
+      "response": "pending"
+    },
+    {
+      "supplier": "BESA Technologies GmbH",
+      "mpn": "BCM5241A1IMLG",
+      "qty": 725,
+      "rfqDate": "2026-03-10",
+      "rfqId": "1130350",
+      "region": "Europe",
+      "response": "pending"
+    },
+    {
+      "supplier": "iget Electronics GmbH",
+      "mpn": "BCM5241A1IMLG",
+      "qty": 375,
+      "rfqDate": "2026-03-10",
+      "rfqId": "1130350",
+      "region": "Europe",
+      "response": "pending"
+    },
+    {
+      "supplier": "Elcom Components, Inc.",
+      "mpn": "C1005X5R1C104K",
+      "qty": 18600,
+      "rfqDate": "2026-03-10",
+      "rfqId": "1130350",
+      "region": "Americas",
+      "response": "pending"
+    },
+    {
+      "supplier": "Atlantic Semiconductor Corp.",
+      "mpn": "C1005X5R1C104K",
+      "qty": 13800,
+      "rfqDate": "2026-03-10",
+      "rfqId": "1130350",
+      "region": "Americas",
+      "response": "pending"
+    },
+    {
+      "supplier": "SVT",
+      "mpn": "CY29946AXC",
+      "qty": 146,
+      "rfqDate": "2026-03-10",
+      "rfqId": "1130350",
+      "region": "Americas",
+      "response": "pending"
+    },
+    {
+      "supplier": "Semi Source Inc.",
+      "mpn": "CY29946AXC",
+      "qty": 675,
+      "rfqDate": "2026-03-10",
+      "rfqId": "1130350",
+      "region": "Americas",
+      "response": "pending"
+    },
+    {
+      "supplier": "SPM Sales and Solution",
+      "mpn": "CY29946AXC",
+      "qty": 113,
+      "rfqDate": "2026-03-10",
+      "rfqId": "1130350",
+      "region": "Americas",
+      "response": "pending"
+    },
+    {
+      "supplier": "Hybrid Electronics",
+      "mpn": "CY8C3866AXI-040",
+      "qty": 40,
+      "rfqDate": "2026-03-10",
+      "rfqId": "1130350",
+      "region": "Americas",
+      "response": "pending"
+    },
+    {
+      "supplier": "Converge LLC",
+      "mpn": "EP5358LUI",
+      "qty": 1000,
+      "rfqDate": "2026-03-10",
+      "rfqId": "1130350",
+      "region": "Americas",
+      "response": "pending"
+    },
+    {
+      "supplier": "Touchstone Systems, LLC",
+      "mpn": "EP5358LUI",
+      "qty": 925,
+      "rfqDate": "2026-03-10",
+      "rfqId": "1130350",
+      "region": "Americas",
+      "response": "pending"
+    },
+    {
+      "supplier": "Quest Components",
+      "mpn": "EP5358LUI",
+      "qty": 675,
+      "rfqDate": "2026-03-10",
+      "rfqId": "1130350",
+      "region": "Americas",
+      "response": "pending"
+    },
+    {
+      "supplier": "ECR Electronics Ltd.",
+      "mpn": "EP5358LUI",
+      "qty": 2300,
+      "rfqDate": "2026-03-10",
+      "rfqId": "1130350",
+      "region": "Europe",
+      "response": "pending"
+    },
+    {
+      "supplier": "Electronic Stock Ltd.",
+      "mpn": "EP5358LUI",
+      "qty": 2300,
+      "rfqDate": "2026-03-10",
+      "rfqId": "1130350",
+      "region": "Europe",
+      "response": "pending"
+    },
+    {
+      "supplier": "Prestocom, Ltd.",
+      "mpn": "EP5358LUI",
+      "qty": 1100,
+      "rfqDate": "2026-03-10",
+      "rfqId": "1130350",
+      "region": "Europe",
+      "response": "pending"
+    },
+    {
+      "supplier": "J2 Sourcing AB",
+      "mpn": "EP5358LUI",
+      "qty": 850,
+      "rfqDate": "2026-03-10",
+      "rfqId": "1130350",
+      "region": "Europe",
+      "response": "pending"
+    },
+    {
+      "supplier": "Touchstone Systems, LLC",
+      "mpn": "EPM2210F324I5N",
+      "qty": 50,
+      "rfqDate": "2026-03-10",
+      "rfqId": "1130350",
+      "region": "Americas",
+      "response": "pending"
+    },
+    {
+      "supplier": "Hybrid Electronics",
+      "mpn": "EPM2210F324I5N",
+      "qty": 20,
+      "rfqDate": "2026-03-10",
+      "rfqId": "1130350",
+      "region": "Americas",
+      "response": "pending"
+    },
+    {
+      "supplier": "Integrated Electronics Company",
+      "mpn": "EPM2210F324I5N",
+      "qty": 50,
+      "rfqDate": "2026-03-10",
+      "rfqId": "1130350",
+      "region": "Americas",
+      "response": "pending"
+    },
+    {
+      "supplier": "Classic Components",
+      "mpn": "EPM2210F324I5N",
+      "qty": 45,
+      "rfqDate": "2026-03-10",
+      "rfqId": "1130350",
+      "region": "Americas",
+      "response": "pending"
+    },
+    {
+      "supplier": "TerraBlock (fka Vecsys)",
+      "mpn": "EPM2210F324I5N",
+      "qty": 50,
+      "rfqDate": "2026-03-10",
+      "rfqId": "1130350",
+      "region": "Europe",
+      "response": "pending"
+    },
+    {
+      "supplier": "Component Electronics Inc.",
+      "mpn": "146839-3",
+      "qty": 141,
+      "rfqDate": "2026-03-10",
+      "rfqId": "1130350",
+      "region": "Americas",
+      "response": "pending"
+    },
+    {
+      "supplier": "IBH Elektrotechnik GmbH",
+      "mpn": "146839-3",
+      "qty": 375,
+      "rfqDate": "2026-03-10",
+      "rfqId": "1130350",
+      "region": "Europe",
+      "response": "pending"
+    },
+    {
+      "supplier": "AG Electronics Limited",
+      "mpn": "146839-3",
+      "qty": 125,
+      "rfqDate": "2026-03-10",
+      "rfqId": "1130350",
+      "region": "Europe",
+      "response": "pending"
+    },
+    {
+      "supplier": "Ashlea Components Ltd.",
+      "mpn": "146839-3",
+      "qty": 70,
+      "rfqDate": "2026-03-10",
+      "rfqId": "1130350",
+      "region": "Europe",
+      "response": "pending"
+    },
+    {
+      "supplier": "Prism Electronics",
+      "mpn": "16TQC100M",
+      "qty": 9400,
+      "rfqDate": "2026-03-10",
+      "rfqId": "1130350",
+      "region": "Americas",
+      "response": "pending"
+    },
+    {
+      "supplier": "FCC (First Choice Components)",
+      "mpn": "16TQC100M",
+      "qty": 9400,
+      "rfqDate": "2026-03-10",
+      "rfqId": "1130350",
+      "region": "Americas",
+      "response": "pending"
+    },
+    {
+      "supplier": "Quantum Digital Technology",
+      "mpn": "16TQC100M",
+      "qty": 9400,
+      "rfqDate": "2026-03-10",
+      "rfqId": "1130350",
+      "region": "Americas",
+      "response": "pending"
+    },
+    {
+      "supplier": "PC Components (PCC)",
+      "mpn": "16TQC100M",
+      "qty": 1400,
+      "rfqDate": "2026-03-10",
+      "rfqId": "1130350",
+      "region": "Americas",
+      "response": "pending"
+    },
+    {
+      "supplier": "Fly Chips",
+      "mpn": "16TQC100M",
+      "qty": 7700,
+      "rfqDate": "2026-03-10",
+      "rfqId": "1130350",
+      "region": "Europe",
+      "response": "pending"
+    },
+    {
+      "supplier": "Electronic Stock Ltd.",
+      "mpn": "16TQC100M",
+      "qty": 7100,
+      "rfqDate": "2026-03-10",
+      "rfqId": "1130350",
+      "region": "Europe",
+      "response": "pending"
+    },
+    {
+      "supplier": "SM Elektronik",
+      "mpn": "16TQC100M",
+      "qty": 3000,
+      "rfqDate": "2026-03-10",
+      "rfqId": "1130350",
+      "region": "Europe",
+      "response": "pending"
+    },
+    {
+      "supplier": "Schukat Electronic GmbH",
+      "mpn": "16TQC100M",
+      "qty": 1800,
+      "rfqDate": "2026-03-10",
+      "rfqId": "1130350",
+      "region": "Europe",
+      "response": "pending"
+    },
+    {
+      "supplier": "Smith & Associates",
+      "mpn": "AFBR-709DMZ",
+      "qty": 300,
+      "rfqDate": "2026-03-10",
+      "rfqId": "1130350",
+      "region": "Americas",
+      "response": "pending"
+    },
+    {
+      "supplier": "AER Worldwide",
+      "mpn": "AFBR-709DMZ",
+      "qty": 50,
+      "rfqDate": "2026-03-10",
+      "rfqId": "1130350",
+      "region": "Americas",
+      "response": "pending"
+    },
+    {
+      "supplier": "FreedomUSA",
+      "mpn": "AQY210S",
+      "qty": 3000,
+      "rfqDate": "2026-03-10",
+      "rfqId": "1130350",
+      "region": "Americas",
+      "response": "pending"
+    },
+    {
+      "supplier": "P&A Components Inc.",
+      "mpn": "AQY210S",
+      "qty": 1000,
+      "rfqDate": "2026-03-10",
+      "rfqId": "1130350",
+      "region": "Americas",
+      "response": "pending"
+    },
+    {
+      "supplier": "Maritex Leszek Losin Sp. j.",
+      "mpn": "AQY210S",
+      "qty": 9500,
+      "rfqDate": "2026-03-10",
+      "rfqId": "1130350",
+      "region": "Europe",
+      "response": "pending"
+    },
+    {
+      "supplier": "Schukat Electronic GmbH",
+      "mpn": "AQY210S",
+      "qty": 4400,
+      "rfqDate": "2026-03-10",
+      "rfqId": "1130350",
+      "region": "Europe",
+      "response": "pending"
+    },
+    {
+      "supplier": "J.M.P. Electronics, Ltd.",
+      "mpn": "AQY210S",
+      "qty": 2000,
+      "rfqDate": "2026-03-10",
+      "rfqId": "1130350",
+      "region": "Europe",
+      "response": "pending"
+    },
+    {
+      "supplier": "HZD GmbH",
+      "mpn": "AQY210S",
+      "qty": 1100,
+      "rfqDate": "2026-03-10",
+      "rfqId": "1130350",
+      "region": "Europe",
+      "response": "pending"
+    },
+    {
+      "supplier": "Lemkor Electronics, Inc",
+      "mpn": "FTLX8571D3BCV",
+      "qty": 225,
+      "rfqDate": "2026-03-10",
+      "rfqId": "1130350",
+      "region": "Americas",
+      "response": "pending"
+    },
+    {
+      "supplier": "Carlin Systems Inc.",
+      "mpn": "FTLX8571D3BCV",
+      "qty": 50,
+      "rfqDate": "2026-03-10",
+      "rfqId": "1130350",
+      "region": "Americas",
+      "response": "pending"
+    },
+    {
+      "supplier": "I.C. Plus, Inc.",
+      "mpn": "FTLX8571D3BCV",
+      "qty": 300,
+      "rfqDate": "2026-03-10",
+      "rfqId": "1130350",
+      "region": "Americas",
+      "response": "pending"
+    },
+    {
+      "supplier": "Demand Components",
+      "mpn": "FTSH-108-01-L-DV",
+      "qty": 2500,
+      "rfqDate": "2026-03-10",
+      "rfqId": "1130350",
+      "region": "Americas",
+      "response": "pending"
+    },
+    {
+      "supplier": "NetSource Technology Inc.",
+      "mpn": "FTSH-108-01-L-DV",
+      "qty": 5400,
+      "rfqDate": "2026-03-10",
+      "rfqId": "1130350",
+      "region": "Americas",
+      "response": "pending"
+    },
+    {
+      "supplier": "Partservice",
+      "mpn": "FTSH-108-01-L-DV",
+      "qty": 1100,
+      "rfqDate": "2026-03-10",
+      "rfqId": "1130350",
+      "region": "Europe",
+      "response": "pending"
+    },
+    {
+      "supplier": "Fly Chips",
+      "mpn": "FTSH-108-01-L-DV",
+      "qty": 600,
+      "rfqDate": "2026-03-10",
+      "rfqId": "1130350",
+      "region": "Europe",
+      "response": "pending"
+    },
+    {
+      "supplier": "Component Sense",
+      "mpn": "FTSH-108-01-L-DV",
+      "qty": 5000,
+      "rfqDate": "2026-03-10",
+      "rfqId": "1130350",
+      "region": "Europe",
+      "response": "pending"
+    },
+    {
+      "supplier": "NexGen Digital, Inc.",
+      "mpn": "HX1188FNL",
+      "qty": 4316,
+      "rfqDate": "2026-03-10",
+      "rfqId": "1130350",
+      "region": "Americas",
+      "response": "pending"
+    },
+    {
+      "supplier": "Megastar Electronics, Inc.",
+      "mpn": "HX1188FNL",
+      "qty": 775,
+      "rfqDate": "2026-03-10",
+      "rfqId": "1130350",
+      "region": "Americas",
+      "response": "pending"
+    },
+    {
+      "supplier": "Chip Stock, LLC",
+      "mpn": "HX1188FNL",
+      "qty": 600,
+      "rfqDate": "2026-03-10",
+      "rfqId": "1130350",
+      "region": "Americas",
+      "response": "pending"
+    },
+    {
+      "supplier": "SM Elektronik",
+      "mpn": "HX1188FNL",
+      "qty": 1200,
+      "rfqDate": "2026-03-10",
+      "rfqId": "1130350",
+      "region": "Europe",
+      "response": "pending"
+    },
+    {
+      "supplier": "SIE Connect-GreenChips",
+      "mpn": "HX1188FNL",
+      "qty": 550,
+      "rfqDate": "2026-03-10",
+      "rfqId": "1130350",
+      "region": "Europe",
+      "response": "pending"
+    },
+    {
+      "supplier": "X-Press Micro, Inc.",
+      "mpn": "J1011F21PNL",
+      "qty": 1640,
+      "rfqDate": "2026-03-10",
+      "rfqId": "1130350",
+      "region": "Americas",
+      "response": "pending"
+    },
+    {
+      "supplier": "Eurodis Components",
+      "mpn": "J1011F21PNL",
+      "qty": 1640,
+      "rfqDate": "2026-03-10",
+      "rfqId": "1130350",
+      "region": "Europe",
+      "response": "pending"
+    },
+    {
+      "supplier": "Solsta Limited",
+      "mpn": "J1011F21PNL",
+      "qty": 550,
+      "rfqDate": "2026-03-10",
+      "rfqId": "1130350",
+      "region": "Europe",
+      "response": "pending"
+    },
+    {
+      "supplier": "J2 Sourcing AB",
+      "mpn": "J1011F21PNL",
+      "qty": 1640,
+      "rfqDate": "2026-03-10",
+      "rfqId": "1130350",
+      "region": "Europe",
+      "response": "pending"
+    },
+    {
+      "supplier": "RLX Solutions Inc.",
+      "mpn": "LS14250",
+      "qty": 775,
+      "rfqDate": "2026-03-10",
+      "rfqId": "1130350",
+      "region": "Americas",
+      "response": "pending"
+    },
+    {
+      "supplier": "Impact Components",
+      "mpn": "LS14250",
+      "qty": 675,
+      "rfqDate": "2026-03-10",
+      "rfqId": "1130350",
+      "region": "Americas",
+      "response": "pending"
+    },
+    {
+      "supplier": "Sonicare Solutions",
+      "mpn": "LS14250",
+      "qty": 175,
+      "rfqDate": "2026-03-10",
+      "rfqId": "1130350",
+      "region": "Americas",
+      "response": "pending"
+    },
+    {
+      "supplier": "TME",
+      "mpn": "LS14250",
+      "qty": 1800,
+      "rfqDate": "2026-03-10",
+      "rfqId": "1130350",
+      "region": "Europe",
+      "response": "pending"
+    },
+    {
+      "supplier": "4Source Electronics AG",
+      "mpn": "LS14250",
+      "qty": 300,
+      "rfqDate": "2026-03-10",
+      "rfqId": "1130350",
+      "region": "Europe",
+      "response": "pending"
+    },
+    {
+      "supplier": "Weisbauer Elektronik GmbH",
+      "mpn": "LS14250",
+      "qty": 1200,
+      "rfqDate": "2026-03-10",
+      "rfqId": "1130350",
+      "region": "Europe",
+      "response": "pending"
+    },
+    {
+      "supplier": "Rapid Electronics Ltd.",
+      "mpn": "LS14250",
+      "qty": 425,
+      "rfqDate": "2026-03-10",
+      "rfqId": "1130350",
+      "region": "Europe",
+      "response": "pending"
+    },
+    {
+      "supplier": "Quest Components",
+      "mpn": "MIC49500WR",
+      "qty": 300,
+      "rfqDate": "2026-03-10",
+      "rfqId": "1130350",
+      "region": "Americas",
+      "response": "pending"
+    },
+    {
+      "supplier": "Right Parts",
+      "mpn": "MIC49500WR",
+      "qty": 170,
+      "rfqDate": "2026-03-10",
+      "rfqId": "1130350",
+      "region": "Americas",
+      "response": "pending"
+    },
+    {
+      "supplier": "Maritex Leszek Losin Sp. j.",
+      "mpn": "MIC49500WR",
+      "qty": 1250,
+      "rfqDate": "2026-03-10",
+      "rfqId": "1130350",
+      "region": "Europe",
+      "response": "pending"
+    },
+    {
+      "supplier": "Zilex Electronics Inc.",
+      "mpn": "MSP430F149IPM",
+      "qty": 900,
+      "rfqDate": "2026-03-10",
+      "rfqId": "1130350",
+      "region": "Americas",
+      "response": "pending"
+    },
+    {
+      "supplier": "Silicon Solutions Inc.",
+      "mpn": "MSP430F149IPM",
+      "qty": 900,
+      "rfqDate": "2026-03-10",
+      "rfqId": "1130350",
+      "region": "Americas",
+      "response": "pending"
+    },
+    {
+      "supplier": "Diverse Electronics",
+      "mpn": "MSP430F149IPM",
+      "qty": 900,
+      "rfqDate": "2026-03-10",
+      "rfqId": "1130350",
+      "region": "Americas",
+      "response": "pending"
+    },
+    {
+      "supplier": "AES - Atlas Electronic Systems",
+      "mpn": "MSP430F149IPM",
+      "qty": 900,
+      "rfqDate": "2026-03-10",
+      "rfqId": "1130350",
+      "region": "Americas",
+      "response": "pending"
+    },
+    {
+      "supplier": "LIBRA Elektronik GmbH",
+      "mpn": "MSP430F149IPM",
+      "qty": 900,
+      "rfqDate": "2026-03-10",
+      "rfqId": "1130350",
+      "region": "Europe",
+      "response": "pending"
+    },
+    {
+      "supplier": "Silicon Solutions LP Europe",
+      "mpn": "MSP430F149IPM",
+      "qty": 900,
+      "rfqDate": "2026-03-10",
+      "rfqId": "1130350",
+      "region": "Europe",
+      "response": "pending"
+    },
+    {
+      "supplier": "Merefields Electronics",
+      "mpn": "MSP430F149IPM",
+      "qty": 900,
+      "rfqDate": "2026-03-10",
+      "rfqId": "1130350",
+      "region": "Europe",
+      "response": "pending"
+    },
+    {
+      "supplier": "A-Source Electronics BV",
+      "mpn": "MSP430F149IPM",
+      "qty": 225,
+      "rfqDate": "2026-03-10",
+      "rfqId": "1130350",
+      "region": "Europe",
+      "response": "pending"
+    },
+    {
+      "supplier": "Chip Stock, LLC",
+      "mpn": "MT28FW02GBBA1HPC-0AAT",
+      "qty": 150,
+      "rfqDate": "2026-03-10",
+      "rfqId": "1130350",
+      "region": "Americas",
+      "response": "pending"
+    },
+    {
+      "supplier": "Aitech Systems Ltd.",
+      "mpn": "MT28FW02GBBA1HPC-0AAT",
+      "qty": 50,
+      "rfqDate": "2026-03-10",
+      "rfqId": "1130350",
+      "region": "Europe",
+      "response": "pending"
+    },
+    {
+      "supplier": "Voyager Components",
+      "mpn": "NFM18PC105R0J3D",
+      "qty": 12700,
+      "rfqDate": "2026-03-10",
+      "rfqId": "1130350",
+      "region": "Americas",
+      "response": "pending"
+    },
+    {
+      "supplier": "Flex-Com International Ltd.",
+      "mpn": "NFM18PC105R0J3D",
+      "qty": 78460,
+      "rfqDate": "2026-03-10",
+      "rfqId": "1130350",
+      "region": "Europe",
+      "response": "pending"
+    },
+    {
+      "supplier": "Seba Components",
+      "mpn": "NFM18PC105R0J3D",
+      "qty": 78460,
+      "rfqDate": "2026-03-10",
+      "rfqId": "1130350",
+      "region": "Europe",
+      "response": "pending"
+    },
+    {
+      "supplier": "Grossenbacher Systeme AG",
+      "mpn": "NFM18PC105R0J3D",
+      "qty": 10800,
+      "rfqDate": "2026-03-10",
+      "rfqId": "1130350",
+      "region": "Europe",
+      "response": "pending"
+    },
+    {
+      "supplier": "GC Components Ltd",
+      "mpn": "NFM18PC105R0J3D",
+      "qty": 8300,
+      "rfqDate": "2026-03-10",
+      "rfqId": "1130350",
+      "region": "Europe",
+      "response": "pending"
+    },
+    {
+      "supplier": "AGS Devices Ltd",
+      "mpn": "PCA9517ADP",
+      "qty": 4900,
+      "rfqDate": "2026-03-10",
+      "rfqId": "1130350",
+      "region": "Americas",
+      "response": "pending"
+    },
+    {
+      "supplier": "Right Parts",
+      "mpn": "PCA9517ADP",
+      "qty": 4700,
+      "rfqDate": "2026-03-10",
+      "rfqId": "1130350",
+      "region": "Americas",
+      "response": "pending"
+    },
+    {
+      "supplier": "Computer Components Ltd",
+      "mpn": "PCA9517ADP",
+      "qty": 2500,
+      "rfqDate": "2026-03-10",
+      "rfqId": "1130350",
+      "region": "Europe",
+      "response": "pending"
+    },
+    {
+      "supplier": "CVC Components Ltd.",
+      "mpn": "PCA9517ADP",
+      "qty": 10000,
+      "rfqDate": "2026-03-10",
+      "rfqId": "1130350",
+      "region": "Europe",
+      "response": "pending"
+    },
+    {
+      "supplier": "SIE Connect-GreenChips",
+      "mpn": "PCA9517ADP",
+      "qty": 3500,
+      "rfqDate": "2026-03-10",
+      "rfqId": "1130350",
+      "region": "Europe",
+      "response": "pending"
+    },
+    {
+      "supplier": "Grossenbacher Systeme AG",
+      "mpn": "PCA9517ADP",
+      "qty": 2600,
+      "rfqDate": "2026-03-10",
+      "rfqId": "1130350",
+      "region": "Europe",
+      "response": "pending"
+    },
+    {
+      "supplier": "Omega GTI",
+      "mpn": "PCA9517DP",
+      "qty": 12465,
+      "rfqDate": "2026-03-10",
+      "rfqId": "1130350",
+      "region": "Americas",
+      "response": "pending"
+    },
+    {
+      "supplier": "NexGen Digital, Inc.",
+      "mpn": "PCA9517DP",
+      "qty": 5000,
+      "rfqDate": "2026-03-10",
+      "rfqId": "1130350",
+      "region": "Americas",
+      "response": "pending"
+    },
+    {
+      "supplier": "AED Inc.",
+      "mpn": "PCA9517DP",
+      "qty": 2900,
+      "rfqDate": "2026-03-10",
+      "rfqId": "1130350",
+      "region": "Americas",
+      "response": "pending"
+    },
+    {
+      "supplier": "IC-Tronix Inc.",
+      "mpn": "PCA9517DP",
+      "qty": 2500,
+      "rfqDate": "2026-03-10",
+      "rfqId": "1130350",
+      "region": "Americas",
+      "response": "pending"
+    },
+    {
+      "supplier": "SECO spa",
+      "mpn": "PCA9517DP",
+      "qty": 12465,
+      "rfqDate": "2026-03-10",
+      "rfqId": "1130350",
+      "region": "Europe",
+      "response": "pending"
+    },
+    {
+      "supplier": "ICL Electronic-Bauteil-Service",
+      "mpn": "PCA9517DP",
+      "qty": 12465,
+      "rfqDate": "2026-03-10",
+      "rfqId": "1130350",
+      "region": "Europe",
+      "response": "pending"
+    },
+    {
+      "supplier": "Avant Electronics Limited",
+      "mpn": "PCA9517DP",
+      "qty": 1800,
+      "rfqDate": "2026-03-10",
+      "rfqId": "1130350",
+      "region": "Europe",
+      "response": "pending"
+    },
+    {
+      "supplier": "Dot Comps Electronics Inc.",
+      "mpn": "S102M59Z5UU83L0R",
+      "qty": 5,
+      "rfqDate": "2026-03-10",
+      "rfqId": "1130350",
+      "region": "Americas",
+      "response": "pending"
+    },
+    {
+      "supplier": "TME",
+      "mpn": "S102M59Z5UU83L0R",
+      "qty": 50,
+      "rfqDate": "2026-03-10",
+      "rfqId": "1130350",
+      "region": "Europe",
+      "response": "pending"
+    },
+    {
+      "supplier": "Dark Horse Electronics",
+      "mpn": "TPS63060DSC",
+      "qty": 4175,
+      "rfqDate": "2026-03-10",
+      "rfqId": "1130350",
+      "region": "Americas",
+      "response": "pending"
+    },
+    {
+      "supplier": "Tencell",
+      "mpn": "TPS63060DSC",
+      "qty": 3000,
+      "rfqDate": "2026-03-10",
+      "rfqId": "1130350",
+      "region": "Europe",
+      "response": "pending"
+    },
+    {
+      "supplier": "Sternenhof Electronics",
+      "mpn": "TPS63060DSC",
+      "qty": 1000,
+      "rfqDate": "2026-03-10",
+      "rfqId": "1130350",
+      "region": "Europe",
+      "response": "pending"
+    }
+  ],
+  "supplierStats": {
+    "ECR Electronics Ltd.": {
+      "totalRfqs": 2,
+      "lastRfqDate": "2026-03-10",
+      "region": "Europe",
+      "mpns": [
+        "TPS63060DSCT",
+        "EP5358LUI"
+      ]
+    },
+    "Goldney Electronics S.L.": {
+      "totalRfqs": 1,
+      "lastRfqDate": "2026-03-10",
+      "region": "Europe",
+      "mpns": [
+        "TPS63060DSCT"
+      ]
+    },
+    "Avant Electronics Limited": {
+      "totalRfqs": 2,
+      "lastRfqDate": "2026-03-10",
+      "region": "Europe",
+      "mpns": [
+        "TPS63060DSCT",
+        "PCA9517DP"
+      ]
+    },
+    "Sogenti GmbH": {
+      "totalRfqs": 1,
+      "lastRfqDate": "2026-03-10",
+      "region": "Europe",
+      "mpns": [
+        "ADG734BRUZ"
+      ]
+    },
+    "Tectiva": {
+      "totalRfqs": 1,
+      "lastRfqDate": "2026-03-10",
+      "region": "Europe",
+      "mpns": [
+        "ADG734BRUZ"
+      ]
+    },
+    "Component Electronics Inc.": {
+      "totalRfqs": 2,
+      "lastRfqDate": "2026-03-10",
+      "region": "Americas",
+      "mpns": [
+        "LT1618EDD",
+        "146839-3"
+      ]
+    },
+    "CCI Europe GmbH": {
+      "totalRfqs": 1,
+      "lastRfqDate": "2026-03-10",
+      "region": "Europe",
+      "mpns": [
+        "LT1618EDD"
+      ]
+    },
+    "Inventory Management Partners": {
+      "totalRfqs": 2,
+      "lastRfqDate": "2026-03-10",
+      "region": "Americas",
+      "mpns": [
+        "LT3070EUFD",
+        "LT3080EDD-1"
+      ]
+    },
+    "Select Technology Inc.": {
+      "totalRfqs": 1,
+      "lastRfqDate": "2026-03-10",
+      "region": "Americas",
+      "mpns": [
+        "LT3070EUFD"
+      ]
+    },
+    "Semitech Inc.": {
+      "totalRfqs": 1,
+      "lastRfqDate": "2026-03-10",
+      "region": "Americas",
+      "mpns": [
+        "LT3070EUFD"
+      ]
+    },
+    "Atlantic Semiconductor Corp.": {
+      "totalRfqs": 2,
+      "lastRfqDate": "2026-03-10",
+      "region": "Americas",
+      "mpns": [
+        "LT3080EDD-1",
+        "C1005X5R1C104K"
+      ]
+    },
+    "Prism Electronics": {
+      "totalRfqs": 2,
+      "lastRfqDate": "2026-03-10",
+      "region": "Americas",
+      "mpns": [
+        "LT3080EDD-1",
+        "16TQC100M"
+      ]
+    },
+    "Tomark Electronics Ltd": {
+      "totalRfqs": 1,
+      "lastRfqDate": "2026-03-10",
+      "region": "Europe",
+      "mpns": [
+        "LT3080EDD-1"
+      ]
+    },
+    "Ganir Tech Ltd.": {
+      "totalRfqs": 2,
+      "lastRfqDate": "2026-03-10",
+      "region": "Europe",
+      "mpns": [
+        "LT3080EDD-1",
+        "BCM5241A1IMLG"
+      ]
+    },
+    "Abstract Electronics": {
+      "totalRfqs": 2,
+      "lastRfqDate": "2026-03-10",
+      "region": "Americas",
+      "mpns": [
+        "LT3973IMSE",
+        "MAX3221EEAE"
+      ]
+    },
+    "ComSIT Distribution GmbH": {
+      "totalRfqs": 2,
+      "lastRfqDate": "2026-03-10",
+      "region": "Europe",
+      "mpns": [
+        "LT3973IMSE",
+        "LTC4263IDE"
+      ]
+    },
+    "GC Components Ltd": {
+      "totalRfqs": 2,
+      "lastRfqDate": "2026-03-10",
+      "region": "Europe",
+      "mpns": [
+        "LTC4263IDE",
+        "NFM18PC105R0J3D"
+      ]
+    },
+    "Husky Intl. Electronics, Inc.": {
+      "totalRfqs": 1,
+      "lastRfqDate": "2026-03-10",
+      "region": "Americas",
+      "mpns": [
+        "LTC4357IMS8"
+      ]
+    },
+    "Voyager Components": {
+      "totalRfqs": 2,
+      "lastRfqDate": "2026-03-10",
+      "region": "Americas",
+      "mpns": [
+        "LTC4357IMS8",
+        "NFM18PC105R0J3D"
+      ]
+    },
+    "Microfarads": {
+      "totalRfqs": 1,
+      "lastRfqDate": "2026-03-10",
+      "region": "Americas",
+      "mpns": [
+        "LTC4357IMS8"
+      ]
+    },
+    "LIBRA Elektronik GmbH": {
+      "totalRfqs": 2,
+      "lastRfqDate": "2026-03-10",
+      "region": "Europe",
+      "mpns": [
+        "LTM8026IV",
+        "MSP430F149IPM"
+      ]
+    },
+    "IC-Tronix Inc.": {
+      "totalRfqs": 2,
+      "lastRfqDate": "2026-03-10",
+      "region": "Americas",
+      "mpns": [
+        "MAX3221EEAE",
+        "PCA9517DP"
+      ]
+    },
+    "YBS Enterprises dbElectro-Comm": {
+      "totalRfqs": 1,
+      "lastRfqDate": "2026-03-10",
+      "region": "Americas",
+      "mpns": [
+        "MAX3221EEAE"
+      ]
+    },
+    "SVT": {
+      "totalRfqs": 2,
+      "lastRfqDate": "2026-03-10",
+      "region": "Americas",
+      "mpns": [
+        "MAX3221EEAE",
+        "CY29946AXC"
+      ]
+    },
+    "Inelco Components S.L.": {
+      "totalRfqs": 1,
+      "lastRfqDate": "2026-03-10",
+      "region": "Europe",
+      "mpns": [
+        "MAX3221EEAE"
+      ]
+    },
+    "EXC GmbH": {
+      "totalRfqs": 1,
+      "lastRfqDate": "2026-03-10",
+      "region": "Europe",
+      "mpns": [
+        "MAX3221EEAE"
+      ]
+    },
+    "Eurodis Components": {
+      "totalRfqs": 2,
+      "lastRfqDate": "2026-03-10",
+      "region": "Europe",
+      "mpns": [
+        "MAX3221EEAE",
+        "J1011F21PNL"
+      ]
+    },
+    "CHANETECH": {
+      "totalRfqs": 1,
+      "lastRfqDate": "2026-03-10",
+      "region": "Europe",
+      "mpns": [
+        "MAX3221EEAE"
+      ]
+    },
+    "A&K Electronics": {
+      "totalRfqs": 1,
+      "lastRfqDate": "2026-03-10",
+      "region": "Americas",
+      "mpns": [
+        "MAX3318EIPW"
+      ]
+    },
+    "Eptix Inc.": {
+      "totalRfqs": 1,
+      "lastRfqDate": "2026-03-10",
+      "region": "Americas",
+      "mpns": [
+        "MAX3318EIPW"
+      ]
+    },
+    "TCX Micro S.L.": {
+      "totalRfqs": 1,
+      "lastRfqDate": "2026-03-10",
+      "region": "Europe",
+      "mpns": [
+        "MAX3318EIPW"
+      ]
+    },
+    "PC Components (PCC)": {
+      "totalRfqs": 2,
+      "lastRfqDate": "2026-03-10",
+      "region": "Americas",
+      "mpns": [
+        "12106D476KAT2A",
+        "16TQC100M"
+      ]
+    },
+    "D.F. Sales Company": {
+      "totalRfqs": 1,
+      "lastRfqDate": "2026-03-10",
+      "region": "Americas",
+      "mpns": [
+        "12106D476KAT2A"
+      ]
+    },
+    "North Shore Components Inc.": {
+      "totalRfqs": 1,
+      "lastRfqDate": "2026-03-10",
+      "region": "Americas",
+      "mpns": [
+        "12106D476KAT2A"
+      ]
+    },
+    "Semi Source Inc.": {
+      "totalRfqs": 2,
+      "lastRfqDate": "2026-03-10",
+      "region": "Americas",
+      "mpns": [
+        "12106D476KAT2A",
+        "CY29946AXC"
+      ]
+    },
+    "New Advantage Corp": {
+      "totalRfqs": 1,
+      "lastRfqDate": "2026-03-10",
+      "region": "Americas",
+      "mpns": [
+        "BCM5241A1IMLG"
+      ]
+    },
+    "Converge LLC": {
+      "totalRfqs": 2,
+      "lastRfqDate": "2026-03-10",
+      "region": "Americas",
+      "mpns": [
+        "BCM5241A1IMLG",
+        "EP5358LUI"
+      ]
+    },
+    "Commodity Components": {
+      "totalRfqs": 1,
+      "lastRfqDate": "2026-03-10",
+      "region": "Americas",
+      "mpns": [
+        "BCM5241A1IMLG"
+      ]
+    },
+    "Nexus Electronics LLC": {
+      "totalRfqs": 1,
+      "lastRfqDate": "2026-03-10",
+      "region": "Americas",
+      "mpns": [
+        "BCM5241A1IMLG"
+      ]
+    },
+    "BESA Technologies GmbH": {
+      "totalRfqs": 1,
+      "lastRfqDate": "2026-03-10",
+      "region": "Europe",
+      "mpns": [
+        "BCM5241A1IMLG"
+      ]
+    },
+    "iget Electronics GmbH": {
+      "totalRfqs": 1,
+      "lastRfqDate": "2026-03-10",
+      "region": "Europe",
+      "mpns": [
+        "BCM5241A1IMLG"
+      ]
+    },
+    "Elcom Components, Inc.": {
+      "totalRfqs": 1,
+      "lastRfqDate": "2026-03-10",
+      "region": "Americas",
+      "mpns": [
+        "C1005X5R1C104K"
+      ]
+    },
+    "SPM Sales and Solution": {
+      "totalRfqs": 1,
+      "lastRfqDate": "2026-03-10",
+      "region": "Americas",
+      "mpns": [
+        "CY29946AXC"
+      ]
+    },
+    "Hybrid Electronics": {
+      "totalRfqs": 2,
+      "lastRfqDate": "2026-03-10",
+      "region": "Americas",
+      "mpns": [
+        "CY8C3866AXI-040",
+        "EPM2210F324I5N"
+      ]
+    },
+    "Touchstone Systems, LLC": {
+      "totalRfqs": 2,
+      "lastRfqDate": "2026-03-10",
+      "region": "Americas",
+      "mpns": [
+        "EP5358LUI",
+        "EPM2210F324I5N"
+      ]
+    },
+    "Quest Components": {
+      "totalRfqs": 2,
+      "lastRfqDate": "2026-03-10",
+      "region": "Americas",
+      "mpns": [
+        "EP5358LUI",
+        "MIC49500WR"
+      ]
+    },
+    "Electronic Stock Ltd.": {
+      "totalRfqs": 2,
+      "lastRfqDate": "2026-03-10",
+      "region": "Europe",
+      "mpns": [
+        "EP5358LUI",
+        "16TQC100M"
+      ]
+    },
+    "Prestocom, Ltd.": {
+      "totalRfqs": 1,
+      "lastRfqDate": "2026-03-10",
+      "region": "Europe",
+      "mpns": [
+        "EP5358LUI"
+      ]
+    },
+    "J2 Sourcing AB": {
+      "totalRfqs": 2,
+      "lastRfqDate": "2026-03-10",
+      "region": "Europe",
+      "mpns": [
+        "EP5358LUI",
+        "J1011F21PNL"
+      ]
+    },
+    "Integrated Electronics Company": {
+      "totalRfqs": 1,
+      "lastRfqDate": "2026-03-10",
+      "region": "Americas",
+      "mpns": [
+        "EPM2210F324I5N"
+      ]
+    },
+    "Classic Components": {
+      "totalRfqs": 1,
+      "lastRfqDate": "2026-03-10",
+      "region": "Americas",
+      "mpns": [
+        "EPM2210F324I5N"
+      ]
+    },
+    "TerraBlock (fka Vecsys)": {
+      "totalRfqs": 1,
+      "lastRfqDate": "2026-03-10",
+      "region": "Europe",
+      "mpns": [
+        "EPM2210F324I5N"
+      ]
+    },
+    "IBH Elektrotechnik GmbH": {
+      "totalRfqs": 1,
+      "lastRfqDate": "2026-03-10",
+      "region": "Europe",
+      "mpns": [
+        "146839-3"
+      ]
+    },
+    "AG Electronics Limited": {
+      "totalRfqs": 1,
+      "lastRfqDate": "2026-03-10",
+      "region": "Europe",
+      "mpns": [
+        "146839-3"
+      ]
+    },
+    "Ashlea Components Ltd.": {
+      "totalRfqs": 1,
+      "lastRfqDate": "2026-03-10",
+      "region": "Europe",
+      "mpns": [
+        "146839-3"
+      ]
+    },
+    "FCC (First Choice Components)": {
+      "totalRfqs": 1,
+      "lastRfqDate": "2026-03-10",
+      "region": "Americas",
+      "mpns": [
+        "16TQC100M"
+      ]
+    },
+    "Quantum Digital Technology": {
+      "totalRfqs": 1,
+      "lastRfqDate": "2026-03-10",
+      "region": "Americas",
+      "mpns": [
+        "16TQC100M"
+      ]
+    },
+    "Fly Chips": {
+      "totalRfqs": 2,
+      "lastRfqDate": "2026-03-10",
+      "region": "Europe",
+      "mpns": [
+        "16TQC100M",
+        "FTSH-108-01-L-DV"
+      ]
+    },
+    "SM Elektronik": {
+      "totalRfqs": 2,
+      "lastRfqDate": "2026-03-10",
+      "region": "Europe",
+      "mpns": [
+        "16TQC100M",
+        "HX1188FNL"
+      ]
+    },
+    "Schukat Electronic GmbH": {
+      "totalRfqs": 2,
+      "lastRfqDate": "2026-03-10",
+      "region": "Europe",
+      "mpns": [
+        "16TQC100M",
+        "AQY210S"
+      ]
+    },
+    "Smith & Associates": {
+      "totalRfqs": 1,
+      "lastRfqDate": "2026-03-10",
+      "region": "Americas",
+      "mpns": [
+        "AFBR-709DMZ"
+      ]
+    },
+    "AER Worldwide": {
+      "totalRfqs": 1,
+      "lastRfqDate": "2026-03-10",
+      "region": "Americas",
+      "mpns": [
+        "AFBR-709DMZ"
+      ]
+    },
+    "FreedomUSA": {
+      "totalRfqs": 1,
+      "lastRfqDate": "2026-03-10",
+      "region": "Americas",
+      "mpns": [
+        "AQY210S"
+      ]
+    },
+    "P&A Components Inc.": {
+      "totalRfqs": 1,
+      "lastRfqDate": "2026-03-10",
+      "region": "Americas",
+      "mpns": [
+        "AQY210S"
+      ]
+    },
+    "Maritex Leszek Losin Sp. j.": {
+      "totalRfqs": 2,
+      "lastRfqDate": "2026-03-10",
+      "region": "Europe",
+      "mpns": [
+        "AQY210S",
+        "MIC49500WR"
+      ]
+    },
+    "J.M.P. Electronics, Ltd.": {
+      "totalRfqs": 1,
+      "lastRfqDate": "2026-03-10",
+      "region": "Europe",
+      "mpns": [
+        "AQY210S"
+      ]
+    },
+    "HZD GmbH": {
+      "totalRfqs": 1,
+      "lastRfqDate": "2026-03-10",
+      "region": "Europe",
+      "mpns": [
+        "AQY210S"
+      ]
+    },
+    "Lemkor Electronics, Inc": {
+      "totalRfqs": 1,
+      "lastRfqDate": "2026-03-10",
+      "region": "Americas",
+      "mpns": [
+        "FTLX8571D3BCV"
+      ]
+    },
+    "Carlin Systems Inc.": {
+      "totalRfqs": 1,
+      "lastRfqDate": "2026-03-10",
+      "region": "Americas",
+      "mpns": [
+        "FTLX8571D3BCV"
+      ]
+    },
+    "I.C. Plus, Inc.": {
+      "totalRfqs": 1,
+      "lastRfqDate": "2026-03-10",
+      "region": "Americas",
+      "mpns": [
+        "FTLX8571D3BCV"
+      ]
+    },
+    "Demand Components": {
+      "totalRfqs": 1,
+      "lastRfqDate": "2026-03-10",
+      "region": "Americas",
+      "mpns": [
+        "FTSH-108-01-L-DV"
+      ]
+    },
+    "NetSource Technology Inc.": {
+      "totalRfqs": 1,
+      "lastRfqDate": "2026-03-10",
+      "region": "Americas",
+      "mpns": [
+        "FTSH-108-01-L-DV"
+      ]
+    },
+    "Partservice": {
+      "totalRfqs": 1,
+      "lastRfqDate": "2026-03-10",
+      "region": "Europe",
+      "mpns": [
+        "FTSH-108-01-L-DV"
+      ]
+    },
+    "Component Sense": {
+      "totalRfqs": 1,
+      "lastRfqDate": "2026-03-10",
+      "region": "Europe",
+      "mpns": [
+        "FTSH-108-01-L-DV"
+      ]
+    },
+    "NexGen Digital, Inc.": {
+      "totalRfqs": 2,
+      "lastRfqDate": "2026-03-10",
+      "region": "Americas",
+      "mpns": [
+        "HX1188FNL",
+        "PCA9517DP"
+      ]
+    },
+    "Megastar Electronics, Inc.": {
+      "totalRfqs": 1,
+      "lastRfqDate": "2026-03-10",
+      "region": "Americas",
+      "mpns": [
+        "HX1188FNL"
+      ]
+    },
+    "Chip Stock, LLC": {
+      "totalRfqs": 2,
+      "lastRfqDate": "2026-03-10",
+      "region": "Americas",
+      "mpns": [
+        "HX1188FNL",
+        "MT28FW02GBBA1HPC-0AAT"
+      ]
+    },
+    "SIE Connect-GreenChips": {
+      "totalRfqs": 2,
+      "lastRfqDate": "2026-03-10",
+      "region": "Europe",
+      "mpns": [
+        "HX1188FNL",
+        "PCA9517ADP"
+      ]
+    },
+    "X-Press Micro, Inc.": {
+      "totalRfqs": 1,
+      "lastRfqDate": "2026-03-10",
+      "region": "Americas",
+      "mpns": [
+        "J1011F21PNL"
+      ]
+    },
+    "Solsta Limited": {
+      "totalRfqs": 1,
+      "lastRfqDate": "2026-03-10",
+      "region": "Europe",
+      "mpns": [
+        "J1011F21PNL"
+      ]
+    },
+    "RLX Solutions Inc.": {
+      "totalRfqs": 1,
+      "lastRfqDate": "2026-03-10",
+      "region": "Americas",
+      "mpns": [
+        "LS14250"
+      ]
+    },
+    "Impact Components": {
+      "totalRfqs": 1,
+      "lastRfqDate": "2026-03-10",
+      "region": "Americas",
+      "mpns": [
+        "LS14250"
+      ]
+    },
+    "Sonicare Solutions": {
+      "totalRfqs": 1,
+      "lastRfqDate": "2026-03-10",
+      "region": "Americas",
+      "mpns": [
+        "LS14250"
+      ]
+    },
+    "TME": {
+      "totalRfqs": 2,
+      "lastRfqDate": "2026-03-10",
+      "region": "Europe",
+      "mpns": [
+        "LS14250",
+        "S102M59Z5UU83L0R"
+      ]
+    },
+    "4Source Electronics AG": {
+      "totalRfqs": 1,
+      "lastRfqDate": "2026-03-10",
+      "region": "Europe",
+      "mpns": [
+        "LS14250"
+      ]
+    },
+    "Weisbauer Elektronik GmbH": {
+      "totalRfqs": 1,
+      "lastRfqDate": "2026-03-10",
+      "region": "Europe",
+      "mpns": [
+        "LS14250"
+      ]
+    },
+    "Rapid Electronics Ltd.": {
+      "totalRfqs": 1,
+      "lastRfqDate": "2026-03-10",
+      "region": "Europe",
+      "mpns": [
+        "LS14250"
+      ]
+    },
+    "Right Parts": {
+      "totalRfqs": 2,
+      "lastRfqDate": "2026-03-10",
+      "region": "Americas",
+      "mpns": [
+        "MIC49500WR",
+        "PCA9517ADP"
+      ]
+    },
+    "Zilex Electronics Inc.": {
+      "totalRfqs": 1,
+      "lastRfqDate": "2026-03-10",
+      "region": "Americas",
+      "mpns": [
+        "MSP430F149IPM"
+      ]
+    },
+    "Silicon Solutions Inc.": {
+      "totalRfqs": 1,
+      "lastRfqDate": "2026-03-10",
+      "region": "Americas",
+      "mpns": [
+        "MSP430F149IPM"
+      ]
+    },
+    "Diverse Electronics": {
+      "totalRfqs": 1,
+      "lastRfqDate": "2026-03-10",
+      "region": "Americas",
+      "mpns": [
+        "MSP430F149IPM"
+      ]
+    },
+    "AES - Atlas Electronic Systems": {
+      "totalRfqs": 1,
+      "lastRfqDate": "2026-03-10",
+      "region": "Americas",
+      "mpns": [
+        "MSP430F149IPM"
+      ]
+    },
+    "Silicon Solutions LP Europe": {
+      "totalRfqs": 1,
+      "lastRfqDate": "2026-03-10",
+      "region": "Europe",
+      "mpns": [
+        "MSP430F149IPM"
+      ]
+    },
+    "Merefields Electronics": {
+      "totalRfqs": 1,
+      "lastRfqDate": "2026-03-10",
+      "region": "Europe",
+      "mpns": [
+        "MSP430F149IPM"
+      ]
+    },
+    "A-Source Electronics BV": {
+      "totalRfqs": 1,
+      "lastRfqDate": "2026-03-10",
+      "region": "Europe",
+      "mpns": [
+        "MSP430F149IPM"
+      ]
+    },
+    "Aitech Systems Ltd.": {
+      "totalRfqs": 1,
+      "lastRfqDate": "2026-03-10",
+      "region": "Europe",
+      "mpns": [
+        "MT28FW02GBBA1HPC-0AAT"
+      ]
+    },
+    "Flex-Com International Ltd.": {
+      "totalRfqs": 1,
+      "lastRfqDate": "2026-03-10",
+      "region": "Europe",
+      "mpns": [
+        "NFM18PC105R0J3D"
+      ]
+    },
+    "Seba Components": {
+      "totalRfqs": 1,
+      "lastRfqDate": "2026-03-10",
+      "region": "Europe",
+      "mpns": [
+        "NFM18PC105R0J3D"
+      ]
+    },
+    "Grossenbacher Systeme AG": {
+      "totalRfqs": 2,
+      "lastRfqDate": "2026-03-10",
+      "region": "Europe",
+      "mpns": [
+        "NFM18PC105R0J3D",
+        "PCA9517ADP"
+      ]
+    },
+    "AGS Devices Ltd": {
+      "totalRfqs": 1,
+      "lastRfqDate": "2026-03-10",
+      "region": "Americas",
+      "mpns": [
+        "PCA9517ADP"
+      ]
+    },
+    "Computer Components Ltd": {
+      "totalRfqs": 1,
+      "lastRfqDate": "2026-03-10",
+      "region": "Europe",
+      "mpns": [
+        "PCA9517ADP"
+      ]
+    },
+    "CVC Components Ltd.": {
+      "totalRfqs": 1,
+      "lastRfqDate": "2026-03-10",
+      "region": "Europe",
+      "mpns": [
+        "PCA9517ADP"
+      ]
+    },
+    "Omega GTI": {
+      "totalRfqs": 1,
+      "lastRfqDate": "2026-03-10",
+      "region": "Americas",
+      "mpns": [
+        "PCA9517DP"
+      ]
+    },
+    "AED Inc.": {
+      "totalRfqs": 1,
+      "lastRfqDate": "2026-03-10",
+      "region": "Americas",
+      "mpns": [
+        "PCA9517DP"
+      ]
+    },
+    "SECO spa": {
+      "totalRfqs": 1,
+      "lastRfqDate": "2026-03-10",
+      "region": "Europe",
+      "mpns": [
+        "PCA9517DP"
+      ]
+    },
+    "ICL Electronic-Bauteil-Service": {
+      "totalRfqs": 1,
+      "lastRfqDate": "2026-03-10",
+      "region": "Europe",
+      "mpns": [
+        "PCA9517DP"
+      ]
+    },
+    "Dot Comps Electronics Inc.": {
+      "totalRfqs": 1,
+      "lastRfqDate": "2026-03-10",
+      "region": "Americas",
+      "mpns": [
+        "S102M59Z5UU83L0R"
+      ]
+    },
+    "Dark Horse Electronics": {
+      "totalRfqs": 1,
+      "lastRfqDate": "2026-03-10",
+      "region": "Americas",
+      "mpns": [
+        "TPS63060DSC"
+      ]
+    },
+    "Tencell": {
+      "totalRfqs": 1,
+      "lastRfqDate": "2026-03-10",
+      "region": "Europe",
+      "mpns": [
+        "TPS63060DSC"
+      ]
+    },
+    "Sternenhof Electronics": {
+      "totalRfqs": 1,
+      "lastRfqDate": "2026-03-10",
+      "region": "Europe",
+      "mpns": [
+        "TPS63060DSC"
+      ]
+    }
+  }
+}
