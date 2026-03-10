@@ -2,6 +2,19 @@
 
 Matches customer RFQs against VQs, market offers, and stock to surface sourcing opportunities and market intelligence.
 
+## Usage
+
+```bash
+node vortex-matches.js <rfq_number>
+```
+
+Example:
+```bash
+node vortex-matches.js 1130895
+```
+
+Output files are generated in `output/` directory.
+
 ## Output Files
 
 Each run generates **Stock + No Prices**, plus either **Good Prices** or **All Prices** depending on whether customer targets exist.
@@ -9,12 +22,12 @@ Each run generates **Stock + No Prices**, plus either **Good Prices** or **All P
 ### 1. Stock
 `{RFQ}_Stock.xlsx`
 
-Offers with `offer_type = "Stock - with a location"`. Always separated because we have more control over this inventory. May or may not include pricing.
+Astute inventory matches (`offer_type = "Stock - *"`). Always separated because we control this inventory. Price left blank when $0.
 
 ### 2. Good Prices
 `{RFQ}_Good Prices.xlsx`
 
-Priced offers (VQs, excess, franchise, broker) at or below **20% above customer target**.
+Priced offers (VQs, excess, franchise, broker) at or below **20% above customer target**. `% Under Target` in column B for quick sorting.
 
 *Only generated when customer provided target prices.*
 
@@ -34,67 +47,59 @@ Supply matches WITHOUT pricing — excess partners, franchise, brokers, occasion
 
 | Parameter | Value | Description |
 |-----------|-------|-------------|
-| Time window | 90 days | Rolling from **request date** (not RFQ date) — fresh market data even on old RFQs |
+| Time window (VQs/MOs) | 90 days | Rolling from request date — fresh market data |
+| Time window (Stock) | No limit | Astute stock always shows if active |
 | Good Prices threshold | ≤20% above target | Filters out offers more than 20% above customer target |
 
-## Generation Logic
+## Data Processing
 
-```
-1. Separate Stock offers (offer_type = "Stock - with a location") → Stock file
+### RFQ Line Deduplication
 
-2. For remaining offers (VQs, excess, franchise, broker):
+RFQ lines with identical `MPN + Qty + Target + Customer Part Number` are deduped before matching. This prevents inflated output when source data has duplicate lines.
 
-   IF customer provided targets:
-     - Priced offers ≤20% above target → Good Prices
-     - Offers without pricing → No Prices
+### MO Type Column
 
-   IF no customer targets:
-     - All priced offers → All Prices
-     - Offers without pricing → No Prices
-```
-
-## Data Sources
-
-- `m_rfqresponse` — Vendor quotes (VQs)
-- `c_rfqline` / `c_rfq` — Customer RFQs with target prices
-- Market offer tables — Excess, franchise, broker inventory
-- Stock offers — `offer_type = "Stock - with a location"`
+- **Market Offers** → Shows offer type (Broker Stock Offer, Customer Excess, Stock - Austin Warehouse, etc.)
+- **VQs** → Blank (MO Type = Market Offer Type, not applicable to verified quotes)
 
 ## Columns by File Type
 
-Base columns from current BI tool (22 total). Each file type removes irrelevant columns.
+### Good Prices (20 columns)
+```
+RFQ Number, % Under Target, RFQ Created, RFQ Customer, RFQ MPN, RFQ Qty, RFQ Target,
+Customer Part Number, Type, MO Type, Supplier MPN, Supplier/Excess Partner, Qty,
+Supplier Price, lead_time, Date Code, Created Date, Days Btw MO/VQ & RFQ, % of Demand, Opp Amount
+```
 
-### Good Prices (all 22 columns)
-Full column set — primary analysis file with target comparisons.
-
-### All Prices (20 columns)
-Remove:
+### All Prices (18 columns)
+Same as Good Prices but without:
 - `% Under Target` — no target to compare against
 - `RFQ Target` — will be empty/0
 
-### No Prices (20 columns)
-Remove:
+### No Prices (17 columns)
+Same as Good Prices but without:
 - `% Under Target` — can't calculate without price
+- `Supplier Price` — obviously no price
 - `Opp Amount` — can't calculate without price
 
-Keep `Supplier Price` (shows 0 explicitly to avoid confusion).
+### Stock (18 columns)
+Same as Good Prices but without:
+- `Type` — always "MO" for stock
 
-### Stock (19 columns)
-Remove:
-- `% Under Target` — our inventory, not a price comparison
-- `Type` — always "MO"
-- `Vendor Grade` — our stock, not a vendor
+Special handling:
+- `lead_time` defaults to **"STOCK"** if blank
+- `Supplier Price` left blank when $0
 
-Keep:
-- `Supplier/Excess Partner` — clarifies it's Astute stock
-- `MO Type` — shows physical location (e.g., "Stock - Philippines Warehouse")
-- `lead_time` — default to **"STOCK"** if blank
+## Data Sources
+
+- `bi_vendor_quote_line_v` — Vendor quotes (VQs)
+- `bi_market_offer_line_v` — Market offers (excess, franchise, broker, stock)
+- `chuboe_rfq` / `chuboe_rfq_line_mpn` — Customer RFQs with target prices
 
 ## Sample Files
 
-See `Samples/` folder for example outputs.
+See `output/` folder for example outputs from RFQ 1130895.
 
 ## Status
 
-**Phase**: Column specs defined
-**Next**: Implement refined exports
+**Implemented** — Ready for use.
