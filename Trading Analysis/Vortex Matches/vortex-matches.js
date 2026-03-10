@@ -50,9 +50,9 @@ const COLUMN_DEFS = {
 // Column sets for each file type
 const COLUMNS = {
   'Good Prices': [
-    'RFQ Number', 'RFQ Created', 'RFQ Customer', 'RFQ MPN', 'RFQ Qty', 'RFQ Target',
+    'RFQ Number', '% Under Target', 'RFQ Created', 'RFQ Customer', 'RFQ MPN', 'RFQ Qty', 'RFQ Target',
     'Customer Part Number', 'Type', 'MO Type', 'Supplier MPN',
-    'Supplier/Excess Partner', 'Qty', 'Supplier Price', '% Under Target',
+    'Supplier/Excess Partner', 'Qty', 'Supplier Price',
     'lead_time', 'Date Code', 'Created Date', 'Days Btw MO/VQ & RFQ', '% of Demand', 'Opp Amount'
   ],
   'All Prices': [
