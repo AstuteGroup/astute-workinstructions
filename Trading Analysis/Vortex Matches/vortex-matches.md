@@ -60,11 +60,35 @@ Supply matches WITHOUT pricing — excess partners, franchise, brokers, occasion
 - Market offer tables — Excess, franchise, broker inventory
 - Stock offers — `offer_type = "Stock - with a location"`
 
-## Column Refinements
+## Columns by File Type
 
-**TODO**: Current BI tool uses same template for all files. Define file-specific columns:
-- Remove irrelevant columns per file type (e.g., "Target Price" on Stock file)
-- Add file-specific columns where needed
+Base columns from current BI tool (22 total). Each file type removes irrelevant columns.
+
+### Good Prices (all 22 columns)
+Full column set — primary analysis file with target comparisons.
+
+### All Prices (20 columns)
+Remove:
+- `% Under Target` — no target to compare against
+- `RFQ Target` — will be empty/0
+
+### No Prices (20 columns)
+Remove:
+- `% Under Target` — can't calculate without price
+- `Opp Amount` — can't calculate without price
+
+Keep `Supplier Price` (shows 0 explicitly to avoid confusion).
+
+### Stock (19 columns)
+Remove:
+- `% Under Target` — our inventory, not a price comparison
+- `Type` — always "MO"
+- `Vendor Grade` — our stock, not a vendor
+
+Keep:
+- `Supplier/Excess Partner` — clarifies it's Astute stock
+- `MO Type` — shows physical location (e.g., "Stock - Philippines Warehouse")
+- `lead_time` — default to **"STOCK"** if blank
 
 ## Sample Files
 
@@ -72,5 +96,5 @@ See `Samples/` folder for example outputs.
 
 ## Status
 
-**Phase**: Defining output specs
-**Next**: Refine columns per file type
+**Phase**: Column specs defined
+**Next**: Implement refined exports
