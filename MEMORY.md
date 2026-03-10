@@ -6,10 +6,10 @@
 
 ## Recent Sessions
 
+- **2026-03-10 (RFQ 1130350 Broker Sourcing)**: Completed full broker RFQ sourcing for excess inventory valuation (101 line items). Sent ~168 RFQs across 7 batches to 80+ suppliers. Fixed workflow issues: (1) Strict MPN matching in franchise screening (was loose prefix match causing CN6880LP $3 error), (2) Wired up min order value filtering with abundant/scarce multipliers (0.2/0.7), (3) Added supplier fatigue tracking (max 2 RFQs per supplier per session), (4) Packaging variant deduplication (skip #TRPBF, -REEL, +T variants), (5) Chip 1 Exchange exclusion. Files: `submit_rfqs.py` updated, batch files `RFQ_1130350_Batch1-7.xlsx`.
 - **2026-03-10 (Quick Quote for RFQ 1130263)**: Generated Quick Quote for Plexus RFQ. Created SQL template (`qq_1130263.sql`) with full pricing logic: floor price = MAX(cost/0.85, cost+$250/qty), suggested resale based on priority hierarchy (same-cust PPV/shortage, other-cust split, target margin, cost-based 30%). Found 8 VQ matches: 4 UNDER target (ready to quote), 4 OVER. Best opportunity: OPA2209AIDR with $1,528 GP at 75% demand coverage.
 - **2026-03-10 (Vortex Matches Implementation)**: Implemented `vortex-matches.js` script. Takes RFQ number as input, queries both market offers (bi_market_offer_line_v) and vendor quotes (bi_vendor_quote_line_v) within 90-day window. Generates categorized Excel files: Stock, Good Prices/All Prices, No Prices. Uses ExcelJS for proper formatting (currency, percentages, dates). Usage: `node vortex-matches.js 1130263`
 - **2026-03-10 (Vortex Matches Output Specs)**: Refined Vortex Matches workflow documentation. Defined four file types: (1) Stock - our inventory, always separate, (2) Good Prices - priced offers ≤20% above target, (3) All Prices - all priced offers when no target, (4) No Prices - supply matches without pricing. 90-day rolling window from request date. Stock defaults lead_time to "STOCK".
-- **2026-03-09 (LAM Billings Reconciliation)**: Comprehensive reconciliation of LAM contract billings. Fixed signed quantity handling (credits subtract, not add). Built Buyer GP analysis across 5 COVs (932 lines, $173k GP, 19.5% margin). Applied COV0019122 NRE credit ($43,822.11) to 9 specific parts via subset-sum algorithm.
 
 ---
 
