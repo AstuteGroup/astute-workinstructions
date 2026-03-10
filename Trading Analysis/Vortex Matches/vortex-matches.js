@@ -23,55 +23,53 @@ const pool = new Pool({
   database: process.env.PGDATABASE || 'idempiere_replica'
 });
 
-// Column definitions with format types (matching sample file column names)
+// Column definitions with format types
 const COLUMN_DEFS = {
   'RFQ Number': { width: 12, format: 'text' },
   'RFQ Created': { width: 14, format: 'date' },
   'RFQ Customer': { width: 28, format: 'text' },
   'RFQ MPN': { width: 22, format: 'text' },
   'RFQ Qty': { width: 12, format: 'number' },
-  'RFQ Target': { width: 14, format: 'currency' },
+  'RFQ Target': { width: 14, format: 'currency_precise' },
   'Customer Part Number': { width: 20, format: 'text' },
-  'RFQ Manufacturer': { width: 20, format: 'text' },
   'Type': { width: 8, format: 'text' },
   'MO Type': { width: 28, format: 'text' },
   'Supplier MPN': { width: 22, format: 'text' },
   'Supplier/Excess Partner': { width: 28, format: 'text' },
-  'Vendor Grade': { width: 30, format: 'text' },
   'Qty': { width: 12, format: 'number' },
-  'Supplier Price': { width: 14, format: 'currency' },
+  'Supplier Price': { width: 14, format: 'currency_precise' },
   '% Under Target': { width: 14, format: 'percent' },
   'lead_time': { width: 14, format: 'text' },
   'Date Code': { width: 14, format: 'text' },
   'Created Date': { width: 14, format: 'date' },
   'Days Btw MO/VQ & RFQ': { width: 20, format: 'number' },
-  '% of Demand': { width: 14, format: 'ratio' },
+  '% of Demand': { width: 14, format: 'percent' },
   'Opp Amount': { width: 14, format: 'currency' }
 };
 
-// Column sets for each file type (matching sample file structure)
+// Column sets for each file type
 const COLUMNS = {
   'Good Prices': [
     'RFQ Number', 'RFQ Created', 'RFQ Customer', 'RFQ MPN', 'RFQ Qty', 'RFQ Target',
-    'Customer Part Number', 'RFQ Manufacturer', 'Type', 'MO Type', 'Supplier MPN',
-    'Supplier/Excess Partner', 'Vendor Grade', 'Qty', 'Supplier Price', '% Under Target',
+    'Customer Part Number', 'Type', 'MO Type', 'Supplier MPN',
+    'Supplier/Excess Partner', 'Qty', 'Supplier Price', '% Under Target',
     'lead_time', 'Date Code', 'Created Date', 'Days Btw MO/VQ & RFQ', '% of Demand', 'Opp Amount'
   ],
   'All Prices': [
     'RFQ Number', 'RFQ Created', 'RFQ Customer', 'RFQ MPN', 'RFQ Qty',
-    'Customer Part Number', 'RFQ Manufacturer', 'Type', 'MO Type', 'Supplier MPN',
-    'Supplier/Excess Partner', 'Vendor Grade', 'Qty', 'Supplier Price',
+    'Customer Part Number', 'Type', 'MO Type', 'Supplier MPN',
+    'Supplier/Excess Partner', 'Qty', 'Supplier Price',
     'lead_time', 'Date Code', 'Created Date', 'Days Btw MO/VQ & RFQ', '% of Demand', 'Opp Amount'
   ],
   'No Prices': [
     'RFQ Number', 'RFQ Created', 'RFQ Customer', 'RFQ MPN', 'RFQ Qty', 'RFQ Target',
-    'Customer Part Number', 'RFQ Manufacturer', 'Type', 'MO Type', 'Supplier MPN',
-    'Supplier/Excess Partner', 'Vendor Grade', 'Qty', 'Supplier Price',
+    'Customer Part Number', 'Type', 'MO Type', 'Supplier MPN',
+    'Supplier/Excess Partner', 'Qty',
     'lead_time', 'Date Code', 'Created Date', 'Days Btw MO/VQ & RFQ', '% of Demand'
   ],
   'Stock': [
     'RFQ Number', 'RFQ Created', 'RFQ Customer', 'RFQ MPN', 'RFQ Qty', 'RFQ Target',
-    'Customer Part Number', 'RFQ Manufacturer', 'MO Type', 'Supplier MPN',
+    'Customer Part Number', 'MO Type', 'Supplier MPN',
     'Supplier/Excess Partner', 'Qty', 'Supplier Price',
     'lead_time', 'Date Code', 'Created Date', 'Days Btw MO/VQ & RFQ', '% of Demand', 'Opp Amount'
   ]
@@ -90,12 +88,10 @@ async function fetchRfqDetails(rfqNumber) {
       rlm.chuboe_mpn_clean,
       rlm.qty AS rfq_qty,
       rlm.priceentered AS rfq_target,
-      rlm.chuboe_cpc AS customer_part_number,
-      mfr.name AS rfq_manufacturer
+      rlm.chuboe_cpc AS customer_part_number
     FROM adempiere.chuboe_rfq r
     JOIN adempiere.chuboe_rfq_line_mpn rlm ON r.chuboe_rfq_id = rlm.chuboe_rfq_id
     LEFT JOIN adempiere.c_bpartner bp ON r.c_bpartner_id = bp.c_bpartner_id
-    LEFT JOIN adempiere.c_bpartner mfr ON rlm.chuboe_mfr_id = mfr.c_bpartner_id
     WHERE r.value = $1
     ORDER BY rlm.chuboe_rfq_line_mpn_id
   `;
@@ -197,8 +193,9 @@ function joinData(rfqRows, offers) {
 
       const supplierQty = parseFloat(offer.qty) || 0;
       const rfqQty = parseFloat(rfq.rfq_qty) || 0;
-      const supplierPrice = parseFloat(offer.supplier_price) || 0;
-      const rfqTarget = parseFloat(rfq.rfq_target) || 0;
+      // Preserve original decimal precision for prices
+      const supplierPrice = offer.supplier_price != null ? Number(offer.supplier_price) : 0;
+      const rfqTarget = rfq.rfq_target != null ? Number(rfq.rfq_target) : 0;
 
       // Calculate % under target (stored as decimal 0-1)
       let percentUnderTarget = null;
@@ -206,7 +203,7 @@ function joinData(rfqRows, offers) {
         percentUnderTarget = (rfqTarget - supplierPrice) / rfqTarget;
       }
 
-      // Calculate % of demand (as ratio, e.g., 10 = 10x demand)
+      // Calculate % of demand (as decimal, e.g., 1.5 = 150%)
       let percentOfDemand = null;
       if (rfqQty > 0) {
         percentOfDemand = supplierQty / rfqQty;
@@ -226,12 +223,10 @@ function joinData(rfqRows, offers) {
         'RFQ Qty': rfqQty,
         'RFQ Target': rfqTarget,
         'Customer Part Number': rfq.customer_part_number || '',
-        'RFQ Manufacturer': rfq.rfq_manufacturer || '',
         'Type': offer.record_type,
         'MO Type': offer.mo_type || '',
         'Supplier MPN': offer.supplier_mpn || '',
         'Supplier/Excess Partner': offer.supplier_partner || '',
-        'Vendor Grade': offer.vendor_grade || '',
         'Qty': supplierQty,
         'Supplier Price': supplierPrice,
         '% Under Target': percentUnderTarget,
@@ -339,14 +334,15 @@ async function createWorkbook(data, columns, fileType) {
       case 'currency':
         column.numFmt = '"$"#,##0.00';
         break;
+      case 'currency_precise':
+        // Preserve source decimals (up to 6 decimal places)
+        column.numFmt = '"$"#,##0.00####';
+        break;
       case 'percent':
         column.numFmt = '0.00%';
         break;
       case 'number':
         column.numFmt = '#,##0';
-        break;
-      case 'ratio':
-        column.numFmt = '0.00';
         break;
       case 'date':
         column.numFmt = 'yyyy-mm-dd';
