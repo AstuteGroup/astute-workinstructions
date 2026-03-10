@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Vortex Matches - Match RFQs against market offers
+ * Vortex Matches - Match RFQs against market offers and vendor quotes
  *
  * Usage: node vortex-matches.js <rfq_number>
  * Example: node vortex-matches.js 1130263
@@ -13,7 +13,7 @@
  */
 
 const { Pool } = require('pg');
-const XLSX = require('xlsx');
+const ExcelJS = require('exceljs');
 const path = require('path');
 const fs = require('fs');
 
@@ -23,53 +23,57 @@ const pool = new Pool({
   database: process.env.PGDATABASE || 'idempiere_replica'
 });
 
-// Column definitions with format types
+// Column definitions with format types (matching sample file column names)
 const COLUMN_DEFS = {
-  'RFQ': { header: 'RFQ', width: 10, format: 'text' },
-  'RFQ Date': { header: 'RFQ Date', width: 12, format: 'date' },
-  'Customer': { header: 'Customer', width: 25, format: 'text' },
-  'RFQ MPN': { header: 'RFQ MPN', width: 20, format: 'text' },
-  'RFQ Qty': { header: 'RFQ Qty', width: 12, format: 'number' },
-  'RFQ Target': { header: 'RFQ Target', width: 12, format: 'currency' },
-  'Customer Part #': { header: 'Customer Part #', width: 18, format: 'text' },
-  'RFQ Manufacturer': { header: 'RFQ Manufacturer', width: 18, format: 'text' },
-  'Type': { header: 'Type', width: 8, format: 'text' },
-  'MO Type': { header: 'MO Type', width: 25, format: 'text' },
-  'Supplier MPN': { header: 'Supplier MPN', width: 20, format: 'text' },
-  'Supplier/Excess Partner': { header: 'Supplier/Excess Partner', width: 25, format: 'text' },
-  'Vendor Grade': { header: 'Vendor Grade', width: 12, format: 'text' },
-  'Supplier Qty': { header: 'Supplier Qty', width: 12, format: 'number' },
-  'Supplier Price': { header: 'Supplier Price', width: 14, format: 'currency' },
-  '% Under Target': { header: '% Under Target', width: 14, format: 'percent' },
-  'Lead Time': { header: 'Lead Time', width: 12, format: 'text' },
-  'Date Code': { header: 'Date Code', width: 12, format: 'text' },
-  'Offer Date': { header: 'Offer Date', width: 12, format: 'date' },
-  'Days Btw MO/VQ & RFQ': { header: 'Days Btw MO/VQ & RFQ', width: 18, format: 'number' },
-  '% of Demand': { header: '% of Demand', width: 12, format: 'percent' },
-  'Opp Amount': { header: 'Opp Amount', width: 14, format: 'currency' }
+  'RFQ Number': { width: 12, format: 'text' },
+  'RFQ Created': { width: 14, format: 'date' },
+  'RFQ Customer': { width: 28, format: 'text' },
+  'RFQ MPN': { width: 22, format: 'text' },
+  'RFQ Qty': { width: 12, format: 'number' },
+  'RFQ Target': { width: 14, format: 'currency' },
+  'Customer Part Number': { width: 20, format: 'text' },
+  'RFQ Manufacturer': { width: 20, format: 'text' },
+  'Type': { width: 8, format: 'text' },
+  'MO Type': { width: 28, format: 'text' },
+  'Supplier MPN': { width: 22, format: 'text' },
+  'Supplier/Excess Partner': { width: 28, format: 'text' },
+  'Vendor Grade': { width: 30, format: 'text' },
+  'Qty': { width: 12, format: 'number' },
+  'Supplier Price': { width: 14, format: 'currency' },
+  '% Under Target': { width: 14, format: 'percent' },
+  'lead_time': { width: 14, format: 'text' },
+  'Date Code': { width: 14, format: 'text' },
+  'Created Date': { width: 14, format: 'date' },
+  'Days Btw MO/VQ & RFQ': { width: 20, format: 'number' },
+  '% of Demand': { width: 14, format: 'ratio' },
+  'Opp Amount': { width: 14, format: 'currency' }
 };
 
-// Column sets for each file type
+// Column sets for each file type (matching sample file structure)
 const COLUMNS = {
   'Good Prices': [
-    'RFQ', 'RFQ Date', 'Customer', 'RFQ MPN', 'RFQ Qty', 'RFQ Target', 'Customer Part #', 'RFQ Manufacturer',
-    'Type', 'MO Type', 'Supplier MPN', 'Supplier/Excess Partner', 'Vendor Grade', 'Supplier Qty', 'Supplier Price',
-    '% Under Target', 'Lead Time', 'Date Code', 'Offer Date', 'Days Btw MO/VQ & RFQ', '% of Demand', 'Opp Amount'
+    'RFQ Number', 'RFQ Created', 'RFQ Customer', 'RFQ MPN', 'RFQ Qty', 'RFQ Target',
+    'Customer Part Number', 'RFQ Manufacturer', 'Type', 'MO Type', 'Supplier MPN',
+    'Supplier/Excess Partner', 'Vendor Grade', 'Qty', 'Supplier Price', '% Under Target',
+    'lead_time', 'Date Code', 'Created Date', 'Days Btw MO/VQ & RFQ', '% of Demand', 'Opp Amount'
   ],
   'All Prices': [
-    'RFQ', 'RFQ Date', 'Customer', 'RFQ MPN', 'RFQ Qty', 'Customer Part #', 'RFQ Manufacturer',
-    'Type', 'MO Type', 'Supplier MPN', 'Supplier/Excess Partner', 'Vendor Grade', 'Supplier Qty', 'Supplier Price',
-    'Lead Time', 'Date Code', 'Offer Date', 'Days Btw MO/VQ & RFQ', '% of Demand', 'Opp Amount'
+    'RFQ Number', 'RFQ Created', 'RFQ Customer', 'RFQ MPN', 'RFQ Qty',
+    'Customer Part Number', 'RFQ Manufacturer', 'Type', 'MO Type', 'Supplier MPN',
+    'Supplier/Excess Partner', 'Vendor Grade', 'Qty', 'Supplier Price',
+    'lead_time', 'Date Code', 'Created Date', 'Days Btw MO/VQ & RFQ', '% of Demand', 'Opp Amount'
   ],
   'No Prices': [
-    'RFQ', 'RFQ Date', 'Customer', 'RFQ MPN', 'RFQ Qty', 'RFQ Target', 'Customer Part #', 'RFQ Manufacturer',
-    'Type', 'MO Type', 'Supplier MPN', 'Supplier/Excess Partner', 'Vendor Grade', 'Supplier Qty', 'Supplier Price',
-    'Lead Time', 'Date Code', 'Offer Date', 'Days Btw MO/VQ & RFQ', '% of Demand'
+    'RFQ Number', 'RFQ Created', 'RFQ Customer', 'RFQ MPN', 'RFQ Qty', 'RFQ Target',
+    'Customer Part Number', 'RFQ Manufacturer', 'Type', 'MO Type', 'Supplier MPN',
+    'Supplier/Excess Partner', 'Vendor Grade', 'Qty', 'Supplier Price',
+    'lead_time', 'Date Code', 'Created Date', 'Days Btw MO/VQ & RFQ', '% of Demand'
   ],
   'Stock': [
-    'RFQ', 'RFQ Date', 'Customer', 'RFQ MPN', 'RFQ Qty', 'RFQ Target', 'Customer Part #', 'RFQ Manufacturer',
-    'MO Type', 'Supplier MPN', 'Supplier/Excess Partner', 'Supplier Qty', 'Supplier Price',
-    'Lead Time', 'Date Code', 'Offer Date', 'Days Btw MO/VQ & RFQ', '% of Demand', 'Opp Amount'
+    'RFQ Number', 'RFQ Created', 'RFQ Customer', 'RFQ MPN', 'RFQ Qty', 'RFQ Target',
+    'Customer Part Number', 'RFQ Manufacturer', 'MO Type', 'Supplier MPN',
+    'Supplier/Excess Partner', 'Qty', 'Supplier Price',
+    'lead_time', 'Date Code', 'Created Date', 'Days Btw MO/VQ & RFQ', '% of Demand', 'Opp Amount'
   ]
 };
 
@@ -101,7 +105,7 @@ async function fetchRfqDetails(rfqNumber) {
 }
 
 /**
- * Fetch market offers matching the cleaned MPNs
+ * Fetch market offers matching the cleaned MPNs (90-day window)
  */
 async function fetchMarketOffers(cleanMpns) {
   if (cleanMpns.length === 0) return [];
@@ -117,7 +121,8 @@ async function fetchMarketOffers(cleanMpns) {
       mol.market_offer_line_price AS supplier_price,
       mol.market_offer_line_lead_time AS lead_time,
       mol.market_offer_line_date_code AS date_code,
-      mol.market_offer_created AS created_date
+      mol.market_offer_created AS created_date,
+      'MO' AS record_type
     FROM adempiere.bi_market_offer_line_v mol
     WHERE mol.market_offer_line_mpn_clean = ANY($1)
       AND mol.market_offer_created >= CURRENT_DATE - INTERVAL '90 days'
@@ -130,23 +135,53 @@ async function fetchMarketOffers(cleanMpns) {
 }
 
 /**
- * Join RFQ data with market offers
+ * Fetch vendor quotes matching the cleaned MPNs (90-day window)
  */
-function joinData(rfqRows, marketOffers) {
+async function fetchVendorQuotes(cleanMpns) {
+  if (cleanMpns.length === 0) return [];
+
+  const query = `
+    SELECT
+      vql.vendor_quote_mpn AS supplier_mpn,
+      vql.vendor_quote_mpn_clean AS market_offer_line_mpn_clean,
+      vql.vendor_type_name AS mo_type,
+      vql.vendor_quote_bpartner_name AS supplier_partner,
+      vql.vendor_quote_bpartner_group_name AS vendor_grade,
+      vql.vendor_quote_quantity AS qty,
+      vql.vendor_quote_cost AS supplier_price,
+      vql.vendor_quote_lead_time AS lead_time,
+      vql.vendor_quote_date_code AS date_code,
+      vql.vendor_quote_created AS created_date,
+      'VQ' AS record_type
+    FROM adempiere.bi_vendor_quote_line_v vql
+    WHERE vql.vendor_quote_mpn_clean = ANY($1)
+      AND vql.vendor_quote_created >= CURRENT_DATE - INTERVAL '90 days'
+    ORDER BY vql.vendor_quote_created DESC
+  `;
+
+  const result = await pool.query(query, [cleanMpns]);
+  return result.rows;
+}
+
+/**
+ * Join RFQ data with market offers and vendor quotes
+ */
+function joinData(rfqRows, offers) {
   const results = [];
 
   // Create a map of cleaned MPN to RFQ row(s)
   const mpnToRfq = new Map();
   for (const rfq of rfqRows) {
     const cleanMpn = rfq.chuboe_mpn_clean;
+    if (!cleanMpn) continue;
     if (!mpnToRfq.has(cleanMpn)) {
       mpnToRfq.set(cleanMpn, []);
     }
     mpnToRfq.get(cleanMpn).push(rfq);
   }
 
-  // Join market offers to RFQ rows
-  for (const offer of marketOffers) {
+  // Join offers to RFQ rows
+  for (const offer of offers) {
     const cleanMpn = offer.market_offer_line_mpn_clean;
     const rfqMatches = mpnToRfq.get(cleanMpn) || [];
 
@@ -160,44 +195,44 @@ function joinData(rfqRows, marketOffers) {
       const supplierPrice = parseFloat(offer.supplier_price) || 0;
       const rfqTarget = parseFloat(rfq.rfq_target) || 0;
 
-      // Calculate % under target
+      // Calculate % under target (stored as decimal 0-1)
       let percentUnderTarget = null;
       if (rfqTarget > 0 && supplierPrice > 0) {
-        percentUnderTarget = ((rfqTarget - supplierPrice) / rfqTarget) * 100;
+        percentUnderTarget = (rfqTarget - supplierPrice) / rfqTarget;
       }
 
-      // Calculate % of demand
+      // Calculate % of demand (as ratio, e.g., 10 = 10x demand)
       let percentOfDemand = null;
-      if (rfqQty > 0 && supplierQty > 0) {
-        percentOfDemand = (supplierQty / rfqQty) * 100;
+      if (rfqQty > 0) {
+        percentOfDemand = supplierQty / rfqQty;
       }
 
-      // Calculate opportunity amount
+      // Calculate opportunity amount (target price * RFQ qty)
       let oppAmount = null;
-      if (supplierQty > 0 && supplierPrice > 0) {
-        oppAmount = supplierQty * supplierPrice;
+      if (rfqTarget > 0 && rfqQty > 0) {
+        oppAmount = rfqTarget * rfqQty;
       }
 
       results.push({
-        'RFQ': rfq.rfq_number,
-        'RFQ Date': rfqDate,
-        'Customer': rfq.customer_name || '',
+        'RFQ Number': rfq.rfq_number,
+        'RFQ Created': rfqDate,
+        'RFQ Customer': rfq.customer_name || '',
         'RFQ MPN': rfq.rfq_mpn || '',
         'RFQ Qty': rfqQty,
         'RFQ Target': rfqTarget,
-        'Customer Part #': rfq.customer_part_number || '',
+        'Customer Part Number': rfq.customer_part_number || '',
         'RFQ Manufacturer': rfq.rfq_manufacturer || '',
-        'Type': 'MO',
+        'Type': offer.record_type,
         'MO Type': offer.mo_type || '',
         'Supplier MPN': offer.supplier_mpn || '',
         'Supplier/Excess Partner': offer.supplier_partner || '',
         'Vendor Grade': offer.vendor_grade || '',
-        'Supplier Qty': supplierQty,
+        'Qty': supplierQty,
         'Supplier Price': supplierPrice,
         '% Under Target': percentUnderTarget,
-        'Lead Time': offer.lead_time || '',
+        'lead_time': offer.lead_time || '',
         'Date Code': offer.date_code || '',
-        'Offer Date': offerDate,
+        'Created Date': offerDate,
         'Days Btw MO/VQ & RFQ': daysBetween,
         '% of Demand': percentOfDemand,
         'Opp Amount': oppAmount
@@ -226,19 +261,19 @@ function categorizeResults(joinedData, hasTargets) {
     if (isStock) {
       // Stock file - default lead time to "STOCK" if blank
       const stockRow = { ...row };
-      if (!stockRow['Lead Time'] || stockRow['Lead Time'].trim() === '') {
-        stockRow['Lead Time'] = 'STOCK';
+      if (!stockRow['lead_time'] || stockRow['lead_time'].trim() === '') {
+        stockRow['lead_time'] = 'STOCK';
       }
       stock.push(stockRow);
     } else if (supplierPrice > 0) {
       // Has pricing
       if (hasTargets) {
-        // Check if within 20% above target
+        // Check if within 20% above target (price <= target * 1.20)
         const threshold = rfqTarget * 1.20;
-        if (supplierPrice <= threshold) {
+        if (rfqTarget > 0 && supplierPrice <= threshold) {
           goodPrices.push(row);
         }
-        // Else: dropped (>20% above target)
+        // Else: dropped (>20% above target or no target for this line)
       } else {
         // No targets - all priced offers go to All Prices
         allPrices.push(row);
@@ -253,79 +288,77 @@ function categorizeResults(joinedData, hasTargets) {
 }
 
 /**
- * Create formatted Excel workbook
+ * Create formatted Excel workbook using ExcelJS
  */
-function createWorkbook(data, columns, fileType) {
-  // Filter data to only include specified columns
-  const filteredData = data.map(row => {
-    const newRow = {};
+async function createWorkbook(data, columns, fileType) {
+  const workbook = new ExcelJS.Workbook();
+  workbook.creator = 'Vortex Matches';
+  workbook.created = new Date();
+
+  const worksheet = workbook.addWorksheet('Matches');
+
+  // Define columns with headers and widths
+  worksheet.columns = columns.map(col => ({
+    header: col,
+    key: col,
+    width: COLUMN_DEFS[col]?.width || 15
+  }));
+
+  // Style header row
+  const headerRow = worksheet.getRow(1);
+  headerRow.font = { bold: true };
+  headerRow.fill = {
+    type: 'pattern',
+    pattern: 'solid',
+    fgColor: { argb: 'FFE0E0E0' }
+  };
+
+  // Add data rows
+  for (const row of data) {
+    const rowData = {};
     for (const col of columns) {
-      newRow[col] = row[col];
+      rowData[col] = row[col];
     }
-    return newRow;
-  });
-
-  // Create worksheet from data
-  const ws = XLSX.utils.json_to_sheet(filteredData, { header: columns });
-
-  // Set column widths
-  const colWidths = columns.map(col => ({ wch: COLUMN_DEFS[col]?.width || 15 }));
-  ws['!cols'] = colWidths;
-
-  // Apply formatting to cells
-  const range = XLSX.utils.decode_range(ws['!ref'] || 'A1');
-
-  for (let C = range.s.c; C <= range.e.c; C++) {
-    const colName = columns[C];
-    const colDef = COLUMN_DEFS[colName];
-    if (!colDef) continue;
-
-    for (let R = range.s.r + 1; R <= range.e.r; R++) {
-      const cellAddress = XLSX.utils.encode_cell({ r: R, c: C });
-      const cell = ws[cellAddress];
-      if (!cell) continue;
-
-      // Apply number format based on column type
-      switch (colDef.format) {
-        case 'currency':
-          if (typeof cell.v === 'number') {
-            cell.z = '"$"#,##0.00';
-          }
-          break;
-        case 'percent':
-          if (typeof cell.v === 'number') {
-            // Store as decimal, display as percentage
-            cell.z = '0.00%';
-            cell.v = cell.v / 100;
-          }
-          break;
-        case 'number':
-          if (typeof cell.v === 'number') {
-            cell.z = '#,##0';
-          }
-          break;
-        case 'date':
-          if (cell.v instanceof Date) {
-            cell.t = 'd';
-            cell.z = 'yyyy-mm-dd';
-          }
-          break;
-      }
-    }
+    worksheet.addRow(rowData);
   }
 
-  const wb = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb, ws, 'Matches');
+  // Apply formatting to columns
+  columns.forEach((col, colIndex) => {
+    const colDef = COLUMN_DEFS[col];
+    if (!colDef) return;
 
-  return wb;
+    const column = worksheet.getColumn(colIndex + 1);
+
+    // Apply number format based on column type
+    switch (colDef.format) {
+      case 'currency':
+        column.numFmt = '"$"#,##0.00';
+        break;
+      case 'percent':
+        column.numFmt = '0.00%';
+        break;
+      case 'number':
+        column.numFmt = '#,##0';
+        break;
+      case 'ratio':
+        column.numFmt = '0.00';
+        break;
+      case 'date':
+        column.numFmt = 'yyyy-mm-dd';
+        break;
+    }
+  });
+
+  return workbook;
 }
 
 /**
  * Write workbook to file
  */
-function writeWorkbook(wb, outputPath) {
-  XLSX.writeFile(wb, outputPath);
-  console.log(`  Created: ${path.basename(outputPath)} (${wb.Sheets['Matches']['!ref'] ? XLSX.utils.decode_range(wb.Sheets['Matches']['!ref']).e.r : 0} rows)`);
+async function writeWorkbook(workbook, outputPath) {
+  await workbook.xlsx.writeFile(outputPath);
+  const worksheet = workbook.getWorksheet('Matches');
+  console.log(`  Created: ${path.basename(outputPath)} (${worksheet.rowCount - 1} rows)`);
 }
 
 /**
@@ -366,21 +399,30 @@ async function main() {
     // Fetch market offers
     console.log('\n2. Searching market offers (90-day window)...');
     const marketOffers = await fetchMarketOffers(cleanMpns);
-    console.log(`   Found ${marketOffers.length} matching offers`);
+    console.log(`   Found ${marketOffers.length} market offers`);
 
-    if (marketOffers.length === 0) {
-      console.log('\nNo market offers found for this RFQ.');
+    // Fetch vendor quotes
+    console.log('\n3. Searching vendor quotes (90-day window)...');
+    const vendorQuotes = await fetchVendorQuotes(cleanMpns);
+    console.log(`   Found ${vendorQuotes.length} vendor quotes`);
+
+    // Combine offers
+    const allOffers = [...marketOffers, ...vendorQuotes];
+    console.log(`   Total: ${allOffers.length} offers`);
+
+    if (allOffers.length === 0) {
+      console.log('\nNo matching offers found for this RFQ.');
       await pool.end();
       return;
     }
 
     // Join data
-    console.log('\n3. Joining RFQ and market offer data...');
-    const joinedData = joinData(rfqRows, marketOffers);
+    console.log('\n4. Joining RFQ and offer data...');
+    const joinedData = joinData(rfqRows, allOffers);
     console.log(`   ${joinedData.length} matched records`);
 
     // Categorize results
-    console.log('\n4. Categorizing results...');
+    console.log('\n5. Categorizing results...');
     const { stock, goodPrices, allPrices, noPrices } = categorizeResults(joinedData, hasTargets);
     console.log(`   Stock: ${stock.length}`);
     if (hasTargets) {
@@ -397,26 +439,26 @@ async function main() {
     }
 
     // Generate output files
-    console.log('\n5. Generating Excel files...');
+    console.log('\n6. Generating Excel files...');
 
     if (stock.length > 0) {
-      const wb = createWorkbook(stock, COLUMNS['Stock'], 'Stock');
-      writeWorkbook(wb, path.join(outputDir, `${rfqNumber}_Stock.xlsx`));
+      const wb = await createWorkbook(stock, COLUMNS['Stock'], 'Stock');
+      await writeWorkbook(wb, path.join(outputDir, `${rfqNumber}_Stock.xlsx`));
     }
 
     if (hasTargets && goodPrices.length > 0) {
-      const wb = createWorkbook(goodPrices, COLUMNS['Good Prices'], 'Good Prices');
-      writeWorkbook(wb, path.join(outputDir, `${rfqNumber}_Good Prices.xlsx`));
+      const wb = await createWorkbook(goodPrices, COLUMNS['Good Prices'], 'Good Prices');
+      await writeWorkbook(wb, path.join(outputDir, `${rfqNumber}_Good Prices.xlsx`));
     }
 
     if (!hasTargets && allPrices.length > 0) {
-      const wb = createWorkbook(allPrices, COLUMNS['All Prices'], 'All Prices');
-      writeWorkbook(wb, path.join(outputDir, `${rfqNumber}_All Prices.xlsx`));
+      const wb = await createWorkbook(allPrices, COLUMNS['All Prices'], 'All Prices');
+      await writeWorkbook(wb, path.join(outputDir, `${rfqNumber}_All Prices.xlsx`));
     }
 
     if (noPrices.length > 0) {
-      const wb = createWorkbook(noPrices, COLUMNS['No Prices'], 'No Prices');
-      writeWorkbook(wb, path.join(outputDir, `${rfqNumber}_No Prices.xlsx`));
+      const wb = await createWorkbook(noPrices, COLUMNS['No Prices'], 'No Prices');
+      await writeWorkbook(wb, path.join(outputDir, `${rfqNumber}_No Prices.xlsx`));
     }
 
     console.log('\nDone!');
