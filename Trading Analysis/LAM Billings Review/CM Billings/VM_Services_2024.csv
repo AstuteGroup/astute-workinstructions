@@ -1,0 +1,9 @@
+Item,Source,CO Number,Line,Customer Name,Number,Invoiced,Line Sell Value,Line Cost,GP,GP%,External,Internal,Area,Vendor Name
+A-HDF26PP/Z-UNC3,Inventory,COV0015482,1,"VM Services, Inc",C005018,20 August 2024,56.64,47.14,9.50,16.77%,joshsyre,Texas,
+A-HDF26PP/Z-UNC3,Inventory,COV0015689,2,"VM Services, Inc",C005018,17 September 2024,44.84,37.32,7.52,16.77%,joshsyre,Texas,
+CBD7W2F37S00X/AA,Inventory,COV0015689,1,"VM Services, Inc",C005018,17 September 2024,548.85,206.20,342.65,62.43%,joshsyre,Texas,
+SDD-H26H26-2-95-FN,Inventory,COV0016123,1,"VM Services, Inc",C005018,12 November 2024,156.82,94.56,62.25,39.70%,joshsyre,Texas,
+SDD-H26H26-2-95-FN,Inventory,COV0016176,1,"VM Services, Inc",C005018,19 November 2024,85.54,51.58,33.96,39.70%,joshsyre,Texas,
+9551666816741,Inventory,COV0016254,1,"VM Services, Inc",C005018,25 November 2024,60.08,49.56,10.52,17.51%,joshsyre,Texas,
+TGHHV50R0JE,Inventory,COV0016503,2,"VM Services, Inc",C005018,31 December 2024,3087.81,2611.75,476.06,15.42%,joshsyre,Texas,
+TGHLV150RJE,Inventory,COV0016503,1,"VM Services, Inc",C005018,31 December 2024,6952.79,5137.23,1815.56,26.11%,joshsyre,Texas,
