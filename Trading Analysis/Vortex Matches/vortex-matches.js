@@ -77,10 +77,11 @@ const COLUMNS = {
 
 /**
  * Fetch RFQ details from database
+ * Dedupes RFQ lines with identical MPN + qty + target + customer part number
  */
 async function fetchRfqDetails(rfqNumber) {
   const query = `
-    SELECT
+    SELECT DISTINCT ON (rlm.chuboe_mpn_clean, rlm.qty, rlm.priceentered, COALESCE(rlm.chuboe_cpc, ''))
       r.value AS rfq_number,
       r.created AS rfq_created,
       bp.name AS customer_name,
@@ -93,7 +94,7 @@ async function fetchRfqDetails(rfqNumber) {
     JOIN adempiere.chuboe_rfq_line_mpn rlm ON r.chuboe_rfq_id = rlm.chuboe_rfq_id
     LEFT JOIN adempiere.c_bpartner bp ON r.c_bpartner_id = bp.c_bpartner_id
     WHERE r.value = $1
-    ORDER BY rlm.chuboe_rfq_line_mpn_id
+    ORDER BY rlm.chuboe_mpn_clean, rlm.qty, rlm.priceentered, COALESCE(rlm.chuboe_cpc, ''), rlm.chuboe_rfq_line_mpn_id
   `;
 
   const result = await pool.query(query, [rfqNumber]);
