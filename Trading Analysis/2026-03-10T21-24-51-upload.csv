@@ -1,44 +1,44 @@
 RFQ Search Key,Buyer,Business Partner Search Key,Contact,MPN,MFR Text,Quoted Quantity,Cost,Currency,Date Code,MOQ,SPQ,Packaging,Lead Time,COO,RoHS,Vendor Notes
-1130350,Jake Harris,1004498,Derek Morgenstern,FTSH10801LDVK,Samtec,2500,1.25,,,,,stock,,,ROHS
-1130350,Jake Harris,1002377,Fred Tananaev,C1005X5R1C104K050BA,TDK,9325,0.005,,10+,,,stock,,,
-1130350,Jake Harris,1003290,Jeff Blyar,FTSH-108-01-L-DV-P-TR,,5475,0.75,,2022,,,,,,Y,Factory T/Rs
-1130350,Jake Harris,1002966,,AQY210SX,,2000,0.80,GBP,,,,,,,Price only - no DC confirmed
-1130350,Jake Harris,1002612,Mike Schiller,EPM2210F324I5N,Intel/Altera,50,50.00,,2137,,,stock,,,Tested at GETS Florida
+1130350,Jake Harris,1004498,,FTSH10801LDVK,Samtec,2500,1.25,,,,,stock,,,Y,
+1130350,Jake Harris,1002377,,C1005X5R1C104K050BA,TDK,9325,0.005,,10+,,,stock,,,,
+1130350,Jake Harris,1003290,,FTSH-108-01-L-DV-P-TR,,5475,0.75,,2022,,,,,,,Factory T/Rs
+1130350,Jake Harris,1002966,,AQY210SX,,2000,0.80,GBP,,,,,,,,Price only - no DC confirmed
+1130350,Jake Harris,1002612,,EPM2210F324I5N,Intel/Altera,50,50.00,,2137,,,stock,,,,Tested at GETS Florida
 1130350,Jake Harris,1002457,,C1005X5R1C104K050BA,,13849,0.02,,1824,,,,,,Y,Quote #394762
-1130350,Jake Harris,1002337,Scott Gross,LT3070EUFD#PBF,,279,4.00,,14,,,stock,,,
-1130350,Jake Harris,1003743,Yves Demeulenaere,C1812C335K1RAC7800,KEMET,9,11.15,EUR,20,,,Cut Tape,stock,MX,Y,
-1130350,Jake Harris,1004879,R.L. van Klaveren,LTC3617EUDD#PBF,Linear Technology,10,7.50,EUR,11+,,,stock,,,Y
-1130350,Jake Harris,1004879,R.L. van Klaveren,NFM18PC225B0J3D,Murata,8000,0.06,EUR,10+,,,stock,,,Y
-1130350,Jake Harris,1002506,Keith Coffey,LT3973IMSE-5#PBF,Linear Tech,200,7.25,,20,,,,,,
+1130350,Jake Harris,1002337,,LT3070EUFD#PBF,,279,4.00,,14,,,stock,,,,
+1130350,Jake Harris,1003743,,C1812C335K1RAC7800,KEMET,9,11.15,EUR,20,,,Cut Tape,stock,MX,Y,
+1130350,Jake Harris,1004879,,LTC3617EUDD#PBF,Linear Technology,10,7.50,EUR,11+,,,stock,,,Y,
+1130350,Jake Harris,1004879,,NFM18PC225B0J3D,Murata,8000,0.06,EUR,10+,,,stock,,,Y,
+1130350,Jake Harris,1002506,,LT3973IMSE-5#PBF,Linear Tech,200,7.25,,20,,,,,,,
 1130350,Jake Harris,1002469,,LTC4357IMS8#PBF,LTC,160,1.00,,UNK,,,Cut Tape,stock,,Y,
-1130350,Jake Harris,1004617,Stuart Hamilton,ADG734BRUZ-REEL,,250,3.50,,,,,stock,,,$50 min order domestic
-1130350,Jake Harris,1002948,Ismael,MAX3221EEAE+,Maxim,580,2.45,,Mixed,,,,Immediate,,,Multiple DC lots
-1130350,Jake Harris,1003021,Ceri Walters,LTC4263IDE#PBF,Analog Devices,171,2.65,GBP,19+,,,stock,MY,,
-1130350,Jake Harris,1004279,Jack Khabbaz,MAX3318EIPWR,,140,0.75,,,140,,Cut Tape,stock,,,
-1130350,Jake Harris,1002457,,LT3080EDD-1#TRPBF,,1250,1.80,,2048,,,,,,Quote #394757
-1130350,Jake Harris,1002595,Paul Dietterle,CY29946AXC,Cypress,146,3.00,,0743,,,stock,,,Y;New
-1130847,Jake Harris,1002495,,MSP430F149IPM-G4,Texas,29,8.00,,05+,,,stock,,,Y
-1130847,Jake Harris,1002842,Brian Bartlett,BCM5241A1IMLG,,376,10.00,,,,,stock,,,
-1130350,Jake Harris,1001041,Paul Weitz,12106D476KAT2A,,5174,0.10,,Mixed,,,,,,Multiple lots
-1130350,Jake Harris,1005290,Brian Housand,AFBR-709DMZ-IN7,,300,4.50,,,,,stock HK,CN,,
-1130350,Jake Harris,1005505,,AQY210SZ,Nais,1000,1.09,,04,,,3 days,,,Factory new
-1130350,Jake Harris,1005611,Jacek Sobek,AQY210SX,,1181,0.50,,17,,,,,,
-1130847,Jake Harris,1002426,Travis Tasker,BCM5241A1IMLG,,2000,5.50,,22,,,,,,
-1130350,Jake Harris,1002787,Amy Goldberg,CY8C3866AXI-040T,,40,8.00,,,,,stock,,,COD terms
-1130350,Jake Harris,1002787,Amy Goldberg,EPM2210F324I5N,Intel,20,74.00,,849,,,stock,,,COD/CC terms
-1130350,Jake Harris,1002457,,SST38VF6401-90-5I-B3KE,Microchip,70,5.00,,1630,,,Tray,,,Y;Quote #394751
-1130350,Jake Harris,1002457,,1210YD226MAT2A,AVX,1488,0.40,,11+/04+,,,,,,Quote #394748
-1130350,Jake Harris,1002863,Avi Sahar,NFM18PC225B0J3D,,4200,0.025,,20+,,,1 day,,,180 day warranty
-1130350,Jake Harris,1004223,Christina Kelly,1210YD226MAT2A,AVX,1000,0.50,,08+,,,,,,COO JP
-1130350,Jake Harris,1005735,,NFM18PC225B0J3D,Murata,8900,0.22,,PTF52,,,,,,NCNR; EXW Israel
-1130350,Jake Harris,1002612,Mike Schiller,SST38VF6401-90-5I-B3KE,,9,6.00,,1120,,,,,,C/C Terms
-1130350,Jake Harris,1003290,Jeff Blyar,LTC3617EUDD#PBF,,100,4.00,,1237,,,stock,,,3rd party T/R
-1130350,Jake Harris,1005353,Nikolaj Valbak,MAX3318EEUP-T,Maxim,1029,3.00,,0528,,,stock,,,NON-ROHS
-1130350,Jake Harris,1001208,,SST38VF6401-90-5I-B3KE,Microchip,80,0.94,,18+,80,,stock,,,NCNR; $500 PO min
-1130350,Jake Harris,1002450,Jeremy Schwaeber,CDRH3D23NP1R0PC,Sumida,1271,0.18,,13,,,T/R,1-2 days,CN,Y,$100 min
-1130350,Jake Harris,1003395,Lee,1210YD226MAT2A,AVX,3000,0.65,,1001,,,stock,,,New; 1K/TR
-1130350,Jake Harris,1002337,Scott Gross,NFM18PC225B0J3D,Murata,9700,0.69,,22,,,stock,,,
-1130350,Jake Harris,1002842,Brian Bartlett,39-29-5243,,10,5.00,,,,,,,,,
-1130350,Jake Harris,1005293,Marco Cioppa,MSP430F149IPMG4,,120,9.75,,,,,,,,,
-1130350,Jake Harris,1002399,Eric Ward,C1812C335K1RAC7800,,468,0.20,,1741,,,Partial Reel,stock,,Y,
-1130350,Jake Harris,1002948,Ismael,LTC3617IUDD#PBF,LT,8,6.00,,1637,,,,Immediate,,,
+1130350,Jake Harris,1004617,,ADG734BRUZ-REEL,,250,3.50,,,,,stock,,,,$50 min order domestic
+1130350,Jake Harris,1002948,,MAX3221EEAE+,Maxim,580,2.45,,Mixed,,,,Immediate,,,Multiple DC lots
+1130350,Jake Harris,1003021,,LTC4263IDE#PBF,Analog Devices,171,2.65,GBP,19+,,,stock,MY,,
+1130350,Jake Harris,1004279,,MAX3318EIPWR,,140,0.75,,,140,,Cut Tape,stock,,,,
+1130350,Jake Harris,1002457,,LT3080EDD-1#TRPBF,,1250,1.80,,2048,,,,,,Y,Quote #394757
+1130350,Jake Harris,1002595,,CY29946AXC,Cypress,146,3.00,,0743,,,stock,,,Y,New
+1130847,Jake Harris,1002495,,MSP430F149IPM-G4,Texas,29,8.00,,05+,,,stock,,,Y,
+1130847,Jake Harris,1002842,,BCM5241A1IMLG,,376,10.00,,,,,stock,,,,
+1130350,Jake Harris,1001041,,12106D476KAT2A,,5174,0.10,,Mixed,,,,,,,Multiple lots
+1130350,Jake Harris,1005290,,AFBR-709DMZ-IN7,,300,4.50,,,,,stock HK,CN,,
+1130350,Jake Harris,1005505,,AQY210SZ,Nais,1000,1.09,,04,,,3 days,,,,Factory new
+1130350,Jake Harris,1005611,,AQY210SX,,1181,0.50,,17,,,,,,,
+1130847,Jake Harris,1002426,,BCM5241A1IMLG,,2000,5.50,,22,,,,,,,
+1130350,Jake Harris,1002787,,CY8C3866AXI-040T,,40,8.00,,,,,stock,,,,COD terms
+1130350,Jake Harris,1002787,,EPM2210F324I5N,Intel,20,74.00,,849,,,stock,,,,COD/CC terms
+1130350,Jake Harris,1002457,,SST38VF6401-90-5I-B3KE,Microchip,70,5.00,,1630,,,Tray,,,Y,Quote #394751
+1130350,Jake Harris,1002457,,1210YD226MAT2A,AVX,1488,0.40,,11+/04+,,,,,,Y,Quote #394748
+1130350,Jake Harris,1002863,,NFM18PC225B0J3D,,4200,0.025,,20+,,,1 day,,,,180 day warranty
+1130350,Jake Harris,1004223,,1210YD226MAT2A,AVX,1000,0.50,,08+,,,,,,Y,COO JP
+1130350,Jake Harris,1005735,,NFM18PC225B0J3D,Murata,8900,0.22,,PTF52,,,,,,Y,NCNR; EXW Israel
+1130350,Jake Harris,1002612,,SST38VF6401-90-5I-B3KE,,9,6.00,,1120,,,,,,Y,C/C Terms
+1130350,Jake Harris,1003290,,LTC3617EUDD#PBF,,100,4.00,,1237,,,stock,,,,3rd party T/R
+1130350,Jake Harris,1005353,,MAX3318EEUP-T,Maxim,1029,3.00,,0528,,,stock,,,N,NON-ROHS
+1130350,Jake Harris,1001208,,SST38VF6401-90-5I-B3KE,Microchip,80,0.94,,18+,80,,stock,,,,NCNR; $500 PO min
+1130350,Jake Harris,1002450,,CDRH3D23NP1R0PC,Sumida,1271,0.18,,13,,,T/R,1-2 days,CN,Y,$100 min
+1130350,Jake Harris,1003395,,1210YD226MAT2A,AVX,3000,0.65,,1001,,,stock,,,,New; 1K/TR
+1130350,Jake Harris,1002337,,NFM18PC225B0J3D,Murata,9700,0.69,,22,,,stock,,,,
+1130350,Jake Harris,1002842,,39-29-5243,,10,5.00,,,,,,,,,,
+1130350,Jake Harris,1005293,,MSP430F149IPMG4,,120,9.75,,,,,,,,,,
+1130350,Jake Harris,1002399,,C1812C335K1RAC7800,,468,0.20,,1741,,,Partial Reel,stock,,Y,
+1130350,Jake Harris,1002948,,LTC3617IUDD#PBF,LT,8,6.00,,1637,,,,Immediate,,,
