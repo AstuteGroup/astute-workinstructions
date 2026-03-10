@@ -31,6 +31,7 @@ from pathlib import Path
 from datetime import datetime
 from playwright.async_api import async_playwright
 import config
+import rfq_history
 
 # Default supplier exclusions (can be overridden via --exclude)
 DEFAULT_EXCLUSIONS = []
@@ -95,6 +96,12 @@ def parse_args():
                         help='Start new session (clear fatigue tracking)')
     parser.add_argument('--no-screenshots', action='store_true',
                         help='Disable screenshot capture')
+    parser.add_argument('--check-cooldown', action='store_true',
+                        help='Check 60-day cooldown before sending (skip supplier+MPN combos recently RFQ\'d)')
+    parser.add_argument('--rfq-id', type=str, default='',
+                        help='RFQ ID for history tracking')
+    parser.add_argument('--region', type=str, default='',
+                        help='Region for history tracking (Americas/Europe)')
     return parser.parse_args()
 
 
@@ -321,6 +328,22 @@ async def main():
                 supplier_data = filtered_supplier_data
                 if excluded_count > 0:
                     print(f'   ({excluded_count} suppliers excluded)')
+
+            # Filter out suppliers in cooldown period (60-day same MPN+supplier check)
+            if args.check_cooldown:
+                cooldown_count = 0
+                filtered_supplier_data = {}
+                for key, s in supplier_data.items():
+                    is_blocked, record = rfq_history.check_cooldown(s['name'], part_number)
+                    if is_blocked:
+                        cooldown_count += 1
+                        cooldown_days = rfq_history.get_cooldown_days(part_number, record.get('response') == 'no-bid')
+                        print(f'   Cooldown: {s["name"]} (RFQ\'d {record["rfqDate"]}, {cooldown_days}-day window)')
+                    else:
+                        filtered_supplier_data[key] = s
+                supplier_data = filtered_supplier_data
+                if cooldown_count > 0:
+                    print(f'   ({cooldown_count} suppliers in cooldown period)')
 
             # Filter out suppliers that have reached max RFQs (fatigue tracking)
             if max_per_supplier:
@@ -560,6 +583,15 @@ async def main():
                                 'status': 'SENT',
                                 'timestamp': datetime.now().isoformat()
                             })
+                            # Record to RFQ history for cooldown tracking
+                            if args.check_cooldown:
+                                rfq_history.record_rfq(
+                                    supplier=supplier['name'],
+                                    mpn=part_number,
+                                    qty=rfq_qty,
+                                    rfq_id=args.rfq_id,
+                                    region=supplier['region']
+                                )
                             # Update session tracking for fatigue and deduplication
                             if max_per_supplier:
                                 supplier_key = supplier['name'].lower()

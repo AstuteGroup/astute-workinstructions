@@ -73,7 +73,7 @@ Consolidated roadmap for RFQ Sourcing and VQ Processing workflows, organized by 
 
 | # | Feature | Priority | Status |
 |---|---------|----------|--------|
-| B1 | Same Part / Same Supplier Cooldown (60 days) | **Now** | Not implemented |
+| B1 | Same Part / Same Supplier Cooldown (60 days) | **Now** | ✅ Done |
 | B2 | No-Bid Filtering | **Now** | Planned |
 | B3 | Supplier Fatigue Tracking | **Next** | Planned |
 | B4 | LLM Description Scanning | Later | Planned |
@@ -87,12 +87,12 @@ Consolidated roadmap for RFQ Sourcing and VQ Processing workflows, organized by 
 
 ## B1. Supplier Selection Deduplication (Same Part / Same Supplier Cooldown)
 
-**Status:** Not implemented | **Priority:** Now
+**Status:** ✅ Done | **Priority:** Now
 
-**Problem:** We sometimes send RFQs to the same supplier for the same MPN multiple times within a short window:
-- Wastes supplier time
-- Annoys suppliers who already quoted or declined
-- Contributes to supplier fatigue
+**Implementation (2026-03-10):**
+- `rfq_history.py` module: `check_cooldown()`, `record_rfq()`, `update_response()`, `get_supplier_rankings()`
+- `rfq_history.json` persistent store with supplier stats
+- Integrated into `submit_rfqs.py` via `--check-cooldown` flag
 
 **Rule:** Don't request the same MPN from the same supplier within 60 days.
 
@@ -101,7 +101,7 @@ Before sending RFQ to supplier, check:
 IF (Supplier + MPN) requested within last 60 days → SKIP
 ```
 
-**Exceptions:**
+**Cooldown Windows:**
 | Scenario | Window |
 |----------|--------|
 | Default | 60 days |
@@ -109,25 +109,19 @@ IF (Supplier + MPN) requested within last 60 days → SKIP
 | Supplier said no-bid | 90 days (longer cooldown) |
 | Urgent/override flag | 0 (always send) |
 
-**Data Structure:**
-```json
-{
-  "rfqHistory": [
-    {
-      "vendorSearchKey": "V12345",
-      "mpn": "LTC2446IUHF#PBF",
-      "rfqDate": "2026-03-01",
-      "rfqId": "1130500",
-      "response": "quoted" | "no-bid" | "pending"
-    }
-  ]
-}
-```
+**Secondary Purpose: Template Prioritization**
+- `get_supplier_rankings()` returns suppliers sorted by RFQ volume
+- Use to identify which suppliers need VQ parser templates
+- `supplierStats` tracks: totalRfqs, lastRfqDate, uniqueMpns
+
+**Files:**
+- `rfq_sourcing/netcomponents/python/rfq_history.py` - Core module
+- `rfq_sourcing/netcomponents/rfq_history.json` - Persistent store
 
 **Integration:**
-- NetComponents RFQ submission (check before sending)
-- VQ Parser (update `response` status when quote received)
-- No-Bid tracking (update when no-bid detected)
+- NetComponents RFQ submission: `--check-cooldown` flag checks before sending, records after
+- VQ Parser: Call `update_response()` when quote/no-bid received
+- CLI: `python rfq_history.py rankings` shows template prioritization
 
 ---
 
@@ -597,6 +591,7 @@ const AUTO_SUFFIXES = /[-#]?(Q|Q1|AEC)$/i;
 - [x] Min order value filtering
 - [x] Basic MPN packaging normalization
 - [x] **MPN Variant Prioritization (B6)** — Suffix classification (packaging/compliance/spec), bidirectional packaging logic, match type in priority scoring, Excel output with color coding
+- [x] **Same Part/Supplier Cooldown (B1)** — 60-day cooldown (14 for memory, 90 after no-bid), rfq_history.py module, supplier ranking for template prioritization
 
 ## Section C: VQ Processing
 - [x] NoBid folder cleanup
@@ -622,7 +617,8 @@ const AUTO_SUFFIXES = /[-#]?(Q|Q1|AEC)$/i;
 | 2026-03-02 | C | Simple quote extraction, NoBid management (87%) |
 | 2026-03-03 | C | RFQ matching window, vendor ID fix |
 | 2026-03-03 | — | Consolidated roadmaps, organized by process flow |
+| 2026-03-10 | B | B1 Cooldown tracking implemented (rfq_history.py + supplier template prioritization) |
 
 ---
 
-*Last updated: 2026-03-03*
+*Last updated: 2026-03-10*
