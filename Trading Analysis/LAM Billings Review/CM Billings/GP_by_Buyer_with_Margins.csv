@@ -1,7 +1,6 @@
-Buyer,Total GP,Margin,Lines,VM Services GP,VM Services Margin,Naprotek GP,Naprotek Margin,LAM Plexus GP,LAM Plexus Margin,2024 GP,2024 Margin
-Danyel Martinez,52.96,7.7%,41,270.55,58.4%,-217.59,-98.7%,,,0.00,
-Edgar Santana,302.27,23.1%,58,66.10,30.6%,208.47,21.9%,27.70,19.6%,0.00,
-Jake Harris,11381.23,42.7%,312,1517.33,47.0%,9863.90,42.1%,,,0.00,
-Stephanie Hill,1395.34,31.8%,102,253.98,32.0%,1141.36,31.7%,,,0.00,
-Tracy Xie,3696.61,40.4%,86,5.02,71.8%,3023.62,44.2%,667.97,29.0%,0.00,
-TOTAL,16828.41,39.9%,599,2112.98,44.9%,14019.76,40.0%,695.67,28.5%,0.00,
+Buyer,Total GP,Margin,Lines,VM Services GP,VM Services Margin,Naprotek GP,Naprotek Margin,LAM Plexus GP,LAM Plexus Margin
+Edgar Santana,355.23,17.8%,72,336.65,49.5%,-9.12,-0.8%,27.70,19.6%
+Jake Harris,11381.23,42.7%,253,1517.33,47.0%,9863.90,42.1%,,
+Stephanie Hill,1395.34,31.8%,92,253.98,32.0%,1141.36,31.7%,,
+Tracy Xie,3696.61,40.4%,51,5.02,71.8%,3023.62,44.2%,667.97,29.0%
+TOTAL,16828.41,39.9%,468
