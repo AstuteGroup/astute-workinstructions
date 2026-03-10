@@ -1,0 +1,42 @@
+2025 LAM PROGRAM BILLINGS - GP BY BUYER
+Generated: 2026-03-10
+═══════════════════════════════════════════════════════════════════════════════
+
+BY BUYER:
+
+JAKE HARRIS - 238 lines | $7,364.29 GP | 38.4% margin
+    VM Services :  74 lines | $1,309.86 | 51.5%
+    Naprotek    : 153 lines | $5,831.72 | 36.9%
+    LAM Plexus  :  11 lines | $  222.71 | 27.9%
+
+TRACY XIE - 40 lines | $6,864.61 GP | 51.3% margin
+    VM Services :   7 lines | $   70.35 | 49.9%
+    Naprotek    :  25 lines | $6,609.84 | 52.9%
+    LAM Plexus  :   8 lines | $  184.42 | 24.6%
+
+STEPHANIE HILL - 105 lines | $1,281.29 GP | 33.5% margin
+    VM Services :  42 lines | $  378.37 | 38.1%
+    Naprotek    :  59 lines | $  887.41 | 32.0%
+    LAM Plexus  :   4 lines | $   15.51 | 27.0%
+
+EDGAR SANTANA - 52 lines | $872.94 GP | 28.8% margin
+    VM Services :   9 lines | $  170.09 | 44.3%
+    Naprotek    :  36 lines | $  493.42 | 24.7%
+    LAM Plexus  :   7 lines | $  209.43 | 32.1%
+
+DANIEL - 28 lines | $386.23 GP | 14.5% margin
+    VM Services :  14 lines | $  186.85 | 28.7%
+    Naprotek    :  11 lines | $  135.79 |  7.4%
+    LAM Plexus  :   3 lines | $   63.60 | 34.0%
+
+#N/A - 6 lines | $61.58 GP | 49.6% margin
+    Naprotek    :   6 lines | $   61.58 | 49.6%
+
+═══════════════════════════════════════════════════════════════════════════════
+TOTAL: 469 lines | $16,830.95 GP | 39.9% margin
+═══════════════════════════════════════════════════════════════════════════════
+
+UNMATCHED - OTHER PROGRAMS (7 lines, $11,397.15 GP):
+    jamediaz  - Naprotek   : COV0019924 - 2 lines, $883.18
+    salvhorn  - LAM Plexus : 4 COVs - 4 lines, $7,843.10
+    ricamora  - LAM Plexus : COV0018345 - 1 line, $2,670.87
