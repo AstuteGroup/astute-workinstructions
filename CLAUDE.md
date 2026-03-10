@@ -48,11 +48,12 @@ At the start of every new conversation, before addressing anything else, always 
 > - `rfq_sourcing/sourcing-roadmap.md` — RFQ Sourcing & VQ Processing
 > - `Trading Analysis/trading-analysis-roadmap.md` — Vortex Matches, Quick Quote, etc.
 
-4. **Periodic Checks** (every 3 days or after 3+ VQ loading sessions):
+4. **Periodic Checks** (every 8 days):
 
 > **Template Candidates:** Check `rfq_sourcing/vq_loading/template-candidates.md`
-> - Any vendors with 5+ cumulative quotes? → Recommend for template development
+> - Any vendors with 5+ cumulative quotes? → Review for templateability
 > - Show top 3 candidates and their counts
+> - Check if structured (table/consistent format) vs free-form (prose) → only structured can be templated
 
 ---
 
