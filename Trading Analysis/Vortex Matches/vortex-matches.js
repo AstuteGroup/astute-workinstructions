@@ -259,10 +259,13 @@ function categorizeResults(joinedData, hasTargets) {
     const rfqTarget = row['RFQ Target'] || 0;
 
     if (isStock) {
-      // Stock file - default lead time to "STOCK" if blank
+      // Stock file - default lead time to "STOCK" if blank, leave price blank if 0
       const stockRow = { ...row };
       if (!stockRow['lead_time'] || stockRow['lead_time'].trim() === '') {
         stockRow['lead_time'] = 'STOCK';
+      }
+      if (stockRow['Supplier Price'] === 0) {
+        stockRow['Supplier Price'] = null;
       }
       stock.push(stockRow);
     } else if (supplierPrice > 0) {
