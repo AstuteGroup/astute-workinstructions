@@ -210,3 +210,29 @@ When modifying a workflow:
 2. Update the workflow doc (`workflow-name.md`) if overview changes
 3. Update `MEMORY.md` with session summary
 4. Commit and push to GitHub
+
+---
+
+## Workspace Setup
+
+Files in `~/workspace/` that reference repo content **must be symlinks** to the repo versions. This ensures edits always go to the repo and can be committed.
+
+**Required symlinks:**
+```bash
+ln -s ~/workspace/astute-workinstructions/CLAUDE.md ~/workspace/CLAUDE.md
+ln -s ~/workspace/astute-workinstructions/MEMORY.md ~/workspace/MEMORY.md
+```
+
+**Why:** If these are regular files instead of symlinks, edits will go to a separate file outside the repo, causing divergence. The repo version won't be updated, and commits will have stale data.
+
+**To verify setup:**
+```bash
+ls -la ~/workspace/CLAUDE.md ~/workspace/MEMORY.md
+# Should show -> pointing to astute-workinstructions/
+```
+
+**To fix if broken:**
+```bash
+rm ~/workspace/MEMORY.md
+ln -s ~/workspace/astute-workinstructions/MEMORY.md ~/workspace/MEMORY.md
+```
