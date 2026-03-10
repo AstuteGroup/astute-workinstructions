@@ -6,10 +6,10 @@
 
 ## Recent Sessions
 
-- **2026-03-10 (VQ Loading Session)**: Processed 52 vendor quote emails from `vq@orangetsunami.com` inbox. Extracted 43 QUOTES, 5 SKIPs (target price requests), 2 PDFs needing manual review, 2 duplicates, 1 needs-review. Output: `vq-parser/data/sessions/2026-03-10T21-24-51-extracted.csv`. Implemented two-agent validation workflow with automatic mismatch resolution. Updated CLAUDE.md with sync rule for .md file updates.
-- **2026-03-10 (Quick Quote Workflow Consistency)**: Added Quick Quote workflow instructions to CLAUDE.md to ensure consistent prompting. Now always: (1) read quick-quote.md, (2) state defaults (15% margin, $250 min GP, 30% fallback), (3) ask about customer overrides/rebates, (4) execute, (5) summarize.
-- **2026-03-10 (RFQ History Tracking - B1)**: Implemented B1 from sourcing roadmap - 60-day cooldown for same supplier+MPN combinations. Created `rfq_history.py` module with `check_cooldown()`, `record_rfq()`, `update_response()`.
-- **2026-03-10 (RFQ 1130350 Broker Sourcing)**: Completed full broker RFQ sourcing for excess inventory valuation (101 line items). Sent ~168 RFQs across 7 batches to 80+ suppliers.
+- **2026-03-10 (VQ Loading + North Star Rule)**: Processed 52 emails → 43 quotes. Identified recurring failure: workflows documented but not followed (skipped vendor ID lookup, used wrong CSV columns). **Root cause:** Working from memory/context instead of reading .md files. **Fixes:** (1) Added "North Star" rule to top of CLAUDE.md: always Read the .md file before executing, never trust memory. (2) Added "Explicit Numbered Steps Required" to documentation standards. (3) Updated vq-loading.md with End-to-End Workflow (Steps 1-6) including Step 3: Resolve Vendor IDs as explicit required step. Output: `Trading Analysis/2026-03-10T21-24-51-upload.csv` (correct VQ Mass Upload Template format).
+- **2026-03-10 (Quick Quote Workflow Consistency)**: Added Quick Quote workflow instructions to CLAUDE.md to ensure consistent prompting. Now always: (1) read quick-quote.md, (2) state defaults, (3) ask about overrides, (4) execute, (5) summarize.
+- **2026-03-10 (RFQ History Tracking - B1)**: Implemented 60-day cooldown for same supplier+MPN combinations. Created `rfq_history.py` module.
+- **2026-03-10 (RFQ 1130350 Broker Sourcing)**: Completed broker RFQ sourcing for excess inventory valuation (101 line items, ~168 RFQs to 80+ suppliers).
 
 ---
 
