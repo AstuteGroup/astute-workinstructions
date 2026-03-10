@@ -6,10 +6,10 @@
 
 ## Recent Sessions
 
-- **2026-03-10 (VQ Loading + North Star Rule)**: Processed 52 emails → 43 quotes. Identified recurring failure: workflows documented but not followed (skipped vendor ID lookup, used wrong CSV columns). **Root cause:** Working from memory/context instead of reading .md files. **Fixes:** (1) Added "North Star" rule to top of CLAUDE.md: always Read the .md file before executing, never trust memory. (2) Added "Explicit Numbered Steps Required" to documentation standards. (3) Updated vq-loading.md with End-to-End Workflow (Steps 1-6) including Step 3: Resolve Vendor IDs as explicit required step. **Field rules learned:** Contact column must be blank (causes ERP import errors if populated); RoHS field is Y/N/blank only (not free-form text like "ROHS" or "NON-ROHS" — move descriptive text to Vendor Notes). Output: `Trading Analysis/2026-03-10T21-24-51-upload.csv`.
-- **2026-03-10 (Quick Quote Workflow Consistency)**: Added Quick Quote workflow instructions to CLAUDE.md to ensure consistent prompting. Now always: (1) read quick-quote.md, (2) state defaults, (3) ask about overrides, (4) execute, (5) summarize.
+- **2026-03-10 (Vortex Matches Refinements)**: Implemented and refined for RFQs 1130895, 1130899. Key fixes: stock no longer filtered by 90-day window, removed bad columns (RFQ Manufacturer, Vendor Grade), MO Type blank for VQs, % Under Target in column B, RFQ line deduplication, decimal precision for prices. Created `Trading Analysis/trading-analysis-roadmap.md` with planned items (A1: Opp Amount, A2: filter low % of Demand). Added roadmap conventions to CONVENTIONS.md and CLAUDE.md.
+- **2026-03-10 (VQ Loading + North Star Rule)**: Processed 52 emails → 43 quotes. Added "North Star" rule to CLAUDE.md: always Read the .md file before executing. Added "Explicit Numbered Steps Required" to documentation standards. Updated vq-loading.md with End-to-End Workflow (Steps 1-6).
+- **2026-03-10 (Quick Quote Workflow Consistency)**: Added Quick Quote workflow instructions to CLAUDE.md to ensure consistent prompting.
 - **2026-03-10 (RFQ History Tracking - B1)**: Implemented 60-day cooldown for same supplier+MPN combinations. Created `rfq_history.py` module.
-- **2026-03-10 (RFQ 1130350 Broker Sourcing)**: Completed broker RFQ sourcing for excess inventory valuation (101 line items, ~168 RFQs to 80+ suppliers).
 
 ---
 
