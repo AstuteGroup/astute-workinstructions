@@ -1,0 +1,9 @@
+CPC,Type,vs Target,RFQ Target,RFQ Qty,Source MPN,Supplier,VQ Cost,Source Qty,Date Code,Floor Price,Suggested Resale,Resale Basis,% Under Tgt,Quoted GP,% Demand,Opp Amount,Confidence,Days Btw,Sales History,Customer
+TPS63700DRCR,VQ,UNDER,0.5355,6000,TPS63700DRCR,PGC-IC Ltd,0.4490,3000,25+,0.5282,0.5355,Target (margin OK),0.0,259.50,50,3213.00,High,0,,Plexus Corp.
+TPS7A8400ARGRR,VQ,UNDER,0.4900,24000,TPS7A8400ARGRR,TYCHIP ELECTRONICS LIMITED,0.3900,3000,25+,0.4588,0.4900,Target (margin OK),0.0,300.00,13,11760.00,High,0,,Plexus Corp.
+TPS7A8400ARGRR,VQ,UNDER,0.4900,24000,TPS7A8400ARGRR,Guiyu Electronics Group (HK) Ltd,0.3800,3000,25+,0.4471,0.4900,Target (margin OK),0.0,330.00,13,11760.00,High,0,,Plexus Corp.
+OPA2209AIDR,VQ,UNDER,0.9338,10000,OPA2209AIDR,"Excellence Time Electronics Co., Ltd",0.7300,7500,,0.8588,0.9338,Target (margin OK),0.0,1528.50,75,9338.00,High,14,,Plexus Corp.
+TPS7A8400ARGRR,VQ,OVER,0.4900,24000,TPS7A8400ARGRR,Fixchips Global Limited,0.4380,3000,24+,0.5153,0.5153,Target (margin OK),-5.2,231.88,13,11760.00,High,0,,Plexus Corp.
+TPS7A8400ARGRR,VQ,OVER,0.4900,24000,TPS7A8400ARGRR,Najie International Ltd,0.4500,3000,25+,0.5294,0.5294,Target (margin OK),-8.0,238.24,13,11760.00,High,0,,Plexus Corp.
+SN74AVC2T245RSWR,VQ,OVER,0.1379,18000,SN74AVC2T245RSWR,Skyeast International Group Ltd,0.1300,20,25+,0.1529,0.1529,Target (margin OK),-10.9,0.46,0,2482.20,High,4,,Plexus Corp.
+REF102AU/2K5,VQ,OVER,1.2005,2500,REF102AU/2K5,Skyeast International Group Ltd,1.2000,1000,25+,1.4118,1.4118,Target (margin OK),-17.6,211.76,40,3001.25,High,12,,Plexus Corp.
