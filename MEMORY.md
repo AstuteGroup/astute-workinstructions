@@ -7,7 +7,7 @@
 ## Recent Sessions
 
 - **2026-03-10 (Vortex Matches Refinements)**: Implemented and refined for RFQs 1130895, 1130899. Key fixes: stock no longer filtered by 90-day window, removed bad columns (RFQ Manufacturer, Vendor Grade), MO Type blank for VQs, % Under Target in column B, RFQ line deduplication, decimal precision for prices. Created `Trading Analysis/trading-analysis-roadmap.md` with planned items (A1: Opp Amount, A2: filter low % of Demand). Added roadmap conventions to CONVENTIONS.md and CLAUDE.md.
-- **2026-03-10 (VQ Loading + North Star Rule)**: Processed 52 emails → 43 quotes. Added "North Star" rule to CLAUDE.md: always Read the .md file before executing. Added "Explicit Numbered Steps Required" to documentation standards. Updated vq-loading.md with End-to-End Workflow (Steps 1-6).
+- **2026-03-10 (VQ Loading + Vendor Tracking)**: Processed 52 emails → 43 quotes. Added "North Star" rule to CLAUDE.md. Added Step 7 (Vendor Frequency Tracking) as REQUIRED step. Created `template-candidates.md` for cumulative tracking. **Key learning:** Historical rigid parser data had bad vendor assignments (non-vendors like Cynosure assigned to VQs) - only use manual extraction sessions for cumulative counts. Field rules: Contact blank, RoHS Y/N only.
 - **2026-03-10 (Quick Quote Workflow Consistency)**: Added Quick Quote workflow instructions to CLAUDE.md to ensure consistent prompting.
 - **2026-03-10 (RFQ History Tracking - B1)**: Implemented 60-day cooldown for same supplier+MPN combinations. Created `rfq_history.py` module.
 

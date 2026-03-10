@@ -42,6 +42,18 @@ At the start of every new conversation, before addressing anything else, always 
 > 9. **Inventory File Cleanup** - Process Infor inventory exports into Chuboe format for iDempiere import (see `Trading Analysis/Inventory File Cleanup/inventory-file-cleanup.md`)
 > 10. **Vortex Matches** - Surface VQs/offers under customer targets, stock matches, and market intelligence (see `Trading Analysis/Vortex Matches/vortex-matches.md`)
 
+3. **Review Roadmaps** (planned work):
+
+> **Roadmaps:**
+> - `rfq_sourcing/sourcing-roadmap.md` — RFQ Sourcing & VQ Processing
+> - `Trading Analysis/trading-analysis-roadmap.md` — Vortex Matches, Quick Quote, etc.
+
+4. **Periodic Checks** (every 3 days or after 3+ VQ loading sessions):
+
+> **Template Candidates:** Check `rfq_sourcing/vq_loading/template-candidates.md`
+> - Any vendors with 5+ cumulative quotes? → Recommend for template development
+> - Show top 3 candidates and their counts
+
 ---
 
 ## Documentation Standards
