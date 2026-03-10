@@ -146,9 +146,8 @@ async function fetchVendorQuotes(cleanMpns) {
     SELECT
       vql.vendor_quote_mpn AS supplier_mpn,
       vql.vendor_quote_mpn_clean AS market_offer_line_mpn_clean,
-      vql.vendor_type_name AS mo_type,
+      NULL AS mo_type,
       vql.vendor_quote_bpartner_name AS supplier_partner,
-      vql.vendor_quote_bpartner_group_name AS vendor_grade,
       vql.vendor_quote_quantity AS qty,
       vql.vendor_quote_cost AS supplier_price,
       vql.vendor_quote_lead_time AS lead_time,
