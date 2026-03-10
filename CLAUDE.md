@@ -51,6 +51,9 @@ When creating or updating workflow documentation, follow the conventions in `CON
 - Task files go in `tasks/` with `snake_case.md` names
 - Keep workflow docs brief; detailed step-by-step instructions belong in `tasks/`
 - Session history goes in `MEMORY.md` (4 most recent entries)
+- **Roadmaps** for planned work go in `*-roadmap.md` files — see CONVENTIONS.md for schema
+
+**When planning future work:** Read the area's roadmap first (`rfq_sourcing/sourcing-roadmap.md`, `Trading Analysis/trading-analysis-roadmap.md`), then add items there — not inline in MEMORY.md. The roadmap is the source of truth for planned improvements.
 
 **CRITICAL: Keep CLAUDE.md in sync**
 - When updating ANY workflow .md file, also update CLAUDE.md to reference it correctly

@@ -109,6 +109,62 @@ tool_folder/
 
 ---
 
+### Roadmaps (`*-roadmap.md`)
+
+**Purpose:** Track planned features, improvements, and technical debt for a workflow area.
+
+**Location:** One roadmap per major workflow area:
+- `rfq_sourcing/sourcing-roadmap.md`
+- `Trading Analysis/trading-analysis-roadmap.md`
+
+**Naming:** `area-roadmap.md` (kebab-case)
+
+**Schema:**
+```markdown
+# Area Roadmap
+
+## Workflows
+| Workflow | Location | Status |
+
+# Section A: Workflow Name
+
+| # | Feature | Priority | Status |
+|---|---------|----------|--------|
+| A1 | Feature name | **Now**/Next/Later | Planned/In Progress/Done |
+
+---
+
+## A1. Feature Name
+
+**Status:** Planned | **Priority:** Now
+
+**Problem:** What's wrong or missing
+
+**Solution:** How to fix it
+
+---
+
+# Completed Items
+- [x] Item description
+
+# Version History
+| Date | Section | Changes |
+```
+
+**Priority Values:**
+- `**Now**` — Current sprint / immediate
+- `Next` — Next up after current work
+- `Later` — Backlog, not scheduled
+
+**When to Update:**
+- New feature idea → Add numbered item to appropriate section
+- Starting work → Change status to "In Progress"
+- Completed → Move to "Completed Items", update Version History
+
+**Important:** Session summaries in MEMORY.md should reference roadmap items briefly, not duplicate the full detail. The roadmap is the source of truth for planned work.
+
+---
+
 ## When to Create What
 
 | Situation | Create |
