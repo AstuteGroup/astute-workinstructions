@@ -37,6 +37,15 @@ When creating or updating workflow documentation, follow the conventions in `CON
 - This prevents stale/incomplete workflows in CLAUDE.md that diverge from the authoritative source
 - The detailed .md file is the single source of truth; CLAUDE.md just references it
 
+**CRITICAL: Explicit Numbered Steps Required**
+All workflow documentation MUST include an "End-to-End Workflow" section with:
+- **Numbered steps** (Step 1, Step 2, etc.) that must be completed in order
+- **"Do not skip"** callouts for critical steps (e.g., database lookups, validation)
+- **Explicit outputs** for each step (what file/data is produced)
+- **Commands or queries** for steps requiring system interaction
+
+Why: Reference sections (like "Vendor Matching Strategy") get skipped when following a workflow. Numbered steps force sequential execution and prevent missed steps. If a step is important enough to document, it's important enough to number.
+
 ---
 
 ## Inventory File Cleanup Workflow

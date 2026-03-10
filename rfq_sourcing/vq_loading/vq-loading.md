@@ -187,7 +187,72 @@ himalaya message move --account vq --folder NeedsVendor Processed [IDs...]
 
 ---
 
-## Quick Start
+## End-to-End Workflow (REQUIRED STEPS)
+
+**Every step must be completed in order. Do not skip steps.**
+
+### Step 1: Fetch Emails
+```bash
+node ~/workspace/vq-parser/src/index.js fetch
+```
+- Pulls emails from INBOX via IMAP
+- Generates session file: `data/sessions/YYYY-MM-DDTHH-MM-SS-inbox.json`
+- Templates auto-extract known vendor formats
+
+### Step 2: Extract Quote Data (Two-Agent Validation)
+- Agent A extracts all fields from emails
+- Agent B independently verifies extractions
+- Resolve discrepancies (re-read email if agents disagree)
+- Record: MPN, Qty, Price, Currency, Date Code, Manufacturer, Vendor Email, Notes
+
+### Step 3: Resolve Vendor IDs (CRITICAL)
+**Do not skip this step.** Output CSV requires `vendor_search_key` for ERP import.
+
+```sql
+-- Look up vendor search_key by email
+SELECT u.email, bp.value as search_key, bp.name, bp.isactive
+FROM adempiere.ad_user u
+JOIN adempiere.c_bpartner bp ON u.c_bpartner_id = bp.c_bpartner_id
+WHERE bp.isvendor = 'Y' AND bp.isactive = 'Y'
+AND LOWER(u.email) LIKE '%domain.com%';
+```
+
+**Matching order:**
+1. Exact email match in `ad_user.email`
+2. Domain-based fallback (extract `@domain.com`, find any vendor with that domain)
+3. Vendor cache lookup (`data/vendor-cache.json`)
+4. **Only use ACTIVE vendors** (`bp.isactive = 'Y'`)
+
+**If vendor not found:** Flag as `NEEDS-VENDOR`, do not include in ERP-ready output.
+
+### Step 4: Match to RFQs
+- Match extracted MPNs to open RFQs (30-day window)
+- Use fuzzy matching if exact match fails (trim suffix chars)
+- Flag unmatched as `[NEEDS_RFQ - no match in 30 days]`
+
+### Step 5: Generate Output Files
+| File | Contents |
+|------|----------|
+| `YYYY-MM-DDTHH-MM-SS-extracted.csv` | All extractions with categories (QUOTE, SKIP, NO-BID, etc.) |
+| `YYYY-MM-DDTHH-MM-SS-erp-ready.csv` | Clean quotes with `vendor_search_key`, ready for import |
+| `needs-vendor.csv` | Complete quotes missing vendor setup |
+
+### Step 6: Route and Move Emails
+```bash
+# Move processed emails
+himalaya message move --account vq --folder INBOX Processed [IDs...]
+```
+
+| Condition | Folder |
+|-----------|--------|
+| Complete quote + vendor found | `Processed` |
+| Complete quote + vendor NOT_FOUND | `NeedsVendor` |
+| No-bid / target price request | `NoBid` |
+| Incomplete (missing data) | `NeedsReview` |
+
+---
+
+## Quick Start (Reference Only)
 
 ```bash
 # 1. Fetch emails and run template extraction (for known vendors)
@@ -201,7 +266,7 @@ himalaya envelope list --account vq --folder INBOX --page-size 500
 node ~/workspace/astute-workinstructions/rfq_sourcing/vq_loading/consolidate-extractions.js
 ```
 
-**Output:** `vq-upload-ready.csv` (231 records as of 2026-03-05)
+**Output:** `vq-upload-ready.csv`
 
 ---
 
