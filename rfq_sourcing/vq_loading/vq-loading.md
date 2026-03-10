@@ -114,45 +114,16 @@ Top vendors by quote volume:
 
 ### Vendor Frequency Tracking
 
-**Cumulative tracking** - counts are ongoing totals across all sessions, not per-session.
-
-Track which vendors respond most frequently to identify:
-- **High-volume vendors** → Prioritize for template development
-- **New vendors** → Add to iDempiere if missing
-- **Response patterns** → Useful for sourcing strategy
-
-After consolidation, review vendor frequency:
-```bash
-# Get vendor quote counts from tracking file (cumulative)
-cut -d',' -f7 vq-upload-ready-tracking.csv | sort | uniq -c | sort -rn | head -20
-```
-
-Update `template-candidates.md` with current counts. High-frequency vendors without templates are priority candidates for automation.
+→ **See Step 7 in End-to-End Workflow.** This is a required step, not optional reference.
 
 ### Output
 - `vq-upload-ready.csv` - VQ Mass Upload Template format, ready for iDempiere import
 - `needs-vendor.csv` - Complete quotes missing vendor setup (add vendor first, then re-consolidate)
 - `vq-upload-ready-tracking.csv` - Source tracking info (emailId, vendor_email for debugging)
 
-### Post-Extraction: Move to Processed
-After extracting quotes from emails, move them to Processed folder:
-```bash
-# Move specific email IDs to Processed
-himalaya message move --account vq --folder INBOX Processed 6944 6950 6951 ...
+### Post-Extraction & Folder Routing
 
-# Verify counts
-himalaya envelope list --account vq --folder INBOX --page-size 500 | grep -c "^|"
-himalaya envelope list --account vq --folder Processed --page-size 500 | grep -c "^|"
-```
-
-### Folder Routing
-| Condition | Folder | Action |
-|-----------|--------|--------|
-| Complete quote + vendor found | `Processed` | Ready for upload |
-| Complete quote + vendor NOT_FOUND | `NeedsVendor` | Add vendor to iDempiere first |
-| No-bid / target price request | `NoBid` | Record with qty=0, price=0 |
-| Incomplete quote (missing data) | `NeedsReview` | Fix data issues, then re-route |
-| Skip (auto-ack, web-link only) | `INBOX` or delete | No action needed |
+→ **See Step 6 in End-to-End Workflow.** This is a required step, not optional reference.
 
 ### Vendor-Missing Workflow
 
@@ -249,6 +220,23 @@ himalaya message move --account vq --folder INBOX Processed [IDs...]
 | Complete quote + vendor NOT_FOUND | `NeedsVendor` |
 | No-bid / target price request | `NoBid` |
 | Incomplete (missing data) | `NeedsReview` |
+
+### Step 7: Update Vendor Frequency Tracking (REQUIRED)
+**Do not skip.** This identifies high-volume vendors for template development.
+
+1. Count vendors from **session output file** (not database):
+   ```bash
+   # From the session upload CSV, count by Business Partner Search Key
+   cut -d',' -f3 [session]-upload.csv | tail -n +2 | sort | uniq -c | sort -rn
+   ```
+
+2. Update `rfq_sourcing/vq_loading/template-candidates.md` with cumulative counts
+
+3. Flag vendors with **5+ cumulative quotes** as template priorities
+
+4. For priority vendors, pull sample emails to analyze format consistency
+
+**Why this matters:** Templates eliminate manual extraction. A vendor sending 10 quotes/week = 40/month of manual work that could be automated.
 
 ---
 
