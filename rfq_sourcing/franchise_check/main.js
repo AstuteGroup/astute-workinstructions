@@ -102,7 +102,7 @@ function saveResults(results, outputPath) {
     [
       'RFQ Number', 'MPN', 'CPC', 'Qty', 'Target Price', 'Customer',
       'Franchise Avail', 'Franchise Qty', 'Franchise Price', 'Franchise Bulk Price',
-      'Opportunity Value', 'Send to Broker', 'Reason', 'Distributor Count'
+      'Opportunity Value', 'Send to Broker', 'Reason', 'Distributor Count', 'Price Warning'
     ],
   ];
 
@@ -122,6 +122,7 @@ function saveResults(results, outputPath) {
       r.send_to_broker ? 'Yes' : 'No',
       r.reason,
       r.distributor_count,
+      r.price_warning || '',  // Flag for suspect pricing
     ]);
   }
 
@@ -177,6 +178,7 @@ function evaluatePart(part, searchResult, threshold) {
     franchise_price: searchResult.lowestPrice,
     franchise_bulk_price: searchResult.bulkPrice,  // Last column / bulk pricing for secondary market valuation
     distributor_count: searchResult.distributorCount,
+    price_warning: searchResult.priceWarning || '',  // Flag for suspect pricing
     opportunity_value: null,
     send_to_broker: true,
     reason: '',
@@ -335,6 +337,9 @@ Options:
       }
 
       console.log(`    → ${evaluated.reason}`);
+      if (evaluated.price_warning) {
+        console.log(`    ⚠️  ${evaluated.price_warning}`);
+      }
 
       // Rate limiting (use native setTimeout since page context is closed)
       if (i < parts.length - 1) {

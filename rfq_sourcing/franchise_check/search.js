@@ -6,6 +6,37 @@
 const config = require('./config');
 
 /**
+ * Price validation - flag obviously wrong prices based on part type
+ * Returns null if price seems reasonable, or a warning string if suspect
+ */
+function validatePrice(partNumber, price) {
+  if (!price || price <= 0) return null;
+
+  const upper = partNumber.toUpperCase();
+
+  // ICs - should generally be >= $0.50
+  const icPrefixes = ['LT', 'LTC', 'LTM', 'AD', 'ADG', 'ADP', 'ADM', 'MAX', 'BCM', 'CN', 'DS', 'EP', 'EN', 'IRF', 'GS', 'MT'];
+  const isIC = icPrefixes.some(p => upper.startsWith(p));
+  if (isIC && price < 0.50) {
+    return `SUSPECT: IC priced at $${price.toFixed(2)} (expected >= $0.50)`;
+  }
+
+  // Passives (capacitors, resistors, inductors) - should generally be < $20
+  const isPassive = /^[CR]\d/.test(upper) || upper.startsWith('CDR') || upper.startsWith('KGM');
+  if (isPassive && price > 20) {
+    return `SUSPECT: Passive priced at $${price.toFixed(2)} (expected < $20)`;
+  }
+
+  // Connectors - should generally be < $50
+  const isConnector = upper.includes('CONN') || upper.endsWith('LF') || upper.startsWith('FP-');
+  if (isConnector && price > 50) {
+    return `SUSPECT: Connector priced at $${price.toFixed(2)} (expected < $50)`;
+  }
+
+  return null;
+}
+
+/**
  * Search for a part on TrustedParts
  * @param {import('playwright').Page} page - Playwright page
  * @param {string} partNumber - Part number to search
@@ -21,6 +52,7 @@ async function searchPart(page, partNumber, debug = false) {
     distributorCount: 0,
     distributors: [],
     error: null,
+    priceWarning: null,  // Flag for suspect pricing
   };
 
   try {
@@ -119,11 +151,10 @@ async function searchPart(page, partNumber, debug = false) {
         const normalizedSearch = stripPackaging(partNumber);
         const normalizedResult = stripPackaging(mfrPartNumber || '');
 
-        // Match if base parts are equal, or one is prefix of the other
-        // (handles remaining suffix variations we didn't anticipate)
-        const isMatch = normalizedResult === normalizedSearch ||
-                        normalizedResult.startsWith(normalizedSearch) ||
-                        normalizedSearch.startsWith(normalizedResult);
+        // Strict matching only - no prefix matching
+        // If FindChips doesn't have the exact part, we want "no data" (the truth)
+        // rather than grabbing data from a similar/cheaper variant
+        const isMatch = normalizedResult === normalizedSearch;
 
         if (!isMatch) {
           if (debug) console.log(`    [DEBUG] Skipping non-match: ${mfrPartNumber} (normalized: ${normalizedResult} vs ${normalizedSearch})`);
@@ -178,6 +209,15 @@ async function searchPart(page, partNumber, debug = false) {
 
     result.distributorCount = result.distributors.length;
     result.found = result.distributorCount > 0;
+
+    // Validate pricing - flag suspect values
+    const priceToCheck = result.bulkPrice || result.lowestPrice;
+    if (priceToCheck) {
+      result.priceWarning = validatePrice(partNumber, priceToCheck);
+      if (result.priceWarning && debug) {
+        console.log(`    [DEBUG] ${result.priceWarning}`);
+      }
+    }
 
     if (debug && result.found) {
       console.log(`    [DEBUG] Total qty: ${result.totalQty}, Lowest price: $${result.lowestPrice}, Bulk price: $${result.bulkPrice}`);
