@@ -42,6 +42,7 @@ At the start of every new conversation, before addressing anything else, always 
 > 9. **Inventory File Cleanup** - Process Infor inventory exports into Chuboe format for iDempiere import (see `Trading Analysis/Inventory File Cleanup/inventory-file-cleanup.md`)
 > 10. **Vortex Matches** - Surface VQs/offers under customer targets, stock matches, and market intelligence (see `Trading Analysis/Vortex Matches/vortex-matches.md`)
 > 11. **Market Offer Uploading** - Process excess inventory emails into ERP-ready offers (see `Trading Analysis/Market Offer Uploading/market-offer-uploading.md`)
+> 12. **BOM Monitoring** - Track BOM risk, commodity analysis, and excess matches (see `Trading Analysis/BOM Monitoring/`)
 
 3. **Review Roadmaps** (planned work):
 

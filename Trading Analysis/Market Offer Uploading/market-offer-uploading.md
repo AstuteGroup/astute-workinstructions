@@ -227,6 +227,9 @@ Partner contacts change frequently. A quote from `john@examplecorp.com` should m
 ## Output Files
 
 ### File Naming Convention
+
+**IMPORTANT: Each email gets its own file.** Do not consolidate multiple emails into one file.
+
 | Scenario | Filename |
 |----------|----------|
 | Offer ID provided | `OFFER_UPLOAD_[OfferID].csv` |
@@ -235,6 +238,7 @@ Partner contacts change frequently. A quote from `john@examplecorp.com` should m
 **Examples:**
 - With offer ID: `OFFER_UPLOAD_1234567.csv`
 - Without: `OFFER_UPLOAD_20260311_Honeywell.csv`
+- Multiple emails same partner: `OFFER_UPLOAD_20260311_Honeywell.csv`, `OFFER_UPLOAD_20260312_Honeywell.csv`
 
 ### Output Files
 | File | Location | Description |
