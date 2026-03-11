@@ -36,6 +36,7 @@ Pull 3-5 sample emails from vendor and check:
 | j2-sourcing.js | J2 Sourcing | 1002946 | j2sourcing.com | - |
 | semitech.js | Semitech Semiconductor | 1006806 | semitech.net | - |
 | akira-global.js | Akira Global | 1007942 | akiraglobal.com | - |
+| atlantic-semi.js | Atlantic Semiconductor | 1002457 | atlanticsemi.com | Mar 11 |
 
 ## Cumulative Vendor Counts
 
@@ -43,7 +44,6 @@ Pull 3-5 sample emails from vendor and check:
 
 | Search Key | Vendor | Cumulative | Format | Priority | Sessions |
 |------------|--------|------------|--------|----------|----------|
-| 1002457 | Atlantic Semiconductor | **8** | ? | **PRIORITY** | Mar 10 (4), Mar 11 (4) |
 | 1002948 | Inelco Components | 4 | ? | - | Mar 10 (2), Mar 11 (2) |
 | 1002787 | Hybrid Electronics | 4 | ? | - | Mar 10 (2), Mar 11 (2) |
 | 1002612 | Integrated Electronics | 4 | ? | - | Mar 10 (2), Mar 11 (2) |
