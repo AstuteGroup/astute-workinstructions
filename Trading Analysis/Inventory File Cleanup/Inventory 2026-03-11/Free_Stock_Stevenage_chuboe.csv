@@ -1,0 +1,7 @@
+Chuboe_Offer_ID[Value],Chuboe_MPN,Chuboe_MFR_ID[Value],Chuboe_MFR_Text,Qty,Chuboe_Lead_Time,Chuboe_Package_Desc,C_Country_ID[Name],Chuboe_Date_Code,C_Currency_ID[ISO_Code],Description,IsActive,Chuboe_MPN_Clean,Chuboe_CPC,PriceEntered,Chuboe_MOQ,Chuboe_SPQ
+,ISL84051IAZ,,Intersil Corp,704,,US2311170000002;QCH210,,,,IC MUX/DEMUX 8X1 16QSOP,,,,,,
+,NC7SZ58P6X,,On Semiconductor,9000,,US2401250000004;QC INSPECT,,,,IC LOGIC GATE UHS 2-INP SC70-6,,,,,,
+,"PCA9518PW,118",,NXP Semiconductors,2500,,US2011090001-02;S0115B,,2036,,,,,,,,
+,"PCA9518PW,118",,NXP Semiconductors,2500,,US2011090001-03;S0115B,,2039,,,,,,,,
+,"PCA9518PW,118",,NXP Semiconductors,2500,,US2011090001-04;S0115B,,2040,,,,,,,,
+,TARIFF,,Charge,1,,US2602160000016;QC INSPECT,,,,TARIFF,,,,286.2,,
