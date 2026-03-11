@@ -31,58 +31,66 @@ Same pattern as VQ Loading. Use two-agent workflow for reliable extraction:
 
 **Template file:** `Market Offer Line Import Template.csv`
 
-Extract ALL available fields from each offer. Required fields must be present; optional fields capture when available.
+**CRITICAL: Do not modify the header row. Use exact headers from template.**
 
-| Column | Required | Description |
-|--------|----------|-------------|
-| `Chuboe_Offer_ID[Value]` | Yes | Offer header search key (links lines to parent offer) |
-| `Chuboe_MPN` | Yes | Part number as provided by partner |
-| `Chuboe_MFR_ID[Value]` | No | Manufacturer search key (lookup if known) |
-| `Chuboe_MFR_Text` | No | Manufacturer name as text (TI, Infineon, etc.) |
-| `Qty` | Yes | Quantity available |
-| `Chuboe_Lead_Time` | No | Lead time (e.g., "stock", "2 weeks") |
-| `Chuboe_Package_Desc` | No | Packaging (Reel, Tube, Tray, Bulk, Cut Tape) |
-| `C_Country_ID[Name]` | No | Country of origin (China, Taiwan, Malaysia, etc.) |
-| `Chuboe_Date_Code` | No | Manufacturing date code (e.g., 2024, 24+) |
-| `C_Currency_ID[ISO_Code]` | No | Currency code (USD, EUR, GBP). Blank = USD |
-| `Description` | No | Notes, conditions, expiry, special terms |
-| `IsActive` | Yes | Y (default) |
-| `Chuboe_MPN_Clean` | No | Normalized MPN (stripped suffixes, spaces) |
-| `Chuboe_CPC` | No | Commodity/product code |
-| `PriceEntered` | No | Unit price |
-| `Chuboe_MOQ` | No | Minimum order quantity |
-| `Chuboe_SPQ` | No | Standard pack quantity |
+| Col | Column Name | Required | Description |
+|-----|-------------|----------|-------------|
+| A | `Chuboe_Offer_ID[Value]` | If provided | Offer header ID. If given, populate and use for filename |
+| B | `Chuboe_MPN` | **YES** | Part number. If multiple MPNs given, split into separate lines |
+| C | `Chuboe_MFR_ID[Value]` | No | **Exact MFR name from DB** (e.g., "Texas Instruments"), NOT the code |
+| D | `Chuboe_MFR_Text` | No | Leave blank (use col C instead) |
+| E | `Qty` | **YES** | Quantity available |
+| F | `Chuboe_Lead_Time` | No | Lead time (e.g., "stock", "2 weeks") |
+| G | `Chuboe_Package_Desc` | No | Rarely used. Packaging if specified |
+| H | `C_Country_ID[Name]` | No | Country of origin |
+| I | `Chuboe_Date_Code` | No | Manufacturing date code |
+| J | `C_Currency_ID[ISO_Code]` | No | Currency. Blank = USD |
+| K | `Description` | No | Notes, conditions, expiry, special terms |
+| L | `IsActive` | **DO NOT USE** | Leave blank |
+| M | `Chuboe_MPN_Clean` | **DO NOT USE** | Leave blank |
+| N | `Chuboe_CPC` | No | **Customer part number** (their internal PN) |
+| O | `PriceEntered` | No | Unit price |
+| P | `Chuboe_MOQ` | No | Minimum order quantity |
+| Q | `Chuboe_SPQ` | No | Standard pack quantity |
 
-**Offer Header:** Lines reference a parent `chuboe_offer` record via `Chuboe_Offer_ID[Value]`. The header contains partner info, offer type, and transaction date. If not provided, leave blank.
+**Key Rules:**
+- **Multiple MPNs:** If customer lists several MPNs without specifying which they have, create a separate line for EACH MPN (same qty, same customer PN)
+- **Customer PN:** Goes in column N (Chuboe_CPC), not Description
+- **MFR Matching:** Use exact name from `chuboe_mfr.name` in column C, not the code
+
+**Offer Header:** If `Chuboe_Offer_ID[Value]` is provided, populate column A. Otherwise leave blank (will be assigned later).
 
 ---
 
 ## Manufacturer Matching (CRITICAL)
 
-**Goal:** Populate `Chuboe_MFR_ID[Value]` (column C) with system codes to enable analytics.
+**Goal:** Populate `Chuboe_MFR_ID[Value]` (column C) with the **exact MFR name from the database** to enable matching.
 
-**Alias file:** `mfr-aliases.json` - maps common abbreviations/variants to system codes.
+**Alias file:** `mfr-aliases.json` - maps common abbreviations/variants to system codes, which we then look up to get the exact name.
 
 ### Matching Order
 1. **Normalize input** - uppercase, trim whitespace
-2. **Alias lookup** - check `mfr-aliases.json` for exact match
-3. **Database lookup** - case-insensitive match on `chuboe_mfr.name`
-4. **No match** - leave column C blank, put raw text in column D (Chuboe_MFR_Text)
+2. **Alias lookup** - check `mfr-aliases.json` to get system code (e.g., M05844)
+3. **Database lookup** - get the exact `name` for that code
+4. **Output** - put the exact name in column C (NOT the code)
+5. **No match** - leave column C blank
 
 ### Example
 ```
 Email says: "TI" or "Texas Instruments" or "TEXAS INSTRUMENTS INC"
     ↓
-Alias lookup: all map to M05844
+Alias lookup: all map to code M05844
     ↓
-Output: Chuboe_MFR_ID[Value] = M05844
+DB lookup: SELECT name FROM chuboe_mfr WHERE value = 'M05844'
+    ↓
+Output: Chuboe_MFR_ID[Value] = "Texas Instruments"  (the exact name, NOT the code)
 ```
 
 ### Adding New Aliases
 When extraction encounters an unmatched manufacturer:
 1. Search database: `SELECT value, name FROM adempiere.chuboe_mfr WHERE name ILIKE '%keyword%'`
 2. If found, add mapping to `mfr-aliases.json`
-3. If not found, use column D (text) only
+3. If not found, leave column C blank
 
 ### Why This Matters
 - **26M offer lines** currently have no manufacturer match
@@ -217,6 +225,17 @@ Partner contacts change frequently. A quote from `john@examplecorp.com` should m
 
 ## Output Files
 
+### File Naming Convention
+| Scenario | Filename |
+|----------|----------|
+| Offer ID provided | `OFFER_UPLOAD_[OfferID].csv` |
+| No offer ID | `OFFER_UPLOAD_YYYYMMDD_[Partner].csv` |
+
+**Examples:**
+- With offer ID: `OFFER_UPLOAD_1234567.csv`
+- Without: `OFFER_UPLOAD_20260311_Honeywell.csv`
+
+### Output Files
 | File | Location | Description |
 |------|----------|-------------|
 | `OFFER_UPLOAD_*.csv` | `output/` | Offer Mass Upload Template format, ready for iDempiere |
