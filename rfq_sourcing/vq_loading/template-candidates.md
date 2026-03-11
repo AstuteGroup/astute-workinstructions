@@ -39,18 +39,21 @@ Pull 3-5 sample emails from vendor and check:
 
 ## Cumulative Vendor Counts
 
-**Baseline:** 2026-03-10 (manual extraction sessions only)
+**Last updated:** 2026-03-11
 
 | Search Key | Vendor | Cumulative | Format | Priority | Sessions |
 |------------|--------|------------|--------|----------|----------|
-| 1002457 | Atlantic Semiconductor | 4 | ? | - | Mar 10 (4) |
-| 1002948 | Inelco Components | 2 | ? | - | Mar 10 (2) |
-| 1002787 | Hybrid Electronics | 2 | ? | - | Mar 10 (2) |
-| 1002612 | Integrated Electronics | 2 | ? | - | Mar 10 (2) |
+| 1002457 | Atlantic Semiconductor | **8** | ? | **PRIORITY** | Mar 10 (4), Mar 11 (4) |
+| 1002948 | Inelco Components | 4 | ? | - | Mar 10 (2), Mar 11 (2) |
+| 1002787 | Hybrid Electronics | 4 | ? | - | Mar 10 (2), Mar 11 (2) |
+| 1002612 | Integrated Electronics | 4 | ? | - | Mar 10 (2), Mar 11 (2) |
+| 1002842 | Nexus Electronics | 4 | ? | - | Mar 10 (2), Mar 11 (2) |
+| 1002337 | Select Technology | 4 | ? | - | Mar 10 (2), Mar 11 (2) |
+| 1004879 | N-tronics GmbH | 4 | ? | - | Mar 10 (2), Mar 11 (2) |
 | 1003290 | NetSource Technology | 2 | ? | - | Mar 10 (2) |
-| 1002337 | Select Technology | 2 | ? | - | Mar 10 (2) |
-| 1002842 | Nexus Electronics | 2 | ? | - | Mar 10 (2) |
-| 1004879 | N-tronics GmbH | 2 | ? | - | Mar 10 (2) |
+| 1005735 | Fly Chips | 2 | ? | - | Mar 11 (2) |
+| 1003141 | Component Sense | 2 | ? | - | Mar 11 (2) |
+| 1002863 | Flex-Com International | 2 | ? | - | Mar 11 (2) |
 
 ## How to Update (Step 7)
 
