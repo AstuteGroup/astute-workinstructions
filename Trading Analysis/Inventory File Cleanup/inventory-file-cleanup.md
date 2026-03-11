@@ -14,15 +14,15 @@ This workflow replaces the Excel VBA macros previously used to clean and split i
 4. **Chuboe Formatting** - Transform columns to match iDempiere import template
 5. **Consignment Handling** - Blank out pricing for consignment inventory
 
-The Python script `inventory_cleanup.py` replicates this logic and adds the consolidated portal export.
+The Node.js script `inventory_cleanup.js` replicates this logic and adds the consolidated portal export. (Python version also available but requires Python environment.)
 
 ---
 
 ## Input Requirements
 
 **Source:** Infor ERP → AST Item Lots Report
-**Format:** CSV export (save Excel as CSV if needed)
-**Filename Pattern:** `ASTItemLotsReportInputs_*.csv` or `Copy of ASTItemLotsReportInputs_*.csv`
+**Format:** Excel (.xlsx) or CSV
+**Filename Pattern:** `ASTItemLotsReportInputs_*.xlsx` or `ASTItemLotsReportInputs_*.csv`
 
 ### Expected Input Structure
 
@@ -58,15 +58,16 @@ The Python script `inventory_cleanup.py` replicates this logic and adds the cons
 ### Step 1: Obtain the Export
 
 1. Run AST Item Lots Report in Infor
-2. Export to Excel
-3. Save as CSV: `ASTItemLotsReportInputs_[identifier].csv`
-4. Copy to: `~/workspace/astute-workinstructions/Trading Analysis/Inventory File Cleanup/`
+2. Export to Excel (.xlsx)
+3. Commit and push to: `Trading Analysis/Inventory File Cleanup/`
 
 ### Step 2: Run the Cleanup Script
 
 ```bash
-python inventory_cleanup.py "ASTItemLotsReportInputs_USS_4516285.csv" ./output
+node inventory_cleanup.js "ASTItemLotsReportInputs_USS_XXXXXXX.xlsx"
 ```
+
+Output folder is automatically created as `Inventory YYYY-MM-DD/` (today's date).
 
 The script will:
 - Remove header rows 1-7
@@ -139,6 +140,15 @@ The script splits inventory into these groups based on Warehouse code and option
 | Main_Warehouse | MAIN | Main warehouse |
 | HK_Warehouse | W105 | Hong Kong warehouse |
 
+### Excluded (Intentionally Unmatched)
+
+| Warehouse Code | Reason |
+|----------------|--------|
+| W110 | Not used for Chuboe import |
+| W116 | Not used for Chuboe import |
+
+Rows with these warehouse codes appear in "Unmatched" count but are intentionally excluded.
+
 ---
 
 ## Chuboe Column Mapping
@@ -197,7 +207,7 @@ Required columns and format to be documented once spec is obtained.
 
 ## Output Files
 
-All output files are saved to the specified output directory (default: `./output/`).
+All output files are saved to a dated folder: `Inventory YYYY-MM-DD/`
 
 | File | Description |
 |------|-------------|
@@ -205,6 +215,18 @@ All output files are saved to the specified output directory (default: `./output
 | `consolidated_portal_{timestamp}.csv` | All inventory for portal upload |
 | `inventory_cleaned_{timestamp}.csv` | Full cleaned/deduped master file |
 | `duplicates_{timestamp}.csv` | Removed duplicates (for audit/review) |
+
+---
+
+## File Retention Policy
+
+**Weekly cleanup after output approval:**
+
+1. **Delete input file** - Remove the `ASTItemLotsReportInputs_*.xlsx` after outputs are approved
+2. **Delete previous output folder** - When creating a new `Inventory YYYY-MM-DD/` folder, delete the previous week's folder
+3. **Keep only current week** - Only one dated output folder should exist at a time
+
+This keeps the repo clean and avoids accumulating large inventory files.
 
 ---
 
@@ -225,20 +247,22 @@ The first occurrence is kept; subsequent duplicates are written to `duplicates_*
 
 ## Usage Examples
 
-### Basic Usage
+### Basic Usage (Node.js - recommended)
 ```bash
-python inventory_cleanup.py "ASTItemLotsReportInputs_USS_4516285.csv" ./output
+node inventory_cleanup.js "ASTItemLotsReportInputs_USS_4544132.xlsx"
 ```
+
+Output automatically goes to `Inventory YYYY-MM-DD/` folder.
 
 ### With Custom Output Directory
 ```bash
-python inventory_cleanup.py "Copy of ASTItemLotsReportInputs_USS_4516285.csv" ~/workspace/inventory-output
+node inventory_cleanup.js "ASTItemLotsReportInputs_USS_4544132.xlsx" ./custom-output
 ```
 
 ### Sample Console Output
 ```
-Processing: ASTItemLotsReportInputs_USS_4516285.csv
-Output directory: ./output
+Processing: ASTItemLotsReportInputs_USS_4544132.xlsx
+Output directory: Inventory 2026-03-11
 ------------------------------------------------------------
 Step 1: Reading and cleaning file...
   - Headers found: 15 columns
