@@ -1,14 +1,10 @@
 Buyer,Total Lines,Total GP,VM Services GP,Naprotek GP,LAM Plexus GP
 Jake Harris,64,4988.09,449.38,3983.73,554.98
-Edgar Santana,22,2292.94,1815.56,400.18,77.20
-DM / ES (needs assignment),1,476.06,476.06,,
+Edgar Santana,36,2894.87,2308.64,509.03,77.2
 Stephanie Hill,22,145.75,,145.39,0.36
-Daniel,13,125.87,17.02,108.85,
 Tracy Xie,6,97.98,,97.98,
 MATCHED TOTAL,128,8126.69,2758.02,4736.13,632.54
 UNMATCHED (see notes),2,24.34,,24.34,
-
-NOTES:
-1. DM / ES line (COV0016503 TGHHV50R0JE $476.06) - needs assignment to Daniel or Edgar
-2. Unmatched MPNs (COV0016276): 76HPS806GWRT ($8.68) and 76HPS810GWRT ($15.66) - need buyer assignment
-3. Negative GP lines (losses): 24FC512-I/SN (-$4.64) 1.5SMC18A (-$2.49) 1-770182-1 (-$23.39 and -$5.20) = -$35.72 total
+NOTES:,,,,,
+2. Unmatched MPNs (COV0016276): 76HPS806GWRT ($8.68) and 76HPS810GWRT ($15.66) - need buyer assignment,,,,,
+3. Negative GP lines (losses): 24FC512-I/SN (-$4.64) 1.5SMC18A (-$2.49) 1-770182-1 (-$23.39 and -$5.20) = -$35.72 total,,,,,
