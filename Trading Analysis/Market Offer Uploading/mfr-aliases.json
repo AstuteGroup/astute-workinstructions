@@ -1,0 +1,234 @@
+{
+  "_comment": "Manufacturer alias mapping for Market Offer Uploading",
+  "_usage": "Map email text → canonical system code (Chuboe_MFR_ID[Value])",
+  "_updated": "2026-03-11",
+
+  "aliases": {
+    "TI": "M05844",
+    "TEXAS INSTRUMENTS": "M05844",
+    "TEXAS INSTRUMENTS INCORPORATED": "M05844",
+    "TEXAS INSTRUMENTS INC": "M05844",
+
+    "ST": "M05538",
+    "STM": "M05538",
+    "STMICROELECTRONICS": "M05538",
+    "STMICROELECTRONICS (EUR S&D)": "M05538",
+    "ST MICROELECTRONICS": "M05538",
+    "ST MICRO": "M05538",
+
+    "ADI": "M06495",
+    "ANALOG DEVICES": "M06495",
+    "ANALOG DEVICES INC": "M06495",
+    "ANALOG DEVICES INCORPORATED": "M06495",
+
+    "ON": "M04180",
+    "ONSEMI": "M04180",
+    "ON SEMICONDUCTOR": "M04180",
+    "ON SEMI": "M04180",
+
+    "IFX": "M02856",
+    "INFINEON": "M02856",
+    "INFINEON TECHNOLOGIES": "M02856",
+    "INFINEON TECHNOLOGIES AG": "M02856",
+
+    "VISHAY": "M06179",
+    "VIS": "M06179",
+    "VISHAY INTERTECHNOLOGY": "M06179",
+    "VISHAY INTERTECHNOLOGY INC": "M06179",
+
+    "NXP": "M04116",
+    "NXP SEMICONDUCTORS": "M04116",
+    "NXP SEMICONDUCTOR": "M04116",
+
+    "MICROCHIP": "M03611",
+    "MCHP": "M03611",
+    "MICROCHIP TECHNOLOGY": "M03611",
+    "MICROCHIP TECHNOLOGY INC": "M03611",
+
+    "NEXPERIA": "M04015",
+
+    "ISSI": "M02945",
+
+    "TE": "M05724",
+    "TE CONNECTIVITY": "M05724",
+    "TE CONNECTIVITY LTD": "M05724",
+    "TYCO": "M05724",
+    "TYCO ELECTRONICS": "M05724",
+    "TYCO / TE CONNECTIVITY": "M05724",
+    "TE CONNECTIVITY/AMP BRAND": "M05724",
+    "TE CONN": "M05724",
+    "AMP": "M05724",
+
+    "SAMSUNG": "M06607",
+    "SAMSUNG ELECTRONICS": "M06607",
+    "SAMSUNG ELECTRO-MECHANICS": "M05017",
+    "SEC": "M05017",
+
+    "MURATA": "M10849",
+    "MURATA ELECTRONICS": "M10849",
+    "MURATA MANUFACTURING": "M10849",
+
+    "BROADCOM": "M00880",
+    "AVAGO": "M00880",
+    "BROADCOM INC": "M00880",
+
+    "FCI": "M02097",
+    "AMPHENOL FCI": "M02097",
+
+    "AMPHENOL": "M00335",
+    "AMPHENOL CORP": "M00335",
+    "AMPHENOL ICC": "M07793",
+
+    "WALSIN": "M06251",
+    "WALSIN TECHNOLOGY": "M06251",
+
+    "PANASONIC": "M11906",
+    "PANASONIC CORP": "M11906",
+    "PANASONIC INDUSTRIAL": "M11906",
+
+    "ITT": "M02957",
+    "ITT CANNON": "M02957",
+    "ITT INC": "M02957",
+
+    "HONEYWELL": "M06708",
+    "HONEYWELL INTERNATIONAL": "M06708",
+
+    "JST": "M03060",
+    "JST MANUFACTURING": "M03060",
+
+    "ABRACON": "M00057",
+    "ABRACON CORPORATION": "M00057",
+
+    "TOSHIBA": "M05898",
+    "TOSHIBA SEMICONDUCTOR": "M05898",
+
+    "EPCOS": "M01927",
+    "TDK EPCOS": "M01927",
+
+    "SEIKO EPSON": "M05128",
+    "EPSON": "M05128",
+
+    "DIODES": "M12289",
+    "DIODES INC": "M12289",
+    "DIODES INCORPORATED": "M12289",
+
+    "FAIRCHILD": "M02066",
+    "FAIRCHILD SEMICONDUCTOR": "M02066",
+
+    "ALTERA": "M00300",
+    "INTEL ALTERA": "M00300",
+
+    "SAMTEC": "M11105",
+    "SAMTEC INC": "M11105",
+
+    "EVERLIGHT": "M02017",
+    "EVERLIGHT ELECTRONICS": "M02017",
+
+    "MACRONIX": "M03491",
+    "MXIC": "M03491",
+
+    "GRAYHILL": "M02453",
+
+    "STACKPOLE": "M05488",
+    "STACKPOLE ELECTRONICS": "M05488",
+
+    "GLENAIR": "M02395",
+
+    "SEMTECH": "M05144",
+    "SEMTECH CORPORATION": "M05144",
+
+    "YAGEO": "M06441",
+    "YAGEO CORP": "M06441",
+    "YAGEO CORPORATION": "M06441",
+
+    "ROHM": "M04915",
+    "ROHM SEMICONDUCTOR": "M04915",
+    "ROHM CO LTD": "M04915",
+
+    "MOLEX": "M03837",
+    "MOLEX LLC": "M03837",
+    "MOLEX CONNECTOR": "M03837",
+
+    "AVX": "M00606",
+    "AVX CORPORATION": "M00606",
+    "AVX/KYOCERA": "M00606",
+    "KYOCERA AVX": "M00606",
+
+    "VIKING": "M06166",
+    "VIKING TECH": "M06166",
+
+    "KEMET": "M03110",
+    "KEMET ELECTRONICS": "M03110",
+    "KEMET ELECTRONICS CORP": "M03110",
+
+    "TDK": "M05652",
+    "TDK CORP": "M05652",
+    "TDK CORPORATION": "M05652",
+
+    "KOA": "M03189",
+    "KOA SPEER": "M03189",
+    "KOA SPEER ELECTRONICS": "M03189",
+
+    "BOURNS": "M00843",
+    "BOURNS INC": "M00843",
+
+    "COILCRAFT": "M01233",
+    "COILCRAFT INC": "M01233",
+
+    "LITTELFUSE": "M03395",
+    "LITTELFUSE INC": "M03395",
+
+    "MICRON": "M03720",
+    "MICRON TECHNOLOGY": "M03720",
+    "MICRON TECHNOLOGY INC": "M03720",
+
+    "MAXIM": "M03593",
+    "MAXIM INTEGRATED": "M03593",
+    "MAXIM INTEGRATED PRODUCTS": "M03593",
+
+    "TAIYO YUDEN": "M05662",
+    "TAIYO": "M05662",
+
+    "SITIME": "M05296",
+    "SITIME CORPORATION": "M05296",
+
+    "RENESAS": "M04861",
+    "RENESAS ELECTRONICS": "M04861",
+
+    "XILINX": "M06291",
+    "AMD XILINX": "M06291",
+
+    "LATTICE": "M03307",
+    "LATTICE SEMICONDUCTOR": "M03307",
+
+    "CYPRESS": "M01511",
+    "CYPRESS SEMICONDUCTOR": "M01511",
+
+    "WINBOND": "M06260",
+    "WINBOND ELECTRONICS": "M06260",
+
+    "ALLIANCE": "M00288",
+    "ALLIANCE MEMORY": "M00288",
+
+    "WURTH": "M06283",
+    "WURTH ELEKTRONIK": "M06283",
+    "WÜRTH": "M06283",
+
+    "PULSE": "M04668",
+    "PULSE ELECTRONICS": "M04668",
+
+    "CINCH": "M01177",
+    "CINCH CONNECTIVITY": "M01177"
+  },
+
+  "_duplicates_in_system": {
+    "_note": "These system codes refer to the same company - consolidate to canonical",
+    "Texas Instruments": ["M05844 (canonical)", "M11884 (TI)", "M12361"],
+    "STMicroelectronics": ["M05538 (canonical)", "M06617 (STM)", "M05466 (St)"],
+    "Infineon": ["M02856 (canonical)", "M11887", "M02854 (Inf)"],
+    "On Semiconductor": ["M04180 (canonical)", "M10829 (Onsemi)"],
+    "Vishay": ["M06179 (canonical)", "M11888"],
+    "Microchip": ["M03611 (canonical)", "M06500", "M09200"],
+    "Diodes": ["M12289 (canonical)", "M01611"]
+  }
+}

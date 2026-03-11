@@ -27,25 +27,67 @@ Same pattern as VQ Loading. Use two-agent workflow for reliable extraction:
 2. **Agent B (Verifier)**: Independently reads same emails, verifies extractions match actual content
 3. **Result**: Only verified records are saved
 
-### Field Reference (Offer Mass Upload Template)
+### Field Reference (Market Offer Line Import Template)
+
+**Template file:** `Market Offer Line Import Template.csv`
 
 Extract ALL available fields from each offer. Required fields must be present; optional fields capture when available.
 
-| Field | Column Name | Required | Description |
-|-------|-------------|----------|-------------|
-| **Partner** | `Business Partner Search Key` | Yes | Partner search_key from domain-based lookup |
-| **Contact** | `Contact` | No | Contact name from email |
-| **MPN** | `MPN` | Yes | Part number offered |
-| **Manufacturer** | `MFR Text` | No | Manufacturer name (TI, Infineon, etc.) |
-| **Quantity** | `Quantity` | Yes | Quantity available |
-| **Price** | `Price` | No | Unit price (if provided) |
-| **Currency** | `Currency` | No | Blank = USD. Only specify for EUR, GBP, other |
-| **Date Code** | `Date Code` | No | Manufacturing date code (e.g., 2024, 24+) |
-| **Lead Time** | `Lead Time` | No | Default: "stock". Only specify if quoted |
-| **COO** | `COO` | No | Country of origin (CN, TW, MY, US, etc.) |
-| **Packaging** | `Packaging` | No | Reel, Tube, Tray, Bulk, Cut Tape |
-| **Offer Type** | `Offer Type` | Yes | Customer Excess, Vendor Stock, etc. |
-| **Notes** | `Notes` | No | Conditions, expiry, special terms |
+| Column | Required | Description |
+|--------|----------|-------------|
+| `Chuboe_Offer_ID[Value]` | Yes | Offer header search key (links lines to parent offer) |
+| `Chuboe_MPN` | Yes | Part number as provided by partner |
+| `Chuboe_MFR_ID[Value]` | No | Manufacturer search key (lookup if known) |
+| `Chuboe_MFR_Text` | No | Manufacturer name as text (TI, Infineon, etc.) |
+| `Qty` | Yes | Quantity available |
+| `Chuboe_Lead_Time` | No | Lead time (e.g., "stock", "2 weeks") |
+| `Chuboe_Package_Desc` | No | Packaging (Reel, Tube, Tray, Bulk, Cut Tape) |
+| `C_Country_ID[Name]` | No | Country of origin (China, Taiwan, Malaysia, etc.) |
+| `Chuboe_Date_Code` | No | Manufacturing date code (e.g., 2024, 24+) |
+| `C_Currency_ID[ISO_Code]` | No | Currency code (USD, EUR, GBP). Blank = USD |
+| `Description` | No | Notes, conditions, expiry, special terms |
+| `IsActive` | Yes | Y (default) |
+| `Chuboe_MPN_Clean` | No | Normalized MPN (stripped suffixes, spaces) |
+| `Chuboe_CPC` | No | Commodity/product code |
+| `PriceEntered` | No | Unit price |
+| `Chuboe_MOQ` | No | Minimum order quantity |
+| `Chuboe_SPQ` | No | Standard pack quantity |
+
+**Offer Header:** Lines reference a parent `chuboe_offer` record via `Chuboe_Offer_ID[Value]`. The header contains partner info, offer type, and transaction date. If not provided, leave blank.
+
+---
+
+## Manufacturer Matching (CRITICAL)
+
+**Goal:** Populate `Chuboe_MFR_ID[Value]` (column C) with system codes to enable analytics.
+
+**Alias file:** `mfr-aliases.json` - maps common abbreviations/variants to system codes.
+
+### Matching Order
+1. **Normalize input** - uppercase, trim whitespace
+2. **Alias lookup** - check `mfr-aliases.json` for exact match
+3. **Database lookup** - case-insensitive match on `chuboe_mfr.name`
+4. **No match** - leave column C blank, put raw text in column D (Chuboe_MFR_Text)
+
+### Example
+```
+Email says: "TI" or "Texas Instruments" or "TEXAS INSTRUMENTS INC"
+    ↓
+Alias lookup: all map to M05844
+    ↓
+Output: Chuboe_MFR_ID[Value] = M05844
+```
+
+### Adding New Aliases
+When extraction encounters an unmatched manufacturer:
+1. Search database: `SELECT value, name FROM adempiere.chuboe_mfr WHERE name ILIKE '%keyword%'`
+2. If found, add mapping to `mfr-aliases.json`
+3. If not found, use column D (text) only
+
+### Why This Matters
+- **26M offer lines** currently have no manufacturer match
+- System's rigid MFR_Text matching has very low conversion rate
+- Pre-matching enables: analytics by manufacturer, cross-reference with VQs, trend analysis
 
 **Notes field usage:**
 - **Expiration**: "Offer expires 2026-03-31"
@@ -201,7 +243,8 @@ The upload template column `Business Partner Search Key` expects the **search_ke
 ---
 
 ## TODO
-- [ ] Get ERP upload template specification (exact column names/formats)
+- [x] Get ERP upload template specification (exact column names/formats) ✓ `Market Offer Line Import Template.csv`
+- [ ] Document offer header creation (chuboe_offer parent record)
 - [ ] Define validation rules (required fields, value constraints)
 - [ ] Build extraction logic for common Excel/CSV formats
 - [ ] Add duplicate detection (same partner + MPN within N days)
