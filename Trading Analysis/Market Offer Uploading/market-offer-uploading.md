@@ -268,7 +268,7 @@ The upload template column `Business Partner Search Key` expects the **search_ke
 - [ ] Define validation rules (required fields, value constraints)
 - [ ] Build extraction logic for common Excel/CSV formats
 - [ ] Add duplicate detection (same partner + MPN within N days)
-- [ ] Create email folders (Processed, NeedsPartner, NeedsReview, NotOffer)
+- [x] Create email folders ✓ Processed created (others: create as needed)
 - [ ] Integrate with Market Offer Matching workflow (auto-refresh after upload)
 
 ---
