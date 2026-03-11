@@ -40,7 +40,7 @@ Same pattern as VQ Loading. Use two-agent workflow for reliable extraction:
 | C | `Chuboe_MFR_ID[Value]` | No | **Exact MFR name from DB** (e.g., "Texas Instruments"), NOT the code |
 | D | `Chuboe_MFR_Text` | No | Leave blank (use col C instead) |
 | E | `Qty` | **YES** | Quantity available |
-| F | `Chuboe_Lead_Time` | No | Lead time (e.g., "stock", "2 weeks") |
+| F | `Chuboe_Lead_Time` | No | Lead time - **only if explicitly stated** |
 | G | `Chuboe_Package_Desc` | No | Rarely used. Packaging if specified |
 | H | `C_Country_ID[Name]` | No | Country of origin |
 | I | `Chuboe_Date_Code` | No | Manufacturing date code |
@@ -54,6 +54,7 @@ Same pattern as VQ Loading. Use two-agent workflow for reliable extraction:
 | Q | `Chuboe_SPQ` | No | Standard pack quantity |
 
 **Key Rules:**
+- **Only populate what's explicit:** Do NOT assume or default values. If lead time, date code, price, etc. are not stated in the input, leave those columns blank
 - **Multiple MPNs:** If customer lists several MPNs without specifying which they have, create a separate line for EACH MPN (same qty, same customer PN)
 - **Customer PN:** Goes in column N (Chuboe_CPC), not Description
 - **MFR Matching:** Use exact name from `chuboe_mfr.name` in column C, not the code
