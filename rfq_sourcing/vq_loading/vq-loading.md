@@ -18,14 +18,75 @@ himalaya envelope list --account vq --folder INBOX --page-size 500
 
 ---
 
-## Two-Agent Manual Extraction (Recommended)
+## Dual-Phase Extraction (MANDATORY)
 
-The rigid parser produces too many errors. Use this two-agent workflow for reliable extraction:
+The rigid parser produces too many errors. **Always use dual-phase extraction + verification.**
 
-### Process
-1. **Agent A (Extractor)**: Reads emails, extracts all quote fields (see Field Reference below)
-2. **Agent B (Verifier)**: Independently reads same emails, verifies extractions match actual content
-3. **Result**: Only verified records are saved
+---
+
+### Phase 1: Extraction
+
+Split emails into batches and launch extraction agents in parallel.
+
+| Email Count | Extraction Agents | Batch Size |
+|-------------|-------------------|------------|
+| 1-25        | 1                 | All        |
+| 26-50       | 2                 | ~25 each   |
+| 51-100      | 4                 | ~25 each   |
+| 100+        | 4-6               | ~20-25 each|
+
+**Output:** Save extractions to `YYYY-MM-DD-extractions.json`
+
+---
+
+### Phase 2: Verification (DO NOT SKIP)
+
+Launch verification agents on the **SAME batches** used in Phase 1.
+
+| Email Count | Verification Agents |
+|-------------|---------------------|
+| 1-25        | 1                   |
+| 26-50       | 2                   |
+| 51-100      | 4                   |
+| 100+        | Match extractors    |
+
+Each verifier must:
+1. Re-read the same emails independently
+2. Extract quote data fresh (not copy from Phase 1)
+3. Compare to Phase 1 extractions
+4. Flag all discrepancies (MPN, qty, price, currency, vendor)
+
+**ENFORCEMENT CHECKPOINT:** After extraction completes, ALWAYS say:
+> "Extraction complete for X emails. Running verification agents now on the same batches."
+
+If this message doesn't appear, verification was skipped.
+
+---
+
+### Phase 3: Reconciliation
+
+1. Review all discrepancies flagged by verifiers
+2. Re-read original emails to determine correct values
+3. Fix errors in the extractions JSON
+4. Only then generate the ERP-ready CSV
+
+**NEVER generate CSV until verification is done.**
+
+---
+
+### Why This Matters
+
+- **Extraction errors are common:** Price breaks, alternate MPNs, currency confusion
+- **Errors are costly:** Wrong data in iDempiere requires manual cleanup
+- **Verification catches ~10-15% errors** on average
+
+---
+
+### Process Summary
+1. **Phase 1 - Extraction**: N agents extract from N batches in parallel → JSON file
+2. **Phase 2 - Verification**: N agents verify the SAME N batches → discrepancy report
+3. **Phase 3 - Reconciliation**: Fix discrepancies → generate CSV
+4. **Result**: Only verified records go to the output CSV
 
 ### Field Reference (VQ Mass Upload Template)
 
@@ -170,11 +231,18 @@ node ~/workspace/vq-parser/src/index.js fetch
 - Generates session file: `data/sessions/YYYY-MM-DDTHH-MM-SS-inbox.json`
 - Templates auto-extract known vendor formats
 
-### Step 2: Extract Quote Data (Two-Agent Validation)
-- Agent A extracts all fields from emails
-- Agent B independently verifies extractions
-- Resolve discrepancies (re-read email if agents disagree)
-- Record: MPN, Qty, Price, Currency, Date Code, Manufacturer, Vendor Email, Notes
+### Step 2: Extract Quote Data (Dual-Phase - DO NOT SKIP VERIFICATION)
+
+**Follow the Dual-Phase Extraction process above. This is 3 phases, not 1:**
+
+1. **Phase 1 - Extraction:** Launch N extraction agents based on email count (see table above)
+2. **Phase 2 - Verification:** Launch N verification agents on SAME batches, compare results
+3. **Phase 3 - Reconciliation:** Fix discrepancies before proceeding
+
+**CHECKPOINT:** You must see this message before proceeding to Step 3:
+> "Extraction complete for X emails. Running verification agents now on the same batches."
+
+If verification was skipped, STOP and run it before generating any output.
 
 ### Step 3: Resolve Vendor IDs (CRITICAL)
 **Do not skip this step.** Output CSV requires `vendor_search_key` for ERP import.
