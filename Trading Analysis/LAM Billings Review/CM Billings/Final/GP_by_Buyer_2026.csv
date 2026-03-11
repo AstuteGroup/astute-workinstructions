@@ -1,8 +1,7 @@
-Buyer,Naprotek GP,VM Services GP,Total Lines,JABIL GP
-Tracy Xie,8.51,11367.16,33,
-Jake Harris,546.77,4196.31,118,-307.29
-Stephanie Hill,93.2,466.35,94,-164.66
-Edgar Santana,12.68,856.08,44,
-SZ,,8.39,2,
-TOTAL GP,661.17,16894.29,291,-471.94
-MARGIN,0.361,0.423,0.391,-0.246
+Buyer,Total Lines,Total GP,Total Margin,VM Services GP,Naprotek GP,JABIL GP
+Tracy Xie,33,11375.67,42.3%,11367.16,8.51,
+Jake Harris,118,4435.79,32.6%,4196.31,546.77,-307.29
+Stephanie Hill,94,394.89,8.2%,466.35,93.2,-164.66
+Edgar Santana,44,868.76,38.1%,856.08,12.68,
+Serena Zhang,2,8.39,18.0%,8.39,,
+TOTAL,291,17083.50,39.1%,16894.29,661.17,-471.94
