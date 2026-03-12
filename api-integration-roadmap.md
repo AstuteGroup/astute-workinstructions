@@ -30,7 +30,7 @@ Real-time pricing and availability from authorized distributors. Replaces FindCh
 | Mouser | REST (API key) | mouser.com/api-hub | **Blocked** | 1000334 |
 | Octopart | REST + GraphQL | octopart.com/api/home | Planned | — |
 | Newark/element14 | REST | developer.element14.com | Planned | 1000390 |
-| Future Electronics | TBD | Contact required | Planned | 1000328 |
+| Future Electronics | REST (?) | futureelectronics.com/api-solutions | **Pending docs** | 1000328 |
 | Venkel | REST (?) | venkel.com | **Pending docs** | 1001951 |
 | Texas Instruments | OAuth2 REST | api-portal.ti.com | **Pending approval** | 1001369 |
 
@@ -194,6 +194,18 @@ node rutronik.js S3001-D320 100
 **iDempiere Vendor:**
 - BP ID: `1001369`
 - Name: `Texas Instruments`
+
+---
+
+### Future Electronics API (Pending Docs)
+
+**API Key:** `IW7OI-DOC91-OKUD3-37YK2-X3RSY`
+
+**iDempiere Vendor:**
+- BP ID: `1000328`
+- Name: `Future Electronics Corporation`
+
+**Status:** Have API key but can't find endpoint documentation. Postman docs at https://documenter.getpostman.com/view/18706946/UzBvFhcj didn't load. Need endpoint URL and auth format from Future.
 
 ---
 
