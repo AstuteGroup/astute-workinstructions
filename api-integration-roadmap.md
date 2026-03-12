@@ -32,6 +32,7 @@ Real-time pricing and availability from authorized distributors. Replaces FindCh
 | Newark/element14 | REST | developer.element14.com | Planned | 1000390 |
 | Future Electronics | TBD | Contact required | Planned | 1000328 |
 | Venkel | REST (?) | venkel.com | **Pending docs** | 1001951 |
+| Texas Instruments | OAuth2 REST | api-portal.ti.com | **Pending approval** | 1001369 |
 
 ### DigiKey API (Active)
 
@@ -170,6 +171,29 @@ node rutronik.js S3001-D320 100
 | `franchiseRfqPrice` | Price at RFQ qty — VQ |
 | `vqLeadTime` | Lead time in days |
 | `vqVendorNotes` | "Rutronik stock: X \| SKU: Y" or "Lead time: X days" |
+
+---
+
+### Texas Instruments API (Pending Approval)
+
+**API:** Inventory and Pricing API | **Auth:** OAuth2 (client credentials)
+
+**Credentials:**
+| Key | Value |
+|-----|-------|
+| Consumer Key | `PhtlnMQsJ7yR6lboZiSEhxnWkzhp83LO` |
+| Consumer Secret | `PYFkiOihdANZqERn` |
+| App Name | `api_astute` |
+| Account | `api.inc@astutegroup.com` |
+
+**Token endpoint:** `https://transact.ti.com/v1/oauth/accesstoken`
+**Inventory endpoint:** `https://transact.ti.com/v2/store/products/{partNumber}?currency=USD`
+
+**Status:** OAuth works but API returns "no apiproduct match found" - need to subscribe to Inventory and Pricing API product in the TI portal.
+
+**iDempiere Vendor:**
+- BP ID: `1001369`
+- Name: `Texas Instruments`
 
 ---
 
