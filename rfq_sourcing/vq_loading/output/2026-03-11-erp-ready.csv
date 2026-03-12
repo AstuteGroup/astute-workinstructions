@@ -1,62 +1,57 @@
 RFQ Search Key,Buyer,Business Partner Search Key,Contact,MPN,MFR Text,Quoted Quantity,Cost,Currency,Date Code,MOQ,SPQ,Packaging,Lead Time,COO,RoHS,Vendor Notes
-1130350,Jake Harris,1003329,,16TQC100M,Sanyo,9400,0.35,,,,,stock,,,Poscap,
-1130350,Jake Harris,1004090,,NFM18PC225B0J3D,Murata,15000,0.22,,2024+,,,5-7 days,Japan,Y,OEM consignment stock EXW France,
-1130350,Jake Harris,1008419,,MSP430F149IPM,Texas Instruments,225,5.98,,03+,,,stock,,,FOB Almelo TT in advance 1 year warranty,
-1130350,Jake Harris,1002948,,LTC3617IUDD#PBF,Linear Technology,8,6.00,,1637,,,stock,,Y,Own stock FOB Spain 1-year warranty,
-1130350,Jake Harris,1005681,,PCA9517DP,118,NXP,12500,0.25,EUR,12+/13+,,,same day,,,T/T in advance Ex work
-1130350,Jake Harris,1004525,,ADG734BRUZ-REEL,Analog Devices,2000,1.04,EUR,20+,2000,,stock,,Y,1450pcs @ 1.20 EUR or 2000pcs @ 1.04 EUR,
-1130350,Jake Harris,1002911,,146839-3,TYCO,70,3.50,,089,,,stock,,,,
-1130350,Jake Harris,1004926,,MAX3221EEAE+T,Maxim,580,3.20,,08+,,,stock,,Y,,
-1130350,Jake Harris,1004875,,146839-3,AMP,125,0.80,,2011,,,stock,Mexico,,quote valid 14 days,
-1130350,Jake Harris,1003141,,FTSH-108-01-L-DV-K-P,Murata,4351,0.715,,1806,,,3-6 business days,Japan,Y,,
-1130588,Jake Harris,1003957,,16TQC100MYF,Panasonic,3000,0.50,,14+,,3000,stock,Japan,Y,,
-1130350,Jake Harris,1003141,,FTSH-108-01-L-DV-K-P,Murata,4351,0.715,,1806,,,stock,,Y,Parts in overseas warehouse,
-1130350,Jake Harris,1002863,,NFM18PC105R0J3D,Murata,159059,0.012,,2021,,,1-Day,,,New And Original Parts Warranty 180 days,
-1130350,Jake Harris,1002714,,J1011F21PNL,Pulse,5600,1.00,,21,,200,stock,CN,Y,Mixed DC: 21/29 21/02 21/04 21/13,
-1130350,Jake Harris,1003256,,MAX3221EEAE+T,Analog Devices,580,0.98,EUR,2418,,2500,stock,Thailand,Y,Min order value 50 EUR,
-1130350,Jake Harris,1003400,,TPS63060DSCR,Texas Instruments,1000,1.90,,,,,stock,,,,
-1130350,Jake Harris,1002999,,FTLX8571D3BCV,Finisar,56,20.00,,15+,,,stock,,,New in factory packaging,
-1130350,Jake Harris,1002276,,12106D476KAT2A,,2500,0.30,,,,,stock,,,Quote valid 10 days,
-1130350,Jake Harris,1003321,,PCA9517DP,118,NXP,2500,0.50,,21,,2500,stock,,,
-1130350,Jake Harris,1005735,,FTSH-108-01-L-DV-K-A-P-TR,,600,6.50,,,600,,stock,Israel,,EXW Israel TT in advance NCNR,
-1130350,Jake Harris,1004498,,FTSH10801LDVK,Samtec,2500,1.25,,2023,,,1-3 day,,,,
-1130350,Jake Harris,1002377,,C1005X5R1C104K050BA,TDK Corporation,9325,0.005,,10+,,,stock,,,,
-1130350,Jake Harris,1003290,,FTSH-108-01-L-DV-P-TR,Samtec,5475,0.75,,2022,,,stock,,Y,Quote valid 24 hours NCNR,
-1130350,Jake Harris,1002966,,AQY210SX,Panasonic,2000,0.80,GBP,,,,stock,,,,
-1130350,Jake Harris,1002612,,EPM2210F324I5N,Intel/Altera,50,50.00,,2137,,,stock,,,Tested at GETS Florida,
-1130350,Jake Harris,1002457,,C1005X5R1C104K050BA,TDK,13849,0.02,,1824,,,,,,Y,Quote# 394762
-1130350,Jake Harris,1002337,,LT3070EUFD#PBF,Linear Technology,279,4.00,,14,,,stock,,,,
-1130350,Jake Harris,1003743,,C1812C335K1RAC7800,Kemet,9,11.15,EUR,20,,,stock,Mexico,Y,Validity 24 hours EXW,
-1130350,Jake Harris,1004879,,LTC3617EUDDPBF,Linear Technology,10,7.50,EUR,11+,,,stock,,Y,,
-1130350,Jake Harris,1004879,,NFM18PC225B0J3D,Murata,8000,0.06,EUR,10+,,,stock,,Y,,
-1130350,Jake Harris,1002506,,LT3973IMSE-5#PBF,Linear Technology,200,7.25,,20,,,,,,,
-1130350,Jake Harris,1002469,,LTC4357IMS8#PBF,Linear Technology,160,1.00,,UNK,,,stock,,Y,,
-1130350,Jake Harris,1004617,,ADG734BRUZ-REEL,Analog Devices,250,3.50,,,,,stock,,,6 month warranty - $50 min order,
-1130350,Jake Harris,1002948,,MAX3221EEAE,Maxim,580,2.45,,Multiple,,,stock,,,Multiple DCs: 1228 (532pcs) 98 (50pcs) 00 (48pcs) 03 (12pcs),
-1130350,Jake Harris,1003021,,LTC4263IDE#PBF,Analog Devices,171,2.65,GBP,19+,,,stock,Malaysia,,,
-1130350,Jake Harris,1004279,,MAX3318EIPWR,Texas Instruments,140,0.75,,,140,,stock,,,Cut tape in Digikey bag,
-1130350,Jake Harris,1002457,,LT3080EDD-1#TRPBF,Analog Devices,1250,1.80,,2048,,,,,,quote# 394757,
-1130350,Jake Harris,1002595,,CY29946AXC,Cypress,146,3.00,,0743,,,,,,Y,
-1130350,Jake Harris,1002495,,MSP430F149IPM-G4,Texas Instruments,29,8.00,,05+,,,stock,,Y,Quote# 12871,
-1130350,Jake Harris,1002842,,BCM5241A1IMLG,Broadcom,376,10.00,,,,,stock,,,,
-1130350,Jake Harris,1001041,,12106D476KAT2A,Kyocera,5174,0.10,,mixed,,,stock,,,Multiple date codes,
-1130350,Jake Harris,1003064,,AFBR-709DMZ-IN7,Broadcom,300,4.50,,,,,stock,China,,Stock in Hong Kong,
-1130350,Jake Harris,1005505,,AQY210SZ,Nais,1000,1.09,,04,,,3 Days,,,USA Stock 30 Days DOA 120 days warranty,
-1130350,Jake Harris,1005611,,AQY210SX,Panasonic,1181,0.50,,17,,,,,,,
-1130847,Jake Harris,1002426,,BCM5241A1IMLG,Broadcom,2000,5.50,,22,,,,,,,
-1130350,Jake Harris,1002787,,CY8C3866AXI-040T,Infineon,40,8.00,,,,,,,,,
-1130350,Jake Harris,1002787,,EPM2210F324I5N,Intel,20,74.00,,849,,,,,,,
-1130350,Jake Harris,1002457,,SST38VF6401-90-5I-B3KE,Microchip,70,5.00,,1630,,,,,Y,Trays quote# 394751,
-1130350,Jake Harris,1002457,,1210YD226MAT2A,AVX,1488,0.40,,11+/04+,,,,,,Y,513pcs 11+ 975pcs 04+. quote# 394748
-1130350,Jake Harris,1002863,,NFM18PC225B0J3D,Murata,4252,0.025,,20+,,,1-Day,,,New And Original Parts Warranty 180 days,
-1130350,Jake Harris,1004223,,1210YD226MAT2A,AVX,1000,0.50,,08+,,,,,JP,,
-1130350,Jake Harris,1005735,,NFM18PC225B0J3D,Murata,8900,0.22,,PTF52,,,,,,,Quote# 007537 EXW Israel
-1130350,Jake Harris,1002612,,SST38VF6401-90-5I-B3KE,Microchip,9,6.00,,1120,,,,,,factory new C/C Terms,
-1130350,Jake Harris,1005353,,MAX3318EEUP-T,Maxim,1029,3.00,,0528,,,,,,N,NON ROHS
-1130350,Jake Harris,1001208,,SST38VF6401-90-5I-B3KE,Microchip,80,0.94,,18+,80,,stock,,,Flip Electronics - $500 PO minimum NCNR,
-[NEEDS_RFQ],Jake Harris,1002450,,CDRH3D23NP1R0PC,SUM,1271,0.18,,13,,,T/R,1-2 business days,CN,Y,AER Worldwide - Min Order $100 30-day warranty
-1130350,Jake Harris,1003395,,1210YD226MAT2A,AVX,3000,0.65,,1001,,1000,T/R,stock,,,Legend Electronics - Min order $100 FOB HNY
-1130350,Jake Harris,1002337,,NFM18PC225B0J3D,Murata,9741,0.69,,22,,,stock,,,Select Technology - new in stock,
-1130350,Jake Harris,1002842,,39-29-5243,,10,5.00,,,,,,,,,Nexus Electronics
-1130350,Jake Harris,1005293,,MSP430F149IPMG4,,120,9.75,,,,,,,,,EGB Inc
-1130350,Jake Harris,1002399,,C1812C335K1RAC7800,,468,0.20,,1741,,,Partial reel,stock,,Y,Inventory Management Partners
+1130350,Jake Harris,1003329,,16TQC100M,Sanyo,9400,0.35,,1034,,,,stock,,Y,Poscap
+1130350,Jake Harris,1005377,,NFM18PC225B0J3D,Murata,15000,0.22,,2024+,,,,5-7 days,Japan,Y,OEM consignment stock EXW France
+1130350,Jake Harris,1008419,,MSP430F149IPM,Texas Instruments,225,5.98,,03+,,,,stock,,,FOB Almelo TT in advance 1 year warranty
+1130350,Jake Harris,1002948,,LTC3617IUDD#PBF,Linear Technology,8,6,,1637,,,,stock,,Y,Own stock FOB Spain 1-year warranty
+1130350,Jake Harris,1005681,,"PCA9517DP,118",NXP,12500,0.25,EUR,12+/13+,,,,stock,,,T/T in advance Ex work
+1130350,Jake Harris,1002911,,146839-3,TYCO,70,3.5,,089,,,,stock,,,
+1130350,Jake Harris,1004926,,MAX3221EEAE+T,Maxim,580,3.2,,08+,,,,stock,,Y,
+1130350,Jake Harris,1004875,,146839-3,AMP,125,0.8,,2011,,,,stock,Mexico,,quote valid 14 days
+1130350,Jake Harris,1003141,,FTSH-108-01-L-DV-K-P,Murata,4351,0.715,,1806,,,,3-6 business days,Japan,Y,
+1130350,Jake Harris,1003957,,16TQC100MYF,Panasonic,3000,0.5,,14+,,,,stock,Japan,Y,
+1130350,Jake Harris,1003141,,FTSH-108-01-L-DV-K-P,Murata,4351,0.715,,1806,,,,stock,,Y,Parts in overseas warehouse
+1130350,Jake Harris,1002863,,NFM18PC105R0J3D,Murata,159059,0.012,,2021,,,,1-Day,,,New And Original Parts Warranty 180 days
+1130350,Jake Harris,1002714,,J1011F21PNL,Pulse,5600,1,,21,,,,stock,CN,Y,Mixed DC: 21/29 21/02 21/04 21/13
+1130350,Jake Harris,1003400,,TPS63060DSCR,Texas Instruments,1000,1.9,,,,,,stock,,,
+1130350,Jake Harris,1002999,,FTLX8571D3BCV,Finisar,56,20,,15+,,,,stock,,,New in factory packaging
+1130350,Jake Harris,1003327,,PCA9517DP,NXP,2999,0.385,,10+,,,,stock,,,
+1130350,Jake Harris,1002276,,12106D476KAT2A,,2500,0.3,,,,,,stock,,,Quote valid 10 days
+1130350,Jake Harris,1008205,,"PCA9517DP,118",NXP,2500,0.5,,21,,,,stock,,,
+1130350,Jake Harris,1005735,,FTSH-108-01-L-DV-K-A-P-TR,,600,6.5,,,,,,stock,Israel,,EXW Israel TT in advance NCNR
+1130350,Jake Harris,1004498,,FTSH10801LDVK,Samtec,2500,1.25,,2023,,,,1-3 day,,,
+1130350,Jake Harris,1002377,,C1005X5R1C104K050BA,TDK Corporation,9325,0.005,,10+,,,,stock,,,
+1130350,Jake Harris,1003290,,FTSH-108-01-L-DV-P-TR,Samtec,5475,0.75,,2022,,,,stock,,Y,Quote valid 24 hours NCNR
+1130350,Jake Harris,1009977,,AQY210SX,Panasonic,2000,0.8,GBP,,,,,stock,,,
+1130350,Jake Harris,1002612,,EPM2210F324I5N,Intel/Altera,50,50,,2137,,,,stock,,,Tested at GETS Florida
+1130350,Jake Harris,1002457,,C1005X5R1C104K050BA,TDK,13849,0.02,,1824,,,,stock,,Y,Quote# 394762
+1130350,Jake Harris,1002337,,LT3070EUFD#PBF,Linear Technology,279,4,,14,,,,stock,,,
+1130350,Jake Harris,1003743,,C1812C335K1RAC7800,Kemet,9,11.15,EUR,20,,,,stock,Mexico,Y,Validity 24 hours EXW
+1130350,Jake Harris,1002506,,LT3973IMSE-5#PBF,Linear Technology,200,7.25,,20,,,,stock,,,
+1130350,Jake Harris,1002469,,LTC4357IMS8#PBF,Linear Technology,160,1,,UNK,,,,stock,,Y,
+1130350,Jake Harris,1004617,,ADG734BRUZ-REEL,Analog Devices,250,3.5,,,,,,stock,,,6 month warranty - $50 min order
+1130350,Jake Harris,1002948,,MAX3221EEAE,Maxim,580,2.45,,Multiple,,,,stock,,,Multiple DCs: 1228 (532pcs) 98 (50pcs) 00 (48pcs) 03 (12pcs)
+1130350,Jake Harris,1003021,,LTC4263IDE#PBF,Analog Devices,171,2.65,GBP,19+,,,,stock,Malaysia,,
+1130350,Jake Harris,1004279,,MAX3318EIPWR,Texas Instruments,140,0.75,,,,,,stock,,,Cut tape in Digikey bag
+1130350,Jake Harris,1002457,,LT3080EDD-1#TRPBF,Analog Devices,1250,1.8,,2048,,,,stock,,,quote# 394757
+1130350,Jake Harris,1002842,,BCM5241A1IMLG,Broadcom,376,10,,,,,,stock,,,
+1130350,Jake Harris,1001041,,12106D476KAT2A,Kyocera,5174,0.1,,mixed,,,,stock,,,Multiple date codes
+1130350,Jake Harris,1005290,,AFBR-709DMZ-IN7,Broadcom,300,4.5,,,,,,stock,China,,Stock in Hong Kong
+1130350,Jake Harris,1005505,,AQY210SZ,Nais,1000,1.09,,04,,,,3 Days,,,USA Stock 30 Days DOA 120 days warranty
+1130350,Jake Harris,1005611,,AQY210SX,Panasonic,1181,0.5,,17,,,,stock,,,
+1130350,Jake Harris,1002426,,BCM5241A1IMLG,Broadcom,2000,5.5,,22,,,,stock,,,
+1130350,Jake Harris,1002787,,CY8C3866AXI-040T,Infineon,40,8,,,,,,stock,,,
+1130350,Jake Harris,1002787,,EPM2210F324I5N,Intel,20,74,,849,,,,stock,,,
+1130350,Jake Harris,1002457,,SST38VF6401-90-5I-B3KE,Microchip,70,5,,1630,,,,stock,,Y,Trays quote# 394751
+1130350,Jake Harris,1002457,,1210YD226MAT2A,AVX,1488,0.4,,11+/04+,,,,stock,,Y,513pcs 11+ 975pcs 04+. quote# 394748
+1130350,Jake Harris,1002863,,NFM18PC225B0J3D,Murata,4252,0.025,,20+,,,,1-Day,,,New And Original Parts Warranty 180 days
+1130350,Jake Harris,1004223,,1210YD226MAT2A,AVX,1000,0.5,,08+,,,,stock,JP,,
+1130350,Jake Harris,1005735,,NFM18PC225B0J3D,Murata,8900,0.22,,PTF52,,,,stock,,,Quote# 007537 EXW Israel
+1130350,Jake Harris,1002612,,SST38VF6401-90-5I-B3KE,Microchip,9,6,,1120,,,,stock,,,factory new C/C Terms
+1130350,Jake Harris,1005353,,MAX3318EEUP-T,Maxim,1029,3,,0528,,,,stock,,N,NON ROHS
+1130350,Jake Harris,1001208,,SST38VF6401-90-5I-B3KE,Microchip,80,0.94,,18+,,,,stock,,,Flip Electronics - $500 PO minimum NCNR
+1130350,Jake Harris,1002450,,CDRH3D23NP1R0PC,SUM,1271,0.18,,13,,,,1-2 business days,CN,Y,AER Worldwide - Min Order $100 30-day warranty
+1130350,Jake Harris,1003395,,1210YD226MAT2A,AVX,3000,0.65,,1001,,,,stock,,,Legend Electronics - Min order $100 FOB HNY
+1130350,Jake Harris,1002337,,NFM18PC225B0J3D,Murata,9741,0.69,,22,,,,stock,,,Select Technology - new in stock
+1130350,Jake Harris,1002842,,39-29-5243,,10,5,,,,,,stock,,,Nexus Electronics
+1130350,Jake Harris,1005549,,MSP430F149IPMG4,,120,9.75,,,,,,stock,,,EGB Inc
+1130350,Jake Harris,1002399,,C1812C335K1RAC7800,,468,0.2,,1741,,,,stock,,Y,Inventory Management Partners
