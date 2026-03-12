@@ -141,11 +141,13 @@ Each search uses a fresh browser context to avoid session state pollution.
            ▼
 ┌─────────────────────┐
 │ Franchise Screening │ ◄── You are here
-│   (FindChips)       │
+│ (DigiKey API +      │
+│  FindChips fallback)│
 │                     │
 │ Outputs:            │
 │ - franchise_qty     │
 │ - franchise_bulk_$  │
+│ - VQ-ready data     │
 └──────────┬──────────┘
            │
     ┌──────┴──────┐
@@ -162,3 +164,42 @@ Each search uses a fresh browser context to avoid session state pollution.
 │ order filter│
 └─────────────┘
 ```
+
+---
+
+## Franchise API Integration
+
+### iDempiere Business Partners (for VQ Loading)
+
+| Distributor | BP ID | BP Value | BP Name |
+|-------------|-------|----------|---------|
+| **DigiKey** | 1000327 | 1002331 | Digi-Key Electronics |
+| **Mouser** | 1000334 | 1002338 | Mouser |
+| **Arrow** | 1000386 | 1002390 | Arrow Electronics |
+| **Newark** | 1000390 | 1002394 | Newark in One (Element 14) |
+| **Future** | 1000328 | 1002332 | Future Electronics Corporation |
+| **Avnet** | 1000002 | 1001002 | Avnet |
+
+### DigiKey API
+
+**Status:** Active | **Code:** `digikey.js`
+
+```bash
+# Single part lookup
+node digikey.js <MPN> [qty]
+
+# Example
+node digikey.js LM317 100
+```
+
+**Pricing Logic:**
+
+| Purpose | Price Used | Why |
+|---------|------------|-----|
+| **Screening decision** | Bulk price (best available) | Most favorable franchise comparison |
+| **VQ loading** | Price at RFQ qty | Actual cost we'd pay |
+| **Vendor Notes** | Total qty available | "DigiKey stock: X,XXX \| DigiKey PN: XXX" |
+
+**Stock Counting:** Use product-level `QuantityAvailable` only. Do NOT sum package types (Cut Tape, Tape & Reel share the same inventory).
+
+**API Details:** See `api-integration-roadmap.md`

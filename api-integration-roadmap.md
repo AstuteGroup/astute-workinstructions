@@ -18,23 +18,56 @@ Cross-cutting roadmap for external API integrations. Individual implementations 
 
 ## Franchise Distributor APIs
 
-**Status:** Planned | **Priority:** Next
+**Status:** In Progress | **Priority:** Active
 
 Real-time pricing and availability from authorized distributors. Replaces FindChips scraping with direct API access.
 
-| Distributor | API Type | Documentation | Status |
-|-------------|----------|---------------|--------|
-| DigiKey | OAuth2 REST | developer.digikey.com | Planned |
-| Arrow | REST (API key) | developers.arrow.com | Planned |
-| Mouser | REST (API key) | mouser.com/api-hub | Planned |
-| Octopart | REST + GraphQL | octopart.com/api/home | Planned |
-| Newark/element14 | REST | developer.element14.com | Planned |
-| Future Electronics | TBD | Contact required | Planned |
+| Distributor | API Type | Documentation | Status | BP ID |
+|-------------|----------|---------------|--------|-------|
+| DigiKey | OAuth2 REST (2-leg) | developer.digikey.com | **Active** | 1000327 |
+| Arrow | REST (API key) | developers.arrow.com | Planned | 1000386 |
+| Mouser | REST (API key) | mouser.com/api-hub | Planned | 1000334 |
+| Octopart | REST + GraphQL | octopart.com/api/home | Planned | — |
+| Newark/element14 | REST | developer.element14.com | Planned | 1000390 |
+| Future Electronics | TBD | Contact required | Planned | 1000328 |
+
+### DigiKey API (Active)
+
+**App:** API_Astute | **API:** Product Information v4 | **Auth:** 2-Legged OAuth
+
+**Credentials:** Stored in `~/workspace/.env`
+- `DIGIKEY_CLIENT_ID`
+- `DIGIKEY_CLIENT_SECRET`
+- `DIGIKEY_ACCOUNT_ID`
+
+**iDempiere Vendor:**
+- BP ID: `1000327`
+- BP Value: `1002331`
+- Name: `Digi-Key Electronics`
+
+**Code:** `rfq_sourcing/franchise_check/digikey.js`
+
+**Usage:**
+```bash
+# Single part lookup
+node digikey.js LM317 100
+
+# Returns: qty, price at RFQ qty, VQ-ready data
+```
+
+**Token lifecycle:** Tokens expire in ~10 minutes. The module auto-refreshes.
+
+**Key fields returned:**
+- `franchiseQty` — Total available (product-level, no double-counting)
+- `franchiseRfqPrice` — Price at RFQ quantity
+- `vqPrice` — Same as above, for VQ loading
+- `vqVendorNotes` — "DigiKey stock: X,XXX | DigiKey PN: XXX"
 
 **Implementation details:** See `rfq_sourcing/sourcing-roadmap.md` Section A
 
 **Key files:**
 - `~/workspace/.env` — API credentials
+- `rfq_sourcing/franchise_check/digikey.js` — DigiKey API module
 - `rfq_sourcing/franchise_check/` — Screening workflow
 
 ---
