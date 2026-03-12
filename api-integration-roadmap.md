@@ -212,6 +212,20 @@ Placeholder for other API integrations as needs arise:
 
 ---
 
+## Monitoring & Alerts
+
+**Status:** Planned
+
+| Feature | Description | Status |
+|---------|-------------|--------|
+| Teams webhook alerts | POST to Teams channel when API fails | Planned |
+| API health check script | `node api-health.js` to test all APIs on demand | Planned |
+| End-of-run summary | Show API success/fail counts after screening | Planned |
+
+**Teams webhook setup:** Create Incoming Webhook connector in Teams channel, paste URL into config.
+
+---
+
 ## Environment Setup
 
 All API keys are stored in `~/workspace/.env`:
