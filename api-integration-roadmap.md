@@ -35,10 +35,14 @@ Real-time pricing and availability from authorized distributors. Replaces FindCh
 
 **App:** API_Astute | **API:** Product Information v4 | **Auth:** 2-Legged OAuth
 
-**Credentials:** Stored in `~/workspace/.env`
-- `DIGIKEY_CLIENT_ID`
-- `DIGIKEY_CLIENT_SECRET`
-- `DIGIKEY_ACCOUNT_ID`
+**Credentials:**
+| Key | Value |
+|-----|-------|
+| Client ID | `ivtDsDLOQ6l4TgHiKzRJeI42BUrw5ZRq` |
+| Client Secret | `2gx8NL6aSwH9GkpH` |
+| Account ID | `14763716` |
+
+**Token endpoint:** `https://api.digikey.com/v1/oauth2/token`
 
 **iDempiere Vendor:**
 - BP ID: `1000327`
