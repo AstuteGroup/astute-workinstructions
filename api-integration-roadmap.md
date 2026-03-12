@@ -26,7 +26,7 @@ Real-time pricing and availability from authorized distributors. Replaces FindCh
 |-------------|----------|---------------|--------|-------|
 | DigiKey | OAuth2 REST (2-leg) | developer.digikey.com | **Active** | 1000327 |
 | Arrow | REST (query params) | developers.arrow.com | **Active** | 1000386 |
-| Mouser | REST (API key) | mouser.com/api-hub | Planned | 1000334 |
+| Mouser | REST (API key) | mouser.com/api-hub | **Blocked** | 1000334 |
 | Octopart | REST + GraphQL | octopart.com/api/home | Planned | — |
 | Newark/element14 | REST | developer.element14.com | Planned | 1000390 |
 | Future Electronics | TBD | Contact required | Planned | 1000328 |
@@ -134,6 +134,19 @@ node arrow.js LM317T 100
 | `dateCode` | Date code filtering |
 | Datasheet URL | Auto-attach to quotes |
 | RoHS/compliance | Compliance filtering |
+
+### Mouser API (Blocked)
+
+**Issue:** API returns `PriceBreaks: []` and `AvailabilityInStock: null` with message "Not available for purchase by distributors."
+
+Mouser restricts pricing/availability data for distributor accounts. The API still works for:
+- Part details, descriptions
+- Lead times
+- Lifecycle status (EOL, obsolete)
+- Suggested replacements
+- Compliance data (HTS, ECCN, RoHS)
+
+**Action needed:** Contact Mouser to request pricing API access, or use for non-pricing use cases only.
 
 ---
 
