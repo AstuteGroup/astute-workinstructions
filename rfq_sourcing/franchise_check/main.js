@@ -34,6 +34,7 @@ const { Client } = require('pg');
 const config = require('./config');
 const { searchPart } = require('./search');
 const digikey = require('./digikey');
+const arrow = require('./arrow');
 
 // =============================================================================
 // Database Functions
@@ -176,16 +177,9 @@ function saveBrokerList(results, outputPath) {
  * Save VQ batch export for ERP import
  * Captures franchise pricing at RFQ qty for ALL parts with franchise availability
  * (regardless of whether they go to broker or not)
+ * Creates separate rows for each franchise source (DigiKey, Arrow)
  */
 function saveVqBatch(results, outputPath, rfqNumber) {
-  // Filter to parts with franchise availability and pricing
-  const vqParts = results.filter(r => r.franchise_available && r.vq_price);
-
-  if (vqParts.length === 0) {
-    console.log('No VQ data to export (no franchise pricing found)');
-    return;
-  }
-
   // VQ Mass Upload Template format
   // See: rfq_sourcing/vq_loading/vq-loading.md for field reference
   const wsData = [
@@ -199,32 +193,61 @@ function saveVqBatch(results, outputPath, rfqNumber) {
       'Qty',                  // Quantity quoted (RFQ qty)
       'Price',                // Price at RFQ qty
       'Currency',             // USD
-      'Vendor Notes',         // Stock info + DigiKey PN
-      'Source',               // Data source (DigiKey API, FindChips)
+      'Vendor Notes',         // Stock info
+      'Source',               // Data source (DigiKey API, Arrow API)
     ],
   ];
 
-  for (const r of vqParts) {
-    wsData.push([
-      r.rfq_number || rfqNumber || '',
-      r.vq_bp_value || '',
-      r.vq_vendor_name || '',
-      r.vq_mpn || r.mpn,
-      r.vq_manufacturer || '',
-      r.vq_description || '',
-      r.qty,
-      r.vq_price,
-      'USD',
-      r.vq_vendor_notes || '',
-      r.data_source || '',
-    ]);
+  let vqCount = 0;
+
+  for (const r of results) {
+    // DigiKey VQ row
+    if (r.vq_price) {
+      wsData.push([
+        r.rfq_number || rfqNumber || '',
+        r.vq_bp_value || '',
+        r.vq_vendor_name || '',
+        r.vq_mpn || r.mpn,
+        r.vq_manufacturer || '',
+        r.vq_description || '',
+        r.qty,
+        r.vq_price,
+        'USD',
+        r.vq_vendor_notes || '',
+        'DigiKey API',
+      ]);
+      vqCount++;
+    }
+
+    // Arrow VQ row (separate line)
+    if (r.arrow_vq_price) {
+      wsData.push([
+        r.rfq_number || rfqNumber || '',
+        r.arrow_vq_bp_value || '',
+        r.arrow_vq_vendor_name || '',
+        r.arrow_vq_mpn || r.mpn,
+        r.arrow_vq_manufacturer || '',
+        r.arrow_vq_description || '',
+        r.qty,
+        r.arrow_vq_price,
+        'USD',
+        r.arrow_vq_vendor_notes || '',
+        'Arrow API',
+      ]);
+      vqCount++;
+    }
+  }
+
+  if (vqCount === 0) {
+    console.log('No VQ data to export (no franchise pricing found)');
+    return;
   }
 
   const ws = XLSX.utils.aoa_to_sheet(wsData);
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, 'VQ Import');
   XLSX.writeFile(wb, outputPath);
-  console.log(`VQ batch saved to: ${outputPath} (${vqParts.length} parts)`);
+  console.log(`VQ batch saved to: ${outputPath} (${vqCount} VQ lines)`);
 }
 
 // =============================================================================
@@ -480,12 +503,35 @@ Options:
             evaluated.vq_vendor_name = digikey.DIGIKEY_CONFIG.bpName;
             evaluated.data_source = 'FindChips + DigiKey';
             vqCount++;
-            console.log(`    📦 DigiKey: ${dkResult.franchiseQty} @ $${dkResult.vqPrice}`);
+            console.log(`    📦 DigiKey: ${dkResult.franchiseQty.toLocaleString()} @ $${dkResult.vqPrice}`);
           } else if (dkResult.error) {
             if (debug) console.log(`    [DEBUG] DigiKey error: ${dkResult.error}`);
           }
         } catch (err) {
           if (debug) console.log(`    [DEBUG] DigiKey error: ${err.message}`);
+        }
+
+        // 3. Arrow API call (additional - for VQ capture)
+        try {
+          const arrowResult = await arrow.searchPart(part.mpn, part.qty);
+          if (arrowResult.found && arrowResult.vqPrice) {
+            // Store Arrow VQ data separately (don't overwrite DigiKey)
+            evaluated.arrow_vq_price = arrowResult.vqPrice;
+            evaluated.arrow_vq_mpn = arrowResult.vqMpn;
+            evaluated.arrow_vq_manufacturer = arrowResult.vqManufacturer;
+            evaluated.arrow_vq_description = arrowResult.vqDescription;
+            evaluated.arrow_vq_vendor_notes = arrowResult.vqVendorNotes;
+            evaluated.arrow_vq_bp_value = arrow.ARROW_CONFIG.bpValue;
+            evaluated.arrow_vq_vendor_name = arrow.ARROW_CONFIG.bpName;
+            evaluated.arrow_qty = arrowResult.arrowQty || 0;
+            evaluated.verical_qty = arrowResult.vericalQty || 0;
+            evaluated.data_source = (evaluated.data_source || 'FindChips') + ' + Arrow';
+            console.log(`    📦 Arrow: ${(arrowResult.arrowQty || 0).toLocaleString()} + Verical: ${(arrowResult.vericalQty || 0).toLocaleString()} @ $${arrowResult.vqPrice}`);
+          } else if (arrowResult.error) {
+            if (debug) console.log(`    [DEBUG] Arrow error: ${arrowResult.error}`);
+          }
+        } catch (err) {
+          if (debug) console.log(`    [DEBUG] Arrow error: ${err.message}`);
         }
       }
 

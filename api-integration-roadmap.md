@@ -25,7 +25,7 @@ Real-time pricing and availability from authorized distributors. Replaces FindCh
 | Distributor | API Type | Documentation | Status | BP ID |
 |-------------|----------|---------------|--------|-------|
 | DigiKey | OAuth2 REST (2-leg) | developer.digikey.com | **Active** | 1000327 |
-| Arrow | REST (API key) | developers.arrow.com | Planned | 1000386 |
+| Arrow | REST (query params) | developers.arrow.com | **Active** | 1000386 |
 | Mouser | REST (API key) | mouser.com/api-hub | Planned | 1000334 |
 | Octopart | REST + GraphQL | octopart.com/api/home | Planned | — |
 | Newark/element14 | REST | developer.element14.com | Planned | 1000390 |
@@ -90,6 +90,50 @@ node digikey.js LM317 100
 - `~/workspace/.env` — API credentials
 - `rfq_sourcing/franchise_check/digikey.js` — DigiKey API module
 - `rfq_sourcing/franchise_check/` — Screening workflow
+
+### Arrow API (Active)
+
+**API:** Pricing & Availability v4 | **Auth:** Query parameters (login + apikey)
+
+**Credentials:**
+| Key | Value |
+|-----|-------|
+| Login | `astutegroup1` |
+| API Key | `fe8176be3335c19ce3d5f82cc8a06b21d04e62354e137b60994f4a95190a6d76` |
+
+**Endpoint:** `https://api.arrow.com/itemservice/v4/en/search/token?login=X&apikey=Y&search_token=MPN`
+
+**iDempiere Vendor:**
+- BP ID: `1000386`
+- BP Value: `1002390`
+- Name: `Arrow Electronics`
+
+**Code:** `rfq_sourcing/franchise_check/arrow.js`
+
+**Usage:**
+```bash
+node arrow.js LM317T 100
+```
+
+**Source filtering:** Arrow API returns both arrow.com (franchise) and Verical.com (marketplace). We filter to arrow.com sources only (AMERICAS, EUROPE, APAC).
+
+**Current Use (Active):**
+| Field | Use |
+|-------|-----|
+| `franchiseQty` | Total available from arrow.com sources |
+| `franchiseBulkPrice` | Lowest price break — used for screening |
+| `franchiseRfqPrice` | Price at RFQ qty — used for VQ |
+| `vqDateCode` | Date code from best source |
+| `vqVendorNotes` | "Arrow stock: X \| DC: YYWW" |
+
+**Future Use Cases:**
+| Field | Future Use |
+|-------|------------|
+| `shipsFrom` | Regional sourcing preferences |
+| `shipsIn` | Lead time estimates |
+| `dateCode` | Date code filtering |
+| Datasheet URL | Auto-attach to quotes |
+| RoHS/compliance | Compliance filtering |
 
 ---
 
