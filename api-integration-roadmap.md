@@ -31,6 +31,7 @@ Real-time pricing and availability from authorized distributors. Replaces FindCh
 | Octopart | REST + GraphQL | octopart.com/api/home | Planned | — |
 | Newark/element14 | REST | developer.element14.com | Planned | 1000390 |
 | Future Electronics | TBD | Contact required | Planned | 1000328 |
+| Venkel | REST (?) | venkel.com | **Pending docs** | 1001951 |
 
 ### DigiKey API (Active)
 
