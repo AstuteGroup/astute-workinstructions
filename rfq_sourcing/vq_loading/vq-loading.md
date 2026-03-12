@@ -272,22 +272,56 @@ AND LOWER(u.email) LIKE '%domain.com%';
 ### Step 5: Generate Output Files
 | File | Contents |
 |------|----------|
-| `YYYY-MM-DDTHH-MM-SS-extracted.csv` | All extractions with categories (QUOTE, SKIP, NO-BID, etc.) |
-| `YYYY-MM-DDTHH-MM-SS-erp-ready.csv` | Clean quotes with `vendor_search_key`, ready for import |
+| `YYYY-MM-DD-extracted.csv` | All extractions with categories (QUOTE, SKIP, NO-BID, etc.) |
+| `YYYY-MM-DD-erp-ready.csv` | Clean quotes with `vendor_search_key`, ready for import |
+| `YYYY-MM-DD-routing.json` | **Email routing decisions** (which emails go to which folder) |
 | `needs-vendor.csv` | Complete quotes missing vendor setup |
 
-### Step 6: Route and Move Emails
-```bash
-# Move processed emails
-himalaya message move --account vq --folder INBOX Processed [IDs...]
+**Routing file format** (generated during extraction):
+```json
+{
+  "sessionId": "2026-03-12",
+  "generatedAt": "2026-03-12T15:30:00.000Z",
+  "moves": {
+    "Processed": ["7868", "7845", "7844"],
+    "NeedsVendor": ["7847"],
+    "NoBid": ["7846", "7843"],
+    "NeedsReview": ["7840"]
+  },
+  "summary": {
+    "total": 7,
+    "Processed": 3,
+    "NeedsVendor": 1,
+    "NoBid": 2,
+    "NeedsReview": 1
+  }
+}
 ```
 
+**Routing rules:**
 | Condition | Folder |
 |-----------|--------|
 | Complete quote + vendor found | `Processed` |
 | Complete quote + vendor NOT_FOUND | `NeedsVendor` |
 | No-bid / target price request | `NoBid` |
-| Incomplete (missing data) | `NeedsReview` |
+| Incomplete (missing data) / can't extract | `NeedsReview` |
+| Skip (empty forward, duplicate) | `Processed` |
+
+### Step 6: Route and Move Emails (REQUIRED)
+**Do not skip.** Emails must be moved out of INBOX after extraction.
+
+```bash
+# Review routing decisions first (dry run)
+node ~/workspace/vq-parser/scripts/route-emails.js --dry-run data/routing/YYYY-MM-DD-routing.json
+
+# Execute the moves
+node ~/workspace/vq-parser/scripts/route-emails.js data/routing/YYYY-MM-DD-routing.json
+
+# Or use --latest to process most recent routing file
+node ~/workspace/vq-parser/scripts/route-emails.js --latest
+```
+
+**CHECKPOINT:** Session is not complete until routing is executed. The hourly fetch will keep re-reporting emails that aren't moved.
 
 ### Step 7: Update Vendor Frequency Tracking (REQUIRED)
 **Do not skip.** This identifies high-volume vendors for template development.
