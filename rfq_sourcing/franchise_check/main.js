@@ -35,6 +35,7 @@ const config = require('./config');
 const { searchPart } = require('./search');
 const digikey = require('./digikey');
 const arrow = require('./arrow');
+const rutronik = require('./rutronik');
 
 // =============================================================================
 // Database Functions
@@ -233,6 +234,24 @@ function saveVqBatch(results, outputPath, rfqNumber) {
         'USD',
         r.arrow_vq_vendor_notes || '',
         'Arrow API',
+      ]);
+      vqCount++;
+    }
+
+    // Rutronik VQ row (separate line)
+    if (r.rutronik_vq_price) {
+      wsData.push([
+        r.rfq_number || rfqNumber || '',
+        r.rutronik_vq_bp_value || '',
+        r.rutronik_vq_vendor_name || '',
+        r.rutronik_vq_mpn || r.mpn,
+        r.rutronik_vq_manufacturer || '',
+        r.rutronik_vq_description || '',
+        r.qty,
+        r.rutronik_vq_price,
+        'USD',
+        r.rutronik_vq_vendor_notes || '',
+        'Rutronik API',
       ]);
       vqCount++;
     }
@@ -532,6 +551,28 @@ Options:
           }
         } catch (err) {
           if (debug) console.log(`    [DEBUG] Arrow error: ${err.message}`);
+        }
+
+        // 4. Rutronik API call (additional - for VQ capture)
+        try {
+          const rutronikResult = await rutronik.searchPart(part.mpn, part.qty);
+          if (rutronikResult.found && rutronikResult.vqPrice) {
+            evaluated.rutronik_vq_price = rutronikResult.vqPrice;
+            evaluated.rutronik_vq_mpn = rutronikResult.vqMpn;
+            evaluated.rutronik_vq_manufacturer = rutronikResult.vqManufacturer;
+            evaluated.rutronik_vq_description = rutronikResult.vqDescription;
+            evaluated.rutronik_vq_vendor_notes = rutronikResult.vqVendorNotes;
+            evaluated.rutronik_vq_bp_value = rutronik.RUTRONIK_CONFIG.bpValue;
+            evaluated.rutronik_vq_vendor_name = rutronik.RUTRONIK_CONFIG.bpName;
+            evaluated.rutronik_qty = rutronikResult.franchiseQty || 0;
+            evaluated.data_source = (evaluated.data_source || 'FindChips') + ' + Rutronik';
+            const stockInfo = rutronikResult.franchiseQty > 0 ? rutronikResult.franchiseQty.toLocaleString() : `LT: ${rutronikResult.vqLeadTime}d`;
+            console.log(`    📦 Rutronik: ${stockInfo} @ $${rutronikResult.vqPrice}`);
+          } else if (rutronikResult.error && rutronikResult.error !== 'nothing found') {
+            if (debug) console.log(`    [DEBUG] Rutronik error: ${rutronikResult.error}`);
+          }
+        } catch (err) {
+          if (debug) console.log(`    [DEBUG] Rutronik error: ${err.message}`);
         }
       }
 

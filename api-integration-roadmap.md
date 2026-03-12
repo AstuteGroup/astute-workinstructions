@@ -26,6 +26,7 @@ Real-time pricing and availability from authorized distributors. Replaces FindCh
 |-------------|----------|---------------|--------|-------|
 | DigiKey | OAuth2 REST (2-leg) | developer.digikey.com | **Active** | 1000327 |
 | Arrow | REST (query params) | developers.arrow.com | **Active** | 1000386 |
+| Rutronik | REST (query params) | rutronik24.com/api.html | **Active** | 1002668 |
 | Mouser | REST (API key) | mouser.com/api-hub | **Blocked** | 1000334 |
 | Octopart | REST + GraphQL | octopart.com/api/home | Planned | — |
 | Newark/element14 | REST | developer.element14.com | Planned | 1000390 |
@@ -134,6 +135,42 @@ node arrow.js LM317T 100
 | `dateCode` | Date code filtering |
 | Datasheet URL | Auto-attach to quotes |
 | RoHS/compliance | Compliance filtering |
+
+### Rutronik API (Active)
+
+**API:** Rutronik24 REST API | **Auth:** Query parameter (apikey)
+
+**Credentials:**
+| Key | Value |
+|-----|-------|
+| API Key | `nppg7idj64gy` |
+
+**Endpoint:** `https://www.rutronik24.com/api/search?searchterm=MPN&apikey=X`
+
+**iDempiere Vendor:**
+- BP ID: `1002668`
+- BP Value: `1004668`
+- Name: `Rutronik Inc.`
+
+**Code:** `rfq_sourcing/franchise_check/rutronik.js`
+
+**Usage:**
+```bash
+node rutronik.js S3001-D320 100
+```
+
+**Note:** European distributor - may not stock all US-common parts. Returns pricing even for zero-stock items (with lead time).
+
+**Current Use (Active):**
+| Field | Use |
+|-------|-----|
+| `franchiseQty` | Stock available |
+| `franchiseBulkPrice` | Lowest price break — screening |
+| `franchiseRfqPrice` | Price at RFQ qty — VQ |
+| `vqLeadTime` | Lead time in days |
+| `vqVendorNotes` | "Rutronik stock: X \| SKU: Y" or "Lead time: X days" |
+
+---
 
 ### Mouser API (Blocked)
 
