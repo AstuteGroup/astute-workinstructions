@@ -31,6 +31,7 @@ Real-time pricing and availability from authorized distributors. Replaces FindCh
 | Octopart | REST + GraphQL | octopart.com/api/home | Planned | — |
 | Newark/element14 | REST | developer.element14.com | Planned | 1000390 |
 | Future Electronics | REST (?) | futureelectronics.com/api-solutions | **Pending docs** | 1000328 |
+| Avnet | OAuth2 REST | apiportal.avnet.com | **Pending docs** | 1000002 |
 | Venkel | REST (?) | venkel.com | **Pending docs** | 1001951 |
 | Texas Instruments | OAuth2 REST | api-portal.ti.com | **Pending approval** | 1001369 |
 
@@ -194,6 +195,19 @@ node rutronik.js S3001-D320 100
 **iDempiere Vendor:**
 - BP ID: `1001369`
 - Name: `Texas Instruments`
+
+---
+
+### Avnet API (Pending Docs)
+
+**Subscription Key:** `067a6c51a2b04ca3ae39c85fd27f7fe2`
+**Auth Header:** `Ocp-Apim-Subscription-Key: <key>`
+
+**iDempiere Vendor:**
+- BP ID: `1000002`
+- Name: `Avnet`
+
+**Status:** Have subscription key but need to log in to [apiportal.avnet.com](https://apiportal.avnet.com/) to see endpoint URLs. The portal mentions a `getPriceAndQty` API but exact path is behind login.
 
 ---
 
