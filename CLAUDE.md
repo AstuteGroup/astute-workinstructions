@@ -47,6 +47,7 @@ At the start of every new conversation, before addressing anything else, always 
 3. **Review Roadmaps** (planned work):
 
 > **Roadmaps:**
+> - `api-integration-roadmap.md` — External APIs (franchise distributors, LLM, future integrations)
 > - `rfq_sourcing/sourcing-roadmap.md` — RFQ Sourcing & VQ Processing
 > - `Trading Analysis/trading-analysis-roadmap.md` — Vortex Matches, Quick Quote, etc.
 

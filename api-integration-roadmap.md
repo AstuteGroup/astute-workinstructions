@@ -1,0 +1,90 @@
+# API Integration Roadmap
+
+Cross-cutting roadmap for external API integrations. Individual implementations live in workflow-specific roadmaps; this provides the centralized view.
+
+**Central Config:** `~/workspace/.env` (all API keys stored here)
+
+---
+
+## Overview
+
+| API Category | Use Cases | Roadmap Reference |
+|--------------|-----------|-------------------|
+| Franchise Distributors | Pricing, stock, screening | `rfq_sourcing/sourcing-roadmap.md` § A1 |
+| LLM / AI | Quote extraction, vendor inference | `rfq_sourcing/sourcing-roadmap.md` § C7 |
+| *Future* | TBD | — |
+
+---
+
+## Franchise Distributor APIs
+
+**Status:** Planned | **Priority:** Next
+
+Real-time pricing and availability from authorized distributors. Replaces FindChips scraping with direct API access.
+
+| Distributor | API Type | Documentation | Status |
+|-------------|----------|---------------|--------|
+| DigiKey | OAuth2 REST | developer.digikey.com | Planned |
+| Arrow | REST (API key) | developers.arrow.com | Planned |
+| Mouser | REST (API key) | mouser.com/api-hub | Planned |
+| Octopart | REST + GraphQL | octopart.com/api/home | Planned |
+| Newark/element14 | REST | developer.element14.com | Planned |
+| Future Electronics | TBD | Contact required | Planned |
+
+**Implementation details:** See `rfq_sourcing/sourcing-roadmap.md` Section A
+
+**Key files:**
+- `~/workspace/.env` — API credentials
+- `rfq_sourcing/franchise_check/` — Screening workflow
+
+---
+
+## LLM / AI APIs
+
+**Status:** Planned | **Priority:** Later
+
+AI-assisted extraction and inference for edge cases.
+
+| Provider | Use Case | Status |
+|----------|----------|--------|
+| Anthropic (Claude) | VQ extraction fallback, vendor name inference | Planned |
+
+**Implementation details:** See `rfq_sourcing/sourcing-roadmap.md` Section C7
+
+---
+
+## Future Integrations
+
+Placeholder for other API integrations as needs arise:
+
+- Shipping/logistics APIs (FedEx, UPS, DHL)
+- Currency conversion APIs
+- Compliance/export control APIs
+- Customer portal integrations
+
+---
+
+## Environment Setup
+
+All API keys are stored in `~/workspace/.env`:
+
+```bash
+# Franchise APIs
+DIGIKEY_CLIENT_ID=
+DIGIKEY_CLIENT_SECRET=
+ARROW_API_KEY=
+MOUSER_API_KEY=
+OCTOPART_API_KEY=
+
+# LLM APIs
+ANTHROPIC_API_KEY=
+```
+
+**Security notes:**
+- `.env` is gitignored — never commit credentials
+- Individual projects load from this central file
+- Rotate keys periodically
+
+---
+
+*Last updated: 2026-03-12*
