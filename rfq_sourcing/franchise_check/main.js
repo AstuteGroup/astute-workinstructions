@@ -1,9 +1,11 @@
 #!/usr/bin/env node
 /**
- * TrustedParts Franchise Screening Tool
+ * Franchise Screening Tool
  *
- * Screens RFQ parts against TrustedParts to identify low-value opportunities
- * that don't need broker sourcing.
+ * Screens RFQ parts against franchise distributors (DigiKey API + FindChips fallback)
+ * to identify low-value opportunities that don't need broker sourcing.
+ *
+ * Also captures franchise pricing as VQs for ERP import.
  *
  * Usage:
  *   # Screen a single part
@@ -17,6 +19,9 @@
  *
  *   # Custom threshold (default $50)
  *   node main.js --rfq 1130292 --threshold 100
+ *
+ *   # Skip DigiKey API (FindChips only)
+ *   node main.js --rfq 1130292 --no-digikey
  */
 
 const { chromium } = require('playwright-extra');
@@ -28,6 +33,7 @@ const fs = require('fs');
 const { Client } = require('pg');
 const config = require('./config');
 const { searchPart } = require('./search');
+const digikey = require('./digikey');
 
 // =============================================================================
 // Database Functions
@@ -166,34 +172,126 @@ function saveBrokerList(results, outputPath) {
   console.log(`Broker list saved to: ${outputPath} (${brokerParts.length} parts)`);
 }
 
+/**
+ * Save VQ batch export for ERP import
+ * Captures franchise pricing at RFQ qty for ALL parts with franchise availability
+ * (regardless of whether they go to broker or not)
+ */
+function saveVqBatch(results, outputPath, rfqNumber) {
+  // Filter to parts with franchise availability and pricing
+  const vqParts = results.filter(r => r.franchise_available && r.vq_price);
+
+  if (vqParts.length === 0) {
+    console.log('No VQ data to export (no franchise pricing found)');
+    return;
+  }
+
+  // VQ Mass Upload Template format
+  // See: rfq_sourcing/vq_loading/vq-loading.md for field reference
+  const wsData = [
+    [
+      'RFQ Number',           // For reference (not in upload template)
+      'BP Value',             // Vendor BP Value
+      'Vendor Name',          // For reference
+      'MPN',                  // Part number
+      'Manufacturer',         // Mfr name
+      'Description',          // Part description
+      'Qty',                  // Quantity quoted (RFQ qty)
+      'Price',                // Price at RFQ qty
+      'Currency',             // USD
+      'Vendor Notes',         // Stock info + DigiKey PN
+      'Source',               // Data source (DigiKey API, FindChips)
+    ],
+  ];
+
+  for (const r of vqParts) {
+    wsData.push([
+      r.rfq_number || rfqNumber || '',
+      r.vq_bp_value || '',
+      r.vq_vendor_name || '',
+      r.vq_mpn || r.mpn,
+      r.vq_manufacturer || '',
+      r.vq_description || '',
+      r.qty,
+      r.vq_price,
+      'USD',
+      r.vq_vendor_notes || '',
+      r.data_source || '',
+    ]);
+  }
+
+  const ws = XLSX.utils.aoa_to_sheet(wsData);
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'VQ Import');
+  XLSX.writeFile(wb, outputPath);
+  console.log(`VQ batch saved to: ${outputPath} (${vqParts.length} parts)`);
+}
+
 // =============================================================================
 // Screening Logic
 // =============================================================================
 
-function evaluatePart(part, searchResult, threshold) {
+/**
+ * Evaluate a part for screening decision
+ * @param {Object} part - Part from RFQ
+ * @param {Object} searchResult - Result from DigiKey or FindChips
+ * @param {number} threshold - Opportunity value threshold
+ * @param {string} dataSource - 'DigiKey API' or 'FindChips'
+ */
+function evaluatePart(part, searchResult, threshold, dataSource = 'FindChips') {
   const result = {
     ...part,
     franchise_available: searchResult.found,
-    franchise_qty: searchResult.totalQty,
-    franchise_price: searchResult.lowestPrice,
-    franchise_bulk_price: searchResult.bulkPrice,  // Last column / bulk pricing for secondary market valuation
-    distributor_count: searchResult.distributorCount,
-    price_warning: searchResult.priceWarning || '',  // Flag for suspect pricing
+    franchise_qty: searchResult.totalQty || searchResult.franchiseQty || 0,
+    franchise_price: searchResult.lowestPrice || searchResult.franchisePrice || null,
+    franchise_bulk_price: searchResult.bulkPrice || searchResult.franchiseBulkPrice || null,
+    franchise_rfq_price: searchResult.franchiseRfqPrice || null,  // Price at RFQ qty
+    distributor_count: searchResult.distributorCount || (searchResult.found ? 1 : 0),
+    price_warning: searchResult.priceWarning || '',
     opportunity_value: null,
     send_to_broker: true,
     reason: '',
+    data_source: dataSource,
+    // VQ fields (for ERP import)
+    vq_price: null,
+    vq_mpn: null,
+    vq_manufacturer: null,
+    vq_description: null,
+    vq_vendor_notes: null,
+    vq_bp_value: null,
+    vq_vendor_name: null,
   };
 
-  // Calculate opportunity value using BULK price (last column) for realistic secondary market valuation
-  // Fall back to lowest price, then target price if no bulk price available
-  const price = searchResult.bulkPrice || searchResult.lowestPrice || part.target_price;
-  if (price && part.qty) {
-    result.opportunity_value = Math.round(price * part.qty * 100) / 100;
+  // Populate VQ fields if from DigiKey
+  if (dataSource === 'DigiKey API' && searchResult.found) {
+    result.vq_price = searchResult.franchiseRfqPrice || searchResult.vqPrice;
+    result.vq_mpn = searchResult.vqMpn || part.mpn;
+    result.vq_manufacturer = searchResult.vqManufacturer || '';
+    result.vq_description = searchResult.vqDescription || '';
+    result.vq_vendor_notes = searchResult.vqVendorNotes || '';
+    result.vq_bp_value = digikey.DIGIKEY_CONFIG.bpValue;
+    result.vq_vendor_name = digikey.DIGIKEY_CONFIG.bpName;
+  }
+
+  // For FindChips, we can still capture VQ data but with less detail
+  if (dataSource === 'FindChips' && searchResult.found && searchResult.lowestPrice) {
+    // Use lowest price as approximation for RFQ qty price
+    result.vq_price = searchResult.lowestPrice;
+    result.vq_mpn = part.mpn;
+    result.vq_vendor_notes = `FindChips aggregate stock: ${result.franchise_qty}`;
+    // Can't assign a single BP for FindChips - multiple distributors
+  }
+
+  // Calculate opportunity value using BULK price for realistic secondary market valuation
+  // Bulk price = best available franchise price (for screening decision)
+  const bulkPrice = result.franchise_bulk_price || result.franchise_price || part.target_price;
+  if (bulkPrice && part.qty) {
+    result.opportunity_value = Math.round(bulkPrice * part.qty * 100) / 100;
   }
 
   // Decision logic:
   // Skip broker if: franchise has enough qty AND opportunity value < threshold
-  if (searchResult.found && searchResult.totalQty >= part.qty) {
+  if (searchResult.found && result.franchise_qty >= part.qty) {
     if (result.opportunity_value !== null && result.opportunity_value < threshold) {
       result.send_to_broker = false;
       result.reason = `Franchise OK (OV: $${result.opportunity_value} < $${threshold})`;
@@ -203,12 +301,41 @@ function evaluatePart(part, searchResult, threshold) {
       result.reason = 'Franchise available but no price data';
     }
   } else if (searchResult.found) {
-    result.reason = `Insufficient franchise qty (${searchResult.totalQty} < ${part.qty})`;
+    result.reason = `Insufficient franchise qty (${result.franchise_qty} < ${part.qty})`;
   } else {
     result.reason = 'Not found in franchise distribution';
   }
 
   return result;
+}
+
+/**
+ * Search DigiKey API for a part
+ * Returns normalized result compatible with evaluatePart()
+ */
+async function searchDigiKey(mpn, qty) {
+  try {
+    const result = await digikey.searchPart(mpn, qty);
+    return {
+      found: result.found,
+      franchiseQty: result.franchiseQty,
+      franchisePrice: result.franchisePrice,
+      franchiseBulkPrice: result.franchiseBulkPrice,
+      franchiseRfqPrice: result.franchiseRfqPrice,
+      vqPrice: result.vqPrice,
+      vqMpn: result.vqMpn,
+      vqManufacturer: result.vqManufacturer,
+      vqDescription: result.vqDescription,
+      vqVendorNotes: result.vqVendorNotes,
+      distributorCount: 1,  // DigiKey is single source
+      error: null,
+    };
+  } catch (error) {
+    return {
+      found: false,
+      error: error.message,
+    };
+  }
 }
 
 // =============================================================================
@@ -227,6 +354,7 @@ async function main() {
   let threshold = config.OPPORTUNITY_THRESHOLD;
   let headless = true;
   let debug = false;
+  let useDigiKey = true;  // Try DigiKey API first by default
 
   for (let i = 0; i < args.length; i++) {
     switch (args[i]) {
@@ -254,13 +382,16 @@ async function main() {
       case '--no-headless':
         headless = false;
         break;
+      case '--no-digikey':
+        useDigiKey = false;
+        break;
       case '--debug':
         debug = true;
         break;
       case '-h':
       case '--help':
         console.log(`
-TrustedParts Franchise Screening Tool
+Franchise Screening Tool (FindChips + DigiKey API)
 
 Usage:
   node main.js -p "LM358N" -q 100     # Single part
@@ -273,7 +404,9 @@ Options:
   -f, --file       Excel file with parts list
   --rfq            iDempiere RFQ number
   --threshold      Opportunity value threshold (default: $${config.OPPORTUNITY_THRESHOLD})
+  --no-digikey     Skip DigiKey API (no VQ capture)
   --no-headless    Run browser in visible mode
+  --debug          Enable debug output
   -h, --help       Show this help
         `);
         process.exit(0);
@@ -300,34 +433,62 @@ Options:
     process.exit(1);
   }
 
-  console.log(`\nTrustedParts Screening`);
-  console.log(`======================`);
+  console.log(`\nFranchise Screening`);
+  console.log(`===================`);
   console.log(`Parts to screen: ${parts.length}`);
   console.log(`Opportunity threshold: $${threshold}`);
+  console.log(`DigiKey API: ${useDigiKey ? 'Enabled (VQ capture)' : 'Disabled'}`);
   console.log(`Headless: ${headless}`);
   console.log();
 
-  // Launch browser
+  // Launch browser for FindChips
   const browser = await chromium.launch({ headless });
 
   const results = [];
   let skipCount = 0;
   let brokerCount = 0;
+  let vqCount = 0;
 
   try {
     for (let i = 0; i < parts.length; i++) {
       const part = parts[i];
       console.log(`[${i + 1}/${parts.length}] Searching: ${part.mpn} (Qty: ${part.qty})`);
 
-      // Create fresh context for each search to avoid session state issues
+      // 1. FindChips search (primary - for screening decision)
       const context = await browser.newContext({
         userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
       });
       const page = await context.newPage();
-
-      const searchResult = await searchPart(page, part.mpn, debug);
+      const findchipsResult = await searchPart(page, part.mpn, debug);
       await context.close();
-      const evaluated = evaluatePart(part, searchResult, threshold);
+
+      // Evaluate screening decision based on FindChips
+      const evaluated = evaluatePart(part, findchipsResult, threshold, 'FindChips');
+
+      // 2. DigiKey API call (additional - for VQ capture)
+      if (useDigiKey) {
+        try {
+          const dkResult = await searchDigiKey(part.mpn, part.qty);
+          if (dkResult.found && dkResult.vqPrice) {
+            // Merge DigiKey VQ data into result
+            evaluated.vq_price = dkResult.vqPrice;
+            evaluated.vq_mpn = dkResult.vqMpn;
+            evaluated.vq_manufacturer = dkResult.vqManufacturer;
+            evaluated.vq_description = dkResult.vqDescription;
+            evaluated.vq_vendor_notes = dkResult.vqVendorNotes;
+            evaluated.vq_bp_value = digikey.DIGIKEY_CONFIG.bpValue;
+            evaluated.vq_vendor_name = digikey.DIGIKEY_CONFIG.bpName;
+            evaluated.data_source = 'FindChips + DigiKey';
+            vqCount++;
+            console.log(`    📦 DigiKey: ${dkResult.franchiseQty} @ $${dkResult.vqPrice}`);
+          } else if (dkResult.error) {
+            if (debug) console.log(`    [DEBUG] DigiKey error: ${dkResult.error}`);
+          }
+        } catch (err) {
+          if (debug) console.log(`    [DEBUG] DigiKey error: ${err.message}`);
+        }
+      }
+
       results.push(evaluated);
 
       if (evaluated.send_to_broker) {
@@ -341,7 +502,7 @@ Options:
         console.log(`    ⚠️  ${evaluated.price_warning}`);
       }
 
-      // Rate limiting (use native setTimeout since page context is closed)
+      // Rate limiting
       if (i < parts.length - 1) {
         await new Promise(resolve => setTimeout(resolve, config.SEARCH_DELAY));
       }
@@ -364,12 +525,18 @@ Options:
     fs.mkdirSync(outputDir, { recursive: true });
   }
 
-  const resultsPath = path.join(outputDir, `${prefix}_TrustedParts_${timestamp}.xlsx`);
+  const resultsPath = path.join(outputDir, `${prefix}_FranchiseScreen_${timestamp}.xlsx`);
   const brokerPath = path.join(outputDir, `${prefix}_ForBrokerRFQ_${timestamp}.xlsx`);
+  const vqPath = path.join(outputDir, `${prefix}_VQ_Import_${timestamp}.xlsx`);
 
   // Save results
   saveResults(results, resultsPath);
   saveBrokerList(results, brokerPath);
+
+  // Save VQ batch (for ERP import)
+  if (useDigiKey) {
+    saveVqBatch(results, vqPath, rfqNumber);
+  }
 
   // Print summary
   console.log(`\n${'='.repeat(50)}`);
@@ -378,9 +545,15 @@ Options:
   console.log(`Total parts screened: ${results.length}`);
   console.log(`Skip broker (franchise OK): ${skipCount}`);
   console.log(`Send to broker: ${brokerCount}`);
+  if (useDigiKey) {
+    console.log(`VQ data captured (DigiKey): ${vqCount}`);
+  }
   console.log(`\nOutput files:`);
-  console.log(`  Full results: ${resultsPath}`);
-  console.log(`  Broker list:  ${brokerPath}`);
+  console.log(`  Screening results: ${resultsPath}`);
+  console.log(`  Broker list:       ${brokerPath}`);
+  if (useDigiKey && vqCount > 0) {
+    console.log(`  VQ import:         ${vqPath}`);
+  }
 
   return 0;
 }

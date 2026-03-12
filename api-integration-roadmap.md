@@ -61,11 +61,28 @@ node digikey.js LM317 100
 
 **Token lifecycle:** Tokens expire in ~10 minutes. The module auto-refreshes.
 
-**Key fields returned:**
-- `franchiseQty` — Total available (product-level, no double-counting)
-- `franchiseRfqPrice` — Price at RFQ quantity
-- `vqPrice` — Same as above, for VQ loading
-- `vqVendorNotes` — "DigiKey stock: X,XXX | DigiKey PN: XXX"
+**Current Use (Active):**
+| Field | Use |
+|-------|-----|
+| `franchiseQty` | Total available (product-level, no double-counting) |
+| `franchiseBulkPrice` | Lowest price break — used for screening decision |
+| `franchiseRfqPrice` | Price at RFQ quantity — used for VQ loading |
+| `vqVendorNotes` | "DigiKey stock: X,XXX \| DigiKey PN: XXX" |
+| `vqMpn`, `vqManufacturer`, `vqDescription` | VQ template fields |
+
+**Future Use Cases (data available in API):**
+| Field | Future Use |
+|-------|------------|
+| `StandardPricing` (all breaks) | Quick Quote pricing intelligence — know full price curve |
+| `ManufacturerLeadWeeks` | Lead time quoting, shortage detection |
+| `ProductStatus` / `Discontinued` / `EndOfLife` | Obsolescence monitoring for BOMs |
+| `DatasheetUrl` | Auto-attach datasheets to quotes |
+| `Parameters` (specs) | Cross-reference / alternative part finding |
+| `RohsStatus` / `ReachStatus` | Compliance filtering |
+| `HtsusCode` | Export/tariff calculations |
+| `MinimumOrderQuantity` | Order planning |
+| `NormallyStocking` | Availability risk assessment |
+| `PhotoUrl` | Visual verification in quotes |
 
 **Implementation details:** See `rfq_sourcing/sourcing-roadmap.md` Section A
 
