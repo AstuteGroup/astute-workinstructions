@@ -1,0 +1,146 @@
+================================================================================
+CPC-LEVEL INVENTORY VALUATION - RFQ 1130350 (General Dynamics)
+Generated: 2026-03-13
+================================================================================
+
+METHODOLOGY:
+- VQ pricing: Average broker quote cost (deduplicated)
+- Franchise x1.4 (scarce): Franchise bulk price x 1.4 when franchise qty < RFQ qty
+- Franchise x0.35 (abundant): Franchise bulk price x 0.35 when franchise qty >= RFQ qty
+- Highest-value MPN alternate used per CPC line
+
+================================================================================
+SUMMARY
+================================================================================
+
+Pricing Source Breakdown:
+  VQ pricing:                  30 CPCs
+  Franchise x1.4 (scarce):     24 CPCs
+  Franchise x0.35 (abundant):  12 CPCs
+  No pricing available:        15 CPCs
+  ─────────────────────────────────────
+  TOTAL CPCs:                  81
+
+Value by Source:
+  VQ-based:             $964,824.98
+  Franchise x1.4:     $4,882,236.04
+  Franchise x0.35:      $328,017.89
+  ─────────────────────────────────────
+  TOTAL MARKET VALUE: $6,175,078.92
+  AVG CPC VALUE:      $93,561.80
+  COVERAGE:           66/81 CPCs (81%)
+
+================================================================================
+ALL CPCs BY VALUE (descending)
+================================================================================
+
+MPN                                  CPC Qty       Price           Value  Source
+----------------------------------------------------------------------------------------------------
+BCM54240C1IFBG                        11,664      $87.20      $1,017,119  Franchise x1.4 (scarce)
+MT28FW02GBBA1HPC-0AAT                 12,990      $66.60        $865,108  Franchise x1.4 (scarce)
+FP-CONN                               32,146      $20.49        $658,779  Franchise x1.4 (scarce)
+FNK-ER12H                                611     $857.50        $523,933  Franchise x1.4 (scarce)
+SI5341B-D-GMR                         18,000      $22.92        $412,524  Franchise x1.4 (scarce)
+FNF-LT11H                              1,340     $273.06        $365,895  Franchise x1.4 (scarce)
+C1812C335K1RAC7800                    49,612       $5.67        $281,548  VQ
+LTM4633MPY#PBF                         1,820     $139.83        $254,494  Franchise x1.4 (scarce)
+EP5358LUI                             31,183       $7.66        $238,862  VQ
+LTC2977IUP#TRPBF                       5,368      $31.61        $169,661  Franchise x1.4 (scarce)
+MT28FW02GBBA1HPC-0AAT                  9,790      $16.65        $162,999  Franchise x0.35 (abundant)
+LT3757AIDD#TRPBF                      14,535       $6.54         $95,032  Franchise x1.4 (scarce)
+MAX3318EEUP+T                          5,984      $12.52         $74,896  Franchise x1.4 (scarce)
+TFM-125-01-S-D-WT                     12,983       $5.53         $71,796  Franchise x1.4 (scarce)
+LTC3617IUDD#TRPBF                      5,203      $12.64         $65,776  Franchise x1.4 (scarce)
+BCM5241A1IMLG                         10,466       $5.90         $61,749  VQ
+EN5319QI                              46,270       $1.32         $61,248  Franchise x0.35 (abundant)
+10081530-12228LF                      17,439       $3.29         $57,374  Franchise x1.4 (scarce)
+S102M59Z5UU83L0R                       5,184      $10.00         $51,840  VQ
+GS8342DT37BGD-300                        761      $63.07         $47,996  Franchise x1.4 (scarce)
+EPM2210F324I5N                           794      $54.97         $43,644  VQ
+530CB50M0000DGR                        3,204      $12.85         $41,178  Franchise x1.4 (scarce)
+531AA156M250DG                         2,651      $14.50         $38,450  Franchise x1.4 (scarce)
+ADG734BRUZ-REEL                        8,628       $3.50         $30,198  VQ
+CDRH3D23NP-1R0P                       59,573       $0.50         $29,608  Franchise x1.4 (scarce)
+JXK0-0190NL                           13,227       $2.12         $28,054  Franchise x0.35 (abundant)
+LT1618EDD#TRPBF                        8,814       $3.00         $26,442  VQ
+NFM18PC225B0J3D                       97,631       $0.24         $23,724  VQ
+SST38VF6401-90-5I-B3KE-T               2,212      $10.00         $22,111  Franchise x1.4 (scarce)
+BCM84728AIFSBG                         1,819      $11.02         $20,047  Franchise x0.35 (abundant)
+MT28FW02GBBA1HPC-0AAT                  1,094      $16.65         $18,215  Franchise x0.35 (abundant)
+MSP430F149IPMG4                        2,351       $7.73         $18,173  VQ
+LT3070EUFD#PBF                         5,322       $3.25         $17,297  VQ
+39295243                               1,816       $9.17         $16,653  Franchise x1.4 (scarce)
+BCM5221A4KPTG                          3,212       $4.98         $15,985  VQ
+FTSH-108-01-L-DV-P-TR                  5,477       $2.83         $15,518  VQ
+LTM8026IV#PBF                          1,811       $8.49         $15,377  Franchise x0.35 (abundant)
+AQY210SZ                              13,528       $1.09         $14,746  VQ
+KGM32LR51C226MU                       35,670       $0.41         $14,742  Franchise x1.4 (scarce)
+12106D476KAT2A                        72,542       $0.20         $14,508  VQ
+16TQC100MYF                           25,224       $0.52         $13,180  VQ
+LT3973IMSE#PBF                         2,660       $4.47         $11,880  Franchise x1.4 (scarce)
+C1005X5R1C104K050BA                  943,258       $0.01         $11,791  VQ
+LS14250                                4,521       $2.50         $11,303  VQ
+TPS63060DSCT                           4,175       $2.52         $10,521  Franchise x1.4 (scarce)
+LTC2977IUP#TRPBF                       1,100       $7.90          $8,692  Franchise x0.35 (abundant)
+CY8C3866AXI-040                        1,588       $5.40          $8,575  VQ
+CN6880LP-1200BG1936-AAP-Y22-G          2,031       $4.20          $8,530  Franchise x1.4 (scarce)
+16TQC100MYF                           15,911       $0.52          $8,313  VQ
+CB2V53I100M0000                        3,176       $2.58          $8,181  Franchise x1.4 (scarce)
+HX1188FNLT                             4,316       $1.75          $7,553  VQ
+MAX3221EEAE+T                          2,270       $3.20          $7,264  VQ
+FTLX8571D3BCV                            388      $17.90          $6,945  VQ
+LT3080EDD-1#TRPBF                      3,673       $1.80          $6,611  VQ
+DS3231SN#                              1,153       $5.00          $5,765  VQ
+PCA9517DP                             12,465       $0.46          $5,755  VQ
+146839-3                               1,742       $3.28          $5,714  VQ
+LTC4357IMS8#TRPBF                      3,852       $1.33          $5,140  Franchise x0.35 (abundant)
+CY29946AXC                             1,036       $4.15          $4,299  VQ
+LTC4263IDE#PBF                         1,283       $2.65          $3,400  VQ
+J1011F21PNL                            1,640       $1.94          $3,182  VQ
+MIC49500WR                             2,118       $1.39          $2,937  Franchise x0.35 (abundant)
+IPB023N06N3G                           3,271       $0.87          $2,859  Franchise x0.35 (abundant)
+SMS1105GC                             17,543       $0.14          $2,419  Franchise x0.35 (abundant)
+NFM18PC105R0J3D                       78,460       $0.01            $942  VQ
+5SGXMABK3H40C2N                            9       $3.50             $32  Franchise x0.35 (abundant)
+GS81302DT37GE-300                        518       $0.00              $0  No pricing
+MT18KSF51272AZ-1G4M1                     896       $0.00              $0  No pricing
+0N622034-5                             1,223       $0.00              $0  No pricing
+BCM54220SB0IFBG                        1,518       $0.00              $0  No pricing
+SI5338C-A01564-GM                      2,329       $0.00              $0  No pricing
+SI5338C-B04948-GM                      3,325       $0.00              $0  No pricing
+SI5338C-A01565-GM                      4,141       $0.00              $0  No pricing
+IS42R16320D-7BLI                       7,108       $0.00              $0  No pricing
+2011P04VMZ0                            7,956       $0.00              $0  No pricing
+CT914BYF-100M                          9,262       $0.00              $0  No pricing
+FNK-ST11H                              9,868       $0.00              $0  No pricing
+CT914BYF-100M                         11,943       $0.00              $0  No pricing
+PA3855.008NL                          12,266       $0.00              $0  No pricing
+SQ4184EY-T1-GE3                       14,057       $0.00              $0  No pricing
+CN7240-1200BG1676I-AAP-P13-G          17,780       $0.00              $0  No pricing
+
+================================================================================
+CPCs WITH NO PRICING DATA - NEED VQ SOURCING
+================================================================================
+
+MPN                                         Qty
+--------------------------------------------------
+CN7240-1200BG1676I-AAP-P13-G             17,780
+SQ4184EY-T1-GE3                          14,057
+PA3855.008NL                             12,266
+CT914BYF-100M                            11,943
+FNK-ST11H                                 9,868
+CT914BYF-100M                             9,262
+2011P04VMZ0                               7,956
+IS42R16320D-7BLI                          7,108
+SI5338C-A01565-GM                         4,141
+SI5338C-B04948-GM                         3,325
+SI5338C-A01564-GM                         2,329
+BCM54220SB0IFBG                           1,518
+0N622034-5                                1,223
+MT18KSF51272AZ-1G4M1                        896
+GS81302DT37GE-300                           518
+--------------------------------------------------
+TOTAL QTY:                              104,190
+
+These parts had no VQ quotes and were not found in franchise distribution.
+Recommend sourcing quotes for high-quantity lines.
