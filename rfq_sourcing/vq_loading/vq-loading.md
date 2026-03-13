@@ -160,17 +160,24 @@ Extract ALL available fields from each quote. Required fields must be present; o
 | Unknown, not stated | (leave blank) |
 
 **Vendor Notes field usage:**
-- **No-bid reasons** (IMPORTANT): When qty=0 and price=0, capture why: "No-bid - out of stock", "No-bid - cannot source", "No-bid - price too high"
-- **Alternate MPN** (CRITICAL): When vendor quotes a different MPN than requested, add "Quoted MPN: [vendor's MPN]" to Vendor Notes. The MPN field MUST contain the customer's original requested MPN (what's in the RFQ).
+- **Alternate MPN** (CRITICAL - MUST BE FIRST): When vendor quotes a different MPN than requested, put "Quoted MPN: [vendor's MPN]" as the **FIRST thing** in Vendor Notes. The MPN field MUST contain the customer's original RFQ MPN - this is how iDempiere links the VQ to the RFQ.
+- **No-bid reasons**: When qty=0 and price=0, capture why: "No-bid - out of stock", "No-bid - cannot source"
 - Special conditions: Lead time details, MOQ notes, pricing tiers
 
-**Alternate MPN Example:**
-- Customer RFQ requested: `LM2903AVQDR`
-- Vendor quoted: `LM2903AVQDRG4Q1` (with suffix)
-- **MPN field:** `LM2903AVQDR` (customer's request)
-- **Vendor Notes:** `Quoted MPN: LM2903AVQDRG4Q1`
+**⚠️ Alternate MPN - CRITICAL:**
+If the MPN field doesn't match an RFQ MPN, iDempiere will reject the line with:
+> "Could not associate VQ with CPC based on MPN"
 
-This ensures the VQ links to the correct RFQ and the alternate part info is preserved.
+**Example:**
+- RFQ requested: `LM2903AVQDR`
+- Vendor quoted: `LM2903AVQDRG4Q1` (with suffix)
+- **MPN field:** `LM2903AVQDR` ← RFQ MPN (required for linking)
+- **Vendor Notes:** `Quoted MPN: LM2903AVQDRG4Q1` ← vendor's MPN (first in notes)
+
+**Common mismatches:**
+- Vendor adds suffix: `LT3080EDD-1` vs RFQ `LT3080EDD-1#TRPBF`
+- Vendor drops suffix: `MSP430F149IPM` vs RFQ `MSP430F149IPMG4`
+- Alternate/substitute part: completely different MPN
 
 **No-bid records:**
 - Set Quantity = 0, Cost = 0
