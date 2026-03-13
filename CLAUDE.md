@@ -60,6 +60,28 @@ At the start of every new conversation, before addressing anything else, always 
 
 ---
 
+## Shared Utilities
+
+**Location:** `shared/`
+
+### CSV Parsing (REQUIRED)
+
+**NEVER use `line.split(',')` for CSV parsing.** It breaks on quoted fields containing commas.
+
+Always use the shared CSV utility:
+```javascript
+const { readCSVFile } = require('../shared/csv-utils');
+const csv = readCSVFile('/path/to/file.csv');
+
+// Filter and aggregate
+const filtered = csv.filterByColumn('Warehouse', 'W111');
+const total = csv.sumColumn('Lot Cost', row => row[warehouseIdx] === 'W111');
+```
+
+See `shared/README.md` for full API.
+
+---
+
 ## Documentation Standards
 
 When creating or updating workflow documentation, follow the conventions in `CONVENTIONS.md`:
