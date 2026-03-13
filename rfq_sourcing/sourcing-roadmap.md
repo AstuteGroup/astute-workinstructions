@@ -369,6 +369,7 @@ const AUTO_SUFFIXES = /[-#]?(Q|Q1|AEC)$/i;
 | C5 | Attachment Handling | Later | Planned |
 | C6 | Retry Tracking | Later | Planned |
 | C7 | LLM Fallback | Later | Planned |
+| C8 | MFR Text Validation | **Next** | Planned |
 
 ---
 
@@ -489,6 +490,21 @@ const AUTO_SUFFIXES = /[-#]?(Q|Q1|AEC)$/i;
 - API cost: ~$0.01-0.05 per email
 - Benefit: 10-15% additional parse rate
 - Decision: Enable for high-value RFQs or after 2 failed attempts
+
+---
+
+## C8. MFR Text Validation
+
+**Status:** Planned | **Priority:** Next
+
+**Problem:** VQ Loading extracts `MFR Text` as freetext with no validation. Unlike Market Offer Upload (which validates `MFR_ID` against `mfr-aliases.json`), VQ uploads may fail or require manual cleanup when MFR Text doesn't map to a known manufacturer.
+
+**Solution:**
+- Prescreen MFR Text against manufacturer codes in iDempiere during extraction
+- Reuse `mfr-aliases.json` from Market Offer workflow (already has common aliases like TI → Texas Instruments)
+- Flag unrecognized manufacturers before upload, report in session summary
+
+**Reference:** See `Trading Analysis/Market Offer Uploading/market-offer-uploading.md` "Manufacturer Matching (CRITICAL)" section for existing implementation pattern.
 
 ---
 
