@@ -1,19 +1,19 @@
 RFQ Search Key,Buyer,Business Partner Search Key,Contact,MPN,MFR Text,Quoted Quantity,Cost,Currency,Date Code,MOQ,SPQ,Packaging,Lead Time,COO,RoHS,Vendor Notes
-1130895,MohanRaj Somasundaram,1002469,,4-1437565-2,,1906,0.05,USD,1216,,,,stock,,,
-1130292,MohanRaj Somasundaram,1002984,,0251002.MXL,,1000,0.5,USD,,,,,2 days,,,Consigned stock - 2 days to ship. New ROHS.
-1131134,Athira.KP,1002399,,"BAS16,215",,81000,0.04,USD,19+,,,Reel,stock,,,Factory-sealed reels. ROHS.
-1130577,MohanRaj Somasundaram,1005295,,BCP53-16TX,,858,1.2,USD,24+,,,,stock,,,EXW Florida
+1130895,Jake Harris,1002469,,4-1437565-2,,1906,0.05,USD,1216,,,,stock,,,
+1130292,Jake Harris,1002984,,0251002.MXL,,1000,0.5,USD,,,,,2 days,,,Consigned stock - 2 days to ship. New ROHS.
+1131134,Jake Harris,1002399,,"BAS16,215",,81000,0.04,USD,19+,,,Reel,stock,,,Factory-sealed reels. ROHS.
+1130577,Jake Harris,1005295,,BCP53-16TX,,858,1.2,USD,24+,,,,stock,,,EXW Florida
 [NEEDS_RFQ - no match in 30 days],Jake Harris,1003550,,BSP77E6433,,350,0.77,USD,2220,,,Cut Tape,stock,,,Manufacturer: INFINEON
-1130895,MohanRaj Somasundaram,1002714,,TPS73801DCQR,,1009,0.6,USD,24/35,,,Cut Tape,stock,,,Mixed lot: 1000pcs cut tape DC 24/35 (no label) + 9pcs reel DC 14+ (Mouser reel). ROHS. New parts.
-1130292,MohanRaj Somasundaram,1002428,,DG403DYZ,,4,12.5,USD,07+,,,,stock,,,Quoted MPN: DG403DYZ-T. Manufacturer: INTERSIL. NEW SURPLUS.
-1130577,MohanRaj Somasundaram,1002428,,HCF4093M013TR,,3000,0.09,USD,92+,,,,stock,,,NEW SURPLUS
+1130895,Jake Harris,1002714,,TPS73801DCQR,,1009,0.6,USD,24/35,,,Cut Tape,stock,,,Mixed lot: 1000pcs cut tape DC 24/35 (no label) + 9pcs reel DC 14+ (Mouser reel). ROHS. New parts.
+1130292,Jake Harris,1002428,,DG403DYZ,,4,12.5,USD,07+,,,,stock,,,Quoted MPN: DG403DYZ-T. Manufacturer: INTERSIL. NEW SURPLUS.
+1130577,Jake Harris,1002428,,HCF4093M013TR,,3000,0.09,USD,92+,,,,stock,,,NEW SURPLUS
 [NEEDS_RFQ - no match in 30 days],Jake Harris,1004170,,BAS16.215,,81000,0.05,USD,22+,,,,stock,,,NXP
-1130292,MohanRaj Somasundaram,1003141,,TG110-S050N2LFTR,,1000,0.78,USD,2207,,,Reel,3 - 6 business days,China,,Mfr: Halo Electronics; 12 Month Warranty; stock in overseas warehouse
+1130292,Jake Harris,1003141,,TG110-S050N2LFTR,,1000,0.78,USD,2207,,,Reel,3 - 6 business days,China,,Mfr: Halo Electronics; 12 Month Warranty; stock in overseas warehouse
 [NEEDS_RFQ - no match in 30 days],Jake Harris,1006177,,B82793S513N201Z97,,2000,0.25,USD,11,,,,stock,,,
-1130462,Amit Dhanka,1005491,,MMA8451QR1,,5,0.75,USD,21+,,,,stock,TW,,NA Lot codes; Stock in HK; TT/Advance; ExWorks; RFQ was for 5000 pcs but only 5 pcs quoted
-1130462,Amit Dhanka,1002797,,OPT3001DNPR,,5000,0.61,USD,2018+,,,Reel,stock,,,Original and partial reels; TI
-1130462,Amit Dhanka,1002274,,OPT3001DNPR,,5000,0.34,USD,16+,,,,stock,,,TI
-1130895,MohanRaj Somasundaram,1004925,,TPS73801DCQR,,14,3.6,USD,22+,,,,stock,,,
-1130462,Amit Dhanka,1003646,,ADS1115IDGSR,,4900,1.1,USD,NEW,2500,,,stock,,,TEXAS; Offer# STS-26020481; FCA; COC available; Total stock 4903
-1131107,Silambarasan G,1005270,,594D127X0020R2T,,1800,2,USD,,,,,stock,,,
-1130847,Roberto Orozco,1003473,,BCM5241A1IMLG,,725,2.75,USD,21+,,,,stock,,,
+1130462,Jake Harris,1005491,,MMA8451QR1,,5,0.75,USD,21+,,,,stock,TW,,NA Lot codes; Stock in HK; TT/Advance; ExWorks; RFQ was for 5000 pcs but only 5 pcs quoted
+1130462,Jake Harris,1002797,,OPT3001DNPR,,5000,0.61,USD,2018+,,,Reel,stock,,,Original and partial reels; TI
+1130462,Jake Harris,1002274,,OPT3001DNPR,,5000,0.34,USD,16+,,,,stock,,,TI
+1130895,Jake Harris,1004925,,TPS73801DCQR,,14,3.6,USD,22+,,,,stock,,,
+1130462,Jake Harris,1003646,,ADS1115IDGSR,,4900,1.1,USD,NEW,2500,,,stock,,,TEXAS; Offer# STS-26020481; FCA; COC available; Total stock 4903
+1131107,Jake Harris,1005270,,594D127X0020R2T,,1800,2,USD,,,,,stock,,,
+1130847,Jake Harris,1003473,,BCM5241A1IMLG,,725,2.75,USD,21+,,,,stock,,,

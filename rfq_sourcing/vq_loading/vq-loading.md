@@ -95,7 +95,15 @@ Extract ALL available fields from each quote. Required fields must be present; o
 | Field | Column Name | Required | Description |
 |-------|-------------|----------|-------------|
 | **RFQ Search Key** | `RFQ Search Key` | Yes | Matched via MPN lookup (30-day window) |
-| **Buyer** | `Buyer` | Yes | Person who sent RFQ (usually Jake Harris) |
+| **Buyer** | `Buyer` | Yes | **Astute employee who forwarded the email** (from outer From: field) |
+| **Forwarder Email** | `forwarder_email` | Yes | Email of Astute employee who forwarded to vq@ (e.g., jake.harris@astutegroup.com) |
+
+**CRITICAL - Buyer Field:**
+- The Buyer is the **Astute employee** who forwarded the VQ email, NOT the customer contact from the RFQ
+- Look at the outer `From:` field: `From: Jake Harris <jake.harris@astutegroup.com>`
+- Extract the email address and name from this field
+- Do NOT use names from the RFQ record (those are customer contacts like "MohanRaj Somasundaram")
+- Common buyers: Jake Harris, Ed Harkins, Tracy Xie, Roberto Orozco
 | **Vendor** | `Business Partner Search Key` | Yes | Vendor search_key from domain-based lookup |
 | **Contact** | `Contact` | No | Vendor contact name |
 | **MPN** | `MPN` | Yes | **Customer's requested MPN** (from RFQ, NOT vendor's alternate) |
