@@ -117,7 +117,7 @@ Extract ALL available fields from each quote. Required fields must be present; o
 | **Packaging** | `Packaging` | No | Reel, Tube, Tray, Bulk, Cut Tape |
 | **Lead Time** | `Lead Time` | No | Default: "stock". Only specify if vendor quotes specific lead time |
 | **COO** | `COO` | No | Country of origin - use **full name** (China, Taiwan, Malaysia, United States, etc.) NOT ISO codes |
-| **RoHS** | `RoHS` | No | Y/N - RoHS compliance status |
+| **RoHS** | `RoHS` | No | **Yes** / **No** / **Not Applicable** / blank (NOT Y/N) |
 | **Vendor Notes** | `Vendor Notes` | No | Alternate MPNs, no-bid reasons, conditions |
 
 **COO Reference (ISO → iDempiere Name):**
@@ -151,6 +151,13 @@ Extract ALL available fields from each quote. Required fields must be present; o
 | Made in Japan | Manufacturing origin | **YES** |
 
 **Rule:** Only populate COO if the vendor explicitly states manufacturing origin. Shipping location ≠ COO.
+
+**RoHS Field Values (lookup field - use exact names):**
+| Vendor Says | Use This Value |
+|-------------|----------------|
+| RoHS, ROHS compliant, Pb-free, Lead-free | **Yes** |
+| Non-RoHS, Leaded, Not RoHS | **No** |
+| Unknown, not stated | (leave blank) |
 
 **Vendor Notes field usage:**
 - **No-bid reasons** (IMPORTANT): When qty=0 and price=0, capture why: "No-bid - out of stock", "No-bid - cannot source", "No-bid - price too high"
