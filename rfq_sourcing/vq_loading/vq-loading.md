@@ -137,6 +137,21 @@ Extract ALL available fields from each quote. Required fields must be present; o
 | HK | Hong Kong |
 | IN | India |
 
+**⚠️ COO vs Shipping Terms - DO NOT CONFUSE:**
+- **COO** = where parts were **manufactured** (e.g., "Made in China", "COO: Taiwan")
+- **Shipping terms** = where parts **ship from** (NOT COO)
+
+| Term | Meaning | Is it COO? |
+|------|---------|------------|
+| EXW Israel | Ex Works Israel (pickup location) | **NO** |
+| FOB Hong Kong | Free on Board HK (shipping point) | **NO** |
+| FCA Germany | Free Carrier Germany | **NO** |
+| Stock in HK | Warehouse location | **NO** |
+| COO: China | Country of Origin | **YES** |
+| Made in Japan | Manufacturing origin | **YES** |
+
+**Rule:** Only populate COO if the vendor explicitly states manufacturing origin. Shipping location ≠ COO.
+
 **Vendor Notes field usage:**
 - **No-bid reasons** (IMPORTANT): When qty=0 and price=0, capture why: "No-bid - out of stock", "No-bid - cannot source", "No-bid - price too high"
 - **Alternate MPN** (CRITICAL): When vendor quotes a different MPN than requested, add "Quoted MPN: [vendor's MPN]" to Vendor Notes. The MPN field MUST contain the customer's original requested MPN (what's in the RFQ).
