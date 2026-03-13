@@ -116,9 +116,26 @@ Extract ALL available fields from each quote. Required fields must be present; o
 | **SPQ** | `SPQ` | No | Standard pack quantity |
 | **Packaging** | `Packaging` | No | Reel, Tube, Tray, Bulk, Cut Tape |
 | **Lead Time** | `Lead Time` | No | Default: "stock". Only specify if vendor quotes specific lead time |
-| **COO** | `COO` | No | Country of origin (CN, TW, MY, US, etc.) |
+| **COO** | `COO` | No | Country of origin - use **full name** (China, Taiwan, Malaysia, United States, etc.) NOT ISO codes |
 | **RoHS** | `RoHS` | No | Y/N - RoHS compliance status |
 | **Vendor Notes** | `Vendor Notes` | No | Alternate MPNs, no-bid reasons, conditions |
+
+**COO Reference (ISO → iDempiere Name):**
+| Code | Use This Name |
+|------|---------------|
+| CN | China |
+| TW | Taiwan |
+| MY | Malaysia |
+| US | United States |
+| JP | Japan |
+| KR | Korea Republic of |
+| DE | Germany |
+| MX | Mexico |
+| TH | Thailand |
+| PH | Philippines |
+| SG | Singapore |
+| HK | Hong Kong |
+| IN | India |
 
 **Vendor Notes field usage:**
 - **No-bid reasons** (IMPORTANT): When qty=0 and price=0, capture why: "No-bid - out of stock", "No-bid - cannot source", "No-bid - price too high"
