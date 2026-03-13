@@ -28,12 +28,17 @@ Real-time pricing and availability from authorized distributors. Replaces FindCh
 | Arrow | REST (query params) | developers.arrow.com | **Active** | 1000386 |
 | Rutronik | REST (query params) | rutronik24.com/api.html | **Active** | 1002668 |
 | Future Electronics | REST (API key header) | documenter.getpostman.com/view/18706946/UzBvFhcj | **Active** | 1000328 |
+| TTI | REST (token) | developer.tti.com | **Pending key refresh** | 1000326 |
+| Newark/element14/Farnell | REST (API key) | partner.element14.com | **Pending key refresh** | 1000390 |
+| Sager Electronics | REST (API key) | developer.sager.com | **To investigate** | 1000335 |
+| Rochester Electronics | REST (?) | api.rocelec.com | **To investigate** | 1000058 |
 | Mouser | REST (API key) | mouser.com/api-hub | **Blocked** | 1000334 |
-| Octopart | REST + GraphQL | octopart.com/api/home | Planned | — |
-| Newark/element14 | REST | developer.element14.com | Planned | 1000390 |
+| Octopart/Nexar | GraphQL | nexar.com/api | Planned (aggregator) | — |
 | Avnet | OAuth2 REST | apiportal.avnet.com | **Pending docs** | 1000002 |
 | Venkel | REST (?) | venkel.com | **Pending docs** | 1001951 |
 | Texas Instruments | OAuth2 REST | api-portal.ti.com | **Pending approval** | 1001369 |
+| Master Electronics | REST/EDI | Contact acct mgr | **To investigate** | 1000405 |
+| Allied Electronics | EDI (?) | Unknown | **To investigate** | 1000392 |
 
 ### DigiKey API (Active)
 
@@ -227,6 +232,68 @@ node future.js LM317 100 contains  # search variants
 
 ---
 
+### TTI API (Pending Key Refresh)
+
+**API:** TTI REST API | **Auth:** Token-based
+
+**Portal:** [developer.tti.com](https://developer.tti.com/)
+
+**iDempiere Vendor:**
+- BP ID: `1000326`
+- Name: `TTI Inc`
+
+**Capabilities:** Real-time inventory, pricing, lead times, product info. Can also place orders via API.
+
+**Status:** Have account, awaiting refreshed API key/token.
+
+---
+
+### Newark/element14/Farnell API (Pending Key Refresh)
+
+**API:** element14 Product Search + Order API | **Auth:** API key
+
+**Portal:** [partner.element14.com](https://partner.element14.com/)
+
+**iDempiere Vendor:**
+- BP ID: `1000390`
+- Name: `Newark in One (Element 14)`
+
+**Capabilities:** Product search, real-time pricing/availability, order management. Same portal covers Newark (US), Farnell (UK/EU), and element14 (APAC).
+
+**Requirements:** Need Trade Account linked to web account with credit payment enabled.
+
+**Status:** Have account, awaiting refreshed API key.
+
+---
+
+### Sager Electronics API (To Investigate)
+
+**Portal:** [developer.sager.com](https://developer.sager.com/)
+
+**iDempiere Vendor:**
+- BP ID: `1000335`
+- Name: `Sager - v3004`
+
+**Capabilities:** Pricing, inventory, order management.
+
+**Status:** Developer portal exists. Need to register and evaluate.
+
+---
+
+### Rochester Electronics API (To Investigate)
+
+**Endpoint:** api.rocelec.com
+
+**iDempiere Vendor:**
+- BP ID: `1000058`
+- Name: `Rochester Electronics`
+
+**Capabilities:** Obsolete/EOL parts specialist. API exists but documentation unclear.
+
+**Status:** Need to contact Rochester for API access/docs.
+
+---
+
 ### Texas Instruments API (Pending Approval)
 
 **API:** Inventory and Pricing API | **Auth:** OAuth2 (client credentials)
@@ -275,6 +342,44 @@ Mouser restricts pricing/availability data for distributor accounts. The API sti
 - Compliance data (HTS, ECCN, RoHS)
 
 **Action needed:** Contact Mouser to request pricing API access, or use for non-pricing use cases only.
+
+---
+
+### Master Electronics API (To Investigate)
+
+**iDempiere Vendor:**
+- BP ID: `1000405`
+- Name: `Master Electronics`
+
+**Capabilities:** API & EDI solutions for pricing, inventory, orders, shipment tracking.
+
+**Status:** No public developer portal. Contact account manager for access.
+
+---
+
+### Allied Electronics API (To Investigate)
+
+**iDempiere Vendor:**
+- BP ID: `1000392`
+- Name: `Allied Electronics Inc`
+
+**Capabilities:** EDI integration available. API unclear.
+
+**Status:** Need to contact Allied for API availability/docs.
+
+---
+
+### Octopart/Nexar API (Planned - Aggregator)
+
+**Portal:** [nexar.com/api](https://nexar.com/api)
+
+**Type:** GraphQL (migrated from REST)
+
+**Pricing:** ~$25-200/month based on request volume
+
+**Capabilities:** Aggregates 100+ distributor sources. Useful as fallback for parts not covered by direct APIs.
+
+**Status:** Planned. Could serve as screening fallback when direct APIs don't have stock.
 
 ---
 
