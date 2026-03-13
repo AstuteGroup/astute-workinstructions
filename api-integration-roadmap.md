@@ -39,6 +39,13 @@ Real-time pricing and availability from authorized distributors. Replaces FindCh
 | Texas Instruments | OAuth2 REST | api-portal.ti.com | **Pending approval** | 1001369 |
 | Master Electronics | REST/EDI | Contact acct mgr | **To investigate** | 1000405 |
 | Allied Electronics | EDI (?) | Unknown | **To investigate** | 1000392 |
+| Waldom Electronics | REST | sandbox.waldom.com | **To investigate** | 1000644 |
+| Analog Devices | REST | analog.com/en/support/api-suites.html | **To investigate** | 1000774 |
+| Wurth Electronics | REST | we-online.com/en/support/collaboration/api | **To investigate** | — |
+| LCSC Electronics | REST | lcsc.com/docs/index.html | **To investigate** | 1002898 |
+| Sourceability | REST | Contact for access | **To investigate** | 1000261 |
+| RS Components | REST | Contact sales rep | **To investigate** | 1000554 |
+| Electro Sonic | REST | CalcuQuote integration | **To investigate** | 1000404 |
 
 ### DigiKey API (Active)
 
@@ -380,6 +387,121 @@ Mouser restricts pricing/availability data for distributor accounts. The API sti
 **Capabilities:** Aggregates 100+ distributor sources. Useful as fallback for parts not covered by direct APIs.
 
 **Status:** Planned. Could serve as screening fallback when direct APIs don't have stock.
+
+---
+
+### Waldom Electronics API (To Investigate)
+
+**Portal:** [sandbox.waldom.com](https://sandbox.waldom.com/en/WaldomAPISuite/GettingStarted)
+
+**Regional portals:**
+- Americas: sandbox.waldom.com
+- APAC: sandbox.waldomapac.com
+- EMEA: sandbox.waldomemea.com
+
+**iDempiere Vendor:**
+- BP ID: `1000644`
+- Name: `Waldom Electronics`
+
+**Capabilities:**
+- **Store API Suite:** Order placement, management, tracking, invoice retrieval
+- **Inventory & Pricing API Suite:** Real-time inventory and pricing data
+
+**Access:** API key from customer profile → "API Access and Services" section. Full sandbox environment available.
+
+**Status:** Developer portal exists with sandbox. Need to register and evaluate.
+
+---
+
+### Analog Devices API (To Investigate)
+
+**Portal:** [analog.com/en/support/api-suites.html](https://www.analog.com/en/support/api-suites.html)
+
+**iDempiere Vendor:**
+- BP ID: `1000774`
+- Name: `Analog Devices`
+
+**Capabilities:**
+- **Ordering API:** Order placement, tracking, modifications, milestone notifications, order documentation
+- Product search, pricing, availability
+
+**Status:** Developer portal exists. Need to register and evaluate.
+
+---
+
+### Wurth Electronics API (To Investigate)
+
+**Portal:** [we-online.com/en/support/collaboration/api](https://www.we-online.com/en/support/collaboration/api)
+
+**iDempiere Vendor:** Not in database (passive component manufacturer)
+
+**Capabilities:** REST API for system integration. Contact sales rep for access and credentials.
+
+**Note:** European passive component manufacturer. May be useful for specific product lines.
+
+**Status:** Contact sales representative for API access.
+
+---
+
+### LCSC Electronics API (To Investigate)
+
+**Portal:** [lcsc.com/docs/index.html](https://www.lcsc.com/docs/index.html)
+
+**Agent Portal:** [lcsc.com/agent](https://www.lcsc.com/agent)
+
+**iDempiere Vendor:**
+- BP ID: `1002898`
+- Name: `Shenzhen LCSC Electronics Technology Co., Ltd`
+
+**Capabilities:** 8 API services including real-time pricing (regular + discounted), product details, order creation.
+
+**Note:** China-based distributor. Large catalog, competitive pricing on passives. Good for Asia sourcing.
+
+**Status:** Need LCSC account to apply for API access.
+
+---
+
+### Sourceability / Sourcengine API (To Investigate)
+
+**iDempiere Vendor:**
+- BP ID: `1000261`
+- Name: `Sourceability North America`
+
+**Capabilities:**
+- **Sourcengine Order API:** Research, quote, purchase from 3,500+ suppliers globally
+- ERP/MRP integration for automated procurement
+
+**Note:** Marketplace aggregator model - connects to thousands of suppliers, not just their own stock.
+
+**Status:** Contact for API access. Integrated with CalcuQuote.
+
+---
+
+### RS Components API (To Investigate)
+
+**iDempiere Vendor:**
+- BP ID: `1000554`
+- Name: `RS Components International`
+
+**Capabilities:** Pricing, availability. App ID required from sales representative.
+
+**Note:** Web price only - no customer-specific pricing via API currently.
+
+**Status:** Contact local sales rep for API App ID.
+
+---
+
+### Electro Sonic API (To Investigate)
+
+**iDempiere Vendor:**
+- BP ID: `1000404`
+- Name: `Electro Sonic Group, Inc.`
+
+**Capabilities:** MPN search, pricing, availability via API. Integrated with CalcuQuote.
+
+**Note:** Canadian distributor, part of Master Electronics group.
+
+**Status:** Contact account manager or CalcuQuote for API access.
 
 ---
 
