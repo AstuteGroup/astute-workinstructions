@@ -251,6 +251,9 @@ You are operating as a restricted user (`analytics_user`) with limited permissio
 - **Connection**: Run `psql` directly (no password needed, database auto-selected)
 - **Schemas available**: `adempiere`, `intermediate`, `intermediate_dev`, `mart`, `mart_dev`
 
+**CRITICAL: Active Records Only**
+Always filter by `isactive = 'Y'` unless explicitly told otherwise. Most iDempiere tables have an `isactive` column — inactive records are soft-deleted and should be excluded from all queries by default.
+
 You CANNOT run INSERT, UPDATE, DELETE, DROP, CREATE, or any other data-modifying commands. They will fail with "permission denied."
 
 ### Example Queries
