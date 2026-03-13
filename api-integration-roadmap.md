@@ -27,10 +27,10 @@ Real-time pricing and availability from authorized distributors. Replaces FindCh
 | DigiKey | OAuth2 REST (2-leg) | developer.digikey.com | **Active** | 1000327 |
 | Arrow | REST (query params) | developers.arrow.com | **Active** | 1000386 |
 | Rutronik | REST (query params) | rutronik24.com/api.html | **Active** | 1002668 |
+| Future Electronics | REST (API key header) | documenter.getpostman.com/view/18706946/UzBvFhcj | **Active** | 1000328 |
 | Mouser | REST (API key) | mouser.com/api-hub | **Blocked** | 1000334 |
 | Octopart | REST + GraphQL | octopart.com/api/home | Planned | — |
 | Newark/element14 | REST | developer.element14.com | Planned | 1000390 |
-| Future Electronics | REST (?) | futureelectronics.com/api-solutions | **Pending docs** | 1000328 |
 | Avnet | OAuth2 REST | apiportal.avnet.com | **Pending docs** | 1000002 |
 | Venkel | REST (?) | venkel.com | **Pending docs** | 1001951 |
 | Texas Instruments | OAuth2 REST | api-portal.ti.com | **Pending approval** | 1001369 |
@@ -173,6 +173,58 @@ node rutronik.js S3001-D320 100
 | `vqLeadTime` | Lead time in days |
 | `vqVendorNotes` | "Rutronik stock: X \| SKU: Y" or "Lead time: X days" |
 
+### Future Electronics API (Active)
+
+**API:** Orbweaver REST API | **Auth:** Header `x-orbweaver-licensekey`
+
+**Credentials:**
+| Key | Value |
+|-----|-------|
+| API Key | `IW7OI-DOC91-OKUD3-37YK2-X3RSY` |
+
+**Endpoints:**
+| Type | Endpoint | Method |
+|------|----------|--------|
+| Single | `https://api.futureelectronics.com/api/v1/pim-future/lookup?part_number=X&lookup_type=exact` | GET |
+| Batch | `https://api.futureelectronics.com/api/v1/pim-future/batch/lookup` | POST |
+
+**Lookup types:** `exact` (default), `default` (starts with), `contains`
+
+**iDempiere Vendor:**
+- BP ID: `1000328`
+- BP Value: `1002332`
+- Name: `Future Electronics Corporation`
+
+**Code:** `rfq_sourcing/franchise_check/future.js`
+
+**Usage:**
+```bash
+node future.js LM317T 100
+node future.js LM317 100 contains  # search variants
+```
+
+**Current Use (Active):**
+| Field | Use |
+|-------|-----|
+| `franchiseQty` | Total available from quantities.quantity_available |
+| `franchiseBulkPrice` | Lowest price break — screening |
+| `franchiseRfqPrice` | Price at RFQ qty — VQ |
+| `vqDateCode` | Date code from part_attributes |
+| `vqLeadTime` | Lead time from quantities.factory_leadtime |
+| `vqVendorNotes` | "Future stock: X \| DC: YYWW \| Future PN: Z" |
+
+**Response structure:**
+```json
+{
+  "offers": [{
+    "part_id": { "mpn": "...", "seller_part_number": "..." },
+    "part_attributes": [{"name": "manufacturerName", "value": "..."}],
+    "quantities": { "quantity_available": 18965, "factory_leadtime": "7" },
+    "pricing": [{ "unit_price": 0.44, "quantity_from": 1, "quantity_to": 14 }]
+  }]
+}
+```
+
 ---
 
 ### Texas Instruments API (Pending Approval)
@@ -208,18 +260,6 @@ node rutronik.js S3001-D320 100
 - Name: `Avnet`
 
 **Status:** Have subscription key but need to log in to [apiportal.avnet.com](https://apiportal.avnet.com/) to see endpoint URLs. The portal mentions a `getPriceAndQty` API but exact path is behind login.
-
----
-
-### Future Electronics API (Pending Docs)
-
-**API Key:** `IW7OI-DOC91-OKUD3-37YK2-X3RSY`
-
-**iDempiere Vendor:**
-- BP ID: `1000328`
-- Name: `Future Electronics Corporation`
-
-**Status:** Have API key but can't find endpoint documentation. Postman docs at https://documenter.getpostman.com/view/18706946/UzBvFhcj didn't load. Need endpoint URL and auth format from Future.
 
 ---
 
@@ -300,4 +340,4 @@ ANTHROPIC_API_KEY=
 
 ---
 
-*Last updated: 2026-03-12*
+*Last updated: 2026-03-13*

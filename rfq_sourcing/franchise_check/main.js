@@ -36,6 +36,7 @@ const { searchPart } = require('./search');
 const digikey = require('./digikey');
 const arrow = require('./arrow');
 const rutronik = require('./rutronik');
+const future = require('./future');
 
 // =============================================================================
 // Database Functions
@@ -252,6 +253,24 @@ function saveVqBatch(results, outputPath, rfqNumber) {
         'USD',
         r.rutronik_vq_vendor_notes || '',
         'Rutronik API',
+      ]);
+      vqCount++;
+    }
+
+    // Future Electronics VQ row (separate line)
+    if (r.future_vq_price) {
+      wsData.push([
+        r.rfq_number || rfqNumber || '',
+        r.future_vq_bp_value || '',
+        r.future_vq_vendor_name || '',
+        r.future_vq_mpn || r.mpn,
+        r.future_vq_manufacturer || '',
+        r.future_vq_description || '',
+        r.qty,
+        r.future_vq_price,
+        'USD',
+        r.future_vq_vendor_notes || '',
+        'Future API',
       ]);
       vqCount++;
     }
@@ -573,6 +592,28 @@ Options:
           }
         } catch (err) {
           if (debug) console.log(`    [DEBUG] Rutronik error: ${err.message}`);
+        }
+
+        // 5. Future Electronics API call (additional - for VQ capture)
+        try {
+          const futureResult = await future.searchPart(part.mpn, part.qty);
+          if (futureResult.found && futureResult.vqPrice) {
+            evaluated.future_vq_price = futureResult.vqPrice;
+            evaluated.future_vq_mpn = futureResult.vqMpn;
+            evaluated.future_vq_manufacturer = futureResult.vqManufacturer;
+            evaluated.future_vq_description = futureResult.vqDescription;
+            evaluated.future_vq_vendor_notes = futureResult.vqVendorNotes;
+            evaluated.future_vq_bp_value = future.FUTURE_CONFIG.bpValue;
+            evaluated.future_vq_vendor_name = future.FUTURE_CONFIG.bpName;
+            evaluated.future_qty = futureResult.franchiseQty || 0;
+            evaluated.data_source = (evaluated.data_source || 'FindChips') + ' + Future';
+            const stockInfo = futureResult.franchiseQty > 0 ? futureResult.franchiseQty.toLocaleString() : `LT: ${futureResult.vqLeadTime}`;
+            console.log(`    📦 Future: ${stockInfo} @ $${futureResult.vqPrice}`);
+          } else if (futureResult.error) {
+            if (debug) console.log(`    [DEBUG] Future error: ${futureResult.error}`);
+          }
+        } catch (err) {
+          if (debug) console.log(`    [DEBUG] Future error: ${err.message}`);
         }
       }
 
