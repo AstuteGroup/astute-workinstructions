@@ -40,7 +40,7 @@ Pull 3-5 sample emails from vendor and check:
 
 ## Cumulative Vendor Counts
 
-**Last updated:** 2026-03-11
+**Last updated:** 2026-03-13
 
 | Search Key | Vendor | Cumulative | Format | Priority | Sessions |
 |------------|--------|------------|--------|----------|----------|
@@ -50,9 +50,10 @@ Pull 3-5 sample emails from vendor and check:
 | 1002842 | Nexus Electronics | 4 | ? | - | Mar 10 (2), Mar 11 (2) |
 | 1002337 | Select Technology | 4 | ? | - | Mar 10 (2), Mar 11 (2) |
 | 1004879 | N-tronics GmbH | 4 | ? | - | Mar 10 (2), Mar 11 (2) |
+| 1003141 | Component Sense | 3 | ? | - | Mar 11 (2), Mar 13 (1) |
+| 1002428 | Concord Components | 2 | ? | - | Mar 13 (2) |
 | 1003290 | NetSource Technology | 2 | ? | - | Mar 10 (2) |
 | 1005735 | Fly Chips | 2 | ? | - | Mar 11 (2) |
-| 1003141 | Component Sense | 2 | ? | - | Mar 11 (2) |
 | 1002863 | Flex-Com International | 2 | ? | - | Mar 11 (2) |
 
 ## How to Update (Step 7)
