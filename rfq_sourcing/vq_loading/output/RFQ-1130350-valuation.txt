@@ -6,40 +6,45 @@ Generated: 2026-03-13
 METHODOLOGY:
 - VQ pricing: Average broker quote cost (deduplicated)
 - Franchise x1.4 (scarce): Franchise bulk price x 1.4 when franchise qty < RFQ qty
+- Franchise x2.5 (memory/scarce): Memory products use 2.5x when scarce
 - Franchise x0.35 (abundant): Franchise bulk price x 0.35 when franchise qty >= RFQ qty
 - Highest-value MPN alternate used per CPC line
+- Additional 8 parts found via base MPN search (format variations in original screening)
 
 ================================================================================
 SUMMARY
 ================================================================================
 
 Pricing Source Breakdown:
-  VQ pricing:                  30 CPCs
-  Franchise x1.4 (scarce):     24 CPCs
-  Franchise x0.35 (abundant):  12 CPCs
-  No pricing available:        15 CPCs
-  ─────────────────────────────────────
-  TOTAL CPCs:                  81
+  VQ pricing:                     30 CPCs
+  Franchise x1.4 (scarce):        32 CPCs
+  Franchise x2.5 (memory/scarce):  1 CPCs
+  Franchise x0.35 (abundant):     12 CPCs
+  No pricing available:            6 CPCs
+  ─────────────────────────────────────────
+  TOTAL CPCs:                     81
 
 Value by Source:
-  VQ-based:             $964,824.98
-  Franchise x1.4:     $4,882,236.04
-  Franchise x0.35:      $328,017.89
-  ─────────────────────────────────────
-  TOTAL MARKET VALUE: $6,175,078.92
-  AVG CPC VALUE:      $93,561.80
-  COVERAGE:           66/81 CPCs (81%)
+  VQ-based:                $964,824.98
+  Franchise x1.4:        $5,215,920.12
+  Franchise x2.5 (mem):    $473,167.10
+  Franchise x0.35:         $328,017.89
+  ─────────────────────────────────────────
+  TOTAL MARKET VALUE:  $6,981,930.09
+  AVG CPC VALUE:       $93,092.40
+  COVERAGE:            75/81 CPCs (93%)
 
 ================================================================================
 ALL CPCs BY VALUE (descending)
 ================================================================================
 
 MPN                                  CPC Qty       Price           Value  Source
-----------------------------------------------------------------------------------------------------
+--------------------------------------------------------------------------------------------------------------
 BCM54240C1IFBG                        11,664      $87.20      $1,017,119  Franchise x1.4 (scarce)
 MT28FW02GBBA1HPC-0AAT                 12,990      $66.60        $865,108  Franchise x1.4 (scarce)
 FP-CONN                               32,146      $20.49        $658,779  Franchise x1.4 (scarce)
 FNK-ER12H                                611     $857.50        $523,933  Franchise x1.4 (scarce)
+GS81302DT37GE-300                        518     $913.45        $473,167  Franchise x2.5 (memory/scarce)
 SI5341B-D-GMR                         18,000      $22.92        $412,524  Franchise x1.4 (scarce)
 FNF-LT11H                              1,340     $273.06        $365,895  Franchise x1.4 (scarce)
 C1812C335K1RAC7800                    49,612       $5.67        $281,548  VQ
@@ -50,22 +55,29 @@ MT28FW02GBBA1HPC-0AAT                  9,790      $16.65        $162,999  Franch
 LT3757AIDD#TRPBF                      14,535       $6.54         $95,032  Franchise x1.4 (scarce)
 MAX3318EEUP+T                          5,984      $12.52         $74,896  Franchise x1.4 (scarce)
 TFM-125-01-S-D-WT                     12,983       $5.53         $71,796  Franchise x1.4 (scarce)
+BCM54220SB0IFBG                        1,518      $45.74         $69,430  Franchise x1.4 (scarce)
+SI5338C-A01565-GM                      4,141      $16.74         $69,337  Franchise x1.4 (scarce)
 LTC3617IUDD#TRPBF                      5,203      $12.64         $65,776  Franchise x1.4 (scarce)
 BCM5241A1IMLG                         10,466       $5.90         $61,749  VQ
 EN5319QI                              46,270       $1.32         $61,248  Franchise x0.35 (abundant)
 10081530-12228LF                      17,439       $3.29         $57,374  Franchise x1.4 (scarce)
+SI5338C-B04948-GM                      3,325      $16.74         $55,674  Franchise x1.4 (scarce)
 S102M59Z5UU83L0R                       5,184      $10.00         $51,840  VQ
 GS8342DT37BGD-300                        761      $63.07         $47,996  Franchise x1.4 (scarce)
 EPM2210F324I5N                           794      $54.97         $43,644  VQ
 530CB50M0000DGR                        3,204      $12.85         $41,178  Franchise x1.4 (scarce)
+SI5338C-A01564-GM                      2,329      $17.49         $40,725  Franchise x1.4 (scarce)
+PA3855.008NL                          12,266       $3.26         $40,012  Franchise x1.4 (scarce)
 531AA156M250DG                         2,651      $14.50         $38,450  Franchise x1.4 (scarce)
 ADG734BRUZ-REEL                        8,628       $3.50         $30,198  VQ
 CDRH3D23NP-1R0P                       59,573       $0.50         $29,608  Franchise x1.4 (scarce)
 JXK0-0190NL                           13,227       $2.12         $28,054  Franchise x0.35 (abundant)
 LT1618EDD#TRPBF                        8,814       $3.00         $26,442  VQ
+CT914BYF-100M                         11,943       $2.13         $25,415  Franchise x1.4 (scarce)
 NFM18PC225B0J3D                       97,631       $0.24         $23,724  VQ
 SST38VF6401-90-5I-B3KE-T               2,212      $10.00         $22,111  Franchise x1.4 (scarce)
 BCM84728AIFSBG                         1,819      $11.02         $20,047  Franchise x0.35 (abundant)
+CT914BYF-100M                          9,262       $2.13         $19,710  Franchise x1.4 (scarce)
 MT28FW02GBBA1HPC-0AAT                  1,094      $16.65         $18,215  Franchise x0.35 (abundant)
 MSP430F149IPMG4                        2,351       $7.73         $18,173  VQ
 LT3070EUFD#PBF                         5,322       $3.25         $17,297  VQ
@@ -76,6 +88,7 @@ LTM8026IV#PBF                          1,811       $8.49         $15,377  Franch
 AQY210SZ                              13,528       $1.09         $14,746  VQ
 KGM32LR51C226MU                       35,670       $0.41         $14,742  Franchise x1.4 (scarce)
 12106D476KAT2A                        72,542       $0.20         $14,508  VQ
+SQ4184EY-T1-GE3                       14,057       $0.95         $13,382  Franchise x1.4 (scarce)
 16TQC100MYF                           25,224       $0.52         $13,180  VQ
 LT3973IMSE#PBF                         2,660       $4.47         $11,880  Franchise x1.4 (scarce)
 C1005X5R1C104K050BA                  943,258       $0.01         $11,791  VQ
@@ -102,20 +115,11 @@ IPB023N06N3G                           3,271       $0.87          $2,859  Franch
 SMS1105GC                             17,543       $0.14          $2,419  Franchise x0.35 (abundant)
 NFM18PC105R0J3D                       78,460       $0.01            $942  VQ
 5SGXMABK3H40C2N                            9       $3.50             $32  Franchise x0.35 (abundant)
-GS81302DT37GE-300                        518       $0.00              $0  No pricing
 MT18KSF51272AZ-1G4M1                     896       $0.00              $0  No pricing
 0N622034-5                             1,223       $0.00              $0  No pricing
-BCM54220SB0IFBG                        1,518       $0.00              $0  No pricing
-SI5338C-A01564-GM                      2,329       $0.00              $0  No pricing
-SI5338C-B04948-GM                      3,325       $0.00              $0  No pricing
-SI5338C-A01565-GM                      4,141       $0.00              $0  No pricing
 IS42R16320D-7BLI                       7,108       $0.00              $0  No pricing
 2011P04VMZ0                            7,956       $0.00              $0  No pricing
-CT914BYF-100M                          9,262       $0.00              $0  No pricing
 FNK-ST11H                              9,868       $0.00              $0  No pricing
-CT914BYF-100M                         11,943       $0.00              $0  No pricing
-PA3855.008NL                          12,266       $0.00              $0  No pricing
-SQ4184EY-T1-GE3                       14,057       $0.00              $0  No pricing
 CN7240-1200BG1676I-AAP-P13-G          17,780       $0.00              $0  No pricing
 
 ================================================================================
@@ -125,22 +129,20 @@ CPCs WITH NO PRICING DATA - NEED VQ SOURCING
 MPN                                         Qty
 --------------------------------------------------
 CN7240-1200BG1676I-AAP-P13-G             17,780
-SQ4184EY-T1-GE3                          14,057
-PA3855.008NL                             12,266
-CT914BYF-100M                            11,943
 FNK-ST11H                                 9,868
-CT914BYF-100M                             9,262
 2011P04VMZ0                               7,956
 IS42R16320D-7BLI                          7,108
-SI5338C-A01565-GM                         4,141
-SI5338C-B04948-GM                         3,325
-SI5338C-A01564-GM                         2,329
-BCM54220SB0IFBG                           1,518
 0N622034-5                                1,223
 MT18KSF51272AZ-1G4M1                        896
-GS81302DT37GE-300                           518
 --------------------------------------------------
-TOTAL QTY:                              104,190
+TOTAL QTY:                               44,831
 
 These parts had no VQ quotes and were not found in franchise distribution.
-Recommend sourcing quotes for high-quantity lines.
+
+================================================================================
+NOTES
+================================================================================
+- 8 parts recovered via base MPN search (original screening missed due to
+  MPN format variations: hyphens vs underscores, suffix differences)
+- Memory products (SRAM, DRAM, DDR) use 2.5x multiplier when scarce
+- Remaining 6 unpriced parts may need manual lookup or broker sourcing
