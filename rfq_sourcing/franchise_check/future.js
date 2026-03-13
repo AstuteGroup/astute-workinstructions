@@ -271,11 +271,97 @@ function normalizeMpn(mpn) {
 }
 
 /**
- * Search multiple parts
+ * Batch search multiple parts using POST (more efficient for >1 part)
  * @param {Array} parts - Array of {mpn, qty} objects
- * @param {number} delayMs - Delay between requests (rate limiting)
+ * @param {string} lookupType - 'exact', 'contains', or 'default'
+ * @returns {Array} Results in same order as input
+ */
+async function searchPartsBatch(parts, lookupType = 'exact') {
+  const mpnList = parts.map(p => p.mpn || p);
+  const qtyMap = {};
+  parts.forEach(p => {
+    const mpn = p.mpn || p;
+    qtyMap[mpn] = p.qty || 1;
+  });
+
+  const body = { parts: mpnList, lookup_type: lookupType };
+  const postData = JSON.stringify(body);
+
+  return new Promise((resolve, reject) => {
+    const options = {
+      hostname: FUTURE_CONFIG.baseUrl,
+      path: '/api/v1/pim-future/batch/lookup',
+      method: 'POST',
+      headers: {
+        'Accept': 'application/json',
+        'Content-Type': 'application/json',
+        'x-orbweaver-licensekey': FUTURE_CONFIG.apiKey,
+        'Content-Length': Buffer.byteLength(postData),
+      },
+      timeout: 60000,
+    };
+
+    const req = https.request(options, (res) => {
+      let data = '';
+      res.on('data', chunk => data += chunk);
+      res.on('end', () => {
+        try {
+          const json = JSON.parse(data);
+
+          if (res.statusCode !== 200) {
+            reject(new Error(`API error ${res.statusCode}: ${json.error || data}`));
+            return;
+          }
+
+          // Parse each result
+          const results = [];
+          for (const item of (json.lookup_parts || [])) {
+            const searchMpn = item.part_number;
+            const rfqQty = qtyMap[searchMpn] || 1;
+
+            // Build fake single-response format for parseSearchResults
+            const singleResponse = { offers: item.offers || [] };
+            const result = parseSearchResults(singleResponse, searchMpn, rfqQty);
+            results.push(result);
+
+            console.log(`[Future Batch] ${searchMpn}: ${result.found ? `${result.franchiseQty} @ $${result.vqPrice}` : 'Not found'}`);
+          }
+
+          resolve(results);
+        } catch (e) {
+          reject(new Error(`Parse error: ${e.message}`));
+        }
+      });
+    });
+
+    req.on('error', reject);
+    req.on('timeout', () => {
+      req.destroy();
+      reject(new Error('Request timeout'));
+    });
+
+    req.write(postData);
+    req.end();
+  });
+}
+
+/**
+ * Search multiple parts (auto-selects batch POST for >1 part, GET for single)
+ * @param {Array} parts - Array of {mpn, qty} objects
+ * @param {number} delayMs - Delay between requests (only used for serial fallback)
  */
 async function searchParts(parts, delayMs = 300) {
+  // Use batch POST for multiple parts
+  if (parts.length > 1) {
+    try {
+      return await searchPartsBatch(parts);
+    } catch (err) {
+      console.warn(`Batch failed, falling back to serial: ${err.message}`);
+      // Fall through to serial
+    }
+  }
+
+  // Serial GET for single part or fallback
   const results = [];
 
   for (let i = 0; i < parts.length; i++) {
@@ -309,6 +395,7 @@ module.exports = {
   FUTURE_CONFIG,
   searchPart,
   searchParts,
+  searchPartsBatch,
   normalizeMpn,
 };
 
