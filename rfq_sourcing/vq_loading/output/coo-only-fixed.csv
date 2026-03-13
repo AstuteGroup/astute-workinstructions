@@ -1,0 +1,17 @@
+RFQ Search Key,Buyer,Business Partner Search Key,Contact,MPN,MFR Text,Quoted Quantity,Cost,Currency,Date Code,MOQ,SPQ,Packaging,Lead Time,COO,RoHS,Vendor Notes
+1130350,Jake Harris,1003743,,C1812C335K1RAC7800,KEMET,9,11.15,EUR,20,,,,In stock,Mexico,Yes,ROHS Cut tape COO Mexico
+1130350,Jake Harris,1003021,,LTC4263IDE#PBF,Analog Devices,171,2.65,GBP,19+,,,,Stock,Malaysia,,COO Malaysia
+1130350,Jake Harris,1005290,,AFBR-709DMZ-IN7,,300,4.50,USD,,,,,Stock HK,China,,COO China
+1130350,Jake Harris,1004223,,1210YD226MAT2A,AVX,1000,0.50,USD,08+,,,,,Japan,,COO JP
+1130350,Jake Harris,1002450,,CDRH3D23NP1R0PC,Sumida,1271,0.18,USD,13,,,,1-2 days,China,,COO China $100 min
+1130350,Jake Harris,1005377,,NFM18PC225B0J3D,Murata,15000,0.22,,2024+,,,,5-7 days,Japan,Yes,OEM consignment stock EXW France
+1130350,Jake Harris,1004875,,146839-3,AMP,125,0.8,,2011,,,,stock,Mexico,,quote valid 14 days
+1130350,Jake Harris,1003141,,FTSH-108-01-L-DV-K-P,Murata,4351,0.715,,1806,,,,3-6 business days,Japan,Yes,
+1130350,Jake Harris,1003957,,16TQC100MYF,Panasonic,3000,0.5,,14+,,,,stock,Japan,Yes,
+1130350,Jake Harris,1002714,,J1011F21PNL,Pulse,5600,1,,21,,,,stock,China,Yes,Mixed DC: 21/29 21/02 21/04 21/13
+1130350,Jake Harris,1003743,,C1812C335K1RAC7800,Kemet,9,11.15,EUR,20,,,,stock,Mexico,Yes,Validity 24 hours EXW
+1130350,Jake Harris,1003021,,LTC4263IDE#PBF,Analog Devices,171,2.65,GBP,19+,,,,stock,Malaysia,,
+1130350,Jake Harris,1005290,,AFBR-709DMZ-IN7,Broadcom,300,4.5,,,,,,stock,China,,Stock in Hong Kong
+1130350,Jake Harris,1004223,,1210YD226MAT2A,AVX,1000,0.5,,08+,,,,stock,Japan,,
+1130350,Jake Harris,1002450,,CDRH3D23NP1R0PC,SUM,1271,0.18,,13,,,,1-2 business days,China,Yes,Min Order $100 30-day warranty
+1130350,Jake Harris,1002450,,CDRH3D23NP1R0PC,,1271,0.18,USD,13,,,,1-2 days,China,Yes,NEW T/R ROHS COO China
