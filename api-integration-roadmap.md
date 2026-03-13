@@ -37,7 +37,7 @@ Real-time pricing and availability from authorized distributors. Replaces FindCh
 | Avnet | OAuth2 REST | apiportal.avnet.com | **Pending docs** | 1000002 |
 | Venkel | REST (?) | venkel.com | **Pending docs** | 1001951 |
 | Texas Instruments | OAuth2 REST | api-portal.ti.com | **Pending approval** | 1001369 |
-| Master Electronics | REST/EDI | Contact acct mgr | **To investigate** | 1000405 |
+| Master Electronics | REST (path params) | masterelectronics.com/en/gettingstarted | **Pending activation** | 1000405 |
 | Allied Electronics | EDI (?) | Unknown | **To investigate** | 1000392 |
 | Waldom Electronics | REST | sandbox.waldom.com | **To investigate** | 1000644 |
 | Analog Devices | REST | analog.com/en/support/api-suites.html | **To investigate** | 1000774 |
@@ -352,15 +352,41 @@ Mouser restricts pricing/availability data for distributor accounts. The API sti
 
 ---
 
-### Master Electronics API (To Investigate)
+### Master Electronics API (Pending Activation)
+
+**API:** cgpriceavailability REST API | **Auth:** API key in path
+
+**Credentials:**
+| Key | Value |
+|-----|-------|
+| API Key | `1640d818-0b10-4162-a2ad-34750e79e346` |
+
+**Endpoint:**
+```
+GET https://api.masterelectronics.com/wapi/v1/cgpriceavailability/{query}/{inStockOnly}/{exactMatch}/{resultsCount}/{apiKey}
+```
+
+**Path Parameters:**
+| Parameter | Description | Values |
+|-----------|-------------|--------|
+| query | Part number(s) | comma-separated for multiple |
+| inStockOnly | Stock filter | `0`=all, `1`=in-stock only |
+| exactMatch | Match type | `0`=partial, `1`=exact |
+| resultsCount | Max results | number |
+| apiKey | Your API key | UUID |
+
+**Example:**
+```bash
+curl -X GET "https://api.masterelectronics.com/wapi/v1/cgpriceavailability/LM317/1/1/10/1640d818-0b10-4162-a2ad-34750e79e346" -H "accept: text/plain"
+```
+
+**Docs:** https://www.masterelectronics.com/en/gettingstarted/?div=gettingstarted2
 
 **iDempiere Vendor:**
 - BP ID: `1000405`
 - Name: `Master Electronics`
 
-**Capabilities:** API & EDI solutions for pricing, inventory, orders, shipment tracking.
-
-**Status:** No public developer portal. Contact account manager for access.
+**Status:** Endpoint structure confirmed. API key returns 401 Unauthorized - **awaiting activation by Master Electronics**. Contact account rep to enable API access for our key.
 
 ---
 
