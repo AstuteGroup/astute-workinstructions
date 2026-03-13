@@ -380,6 +380,34 @@ node ~/workspace/vq-parser/scripts/route-emails.js --latest
 
 **Why this matters:** Templates eliminate manual extraction. A vendor sending 10 quotes/week = 40/month of manual work that could be automated.
 
+### Step 8: Move Actioned Emails to Processed (REQUIRED)
+**Do not skip.** Emails in NeedsReview, NoBid, and NeedsVendor must be moved to Processed after being actioned.
+
+**When to move:**
+| Folder | Action Required | Then Move to Processed |
+|--------|-----------------|------------------------|
+| **NeedsReview** | Extract PDF/attachment data, add to ERP-ready CSV | Yes |
+| **NoBid** | No action needed (info only) | Yes (after noting) |
+| **NeedsVendor** | Add vendor to iDempiere, re-run consolidation | Yes |
+
+**Commands:**
+```bash
+# Move specific emails after actioning
+himalaya message move -f 'NeedsReview' 'Processed' [ID1] [ID2] [ID3]
+himalaya message move -f 'NoBid' 'Processed' [ID1] [ID2]
+himalaya message move -f 'NeedsVendor' 'Processed' [ID1]
+
+# Check folder counts
+himalaya envelope list -f 'NeedsReview' --page-size 500 | wc -l
+himalaya envelope list -f 'NoBid' --page-size 500 | wc -l
+himalaya envelope list -f 'NeedsVendor' --page-size 500 | wc -l
+```
+
+**CHECKPOINT:** Session is fully complete when:
+- All INBOX emails routed (Step 6)
+- All NeedsReview PDFs extracted and merged
+- All actioned folders emptied to Processed (this step)
+
 ---
 
 ## Quick Start (Reference Only)

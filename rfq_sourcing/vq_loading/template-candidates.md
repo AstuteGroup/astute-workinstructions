@@ -51,10 +51,29 @@ Pull 3-5 sample emails from vendor and check:
 | 1002337 | Select Technology | 4 | ? | - | Mar 10 (2), Mar 11 (2) |
 | 1004879 | N-tronics GmbH | 4 | ? | - | Mar 10 (2), Mar 11 (2) |
 | 1003141 | Component Sense | 3 | ? | - | Mar 11 (2), Mar 13 (1) |
+| 1002491 | ComSIT | 2 | STRUCTURED | - | Mar 13 (2 PDF) |
 | 1002428 | Concord Components | 2 | ? | - | Mar 13 (2) |
 | 1003290 | NetSource Technology | 2 | ? | - | Mar 10 (2) |
 | 1005735 | Fly Chips | 2 | ? | - | Mar 11 (2) |
 | 1002863 | Flex-Com International | 2 | ? | - | Mar 11 (2) |
+| 1004515 | Schukat | 1 | STRUCTURED | - | Mar 13 (1 PDF) |
+| 1003327 | AED Electronics | 1 | STRUCTURED | - | Mar 13 (1 PDF) |
+| 1005739 | Solsta | 1 | STRUCTURED | - | Mar 13 (1 PDF) |
+| 1003320 | Charcroft | 1 | STRUCTURED | - | Mar 13 (1 PDF) |
+| 1002495 | Cyclops/Lantek | 1 | STRUCTURED | - | Mar 13 (1 PDF) |
+| 1003723 | 4Source | 1 | STRUCTURED | - | Mar 13 (1 PDF) |
+| 1006201 | IBH Elektrotechnik | 1 | STRUCTURED | - | Mar 13 (1 PDF) |
+
+## PDF Extraction Notes (Mar 13)
+
+Discovered that Claude's **Read tool** can natively extract data from PDF attachments without external libraries. This enables direct processing of PDF quotes in NeedsReview folder.
+
+**Structured PDF vendors** (good template candidates when volume increases):
+- Schukat: German distributor, consistent table format
+- ComSIT: EMEA broker, standardized quote layout
+- Charcroft: UK distributor, clean tabular quotes
+- 4Source: German broker, price break tables
+- IBH Elektrotechnik: German supplier, formal quote structure
 
 ## How to Update (Step 7)
 
