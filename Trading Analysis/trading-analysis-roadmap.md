@@ -12,6 +12,8 @@ Consolidated roadmap for Trading Analysis workflows.
 | Quick Quote | `Quick Quote/` | Operational |
 | Market Offer Matching | `Market Offer Matching for RFQs/` | Operational |
 | Inventory File Cleanup | `Inventory File Cleanup/` | Operational |
+| LAM Kitting Reorder | `LAM Kitting Reorder/` | Planned |
+| Stock Market Analysis | — | Planned |
 
 ---
 
@@ -80,6 +82,88 @@ Consolidated roadmap for Trading Analysis workflows.
 - Add `Match Type` column to output
 
 **Depends on:** `mpn_variants.py` module from RFQ Sourcing
+
+---
+
+# Section B: Stock Market Analysis
+
+| # | Feature | Priority | Status |
+|---|---------|----------|--------|
+| B1 | Warehouse Rotation Schedule | Later | Planned |
+| B2 | Market Price Comparison | Later | Planned |
+| B3 | Resale Price Recommendations | Later | Planned |
+
+---
+
+## B1. Warehouse Rotation Schedule
+
+**Status:** Planned | **Priority:** Later
+
+**Problem:** Need to systematically analyze inventory across warehouses to optimize resale pricing, but analyzing all warehouses at once is overwhelming.
+
+**Solution:**
+- Rotate through warehouses on a schedule (e.g., 1-2 warehouses per week)
+- Prioritize high-value or slow-moving inventory
+- Track last analysis date per warehouse
+
+**Warehouses to Rotate:**
+- Free Stock: W102, W104/W112, W108/W113, W109/W114
+- Allocated: MAIN, W105
+
+---
+
+## B2. Market Price Comparison
+
+**Status:** Planned | **Priority:** Later
+
+**Problem:** Current inventory pricing may be stale or not competitive with market.
+
+**Solution:**
+- Pull recent VQ data for same MPNs
+- Compare to market offers (from Market Offer Uploading)
+- Identify parts priced above/below market
+- Factor in date codes, quantity breaks
+
+**Inputs:**
+- Warehouse inventory file (from Inventory File Cleanup)
+- VQ history (last 90 days)
+- Market offers
+
+---
+
+## B3. Resale Price Recommendations
+
+**Status:** Planned | **Priority:** Later
+
+**Problem:** Need data-driven resale pricing rather than gut feel.
+
+**Solution:**
+- Apply Quick Quote logic (min margin, min GP, fat margin fallback)
+- Factor in inventory age/date code
+- Consider market pricing from B2
+- Generate recommended resale prices
+
+**Outputs:**
+- Pricing recommendations CSV
+- Flagged items needing price adjustments
+
+---
+
+# Section C: LAM Kitting Reorder
+
+| # | Feature | Priority | Status |
+|---|---------|----------|--------|
+| C1 | LAM Kitting Reorder Workflow | **Next** | Planned |
+
+---
+
+## C1. LAM Kitting Reorder Workflow
+
+**Status:** Planned | **Priority:** Next
+
+**Problem:** LAM kitting warehouses (W111, W115) need inventory monitoring to trigger reorders, update lead times, and track historical sourcing.
+
+**Solution:** Dedicated workflow — see `LAM Kitting Reorder/lam-kitting-reorder.md`
 
 ---
 
