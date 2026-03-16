@@ -37,7 +37,7 @@ Real-time pricing and availability from authorized distributors. Replaces FindCh
 | Avnet | OAuth2 REST | apiportal.avnet.com | **Pending docs** | 1000002 |
 | Venkel | REST (?) | venkel.com | **Pending docs** | 1001951 |
 | Texas Instruments | OAuth2 REST | api-portal.ti.com | **Pending approval** | 1001369 |
-| Master Electronics | REST (path params) | masterelectronics.com/en/gettingstarted | **Pending activation** | 1000405 |
+| Master Electronics | REST v2 (path params) | masterelectronics.com/en/gettingstarted | **Pending IP whitelist** | 1000405 |
 | Allied Electronics | EDI (?) | Unknown | **To investigate** | 1000392 |
 | Waldom Electronics | REST | sandbox.waldom.com | **To investigate** | 1000644 |
 | Analog Devices | REST | analog.com/en/support/api-suites.html | **To investigate** | 1000774 |
@@ -352,9 +352,9 @@ Mouser restricts pricing/availability data for distributor accounts. The API sti
 
 ---
 
-### Master Electronics API (Pending Activation)
+### Master Electronics API (Pending IP Whitelist)
 
-**API:** cgpriceavailability REST API | **Auth:** API key in path
+**API:** cpriceavailability REST API v2 | **Auth:** API key in path
 
 **Credentials:**
 | Key | Value |
@@ -363,7 +363,7 @@ Mouser restricts pricing/availability data for distributor accounts. The API sti
 
 **Endpoint:**
 ```
-GET https://api.masterelectronics.com/wapi/v1/cgpriceavailability/{query}/{inStockOnly}/{exactMatch}/{resultsCount}/{apiKey}
+GET https://api.masterelectronics.com/wapi/v2/cpriceavailability/{query}/{inStockOnly}/{exactMatch}/{resultsCount}/{apiKey}
 ```
 
 **Path Parameters:**
@@ -377,7 +377,7 @@ GET https://api.masterelectronics.com/wapi/v1/cgpriceavailability/{query}/{inSto
 
 **Example:**
 ```bash
-curl -X GET "https://api.masterelectronics.com/wapi/v1/cgpriceavailability/LM317/1/1/10/1640d818-0b10-4162-a2ad-34750e79e346" -H "accept: text/plain"
+curl -X GET "https://api.masterelectronics.com/wapi/v2/cpriceavailability/LM317/1/1/10/1640d818-0b10-4162-a2ad-34750e79e346" -H "accept: text/plain"
 ```
 
 **Docs:** https://www.masterelectronics.com/en/gettingstarted/?div=gettingstarted2
@@ -386,7 +386,7 @@ curl -X GET "https://api.masterelectronics.com/wapi/v1/cgpriceavailability/LM317
 - BP ID: `1000405`
 - Name: `Master Electronics`
 
-**Status:** Endpoint structure confirmed. API key returns 401 Unauthorized - **awaiting activation by Master Electronics**. Contact account rep to enable API access for our key.
+**Status:** API key confirmed active (2026-03-16). Returns 401 from our server — **awaiting IP whitelist**. Requested whitelist for `44.222.126.129`.
 
 ---
 
@@ -593,4 +593,4 @@ ANTHROPIC_API_KEY=
 
 ---
 
-*Last updated: 2026-03-13*
+*Last updated: 2026-03-16*
