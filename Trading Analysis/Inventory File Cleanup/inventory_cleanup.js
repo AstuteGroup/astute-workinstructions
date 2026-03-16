@@ -47,24 +47,25 @@ const FOOTER_PATTERNS = ['Page ', 'USS,'];
 // Composite key fields for deduplication
 const DEDUPE_FIELDS = ['Item', 'Lot', 'Location', 'Warehouse Name', 'Site', 'Date Lot'];
 
-// Warehouse groupings: [group_name, warehouse_codes, special_filter]
+// Warehouse groupings: [group_name, warehouse_codes, special_filter, file_prefix]
 // Special filter format: {column, value} or null
+// file_prefix: used for output filename (defaults to joining warehouse codes)
 const WAREHOUSE_GROUPS = [
-    ['Franchise_Stock', ['W104'], { column: 'Name', value: 'positronic' }],
-    ['Free_Stock_Stevenage', ['W102'], null],
-    ['GE_Consignment', ['W103'], null],
-    ['Free_Stock_Austin', ['W104', 'W112'], null],
-    ['Taxan_Consignment', ['W106'], null],
-    ['Spartronics_Consignment', ['W107'], null],
-    ['Free_Stock_Hong_Kong', ['W108', 'W113'], null],
-    ['Free_Stock_Philippines', ['W109', 'W114'], null],
-    ['LAM_Dead_Inventory', ['W115'], null],
-    ['LAM_Consignment', ['W118'], null],
-    ['Eaton_Consignment', ['W117'], null],
-    ['LAM_3PL', ['W111'], null],
-    ['SPE_ATX', ['W112'], null],
-    ['Main_Warehouse', ['MAIN'], null],
-    ['HK_Warehouse', ['W105'], null],
+    ['Franchise_Stock', ['W104'], { column: 'Name', value: 'positronic' }, 'W104_Positronic'],
+    ['Free_Stock_Stevenage', ['W102'], null, 'W102'],
+    ['GE_Consignment', ['W103'], null, 'W103'],
+    ['Free_Stock_Austin', ['W104', 'W112'], null, 'W104_W112'],
+    ['Taxan_Consignment', ['W106'], null, 'W106'],
+    ['Spartronics_Consignment', ['W107'], null, 'W107'],
+    ['Free_Stock_Hong_Kong', ['W108', 'W113'], null, 'W108_W113'],
+    ['Free_Stock_Philippines', ['W109', 'W114'], null, 'W109_W114'],
+    ['LAM_Dead_Inventory', ['W115'], null, 'W115'],
+    ['LAM_Consignment', ['W118'], null, 'W118'],
+    ['Eaton_Consignment', ['W117'], null, 'W117'],
+    ['LAM_3PL', ['W111'], null, 'W111'],
+    ['SPE_ATX', ['W112'], null, 'W112_SPE'],
+    ['Main_Warehouse', ['MAIN'], null, 'MAIN'],
+    ['HK_Warehouse', ['W105'], null, 'W105'],
 ];
 
 // Chuboe output column mapping
@@ -594,15 +595,22 @@ function processInventoryFile(inputFile, outputDir) {
     const chuboeHeaders = CHUBOE_COLUMNS.map(col => col[0]);
     const chuboeFiles = [];
 
+    // Build map from group name to file prefix
+    const groupToFilePrefix = {};
+    for (const [gName, wCodes, filter, filePrefix] of WAREHOUSE_GROUPS) {
+        groupToFilePrefix[gName] = filePrefix || wCodes.join('_');
+    }
+
     for (const groupName of sortedGroups) {
         const rows = groupedRows[groupName];
         if (!rows || rows.length === 0) continue;
 
         const transformed = rows.map(row => transformToChuboe(row, groupName));
-        const outFile = path.join(outputDir, `${groupName}_chuboe.csv`);
+        const filePrefix = groupToFilePrefix[groupName] || groupName;
+        const outFile = path.join(outputDir, `${filePrefix}_chuboe.csv`);
         fs.writeFileSync(outFile, arrayToCSV(transformed, chuboeHeaders));
         chuboeFiles.push(outFile);
-        console.log(`  - Saved: ${groupName}_chuboe.csv (${rows.length} rows)`);
+        console.log(`  - Saved: ${filePrefix}_chuboe.csv (${rows.length} rows)`);
     }
 
     // ==========================================================================
