@@ -4,6 +4,66 @@ Processes Infor ERP inventory exports (AST Item Lots Report) into formats ready 
 
 ---
 
+## Automated Mode (Recommended)
+
+The workflow runs **automatically every Monday at 6 AM EST** via cron job. No manual intervention required.
+
+### How It Works
+
+1. **Infor sends** the AST Item Lots Report via automated task every Monday morning
+2. **Email auto-forwards** to `excess@orangetsunami.com` inbox
+3. **Cron job runs** at 6 AM EST, fetches the email, downloads attachment
+4. **Script processes** the file (clean, dedupe, split, export)
+5. **Two emails sent** to jake.harris@astutegroup.com:
+   - **"Netcomponents Upload"** — consolidated portal CSV attached
+   - **"OT Inventory Upload"** — zipped Chuboe files for iDempiere
+6. **Source email moved** to `Inventory-Processed` folder
+
+### Email Configuration
+
+| Setting | Value |
+|---------|-------|
+| Source Inbox | `excess@orangetsunami.com` |
+| Subject Pattern | `Task finished: [success] NNNNNN AST Item Lots Report Inputs` |
+| Recipient | jake.harris@astutegroup.com |
+| Schedule | Every Monday, 6 AM EST (11:00 UTC) |
+| Processed Folder | `Inventory-Processed` |
+
+### Failure Notification
+
+If processing fails (no email found, attachment missing, processing error), a failure notification is sent to jake.harris@astutegroup.com with error details.
+
+### Manual Fetch
+
+To run the automated fetch manually (e.g., to test or reprocess):
+
+```bash
+cd ~/workspace/astute-workinstructions/Trading\ Analysis/Inventory\ File\ Cleanup
+node inventory_cleanup.js fetch
+```
+
+### Cron Job
+
+```
+0 11 * * 1 cd /home/analytics_user/workspace/astute-workinstructions/Trading\ Analysis/Inventory\ File\ Cleanup && /usr/bin/node inventory_cleanup.js fetch >> /tmp/inventory-cleanup.log 2>&1
+```
+
+### Logs
+
+Check `/tmp/inventory-cleanup.log` for cron execution history.
+
+---
+
+## Manual Mode
+
+For processing files manually (e.g., ad-hoc reports, testing):
+
+```bash
+node inventory_cleanup.js "ASTItemLotsReportInputs_USS_XXXXXXX.xlsx"
+```
+
+---
+
 ## Background
 
 This workflow replaces the Excel VBA macros previously used to clean and split inventory files. The original macros performed:
@@ -330,5 +390,5 @@ The Python script replicates these Excel VBA macro operations:
 - [ ] Define and implement NetComponents upload template
 - [ ] Define and implement IC Source upload template
 - [ ] Add direct iDempiere write-back (bypass CSV import)
-- [ ] Add email notification on completion
-- [ ] Add scheduling for automated runs
+- [x] ~~Add email notification on completion~~ ✓ Implemented 2026-03-16
+- [x] ~~Add scheduling for automated runs~~ ✓ Cron job added 2026-03-16
