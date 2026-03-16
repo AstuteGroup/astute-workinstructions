@@ -99,11 +99,13 @@ Extract ALL available fields from each quote. Required fields must be present; o
 | **Forwarder Email** | `forwarder_email` | Yes | Email of Astute employee who forwarded to vq@ (e.g., jake.harris@astutegroup.com) |
 
 **CRITICAL - Buyer Field:**
-- The Buyer is the **Astute employee** who forwarded the VQ email, NOT the customer contact from the RFQ
-- Look at the outer `From:` field: `From: Jake Harris <jake.harris@astutegroup.com>`
-- Extract the email address and name from this field
-- Do NOT use names from the RFQ record (those are customer contacts like "MohanRaj Somasundaram")
-- Common buyers: Jake Harris, Ed Harkins, Tracy Xie, Roberto Orozco
+- The Buyer is the **Astute employee who did the sourcing work**, NOT the customer contact from the RFQ
+- **Type 1 (Direct broker quote):** Use the outer `From:` field (who forwarded to vq@)
+- **Type 2 (Bulk sourcing summary):** Use the person who compiled the summary, even if someone else forwarded it
+  - Example: Feong compiled quotes → Leonard forwarded to Jake → Jake forwarded to vq@
+  - Buyer = **Feong** (did the sourcing), not Jake (just forwarded)
+- Do NOT use names from the RFQ record (those are customer contacts)
+- Common buyers: Jake Harris, Ed Harkins, Tracy Xie, Roberto Orozco, Feong Chang
 | **Vendor** | `Business Partner Search Key` | Yes | Vendor search_key from domain-based lookup |
 | **Contact** | `Contact` | No | Vendor contact name |
 | **MPN** | `MPN` | Yes | **Customer's requested MPN** (from RFQ, NOT vendor's alternate) |
@@ -273,6 +275,54 @@ himalaya message move --account vq --folder NeedsVendor Processed [IDs...]
 
 ---
 
+## Email Types
+
+### Type 1: Direct Broker Quote (Most Common)
+Single vendor quote forwarded by a buyer. Structure:
+```
+From: Jake Harris → vq@
+  └── From: sales@vendor.com → Jake
+      └── Quote details (MPN, qty, price, etc.)
+```
+- **Buyer:** The Astute employee who forwarded (Jake Harris)
+- **Vendor:** The external sender (sales@vendor.com)
+- **Records:** Usually 1-3 line items
+
+### Type 2: Bulk Sourcing Summary
+Buyer consolidates multiple broker quotes into a single email, typically sent to a seller or support for loading. Structure:
+```
+From: Jake Harris → vq@
+  └── From: Leonard Tan → Jake (FYI)
+      └── From: Feong Chang → Zoran (seller)
+          └── Summary of broker quotes
+```
+
+**Detection signals:**
+- Multiple vendor names in quick succession
+- Informal notation: `Broker :Poplar :`, `moq :2000`, `13.8usd`, `25+`, `ex hk`
+- Internal → internal forwarding (buyer summarizing for seller/support)
+- Patterns vary - no rigid template (don't build logic around "Broker:")
+
+**Key differences from Type 1:**
+| Field | Type 1 (Direct) | Type 2 (Bulk Summary) |
+|-------|-----------------|----------------------|
+| **Buyer** | Outer forwarder | Person who compiled the summary (e.g., Feong) |
+| **Vendor** | Email sender domain | Name mentioned in summary (search DB by name) |
+| **Records** | 1-3 per email | 5-20+ per email |
+
+**Vendor matching for bulk summaries:**
+- No email domain available - search by vendor name instead
+- Use fuzzy name matching: `LOWER(bp.name) LIKE '%poplar%'`
+- Common shortnames map to full names (Poplar → Poplar Technology Co., Ltd)
+
+**Example extraction from bulk summary:**
+```
+Broker :Poplar : MICRON, MT47H128M16RT-25E:C 1000 pcs. 25+ 14usd cut tape, copy full label, 3d ex hk
+```
+→ Vendor: Poplar, MPN: MT47H128M16RT-25E:C, Qty: 1000, Cost: $14.00, DC: 25+, Packaging: cut tape, Lead Time: 3 days
+
+---
+
 ## End-to-End Workflow (REQUIRED STEPS)
 
 **Every step must be completed in order. Do not skip steps.**
@@ -318,10 +368,42 @@ AND LOWER(u.email) LIKE '%domain.com%';
 
 **If vendor not found:** Flag as `NEEDS-VENDOR`, do not include in ERP-ready output.
 
-### Step 4: Match to RFQs
-- Match extracted MPNs to open RFQs (30-day window)
-- Use fuzzy matching if exact match fails (trim suffix chars)
-- Flag unmatched as `[NEEDS_RFQ - no match in 30 days]`
+### Step 4: Match to RFQs (with MPN Fuzzy Matching)
+**Do not skip.** MPN must match an RFQ for iDempiere to link the VQ.
+
+**Matching process:**
+1. **Exact match first** - Search for vendor's quoted MPN in RFQs (60-day window)
+2. **Fuzzy match if no exact** - Try partial matches:
+   - Strip common suffixes: `-TR`, `#PBF`, `#TRPBF`, `-ND`
+   - Strip trailing characters: `G4`, `Q1`, `E4`
+   - Match base MPN without packaging/temp suffixes
+3. **Flag unmatched** - `[NEEDS_RFQ - no match in 60 days]`
+
+```sql
+-- Fuzzy MPN search example
+SELECT r.value as rfq_search_key, lm.chuboe_mpn as rfq_mpn
+FROM adempiere.chuboe_rfq r
+JOIN adempiere.chuboe_rfq_line l ON r.chuboe_rfq_id = l.chuboe_rfq_id
+JOIN adempiere.chuboe_rfq_line_mpn lm ON l.chuboe_rfq_line_id = lm.chuboe_rfq_line_id
+WHERE r.isactive = 'Y'
+  AND r.created >= CURRENT_DATE - INTERVAL '60 days'
+  AND UPPER(lm.chuboe_mpn) LIKE '%MT47H128M16RT-25E%'  -- base MPN pattern
+ORDER BY r.created DESC;
+```
+
+**⚠️ CRITICAL: When MPN doesn't match exactly (AUTO-APPLY):**
+
+If the vendor's quoted MPN differs from the RFQ MPN, you MUST:
+1. **MPN field:** Use the **RFQ MPN** (required for iDempiere linking)
+2. **Vendor Notes:** Add `Quoted MPN: [vendor's MPN]` as the **FIRST entry**
+
+| Scenario | Vendor Quoted | RFQ Has | MPN Field | Vendor Notes |
+|----------|---------------|---------|-----------|--------------|
+| Vendor drops suffix | MT47H128M16RT-25E:C | MT47H128M16RT-25E:C TR | MT47H128M16RT-25E:C TR | Quoted MPN: MT47H128M16RT-25E:C |
+| Vendor adds suffix | LM2903AVQDRG4Q1 | LM2903AVQDR | LM2903AVQDR | Quoted MPN: LM2903AVQDRG4Q1 |
+| Alternate part | IS43DR16128C-25DBLI-TR | IS43DR16128C-25DBL | IS43DR16128C-25DBL | Quoted MPN: IS43DR16128C-25DBLI-TR (high temp alternate) |
+
+**This is automatic** - whenever a fuzzy match is used instead of exact match, populate Vendor Notes with the quoted MPN. Do not ask; just do it.
 
 ### Step 5: Generate Output Files
 | File | Contents |
