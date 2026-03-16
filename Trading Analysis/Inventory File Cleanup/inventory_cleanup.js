@@ -64,8 +64,8 @@ const WAREHOUSE_GROUPS = [
     ['Eaton_Consignment', ['W117'], null],
     ['LAM_3PL', ['W111'], null],
     ['SPE_ATX', ['W112'], null],
-    ['Main_Warehouse', ['MAIN'], null],
-    ['HK_Warehouse', ['W105'], null],
+    ['Allocated_Warehouse', ['MAIN'], null],
+    ['HK_Allocated_Warehouse', ['W105'], null],
 ];
 
 // Chuboe output column mapping
