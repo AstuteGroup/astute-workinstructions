@@ -203,7 +203,7 @@ async function downloadAttachment(messageId, folder = 'INBOX') {
         const timer = setTimeout(() => {
             proc.kill('SIGKILL');
             reject(new Error('Attachment download timeout'));
-        }, 60000);
+        }, 600000); // 10 minutes for large files (cron runs unattended)
 
         proc.on('close', (code) => {
             clearTimeout(timer);
@@ -273,23 +273,39 @@ ${body}
         }
     }
 
-    try {
-        // Write template to temp file
-        const tempFile = '/tmp/inventory-email.mml';
-        fs.writeFileSync(tempFile, mml);
+    return new Promise((resolve) => {
+        console.log(`  Sending email to ${to}: ${subject}`);
 
-        await runHimalayaRaw([
+        const proc = spawn(HIMALAYA_BIN, [
             'template', 'send',
-            '--account', EMAIL_CONFIG.account,
-            mml
-        ], 60000);
+            '--account', EMAIL_CONFIG.account
+        ], {
+            env: process.env,
+            stdio: ['pipe', 'pipe', 'pipe']
+        });
 
-        console.log(`  Email sent to ${to}: ${subject}`);
-        return true;
-    } catch (err) {
-        console.error(`  Failed to send email: ${err.message}`);
-        return false;
-    }
+        let stderr = '';
+        proc.stderr.on('data', (data) => { stderr += data.toString(); });
+
+        proc.on('close', (code) => {
+            if (code === 0) {
+                console.log(`  Email sent successfully`);
+                resolve(true);
+            } else {
+                console.error(`  Failed to send email: ${stderr}`);
+                resolve(false);
+            }
+        });
+
+        proc.on('error', (err) => {
+            console.error(`  Failed to send email: ${err.message}`);
+            resolve(false);
+        });
+
+        // Write template to stdin and close
+        proc.stdin.write(mml);
+        proc.stdin.end();
+    });
 }
 
 async function sendFailureNotice(error) {
