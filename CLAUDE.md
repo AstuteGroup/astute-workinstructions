@@ -21,6 +21,8 @@ If you catch yourself thinking "I remember how this works" - STOP and read the f
 
 # Session Greeting
 
+**TRIGGER:** When you see `SessionStart:startup hook success` in a system-reminder, IMMEDIATELY display the greeting below — do not wait for user input. This allows the user to jump straight into their task.
+
 At the start of every new conversation, before addressing anything else, always display the following:
 
 1. **Recent Work** — Check the `## Recent Sessions` section in MEMORY.md. Display the 2-4 most recent entries so the user can quickly pick up where they left off. Format as:
