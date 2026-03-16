@@ -169,27 +169,19 @@ async function listEmails(folder = 'INBOX') {
 }
 
 async function downloadAttachment(messageId, folder = 'INBOX') {
-    const tempDir = '/tmp/inventory-attachments';
-    if (!fs.existsSync(tempDir)) {
-        fs.mkdirSync(tempDir, { recursive: true });
-    }
-
-    // Clean up old files first
-    const oldFiles = fs.readdirSync(tempDir);
-    for (const f of oldFiles) {
-        try {
-            fs.unlinkSync(path.join(tempDir, f));
-        } catch (e) { /* ignore */ }
-    }
+    // Use 'message export' instead of 'attachment download' - more reliable
+    // This exports attachments to /tmp with their original filenames
 
     return new Promise((resolve, reject) => {
+        console.log(`  Exporting message ${messageId} to extract attachments...`);
+
         const proc = spawn(HIMALAYA_BIN, [
-            'attachment', 'download',
+            'message', 'export',
             '--account', EMAIL_CONFIG.account,
             '--folder', folder,
             String(messageId)
         ], {
-            cwd: tempDir,
+            cwd: '/tmp',
             env: process.env,
             stdio: ['ignore', 'pipe', 'pipe']
         });
@@ -202,33 +194,50 @@ async function downloadAttachment(messageId, folder = 'INBOX') {
 
         const timer = setTimeout(() => {
             proc.kill('SIGKILL');
-            reject(new Error('Attachment download timeout'));
-        }, 600000); // 10 minutes for large files (cron runs unattended)
+            reject(new Error('Message export timeout'));
+        }, 300000); // 5 minutes
 
         proc.on('close', (code) => {
             clearTimeout(timer);
-            if (code !== 0) {
-                return reject(new Error(`Download failed: ${stderr}`));
-            }
 
-            // Find downloaded xlsx file
-            const files = fs.readdirSync(tempDir);
-            const xlsxFile = files.find(f => f.endsWith('.xlsx') || f.endsWith('.xls'));
+            console.log(`  Export complete, searching for xlsx file...`);
 
-            if (xlsxFile) {
-                resolve(path.join(tempDir, xlsxFile));
-            } else {
-                // Also check /tmp directly (himalaya sometimes puts files there)
-                const tmpFiles = fs.readdirSync('/tmp').filter(f =>
-                    (f.endsWith('.xlsx') || f.endsWith('.xls')) &&
-                    f.includes('AST') || f.includes('Item')
+            // Find xlsx file in /tmp (himalaya exports attachments there)
+            // Files may have .aaf extension but are actually xlsx
+            const tmpFiles = fs.readdirSync('/tmp');
+
+            // First try exact xlsx match
+            let xlsxFile = tmpFiles.find(f =>
+                f.includes('ASTItemLotsReport') && (f.endsWith('.xlsx') || f.endsWith('.xls'))
+            );
+
+            // If not found, check for .aaf files (himalaya sometimes uses this extension)
+            if (!xlsxFile) {
+                const aafFile = tmpFiles.find(f =>
+                    f.includes('ASTItemLotsReport') && f.endsWith('.aaf')
                 );
-                if (tmpFiles.length > 0) {
-                    resolve(path.join('/tmp', tmpFiles[0]));
-                } else {
-                    reject(new Error('No xlsx attachment found'));
+                if (aafFile) {
+                    // Rename to xlsx
+                    const aafPath = path.join('/tmp', aafFile);
+                    const xlsxPath = aafPath.replace('.aaf', '.xlsx');
+                    fs.copyFileSync(aafPath, xlsxPath);
+                    xlsxFile = path.basename(xlsxPath);
+                    console.log(`  Converted ${aafFile} to ${xlsxFile}`);
                 }
             }
+
+            if (xlsxFile) {
+                const fullPath = path.join('/tmp', xlsxFile);
+                console.log(`  Found: ${fullPath}`);
+                resolve(fullPath);
+            } else {
+                reject(new Error('No xlsx attachment found after export'));
+            }
+        });
+
+        proc.on('error', (err) => {
+            clearTimeout(timer);
+            reject(new Error(`Export failed: ${err.message}`));
         });
     });
 }
