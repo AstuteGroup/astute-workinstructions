@@ -149,7 +149,9 @@ Check the console output for:
 
 ### Step 4: Load to iDempiere
 
-Upload the `*_chuboe.csv` files via Chuboe import process (one file per warehouse group).
+Upload the `{WarehouseCode}_{GroupName}.csv` files via Chuboe import process (one file per warehouse group).
+
+In automated mode, these files are zipped and emailed as "OT Inventory Upload".
 
 ### Step 5: Upload to Portals (TBD)
 
@@ -192,13 +194,13 @@ The script splits inventory into these groups based on Warehouse code and option
 
 ### Other
 
-| Group | Warehouse Code(s) | Notes |
-|-------|-------------------|-------|
-| LAM_Dead_Inventory | W115 | LAM dead stock |
-| LAM_3PL | W111 | LAM 3PL managed |
-| SPE_ATX | W112 | SPE Austin |
-| Main_Warehouse | MAIN | Main warehouse |
-| HK_Warehouse | W105 | Hong Kong warehouse |
+| Group | Warehouse Code(s) | Output Filename | Notes |
+|-------|-------------------|-----------------|-------|
+| LAM_Dead_Inventory | W115 | W115_LAM_Dead_Inventory.csv | LAM dead stock |
+| LAM_3PL | W111 | W111_LAM_3PL.csv | LAM 3PL managed |
+| SPE_ATX | W112 | W112_SPE_ATX.csv | SPE Austin |
+| Allocated_Warehouse | MAIN | MAIN_Allocated_Warehouse.csv | Main allocated warehouse |
+| HK_Allocated_Warehouse | W105 | W105_HK_Allocated_Warehouse.csv | Hong Kong allocated warehouse |
 
 ### Excluded (Intentionally Unmatched)
 
@@ -271,10 +273,32 @@ All output files are saved to a dated folder: `Inventory YYYY-MM-DD/`
 
 | File | Description |
 |------|-------------|
-| `{Group}_chuboe.csv` | Chuboe format for iDempiere (one per warehouse group) |
-| `consolidated_portal_{timestamp}.csv` | All inventory for portal upload |
+| `{WarehouseCode}_{GroupName}.csv` | Chuboe format for iDempiere (one per warehouse group) |
+| `OT_Chuboe_Files_YYYY-MM-DD.zip` | Zipped archive of all Chuboe CSVs (emailed) |
+| `consolidated_portal_{timestamp}.csv` | All inventory for portal upload (emailed) |
 | `inventory_cleaned_{timestamp}.csv` | Full cleaned/deduped master file |
 | `duplicates_{timestamp}.csv` | Removed duplicates (for audit/review) |
+
+### File Naming Convention
+
+Output files use the format `{WarehouseCode}_{GroupName}.csv`:
+
+| Example Filename | Warehouse | Group |
+|------------------|-----------|-------|
+| W102_Free_Stock_Stevenage.csv | W102 | Free_Stock_Stevenage |
+| W103_GE_Consignment.csv | W103 | GE_Consignment |
+| W104_Franchise_Stock.csv | W104 | Franchise_Stock |
+| W104_W112_Free_Stock_Austin.csv | W104, W112 | Free_Stock_Austin |
+| W105_HK_Allocated_Warehouse.csv | W105 | HK_Allocated_Warehouse |
+| W106_Taxan_Consignment.csv | W106 | Taxan_Consignment |
+| W107_Spartronics_Consignment.csv | W107 | Spartronics_Consignment |
+| W108_W113_Free_Stock_Hong_Kong.csv | W108, W113 | Free_Stock_Hong_Kong |
+| W109_W114_Free_Stock_Philippines.csv | W109, W114 | Free_Stock_Philippines |
+| W111_LAM_3PL.csv | W111 | LAM_3PL |
+| W115_LAM_Dead_Inventory.csv | W115 | LAM_Dead_Inventory |
+| W117_Eaton_Consignment.csv | W117 | Eaton_Consignment |
+| W118_LAM_Consignment.csv | W118 | LAM_Consignment |
+| MAIN_Allocated_Warehouse.csv | MAIN | Allocated_Warehouse |
 
 ---
 
@@ -321,33 +345,40 @@ node inventory_cleanup.js "ASTItemLotsReportInputs_USS_4544132.xlsx" ./custom-ou
 
 ### Sample Console Output
 ```
-Processing: ASTItemLotsReportInputs_USS_4544132.xlsx
-Output directory: Inventory 2026-03-11
+Processing: ASTItemLotsReportInputs_USS_4557834.xlsx
+Output directory: Inventory 2026-03-16
 ------------------------------------------------------------
 Step 1: Reading and cleaning file...
-  - Headers found: 15 columns
-  - Data rows read: 12847
+  - Headers found: 31 columns
+  - Data rows read: 5712
 
 Step 2: Deduplicating...
-  - Unique rows: 12803
-  - Duplicate rows removed: 44
-  - Duplicates saved to: ./output/duplicates_20260224_173444.csv
+  - Unique rows: 5694
+  - Duplicate rows removed: 18
 
 Step 3: Splitting by warehouse group...
-  - Franchise_Stock: 156 rows
-  - Free_Stock_Austin: 892 rows
-  - GE_Consignment: 3421 rows
+  - Allocated_Warehouse: 427 rows
+  - Eaton_Consignment: 4 rows
+  - Franchise_Stock: 82 rows
+  - Free_Stock_Austin: 483 rows
+  - GE_Consignment: 1496 rows
+  - HK_Allocated_Warehouse: 631 rows
   ...
 
 Step 4: Exporting Chuboe format files...
-  - Saved: Franchise_Stock_chuboe.csv (156 rows)
+  - Saved: MAIN_Allocated_Warehouse.csv (427 rows)
+  - Saved: W117_Eaton_Consignment.csv (4 rows)
+  - Saved: W104_Franchise_Stock.csv (82 rows)
+  - Saved: W104_W112_Free_Stock_Austin.csv (483 rows)
+  - Saved: W103_GE_Consignment.csv (1496 rows)
+  - Saved: W105_HK_Allocated_Warehouse.csv (631 rows)
   ...
 
 Step 5: Exporting consolidated portal file...
-  - Saved: consolidated_portal_20260224_173444.csv (12803 rows)
+  - Saved: consolidated_portal_20260316194633.csv (5694 rows)
 
 Step 6: Saving cleaned master file...
-  - Saved: inventory_cleaned_20260224_173444.csv (12803 rows)
+  - Saved: inventory_cleaned_20260316194633.csv (5694 rows)
 
 ============================================================
 PROCESSING COMPLETE
