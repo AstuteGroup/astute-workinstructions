@@ -185,6 +185,38 @@ These are the **ONLY** valid values. Use exact spelling and case:
 - ❌ `EACH` → ✓ `BULK`
 - ❌ `T&R` → ✓ `REEL`
 - ❌ `1`, `400`, `5000` → ✓ (blank) - these are SPQ values, not packaging
+- ❌ `Y` / `N` for RoHS → ✓ `Yes` / `No` (full words required)
+
+**Filling Blank Packaging from Database (DO NOT SKIP):**
+
+When packaging is blank, query the database for similar MPNs to infer the correct value:
+
+```sql
+-- Find packaging for blank MPNs from existing VQs
+SELECT
+  vql.chuboe_mpn,
+  pkg.name as packaging,
+  COUNT(*) as vq_count
+FROM adempiere.chuboe_vq_line vql
+LEFT JOIN adempiere.chuboe_packaging pkg
+  ON vql.chuboe_packaging_id = pkg.chuboe_packaging_id
+WHERE vql.isactive = 'Y'
+  AND vql.chuboe_mpn_clean LIKE '%<BASE_MPN_PATTERN>%'
+GROUP BY vql.chuboe_mpn, pkg.name
+ORDER BY vq_count DESC;
+```
+
+**Part Family Defaults (when no DB match):**
+
+| Part Type | Typical Packaging |
+|-----------|-------------------|
+| Bourns 3299Z trimmers | F-TUBE |
+| Samtec connectors (SSW, TSW, IPL, MOLC) | BULK |
+| SMD passives (0402, 0603, 0805, etc.) | REEL |
+| DIP/through-hole ICs | F-TUBE |
+| QFP/QFN/BGA ICs | TRAY |
+| Large connectors, switches | BULK |
+| Power modules (LMZ, R-78) | F-TUBE |
 
 **Vendor Notes field usage:**
 - **Alternate MPN** (CRITICAL - MUST BE FIRST): When vendor quotes a different MPN than requested, put "Quoted MPN: [vendor's MPN]" as the **FIRST thing** in Vendor Notes. The MPN field MUST contain the customer's original RFQ MPN - this is how iDempiere links the VQ to the RFQ.
@@ -256,7 +288,7 @@ Top vendors by quote volume:
 
 ### Vendor Frequency Tracking
 
-→ **See Step 7 in End-to-End Workflow.** This is a required step, not optional reference.
+→ **See Step 8 in End-to-End Workflow.** This is a required step, not optional reference.
 
 ### Output
 - `vq-upload-ready.csv` - VQ Mass Upload Template format, ready for iDempiere import
@@ -265,7 +297,7 @@ Top vendors by quote volume:
 
 ### Post-Extraction & Folder Routing
 
-→ **See Step 6 in End-to-End Workflow.** This is a required step, not optional reference.
+→ **See Step 7 in End-to-End Workflow.** This is a required step, not optional reference.
 
 ### Vendor-Missing Workflow
 
@@ -430,7 +462,44 @@ If the vendor's quoted MPN differs from the RFQ MPN, you MUST:
 
 **This is automatic** - whenever a fuzzy match is used instead of exact match, populate Vendor Notes with the quoted MPN. Do not ask; just do it.
 
-### Step 5: Generate Output Files
+### Step 5: Fill Blank Packaging from Database (DO NOT SKIP)
+**Applies to ALL VQ sources:** email extraction, CalcuQuote/franchise exports, templates.
+
+1. **Identify blank packaging in output:**
+```bash
+# Quick check for blanks
+grep -E "^[^,]*,[^,]*,[^,]*,[^,]*,[^,]*,[^,]*,[^,]*,[^,]*,[^,]*,[^,]*,[^,]*,[^,]*,," output.csv
+```
+
+2. **Query database for each blank MPN:**
+```sql
+SELECT
+  vql.chuboe_mpn,
+  pkg.name as packaging,
+  COUNT(*) as vq_count
+FROM adempiere.chuboe_vq_line vql
+JOIN adempiere.chuboe_packaging pkg
+  ON vql.chuboe_packaging_id = pkg.chuboe_packaging_id
+WHERE vql.isactive = 'Y'
+  AND vql.chuboe_mpn_clean LIKE '%<BASE_MPN>%'
+GROUP BY vql.chuboe_mpn, pkg.name
+ORDER BY vq_count DESC
+LIMIT 5;
+```
+
+3. **Apply packaging based on:**
+   - **Same MPN match** - Use exact packaging from DB
+   - **Same series match** - Use packaging from similar part (e.g., 3299Z-1-503LF → 3299Z-1-202LF)
+   - **Part family default** - Use typical packaging for part type (see Field Reference above)
+
+4. **Validate all lookup fields before proceeding:**
+```bash
+node ~/workspace/validate-vq-upload.js <output.csv>
+```
+
+**CHECKPOINT:** Do not proceed to Step 6 until validation shows `✓ PASS - All lookup fields valid`.
+
+### Step 6: Generate Output Files
 | File | Contents |
 |------|----------|
 | `YYYY-MM-DD-extracted.csv` | All extractions with categories (QUOTE, SKIP, NO-BID, etc.) |
@@ -468,7 +537,7 @@ If the vendor's quoted MPN differs from the RFQ MPN, you MUST:
 | Incomplete (missing data) / can't extract | `NeedsReview` |
 | Skip (empty forward, duplicate) | `Processed` |
 
-### Step 6: Route and Move Emails (REQUIRED)
+### Step 7: Route and Move Emails (REQUIRED)
 **Do not skip.** Emails must be moved out of INBOX after extraction.
 
 ```bash
@@ -484,7 +553,7 @@ node ~/workspace/vq-parser/scripts/route-emails.js --latest
 
 **CHECKPOINT:** Session is not complete until routing is executed. The hourly fetch will keep re-reporting emails that aren't moved.
 
-### Step 7: Update Vendor Frequency Tracking (REQUIRED)
+### Step 8: Update Vendor Frequency Tracking (REQUIRED)
 **Do not skip.** This identifies high-volume vendors for template development.
 
 1. Count vendors from **session output file** (not database):
@@ -501,7 +570,7 @@ node ~/workspace/vq-parser/scripts/route-emails.js --latest
 
 **Why this matters:** Templates eliminate manual extraction. A vendor sending 10 quotes/week = 40/month of manual work that could be automated.
 
-### Step 8: Move Actioned Emails to Processed (REQUIRED)
+### Step 9: Move Actioned Emails to Processed (REQUIRED)
 **Do not skip.** Emails in NeedsReview, NoBid, and NeedsVendor must be moved to Processed after being actioned.
 
 **When to move:**
@@ -525,7 +594,7 @@ himalaya envelope list -f 'NeedsVendor' --page-size 500 | wc -l
 ```
 
 **CHECKPOINT:** Session is fully complete when:
-- All INBOX emails routed (Step 6)
+- All INBOX emails routed (Step 7)
 - All NeedsReview PDFs extracted and merged
 - All actioned folders emptied to Processed (this step)
 
