@@ -187,37 +187,6 @@ These are the **ONLY** valid values. Use exact spelling and case:
 - ❌ `1`, `400`, `5000` → ✓ (blank) - these are SPQ values, not packaging
 - ❌ `Y` / `N` for RoHS → ✓ `Yes` / `No` (full words required)
 
-**Filling Blank Packaging from Database (DO NOT SKIP):**
-
-When packaging is blank, query the database for similar MPNs to infer the correct value:
-
-```sql
--- Find packaging for blank MPNs from existing VQs
-SELECT
-  vql.chuboe_mpn,
-  pkg.name as packaging,
-  COUNT(*) as vq_count
-FROM adempiere.chuboe_vq_line vql
-LEFT JOIN adempiere.chuboe_packaging pkg
-  ON vql.chuboe_packaging_id = pkg.chuboe_packaging_id
-WHERE vql.isactive = 'Y'
-  AND vql.chuboe_mpn_clean LIKE '%<BASE_MPN_PATTERN>%'
-GROUP BY vql.chuboe_mpn, pkg.name
-ORDER BY vq_count DESC;
-```
-
-**Part Family Defaults (when no DB match):**
-
-| Part Type | Typical Packaging |
-|-----------|-------------------|
-| Bourns 3299Z trimmers | F-TUBE |
-| Samtec connectors (SSW, TSW, IPL, MOLC) | BULK |
-| SMD passives (0402, 0603, 0805, etc.) | REEL |
-| DIP/through-hole ICs | F-TUBE |
-| QFP/QFN/BGA ICs | TRAY |
-| Large connectors, switches | BULK |
-| Power modules (LMZ, R-78) | F-TUBE |
-
 **Vendor Notes field usage:**
 - **Alternate MPN** (CRITICAL - MUST BE FIRST): When vendor quotes a different MPN than requested, put "Quoted MPN: [vendor's MPN]" as the **FIRST thing** in Vendor Notes. The MPN field MUST contain the customer's original RFQ MPN - this is how iDempiere links the VQ to the RFQ.
 - **No-bid reasons**: When qty=0 and price=0, capture why: "No-bid - out of stock", "No-bid - cannot source"
@@ -462,40 +431,31 @@ If the vendor's quoted MPN differs from the RFQ MPN, you MUST:
 
 **This is automatic** - whenever a fuzzy match is used instead of exact match, populate Vendor Notes with the quoted MPN. Do not ask; just do it.
 
-### Step 5: Fill Blank Packaging from Database (DO NOT SKIP)
+### Step 5: Validate Lookup Fields (DO NOT SKIP)
 **Applies to ALL VQ sources:** email extraction, CalcuQuote/franchise exports, templates.
 
-1. **Identify blank packaging in output:**
-```bash
-# Quick check for blanks
-grep -E "^[^,]*,[^,]*,[^,]*,[^,]*,[^,]*,[^,]*,[^,]*,[^,]*,[^,]*,[^,]*,[^,]*,[^,]*,," output.csv
-```
-
-2. **Query database for each blank MPN:**
-```sql
-SELECT
-  vql.chuboe_mpn,
-  pkg.name as packaging,
-  COUNT(*) as vq_count
-FROM adempiere.chuboe_vq_line vql
-JOIN adempiere.chuboe_packaging pkg
-  ON vql.chuboe_packaging_id = pkg.chuboe_packaging_id
-WHERE vql.isactive = 'Y'
-  AND vql.chuboe_mpn_clean LIKE '%<BASE_MPN>%'
-GROUP BY vql.chuboe_mpn, pkg.name
-ORDER BY vq_count DESC
-LIMIT 5;
-```
-
-3. **Apply packaging based on:**
-   - **Same MPN match** - Use exact packaging from DB
-   - **Same series match** - Use packaging from similar part (e.g., 3299Z-1-503LF → 3299Z-1-202LF)
-   - **Part family default** - Use typical packaging for part type (see Field Reference above)
-
-4. **Validate all lookup fields before proceeding:**
+Run validation before generating final output:
 ```bash
 node ~/workspace/validate-vq-upload.js <output.csv>
 ```
+
+**What it checks:**
+- **Packaging** — Must be UPPERCASE valid value (REEL, TRAY, BULK, CUT TAPE, F-TUBE, etc.) or blank
+- **RoHS** — Must be `Yes`, `No`, `Not Applicable`, or blank (NOT `Y`/`N`)
+- **Currency** — Must be valid ISO code (GBP, EUR, USD, etc.) or blank
+
+**Common normalization fixes:**
+| Source Value | Correct Value | Why |
+|--------------|---------------|-----|
+| `Y` | `Yes` | RoHS requires full word |
+| `N` | `No` | RoHS requires full word |
+| `TUBE` | `F-TUBE` | No plain TUBE in DB |
+| `Reel` | `REEL` | Must be UPPERCASE |
+| `T&R` | `REEL` | Normalize abbreviation |
+| `EACH` | `BULK` | Map to valid value |
+| `1`, `500` | (blank) | These are SPQ, not packaging |
+
+**If vendor didn't provide packaging** → leave blank (don't guess or look up).
 
 **CHECKPOINT:** Do not proceed to Step 6 until validation shows `✓ PASS - All lookup fields valid`.
 
