@@ -10,9 +10,10 @@ Consolidated roadmap for Trading Analysis workflows.
 |----------|----------|--------|
 | Vortex Matches | `Vortex Matches/` | Operational |
 | Quick Quote | `Quick Quote/` | Operational |
-| Market Offer Matching | `Market Offer Matching for RFQs/` | Operational |
+| **Live Opportunities (RFQ → Offers)** | `Market Offer Matching for RFQs/` | Operational |
+| **Proactive Opportunities (Offers → Historical)** | `Market Offer Matching for RFQs/` | Partial |
 | Inventory File Cleanup | `Inventory File Cleanup/` | Operational |
-| LAM Kitting Reorder | `LAM Kitting Reorder/` | Planned |
+| LAM Kitting Reorder | `LAM Kitting Reorder/` | Operational |
 | Stock Market Analysis | — | Planned |
 
 ---
@@ -159,11 +160,86 @@ Consolidated roadmap for Trading Analysis workflows.
 
 ## C1. LAM Kitting Reorder Workflow
 
-**Status:** Planned | **Priority:** Next
+**Status:** Operational | **Priority:** Complete
 
 **Problem:** LAM kitting warehouses (W111, W115) need inventory monitoring to trigger reorders, update lead times, and track historical sourcing.
 
-**Solution:** Dedicated workflow — see `LAM Kitting Reorder/lam-kitting-reorder.md`
+**Solution:** `lam-kitting-reorder.js` — compares W111+W115 inventory to Excel thresholds, generates reorder alerts with historical sourcing data.
+
+**Output:** `LAM_Reorder_Alerts_YYYY-MM-DD.csv` emailed to jake.harris@astutegroup.com
+
+---
+
+# Section D: Market Offer Matching
+
+Two complementary workflows for matching market offers to demand:
+
+| # | Workflow | Direction | Purpose | Status |
+|---|----------|-----------|---------|--------|
+| D1 | Live Opportunities | RFQ → Offers | Match new RFQs against existing offers for immediate fulfillment | Operational |
+| D2 | Proactive Opportunities | Offers → Historical + Market | Match new offers against historical RFQs + market conditions for proactive outreach | Partial |
+
+---
+
+## D1. Live Opportunities (RFQ → Offers)
+
+**Status:** Operational | **Trigger:** New RFQs
+
+**Purpose:** When new RFQs arrive, identify existing market offers that can fulfill the demand.
+
+**Data Sources:**
+- **RFQs:** New RFQs from database (incremental, tracks last processed)
+- **Offers:** Customer Excess offers in database (90-day lookback)
+
+**Process:**
+1. Get new RFQs since last run
+2. Match against Customer Excess offers (type_id = 1000000)
+3. Calculate opportunity value and coverage
+4. Tier results (TIER_1/2/3)
+5. Output `Excess_Match_MM-DD_RFQ_[start]-[end].csv`
+
+**Documentation:** `Market Offer Matching for RFQs/market-offer-matching.md`
+
+**Limitation:** Offers must be imported to database first. Does not see offers still in CSV form.
+
+---
+
+## D2. Proactive Opportunities (Offers → Historical + Market)
+
+**Status:** Partial | **Trigger:** New market offers uploaded
+
+**Purpose:** When new market offers arrive, identify historical demand signals and market conditions for proactive sales outreach.
+
+**Data Sources:**
+- **Offers:** New offers from CSV (just extracted, not yet in DB)
+- **Historical RFQs:** ALL RFQ history (not time-limited) — demand signal doesn't expire
+- **Market Conditions:** VQ history, pricing trends, related offers (TBD)
+
+**Process:**
+1. Extract offers from CSV (Market Offer Uploading Step 1-6)
+2. Match MPNs against ALL historical RFQs
+3. Pull market intelligence (VQ pricing, demand frequency, last activity)
+4. Identify proactive outreach opportunities
+5. Output actionable report
+
+**Current Implementation:** `analyze-new-offers.js` — partial (180-day RFQ lookback only, no market conditions)
+
+**Gaps to Address:**
+| Gap | Description | Priority |
+|-----|-------------|----------|
+| D2.1 | Expand RFQ lookback to ALL TIME (or configurable 2+ years) | Next |
+| D2.2 | Add market conditions: VQ pricing history for matched MPNs | Next |
+| D2.3 | Add demand frequency: how often has this MPN been requested? | Next |
+| D2.4 | Add recency signal: when was the last RFQ for this MPN? | Next |
+| D2.5 | Add customer context: which customers have requested this? | Later |
+
+**Output Columns (Target):**
+```
+offer_mpn, offer_qty, offer_price, offer_partner,
+historical_rfq_count, last_rfq_date, customers_requested,
+avg_vq_cost, min_vq_cost, max_vq_cost, last_vq_date,
+demand_signal_strength, recommended_action
+```
 
 ---
 
@@ -188,7 +264,9 @@ Consolidated roadmap for Trading Analysis workflows.
 |------|---------|---------|
 | 2026-03-09 | A | Vortex Matches initial setup |
 | 2026-03-10 | A | Full implementation: deduplication, column cleanup, MO Type fix |
+| 2026-03-17 | C | LAM Kitting Reorder: Operational |
+| 2026-03-17 | D | Added Market Offer Matching section with D1 (Live) and D2 (Proactive) workflows |
 
 ---
 
-*Last updated: 2026-03-10*
+*Last updated: 2026-03-17*

@@ -19,7 +19,7 @@ const path = require('path');
 
 // Configuration
 const OUTPUT_DIR = __dirname;
-const RFQ_LOOKBACK_DAYS = 90;
+const RFQ_LOOKBACK_DAYS = 180;
 const MIN_OPPORTUNITY_VALUE = 500;
 
 function log(msg) {

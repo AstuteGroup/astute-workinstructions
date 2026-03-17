@@ -1,7 +1,13 @@
-# Market Offer Analysis for RFQs
+# Market Offer Analysis for RFQs (Live Opportunities)
+
+**Roadmap ID:** D1 — see `trading-analysis-roadmap.md`
 
 ## Overview
-Match new RFQs against Customer Excess inventory to identify fulfillment opportunities. Output is a tiered CSV with estimated values and validation flags.
+Match new RFQs against Customer Excess inventory to identify **live fulfillment opportunities**. Output is a tiered CSV with estimated values and validation flags.
+
+**Direction:** RFQ → Offers (demand drives the match)
+
+**Complementary workflow:** D2 Proactive Opportunities (Offers → Historical RFQs) — triggered by Market Offer Uploading Step 9.
 
 ## Tracking
 - **File naming:** `Excess_Match_MM-DD_RFQ_[start]-[end].csv`
