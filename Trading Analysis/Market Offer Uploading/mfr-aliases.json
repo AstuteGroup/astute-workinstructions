@@ -3,53 +3,44 @@
   "_usage": "Map email text → canonical name for Chuboe_MFR_Text. System auto-maps to MFR ID on import.",
   "_note": "Values are exact chuboe_mfr.name values from database.",
   "_updated": "2026-03-17",
-
+  "_last_validated": "2026-03-17",
+  "_validation_cadence": "Monthly - run validate-mfr-aliases.js",
   "aliases": {
     "TI": "Texas Instruments",
     "TEXAS INSTRUMENTS": "Texas Instruments",
     "TEXAS INSTRUMENTS INCORPORATED": "Texas Instruments",
     "TEXAS INSTRUMENTS INC": "Texas Instruments",
-
     "ST": "STMicroelectronics",
     "STM": "STMicroelectronics",
     "STMICROELECTRONICS": "STMicroelectronics",
     "STMICROELECTRONICS (EUR S&D)": "STMicroelectronics",
     "ST MICROELECTRONICS": "STMicroelectronics",
     "ST MICRO": "STMicroelectronics",
-
     "ADI": "Analog Devices Inc",
     "ANALOG DEVICES": "Analog Devices Inc",
     "ANALOG DEVICES INC": "Analog Devices Inc",
     "ANALOG DEVICES INCORPORATED": "Analog Devices Inc",
-
     "ON": "On Semiconductor",
     "ONSEMI": "On Semiconductor",
     "ON SEMICONDUCTOR": "On Semiconductor",
     "ON SEMI": "On Semiconductor",
-
     "IFX": "Infineon Technologies",
     "INFINEON": "Infineon Technologies",
     "INFINEON TECHNOLOGIES": "Infineon Technologies",
     "INFINEON TECHNOLOGIES AG": "Infineon Technologies",
-
     "VISHAY": "Vishay Intertechnology Inc",
     "VIS": "Vishay Intertechnology Inc",
     "VISHAY INTERTECHNOLOGY": "Vishay Intertechnology Inc",
     "VISHAY INTERTECHNOLOGY INC": "Vishay Intertechnology Inc",
-
     "NXP": "NXP Semiconductors",
     "NXP SEMICONDUCTORS": "NXP Semiconductors",
     "NXP SEMICONDUCTOR": "NXP Semiconductors",
-
     "MICROCHIP": "Microchip Technology Inc",
     "MCHP": "Microchip Technology Inc",
     "MICROCHIP TECHNOLOGY": "Microchip Technology Inc",
     "MICROCHIP TECHNOLOGY INC": "Microchip Technology Inc",
-
     "NEXPERIA": "Nexperia",
-
     "ISSI": "Issi",
-
     "TE": "TE Connectivity Ltd",
     "TE CONNECTIVITY": "TE Connectivity Ltd",
     "TE CONNECTIVITY LTD": "TE Connectivity Ltd",
@@ -59,165 +50,117 @@
     "TE CONNECTIVITY/AMP BRAND": "TE Connectivity Ltd",
     "TE CONN": "TE Connectivity Ltd",
     "AMP": "TE Connectivity Ltd",
-
     "SAMSUNG": "Samsung",
     "SAMSUNG ELECTRONICS": "Samsung",
     "SAMSUNG ELECTRO-MECHANICS": "Samsung Electro-Mechanics",
     "SEC": "Samsung Electro-Mechanics",
-
     "MURATA": "Murata",
     "MURATA ELECTRONICS": "Murata",
     "MURATA MANUFACTURING": "Murata",
-
     "BROADCOM": "Broadcom",
     "AVAGO": "Broadcom",
     "BROADCOM INC": "Broadcom",
-
     "FCI": "Fci",
     "AMPHENOL FCI": "Fci",
-
     "AMPHENOL": "Amphenol Corp",
     "AMPHENOL CORP": "Amphenol Corp",
     "AMPHENOL ICC": "Amphenol ICC",
-
     "WALSIN": "Walsin",
     "WALSIN TECHNOLOGY": "Walsin",
-
     "PANASONIC": "Panasonic",
     "PANASONIC CORP": "Panasonic",
     "PANASONIC INDUSTRIAL": "Panasonic",
-
     "ITT": "ITT Cannon",
     "ITT CANNON": "ITT Cannon",
     "ITT INC": "ITT Cannon",
-
     "HONEYWELL": "Honeywell",
     "HONEYWELL INTERNATIONAL": "Honeywell",
-
     "JST": "Jst",
     "JST MANUFACTURING": "Jst",
-
     "ABRACON": "Abracon",
     "ABRACON CORPORATION": "Abracon",
-
     "TOSHIBA": "Toshiba",
     "TOSHIBA SEMICONDUCTOR": "Toshiba",
-
     "EPCOS": "Epcos",
     "TDK EPCOS": "Epcos",
-
     "SEIKO EPSON": "Seiko Epson",
     "EPSON": "Seiko Epson",
-
     "DIODES": "Diodes Incorporated",
     "DIODES INC": "Diodes Incorporated",
     "DIODES INCORPORATED": "Diodes Incorporated",
-
     "FAIRCHILD": "Fairchild",
     "FAIRCHILD SEMICONDUCTOR": "Fairchild",
-
     "ALTERA": "Altera",
     "INTEL ALTERA": "Altera",
-
     "SAMTEC": "Samtec",
     "SAMTEC INC": "Samtec",
-
     "EVERLIGHT": "Everlight",
     "EVERLIGHT ELECTRONICS": "Everlight",
-
     "MACRONIX": "Macronix",
     "MXIC": "Macronix",
-
     "GRAYHILL": "Grayhill",
-
     "STACKPOLE": "Stackpole",
     "STACKPOLE ELECTRONICS": "Stackpole",
-
     "GLENAIR": "Glenair",
-
     "SEMTECH": "Semtech",
     "SEMTECH CORPORATION": "Semtech",
-
     "YAGEO": "Yageo Corp",
     "YAGEO CORP": "Yageo Corp",
     "YAGEO CORPORATION": "Yageo Corp",
-
     "ROHM": "Rohm Co Ltd",
     "ROHM SEMICONDUCTOR": "Rohm Co Ltd",
     "ROHM CO LTD": "Rohm Co Ltd",
-
     "MOLEX": "Molex LLC",
     "MOLEX LLC": "Molex LLC",
     "MOLEX CONNECTOR": "Molex LLC",
-
     "AVX": "AVX Corporation",
     "AVX CORPORATION": "AVX Corporation",
     "AVX/KYOCERA": "AVX Corporation",
     "KYOCERA AVX": "AVX Corporation",
-
     "VIKING": "Viking Connectors",
     "VIKING TECH": "Viking Connectors",
-
     "KEMET": "Kemet Electronics Corp",
     "KEMET ELECTRONICS": "Kemet Electronics Corp",
     "KEMET ELECTRONICS CORP": "Kemet Electronics Corp",
-
     "TDK": "TDK Corp",
     "TDK CORP": "TDK Corp",
     "TDK CORPORATION": "TDK Corp",
-
     "KOA": "KOA Speer Electronics Inc",
     "KOA SPEER": "KOA Speer Electronics Inc",
     "KOA SPEER ELECTRONICS": "KOA Speer Electronics Inc",
-
     "BOURNS": "Bourns Inc",
     "BOURNS INC": "Bourns Inc",
-
     "COILCRAFT": "Coilcraft Inc",
     "COILCRAFT INC": "Coilcraft Inc",
-
     "LITTELFUSE": "Littelfuse Inc",
     "LITTELFUSE INC": "Littelfuse Inc",
-
     "MICRON": "Micron Technology Inc",
     "MICRON TECHNOLOGY": "Micron Technology Inc",
     "MICRON TECHNOLOGY INC": "Micron Technology Inc",
-
     "MAXIM": "Maxim Integrated Products Inc",
     "MAXIM INTEGRATED": "Maxim Integrated Products Inc",
     "MAXIM INTEGRATED PRODUCTS": "Maxim Integrated Products Inc",
-
     "TAIYO YUDEN": "Taiyo Yuden Co Ltd",
     "TAIYO": "Taiyo Yuden Co Ltd",
-
     "SITIME": "SiTime Corporation",
     "SITIME CORPORATION": "SiTime Corporation",
-
     "RENESAS": "Renesas Electronics Corp",
     "RENESAS ELECTRONICS": "Renesas Electronics Corp",
-
     "XILINX": "Xilinx Inc",
     "AMD XILINX": "Xilinx Inc",
-
     "LATTICE": "Lattice Semiconductor Corp",
     "LATTICE SEMICONDUCTOR": "Lattice Semiconductor Corp",
-
     "CYPRESS": "Cypress Semiconductor Corp",
     "CYPRESS SEMICONDUCTOR": "Cypress Semiconductor Corp",
-
     "WINBOND": "Winbond",
     "WINBOND ELECTRONICS": "Winbond",
-
     "ALLIANCE": "Alliance Memory Inc",
     "ALLIANCE MEMORY": "Alliance Memory Inc",
-
     "WURTH": "WURTH ELEKTRONIK",
     "WURTH ELEKTRONIK": "WURTH ELEKTRONIK",
     "WÜRTH": "WURTH ELEKTRONIK",
-
     "PULSE": "Pulse Electronics Corp",
     "PULSE ELECTRONICS": "Pulse Electronics Corp",
-
     "CINCH": "Cinch",
     "CINCH CONNECTIVITY": "CINCH CONNECTIVITY SOLUTIONS"
   }

@@ -140,6 +140,14 @@ himalaya attachment download --account excess --folder INBOX [ID]
 
 **Every step must be completed in order. Do not skip steps.**
 
+### Step 0: Validate MFR Aliases (if stale)
+Check `_last_validated` in `mfr-aliases.json`. If 30+ days old, run validation:
+```bash
+node "Trading Analysis/Market Offer Uploading/validate-mfr-aliases.js"
+```
+- If pass: proceeds and updates `_last_validated`
+- If failures: fix mismatches before continuing
+
 ### Step 1: Fetch Emails
 ```bash
 himalaya envelope list --account excess --folder INBOX --page-size 500
