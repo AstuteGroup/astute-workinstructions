@@ -198,7 +198,29 @@ himalaya message move --account excess --folder INBOX Processed [IDs...]
 | Inquiry only / no offer | `NotOffer` |
 | Incomplete (missing data) | `NeedsReview` |
 
-### Step 7: Commit and Push
+### Step 7: Email Output Files (REQUIRED)
+**Send each output file to jake.harris@astutegroup.com for ERP upload.**
+
+Subject format: `[Partner Name]/[Search Key], Market Offer Upload Ready`
+
+```bash
+# Single file
+node "Trading Analysis/Market Offer Uploading/send-offer-email.js" \
+  "output/OFFER_UPLOAD_20260317_Celestica_CMY2.csv" "Celestica" "1001118"
+
+# Batch mode (multiple files)
+node "Trading Analysis/Market Offer Uploading/send-offer-email.js" --batch offers.json
+```
+
+**Batch JSON format:**
+```json
+[
+  {"csvPath": "output/OFFER_UPLOAD_20260317_Celestica_CMY2.csv", "partnerName": "Celestica", "searchKey": "1001118"},
+  {"csvPath": "output/OFFER_UPLOAD_20260317_GE_Healthcare.csv", "partnerName": "GE Healthcare", "searchKey": "1002736"}
+]
+```
+
+### Step 8: Commit and Push
 ```bash
 cd ~/workspace/astute-workinstructions
 git add "Trading Analysis/Market Offer Uploading/"
@@ -268,9 +290,10 @@ The upload template column `Business Partner Search Key` expects the **search_ke
 
 ## TODO
 - [x] Get ERP upload template specification (exact column names/formats) ✓ `Market Offer Line Import Template.csv`
+- [x] Email notification to jake.harris@astutegroup.com ✓ `send-offer-email.js`
 - [ ] Document offer header creation (chuboe_offer parent record)
 - [ ] Define validation rules (required fields, value constraints)
-- [ ] Build extraction logic for common Excel/CSV formats
+- [x] Build extraction logic for common Excel/CSV formats ✓ `extract-market-offers.js`
 - [ ] Add duplicate detection (same partner + MPN within N days)
 - [x] Create email folders ✓ Processed created (others: create as needed)
 - [ ] Integrate with Market Offer Matching workflow (auto-refresh after upload)
