@@ -1,7 +1,8 @@
 {
   "_comment": "Manufacturer alias mapping for Market Offer Uploading",
-  "_usage": "Map email text → canonical system code (Chuboe_MFR_ID[Value])",
-  "_updated": "2026-03-11",
+  "_usage": "Map email text → canonical name for Chuboe_MFR_Text. System auto-maps to MFR ID on import.",
+  "_note": "Use exact chuboe_mfr.name values. Codes shown for reference only.",
+  "_updated": "2026-03-17",
 
   "aliases": {
     "TI": "M05844",
@@ -137,9 +138,9 @@
     "SEMTECH": "M05144",
     "SEMTECH CORPORATION": "M05144",
 
-    "YAGEO": "M06441",
-    "YAGEO CORP": "M06441",
-    "YAGEO CORPORATION": "M06441",
+    "YAGEO": "Yageo Corp",
+    "YAGEO CORP": "Yageo Corp",
+    "YAGEO CORPORATION": "Yageo Corp",
 
     "ROHM": "M04915",
     "ROHM SEMICONDUCTOR": "M04915",
