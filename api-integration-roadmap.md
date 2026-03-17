@@ -239,9 +239,11 @@ node future.js LM317 100 contains  # search variants
 
 ---
 
-### Newark / element14 / Farnell API (Active)
+### Newark / Farnell / element14 API (Unified)
 
 **API:** element14 Product Search API | **Auth:** Query parameter (callInfo.apiKey)
+
+Single API key provides access to all regional stores. Different stores have different inventory pools and local currency pricing.
 
 **Credentials:**
 | Key | Value |
@@ -250,42 +252,63 @@ node future.js LM317 100 contains  # search variants
 
 **Endpoint:** `https://api.element14.com/catalog/products`
 
-**Search types:**
-- MPN search: `term=manuPartNum:LM317T`
-- Keyword search: `term=any:fuse`
-- Element14 SKU: `term=id:1278613`
-
-**Store IDs (storeInfo.id):**
-| Store | ID |
-|-------|-----|
-| Newark (US) | `www.newark.com` |
-| Farnell (UK) | `uk.farnell.com` |
-| element14 (AU) | `au.element14.com` |
-| element14 (SG) | `sg.element14.com` |
-
 **Rate limits:** 2 calls/sec, 1,000 calls/day (free tier)
 
-**iDempiere Vendor:**
+---
+
+#### Regional Stores
+
+| Store | storeInfo.id | Currency | Status | Notes |
+|-------|--------------|----------|--------|-------|
+| **Newark** | `www.newark.com` | USD | **Active** | Primary for US/USD screening |
+| **Farnell** | `uk.farnell.com` | GBP | **Active** | UK/EU coverage |
+| element14 AU | `au.element14.com` | AUD | To investigate | |
+| element14 SG | `sg.element14.com` | SGD | To investigate | |
+| element14 CN | `cn.element14.com` | CNY | To investigate | |
+| element14 HK | `hk.element14.com` | HKD | To investigate | |
+
+**Note:** Newark and Farnell maintain separate inventory. Querying both stores uses 2 API calls per part.
+
+---
+
+#### iDempiere Vendor
+
 - BP ID: `1000390`
 - BP Value: `1002394`
 - Name: `Newark in One (Element 14)`
 
+---
+
+#### Code & Usage
+
 **Code:** `rfq_sourcing/franchise_check/newark.js`
 
-**Usage:**
 ```bash
+# Search both Newark + Farnell (default)
 node newark.js LM317T 100
-node newark.js LM317T 100 uk.farnell.com  # UK store
+
+# Search single store only
+node newark.js LM317T 100 --store www.newark.com
+node newark.js LM317T 100 --store uk.farnell.com
 ```
 
-**Current Use (Active):**
+**Search types:**
+- MPN search: `term=manuPartNum:LM317T`
+- Keyword search: `term=any:fuse`
+- SKU search: `term=id:1278613`
+
+---
+
+#### Output Fields
+
 | Field | Use |
 |-------|-----|
-| `franchiseQty` | Stock from stock.level |
-| `franchiseBulkPrice` | Lowest price break — screening |
-| `franchiseRfqPrice` | Price at RFQ qty — VQ |
-| `vqNewarkSku` | Newark/Farnell SKU for ordering |
-| `vqVendorNotes` | "Newark stock: X,XXX \| SKU: Y" |
+| `franchiseQty` | Combined stock (Newark + Farnell) |
+| `franchiseBulkPrice` | Lowest price break — screening (USD from Newark) |
+| `franchiseRfqPrice` | Price at RFQ qty — VQ (USD from Newark) |
+| `stores.newark` | Newark-specific: stock, price, SKU, currency |
+| `stores.farnell` | Farnell-specific: stock, price, SKU, currency |
+| `vqVendorNotes` | "Newark: X @ $Y \| Farnell: X @ £Y" |
 | `vqDatasheetUrl` | Link to datasheet PDF |
 
 **Response groups:**
@@ -308,24 +331,6 @@ node newark.js LM317T 100 uk.farnell.com  # UK store
 **Capabilities:** Real-time inventory, pricing, lead times, product info. Can also place orders via API.
 
 **Status:** Have account, awaiting refreshed API key/token.
-
----
-
-### Newark/element14/Farnell API (Pending Key Refresh)
-
-**API:** element14 Product Search + Order API | **Auth:** API key
-
-**Portal:** [partner.element14.com](https://partner.element14.com/)
-
-**iDempiere Vendor:**
-- BP ID: `1000390`
-- Name: `Newark in One (Element 14)`
-
-**Capabilities:** Product search, real-time pricing/availability, order management. Same portal covers Newark (US), Farnell (UK/EU), and element14 (APAC).
-
-**Requirements:** Need Trade Account linked to web account with credit payment enabled.
-
-**Status:** Have account, awaiting refreshed API key.
 
 ---
 
