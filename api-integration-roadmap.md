@@ -29,7 +29,7 @@ Real-time pricing and availability from authorized distributors. Replaces FindCh
 | Rutronik | REST (query params) | rutronik24.com/api.html | **Active** | 1002668 |
 | Future Electronics | REST (API key header) | documenter.getpostman.com/view/18706946/UzBvFhcj | **Active** | 1000328 |
 | TTI | REST (token) | developer.tti.com | **Pending key refresh** | 1000326 |
-| Newark/element14/Farnell | REST (API key) | partner.element14.com | **Pending key refresh** | 1000390 |
+| Newark/element14/Farnell | REST (API key) | partner.element14.com | **Active** | 1000390 |
 | Sager Electronics | REST (API key) | developer.sager.com | **To investigate** | 1000335 |
 | Rochester Electronics | REST (?) | api.rocelec.com | **To investigate** | 1000058 |
 | Mouser | REST (API key) | mouser.com/api-hub | **Blocked** | 1000334 |
@@ -236,6 +236,62 @@ node future.js LM317 100 contains  # search variants
   }]
 }
 ```
+
+---
+
+### Newark / element14 / Farnell API (Active)
+
+**API:** element14 Product Search API | **Auth:** Query parameter (callInfo.apiKey)
+
+**Credentials:**
+| Key | Value |
+|-----|-------|
+| API Key | `72pqcg952mk4kkw3g8veb9xz` |
+
+**Endpoint:** `https://api.element14.com/catalog/products`
+
+**Search types:**
+- MPN search: `term=manuPartNum:LM317T`
+- Keyword search: `term=any:fuse`
+- Element14 SKU: `term=id:1278613`
+
+**Store IDs (storeInfo.id):**
+| Store | ID |
+|-------|-----|
+| Newark (US) | `www.newark.com` |
+| Farnell (UK) | `uk.farnell.com` |
+| element14 (AU) | `au.element14.com` |
+| element14 (SG) | `sg.element14.com` |
+
+**Rate limits:** 2 calls/sec, 1,000 calls/day (free tier)
+
+**iDempiere Vendor:**
+- BP ID: `1000390`
+- BP Value: `1002394`
+- Name: `Newark in One (Element 14)`
+
+**Code:** `rfq_sourcing/franchise_check/newark.js`
+
+**Usage:**
+```bash
+node newark.js LM317T 100
+node newark.js LM317T 100 uk.farnell.com  # UK store
+```
+
+**Current Use (Active):**
+| Field | Use |
+|-------|-----|
+| `franchiseQty` | Stock from stock.level |
+| `franchiseBulkPrice` | Lowest price break — screening |
+| `franchiseRfqPrice` | Price at RFQ qty — VQ |
+| `vqNewarkSku` | Newark/Farnell SKU for ordering |
+| `vqVendorNotes` | "Newark stock: X,XXX \| SKU: Y" |
+| `vqDatasheetUrl` | Link to datasheet PDF |
+
+**Response groups:**
+- `small`: Basic product info
+- `medium`: Adds pricing and stock
+- `large`: Full details including datasheets (default)
 
 ---
 
