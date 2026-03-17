@@ -169,7 +169,19 @@ async function sendBatch(offers) {
 if (require.main === module) {
     const args = process.argv.slice(2);
 
-    if (args.length < 3) {
+    if (args[0] === '--batch') {
+        // Batch mode: read JSON file with array of offers
+        if (args.length < 2) {
+            console.log('Usage: node send-offer-email.js --batch <json_file>');
+            process.exit(1);
+        }
+        const batchFile = args[1];
+        const offers = JSON.parse(fs.readFileSync(batchFile, 'utf8'));
+        sendBatch(offers).then(results => {
+            const allSuccess = results.every(r => r.success);
+            process.exit(allSuccess ? 0 : 1);
+        });
+    } else if (args.length < 3) {
         console.log('Usage: node send-offer-email.js <csv_file> <partner_name> <search_key>');
         console.log('       node send-offer-email.js --batch <json_file>');
         console.log('\nExamples:');
@@ -177,16 +189,6 @@ if (require.main === module) {
         console.log('\nBatch JSON format:');
         console.log('  [{"csvPath": "...", "partnerName": "...", "searchKey": "..."}, ...]');
         process.exit(1);
-    }
-
-    if (args[0] === '--batch') {
-        // Batch mode: read JSON file with array of offers
-        const batchFile = args[1];
-        const offers = JSON.parse(fs.readFileSync(batchFile, 'utf8'));
-        sendBatch(offers).then(results => {
-            const allSuccess = results.every(r => r.success);
-            process.exit(allSuccess ? 0 : 1);
-        });
     } else {
         // Single file mode
         const [csvPath, partnerName, searchKey] = args;
