@@ -443,6 +443,7 @@ node ~/workspace/validate-vq-upload.js <output.csv>
 - **Packaging** — Must be UPPERCASE valid value (REEL, TRAY, BULK, CUT TAPE, F-TUBE, etc.) or blank
 - **RoHS** — Must be `Yes`, `No`, `Not Applicable`, or blank (NOT `Y`/`N`)
 - **Currency** — Must be valid ISO code (GBP, EUR, USD, etc.) or blank
+- **COO** — Must be full country name (NOT ISO codes like CN, TW, CR, PT, VN)
 
 **Common normalization fixes:**
 | Source Value | Correct Value | Why |
@@ -454,8 +455,12 @@ node ~/workspace/validate-vq-upload.js <output.csv>
 | `T&R` | `REEL` | Normalize abbreviation |
 | `EACH` | `BULK` | Map to valid value |
 | `1`, `500` | (blank) | These are SPQ, not packaging |
+| `CR` | `Costa Rica` | COO requires full name |
+| `PT` | `Portugal` | COO requires full name |
+| `VN` | `Viet Nam` | COO requires full name |
+| `CN` | `China` | COO requires full name |
 
-**If vendor didn't provide packaging** → leave blank (don't guess or look up).
+**If vendor didn't provide a value** → leave blank (don't guess or look up).
 
 **CHECKPOINT:** Do not proceed to Step 6 until validation shows `✓ PASS - All lookup fields valid`.
 
