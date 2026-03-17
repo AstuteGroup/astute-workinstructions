@@ -318,7 +318,7 @@ The upload template column `Business Partner Search Key` expects the **search_ke
 - [x] Build extraction logic for common Excel/CSV formats ✓ `extract-market-offers.js`
 - [ ] Add duplicate detection (same partner + MPN within N days)
 - [x] Create email folders ✓ Processed created (others: create as needed)
-- [ ] Integrate with Market Offer Matching workflow (auto-refresh after upload)
+- [x] Integrate with Market Offer Matching workflow ✓ Step 9 triggers `analyze-new-offers.js`
 
 ---
 
