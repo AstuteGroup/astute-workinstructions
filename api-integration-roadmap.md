@@ -37,7 +37,7 @@ Real-time pricing and availability from authorized distributors. Replaces FindCh
 | Avnet | OAuth2 REST | apiportal.avnet.com | **Pending docs** | 1000002 |
 | Venkel | REST (?) | venkel.com | **Pending docs** | 1001951 |
 | Texas Instruments | OAuth2 REST | api-portal.ti.com | **Pending approval** | 1001369 |
-| Master Electronics | REST v2 (path params) | masterelectronics.com/en/gettingstarted | **Pending IP whitelist** | 1000405 |
+| Master Electronics | REST v2 (path params) | masterelectronics.com/en/gettingstarted | **Active** | 1000405 |
 | Allied Electronics | EDI (?) | Unknown | **To investigate** | 1000392 |
 | Waldom Electronics | REST | sandbox.waldom.com | **To investigate** | 1000644 |
 | Analog Devices | REST | analog.com/en/support/api-suites.html | **To investigate** | 1000774 |
@@ -352,9 +352,9 @@ Mouser restricts pricing/availability data for distributor accounts. The API sti
 
 ---
 
-### Master Electronics API (Pending IP Whitelist)
+### Master Electronics API (Active)
 
-**API:** cpriceavailability REST API v2 | **Auth:** API key in path
+**API:** cgpriceavailability REST API v2 | **Auth:** API key in path
 
 **Credentials:**
 | Key | Value |
@@ -363,8 +363,10 @@ Mouser restricts pricing/availability data for distributor accounts. The API sti
 
 **Endpoint:**
 ```
-GET https://api.masterelectronics.com/wapi/v2/cpriceavailability/{query}/{inStockOnly}/{exactMatch}/{resultsCount}/{apiKey}
+GET https://api.masterelectronics.com/wapi/v2/cgpriceavailability/{query}/{inStockOnly}/{exactMatch}/{resultsCount}/{apiKey}
 ```
+
+**IMPORTANT:** The endpoint is `cgpriceavailability` (with 'g'), NOT `cpriceavailability`.
 
 **Path Parameters:**
 | Parameter | Description | Values |
@@ -377,16 +379,50 @@ GET https://api.masterelectronics.com/wapi/v2/cpriceavailability/{query}/{inStoc
 
 **Example:**
 ```bash
-curl -X GET "https://api.masterelectronics.com/wapi/v2/cpriceavailability/LM317/1/1/10/1640d818-0b10-4162-a2ad-34750e79e346" -H "accept: text/plain"
+curl -X GET "https://api.masterelectronics.com/wapi/v2/cgpriceavailability/LM317/0/1/10/1640d818-0b10-4162-a2ad-34750e79e346" -H "accept: application/json"
 ```
 
 **Docs:** https://www.masterelectronics.com/en/gettingstarted/?div=gettingstarted2
 
 **iDempiere Vendor:**
 - BP ID: `1000405`
+- BP Value: `1002409`
 - Name: `Master Electronics`
 
-**Status:** API key confirmed active (2026-03-16). Returns 401 from our server — **awaiting IP whitelist**. Requested whitelist for `44.222.126.129`.
+**Code:** `rfq_sourcing/franchise_check/master.js`
+
+**Usage:**
+```bash
+node master.js LM317T 100
+node master.js LM317 100 --partial    # partial match
+node master.js LM317 100 --in-stock   # in-stock only
+```
+
+**Current Use (Active):**
+| Field | Use |
+|-------|-----|
+| `franchiseQty` | Stock available from quantityAvailable |
+| `franchiseBulkPrice` | Lowest price break — screening |
+| `franchiseRfqPrice` | Price at RFQ qty — VQ |
+| `vqLeadTime` | Lead time from factoryLeadTimeTxt |
+| `vqMoq` | Minimum order quantity |
+| `vqVendorNotes` | "Master stock: X \| MOQ: Y \| Mfr: Z" |
+
+**Response Fields:**
+| Field | Description |
+|-------|-------------|
+| `partNumber` | MPN |
+| `manufacturer` | Manufacturer name |
+| `quantityAvailable` | Stock (string, parse to int) |
+| `factoryLeadTime` | Lead time in weeks |
+| `factoryLeadTimeTxt` | "X Week(s)" |
+| `moq` | Minimum order quantity |
+| `roHS` | "Yes"/"No" |
+| `coo` | Country of origin |
+| `productLifeCycle` | "Active", "EOL", etc. |
+| `price_breaks` | Array of {pricebreak, pricelist} |
+
+**Note:** Activated 2026-03-17. Initial 401 was due to endpoint typo (`cpriceavailability` vs `cgpriceavailability`).
 
 ---
 
@@ -593,4 +629,4 @@ ANTHROPIC_API_KEY=
 
 ---
 
-*Last updated: 2026-03-16*
+*Last updated: 2026-03-17*

@@ -37,6 +37,7 @@ const digikey = require('./digikey');
 const arrow = require('./arrow');
 const rutronik = require('./rutronik');
 const future = require('./future');
+const master = require('./master');
 
 // =============================================================================
 // Database Functions
@@ -271,6 +272,24 @@ function saveVqBatch(results, outputPath, rfqNumber) {
         'USD',
         r.future_vq_vendor_notes || '',
         'Future API',
+      ]);
+      vqCount++;
+    }
+
+    // Master Electronics VQ row (separate line)
+    if (r.master_vq_price) {
+      wsData.push([
+        r.rfq_number || rfqNumber || '',
+        r.master_vq_bp_value || '',
+        r.master_vq_vendor_name || '',
+        r.master_vq_mpn || r.mpn,
+        r.master_vq_manufacturer || '',
+        r.master_vq_description || '',
+        r.qty,
+        r.master_vq_price,
+        'USD',
+        r.master_vq_vendor_notes || '',
+        'Master API',
       ]);
       vqCount++;
     }
@@ -614,6 +633,28 @@ Options:
           }
         } catch (err) {
           if (debug) console.log(`    [DEBUG] Future error: ${err.message}`);
+        }
+
+        // 6. Master Electronics API call (additional - for VQ capture)
+        try {
+          const masterResult = await master.searchPart(part.mpn, part.qty);
+          if (masterResult.found && masterResult.vqPrice) {
+            evaluated.master_vq_price = masterResult.vqPrice;
+            evaluated.master_vq_mpn = masterResult.vqMpn;
+            evaluated.master_vq_manufacturer = masterResult.vqManufacturer;
+            evaluated.master_vq_description = masterResult.vqDescription;
+            evaluated.master_vq_vendor_notes = masterResult.vqVendorNotes;
+            evaluated.master_vq_bp_value = master.MASTER_CONFIG.bpValue;
+            evaluated.master_vq_vendor_name = master.MASTER_CONFIG.bpName;
+            evaluated.master_qty = masterResult.franchiseQty || 0;
+            evaluated.data_source = (evaluated.data_source || 'FindChips') + ' + Master';
+            const stockInfo = masterResult.franchiseQty > 0 ? masterResult.franchiseQty.toLocaleString() : `LT: ${masterResult.vqLeadTime}`;
+            console.log(`    📦 Master: ${stockInfo} @ $${masterResult.vqPrice}`);
+          } else if (masterResult.error) {
+            if (debug) console.log(`    [DEBUG] Master error: ${masterResult.error}`);
+          }
+        } catch (err) {
+          if (debug) console.log(`    [DEBUG] Master error: ${err.message}`);
         }
       }
 
