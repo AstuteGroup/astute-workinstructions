@@ -6,10 +6,26 @@
 
 ## Recent Sessions
 
-- **2026-03-16 (Inventory Cleanup Automation)**: Fully automated the inventory file cleanup workflow. **Email integration:** Fetches from excess@orangetsunami.com, filters by subject "Task finished: [success] * AST Item Lots Report Inputs". **Cron:** Runs every Monday 6 AM EST (11:00 UTC). **Outputs:** Two emails sent to jake.harris@astutegroup.com — "Netcomponents Upload" (consolidated CSV) and "OT Inventory Upload" (zipped Chuboe files). **Fixes:** Used `himalaya message export` instead of `attachment download` (more reliable), handled .aaf→.xlsx conversion, created "Sent" folder in excess inbox. **Test run:** 5,694 rows processed, 14 warehouse groups, emails sent successfully. **Action needed:** Set up Outlook auto-forward rule for Infor emails. Commits: f4c8566, 3dee1eb, ff306ad.
+- **2026-03-16 (Inventory Cleanup + LAM Kitting Reorder)**: **Inventory Cleanup Automation:** Fully automated — fetches from excess@orangetsunami.com, cron runs Monday 6 AM EST, emails "Netcomponents Upload" (CSV) and "OT Inventory Upload" (zipped Chuboe files) to jake.harris@astutegroup.com. File naming: `{WarehouseCode}_{GroupName}.csv` (e.g., W103_GE_Consignment.csv). Renamed MAIN→Allocated_Warehouse, W105→HK_Allocated_Warehouse. **LAM Kitting Reorder:** Created new workflow folder and docs. Added Stock Market Analysis (B1-B3) and LAM Kitting Reorder (C1) to trading-analysis-roadmap.md. Analyzed `Lam_Kitting_DB_03132026.xlsx` — has 5 sheets: INVENTORY (946 rows), RE_ORDER REQUESTS (46), CM Orders (1631), MIN (1020 thresholds), Lam_DB (empty). **Source of truth:** Inventory Cleanup output (W111/W115 files), not the Excel INVENTORY sheet. **PENDING QUESTIONS — resume here.** Commits: f4c8566 → c833717.
 - **2026-03-16 (VQ Email Types + MPN Fuzzy Matching)**: Added workflow support for two VQ email types. **Type 1 (Direct):** Single vendor quote forwarded by buyer — buyer is the forwarder, vendor lookup by email domain. **Type 2 (Buyer Consolidated):** Buyer compiles multiple broker quotes into one email (e.g., "Broker :Poplar : MPN 1000pcs 14usd 25+") — buyer is the person who compiled the list (not the forwarder), vendor lookup by name search. **Key distinction:** Type 2 has multiple vendor names in quick succession with informal notation (moq, usd, ex hk). No rigid template — pattern recognition. **MPN fuzzy matching:** When vendor quoted MPN differs from RFQ MPN (e.g., drops `-TR` suffix), auto-apply: use RFQ MPN in MPN field, add "Quoted MPN: [vendor's MPN]" to Vendor Notes. Processed 3 direct quotes (Component Sense, X-Press Micro). Commit: 451447a.
 - **2026-03-13 (VQ Duplicate Audit)**: Audited RFQ 1130350 VQs after multiple file uploads. **Duplicates:** 243 total VQ lines, 89 unique, **154 duplicate extras** (same vendor+MPN+cost+qty loaded multiple times). Worst offenders: SST38VF6401/Flip Electronics 7x, 39-29-5243/Nexus 7x. **Coverage:** 36 of 76 CPCs have VQs, 47 unique MPNs. **MPN mismatches:** Created `mpn-mismatch-fix.csv` with 6 correctable rows (mapped vendor quoted MPNs to RFQ MPNs). **Unfixable (2):** LT3973IMSE vs LT3973EMSE (I=Industrial, E=Extended temp), AFBR-709DMZ vs AFBR-709SMZ (different transceiver types). Commit: eacb8ab.
 - **2026-03-13 (VQ Upload Field Fixes)**: Fixed iDempiere lookup field formats for RFQ 1130350. **COO:** ISO codes → full names (CN→China, TW→Taiwan, etc.) - `C_Country_ID[Name]` expects country names. **RoHS:** Y/N → Yes/No/blank - `Chuboe_RoHS[Name]` lookup field. **MPN rule:** Must use RFQ MPN for linking; vendor quoted MPN goes FIRST in Vendor Notes as "Quoted MPN: XXX". **Subset files** to avoid duplicates: `coo-only-fixed.csv` (16 rows), `rohs-only-fixed.csv` (35 rows). Updated `vq-loading.md` with lookup field formats, COO reference table, COO vs shipping terms guidance. Added C8 MFR Text Validation to `sourcing-roadmap.md`. Commits: 7cf6471, 36f0ed4, 3ab7c98, 8e61cdc, 3c20a26, 906bb61, 9921903.
+
+---
+
+## Pending: LAM Kitting Reorder Questions
+
+**Resume here next session.** Need answers before implementing:
+
+1. **Join key** — Match Inventory Cleanup to Excel on **MPN**? (Inventory Cleanup has `Item`/MPN, Excel has `Lam P/N` + `MPN`)
+
+2. **MIN thresholds** — Use from:
+   - INVENTORY sheet (`MIN QTY` column), or
+   - MIN sheet (`CPC` → `Min` mapping)?
+   - Is `CPC` in MIN sheet the same as `Lam P/N`?
+
+3. **Which warehouses?** — W111 (LAM 3PL) only, or also W115 (LAM Dead Inventory)?
+   - Should dead stock trigger reorders?
 
 ---
 
