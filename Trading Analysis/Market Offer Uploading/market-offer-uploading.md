@@ -37,8 +37,8 @@ Same pattern as VQ Loading. Use two-agent workflow for reliable extraction:
 |-----|-------------|----------|-------------|
 | A | `Chuboe_Offer_ID[Value]` | If provided | Offer header ID. If given, populate and use for filename |
 | B | `Chuboe_MPN` | **YES** | Part number. If multiple MPNs given, split into separate lines |
-| C | `Chuboe_MFR_ID[Value]` | **DO NOT USE** | Leave blank - system auto-maps from MFR Text |
-| D | `Chuboe_MFR_Text` | No | Manufacturer name (e.g., "Broadcom", "Texas Instruments"). System auto-maps to MFR ID on import |
+| C | `Chuboe_MFR_ID[Value]` | **DO NOT USE** | Leave blank - system auto-maps from MFR Text on import |
+| D | `Chuboe_MFR_Text` | No | Manufacturer name. **On import, system matches this text against `chuboe_mfr.name` to populate `Chuboe_MFR_ID`** |
 | E | `Qty` | **YES** | Quantity available |
 | F | `Chuboe_Lead_Time` | No | Lead time - **only if explicitly stated** |
 | G | `Chuboe_Package_Desc` | No | Rarely used. Packaging if specified |
@@ -69,9 +69,11 @@ Same pattern as VQ Loading. Use two-agent workflow for reliable extraction:
 
 ## Manufacturer Matching
 
-**Goal:** Populate `Chuboe_MFR_Text` (column D) with a canonical manufacturer name. The system auto-maps to MFR ID on import.
+**Goal:** Populate `Chuboe_MFR_Text` (column D) with a manufacturer name that matches a `chuboe_mfr.name` value in the database.
 
-**IMPORTANT:** Always use column D (`Chuboe_MFR_Text`). Leave column C (`Chuboe_MFR_ID[Value]`) blank.
+**How it works:** On import, the system takes the value in `Chuboe_MFR_Text` and looks it up against `chuboe_mfr.name`. If a match is found, it automatically populates `Chuboe_MFR_ID` with the corresponding record. This is why using canonical names (exactly as they appear in the database) improves match rates.
+
+**IMPORTANT:** Always use column D (`Chuboe_MFR_Text`). Leave column C (`Chuboe_MFR_ID[Value]`) blank — direct ID lookups have client-level visibility issues.
 
 **Alias file:** `mfr-aliases.json` - maps common abbreviations/variants to canonical names.
 
