@@ -37,15 +37,15 @@ Same pattern as VQ Loading. Use two-agent workflow for reliable extraction:
 |-----|-------------|----------|-------------|
 | A | `Chuboe_Offer_ID[Value]` | If provided | Offer header ID. If given, populate and use for filename |
 | B | `Chuboe_MPN` | **YES** | Part number. If multiple MPNs given, split into separate lines |
-| C | `Chuboe_MFR_ID[Value]` | No | **Exact MFR name from DB** (e.g., "Texas Instruments"), NOT the code |
-| D | `Chuboe_MFR_Text` | No | Leave blank (use col C instead) |
+| C | `Chuboe_MFR_ID[Value]` | No | **Exact MFR name from DB** (e.g., "Texas Instruments") - only if matched |
+| D | `Chuboe_MFR_Text` | No | **Free text** - use when MFR can't be matched to DB (raw abbreviation/name) |
 | E | `Qty` | **YES** | Quantity available |
 | F | `Chuboe_Lead_Time` | No | Lead time - **only if explicitly stated** |
 | G | `Chuboe_Package_Desc` | No | Rarely used. Packaging if specified |
 | H | `C_Country_ID[Name]` | No | Country of origin |
 | I | `Chuboe_Date_Code` | No | Manufacturing date code |
 | J | `C_Currency_ID[ISO_Code]` | No | Currency. Blank = USD |
-| K | `Description` | No | Notes, conditions, expiry, special terms |
+| K | `Description` | No | **Part-specific** notes only (conditions, expiry). NOT source metadata |
 | L | `IsActive` | **DO NOT USE** | Leave blank |
 | M | `Chuboe_MPN_Clean` | **DO NOT USE** | Leave blank |
 | N | `Chuboe_CPC` | No | **Customer part number** (their internal PN) |
@@ -57,7 +57,10 @@ Same pattern as VQ Loading. Use two-agent workflow for reliable extraction:
 - **Only populate what's explicit:** Do NOT assume or default values. If lead time, date code, price, etc. are not stated in the input, leave those columns blank
 - **Multiple MPNs:** If customer lists several MPNs without specifying which they have, create a separate line for EACH MPN (same qty, same customer PN)
 - **Customer PN:** Goes in column N (Chuboe_CPC), not Description
-- **MFR Matching:** Use exact name from `chuboe_mfr.name` in column C, not the code
+- **MFR Matching:**
+  - If MFR maps to DB name → put in `Chuboe_MFR_ID[Value]` (col C), leave `Chuboe_MFR_Text` blank
+  - If MFR cannot be mapped → leave `Chuboe_MFR_ID[Value]` blank, put raw text in `Chuboe_MFR_Text` (col D)
+- **Description:** Part-specific notes only (e.g., "Ships from HK", "Expires 2026-06-30"). Do NOT put source metadata (e.g., "Benchmark excess")
 
 **Offer Header:** If `Chuboe_Offer_ID[Value]` is provided, populate column A. Otherwise leave blank (will be assigned later).
 
@@ -227,6 +230,25 @@ git add "Trading Analysis/Market Offer Uploading/"
 git commit -m "Add market offers: [partner] [date]"
 git push
 ```
+
+### Step 9: Run RFQ Match Analysis (AUTOMATIC TRIGGER)
+**Immediately match the new offers against open RFQs.** This runs against the CSV data — no database import required.
+
+```bash
+node "Trading Analysis/Market Offer Matching for RFQs/analyze-new-offers.js" \
+  "Trading Analysis/Market Offer Uploading/output/OFFER_UPLOAD_20260317_[Partner].csv"
+```
+
+**Output:** `RFQ_Matches_[Partner]_[date].csv` in `Trading Analysis/Market Offer Matching for RFQs/`
+
+**What it does:**
+1. Reads MPNs from the just-created offer CSV
+2. Queries database for matching RFQs (last 90 days)
+3. Calculates opportunity values and coverage
+4. Tiers results (TIER_1/2/3) by value and coverage
+5. Outputs matches for immediate action
+
+**If matches found:** Review TIER_1 opportunities first — these are high-value, good-coverage matches that warrant immediate follow-up.
 
 ---
 
