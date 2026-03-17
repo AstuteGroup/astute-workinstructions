@@ -294,7 +294,7 @@ function loadHistoricalPurchaseData(mpns) {
         AND ol.chuboe_mpn IS NOT NULL
         AND ol.chuboe_mpn != ''
     )
-    SELECT chuboe_mpn, supplier_name, purchase_price, buyer_name
+    SELECT chuboe_mpn, supplier_name, purchase_price, buyer_name, dateordered::date
     FROM recent_purchases
     WHERE rn = 1;
   `;
@@ -310,12 +310,13 @@ function loadHistoricalPurchaseData(mpns) {
     const lines = result.trim().split('\n').filter(l => l.trim());
 
     for (const line of lines) {
-      const [mpn, supplier, price, buyer] = line.split('|');
+      const [mpn, supplier, price, buyer, dateordered] = line.split('|');
       if (mpn && mpn.trim()) {
         historicalData[mpn.trim()] = {
           Previous_Supplier: (supplier || '').trim(),
           Historical_Purchase_Price: parseFloat(price) || 0,
-          Buyer: (buyer || '').trim()
+          Buyer: (buyer || '').trim(),
+          Last_Purchase_Date: (dateordered || '').trim()
         };
       }
     }
@@ -383,6 +384,7 @@ function identifyReorderCandidates(aggregated, excelData, historicalData) {
         'Previous Supplier': history.Previous_Supplier || '',
         'Buyer': history.Buyer || '',
         'Historical Purchase Price': history.Historical_Purchase_Price || '',
+        'Last Purchase Date': history.Last_Purchase_Date || '',
         'Shortfall': shortfall,
         'Priority': priority
       });
@@ -419,6 +421,7 @@ function identifyReorderCandidates(aggregated, excelData, historicalData) {
       'Previous Supplier': history.Previous_Supplier || '',
       'Buyer': history.Buyer || '',
       'Historical Purchase Price': history.Historical_Purchase_Price || '',
+      'Last Purchase Date': history.Last_Purchase_Date || '',
       'Shortfall': minQty,  // 100% shortfall
       'Priority': 'CRITICAL'  // Highest priority - zero stock
     });
@@ -457,6 +460,7 @@ function writeReorderAlerts(alerts, outputPath) {
     'Previous Supplier',
     'Buyer',
     'Historical Purchase Price',
+    'Last Purchase Date',
     'Shortfall',
     'Priority'
   ];
