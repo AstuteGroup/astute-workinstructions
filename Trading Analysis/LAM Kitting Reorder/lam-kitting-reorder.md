@@ -11,12 +11,13 @@ Monitor LAM kitting warehouse inventory levels to trigger reorders, update lead 
 | Warehouses | W111 (LAM 3PL) + W115 (LAM Dead Inventory) — combined |
 | Trigger | After Inventory File Cleanup (Monday) or on-demand |
 | Threshold Source | `Lam_Kitting_DB.xlsx` → INVENTORY sheet → Column I (MIN QTY) |
-| Join Key | LAM CPC (primary), MPN (fallback) |
+| Join Key | MPN (CPC not in source inventory data) |
 
 **Key Design Decisions:**
 - **Separate workflow** — Independent of Inventory File Cleanup, but triggered by it
 - **Combined inventory** — W111 + W115 quantities summed per part (dead stock counts)
 - **Fixed thresholds** — MIN QTY is a fixed value in INVENTORY sheet (no lookup to MIN sheet)
+- **MPN is join key** — CPC not available in Infor Item Lots Report; join on MPN only
 
 ---
 
@@ -36,9 +37,13 @@ Monitor LAM kitting warehouse inventory levels to trigger reorders, update lead 
 | `Lam_Kitting_DB_*.xlsx` | INVENTORY | CPC (Lam P/N), MPN, MIN QTY (Col I) |
 
 **Column Mapping (INVENTORY sheet):**
-- **CPC / Lam P/N** — LAM's internal part code (join key primary)
-- **MPN** — Manufacturer part number (join key fallback)
+- **MPN (Column B)** — Manufacturer part number (**join key**)
+- **Lam P/N (Column A)** — LAM's CPC (for reference/display only)
 - **MIN QTY (Column I)** — Fixed reorder threshold
+
+**Column Mapping (Chuboe Output):**
+- **Chuboe_MPN** — Manufacturer part number (**join key**)
+- **Qty** — Quantity on hand
 
 ---
 
@@ -74,8 +79,8 @@ Load `Lam_Kitting_DB_*.xlsx` → INVENTORY sheet:
 ### Step 4: Join Inventory to Thresholds
 
 Match aggregated inventory to thresholds:
-1. **Primary match:** Join on CPC (LAM P/N)
-2. **Fallback match:** If no CPC match, join on MPN
+- Join on **MPN** (only common key — CPC not in Infor source data)
+- Pull CPC from Excel for reference/display in output
 
 **Output:** Combined dataset with Current_Qty and MIN_QTY per part
 
@@ -146,7 +151,7 @@ Generates reorder alerts
 
 | Question | Answer |
 |----------|--------|
-| Join key? | CPC (primary), MPN (fallback) |
+| Join key? | **MPN only** — CPC not in Infor Item Lots Report |
 | Threshold source? | INVENTORY sheet Column I (MIN QTY) — fixed value |
 | Which warehouses? | W111 + W115 combined |
 | Dead stock? | Yes, counts toward inventory level |
@@ -156,11 +161,13 @@ Generates reorder alerts
 
 ## TODO
 
-- [ ] Map Inventory Cleanup output columns to CPC/MPN
-- [ ] Build aggregation script (Node.js)
-- [ ] Add historical sourcing data from ERP (Step 6)
+- [x] Map columns — MPN is join key (CPC not in source)
+- [ ] Build reorder script (Node.js) — Steps 1-5, 7
 - [ ] Email notifications for reorder alerts
 - [ ] Integrate as cron job after Inventory File Cleanup
+
+**Deferred:**
+- [ ] Historical sourcing data from ERP (Step 6) — add later once basics work
 
 ---
 
