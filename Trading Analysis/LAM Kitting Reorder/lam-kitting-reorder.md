@@ -1,6 +1,6 @@
 # LAM Kitting Reorder Workflow
 
-Monitor LAM kitting warehouse inventory levels to trigger reorders, update lead times, and track historical sourcing.
+Monitor LAM kitting warehouse inventory levels to trigger reorders and source replenishment.
 
 ---
 
@@ -18,6 +18,7 @@ Monitor LAM kitting warehouse inventory levels to trigger reorders, update lead 
 - **Combined inventory** — W111 + W115 quantities summed per part (dead stock counts)
 - **Fixed thresholds** — MIN QTY is a fixed value in INVENTORY sheet (no lookup to MIN sheet)
 - **MPN is join key** — CPC not available in Infor Item Lots Report; join on MPN only
+- **Zero-stock detection** — Items in Excel but not in inventory files flagged as CRITICAL
 
 ---
 
@@ -27,122 +28,161 @@ Monitor LAM kitting warehouse inventory levels to trigger reorders, update lead 
 
 | File | Description |
 |------|-------------|
-| `W111_LAM_3PL.csv` | Current W111 inventory (Chuboe format) |
-| `W115_LAM_Dead_Inventory.csv` | Current W115 inventory (Chuboe format) |
+| `LAM_3PL_chuboe.csv` | Current W111 inventory |
+| `LAM_Dead_Inventory_chuboe.csv` | Current W115 inventory |
 
 ### From LAM Kitting Database
 
 | File | Sheet | Key Columns |
 |------|-------|-------------|
-| `Lam_Kitting_DB_*.xlsx` | INVENTORY | CPC (Lam P/N), MPN, MIN QTY (Col I) |
+| `Lam_Kitting_DB_*.xlsx` | INVENTORY | Lam P/N (A), MPN (B), MIN QTY (I) |
 
-**Column Mapping (INVENTORY sheet):**
-- **MPN (Column B)** — Manufacturer part number (**join key**)
-- **Lam P/N (Column A)** — LAM's CPC (for reference/display only)
-- **MIN QTY (Column I)** — Fixed reorder threshold
+### From ERP (Historical Data)
 
-**Column Mapping (Chuboe Output):**
-- **Chuboe_MPN** — Manufacturer part number (**join key**)
-- **Qty** — Quantity on hand
+| Data | Source | Notes |
+|------|--------|-------|
+| Previous Supplier | `c_order` + `c_bpartner` | Most recent PO |
+| Buyer | `c_order` + `ad_user` | Who created the PO |
+| Historical Purchase Price | `c_orderline.priceentered` | Last price paid |
+| Last Purchase Date | `c_order.dateordered` | When last ordered |
+
+**Note:** ERP only has rebuy data — initial buys were tracked outside the system.
 
 ---
 
 ## End-to-End Workflow
 
-### Step 1: Load Inventory Files
+### Step 1: Generate Reorder Alerts
 
-Load the latest W111 and W115 files from Inventory File Cleanup output:
+Run the reorder detection script:
+
+```bash
+cd "Trading Analysis/LAM Kitting Reorder"
+node lam-kitting-reorder.js "<inventory-folder>" "<excel-file>"
+
+# Example:
+node lam-kitting-reorder.js \
+  "../Inventory File Cleanup/Inventory 2026-03-11" \
+  "./Lam_Kitting_DB_03132026.xlsx"
 ```
-W111_LAM_3PL.csv
-W115_LAM_Dead_Inventory.csv
+
+**What it does:**
+1. Loads W111 + W115 inventory from Chuboe CSVs
+2. Aggregates quantity by MPN across both warehouses
+3. Loads MIN QTY thresholds from Excel INVENTORY sheet
+4. Joins on MPN
+5. Identifies shortfalls (Current_Qty < MIN_QTY)
+6. Detects zero-stock items (in Excel but not in inventory files)
+7. Enriches with ERP historical data (supplier, buyer, price, date)
+
+**Output:** `output/LAM_Reorder_Alerts_YYYY-MM-DD.csv`
+
+### Step 2: Review Reorder Alerts
+
+Review the output file. Priority levels:
+
+| Priority | Criteria | Action |
+|----------|----------|--------|
+| CRITICAL | Zero stock (100% shortfall) | Source immediately |
+| HIGH | 75%+ shortfall | Source soon |
+| MEDIUM | 50-74% shortfall | Source this week |
+| LOW | <50% shortfall | Monitor / source as needed |
+
+### Step 3: Source via Franchise Screening
+
+**IMPORTANT:** Follow the Franchise Screening workflow for sourcing.
+
+**Location:** `rfq_sourcing/franchise_check/franchise-screening.md`
+
+**LAM-specific context:**
+- **Goal:** Replenishment purchase, not customer quote
+- **Quantity:** Use `Shortfall` column as the qty to source (or `MIN QTY` for full replenishment)
+- **Skip NetComponents** — Franchise APIs only unless specifically tasked for broker sourcing
+- **No opportunity threshold** — We need the parts regardless of value
+
+**Run franchise screening on reorder alerts:**
+
+```bash
+cd rfq_sourcing/franchise_check
+
+# Option 1: From Excel export of reorder alerts
+node main.js -f "../../Trading Analysis/LAM Kitting Reorder/output/LAM_Reorder_Alerts_YYYY-MM-DD.xlsx"
+
+# Option 2: Single part check
+node main.js -p "MPN-HERE" -q <shortfall_qty>
 ```
 
-**Output:** Combined inventory list with columns: CPC, MPN, Warehouse, Qty
+**Expected output:**
+- Franchise availability (DigiKey, Arrow, Rutronik, Future, Master)
+- Best franchise price per MPN
+- Lead time from franchise
 
-### Step 2: Aggregate by Part
+### Step 4: Create Purchase Orders
 
-Combine W111 + W115 quantities per part:
-- Group by CPC (primary) or MPN (if no CPC match)
-- Sum quantities across both warehouses
-- Track which warehouses have stock
+For items with franchise availability:
+1. Review franchise pricing vs. historical purchase price
+2. Create PO in iDempiere for selected supplier
+3. Update LAM Kitting DB as needed
 
-**Output:** Aggregated inventory with Total_Qty per CPC/MPN
+For items without franchise coverage:
+- Flag for manual broker sourcing (NetComponents) if critical
+- Or wait for next reorder cycle
 
-### Step 3: Load Thresholds
+### Step 5: Email Alerts (Optional)
 
-Load `Lam_Kitting_DB_*.xlsx` → INVENTORY sheet:
-- Extract CPC, MPN, MIN QTY columns
-- MIN QTY is the reorder trigger threshold
+Email report to buyers:
 
-**Output:** Threshold lookup table (CPC/MPN → MIN_QTY)
-
-### Step 4: Join Inventory to Thresholds
-
-Match aggregated inventory to thresholds:
-- Join on **MPN** (only common key — CPC not in Infor source data)
-- Pull CPC from Excel for reference/display in output
-
-**Output:** Combined dataset with Current_Qty and MIN_QTY per part
-
-### Step 5: Identify Reorder Candidates
-
-Flag parts where `Current_Qty < MIN_QTY`:
-- Calculate shortfall: `MIN_QTY - Current_Qty`
-- Prioritize by shortfall size or criticality
-
-**Output:** Reorder candidates list
-
-### Step 6: Enrich with Historical Data (TBD)
-
-For reorder candidates, pull from ERP:
-- Last purchase price
-- Last supplier
-- Average lead time
-- Buyer who handled previous orders
-
-**Output:** Enriched reorder list
-
-### Step 7: Generate Reorder Alerts
-
-Output final reorder recommendations.
-
-**Output:** `LAM_Reorder_Alerts_YYYY-MM-DD.csv`
+```bash
+# Sent automatically by script, or manually:
+# Subject: LAM Kitting Reorder Alert - YYYY-MM-DD
+# To: jake.harris@astutegroup.com
+# Attachment: LAM_Reorder_Alerts_YYYY-MM-DD.csv
+```
 
 ---
 
 ## Output Format
 
-### Reorder Alert Columns
+### Reorder Alert Columns (17 total)
 
-| Column | Description |
-|--------|-------------|
-| CPC | LAM's part code |
-| MPN | Manufacturer part number |
-| W111_Qty | Quantity in W111 (LAM 3PL) |
-| W115_Qty | Quantity in W115 (Dead Inventory) |
-| Total_Qty | Combined quantity |
-| MIN_QTY | Reorder threshold |
-| Shortfall | MIN_QTY - Total_Qty |
-| Last_Supplier | Previous supplier (from ERP) |
-| Last_Price | Previous purchase price |
-| Avg_Lead_Time | Average lead time in days |
-| Assigned_Buyer | Buyer to handle reorder |
-| Priority | High/Medium/Low based on shortfall % |
+| # | Column | Source |
+|---|--------|--------|
+| 1 | Lam P/N | Excel (CPC) |
+| 2 | MPN | Excel |
+| 3 | Manufacturer | Excel |
+| 4 | Item Description | Excel |
+| 5 | Lead Time | Excel |
+| 6 | QTY ON HAND | Inventory Files (calculated) |
+| 7 | Base Unit Price | Excel |
+| 8 | Resale Price | Excel |
+| 9 | MIN QTY | Excel |
+| 10 | MOQ | Excel |
+| 11 | Lam Owned Inventory? | Calculated (YES if W115 > 0) |
+| 12 | Previous Supplier | ERP |
+| 13 | Buyer | ERP |
+| 14 | Historical Purchase Price | ERP |
+| 15 | Last Purchase Date | ERP |
+| 16 | Shortfall | Calculated (MIN - QTY) |
+| 17 | Priority | Calculated |
 
 ---
 
-## Integration with Inventory File Cleanup
+## Integration Flow
 
 ```
 Inventory Cleanup (Monday 6 AM cron)
     ↓
-Produces W111_LAM_3PL.csv + W115_LAM_Dead_Inventory.csv
+Produces LAM_3PL_chuboe.csv + LAM_Dead_Inventory_chuboe.csv
     ↓
-Triggers LAM Kitting Reorder (this workflow)
+Step 1: Run lam-kitting-reorder.js
     ↓
-Generates reorder alerts
+Step 2: Review reorder alerts (34 items typical)
     ↓
-(Optional) Email alerts to buyers
+Step 3: Franchise Screening (see rfq_sourcing/franchise_check/)
+    ↓
+Step 4: Create POs for available items
+    ↓
+Step 5: Email summary to buyers
 ```
 
 ---
@@ -155,19 +195,31 @@ Generates reorder alerts
 | Threshold source? | INVENTORY sheet Column I (MIN QTY) — fixed value |
 | Which warehouses? | W111 + W115 combined |
 | Dead stock? | Yes, counts toward inventory level |
-| Separate workflow? | Yes, triggered by Inventory File Cleanup |
+| Zero stock detection? | Yes, items in Excel but not in inventory = CRITICAL |
+| Sourcing workflow? | **Follow Franchise Screening** (`rfq_sourcing/franchise_check/`) |
+| NetComponents? | Only if specifically tasked — not default |
+
+---
+
+## Files
+
+| File | Description |
+|------|-------------|
+| `lam-kitting-reorder.js` | Main script (Steps 1-7) |
+| `output/LAM_Reorder_Alerts_*.csv` | Generated reorder alerts |
+| `Lam_Kitting_DB_*.xlsx` | Source Excel with thresholds |
 
 ---
 
 ## TODO
 
 - [x] Map columns — MPN is join key (CPC not in source)
-- [ ] Build reorder script (Node.js) — Steps 1-5, 7
-- [ ] Email notifications for reorder alerts
+- [x] Build reorder script (Node.js) — detection + ERP enrichment
+- [x] Zero-stock detection (CRITICAL priority)
+- [x] Historical data from ERP (supplier, buyer, price, date)
+- [x] Email report to jake.harris@astutegroup.com
 - [ ] Integrate as cron job after Inventory File Cleanup
-
-**Deferred:**
-- [ ] Historical sourcing data from ERP (Step 6) — add later once basics work
+- [ ] Add franchise screening results to output (after Step 3)
 
 ---
 
