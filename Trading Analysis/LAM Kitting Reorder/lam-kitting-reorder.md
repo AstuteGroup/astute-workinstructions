@@ -88,55 +88,70 @@ Review the output file. Priority levels:
 | MEDIUM | 50-74% shortfall | Source this week |
 | LOW | <50% shortfall | Monitor / source as needed |
 
-### Step 3: Source via Franchise Screening
+### Step 3: Run Franchise Sourcing
 
-**IMPORTANT:** Follow the Franchise Screening workflow for sourcing.
-
-**Location:** `rfq_sourcing/franchise_check/franchise-screening.md`
-
-**LAM-specific context:**
-- **Goal:** Replenishment purchase, not customer quote
-- **Quantity:** Use `Shortfall` column as the qty to source (or `MIN QTY` for full replenishment)
-- **Skip NetComponents** — Franchise APIs only unless specifically tasked for broker sourcing
-- **No opportunity threshold** — We need the parts regardless of value
-
-**Run franchise screening on reorder alerts:**
+Run the integrated sourcing script on reorder alerts:
 
 ```bash
-cd rfq_sourcing/franchise_check
+cd "Trading Analysis/LAM Kitting Reorder"
+node lam-kitting-source.js output/LAM_Reorder_Alerts_YYYY-MM-DD.csv
 
-# Option 1: From Excel export of reorder alerts
-node main.js -f "../../Trading Analysis/LAM Kitting Reorder/output/LAM_Reorder_Alerts_YYYY-MM-DD.xlsx"
-
-# Option 2: Single part check
-node main.js -p "MPN-HERE" -q <shortfall_qty>
+# Output: output/LAM_Reorder_Alerts_YYYY-MM-DD_sourced.xlsx (+ .csv)
 ```
 
-**Expected output:**
-- Franchise availability (DigiKey, Arrow, Rutronik, Future, Master)
-- Best franchise price per MPN
-- Lead time from franchise
+**What it does:**
+1. Queries franchise APIs (DigiKey, Arrow, Rutronik, Future, Master) at **MOQ quantity**
+2. Finds best in-stock option (lowest price with available qty)
+3. Finds best lead-time option (for items without immediate stock)
+4. Calculates margin vs. LAM Resale Price
+5. Outputs Excel with **color-coded margins**:
+   - 🟢 Green: >18% margin (good to buy)
+   - 🟡 Yellow: 0-18% margin (review)
+   - 🔴 Red: Negative margin (needs price review or broker sourcing)
 
-### Step 4: Create Purchase Orders
+**Output columns added:**
+| Column | Description |
+|--------|-------------|
+| In Stock Supplier | Best franchise with stock |
+| In Stock Price | Price at MOQ |
+| In Stock Qty | Available quantity |
+| In Stock Margin % | (Resale - Price) / Resale |
+| Lead Time Supplier | Alternative with lead time |
+| Lead Time Price | Price for lead time order |
+| Lead Time (Weeks) | Expected wait |
+| Lead Time Margin % | Margin for lead time option |
 
-For items with franchise availability:
+**Note:** Uses `rfq_sourcing/franchise_check/` API modules — no duplicate logic.
+
+### Step 4: Review Sourcing Results
+
+Review the color-coded Excel:
+
+| Margin Color | Action |
+|--------------|--------|
+| 🟢 Green (>18%) | Good to buy — proceed with PO |
+| 🟡 Yellow (0-18%) | Review — margin thin but acceptable |
+| 🔴 Red (<0%) | Escalate — franchise price > resale, need broker or price review |
+
+For items **without franchise coverage** (5 typical):
+- Flag for manual broker sourcing (NetComponents) if critical
+- Or wait for next reorder cycle
+
+### Step 5: Create Purchase Orders
+
+For items with acceptable margins:
 1. Review franchise pricing vs. historical purchase price
 2. Create PO in iDempiere for selected supplier
 3. Update LAM Kitting DB as needed
 
-For items without franchise coverage:
-- Flag for manual broker sourcing (NetComponents) if critical
-- Or wait for next reorder cycle
+### Step 6: Email Alerts
 
-### Step 5: Email Alerts (Optional)
-
-Email report to buyers:
+Email sourced report to buyers:
 
 ```bash
-# Sent automatically by script, or manually:
-# Subject: LAM Kitting Reorder Alert - YYYY-MM-DD
+# Subject: LAM Kitting Reorder Alerts - Sourced (YYYY-MM-DD)
 # To: jake.harris@astutegroup.com
-# Attachment: LAM_Reorder_Alerts_YYYY-MM-DD.csv
+# Attachment: LAM_Reorder_Alerts_YYYY-MM-DD_sourced.xlsx
 ```
 
 ---
@@ -174,15 +189,17 @@ Inventory Cleanup (Monday 6 AM cron)
     ↓
 Produces LAM_3PL_chuboe.csv + LAM_Dead_Inventory_chuboe.csv
     ↓
-Step 1: Run lam-kitting-reorder.js
+Step 1: Run lam-kitting-reorder.js → LAM_Reorder_Alerts_*.csv
     ↓
 Step 2: Review reorder alerts (34 items typical)
     ↓
-Step 3: Franchise Screening (see rfq_sourcing/franchise_check/)
+Step 3: Run lam-kitting-source.js → LAM_Reorder_Alerts_*_sourced.xlsx
     ↓
-Step 4: Create POs for available items
+Step 4: Review margins (green=buy, yellow=review, red=escalate)
     ↓
-Step 5: Email summary to buyers
+Step 5: Create POs for available items
+    ↓
+Step 6: Email summary to buyers
 ```
 
 ---
@@ -205,8 +222,10 @@ Step 5: Email summary to buyers
 
 | File | Description |
 |------|-------------|
-| `lam-kitting-reorder.js` | Main script (Steps 1-7) |
+| `lam-kitting-reorder.js` | Detection script — generates reorder alerts |
+| `lam-kitting-source.js` | Sourcing script — runs franchise APIs, adds margins |
 | `output/LAM_Reorder_Alerts_*.csv` | Generated reorder alerts |
+| `output/LAM_Reorder_Alerts_*_sourced.xlsx` | Sourced alerts with color-coded margins |
 | `Lam_Kitting_DB_*.xlsx` | Source Excel with thresholds |
 
 ---
@@ -218,10 +237,12 @@ Step 5: Email summary to buyers
 - [x] Zero-stock detection (CRITICAL priority)
 - [x] Historical data from ERP (supplier, buyer, price, date)
 - [x] Email report to jake.harris@astutegroup.com
+- [x] Add franchise sourcing with margin analysis
+- [x] Excel output with color-coded margins (green/yellow/red)
+- [x] Query at MOQ for accurate bulk pricing
 - [ ] Integrate as cron job after Inventory File Cleanup
-- [ ] Add franchise screening results to output (after Step 3)
 
 ---
 
 *Created: 2026-03-16*
-*Updated: 2026-03-17*
+*Updated: 2026-03-17* — Added integrated sourcing script with MOQ pricing and margin color coding
