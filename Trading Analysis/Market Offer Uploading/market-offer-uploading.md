@@ -37,8 +37,8 @@ Same pattern as VQ Loading. Use two-agent workflow for reliable extraction:
 |-----|-------------|----------|-------------|
 | A | `Chuboe_Offer_ID[Value]` | If provided | Offer header ID. If given, populate and use for filename |
 | B | `Chuboe_MPN` | **YES** | Part number. If multiple MPNs given, split into separate lines |
-| C | `Chuboe_MFR_ID[Value]` | No | **Exact MFR name from DB** (e.g., "Texas Instruments") - only if matched |
-| D | `Chuboe_MFR_Text` | No | **Free text** - use when MFR can't be matched to DB (raw abbreviation/name) |
+| C | `Chuboe_MFR_ID[Value]` | **DO NOT USE** | Leave blank - system auto-maps from MFR Text |
+| D | `Chuboe_MFR_Text` | No | Manufacturer name (e.g., "Broadcom", "Texas Instruments"). System auto-maps to MFR ID on import |
 | E | `Qty` | **YES** | Quantity available |
 | F | `Chuboe_Lead_Time` | No | Lead time - **only if explicitly stated** |
 | G | `Chuboe_Package_Desc` | No | Rarely used. Packaging if specified |
@@ -58,48 +58,50 @@ Same pattern as VQ Loading. Use two-agent workflow for reliable extraction:
 - **Multiple MPNs:** If customer lists several MPNs without specifying which they have, create a separate line for EACH MPN (same qty, same customer PN)
 - **Customer PN:** Goes in column N (Chuboe_CPC), not Description
 - **MFR Matching:**
-  - If MFR maps to DB name → put in `Chuboe_MFR_ID[Value]` (col C), leave `Chuboe_MFR_Text` blank
-  - If MFR cannot be mapped → leave `Chuboe_MFR_ID[Value]` blank, put raw text in `Chuboe_MFR_Text` (col D)
+  - **Always use column D** (`Chuboe_MFR_Text`) for manufacturer names
+  - **Leave column C blank** - system auto-maps text to MFR ID on import
+  - Use canonical names from `mfr-aliases.json` when possible (e.g., "Broadcom" not "BRCM")
 - **Description:** Part-specific notes only (e.g., "Ships from HK", "Expires 2026-06-30"). Do NOT put source metadata (e.g., "Benchmark excess")
 
 **Offer Header:** If `Chuboe_Offer_ID[Value]` is provided, populate column A. Otherwise leave blank (will be assigned later).
 
 ---
 
-## Manufacturer Matching (CRITICAL)
+## Manufacturer Matching
 
-**Goal:** Populate `Chuboe_MFR_ID[Value]` (column C) with the **exact MFR name from the database** to enable matching.
+**Goal:** Populate `Chuboe_MFR_Text` (column D) with a canonical manufacturer name. The system auto-maps to MFR ID on import.
 
-**Alias file:** `mfr-aliases.json` - maps common abbreviations/variants to system codes, which we then look up to get the exact name.
+**IMPORTANT:** Always use column D (`Chuboe_MFR_Text`). Leave column C (`Chuboe_MFR_ID[Value]`) blank.
+
+**Alias file:** `mfr-aliases.json` - maps common abbreviations/variants to canonical names.
 
 ### Matching Order
 1. **Normalize input** - uppercase, trim whitespace
-2. **Alias lookup** - check `mfr-aliases.json` to get system code (e.g., M05844)
-3. **Database lookup** - get the exact `name` for that code
-4. **Output** - put the exact name in column C (NOT the code)
-5. **No match** - leave column C blank
+2. **Alias lookup** - check `mfr-aliases.json` to get canonical name
+3. **Output** - put the canonical name in column D (`Chuboe_MFR_Text`)
+4. **No match** - use the name as-is in column D (system may still match it)
 
 ### Example
 ```
-Email says: "TI" or "Texas Instruments" or "TEXAS INSTRUMENTS INC"
+Email says: "TI" or "TEXAS INSTRUMENTS INC"
     ↓
-Alias lookup: all map to code M05844
+Alias lookup: maps to "Texas Instruments"
     ↓
-DB lookup: SELECT name FROM chuboe_mfr WHERE value = 'M05844'
+Output: Chuboe_MFR_Text = "Texas Instruments"
     ↓
-Output: Chuboe_MFR_ID[Value] = "Texas Instruments"  (the exact name, NOT the code)
+On import: System auto-maps to MFR ID
 ```
 
 ### Adding New Aliases
-When extraction encounters an unmatched manufacturer:
-1. Search database: `SELECT value, name FROM adempiere.chuboe_mfr WHERE name ILIKE '%keyword%'`
-2. If found, add mapping to `mfr-aliases.json`
-3. If not found, leave column C blank
+When extraction encounters an unmatched manufacturer abbreviation:
+1. Search database: `SELECT value, name FROM adempiere.chuboe_mfr WHERE ad_client_id = 1000000 AND name ILIKE '%keyword%'`
+2. If found, add mapping to `mfr-aliases.json` (abbreviation → canonical name)
+3. If not found, use the name as-is — system may still match it
 
 ### Why This Matters
-- **26M offer lines** currently have no manufacturer match
-- System's rigid MFR_Text matching has very low conversion rate
-- Pre-matching enables: analytics by manufacturer, cross-reference with VQs, trend analysis
+- System auto-maps text to MFR ID, avoiding client-level lookup issues
+- Canonical names improve match rate vs raw abbreviations
+- Pre-normalizing enables: analytics by manufacturer, cross-reference with VQs, trend analysis
 
 **Notes field usage:**
 - **Expiration**: "Offer expires 2026-03-31"
