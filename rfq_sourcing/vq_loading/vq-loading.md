@@ -116,7 +116,7 @@ Extract ALL available fields from each quote. Required fields must be present; o
 | **Date Code** | `Date Code` | No | Manufacturing date code (e.g., 2024, 24+) |
 | **MOQ** | `MOQ` | No | Minimum order quantity |
 | **SPQ** | `SPQ` | No | Standard pack quantity |
-| **Packaging** | `Packaging` | No | Reel, Tube, Tray, Bulk, Cut Tape |
+| **Packaging** | `Packaging` | No | **UPPERCASE lookup field** - see Packaging Reference below |
 | **Lead Time** | `Lead Time` | No | Default: "stock". Only specify if vendor quotes specific lead time |
 | **COO** | `COO` | No | Country of origin - use **full name** (China, Taiwan, Malaysia, United States, etc.) NOT ISO codes |
 | **RoHS** | `RoHS` | No | **Yes** / **No** / **Not Applicable** / blank (NOT Y/N) |
@@ -160,6 +160,31 @@ Extract ALL available fields from each quote. Required fields must be present; o
 | RoHS, ROHS compliant, Pb-free, Lead-free | **Yes** |
 | Non-RoHS, Leaded, Not RoHS | **No** |
 | Unknown, not stated | (leave blank) |
+
+**⚠️ Packaging Field Values (CRITICAL - UPPERCASE lookup field):**
+
+These are the **ONLY** valid values. Use exact spelling and case:
+
+| Valid Value | When to Use |
+|-------------|-------------|
+| **REEL** | Tape & Reel, T&R, Custom Reel |
+| **TRAY** | Tray, Trays |
+| **BULK** | Bulk, Each, Bag, Carton, Pack, Dry Pack |
+| **CUT TAPE** | Cut Tape, Cut Strips, Strip |
+| **F-TUBE** | Tube, Tubes, Rail (no plain "TUBE" exists) |
+| **AMMO** | Ammo pack |
+| **BOX** | Box |
+| **F-REEL** | Franchise Reel |
+| **F-TRAY** | Franchise Tray |
+| **OTHER** | Anything else not listed |
+| (blank) | Unknown or not specified |
+
+**Common Mistakes:**
+- ❌ `Reel` → ✓ `REEL` (must be UPPERCASE)
+- ❌ `TUBE` → ✓ `F-TUBE` (plain TUBE doesn't exist)
+- ❌ `EACH` → ✓ `BULK`
+- ❌ `T&R` → ✓ `REEL`
+- ❌ `1`, `400`, `5000` → ✓ (blank) - these are SPQ values, not packaging
 
 **Vendor Notes field usage:**
 - **Alternate MPN** (CRITICAL - MUST BE FIRST): When vendor quotes a different MPN than requested, put "Quoted MPN: [vendor's MPN]" as the **FIRST thing** in Vendor Notes. The MPN field MUST contain the customer's original RFQ MPN - this is how iDempiere links the VQ to the RFQ.
