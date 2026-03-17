@@ -1,9 +1,9 @@
 const fs = require('fs');
 
-// Valid values for lookup fields in iDempiere
+// Valid values for lookup fields in iDempiere (from database)
 const VALID = {
-  Packaging: ['Reel', 'Tube', 'Tray', 'Bulk', 'Cut Tape', ''],
-  RoHS: ['Yes', 'No', 'Not Applicable', ''],
+  Packaging: ['REEL', 'TRAY', 'BULK', 'CUT TAPE', 'AMMO', 'BOX', 'F-REEL', 'F-TRAY', 'F-TUBE', 'OTHER', ''],
+  RoHS: ['Y', 'N', 'NA', ''],
   Currency: ['GBP', 'EUR', 'USD', 'JPY', 'CNY', '']
 };
 
