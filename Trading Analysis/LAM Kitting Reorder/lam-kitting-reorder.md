@@ -1,6 +1,6 @@
 # LAM Kitting Reorder Workflow
 
-Monitor LAM kitting warehouse inventory levels to trigger reorders, update lead times, and track historical sourcing and buyer data.
+Monitor LAM kitting warehouse inventory levels to trigger reorders, update lead times, and track historical sourcing.
 
 ---
 
@@ -8,164 +8,161 @@ Monitor LAM kitting warehouse inventory levels to trigger reorders, update lead 
 
 | Setting | Value |
 |---------|-------|
-| Warehouses | W111 (LAM 3PL), W115 (LAM Dead Inventory) |
+| Warehouses | W111 (LAM 3PL) + W115 (LAM Dead Inventory) — combined |
 | Trigger | After Inventory File Cleanup (Monday) or on-demand |
-| Inputs | Inventory files, historical sourcing, buyer data |
-| Outputs | Reorder alerts, lead time updates |
+| Threshold Source | `Lam_Kitting_DB.xlsx` → INVENTORY sheet → Column I (MIN QTY) |
+| Join Key | LAM CPC (primary), MPN (fallback) |
+
+**Key Design Decisions:**
+- **Separate workflow** — Independent of Inventory File Cleanup, but triggered by it
+- **Combined inventory** — W111 + W115 quantities summed per part (dead stock counts)
+- **Fixed thresholds** — MIN QTY is a fixed value in INVENTORY sheet (no lookup to MIN sheet)
 
 ---
 
 ## Inputs
 
-### From Inventory File Cleanup
+### From Inventory File Cleanup (Trigger)
 
 | File | Description |
 |------|-------------|
-| `W111_LAM_3PL.csv` | Current W111 inventory |
-| `W115_LAM_Dead_Inventory.csv` | Current W115 inventory |
+| `W111_LAM_3PL.csv` | Current W111 inventory (Chuboe format) |
+| `W115_LAM_Dead_Inventory.csv` | Current W115 inventory (Chuboe format) |
 
-### Historical Data (TBD)
+### From LAM Kitting Database
 
-| Input | Source | Format | Description |
-|-------|--------|--------|-------------|
-| Historical Sourcing | ? | ? | Past purchase history for lead time estimation |
-| Buyer Data | ? | ? | Buyer assignments, preferences |
-| Reorder Thresholds | ? | ? | Min/max levels per MPN |
+| File | Sheet | Key Columns |
+|------|-------|-------------|
+| `Lam_Kitting_DB_*.xlsx` | INVENTORY | CPC (Lam P/N), MPN, MIN QTY (Col I) |
+
+**Column Mapping (INVENTORY sheet):**
+- **CPC / Lam P/N** — LAM's internal part code (join key primary)
+- **MPN** — Manufacturer part number (join key fallback)
+- **MIN QTY (Column I)** — Fixed reorder threshold
 
 ---
 
-## Workflow Steps
+## End-to-End Workflow
 
-### Step 1: Load Current Inventory
+### Step 1: Load Inventory Files
 
-Load the latest inventory files from the Inventory File Cleanup output:
-- `W111_LAM_3PL.csv`
-- `W115_LAM_Dead_Inventory.csv`
+Load the latest W111 and W115 files from Inventory File Cleanup output:
+```
+W111_LAM_3PL.csv
+W115_LAM_Dead_Inventory.csv
+```
 
-### Step 2: Load Reorder Thresholds (TBD)
+**Output:** Combined inventory list with columns: CPC, MPN, Warehouse, Qty
 
-Load target inventory levels per MPN:
-- Minimum quantity (reorder trigger)
-- Maximum quantity (target after reorder)
-- Safety stock days
+### Step 2: Aggregate by Part
 
-### Step 3: Compare Inventory to Thresholds
+Combine W111 + W115 quantities per part:
+- Group by CPC (primary) or MPN (if no CPC match)
+- Sum quantities across both warehouses
+- Track which warehouses have stock
 
-For each MPN:
-1. Current qty vs. minimum threshold
-2. If current < minimum → flag for reorder
-3. Calculate reorder quantity: `max_qty - current_qty`
+**Output:** Aggregated inventory with Total_Qty per CPC/MPN
 
-### Step 4: Pull Historical Sourcing Data (TBD)
+### Step 3: Load Thresholds
 
-For reorder items, pull:
+Load `Lam_Kitting_DB_*.xlsx` → INVENTORY sheet:
+- Extract CPC, MPN, MIN QTY columns
+- MIN QTY is the reorder trigger threshold
+
+**Output:** Threshold lookup table (CPC/MPN → MIN_QTY)
+
+### Step 4: Join Inventory to Thresholds
+
+Match aggregated inventory to thresholds:
+1. **Primary match:** Join on CPC (LAM P/N)
+2. **Fallback match:** If no CPC match, join on MPN
+
+**Output:** Combined dataset with Current_Qty and MIN_QTY per part
+
+### Step 5: Identify Reorder Candidates
+
+Flag parts where `Current_Qty < MIN_QTY`:
+- Calculate shortfall: `MIN_QTY - Current_Qty`
+- Prioritize by shortfall size or criticality
+
+**Output:** Reorder candidates list
+
+### Step 6: Enrich with Historical Data (TBD)
+
+For reorder candidates, pull from ERP:
 - Last purchase price
 - Last supplier
 - Average lead time
 - Buyer who handled previous orders
 
-### Step 5: Generate Reorder Alerts
+**Output:** Enriched reorder list
 
-Output reorder recommendations with:
-- MPN
-- Current quantity
-- Reorder quantity
-- Suggested supplier (from history)
-- Estimated lead time
-- Assigned buyer
+### Step 7: Generate Reorder Alerts
 
-### Step 6: Update Lead Times (TBD)
+Output final reorder recommendations.
 
-Based on recent sourcing history:
-- Calculate average lead time per MPN/supplier
-- Update lead time data for planning
+**Output:** `LAM_Reorder_Alerts_YYYY-MM-DD.csv`
 
 ---
 
-## Outputs
+## Output Format
 
-| File | Description |
-|------|-------------|
-| `LAM_Reorder_Alerts_YYYY-MM-DD.csv` | Parts below minimum threshold needing reorder |
-| `LAM_Lead_Time_Updates_YYYY-MM-DD.csv` | Updated lead times based on historical data |
-
-### Reorder Alert Columns (Draft)
+### Reorder Alert Columns
 
 | Column | Description |
 |--------|-------------|
-| Warehouse | W111 or W115 |
-| MPN | Part number |
-| Current_Qty | Current inventory quantity |
-| Min_Threshold | Minimum inventory level |
-| Reorder_Qty | Quantity to order (max - current) |
-| Last_Supplier | Previous supplier from history |
+| CPC | LAM's part code |
+| MPN | Manufacturer part number |
+| W111_Qty | Quantity in W111 (LAM 3PL) |
+| W115_Qty | Quantity in W115 (Dead Inventory) |
+| Total_Qty | Combined quantity |
+| MIN_QTY | Reorder threshold |
+| Shortfall | MIN_QTY - Total_Qty |
+| Last_Supplier | Previous supplier (from ERP) |
 | Last_Price | Previous purchase price |
 | Avg_Lead_Time | Average lead time in days |
 | Assigned_Buyer | Buyer to handle reorder |
-| Priority | High/Medium/Low based on urgency |
-
----
-
-## Questions to Resolve
-
-Before implementation, need to clarify:
-
-1. **Reorder Thresholds**
-   - Where are min/max inventory levels defined?
-   - Is this per MPN or per MPN+Warehouse?
-   - Who maintains these thresholds?
-
-2. **Historical Sourcing Data**
-   - What system/file contains purchase history?
-   - What fields are available (price, supplier, lead time, buyer)?
-   - How far back should we look?
-
-3. **Buyer Assignment**
-   - Are buyers assigned per MPN, per supplier, or per warehouse?
-   - Where is this mapping stored?
-
-4. **Lead Time Calculation**
-   - Simple average of past orders?
-   - Weighted by recency?
-   - Per supplier or overall?
-
-5. **Notification**
-   - Email alerts like Inventory File Cleanup?
-   - Who should receive reorder alerts?
-
-6. **W115 (Dead Inventory)**
-   - Should dead inventory trigger reorders?
-   - Or is this for analysis/disposition only?
+| Priority | High/Medium/Low based on shortfall % |
 
 ---
 
 ## Integration with Inventory File Cleanup
 
-This workflow can be triggered automatically after Inventory File Cleanup:
-
 ```
-Inventory Cleanup completes
+Inventory Cleanup (Monday 6 AM cron)
     ↓
-Check if W111/W115 files exist
+Produces W111_LAM_3PL.csv + W115_LAM_Dead_Inventory.csv
     ↓
-Run LAM Kitting Reorder
+Triggers LAM Kitting Reorder (this workflow)
     ↓
-Email reorder alerts
+Generates reorder alerts
+    ↓
+(Optional) Email alerts to buyers
 ```
-
-Alternatively, run on-demand when needed.
 
 ---
 
-## Future Enhancements
+## Questions Resolved
 
-- [ ] Define reorder threshold source
-- [ ] Integrate historical sourcing data
-- [ ] Add buyer assignment logic
-- [ ] Add lead time calculation
+| Question | Answer |
+|----------|--------|
+| Join key? | CPC (primary), MPN (fallback) |
+| Threshold source? | INVENTORY sheet Column I (MIN QTY) — fixed value |
+| Which warehouses? | W111 + W115 combined |
+| Dead stock? | Yes, counts toward inventory level |
+| Separate workflow? | Yes, triggered by Inventory File Cleanup |
+
+---
+
+## TODO
+
+- [ ] Map Inventory Cleanup output columns to CPC/MPN
+- [ ] Build aggregation script (Node.js)
+- [ ] Add historical sourcing data from ERP (Step 6)
 - [ ] Email notifications for reorder alerts
-- [ ] Dashboard/summary view of inventory health
+- [ ] Integrate as cron job after Inventory File Cleanup
 
 ---
 
 *Created: 2026-03-16*
+*Updated: 2026-03-17*

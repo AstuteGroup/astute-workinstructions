@@ -112,6 +112,14 @@ Why: Reference sections (like "Vendor Matching Strategy") get skipped when follo
 
 ---
 
+## Terminology
+
+See `MEMORY.md` for full list. Key terms:
+- **CPC** — Customer Part Code (customer's internal part number). "LAM CPC" = LAM's part code.
+- **OT** — Orange Tsunami (internal name for iDempiere-based system)
+
+---
+
 ## Inventory File Cleanup Workflow
 
 **Location:** `~/workspace/astute-workinstructions/Trading Analysis/Inventory File Cleanup/`
