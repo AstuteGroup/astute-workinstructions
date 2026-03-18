@@ -1,18 +1,21 @@
 /**
  * TTI API Integration for Franchise Screening
  *
- * Uses TTI Lead Time API (primary) + Search API (manufacturer reference)
- * Auth: apiKey header (custom Azure APIM header name)
+ * Auth: apiKey header (custom Azure APIM header — NOT Ocp-Apim-Subscription-Key)
  * Portal: https://developer.tti.com
  *
  * API Products:
- *   - Lead Time: POST /leadtime/v1/requestLeadtime — stock, lead time, lifecycle, CoO
- *   - Search:    GET /service/api/v1/search/manufacturers — manufacturer code list
- *   - Quote:     GET /quote/v2/{quoteId}/lineitems — requires separate key (not yet subscribed)
+ *   - Search (primary): GET /service/api/v1/search/keyword — pricing, stock, lead time, compliance
+ *   - Lead Time:        POST /leadtime/v1/requestLeadtime — lifecycle, CoO, on-order pipeline
+ *   - Manufacturers:    GET /service/api/v1/search/manufacturers — reference list
+ *   - Quote:            GET /quote/v2/{quoteId}/lineitems — needs separate key
  *
- * Lead Time API returns: stock qty, lead time (weeks), lifecycle, CoO, mfr code
- * No pricing data available — TTI APIs don't expose price breaks
- * Rate limit: ~5 seconds between lead time calls
+ * Search API response fields:
+ *   ttiPartNumber, manufacturerPartNumber, manufacturer, description,
+ *   availableToSell, pricing.quantityPriceBreaks[], leadTime,
+ *   salesMinimum (MOQ), salesMultiple (SPQ), packaging,
+ *   datasheetURL, buyUrl, hts, eccn, rohsStatus, imageURL,
+ *   regionalInventory[], availableOnOrder[]
  */
 
 const https = require('https');
@@ -27,35 +30,14 @@ const TTI_CONFIG = {
   baseUrl: 'api.tti.com',
 
   // Endpoints
-  leadTimePath: '/leadtime/v1/requestLeadtime',         // POST — primary endpoint
-  manufacturersPath: '/service/api/v1/search/manufacturers', // GET — reference only
-
-  // Rate limit (seconds between lead time calls)
-  rateLimitMs: 6000,
+  searchPath: '/service/api/v1/search/keyword',            // GET — primary (pricing + stock)
+  leadTimePath: '/leadtime/v1/requestLeadtime',             // POST — supplemental (lifecycle, CoO)
+  manufacturersPath: '/service/api/v1/search/manufacturers', // GET — reference
 
   // iDempiere Business Partner for VQ loading
   bpId: 1000326,
   bpValue: '1002330',
   bpName: 'TTI Inc',
-};
-
-// Manufacturer code mapping (from Search API, cached)
-// mfrAlias → full name (populated on first use or from search API)
-const MFR_ALIASES = {
-  'KEM': 'Kemet',
-  'PAN': 'Panasonic',
-  'VIS': 'Vishay',
-  'TXN': 'Texas Instruments',
-  'AVX': 'Kyocera AVX',
-  'BOU': 'Bourns',
-  'MUR': 'Murata',
-  'TDK': 'TDK',
-  'YAG': 'Yageo',
-  'CDE': 'Cornell Dubilier',
-  'AMO': 'ams OSRAM',
-  'HON': 'Honeywell',
-  'LIT': 'Littelfuse',
-  'TEL': 'TE Connectivity',
 };
 
 /**
@@ -91,7 +73,6 @@ function ttiRequest(path, apiKey, method = 'GET', body = null) {
           return;
         }
         if (res.statusCode === 429) {
-          // Extract retry-after if available
           let retryMsg = 'Rate limited';
           try {
             const errBody = JSON.parse(data);
@@ -126,62 +107,86 @@ function ttiRequest(path, apiKey, method = 'GET', body = null) {
 }
 
 /**
- * Look up a single part via Lead Time API
+ * Search TTI for a part number via Search API (keyword endpoint)
  * @param {string} mpn - Manufacturer part number
- * @param {number} rfqQty - Customer requested quantity
- * @param {Object} options - { verbose: boolean }
+ * @param {number} rfqQty - Customer requested quantity (for price break selection)
+ * @param {Object} options - { exact: boolean, enrichLeadTime: boolean, verbose: boolean }
  * @returns {Object} Screening and VQ data
  */
 async function searchPart(mpn, rfqQty = 1, options = {}) {
-  const body = {
-    description: `Lookup ${mpn}`,
-    partNumbers: [mpn],
-  };
+  const exact = options.exact !== false; // default true
+  const params = new URLSearchParams({ searchTerms: mpn });
+  if (exact) params.append('exactMatchPartNumber', 'true');
 
-  const json = await ttiRequest(
-    TTI_CONFIG.leadTimePath,
-    TTI_CONFIG.leadTimeKey,
-    'POST',
-    body
-  );
+  const path = `${TTI_CONFIG.searchPath}?${params.toString()}`;
+  const json = await ttiRequest(path, TTI_CONFIG.searchKey);
+  const result = parseSearchResults(json, mpn, rfqQty);
 
-  return parseLeadTimeResult(json, mpn, rfqQty);
+  // Optionally enrich with Lead Time API data (lifecycle, CoO, on-order)
+  if (options.enrichLeadTime && result.found) {
+    try {
+      const ltJson = await ttiRequest(
+        TTI_CONFIG.leadTimePath,
+        TTI_CONFIG.leadTimeKey,
+        'POST',
+        { description: `Enrich ${mpn}`, partNumbers: [mpn] }
+      );
+      enrichWithLeadTime(result, ltJson);
+    } catch (e) {
+      if (options.verbose) {
+        console.error(`  Lead time enrichment failed: ${e.message}`);
+      }
+    }
+  }
+
+  return result;
 }
 
 /**
- * Parse Lead Time API response into standard screening + VQ format
+ * Parse Search API (keyword) response into standard screening + VQ format
  *
  * Response shape:
  * {
- *   "description": "...",
- *   "leadTimes": [{
- *     "customerEntity": "NDC" | null,
- *     "requestedPartNumber": "C0805C104K5RACTU",
- *     "ttiPartNumber": "C0805C104K5RACTU" | "Not a TTI Part",
- *     "manufacturerPartNumber": "C0805C104K5RAC7800" | null,
- *     "leadTime": "14" | null,          // weeks
- *     "available": 2832000 | null,       // stock qty
- *     "mfrAlias": "KEM" | null,          // manufacturer code
- *     "approvalIndicator": " " | null,
- *     "lifeCycle": "Active" | null,
- *     "commentsToCustomer": "...",
- *     "countryOfOrigin": "CN" | null,
- *     "primaryCountryOfOrigin": "CN" | null,
- *     "availableOnOrder": [{ "quantity": 0, "date": "N/A" }, ...]
+ *   "parts": [{
+ *     "ttiPartNumber": "C0805C104K5RACTU",
+ *     "manufacturerPartNumber": "C0805C104K5RAC7800",
+ *     "manufacturerCode": "KEM",
+ *     "manufacturer": "KEMET",
+ *     "description": "Multilayer Ceramic Capacitors MLCC...",
+ *     "availableToSell": 2832000,
+ *     "salesMinimum": 4000,        // MOQ
+ *     "salesMultiple": 4000,       // SPQ
+ *     "pricing": {
+ *       "quantityPriceBreaks": [{ "quantity": 4000, "price": 0.0114 }, ...]
+ *     },
+ *     "leadTime": "14 Weeks",
+ *     "packaging": "Reel",
+ *     "datasheetURL": "https://...",
+ *     "buyUrl": "https://...",
+ *     "hts": "8532240020",
+ *     "category": "Multilayer Ceramic Capacitors...",
+ *     "partNCNR": "N",
+ *     "tariffMessage": "Tariff May Apply",
+ *     "exportInformation": { "eccn": "EAR99", "hts": "...", "taric": "..." },
+ *     "environmentalInformation": { "rohsStatus": "Compliant", ... },
+ *     "regionalInventory": [{ "ttiRegion": "AS", "availableToSell": 20000, ... }],
+ *     "availableOnOrder": [{ "quantity": 184000, "date": "2026-03-18" }],
+ *     "roHsStatus": "Compliant"
  *   }],
- *   "totalCount": 1
+ *   "currencyCode": "USD",
+ *   "recordCount": 2
  * }
  */
-function parseLeadTimeResult(apiResponse, searchMpn, rfqQty) {
+function parseSearchResults(apiResponse, searchMpn, rfqQty) {
   const result = {
     searchMpn,
     rfqQty,
     found: false,
     // Screening fields
     franchiseQty: 0,
-    franchisePrice: null,      // Not available from TTI API
-    franchiseBulkPrice: null,  // Not available from TTI API
-    franchiseRfqPrice: null,   // Not available from TTI API
+    franchisePrice: null,      // Price at MOQ
+    franchiseBulkPrice: null,  // Lowest price break
+    franchiseRfqPrice: null,   // Price at RFQ qty
     opportunityValue: null,
     // VQ fields
     vqPrice: null,
@@ -190,74 +195,109 @@ function parseLeadTimeResult(apiResponse, searchMpn, rfqQty) {
     vqDescription: null,
     vqManufacturer: null,
     vqLeadTime: null,
+    vqMoq: null,
+    vqSpq: null,
+    vqSku: null,
+    vqDatasheetUrl: null,
+    vqRohs: null,
+    vqHts: null,
+    vqEccn: null,
     vqCoo: null,
-    vqSku: null,               // TTI part number
     vqLifeCycle: null,
+    vqPackaging: null,
     // Raw data
     allMatches: [],
     matchCount: 0,
+    currency: apiResponse.currencyCode || 'USD',
   };
 
-  const leadTimes = apiResponse.leadTimes || [];
-  if (leadTimes.length === 0) return result;
+  const parts = apiResponse.parts || [];
+  if (parts.length === 0) return result;
 
-  result.matchCount = leadTimes.length;
-
-  // Find the matching part (usually just one since we search one at a time)
+  result.matchCount = parts.length;
   const normalizedSearch = normalizeMpn(searchMpn);
+
+  // Find best match: exact MPN with highest stock
   let bestMatch = null;
 
-  for (const item of leadTimes) {
-    // Skip "Not a TTI Part" entries if we have better ones
-    if (item.ttiPartNumber && item.ttiPartNumber.trim() !== 'Not a TTI Part') {
-      if (!bestMatch || (item.available || 0) > (bestMatch.available || 0)) {
-        bestMatch = item;
-      }
+  // First: exact match with stock
+  const exactWithStock = parts.filter(p =>
+    normalizeMpn(p.ttiPartNumber) === normalizedSearch &&
+    (p.availableToSell || 0) > 0
+  );
+  if (exactWithStock.length > 0) {
+    exactWithStock.sort((a, b) => (b.availableToSell || 0) - (a.availableToSell || 0));
+    bestMatch = exactWithStock[0];
+  }
+
+  // Second: exact match (no stock requirement)
+  if (!bestMatch) {
+    bestMatch = parts.find(p => normalizeMpn(p.ttiPartNumber) === normalizedSearch);
+  }
+
+  // Third: any match with highest stock
+  if (!bestMatch) {
+    const withStock = parts.filter(p => (p.availableToSell || 0) > 0);
+    if (withStock.length > 0) {
+      withStock.sort((a, b) => (b.availableToSell || 0) - (a.availableToSell || 0));
+      bestMatch = withStock[0];
     }
   }
 
-  // Fall back to first result (may be "Not a TTI Part")
+  // Fallback: first result
   if (!bestMatch) {
-    bestMatch = leadTimes[0];
-  }
-
-  // Check if TTI carries this part
-  const isTtiPart = bestMatch.ttiPartNumber &&
-    bestMatch.ttiPartNumber.trim() !== 'Not a TTI Part';
-
-  if (!isTtiPart) {
-    // TTI doesn't carry it — still return result with found=false
-    result.vqMpn = searchMpn;
-    result.vqVendorNotes = 'Not a TTI Part';
-    return result;
+    bestMatch = parts[0];
   }
 
   result.found = true;
 
   // Part info
-  result.vqMpn = (bestMatch.manufacturerPartNumber || '').trim() || searchMpn;
-  result.vqSku = (bestMatch.ttiPartNumber || '').trim();
-
-  // Manufacturer (resolve alias if possible)
-  const mfrCode = bestMatch.mfrAlias || '';
-  result.vqManufacturer = MFR_ALIASES[mfrCode] || mfrCode;
+  result.vqMpn = bestMatch.manufacturerPartNumber || bestMatch.ttiPartNumber || '';
+  result.vqSku = bestMatch.ttiPartNumber || '';
+  result.vqManufacturer = bestMatch.manufacturer || '';
+  result.vqDescription = bestMatch.description || '';
 
   // Stock
-  result.franchiseQty = bestMatch.available || 0;
+  result.franchiseQty = bestMatch.availableToSell || 0;
 
-  // Lead time (weeks)
-  if (bestMatch.leadTime) {
-    const weeks = parseInt(bestMatch.leadTime);
-    result.vqLeadTime = isNaN(weeks) ? bestMatch.leadTime : `${weeks} Week(s)`;
+  // Regional inventory (e.g., Asia stock)
+  const regionalStock = (bestMatch.regionalInventory || []).reduce(
+    (sum, r) => sum + (r.availableToSell || 0), 0
+  );
+
+  // MOQ / SPQ
+  result.vqMoq = bestMatch.salesMinimum || null;
+  result.vqSpq = bestMatch.salesMultiple || null;
+
+  // Pricing
+  const priceBreaks = bestMatch.pricing?.quantityPriceBreaks || [];
+  if (priceBreaks.length > 0) {
+    // Already sorted by quantity from API, but ensure it
+    const sorted = [...priceBreaks].sort((a, b) => a.quantity - b.quantity);
+
+    result.franchisePrice = sorted[0].price;
+    result.franchiseBulkPrice = sorted[sorted.length - 1].price;
+    result.franchiseRfqPrice = getPriceAtQty(sorted, rfqQty);
+    result.vqPrice = result.franchiseRfqPrice;
   }
 
-  // Country of origin
-  result.vqCoo = bestMatch.countryOfOrigin || bestMatch.primaryCountryOfOrigin || null;
+  if (result.franchiseBulkPrice && rfqQty) {
+    result.opportunityValue = result.franchiseBulkPrice * rfqQty;
+  }
 
-  // Lifecycle
-  result.vqLifeCycle = bestMatch.lifeCycle || null;
+  // Lead time
+  if (bestMatch.leadTime) {
+    result.vqLeadTime = bestMatch.leadTime; // Already formatted: "14 Weeks"
+  }
 
-  // Available on order (future stock pipeline)
+  // Compliance & export
+  result.vqRohs = bestMatch.roHsStatus || bestMatch.environmentalInformation?.rohsStatus || null;
+  result.vqHts = bestMatch.hts || bestMatch.exportInformation?.hts || null;
+  result.vqEccn = bestMatch.exportInformation?.eccn || null;
+  result.vqPackaging = bestMatch.packaging || null;
+  result.vqDatasheetUrl = bestMatch.datasheetURL || null;
+
+  // On-order pipeline
   const onOrder = (bestMatch.availableOnOrder || []).filter(
     o => o.quantity > 0 && o.date !== 'N/A'
   );
@@ -267,17 +307,20 @@ function parseLeadTimeResult(apiResponse, searchMpn, rfqQty) {
   if (result.franchiseQty > 0) {
     notes.push(`TTI stock: ${result.franchiseQty.toLocaleString()}`);
   }
+  if (regionalStock > 0) {
+    notes.push(`Asia: ${regionalStock.toLocaleString()}`);
+  }
   if (result.vqLeadTime) {
     notes.push(`LT: ${result.vqLeadTime}`);
   }
-  if (result.vqLifeCycle && result.vqLifeCycle !== 'Active') {
-    notes.push(`Lifecycle: ${result.vqLifeCycle}`);
-  }
-  if (result.vqCoo) {
-    notes.push(`CoO: ${result.vqCoo}`);
+  if (result.vqMoq && result.vqMoq > 1) {
+    notes.push(`MOQ: ${result.vqMoq.toLocaleString()}`);
   }
   if (result.vqManufacturer) {
     notes.push(`Mfr: ${result.vqManufacturer}`);
+  }
+  if (bestMatch.tariffMessage) {
+    notes.push(bestMatch.tariffMessage);
   }
   if (onOrder.length > 0) {
     const pipeline = onOrder.map(o => `${o.quantity.toLocaleString()} by ${o.date}`).join(', ');
@@ -285,92 +328,108 @@ function parseLeadTimeResult(apiResponse, searchMpn, rfqQty) {
   }
   result.vqVendorNotes = notes.join(' | ') || 'TTI part (no stock)';
 
-  // Collect all matches for reference
-  result.allMatches = leadTimes.map(item => ({
-    requestedMpn: item.requestedPartNumber,
-    ttiPn: (item.ttiPartNumber || '').trim(),
-    mfrPn: (item.manufacturerPartNumber || '').trim(),
-    stock: item.available || 0,
-    leadTime: item.leadTime,
-    mfr: item.mfrAlias,
-    lifecycle: item.lifeCycle,
-    coo: item.countryOfOrigin,
+  // Collect all matches
+  result.allMatches = parts.map(p => ({
+    ttiPn: p.ttiPartNumber || '',
+    mfrPn: p.manufacturerPartNumber || '',
+    manufacturer: p.manufacturer || '',
+    stock: p.availableToSell || 0,
+    moq: p.salesMinimum,
+    leadTime: p.leadTime,
+    price: p.pricing?.quantityPriceBreaks?.[0]?.price || null,
+    bulkPrice: p.pricing?.quantityPriceBreaks?.slice(-1)[0]?.price || null,
+    packaging: p.packaging,
+    rohs: p.roHsStatus,
+    regionalStock: (p.regionalInventory || []).map(r => ({
+      region: r.ttiRegion,
+      stock: r.availableToSell,
+    })),
   }));
 
   return result;
 }
 
 /**
- * Search multiple parts via Lead Time API
- * Batches parts into the partNumbers array (API supports multiple)
- * @param {Array} parts - Array of {mpn, qty} objects
- * @param {number} delayMs - Delay between batch requests (rate limiting)
- * @param {Object} options - { batchSize: number, verbose: boolean }
+ * Enrich result with Lead Time API data (lifecycle, CoO)
+ * Adds fields not available in the Search API response
  */
-async function searchParts(parts, delayMs = TTI_CONFIG.rateLimitMs, options = {}) {
-  const batchSize = options.batchSize || 20; // TTI may support batch lookups
+function enrichWithLeadTime(result, ltResponse) {
+  const leadTimes = ltResponse.leadTimes || [];
+  if (leadTimes.length === 0) return;
+
+  // Find matching entry
+  const match = leadTimes.find(lt =>
+    lt.ttiPartNumber && lt.ttiPartNumber.trim() !== 'Not a TTI Part'
+  );
+  if (!match) return;
+
+  if (match.lifeCycle) {
+    result.vqLifeCycle = match.lifeCycle;
+    if (match.lifeCycle !== 'Active' && !result.vqVendorNotes.includes('Lifecycle')) {
+      result.vqVendorNotes += ` | Lifecycle: ${match.lifeCycle}`;
+    }
+  }
+
+  if (match.countryOfOrigin || match.primaryCountryOfOrigin) {
+    result.vqCoo = match.countryOfOrigin || match.primaryCountryOfOrigin;
+  }
+}
+
+/**
+ * Get price at a specific quantity from price breaks
+ * TTI price breaks: [{ quantity: 4000, price: 0.0114 }, ...]
+ */
+function getPriceAtQty(priceBreaks, qty) {
+  if (!priceBreaks || priceBreaks.length === 0) return null;
+
+  let price = priceBreaks[0].price;
+  for (const tier of priceBreaks) {
+    if (qty >= tier.quantity) {
+      price = tier.price;
+    }
+  }
+  return price;
+}
+
+/**
+ * Normalize MPN for comparison
+ */
+function normalizeMpn(mpn) {
+  if (!mpn) return '';
+  return mpn.replace(/[-\s]/g, '').toUpperCase();
+}
+
+/**
+ * Search multiple parts (sequential with rate limiting)
+ * @param {Array} parts - Array of {mpn, qty} objects
+ * @param {number} delayMs - Delay between requests
+ * @param {Object} options - Passed to searchPart
+ */
+async function searchParts(parts, delayMs = 300, options = {}) {
   const results = [];
 
-  // Try batch first — send all MPNs in one request
-  for (let i = 0; i < parts.length; i += batchSize) {
-    const batch = parts.slice(i, i + batchSize);
-    const partNumbers = batch.map(p => p.mpn);
+  for (let i = 0; i < parts.length; i++) {
+    const { mpn, qty } = parts[i];
 
     try {
-      const body = {
-        description: `Batch lookup ${i + 1}-${i + batch.length}`,
-        partNumbers: partNumbers,
-      };
+      const result = await searchPart(mpn, qty || 1, options);
+      results.push(result);
 
-      const json = await ttiRequest(
-        TTI_CONFIG.leadTimePath,
-        TTI_CONFIG.leadTimeKey,
-        'POST',
-        body
-      );
-
-      // Parse each result from the batch response
-      const leadTimes = json.leadTimes || [];
-      for (let j = 0; j < batch.length; j++) {
-        const { mpn, qty } = batch[j];
-        // Find this part's lead time entry
-        const partLt = leadTimes.find(
-          lt => normalizeMpn(lt.requestedPartNumber) === normalizeMpn(mpn)
-        );
-
-        if (partLt) {
-          const singleResponse = { leadTimes: [partLt], totalCount: 1 };
-          const result = parseLeadTimeResult(singleResponse, mpn, qty || 1);
-          results.push(result);
-          const status = result.found
-            ? `${result.franchiseQty.toLocaleString()} avail | LT: ${result.vqLeadTime || 'N/A'}`
-            : 'Not a TTI part';
-          console.log(`[${results.length}/${parts.length}] ${mpn}: ${status}`);
-        } else {
-          results.push({
-            searchMpn: mpn,
-            rfqQty: qty,
-            found: false,
-            vqVendorNotes: 'No response from TTI',
-          });
-          console.log(`[${results.length}/${parts.length}] ${mpn}: No match in response`);
-        }
-      }
+      const status = result.found
+        ? `${result.franchiseQty.toLocaleString()} @ $${result.vqPrice || 'N/A'}`
+        : 'Not found';
+      console.log(`[${i + 1}/${parts.length}] ${mpn}: ${status}`);
     } catch (error) {
-      console.error(`Batch ${i + 1}-${i + batch.length} error: ${error.message}`);
-      // Add error entries for all parts in failed batch
-      for (const { mpn, qty } of batch) {
-        results.push({
-          searchMpn: mpn,
-          rfqQty: qty,
-          found: false,
-          error: error.message,
-        });
-      }
+      console.error(`[${i + 1}/${parts.length}] ${mpn}: Error - ${error.message}`);
+      results.push({
+        searchMpn: mpn,
+        rfqQty: qty,
+        found: false,
+        error: error.message,
+      });
     }
 
-    // Rate limiting between batches
-    if (i + batchSize < parts.length && delayMs > 0) {
+    if (i < parts.length - 1 && delayMs > 0) {
       await new Promise(resolve => setTimeout(resolve, delayMs));
     }
   }
@@ -380,21 +439,9 @@ async function searchParts(parts, delayMs = TTI_CONFIG.rateLimitMs, options = {}
 
 /**
  * Fetch manufacturer code list from Search API
- * Returns array of { manufacturerCode, manufacturer }
  */
 async function getManufacturers() {
-  return ttiRequest(
-    TTI_CONFIG.manufacturersPath,
-    TTI_CONFIG.searchKey
-  );
-}
-
-/**
- * Normalize MPN for comparison
- */
-function normalizeMpn(mpn) {
-  if (!mpn) return '';
-  return mpn.replace(/[-\s]/g, '').toUpperCase();
+  return ttiRequest(TTI_CONFIG.manufacturersPath, TTI_CONFIG.searchKey);
 }
 
 // Export for use in other modules
@@ -412,13 +459,13 @@ if (require.main === module) {
 
   if (args.length === 0) {
     console.log('Usage: node tti.js <MPN> [qty]');
-    console.log('       node tti.js <MPN1> <MPN2> <MPN3>    # batch lookup');
+    console.log('       node tti.js <MPN> [qty] --enrich    # add lifecycle/CoO from Lead Time API');
+    console.log('       node tti.js <MPN> [qty] --partial   # non-exact search');
     console.log('       node tti.js --manufacturers          # list manufacturer codes');
     console.log('\nExamples:');
     console.log('  node tti.js C0805C104K5RACTU 100');
-    console.log('  node tti.js ERJ-6ENF1001V GRM188R71H104KA93D');
-    console.log('\nNote: TTI API provides stock, lead time, lifecycle, and CoO.');
-    console.log('      Pricing is NOT available via the Lead Time API.');
+    console.log('  node tti.js ERJ-6ENF1001V 5000 --enrich');
+    console.log('  node tti.js C0805 100 --partial');
     process.exit(1);
   }
 
@@ -435,31 +482,19 @@ if (require.main === module) {
         console.error('Error:', err.message);
         process.exit(1);
       });
-  } else if (args.length === 1 || (args.length === 2 && !isNaN(args[1]))) {
-    // Single part lookup
+  } else {
     const mpn = args[0];
     const qty = parseInt(args[1]) || 1;
+    const opts = {
+      exact: !args.includes('--partial'),
+      enrichLeadTime: args.includes('--enrich'),
+      verbose: true,
+    };
 
-    searchPart(mpn, qty)
+    searchPart(mpn, qty, opts)
       .then(result => {
         console.log('\n=== TTI Search Result ===');
         console.log(JSON.stringify(result, null, 2));
-      })
-      .catch(err => {
-        console.error('Error:', err.message);
-        process.exit(1);
-      });
-  } else {
-    // Batch lookup — all args are MPNs
-    const parts = args.map(mpn => ({ mpn, qty: 1 }));
-
-    searchParts(parts)
-      .then(results => {
-        console.log('\n=== TTI Batch Results ===');
-        const found = results.filter(r => r.found).length;
-        const notTti = results.filter(r => !r.found).length;
-        console.log(`Found: ${found} | Not TTI: ${notTti} | Total: ${results.length}`);
-        console.log(JSON.stringify(results, null, 2));
       })
       .catch(err => {
         console.error('Error:', err.message);
