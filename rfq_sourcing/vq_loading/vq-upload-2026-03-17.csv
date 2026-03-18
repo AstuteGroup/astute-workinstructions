@@ -1,0 +1,11 @@
+RFQ Search Key,Buyer,Business Partner Search Key,Contact,MPN,MFR Text,Quoted Quantity,Cost,Currency,Date Code,MOQ,SPQ,Packaging,Lead Time,COO,RoHS,Vendor Notes
+1130350,Jake Harris,1005374,Steven Song,MAX3221EEAE+T,,580,6.50,,1447,,,,,,,Quoted MPN: MAX3221EEAE. Factory new with MFR's COC. Terms: Credit Card. DC 2014 - very old.
+1130350,Jake Harris,1005030,Bekim Pajaziti,LS14250,SAFT,502,2.35,EUR,25+,,,,stock,,,Only 502 pcs available (requested 1200). Shipment only via UPS by road (lithium).
+[NEEDS_RFQ],Feong Chang,1003874,,Y14870R00500B9R,VISHAY,50,19.05,,UNKNOWN,,,,2-3 weeks,,,Quoted as Mouser via IC360.
+1130577,Feong Chang,1006857,,LTM8074EY#PBF,ADI,80,6.20,,25+,,,,stock,,,Cut label stock.
+[NEEDS_RFQ],Feong Chang,1006857,,LT1491ACS#PBF,LINEAR,19,12.50,,21+,,,,stock,,,Cut label stock.
+[NEEDS_RFQ],Feong Chang,1006857,,MAX16029TG+T,ADI,75,6.20,,24+,,,,stock,,,Cut label stock. BOM MPN is MAX16029TG+ (no trailing T).
+[NEEDS_RFQ],Feong Chang,1008629,,AD9467BCPZ-250,ADI,100,122.15,,25+,,,,stock,,,Cut label stock. Note: RFQ system has -200 speed grade only.
+[NEEDS_RFQ],Feong Chang,1006032,,AD9467BCPZ-250,ADI,100,119.00,,25+,,,,stock,,,Cut label stock. Note: RFQ system has -200 speed grade only.
+[NEEDS_RFQ],Feong Chang,1003648,,LTM4632EV#PBF,ADI,80,9.00,,21+,,,,stock,,,Cut label stock. LGA package.
+1130577,Feong Chang,1012507,,LTM8074EY#PBF,ADI,80,6.815,,25+,,,,stock,,,
