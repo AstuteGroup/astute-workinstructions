@@ -66,26 +66,62 @@ Same as Market Offer Uploading:
 
 ## Customer/Partner Matching (DO NOT SKIP)
 
-**Same domain-based matching as Market Offer Uploading.**
+**Same multi-tier matching as VQ Loading (`vq-parser/src/mapper/vendor-lookup.js`), adapted for customers.**
 
+### Matching Order (3 tiers)
+
+**Tier 1: Exact email match**
 ```sql
--- Look up partner search_key by email domain
-SELECT DISTINCT
-  LOWER(SUBSTRING(au.email FROM POSITION('@' IN au.email) + 1)) as domain,
-  bp.value as search_key,
-  bp.name,
-  bp.isactive
+SELECT bp.value as search_key, bp.name
 FROM adempiere.ad_user au
 JOIN adempiere.c_bpartner bp ON au.c_bpartner_id = bp.c_bpartner_id
 WHERE bp.isactive = 'Y'
-AND LOWER(au.email) LIKE '%@domain.com%';
+AND LOWER(au.email) = LOWER('sender@domain.com');
 ```
 
-**Matching order:**
-1. Exact email match in `ad_user.email`
-2. Domain-based fallback (extract `@domain.com`, find any partner with that domain)
-3. Only ACTIVE partners (`bp.isactive = 'Y'`)
-4. **If not found → use `1008499` (Unqualified Broker)** and put customer name in Description
+**Tier 2: Domain-based lookup** (skip for generic domains)
+Extract company name hints from the email domain and search `c_bpartner.name`.
+
+```sql
+-- e.g., bliss@hongdaelectronicsco.com.cn → hint = 'hongda'
+SELECT bp.value as search_key, bp.name
+FROM adempiere.c_bpartner bp
+WHERE bp.isactive = 'Y'
+AND LOWER(bp.name) LIKE '%hongda%'
+ORDER BY
+  CASE WHEN LOWER(bp.name) LIKE 'hongda%' THEN 0 ELSE 1 END,
+  bp.created DESC
+LIMIT 3;
+```
+
+**Domain hint extraction** (same as VQ parser):
+1. Extract domain part before first `.` (e.g., `hongdaelectronicsco`)
+2. Strip common suffixes: `electronics`, `tech`, `intl`, `group`, `corp`, `inc`, `ltd`
+3. Result: `hongda` → search against `c_bpartner.name`
+4. Prefer starts-with matches over contains (avoids false positives like `tongda` matching `Sitongda`)
+
+**Generic domains to SKIP** (fall through to Tier 3):
+`gmail`, `yahoo`, `hotmail`, `outlook`, `aol`, `mail`, `163.com`, `qq.com`, `126.com`, `vip.163.com`
+
+**Tier 3: Name-based fallback** (from email signature/body)
+When domain is generic (163.com, outlook.com), extract company name from the email body/signature and search:
+```sql
+SELECT bp.value as search_key, bp.name
+FROM adempiere.c_bpartner bp
+WHERE bp.isactive = 'Y'
+AND bp.name ILIKE '%CompanyName%'
+ORDER BY
+  CASE WHEN LOWER(bp.name) = LOWER('CompanyName') THEN 0 ELSE 1 END,
+  bp.created DESC
+LIMIT 5;
+```
+
+**If NO match after all 3 tiers → use `1008499` (Unqualified Broker)** and put customer name in Description.
+
+### Why Multi-Tier Matters
+- Many partners register with personal emails (outlook.com, 163.com) that don't match their company domain
+- Domain hint matching catches companies like Hongda (email domain `hongdaelectronicsco.com.cn`, DB contact uses `outlook.com`)
+- Name fallback catches 163.com senders where domain gives no company info
 
 ---
 
