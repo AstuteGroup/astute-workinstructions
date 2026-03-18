@@ -433,9 +433,10 @@ node tti.js --manufacturers
 - Lead Time API adds lifecycle and CoO not in Search response, but has strict rate limiting
 - Parts not in TTI catalog return empty `parts` array (Search) or `"Not a TTI Part"` (Lead Time)
 
+**Account:** `VAA050` (Astute) — embedded in API key. `customerAccountNumber` param tested but returns same web pricing. Customer-specific/negotiated pricing requires the Quote API.
+
 **TODO:**
-- [ ] Subscribe to Quote API for quote-specific pricing
-- [ ] Test `customerAccountNumber` and `requestEntity` params for customer-specific pricing
+- [ ] Subscribe to Quote API for negotiated/customer-specific pricing (endpoint exists, needs key)
 - [ ] Integrate into franchise screening pipeline alongside DigiKey/Arrow/etc.
 
 ---
