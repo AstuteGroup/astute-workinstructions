@@ -28,7 +28,7 @@ Real-time pricing and availability from authorized distributors. Replaces FindCh
 | Arrow | REST (query params) | developers.arrow.com | **Active** | 1000386 |
 | Rutronik | REST (query params) | rutronik24.com/api.html | **Active** | 1002668 |
 | Future Electronics | REST (API key header) | documenter.getpostman.com/view/18706946/UzBvFhcj | **Active** | 1000328 |
-| TTI | REST (token) | developer.tti.com | **Pending key refresh** | 1000326 |
+| TTI | REST (apiKey header) | developer.tti.com | **Active** (Lead Time) | 1000326 |
 | Newark/element14/Farnell | REST (API key) | partner.element14.com | **Active** | 1000390 |
 | Sager Electronics | REST (API key) | developer.sager.com | **To investigate** | 1000335 |
 | Rochester Electronics | REST (?) | api.rocelec.com | **To investigate** | 1000058 |
@@ -318,19 +318,96 @@ node newark.js LM317T 100 --store uk.farnell.com
 
 ---
 
-### TTI API (Pending Key Refresh)
+### TTI API (Active — Lead Time)
 
-**API:** TTI REST API | **Auth:** Token-based
+**API:** Lead Time API (POST) + Search API (GET) + Quote API (not yet subscribed)
+**Auth:** `apiKey` header (custom Azure APIM header — NOT `Ocp-Apim-Subscription-Key`)
 
 **Portal:** [developer.tti.com](https://developer.tti.com/)
 
+**Credentials:**
+| Key | Product | Value |
+|-----|---------|-------|
+| Search API Key | Search (manufacturers list) | `9cafe5893ee04935a82d2c5ab663cf26` |
+| Lead Time API Key | Lead Time (stock, LT, lifecycle) | `ee0620712e46441296dd77341d6179e8` |
+| Quote API Key | Quote line items | *(not yet subscribed)* |
+
+**Endpoints:**
+| Method | Path | API Key | Description |
+|--------|------|---------|-------------|
+| POST | `/leadtime/v1/requestLeadtime` | Lead Time | Stock, lead time, lifecycle, CoO |
+| GET | `/service/api/v1/search/manufacturers` | Search | Manufacturer code reference list |
+| GET | `/quote/v2/{quoteId}/lineitems?page=X&size=Y` | Quote | Quote line items (needs key) |
+
+**Lead Time API Request:**
+```json
+POST /leadtime/v1/requestLeadtime
+Headers: apiKey: <key>, Content-Type: application/json, Cache-Control: no-cache
+
+{ "description": "Lookup description", "partNumbers": ["MPN1", "MPN2", "MPN3"] }
+```
+
+**Lead Time API Response:**
+```json
+{
+  "leadTimes": [{
+    "requestedPartNumber": "C0805C104K5RACTU",
+    "ttiPartNumber": "C0805C104K5RACTU",
+    "manufacturerPartNumber": "C0805C104K5RAC7800",
+    "leadTime": "14",           // weeks
+    "available": 2832000,       // stock qty
+    "mfrAlias": "KEM",          // manufacturer code
+    "lifeCycle": "Active",
+    "countryOfOrigin": "CN",
+    "customerEntity": "NDC",
+    "availableOnOrder": [{"quantity": 0, "date": "N/A"}]
+  }],
+  "totalCount": 1
+}
+```
+
+**Rate limit:** ~5 seconds between lead time calls
+
 **iDempiere Vendor:**
 - BP ID: `1000326`
+- BP Value: `1002330`
 - Name: `TTI Inc`
 
-**Capabilities:** Real-time inventory, pricing, lead times, product info. Can also place orders via API.
+**Code:** `rfq_sourcing/franchise_check/tti.js`
 
-**Status:** Have account, awaiting refreshed API key/token.
+**Usage:**
+```bash
+# Single part lookup
+node tti.js C0805C104K5RACTU 100
+
+# Batch lookup (all sent in one API call)
+node tti.js ERJ-6ENF1001V C0805C104K5RACTU LM317T
+
+# List manufacturer codes
+node tti.js --manufacturers
+```
+
+**Current Use (Active):**
+| Field | Use |
+|-------|-----|
+| `franchiseQty` | Stock available from `available` field |
+| `vqLeadTime` | Lead time in weeks |
+| `vqLifeCycle` | Active/EOL/etc. |
+| `vqCoo` | Country of origin |
+| `vqManufacturer` | Resolved from mfrAlias code |
+| `vqSku` | TTI part number |
+| `vqVendorNotes` | "TTI stock: X \| LT: Y \| CoO: Z \| Mfr: W" |
+
+**Limitations:**
+- **No pricing data** — TTI API does not expose price breaks via Lead Time API
+- Pricing may be available via Quote API (needs subscription key)
+- Parts not in TTI catalog return `ttiPartNumber: "Not a TTI Part"`
+- TTI specializes in passives & connectors — most semiconductor MPNs won't match
+
+**TODO:**
+- [ ] Subscribe to Quote API for pricing data
+- [ ] Test batch size limits (currently using 20 per request)
+- [ ] Integrate into franchise screening pipeline alongside DigiKey/Arrow/etc.
 
 ---
 
@@ -690,4 +767,4 @@ ANTHROPIC_API_KEY=
 
 ---
 
-*Last updated: 2026-03-17*
+*Last updated: 2026-03-18*
