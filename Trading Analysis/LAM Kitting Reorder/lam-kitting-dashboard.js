@@ -17,7 +17,6 @@
 const fs = require('fs');
 const path = require('path');
 const XLSX = require('xlsx');
-const { execSync } = require('child_process');
 const { readCSVFile } = require('../../shared/csv-utils');
 
 // Configuration
@@ -85,63 +84,7 @@ function loadExcelData(excelPath) {
   return items;
 }
 
-function loadOpenPODeliveryDates() {
-  // Query open POs for LAM-related warehouses to get expected delivery dates
-  const sql = `
-    SELECT
-      ol.chuboe_mpn,
-      o.dateordered::date as order_date,
-      COALESCE(ol.datepromised, o.datepromised)::date as promised_date,
-      ol.qtyordered - ol.qtydelivered as qty_open,
-      bp.name as supplier_name,
-      o.documentno
-    FROM adempiere.c_orderline ol
-    JOIN adempiere.c_order o ON ol.c_order_id = o.c_order_id
-    JOIN adempiere.c_bpartner bp ON o.c_bpartner_id = bp.c_bpartner_id
-    WHERE o.issotrx = 'N'
-      AND o.isactive = 'Y'
-      AND o.docstatus IN ('CO', 'IP')
-      AND ol.chuboe_mpn IS NOT NULL
-      AND ol.chuboe_mpn != ''
-      AND (ol.qtyordered - ol.qtydelivered) > 0
-    ORDER BY ol.chuboe_mpn, COALESCE(ol.datepromised, o.datepromised) ASC;
-  `;
-
-  try {
-    const result = execSync(`psql -t -A -F '|' -c "${sql.replace(/"/g, '\\"')}"`, {
-      encoding: 'utf8',
-      maxBuffer: 50 * 1024 * 1024
-    });
-
-    // Group by MPN — take the earliest promised date
-    const deliveryDates = {};
-    const lines = result.trim().split('\n').filter(l => l.trim());
-
-    for (const line of lines) {
-      const [mpn, orderDate, promisedDate, qtyOpen, supplier, docNo] = line.split('|');
-      const mpnClean = (mpn || '').trim();
-      if (!mpnClean) continue;
-
-      if (!deliveryDates[mpnClean]) {
-        deliveryDates[mpnClean] = {
-          deliveryDate: promisedDate || orderDate || '',
-          qtyOpen: parseFloat(qtyOpen) || 0,
-          supplier: (supplier || '').trim(),
-          poNumber: (docNo || '').trim()
-        };
-      } else {
-        // Accumulate open qty across multiple POs
-        deliveryDates[mpnClean].qtyOpen += parseFloat(qtyOpen) || 0;
-      }
-    }
-
-    console.log(`  Open PO delivery dates found: ${Object.keys(deliveryDates).length} MPNs`);
-    return deliveryDates;
-  } catch (err) {
-    console.error(`  WARNING: Could not load open PO data: ${err.message}`);
-    return {};
-  }
-}
+// loadOpenPODeliveryDates removed — delivery date left blank for now
 
 // ─────────────────────────────────────────────────────────────────────────────
 // HTML Generation
@@ -504,17 +447,12 @@ async function main() {
   const excelItems = loadExcelData(excelFile);
   console.log(`  Excel items loaded: ${excelItems.length}`);
 
-  // Step 3: Query open POs
-  console.log('\nStep 3: Querying open PO delivery dates...');
-  const openPOs = loadOpenPODeliveryDates();
-
-  // Step 4: Join data
-  console.log('\nStep 4: Joining data...');
+  // Step 3: Join data
+  console.log('\nStep 3: Joining data...');
   const dashboardItems = excelItems.map(item => {
     const w111Qty = w111[item.mpn] || 0;
     const w115Qty = w115[item.mpn] || 0;
     const totalQty = w111Qty + w115Qty;
-    const po = openPOs[item.mpn];
 
     return {
       cpc: item.cpc,
@@ -524,7 +462,7 @@ async function main() {
       resalePrice: item.resalePrice,
       qtyOnHand: totalQty,
       leadTime: item.leadTime,
-      deliveryDate: po ? po.deliveryDate : '',
+      deliveryDate: '', // blank for now
       loi: '', // blank for now
       minQty: item.minQty  // used for status coloring, not displayed
     };
@@ -532,7 +470,6 @@ async function main() {
 
   console.log(`  Dashboard items: ${dashboardItems.length}`);
   console.log(`  With inventory: ${dashboardItems.filter(i => i.qtyOnHand > 0).length}`);
-  console.log(`  With open PO: ${dashboardItems.filter(i => i.deliveryDate).length}`);
 
   // Extract dates from filenames for subtitle
   const invDateMatch = inventoryFolder.match(/(\d{4}-\d{2}-\d{2})/);
