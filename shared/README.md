@@ -2,6 +2,25 @@
 
 Reusable utilities for all Astute workflows. **Always use these instead of ad-hoc implementations.**
 
+## partner-lookup.js
+
+Resolves business partners (vendors or customers) from email addresses and company names against iDempiere. Used by VQ Loading, Market Offer Uploading, and Stock RFQ Loading.
+
+See `partner-matching.md` for full documentation.
+
+```javascript
+const { resolvePartner } = require('../shared/partner-lookup.js');
+
+const result = resolvePartner({
+  email: 'bliss@hongdaelectronicsco.com.cn',
+  companyName: 'Hongda Electronics Co.',
+  partnerType: 'any'  // 'vendor', 'customer', or 'any'
+});
+// → { search_key: '1007848', name: 'Hongda electronics co., ltd', matched: true, tier: 2, tierName: 'domain_hint' }
+```
+
+**Matching tiers:** exact email → email domain → domain hint → name match
+
 ## csv-utils.js
 
 Proper CSV parsing that handles:

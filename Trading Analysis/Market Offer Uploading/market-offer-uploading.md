@@ -164,23 +164,20 @@ himalaya envelope list --account excess --folder INBOX --page-size 500
 ### Step 3: Resolve Partner IDs (CRITICAL - DO NOT SKIP)
 **Output CSV requires `partner_search_key` for ERP import.**
 
-```sql
--- Look up partner search_key by email domain
-SELECT DISTINCT
-  LOWER(SUBSTRING(au.email FROM POSITION('@' IN au.email) + 1)) as domain,
-  bp.value as search_key,
-  bp.name,
-  bp.isactive
-FROM adempiere.ad_user au
-JOIN adempiere.c_bpartner bp ON au.c_bpartner_id = bp.c_bpartner_id
-WHERE bp.isactive = 'Y'
-AND LOWER(au.email) LIKE '%domain.com%';
+**Uses shared module:** `shared/partner-lookup.js` — see `shared/partner-matching.md` for full documentation.
+
+```javascript
+const { resolvePartner } = require('../../shared/partner-lookup.js');
+
+const result = resolvePartner({
+  email: senderEmail,
+  companyName: companyNameFromSignature,
+  partnerType: 'any'
+});
+// result.search_key, result.name, result.matched, result.tierName
 ```
 
-**Matching order:**
-1. Exact email match in `ad_user.email`
-2. Domain-based fallback (extract `@domain.com`, find any partner with that domain)
-3. **Only use ACTIVE partners** (`bp.isactive = 'Y'`)
+**Matching tiers** (in order): exact email → email domain → domain hint → name match.
 
 **If partner not found:** Flag as `NEEDS-PARTNER`, do not include in ERP-ready output.
 
@@ -266,17 +263,10 @@ node "Trading Analysis/Market Offer Matching for RFQs/analyze-new-offers.js" \
 
 ## Partner Matching Strategy
 
-**IMPORTANT: Use domain-based matching, NOT exact email matching.**
+**Canonical reference:** `shared/partner-matching.md` and `shared/partner-lookup.js`
 
-**IMPORTANT: Only match ACTIVE partners (`bp.isactive = 'Y'`).** Inactive partner search_keys will not be recognized by iDempiere on import.
-
-Partner contacts change frequently. A quote from `john@examplecorp.com` should match Example Corp even if only `purchasing@examplecorp.com` is in the database.
-
-### Matching Order
-1. **Exact email match** in `ad_user.email` (fast path)
-2. **Domain-based fallback** - extract `@domain.com` and find any partner with that domain
-3. **Active filter** - only return partners where `bp.isactive = 'Y'`
-4. Return `NOT_FOUND` only if no active domain match exists
+Uses shared multi-tier matching: exact email → email domain → domain hint → name match.
+All tiers filter by `bp.isactive = 'Y'`. See shared docs for details.
 
 ---
 
