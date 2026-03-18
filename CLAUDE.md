@@ -45,6 +45,7 @@ At the start of every new conversation, before addressing anything else, always 
 > 10. **Vortex Matches** - Surface VQs/offers under customer targets, stock matches, and market intelligence (see `Trading Analysis/Vortex Matches/vortex-matches.md`)
 > 11. **Market Offer Uploading** - Process excess inventory emails into ERP-ready offers (see `Trading Analysis/Market Offer Uploading/market-offer-uploading.md`)
 > 12. **BOM Monitoring** - Track BOM risk, commodity analysis, and excess matches (see `Trading Analysis/BOM Monitoring/`)
+> 13. **Stock RFQ Loading** - Process customer RFQ emails into ERP-ready CSV for import (see `Trading Analysis/Stock RFQ Loading/stock-rfq-loading.md`)
 
 3. **Review Roadmaps** (planned work):
 
