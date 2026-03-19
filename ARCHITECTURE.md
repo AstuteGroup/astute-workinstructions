@@ -139,7 +139,7 @@ Each row is an operation. Each column is a workflow. ✓ = uses it. **Bold** = c
 | **Line item extraction** | Each workflow extracts MPN + Qty + Price + MFR from different email formats. Core parsing logic is similar. | Could share extraction patterns/helpers, but email formats vary enough that full sharing is hard |
 | **Commit & push** | Every workflow does `git add → commit → push` at the end | `shared/git-utils.js` — `commitAndPush(files, message)` |
 | **VQ capture from APIs** | franchise-api.js produces VQ lines, but the actual VQ Mass Upload Template formatting isn't shared | `shared/vq-template.js` — format any VQ data (API, extraction) into VQ Mass Upload Template |
-| **Price synthesis** | Suggested Resale and Quick Quote both determine a resale price from market data. Different rules but same inputs. | `shared/pricing-engine.js` — pluggable pricing strategies using market-data.js output |
+| **Price synthesis** | Suggested Resale (broker-to-broker) and Quick Quote (direct customer) use the SAME market data but COMPLETELY DIFFERENT pricing logic. Broker: ~20-30% of franchise. Customer: margin/GP-based. Must NOT be merged into one model. | `shared/pricing-engine.js` — pluggable strategies: broker strategy (franchise-ratio) vs customer strategy (margin/GP). Same inputs, different rules. |
 
 ---
 
@@ -215,6 +215,8 @@ Workflows don't just use cogs — they feed into each other:
 4. **API data = confirmed → capture as VQ.** Scraped data = reference only. This distinction lives in `franchise-api.js`, not in the workflow.
 
 5. **The system is the source of truth.** DB data (VQs, sales, offers, RFQs) trumps memory, context, or assumptions. Always query, never guess.
+
+6. **Broker quoting ≠ customer quoting.** Stock RFQ (broker-to-broker) and Quick Quote (direct customer/OEM) share the same market data cogs but use fundamentally different pricing logic. Broker: ~20-30% of franchise price (older DC, untraceable, buyer needs margin room). Customer: margin/GP-based (min margin, min GP/line, contract terms). Never apply one model to the other.
 
 ---
 
