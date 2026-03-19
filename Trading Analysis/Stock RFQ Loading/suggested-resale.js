@@ -18,7 +18,13 @@ const path = require('path');
 const { execSync } = require('child_process');
 
 // --- Config ---
-const DIGIKEY_SCRIPT = path.resolve(__dirname, '../../rfq_sourcing/franchise_check/digikey.js');
+const { searchAllDistributors, writeVQCapture } = require('../../shared/franchise-api');
+const FINDCHIPS_SCRIPT = path.resolve(__dirname, '../../rfq_sourcing/franchise_check/main.js');
+
+// Franchise pricing rule: our price ≈ 20% of franchise best price
+// (older DC, untraceable stock — buyer needs room to resell vs franchise)
+const FRANCHISE_RATIO = 0.20;
+const FRANCHISE_RATIO_NEWER_DC = 0.30; // slightly more for 3-5yr date codes
 const VQ_LOOKBACK_MONTHS = 12;
 const OFFER_LOOKBACK_DAYS = 180;
 const SALES_LOOKBACK_MONTHS = 24;
@@ -87,24 +93,36 @@ function mpnWhereClause(column, mpnClean) {
   return `${column} ILIKE '${mpnClean}%'`;
 }
 
-function runDigiKey(mpn, qty) {
+// runDigiKey removed — use shared/franchise-api.js searchAllDistributors() instead
+
+function runFindChips(mpn, qty) {
+  // FindChips = AVAILABILITY signal only, not confirmed pricing
+  // Returns franchise distributor stock levels (scraped, not API)
   try {
-    const result = execSync(`node "${DIGIKEY_SCRIPT}" "${mpn}" ${qty}`, {
+    const result = execSync(`node "${FINDCHIPS_SCRIPT}" -p "${mpn}" -q ${qty} 2>&1`, {
       encoding: 'utf-8',
-      timeout: 30000
+      timeout: 60000
     });
-    // Extract JSON from output
-    const jsonMatch = result.match(/\{[\s\S]*\}/);
-    if (jsonMatch) return JSON.parse(jsonMatch[0]);
-    // Try stderr too (rbash puts stdout there)
-    return null;
+    // Parse the screening output for franchise qty
+    const combined = result;
+    // Look for "Not found" or franchise data in the xlsx output
+    if (combined.includes('Not found in franchise distribution')) {
+      return { found: false, franchiseQty: 0, note: 'Not in any franchise distributor (FindChips)' };
+    }
+    if (combined.includes('Skip broker (franchise OK)')) {
+      return { found: true, franchiseQty: qty, note: 'Available in franchise distribution (FindChips)' };
+    }
+    // Default: sent to broker = not readily available in franchise
+    return { found: false, franchiseQty: 0, note: 'Not readily available in franchise (FindChips)' };
   } catch (e) {
     const out = (e.stderr || '') + (e.stdout || '');
-    const jsonMatch = out.match(/\{[\s\S]*\}/);
-    if (jsonMatch) {
-      try { return JSON.parse(jsonMatch[0]); } catch (_) {}
+    if (out.includes('Not found in franchise distribution')) {
+      return { found: false, franchiseQty: 0, note: 'Not in any franchise distributor (FindChips)' };
     }
-    return null;
+    if (out.includes('Skip broker')) {
+      return { found: true, franchiseQty: qty, note: 'Available in franchise distribution (FindChips)' };
+    }
+    return { found: false, franchiseQty: 0, note: 'FindChips check failed' };
   }
 }
 
@@ -245,13 +263,13 @@ function getRFQCount(mpnClean) {
 // --- Pricing Logic ---
 
 function calculateSuggestedResale(data) {
-  const { digikey, vqs, offers, sales, rfqDemand, rfqCount, line } = data;
+  const { franchise, vqs, offers, sales, rfqDemand, rfqCount, line } = data;
 
   const result = {
     franchiseStock: 0,
-    franchisePrice: null,
-    franchiseBulkPrice: null,
+    franchiseLowestPrice: null,
     franchiseCoverage: 'NONE',       // FULL, PARTIAL, NONE
+    franchiseDistributors: 0,        // how many distributors have it
     vqCostLow: null,
     vqCostHigh: null,
     vqCostMedian: null,
@@ -269,25 +287,26 @@ function calculateSuggestedResale(data) {
     notes: []
   };
 
-  // --- 1. Franchise (highest priority factor) ---
-  if (digikey && digikey.found) {
-    result.franchiseStock = digikey.franchiseQty;
-    result.franchisePrice = digikey.franchisePrice;
-    result.franchiseBulkPrice = digikey.franchiseBulkPrice;
+  // --- 1. Franchise (ALL 7 distributors via shared/franchise-api.js) ---
+  if (franchise && franchise.summary) {
+    const s = franchise.summary;
+    result.franchiseStock = s.totalStock;
+    result.franchiseLowestPrice = s.lowestPrice;
+    result.franchiseDistributors = s.distributorsWithStock;
+    result.franchiseCoverage = s.coverage;
 
-    if (digikey.franchiseQty >= line.qty) {
-      result.franchiseCoverage = 'FULL';
-      result.notes.push(`DigiKey FULL coverage: ${digikey.franchiseQty.toLocaleString()} avail vs ${line.qty.toLocaleString()} needed @ $${digikey.franchiseBulkPrice?.toFixed(4)}/ea`);
-    } else if (digikey.franchiseQty > 0) {
-      result.franchiseCoverage = 'PARTIAL';
-      const pct = Math.round(digikey.franchiseQty / line.qty * 100);
-      result.notes.push(`DigiKey PARTIAL: ${digikey.franchiseQty.toLocaleString()} avail (${pct}% of ${line.qty.toLocaleString()}) @ $${digikey.franchiseBulkPrice?.toFixed(4)}/ea`);
+    if (s.distributorsWithStock > 0) {
+      // List each distributor with stock
+      for (const d of franchise.found) {
+        result.notes.push(`${d.name}: ${d.franchiseQty.toLocaleString()} pcs @ $${d.franchiseBulkPrice?.toFixed(4)}/ea`);
+      }
+      result.notes.push(`FRANCHISE TOTAL: ${s.totalStock.toLocaleString()} pcs across ${s.distributorsWithStock} distributors. Best price: $${s.lowestPrice?.toFixed(4)}. Coverage: ${s.coverage} (${s.coveragePct}%)`);
     } else {
-      result.notes.push('DigiKey: found but 0 stock');
+      result.notes.push(`Franchise: checked ${s.distributorsChecked} distributors — NOT AVAILABLE in distribution`);
     }
   } else {
     result.franchiseCoverage = 'NONE';
-    result.notes.push('DigiKey: NOT AVAILABLE in franchise distribution');
+    result.notes.push('Franchise: data not available');
   }
 
   // --- 2. Secondary market VQ costs ---
@@ -351,107 +370,100 @@ function calculateSuggestedResale(data) {
   }
 
   // --- PRICING SYNTHESIS ---
-  // Priority: broker sale > franchise markup > VQ cost markup > market offer
-  // Franchise availability modifies everything
+  // MARKET-BASED, not cost-plus. Inventory often has no cost (consignment, aged).
+  // Anchor to market signals, adjust by scarcity (franchise availability).
+  //
+  // Signal hierarchy:
+  //   1. Broker sale price (strongest — real market clearing price)
+  //   2. DigiKey API price (confirmed franchise — price ceiling when available)
+  //   3. VQ market level (secondary market benchmark)
+  //   4. Market offer prices (supply-side reference)
+  //   5. Customer sale price (weaker — relationship/contract factors)
+  //
+  // Scarcity modifier:
+  //   Franchise FULL → price near franchise (customer has alternatives)
+  //   Franchise PARTIAL → price above franchise (broker fills the gap)
+  //   Franchise NONE → scarcity premium (secondary market only)
 
   let suggestedResale = null;
   let basis = '';
 
-  // Determine cost basis (what we'd pay to source)
-  let costBasis = null;
-  let costSource = '';
+  const hasAnyFranchise = result.franchiseCoverage !== 'NONE';
 
-  if (result.vqPurchasedCost) {
-    costBasis = result.vqPurchasedCost;
-    costSource = 'purchased VQ';
-  } else if (result.vqCostMedian) {
-    costBasis = result.vqCostMedian;
-    costSource = 'median VQ';
-  } else if (result.franchiseBulkPrice) {
-    costBasis = result.franchiseBulkPrice;
-    costSource = 'DigiKey bulk';
+  // SCENARIO A: Franchise HAS stock → start at ~20-30% of their best price
+  // Our stock is older DC, untraceable. Buyer (another broker) needs room
+  // to resell vs franchise. Baseline 20% for cheap parts, up to 30% for pricier parts.
+  // BUT: broker sales/VQ market can override this if the real market is different.
+  if (result.franchiseCoverage !== 'NONE' && result.franchiseLowestPrice) {
+    // Scale ratio: higher-value parts → closer to 30%
+    const franchiseVal = result.franchiseLowestPrice;
+    let ratio = FRANCHISE_RATIO; // 20% baseline
+    if (franchiseVal >= 10) ratio = 0.30;       // $10+ parts → 30%
+    else if (franchiseVal >= 1) ratio = 0.25;   // $1-10 → 25%
+    // else < $1 → 20%
+
+    suggestedResale = franchiseVal * ratio;
+    basis = `~${Math.round(ratio*100)}% of franchise best ($${franchiseVal.toFixed(4)})`;
+    basis += ` | ${result.franchiseDistributors} distributor(s), ${result.franchiseStock.toLocaleString()} pcs`;
+
+    // Broker sales or VQ market can override franchise-based pricing
+    if (result.brokerSalePrice) {
+      // If brokers are selling at a different level, that's the real market
+      const brokerRatio = result.brokerSalePrice / franchiseVal;
+      if (Math.abs(brokerRatio - ratio) > 0.05) {
+        suggestedResale = result.brokerSalePrice;
+        basis = `Broker sale $${result.brokerSalePrice.toFixed(2)} (${Math.round(brokerRatio*100)}% of franchise) overrides baseline`;
+      } else {
+        basis += ` | Broker sale confirms: $${result.brokerSalePrice.toFixed(2)}`;
+      }
+    } else if (result.vqCostMedian && result.vqCostMedian < suggestedResale) {
+      // If secondary market is trading below our franchise-based price, adjust down
+      suggestedResale = result.vqCostMedian * 0.80; // below VQ market (we're selling, not buying)
+      basis += ` | Adjusted down: VQ market median $${result.vqCostMedian.toFixed(2)} is below franchise ratio`;
+    }
+
+    result.confidence = 'HIGH';
   }
-
-  // TIER 1: Broker sale history (strongest market signal)
-  if (result.brokerSalePrice && costBasis) {
+  // SCENARIO B: NO franchise stock → different game. Secondary market/scarcity pricing.
+  // TIER B1: Broker sale price (strongest market signal for no-franchise parts)
+  else if (result.brokerSalePrice) {
     suggestedResale = result.brokerSalePrice;
-    basis = `Broker sale price ($${result.brokerSalePrice.toFixed(2)})`;
-
-    // Adjust if franchise changes the picture
-    if (result.franchiseCoverage === 'FULL' && result.franchiseBulkPrice) {
-      // Franchise available = price pressure DOWN
-      const franchiseCeiling = result.franchiseBulkPrice * 1.15; // can't go much above franchise
-      if (suggestedResale > franchiseCeiling) {
-        suggestedResale = franchiseCeiling;
-        basis += ` → capped by franchise availability ($${result.franchiseBulkPrice.toFixed(4)} + 15%)`;
-      }
-    } else if (result.franchiseCoverage === 'NONE') {
-      // No franchise = scarcity premium possible
-      if (result.demandStrength === 'HIGH') {
-        suggestedResale *= 1.10; // 10% premium on scarcity + demand
-        basis += ' + 10% scarcity premium (no franchise, high demand)';
-      }
+    basis = `Broker sale: $${result.brokerSalePrice.toFixed(2)} (no franchise — secondary market)`;
+    if (result.demandStrength === 'HIGH') {
+      basis += ' | High demand supports this level';
     }
     result.confidence = 'HIGH';
   }
-  // TIER 2: Customer sale history (weaker signal, but real transaction)
-  else if (result.customerSalePrice && costBasis) {
-    suggestedResale = result.customerSalePrice;
-    basis = `Customer sale price ($${result.customerSalePrice.toFixed(2)}) — weaker signal than broker`;
+  // TIER B2: VQ market level (what secondary market is trading at)
+  else if (result.vqCostMedian) {
+    suggestedResale = result.vqCostMedian;
+    basis = `VQ market median: $${result.vqCostMedian.toFixed(2)} (no franchise — secondary market level)`;
 
-    if (result.franchiseCoverage === 'FULL' && result.franchiseBulkPrice) {
-      const franchiseCeiling = result.franchiseBulkPrice * 1.15;
-      if (suggestedResale > franchiseCeiling) {
-        suggestedResale = franchiseCeiling;
-        basis += ` → capped by franchise ($${result.franchiseBulkPrice.toFixed(4)} + 15%)`;
-      }
+    if (result.vqPurchasedCost) {
+      basis += ` | Purchased at $${result.vqPurchasedCost.toFixed(2)}`;
     }
-    result.confidence = 'MEDIUM';
-  }
-  // TIER 3: Cost-based with franchise-adjusted margin
-  else if (costBasis) {
-    if (result.franchiseCoverage === 'FULL') {
-      // Franchise fully covers — customer can buy direct. Broker margin is thin.
-      suggestedResale = costBasis * 1.12; // 12% margin max
-      basis = `${costSource} $${costBasis.toFixed(2)} + 12% (franchise covers full qty — thin broker margin)`;
-      result.confidence = 'MEDIUM';
-    } else if (result.franchiseCoverage === 'PARTIAL') {
-      // Some franchise — moderate margin
-      suggestedResale = costBasis * 1.20; // 20% margin
-      basis = `${costSource} $${costBasis.toFixed(2)} + 20% (partial franchise — moderate broker margin)`;
-      result.confidence = 'MEDIUM';
-    } else {
-      // No franchise — scarcity pricing
-      if (result.demandStrength === 'HIGH') {
-        suggestedResale = costBasis * 1.35; // 35% margin
-        basis = `${costSource} $${costBasis.toFixed(2)} + 35% (no franchise, high demand — scarcity premium)`;
-      } else if (result.demandStrength === 'MEDIUM') {
-        suggestedResale = costBasis * 1.30; // 30% margin
-        basis = `${costSource} $${costBasis.toFixed(2)} + 30% (no franchise, medium demand)`;
-      } else {
-        suggestedResale = costBasis * 1.25; // 25% margin
-        basis = `${costSource} $${costBasis.toFixed(2)} + 25% (no franchise, standard margin)`;
-      }
-      result.confidence = costSource === 'purchased VQ' ? 'HIGH' : 'MEDIUM';
+    // Demand strength as context, not a multiplier
+    if (result.demandStrength === 'HIGH') {
+      basis += ' | HIGH demand — room to price above median';
     }
+    result.confidence = result.vqPurchasedCost ? 'HIGH' : 'MEDIUM';
   }
-  // TIER 4: Market offer based
+  // TIER B3: Market offers as reference
   else if (result.marketOfferPriceLow) {
-    // Use market offer as proxy for cost, add margin
-    costBasis = result.marketOfferPriceLow;
-    if (result.franchiseCoverage === 'NONE') {
-      suggestedResale = costBasis * 1.25;
-      basis = `Market offer low $${costBasis.toFixed(2)} + 25% (no other cost data)`;
-    } else {
-      suggestedResale = costBasis * 1.15;
-      basis = `Market offer low $${costBasis.toFixed(2)} + 15% (franchise available)`;
-    }
+    suggestedResale = (result.marketOfferPriceLow + result.marketOfferPriceHigh) / 2;
+    basis = `Market offer mid-point: $${suggestedResale.toFixed(2)} (no franchise, no VQ — offer-based)`;
     result.confidence = 'LOW';
   }
-  // TIER 5: No data — flag for research
+  // TIER B4: Customer sale (weakest signal)
+  else if (result.customerSalePrice) {
+    suggestedResale = result.customerSalePrice;
+    basis = `Customer sale: $${result.customerSalePrice.toFixed(2)} (weak signal — no other data)`;
+    result.confidence = 'LOW';
+  }
+  // TIER B5: No data — flag for research
   else {
     suggestedResale = null;
-    basis = 'INSUFFICIENT DATA — no VQ, franchise, sales, or offer history';
+    basis = 'INSUFFICIENT DATA — no franchise, VQ, sales, or offer history';
     result.confidence = 'NONE';
   }
 
@@ -461,27 +473,7 @@ function calculateSuggestedResale(data) {
   return result;
 }
 
-// --- VQ Capture (DigiKey data for ERP import) ---
-
-function generateVQCapture(digikeyResults) {
-  const vqLines = [];
-  for (const { mpn, qty, dk } of digikeyResults) {
-    if (dk && dk.found && dk.vqPrice) {
-      vqLines.push({
-        vendor: 'Digi-Key Electronics',
-        vendorBP: '1002331',
-        mpn: dk.vqMpn || mpn,
-        manufacturer: dk.vqManufacturer || '',
-        cost: dk.vqPrice,
-        qty: dk.franchiseQty,
-        description: dk.vqDescription || '',
-        vendorNotes: dk.vqVendorNotes || '',
-        digiKeyPN: dk.vqDigiKeyPn || ''
-      });
-    }
-  }
-  return vqLines;
-}
+// VQ capture now handled by shared/franchise-api.js writeVQCapture()
 
 // --- Main ---
 
@@ -510,7 +502,7 @@ async function main() {
 
   // Collect data for each MPN
   const mpnData = {};
-  const digikeyCapture = [];
+  const allVqLines = []; // VQ capture from ALL API results
 
   for (const line of lines) {
     const mpn = line.mpn;
@@ -523,14 +515,25 @@ async function main() {
 
     console.log(`[${mpn}] Collecting data...`);
 
-    // 1. DigiKey API
-    console.log(`  → DigiKey API...`);
-    const dk = runDigiKey(mpn, line.qty);
-    if (dk && dk.found) {
-      console.log(`    ✓ Found: ${dk.franchiseQty} pcs @ $${dk.franchiseBulkPrice}/ea`);
-      digikeyCapture.push({ mpn, qty: line.qty, dk });
-    } else {
-      console.log(`    ✗ Not available`);
+    // 1. Franchise APIs (ALL 7 distributors via shared/franchise-api.js)
+    console.log(`  → Franchise APIs (7 distributors)...`);
+    const franchise = await searchAllDistributors(mpn, line.qty, {
+      onResult: (r) => {
+        if (r.found) {
+          console.log(`    ✓ ${r.name}: ${r.franchiseQty} pcs @ $${r.franchiseBulkPrice?.toFixed(4)}/ea`);
+        } else if (r.error) {
+          console.log(`    ✗ ${r.name}: ${r.error}`);
+        } else {
+          console.log(`    - ${r.name}: not available`);
+        }
+      }
+    });
+    console.log(`    TOTAL: ${franchise.summary.totalStock} pcs from ${franchise.summary.distributorsWithStock} distributors`);
+
+    // Collect VQ lines from API results (confirmed pricing → log as VQ)
+    if (franchise.vqLines.length > 0) {
+      allVqLines.push(...franchise.vqLines);
+      console.log(`    VQ capture: ${franchise.vqLines.length} lines from API data`);
     }
 
     // 2. VQ History
@@ -555,7 +558,7 @@ async function main() {
     const rfqCount = getRFQCount(mpnClean);
     console.log(`    ${rfqCount.count} total RFQs`);
 
-    mpnData[mpn] = { digikey: dk, vqs, offers, sales, rfqDemand, rfqCount };
+    mpnData[mpn] = { franchise, vqs, offers, sales, rfqDemand, rfqCount };
     console.log('');
   }
 
@@ -574,7 +577,7 @@ async function main() {
 
   const csvHeader = [
     'MPN', 'RFQ Qty', 'Requestor', 'Customer Target',
-    'Franchise Stock', 'Franchise Bulk Price', 'Franchise Coverage',
+    'Franchise Stock', 'Franchise Lowest Price', 'Franchise Coverage', 'Franchise Distributors',
     'VQ Cost Low', 'VQ Cost High', 'VQ Purchased Cost',
     'Market Offers', 'Offer Price Range',
     'Broker Sale Price', 'Customer Sale Price',
@@ -595,8 +598,9 @@ async function main() {
       `"${line.description || line.rfqId}"`,
       fmt(line.targetPrice),
       pricing.franchiseStock,
-      fmt(pricing.franchiseBulkPrice, 4),
+      fmt(pricing.franchiseLowestPrice, 4),
       pricing.franchiseCoverage,
+      pricing.franchiseDistributors,
       fmt(pricing.vqCostLow),
       fmt(pricing.vqCostHigh),
       fmt(pricing.vqPurchasedCost),
@@ -617,17 +621,11 @@ async function main() {
   fs.writeFileSync(outFile, csvContent);
   console.log(`\nResale analysis saved to: ${outFile}`);
 
-  // --- VQ Capture File (DigiKey data for ERP import) ---
-  const vqLines = generateVQCapture(digikeyCapture);
-  if (vqLines.length > 0) {
-    const vqFile = path.join(outputDir, `${baseName}_DigiKey_VQ.csv`);
-    const vqHeader = 'Vendor BP,MPN,Manufacturer,Cost,Qty Available,Description,Vendor Notes,DigiKey PN';
-    const vqRows = vqLines.map(v => [
-      v.vendorBP, `"${v.mpn}"`, `"${v.manufacturer}"`, v.cost,
-      v.qty, `"${v.description}"`, `"${v.vendorNotes}"`, `"${v.digiKeyPN}"`
-    ].join(','));
-    fs.writeFileSync(vqFile, [vqHeader, ...vqRows].join('\n') + '\n');
-    console.log(`DigiKey VQ capture saved to: ${vqFile} (${vqLines.length} lines)`);
+  // --- VQ Capture File (ALL API data for ERP import) ---
+  if (allVqLines.length > 0) {
+    const vqFile = path.join(outputDir, `${baseName}_Franchise_VQ.csv`);
+    writeVQCapture(vqFile, allVqLines);
+    console.log(`Franchise VQ capture saved to: ${vqFile} (${allVqLines.length} lines from ${new Set(allVqLines.map(v => v.vendorName)).size} distributors)`);
   }
 
   // --- Console Summary ---
@@ -640,8 +638,8 @@ async function main() {
       ? `$${pricing.suggestedResale.toFixed(2)}`
       : 'N/A';
     const franchiseStr = pricing.franchiseCoverage !== 'NONE'
-      ? `${pricing.franchiseCoverage} (${pricing.franchiseStock})`
-      : 'NONE';
+      ? `${pricing.franchiseCoverage} (${pricing.franchiseStock.toLocaleString()} pcs, ${pricing.franchiseDistributors} distributors, best $${pricing.franchiseLowestPrice?.toFixed(4)})`
+      : `NONE (checked 7 distributors)`;
 
     console.log(`\n${line.mpn} (qty ${line.qty.toLocaleString()})`);
     console.log(`  Franchise: ${franchiseStr}`);
