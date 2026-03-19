@@ -869,7 +869,7 @@ node master.js LM317 100 --in-stock   # in-stock only
 
 ---
 
-### TrustedParts API (To Investigate - Aggregator)
+### TrustedParts API (Blocked - Access Denied)
 
 **Portal:** [trustedparts.com/docs/api/trustedparts-api](https://www.trustedparts.com/docs/api/trustedparts-api/)
 
@@ -877,9 +877,9 @@ node master.js LM317 100 --in-stock   # in-stock only
 
 **Capabilities:** Authorized-only inventory search across 25M+ part numbers from 2,000+ manufacturers. Batch queries up to 50 parts/request. Swagger docs available.
 
-**Note:** Run by ECIA (Electronic Components Industry Association) — high-trust, franchise-only data. No broker/open market results. **Free** in almost all cases with generous rate limits. Perfect complement to FindChips for franchise screening.
+**Note:** Run by ECIA (Electronic Components Industry Association) — franchise-only data. Advertised as free but **access denied to Astute** (likely restricted to OEMs/CMs, not brokers/resellers).
 
-**Status:** To investigate. Register for free account, then request API access.
+**Status:** Blocked. Access request denied.
 
 ---
 
