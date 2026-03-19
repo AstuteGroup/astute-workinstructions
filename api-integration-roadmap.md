@@ -8,12 +8,14 @@ Cross-cutting roadmap for external API integrations. Individual implementations 
 
 ## Overview
 
-| API Category | Use Cases | Roadmap Reference |
-|--------------|-----------|-------------------|
-| Franchise Distributors | Pricing, stock, screening | `rfq_sourcing/sourcing-roadmap.md` § A1 |
-| LLM / AI | Quote extraction, vendor inference | `rfq_sourcing/sourcing-roadmap.md` § C7 |
-| MRO / Industrial Suppliers | Pricing, specs, procurement | This file |
-| *Future* | TBD | — |
+| API Category | Use Cases | Count | Roadmap Reference |
+|--------------|-----------|-------|-------------------|
+| Franchise Distributors | Pricing, stock, screening | 25 | `rfq_sourcing/sourcing-roadmap.md` § A1 |
+| Broker / Independent | Pricing, inventory, RFQ | 2 | This file |
+| Aggregators | Multi-source search, screening | 4 | This file |
+| Component Intelligence | Lifecycle, risk, compliance | 2 | This file |
+| MRO / Industrial Suppliers | Pricing, specs, procurement | 1 | This file |
+| LLM / AI | Quote extraction, vendor inference | 1 | `rfq_sourcing/sourcing-roadmap.md` § C7 |
 
 ---
 
@@ -499,7 +501,9 @@ node tti.js --manufacturers
 **Auth Header:** `Ocp-Apim-Subscription-Key: <key>`
 
 **iDempiere Vendor:**
-- BP ID: `1000002`
+- BP ID: `1000051` (primary, 6,971 VQ lines) — also `1000002` (legacy, 1 VQ line from 2018)
+- Related entities: Avnet EM (1000336), Avnet EMG Ltd (1000202, 1000426), Avnet Silica (1004943), Avnet Technology HK (1000376)
+- Combined VQ volume: ~9,800 lines
 - Name: `Avnet`
 
 **Status:** Have subscription key but need to log in to [apiportal.avnet.com](https://apiportal.avnet.com/) to see endpoint URLs. The portal mentions a `getPriceAndQty` API but exact path is behind login.
@@ -607,6 +611,250 @@ node master.js LM317 100 --in-stock   # in-stock only
 
 ---
 
+### TME / Transfer Multisort Elektronik API (To Investigate)
+
+**Portal:** [developers.tme.eu](https://developers.tme.eu) | **Docs:** [api-doc.tme.eu](https://api-doc.tme.eu)
+
+**API:** REST | **Auth:** HMAC-SHA1 signed requests (50-char token + 20-char secret)
+
+**iDempiere Vendor:**
+- BP ID: `1000969` (Transfer Multisort Elektronik) / `1006376` (TME Germany GmbH)
+- Name: `Transfer Multisort Elektronik`
+
+**Capabilities:**
+- Product search (text, category, filters)
+- Real-time pricing (multi-tier, multi-currency, customer discounts)
+- Real-time stock levels
+- Combined pricing + stock endpoint
+- Delivery time estimates
+- Product specs/parameters, datasheets, photos
+- Category tree, similar product recommendations
+- Autocomplete/suggestions
+
+**Rate Limits:** 10 req/sec general; 2 req/sec for pricing/stock
+
+**Sandbox:** Feature-unlimited sandbox environment for testing
+
+**Access:** Free self-service registration at developers.tme.eu/signup
+
+**Note:** Large European distributor, 500K+ products. Best-documented API of the new batch — self-service signup with sandbox.
+
+**Status:** To investigate. Register and evaluate.
+
+---
+
+### Samtec API (To Investigate)
+
+**Portal:** [developer.samtec.com](https://developer.samtec.com) | **Catalog API:** [api.samtec.com/catalog](https://api.samtec.com/catalog/index.html)
+
+**API:** REST | **Auth:** Web token-based, 3-step onboarding
+
+**iDempiere Vendor:**
+- BP ID: `1000685`
+- Name: `Samtec Inc`
+
+**Capabilities:** Product catalog data access (details gated behind registration).
+
+**Contact:** apionboarding@samtec.com
+
+**Note:** High-speed connector manufacturer. Manufacturer-direct channel, not a traditional distributor.
+
+**Status:** To investigate. Register at developer portal.
+
+---
+
+### Schukat API (To Investigate)
+
+**API:** SOAP-based (also supports JSON) | **Auth:** API key per company
+
+**iDempiere Vendor:**
+- BP ID: `1002515`
+- Name: `Schukat Electronic Vertriebs GmbH`
+
+**Capabilities:** Real-time pricing and stock/availability data.
+
+**Access:** Registration form on website; API key sent by email. Credentials are non-transferable. Daily access limits monitored.
+
+**Note:** German distributor. CalcuQuote has a live integration with their API. SOAP-based is older but functional.
+
+**Status:** To investigate. Register for API key.
+
+---
+
+### SOS Electronic API (To Investigate)
+
+**Portal:** [api-customer.sos.sk/docs](https://api-customer.sos.sk/docs)
+
+**API:** REST/JSON | **Auth:** OAuth 2.0 (Bearer tokens) + Basic HTTP auth
+
+**iDempiere Vendor:**
+- BP ID: `1001178`
+- Name: `SOS Electronic`
+
+**Capabilities (documented):**
+- Invoice retrieval (paid/unpaid, itemized)
+- Open order tracking with delivery status
+- Product delivery status by order
+
+**Note:** Central/Eastern European distributor. Documented API focuses on order/invoice management. Product pricing/search may exist as separate undocumented endpoints. Contact sales rep to clarify.
+
+**Status:** To investigate. Contact sales for full API scope.
+
+---
+
+### Bürklin API (To Investigate)
+
+**Portal:** [buerklin.com/en/services/eprocurement](https://www.buerklin.com/en/services/eprocurement/)
+
+**API:** Listed as available, plus OCI, cXML PunchOut, BMEcat, EDI
+
+**iDempiere Vendor:**
+- BP ID: `1004237` (Buerklin GmbH & Co.) / `1003563` (Burklin GmbH)
+- Name: `Buerklin GmbH & Co.`
+
+**Capabilities:** API listed alongside OCI, cXML, BMEcat, Stock Report, EDI (EDIFACT, EANCOM, IDOC, OpenTRANS, CSV).
+
+**Contact:** Robert Mattheus, e-procurement@buerklin.com, +49 89 55875-110
+
+**Note:** German distributor. No public API docs — access requires contacting e-procurement team. Setup reportedly 15-30 min for basic integration.
+
+**Status:** To investigate. Contact e-procurement team for API documentation.
+
+---
+
+### Heilind Electronics (No Public API)
+
+**iDempiere Vendor:**
+- BP ID: `1000351`
+- Name: `Heilind Electronics`
+
+**Note:** Major interconnect/electromech distributor (connectors, relays, sensors). No public API or developer portal found. May offer EDI for large accounts. Site protected by WAF (Incapsula/Imperva).
+
+**Status:** No API available. Monitor for future availability.
+
+---
+
+### PEI-Genesis (No Public API)
+
+**iDempiere Vendor:**
+- BP ID: `1000674`
+- Name: `PEI-Genesis`
+
+**Note:** Connector specialist (mil/aero, industrial). EDI integration available for supply chain partners. Web portal (MyPEI) for order management. No REST API.
+
+**Status:** EDI only. Not a candidate for API integration.
+
+---
+
+### Distrelec (No Public API)
+
+**iDempiere Vendor:**
+- BP ID: `1005503`
+- Name: `Distrelec Group AG`
+
+**Note:** European distributor, now part of RS Group. Offers OCI (SAP), cXML PunchOut (Ariba), eCl@ss/UNSPSC classification. No REST API.
+
+**Status:** E-procurement integrations only. RS Components API may cover same inventory.
+
+---
+
+### WIN SOURCE API (To Investigate)
+
+**Portal:** [win-source.net/api-solution](https://www.win-source.net/api-solution)
+
+**iDempiere Vendor:**
+- BP ID: `1000740`
+- Name: `Win Source Electronics`
+
+**Capabilities:** Real-time pricing, inventory, product details, technical specifications. 1.1M+ SKUs, strong in obsolete/hard-to-find parts.
+
+**Contact:** apisolution@win-source.net
+
+**Note:** Independent distributor (not franchise for most lines). Founded 1999, serves 100+ countries. Aligns well with broker sourcing for hard-to-find parts.
+
+**Status:** To investigate. Apply via web form.
+
+---
+
+### OnlineComponents.com API (To Investigate)
+
+**Portal:** [onlinecomponents.com/en/api-suites](https://www.onlinecomponents.com/en/api-suites/)
+
+**iDempiere Vendor:**
+- BP ID: `1000882`
+- Name: `Onlinecomponents.com`
+
+**Capabilities:** Real-time inventory and pricing across 2.5M+ parts from 400+ suppliers. Contract pricing integration. Compliance data. Also supports EDI.
+
+**Note:** Authorized distributor with broad linecard.
+
+**Status:** To investigate. Contact sales or integration partners.
+
+---
+
+## Broker / Independent Distributor APIs
+
+### Fusion Worldwide API (To Investigate)
+
+**Portal:** [api.fusionww.com/docs](https://api.fusionww.com/docs) (Swagger) | **OpenAPI spec:** [api.fusionww.com/openapi.json](https://api.fusionww.com/openapi.json)
+
+**API:** REST/JSON, OpenAPI 3.1 | **Auth:** Public tier (no auth) + Partner tier (Bearer token)
+
+**iDempiere Vendor:**
+- BP ID: `1006372` (listed as customer only — isvendor=N)
+- Name: `Fusion Worldwide`
+
+**Public Endpoints (no auth):**
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | `/v1/search?q={term}` | Full-text product search |
+| GET | `/v1/catalog/products/{mpn}` | Lookup by MPN |
+| GET | `/v1/catalog/categories` | Category hierarchy |
+| GET | `/v1/catalog/manufacturers` | Manufacturer listing |
+| GET | `/v1/search/suggest?q={prefix}` | Autocomplete |
+
+**Partner Endpoints (Bearer token):**
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | `/v1/partner/inventory/{mpn}` | Single MPN inventory |
+| POST | `/v1/partner/inventory/batch` | Batch inventory (up to 100 MPNs) |
+| GET | `/v1/partner/pricing/{mpn}` | Pricing with tier breaks |
+| POST | `/v1/partner/pricing/batch` | Batch pricing (up to 100 MPNs) |
+| POST | `/v1/partner/quotes/bom` | BOM quote (up to 100 lines) |
+| POST | `/v1/partner/rfq` | RFQ submission |
+
+**Catalog:** 700K+ components, 1,200+ categories, 800+ manufacturers
+
+**Contact:** contact@fusionww.com for partner API access
+
+**Note:** Large independent distributor with a modern, well-documented API. Public tier is unusual for a broker — gives free catalog/search. Partner tier adds pricing, inventory, batch operations, and RFQ submission.
+
+**Status:** To investigate. Public tier can be tested immediately; partner tier requires contact.
+
+---
+
+### Quest Components API (To Investigate)
+
+**Portal:** [questcomp.com/questapi.aspx](https://www.questcomp.com/questapi.aspx)
+
+**API:** REST, JSON/XML | **Auth:** API key (issued after approval)
+
+**iDempiere Vendor:**
+- BP ID: `1000377`
+- Name: `Quest Components`
+
+**Capabilities:** Search inventory by MPN. Returns availability, pricing, lead times. Access to $60M+ inventory (1.5B+ parts).
+
+**Access:** Submit request form with company name, contact info, use case, estimated daily call volume. Docs provided after approval.
+
+**Note:** Broker specializing in obsolete & allocated parts. API docs are not public — provided after access approval.
+
+**Status:** To investigate. Submit request form for API access.
+
+---
+
+## Aggregator APIs
+
 ### Octopart/Nexar API (Planned - Aggregator)
 
 **Portal:** [nexar.com/api](https://nexar.com/api)
@@ -618,6 +866,78 @@ node master.js LM317 100 --in-stock   # in-stock only
 **Capabilities:** Aggregates 100+ distributor sources. Useful as fallback for parts not covered by direct APIs.
 
 **Status:** Planned. Could serve as screening fallback when direct APIs don't have stock.
+
+---
+
+### TrustedParts API (To Investigate - Aggregator)
+
+**Portal:** [trustedparts.com/docs/api/trustedparts-api](https://www.trustedparts.com/docs/api/trustedparts-api/)
+
+**API:** REST | **Auth:** Free user account + API access request
+
+**Capabilities:** Authorized-only inventory search across 25M+ part numbers from 2,000+ manufacturers. Batch queries up to 50 parts/request. Swagger docs available.
+
+**Note:** Run by ECIA (Electronic Components Industry Association) — high-trust, franchise-only data. No broker/open market results. **Free** in almost all cases with generous rate limits. Perfect complement to FindChips for franchise screening.
+
+**Status:** To investigate. Register for free account, then request API access.
+
+---
+
+### OEMSecrets API (To Investigate - Aggregator)
+
+**Portal:** [oemsecrets.com/api](https://www.oemsecrets.com/api) | **Docs:** [oemsecretsapi.com/documentation](https://oemsecretsapi.com/documentation/)
+
+**API:** REST/JSON | **Auth:** Free API key (apply on site, approval required)
+
+**Capabilities:** Part search across 40M+ parts. Real-time pricing and stock from DigiKey, Farnell, RS, Arrow, Mouser, Avnet, Future, and more. BOM tool data. Global coverage.
+
+**Note:** Strong aggregator alternative to Octopart. Multi-distributor price comparison in one API call. Free tier available.
+
+**Status:** To investigate. Apply for free API key.
+
+---
+
+### Supplyframe / FindChips API (To Investigate - Aggregator)
+
+**Portal:** [dev.supplyframe.com](http://dev.supplyframe.com/)
+
+**API:** Developer API | **Auth:** Application through developer portal
+
+**Capabilities:** 600M+ MPNs. Pricing, availability, datasheets, lifecycle, parametric data. Powers PartQuest, Altium integration.
+
+**Note:** Astute already uses FindChips via Playwright for franchise screening. The official API would replace browser automation with a more reliable, faster programmatic interface. Now owned by Siemens.
+
+**Status:** To investigate. Apply through developer portal.
+
+---
+
+## Component Intelligence APIs
+
+### SiliconExpert API (To Investigate)
+
+**Portal:** [siliconexpert.com/products/api](https://www.siliconexpert.com/products/api/)
+
+**API:** REST | **Auth:** Paid subscription (free trial available)
+
+**Capabilities:** 1B+ components. Lifecycle status, obsolescence forecasts, compliance (RoHS/REACH), parametric data, cross-references, inventory data. Silver package (static) vs. Gold package (dynamic EOL predictions). Connects to PLM/CAD/ERP tools.
+
+**Note:** Not a pricing API — lifecycle and obsolescence intelligence. High value for BOM Monitoring (workflow #12) and Vortex Matches (workflow #10) for knowing when parts are going EOL before quoting.
+
+**Status:** To investigate. Request free trial to evaluate.
+
+---
+
+### Z2Data (To Investigate)
+
+**Portal:** [z2data.com](https://www.z2data.com/)
+
+**API:** REST | **Auth:** Paid platform
+
+**Capabilities:** Risk scoring, lifecycle management, compliance (1B+ parts, 150K+ suppliers), geographic risk, sub-tier supplier mapping. All data exportable via API.
+
+**Note:** Supply chain risk intelligence. Complements pricing APIs with "should we even source this part" risk data.
+
+**Status:** To investigate. Contact for API access and pricing.
 
 ---
 
