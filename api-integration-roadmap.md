@@ -1058,7 +1058,7 @@ node master.js LM317 100 --in-stock   # in-stock only
 
 ## MRO / Industrial Supplier APIs
 
-### McMaster-Carr API (To Investigate)
+### McMaster-Carr API (Blocked - Access Denied)
 
 **Portal:** [mcmaster.com/help/api](https://www.mcmaster.com/help/api/)
 **Contact:** eprocurement@mcmaster.com
@@ -1070,41 +1070,12 @@ node master.js LM317 100 --in-stock   # in-stock only
 - BP Value: `1002922`
 - Name: `McMaster-Carr`
 
-**Endpoints:**
-| Method | Path | Description |
-|--------|------|-------------|
-| POST | `/v1/login` | Obtain authorization token |
-| POST | `/v1/logout` | Expire authorization token |
-| PUT | `/v1/products` | Subscribe to product data |
-| DELETE | `/v1/products` | Unsubscribe from product data |
-| GET | `/v1/products/{partNumber}` | Product specifications |
-| GET | `/v1/products/{partNumber}/price` | Current pricing |
-| GET | `/v1/images/{path}` | Product images |
-| GET | `/v1/cad/{path}` | CAD files (DWG, STEP) |
-
-**Access model:** Approval-based. Email eprocurement@mcmaster.com to begin integration. McMaster issues a client certificate and password per approved customer.
-
-**Capabilities:**
-- Product specs, pricing, images, CAD files
-- Subscription model — must subscribe to products before retrieving data
-- Rate-limited on bandwidth-intensive endpoints (CAD, images)
-- User quotas on total subscriptions and daily additions
-
-**Use cases for Astute:**
-- Automated pricing lookups for MRO/industrial parts (hardware, tools, raw materials)
-- Product spec retrieval for kitting/BOM support
-
-**Restrictions:**
-- Not a traditional electronic component distributor — MRO/industrial supplies
-- Subscription-per-product model adds complexity vs. simple search APIs
-- Client certificate auth is more involved than API key auth
-
-**Status:** To investigate. Need to email eprocurement@mcmaster.com to request API access.
+**Status:** Access denied. McMaster reserves API access for long-standing customers and does not provide access to other distributors as company policy.
 
 **TODO:**
-- [ ] Email eprocurement@mcmaster.com to request API integration
-- [ ] Evaluate subscription model feasibility for Astute's use case
-- [ ] Determine which product categories are relevant (fasteners, thermal, etc.)
+- [x] ~~Email eprocurement@mcmaster.com to request API integration~~ — Denied (distributor policy)
+- [ ] ~~Evaluate subscription model feasibility~~ — N/A
+- [ ] ~~Determine relevant product categories~~ — N/A
 
 ---
 
