@@ -11,6 +11,8 @@
 | Module | Purpose | Use When | Consumers |
 |--------|---------|----------|-----------|
 | `franchise-api.js` | All 7 franchise distributor APIs (DigiKey, Arrow, Rutronik, Future, Newark, TTI, Master) | Need franchise stock/pricing for ANY workflow | Franchise Screening, Suggested Resale, VQ Loading, Quick Quote |
+| `market-data.js` | DB queries: VQ history, sales history (broker vs customer), market offers, RFQ demand | Need pricing intelligence from the system | Suggested Resale, Quick Quote, Vortex Matches, Market Offer Analysis |
+| `mfr-lookup.js` | Resolve manufacturer names → canonical `chuboe_mfr.name`. Aliases (165+) → DB → cache. | Normalizing MFR names from any source | VQ Loading, Market Offer Uploading, Stock RFQ Loading |
 | `partner-lookup.js` | Resolve email/name → iDempiere business partner | Matching sender to BP in any inbound email workflow | VQ Loading, Market Offer Uploading, Stock RFQ Loading |
 | `csv-utils.js` | CSV parsing with proper quoting | Any CSV read/write (**NEVER** use `line.split(',')`) | All workflows |
 
@@ -98,6 +100,51 @@ const result = resolvePartner({
 ```
 
 **Matching tiers:** exact email → email domain → domain hint → name match
+
+---
+
+## market-data.js
+
+Centralized DB queries for all pricing intelligence. Queries VQ history, sales history (distinguishing broker vs customer), market offers, and RFQ demand.
+
+```javascript
+const { getAllMarketData, getVQHistory, getSalesHistory } = require('../shared/market-data');
+
+// Get everything for a part
+const data = getAllMarketData('ADS1115IDGST');
+console.log(data.vqSummary);        // { count, low, high, median, purchasedCost }
+console.log(data.brokerSales);       // strongest price signal
+console.log(data.demandStrength);    // HIGH/MEDIUM/LOW/NONE
+console.log(data.offerPriceRange);   // { low, high }
+
+// Or individual queries with options
+const vqs = getVQHistory('ADS1115IDGST', { months: 6 });
+const sales = getSalesHistory('ADS1115IDGST', { months: 12 });
+```
+
+**Includes:** `cleanMpn()`, `getBaseMpn()`, `mpnWhereClause()` for MPN normalization and packaging-variant matching (e.g., FT2232HL-REEL → also searches FT2232HL).
+
+---
+
+## mfr-lookup.js
+
+Resolves manufacturer names to canonical `chuboe_mfr.name` values. Three-tier resolution:
+
+1. **Alias file** (`mfr-aliases.json`, 165+ entries) — fast, covers common abbreviations
+2. **DB lookup** (`chuboe_mfr` table) — strict matching, avoids false positives
+3. **Cache** — previous results stored in `shared/data/mfr-cache.json`
+
+```javascript
+const { normalizeMfr, lookupMfr } = require('../shared/mfr-lookup');
+
+normalizeMfr('TI');           // → 'Texas Instruments Incorporated'
+normalizeMfr('MICRON');       // → 'Micron Technology, Inc.'
+
+const detail = lookupMfr('NEXPERIA');
+// → { canonical: 'Nexperia', source: 'alias', matched: true }
+```
+
+**Alias file location:** `Trading Analysis/Market Offer Uploading/mfr-aliases.json`
 
 ---
 
