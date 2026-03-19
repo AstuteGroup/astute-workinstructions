@@ -206,5 +206,5 @@ Currently outputs CSV for manual import. Future state: write RFQ lines directly 
 ## Related
 
 - [Market Offer Uploading](../Market%20Offer%20Uploading/market-offer-uploading.md) — Sister workflow, same MFR matching and partner lookup patterns
-- [VQ Loading](../../rfq_sourcing/vq_loading/vq-loading.md) — Similar two-agent extraction pattern
+- [VQ Loading](../../Trading Analysis/RFQ Sourcing/vq_loading/vq-loading.md) — Similar two-agent extraction pattern
 - MFR Aliases: `../Market Offer Uploading/mfr-aliases.json` (shared)

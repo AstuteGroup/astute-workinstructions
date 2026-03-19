@@ -19,7 +19,7 @@ const { execSync } = require('child_process');
 
 // --- Config ---
 const { searchAllDistributors, writeVQCapture } = require('../../shared/franchise-api');
-const FINDCHIPS_SCRIPT = path.resolve(__dirname, '../../rfq_sourcing/franchise_check/main.js');
+const FINDCHIPS_SCRIPT = path.resolve(__dirname, '../RFQ Sourcing/franchise_check/main.js');
 
 // Franchise pricing rule: our price ≈ 20% of franchise best price
 // (older DC, untraceable stock — buyer needs room to resell vs franchise)

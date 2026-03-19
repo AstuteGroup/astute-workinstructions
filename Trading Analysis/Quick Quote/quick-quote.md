@@ -155,7 +155,7 @@ TPS51200DRCR,Stock,CHECK WITH JAKE,0.1125,,,,,,,
 
 ## Related
 
-- [VQ Loading](../../rfq_sourcing/vq_loading/vq-loading.md) - How VQs get into the system
+- [VQ Loading](../../Trading Analysis/RFQ Sourcing/vq_loading/vq-loading.md) - How VQs get into the system
 - [Market Offer Matching](../Market%20Offer%20Matching%20for%20RFQs/market-offer-matching.md) - Match RFQs against excess/stock
 
 ---

@@ -12,9 +12,9 @@ See [MEMORY.md](MEMORY.md) for recent session history and workflow index.
 
 | Workflow | Location | Description |
 |----------|----------|-------------|
-| **Franchise Screening** | [`rfq_sourcing/franchise_check/`](rfq_sourcing/franchise_check/) | Screen RFQs against franchise distributors |
-| **RFQ Sourcing** | [`rfq_sourcing/netcomponents/`](rfq_sourcing/netcomponents/) | Automated NetComponents RFQ submission |
-| **VQ Loading** | [`rfq_sourcing/vq_loading/`](rfq_sourcing/vq_loading/) | Process supplier quote emails into VQ template |
+| **Franchise Screening** | [`Trading Analysis/RFQ Sourcing/franchise_check/`](Trading Analysis/RFQ Sourcing/franchise_check/) | Screen RFQs against franchise distributors |
+| **RFQ Sourcing** | [`Trading Analysis/RFQ Sourcing/netcomponents/`](Trading Analysis/RFQ Sourcing/netcomponents/) | Automated NetComponents RFQ submission |
+| **VQ Loading** | [`Trading Analysis/RFQ Sourcing/vq_loading/`](Trading Analysis/RFQ Sourcing/vq_loading/) | Process supplier quote emails into VQ template |
 | **Market Offer Matching** | [`Trading Analysis/Market Offer Matching for RFQs/`](Trading%20Analysis/Market%20Offer%20Matching%20for%20RFQs/) | Match RFQs against customer excess/stock |
 | **Quick Quote** | [`Trading Analysis/Quick Quote/`](Trading%20Analysis/Quick%20Quote/) | Generate baseline quotes from recent VQs |
 

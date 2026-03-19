@@ -121,7 +121,7 @@ node lam-kitting-source.js output/LAM_Reorder_Alerts_YYYY-MM-DD.csv
 | Lead Time (Weeks) | Expected wait |
 | Lead Time Margin % | Margin for lead time option |
 
-**Note:** Uses `rfq_sourcing/franchise_check/` API modules — no duplicate logic.
+**Note:** Uses `Trading Analysis/RFQ Sourcing/franchise_check/` API modules — no duplicate logic.
 
 ### Step 4: Review Sourcing Results
 
@@ -213,7 +213,7 @@ Step 6: Email summary to buyers
 | Which warehouses? | W111 + W115 combined |
 | Dead stock? | Yes, counts toward inventory level |
 | Zero stock detection? | Yes, items in Excel but not in inventory = CRITICAL |
-| Sourcing workflow? | **Follow Franchise Screening** (`rfq_sourcing/franchise_check/`) |
+| Sourcing workflow? | **Follow Franchise Screening** (`Trading Analysis/RFQ Sourcing/franchise_check/`) |
 | NetComponents? | Only if specifically tasked — not default |
 
 ---

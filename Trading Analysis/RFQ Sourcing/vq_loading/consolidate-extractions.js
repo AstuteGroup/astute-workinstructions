@@ -2,7 +2,7 @@ const { execSync } = require('child_process');
 const fs = require('fs');
 
 // Load existing extractions
-const existingCsv = fs.readFileSync('/home/analytics_user/workspace/astute-workinstructions/rfq_sourcing/vq_loading/verified-extractions-all-enriched.csv', 'utf8');
+const existingCsv = fs.readFileSync('/home/analytics_user/workspace/astute-workinstructions/Trading Analysis/RFQ Sourcing/vq_loading/verified-extractions-all-enriched.csv', 'utf8');
 const existingLines = existingCsv.trim().split('\n').slice(1); // Skip header
 
 const existingRecords = existingLines.map(line => {
@@ -23,7 +23,7 @@ const existingRecords = existingLines.map(line => {
 console.log(`Loaded ${existingRecords.length} existing records`);
 
 // Load new extractions (6774-6943)
-const newExtractionsJson = JSON.parse(fs.readFileSync('/home/analytics_user/workspace/astute-workinstructions/rfq_sourcing/vq_loading/new-extractions-6774-6943.json', 'utf8'));
+const newExtractionsJson = JSON.parse(fs.readFileSync('/home/analytics_user/workspace/astute-workinstructions/Trading Analysis/RFQ Sourcing/vq_loading/new-extractions-6774-6943.json', 'utf8'));
 
 // Flatten all sections
 const newRecords = [
@@ -38,7 +38,7 @@ console.log(`Loaded ${newRecords.length} new records (6774-6943)`);
 // Load old extractions (2xxx-5xxx)
 let oldRecords = [];
 try {
-  const oldExtractionsJson = JSON.parse(fs.readFileSync('/home/analytics_user/workspace/astute-workinstructions/rfq_sourcing/vq_loading/old-extractions-2xxx-5xxx.json', 'utf8'));
+  const oldExtractionsJson = JSON.parse(fs.readFileSync('/home/analytics_user/workspace/astute-workinstructions/Trading Analysis/RFQ Sourcing/vq_loading/old-extractions-2xxx-5xxx.json', 'utf8'));
   oldRecords = oldExtractionsJson.extracted_quotes || [];
   console.log(`Loaded ${oldRecords.length} old records (2xxx-5xxx)`);
 } catch (e) {
@@ -48,7 +48,7 @@ try {
 // Load no-bid records
 let noBidRecords = [];
 try {
-  const noBidJson = JSON.parse(fs.readFileSync('/home/analytics_user/workspace/astute-workinstructions/rfq_sourcing/vq_loading/nobid-extractions.json', 'utf8'));
+  const noBidJson = JSON.parse(fs.readFileSync('/home/analytics_user/workspace/astute-workinstructions/Trading Analysis/RFQ Sourcing/vq_loading/nobid-extractions.json', 'utf8'));
   noBidRecords = noBidJson.records || [];
   console.log(`Loaded ${noBidRecords.length} no-bid records`);
 } catch (e) {
@@ -58,7 +58,7 @@ try {
 // Load PDF extractions (new comprehensive file)
 let pdfRecords = [];
 try {
-  const pdfJson = JSON.parse(fs.readFileSync('/home/analytics_user/workspace/astute-workinstructions/rfq_sourcing/vq_loading/pdf-extractions-new.json', 'utf8'));
+  const pdfJson = JSON.parse(fs.readFileSync('/home/analytics_user/workspace/astute-workinstructions/Trading Analysis/RFQ Sourcing/vq_loading/pdf-extractions-new.json', 'utf8'));
   pdfRecords = pdfJson.records || [];
   console.log(`Loaded ${pdfRecords.length} PDF records`);
 } catch (e) {
@@ -69,7 +69,7 @@ try {
 let remainingQuotes = [];
 let remainingNoBids = [];
 try {
-  const remainingJson = JSON.parse(fs.readFileSync('/home/analytics_user/workspace/astute-workinstructions/rfq_sourcing/vq_loading/remaining-extractions.json', 'utf8'));
+  const remainingJson = JSON.parse(fs.readFileSync('/home/analytics_user/workspace/astute-workinstructions/Trading Analysis/RFQ Sourcing/vq_loading/remaining-extractions.json', 'utf8'));
   remainingQuotes = remainingJson.quotes || [];
   // Combine no_bids and target_price as they both have qty=0, price=0
   remainingNoBids = [...(remainingJson.no_bids || []), ...(remainingJson.target_price || [])];
@@ -494,13 +494,13 @@ const uploadReady = deduped.filter(r => r.vendor_search_key !== 'NOT_FOUND');
 
 // Write VQ Mass Upload format (ready for iDempiere import)
 fs.writeFileSync(
-  '/home/analytics_user/workspace/astute-workinstructions/rfq_sourcing/vq_loading/vq-upload-ready.csv',
+  '/home/analytics_user/workspace/astute-workinstructions/Trading Analysis/RFQ Sourcing/vq_loading/vq-upload-ready.csv',
   [VQ_HEADER, ...uploadReady.map(formatVqLine)].join('\n')
 );
 
 // Write tracking format (for reference/debugging)
 fs.writeFileSync(
-  '/home/analytics_user/workspace/astute-workinstructions/rfq_sourcing/vq_loading/vq-upload-ready-tracking.csv',
+  '/home/analytics_user/workspace/astute-workinstructions/Trading Analysis/RFQ Sourcing/vq_loading/vq-upload-ready-tracking.csv',
   [TRACKING_HEADER, ...uploadReady.map(formatTrackingLine)].join('\n')
 );
 
@@ -511,7 +511,7 @@ const needsVendor = deduped.filter(r =>
   parseFloat(r.price) > 0
 );
 fs.writeFileSync(
-  '/home/analytics_user/workspace/astute-workinstructions/rfq_sourcing/vq_loading/needs-vendor.csv',
+  '/home/analytics_user/workspace/astute-workinstructions/Trading Analysis/RFQ Sourcing/vq_loading/needs-vendor.csv',
   [TRACKING_HEADER, ...needsVendor.map(formatTrackingLine)].join('\n')
 );
 

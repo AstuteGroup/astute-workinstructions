@@ -30,7 +30,7 @@
 const path = require('path');
 
 // All active distributor API modules
-const API_DIR = path.resolve(__dirname, '../rfq_sourcing/franchise_check');
+const API_DIR = path.resolve(__dirname, '../Trading Analysis/RFQ Sourcing/franchise_check');
 
 const DISTRIBUTORS = {
   digikey: {

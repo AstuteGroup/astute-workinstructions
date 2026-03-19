@@ -33,9 +33,9 @@ At the start of every new conversation, before addressing anything else, always 
 2. **Available Workflows:**
 
 > **Available Workflows:**
-> 1. **Franchise Screening** - Screen RFQs against FindChips to filter low-value parts before broker sourcing (see `rfq_sourcing/franchise_check/franchise-screening.md`)
-> 2. **RFQ Sourcing** - Submit RFQs to NetComponents suppliers (see `rfq_sourcing/netcomponents/rfq-sourcing-netcomponents.md`)
-> 3. **VQ Loading** - Process supplier quote emails into ERP-ready CSV (see `rfq_sourcing/vq_loading/vq-loading.md`)
+> 1. **Franchise Screening** - Screen RFQs against FindChips to filter low-value parts before broker sourcing (see `Trading Analysis/RFQ Sourcing/franchise_check/franchise-screening.md`)
+> 2. **RFQ Sourcing** - Submit RFQs to NetComponents suppliers (see `Trading Analysis/RFQ Sourcing/netcomponents/rfq-sourcing-netcomponents.md`)
+> 3. **VQ Loading** - Process supplier quote emails into ERP-ready CSV (see `Trading Analysis/RFQ Sourcing/vq_loading/vq-loading.md`)
 > 4. **RFQ Loading through AI** - AI-assisted extraction and loading of RFQs from customer emails/documents
 > 5. **Market Offer Analysis for RFQs** - Match new RFQs against customer excess and stock offers (see `Trading Analysis/Market Offer Matching for RFQs/market-offer-matching.md`)
 > 6. **Quick Quote** - Generate baseline quotes from recent VQs (0-30 days) with margin/GP/rebate pricing logic
@@ -51,12 +51,12 @@ At the start of every new conversation, before addressing anything else, always 
 
 > **Roadmaps:**
 > - `api-integration-roadmap.md` — External APIs (franchise distributors, LLM, future integrations)
-> - `rfq_sourcing/sourcing-roadmap.md` — RFQ Sourcing & VQ Processing
+> - `Trading Analysis/RFQ Sourcing/sourcing-roadmap.md` — RFQ Sourcing & VQ Processing
 > - `Trading Analysis/trading-analysis-roadmap.md` — Vortex Matches, Quick Quote, etc.
 
 4. **Periodic Checks** (every 8 days):
 
-> **Template Candidates:** Check `rfq_sourcing/vq_loading/template-candidates.md`
+> **Template Candidates:** Check `Trading Analysis/RFQ Sourcing/vq_loading/template-candidates.md`
 > - Any vendors with 5+ cumulative quotes? → Review for templateability
 > - Show top 3 candidates and their counts
 > - Check if structured (table/consistent format) vs free-form (prose) → only structured can be templated
@@ -94,7 +94,7 @@ When creating or updating workflow documentation, follow the conventions in `CON
 - Session history goes in `MEMORY.md` (4 most recent entries)
 - **Roadmaps** for planned work go in `*-roadmap.md` files — see CONVENTIONS.md for schema
 
-**When planning future work:** Read the area's roadmap first (`rfq_sourcing/sourcing-roadmap.md`, `Trading Analysis/trading-analysis-roadmap.md`), then add items there — not inline in MEMORY.md. The roadmap is the source of truth for planned improvements.
+**When planning future work:** Read the area's roadmap first (`Trading Analysis/RFQ Sourcing/sourcing-roadmap.md`, `Trading Analysis/trading-analysis-roadmap.md`), then add items there — not inline in MEMORY.md. The roadmap is the source of truth for planned improvements.
 
 **CRITICAL: Keep CLAUDE.md in sync**
 - When updating ANY workflow .md file, also update CLAUDE.md to reference it correctly
@@ -161,7 +161,7 @@ python inventory_cleanup.py "ASTItemLotsReportInputs_*.csv" ./output
 
 ## VQ Loading Workflow
 
-**BEFORE STARTING:** Read the full workflow documentation at `rfq_sourcing/vq_loading/vq-loading.md`
+**BEFORE STARTING:** Read the full workflow documentation at `Trading Analysis/RFQ Sourcing/vq_loading/vq-loading.md`
 
 This includes:
 - **Two-Agent Validation** (REQUIRED) - Extractor agent + Verifier agent

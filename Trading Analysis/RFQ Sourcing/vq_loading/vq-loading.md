@@ -527,7 +527,7 @@ node ~/workspace/vq-parser/scripts/route-emails.js --latest
    cut -d',' -f3 [session]-upload.csv | tail -n +2 | sort | uniq -c | sort -rn
    ```
 
-2. Update `rfq_sourcing/vq_loading/template-candidates.md` with cumulative counts
+2. Update `Trading Analysis/RFQ Sourcing/vq_loading/template-candidates.md` with cumulative counts
 
 3. Flag vendors with **5+ cumulative quotes** as template priorities
 
@@ -576,7 +576,7 @@ himalaya envelope list --account vq --folder INBOX --page-size 500
 # Extract → save to JSON files in vq_loading/
 
 # 3. Consolidate all extractions into upload-ready CSV
-node ~/workspace/astute-workinstructions/rfq_sourcing/vq_loading/consolidate-extractions.js
+node ~/workspace/astute-workinstructions/Trading Analysis/RFQ Sourcing/vq_loading/consolidate-extractions.js
 ```
 
 **Output:** `vq-upload-ready.csv`

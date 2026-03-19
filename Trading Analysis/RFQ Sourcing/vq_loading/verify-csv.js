@@ -1,5 +1,5 @@
 const fs = require('fs');
-const dir = '/home/analytics_user/workspace/astute-workinstructions/rfq_sourcing/vq_loading/output';
+const dir = '/home/analytics_user/workspace/astute-workinstructions/Trading Analysis/RFQ Sourcing/vq_loading/output';
 
 ['2026-03-10-erp-ready.csv', '2026-03-11-erp-ready.csv', '2026-03-12-erp-ready.csv'].forEach(f => {
   const p = `${dir}/${f}`;

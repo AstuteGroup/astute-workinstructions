@@ -24,7 +24,7 @@ Centralized access to all active franchise distributor APIs. Returns standardize
 
 **Key distinction:**
 - **API data = confirmed pricing** → captured as VQ lines (this module)
-- **FindChips scraped data = availability reference only** → NOT captured as VQ (see `rfq_sourcing/franchise_check/main.js`)
+- **FindChips scraped data = availability reference only** → NOT captured as VQ (see `Trading Analysis/RFQ Sourcing/franchise_check/main.js`)
 
 ### Active Distributors
 

@@ -184,7 +184,7 @@ function saveBrokerList(results, outputPath) {
  */
 function saveVqBatch(results, outputPath, rfqNumber) {
   // VQ Mass Upload Template format
-  // See: rfq_sourcing/vq_loading/vq-loading.md for field reference
+  // See: Trading Analysis/RFQ Sourcing/vq_loading/vq-loading.md for field reference
   const wsData = [
     [
       'RFQ Number',           // For reference (not in upload template)

@@ -73,7 +73,7 @@ Skip supplier if: min_order_value > est_value
 ## Usage
 
 ```bash
-cd rfq_sourcing/franchise_check
+cd Trading Analysis/RFQ Sourcing/franchise_check
 
 # Screen from iDempiere RFQ
 node main.js --rfq 1130410 --threshold 100

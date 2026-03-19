@@ -10,12 +10,12 @@ Cross-cutting roadmap for external API integrations. Individual implementations 
 
 | API Category | Use Cases | Count | Roadmap Reference |
 |--------------|-----------|-------|-------------------|
-| Franchise Distributors | Pricing, stock, screening | 25 | `rfq_sourcing/sourcing-roadmap.md` § A1 |
+| Franchise Distributors | Pricing, stock, screening | 25 | `Trading Analysis/RFQ Sourcing/sourcing-roadmap.md` § A1 |
 | Broker / Independent | Pricing, inventory, RFQ | 2 | This file |
 | Aggregators | Multi-source search, screening | 4 | This file |
 | Component Intelligence | Lifecycle, risk, compliance | 2 | This file |
 | MRO / Industrial Suppliers | Pricing, specs, procurement | 1 | This file |
-| LLM / AI | Quote extraction, vendor inference | 1 | `rfq_sourcing/sourcing-roadmap.md` § C7 |
+| LLM / AI | Quote extraction, vendor inference | 1 | `Trading Analysis/RFQ Sourcing/sourcing-roadmap.md` § C7 |
 
 ---
 
@@ -68,7 +68,7 @@ Real-time pricing and availability from authorized distributors. Replaces FindCh
 - BP Value: `1002331`
 - Name: `Digi-Key Electronics`
 
-**Code:** `rfq_sourcing/franchise_check/digikey.js`
+**Code:** `Trading Analysis/RFQ Sourcing/franchise_check/digikey.js`
 
 **Usage:**
 ```bash
@@ -103,12 +103,12 @@ node digikey.js LM317 100
 | `NormallyStocking` | Availability risk assessment |
 | `PhotoUrl` | Visual verification in quotes |
 
-**Implementation details:** See `rfq_sourcing/sourcing-roadmap.md` Section A
+**Implementation details:** See `Trading Analysis/RFQ Sourcing/sourcing-roadmap.md` Section A
 
 **Key files:**
 - `~/workspace/.env` — API credentials
-- `rfq_sourcing/franchise_check/digikey.js` — DigiKey API module
-- `rfq_sourcing/franchise_check/` — Screening workflow
+- `Trading Analysis/RFQ Sourcing/franchise_check/digikey.js` — DigiKey API module
+- `Trading Analysis/RFQ Sourcing/franchise_check/` — Screening workflow
 
 ### Arrow API (Active)
 
@@ -127,7 +127,7 @@ node digikey.js LM317 100
 - BP Value: `1002390`
 - Name: `Arrow Electronics`
 
-**Code:** `rfq_sourcing/franchise_check/arrow.js`
+**Code:** `Trading Analysis/RFQ Sourcing/franchise_check/arrow.js`
 
 **Usage:**
 ```bash
@@ -170,7 +170,7 @@ node arrow.js LM317T 100
 - BP Value: `1004668`
 - Name: `Rutronik Inc.`
 
-**Code:** `rfq_sourcing/franchise_check/rutronik.js`
+**Code:** `Trading Analysis/RFQ Sourcing/franchise_check/rutronik.js`
 
 **Usage:**
 ```bash
@@ -210,7 +210,7 @@ node rutronik.js S3001-D320 100
 - BP Value: `1002332`
 - Name: `Future Electronics Corporation`
 
-**Code:** `rfq_sourcing/franchise_check/future.js`
+**Code:** `Trading Analysis/RFQ Sourcing/franchise_check/future.js`
 
 **Usage:**
 ```bash
@@ -284,7 +284,7 @@ Single API key provides access to all regional stores. Different stores have dif
 
 #### Code & Usage
 
-**Code:** `rfq_sourcing/franchise_check/newark.js`
+**Code:** `Trading Analysis/RFQ Sourcing/franchise_check/newark.js`
 
 ```bash
 # Search both Newark + Farnell (default)
@@ -394,7 +394,7 @@ Headers: apiKey: <leadtime-key>, Content-Type: application/json
 - BP Value: `1002330`
 - Name: `TTI Inc`
 
-**Code:** `rfq_sourcing/franchise_check/tti.js`
+**Code:** `Trading Analysis/RFQ Sourcing/franchise_check/tti.js`
 
 **Usage:**
 ```bash
@@ -562,7 +562,7 @@ curl -X GET "https://api.masterelectronics.com/wapi/v2/cgpriceavailability/LM317
 - BP Value: `1002409`
 - Name: `Master Electronics`
 
-**Code:** `rfq_sourcing/franchise_check/master.js`
+**Code:** `Trading Analysis/RFQ Sourcing/franchise_check/master.js`
 
 **Usage:**
 ```bash
@@ -1089,7 +1089,7 @@ AI-assisted extraction and inference for edge cases.
 |----------|----------|--------|
 | Anthropic (Claude) | VQ extraction fallback, vendor name inference | Planned |
 
-**Implementation details:** See `rfq_sourcing/sourcing-roadmap.md` Section C7
+**Implementation details:** See `Trading Analysis/RFQ Sourcing/sourcing-roadmap.md` Section C7
 
 ---
 

@@ -25,8 +25,8 @@ Consolidated roadmap for RFQ Sourcing and VQ Processing workflows, organized by 
 ```
 
 **Repos:**
-- `rfq_sourcing/` — Franchise screening + NetComponents RFQ submission + VQ Loading
-- `vq-parser/` (code at ~/workspace/vq-parser/, docs at rfq_sourcing/vq_loading/)
+- `Trading Analysis/RFQ Sourcing/` — Franchise screening + NetComponents RFQ submission + VQ Loading
+- `vq-parser/` (code at ~/workspace/vq-parser/, docs at Trading Analysis/RFQ Sourcing/vq_loading/)
 
 ---
 
@@ -82,6 +82,7 @@ Consolidated roadmap for RFQ Sourcing and VQ Processing workflows, organized by 
 | B7 | Memory Product Handling | Later | Planned |
 | B8 | BrokerBin RFQ Automation | Later | Planned |
 | B9 | PartsBase RFQ Automation | Later | Planned |
+| B10 | NetComponents Email Update | **High** | Planned |
 
 ---
 
@@ -115,8 +116,8 @@ IF (Supplier + MPN) requested within last 60 days → SKIP
 - `supplierStats` tracks: totalRfqs, lastRfqDate, uniqueMpns
 
 **Files:**
-- `rfq_sourcing/netcomponents/python/rfq_history.py` - Core module
-- `rfq_sourcing/netcomponents/rfq_history.json` - Persistent store
+- `Trading Analysis/RFQ Sourcing/netcomponents/python/rfq_history.py` - Core module
+- `Trading Analysis/RFQ Sourcing/netcomponents/rfq_history.json` - Persistent store
 
 **Integration:**
 - NetComponents RFQ submission: `--check-cooldown` flag checks before sending, records after
@@ -355,6 +356,21 @@ const AUTO_SUFFIXES = /[-#]?(Q|Q1|AEC)$/i;
 - Extend RFQ automation to PartsBase platform
 - Adapt supplier selection logic for PartsBase listings
 - Integrate responses into VQ Parser workflow
+
+---
+
+## B10. NetComponents Email Update
+
+**Status:** Planned | **Priority:** High
+
+**Task:** Change the contact/reply-to email address on the NetComponents account to `astutesourcing@astutegroup.com`.
+
+**Why:** Supplier quote responses will route directly to the Astute group email instead of requiring manual forwarding or tracking. Keeps responses in the official domain.
+
+**Steps:**
+1. Log into NetComponents account settings
+2. Update email address to `astutesourcing@astutegroup.com`
+3. Send a test RFQ batch and confirm supplier responses arrive at the new address
 
 ---
 

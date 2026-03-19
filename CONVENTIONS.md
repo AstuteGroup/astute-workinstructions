@@ -11,7 +11,7 @@ astute-workinstructions/
 ├── tasks/                    # Explicit task instructions (canonical)
 ├── roles/                    # Role definitions
 ├── Trading Analysis/         # Workflow folders with descriptive docs
-├── rfq_sourcing/            # RFQ sourcing (franchise_check + netcomponents + vq_loading)
+├── Trading Analysis/RFQ Sourcing/            # RFQ sourcing (franchise_check + netcomponents + vq_loading)
 ├── src/                     # Legacy work instructions
 ├── CLAUDE.md                # Claude Code session instructions
 ├── MEMORY.md                # Session tracking (recent work)
@@ -81,7 +81,7 @@ astute-workinstructions/
 
 **Purpose:** Contain automation code plus workflow documentation.
 
-**Location:** Root level (e.g., `rfq_sourcing/`)
+**Location:** Root level (e.g., `Trading Analysis/RFQ Sourcing/`)
 
 **Structure:**
 ```
@@ -114,7 +114,7 @@ tool_folder/
 **Purpose:** Track planned features, improvements, and technical debt for a workflow area.
 
 **Location:** One roadmap per major workflow area:
-- `rfq_sourcing/sourcing-roadmap.md`
+- `Trading Analysis/RFQ Sourcing/sourcing-roadmap.md`
 - `Trading Analysis/trading-analysis-roadmap.md`
 
 **Naming:** `area-roadmap.md` (kebab-case)
@@ -196,7 +196,7 @@ Task files should be self-contained and not require reading other files.
 | Task files | `snake_case.md` | `vq_loading.md` |
 | Workflow docs | `kebab-case.md` (descriptive) | `inventory-file-cleanup.md` |
 | Workflow folders | Title Case | `VQ Loading/` |
-| Tool folders | `snake_case` | `rfq_sourcing/` |
+| Tool folders | `snake_case` | `Trading Analysis/RFQ Sourcing/` |
 | Role files | `snake_case.md` | `data_entry_specialist.md` |
 
 **Important:** Never name workflow docs `README.md`. Use descriptive names that identify the content without relying on folder context.

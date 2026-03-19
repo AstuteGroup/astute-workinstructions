@@ -326,5 +326,5 @@ The upload template column `Business Partner Search Key` expects the **search_ke
 
 ## Related
 
-- [VQ Loading](../../rfq_sourcing/vq_loading/vq-loading.md) - Similar workflow for vendor quotes
+- [VQ Loading](../../Trading Analysis/RFQ Sourcing/vq_loading/vq-loading.md) - Similar workflow for vendor quotes
 - [Market Offer Matching for RFQs](../Market%20Offer%20Matching%20for%20RFQs/market-offer-matching.md) - Downstream consumer of uploaded offers

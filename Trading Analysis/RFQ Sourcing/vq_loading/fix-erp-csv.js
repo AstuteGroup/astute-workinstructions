@@ -80,7 +80,7 @@ function fixCsvFile(inputPath) {
 }
 
 // Fix both files
-const dir = '/home/analytics_user/workspace/astute-workinstructions/rfq_sourcing/vq_loading/output';
+const dir = '/home/analytics_user/workspace/astute-workinstructions/Trading Analysis/RFQ Sourcing/vq_loading/output';
 console.log('Fixing 03-10...');
 fixCsvFile(`${dir}/2026-03-10-erp-ready.csv`);
 console.log('\nFixing 03-11...');

@@ -3,7 +3,7 @@
  * LAM Kitting Sourcing Script
  *
  * Runs franchise screening on reorder alerts and enriches with sourcing data.
- * Uses the franchise API modules from rfq_sourcing/franchise_check/
+ * Uses the franchise API modules from Trading Analysis/RFQ Sourcing/franchise_check/
  *
  * Usage:
  *   node lam-kitting-source.js <reorder-alerts-csv> [output-csv]
@@ -16,7 +16,7 @@ const fs = require('fs');
 const path = require('path');
 
 // Import franchise API modules
-const franchiseDir = path.join(__dirname, '../../rfq_sourcing/franchise_check');
+const franchiseDir = path.join(__dirname, '../RFQ Sourcing/franchise_check');
 const digikey = require(path.join(franchiseDir, 'digikey'));
 const arrow = require(path.join(franchiseDir, 'arrow'));
 const rutronik = require(path.join(franchiseDir, 'rutronik'));
