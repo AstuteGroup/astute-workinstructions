@@ -92,13 +92,17 @@ if (result.matched) {
 
 | Condition | Action |
 |-----------|--------|
-| Legitimate RFQ with line items | **Process** |
-| Junk/spam Chinese broker RFQ | **Skip** — move to `Junk` folder |
+| Any email with MPN + quantity | **Process** — even broker blasts. Use `1008499` (Unqualified Broker) if customer not in DB |
 | Inquiry only (no parts listed) | **Skip** — move to `NotRFQ` |
 | Duplicate (same customer + parts already processed) | **Skip** — move to `Duplicates` |
 | PDF/attachment only (no inline data) | **Queue** for attachment extraction |
+| No extractable part data (pure marketing, newsletters) | **Skip** — move to `Junk` |
 
-**Junk indicators:** Generic broker blast emails, no specific part numbers, machine-translated text, mass-mailing format, domains known for spam RFQs.
+### Why we don't junk broker RFQs
+
+Chinese and other overseas brokers frequently send templated RFQ blasts. While these look like spam, they represent **real demand signals** — brokers are speculating on inventory to resell, and some of our stock warrants their price points. Loading these as Unqualified Broker (1008499) with company name in Description means the trading team sees what parts have active demand, even from unknown buyers. This visibility is more valuable than a clean inbox.
+
+**The only true junk** is emails with zero extractable part data (marketing, newsletters, etc.).
 
 ---
 
@@ -115,8 +119,8 @@ himalaya envelope list --account stockrfq --folder INBOX --page-size 500
 
 ### Step 2: Read and Categorize Emails
 - Read each email body (and attachments if needed)
-- Categorize: **Process** / **Junk** / **NotRFQ** / **Duplicate**
-- Skip junk immediately (move to Junk folder)
+- Categorize: **Process** / **NotRFQ** / **Duplicate**
+- If it has an MPN + quantity, it gets processed — even broker blasts (see "Why we don't junk broker RFQs" above)
 
 ### Step 3: Extract RFQ Line Items (Two-Agent Validation)
 - **Agent A (Extractor):** Reads emails, extracts: MPN, Qty, MFR, CPC (if distinct), target price (if given), customer name/email
@@ -147,18 +151,14 @@ For each manufacturer in the extracted data:
 
 ### Step 7: Route and Move Emails
 ```bash
-# Move processed emails
+# Move processed emails (includes broker RFQs loaded as 1008499)
 himalaya message move --account stockrfq --folder INBOX Processed [IDs...]
-
-# Move junk
-himalaya message move --account stockrfq --folder INBOX Junk [IDs...]
 ```
 
 | Condition | Folder |
 |-----------|--------|
-| Processed successfully | `Processed` |
-| Junk/spam | `Junk` |
-| Not an RFQ | `NotRFQ` |
+| Processed (any email with MPN+qty, including brokers) | `Processed` |
+| Not an RFQ (no parts data) | `NotRFQ` |
 | Needs manual review | `NeedsReview` |
 
 ### Step 8: Email Output File
