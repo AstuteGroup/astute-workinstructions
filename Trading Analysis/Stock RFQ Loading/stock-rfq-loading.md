@@ -98,11 +98,13 @@ if (result.matched) {
 | PDF/attachment only (no inline data) | **Queue** for attachment extraction |
 | No extractable part data (pure marketing, newsletters) | **Skip** — move to `Junk` |
 
-### Why we don't junk broker RFQs
+### Why we process everything
 
-Chinese and other overseas brokers frequently send templated RFQ blasts. While these look like spam, they represent **real demand signals** — brokers are speculating on inventory to resell, and some of our stock warrants their price points. Loading these as Unqualified Broker (1008499) with company name in Description means the trading team sees what parts have active demand, even from unknown buyers. This visibility is more valuable than a clean inbox.
+Every RFQ with a part number represents **activity around that part** — someone in the market wants it. Even if we won't quote a particular sender, capturing the MPN + quantity as an RFQ line gives the trading team visibility into demand. This data feeds into sourcing decisions, pricing intelligence, and inventory positioning.
 
-**The only true junk** is emails with zero extractable part data (marketing, newsletters, etc.).
+**Not in the system ≠ junk.** A sender not matching a DB partner just means they're loaded under Unqualified Broker (1008499). The trading team decides whether to quote — that's a business decision, not a data-capture decision. Our job is to make sure the part activity is recorded.
+
+**The only true skip** is emails with zero extractable part data (marketing, newsletters, general inquiries with no MPNs).
 
 ---
 
