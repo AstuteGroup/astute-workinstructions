@@ -1,0 +1,505 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Astute Analytics — Workflow Architecture</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #0f1419; color: #e1e8ed; padding: 20px; }
+  h1 { text-align: center; font-size: 1.6em; margin-bottom: 5px; color: #fff; }
+  .subtitle { text-align: center; font-size: 0.85em; color: #8899a6; margin-bottom: 25px; }
+
+  /* Legend */
+  .legend { display: flex; justify-content: center; gap: 25px; margin-bottom: 20px; flex-wrap: wrap; }
+  .legend-item { display: flex; align-items: center; gap: 6px; font-size: 0.8em; color: #8899a6; }
+  .legend-dot { width: 12px; height: 12px; border-radius: 3px; }
+
+  /* Main layout */
+  .architecture { max-width: 1400px; margin: 0 auto; }
+
+  /* Section containers */
+  .section { margin-bottom: 20px; border-radius: 12px; padding: 18px; position: relative; }
+  .section-label { font-size: 0.7em; font-weight: 700; letter-spacing: 1.5px; text-transform: uppercase; margin-bottom: 12px; }
+
+  .inbound { background: rgba(29, 161, 242, 0.08); border: 1px solid rgba(29, 161, 242, 0.2); }
+  .inbound .section-label { color: #1da1f2; }
+
+  .system { background: rgba(255, 255, 255, 0.04); border: 1px solid rgba(255, 255, 255, 0.1); }
+  .system .section-label { color: #8899a6; }
+
+  .intelligence { background: rgba(23, 191, 99, 0.08); border: 1px solid rgba(23, 191, 99, 0.2); }
+  .intelligence .section-label { color: #17bf63; }
+
+  .sourcing { background: rgba(244, 93, 34, 0.08); border: 1px solid rgba(244, 93, 34, 0.2); }
+  .sourcing .section-label { color: #f45d22; }
+
+  .reporting { background: rgba(153, 102, 255, 0.08); border: 1px solid rgba(153, 102, 255, 0.2); }
+  .reporting .section-label { color: #9966ff; }
+
+  /* Workflow cards */
+  .workflow-row { display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 12px; }
+  .workflow { border-radius: 8px; padding: 12px 14px; flex: 1; min-width: 180px; cursor: pointer; transition: all 0.2s; position: relative; }
+  .workflow:hover { transform: translateY(-2px); }
+  .workflow.active { outline: 2px solid #fff; outline-offset: 2px; }
+  .workflow h3 { font-size: 0.85em; margin-bottom: 4px; }
+  .workflow .wf-desc { font-size: 0.7em; color: #8899a6; line-height: 1.3; }
+  .workflow .wf-status { font-size: 0.6em; position: absolute; top: 8px; right: 10px; padding: 2px 6px; border-radius: 3px; }
+
+  .wf-blue { background: rgba(29, 161, 242, 0.15); border: 1px solid rgba(29, 161, 242, 0.3); }
+  .wf-blue h3 { color: #1da1f2; }
+  .wf-green { background: rgba(23, 191, 99, 0.15); border: 1px solid rgba(23, 191, 99, 0.3); }
+  .wf-green h3 { color: #17bf63; }
+  .wf-orange { background: rgba(244, 93, 34, 0.15); border: 1px solid rgba(244, 93, 34, 0.3); }
+  .wf-orange h3 { color: #f45d22; }
+  .wf-purple { background: rgba(153, 102, 255, 0.15); border: 1px solid rgba(153, 102, 255, 0.3); }
+  .wf-purple h3 { color: #9966ff; }
+
+  .status-active { background: rgba(23, 191, 99, 0.3); color: #17bf63; }
+  .status-planned { background: rgba(255, 173, 31, 0.3); color: #ffad1f; }
+
+  /* Cog pills */
+  .cogs-section { margin-top: 15px; }
+  .cogs-label { font-size: 0.65em; font-weight: 600; color: #8899a6; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px; }
+  .cog-grid { display: flex; gap: 8px; flex-wrap: wrap; }
+  .cog { padding: 8px 12px; border-radius: 6px; font-size: 0.75em; cursor: pointer; transition: all 0.2s; border: 1px solid; }
+  .cog:hover { transform: scale(1.05); }
+  .cog.active { outline: 2px solid #fff; outline-offset: 2px; }
+  .cog-name { font-weight: 600; }
+  .cog-desc { font-size: 0.85em; color: #8899a6; margin-top: 2px; }
+
+  .cog-exists { background: rgba(23, 191, 99, 0.12); border-color: rgba(23, 191, 99, 0.3); }
+  .cog-exists .cog-name { color: #17bf63; }
+  .cog-gap { background: rgba(255, 173, 31, 0.12); border-color: rgba(255, 173, 31, 0.3); }
+  .cog-gap .cog-name { color: #ffad1f; }
+
+  /* Connection lines (flow arrows) */
+  .flow-section { display: flex; align-items: center; justify-content: center; padding: 8px 0; }
+  .flow-arrow { color: #556; font-size: 1.2em; }
+  .flow-label { font-size: 0.7em; color: #667; margin: 0 10px; }
+
+  /* Detail panel */
+  .detail-panel { background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.1); border-radius: 10px; padding: 18px; margin-top: 20px; display: none; }
+  .detail-panel.visible { display: block; }
+  .detail-panel h2 { font-size: 1em; margin-bottom: 10px; }
+  .detail-panel .detail-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; }
+  .detail-col h4 { font-size: 0.75em; color: #8899a6; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px; }
+  .detail-col ul { list-style: none; padding: 0; }
+  .detail-col li { font-size: 0.8em; padding: 4px 0; border-bottom: 1px solid rgba(255,255,255,0.05); }
+  .detail-col li .tag { display: inline-block; font-size: 0.8em; padding: 1px 5px; border-radius: 3px; margin-left: 5px; }
+  .tag-cog { background: rgba(23,191,99,0.2); color: #17bf63; }
+  .tag-gap { background: rgba(255,173,31,0.2); color: #ffad1f; }
+  .tag-local { background: rgba(29,161,242,0.2); color: #1da1f2; }
+
+  /* Lifecycle pipeline */
+  .lifecycle { margin-top: 20px; }
+  .lifecycle-label { font-size: 0.7em; font-weight: 700; letter-spacing: 1.5px; text-transform: uppercase; color: #8899a6; margin-bottom: 10px; }
+  .pipeline { display: flex; align-items: center; gap: 0; flex-wrap: wrap; justify-content: center; }
+  .pipeline-step { padding: 10px 16px; font-size: 0.75em; font-weight: 600; position: relative; }
+  .pipeline-step::after { content: '→'; position: absolute; right: -8px; top: 50%; transform: translateY(-50%); color: #556; font-size: 1.2em; }
+  .pipeline-step:last-child::after { display: none; }
+  .ps-blue { background: rgba(29,161,242,0.2); color: #1da1f2; border-radius: 6px 0 0 6px; }
+  .ps-orange { background: rgba(244,93,34,0.2); color: #f45d22; }
+  .ps-blue2 { background: rgba(29,161,242,0.15); color: #5ba0d0; }
+  .ps-green { background: rgba(23,191,99,0.2); color: #17bf63; }
+  .ps-purple { background: rgba(153,102,255,0.2); color: #9966ff; border-radius: 0 6px 6px 0; }
+  .pipeline-cog { font-size: 0.6em; display: block; color: #8899a6; font-weight: 400; margin-top: 2px; }
+
+  /* Intersection matrix */
+  .matrix { margin-top: 20px; overflow-x: auto; }
+  .matrix table { border-collapse: collapse; width: 100%; font-size: 0.7em; }
+  .matrix th { padding: 6px 8px; text-align: left; border-bottom: 1px solid rgba(255,255,255,0.1); color: #8899a6; font-weight: 600; }
+  .matrix td { padding: 5px 8px; border-bottom: 1px solid rgba(255,255,255,0.05); }
+  .matrix .op-name { white-space: nowrap; font-weight: 500; }
+  .matrix .check { color: #17bf63; text-align: center; font-weight: 700; }
+  .matrix .planned { color: #ffad1f; text-align: center; font-size: 0.9em; }
+  .matrix tr:hover { background: rgba(255,255,255,0.03); }
+  .matrix .cog-col { color: #17bf63; font-size: 0.85em; white-space: nowrap; }
+  .matrix .gap-col { color: #ffad1f; font-size: 0.85em; white-space: nowrap; }
+
+  /* Tabs */
+  .tabs { display: flex; gap: 0; margin-top: 20px; }
+  .tab { padding: 10px 20px; font-size: 0.8em; cursor: pointer; border: 1px solid rgba(255,255,255,0.1); background: rgba(255,255,255,0.03); color: #8899a6; transition: all 0.15s; }
+  .tab:first-child { border-radius: 8px 0 0 0; }
+  .tab:last-child { border-radius: 0 8px 0 0; }
+  .tab.active { background: rgba(255,255,255,0.08); color: #fff; border-bottom-color: transparent; }
+  .tab-content { border: 1px solid rgba(255,255,255,0.1); border-top: none; border-radius: 0 0 8px 8px; padding: 18px; background: rgba(255,255,255,0.02); display: none; }
+  .tab-content.active { display: block; }
+
+  .timestamp { text-align: center; font-size: 0.65em; color: #556; margin-top: 20px; }
+</style>
+</head>
+<body>
+
+<h1>Astute Analytics — Workflow Architecture</h1>
+<p class="subtitle">Workflows, shared cogs, and how they connect</p>
+
+<div class="legend">
+  <div class="legend-item"><div class="legend-dot" style="background:#1da1f2"></div> Inbound Email</div>
+  <div class="legend-item"><div class="legend-dot" style="background:#17bf63"></div> Market Intelligence</div>
+  <div class="legend-item"><div class="legend-dot" style="background:#f45d22"></div> Screening / Sourcing</div>
+  <div class="legend-item"><div class="legend-dot" style="background:#9966ff"></div> Reporting / Other</div>
+  <div class="legend-item"><div class="legend-dot" style="background:rgba(23,191,99,0.5)"></div> Cog (exists)</div>
+  <div class="legend-item"><div class="legend-dot" style="background:rgba(255,173,31,0.5)"></div> Cog (gap)</div>
+</div>
+
+<div class="architecture">
+
+<!-- LIFECYCLE PIPELINE -->
+<div class="lifecycle">
+  <div class="lifecycle-label">Full Lifecycle: RFQ → Revenue</div>
+  <div class="pipeline">
+    <div class="pipeline-step ps-blue">Customer RFQ<span class="pipeline-cog">Stock RFQ Loading</span></div>
+    <div class="pipeline-step ps-orange">Screen<span class="pipeline-cog">Franchise Screening</span></div>
+    <div class="pipeline-step ps-orange">Source<span class="pipeline-cog">RFQ Sourcing</span></div>
+    <div class="pipeline-step ps-blue2">VQ Received<span class="pipeline-cog">VQ Loading</span></div>
+    <div class="pipeline-step ps-green">Quote<span class="pipeline-cog">Suggested Resale / Quick Quote</span></div>
+    <div class="pipeline-step ps-purple">Sale<span class="pipeline-cog">Sales Order</span></div>
+  </div>
+</div>
+
+<!-- INBOUND EMAIL PIPELINES -->
+<div class="section inbound">
+  <div class="section-label">Inbound Email Pipelines — Same Pattern, Different Direction</div>
+  <div class="workflow-row">
+    <div class="workflow wf-blue" onclick="showDetail('vq')">
+      <span class="wf-status status-active">Active</span>
+      <h3>VQ Loading</h3>
+      <div class="wf-desc">Supplier quote emails → VQ Mass Upload Template</div>
+    </div>
+    <div class="workflow wf-blue" onclick="showDetail('mou')">
+      <span class="wf-status status-active">Active</span>
+      <h3>Market Offer Uploading</h3>
+      <div class="wf-desc">Excess inventory emails → Offer Import CSV</div>
+    </div>
+    <div class="workflow wf-blue" onclick="showDetail('srfq')">
+      <span class="wf-status status-active">Active</span>
+      <h3>Stock RFQ Loading</h3>
+      <div class="wf-desc">Customer RFQ emails → RFQ Import Template + Resale</div>
+    </div>
+  </div>
+  <div style="font-size:0.75em; color:#5ba0d0; padding: 6px 0 2px;">
+    Shared steps: Fetch → Read → Extract → Match Partner → Match MFR → Generate CSV → Route → Notify → Commit
+  </div>
+</div>
+
+<div class="flow-section">
+  <span class="flow-arrow">▼</span>
+  <span class="flow-label">Data flows INTO the system</span>
+  <span class="flow-arrow">▼</span>
+</div>
+
+<!-- SYSTEM -->
+<div class="section system">
+  <div class="section-label">System — iDempiere (OT) Database</div>
+  <div style="display:flex; gap:15px; flex-wrap:wrap; font-size:0.8em;">
+    <span style="padding:6px 12px; background:rgba(255,255,255,0.05); border-radius:5px;">RFQs</span>
+    <span style="color:#556;">→</span>
+    <span style="padding:6px 12px; background:rgba(255,255,255,0.05); border-radius:5px;">VQs</span>
+    <span style="color:#556;">→</span>
+    <span style="padding:6px 12px; background:rgba(255,255,255,0.05); border-radius:5px;">CQs</span>
+    <span style="color:#556;">→</span>
+    <span style="padding:6px 12px; background:rgba(255,255,255,0.05); border-radius:5px;">Sales Orders</span>
+    <span style="color:#556; margin-left:15px;">|</span>
+    <span style="padding:6px 12px; background:rgba(255,255,255,0.05); border-radius:5px;">Market Offers</span>
+    <span style="padding:6px 12px; background:rgba(255,255,255,0.05); border-radius:5px;">Inventory</span>
+    <span style="padding:6px 12px; background:rgba(255,255,255,0.05); border-radius:5px;">Partners</span>
+    <span style="padding:6px 12px; background:rgba(255,255,255,0.05); border-radius:5px;">MFRs</span>
+  </div>
+</div>
+
+<div class="flow-section">
+  <span class="flow-arrow">▼</span>
+  <span class="flow-label">Data flows OUT for analysis</span>
+  <span class="flow-arrow">▼</span>
+</div>
+
+<!-- MARKET INTELLIGENCE -->
+<div class="section intelligence">
+  <div class="section-label">Market Intelligence — Same Data, Different Lens</div>
+  <div class="workflow-row">
+    <div class="workflow wf-green" onclick="showDetail('resale')">
+      <span class="wf-status status-active">Active</span>
+      <h3>Suggested Resale</h3>
+      <div class="wf-desc">Franchise + secondary market → what to sell for</div>
+    </div>
+    <div class="workflow wf-green" onclick="showDetail('qq')">
+      <span class="wf-status status-active">Active</span>
+      <h3>Quick Quote</h3>
+      <div class="wf-desc">VQ costs + margin rules → baseline quote</div>
+    </div>
+    <div class="workflow wf-green" onclick="showDetail('vortex')">
+      <span class="wf-status status-active">Active</span>
+      <h3>Vortex Matches</h3>
+      <div class="wf-desc">RFQs × VQs × Offers → opportunities</div>
+    </div>
+    <div class="workflow wf-green" onclick="showDetail('moa')">
+      <span class="wf-status status-active">Active</span>
+      <h3>Market Offer Analysis</h3>
+      <div class="wf-desc">New RFQs × existing offers → matches</div>
+    </div>
+  </div>
+</div>
+
+<!-- SCREENING / SOURCING -->
+<div class="section sourcing">
+  <div class="section-label">Screening & Sourcing</div>
+  <div class="workflow-row">
+    <div class="workflow wf-orange" onclick="showDetail('fscreen')">
+      <span class="wf-status status-active">Active</span>
+      <h3>Franchise Screening</h3>
+      <div class="wf-desc">Check distribution stock → skip/proceed to broker</div>
+    </div>
+    <div class="workflow wf-orange" onclick="showDetail('rfqsource')">
+      <span class="wf-status status-active">Active</span>
+      <h3>RFQ Sourcing</h3>
+      <div class="wf-desc">Submit RFQs to NetComponents suppliers</div>
+    </div>
+  </div>
+</div>
+
+<!-- REPORTING / OTHER -->
+<div class="section reporting">
+  <div class="section-label">Reporting & Operations</div>
+  <div class="workflow-row">
+    <div class="workflow wf-purple">
+      <span class="wf-status status-active">Active</span>
+      <h3>Inventory Cleanup</h3>
+      <div class="wf-desc">Infor exports → Chuboe format</div>
+    </div>
+    <div class="workflow wf-purple">
+      <span class="wf-status status-active">Active</span>
+      <h3>LAM Kitting Reorder</h3>
+      <div class="wf-desc">Inventory monitoring + alerts</div>
+    </div>
+    <div class="workflow wf-purple">
+      <span class="wf-status status-active">Active</span>
+      <h3>Seller Quoting Activity</h3>
+      <div class="wf-desc">VQ→CQ→SO funnel analysis</div>
+    </div>
+    <div class="workflow wf-purple">
+      <span class="wf-status status-active">Active</span>
+      <h3>Order Tracking</h3>
+      <div class="wf-desc">COV/SO/MPN/PO lookups</div>
+    </div>
+    <div class="workflow wf-purple">
+      <span class="wf-status status-planned">Planned</span>
+      <h3>BOM Monitoring</h3>
+      <div class="wf-desc">Risk, commodity, excess matches</div>
+    </div>
+  </div>
+</div>
+
+<!-- SHARED COGS -->
+<div class="cogs-section">
+  <div class="cogs-label">Shared Cogs (shared/)</div>
+  <div class="cog-grid">
+    <div class="cog cog-exists" onclick="showCog('franchise')">
+      <div class="cog-name">franchise-api.js</div>
+      <div class="cog-desc">7 distributor APIs → stock + pricing + VQ capture</div>
+    </div>
+    <div class="cog cog-exists" onclick="showCog('market')">
+      <div class="cog-name">market-data.js</div>
+      <div class="cog-desc">VQ history, sales, offers, RFQ demand</div>
+    </div>
+    <div class="cog cog-exists" onclick="showCog('mfr')">
+      <div class="cog-name">mfr-lookup.js</div>
+      <div class="cog-desc">MFR name → canonical (aliases + DB + cache)</div>
+    </div>
+    <div class="cog cog-exists" onclick="showCog('partner')">
+      <div class="cog-name">partner-lookup.js</div>
+      <div class="cog-desc">Email/name → iDempiere BP (4-tier)</div>
+    </div>
+    <div class="cog cog-exists" onclick="showCog('csv')">
+      <div class="cog-name">csv-utils.js</div>
+      <div class="cog-desc">CSV read/write with proper quoting</div>
+    </div>
+  </div>
+  <div class="cogs-label" style="margin-top:12px;">Planned Cogs</div>
+  <div class="cog-grid">
+    <div class="cog cog-gap">
+      <div class="cog-name">email-processor.js</div>
+      <div class="cog-desc">Unified email pipeline (fetch→extract→route)</div>
+    </div>
+    <div class="cog cog-gap">
+      <div class="cog-name">two-agent-validator.js</div>
+      <div class="cog-desc">Extract + verify pattern for line items</div>
+    </div>
+    <div class="cog cog-gap">
+      <div class="cog-name">send-notification.js</div>
+      <div class="cog-desc">Email output files to recipients</div>
+    </div>
+    <div class="cog cog-gap">
+      <div class="cog-name">pricing-engine.js</div>
+      <div class="cog-desc">Market-based pricing (pluggable strategies)</div>
+    </div>
+  </div>
+</div>
+
+<!-- TABS: Matrix / Details -->
+<div class="tabs">
+  <div class="tab active" onclick="switchTab('matrix')">Operation × Workflow Matrix</div>
+  <div class="tab" onclick="switchTab('apis')">Franchise APIs (7)</div>
+  <div class="tab" onclick="switchTab('data')">Data Sources</div>
+</div>
+
+<div class="tab-content active" id="tab-matrix">
+  <div class="matrix">
+    <table>
+      <thead>
+        <tr>
+          <th>Operation</th>
+          <th>Cog</th>
+          <th style="text-align:center">VQ Load</th>
+          <th style="text-align:center">Mkt Offer</th>
+          <th style="text-align:center">Stock RFQ</th>
+          <th style="text-align:center">Resale</th>
+          <th style="text-align:center">Quick Qt</th>
+          <th style="text-align:center">Vortex</th>
+          <th style="text-align:center">Offer Anl</th>
+          <th style="text-align:center">Fr. Screen</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr><td class="op-name">Email fetch</td><td class="gap-col">email-processor*</td><td class="check">✓</td><td class="check">✓</td><td class="check">✓</td><td></td><td></td><td></td><td></td><td></td></tr>
+        <tr><td class="op-name">Extract line items</td><td class="gap-col">two-agent*</td><td class="check">✓</td><td class="check">✓</td><td class="check">✓</td><td></td><td></td><td></td><td></td><td></td></tr>
+        <tr><td class="op-name">Partner matching</td><td class="cog-col">partner-lookup</td><td class="check">✓</td><td class="check">✓</td><td class="check">✓</td><td></td><td></td><td></td><td></td><td></td></tr>
+        <tr><td class="op-name">MFR matching</td><td class="cog-col">mfr-lookup</td><td class="check">✓</td><td class="check">✓</td><td class="check">✓</td><td></td><td></td><td></td><td></td><td></td></tr>
+        <tr><td class="op-name">Franchise API check</td><td class="cog-col">franchise-api</td><td></td><td></td><td class="check">✓</td><td class="check">✓</td><td class="planned">◐</td><td></td><td></td><td class="check">✓</td></tr>
+        <tr><td class="op-name">VQ history</td><td class="cog-col">market-data</td><td></td><td></td><td></td><td class="check">✓</td><td class="check">✓</td><td class="check">✓</td><td></td><td></td></tr>
+        <tr><td class="op-name">Sales history</td><td class="cog-col">market-data</td><td></td><td></td><td></td><td class="check">✓</td><td class="check">✓</td><td></td><td></td><td></td></tr>
+        <tr><td class="op-name">Market offers</td><td class="cog-col">market-data</td><td></td><td></td><td></td><td class="check">✓</td><td></td><td class="check">✓</td><td class="check">✓</td><td></td></tr>
+        <tr><td class="op-name">RFQ demand</td><td class="cog-col">market-data</td><td></td><td></td><td></td><td class="check">✓</td><td></td><td class="check">✓</td><td class="check">✓</td><td></td></tr>
+        <tr><td class="op-name">MPN cleaning</td><td class="cog-col">market-data</td><td></td><td></td><td></td><td class="check">✓</td><td class="check">✓</td><td class="check">✓</td><td class="check">✓</td><td></td></tr>
+        <tr><td class="op-name">Price synthesis</td><td class="gap-col">pricing-engine*</td><td></td><td></td><td class="check">✓</td><td class="check">✓</td><td class="check">✓</td><td></td><td></td><td></td></tr>
+        <tr><td class="op-name">CSV generation</td><td class="cog-col">csv-utils</td><td class="check">✓</td><td class="check">✓</td><td class="check">✓</td><td class="check">✓</td><td class="check">✓</td><td class="check">✓</td><td class="check">✓</td><td class="check">✓</td></tr>
+        <tr><td class="op-name">VQ capture (API→VQ)</td><td class="cog-col">franchise-api</td><td></td><td></td><td class="check">✓</td><td class="check">✓</td><td></td><td></td><td></td><td class="check">✓</td></tr>
+        <tr><td class="op-name">Email notification</td><td class="gap-col">send-notif*</td><td class="check">✓</td><td class="check">✓</td><td class="check">✓</td><td></td><td></td><td></td><td></td><td></td></tr>
+        <tr><td class="op-name">Commit & push</td><td class="gap-col">git-utils*</td><td class="check">✓</td><td class="check">✓</td><td class="check">✓</td><td class="check">✓</td><td class="check">✓</td><td class="check">✓</td><td class="check">✓</td><td></td></tr>
+      </tbody>
+    </table>
+    <div style="font-size:0.65em; color:#8899a6; margin-top:8px;">
+      ✓ = uses operation &nbsp; ◐ = planned &nbsp; <span style="color:#17bf63;">green</span> = cog exists &nbsp; <span style="color:#ffad1f;">yellow*</span> = gap (not yet extracted)
+    </div>
+  </div>
+</div>
+
+<div class="tab-content" id="tab-apis">
+  <div style="display:grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap:10px;">
+    <div style="background:rgba(23,191,99,0.1); border:1px solid rgba(23,191,99,0.2); border-radius:8px; padding:12px;">
+      <div style="font-weight:600; color:#17bf63; font-size:0.85em;">DigiKey</div>
+      <div style="font-size:0.7em; color:#8899a6;">OAuth2 REST</div>
+      <div style="font-size:0.7em; color:#8899a6;">BP: 1002331</div>
+      <div style="font-size:0.65em; color:#556; margin-top:4px;">Broadest catalog</div>
+    </div>
+    <div style="background:rgba(23,191,99,0.1); border:1px solid rgba(23,191,99,0.2); border-radius:8px; padding:12px;">
+      <div style="font-weight:600; color:#17bf63; font-size:0.85em;">Arrow</div>
+      <div style="font-size:0.7em; color:#8899a6;">REST (query params)</div>
+      <div style="font-size:0.7em; color:#8899a6;">BP: 1002390</div>
+      <div style="font-size:0.65em; color:#556; margin-top:4px;">Filters out Verical</div>
+    </div>
+    <div style="background:rgba(23,191,99,0.1); border:1px solid rgba(23,191,99,0.2); border-radius:8px; padding:12px;">
+      <div style="font-weight:600; color:#17bf63; font-size:0.85em;">Rutronik</div>
+      <div style="font-size:0.7em; color:#8899a6;">REST (API key)</div>
+      <div style="font-size:0.7em; color:#8899a6;">BP: 1004668</div>
+      <div style="font-size:0.65em; color:#556; margin-top:4px;">European focus</div>
+    </div>
+    <div style="background:rgba(23,191,99,0.1); border:1px solid rgba(23,191,99,0.2); border-radius:8px; padding:12px;">
+      <div style="font-weight:600; color:#17bf63; font-size:0.85em;">Future Electronics</div>
+      <div style="font-size:0.7em; color:#8899a6;">Orbweaver API</div>
+      <div style="font-size:0.7em; color:#8899a6;">BP: 1002332</div>
+      <div style="font-size:0.65em; color:#556; margin-top:4px;">Batch capable</div>
+    </div>
+    <div style="background:rgba(23,191,99,0.1); border:1px solid rgba(23,191,99,0.2); border-radius:8px; padding:12px;">
+      <div style="font-weight:600; color:#17bf63; font-size:0.85em;">Newark / Farnell</div>
+      <div style="font-size:0.7em; color:#8899a6;">element14 API</div>
+      <div style="font-size:0.7em; color:#8899a6;">BP: 1002394</div>
+      <div style="font-size:0.65em; color:#556; margin-top:4px;">US + UK stores</div>
+    </div>
+    <div style="background:rgba(23,191,99,0.1); border:1px solid rgba(23,191,99,0.2); border-radius:8px; padding:12px;">
+      <div style="font-weight:600; color:#17bf63; font-size:0.85em;">TTI</div>
+      <div style="font-size:0.7em; color:#8899a6;">Azure APIM</div>
+      <div style="font-size:0.7em; color:#8899a6;">BP: 1002330</div>
+      <div style="font-size:0.65em; color:#556; margin-top:4px;">Passives + connectors</div>
+    </div>
+    <div style="background:rgba(23,191,99,0.1); border:1px solid rgba(23,191,99,0.2); border-radius:8px; padding:12px;">
+      <div style="font-weight:600; color:#17bf63; font-size:0.85em;">Master Electronics</div>
+      <div style="font-size:0.7em; color:#8899a6;">REST v2 (path)</div>
+      <div style="font-size:0.7em; color:#8899a6;">BP: 1002409</div>
+      <div style="font-size:0.65em; color:#556; margin-top:4px;">Added 2026-03-17</div>
+    </div>
+  </div>
+  <div style="margin-top:12px; font-size:0.75em; color:#8899a6;">
+    All called via <code style="color:#17bf63;">shared/franchise-api.js</code> → <code>searchAllDistributors(mpn, qty)</code>
+    <br>API data = confirmed pricing → captured as VQ lines for ERP import
+  </div>
+</div>
+
+<div class="tab-content" id="tab-data">
+  <div style="display:grid; grid-template-columns: 1fr 1fr; gap:15px;">
+    <div>
+      <h4 style="font-size:0.8em; color:#17bf63; margin-bottom:8px;">Confirmed (API) → Log as VQ</h4>
+      <ul style="list-style:none; font-size:0.8em;">
+        <li style="padding:4px 0; border-bottom:1px solid rgba(255,255,255,0.05);">DigiKey API pricing</li>
+        <li style="padding:4px 0; border-bottom:1px solid rgba(255,255,255,0.05);">Arrow API pricing</li>
+        <li style="padding:4px 0; border-bottom:1px solid rgba(255,255,255,0.05);">Rutronik API pricing</li>
+        <li style="padding:4px 0; border-bottom:1px solid rgba(255,255,255,0.05);">Future Electronics API pricing</li>
+        <li style="padding:4px 0; border-bottom:1px solid rgba(255,255,255,0.05);">Newark/Farnell API pricing</li>
+        <li style="padding:4px 0; border-bottom:1px solid rgba(255,255,255,0.05);">TTI API pricing</li>
+        <li style="padding:4px 0;">Master Electronics API pricing</li>
+      </ul>
+    </div>
+    <div>
+      <h4 style="font-size:0.8em; color:#ffad1f; margin-bottom:8px;">Reference Only (scraped / unconfirmed)</h4>
+      <ul style="list-style:none; font-size:0.8em;">
+        <li style="padding:4px 0; border-bottom:1px solid rgba(255,255,255,0.05);">FindChips (availability signal, NOT pricing)</li>
+        <li style="padding:4px 0; border-bottom:1px solid rgba(255,255,255,0.05);">Customer targets (loose guidance)</li>
+        <li style="padding:4px 0;">Customer sale prices (relationship factors)</li>
+      </ul>
+    </div>
+    <div>
+      <h4 style="font-size:0.8em; color:#1da1f2; margin-bottom:8px;">System Data (DB queries)</h4>
+      <ul style="list-style:none; font-size:0.8em;">
+        <li style="padding:4px 0; border-bottom:1px solid rgba(255,255,255,0.05);">VQ history — secondary market costs</li>
+        <li style="padding:4px 0; border-bottom:1px solid rgba(255,255,255,0.05);">Broker sales — strongest pricing signal</li>
+        <li style="padding:4px 0; border-bottom:1px solid rgba(255,255,255,0.05);">Market offers — supply signals</li>
+        <li style="padding:4px 0;">RFQ demand — demand signals</li>
+      </ul>
+    </div>
+    <div>
+      <h4 style="font-size:0.8em; color:#f45d22; margin-bottom:8px;">Pricing Rule (when franchise has stock)</h4>
+      <div style="font-size:0.8em; line-height:1.6;">
+        Our price ≈ <strong>20-30%</strong> of franchise best price<br>
+        <span style="color:#8899a6;">Why: older DC, untraceable stock. Buyer (broker) needs margin room to resell vs franchise.</span><br>
+        <span style="color:#8899a6;">&lt;$1 → 20% &nbsp;|&nbsp; $1-10 → 25% &nbsp;|&nbsp; $10+ → 30%</span><br>
+        <span style="color:#8899a6;">Broker sales can override if market clears differently.</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+</div>
+
+<div class="timestamp">Generated 2026-03-19 — Astute Analytics Architecture v1</div>
+
+<script>
+function switchTab(name) {
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+  event.target.classList.add('active');
+  document.getElementById('tab-' + name).classList.add('active');
+}
+
+function showDetail(id) {
+  // Toggle active state on workflow cards
+  document.querySelectorAll('.workflow').forEach(w => w.classList.remove('active'));
+  event.currentTarget.classList.add('active');
+}
+
+function showCog(id) {
+  document.querySelectorAll('.cog').forEach(c => c.classList.remove('active'));
+  event.currentTarget.classList.add('active');
+}
+</script>
+</body>
+</html>
