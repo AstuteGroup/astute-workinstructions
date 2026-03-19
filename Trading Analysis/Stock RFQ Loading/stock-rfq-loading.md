@@ -195,7 +195,7 @@ Currently outputs CSV for manual import. Future state: write RFQ lines directly 
 ## TODO
 - [x] Get RFQ Import Template ✓ `RFQ Import Template.csv`
 - [x] Configure `stockRFQ@orangetsunami.com` in Himalaya ✓
-- [ ] Create email folders (Processed, Junk, NotRFQ, NeedsReview) in stockRFQ mailbox
+- [x] Create email folders (Processed, NotRFQ, NeedsReview) in stockRFQ mailbox ✓ 2026-03-19
 - [ ] Build email notification script (like market offer `send-offer-email.js`)
 - [ ] Define cadence with user
 - [ ] Add common junk sender domain list for auto-skip
