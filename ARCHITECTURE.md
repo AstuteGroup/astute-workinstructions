@@ -1,157 +1,226 @@
-# Architecture: Workflows & Shared Cogs
+# Architecture: Workflows, Cogs & Intersections
 
 How workflows connect to shared modules ("cogs") and each other. **Read this before building anything new.**
 
 ---
 
-## Shared Cogs (`shared/`)
-
-Reusable modules used by 2+ workflows. Full API docs in `shared/README.md`.
-
-| Cog | Purpose | Key Function |
-|-----|---------|-------------|
-| **franchise-api.js** | Call all 7 franchise distributor APIs (DigiKey, Arrow, Rutronik, Future, Newark, TTI, Master). Returns standardized stock + pricing. API data = confirmed → captures VQ lines. | `searchAllDistributors(mpn, qty)` |
-| **market-data.js** | Query DB for VQ history, sales history (broker vs customer), market offers, RFQ demand. All pricing intelligence from the system. | `getAllMarketData(mpn)` |
-| **mfr-lookup.js** | Resolve manufacturer names → canonical `chuboe_mfr.name`. Aliases file (165+) → DB lookup → cache. | `normalizeMfr(name)` |
-| **partner-lookup.js** | Resolve email/company → iDempiere business partner. 4-tier matching. | `resolvePartner({ email, companyName })` |
-| **csv-utils.js** | CSV parsing with proper quoting. Never use `line.split(',')`. | `readCSVFile(path)` / `writeCSVFile(path, headers, rows)` |
-
-### Data Flow
+## The Big Picture
 
 ```
-External Sources                    Shared Cogs                      System (iDempiere)
-─────────────────                   ───────────                      ──────────────────
-Emails (Himalaya)  ───────┐
-                          ├──→  partner-lookup.js  ──→  BP match (search_key)
-Customer/vendor info  ────┘
-
-MFR names from emails ────────→  mfr-lookup.js     ──→  Canonical MFR name
-
-DigiKey, Arrow, etc.  ────────→  franchise-api.js   ──→  Stock + pricing + VQ lines
-(7 distributor APIs)              │
-                                  └──→  [VQ capture files for import]
-
-DB (read-only)  ──────────────→  market-data.js     ──→  VQ history, sales, offers, demand
-
-CSV files  ───────────────────→  csv-utils.js       ──→  Parsed/written data
+┌─────────────────────────────────────────────────────────────────────┐
+│                        INBOUND EMAIL PIPELINES                       │
+│                   (same pattern, different direction)                 │
+│                                                                      │
+│   ┌──────────────┐   ┌──────────────────┐   ┌──────────────────┐   │
+│   │  VQ Loading   │   │ Market Offer     │   │ Stock RFQ        │   │
+│   │  (supplier    │   │ Uploading        │   │ Loading          │   │
+│   │   quotes)     │   │ (excess inv)     │   │ (customer RFQs)  │   │
+│   └──────┬───────┘   └───────┬──────────┘   └───────┬──────────┘   │
+│          │                   │                       │              │
+│          └───────────────────┼───────────────────────┘              │
+│                              │                                      │
+│                    SHARED OPERATIONS:                                │
+│                    • Email fetch (Himalaya)                          │
+│                    • Read & categorize                               │
+│                    • Extract line items                              │
+│                    • Partner matching ──→ partner-lookup.js          │
+│                    • MFR matching ─────→ mfr-lookup.js              │
+│                    • CSV generation ───→ csv-utils.js               │
+│                    • Email routing (move to folders)                 │
+│                    • Notification (send to Jake)                     │
+│                    • Commit & push                                   │
+│                                                                      │
+│          ONLY DIFFERENCE: template format + data direction           │
+│          (VQ template vs Offer template vs RFQ template)             │
+└─────────────────────────────────────────────────────────────────────┘
+                              │
+                  Data flows INTO the system
+                              │
+                              ▼
+┌─────────────────────────────────────────────────────────────────────┐
+│                        SYSTEM (iDempiere DB)                         │
+│                                                                      │
+│   RFQs ──── VQs ──── CQs ──── SOs ──── Market Offers ──── Stock    │
+│                                                                      │
+└─────────────────────────────────────────────────────────────────────┘
+                              │
+                  Data flows OUT for analysis
+                              │
+                              ▼
+┌─────────────────────────────────────────────────────────────────────┐
+│                      MARKET INTELLIGENCE                             │
+│              (same data sources, different lens)                      │
+│                                                                      │
+│   ┌──────────────┐  ┌──────────┐  ┌──────────┐  ┌──────────────┐  │
+│   │  Suggested   │  │  Quick   │  │  Vortex  │  │ Market Offer │  │
+│   │  Resale      │  │  Quote   │  │  Matches │  │ Analysis     │  │
+│   └──────┬───────┘  └────┬─────┘  └────┬─────┘  └──────┬───────┘  │
+│          │               │              │               │          │
+│          └───────────────┼──────────────┼───────────────┘          │
+│                          │              │                          │
+│                 SHARED OPERATIONS:                                  │
+│                 • VQ history ──────────→ market-data.js             │
+│                 • Sales history ───────→ market-data.js             │
+│                 • Market offers ───────→ market-data.js             │
+│                 • RFQ demand ──────────→ market-data.js             │
+│                 • Franchise pricing ───→ franchise-api.js           │
+│                 • MPN matching ────────→ market-data.js             │
+│                                                                      │
+│          ONLY DIFFERENCE: pricing logic + output format              │
+│          (resale vs quote vs match ranking)                          │
+└─────────────────────────────────────────────────────────────────────┘
+                              │
+                              ▼
+┌─────────────────────────────────────────────────────────────────────┐
+│                     SCREENING / SOURCING                             │
+│                                                                      │
+│   ┌──────────────────┐          ┌──────────────────┐               │
+│   │ Franchise        │ ────────→│ RFQ Sourcing     │               │
+│   │ Screening        │ skip/    │ (NetComponents)  │               │
+│   │                  │ proceed  │                  │               │
+│   └──────┬───────────┘          └──────────────────┘               │
+│          │                                                          │
+│          └──→ franchise-api.js (7 distributor APIs)                 │
+│                                                                      │
+│   Screening feeds INTO sourcing (skip low-value parts)              │
+│   Sourcing generates VQs that feed BACK into VQ Loading             │
+└─────────────────────────────────────────────────────────────────────┘
 ```
 
 ---
 
-## Workflows & Which Cogs They Use
+## Operation × Workflow Matrix
 
-### 1. Stock RFQ Loading
-**Path:** `Trading Analysis/Stock RFQ Loading/`
-**Purpose:** Customer RFQ emails → RFQ Import Template + Suggested Resale
+Each row is an operation. Each column is a workflow. ✓ = uses it. **Bold** = cog exists.
 
-| Step | Cog Used | Output |
-|------|----------|--------|
-| Extract email | Himalaya CLI (`--account stockrfq`) | Email body + attachments |
-| Match customer | **partner-lookup.js** | BP search_key or 1008499 (Unqualified) |
-| Match MFR | **mfr-lookup.js** | Canonical MFR name |
-| Generate RFQ CSV | **csv-utils.js** | `RFQ_UPLOAD_YYYYMMDD.csv` |
-| Market check | **franchise-api.js** | Franchise stock + pricing across 7 distributors |
-| System check | **market-data.js** | VQ, sales, offers, demand data |
-| Suggested resale | `suggested-resale.js` (local) | Market-based pricing |
-| VQ capture | **franchise-api.js** `writeVQCapture()` | `*_Franchise_VQ.csv` |
-
-### 2. VQ Loading
-**Path:** `rfq_sourcing/vq_loading/`  |  **Code:** `~/workspace/vq-parser/`
-**Purpose:** Supplier quote emails → VQ Mass Upload Template
-
-| Step | Cog Used |
-|------|----------|
-| Fetch emails | Himalaya CLI (`--account excess`) |
-| Match vendor | **partner-lookup.js** |
-| Match MFR | **mfr-lookup.js** (via vq-parser's mfr-lookup.js — to be migrated) |
-| Parse quotes | vq-parser extraction + verification |
-| Generate VQ CSV | Template-specific output |
-
-### 3. Market Offer Uploading
-**Path:** `Trading Analysis/Market Offer Uploading/`
-**Purpose:** Excess inventory emails → Market Offer Import CSV
-
-| Step | Cog Used |
-|------|----------|
-| Extract email | Himalaya CLI |
-| Match partner | **partner-lookup.js** |
-| Match MFR | **mfr-lookup.js** (alias file lives here: `mfr-aliases.json`) |
-| Generate offer CSV | **csv-utils.js** |
-
-### 4. Market Offer Analysis (RFQ → Offers)
-**Path:** `Trading Analysis/Market Offer Matching for RFQs/`
-**Purpose:** Match new RFQs against existing offers
-
-| Step | Cog Used |
-|------|----------|
-| Get new RFQs | **market-data.js** `getRFQDemand()` |
-| Match against offers | **market-data.js** `getMarketOffers()` |
-| Calculate opportunity | Local logic |
-
-### 5. Quick Quote
-**Path:** `Trading Analysis/Quick Quote/`
-**Purpose:** Baseline quotes from recent VQs with margin/GP logic
-
-| Step | Cog Used |
-|------|----------|
-| Get VQ costs | **market-data.js** `getVQHistory()` |
-| Get sales history | **market-data.js** `getSalesHistory()` |
-| Franchise ceiling | **franchise-api.js** (planned) |
-| Pricing logic | Local (min margin, min GP, fat margin fallback) |
-
-### 6. Franchise Screening
-**Path:** `rfq_sourcing/franchise_check/`
-**Purpose:** Pre-screen RFQs against franchise distribution before broker sourcing
-
-| Step | Cog Used |
-|------|----------|
-| Check franchise stock | **franchise-api.js** |
-| Screening decision | Local (stock vs demand, opportunity value) |
-| FindChips fallback | `main.js` (scraped data — availability only, not VQ) |
-
-### 7. Vortex Matches
-**Path:** `Trading Analysis/Vortex Matches/`
-**Purpose:** Surface VQs/offers under customer targets
-
-| Step | Cog Used |
-|------|----------|
-| RFQ demand | **market-data.js** `getRFQDemand()` |
-| VQ matches | **market-data.js** `getVQHistory()` |
-| Offer matches | **market-data.js** `getMarketOffers()` |
-
-### 8. RFQ Sourcing (NetComponents)
-**Path:** `rfq_sourcing/netcomponents/`
-**Purpose:** Submit RFQs to NetComponents suppliers
-
-| Step | Cog Used |
-|------|----------|
-| Franchise pre-screen | **franchise-api.js** (via Franchise Screening) |
-| Source submission | `main.py` (Python — separate toolchain) |
-
-### 9. Inventory File Cleanup
-**Path:** `Trading Analysis/Inventory File Cleanup/`
-**Purpose:** Infor exports → Chuboe format for iDempiere
-
-| Step | Cog Used |
-|------|----------|
-| Parse inventory CSV | **csv-utils.js** |
-| Clean/dedupe/split | `inventory_cleanup.py` (Python) |
-
-### 10–13. Other Workflows
-- **Seller Quoting Activity** — DB queries (could use market-data.js)
-- **Order/Shipment Tracking** — DB queries (standalone)
-- **BOM Monitoring** — Planned (will use market-data.js + franchise-api.js)
-- **LAM Kitting Reorder** — DB queries + email (standalone)
+| Operation | VQ Loading | Mkt Offer Upload | Stock RFQ | Suggested Resale | Quick Quote | Vortex | Mkt Offer Analysis | Franchise Screen | Inventory Cleanup |
+|-----------|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|
+| **Email fetch** (Himalaya) | ✓ | ✓ | ✓ | | | | | | |
+| Email read & categorize | ✓ | ✓ | ✓ | | | | | | |
+| Extract line items | ✓ | ✓ | ✓ | | | | | | |
+| Two-agent validation | ✓ | | ✓ | | | | | | |
+| **Partner matching** | ✓ | ✓ | ✓ | | | | | | |
+| **MFR matching** | ✓ | ✓ | ✓ | | | | | | |
+| **MPN cleaning/matching** | | | | ✓ | ✓ | ✓ | ✓ | | |
+| **Franchise API check** | | | ✓ | ✓ | (planned) | | | ✓ | |
+| **VQ history query** | | | | ✓ | ✓ | ✓ | | | |
+| **Sales history query** | | | | ✓ | ✓ | | | | |
+| **Market offer query** | | | | ✓ | | ✓ | ✓ | | |
+| **RFQ demand query** | | | | ✓ | | ✓ | ✓ | | |
+| Price synthesis | | | | ✓ | ✓ | | | | |
+| Match + rank | | | | | | ✓ | ✓ | | |
+| Screening decision | | | | | | | | ✓ | |
+| **CSV generation** | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
+| **VQ capture** (API → VQ file) | | | ✓ | ✓ | | | | ✓ | |
+| Email move/route | ✓ | ✓ | ✓ | | | | | | |
+| Email notification | ✓ | ✓ | ✓ | | | | | | |
+| **Commit & push** | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | | ✓ |
 
 ---
 
-## Adding New Workflows
+## Current Cogs vs. Gaps
 
-1. **Check `shared/README.md`** for existing cogs
-2. **If a cog doesn't exist** but the capability is needed by 2+ workflows → build it in `shared/`
-3. **If extending a cog** → update `shared/README.md` and this doc
-4. **Workflow-specific logic** stays in the workflow directory
-5. **The cog never knows about the workflow** — it provides data, the workflow decides what to do with it
+### Exists (5 cogs)
+
+| Cog | File | Consumers |
+|-----|------|-----------|
+| **franchise-api** | `shared/franchise-api.js` | Stock RFQ, Suggested Resale, Franchise Screen, (Quick Quote planned) |
+| **market-data** | `shared/market-data.js` | Suggested Resale, (Quick Quote, Vortex, Mkt Offer Analysis planned) |
+| **mfr-lookup** | `shared/mfr-lookup.js` | VQ Loading, Mkt Offer Upload, Stock RFQ |
+| **partner-lookup** | `shared/partner-lookup.js` | VQ Loading, Mkt Offer Upload, Stock RFQ |
+| **csv-utils** | `shared/csv-utils.js` | All workflows |
+
+### Gaps (operations repeated across workflows but NOT shared yet)
+
+| Gap | Where It's Duplicated | Potential Cog |
+|-----|-----------------------|---------------|
+| **Email ingestion** | VQ Loading (vq-parser), Market Offer (extract-market-offers.js), Stock RFQ (manual) all do: Himalaya fetch → read → categorize → extract → route | `shared/email-processor.js` — generic email pipeline: fetch, read, categorize, extract structured data, route |
+| **Email notification** | Market Offer has `send-offer-email.js`, Stock RFQ needs one, VQ Loading needs one | `shared/send-notification.js` — send file to recipient with standard subject/body |
+| **Line item extraction** | Each workflow extracts MPN + Qty + Price + MFR from different email formats. Core parsing logic is similar. | Could share extraction patterns/helpers, but email formats vary enough that full sharing is hard |
+| **Commit & push** | Every workflow does `git add → commit → push` at the end | `shared/git-utils.js` — `commitAndPush(files, message)` |
+| **VQ capture from APIs** | franchise-api.js produces VQ lines, but the actual VQ Mass Upload Template formatting isn't shared | `shared/vq-template.js` — format any VQ data (API, extraction) into VQ Mass Upload Template |
+| **Price synthesis** | Suggested Resale and Quick Quote both determine a resale price from market data. Different rules but same inputs. | `shared/pricing-engine.js` — pluggable pricing strategies using market-data.js output |
+
+---
+
+## Workflow Interaction Map
+
+Workflows don't just use cogs — they feed into each other:
+
+```
+                    ┌─────────────────────┐
+                    │   Customer emails    │
+                    │   (stockRFQ inbox)   │
+                    └──────────┬──────────┘
+                               │
+                    ┌──────────▼──────────┐
+                    │  Stock RFQ Loading   │──→ RFQ lines in system
+                    └──────────┬──────────┘
+                               │ triggers
+              ┌────────────────┼────────────────┐
+              │                │                │
+   ┌──────────▼──────┐  ┌─────▼──────┐  ┌──────▼──────────┐
+   │ Franchise Screen │  │ Suggested  │  │ Market Offer    │
+   │ (is it worth     │  │ Resale     │  │ Analysis        │
+   │  sourcing?)      │  │ (what to   │  │ (do we have     │
+   │                  │  │  quote?)   │  │  matching stock?)│
+   └────────┬─────────┘  └────────────┘  └─────────────────┘
+            │ proceed
+   ┌────────▼─────────┐
+   │ RFQ Sourcing     │──→ RFQs sent to suppliers
+   │ (NetComponents)  │
+   └────────┬─────────┘
+            │ suppliers respond
+   ┌────────▼─────────┐
+   │ VQ Loading       │──→ VQ lines in system
+   └────────┬─────────┘
+            │ VQs enable
+   ┌────────▼─────────┐
+   │ Quick Quote      │──→ CQ proposal
+   └────────┬─────────┘
+            │ quote wins
+   ┌────────▼─────────┐
+   │ Sales Order      │──→ Revenue
+   └──────────────────┘
+```
+
+**Meanwhile, in parallel:**
+
+```
+   ┌──────────────────┐
+   │ Supplier emails   │──→ Market Offer Uploading ──→ Offers in system
+   │ (excess inbox)    │                                    │
+   └──────────────────┘                                     │
+                                                            ▼
+   ┌──────────────────┐                              ┌─────────────┐
+   │ Inventory exports │──→ Inventory Cleanup ──→     │ Vortex      │
+   │ (Infor)          │                               │ Matches     │
+   └──────────────────┘                               │ (match all  │
+                                                      │  supply to  │
+   ┌──────────────────┐                               │  demand)    │
+   │ BOM data         │──→ BOM Monitoring ──→         │             │
+   └──────────────────┘                               └─────────────┘
+```
+
+---
+
+## Architectural Principles
+
+1. **Cogs are stateless and workflow-agnostic.** A cog provides data or performs an operation. It never knows which workflow called it.
+
+2. **Workflows own the business logic.** The pricing rules, skip/proceed decisions, template formats — these are workflow-specific. Cogs provide the data; workflows decide what to do with it.
+
+3. **If 2+ workflows do the same thing, extract a cog.** Don't wait for 3. The second duplication is the signal.
+
+4. **API data = confirmed → capture as VQ.** Scraped data = reference only. This distinction lives in `franchise-api.js`, not in the workflow.
+
+5. **The system is the source of truth.** DB data (VQs, sales, offers, RFQs) trumps memory, context, or assumptions. Always query, never guess.
+
+---
+
+## Shared Cogs — Full API Reference
+
+See `shared/README.md` for usage examples and detailed documentation.
 
 ---
 
@@ -167,7 +236,7 @@ CSV files  ───────────────────→  csv-uti
 | Newark/Farnell API | API key | franchise-api.js |
 | TTI API | API key | franchise-api.js |
 | Master Electronics API | API key | franchise-api.js |
-| Himalaya (IMAP) | Email accounts | Stock RFQ, VQ Loading, Market Offers |
+| Himalaya (IMAP) | Email accounts (stockrfq, excess) | Inbound email workflows |
 | FindChips (scraped) | Browser automation | Franchise Screening (availability only) |
 | GitHub | Push access | All output files |
 
