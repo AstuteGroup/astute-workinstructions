@@ -215,9 +215,10 @@ async function extractWithCLI(emailBody, subject) {
 
   try {
     log.info('  Extracting via Claude CLI...');
+    const promptContent = fs.readFileSync(tmpFile, 'utf-8');
     const result = execSync(
-      `claude -p "$(cat '${tmpFile}')" --output-format json 2>/dev/null`,
-      { encoding: 'utf-8', timeout: 120000, maxBuffer: 5 * 1024 * 1024 }
+      `claude -p --output-format json`,
+      { input: promptContent, encoding: 'utf-8', timeout: 120000, maxBuffer: 5 * 1024 * 1024, stdio: ['pipe', 'pipe', 'ignore'] }
     );
 
     // Parse Claude CLI JSON output
