@@ -52,9 +52,8 @@ const RFQ_COLUMNS = [
 const log = sharedLogger.createLogger('StockRFQ');
 const fetcher = createFetcher(ACCOUNT);
 const tracker = createTracker(DATA_DIR);
-// Send via vq@ (confirmed SMTP auth working) — stockRFQ@ doesn't have SMTP configured
 const notifier = createNotifier({
-  fromEmail: 'vq@orangetsunami.com',
+  fromEmail: 'stockRFQ@orangetsunami.com',
   fromName: 'Stock RFQ Loader',
   smtpPass: SMTP_PASS
 });
