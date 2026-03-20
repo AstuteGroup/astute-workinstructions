@@ -15,10 +15,15 @@
 const fs = require('fs');
 const path = require('path');
 const XLSX = require('xlsx');
-const { execSync } = require('child_process');
+const { execSync, spawn } = require('child_process');
 
 // Use shared CSV utility
 const { readCSVFile } = require('../../shared/csv-utils');
+
+// Email configuration - same account as Inventory File Cleanup (triggered together)
+const HIMALAYA_BIN = process.env.HIMALAYA_BIN || path.join(process.env.HOME, 'bin', 'himalaya');
+const EMAIL_ACCOUNT = 'excess';
+const NOTIFY_EMAIL = process.env.NOTIFY_EMAIL || 'jake.harris@astutegroup.com';
 
 // -----------------------------------------------------------------------------
 // Configuration
@@ -148,6 +153,32 @@ async function main() {
   console.log('=== Match Statistics ===');
   console.log(`  In inventory but not in Excel: ${inInventoryNotExcel.length} MPNs`);
   console.log(`  In Excel but not in inventory: ${inExcelNotInventory.length} MPNs`);
+
+  // Step 7: Email results
+  console.log('');
+  console.log('Step 7: Emailing results...');
+  const critCount = reorderAlerts.filter(r => r.Priority === 'CRITICAL').length;
+  const highCount = reorderAlerts.filter(r => r.Priority === 'HIGH').length;
+  const medCount = reorderAlerts.filter(r => r.Priority === 'MEDIUM').length;
+  const lowCount = reorderAlerts.filter(r => r.Priority === 'LOW').length;
+
+  const emailBody = `LAM Kitting Reorder Alerts generated ${getDateStamp()}.
+
+${reorderAlerts.length} items below threshold:
+- CRITICAL (zero stock): ${critCount}
+- HIGH: ${highCount}
+- MEDIUM: ${medCount}
+- LOW: ${lowCount}
+
+Inventory source: ${path.basename(inventoryFolder)}`;
+
+  const sent = await sendEmail(
+    NOTIFY_EMAIL,
+    `LAM Kitting Reorder Alerts - ${getDateStamp()}`,
+    emailBody,
+    [outputFile]
+  );
+  console.log(sent ? '  Email sent.' : '  Email failed (check Himalaya config).');
 }
 
 // -----------------------------------------------------------------------------
@@ -481,6 +512,59 @@ function writeReorderAlerts(alerts, outputPath) {
   }
 
   fs.writeFileSync(outputPath, lines.join('\n'));
+}
+
+// -----------------------------------------------------------------------------
+// Email
+// -----------------------------------------------------------------------------
+
+async function sendEmail(to, subject, body, attachments = []) {
+  let mml = `From: ${EMAIL_ACCOUNT}@orangetsunami.com
+To: ${to}
+Subject: ${subject}
+
+<#part type=text/plain>
+${body}
+<#/part>`;
+
+  for (const attachment of attachments) {
+    if (fs.existsSync(attachment)) {
+      mml += `
+<#part filename="${attachment}" disposition=attachment>
+<#/part>`;
+    }
+  }
+
+  return new Promise((resolve) => {
+    const proc = spawn(HIMALAYA_BIN, [
+      'template', 'send',
+      '--account', EMAIL_ACCOUNT
+    ], {
+      env: process.env,
+      stdio: ['pipe', 'pipe', 'pipe']
+    });
+
+    let stderr = '';
+    proc.stderr.on('data', (data) => { stderr += data.toString(); });
+
+    proc.on('close', (code) => {
+      if (code === 0) {
+        console.log(`  Email sent to ${to}`);
+        resolve(true);
+      } else {
+        console.error(`  Failed to send email: ${stderr}`);
+        resolve(false);
+      }
+    });
+
+    proc.on('error', (err) => {
+      console.error(`  Failed to send email: ${err.message}`);
+      resolve(false);
+    });
+
+    proc.stdin.write(mml);
+    proc.stdin.end();
+  });
 }
 
 // -----------------------------------------------------------------------------
