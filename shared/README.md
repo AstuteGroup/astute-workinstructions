@@ -15,6 +15,11 @@
 | `mfr-lookup.js` | Resolve manufacturer names → canonical `chuboe_mfr.name`. Aliases (165+) → DB → cache. | Normalizing MFR names from any source | VQ Loading, Market Offer Uploading, Stock RFQ Loading |
 | `partner-lookup.js` | Resolve email/name → iDempiere business partner | Matching sender to BP in any inbound email workflow | VQ Loading, Market Offer Uploading, Stock RFQ Loading |
 | `csv-utils.js` | CSV parsing with proper quoting | Any CSV read/write (**NEVER** use `line.split(',')`) | All workflows |
+| `logger.js` | Timestamped logging with optional prefix | Any module needing structured logs | All workflows, all shared cogs |
+| `himalaya-cli.js` | Low-level himalaya binary wrapper (JSON output) | Any email operation | email-fetcher.js |
+| `email-fetcher.js` | Email operations: list, read, move, folders. Factory: `createFetcher(account)` | Fetching/routing emails from any inbox | VQ Loading, Stock RFQ Loading |
+| `email-tracker.js` | Processed email dedup, stats, retry queue. Factory: `createTracker(dataDir)` | Tracking processed emails in any workflow | VQ Loading, Stock RFQ Loading |
+| `notifier.js` | Email notifications via AWS WorkMail SMTP. Factory: `createNotifier({fromEmail, fromName})` | Sending notifications/attachments from any workflow | VQ Loading, Stock RFQ Loading |
 
 ---
 
@@ -173,3 +178,98 @@ writeCSVFile('/path/to/output.csv', headers, rows);
 | `parseCSV(content, options)` | Parse CSV string → `{headers, rows}` |
 | `readCSVFile(path, options)` | Read file → object with helper methods |
 | `writeCSVFile(path, headers, rows)` | Write CSV with proper quoting |
+
+---
+
+## logger.js
+
+Timestamped console logging with optional prefix. Supports `VERBOSE`/`DEBUG` env vars for debug output.
+
+```javascript
+const logger = require('../shared/logger');                     // default (no prefix)
+const log = require('../shared/logger').createLogger('StockRFQ'); // prefixed: [StockRFQ]
+
+log.info('Processing email 133');   // [2026-03-20T13:21:07Z] [StockRFQ] INFO: Processing email 133
+log.debug('Details...');            // Only shown when VERBOSE=1 or DEBUG=1
+```
+
+**Extracted from:** `vq-parser/src/utils/logger.js`
+
+---
+
+## himalaya-cli.js
+
+Low-level wrapper around the himalaya binary. Runs commands with `--output json` and parses results. Used internally by `email-fetcher.js`.
+
+```javascript
+const { runHimalaya } = require('../shared/himalaya-cli');
+const result = await runHimalaya(['envelope', 'list', '--account', 'vq', '--folder', 'INBOX']);
+```
+
+**Extracted from:** `vq-parser/src/utils/himalaya-cli.js`
+
+---
+
+## email-fetcher.js
+
+Factory that creates an email fetcher bound to a himalaya account. All email operations (list, read, move, folders) go through this.
+
+```javascript
+const { createFetcher } = require('../shared/email-fetcher');
+const fetcher = createFetcher('stockrfq');
+
+const envelopes = await fetcher.listEnvelopes('INBOX', 500);
+const body = await fetcher.readMessage(envelopes[0].id);
+await fetcher.moveMessage(envelopes[0].id, 'Processed');
+await fetcher.createFolder('NeedsReview');
+```
+
+**API:** `listEnvelopes`, `readMessage`, `getRawMessage`, `moveMessage`, `verifyMessageGone`, `listFolders`, `createFolder`, `getMessageHeaders`, `markUnread`, `downloadAttachments`
+
+**Extracted from:** `vq-parser/src/email/fetcher.js` — changed from env var `HIMALAYA_ACCOUNT` to factory parameter.
+
+---
+
+## email-tracker.js
+
+Factory that creates a tracker bound to a workflow's data directory. Handles processed email dedup, run stats, and retry queue for failed moves.
+
+```javascript
+const { createTracker } = require('../shared/email-tracker');
+const tracker = createTracker(path.join(__dirname, 'data'));
+
+if (!tracker.isProcessed(emailId)) {
+  // process email...
+  tracker.markProcessed(emailId, { subject, from, recordsAdded: 3 });
+}
+
+tracker.updateStats({ emailsProcessed: 1, recordsGenerated: 5 });
+const stats = tracker.getStats();
+```
+
+**Data files** (per workflow, in `dataDir`): `processed-ids.json`, `stats.json`, `retry-queue.json`
+
+**Extracted from:** `vq-parser/src/email/tracker.js` — changed from hardcoded path to factory parameter.
+
+---
+
+## notifier.js
+
+Factory that creates an email notifier with configurable sender identity. Uses nodemailer with AWS WorkMail SMTP.
+
+```javascript
+const { createNotifier } = require('../shared/notifier');
+const notifier = createNotifier({
+  fromEmail: 'stockRFQ@orangetsunami.com',
+  fromName: 'Stock RFQ Loader'
+});
+
+await notifier.sendEmail('jake@example.com', 'Subject', 'Body text');
+await notifier.sendWithAttachment('jake@example.com', 'Subject', 'Body', [
+  { filename: 'output.csv', path: '/path/to/file.csv' }
+]);
+```
+
+**SMTP password:** Set via `SMTP_PASS` env var or pass as `smtpPass` option.
+
+**Extracted from:** `vq-parser/src/utils/notifier.js` — generic send moved to shared; VQ-specific `sendFetchSummary` stays in vq-parser.
