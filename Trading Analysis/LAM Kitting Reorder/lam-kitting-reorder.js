@@ -32,20 +32,18 @@ const CHUBOE_MPN_COL = 'Chuboe_MPN';
 const CHUBOE_QTY_COL = 'Qty';
 
 // Column indices in Excel INVENTORY sheet (0-based)
-// A=0, B=1, C=2, D=3, E=4, F=5, G=6, H=7, I=8, J=9, K=10, L=11
+// A=0, B=1, C=2, D=3, E=4, F=5, G=6, H=7, I=8, J=9
 const EXCEL = {
   CPC: 0,           // A - Lam P/N
   MPN: 1,           // B - MPN
   MANUFACTURER: 2,  // C - Manufacturer
   DESCRIPTION: 3,   // D - Item Description
   LEAD_TIME: 4,     // E - Lead Time
-  QTY_ON_HAND: 5,   // F - QTY ON HAND (we'll use our calculated total)
-  BASE_PRICE: 6,    // G - Base Unit Price
-  RESALE_PRICE: 7,  // H - Resale Price
-  MIN_QTY: 8,       // I - MIN QTY
-  // STATUS: 9,     // J - STATUS (excluded)
-  MOQ: 10,          // K - MOQ
-  LAM_OWNED: 11     // L - Lam Owned Inventory? (made dynamic)
+  BASE_PRICE: 5,    // F - Base Unit Price
+  RESALE_PRICE: 6,  // G - Resale Price
+  MIN_QTY: 7,       // H - MIN QTY
+  MOQ: 8,           // I - MOQ
+  HIST_BUYER: 9     // J - Buyer (historical, from SIPOC)
 };
 
 // -----------------------------------------------------------------------------
@@ -136,7 +134,7 @@ async function main() {
     console.log(`  MEDIUM priority: ${medPriority}`);
     console.log(`  LOW priority: ${lowPriority}`);
 
-    const withHistory = reorderAlerts.filter(r => r['Previous Supplier']).length;
+    const withHistory = reorderAlerts.filter(r => r['OT Previous Supplier']).length;
     console.log(`  With historical purchase data: ${withHistory}`);
   }
 
@@ -258,8 +256,8 @@ function loadExcelData(excelPath) {
       Base_Unit_Price: parseFloat(row[EXCEL.BASE_PRICE]) || 0,
       Resale_Price: parseFloat(row[EXCEL.RESALE_PRICE]) || 0,
       MIN_QTY: parseFloat(row[EXCEL.MIN_QTY]) || 0,
-      MOQ: parseFloat(row[EXCEL.MOQ]) || 0
-      // LAM_Owned will be calculated dynamically based on W115 qty
+      MOQ: parseFloat(row[EXCEL.MOQ]) || 0,
+      Historical_Buyer: (row[EXCEL.HIST_BUYER] || '').toString().trim()
     };
   }
 
@@ -313,9 +311,9 @@ function loadHistoricalPurchaseData(mpns) {
       const [mpn, supplier, price, buyer, dateordered] = line.split('|');
       if (mpn && mpn.trim()) {
         historicalData[mpn.trim()] = {
-          Previous_Supplier: (supplier || '').trim(),
+          OT_Previous_Supplier: (supplier || '').trim(),
           Historical_Purchase_Price: parseFloat(price) || 0,
-          Buyer: (buyer || '').trim(),
+          OT_Buyer: (buyer || '').trim(),
           Last_Purchase_Date: (dateordered || '').trim()
         };
       }
@@ -381,8 +379,9 @@ function identifyReorderCandidates(aggregated, excelData, historicalData) {
         'MIN QTY': minQty,
         'MOQ': excel.MOQ,
         'Lam Owned Inventory?': lamOwned,
-        'Previous Supplier': history.Previous_Supplier || '',
-        'Buyer': history.Buyer || '',
+        'Historical Buyer': excel.Historical_Buyer || '',
+        'OT Previous Supplier': history.OT_Previous_Supplier || '',
+        'OT Buyer': history.OT_Buyer || '',
         'Historical Purchase Price': history.Historical_Purchase_Price || '',
         'Last Purchase Date': history.Last_Purchase_Date || '',
         'Shortfall': shortfall,
@@ -418,8 +417,9 @@ function identifyReorderCandidates(aggregated, excelData, historicalData) {
       'MIN QTY': minQty,
       'MOQ': excel.MOQ,
       'Lam Owned Inventory?': 'NO',  // No inventory = not LAM owned
-      'Previous Supplier': history.Previous_Supplier || '',
-      'Buyer': history.Buyer || '',
+      'Historical Buyer': excel.Historical_Buyer || '',
+      'OT Previous Supplier': history.OT_Previous_Supplier || '',
+      'OT Buyer': history.OT_Buyer || '',
       'Historical Purchase Price': history.Historical_Purchase_Price || '',
       'Last Purchase Date': history.Last_Purchase_Date || '',
       'Shortfall': minQty,  // 100% shortfall
@@ -457,8 +457,9 @@ function writeReorderAlerts(alerts, outputPath) {
     'MIN QTY',
     'MOQ',
     'Lam Owned Inventory?',
-    'Previous Supplier',
-    'Buyer',
+    'Historical Buyer',
+    'OT Previous Supplier',
+    'OT Buyer',
     'Historical Purchase Price',
     'Last Purchase Date',
     'Shortfall',
