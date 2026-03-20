@@ -293,11 +293,75 @@ function extractOriginalSender(body) {
 // Email Categorization
 // ============================================
 
+// Subject patterns that are definitively NOT RFQs
+const NOT_RFQ_SUBJECT_PATTERNS = [
+  /purchase order/i,
+  /stock order/i,
+  /you have new held messages/i,
+  /your office/i,
+  /para tu pais/i,
+  /unsubscribe/i,
+  /newsletter/i,
+  /out of office/i,
+  /automatic reply/i,
+  /auto[- ]?reply/i,
+  /delivery notification/i,
+  /read receipt/i,
+  /mailer[- ]daemon/i,
+  /postmaster/i,
+  /RFQ Import Template.*\.csv/i,
+];
+
+// Subject patterns that indicate orders/follow-ups (not new RFQs)
+const ORDER_FOLLOW_UP_PATTERNS = [
+  /\bPO\b.*\d{5,}/i,                  // PO + number
+  /\bCOV\d{5,}/i,                      // COV order reference
+  /\bSO\d{5,}/i,                       // Sales order reference
+  /shipment|tracking|shipped/i,        // Shipping related
+  /invoice|payment|remittance/i,       // Financial
+  /following up|follow up|checking in/i, // Follow-ups
+];
+
+// News/marketing subject patterns
+const JUNK_SUBJECT_PATTERNS = [
+  /strikes|kills|bomb|attack|war|conflict/i,  // News headlines
+  /\$\d+[BMK]\s/i,                             // Dollar amounts in news ($15B)
+  /impeccable|luxury|sale|discount|offer expires/i, // Marketing
+];
+
+/**
+ * Categorize an email by subject and body content.
+ * Returns: 'rfq' | 'not-rfq' | 'needs-review'
+ */
+function categorizeEmail(subject, body) {
+  // Check subject-based rules first (cheapest)
+  if (NOT_RFQ_SUBJECT_PATTERNS.some(p => p.test(subject))) return 'not-rfq';
+  if (JUNK_SUBJECT_PATTERNS.some(p => p.test(subject))) return 'not-rfq';
+  if (ORDER_FOLLOW_UP_PATTERNS.some(p => p.test(subject))) return 'not-rfq';
+
+  // Check body for order/follow-up signals
+  if (body) {
+    const bodyLower = body.toLowerCase();
+    if (bodyLower.includes('please find attached invoice') ||
+        bodyLower.includes('tracking number') ||
+        bodyLower.includes('has been shipped') ||
+        bodyLower.includes('payment confirmation')) {
+      return 'not-rfq';
+    }
+  }
+
+  // Check if email has extractable part data
+  if (hasPartData(body, subject)) return 'rfq';
+
+  // Subject has MPN-like pattern but body was empty — likely RFQ with rendering issue
+  const mpnInSubject = /[A-Z0-9][A-Z0-9\-\/\.]{3,}/i.test(subject);
+  if (mpnInSubject && (!body || body.trim() === '')) return 'needs-review';
+
+  return 'needs-review';
+}
+
 function hasPartData(body, subject) {
-  // Check if email contains MPN-like patterns + quantities
-  // MPN pattern: alphanumeric with dashes/dots, 4+ chars
   const mpnPattern = /[A-Z0-9][A-Z0-9\-\/\.]{3,}/i;
-  // Quantity pattern: number possibly with k/K/pcs/ea suffix
   const qtyPattern = /\b\d+(?:,\d{3})*(?:\s*(?:k|K|pcs|ea|units?|pc))?\b/;
 
   const fullText = `${subject}\n${body}`;
@@ -349,18 +413,19 @@ async function run() {
     try {
       // Step 2: Read email
       const body = await fetcher.readMessage(envelope.id);
-      if (!body) {
-        log.warn(`  Empty body, skipping`);
-        needsReviewIds.push(envelope.id);
-        summary.needsReview++;
-        continue;
-      }
 
-      // Step 2b: Categorize
-      if (!hasPartData(body, envelope.subject)) {
-        log.info(`  No part data detected → NotRFQ`);
+      // Step 2b: Categorize (subject + body analysis)
+      const category = categorizeEmail(envelope.subject, body || '');
+      if (category === 'not-rfq') {
+        log.info(`  Categorized as NotRFQ (order/follow-up/junk)`);
         notRfqIds.push(envelope.id);
         summary.notRfq++;
+        continue;
+      }
+      if (category === 'needs-review') {
+        log.info(`  Needs review (empty body or ambiguous)`);
+        needsReviewIds.push(envelope.id);
+        summary.needsReview++;
         continue;
       }
 
