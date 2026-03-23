@@ -1,0 +1,1030 @@
+{
+  "processedIds": {
+    "3": {
+      "date": "2026-03-20T13:37:48.833Z",
+      "status": "needs-review"
+    },
+    "72": {
+      "date": "2026-03-20T13:37:47.627Z",
+      "status": "needs-review"
+    },
+    "73": {
+      "date": "2026-03-20T13:37:46.443Z",
+      "status": "needs-review"
+    },
+    "74": {
+      "date": "2026-03-20T13:37:45.348Z",
+      "status": "needs-review"
+    },
+    "75": {
+      "date": "2026-03-20T13:37:44.155Z",
+      "status": "needs-review"
+    },
+    "76": {
+      "date": "2026-03-20T13:37:43.021Z",
+      "status": "needs-review"
+    },
+    "77": {
+      "date": "2026-03-20T13:37:35.280Z",
+      "status": "needs-review"
+    },
+    "78": {
+      "date": "2026-03-20T13:37:34.125Z",
+      "status": "needs-review"
+    },
+    "79": {
+      "date": "2026-03-20T13:36:36.709Z",
+      "status": "processed",
+      "lines": 35
+    },
+    "80": {
+      "date": "2026-03-20T13:37:32.970Z",
+      "status": "needs-review"
+    },
+    "81": {
+      "date": "2026-03-20T13:37:27.004Z",
+      "status": "needs-review"
+    },
+    "82": {
+      "date": "2026-03-20T13:37:25.836Z",
+      "status": "needs-review"
+    },
+    "83": {
+      "date": "2026-03-20T13:37:24.637Z",
+      "status": "needs-review"
+    },
+    "84": {
+      "date": "2026-03-20T13:36:35.626Z",
+      "status": "processed",
+      "lines": 35
+    },
+    "85": {
+      "date": "2026-03-20T13:37:23.441Z",
+      "status": "needs-review"
+    },
+    "86": {
+      "date": "2026-03-20T13:37:22.292Z",
+      "status": "needs-review"
+    },
+    "87": {
+      "date": "2026-03-20T13:37:16.674Z",
+      "status": "needs-review"
+    },
+    "88": {
+      "date": "2026-03-20T13:37:15.527Z",
+      "status": "needs-review"
+    },
+    "89": {
+      "date": "2026-03-20T13:36:34.409Z",
+      "status": "processed",
+      "lines": 35
+    },
+    "90": {
+      "date": "2026-03-20T13:37:14.357Z",
+      "status": "needs-review"
+    },
+    "91": {
+      "date": "2026-03-20T13:37:13.134Z",
+      "status": "needs-review"
+    },
+    "92": {
+      "date": "2026-03-20T13:37:11.971Z",
+      "status": "needs-review"
+    },
+    "93": {
+      "date": "2026-03-20T13:37:03.362Z",
+      "status": "needs-review"
+    },
+    "94": {
+      "date": "2026-03-20T13:37:02.086Z",
+      "status": "needs-review"
+    },
+    "95": {
+      "date": "2026-03-20T13:36:33.311Z",
+      "status": "processed",
+      "lines": 35
+    },
+    "96": {
+      "date": "2026-03-20T13:37:00.875Z",
+      "status": "needs-review"
+    },
+    "97": {
+      "date": "2026-03-20T13:36:59.685Z",
+      "status": "needs-review"
+    },
+    "98": {
+      "date": "2026-03-20T13:36:58.567Z",
+      "status": "needs-review"
+    },
+    "99": {
+      "date": "2026-03-20T13:36:57.458Z",
+      "status": "needs-review"
+    },
+    "100": {
+      "date": "2026-03-20T13:36:47.667Z",
+      "status": "needs-review"
+    },
+    "101": {
+      "date": "2026-03-20T13:36:27.201Z",
+      "status": "processed",
+      "lines": 35
+    },
+    "102": {
+      "date": "2026-03-20T13:36:46.522Z",
+      "status": "needs-review"
+    },
+    "103": {
+      "date": "2026-03-20T13:36:26.054Z",
+      "status": "processed",
+      "lines": 35
+    },
+    "104": {
+      "date": "2026-03-20T13:36:43.082Z",
+      "status": "needs-review"
+    },
+    "105": {
+      "date": "2026-03-20T13:36:24.199Z",
+      "status": "processed",
+      "lines": 35
+    },
+    "106": {
+      "date": "2026-03-20T13:36:21.036Z",
+      "status": "processed",
+      "lines": 35
+    },
+    "107": {
+      "date": "2026-03-20T13:36:41.844Z",
+      "status": "needs-review"
+    },
+    "108": {
+      "date": "2026-03-20T13:36:19.952Z",
+      "status": "processed",
+      "lines": 35
+    },
+    "109": {
+      "date": "2026-03-20T13:36:16.478Z",
+      "status": "processed",
+      "lines": 35
+    },
+    "110": {
+      "date": "2026-03-20T13:36:15.367Z",
+      "status": "processed",
+      "lines": 35
+    },
+    "111": {
+      "date": "2026-03-20T13:36:14.217Z",
+      "status": "processed",
+      "lines": 35
+    },
+    "112": {
+      "date": "2026-03-20T13:36:12.583Z",
+      "status": "processed",
+      "lines": 35
+    },
+    "113": {
+      "date": "2026-03-20T13:36:11.365Z",
+      "status": "processed",
+      "lines": 35
+    },
+    "114": {
+      "date": "2026-03-20T13:36:03.170Z",
+      "status": "processed",
+      "lines": 35
+    },
+    "115": {
+      "date": "2026-03-20T13:36:01.822Z",
+      "status": "processed",
+      "lines": 35
+    },
+    "116": {
+      "date": "2026-03-20T13:36:00.162Z",
+      "status": "processed",
+      "lines": 35
+    },
+    "117": {
+      "date": "2026-03-20T13:35:59.021Z",
+      "status": "processed",
+      "lines": 35
+    },
+    "118": {
+      "date": "2026-03-20T13:35:57.838Z",
+      "status": "processed",
+      "lines": 35
+    },
+    "119": {
+      "date": "2026-03-20T13:35:56.702Z",
+      "status": "processed",
+      "lines": 35
+    },
+    "120": {
+      "date": "2026-03-20T13:35:46.161Z",
+      "status": "processed",
+      "lines": 35
+    },
+    "121": {
+      "date": "2026-03-20T13:35:45.059Z",
+      "status": "processed",
+      "lines": 35
+    },
+    "122": {
+      "date": "2026-03-20T13:35:43.861Z",
+      "status": "processed",
+      "lines": 35
+    },
+    "123": {
+      "date": "2026-03-20T13:35:42.570Z",
+      "status": "processed",
+      "lines": 35
+    },
+    "124": {
+      "date": "2026-03-20T13:35:41.340Z",
+      "status": "processed",
+      "lines": 35
+    },
+    "125": {
+      "date": "2026-03-20T13:35:35.200Z",
+      "status": "processed",
+      "lines": 35
+    },
+    "126": {
+      "date": "2026-03-20T13:35:34.100Z",
+      "status": "processed",
+      "lines": 35
+    },
+    "127": {
+      "date": "2026-03-20T13:35:32.433Z",
+      "status": "processed",
+      "lines": 35
+    },
+    "128": {
+      "date": "2026-03-20T13:36:40.668Z",
+      "status": "needs-review"
+    },
+    "129": {
+      "date": "2026-03-20T13:35:31.230Z",
+      "status": "processed",
+      "lines": 35
+    },
+    "130": {
+      "date": "2026-03-20T13:35:30.086Z",
+      "status": "processed",
+      "lines": 35
+    },
+    "131": {
+      "date": "2026-03-20T13:35:21.891Z",
+      "status": "processed",
+      "lines": 35
+    },
+    "132": {
+      "date": "2026-03-20T13:35:20.721Z",
+      "status": "processed",
+      "lines": 35
+    },
+    "133": {
+      "date": "2026-03-20T13:35:19.600Z",
+      "status": "processed",
+      "lines": 35
+    },
+    "134": {
+      "date": "2026-03-20T14:00:07.783Z",
+      "status": "needs-review"
+    },
+    "261": {
+      "date": "2026-03-20T15:00:10.189Z",
+      "status": "needs-review"
+    },
+    "262": {
+      "date": "2026-03-20T15:00:08.521Z",
+      "status": "needs-review"
+    },
+    "266": {
+      "date": "2026-03-20T16:30:11.096Z",
+      "status": "needs-review"
+    },
+    "269": {
+      "date": "2026-03-20T17:30:10.059Z",
+      "status": "needs-review"
+    },
+    "270": {
+      "date": "2026-03-20T17:30:08.426Z",
+      "status": "not-rfq"
+    },
+    "273": {
+      "date": "2026-03-20T18:00:08.214Z",
+      "status": "needs-review"
+    },
+    "276": {
+      "date": "2026-03-21T02:00:08.394Z",
+      "status": "needs-review"
+    },
+    "277": {
+      "date": "2026-03-21T02:00:10.759Z",
+      "status": "needs-review"
+    },
+    "280": {
+      "date": "2026-03-21T02:30:16.314Z",
+      "status": "needs-review"
+    },
+    "281": {
+      "date": "2026-03-21T02:30:13.365Z",
+      "status": "needs-review"
+    },
+    "284": {
+      "date": "2026-03-21T03:30:08.207Z",
+      "status": "needs-review"
+    },
+    "285": {
+      "date": "2026-03-21T03:30:09.846Z",
+      "status": "needs-review"
+    },
+    "288": {
+      "date": "2026-03-21T06:00:10.104Z",
+      "status": "needs-review"
+    },
+    "289": {
+      "date": "2026-03-21T06:00:08.459Z",
+      "status": "needs-review"
+    },
+    "292": {
+      "date": "2026-03-21T07:00:08.832Z",
+      "status": "needs-review"
+    },
+    "293": {
+      "date": "2026-03-21T07:00:10.526Z",
+      "status": "needs-review"
+    },
+    "296": {
+      "date": "2026-03-21T08:30:10.829Z",
+      "status": "needs-review"
+    },
+    "297": {
+      "date": "2026-03-21T08:30:09.127Z",
+      "status": "needs-review"
+    },
+    "300": {
+      "date": "2026-03-21T09:00:09.140Z",
+      "status": "needs-review"
+    },
+    "301": {
+      "date": "2026-03-21T09:00:10.764Z",
+      "status": "needs-review"
+    },
+    "304": {
+      "date": "2026-03-21T10:00:08.108Z",
+      "status": "needs-review"
+    },
+    "305": {
+      "date": "2026-03-21T10:00:09.728Z",
+      "status": "needs-review"
+    },
+    "308": {
+      "date": "2026-03-21T16:30:12.185Z",
+      "status": "not-rfq"
+    },
+    "309": {
+      "date": "2026-03-21T16:30:13.874Z",
+      "status": "not-rfq"
+    },
+    "312": {
+      "date": "2026-03-22T01:00:10.160Z",
+      "status": "needs-review"
+    },
+    "313": {
+      "date": "2026-03-22T01:00:08.512Z",
+      "status": "needs-review"
+    },
+    "316": {
+      "date": "2026-03-22T04:30:12.879Z",
+      "status": "not-rfq"
+    },
+    "317": {
+      "date": "2026-03-22T04:30:11.367Z",
+      "status": "not-rfq"
+    },
+    "320": {
+      "date": "2026-03-22T08:30:09.539Z",
+      "status": "needs-review"
+    },
+    "321": {
+      "date": "2026-03-22T08:30:11.207Z",
+      "status": "needs-review"
+    },
+    "324": {
+      "date": "2026-03-22T10:00:10.619Z",
+      "status": "needs-review"
+    },
+    "325": {
+      "date": "2026-03-22T10:00:08.948Z",
+      "status": "needs-review"
+    },
+    "328": {
+      "date": "2026-03-22T12:00:10.811Z",
+      "status": "needs-review"
+    },
+    "329": {
+      "date": "2026-03-22T12:00:09.170Z",
+      "status": "needs-review"
+    },
+    "332": {
+      "date": "2026-03-22T14:30:13.370Z",
+      "status": "needs-review"
+    },
+    "333": {
+      "date": "2026-03-22T14:30:14.912Z",
+      "status": "needs-review"
+    },
+    "336": {
+      "date": "2026-03-23T01:00:08.008Z",
+      "status": "needs-review"
+    },
+    "337": {
+      "date": "2026-03-23T01:00:09.642Z",
+      "status": "needs-review"
+    },
+    "340": {
+      "date": "2026-03-23T01:30:09.528Z",
+      "status": "needs-review"
+    },
+    "341": {
+      "date": "2026-03-23T01:30:07.834Z",
+      "status": "needs-review"
+    },
+    "344": {
+      "date": "2026-03-23T02:00:42.887Z",
+      "status": "needs-review"
+    },
+    "345": {
+      "date": "2026-03-23T02:00:41.304Z",
+      "status": "needs-review"
+    },
+    "346": {
+      "date": "2026-03-23T02:00:39.768Z",
+      "status": "needs-review"
+    },
+    "347": {
+      "date": "2026-03-23T02:00:38.220Z",
+      "status": "needs-review"
+    },
+    "348": {
+      "date": "2026-03-23T02:00:31.633Z",
+      "status": "needs-review"
+    },
+    "349": {
+      "date": "2026-03-23T02:00:26.195Z",
+      "status": "needs-review"
+    },
+    "350": {
+      "date": "2026-03-23T02:00:24.594Z",
+      "status": "needs-review"
+    },
+    "351": {
+      "date": "2026-03-23T02:00:22.811Z",
+      "status": "needs-review"
+    },
+    "352": {
+      "date": "2026-03-23T02:00:19.579Z",
+      "status": "needs-review"
+    },
+    "353": {
+      "date": "2026-03-23T02:00:21.203Z",
+      "status": "needs-review"
+    },
+    "364": {
+      "date": "2026-03-23T02:30:18.288Z",
+      "status": "needs-review"
+    },
+    "365": {
+      "date": "2026-03-23T02:30:16.794Z",
+      "status": "needs-review"
+    },
+    "366": {
+      "date": "2026-03-23T02:30:12.176Z",
+      "status": "needs-review"
+    },
+    "367": {
+      "date": "2026-03-23T02:30:10.431Z",
+      "status": "needs-review"
+    },
+    "372": {
+      "date": "2026-03-23T03:00:18.264Z",
+      "status": "needs-review"
+    },
+    "373": {
+      "date": "2026-03-23T03:00:19.805Z",
+      "status": "needs-review"
+    },
+    "374": {
+      "date": "2026-03-23T03:00:10.946Z",
+      "status": "needs-review"
+    },
+    "375": {
+      "date": "2026-03-23T03:00:09.358Z",
+      "status": "needs-review"
+    },
+    "380": {
+      "date": "2026-03-23T03:30:19.233Z",
+      "status": "needs-review"
+    },
+    "381": {
+      "date": "2026-03-23T03:30:17.644Z",
+      "status": "needs-review"
+    },
+    "382": {
+      "date": "2026-03-23T03:30:09.621Z",
+      "status": "needs-review"
+    },
+    "383": {
+      "date": "2026-03-23T03:30:11.206Z",
+      "status": "needs-review"
+    },
+    "388": {
+      "date": "2026-03-23T04:00:32.297Z",
+      "status": "needs-review"
+    },
+    "389": {
+      "date": "2026-03-23T04:00:30.734Z",
+      "status": "needs-review"
+    },
+    "390": {
+      "date": "2026-03-23T04:00:25.818Z",
+      "status": "needs-review"
+    },
+    "391": {
+      "date": "2026-03-23T04:00:24.250Z",
+      "status": "needs-review"
+    },
+    "392": {
+      "date": "2026-03-23T04:00:21.179Z",
+      "status": "needs-review"
+    },
+    "393": {
+      "date": "2026-03-23T04:00:22.709Z",
+      "status": "needs-review"
+    },
+    "394": {
+      "date": "2026-03-23T04:00:12.313Z",
+      "status": "needs-review"
+    },
+    "395": {
+      "date": "2026-03-23T04:00:19.436Z",
+      "status": "needs-review"
+    },
+    "404": {
+      "date": "2026-03-23T04:30:09.913Z",
+      "status": "not-rfq"
+    },
+    "405": {
+      "date": "2026-03-23T04:30:11.647Z",
+      "status": "not-rfq"
+    },
+    "408": {
+      "date": "2026-03-23T05:00:08.622Z",
+      "status": "needs-review"
+    },
+    "409": {
+      "date": "2026-03-23T05:00:10.349Z",
+      "status": "needs-review"
+    },
+    "412": {
+      "date": "2026-03-23T06:00:52.315Z",
+      "status": "needs-review"
+    },
+    "413": {
+      "date": "2026-03-23T05:30:17.853Z",
+      "status": "needs-review"
+    },
+    "414": {
+      "date": "2026-03-23T05:30:10.722Z",
+      "status": "needs-review"
+    },
+    "415": {
+      "date": "2026-03-23T05:30:09.192Z",
+      "status": "needs-review"
+    },
+    "419": {
+      "date": "2026-03-23T06:00:50.690Z",
+      "status": "needs-review"
+    },
+    "420": {
+      "date": "2026-03-23T06:00:49.100Z",
+      "status": "needs-review"
+    },
+    "421": {
+      "date": "2026-03-23T06:00:47.561Z",
+      "status": "needs-review"
+    },
+    "422": {
+      "date": "2026-03-23T06:00:41.974Z",
+      "status": "needs-review"
+    },
+    "423": {
+      "date": "2026-03-23T06:30:26.872Z",
+      "status": "needs-review"
+    },
+    "424": {
+      "date": "2026-03-23T06:00:35.593Z",
+      "status": "needs-review"
+    },
+    "425": {
+      "date": "2026-03-23T06:00:33.992Z",
+      "status": "needs-review"
+    },
+    "426": {
+      "date": "2026-03-23T06:00:29.700Z",
+      "status": "needs-review"
+    },
+    "427": {
+      "date": "2026-03-23T06:00:28.040Z",
+      "status": "needs-review"
+    },
+    "428": {
+      "date": "2026-03-23T06:00:26.294Z",
+      "status": "needs-review"
+    },
+    "429": {
+      "date": "2026-03-23T06:00:22.994Z",
+      "status": "needs-review"
+    },
+    "430": {
+      "date": "2026-03-23T06:00:24.647Z",
+      "status": "needs-review"
+    },
+    "443": {
+      "date": "2026-03-23T06:30:19.138Z",
+      "status": "needs-review"
+    },
+    "444": {
+      "date": "2026-03-23T06:30:25.068Z",
+      "status": "needs-review"
+    },
+    "445": {
+      "date": "2026-03-23T06:30:17.418Z",
+      "status": "needs-review"
+    },
+    "446": {
+      "date": "2026-03-23T06:30:15.729Z",
+      "status": "needs-review"
+    },
+    "452": {
+      "date": "2026-03-23T07:00:30.214Z",
+      "status": "needs-review"
+    },
+    "453": {
+      "date": "2026-03-23T07:00:28.762Z",
+      "status": "needs-review"
+    },
+    "454": {
+      "date": "2026-03-23T07:00:19.960Z",
+      "status": "needs-review"
+    },
+    "455": {
+      "date": "2026-03-23T07:00:18.366Z",
+      "status": "needs-review"
+    },
+    "456": {
+      "date": "2026-03-23T07:00:16.803Z",
+      "status": "needs-review"
+    },
+    "457": {
+      "date": "2026-03-23T07:00:11.428Z",
+      "status": "needs-review"
+    },
+    "464": {
+      "date": "2026-03-23T07:30:12.496Z",
+      "status": "not-rfq"
+    },
+    "465": {
+      "date": "2026-03-23T08:00:11.135Z",
+      "status": "not-rfq"
+    },
+    "466": {
+      "date": "2026-03-23T07:30:28.805Z",
+      "status": "needs-review"
+    },
+    "467": {
+      "date": "2026-03-23T07:30:27.169Z",
+      "status": "needs-review"
+    },
+    "468": {
+      "date": "2026-03-23T08:00:29.129Z",
+      "status": "needs-review"
+    },
+    "469": {
+      "date": "2026-03-23T07:30:21.460Z",
+      "status": "needs-review"
+    },
+    "470": {
+      "date": "2026-03-23T07:30:19.952Z",
+      "status": "needs-review"
+    },
+    "471": {
+      "date": "2026-03-23T07:30:18.315Z",
+      "status": "needs-review"
+    },
+    "478": {
+      "date": "2026-03-23T08:30:42.115Z",
+      "status": "needs-review"
+    },
+    "479": {
+      "date": "2026-03-23T08:00:18.236Z",
+      "status": "needs-review"
+    },
+    "480": {
+      "date": "2026-03-23T08:00:12.751Z",
+      "status": "needs-review"
+    },
+    "481": {
+      "date": "2026-03-23T08:00:16.647Z",
+      "status": "needs-review"
+    },
+    "487": {
+      "date": "2026-03-23T08:30:40.611Z",
+      "status": "needs-review"
+    },
+    "488": {
+      "date": "2026-03-23T08:30:29.736Z",
+      "status": "needs-review"
+    },
+    "489": {
+      "date": "2026-03-23T08:30:19.929Z",
+      "status": "not-rfq"
+    },
+    "490": {
+      "date": "2026-03-23T08:30:13.785Z",
+      "status": "not-rfq"
+    },
+    "491": {
+      "date": "2026-03-23T08:30:26.493Z",
+      "status": "needs-review"
+    },
+    "492": {
+      "date": "2026-03-23T08:30:24.960Z",
+      "status": "needs-review"
+    },
+    "493": {
+      "date": "2026-03-23T08:30:21.614Z",
+      "status": "needs-review"
+    },
+    "494": {
+      "date": "2026-03-23T08:30:23.282Z",
+      "status": "needs-review"
+    },
+    "504": {
+      "date": "2026-03-23T09:00:39.564Z",
+      "status": "needs-review"
+    },
+    "505": {
+      "date": "2026-03-23T09:00:44.636Z",
+      "status": "needs-review"
+    },
+    "506": {
+      "date": "2026-03-23T09:00:33.756Z",
+      "status": "needs-review"
+    },
+    "507": {
+      "date": "2026-03-23T09:00:37.923Z",
+      "status": "needs-review"
+    },
+    "508": {
+      "date": "2026-03-23T09:00:30.469Z",
+      "status": "needs-review"
+    },
+    "509": {
+      "date": "2026-03-23T09:00:32.098Z",
+      "status": "needs-review"
+    },
+    "510": {
+      "date": "2026-03-23T09:00:27.192Z",
+      "status": "needs-review"
+    },
+    "511": {
+      "date": "2026-03-23T09:00:28.848Z",
+      "status": "needs-review"
+    },
+    "512": {
+      "date": "2026-03-23T09:00:25.436Z",
+      "status": "needs-review"
+    },
+    "513": {
+      "date": "2026-03-23T09:00:15.782Z",
+      "status": "needs-review"
+    },
+    "524": {
+      "date": "2026-03-23T09:30:45.098Z",
+      "status": "needs-review"
+    },
+    "525": {
+      "date": "2026-03-23T09:30:48.913Z",
+      "status": "needs-review"
+    },
+    "526": {
+      "date": "2026-03-23T09:30:41.851Z",
+      "status": "needs-review"
+    },
+    "527": {
+      "date": "2026-03-23T09:30:43.411Z",
+      "status": "needs-review"
+    },
+    "528": {
+      "date": "2026-03-23T09:30:38.730Z",
+      "status": "needs-review"
+    },
+    "529": {
+      "date": "2026-03-23T09:30:40.230Z",
+      "status": "needs-review"
+    },
+    "530": {
+      "date": "2026-03-23T10:00:46.416Z",
+      "status": "needs-review"
+    },
+    "531": {
+      "date": "2026-03-23T09:30:28.513Z",
+      "status": "needs-review"
+    },
+    "532": {
+      "date": "2026-03-23T09:30:22.228Z",
+      "status": "needs-review"
+    },
+    "533": {
+      "date": "2026-03-23T09:30:27.009Z",
+      "status": "needs-review"
+    },
+    "534": {
+      "date": "2026-03-23T09:30:20.590Z",
+      "status": "needs-review"
+    },
+    "535": {
+      "date": "2026-03-23T09:30:19.031Z",
+      "status": "needs-review"
+    },
+    "547": {
+      "date": "2026-03-23T10:00:38.523Z",
+      "status": "needs-review"
+    },
+    "548": {
+      "date": "2026-03-23T10:00:44.739Z",
+      "status": "needs-review"
+    },
+    "549": {
+      "date": "2026-03-23T10:00:36.791Z",
+      "status": "needs-review"
+    },
+    "550": {
+      "date": "2026-03-23T10:00:35.087Z",
+      "status": "needs-review"
+    },
+    "551": {
+      "date": "2026-03-23T10:00:29.144Z",
+      "status": "needs-review"
+    },
+    "552": {
+      "date": "2026-03-23T10:00:27.451Z",
+      "status": "needs-review"
+    },
+    "553": {
+      "date": "2026-03-23T10:00:24.215Z",
+      "status": "needs-review"
+    },
+    "554": {
+      "date": "2026-03-23T10:00:25.799Z",
+      "status": "needs-review"
+    },
+    "555": {
+      "date": "2026-03-23T10:00:22.622Z",
+      "status": "needs-review"
+    },
+    "556": {
+      "date": "2026-03-23T10:00:15.407Z",
+      "status": "needs-review"
+    },
+    "568": {
+      "date": "2026-03-23T10:30:10.571Z",
+      "status": "needs-review"
+    },
+    "569": {
+      "date": "2026-03-23T10:30:12.282Z",
+      "status": "needs-review"
+    },
+    "572": {
+      "date": "2026-03-23T11:30:09.874Z",
+      "status": "not-rfq"
+    },
+    "573": {
+      "date": "2026-03-23T11:30:08.075Z",
+      "status": "not-rfq"
+    },
+    "576": {
+      "date": "2026-03-23T12:30:09.280Z",
+      "status": "not-rfq"
+    },
+    "577": {
+      "date": "2026-03-23T12:30:10.954Z",
+      "status": "not-rfq"
+    },
+    "580": {
+      "date": "2026-03-23T13:00:10.587Z",
+      "status": "needs-review"
+    },
+    "581": {
+      "date": "2026-03-23T13:00:08.792Z",
+      "status": "needs-review"
+    },
+    "584": {
+      "date": "2026-03-23T13:30:08.729Z",
+      "status": "needs-review"
+    },
+    "585": {
+      "date": "2026-03-23T13:30:10.567Z",
+      "status": "needs-review"
+    },
+    "588": {
+      "date": "2026-03-23T14:00:11.343Z",
+      "status": "needs-review"
+    },
+    "589": {
+      "date": "2026-03-23T14:00:09.483Z",
+      "status": "needs-review"
+    },
+    "592": {
+      "date": "2026-03-23T14:30:26.672Z",
+      "status": "needs-review"
+    },
+    "593": {
+      "date": "2026-03-23T14:30:24.950Z",
+      "status": "needs-review"
+    },
+    "594": {
+      "date": "2026-03-23T14:30:21.632Z",
+      "status": "needs-review"
+    },
+    "595": {
+      "date": "2026-03-23T14:30:23.298Z",
+      "status": "needs-review"
+    },
+    "596": {
+      "date": "2026-03-23T14:30:12.828Z",
+      "status": "needs-review"
+    },
+    "597": {
+      "date": "2026-03-23T14:30:14.531Z",
+      "status": "needs-review"
+    },
+    "604": {
+      "date": "2026-03-23T15:30:08.283Z",
+      "status": "needs-review"
+    },
+    "605": {
+      "date": "2026-03-23T15:30:09.891Z",
+      "status": "needs-review"
+    },
+    "608": {
+      "date": "2026-03-23T16:00:08.142Z",
+      "status": "needs-review"
+    },
+    "609": {
+      "date": "2026-03-23T16:00:09.910Z",
+      "status": "needs-review"
+    },
+    "612": {
+      "date": "2026-03-23T16:30:10.134Z",
+      "status": "needs-review"
+    },
+    "613": {
+      "date": "2026-03-23T16:30:11.713Z",
+      "status": "needs-review"
+    },
+    "616": {
+      "date": "2026-03-23T17:00:09.737Z",
+      "status": "not-rfq"
+    },
+    "617": {
+      "date": "2026-03-23T17:00:11.440Z",
+      "status": "not-rfq"
+    },
+    "620": {
+      "date": "2026-03-23T17:30:09.773Z",
+      "status": "not-rfq"
+    },
+    "621": {
+      "date": "2026-03-23T17:30:11.408Z",
+      "status": "not-rfq"
+    },
+    "622": {
+      "date": "2026-03-23T17:30:18.711Z",
+      "status": "needs-review"
+    },
+    "623": {
+      "date": "2026-03-23T17:30:17.027Z",
+      "status": "needs-review"
+    },
+    "628": {
+      "date": "2026-03-23T18:00:10.148Z",
+      "status": "needs-review"
+    },
+    "629": {
+      "date": "2026-03-23T18:00:12.015Z",
+      "status": "needs-review"
+    }
+  },
+  "lastRun": "2026-03-23T18:00:12.015Z"
+}

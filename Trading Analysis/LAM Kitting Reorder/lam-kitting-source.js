@@ -272,14 +272,16 @@ async function writeEnrichedOutput(results, originalHeaders, outputPath) {
   const leadTimeMarginCol = allHeaders.indexOf('Lead Time Margin %') + 1;
 
   for (const result of results) {
-    // Format original values - format price columns with $
+    // Keep original values - pass numbers as numbers for Excel formatting
     const originalValues = result.originalRow.map((v, idx) => {
       const header = originalHeaders[idx];
       if (['Base Unit Price', 'Resale Price', 'Historical Purchase Price'].includes(header)) {
         const num = parseFloat(v);
-        if (!isNaN(num)) {
-          return formatDollar(num);
-        }
+        if (!isNaN(num)) return num;
+      }
+      if (['MIN QTY', 'MOQ', 'QTY ON HAND', 'Shortfall'].includes(header)) {
+        const num = parseFloat(v);
+        if (!isNaN(num)) return num;
       }
       return v;
     });
@@ -301,11 +303,11 @@ async function writeEnrichedOutput(results, originalHeaders, outputPath) {
 
     const franchiseValues = [
       result.franchise.inStockSupplier || '',
-      result.franchise.inStockPrice ? formatDollar(result.franchise.inStockPrice) : '',
-      result.franchise.inStockQty || '',
+      result.franchise.inStockPrice ? parseFloat(result.franchise.inStockPrice) : '',
+      result.franchise.inStockQty ? parseInt(result.franchise.inStockQty) : '',
       inStockMarginNum,  // Store as number for coloring
       result.franchise.leadTimeSupplier || '',
-      result.franchise.leadTimePrice ? formatDollar(result.franchise.leadTimePrice) : '',
+      result.franchise.leadTimePrice ? parseFloat(result.franchise.leadTimePrice) : '',
       result.franchise.leadTimeWeeks || '',
       leadTimeMarginNum,  // Store as number for coloring
     ];
@@ -358,6 +360,19 @@ async function writeEnrichedOutput(results, originalHeaders, outputPath) {
       };
     }
   }
+
+  // Apply number formats to currency and quantity columns
+  const currencyCols = ['Base Unit Price', 'Resale Price', 'Historical Purchase Price', 'In Stock Price', 'Lead Time Price'];
+  const intCols = ['MIN QTY', 'MOQ', 'QTY ON HAND', 'Shortfall', 'In Stock Qty'];
+
+  allHeaders.forEach((header, idx) => {
+    const colNum = idx + 1;
+    if (currencyCols.includes(header)) {
+      worksheet.getColumn(colNum).numFmt = '$#,##0.0000';
+    } else if (intCols.includes(header)) {
+      worksheet.getColumn(colNum).numFmt = '#,##0';
+    }
+  });
 
   // Set column widths
   worksheet.columns.forEach((col, idx) => {

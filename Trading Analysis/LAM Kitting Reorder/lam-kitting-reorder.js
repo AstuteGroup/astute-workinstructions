@@ -29,8 +29,8 @@ const NOTIFY_EMAIL = process.env.NOTIFY_EMAIL || 'jake.harris@astutegroup.com';
 // Configuration
 // -----------------------------------------------------------------------------
 
-const W111_FILENAME = 'LAM_3PL_chuboe.csv';
-const W115_FILENAME = 'LAM_Dead_Inventory_chuboe.csv';
+const W111_FILENAME = 'W111_LAM_3PL.csv';
+const W115_FILENAME = 'W115_LAM_Dead_Inventory.csv';
 
 // Column names in Chuboe output
 const CHUBOE_MPN_COL = 'Chuboe_MPN';
@@ -56,10 +56,11 @@ const EXCEL = {
 // -----------------------------------------------------------------------------
 
 async function main() {
-  const args = process.argv.slice(2);
+  const args = process.argv.slice(2).filter(a => a !== '--no-email');
+  const skipEmail = process.argv.includes('--no-email');
 
   if (args.length < 2) {
-    console.error('Usage: node lam-kitting-reorder.js <inventory-folder> <excel-file> [output-file]');
+    console.error('Usage: node lam-kitting-reorder.js <inventory-folder> <excel-file> [output-file] [--no-email]');
     console.error('');
     console.error('Example:');
     console.error('  node lam-kitting-reorder.js "./Inventory 2026-03-11" "./Lam_Kitting_DB_03132026.xlsx"');
@@ -112,10 +113,16 @@ async function main() {
   const historicalData = loadHistoricalPurchaseData(mpnsToQuery);
   console.log(`  Historical data found: ${Object.keys(historicalData).length} MPNs`);
 
+  // Step 4b: Load recent POVs (vendor receipts in last 4 months)
+  console.log('');
+  console.log('Step 4b: Loading recent POVs (last 4 months)...');
+  const recentPOVs = loadRecentPOVs();
+  console.log(`  Recent POVs found: ${Object.keys(recentPOVs).length} MPNs`);
+
   // Step 5: Join and identify reorder candidates
   console.log('');
   console.log('Step 5: Identifying reorder candidates...');
-  const reorderAlerts = identifyReorderCandidates(aggregated, excelData, historicalData);
+  const reorderAlerts = identifyReorderCandidates(aggregated, excelData, historicalData, recentPOVs);
   console.log(`  Reorder candidates: ${reorderAlerts.length} items`);
 
   // Step 6: Generate output
@@ -154,15 +161,19 @@ async function main() {
   console.log(`  In inventory but not in Excel: ${inInventoryNotExcel.length} MPNs`);
   console.log(`  In Excel but not in inventory: ${inExcelNotInventory.length} MPNs`);
 
-  // Step 7: Email results
-  console.log('');
-  console.log('Step 7: Emailing results...');
-  const critCount = reorderAlerts.filter(r => r.Priority === 'CRITICAL').length;
-  const highCount = reorderAlerts.filter(r => r.Priority === 'HIGH').length;
-  const medCount = reorderAlerts.filter(r => r.Priority === 'MEDIUM').length;
-  const lowCount = reorderAlerts.filter(r => r.Priority === 'LOW').length;
+  // Step 7: Email results (unless --no-email flag is set)
+  if (skipEmail) {
+    console.log('');
+    console.log('Step 7: Skipping email (--no-email flag set).');
+  } else {
+    console.log('');
+    console.log('Step 7: Emailing results...');
+    const critCount = reorderAlerts.filter(r => r.Priority === 'CRITICAL').length;
+    const highCount = reorderAlerts.filter(r => r.Priority === 'HIGH').length;
+    const medCount = reorderAlerts.filter(r => r.Priority === 'MEDIUM').length;
+    const lowCount = reorderAlerts.filter(r => r.Priority === 'LOW').length;
 
-  const emailBody = `LAM Kitting Reorder Alerts generated ${getDateStamp()}.
+    const emailBody = `LAM Kitting Reorder Alerts generated ${getDateStamp()}.
 
 ${reorderAlerts.length} items below threshold:
 - CRITICAL (zero stock): ${critCount}
@@ -172,13 +183,14 @@ ${reorderAlerts.length} items below threshold:
 
 Inventory source: ${path.basename(inventoryFolder)}`;
 
-  const sent = await sendEmail(
-    NOTIFY_EMAIL,
-    `LAM Kitting Reorder Alerts - ${getDateStamp()}`,
-    emailBody,
-    [outputFile]
-  );
-  console.log(sent ? '  Email sent.' : '  Email failed (check Himalaya config).');
+    const sent = await sendEmail(
+      NOTIFY_EMAIL,
+      `LAM Kitting Reorder Alerts - ${getDateStamp()}`,
+      emailBody,
+      [outputFile]
+    );
+    console.log(sent ? '  Email sent.' : '  Email failed (check Himalaya config).');
+  }
 }
 
 // -----------------------------------------------------------------------------
@@ -304,7 +316,8 @@ function loadHistoricalPurchaseData(mpns) {
     return {};
   }
 
-  // Build SQL query for most recent purchase per MPN
+  // Build SQL query for most recent LAM purchase per MPN
+  // LAM Research bpartner_id = 1000730
   const sql = `
     WITH recent_purchases AS (
       SELECT
@@ -318,10 +331,13 @@ function loadHistoricalPurchaseData(mpns) {
       JOIN adempiere.c_order o ON ol.c_order_id = o.c_order_id
       JOIN adempiere.c_bpartner bp ON o.c_bpartner_id = bp.c_bpartner_id
       LEFT JOIN adempiere.ad_user u ON o.createdby = u.ad_user_id
+      JOIN adempiere.chuboe_rfq_line rl ON ol.chuboe_vq_line_id = rl.chuboe_rfq_line_id
+      JOIN adempiere.chuboe_rfq rfq ON rl.chuboe_rfq_id = rfq.chuboe_rfq_id
       WHERE o.issotrx = 'N'
         AND o.isactive = 'Y'
         AND ol.chuboe_mpn IS NOT NULL
         AND ol.chuboe_mpn != ''
+        AND (rfq.c_bpartner_id = 1000730 OR rfq.chuboe_bpartner_enduser_id = 1000730)
     )
     SELECT chuboe_mpn, supplier_name, purchase_price, buyer_name, dateordered::date
     FROM recent_purchases
@@ -359,10 +375,72 @@ function loadHistoricalPurchaseData(mpns) {
 }
 
 // -----------------------------------------------------------------------------
+// Step 4b: Load Recent POVs (vendor receipts in last 4 months)
+// -----------------------------------------------------------------------------
+
+function loadRecentPOVs() {
+  // LAM Research bpartner_id = 1000730
+  // Filter POVs to only those linked to LAM RFQs (as customer or end-user)
+  const sql = `
+    WITH recent_povs AS (
+      SELECT
+        ol.chuboe_mpn as mpn,
+        io.documentno as pov_number,
+        iol.movementqty,
+        io.movementdate::date,
+        bp.name as supplier,
+        ROW_NUMBER() OVER (PARTITION BY ol.chuboe_mpn ORDER BY io.movementdate DESC) as rn
+      FROM adempiere.m_inoutline iol
+      JOIN adempiere.m_inout io ON iol.m_inout_id = io.m_inout_id
+      JOIN adempiere.c_orderline ol ON iol.c_orderline_id = ol.c_orderline_id
+      JOIN adempiere.c_bpartner bp ON io.c_bpartner_id = bp.c_bpartner_id
+      JOIN adempiere.chuboe_rfq_line rl ON ol.chuboe_vq_line_id = rl.chuboe_rfq_line_id
+      JOIN adempiere.chuboe_rfq rfq ON rl.chuboe_rfq_id = rfq.chuboe_rfq_id
+      WHERE io.issotrx = 'N'
+        AND io.isactive = 'Y'
+        AND io.movementdate >= CURRENT_DATE - INTERVAL '4 months'
+        AND ol.chuboe_mpn IS NOT NULL
+        AND ol.chuboe_mpn != ''
+        AND (rfq.c_bpartner_id = 1000730 OR rfq.chuboe_bpartner_enduser_id = 1000730)
+    )
+    SELECT mpn, pov_number, movementqty, movementdate, supplier
+    FROM recent_povs WHERE rn = 1;
+  `;
+
+  try {
+    const result = execSync(`psql -t -A -F '|' -c "${sql.replace(/"/g, '\\"')}"`, {
+      encoding: 'utf8',
+      maxBuffer: 50 * 1024 * 1024
+    });
+
+    const povData = {};
+    const lines = result.trim().split('\n').filter(l => l.trim());
+
+    for (const line of lines) {
+      const [mpn, pov, qty, date, supplier] = line.split('|');
+      if (mpn && mpn.trim()) {
+        povData[mpn.trim()] = {
+          POV_Number: (pov || '').trim(),
+          POV_Qty: parseFloat(qty) || 0,
+          POV_Date: (date || '').trim(),
+          POV_Supplier: (supplier || '').trim()
+        };
+      }
+    }
+
+    return povData;
+  } catch (err) {
+    console.error('  WARNING: Could not load recent POV data from ERP');
+    console.error(`  ${err.message}`);
+    return {};
+  }
+}
+
+// -----------------------------------------------------------------------------
 // Step 5: Identify Reorder Candidates
 // -----------------------------------------------------------------------------
 
-function identifyReorderCandidates(aggregated, excelData, historicalData) {
+function identifyReorderCandidates(aggregated, excelData, historicalData, recentPOVs = {}) {
   const alerts = [];
   const inventoryMPNs = new Set(Object.keys(aggregated));
 
@@ -397,6 +475,7 @@ function identifyReorderCandidates(aggregated, excelData, historicalData) {
 
       // Get historical data if available
       const history = historicalData[mpn] || {};
+      const pov = recentPOVs[mpn];
 
       alerts.push({
         'Lam P/N': excel.CPC,
@@ -415,6 +494,7 @@ function identifyReorderCandidates(aggregated, excelData, historicalData) {
         'OT Buyer': history.OT_Buyer || '',
         'Historical Purchase Price': history.Historical_Purchase_Price || '',
         'Last Purchase Date': history.Last_Purchase_Date || '',
+        'Recent POV': pov ? `${pov.POV_Number} (${pov.POV_Date}, ${pov.POV_Qty} pcs from ${pov.POV_Supplier})` : '',
         'Shortfall': shortfall,
         'Priority': priority
       });
@@ -435,6 +515,7 @@ function identifyReorderCandidates(aggregated, excelData, historicalData) {
     if (minQty <= 0) continue;
 
     const history = historicalData[mpn] || {};
+    const pov = recentPOVs[mpn];
 
     alerts.push({
       'Lam P/N': excel.CPC,
@@ -453,6 +534,7 @@ function identifyReorderCandidates(aggregated, excelData, historicalData) {
       'OT Buyer': history.OT_Buyer || '',
       'Historical Purchase Price': history.Historical_Purchase_Price || '',
       'Last Purchase Date': history.Last_Purchase_Date || '',
+      'Recent POV': pov ? `${pov.POV_Number} (${pov.POV_Date}, ${pov.POV_Qty} pcs from ${pov.POV_Supplier})` : '',
       'Shortfall': minQty,  // 100% shortfall
       'Priority': 'CRITICAL'  // Highest priority - zero stock
     });
@@ -493,6 +575,7 @@ function writeReorderAlerts(alerts, outputPath) {
     'OT Buyer',
     'Historical Purchase Price',
     'Last Purchase Date',
+    'Recent POV',
     'Shortfall',
     'Priority'
   ];

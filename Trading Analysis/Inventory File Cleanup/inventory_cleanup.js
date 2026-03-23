@@ -176,6 +176,12 @@ async function downloadAttachment(messageId, folder = 'INBOX') {
     return new Promise((resolve, reject) => {
         console.log(`  Exporting message ${messageId} to extract attachments...`);
 
+        // Clean up any previous ASTItemLotsReport files in /tmp to avoid stale matches
+        const oldFiles = fs.readdirSync('/tmp').filter(f => f.includes('ASTItemLotsReport'));
+        for (const f of oldFiles) {
+            try { fs.unlinkSync(path.join('/tmp', f)); } catch (e) { /* ignore */ }
+        }
+
         const proc = spawn(HIMALAYA_BIN, [
             'message', 'export',
             '--account', EMAIL_CONFIG.account,

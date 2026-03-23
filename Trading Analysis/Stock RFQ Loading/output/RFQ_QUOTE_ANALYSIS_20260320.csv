@@ -1,0 +1,36 @@
+MPN,RFQ Qty,Broker/Sender,BP Key,Our Stock,Franchise Stock,Franchise Low,Suggested Resale,Flag,Notes
+UCC28C43DR,18187,diana@qixunmicro-ic.com (QiXun Micro IC),1013161,5687,9239,$0.5022,$0.1507 - $0.2009,,"Franchise-short, scarcity premium"
+LIS3DHTR,8000,autosend@icsource.com (ICSource auto),1008499,47894,1612691,$0.7743,$0.1549 - $0.2323,,
+LIS3DHTR,32000,Newchip Electronics (1007081),1007081,47894,1612691,$0.7743,$0.1549 - $0.2323,,
+PMMAD1103-LF,3500,bs@alantys.com (Alantys Technology),1002761,3315,798,$1.5970,$0.4791 - $0.6388,,"Franchise-short, scarcity premium"
+ALM-38140-TR1G,1537,Katia-Xinsheng@aliyun.com (Xinsheng),1008499,1537,-,-,MANUAL - No franchise ref,PRICE CHECK?,Qty matches our exact stock (1537)
+OPA1678IDR,14663,lily@szhfb.com.cn (SZ HFB),1008499,14663,21325,$0.3371,$0.1011 - $0.1348,PRICE CHECK?,Qty matches our exact stock (14663)
+LIS2DH12TR,4000,lris@igzrc.cn (IGZRC),1008499,4000,97274,$1.0060,$0.2012 - $0.3018,PRICE CHECK?,Qty matches our exact stock (4000)
+WKO331MCPCF0KR,2997,bluesu852@163.com (Unknown),1008499,3000,8170,$0.2960,$0.0592 - $0.0888,PRICE CHECK?,Qty matches our exact stock (3000)
+SN55107AJ,1378,alan@zkxwic.com (Alan Electronic),1009583,1378,75,$17.9100,$5.3730 - $7.1640,PRICE CHECK?,Qty matches our exact stock (1378)
+OPA2834IDGKR,10579,xixi265896@163.com (Unknown),1013161,10579,3455,$0.8642,$0.2593 - $0.3457,PRICE CHECK?,Qty matches our exact stock (10579)
+LIS3DHTR,47894,rachel@xiaochuang.org.cn (Rachel Weier),1010161,47894,1612691,$0.7743,$0.1549 - $0.2323,PRICE CHECK?,Qty matches our exact stock (47894)
+LIS2DH12TR,4000,rachel@xiaochuang.org.cn (Rachel Weier),1010161,4000,97274,$1.0060,$0.2012 - $0.3018,PRICE CHECK?,Qty matches our exact stock (4000)
+STD5N52U,83378,zhengyang@pimee.cn (Zheng yang/Pimee),1008499,80878,14932,$0.4590,$0.1377 - $0.1836,PRICE CHECK?,Qty matches our exact stock (80878)
+FT2232HL,1000,Rukat_JinXian@163.com (JinXian Technology),1008499,-,-,-,,NO STOCK,Nothing to quote
+EP3C120F484I7N,1000,alice@chenguang-ic.com (Chenguang IC),1008499,-,-,-,,NO STOCK,Nothing to quote
+IS42S16400J-7TLI,10000,kuangye@xinyuanxin.net (XiaoChen/XinYuanXin),1007783,-,-,-,,NO STOCK,Nothing to quote
+AD9707BCPZ-RL7,2997,Lynn@qxqcc.cn (Lynntech?),1005200,-,-,-,,NO STOCK,Nothing to quote
+EPCS64SI16N,4337,18807072336@163.com (Unknown),1008499,-,-,-,,NO STOCK,Nothing to quote
+AD9220ARS-REEL,5230,mini@qxqcc.cn (MiniMetal Ltd),1012193,-,-,-,,NO STOCK,Nothing to quote
+STM32F103RBT6,1280,3393254835@qq.com (Unknown QQ),1008499,-,-,-,,NO STOCK,Nothing to quote
+PTH05060WAH,338,17728867474@163.com (Unknown),1008499,-,-,-,,NO STOCK,Nothing to quote
+FT2232HL-REEL,1000,alice@chenguang-ic.com (Chenguang IC),1008499,-,-,-,,NO STOCK,Nothing to quote
+EP3C120F484I7N,3467,echoamberch@163.com (Unknown),1008499,-,-,-,,NO STOCK,Nothing to quote
+FT2232HL-REEL,1000,elis@chenguang-ic.com (Chenguang IC),1013161,-,-,-,,NO STOCK,Nothing to quote
+MT40A256M16LY-062E,1950,stephenleo56@163.com (Unknown),1013161,-,-,-,,NO STOCK,Nothing to quote
+W25Q128JVSIQ,1985,stella@lwchain.cn (Sini/LWChain),1008499,-,-,-,,NO STOCK,Nothing to quote
+FT2232HL-REEL,1000,alice@chenguang-ic.com (Chenguang IC),1008499,-,-,-,,NO STOCK,Nothing to quote
+PMMAD1103LF,3500,autosend@icsource.com → Alantys Technology,1008499,-,-,-,,NO STOCK,Nothing to quote
+MT40A256M16LY-062E,1950,alice@chenguang-ic.com (Chenguang IC),1008499,-,-,-,,NO STOCK,Nothing to quote
+XC9521610HQ208I,200,autosend@icsource.com → Chip Prospect Industry,1008499,-,-,-,,NO STOCK,Nothing to quote
+EPCS64SI16N,4337,zoe@tuije.cn (Tuije),1008499,-,-,-,,NO STOCK,Nothing to quote
+STLD125N4F6AG,25000,chioe77@foxmail.com (Unknown),1008499,-,-,-,,NO STOCK,Nothing to quote
+MT47H128M16RT-25E:C,2000,liorah@foxmail.com (Unknown),1008499,-,-,-,,NO STOCK,Nothing to quote
+AD9707BCPZ-RL7,2997,mila-5085qwer@qq.com (Unknown QQ),1008499,-,-,-,,NO STOCK,Nothing to quote
+FT2232HL-REEL,1000,sam-nuo@foxmail.com (Unknown),1008499,-,-,-,,NO STOCK,Nothing to quote
