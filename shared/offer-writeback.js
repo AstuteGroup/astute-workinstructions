@@ -230,14 +230,14 @@ async function writeOffer(opts) {
     INSERT INTO ai_writeback.chuboe_offer (
       chuboe_offer_id, ad_client_id, ad_org_id, isactive,
       created, createdby, updated, updatedby,
-      c_bpartner_id, chuboe_offer_type_id, description, value, datetrx,
+      c_bpartner_id, chuboe_offer_type_id, description, datetrx,
       chuboe_user_id, chuboe_buyer_id,
       chuboe_csv_import, chuboe_pulllmarketofferinto,
       add_pricing_api_vendor, chuboe_search_vendor
     ) VALUES (
       ${offerId}, ${IDEMPIERE_DEFAULTS.ad_client_id}, ${IDEMPIERE_DEFAULTS.ad_org_id}, '${IDEMPIERE_DEFAULTS.isactive}',
       CURRENT_TIMESTAMP, ${IDEMPIERE_DEFAULTS.createdby}, CURRENT_TIMESTAMP, ${IDEMPIERE_DEFAULTS.updatedby},
-      ${bpartnerId}, ${offerTypeId}, ${sqlStr(description)}, ${sqlStr(String(offerId))}, ${datetrx ? sqlStr(datetrx) : 'CURRENT_TIMESTAMP'},
+      ${bpartnerId}, ${offerTypeId}, ${sqlStr(description)}, ${datetrx ? sqlStr(datetrx) : 'CURRENT_TIMESTAMP'},
       ${sqlNum(userId)}, ${sqlNum(buyerId)},
       'N', 'N',
       'N', 'N'
