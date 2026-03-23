@@ -312,10 +312,43 @@ The upload template column `Business Partner Search Key` expects the **search_ke
 
 ---
 
+## Direct Database Write-Back
+
+The shared `offer-writeback.js` module enables writing offers directly to the ERP instead of CSV import.
+
+**Module:** `shared/offer-writeback.js` — see `shared/README.md` for full API.
+
+### Usage
+
+```javascript
+const { writeOffer } = require('../../shared/offer-writeback');
+
+await writeOffer({
+  bpartnerId: resolvedPartnerId,     // from partner-lookup.js
+  offerTypeId: 'Customer Excess',    // or 1000000, 'Broker Stock Offer', etc.
+  description: '03.23.2026-Celestica',
+  lines: extractedLines.map(l => ({
+    mpn: l.mpn,
+    mfrText: l.mfrText,
+    qty: l.qty,
+    price: l.price,
+    dateCode: l.dateCode,
+    cpc: l.cpc,
+  }))
+});
+```
+
+### TODO for Integration
+
+- [ ] Wire `offer-writeback.js` into extraction pipeline as alternative to CSV-only output
+- [ ] Decide: write-back as replacement for CSV email, or in addition to it?
+
+---
+
 ## TODO
 - [x] Get ERP upload template specification (exact column names/formats) ✓ `Market Offer Line Import Template.csv`
 - [x] Email notification to jake.harris@astutegroup.com ✓ `send-offer-email.js`
-- [ ] Document offer header creation (chuboe_offer parent record)
+- [x] ~~Document offer header creation (chuboe_offer parent record)~~ ✓ `shared/offer-writeback.js` handles this (2026-03-23)
 - [ ] Define validation rules (required fields, value constraints)
 - [x] Build extraction logic for common Excel/CSV formats ✓ `extract-market-offers.js`
 - [ ] Add duplicate detection (same partner + MPN within N days)

@@ -21,6 +21,7 @@
 | `email-tracker.js` | Processed email dedup, stats, retry queue. Factory: `createTracker(dataDir)` | Tracking processed emails in any workflow | VQ Loading, Stock RFQ Loading |
 | `notifier.js` | Email notifications via AWS WorkMail SMTP. Factory: `createNotifier({fromEmail, fromName})` | Sending notifications/attachments from any workflow | VQ Loading, Stock RFQ Loading |
 | `rfq-writer.js` | Write RFQs to `ai_writeback` schema (header + line + line_mpn). Auto IDs, MPN description enrichment, MFR ID lookup. | Writing any RFQ type to the ERP writeback | Stock RFQ Loading, (future) other RFQ workflows |
+| `offer-writeback.js` | Write market offers to `ai_writeback` schema (header + line + optional line_mpn). Auto IDs, batch write, deactivation of prior offers. | Writing any offer type to the ERP writeback | Market Offer Uploading, Inventory File Cleanup, (future) VQ Loading |
 
 ---
 
@@ -337,4 +338,88 @@ const result = await writeRFQ({
 | `targetPrice` | No | 0 | Customer's target price |
 | `description` | No | System lookup | Auto-enriched from 120-day history |
 | `dateCode` | No | NULL | Date code requirement |
+| `mpnClean` | No | Auto-generated | Stripped MPN for matching |
+
+---
+
+## offer-writeback.js
+
+Writes complete market offers (header + lines + optional line MPNs) to the `ai_writeback` schema for ERP import via FDW. Handles all offer types.
+
+```javascript
+const { writeOffer, writeOffers, deactivatePriorOffers, lookupMfrId } = require('../shared/offer-writeback');
+
+// Write a single offer
+const result = await writeOffer({
+  bpartnerId: 1000332,              // Astute Electronics Inc
+  offerTypeId: 1000008,             // or 'Stock - Austin Warehouse'
+  description: 'Weekly inventory 2026-03-23',
+  lines: [
+    { mpn: 'ADS1115IDGST', mfrText: 'Texas Instruments', qty: 500, price: 3.50, dateCode: '2024+' },
+    { mpn: 'LM358DR', qty: 1000, price: 0.25 }
+  ]
+});
+// → { offerId: 9000000, linesWritten: 2, mpnsWritten: 0, errors: [] }
+
+// Batch: write multiple offers at once
+const results = await writeOffers([offer1Opts, offer2Opts, offer3Opts]);
+
+// Deactivate prior offers before refresh (e.g., weekly inventory)
+deactivatePriorOffers(1000332, 1000008);  // BP + type
+```
+
+### Offer Types
+
+| Name | ID |
+|------|----|
+| Customer Excess | 1000000 |
+| Broker Stock Offer | 1000001 |
+| Franchise Offers | 1000002 |
+| Customer Lead Time Buy | 1000003 |
+| Franchise Stock Offers | 1000004 |
+| Requested Quote | 1000005 |
+| Stock - Stevenage | 1000006 |
+| Stock - Austin Warehouse | 1000008 |
+| Stock - Hong Kong Warehouse | 1000009 |
+| Stock - Philippines Warehouse | 1000014 |
+
+*(Plus portal types: IC Source, NetComp, ERAI, Partstack — both Stock and Unqualified Spot RFQ)*
+
+### Tables Written
+
+1. `ai_writeback.chuboe_offer` — Offer header (one per call)
+2. `ai_writeback.chuboe_offer_line` — One per line item
+3. `ai_writeback.chuboe_offer_line_mpn` — Optional (set `writeMpnRecords: true`)
+
+### writeOffer Options
+
+| Field | Required | Default | Notes |
+|-------|----------|---------|-------|
+| `bpartnerId` | Yes | — | c_bpartner_id |
+| `offerTypeId` | Yes | — | Numeric ID or type name string |
+| `description` | No | NULL | Offer-level description |
+| `datetrx` | No | NOW | Transaction date |
+| `userId` | No | NULL | chuboe_user_id |
+| `buyerId` | No | NULL | chuboe_buyer_id |
+| `writeMpnRecords` | No | false | Also write chuboe_offer_line_mpn |
+
+### Line Object Fields
+
+| Field | Required | Default | Notes |
+|-------|----------|---------|-------|
+| `mpn` | Yes | — | Part number |
+| `qty` | No | NULL | Quantity |
+| `price` | No | NULL | Unit price (PriceEntered) |
+| `mfrId` | No | NULL | Use `lookupMfrId()` to resolve |
+| `mfrText` | No | NULL | Manufacturer text |
+| `dateCode` | No | NULL | Date code |
+| `leadTime` | No | NULL | Lead time |
+| `packageDesc` | No | NULL | Package description |
+| `description` | No | NULL | Line-level notes |
+| `moq` | No | NULL | Minimum order quantity |
+| `spq` | No | NULL | Standard pack quantity |
+| `cpc` | No | NULL | Customer part code |
+| `recommendedResale` | No | NULL | Suggested resale price |
+| `countryId` | No | NULL | c_country_id |
+| `currencyId` | No | NULL | c_currency_id |
 | `mpnClean` | No | Auto-generated | Stripped MPN for matching |

@@ -416,10 +416,57 @@ The Python script replicates these Excel VBA macro operations:
 
 ---
 
+## Direct Database Write-Back
+
+The shared `offer-writeback.js` module enables writing inventory directly to the ERP instead of CSV import.
+
+**Module:** `shared/offer-writeback.js` — see `shared/README.md` for full API.
+
+### Warehouse → Offer Mapping
+
+Each warehouse group maps to a specific offer type and business partner (as used in production):
+
+| Warehouse Group | Offer Type (ID) | Business Partner (ID) | Search Key |
+|---|---|---|---|
+| Free_Stock_Austin | Stock - Austin Warehouse (1000008) | Astute Electronics Inc (1000332) | 1002336 |
+| Free_Stock_Stevenage | Stock - Stevenage (1000006) | Astute Electronics Inc (1000332) | 1002336 |
+| Free_Stock_Hong_Kong | Stock - Hong Kong Warehouse (1000009) | Astute Electronics Inc (1000332) | 1002336 |
+| Free_Stock_Philippines | Stock - Philippines Warehouse (1000014) | Astute Electronics Inc (1000332) | 1002336 |
+| Franchise_Stock | Stock - Austin Warehouse (1000008) | Astute Electronics - Franchise Stock (1000325) | 1002329 |
+| GE_Consignment | Stock - Austin Warehouse (1000008) | Astute Electronics - GE Aviation Excess (1003236) | 1005235 |
+| Taxan_Consignment | Stock - Austin Warehouse (1000008) | Astute Electronics - Taxan Excess (1003621) | 1005619 |
+| Spartronics_Consignment | Stock - Austin Warehouse (1000008) | Astute Electronics - Spartronics Excess (1005225) | 1007221 |
+| Eaton_Consignment | Stock - Philippines Warehouse (1000014) | Astute Electronics Inc - Eaton Consignment (1010966) | 1012832 |
+
+### Usage (Future Integration)
+
+```javascript
+const { writeOffer, deactivatePriorOffers } = require('../../shared/offer-writeback');
+
+// 1. Deactivate previous week's inventory for this warehouse
+deactivatePriorOffers(1000332, 1000008);
+
+// 2. Write fresh inventory
+await writeOffer({
+  bpartnerId: 1000332,
+  offerTypeId: 1000008,
+  description: 'Weekly inventory 2026-03-23',
+  lines: chuboeRows  // already mapped by inventory_cleanup.js
+});
+```
+
+### TODO for Integration
+
+- [ ] Wire `offer-writeback.js` into `inventory_cleanup.js` as post-processing step
+- [ ] Add deactivation of prior week's offers before writing new ones
+- [ ] Decide: write-back as replacement for CSV email, or in addition to it?
+
+---
+
 ## Future Enhancements
 
 - [ ] Define and implement NetComponents upload template
 - [ ] Define and implement IC Source upload template
-- [ ] Add direct iDempiere write-back (bypass CSV import)
+- [x] ~~Add direct iDempiere write-back (bypass CSV import)~~ ✓ Module built: `shared/offer-writeback.js` (2026-03-23). Wiring into inventory_cleanup.js pending.
 - [x] ~~Add email notification on completion~~ ✓ Implemented 2026-03-16
 - [x] ~~Add scheduling for automated runs~~ ✓ Cron job added 2026-03-16
