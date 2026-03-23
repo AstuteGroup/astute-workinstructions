@@ -25,8 +25,9 @@ const { createTracker } = require('../../shared/email-tracker');
 const { createNotifier } = require('../../shared/notifier');
 const sharedLogger = require('../../shared/logger');
 const { resolvePartner } = require('../../shared/partner-lookup');
-const { normalizeMfr } = require('../../shared/mfr-lookup');
+const { normalizeMfr, lookupMfr } = require('../../shared/mfr-lookup');
 const { writeCSVFile } = require('../../shared/csv-utils');
+const { writeRFQ } = require('../../shared/rfq-writer');
 
 // Config
 const ACCOUNT = 'stockrfq';
@@ -35,7 +36,8 @@ const SMTP_PASS = process.env.SMTP_PASS || 'A$tuteu$a';
 const OUTPUT_DIR = path.join(__dirname, 'output');
 const DATA_DIR = path.join(__dirname, 'data');
 const WORKINSTRUCTIONS_ROOT = path.resolve(__dirname, '../..');
-const UNQUALIFIED_BROKER = '1008499';
+const UNQUALIFIED_BROKER = '1008499';       // search_key for CSV
+const UNQUALIFIED_BROKER_ID = 1006505;      // c_bpartner_id for DB writeback
 
 // RFQ Import Template columns
 const RFQ_COLUMNS = [
@@ -406,7 +408,7 @@ async function run() {
   const processedIds = [];
   const notRfqIds = [];
   const needsReviewIds = [];
-  const summary = { processed: 0, notRfq: 0, needsReview: 0, totalLines: 0, errors: 0 };
+  const summary = { processed: 0, notRfq: 0, needsReview: 0, totalLines: 0, errors: 0, rfqsWritten: 0, writebackErrors: 0 };
 
   for (const envelope of unprocessed) {
     log.info(`--- Processing email ${envelope.id}: "${envelope.subject}" from ${envelope.from?.addr || 'unknown'}`);
@@ -459,9 +461,10 @@ async function run() {
 
       let customerKey = UNQUALIFIED_BROKER;
       let customerName = senderName || senderEmail;
+      let partner = { matched: false, c_bpartner_id: String(UNQUALIFIED_BROKER_ID) };
 
       if (senderEmail) {
-        const partner = resolvePartner({
+        partner = resolvePartner({
           email: senderEmail,
           companyName: senderName,
           partnerType: 'any'
@@ -477,9 +480,15 @@ async function run() {
         }
       }
 
-      // Steps 5-6: MFR matching + build CSV rows
+      // Steps 5-6: MFR matching + build CSV rows + DB writeback lines
+      const rfqWriterLines = [];
+
       for (const item of items) {
-        const mfr = item.mfr ? normalizeMfr(item.mfr) : '';
+        // Single lookup: gets canonical name + chuboe_mfr_id (cached after first hit)
+        const mfrResult = item.mfr ? lookupMfr(item.mfr) : { canonical: '', id: null };
+        const mfr = mfrResult.canonical;
+        const mfrId = mfrResult.id;
+
         const mpn = (item.mpn || '').trim();
         const cpc = item.cpc || mpn; // Default CPC to MPN if not distinct
         const qty = parseInt(item.qty, 10) || 0;
@@ -491,6 +500,7 @@ async function run() {
           description = description ? `${customerName} - ${description}` : customerName;
         }
 
+        // CSV row (existing behavior)
         allRows.push([
           customerKey,    // Chuboe_RFQ_ID[Value]
           cpc,            // Chuboe_CPC
@@ -500,10 +510,50 @@ async function run() {
           price,          // PriceEntered
           description     // Description
         ]);
+
+        // DB writeback line
+        rfqWriterLines.push({
+          mpn,
+          mfrId,
+          mfrText: mfr || null,
+          qty,
+          targetPrice: price || 0,
+          dateCode: null,
+        });
       }
 
       log.info(`  Extracted ${items.length} lines`);
       summary.totalLines += items.length;
+
+      // Step 5b: Write RFQ to ai_writeback (parallel to CSV)
+      if (!DRY_RUN) {
+        try {
+          const bpId = partner.matched ? parseInt(partner.c_bpartner_id, 10) : UNQUALIFIED_BROKER_ID;
+
+          // Build description from email subject (strip FW:/Fwd: prefixes)
+          const rfqDesc = envelope.subject.replace(/^(FW|Fwd|Re):\s*/gi, '').slice(0, 2000);
+
+          const writeResult = await writeRFQ({
+            bpartnerId: bpId,
+            type: 'Stock',
+            description: rfqDesc,
+            lines: rfqWriterLines,
+          });
+
+          if (writeResult.errors.length === 0) {
+            log.info(`  DB writeback: rfqId=${writeResult.rfqId}, ${writeResult.linesWritten} lines`);
+            summary.rfqsWritten++;
+          } else {
+            log.warn(`  DB writeback partial: rfqId=${writeResult.rfqId}, errors: ${writeResult.errors.join('; ')}`);
+            summary.rfqsWritten++;
+            summary.writebackErrors += writeResult.errors.length;
+          }
+        } catch (writeErr) {
+          log.error(`  DB writeback failed: ${writeErr.message}`);
+          summary.writebackErrors++;
+        }
+      }
+
       processedIds.push(envelope.id);
       summary.processed++;
 
@@ -556,9 +606,10 @@ async function run() {
         `Errors: ${summary.errors}`,
         '',
         `Total RFQ lines extracted: ${summary.totalLines}`,
+        `RFQs written to DB: ${summary.rfqsWritten}${summary.writebackErrors ? ` (${summary.writebackErrors} line errors)` : ''}`,
         `Output file: ${path.basename(outputFile)}`,
         '',
-        'CSV attached for review before ERP import.',
+        'CSV attached for review. RFQs also staged in ai_writeback for ERP import.',
         '',
         '---',
         'Automated by Stock RFQ Runner'
@@ -610,7 +661,7 @@ async function run() {
     recordsGenerated: summary.totalLines
   });
 
-  log.info(`=== Stock RFQ Runner complete: ${summary.processed} emails → ${summary.totalLines} lines ===`);
+  log.info(`=== Stock RFQ Runner complete: ${summary.processed} emails → ${summary.totalLines} lines, ${summary.rfqsWritten} RFQs written to DB ===`);
 }
 
 // Run

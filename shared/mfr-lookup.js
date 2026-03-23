@@ -76,13 +76,14 @@ function saveCache() {
 /**
  * Query chuboe_mfr table for a manufacturer name
  * Uses strict matching to avoid false positives (e.g., "Target" → "Kopin Targeting Corp")
+ * Returns { name, id } or null
  */
 function queryDB(mfrName) {
   try {
     const escaped = mfrName.replace(/'/g, "''");
-    const sql = `SELECT name FROM adempiere.chuboe_mfr WHERE ad_client_id = 1000000 AND isactive='Y' AND (UPPER(name) = UPPER('${escaped}') OR name ILIKE '${escaped} %' OR name ILIKE '% ${escaped}' OR name ILIKE '${escaped},%') ORDER BY CASE WHEN UPPER(name) = UPPER('${escaped}') THEN 0 ELSE 1 END LIMIT 1`;
+    const sql = `SELECT chuboe_mfr_id, name FROM adempiere.chuboe_mfr WHERE isactive='Y' AND (UPPER(name) = UPPER('${escaped}') OR name ILIKE '${escaped} %' OR name ILIKE '% ${escaped}' OR name ILIKE '${escaped},%' OR '${escaped}' ILIKE name || ' %') ORDER BY CASE WHEN UPPER(name) = UPPER('${escaped}') THEN 0 WHEN name ILIKE '${escaped}%' THEN 1 ELSE 2 END, LENGTH(name) ASC LIMIT 1`;
 
-    const result = execSync(`psql -t -A -c "${sql.replace(/"/g, '\\"')}"`, {
+    const result = execSync(`psql -t -A -F '|' -c "${sql.replace(/"/g, '\\"')}"`, {
       encoding: 'utf-8',
       timeout: 10000,
     });
@@ -91,7 +92,14 @@ function queryDB(mfrName) {
       const t = l.trim();
       return t && !t.includes('rbash') && !t.includes('bashrc') && !t.includes('/dev/null') && !t.includes('restricted:') && !t.includes('/tmp/claude');
     });
-    if (lines.length > 0) return lines[0].trim();
+    if (lines.length > 0) {
+      const parts = lines[0].trim().split('|');
+      if (parts.length >= 2) {
+        return { id: parseInt(parts[0], 10), name: parts[1] };
+      }
+      // Fallback: single column (shouldn't happen but be safe)
+      return { id: null, name: parts[0] };
+    }
   } catch (e) {
     // Also check stderr for rbash environments
     const combined = ((e.stdout || '') + '\n' + (e.stderr || '')).trim();
@@ -99,8 +107,26 @@ function queryDB(mfrName) {
       const t = l.trim();
       return t && !t.includes('rbash') && !t.includes('bashrc') && !t.includes('/dev/null') && !t.includes('restricted:') && !t.includes('/tmp/claude') && !t.includes('ERROR:');
     });
-    if (lines.length > 0) return lines[0].trim();
+    if (lines.length > 0) {
+      const parts = lines[0].trim().split('|');
+      if (parts.length >= 2) {
+        return { id: parseInt(parts[0], 10), name: parts[1] };
+      }
+      return { id: null, name: parts[0] };
+    }
   }
+  return null;
+}
+
+/**
+ * Read a cache entry. Handles both old format (string) and new format ({ name, id }).
+ * Returns { name, id } or null.
+ */
+function cacheGet(c, upper) {
+  if (!(upper in c)) return null;
+  const val = c[upper];
+  if (val && typeof val === 'object') return val;       // new format
+  if (typeof val === 'string') return { name: val, id: null }; // old format (no ID)
   return null;
 }
 
@@ -130,64 +156,88 @@ function normalizeMfr(mfrText) {
 
   // 2. Check cache
   const c = loadCache();
-  if (upper in c) return c[upper] || trimmed;
+  const cached = cacheGet(c, upper);
+  if (cached) return cached.name || trimmed;
 
   // 3. DB lookup
   const dbResult = queryDB(trimmed);
   if (dbResult) {
-    c[upper] = dbResult;
+    c[upper] = { name: dbResult.name, id: dbResult.id };
     cache = c;
     saveCache();
-    return dbResult;
+    return dbResult.name;
   }
 
   // 4. Pass-through (cache the miss to avoid re-querying)
-  c[upper] = trimmed;
+  c[upper] = { name: trimmed, id: null };
   cache = c;
   saveCache();
   return trimmed;
 }
 
 /**
- * Full lookup returning match details (for workflows that need to know the source)
+ * Full lookup returning match details (for workflows that need to know the source).
+ * Now includes chuboe_mfr_id for DB writeback.
  *
  * @param {string} mfrText - Raw manufacturer name
- * @returns {{ canonical: string, source: string, matched: boolean }}
+ * @returns {{ canonical: string, id: number|null, source: string, matched: boolean }}
  */
 function lookupMfr(mfrText) {
-  if (!mfrText) return { canonical: '', source: 'empty', matched: false };
+  if (!mfrText) return { canonical: '', id: null, source: 'empty', matched: false };
 
   const trimmed = mfrText.trim();
   const upper = trimmed.toUpperCase();
 
-  // 1. Alias
+  // 1. Alias — need to resolve the ID via DB/cache since alias file only has names
   const aliases = loadAliases();
   if (aliases[upper]) {
-    return { canonical: aliases[upper], source: 'alias', matched: true };
+    const aliasName = aliases[upper];
+    // Check cache for the alias name's ID
+    const aliasUpper = aliasName.toUpperCase();
+    const c = loadCache();
+    const cached = cacheGet(c, aliasUpper);
+    if (cached && cached.id) {
+      return { canonical: aliasName, id: cached.id, source: 'alias', matched: true };
+    }
+    // Query DB for the alias name's ID
+    const dbResult = queryDB(aliasName);
+    if (dbResult) {
+      c[aliasUpper] = { name: dbResult.name, id: dbResult.id };
+      c[upper] = { name: dbResult.name, id: dbResult.id };
+      cache = c;
+      saveCache();
+      return { canonical: dbResult.name, id: dbResult.id, source: 'alias', matched: true };
+    }
+    return { canonical: aliasName, id: null, source: 'alias', matched: true };
   }
 
   // 2. Cache (check if it was a DB hit or a miss)
   const c = loadCache();
-  if (upper in c) {
-    const val = c[upper];
-    const wasDbHit = val !== trimmed && val !== upper;
-    return { canonical: val || trimmed, source: wasDbHit ? 'cache(db)' : 'cache(passthrough)', matched: wasDbHit };
+  const cached = cacheGet(c, upper);
+  if (cached) {
+    const wasDbHit = cached.name !== trimmed && cached.name !== upper;
+    return {
+      canonical: cached.name || trimmed,
+      id: cached.id || null,
+      source: wasDbHit ? 'cache(db)' : 'cache(passthrough)',
+      matched: wasDbHit,
+    };
   }
 
   // 3. DB
   const dbResult = queryDB(trimmed);
   if (dbResult) {
-    c[upper] = dbResult;
+    c[upper] = { name: dbResult.name, id: dbResult.id };
     cache = c;
     saveCache();
-    return { canonical: dbResult, source: 'db', matched: true };
+    return { canonical: dbResult.name, id: dbResult.id, source: 'db', matched: true };
   }
 
   // 4. Pass-through
-  c[upper] = trimmed;
+  c[upper] = { name: trimmed, id: null };
   cache = c;
   saveCache();
-  return { canonical: trimmed, source: 'passthrough', matched: false };
+  return { canonical: trimmed, id: null, source: 'passthrough', matched: false };
 }
 
 /**

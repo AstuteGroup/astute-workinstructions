@@ -20,6 +20,7 @@
 | `email-fetcher.js` | Email operations: list, read, move, folders. Factory: `createFetcher(account)` | Fetching/routing emails from any inbox | VQ Loading, Stock RFQ Loading |
 | `email-tracker.js` | Processed email dedup, stats, retry queue. Factory: `createTracker(dataDir)` | Tracking processed emails in any workflow | VQ Loading, Stock RFQ Loading |
 | `notifier.js` | Email notifications via AWS WorkMail SMTP. Factory: `createNotifier({fromEmail, fromName})` | Sending notifications/attachments from any workflow | VQ Loading, Stock RFQ Loading |
+| `rfq-writer.js` | Write RFQs to `ai_writeback` schema (header + line + line_mpn). Auto IDs, MPN description enrichment, MFR ID lookup. | Writing any RFQ type to the ERP writeback | Stock RFQ Loading, (future) other RFQ workflows |
 
 ---
 
@@ -273,3 +274,67 @@ await notifier.sendWithAttachment('jake@example.com', 'Subject', 'Body', [
 **SMTP password:** Set via `SMTP_PASS` env var or pass as `smtpPass` option.
 
 **Extracted from:** `vq-parser/src/utils/notifier.js` — generic send moved to shared; VQ-specific `sendFetchSummary` stays in vq-parser.
+
+---
+
+## rfq-writer.js
+
+Writes complete RFQ records (header + lines + line MPNs) to the `ai_writeback` schema for ERP import via FDW. Handles all RFQ types.
+
+```javascript
+const { writeRFQ, lookupMfrId } = require('../shared/rfq-writer');
+
+const mfrId = lookupMfrId('Vishay');  // → 1019796
+
+const result = await writeRFQ({
+  bpartnerId: 1000190,           // AGS Devices
+  type: 'Stock',                  // or 'Shortage', 'PPV', etc.
+  description: 'RFQ #790665',    // customer reference (optional)
+  // salesrepId: 1000004,         // defaults to Jake Harris
+  lines: [
+    { mpn: '561R10TCCT12', mfrId, qty: 200, targetPrice: 0 }
+  ]
+});
+// → { rfqId: 9000000, linesWritten: 1, mpnsWritten: 1, errors: [] }
+```
+
+### Features
+
+| Feature | Details |
+|---------|---------|
+| **Auto ID management** | IDs start at 9,000,000+, queries `ai_writeback` for current max |
+| **MPN description enrichment** | Looks up existing description from system (past 120 days) |
+| **API enrichment hook** | `enrichDescription(mpn, mpnClean)` callback for future API data |
+| **MFR ID lookup** | `lookupMfrId(name)` resolves manufacturer name → `chuboe_mfr_id` |
+| **MPN cleaning** | Strips non-alphanumeric, uppercases (matches iDempiere behavior) |
+| **All mandatory fields** | iDempiere columns, flag defaults, salesrep, status |
+
+### RFQ Types
+
+| Name | ID |
+|------|----|
+| Stock | 1000007 |
+| Shortage | 1000000 |
+| PPV | 1000001 |
+| EOL/LTB | 1000003 |
+| Hot Parts | 1000013 |
+| Unqualified Spot RFQ | 1000012 |
+
+### Tables Written
+
+1. `ai_writeback.chuboe_rfq` — RFQ header (one per call)
+2. `ai_writeback.chuboe_rfq_line` — One per line item
+3. `ai_writeback.chuboe_rfq_line_mpn` — One per line (MPN detail)
+
+### Line Object Fields
+
+| Field | Required | Default | Notes |
+|-------|----------|---------|-------|
+| `mpn` | Yes | — | Part number |
+| `qty` | Yes | — | Quantity |
+| `mfrId` | No | NULL | Use `lookupMfrId()` to resolve |
+| `mfrText` | No | NULL | Raw manufacturer text |
+| `targetPrice` | No | 0 | Customer's target price |
+| `description` | No | System lookup | Auto-enriched from 120-day history |
+| `dateCode` | No | NULL | Date code requirement |
+| `mpnClean` | No | Auto-generated | Stripped MPN for matching |
