@@ -684,13 +684,31 @@ async function fetchAndProcess() {
     console.log('-'.repeat(60));
 
     try {
-        // Step 1: List emails
-        console.log('\nStep 1: Checking inbox...');
-        const emails = await listEmails('INBOX');
-        console.log(`  Found ${emails.length} emails in INBOX`);
+        // Step 1: Sort inbox - move any inventory emails to Inventory Reports folder
+        console.log('\nStep 1: Sorting inbox...');
+        const inboxEmails = await listEmails('INBOX');
+        const inventoryInInbox = inboxEmails.filter(e => EMAIL_CONFIG.subjectPattern.test(e.subject));
+        if (inventoryInInbox.length > 0) {
+            console.log(`  Found ${inventoryInInbox.length} inventory email(s) in INBOX, moving to Inventory Reports...`);
+            for (const e of inventoryInInbox) {
+                await moveEmail(e.id, 'Inventory Reports', 'INBOX');
+            }
+        } else {
+            console.log('  No new inventory emails in INBOX');
+        }
 
-        // Step 2: Find matching email
-        const matchingEmail = emails.find(e => EMAIL_CONFIG.subjectPattern.test(e.subject));
+        // Step 2: Check Inventory Reports folder for unprocessed emails
+        console.log('\nStep 2: Checking Inventory Reports folder...');
+        const emails = await listEmails('Inventory Reports');
+        console.log(`  Found ${emails.length} emails in Inventory Reports`);
+
+        // Find the most recent matching email (highest task number = most recent report)
+        const matchingEmails = emails.filter(e => EMAIL_CONFIG.subjectPattern.test(e.subject));
+        const matchingEmail = matchingEmails.sort((a, b) => {
+            const numA = (a.subject.match(/(\d{7})/) || [0, 0])[1];
+            const numB = (b.subject.match(/(\d{7})/) || [0, 0])[1];
+            return parseInt(numB) - parseInt(numA);
+        })[0];
 
         if (!matchingEmail) {
             console.log('\n  No matching inventory report email found.');
@@ -704,28 +722,28 @@ async function fetchAndProcess() {
         console.log(`    Date: ${matchingEmail.date}`);
 
         // Step 3: Download attachment
-        console.log('\nStep 2: Downloading attachment...');
+        console.log('\nStep 3: Downloading attachment...');
         let attachmentPath;
         try {
-            attachmentPath = await downloadAttachment(matchingEmail.id);
+            attachmentPath = await downloadAttachment(matchingEmail.id, 'Inventory Reports');
             console.log(`  Downloaded: ${attachmentPath}`);
         } catch (err) {
             throw new Error(`Failed to download attachment: ${err.message}`);
         }
 
         // Step 4: Process the file
-        console.log('\nStep 3: Processing inventory file...');
+        console.log('\nStep 4: Processing inventory file...');
         const scriptDir = path.dirname(__filename);
         const result = processInventoryFile(attachmentPath, null);
 
         // Step 5: Create zip of Chuboe files
-        console.log('\nStep 4: Creating zip archive of Chuboe files...');
+        console.log('\nStep 5: Creating zip archive of Chuboe files...');
         const dateStr = new Date().toISOString().split('T')[0];
         const zipPath = path.join(result.outputDir, `OT_Chuboe_Files_${dateStr}.zip`);
         await createZipArchive(result.chuboeFiles, zipPath);
 
         // Step 6: Send emails
-        console.log('\nStep 5: Sending notification emails...');
+        console.log('\nStep 6: Sending notification emails...');
 
         // Email 1: Netcomponents Upload
         const sent1 = await sendEmail(
@@ -755,11 +773,11 @@ Date: ${dateStr}`,
         );
 
         // Step 7: Move processed email
-        console.log('\nStep 6: Moving email to processed folder...');
-        await moveEmail(matchingEmail.id, EMAIL_CONFIG.processedFolder);
+        console.log('\nStep 7: Moving email to processed folder...');
+        await moveEmail(matchingEmail.id, EMAIL_CONFIG.processedFolder, 'Inventory Reports');
 
         // Step 8: Cleanup attachment
-        console.log('\nStep 7: Cleaning up temp files...');
+        console.log('\nStep 8: Cleaning up temp files...');
         try {
             fs.unlinkSync(attachmentPath);
         } catch (e) { /* ignore */ }
