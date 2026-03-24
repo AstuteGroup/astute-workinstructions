@@ -178,6 +178,7 @@ Each search uses a fresh browser context to avoid session state pollution.
 | **Arrow** | 1000386 | 1002390 | Arrow Electronics |
 | **Newark** | 1000390 | 1002394 | Newark in One (Element 14) |
 | **Future** | 1000328 | 1002332 | Future Electronics Corporation |
+| **Mouser** | 1000334 | 1002338 | Mouser |
 | **Avnet** | 1000002 | 1001002 | Avnet |
 
 ### DigiKey API

@@ -2,10 +2,13 @@
 /**
  * Franchise Screening Tool
  *
- * Screens RFQ parts against franchise distributors (DigiKey API + FindChips fallback)
+ * Screens RFQ parts against franchise distributors (APIs + FindChips fallback)
  * to identify low-value opportunities that don't need broker sourcing.
  *
  * Also captures franchise pricing as VQs for ERP import.
+ *
+ * Distributor APIs are managed centrally via shared/franchise-api.js.
+ * Adding a new API there automatically includes it in screening.
  *
  * Usage:
  *   # Screen a single part
@@ -20,8 +23,8 @@
  *   # Custom threshold (default $50)
  *   node main.js --rfq 1130292 --threshold 100
  *
- *   # Skip DigiKey API (FindChips only)
- *   node main.js --rfq 1130292 --no-digikey
+ *   # Skip franchise APIs (FindChips only)
+ *   node main.js --rfq 1130292 --no-api
  */
 
 const { chromium } = require('playwright-extra');
@@ -32,12 +35,8 @@ const path = require('path');
 const fs = require('fs');
 const { Client } = require('pg');
 const config = require('./config');
-const { searchPart } = require('./search');
-const digikey = require('./digikey');
-const arrow = require('./arrow');
-const rutronik = require('./rutronik');
-const future = require('./future');
-const master = require('./master');
+const { searchPart: findChipsSearch } = require('./search');
+const { searchAllDistributors, getActiveDistributors } = require('../../../shared/franchise-api');
 
 // =============================================================================
 // Database Functions
@@ -127,12 +126,12 @@ function saveResults(results, outputPath) {
       r.franchise_available ? 'Yes' : 'No',
       r.franchise_qty,
       r.franchise_price || '',
-      r.franchise_bulk_price || '',  // Last column / bulk pricing
+      r.franchise_bulk_price || '',
       r.opportunity_value || '',
       r.send_to_broker ? 'Yes' : 'No',
       r.reason,
       r.distributor_count,
-      r.price_warning || '',  // Flag for suspect pricing
+      r.price_warning || '',
     ]);
   }
 
@@ -144,8 +143,6 @@ function saveResults(results, outputPath) {
 }
 
 function saveBrokerList(results, outputPath) {
-  // Save only parts that should go to brokers, with all needed fields
-  // Includes franchise data needed by RFQ Sourcing for min order value filtering
   const brokerParts = results.filter(r => r.send_to_broker);
 
   const wsData = [
@@ -164,7 +161,7 @@ function saveBrokerList(results, outputPath) {
       r.target_price || '',
       r.customer || '',
       r.franchise_qty || 0,
-      r.franchise_bulk_price || '',  // Needed by RFQ Sourcing for min order value filter
+      r.franchise_bulk_price || '',
       r.opportunity_value || '',
     ]);
   }
@@ -179,117 +176,43 @@ function saveBrokerList(results, outputPath) {
 /**
  * Save VQ batch export for ERP import
  * Captures franchise pricing at RFQ qty for ALL parts with franchise availability
- * (regardless of whether they go to broker or not)
- * Creates separate rows for each franchise source (DigiKey, Arrow)
+ * Creates separate rows for each franchise distributor with pricing
  */
 function saveVqBatch(results, outputPath, rfqNumber) {
-  // VQ Mass Upload Template format
-  // See: Trading Analysis/RFQ Sourcing/vq_loading/vq-loading.md for field reference
   const wsData = [
     [
-      'RFQ Number',           // For reference (not in upload template)
-      'BP Value',             // Vendor BP Value
-      'Vendor Name',          // For reference
-      'MPN',                  // Part number
-      'Manufacturer',         // Mfr name
-      'Description',          // Part description
-      'Qty',                  // Quantity quoted (RFQ qty)
-      'Price',                // Price at RFQ qty
-      'Currency',             // USD
-      'Vendor Notes',         // Stock info
-      'Source',               // Data source (DigiKey API, Arrow API)
+      'RFQ Number',
+      'BP Value',
+      'Vendor Name',
+      'MPN',
+      'Manufacturer',
+      'Description',
+      'Qty',
+      'Price',
+      'Currency',
+      'Vendor Notes',
+      'Source',
     ],
   ];
 
   let vqCount = 0;
 
   for (const r of results) {
-    // DigiKey VQ row
-    if (r.vq_price) {
+    // Each result has a vq_lines array with one entry per distributor that had pricing
+    const vqLines = r.vq_lines || [];
+    for (const vq of vqLines) {
       wsData.push([
         r.rfq_number || rfqNumber || '',
-        r.vq_bp_value || '',
-        r.vq_vendor_name || '',
-        r.vq_mpn || r.mpn,
-        r.vq_manufacturer || '',
-        r.vq_description || '',
+        vq.bpValue || '',
+        vq.vendorName || '',
+        vq.mpn || r.mpn,
+        vq.manufacturer || '',
+        vq.description || '',
         r.qty,
-        r.vq_price,
+        vq.price,
         'USD',
-        r.vq_vendor_notes || '',
-        'DigiKey API',
-      ]);
-      vqCount++;
-    }
-
-    // Arrow VQ row (separate line)
-    if (r.arrow_vq_price) {
-      wsData.push([
-        r.rfq_number || rfqNumber || '',
-        r.arrow_vq_bp_value || '',
-        r.arrow_vq_vendor_name || '',
-        r.arrow_vq_mpn || r.mpn,
-        r.arrow_vq_manufacturer || '',
-        r.arrow_vq_description || '',
-        r.qty,
-        r.arrow_vq_price,
-        'USD',
-        r.arrow_vq_vendor_notes || '',
-        'Arrow API',
-      ]);
-      vqCount++;
-    }
-
-    // Rutronik VQ row (separate line)
-    if (r.rutronik_vq_price) {
-      wsData.push([
-        r.rfq_number || rfqNumber || '',
-        r.rutronik_vq_bp_value || '',
-        r.rutronik_vq_vendor_name || '',
-        r.rutronik_vq_mpn || r.mpn,
-        r.rutronik_vq_manufacturer || '',
-        r.rutronik_vq_description || '',
-        r.qty,
-        r.rutronik_vq_price,
-        'USD',
-        r.rutronik_vq_vendor_notes || '',
-        'Rutronik API',
-      ]);
-      vqCount++;
-    }
-
-    // Future Electronics VQ row (separate line)
-    if (r.future_vq_price) {
-      wsData.push([
-        r.rfq_number || rfqNumber || '',
-        r.future_vq_bp_value || '',
-        r.future_vq_vendor_name || '',
-        r.future_vq_mpn || r.mpn,
-        r.future_vq_manufacturer || '',
-        r.future_vq_description || '',
-        r.qty,
-        r.future_vq_price,
-        'USD',
-        r.future_vq_vendor_notes || '',
-        'Future API',
-      ]);
-      vqCount++;
-    }
-
-    // Master Electronics VQ row (separate line)
-    if (r.master_vq_price) {
-      wsData.push([
-        r.rfq_number || rfqNumber || '',
-        r.master_vq_bp_value || '',
-        r.master_vq_vendor_name || '',
-        r.master_vq_mpn || r.mpn,
-        r.master_vq_manufacturer || '',
-        r.master_vq_description || '',
-        r.qty,
-        r.master_vq_price,
-        'USD',
-        r.master_vq_vendor_notes || '',
-        'Master API',
+        vq.vendorNotes || '',
+        `${vq.source} API`,
       ]);
       vqCount++;
     }
@@ -314,9 +237,9 @@ function saveVqBatch(results, outputPath, rfqNumber) {
 /**
  * Evaluate a part for screening decision
  * @param {Object} part - Part from RFQ
- * @param {Object} searchResult - Result from DigiKey or FindChips
+ * @param {Object} searchResult - Result from FindChips
  * @param {number} threshold - Opportunity value threshold
- * @param {string} dataSource - 'DigiKey API' or 'FindChips'
+ * @param {string} dataSource - Data source label
  */
 function evaluatePart(part, searchResult, threshold, dataSource = 'FindChips') {
   const result = {
@@ -325,52 +248,38 @@ function evaluatePart(part, searchResult, threshold, dataSource = 'FindChips') {
     franchise_qty: searchResult.totalQty || searchResult.franchiseQty || 0,
     franchise_price: searchResult.lowestPrice || searchResult.franchisePrice || null,
     franchise_bulk_price: searchResult.bulkPrice || searchResult.franchiseBulkPrice || null,
-    franchise_rfq_price: searchResult.franchiseRfqPrice || null,  // Price at RFQ qty
+    franchise_rfq_price: searchResult.franchiseRfqPrice || null,
     distributor_count: searchResult.distributorCount || (searchResult.found ? 1 : 0),
     price_warning: searchResult.priceWarning || '',
     opportunity_value: null,
     send_to_broker: true,
     reason: '',
     data_source: dataSource,
-    // VQ fields (for ERP import)
-    vq_price: null,
-    vq_mpn: null,
-    vq_manufacturer: null,
-    vq_description: null,
-    vq_vendor_notes: null,
-    vq_bp_value: null,
-    vq_vendor_name: null,
+    // Generic VQ lines array — populated by franchise API results
+    vq_lines: [],
   };
 
-  // Populate VQ fields if from DigiKey
-  if (dataSource === 'DigiKey API' && searchResult.found) {
-    result.vq_price = searchResult.franchiseRfqPrice || searchResult.vqPrice;
-    result.vq_mpn = searchResult.vqMpn || part.mpn;
-    result.vq_manufacturer = searchResult.vqManufacturer || '';
-    result.vq_description = searchResult.vqDescription || '';
-    result.vq_vendor_notes = searchResult.vqVendorNotes || '';
-    result.vq_bp_value = digikey.DIGIKEY_CONFIG.bpValue;
-    result.vq_vendor_name = digikey.DIGIKEY_CONFIG.bpName;
-  }
-
-  // For FindChips, we can still capture VQ data but with less detail
+  // For FindChips, capture aggregate VQ data
   if (dataSource === 'FindChips' && searchResult.found && searchResult.lowestPrice) {
-    // Use lowest price as approximation for RFQ qty price
-    result.vq_price = searchResult.lowestPrice;
-    result.vq_mpn = part.mpn;
-    result.vq_vendor_notes = `FindChips aggregate stock: ${result.franchise_qty}`;
-    // Can't assign a single BP for FindChips - multiple distributors
+    result.vq_lines.push({
+      bpValue: '',
+      vendorName: '',
+      mpn: part.mpn,
+      manufacturer: '',
+      description: '',
+      price: searchResult.lowestPrice,
+      vendorNotes: `FindChips aggregate stock: ${result.franchise_qty}`,
+      source: 'FindChips',
+    });
   }
 
-  // Calculate opportunity value using BULK price for realistic secondary market valuation
-  // Bulk price = best available franchise price (for screening decision)
+  // Calculate opportunity value using BULK price
   const bulkPrice = result.franchise_bulk_price || result.franchise_price || part.target_price;
   if (bulkPrice && part.qty) {
     result.opportunity_value = Math.round(bulkPrice * part.qty * 100) / 100;
   }
 
-  // Decision logic:
-  // Skip broker if: franchise has enough qty AND opportunity value < threshold
+  // Decision logic
   if (searchResult.found && result.franchise_qty >= part.qty) {
     if (result.opportunity_value !== null && result.opportunity_value < threshold) {
       result.send_to_broker = false;
@@ -389,35 +298,6 @@ function evaluatePart(part, searchResult, threshold, dataSource = 'FindChips') {
   return result;
 }
 
-/**
- * Search DigiKey API for a part
- * Returns normalized result compatible with evaluatePart()
- */
-async function searchDigiKey(mpn, qty) {
-  try {
-    const result = await digikey.searchPart(mpn, qty);
-    return {
-      found: result.found,
-      franchiseQty: result.franchiseQty,
-      franchisePrice: result.franchisePrice,
-      franchiseBulkPrice: result.franchiseBulkPrice,
-      franchiseRfqPrice: result.franchiseRfqPrice,
-      vqPrice: result.vqPrice,
-      vqMpn: result.vqMpn,
-      vqManufacturer: result.vqManufacturer,
-      vqDescription: result.vqDescription,
-      vqVendorNotes: result.vqVendorNotes,
-      distributorCount: 1,  // DigiKey is single source
-      error: null,
-    };
-  } catch (error) {
-    return {
-      found: false,
-      error: error.message,
-    };
-  }
-}
-
 // =============================================================================
 // Main
 // =============================================================================
@@ -434,7 +314,7 @@ async function main() {
   let threshold = config.OPPORTUNITY_THRESHOLD;
   let headless = true;
   let debug = false;
-  let useDigiKey = true;  // Try DigiKey API first by default
+  let useApis = true;
 
   for (let i = 0; i < args.length; i++) {
     switch (args[i]) {
@@ -462,8 +342,9 @@ async function main() {
       case '--no-headless':
         headless = false;
         break;
-      case '--no-digikey':
-        useDigiKey = false;
+      case '--no-api':
+      case '--no-digikey':  // backward compat
+        useApis = false;
         break;
       case '--debug':
         debug = true;
@@ -471,7 +352,7 @@ async function main() {
       case '-h':
       case '--help':
         console.log(`
-Franchise Screening Tool (FindChips + DigiKey API)
+Franchise Screening Tool (Franchise APIs + FindChips)
 
 Usage:
   node main.js -p "LM358N" -q 100     # Single part
@@ -484,7 +365,7 @@ Options:
   -f, --file       Excel file with parts list
   --rfq            iDempiere RFQ number
   --threshold      Opportunity value threshold (default: $${config.OPPORTUNITY_THRESHOLD})
-  --no-digikey     Skip DigiKey API (no VQ capture)
+  --no-api         Skip franchise APIs (FindChips only)
   --no-headless    Run browser in visible mode
   --debug          Enable debug output
   -h, --help       Show this help
@@ -513,11 +394,15 @@ Options:
     process.exit(1);
   }
 
+  // Show active distributors
+  const activeDistributors = getActiveDistributors();
+  const distributorNames = activeDistributors.map(d => d.name).join(', ');
+
   console.log(`\nFranchise Screening`);
   console.log(`===================`);
   console.log(`Parts to screen: ${parts.length}`);
   console.log(`Opportunity threshold: $${threshold}`);
-  console.log(`DigiKey API: ${useDigiKey ? 'Enabled (VQ capture)' : 'Disabled'}`);
+  console.log(`Franchise APIs: ${useApis ? `Enabled (${activeDistributors.length}: ${distributorNames})` : 'Disabled'}`);
   console.log(`Headless: ${headless}`);
   console.log();
 
@@ -527,7 +412,7 @@ Options:
   const results = [];
   let skipCount = 0;
   let brokerCount = 0;
-  let vqCount = 0;
+  let totalVqLines = 0;
 
   try {
     for (let i = 0; i < parts.length; i++) {
@@ -539,122 +424,76 @@ Options:
         userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
       });
       const page = await context.newPage();
-      const findchipsResult = await searchPart(page, part.mpn, debug);
+      const findchipsResult = await findChipsSearch(page, part.mpn, debug);
       await context.close();
 
       // Evaluate screening decision based on FindChips
       const evaluated = evaluatePart(part, findchipsResult, threshold, 'FindChips');
 
-      // 2. DigiKey API call (additional - for VQ capture)
-      if (useDigiKey) {
+      // 2. All franchise APIs in parallel (for VQ capture)
+      if (useApis) {
         try {
-          const dkResult = await searchDigiKey(part.mpn, part.qty);
-          if (dkResult.found && dkResult.vqPrice) {
-            // Merge DigiKey VQ data into result
-            evaluated.vq_price = dkResult.vqPrice;
-            evaluated.vq_mpn = dkResult.vqMpn;
-            evaluated.vq_manufacturer = dkResult.vqManufacturer;
-            evaluated.vq_description = dkResult.vqDescription;
-            evaluated.vq_vendor_notes = dkResult.vqVendorNotes;
-            evaluated.vq_bp_value = digikey.DIGIKEY_CONFIG.bpValue;
-            evaluated.vq_vendor_name = digikey.DIGIKEY_CONFIG.bpName;
-            evaluated.data_source = 'FindChips + DigiKey';
-            vqCount++;
-            console.log(`    📦 DigiKey: ${dkResult.franchiseQty.toLocaleString()} @ $${dkResult.vqPrice}`);
-          } else if (dkResult.error) {
-            if (debug) console.log(`    [DEBUG] DigiKey error: ${dkResult.error}`);
-          }
-        } catch (err) {
-          if (debug) console.log(`    [DEBUG] DigiKey error: ${err.message}`);
-        }
+          const apiResults = await searchAllDistributors(part.mpn, part.qty, {
+            parallel: true,
+            onResult: (r) => {
+              if (debug && r.error) {
+                console.log(`    [DEBUG] ${r.name} error: ${r.error}`);
+              }
+            },
+          });
 
-        // 3. Arrow API call (additional - for VQ capture)
-        try {
-          const arrowResult = await arrow.searchPart(part.mpn, part.qty);
-          if (arrowResult.found && arrowResult.vqPrice) {
-            // Store Arrow VQ data separately (don't overwrite DigiKey)
-            evaluated.arrow_vq_price = arrowResult.vqPrice;
-            evaluated.arrow_vq_mpn = arrowResult.vqMpn;
-            evaluated.arrow_vq_manufacturer = arrowResult.vqManufacturer;
-            evaluated.arrow_vq_description = arrowResult.vqDescription;
-            evaluated.arrow_vq_vendor_notes = arrowResult.vqVendorNotes;
-            evaluated.arrow_vq_bp_value = arrow.ARROW_CONFIG.bpValue;
-            evaluated.arrow_vq_vendor_name = arrow.ARROW_CONFIG.bpName;
-            evaluated.arrow_qty = arrowResult.arrowQty || 0;
-            evaluated.verical_qty = arrowResult.vericalQty || 0;
-            evaluated.data_source = (evaluated.data_source || 'FindChips') + ' + Arrow';
-            console.log(`    📦 Arrow: ${(arrowResult.arrowQty || 0).toLocaleString()} + Verical: ${(arrowResult.vericalQty || 0).toLocaleString()} @ $${arrowResult.vqPrice}`);
-          } else if (arrowResult.error) {
-            if (debug) console.log(`    [DEBUG] Arrow error: ${arrowResult.error}`);
+          // Log each distributor with stock
+          for (const d of apiResults.distributors) {
+            if (d.found && d.franchiseQty > 0 && d.vqPrice) {
+              const stockInfo = d.franchiseQty > 0
+                ? d.franchiseQty.toLocaleString()
+                : `LT: ${d.vqLeadTime || 'N/A'}`;
+              console.log(`    ${d.name}: ${stockInfo} @ $${d.vqPrice}`);
+            } else if (d.found && d.franchiseQty > 0) {
+              console.log(`    ${d.name}: ${d.franchiseQty.toLocaleString()} (no pricing)`);
+            } else if (debug && d.error) {
+              // Already logged via onResult
+            }
           }
-        } catch (err) {
-          if (debug) console.log(`    [DEBUG] Arrow error: ${err.message}`);
-        }
 
-        // 4. Rutronik API call (additional - for VQ capture)
-        try {
-          const rutronikResult = await rutronik.searchPart(part.mpn, part.qty);
-          if (rutronikResult.found && rutronikResult.vqPrice) {
-            evaluated.rutronik_vq_price = rutronikResult.vqPrice;
-            evaluated.rutronik_vq_mpn = rutronikResult.vqMpn;
-            evaluated.rutronik_vq_manufacturer = rutronikResult.vqManufacturer;
-            evaluated.rutronik_vq_description = rutronikResult.vqDescription;
-            evaluated.rutronik_vq_vendor_notes = rutronikResult.vqVendorNotes;
-            evaluated.rutronik_vq_bp_value = rutronik.RUTRONIK_CONFIG.bpValue;
-            evaluated.rutronik_vq_vendor_name = rutronik.RUTRONIK_CONFIG.bpName;
-            evaluated.rutronik_qty = rutronikResult.franchiseQty || 0;
-            evaluated.data_source = (evaluated.data_source || 'FindChips') + ' + Rutronik';
-            const stockInfo = rutronikResult.franchiseQty > 0 ? rutronikResult.franchiseQty.toLocaleString() : `LT: ${rutronikResult.vqLeadTime}d`;
-            console.log(`    📦 Rutronik: ${stockInfo} @ $${rutronikResult.vqPrice}`);
-          } else if (rutronikResult.error && rutronikResult.error !== 'nothing found') {
-            if (debug) console.log(`    [DEBUG] Rutronik error: ${rutronikResult.error}`);
+          // Build VQ lines from API results
+          for (const d of apiResults.found) {
+            if (d.vqPrice && d.vqPrice > 0) {
+              evaluated.vq_lines.push({
+                bpValue: d.bpValue,
+                vendorName: d.bpName,
+                mpn: d.vqMpn || part.mpn,
+                manufacturer: d.vqManufacturer || '',
+                description: d.vqDescription || '',
+                price: d.vqPrice,
+                vendorNotes: d.vqVendorNotes || '',
+                source: d.name,
+              });
+            }
           }
-        } catch (err) {
-          if (debug) console.log(`    [DEBUG] Rutronik error: ${err.message}`);
-        }
 
-        // 5. Future Electronics API call (additional - for VQ capture)
-        try {
-          const futureResult = await future.searchPart(part.mpn, part.qty);
-          if (futureResult.found && futureResult.vqPrice) {
-            evaluated.future_vq_price = futureResult.vqPrice;
-            evaluated.future_vq_mpn = futureResult.vqMpn;
-            evaluated.future_vq_manufacturer = futureResult.vqManufacturer;
-            evaluated.future_vq_description = futureResult.vqDescription;
-            evaluated.future_vq_vendor_notes = futureResult.vqVendorNotes;
-            evaluated.future_vq_bp_value = future.FUTURE_CONFIG.bpValue;
-            evaluated.future_vq_vendor_name = future.FUTURE_CONFIG.bpName;
-            evaluated.future_qty = futureResult.franchiseQty || 0;
-            evaluated.data_source = (evaluated.data_source || 'FindChips') + ' + Future';
-            const stockInfo = futureResult.franchiseQty > 0 ? futureResult.franchiseQty.toLocaleString() : `LT: ${futureResult.vqLeadTime}`;
-            console.log(`    📦 Future: ${stockInfo} @ $${futureResult.vqPrice}`);
-          } else if (futureResult.error) {
-            if (debug) console.log(`    [DEBUG] Future error: ${futureResult.error}`);
+          // Update data source label
+          const apiSources = apiResults.found.filter(d => d.vqPrice > 0).map(d => d.name);
+          if (apiSources.length > 0) {
+            evaluated.data_source = `FindChips + ${apiSources.join(' + ')}`;
           }
-        } catch (err) {
-          if (debug) console.log(`    [DEBUG] Future error: ${err.message}`);
-        }
 
-        // 6. Master Electronics API call (additional - for VQ capture)
-        try {
-          const masterResult = await master.searchPart(part.mpn, part.qty);
-          if (masterResult.found && masterResult.vqPrice) {
-            evaluated.master_vq_price = masterResult.vqPrice;
-            evaluated.master_vq_mpn = masterResult.vqMpn;
-            evaluated.master_vq_manufacturer = masterResult.vqManufacturer;
-            evaluated.master_vq_description = masterResult.vqDescription;
-            evaluated.master_vq_vendor_notes = masterResult.vqVendorNotes;
-            evaluated.master_vq_bp_value = master.MASTER_CONFIG.bpValue;
-            evaluated.master_vq_vendor_name = master.MASTER_CONFIG.bpName;
-            evaluated.master_qty = masterResult.franchiseQty || 0;
-            evaluated.data_source = (evaluated.data_source || 'FindChips') + ' + Master';
-            const stockInfo = masterResult.franchiseQty > 0 ? masterResult.franchiseQty.toLocaleString() : `LT: ${masterResult.vqLeadTime}`;
-            console.log(`    📦 Master: ${stockInfo} @ $${masterResult.vqPrice}`);
-          } else if (masterResult.error) {
-            if (debug) console.log(`    [DEBUG] Master error: ${masterResult.error}`);
+          // Update summary with API aggregate data (richer than FindChips alone)
+          if (apiResults.summary.totalStock > evaluated.franchise_qty) {
+            evaluated.franchise_qty = apiResults.summary.totalStock;
           }
+          if (apiResults.summary.lowestPrice && (!evaluated.franchise_bulk_price || apiResults.summary.lowestPrice < evaluated.franchise_bulk_price)) {
+            evaluated.franchise_bulk_price = apiResults.summary.lowestPrice;
+          }
+          evaluated.distributor_count = Math.max(
+            evaluated.distributor_count,
+            apiResults.summary.distributorsWithStock
+          );
+
+          totalVqLines += evaluated.vq_lines.length;
+
         } catch (err) {
-          if (debug) console.log(`    [DEBUG] Master error: ${err.message}`);
+          console.log(`    API error: ${err.message}`);
         }
       }
 
@@ -666,12 +505,12 @@ Options:
         skipCount++;
       }
 
-      console.log(`    → ${evaluated.reason}`);
+      console.log(`    -> ${evaluated.reason}`);
       if (evaluated.price_warning) {
-        console.log(`    ⚠️  ${evaluated.price_warning}`);
+        console.log(`    !!  ${evaluated.price_warning}`);
       }
 
-      // Rate limiting
+      // Rate limiting between parts
       if (i < parts.length - 1) {
         await new Promise(resolve => setTimeout(resolve, config.SEARCH_DELAY));
       }
@@ -703,7 +542,7 @@ Options:
   saveBrokerList(results, brokerPath);
 
   // Save VQ batch (for ERP import)
-  if (useDigiKey) {
+  if (useApis) {
     saveVqBatch(results, vqPath, rfqNumber);
   }
 
@@ -714,13 +553,13 @@ Options:
   console.log(`Total parts screened: ${results.length}`);
   console.log(`Skip broker (franchise OK): ${skipCount}`);
   console.log(`Send to broker: ${brokerCount}`);
-  if (useDigiKey) {
-    console.log(`VQ data captured (DigiKey): ${vqCount}`);
+  if (useApis) {
+    console.log(`VQ lines captured: ${totalVqLines} (across ${activeDistributors.length} distributors)`);
   }
   console.log(`\nOutput files:`);
   console.log(`  Screening results: ${resultsPath}`);
   console.log(`  Broker list:       ${brokerPath}`);
-  if (useDigiKey && vqCount > 0) {
+  if (useApis && totalVqLines > 0) {
     console.log(`  VQ import:         ${vqPath}`);
   }
 

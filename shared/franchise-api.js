@@ -81,6 +81,14 @@ const DISTRIBUTORS = {
     bpId: 1000326,
     active: true,
   },
+  mouser: {
+    name: 'Mouser',
+    script: path.join(API_DIR, 'mouser.js'),
+    bpValue: '1002338',
+    bpName: 'Mouser',
+    bpId: 1000334,
+    active: true,
+  },
   master: {
     name: 'Master',
     script: path.join(API_DIR, 'master.js'),

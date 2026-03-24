@@ -35,7 +35,7 @@ Real-time pricing and availability from authorized distributors. Replaces FindCh
 | Newark/element14/Farnell | REST (API key) | partner.element14.com | **Active** | 1000390 |
 | Sager Electronics | REST (API key) | developer.sager.com | **To investigate** | 1000335 |
 | Rochester Electronics | REST (?) | api.rocelec.com | **To investigate** | 1000058 |
-| Mouser | REST (API key) | mouser.com/api-hub | **Blocked** | 1000334 |
+| Mouser | REST (API key) | api.mouser.com/api/docs/ui/index | **Active** | 1000334 |
 | Octopart/Nexar | GraphQL | nexar.com/api | Planned (aggregator) | — |
 | Avnet | OAuth2 REST | apiportal.avnet.com | **Pending docs** | 1000002 |
 | Venkel | REST (?) | venkel.com | **Pending docs** | 1001951 |
@@ -510,18 +510,71 @@ node tti.js --manufacturers
 
 ---
 
-### Mouser API (Blocked)
+### Mouser API (Active)
 
-**Issue:** API returns `PriceBreaks: []` and `AvailabilityInStock: null` with message "Not available for purchase by distributors."
+**API:** Part Number Search (primary) + Keyword Search
+**Auth:** `apiKey` query parameter
+**Portal:** [api.mouser.com/api/docs/ui/index](https://api.mouser.com/api/docs/ui/index)
 
-Mouser restricts pricing/availability data for distributor accounts. The API still works for:
-- Part details, descriptions
-- Lead times
-- Lifecycle status (EOL, obsolete)
-- Suggested replacements
-- Compliance data (HTS, ECCN, RoHS)
+**Credentials:**
+| Key | Value |
+|-----|-------|
+| API Key | `d73312c1-9675-4406-b0b5-d96241d46a5c` |
 
-**Action needed:** Contact Mouser to request pricing API access, or use for non-pricing use cases only.
+**Endpoints:**
+| Method | Path | Description |
+|--------|------|-------------|
+| POST | `/api/v1/search/partnumber?apiKey=X` | **Primary** — pricing, stock, lead time, compliance |
+| POST | `/api/v1/search/keyword?apiKey=X` | Broader keyword search |
+| GET | `/api/v2/search/manufacturerlist?apiKey=X` | Manufacturer reference list |
+
+**Part Number Search:**
+```
+POST /api/v1/search/partnumber?apiKey={key}
+Content-Type: application/json
+
+{ "SearchByPartRequest": { "mouserPartNumber": "{mpn}", "partSearchOptions": "Exact" } }
+```
+
+**iDempiere Vendor:**
+- BP ID: `1000334`
+- BP Value: `1002338`
+- Name: `Mouser`
+
+**Code:** `Trading Analysis/RFQ Sourcing/franchise_check/mouser.js`
+
+**Usage:**
+```bash
+# Single part lookup
+node mouser.js C0805C104K5RACTU 100
+
+# Non-exact (partial match) search
+node mouser.js C0805 100 --partial
+```
+
+**Current Use (Active):**
+| Field | Source | Use |
+|-------|--------|-----|
+| `franchiseQty` | AvailabilityInStock | Stock available |
+| `franchisePrice` | PriceBreaks[0] | Price at MOQ |
+| `franchiseBulkPrice` | PriceBreaks[-1] | Lowest price break |
+| `franchiseRfqPrice` | PriceBreaks | Price at RFQ qty |
+| `vqLeadTime` | LeadTime | Lead time (e.g., "140 Days") |
+| `vqMoq` / `vqSpq` | Min / Mult | Min order qty / sales multiple |
+| `vqManufacturer` | Manufacturer | Full manufacturer name |
+| `vqDescription` | Description | Part description |
+| `vqRohs` | ROHSStatus | RoHS compliance status |
+| `vqHts` / `vqEccn` | ProductCompliance[] | Export control codes |
+| `vqDatasheetUrl` | DataSheetUrl | Datasheet link |
+| `vqPackaging` | ProductAttributes | Reel/Tube/etc. |
+| `vqLifeCycle` | LifecycleStatus | Active/Obsolete |
+| `vqVendorNotes` | Composite | "Mouser stock: X | LT: Y | Mfr: Z" |
+
+**Notes:**
+- Previous key was blocked for distributor accounts (no pricing/stock). New key (2026-03-24) has full access.
+- Some parts still return "Not available for purchase by distributors" — handled gracefully as restriction in vendor notes.
+- API key goes in query string, not header.
+- Mouser has Cart and Order APIs too (27 endpoints total) — not used yet but available for future procurement automation.
 
 ---
 
@@ -1090,6 +1143,64 @@ AI-assisted extraction and inference for edge cases.
 | Anthropic (Claude) | VQ extraction fallback, vendor name inference | Planned |
 
 **Implementation details:** See `Trading Analysis/RFQ Sourcing/sourcing-roadmap.md` Section C7
+
+---
+
+## API Response Caching
+
+**Status:** Planned | **Priority:** High | **Location:** `shared/franchise-api.js`
+
+Cache franchise API responses to avoid duplicate calls across workflows and within large RFQ runs. Caching applies to ALL API consumers (LAM Kitting, Franchise Screening, Stock RFQ, Vortex, Quick Quote).
+
+### Design
+
+**Cache key:** MPN + distributor
+**Storage:** JSON file(s) in `shared/cache/` or `/tmp/franchise-cache/`
+**Stores:** Full API response (all price breaks, stock levels, lead time) — each workflow picks the relevant price break for its context
+
+### TTL Rules
+
+| Context | TTL | Rationale |
+|---------|-----|-----------|
+| Default | 7 days | Standard franchise pricing doesn't move fast |
+| PPV RFQ type | 30 days | PPV parts are even more stable |
+| PPV + price under customer target | Force refresh | Need to confirm inventory is still available at that price |
+
+### Interface (proposed)
+
+```javascript
+const results = await searchAllDistributors(mpn, qty, {
+  cacheTTL: '7d',           // default
+  // or for PPV:
+  cacheTTL: '30d',
+  // or conditional refresh:
+  cacheBypassIf: (cached) => cached.lowestPrice < customerTarget,
+});
+```
+
+### Dual Purpose: Cache + VQ
+
+Every API call serves two purposes:
+
+1. **Cache (local JSON)** — fast rate-limit check before making API calls
+2. **VQ (database)** — permanent pricing record via `shared/rfq-writer.js`
+
+On each API call:
+1. Check cache → if within TTL, return cached data (no API call)
+2. If stale → make API call → write cache file + write VQ lines to `ai_writeback`
+3. All price breaks captured as VQ lines:
+   - Stock qty > 0 at a price break → VQ with availability
+   - Price break qty > available stock → lead time quote
+4. VQ history feeds Quick Quote, suggested resale, market data
+
+The cache prevents duplicate API calls. The VQs build pricing history over time.
+
+### Why This Matters
+- Large RFQs (300+ lines x 8 APIs = 2,400+ calls) hit rate limits
+- Same MPN appearing across multiple RFQs/workflows gets queried repeatedly
+- Pricing data is stable enough for weekly caching; inventory is the variable
+- Each workflow displays different price breaks from the same cached data (MOQ for LAM, qty-1 for Vortex, customer qty for Quick Quote)
+- VQ history provides pricing trends and feeds downstream quoting workflows
 
 ---
 
