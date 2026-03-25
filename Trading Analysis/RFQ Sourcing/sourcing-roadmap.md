@@ -47,6 +47,7 @@ Consolidated roadmap for RFQ Sourcing and VQ Processing workflows, organized by 
 | # | Feature | Priority | Status |
 |---|---------|----------|--------|
 | A1 | Franchise Pricing via API | Later | Planned |
+| A2 | Non-API Account Scraping | Later | Planned |
 
 ---
 
@@ -66,6 +67,33 @@ Consolidated roadmap for RFQ Sourcing and VQ Processing workflows, organized by 
 - DigiKey API — Direct pricing and stock
 - Mouser API — Direct pricing and stock
 - Arrow API — Direct pricing and stock
+
+---
+
+## A2. Non-API Account Scraping
+
+**Status:** Planned | **Priority:** Later
+
+**Problem:** Some franchise manufacturers where Astute has direct accounts offer web-based price & availability tools but no programmatic API. Currently these require manual lookups.
+
+**Solution:**
+- Use Playwright to automate web-based P&A tools
+- Submit part numbers + quantities, scrape pricing and availability
+- Feed results into franchise screening and Quick Quote workflows
+
+**Target Accounts:**
+- **Coilcraft** — `coilcraft.com/en-us/partupload/` (bulk part upload form, returns pricing + availability from US warehouse)
+
+**Implementation Approach:**
+1. Build per-manufacturer Playwright scripts in `shared/` or `Trading Analysis/RFQ Sourcing/franchise_check/`
+2. Handle auth/session management per account
+3. Parse response tables into standardized format (MPN, price breaks, stock qty, lead time)
+4. Integrate with `shared/franchise-api.js` as additional data source
+
+**Notes:**
+- Fragile by nature — manufacturer site changes can break scrapers
+- Rate-limit requests to avoid account issues
+- Add new manufacturers here as direct accounts are identified
 
 ---
 
