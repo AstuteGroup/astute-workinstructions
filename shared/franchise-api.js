@@ -97,6 +97,14 @@ const DISTRIBUTORS = {
     bpId: 1000405,
     active: true,
   },
+  waldom: {
+    name: 'Waldom',
+    script: path.join(API_DIR, 'waldom.js'),
+    bpValue: '1002648',
+    bpName: 'Waldom Electronics',
+    bpId: 1000644,
+    active: true,
+  },
 };
 
 /**

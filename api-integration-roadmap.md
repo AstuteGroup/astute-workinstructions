@@ -42,7 +42,7 @@ Real-time pricing and availability from authorized distributors. Replaces FindCh
 | Texas Instruments | OAuth2 REST | api-portal.ti.com | **Pending approval** | 1001369 |
 | Master Electronics | REST v2 (path params) | masterelectronics.com/en/gettingstarted | **Active** | 1000405 |
 | Allied Electronics | EDI (?) | Unknown | **To investigate** | 1000392 |
-| Waldom Electronics | REST | sandbox.waldom.com | **To investigate** | 1000644 |
+| Waldom Electronics | REST | api.waldom.com | **Active** | 1000644 |
 | Analog Devices | REST | analog.com/en/support/api-suites.html | **To investigate** | 1000774 |
 | Wurth Electronics | REST | we-online.com/en/support/collaboration/api | **To investigate** | — |
 | LCSC Electronics | REST | lcsc.com/docs/index.html | **To investigate** | 1002898 |
@@ -994,8 +994,10 @@ node master.js LM317 100 --in-stock   # in-stock only
 
 ---
 
-### Waldom Electronics API (To Investigate)
+### Waldom Electronics API (Active)
 
+**Production URL:** `https://api.waldom.com`
+**Swagger:** `https://api.waldom.com/swagger/index.html`
 **Portal:** [sandbox.waldom.com](https://sandbox.waldom.com/en/WaldomAPISuite/GettingStarted)
 
 **Regional portals:**
@@ -1005,15 +1007,28 @@ node master.js LM317 100 --in-stock   # in-stock only
 
 **iDempiere Vendor:**
 - BP ID: `1000644`
+- BP Value: `1002648`
 - Name: `Waldom Electronics`
+
+**Auth:** API key in URL path: `/api/v1/{ApiKey}/...`
+
+**Endpoints (from Swagger):**
+- `GET /api/v1/{ApiKey}/InventoryAndPricing/{Term}/{InStockOnly}/{ExactMatch}/{ResultsCount}` — Primary search (inventory + pricing)
+- `GET /api/v1/{ApiKey}/Inventory` — Inventory only (POST required)
+- `GET /api/v1/{ApiKey}/Pricing` — Pricing only
+- `GET /api/v1/{ApiKey}/ProductSearch/{Term}/{InStockOnly}/{ExactMatch}/{ResultsCount}` — Product search
+- `POST /api/v1/{ApiKey}/OrderAPI` — Place orders
+- `GET /api/v1/{ApiKey}/OrderAPI/{PONumber}` — Order status
+- `GET /api/v1/{ApiKey}/AsnAPI/{PONumber}` — ASN/shipping
+- `GET /api/v1/{ApiKey}/InvoiceAPI/{PONumber}` — Invoices
 
 **Capabilities:**
 - **Store API Suite:** Order placement, management, tracking, invoice retrieval
 - **Inventory & Pricing API Suite:** Real-time inventory and pricing data
 
-**Access:** API key from customer profile → "API Access and Services" section. Full sandbox environment available.
-
-**Status:** Developer portal exists with sandbox. Need to register and evaluate.
+**Script:** `Trading Analysis/RFQ Sourcing/franchise_check/waldom.js`
+**Activated:** 2026-03-25
+**Status:** Active. Integrated into `shared/franchise-api.js` as distributor #8.
 
 ---
 

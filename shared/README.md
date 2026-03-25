@@ -10,7 +10,7 @@
 
 | Module | Purpose | Use When | Consumers |
 |--------|---------|----------|-----------|
-| `franchise-api.js` | All 7 franchise distributor APIs (DigiKey, Arrow, Rutronik, Future, Newark, TTI, Master) | Need franchise stock/pricing for ANY workflow | Franchise Screening, Suggested Resale, VQ Loading, Quick Quote |
+| `franchise-api.js` | All 8 franchise distributor APIs (DigiKey, Arrow, Rutronik, Future, Newark, TTI, Master, Waldom) | Need franchise stock/pricing for ANY workflow | Franchise Screening, Suggested Resale, VQ Loading, Quick Quote |
 | `market-data.js` | DB queries: VQ history, sales history (broker vs customer), market offers, RFQ demand | Need pricing intelligence from the system | Suggested Resale, Quick Quote, Vortex Matches, Market Offer Analysis |
 | `mfr-lookup.js` | Resolve manufacturer names → canonical `chuboe_mfr.name`. Aliases (165+) → DB → cache. | Normalizing MFR names from any source | VQ Loading, Market Offer Uploading, Stock RFQ Loading |
 | `partner-lookup.js` | Resolve email/name → iDempiere business partner | Matching sender to BP in any inbound email workflow | VQ Loading, Market Offer Uploading, Stock RFQ Loading |
@@ -44,6 +44,7 @@ Centralized access to all active franchise distributor APIs. Returns standardize
 | Newark/Farnell | 1002394 | `newark.js` | Queries both US + UK stores |
 | TTI | 1002330 | `tti.js` | Strong on passives/connectors |
 | Master Electronics | 1002409 | `master.js` | Activated 2026-03-17 |
+| Waldom Electronics | 1002648 | `waldom.js` | Activated 2026-03-25, key in URL path |
 
 ### Usage
 
