@@ -444,9 +444,10 @@ node tti.js --manufacturers
 
 ---
 
-### Sager Electronics API (To Investigate)
+### Sager Electronics API (Blocked — Awaiting Access)
 
 **Portal:** [developer.sager.com](https://developer.sager.com/)
+**Admin:** Mashery — `Sagerelectronics.admin.mashery.com`
 
 **iDempiere Vendor:**
 - BP ID: `1000335`
@@ -454,7 +455,12 @@ node tti.js --manufacturers
 
 **Capabilities:** Pricing, inventory, order management.
 
-**Status:** Developer portal exists. Need to register and evaluate.
+**API Key:** `y7deugn3bmsk8czcc5aaxk9q` (active, created 2026-03-25)
+**Mashery Package Key:** `d378375c-b6fa-45e7-97cd-13603befc563`
+
+**Status:** Registered and API key obtained. IO Docs page is empty — key has no API plan/package assigned. Need Sager to grant access to Part Search/Inventory API before endpoints are visible.
+
+**Next:** Contact Sager rep to activate API plan, then build `sager.js` module.
 
 ---
 
