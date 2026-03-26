@@ -502,7 +502,7 @@ node tti.js --manufacturers
 **Token endpoint:** `https://transact.ti.com/v1/oauth/accesstoken`
 **Inventory endpoint:** `https://transact.ti.com/v2/store/products/{partNumber}?currency=USD`
 
-**Status:** OAuth works but API returns "no apiproduct match found" - need to subscribe to Inventory and Pricing API product in the TI portal.
+**Status:** OAuth works but API returns "no apiproduct match found" — need TI to approve subscription to Inventory and Pricing API product. Awaiting TI approval (as of 2026-03-26). Once approved, build `ti.js` module, add `priceBreaks`, register in `franchise-api.js`.
 
 **iDempiere Vendor:**
 - BP ID: `1001369`
@@ -521,7 +521,7 @@ node tti.js --manufacturers
 - Combined VQ volume: ~9,800 lines
 - Name: `Avnet`
 
-**Status:** Have subscription key but need to log in to [apiportal.avnet.com](https://apiportal.avnet.com/) to see endpoint URLs. The portal mentions a `getPriceAndQty` API but exact path is behind login.
+**Status:** Have subscription key but need Avnet to grant access to endpoint docs at [apiportal.avnet.com](https://apiportal.avnet.com/). Portal mentions `getPriceAndQty` API but exact path is behind login. Awaiting Avnet approval (as of 2026-03-26). Once approved, build `avnet.js` module, add `priceBreaks`, register in `franchise-api.js`.
 
 ---
 
