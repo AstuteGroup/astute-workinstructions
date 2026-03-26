@@ -206,6 +206,7 @@ function parseSearchResults(json, searchMpn, rfqQty) {
     result.franchiseBulkPrice = pricingInfo.bulkPrice;
     result.franchiseRfqPrice = pricingInfo.rfqPrice;
     result.vqPrice = pricingInfo.rfqPrice;
+    result.priceBreaks = pricingInfo.priceBreaks;
     result.opportunityValue = result.franchiseRfqPrice * rfqQty;
   }
 
@@ -261,6 +262,7 @@ function selectBestPricing(variations, rfqQty) {
     bulkPrice: pricing[pricing.length - 1]?.UnitPrice || null,
     rfqPrice: getPriceAtQty(pricing, rfqQty),
     moq: selected.MinimumOrderQuantity || 1,
+    priceBreaks: pricing.map(p => ({ qty: p.BreakQuantity, unitPrice: p.UnitPrice })).sort((a, b) => a.qty - b.qty),
   };
 }
 

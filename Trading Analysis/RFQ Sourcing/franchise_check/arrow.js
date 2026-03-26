@@ -210,6 +210,9 @@ function parseSearchResults(json, searchMpn, rfqQty) {
     result.vqDateCode = bestDateCode;
     result.vqSourceType = bestSourceType;
     result.opportunityValue = bestBulkPrice ? bestBulkPrice * rfqQty : null;
+    result.priceBreaks = bestSource && bestSource.Prices?.resaleList
+      ? bestSource.Prices.resaleList.map(p => ({ qty: p.minQty, unitPrice: p.price })).sort((a, b) => a.qty - b.qty)
+      : [];
 
     // Build vendor notes - distinguish Arrow vs Verical
     const notes = [];

@@ -19,6 +19,7 @@ const { execSync } = require('child_process');
 
 // --- Config ---
 const { searchAllDistributors, writeVQCapture } = require('../../shared/franchise-api');
+const { writePricingResult } = require('../../shared/api-result-writer');
 const FINDCHIPS_SCRIPT = path.resolve(__dirname, '../RFQ Sourcing/franchise_check/main.js');
 
 // Franchise pricing rule: our price ≈ 20% of franchise best price
@@ -529,6 +530,10 @@ async function main() {
       }
     });
     console.log(`    TOTAL: ${franchise.summary.totalStock} pcs from ${franchise.summary.distributorsWithStock} distributors`);
+
+    // Capture full API pricing data (all price breaks) for market intelligence
+    writePricingResult({ searchResult: franchise, mpn, qty: line.qty, source: 'suggested-resale' })
+      .catch(err => console.error(`    API result capture failed: ${err.message}`));
 
     // Collect VQ lines from API results (confirmed pricing → log as VQ)
     if (franchise.vqLines.length > 0) {

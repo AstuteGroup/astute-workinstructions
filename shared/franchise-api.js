@@ -148,6 +148,8 @@ async function searchPart(distributor, mpn, qty) {
       vqVendorNotes: result.vqVendorNotes || '',
       vqDateCode: result.vqDateCode || '',
       vqLeadTime: result.vqLeadTime || '',
+      // Full price break array for api-result-writer capture
+      priceBreaks: result.priceBreaks || [],
       // Raw result for workflow-specific needs
       raw: result,
     };

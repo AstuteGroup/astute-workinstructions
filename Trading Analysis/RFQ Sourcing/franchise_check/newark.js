@@ -138,9 +138,40 @@ async function searchPart(mpn, rfqQty = 1) {
     }
   }
 
-  // Combine results - use Newark (USD) as primary for pricing decisions
+  // Combine results - use Newark (USD) as primary; only fall back to Farnell if Newark has no stock
+  // IMPORTANT: Do NOT sum stock across stores — prices are in different currencies
   const newarkResult = storeResults.find(r => r.store === 'Newark');
   const farnellResult = storeResults.find(r => r.store === 'Farnell');
+
+  // Pick primary store: Newark if it has stock, otherwise Farnell (with GBP→USD conversion)
+  const GBP_TO_USD = 1.3052;
+  const newarkHasStock = newarkResult && newarkResult.franchiseQty > 0;
+  const farnellHasStock = farnellResult && farnellResult.franchiseQty > 0;
+
+  let primaryQty, primaryPrice, primaryBulk, primaryRfqPrice, primaryVqPrice;
+
+  if (newarkHasStock) {
+    // Newark has stock — use Newark pricing (USD)
+    primaryQty = newarkResult.franchiseQty;
+    primaryPrice = newarkResult.franchisePrice;
+    primaryBulk = newarkResult.franchiseBulkPrice;
+    primaryRfqPrice = newarkResult.franchiseRfqPrice;
+    primaryVqPrice = newarkResult.vqPrice;
+  } else if (farnellHasStock) {
+    // Only Farnell has stock — convert GBP to USD
+    primaryQty = farnellResult.franchiseQty;
+    primaryPrice = farnellResult.franchisePrice ? farnellResult.franchisePrice * GBP_TO_USD : null;
+    primaryBulk = farnellResult.franchiseBulkPrice ? farnellResult.franchiseBulkPrice * GBP_TO_USD : null;
+    primaryRfqPrice = farnellResult.franchiseRfqPrice ? farnellResult.franchiseRfqPrice * GBP_TO_USD : null;
+    primaryVqPrice = farnellResult.vqPrice ? farnellResult.vqPrice * GBP_TO_USD : null;
+  } else {
+    // Neither has stock — use Newark pricing if available for lead time reference
+    primaryQty = 0;
+    primaryPrice = newarkResult?.franchisePrice || null;
+    primaryBulk = newarkResult?.franchiseBulkPrice || null;
+    primaryRfqPrice = newarkResult?.franchiseRfqPrice || null;
+    primaryVqPrice = newarkResult?.vqPrice || null;
+  }
 
   const combined = {
     searchMpn: mpn,
@@ -148,15 +179,14 @@ async function searchPart(mpn, rfqQty = 1) {
     found: storeResults.some(r => r.found),
     source: 'Newark/Farnell',
 
-    // Use Newark for USD-based screening (primary)
-    franchiseQty: (newarkResult?.franchiseQty || 0) + (farnellResult?.franchiseQty || 0),
-    franchisePrice: newarkResult?.franchisePrice || null,        // USD
-    franchiseBulkPrice: newarkResult?.franchiseBulkPrice || null, // USD
-    franchiseRfqPrice: newarkResult?.franchiseRfqPrice || null,   // USD
-    opportunityValue: newarkResult?.opportunityValue || null,
+    franchiseQty: primaryQty,
+    franchisePrice: primaryPrice,
+    franchiseBulkPrice: primaryBulk,
+    franchiseRfqPrice: primaryRfqPrice,
+    opportunityValue: primaryRfqPrice ? primaryRfqPrice * rfqQty : null,
 
-    // VQ fields from Newark (USD pricing)
-    vqPrice: newarkResult?.vqPrice || null,
+    // VQ fields
+    vqPrice: primaryVqPrice,
     vqMpn: newarkResult?.vqMpn || farnellResult?.vqMpn || null,
     vqDescription: newarkResult?.vqDescription || farnellResult?.vqDescription || null,
     vqManufacturer: newarkResult?.vqManufacturer || farnellResult?.vqManufacturer || null,
@@ -184,6 +214,9 @@ async function searchPart(mpn, rfqQty = 1) {
 
     // Build vendor notes
     vqVendorNotes: buildCombinedNotes(newarkResult, farnellResult),
+
+    // Price breaks from primary store (Newark preferred)
+    priceBreaks: newarkResult?.priceBreaks || farnellResult?.priceBreaks || [],
 
     // Errors if any
     errors: errors.length > 0 ? errors : undefined,
@@ -268,6 +301,7 @@ function parseSearchResults(json, searchMpn, rfqQty, storeInfo) {
     result.franchiseBulkPrice = prices[prices.length - 1].cost;
     result.franchiseRfqPrice = getPriceAtQty(prices, rfqQty);
     result.vqPrice = result.franchiseRfqPrice;
+    result.priceBreaks = prices.map(p => ({ qty: p.from, unitPrice: p.cost })).sort((a, b) => a.qty - b.qty);
   }
 
   if (stockLevel > 0 || prices.length > 0) {

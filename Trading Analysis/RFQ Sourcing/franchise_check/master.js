@@ -194,6 +194,8 @@ function parseSearchResults(results, searchMpn, rfqQty) {
     result.franchiseBulkPrice = parseFloat(priceBreaks[priceBreaks.length - 1].pricelist);
     // Price at RFQ qty
     result.franchiseRfqPrice = getPriceAtQty(priceBreaks, rfqQty);
+    // All price breaks sorted ascending by qty
+    result.priceBreaks = priceBreaks.map(pb => ({ qty: parseInt(pb.pricebreak), unitPrice: parseFloat(pb.pricelist) })).sort((a, b) => a.qty - b.qty);
   }
 
   if (result.franchiseRfqPrice !== null) {

@@ -15,28 +15,12 @@
 const fs = require('fs');
 const path = require('path');
 
-// Import franchise API modules
-const franchiseDir = path.join(__dirname, '../RFQ Sourcing/franchise_check');
-const digikey = require(path.join(franchiseDir, 'digikey'));
-const arrow = require(path.join(franchiseDir, 'arrow'));
-const rutronik = require(path.join(franchiseDir, 'rutronik'));
-const future = require(path.join(franchiseDir, 'future'));
-const master = require(path.join(franchiseDir, 'master'));
+// Use shared franchise API module (single source of truth for all distributor APIs)
+const { searchAllDistributors } = require('../../shared/franchise-api');
+const { writePricingResult } = require('../../shared/api-result-writer');
 
 // Use shared CSV utility
 const { readCSVFile } = require('../../shared/csv-utils');
-
-// -----------------------------------------------------------------------------
-// Configuration
-// -----------------------------------------------------------------------------
-
-const FRANCHISE_APIS = [
-  { name: 'DigiKey', module: digikey, bpName: 'Digi-Key Electronics' },
-  { name: 'Arrow', module: arrow, bpName: 'Arrow Electronics' },
-  { name: 'Rutronik', module: rutronik, bpName: 'Rutronik UK' },
-  { name: 'Future', module: future, bpName: 'Future Electronics Corporation' },
-  { name: 'Master', module: master, bpName: 'Master Electronics' },
-];
 
 const DELAY_BETWEEN_PARTS = 500; // ms between parts to avoid rate limiting
 
@@ -156,30 +140,22 @@ async function main() {
 // -----------------------------------------------------------------------------
 
 async function queryFranchiseAPIs(mpn, qty) {
+  const aggregated = await searchAllDistributors(mpn, qty);
+
+  // Capture full API pricing data (all price breaks) for market intelligence
+  writePricingResult({ searchResult: aggregated, mpn, qty, source: 'lam-kitting' })
+    .catch(err => console.error(`  API result capture failed: ${err.message}`));
+
   const results = {};
 
-  for (const api of FRANCHISE_APIS) {
-    try {
-      const result = await api.module.searchPart(mpn, qty);
-
-      if (result && result.found) {
-        // Handle different field names across APIs
-        const availQty = result.franchiseQty || result.qty || 0;
-        const price = result.franchiseRfqPrice || result.franchiseBulkPrice || result.price || null;
-        const leadTime = result.leadTime || result.vqLeadTime || '';
-
-        if (availQty > 0) {
-          results[api.name] = {
-            qty: availQty,
-            price: price,
-            leadTime: leadTime,
-            supplier: api.bpName,
-          };
-        }
-      }
-    } catch (err) {
-      // API error - skip this supplier
-      // console.error(`    ${api.name} error: ${err.message}`);
+  for (const r of aggregated.distributors) {
+    if (r.found && (r.franchiseQty > 0 || r.franchiseRfqPrice || r.franchiseBulkPrice)) {
+      results[r.name] = {
+        qty: r.franchiseQty || 0,
+        price: r.franchiseRfqPrice || r.franchiseBulkPrice || null,
+        leadTime: r.vqLeadTime || '',
+        supplier: r.bpName || r.name,
+      };
     }
   }
 
@@ -191,50 +167,58 @@ async function queryFranchiseAPIs(mpn, qty) {
 // -----------------------------------------------------------------------------
 
 /**
- * Find best in-stock option (has qty available)
- * Returns supplier with lowest price among those with stock
+ * Find best in-stock option (has enough qty to cover needed quantity)
+ * Returns supplier with lowest price among those with sufficient stock
  */
 function findBestInStock(franchiseResults, neededQty) {
   let best = null;
+  let bestPartial = null;
 
   for (const [name, data] of Object.entries(franchiseResults)) {
     if (!data || data.qty <= 0) continue;
 
-    // Only consider if has stock
+    if (data.qty >= neededQty) {
+      // Full coverage — pick lowest price
+      if (!best || (data.price && data.price < best.price)) {
+        best = { ...data, supplier: name };
+      }
+    } else {
+      // Partial stock — track as fallback
+      if (!bestPartial || (data.price && data.price < bestPartial.price)) {
+        bestPartial = { ...data, supplier: name };
+      }
+    }
+  }
+
+  // Return full coverage winner; if none, return partial with note
+  if (best) return best;
+  if (bestPartial) {
+    bestPartial.partialStock = true;
+    return bestPartial;
+  }
+  return null;
+}
+
+/**
+ * Find best lead time option (for items without immediate stock)
+ * Returns supplier with pricing but no/insufficient stock (lowest price)
+ */
+function findBestLeadTime(franchiseResults) {
+  let best = null;
+
+  for (const [name, data] of Object.entries(franchiseResults)) {
+    if (!data || !data.price) continue;
+
+    // Only consider items without stock (lead time orders)
+    if (data.qty > 0) continue;
+
     if (!best) {
       best = { ...data, supplier: name };
       continue;
     }
 
     // Pick lowest price
-    if (data.price && (!best.price || data.price < best.price)) {
-      best = { ...data, supplier: name };
-    }
-  }
-
-  return best;
-}
-
-/**
- * Find best lead time option (for items without immediate stock)
- * Returns supplier with lead time info and lowest price
- */
-function findBestLeadTime(franchiseResults) {
-  let best = null;
-
-  for (const [name, data] of Object.entries(franchiseResults)) {
-    if (!data) continue;
-
-    // Only consider if has lead time info
-    if (!data.leadTime) continue;
-
-    if (!best) {
-      best = { ...data, supplier: name };
-      continue;
-    }
-
-    // Pick lowest price among those with lead time
-    if (data.price && (!best.price || data.price < best.price)) {
+    if (data.price < best.price) {
       best = { ...data, supplier: name };
     }
   }
@@ -279,7 +263,7 @@ async function writeEnrichedOutput(results, originalHeaders, outputPath) {
         const num = parseFloat(v);
         if (!isNaN(num)) return num;
       }
-      if (['MIN QTY', 'MOQ', 'QTY ON HAND', 'Shortfall'].includes(header)) {
+      if (['Reorder Threshold', 'MOQ', 'QTY ON HAND', 'Shortfall', 'On Order Qty', 'Available Qty (Other WH)'].includes(header)) {
         const num = parseFloat(v);
         if (!isNaN(num)) return num;
       }
@@ -341,7 +325,7 @@ async function writeEnrichedOutput(results, originalHeaders, outputPath) {
     // In Stock Margin cell
     if (inStockMargin !== null && inStockMargin !== undefined) {
       const cell = excelRow.getCell(inStockMarginCol);
-      cell.value = inStockMargin.toFixed(1) + '%';
+      cell.value = inStockMargin / 100;  // Store as decimal for % format
       cell.fill = {
         type: 'pattern',
         pattern: 'solid',
@@ -352,7 +336,7 @@ async function writeEnrichedOutput(results, originalHeaders, outputPath) {
     // Lead Time Margin cell
     if (leadTimeMargin !== null && leadTimeMargin !== undefined) {
       const cell = excelRow.getCell(leadTimeMarginCol);
-      cell.value = leadTimeMargin.toFixed(1) + '%';
+      cell.value = leadTimeMargin / 100;  // Store as decimal for % format
       cell.fill = {
         type: 'pattern',
         pattern: 'solid',
@@ -363,7 +347,8 @@ async function writeEnrichedOutput(results, originalHeaders, outputPath) {
 
   // Apply number formats to currency and quantity columns
   const currencyCols = ['Base Unit Price', 'Resale Price', 'Historical Purchase Price', 'In Stock Price', 'Lead Time Price'];
-  const intCols = ['MIN QTY', 'MOQ', 'QTY ON HAND', 'Shortfall', 'In Stock Qty'];
+  const intCols = ['Reorder Threshold', 'MOQ', 'QTY ON HAND', 'Shortfall', 'In Stock Qty', 'On Order Qty', 'Available Qty (Other WH)'];
+  const pctCols = ['In Stock Margin %', 'Lead Time Margin %'];
 
   allHeaders.forEach((header, idx) => {
     const colNum = idx + 1;
@@ -371,6 +356,8 @@ async function writeEnrichedOutput(results, originalHeaders, outputPath) {
       worksheet.getColumn(colNum).numFmt = '$#,##0.0000';
     } else if (intCols.includes(header)) {
       worksheet.getColumn(colNum).numFmt = '#,##0';
+    } else if (pctCols.includes(header)) {
+      worksheet.getColumn(colNum).numFmt = '0.0%';
     }
   });
 

@@ -10,7 +10,7 @@
 
 | Module | Purpose | Use When | Consumers |
 |--------|---------|----------|-----------|
-| `franchise-api.js` | All 8 franchise distributor APIs (DigiKey, Arrow, Rutronik, Future, Newark, TTI, Master, Waldom) | Need franchise stock/pricing for ANY workflow | Franchise Screening, Suggested Resale, VQ Loading, Quick Quote |
+| `franchise-api.js` | All 10 franchise distributor APIs (DigiKey, Arrow, Rutronik, Future, Newark, TTI, Mouser, Master, Waldom, Sager) | Need franchise stock/pricing for ANY workflow | Franchise Screening, Suggested Resale, VQ Loading, Quick Quote |
 | `market-data.js` | DB queries: VQ history, sales history (broker vs customer), market offers, RFQ demand | Need pricing intelligence from the system | Suggested Resale, Quick Quote, Vortex Matches, Market Offer Analysis |
 | `mfr-lookup.js` | Resolve manufacturer names → canonical `chuboe_mfr.name`. Aliases (165+) → DB → cache. | Normalizing MFR names from any source | VQ Loading, Market Offer Uploading, Stock RFQ Loading |
 | `partner-lookup.js` | Resolve email/name → iDempiere business partner | Matching sender to BP in any inbound email workflow | VQ Loading, Market Offer Uploading, Stock RFQ Loading |
@@ -22,6 +22,8 @@
 | `notifier.js` | Email notifications via AWS WorkMail SMTP. Factory: `createNotifier({fromEmail, fromName})` | Sending notifications/attachments from any workflow | VQ Loading, Stock RFQ Loading |
 | `rfq-writer.js` | Write RFQs to `ai_writeback` schema (header + line + line_mpn). Auto IDs, MPN description enrichment, MFR ID lookup. | Writing any RFQ type to the ERP writeback | Stock RFQ Loading, (future) other RFQ workflows |
 | `offer-writeback.js` | Write market offers to `ai_writeback` schema (header + line + optional line_mpn). Auto IDs, batch write, deactivation of prior offers. | Writing any offer type to the ERP writeback | Market Offer Uploading, Inventory File Cleanup, (future) VQ Loading |
+| `api-result-writer.js` | Capture full franchise API responses (all price breaks, stock, lead time) to cache + DB. Extract qty-relevant prices for downstream consumers. | After any `searchAllDistributors()` call (write), or when Vortex/Quick Quote needs franchise pricing (read) | Franchise Screening, Suggested Resale, LAM Kitting (write); Vortex Matches, Quick Quote (read) |
+| `db-helpers.js` | Shared DB utilities: `psqlQuery`, `psqlExec`, `getNextId`, `sqlStr`, `sqlNum`, `cleanMpn`, `tableExists` | Any module writing to `ai_writeback` | offer-writeback.js, rfq-writer.js, api-result-writer.js |
 
 ---
 
@@ -424,3 +426,85 @@ deactivatePriorOffers(1000332, 1000008);  // BP + type
 | `countryId` | No | NULL | c_country_id |
 | `currencyId` | No | NULL | c_currency_id |
 | `mpnClean` | No | Auto-generated | Stripped MPN for matching |
+
+---
+
+## api-result-writer.js
+
+Captures full franchise API responses (all price breaks, stock, lead time, MOQ) for market intelligence. Dual-write: local cache + DB (when available).
+
+**Key distinction:**
+- **VQ lines** get ONE price per distributor (at RFQ qty) — for active sourcing
+- **API result cache/DB** gets ALL price breaks — for Vortex, Quick Quote, Hurricane
+
+### Data Flow
+
+```
+searchAllDistributors() → writePricingResult()
+    ├─► Cache: shared/data/api-pricing-cache/{MPN}_{date}.json (always)
+    └─► DB: ai_writeback.chuboe_pricing_api_result (when table exists)
+
+extractPriceAtQty() ← Vortex / Quick Quote / future workflows
+    reads DB first → falls back to cache → filters by maxAgeDays
+    returns one row per distributor with price at requested qty
+```
+
+### Write (after API calls)
+
+```javascript
+const { writePricingResult } = require('../shared/api-result-writer');
+
+// Fire-and-forget — never blocks the sourcing workflow
+writePricingResult({
+  searchResult: franchise,      // from searchAllDistributors()
+  mpn: 'ADS1115IDGST',
+  qty: 700,
+  rfqId: 1131217,               // optional — links to triggering RFQ
+  source: 'franchise-screening' // consumer name for tracking
+}).catch(err => console.error(err.message));
+```
+
+### Read (for market intelligence)
+
+```javascript
+const { extractPriceAtQty } = require('../shared/api-result-writer');
+
+// Get price at qty 700 from data no older than 90 days
+const rows = extractPriceAtQty('ADS1115IDGST', 700, { maxAgeDays: 90 });
+// → [{ supplier: 'DigiKey', priceAtQty: 2.47, stock: 45000, ... }, ...]
+```
+
+### Freshness Rules (enforced by reader, not writer)
+
+| Consumer | `maxAgeDays` | Rationale |
+|----------|-------------|-----------|
+| Vortex Matches | 90 | Matches 90-day offer/VQ window |
+| Quick Quote | 30 | Matches 30-day VQ window |
+| On-demand | 7 | Fresh data for active decisions |
+
+### Utilities
+
+| Function | Purpose |
+|----------|---------|
+| `flushCacheToDB()` | Bulk import cache → DB (run once when table ready) |
+| `pruneCache(maxAgeDays)` | Delete cache files older than N days (default 90) |
+
+---
+
+## db-helpers.js
+
+Shared database utilities extracted from offer-writeback.js. Used by all modules that write to `ai_writeback`.
+
+```javascript
+const { psqlQuery, psqlExec, getNextId, sqlStr, sqlNum, cleanMpn, tableExists } = require('../shared/db-helpers');
+```
+
+| Function | Purpose |
+|----------|---------|
+| `psqlQuery(sql)` | Run SELECT, return filtered output |
+| `psqlExec(sql)` | Run INSERT/UPDATE, return true/false |
+| `getNextId(table, column)` | Next safe ID (9000000+) |
+| `sqlStr(val)` | Escape string for SQL (or NULL) |
+| `sqlNum(val)` | Coerce to number for SQL (or NULL) |
+| `cleanMpn(mpn)` | Strip non-alphanumeric, uppercase |
+| `tableExists(name)` | Check if ai_writeback table exists |

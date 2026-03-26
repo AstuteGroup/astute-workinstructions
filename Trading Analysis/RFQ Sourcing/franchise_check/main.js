@@ -37,6 +37,7 @@ const { Client } = require('pg');
 const config = require('./config');
 const { searchPart: findChipsSearch } = require('./search');
 const { searchAllDistributors, getActiveDistributors } = require('../../../shared/franchise-api');
+const { writePricingResult } = require('../../../shared/api-result-writer');
 
 // =============================================================================
 // Database Functions
@@ -441,6 +442,10 @@ Options:
               }
             },
           });
+
+          // Capture full API pricing data (all price breaks) for market intelligence
+          writePricingResult({ searchResult: apiResults, mpn: part.mpn, qty: part.qty, source: 'franchise-screening' })
+            .catch(err => console.error(`  API result capture failed: ${err.message}`));
 
           // Log each distributor with stock
           for (const d of apiResults.distributors) {

@@ -177,6 +177,8 @@ async function searchPart(mpn, rfqQty = 1) {
     result.franchisePrice = parseFloat(sorted[0].unitPrice);
     result.franchiseBulkPrice = parseFloat(sorted[sorted.length - 1].unitPrice);
     result.franchiseRfqPrice = getPriceAtQty(pricings, rfqQty);
+    // All price breaks sorted ascending by qty
+    result.priceBreaks = sorted.map(pb => ({ qty: pb.qtyBreak, unitPrice: parseFloat(pb.unitPrice) })).sort((a, b) => a.qty - b.qty);
   }
 
   if (result.franchiseRfqPrice && rfqQty) {

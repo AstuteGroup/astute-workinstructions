@@ -289,6 +289,7 @@ function parseSearchResults(apiResponse, searchMpn, rfqQty) {
     result.franchiseRfqPrice = getPriceAtQty(sorted, rfqQty);
     result.vqPrice = result.franchiseRfqPrice;
     result.currency = sorted[0].currency || 'USD';
+    result.priceBreaks = sorted.map(pb => ({ qty: pb.quantity, unitPrice: pb.price }));
   }
 
   if (result.franchiseBulkPrice && rfqQty) {
