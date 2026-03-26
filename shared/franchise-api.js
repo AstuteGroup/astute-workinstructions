@@ -105,6 +105,14 @@ const DISTRIBUTORS = {
     bpId: 1000644,
     active: true,
   },
+  sager: {
+    name: 'Sager',
+    script: path.join(API_DIR, 'sager.js'),
+    bpValue: '1002339',
+    bpName: 'Sager - v3004',
+    bpId: 1000335,
+    active: true,
+  },
 };
 
 /**

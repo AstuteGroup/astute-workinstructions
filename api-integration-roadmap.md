@@ -33,7 +33,7 @@ Real-time pricing and availability from authorized distributors. Replaces FindCh
 | Future Electronics | REST (API key header) | documenter.getpostman.com/view/18706946/UzBvFhcj | **Active** | 1000328 |
 | TTI | REST (apiKey header) | developer.tti.com | **Active** | 1000326 |
 | Newark/element14/Farnell | REST (API key) | partner.element14.com | **Active** | 1000390 |
-| Sager Electronics | REST (API key) | developer.sager.com | **To investigate** | 1000335 |
+| Sager Electronics | REST (API key) | developer.sager.com | **Active** | 1000335 |
 | Rochester Electronics | REST (?) | api.rocelec.com | **To investigate** | 1000058 |
 | Mouser | REST (API key) | api.mouser.com/api/docs/ui/index | **Active** | 1000334 |
 | Octopart/Nexar | GraphQL | nexar.com/api | Planned (aggregator) | — |
@@ -444,23 +444,32 @@ node tti.js --manufacturers
 
 ---
 
-### Sager Electronics API (Blocked — Awaiting Access)
+### Sager Electronics API (Active)
 
 **Portal:** [developer.sager.com](https://developer.sager.com/)
 **Admin:** Mashery — `Sagerelectronics.admin.mashery.com`
+**Base URL:** `sagerelectronics.api.mashery.com`
 
 **iDempiere Vendor:**
 - BP ID: `1000335`
 - Name: `Sager - v3004`
+- Value: `1002339`
 
-**Capabilities:** Pricing, inventory, order management.
+**API:** Customer Price and Availability
+- `POST /customer-price-availability/v1`
+- Body: `{ "PartNumber": "MPN" }`
+- Auth: `api_key` header (NOT query param)
+- Rate limit: 4 calls/sec, 100K calls/day
 
 **API Key:** `y7deugn3bmsk8czcc5aaxk9q` (active, created 2026-03-25)
 **Mashery Package Key:** `d378375c-b6fa-45e7-97cd-13603befc563`
 
-**Status:** Registered and API key obtained. IO Docs page is empty — key has no API plan/package assigned. Need Sager to grant access to Part Search/Inventory API before endpoints are visible.
+**Response fields:** manufacturerPartNumber, manufacturerName, description, currentStockQty, onOrderQuantity, leadTimeDays, pricings[] (unitPrice/qtyBreak tiers), minimumBuy, multiplier, ncnr, roHS, lifeCycleStatus, category, currency, dataSheetUrl, productUrl (includes Astute UTM tracking), sku, packaging.
 
-**Next:** Contact Sager rep to activate API plan, then build `sager.js` module.
+**Module:** `Trading Analysis/RFQ Sourcing/franchise_check/sager.js`
+**Registered in:** `shared/franchise-api.js`
+
+**Status:** Live and integrated. Module built 2026-03-26. Specializes in power, thermal, connectors, electromechanical — returns empty for semiconductor parts not in Sager catalog.
 
 ---
 
