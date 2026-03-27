@@ -1,0 +1,345 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Price Trend: MT40A1G8SA-062E IT:E</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns@3.0.0/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #0f1117; color: #e0e0e0; padding: 24px; }
+  .header { text-align: center; margin-bottom: 24px; }
+  .header h1 { font-size: 22px; font-weight: 600; color: #fff; }
+  .header .mpn { font-size: 16px; color: #8b8fa3; margin-top: 4px; }
+  .header .subtitle { font-size: 13px; color: #6b7080; margin-top: 2px; }
+  .chart-container { background: #181a20; border-radius: 12px; padding: 24px; max-width: 1100px; margin: 0 auto 24px; border: 1px solid #2a2d38; }
+  .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; max-width: 1100px; margin: 0 auto 24px; }
+  .stat-card { background: #181a20; border-radius: 10px; padding: 16px 20px; border: 1px solid #2a2d38; }
+  .stat-card .label { font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; color: #6b7080; margin-bottom: 6px; }
+  .stat-card .value { font-size: 22px; font-weight: 700; }
+  .stat-card .change { font-size: 12px; margin-top: 4px; }
+  .up { color: #ef4444; }
+  .down { color: #22c55e; }
+  .neutral { color: #8b8fa3; }
+  .vq-color { color: #3b82f6; }
+  .mo-color { color: #f59e0b; }
+  .target-color { color: #10b981; }
+  .table-section { background: #181a20; border-radius: 12px; padding: 24px; max-width: 1100px; margin: 0 auto 24px; border: 1px solid #2a2d38; }
+  .table-section h3 { font-size: 14px; margin-bottom: 12px; color: #8b8fa3; }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th { text-align: left; padding: 8px 12px; border-bottom: 1px solid #2a2d38; color: #6b7080; font-weight: 500; font-size: 11px; text-transform: uppercase; }
+  td { padding: 7px 12px; border-bottom: 1px solid #1e2028; }
+  tr:hover { background: #1e2028; }
+  .price { font-weight: 600; font-variant-numeric: tabular-nums; }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1>Price Trend Analysis</h1>
+  <div class="mpn">MT40A1G8SA-062E IT:E</div>
+  <div class="subtitle">Micron — 8Gb DDR4 SDRAM | 10-Month Window (Jun 2025 – Mar 2026)</div>
+</div>
+
+<div class="stats-grid">
+  <div class="stat-card">
+    <div class="label">VQ Avg (Last 30d)</div>
+    <div class="value vq-color" id="vq-recent">—</div>
+    <div class="change" id="vq-change">—</div>
+  </div>
+  <div class="stat-card">
+    <div class="label">MO Avg (Last 30d)</div>
+    <div class="value mo-color" id="mo-recent">—</div>
+    <div class="change" id="mo-change">—</div>
+  </div>
+  <div class="stat-card">
+    <div class="label">Latest Customer Target</div>
+    <div class="value target-color" id="target-latest">—</div>
+    <div class="change neutral" id="target-customer">—</div>
+  </div>
+  <div class="stat-card">
+    <div class="label">Price Movement</div>
+    <div class="value" id="movement-pct">—</div>
+    <div class="change neutral">VQ low-to-current</div>
+  </div>
+</div>
+
+<div class="chart-container">
+  <canvas id="priceChart" height="110"></canvas>
+</div>
+
+<div class="table-section">
+  <h3>Customer Targets (CQ Bids)</h3>
+  <table>
+    <thead><tr><th>Date</th><th>Customer</th><th>Qty</th><th>Target Price</th></tr></thead>
+    <tbody id="target-table"></tbody>
+  </table>
+</div>
+
+<script>
+// ── Raw Data ──
+const vqData = [
+  {dt:'2025-07-21',price:7.50,qty:2000,vendor:'Blink Electronics'},
+  {dt:'2025-07-21',price:6.28,qty:1500,vendor:'Keming Electronics'},
+  {dt:'2025-07-21',price:6.29,qty:1500,vendor:'HK Firsttop'},
+  {dt:'2025-07-21',price:8.45,qty:1500,vendor:'Insight (HK)'},
+  {dt:'2025-07-21',price:10.10,qty:2000,vendor:'Action (HK)'},
+  {dt:'2025-07-21',price:5.29,qty:1500,vendor:'SMARTEL'},
+  {dt:'2025-07-23',price:5.33,qty:1500,vendor:'Fixchips'},
+  {dt:'2025-07-23',price:8.00,qty:1500,vendor:'Archermind'},
+  {dt:'2025-07-23',price:7.50,qty:2000,vendor:'Blink Electronics'},
+  {dt:'2025-07-23',price:6.28,qty:1500,vendor:'Keming Electronics'},
+  {dt:'2025-07-23',price:6.29,qty:1500,vendor:'HK Firsttop'},
+  {dt:'2025-07-23',price:8.45,qty:1500,vendor:'Insight (HK)'},
+  {dt:'2025-07-23',price:10.10,qty:2000,vendor:'Action (HK)'},
+  {dt:'2025-07-23',price:5.29,qty:1500,vendor:'SMARTEL'},
+  {dt:'2025-07-29',price:7.50,qty:10000,vendor:'Blink Electronics'},
+  {dt:'2025-07-29',price:6.60,qty:8190,vendor:'SSF GROUP'},
+  {dt:'2025-07-29',price:7.16,qty:8190,vendor:'HK Firsttop'},
+  {dt:'2025-07-29',price:9.71,qty:8190,vendor:'HK Firsttop'},
+  {dt:'2025-07-29',price:10.31,qty:8190,vendor:'Dragon Core'},
+  {dt:'2025-07-29',price:6.35,qty:6000,vendor:'Fixchips'},
+  {dt:'2025-07-29',price:7.65,qty:10000,vendor:'Action (HK)'},
+  {dt:'2025-07-29',price:7.78,qty:6000,vendor:'SMARTEL'},
+  {dt:'2025-08-20',price:8.08,qty:6000,vendor:'Fixchips'},
+  {dt:'2025-08-20',price:6.18,qty:2000,vendor:'Fixchips'},
+  {dt:'2025-08-20',price:6.70,qty:2000,vendor:'Fixchips'},
+  {dt:'2025-08-21',price:7.20,qty:6000,vendor:'Archermind'},
+  {dt:'2025-08-21',price:8.00,qty:6000,vendor:'Blink Electronics'},
+  {dt:'2025-08-21',price:6.90,qty:6000,vendor:'Quiksol'},
+  {dt:'2025-09-12',price:5.69,qty:2000,vendor:'HK Firsttop'},
+  {dt:'2025-09-24',price:7.00,qty:2000,vendor:'Blink Electronics'},
+  {dt:'2025-09-24',price:8.15,qty:2000,vendor:'Unknown'},
+  {dt:'2025-09-24',price:8.43,qty:1000,vendor:'PGC-IC'},
+  {dt:'2025-09-24',price:9.00,qty:2000,vendor:'PGC-IC'},
+  {dt:'2025-10-15',price:9.26,qty:3500,vendor:'Keming Electronics'},
+  {dt:'2025-10-15',price:7.25,qty:1700,vendor:'Fixchips'},
+  {dt:'2025-10-15',price:7.63,qty:2999,vendor:'Fixchips'},
+  {dt:'2025-10-15',price:8.60,qty:2033,vendor:'Fixchips'},
+  {dt:'2025-10-15',price:7.54,qty:4000,vendor:'EC Infinite'},
+  {dt:'2025-10-28',price:8.70,qty:9000,vendor:'Insight (HK)'},
+  {dt:'2026-01-21',price:19.42,qty:18900,vendor:'PGC-IC'},
+  {dt:'2026-01-21',price:29.71,qty:3000,vendor:'Keming Electronics'},
+  {dt:'2026-01-21',price:29.86,qty:4000,vendor:'HK Firsttop'},
+  {dt:'2026-01-21',price:29.86,qty:1000,vendor:'HK Firsttop'},
+  {dt:'2026-01-29',price:25.00,qty:8000,vendor:'DST Electronics'},
+  {dt:'2026-02-26',price:38.00,qty:4000,vendor:'CORERINE'},
+  {dt:'2026-02-26',price:41.60,qty:12000,vendor:'CORERINE'},
+  {dt:'2026-02-26',price:29.89,qty:4000,vendor:'Fixchips'},
+  {dt:'2026-02-26',price:37.60,qty:4000,vendor:'Fixchips'},
+  {dt:'2026-02-26',price:30.00,qty:4000,vendor:'Fixchips'},
+  {dt:'2026-02-26',price:34.60,qty:1000,vendor:'CORERINE'},
+  {dt:'2026-03-05',price:40.00,qty:4000,vendor:'Blink Electronics'},
+  {dt:'2026-03-05',price:45.00,qty:2000,vendor:'Archermind'},
+  {dt:'2026-03-05',price:29.60,qty:7344,vendor:'Fixchips'},
+  {dt:'2026-03-11',price:54.98,qty:4000,vendor:'Invelox Micro'},
+  {dt:'2026-03-12',price:40.74,qty:9450,vendor:'HK Firsttop'},
+  {dt:'2026-03-12',price:35.38,qty:3519,vendor:'Keming Electronics'},
+  {dt:'2026-03-12',price:35.91,qty:9450,vendor:'PGC-IC'},
+  {dt:'2026-03-12',price:36.75,qty:4000,vendor:'PGC-IC'},
+  {dt:'2026-03-12',price:36.75,qty:1260,vendor:'PGC-IC'},
+  {dt:'2026-03-12',price:30.94,qty:3500,vendor:'PGC-IC'},
+  {dt:'2026-03-12',price:46.00,qty:2000,vendor:'PGC-IC'},
+];
+
+const moData = [
+  {dt:'2025-06-18',price:5.20,qty:10000,vendor:'Cystron Technology'},
+  {dt:'2025-06-23',price:5.00,qty:4000,vendor:'Cystron Technology'},
+  {dt:'2025-07-01',price:2.38,qty:133,vendor:'IMI'},
+  {dt:'2025-07-03',price:6.50,qty:10000,vendor:'Cystron Technology'},
+  {dt:'2025-07-14',price:6.50,qty:4000,vendor:'Cystron Technology'},
+  {dt:'2025-07-24',price:6.55,qty:4000,vendor:'Cystron Technology'},
+  {dt:'2025-07-28',price:7.65,qty:10000,vendor:'Action (HK)'},
+  {dt:'2025-07-28',price:7.30,qty:10000,vendor:'Action (HK)'},
+  {dt:'2025-08-01',price:6.95,qty:4000,vendor:'Cystron Technology'},
+  {dt:'2025-08-08',price:6.50,qty:6000,vendor:'Cystron Technology'},
+  {dt:'2025-08-22',price:7.40,qty:10000,vendor:'Action (HK)'},
+  {dt:'2025-08-22',price:7.30,qty:4000,vendor:'Action (HK)'},
+  {dt:'2025-09-02',price:7.00,qty:4000,vendor:'Cystron Technology'},
+  {dt:'2025-09-09',price:7.10,qty:8000,vendor:'Action (HK)'},
+  {dt:'2025-09-10',price:7.00,qty:6000,vendor:'Cystron Technology'},
+  {dt:'2025-09-19',price:9.10,qty:2000,vendor:'Action (HK)'},
+  {dt:'2025-09-29',price:6.80,qty:4000,vendor:'Cystron Technology'},
+  {dt:'2025-11-17',price:13.80,qty:6000,vendor:'DST International'},
+  {dt:'2025-12-23',price:18.19,qty:4000,vendor:'HK ShunChiu'},
+  {dt:'2025-12-25',price:13.00,qty:10000,vendor:'Link Cost'},
+  {dt:'2026-01-05',price:23.00,qty:4000,vendor:'Cystron Technology'},
+  {dt:'2026-01-06',price:17.20,qty:8000,vendor:'DST International'},
+  {dt:'2026-01-20',price:30.00,qty:8000,vendor:'DST International'},
+  {dt:'2026-01-29',price:25.92,qty:2000,vendor:'HK ShunChiu'},
+  {dt:'2026-02-03',price:36.30,qty:4000,vendor:'DST International'},
+  {dt:'2026-02-26',price:27.00,qty:2000,vendor:'DST International'},
+  {dt:'2026-03-09',price:30.80,qty:4000,vendor:'Semihouse'},
+];
+
+const targetData = [
+  {dt:'2025-06-12',price:1.60,qty:4000,customer:'Shenzhen Kaisheng'},
+  {dt:'2025-06-20',price:2.50,qty:4000,customer:'XT Microelectronics'},
+  {dt:'2025-11-05',price:11.00,qty:631,customer:'CAMEO Communications'},
+  {dt:'2025-12-12',price:18.50,qty:2000,customer:'Sanmina'},
+  {dt:'2026-01-06',price:23.51,qty:15000,customer:'Mercury Systems'},
+  {dt:'2026-01-08',price:75.00,qty:18,customer:'Mercury Systems'},
+  {dt:'2026-01-13',price:25.79,qty:360,customer:'Abaco Systems'},
+  {dt:'2026-01-13',price:25.79,qty:6716,customer:'Abaco Systems'},
+  {dt:'2026-01-13',price:25.79,qty:1424,customer:'Abaco Systems'},
+  {dt:'2026-01-16',price:35.00,qty:1856,customer:'CAMEO Communications'},
+  {dt:'2026-01-26',price:37.63,qty:16000,customer:'Lam Research'},
+  {dt:'2026-01-29',price:25.65,qty:20000,customer:'Lam Research'},
+];
+
+// ── Helpers ──
+const fmt = v => '$' + v.toLocaleString('en-US', {minimumFractionDigits:2, maximumFractionDigits:2});
+const avg = arr => arr.reduce((s,x) => s + x, 0) / arr.length;
+
+// Weekly averages for line charts
+function weeklyAvg(data) {
+  const weeks = {};
+  data.forEach(d => {
+    const date = new Date(d.dt);
+    const weekStart = new Date(date);
+    weekStart.setDate(date.getDate() - date.getDay());
+    const key = weekStart.toISOString().slice(0,10);
+    if (!weeks[key]) weeks[key] = [];
+    weeks[key].push(d.price);
+  });
+  return Object.entries(weeks).map(([dt, prices]) => ({
+    x: dt, y: Math.round(avg(prices) * 100) / 100
+  })).sort((a,b) => a.x.localeCompare(b.x));
+}
+
+const vqWeekly = weeklyAvg(vqData);
+const moWeekly = weeklyAvg(moData);
+
+// ── Stats ──
+const cutoff30 = new Date('2026-02-25');
+const vqRecent = vqData.filter(d => new Date(d.dt) >= cutoff30).map(d => d.price);
+const moRecent = moData.filter(d => new Date(d.dt) >= cutoff30).map(d => d.price);
+const vqEarly = vqData.filter(d => new Date(d.dt) < new Date('2025-08-01')).map(d => d.price);
+const moEarly = moData.filter(d => new Date(d.dt) < new Date('2025-08-01')).map(d => d.price);
+
+const vqAvgRecent = avg(vqRecent);
+const moAvgRecent = avg(moRecent);
+const vqAvgEarly = avg(vqEarly);
+const moAvgEarly = avg(moEarly);
+
+document.getElementById('vq-recent').textContent = fmt(vqAvgRecent);
+document.getElementById('mo-recent').textContent = fmt(moAvgRecent);
+const vqPctChange = ((vqAvgRecent - vqAvgEarly) / vqAvgEarly * 100).toFixed(0);
+const moPctChange = ((moAvgRecent - moAvgEarly) / moAvgEarly * 100).toFixed(0);
+document.getElementById('vq-change').innerHTML = `<span class="${vqPctChange > 0 ? 'up' : 'down'}">↑ ${Math.abs(vqPctChange)}% vs Jul '25</span>`;
+document.getElementById('mo-change').innerHTML = `<span class="${moPctChange > 0 ? 'up' : 'down'}">↑ ${Math.abs(moPctChange)}% vs Jun-Jul '25</span>`;
+
+const lastTarget = targetData[targetData.length - 1];
+document.getElementById('target-latest').textContent = fmt(lastTarget.price);
+document.getElementById('target-customer').textContent = lastTarget.customer + ' (' + lastTarget.dt + ')';
+
+const vqLow = Math.min(...vqData.map(d => d.price));
+const movementPct = ((vqAvgRecent - vqLow) / vqLow * 100).toFixed(0);
+document.getElementById('movement-pct').innerHTML = `<span class="up">+${movementPct}%</span>`;
+
+// ── Target table ──
+const tbody = document.getElementById('target-table');
+targetData.forEach(t => {
+  const tr = document.createElement('tr');
+  tr.innerHTML = `<td>${t.dt}</td><td>${t.customer}</td><td>${t.qty.toLocaleString()}</td><td class="price">${fmt(t.price)}</td>`;
+  tbody.appendChild(tr);
+});
+
+// ── Chart ──
+const ctx = document.getElementById('priceChart').getContext('2d');
+new Chart(ctx, {
+  type: 'line',
+  data: {
+    datasets: [
+      {
+        label: 'VQ Avg (Weekly)',
+        data: vqWeekly,
+        borderColor: '#3b82f6',
+        backgroundColor: 'rgba(59,130,246,0.08)',
+        borderWidth: 2.5,
+        fill: true,
+        tension: 0.3,
+        pointRadius: 4,
+        pointHoverRadius: 7,
+        pointBackgroundColor: '#3b82f6',
+        order: 2,
+      },
+      {
+        label: 'MO Avg (Weekly)',
+        data: moWeekly,
+        borderColor: '#f59e0b',
+        backgroundColor: 'rgba(245,158,11,0.08)',
+        borderWidth: 2.5,
+        fill: true,
+        tension: 0.3,
+        pointRadius: 4,
+        pointHoverRadius: 7,
+        pointBackgroundColor: '#f59e0b',
+        order: 3,
+      },
+      {
+        label: 'Customer Targets',
+        data: targetData.map(t => ({x: t.dt, y: t.price, customer: t.customer, qty: t.qty})),
+        type: 'scatter',
+        borderColor: '#10b981',
+        backgroundColor: 'rgba(16,185,129,0.7)',
+        pointRadius: 7,
+        pointHoverRadius: 10,
+        pointStyle: 'triangle',
+        borderWidth: 1.5,
+        order: 1,
+      }
+    ]
+  },
+  options: {
+    responsive: true,
+    interaction: { mode: 'nearest', intersect: false },
+    plugins: {
+      legend: {
+        labels: { color: '#8b8fa3', font: { size: 12 }, usePointStyle: true, padding: 20 }
+      },
+      tooltip: {
+        backgroundColor: '#1e2028',
+        titleColor: '#fff',
+        bodyColor: '#c0c4d0',
+        borderColor: '#2a2d38',
+        borderWidth: 1,
+        padding: 12,
+        callbacks: {
+          label: function(ctx) {
+            const ds = ctx.dataset.label;
+            const val = fmt(ctx.parsed.y);
+            if (ds === 'Customer Targets') {
+              const pt = ctx.raw;
+              return `${pt.customer}: ${val} (${pt.qty.toLocaleString()} pcs)`;
+            }
+            return `${ds}: ${val}`;
+          }
+        }
+      }
+    },
+    scales: {
+      x: {
+        type: 'time',
+        time: { unit: 'month', displayFormats: { month: 'MMM yyyy' } },
+        grid: { color: '#1e2028' },
+        ticks: { color: '#6b7080', font: { size: 11 } },
+        title: { display: true, text: 'Date', color: '#6b7080' }
+      },
+      y: {
+        grid: { color: '#1e2028' },
+        ticks: {
+          color: '#6b7080',
+          font: { size: 11 },
+          callback: v => '$' + v.toFixed(0)
+        },
+        title: { display: true, text: 'Price (USD)', color: '#6b7080' }
+      }
+    }
+  }
+});
+</script>
+
+</body>
+</html>
