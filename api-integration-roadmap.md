@@ -951,17 +951,23 @@ node master.js LM317 100 --in-stock   # in-stock only
 
 ---
 
-### OEMSecrets API (To Investigate - Aggregator)
+### OEMSecrets API (Built - Aggregator, Rate Limited)
 
 **Portal:** [oemsecrets.com/api](https://www.oemsecrets.com/api) | **Docs:** [oemsecretsapi.com/documentation](https://oemsecretsapi.com/documentation/)
 
-**API:** REST/JSON | **Auth:** Free API key (apply on site, approval required)
+**API:** REST/JSON (single GET endpoint) | **Auth:** API key as query parameter
 
-**Capabilities:** Part search across 40M+ parts. Real-time pricing and stock from DigiKey, Farnell, RS, Arrow, Mouser, Avnet, Future, and more. BOM tool data. Global coverage.
+**Capabilities:** Part search across 40M+ parts. Real-time pricing (full price breaks) and stock from 60+ distributors including Avnet, RS, Rochester, Verical, TME, EBV, Chip One Stop — plus all our direct-API distributors. Lead time, lifecycle, compliance (RoHS/Pb), datasheets.
 
-**Note:** Strong aggregator alternative to Octopart. Multi-distributor price comparison in one API call. Free tier available.
+**Module:** `Trading Analysis/RFQ Sourcing/franchise_check/oemsecrets.js`
+- Filters out 11 distributors we already have direct APIs for (DigiKey, Arrow, Mouser, etc.)
+- Surfaces ~49 incremental distributors per search
+- CLI: `node oemsecrets.js <MPN> [qty] [--all]`
+- `--all` flag includes direct-API distributors for cross-reference
 
-**Status:** To investigate. Apply for free API key.
+**Rate Limit:** 10 calls/day (free tier, confirmed 3/27). Too low for bulk screening. Contacted OEMSecrets 3/27 to request higher tier.
+
+**Status:** Module built and tested. **Blocked on rate limit increase.** If bumped to 500+/day, could replace FindChips scraping entirely (better data, zero maintenance). Not yet registered in `franchise-api.js` — will integrate when quota is sufficient.
 
 ---
 
