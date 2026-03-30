@@ -69,6 +69,8 @@ ORDER BY rl.created DESC
 LIMIT 1;
 ```
 
+> **RFQ table hierarchy and join patterns:** See [`shared/data-model.md`](../shared/data-model.md).
+
 ---
 
 ## MPN Mismatch Handling
@@ -92,6 +94,8 @@ Missing price or quantity triggers a flag for manual review:
 ---
 
 ## Field Mappings
+
+> **Full VQ table schema, valid values, and column details:** See [`shared/data-model.md`](../shared/data-model.md).
 
 | Template Column | Description | Valid Values |
 |-----------------|-------------|--------------|

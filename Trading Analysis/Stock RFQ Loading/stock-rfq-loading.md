@@ -35,6 +35,8 @@ himalaya attachment download --account stockrfq --folder INBOX [ID]
 | F | `PriceEntered` | No | Customer's **target price** if provided. Leave blank if not stated |
 | G | `Description` | No | Part-specific notes. **If customer is Unqualified Broker (1008499):** put the actual customer/company name here |
 
+> **Schema reference:** For RFQ table hierarchy and where MPN/MFR/CPC fields live, see [`shared/data-model.md`](../../shared/data-model.md) § RFQ Chain.
+
 ### Column A Logic (Chuboe_RFQ_ID)
 
 ```
@@ -54,13 +56,7 @@ ELSE → use MPN (same value as column D)
 
 ### Column C Logic (Chuboe_MFR_Text)
 
-Same as Market Offer Uploading:
-1. Normalize input — uppercase, trim whitespace
-2. Alias lookup — check `mfr-aliases.json` for canonical name
-3. DB lookup if no alias — `SELECT name FROM adempiere.chuboe_mfr WHERE ad_client_id = 1000000 AND name ILIKE '%keyword%'`
-4. Output canonical name. If no match, use name as-is
-
-**Alias file:** `../Market Offer Uploading/mfr-aliases.json` (shared)
+MFR resolution follows the standard pattern. See [`shared/data-model.md`](../../shared/data-model.md) § Manufacturer for resolution order.
 
 ---
 

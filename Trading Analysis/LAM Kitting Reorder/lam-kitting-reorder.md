@@ -9,16 +9,43 @@ Monitor LAM kitting warehouse inventory levels to trigger reorders and source re
 | Setting | Value |
 |---------|-------|
 | Warehouses | W111 (LAM 3PL) + W115 (LAM Dead Inventory) — combined |
-| Trigger | After Inventory File Cleanup (Monday) or on-demand |
-| Threshold Source | `Lam_Kitting_DB.xlsx` → INVENTORY sheet → Column I (MIN QTY) |
+| Trigger | Cron: Mondays at 12:00 PM (after Inventory Cleanup at 11:00 AM) |
+| Threshold Source | `Lam_Kitting_DB.xlsx` → INVENTORY sheet → Column H (Reorder Threshold) |
 | Join Key | MPN (CPC not in source inventory data) |
+| Sourcing | Franchise-only — 8 APIs via `shared/franchise-api.js` |
+| LAM bpartner_id | 1000730 |
 
 **Key Design Decisions:**
-- **Separate workflow** — Independent of Inventory File Cleanup, but triggered by it
+- **Franchise-only sourcing** — No broker sourcing for this program. Items without API coverage need manual franchise sourcing (checking distributor websites, contacting reps)
 - **Combined inventory** — W111 + W115 quantities summed per part (dead stock counts)
-- **Fixed thresholds** — MIN QTY is a fixed value in INVENTORY sheet (no lookup to MIN sheet)
 - **MPN is join key** — CPC not available in Infor Item Lots Report; join on MPN only
 - **Zero-stock detection** — Items in Excel but not in inventory files flagged as CRITICAL
+- **LAM-filtered purchase history** — All ERP data filtered to LAM RFQs only (c_bpartner_id = 1000730)
+- **Source all parts** — Even parts on order get sourced for current pricing visibility and supplier consolidation opportunities
+- **Supplier consolidation** — Fewer suppliers = fewer POs, fewer shipments, lower processing/shipping costs
+
+---
+
+## Automation
+
+**Cron:** Mondays at 12:00 PM
+**Runner:** `lam-kitting-runner.js`
+
+```
+Inventory Cleanup (Monday 11:00 AM cron)
+    ↓
+Produces W111_LAM_3PL.csv + W115_LAM_Dead_Inventory.csv
+    ↓
+LAM Kitting Runner (Monday 12:00 PM cron)
+    ↓
+Step 1: Find today's inventory folder (or run cleanup if missing)
+Step 2: Find latest Lam_Kitting_DB*.xlsx
+Step 3: Run lam-kitting-reorder.js --no-email
+Step 4: Run lam-kitting-source.js → _sourced.xlsx
+Step 5: Email sourced report to jake.harris@astutegroup.com
+```
+
+One email with the final sourced Excel (color-coded margins). No intermediate unsourced email.
 
 ---
 
@@ -28,58 +55,56 @@ Monitor LAM kitting warehouse inventory levels to trigger reorders and source re
 
 | File | Description |
 |------|-------------|
-| `LAM_3PL_chuboe.csv` | Current W111 inventory |
-| `LAM_Dead_Inventory_chuboe.csv` | Current W115 inventory |
+| `W111_LAM_3PL.csv` | Current W111 inventory (Chuboe format) |
+| `W115_LAM_Dead_Inventory.csv` | Current W115 inventory (Chuboe format) |
 
 ### From LAM Kitting Database
 
 | File | Sheet | Key Columns |
 |------|-------|-------------|
-| `Lam_Kitting_DB_*.xlsx` | INVENTORY | Lam P/N (A), MPN (B), MIN QTY (I) |
+| `Lam_Kitting_DB_*.xlsx` | INVENTORY | Lam P/N (A), MPN (B), Reorder Threshold (H), MOQ (I), Buyer (J), Notes (K) |
 
-### From ERP (Historical Data)
+### From ERP (LAM Purchases Only)
 
-| Data | Source | Notes |
-|------|--------|-------|
-| Previous Supplier | `c_order` + `c_bpartner` | Most recent PO |
-| Buyer | `c_order` + `ad_user` | Who created the PO |
-| Historical Purchase Price | `c_orderline.priceentered` | Last price paid |
-| Last Purchase Date | `c_order.dateordered` | When last ordered |
+| Data | LAM Filter | Notes |
+|------|------------|-------|
+| Previous Supplier | `rfq.c_bpartner_id = 1000730` | Most recent LAM PO supplier |
+| Buyer | Same filter | Who created the PO (`c_order.createdby`) |
+| Historical Purchase Price | Same filter | Last price paid |
+| Last Promise Date | Same filter | Promise date (more useful than order date) |
+| Last RFQ | Same filter | LAM RFQ number |
+| Infor POV Number | `chuboe_po_string LIKE 'POV%'` | Must start with 'POV' (not 'STOCK') |
+| On Order Qty | 90-day window | Open qty on recent POV line |
 
-**Note:** ERP only has rebuy data — initial buys were tracked outside the system.
+> **Join Paths:** See [`shared/data-model.md`](../../shared/data-model.md) § Key Join Patterns for the correct RFQ→VQ→Order join chain and common wrong joins.
+>
+> **POV number:** `c_orderline.chuboe_po_string` (see [`shared/data-model.md`](../../shared/data-model.md) § Order Line).
 
 ---
 
 ## End-to-End Workflow
 
-### Step 1: Generate Reorder Alerts
+### Step 1: Run Automated Pipeline (Cron)
 
-Run the reorder detection script:
+The runner handles everything automatically:
 
 ```bash
-cd "Trading Analysis/LAM Kitting Reorder"
-node lam-kitting-reorder.js "<inventory-folder>" "<excel-file>"
-
-# Example:
-node lam-kitting-reorder.js \
-  "../Inventory File Cleanup/Inventory 2026-03-11" \
-  "./Lam_Kitting_DB_03132026.xlsx"
+node lam-kitting-runner.js
 ```
 
-**What it does:**
-1. Loads W111 + W115 inventory from Chuboe CSVs
-2. Aggregates quantity by MPN across both warehouses
-3. Loads MIN QTY thresholds from Excel INVENTORY sheet
-4. Joins on MPN
-5. Identifies shortfalls (Current_Qty < MIN_QTY)
-6. Detects zero-stock items (in Excel but not in inventory files)
-7. Enriches with ERP historical data (supplier, buyer, price, date)
+Or run manually:
 
-**Output:** `output/LAM_Reorder_Alerts_YYYY-MM-DD.csv`
+```bash
+# Reorder detection only
+node lam-kitting-reorder.js "<inventory-folder>" "<excel-file>" [--no-email]
 
-### Step 2: Review Reorder Alerts
+# Sourcing only
+node lam-kitting-source.js output/LAM_Reorder_Alerts_YYYY-MM-DD.csv
+```
 
-Review the output file. Priority levels:
+### Step 2: Review Sourced Report
+
+Review the color-coded Excel. Priority levels:
 
 | Priority | Criteria | Action |
 |----------|----------|--------|
@@ -88,31 +113,64 @@ Review the output file. Priority levels:
 | MEDIUM | 50-74% shortfall | Source this week |
 | LOW | <50% shortfall | Monitor / source as needed |
 
-### Step 3: Run Franchise Sourcing
+Margin colors:
 
-Run the integrated sourcing script on reorder alerts:
+| Color | Margin | Action |
+|-------|--------|--------|
+| Green | >18% | Good to buy — proceed with PO |
+| Yellow | 0-18% | Review — margin thin but acceptable |
+| Red | <0% | Escalate — franchise price > resale, need price review |
 
-```bash
-cd "Trading Analysis/LAM Kitting Reorder"
-node lam-kitting-source.js output/LAM_Reorder_Alerts_YYYY-MM-DD.csv
+### Step 3: Check Recent POV / On Order
 
-# Output: output/LAM_Reorder_Alerts_YYYY-MM-DD_sourced.xlsx (+ .csv)
-```
+Parts with a **Recent POV** (90-day window) already have an open order. Review before re-ordering:
+- On Order Qty shows open quantity on that specific POV line
+- Still sourced for current pricing / alternative supplier visibility
+- Look for supplier consolidation opportunities (same supplier across multiple parts)
 
-**What it does:**
-1. Queries franchise APIs (DigiKey, Arrow, Rutronik, Future, Master) at **MOQ quantity**
-2. Finds best in-stock option (lowest price with available qty)
-3. Finds best lead-time option (for items without immediate stock)
-4. Calculates margin vs. LAM Resale Price
-5. Outputs Excel with **color-coded margins**:
-   - 🟢 Green: >18% margin (good to buy)
-   - 🟡 Yellow: 0-18% margin (review)
-   - 🔴 Red: Negative margin (needs price review or broker sourcing)
+### Step 4: Create Purchase Orders
 
-**Output columns added:**
+For items needing reorder:
+1. Review franchise pricing vs. historical purchase price
+2. Consider supplier consolidation (fewer POs = lower processing/shipping costs)
+3. Create PO in iDempiere
+4. Update LAM Kitting DB as needed
+
+---
+
+## Output Format
+
+### Reorder Alert Columns (22 total)
+
+| # | Group | Column | Source |
+|---|-------|--------|--------|
+| 1 | Part ID | Lam P/N | Excel (CPC) |
+| 2 | Part ID | MPN | Excel |
+| 3 | Part ID | Manufacturer | Excel |
+| 4 | Part ID | Item Description | Excel |
+| 5 | Inventory | QTY ON HAND | Inventory Files (W111+W115) |
+| 6 | Inventory | Lam Owned Inventory? | YES if W115 > 0 |
+| 7 | Inventory | Reorder Threshold | Excel (Column H) |
+| 8 | Inventory | Shortfall | Threshold - QTY ON HAND |
+| 9 | Inventory | Priority | CRITICAL/HIGH/MEDIUM/LOW |
+| 10 | Inventory | On Order Qty | ERP (90-day, specific POV line) |
+| 11 | Inventory | Recent POV | ERP (90-day, Infor POV number) |
+| 12 | Inventory | Last Promise Date | ERP (LAM purchases only) |
+| 13 | Inventory | Last RFQ | ERP (LAM RFQ number + customer) |
+| 14 | Pricing | Base Unit Price | Excel |
+| 15 | Pricing | Resale Price | Excel |
+| 16 | Pricing | Historical Purchase Price | ERP (LAM purchases only) |
+| 17 | History | OT Previous Supplier | ERP (LAM purchases only) |
+| 18 | History | OT Buyer | ERP (who created PO) |
+| 19 | History | Historical Buyer | Excel (Column J) |
+| 20 | Kitting | Lead Time | Excel |
+| 21 | Kitting | MOQ | Excel |
+
+### Sourced Columns (added by lam-kitting-source.js)
+
 | Column | Description |
 |--------|-------------|
-| In Stock Supplier | Best franchise with stock |
+| In Stock Supplier | Best franchise with stock (lowest price) |
 | In Stock Price | Price at MOQ |
 | In Stock Qty | Available quantity |
 | In Stock Margin % | (Resale - Price) / Resale |
@@ -121,86 +179,34 @@ node lam-kitting-source.js output/LAM_Reorder_Alerts_YYYY-MM-DD.csv
 | Lead Time (Weeks) | Expected wait |
 | Lead Time Margin % | Margin for lead time option |
 
-**Note:** Uses `Trading Analysis/RFQ Sourcing/franchise_check/` API modules — no duplicate logic.
+---
 
-### Step 4: Review Sourcing Results
+## Franchise APIs (via shared/franchise-api.js)
 
-Review the color-coded Excel:
+All 8 active distributors, queried at MOQ quantity:
 
-| Margin Color | Action |
-|--------------|--------|
-| 🟢 Green (>18%) | Good to buy — proceed with PO |
-| 🟡 Yellow (0-18%) | Review — margin thin but acceptable |
-| 🔴 Red (<0%) | Escalate — franchise price > resale, need broker or price review |
+| API | Module |
+|-----|--------|
+| DigiKey | `franchise_check/digikey.js` |
+| Arrow | `franchise_check/arrow.js` |
+| Rutronik | `franchise_check/rutronik.js` |
+| Future | `franchise_check/future.js` |
+| Master | `franchise_check/master.js` |
+| TTI | `franchise_check/tti.js` |
+| Newark/Farnell | `franchise_check/newark.js` |
+| Mouser | `franchise_check/mouser.js` |
 
-For items **without franchise coverage** (5 typical):
-- Flag for manual broker sourcing (NetComponents) if critical
-- Or wait for next reorder cycle
-
-### Step 5: Create Purchase Orders
-
-For items with acceptable margins:
-1. Review franchise pricing vs. historical purchase price
-2. Create PO in iDempiere for selected supplier
-3. Update LAM Kitting DB as needed
-
-### Step 6: Email Alerts
-
-Email sourced report to buyers:
-
-```bash
-# Subject: LAM Kitting Reorder Alerts - Sourced (YYYY-MM-DD)
-# To: jake.harris@astutegroup.com
-# Attachment: LAM_Reorder_Alerts_YYYY-MM-DD_sourced.xlsx
-```
+**Important:** Sourcing uses `shared/franchise-api.js` — adding a new API there automatically includes it in LAM sourcing.
 
 ---
 
-## Output Format
+## Architecture Notes
 
-### Reorder Alert Columns (17 total)
+### Single buildAlert() Function
+All output columns are defined in one place (`ALERT_COLUMNS` array + `buildAlert()` function). Both code paths (inventory items and zero-stock CRITICAL items) call the same function. To add/remove/reorder columns, update `ALERT_COLUMNS` and `buildAlert()` — no other changes needed.
 
-| # | Column | Source |
-|---|--------|--------|
-| 1 | Lam P/N | Excel (CPC) |
-| 2 | MPN | Excel |
-| 3 | Manufacturer | Excel |
-| 4 | Item Description | Excel |
-| 5 | Lead Time | Excel |
-| 6 | QTY ON HAND | Inventory Files (calculated) |
-| 7 | Base Unit Price | Excel |
-| 8 | Resale Price | Excel |
-| 9 | MIN QTY | Excel |
-| 10 | MOQ | Excel |
-| 11 | Lam Owned Inventory? | Calculated (YES if W115 > 0) |
-| 12 | Previous Supplier | ERP |
-| 13 | Buyer | ERP |
-| 14 | Historical Purchase Price | ERP |
-| 15 | Last Purchase Date | ERP |
-| 16 | Shortfall | Calculated (MIN - QTY) |
-| 17 | Priority | Calculated |
-
----
-
-## Integration Flow
-
-```
-Inventory Cleanup (Monday 6 AM cron)
-    ↓
-Produces LAM_3PL_chuboe.csv + LAM_Dead_Inventory_chuboe.csv
-    ↓
-Step 1: Run lam-kitting-reorder.js → LAM_Reorder_Alerts_*.csv
-    ↓
-Step 2: Review reorder alerts (34 items typical)
-    ↓
-Step 3: Run lam-kitting-source.js → LAM_Reorder_Alerts_*_sourced.xlsx
-    ↓
-Step 4: Review margins (green=buy, yellow=review, red=escalate)
-    ↓
-Step 5: Create POs for available items
-    ↓
-Step 6: Email summary to buyers
-```
+### SQL Execution in rbash
+The rbash environment causes non-zero exit codes even on successful queries. The script writes SQL to temp files and uses `psql -o` for file-based output to avoid stdout issues.
 
 ---
 
@@ -209,12 +215,18 @@ Step 6: Email summary to buyers
 | Question | Answer |
 |----------|--------|
 | Join key? | **MPN only** — CPC not in Infor Item Lots Report |
-| Threshold source? | INVENTORY sheet Column I (MIN QTY) — fixed value |
+| Threshold source? | INVENTORY sheet Column H (Reorder Threshold) |
 | Which warehouses? | W111 + W115 combined |
 | Dead stock? | Yes, counts toward inventory level |
 | Zero stock detection? | Yes, items in Excel but not in inventory = CRITICAL |
-| Sourcing workflow? | **Follow Franchise Screening** (`Trading Analysis/RFQ Sourcing/franchise_check/`) |
-| NetComponents? | Only if specifically tasked — not default |
+| Sourcing? | **Franchise-only** via `shared/franchise-api.js` (8 APIs) |
+| Broker sourcing? | No — manual franchise sourcing for items without API coverage |
+| Source parts on order? | Yes — for pricing visibility and supplier consolidation |
+| ERP join path? | See `shared/data-model.md` § Key Join Patterns |
+| Infor POV number? | `c_orderline.chuboe_po_string` — see `shared/data-model.md` § Order Line |
+| Promise date vs order date? | **Promise date** (`c_orderline.datepromised`) |
+| LAM filter? | `rfq.c_bpartner_id = 1000730` (Lam Research only) |
+| CMs (Naprotek, etc)? | Filtered out of Last RFQ — those are sales TO CMs, not supplier purchases |
 
 ---
 
@@ -222,11 +234,14 @@ Step 6: Email summary to buyers
 
 | File | Description |
 |------|-------------|
-| `lam-kitting-reorder.js` | Detection script — generates reorder alerts |
-| `lam-kitting-source.js` | Sourcing script — runs franchise APIs, adds margins |
+| `lam-kitting-runner.js` | Cron runner — chains cleanup → reorder → sourcing → email |
+| `lam-kitting-reorder.js` | Reorder detection + ERP enrichment |
+| `lam-kitting-source.js` | Franchise sourcing via shared API module |
+| `lam-kitting-dashboard.js` | Dashboard generator |
 | `output/LAM_Reorder_Alerts_*.csv` | Generated reorder alerts |
 | `output/LAM_Reorder_Alerts_*_sourced.xlsx` | Sourced alerts with color-coded margins |
-| `Lam_Kitting_DB_*.xlsx` | Source Excel with thresholds |
+| `Lam_Kitting_DB_*.xlsx` | Source Excel with thresholds and buyer data |
+| `SIPOC FOR BUYER ADDITION.xlsx` | Original buyer reference (data now in Kitting DB Column J) |
 
 ---
 
@@ -240,9 +255,17 @@ Step 6: Email summary to buyers
 - [x] Add franchise sourcing with margin analysis
 - [x] Excel output with color-coded margins (green/yellow/red)
 - [x] Query at MOQ for accurate bulk pricing
-- [ ] Integrate as cron job after Inventory File Cleanup
+- [x] Integrate as cron job (Monday 12pm, after Inventory Cleanup at 11am)
+- [x] LAM-only purchase history filter (chuboe_vq_line → chuboe_rfq join)
+- [x] Infor POV numbers (chuboe_po_string)
+- [x] Recent POV with on-order qty (90-day window)
+- [x] Use shared/franchise-api.js (all 8 APIs)
+- [x] Single buildAlert() function (prevents column sync issues)
+- [x] Excel number formatting (currency/integers)
+- [ ] Auto-load RFQ for reorder lines (via shared/rfq-writer.js)
+- [ ] Add Mouser API to shared/franchise-api.js distributor list (module exists, needs BP verification)
 
 ---
 
 *Created: 2026-03-16*
-*Updated: 2026-03-17* — Added integrated sourcing script with MOQ pricing and margin color coding
+*Updated: 2026-03-24* — Major overhaul: LAM-filtered ERP data, correct RFQ join path, 8 franchise APIs, cron automation, column reorganization, single buildAlert() architecture

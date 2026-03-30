@@ -23,6 +23,8 @@ psql -f qq_RFQNUM_sales.sql > "Quick Quote RFQNUM YYYY-MM-DD CUSTOMER.csv"
 | `c_order` / `c_orderline` | 12mo same-cust, 6mo other | Sales history for pricing |
 | `chuboe_cq_line` | 12 months | Losing CQ prices (same customer/type) |
 
+> **Table structures and join patterns:** See [`shared/data-model.md`](../../shared/data-model.md).
+
 ---
 
 ## Pricing Logic

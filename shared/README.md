@@ -313,35 +313,9 @@ const result = await writeRFQ({
 | **MPN cleaning** | Strips non-alphanumeric, uppercases (matches iDempiere behavior) |
 | **All mandatory fields** | iDempiere columns, flag defaults, salesrep, status |
 
-### RFQ Types
+### Schema Reference
 
-| Name | ID |
-|------|----|
-| Stock | 1000007 |
-| Shortage | 1000000 |
-| PPV | 1000001 |
-| EOL/LTB | 1000003 |
-| Hot Parts | 1000013 |
-| Unqualified Spot RFQ | 1000012 |
-
-### Tables Written
-
-1. `ai_writeback.chuboe_rfq` — RFQ header (one per call)
-2. `ai_writeback.chuboe_rfq_line` — One per line item
-3. `ai_writeback.chuboe_rfq_line_mpn` — One per line (MPN detail)
-
-### Line Object Fields
-
-| Field | Required | Default | Notes |
-|-------|----------|---------|-------|
-| `mpn` | Yes | — | Part number |
-| `qty` | Yes | — | Quantity |
-| `mfrId` | No | NULL | Use `lookupMfrId()` to resolve |
-| `mfrText` | No | NULL | Raw manufacturer text |
-| `targetPrice` | No | 0 | Customer's target price |
-| `description` | No | System lookup | Auto-enriched from 120-day history |
-| `dateCode` | No | NULL | Date code requirement |
-| `mpnClean` | No | Auto-generated | Stripped MPN for matching |
+> See [`shared/data-model.md`](data-model.md) for RFQ type IDs, table hierarchy (header → line → line_mpn), field definitions, and join patterns.
 
 ---
 
@@ -371,61 +345,9 @@ const results = await writeOffers([offer1Opts, offer2Opts, offer3Opts]);
 deactivatePriorOffers(1000332, 1000008);  // BP + type
 ```
 
-### Offer Types
+### Schema Reference
 
-| Name | ID |
-|------|----|
-| Customer Excess | 1000000 |
-| Broker Stock Offer | 1000001 |
-| Franchise Offers | 1000002 |
-| Customer Lead Time Buy | 1000003 |
-| Franchise Stock Offers | 1000004 |
-| Requested Quote | 1000005 |
-| Stock - Stevenage | 1000006 |
-| Stock - Austin Warehouse | 1000008 |
-| Stock - Hong Kong Warehouse | 1000009 |
-| Stock - Philippines Warehouse | 1000014 |
-
-*(Plus portal types: IC Source, NetComp, ERAI, Partstack — both Stock and Unqualified Spot RFQ)*
-
-### Tables Written
-
-1. `ai_writeback.chuboe_offer` — Offer header (one per call)
-2. `ai_writeback.chuboe_offer_line` — One per line item
-3. `ai_writeback.chuboe_offer_line_mpn` — Optional (set `writeMpnRecords: true`)
-
-### writeOffer Options
-
-| Field | Required | Default | Notes |
-|-------|----------|---------|-------|
-| `bpartnerId` | Yes | — | c_bpartner_id |
-| `offerTypeId` | Yes | — | Numeric ID or type name string |
-| `description` | No | NULL | Offer-level description |
-| `datetrx` | No | NOW | Transaction date |
-| `userId` | No | NULL | chuboe_user_id |
-| `buyerId` | No | NULL | chuboe_buyer_id |
-| `writeMpnRecords` | No | false | Also write chuboe_offer_line_mpn |
-
-### Line Object Fields
-
-| Field | Required | Default | Notes |
-|-------|----------|---------|-------|
-| `mpn` | Yes | — | Part number |
-| `qty` | No | NULL | Quantity |
-| `price` | No | NULL | Unit price (PriceEntered) |
-| `mfrId` | No | NULL | Use `lookupMfrId()` to resolve |
-| `mfrText` | No | NULL | Manufacturer text |
-| `dateCode` | No | NULL | Date code |
-| `leadTime` | No | NULL | Lead time |
-| `packageDesc` | No | NULL | Package description |
-| `description` | No | NULL | Line-level notes |
-| `moq` | No | NULL | Minimum order quantity |
-| `spq` | No | NULL | Standard pack quantity |
-| `cpc` | No | NULL | Customer part code |
-| `recommendedResale` | No | NULL | Suggested resale price |
-| `countryId` | No | NULL | c_country_id |
-| `currencyId` | No | NULL | c_currency_id |
-| `mpnClean` | No | Auto-generated | Stripped MPN for matching |
+> See [`shared/data-model.md`](data-model.md) for offer type IDs, table hierarchy (header → line → line_mpn), field definitions (writeOffer options + line object fields), and join patterns.
 
 ---
 

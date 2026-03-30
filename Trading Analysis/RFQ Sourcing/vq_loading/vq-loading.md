@@ -122,22 +122,7 @@ Extract ALL available fields from each quote. Required fields must be present; o
 | **RoHS** | `RoHS` | No | **Yes** / **No** / **Not Applicable** / blank (NOT Y/N) |
 | **Vendor Notes** | `Vendor Notes` | No | Alternate MPNs, no-bid reasons, conditions |
 
-**COO Reference (ISO → iDempiere Name):**
-| Code | Use This Name |
-|------|---------------|
-| CN | China |
-| TW | Taiwan |
-| MY | Malaysia |
-| US | United States |
-| JP | Japan |
-| KR | Korea Republic of |
-| DE | Germany |
-| MX | Mexico |
-| TH | Thailand |
-| PH | Philippines |
-| SG | Singapore |
-| HK | Hong Kong |
-| IN | India |
+**COO Reference:** ISO → iDempiere full name mapping is in [`shared/data-model.md`](../../../shared/data-model.md) § Valid Values (Enums). Always use full country names (e.g., "China" not "CN").
 
 **⚠️ COO vs Shipping Terms - DO NOT CONFUSE:**
 - **COO** = where parts were **manufactured** (e.g., "Made in China", "COO: Taiwan")
@@ -163,21 +148,7 @@ Extract ALL available fields from each quote. Required fields must be present; o
 
 **⚠️ Packaging Field Values (CRITICAL - UPPERCASE lookup field):**
 
-These are the **ONLY** valid values. Use exact spelling and case:
-
-| Valid Value | When to Use |
-|-------------|-------------|
-| **REEL** | Tape & Reel, T&R, Custom Reel |
-| **TRAY** | Tray, Trays |
-| **BULK** | Bulk, Each, Bag, Carton, Pack, Dry Pack |
-| **CUT TAPE** | Cut Tape, Cut Strips, Strip |
-| **F-TUBE** | Tube, Tubes, Rail (no plain "TUBE" exists) |
-| **AMMO** | Ammo pack |
-| **BOX** | Box |
-| **F-REEL** | Franchise Reel |
-| **F-TRAY** | Franchise Tray |
-| **OTHER** | Anything else not listed |
-| (blank) | Unknown or not specified |
+Valid values: see [`shared/data-model.md`](../../../shared/data-model.md) § Valid Values (Enums). Use exact spelling and UPPERCASE.
 
 **Common Mistakes:**
 - ❌ `Reel` → ✓ `REEL` (must be UPPERCASE)
@@ -386,6 +357,8 @@ WHERE bp.isvendor = 'Y' AND bp.isactive = 'Y'
 AND LOWER(u.email) LIKE '%domain.com%';
 ```
 
+> See [`shared/data-model.md`](../../../shared/data-model.md) for partner table structure and join patterns.
+
 **Matching order:**
 1. Exact email match in `ad_user.email`
 2. Domain-based fallback (extract `@domain.com`, find any vendor with that domain)
@@ -416,6 +389,8 @@ WHERE r.isactive = 'Y'
   AND UPPER(lm.chuboe_mpn) LIKE '%MT47H128M16RT-25E%'  -- base MPN pattern
 ORDER BY r.created DESC;
 ```
+
+> Join path reference: [`shared/data-model.md`](../../../shared/data-model.md) § Key Join Patterns.
 
 **⚠️ CRITICAL: When MPN doesn't match exactly (AUTO-APPLY):**
 
@@ -662,25 +637,11 @@ Applies learned vendor mappings and merges to final upload.
 
 ## CRITICAL: search_key vs c_bpartner_id
 
-**ALWAYS use `search_key` (c_bpartner.value), NEVER use `c_bpartner_id` (database primary key).**
+> **CRITICAL:** `search_key` and `c_bpartner_id` are DIFFERENT numbers for the same partner. Import templates expect `search_key`. See [`shared/data-model.md`](../../../shared/data-model.md) § search_key vs c_bpartner_id.
 
-These are DIFFERENT numbers:
-| Vendor | c_bpartner_id | search_key |
-|--------|---------------|------------|
-| Cyclops Electronics | 1000491 | 1002495 |
-| Atlantic Semiconductor | 1000453 | 1002457 |
-| Velocity Electronics | 1000036 | 1001036 |
-
-The upload template column `Business Partner Search Key` expects the **search_key** value.
-
-**Parser fix (field-mapper.js:304):**
-```javascript
-const bpId = vendorResult.search_key || vendorResult.c_bpartner_id || '';
-```
+The upload template column `Business Partner Search Key` expects the **search_key** value (`c_bpartner.value`), NOT the database primary key (`c_bpartner_id`).
 
 **Vendor cache stores both:** Check `data/vendor-cache.json` - each entry has both `c_bpartner_id` and `search_key`. Always use `search_key` for output.
-
-**If you see mismatched data:** Old records created before this fix may have c_bpartner_id values. These need to be converted to search_key before upload.
 
 ---
 

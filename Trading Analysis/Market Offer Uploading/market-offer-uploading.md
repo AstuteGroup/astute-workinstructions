@@ -65,6 +65,8 @@ Same pattern as VQ Loading. Use two-agent workflow for reliable extraction:
 
 **Offer Header:** If `Chuboe_Offer_ID[Value]` is provided, populate column A. Otherwise leave blank (will be assigned later).
 
+> **Schema reference:** For Offer table hierarchy and where MPN/MFR fields live, see [`shared/data-model.md`](../../shared/data-model.md) § Offer Chain.
+
 ---
 
 ## Manufacturer Matching
@@ -75,35 +77,7 @@ Same pattern as VQ Loading. Use two-agent workflow for reliable extraction:
 
 **IMPORTANT:** Always use column D (`Chuboe_MFR_Text`). Leave column C (`Chuboe_MFR_ID[Value]`) blank — direct ID lookups have client-level visibility issues.
 
-**Alias file:** `mfr-aliases.json` - maps common abbreviations/variants to canonical names.
-
-### Matching Order
-1. **Normalize input** - uppercase, trim whitespace
-2. **Alias lookup** - check `mfr-aliases.json` to get canonical name
-3. **Output** - put the canonical name in column D (`Chuboe_MFR_Text`)
-4. **No match** - use the name as-is in column D (system may still match it)
-
-### Example
-```
-Email says: "TI" or "TEXAS INSTRUMENTS INC"
-    ↓
-Alias lookup: maps to "Texas Instruments"
-    ↓
-Output: Chuboe_MFR_Text = "Texas Instruments"
-    ↓
-On import: System auto-maps to MFR ID
-```
-
-### Adding New Aliases
-When extraction encounters an unmatched manufacturer abbreviation:
-1. Search database: `SELECT value, name FROM adempiere.chuboe_mfr WHERE ad_client_id = 1000000 AND name ILIKE '%keyword%'`
-2. If found, add mapping to `mfr-aliases.json` (abbreviation → canonical name)
-3. If not found, use the name as-is — system may still match it
-
-### Why This Matters
-- System auto-maps text to MFR ID, avoiding client-level lookup issues
-- Canonical names improve match rate vs raw abbreviations
-- Pre-normalizing enables: analytics by manufacturer, cross-reference with VQs, trend analysis
+MFR resolution follows the standard pattern. See [`shared/data-model.md`](../../shared/data-model.md) § Manufacturer for resolution order and alias file location.
 
 **Notes field usage:**
 - **Expiration**: "Offer expires 2026-03-31"

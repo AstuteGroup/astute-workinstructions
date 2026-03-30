@@ -19,6 +19,21 @@ If you catch yourself thinking "I remember how this works" - STOP and read the f
 
 ---
 
+# Output Formatting Standards
+
+**ALL outputs — Excel, CSV, HTML emails, console tables — MUST be properly formatted:**
+
+- **Currency:** Always display as `$1,234.56` (dollar sign, comma separators, 2-4 decimal places). Never raw floats like `0.28296` without a `$`.
+- **Percentages:** Always display as `18.5%` (with `%` sign). In Excel, use `0.0%` cell format (store as decimal, display as %). Never show raw decimals like `0.185` in a margin column.
+- **Quantities:** Use comma separators for 1,000+. No decimals on whole quantities.
+- **Excel number formats:** Always set `z` property on cells: `$#,##0.00` for currency, `0.0%` for percentages, `#,##0` for quantities.
+- **Column widths:** Set `!cols` on every sheet so data isn't truncated.
+- **Savings/GP:** Show with `$` and sign context. Positive savings = good (under base).
+
+**Why:** Unformatted outputs waste the buyer's time re-interpreting raw numbers and create errors when values like `0.185` are ambiguous (is it 18.5% or $0.185?).
+
+---
+
 # Session Greeting
 
 **TRIGGER:** When you see `SessionStart:startup hook success` in a system-reminder, IMMEDIATELY display the greeting below — do not wait for user input. This allows the user to jump straight into their task.
@@ -66,6 +81,19 @@ At the start of every new conversation, before addressing anything else, always 
 ## Shared Utilities
 
 **Location:** `shared/`
+
+### Data Model (REQUIRED — READ BEFORE ANY DB QUERY)
+
+**`shared/data-model.md`** is the single source of truth for:
+- Table hierarchies (RFQ → RFQ Line → RFQ Line MPN; Offer → Offer Line → Offer Line MPN)
+- **Where fields live** (MPN/MFR on `chuboe_rfq_line_mpn`, NOT `chuboe_rfq_line`; VQ has no CPC; etc.)
+- Join patterns and common wrong joins
+- Price column names (they differ per table: `cost` on VQ, `priceentered` on CQ/RFQ/Offer)
+- `search_key` vs `c_bpartner_id` distinction
+- Valid values (packaging, RoHS, COO, RFQ types, offer types)
+- ai_writeback mandatory columns and PK rules
+
+**RULE:** Never hardcode schema knowledge in individual workflows. Reference `shared/data-model.md` instead. When discovering new schema details, update the data model — not the workflow doc.
 
 ### CSV Parsing (REQUIRED)
 

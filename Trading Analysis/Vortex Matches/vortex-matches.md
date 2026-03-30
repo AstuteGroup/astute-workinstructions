@@ -96,6 +96,8 @@ Special handling:
 - `bi_market_offer_line_v` — Market offers (excess, franchise, broker, stock)
 - `chuboe_rfq` / `chuboe_rfq_line_mpn` — Customer RFQs with target prices
 
+> **View definitions, underlying table structures, and join patterns:** See [`shared/data-model.md`](../../shared/data-model.md).
+
 ## Sample Files
 
 See `output/` folder for example outputs from RFQ 1130895.

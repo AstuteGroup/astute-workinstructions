@@ -19,15 +19,17 @@ Example: Latest file is `Excess_Match_02-17_RFQ_1129934-1130062.csv` → next ru
 
 ### Data Sources
 - **RFQs:** `adempiere.chuboe_rfq` + `chuboe_rfq_line_mpn`
-- **Customer Excess:** `adempiere.chuboe_offer` where `chuboe_offer_type_id = 1000000`
+- **Customer Excess:** `adempiere.chuboe_offer` + `chuboe_offer_line` (Customer Excess type)
 - **VQ Pricing:** `adempiere.chuboe_vq_line` (for validation, not tiering)
+
+> **Table structures, join patterns, and offer type IDs:** See [`shared/data-model.md`](../../shared/data-model.md).
 
 ### Filters
 | Filter | Value |
 |--------|-------|
 | Excess lookback | 90 days |
 | Minimum opportunity value | $500 |
-| Offer type | Customer Excess only (type_id = 1000000) |
+| Offer type | Customer Excess only (see `data-model.md` for type IDs) |
 
 ### Exclusions
 1. **PPV Self-matches:** Remove when RFQ type is "PPV" AND customer = excess partner (customer validating pricing on their own excess)
