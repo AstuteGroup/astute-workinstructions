@@ -51,14 +51,14 @@ At the start of every new conversation, before addressing anything else, always 
 > 1. **Franchise Screening** - Screen RFQs against FindChips to filter low-value parts before broker sourcing (see `Trading Analysis/RFQ Sourcing/franchise_check/franchise-screening.md`)
 > 2. **RFQ Sourcing** - Submit RFQs to NetComponents suppliers (see `Trading Analysis/RFQ Sourcing/netcomponents/rfq-sourcing-netcomponents.md`)
 > 3. **VQ Loading** - Process supplier quote emails into ERP-ready CSV (see `Trading Analysis/RFQ Sourcing/vq_loading/vq-loading.md`)
-> 4. **RFQ Loading through AI** - AI-assisted extraction and loading of RFQs from customer emails/documents
+> 4. **RFQ Loading through AI** - AI-assisted extraction and loading of RFQs from customer emails/documents (see `Trading Analysis/RFQ Loading/rfq-loading.md`)
 > 5. **Market Offer Analysis for RFQs** - Match new RFQs against customer excess and stock offers (see `Trading Analysis/Market Offer Matching for RFQs/market-offer-matching.md`)
 > 6. **Quick Quote** - Generate baseline quotes from recent VQs (0-30 days) with margin/GP/rebate pricing logic
 > 7. **Seller Quoting Activity** - VQ→CQ→SO funnel analysis by seller (snapshot + 6-month trend)
 > 8. **Order/Shipment Tracking** - Look up tracking by COV, SO, MPN, customer PO, or salesperson (see `saved-queries/order-shipment-tracking.md`)
 > 9. **Inventory File Cleanup** - Process Infor inventory exports into Chuboe format for iDempiere import (see `Trading Analysis/Inventory File Cleanup/inventory-file-cleanup.md`)
 > 10. **Vortex Matches** - Surface VQs/offers under customer targets, stock matches, and market intelligence (see `Trading Analysis/Vortex Matches/vortex-matches.md`)
-> 11. **Market Offer Uploading** - Process excess inventory emails into ERP-ready offers (see `Trading Analysis/Market Offer Uploading/market-offer-uploading.md`)
+> 11. **Market Offer Analysis** - Load excess offers, enrich with market intelligence, score opportunities, and analyze by intent: reactive (RFQ match), spec buy, or consignment (see `Trading Analysis/Market Offer Analysis/market-offer-analysis.md`)
 > 12. **BOM Monitoring** - Track BOM risk, commodity analysis, and excess matches (see `Trading Analysis/BOM Monitoring/`)
 > 13. **Stock RFQ Loading** - Process customer RFQ emails into ERP-ready CSV for import (see `Trading Analysis/Stock RFQ Loading/stock-rfq-loading.md`)
 
@@ -91,7 +91,7 @@ At the start of every new conversation, before addressing anything else, always 
 - Price column names (they differ per table: `cost` on VQ, `priceentered` on CQ/RFQ/Offer)
 - `search_key` vs `c_bpartner_id` distinction
 - Valid values (packaging, RoHS, COO, RFQ types, offer types)
-- ai_writeback mandatory columns and PK rules
+- REST API write-back (see `shared/api-writeback.md` for payloads and auth)
 
 **RULE:** Never hardcode schema knowledge in individual workflows. Reference `shared/data-model.md` instead. When discovering new schema details, update the data model — not the workflow doc.
 
@@ -305,46 +305,53 @@ You are an analytics and automation assistant connected to a PostgreSQL logical 
 
 The `adempiere` schema is a read-only logical replica streaming directly from production. You are strictly forbidden from attempting `INSERT`, `UPDATE`, or `DELETE` operations on any table within the `adempiere` schema.
 
-### ✅ HOW TO WRITE DATA: The `ai_writeback` Schema
+### ✅ HOW TO WRITE DATA: iDempiere REST API
 
-When you generate new data (like RFQs, Orders, or Business Partners) that needs to go back to the ERP, you MUST write it to the `ai_writeback` schema.
+When you generate new data (like RFQs, Orders, or Business Partners) that needs to go back to the ERP, write it via the **iDempiere REST API** using `shared/api-client.js`.
 
-These tables are structural clones of the production tables. Production will read from these tables via a Foreign Data Wrapper (FDW).
+**Full documentation:** See **`shared/api-writeback.md`** for authentication, credential management, payload structures for all 12 tables, and examples.
 
-#### iDempiere Mandatory Columns
+#### Quick Reference
 
-Every time you `INSERT` a record into the `ai_writeback` schema, you MUST include the following standard iDempiere mandatory columns to ensure Jake Harris is the recorded author:
+```javascript
+const { apiPost } = require('../shared/api-client');
 
-- `ad_client_id`: 1000000
-- `ad_org_id`: 0
-- `isactive`: 'Y'
-- `created`: CURRENT_TIMESTAMP
-- `createdby`: 1000004
-- `updated`: CURRENT_TIMESTAMP
-- `updatedby`: 1000004
-
-#### Primary Key Management (AVOID COLLISIONS)
-
-iDempiere does not use auto-incrementing database serials; it uses application-level sequences. Because you are writing offline from production, you MUST use a completely separate ID block to prevent primary key collisions when the data is merged.
-
-**Rule:** Any new Primary Key ID you generate (e.g., `c_order_id`, `chuboe_rfq_id`, `c_bpartner_id`) MUST start at **9000000** or higher.
-
-Do not use IDs lower than 9000000. You are responsible for querying the `ai_writeback` schema to find the `MAX(id)` you previously used and incrementing it safely.
-
-#### Example SQL
-
-If asked to create a new Order, your SQL should look like this:
-
-```sql
-INSERT INTO ai_writeback.c_order (
-    c_order_id, ad_client_id, ad_org_id, isactive, created, createdby, updated, updatedby,
-    documentno, docstatus, c_bpartner_id, dateordered
-) VALUES (
-    9000001, -- Safe, high ID
-    1000000, 0, 'Y', CURRENT_TIMESTAMP, 1000004, CURRENT_TIMESTAMP, 1000004,
-    'AI-ORD-001', 'DR', 10543, CURRENT_TIMESTAMP
-);
+// Create a record — server assigns the ID
+const rfq = await apiPost('chuboe_rfq', {
+  C_BPartner_ID: 1000190,
+  chuboe_rfq_type_id: 1000007,
+  SalesRep_ID: 1000004,
+  Description: 'Stock RFQ from broker email'
+});
+console.log(rfq.id); // server-assigned ID
 ```
+
+#### Standard Payload Fields (Auto-Populated by Server)
+
+The following fields are **automatically set by the server** from the authenticated session — do NOT include them in payloads:
+- `AD_Client_ID`, `AD_Org_ID`, `IsActive`, `CreatedBy`, `UpdatedBy`, `Created`, `Updated`, `id`, `uid`
+
+See [iDempiere REST API docs](https://bxservice.github.io/idempiere-rest-docs/docs/api-guides/crud-operations/creating-data) for details.
+
+#### ID Management
+
+IDs are **assigned server-side** by iDempiere — do NOT include PK fields in POST payloads. For parent-child records, POST the parent first, extract the ID from the response, then POST children with the parent's ID.
+
+#### Consumer Modules (Identical Interfaces)
+
+| Module | Function | What It Writes |
+|--------|----------|----------------|
+| `shared/rfq-writer.js` | `writeRFQ(opts)` | chuboe_rfq + lines + line_mpn |
+| `shared/offer-writeback.js` | `writeOffer(opts)` | chuboe_offer + lines + line_mpn |
+| `shared/api-result-writer.js` | `writePricingResult(opts)` | chuboe_pricing_api_result |
+| `shared/vq-writer.js` | `writeVQBatch(rfq, items)` | chuboe_vq_line (two-pass: exact → fuzzy) |
+| `shared/cq-writer.js` | `writeCQ(rfq, line)` / `writeCQBatch(rfq, lines)` | chuboe_cq_line (flat, no header) |
+
+#### Credentials
+
+Stored in `~/workspace/.env` (gitignored). Template at `shared/.env.example`. Required vars: `IDEMPIERE_BASE_URL`, `IDEMPIERE_USERNAME`, `IDEMPIERE_PASSWORD`.
+
+**Note:** Currently pointed at the TEST instance — data will NOT appear in the production replica.
 
 ---
 

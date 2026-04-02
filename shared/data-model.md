@@ -161,6 +161,24 @@ Single source of truth for iDempiere (OT) table structures, relationships, and f
 - `chuboe_rfq_id` → `chuboe_rfq` (denormalized)
 - **NO direct FK to VQ.** VQ↔CQ link is indirect through shared `chuboe_rfq_line_id`.
 
+**CQ Status (`r_status_id`):**
+| ID | Name | Use |
+|----|------|-----|
+| 1000027 | Open | New/active quote |
+| 1000026 | Closed | Finalized |
+
+**CQ Resolution (`chuboe_cq_resolution_id`):**
+| ID | Name |
+|----|------|
+| 1000000 | No Stock |
+| 1000001 | Bought From Authorized Channels |
+| 1000002 | Lower Price |
+| 1000003 | Pushed Demand |
+| 1000004 | Won |
+| 1000005 | Lost Stock |
+
+**Writer:** `shared/cq-writer.js` — `writeCQ(rfqSearchKey, line)` / `writeCQBatch(rfqSearchKey, lines)`
+
 ---
 
 ### Order Line (Convergence Point)
@@ -221,6 +239,21 @@ Price means different things on different tables:
 | LAM Research | 1000730 | (different) |
 
 Always use `c_bpartner.value` (search_key) when populating import templates.
+
+### `Value` (Search Key) on Chuboe Tables
+
+The `value` column on all chuboe header tables (`chuboe_rfq`, `chuboe_offer`, etc.) is the **search key** — the user-facing document number visible in the OT UI. This is NOT the same as the internal primary key.
+
+| Field | Example | Purpose |
+|-------|---------|---------|
+| `chuboe_rfq_id` (PK) | `1133457` | Internal database ID — used for joins and FK references |
+| `value` (search key) | `1124042` | User-facing RFQ number — what users reference in conversation and UI |
+
+**Rules:**
+- When reporting results to users, always use the search key (`value`), not the internal PK
+- The REST API POST response includes both `id` (PK) and `Value` (search key) — extract both
+- In SQL queries, select `value` when you need to display a document number to the user
+- The PK is for programmatic use (joins, parent-child linking); the search key is for human use
 
 ---
 
@@ -293,25 +326,133 @@ Yes, No, Not Applicable
 
 ---
 
-## ai_writeback Schema
+## Write-Back: iDempiere REST API
 
-### Mandatory Columns (Every INSERT)
-```sql
-ad_client_id  = 1000000
-ad_org_id     = 0
-isactive      = 'Y'
-created       = CURRENT_TIMESTAMP
-createdby     = 1000004        -- Jake Harris
-updated       = CURRENT_TIMESTAMP
-updatedby     = 1000004
+Writes to iDempiere now go through the **REST API** via `shared/api-client.js`, replacing the prior `ai_writeback` SQL schema approach.
+
+**Full documentation:** See **`shared/api-writeback.md`** for authentication, payload structures, credential management, and examples for all 12 tables.
+
+### Standard Payload Fields (Every POST)
+```json
+{
+  "AD_Client_ID": 1000000,
+  "AD_Org_ID": 0,
+  "IsActive": true,
+  "CreatedBy": 1000004,
+  "UpdatedBy": 1000004
+}
 ```
 
-### Primary Key Rules
-- All new IDs **must start at 9000000+** to avoid collisions with production sequences
-- Query `MAX(id)` from `ai_writeback` before inserting to find next safe ID
+### ID Management
+- **IDs are server-assigned** — no more 9000000+ block
+- POST parent first → extract ID from response → POST children with parent ID
+- Do NOT include PK fields in POST payloads
 
-### Available Tables
+### Supported Tables
 `chuboe_rfq`, `chuboe_rfq_line`, `chuboe_rfq_line_mpn`, `chuboe_vq_line`, `chuboe_cq_line`, `chuboe_offer`, `chuboe_offer_line`, `chuboe_offer_line_mpn`, `c_bpartner`, `c_bpartner_location`, `c_order`, `c_orderline`, `chuboe_pricing_api_result`
+
+### Consumer Modules (Same Public Interfaces)
+| Module | Write Function | Tables Written |
+|--------|---------------|----------------|
+| `rfq-writer.js` | `writeRFQ(opts)` | chuboe_rfq, chuboe_rfq_line, chuboe_rfq_line_mpn |
+| `offer-writeback.js` | `writeOffer(opts)` | chuboe_offer, chuboe_offer_line, chuboe_offer_line_mpn |
+| `api-result-writer.js` | `writePricingResult(opts)` | chuboe_pricing_api_result |
+
+### REST API Column Names (PascalCase — Case-Sensitive)
+
+**CRITICAL:** The iDempiere REST API requires **exact PascalCase column names** from the application dictionary (`ad_column.columnname`). Lowercase names will be silently rejected. These are NOT the same as the lowercase PostgreSQL column names used in SELECT queries.
+
+**How to look up column names:**
+```sql
+SELECT c.columnname FROM adempiere.ad_column c
+JOIN adempiere.ad_table t ON c.ad_table_id = t.ad_table_id
+WHERE t.tablename = 'Chuboe_RFQ' AND c.isactive = 'Y';
+```
+Note: `ad_table.tablename` is also PascalCase (e.g., `Chuboe_RFQ`, not `chuboe_rfq`).
+
+#### Chuboe_RFQ (52 columns — key ones for API writes)
+
+| API Column Name | Notes |
+|-----------------|-------|
+| `AD_Client_ID` | auto-included by apiPost |
+| `AD_Org_ID` | auto-included by apiPost |
+| `C_BPartner_ID` | Customer |
+| `Chuboe_RFQ_Type_ID` | See RFQ Types lookup |
+| `SalesRep_ID` | Salesperson |
+| `Description` | |
+| `Processed` | |
+| `Chuboe_InitialLoad_API` | |
+| `Chuboe_CSV_Import` | |
+| `CustomerQuoteReport` | |
+| `Chuboe_RFQ_ToRequest_Button` | |
+| `Chuboe_AMER_RFQ2BuyerQueue` | |
+| `Chuboe_APAC_RFQ2BuyerQueue` | |
+| `Chuboe_EMEA_RFQ2BuyerQueue` | |
+| `Chuboe_INDIA_RFQ2BuyerQueue` | **INDIA** all-caps |
+| `Chuboe_JAPN_RFQ2BuyerQueue` | **JAPN** all-caps |
+| `Add_Pricing_API_Vendor` | |
+| `Chuboe_Search_vendor` | **lowercase v** in vendor |
+| `Chuboe_Search_Stock` | |
+| `Chuboe_Multi_RFQtoBuyerQueue` | **lowercase 'to'** |
+| `Chuboe_CSV_CQMass` | |
+| `R_Status_ID` | |
+| `IsActive` | auto-included by apiPost |
+| `Created` | |
+| `CreatedBy` | auto-included by apiPost |
+| `Updated` | |
+| `UpdatedBy` | auto-included by apiPost |
+
+#### Chuboe_RFQ_Line (28 columns — key ones for API writes)
+
+| API Column Name | Notes |
+|-----------------|-------|
+| `Chuboe_RFQ_ID` | FK to parent RFQ |
+| `Chuboe_RFQ_Line_ID` | PK — do NOT include in POST |
+| `Line` | Line number |
+| `Qty` | |
+| `PriceEntered` | Target price |
+| `Chuboe_CPC` | Customer Part Code |
+| `Chuboe_CPC_Clean` | Cleaned CPC |
+| `Chuboe_Date_Code` | |
+| `Description` | |
+| `Chuboe_Note_Public` | |
+| `Chuboe_Note_Private` | |
+| `POReference` | |
+| `IsActive` | auto-included |
+| `Created` | |
+| `CreatedBy` | auto-included |
+| `Updated` | |
+| `UpdatedBy` | auto-included |
+
+#### Chuboe_RFQ_Line_MPN (22 columns — key ones for API writes)
+
+| API Column Name | Notes |
+|-----------------|-------|
+| `Chuboe_RFQ_Line_ID` | FK to parent line |
+| `Chuboe_RFQ_ID` | FK to header (denormalized) |
+| `Chuboe_RFQ_Line_MPN_ID` | PK — do NOT include in POST |
+| `Chuboe_MPN` | Manufacturer Part Number |
+| `Chuboe_MPN_Clean` | Cleaned MPN |
+| `Chuboe_MFR_ID` | FK to chuboe_mfr |
+| `Chuboe_MFR_Text` | MFR as free text |
+| `Qty` | |
+| `PriceEntered` | Target price |
+| `Chuboe_Date_Code` | |
+| `Chuboe_CPC` | CPC (copy from line) |
+| `Description` | |
+| `Chuboe_RFQ_MPN_To_VQ_Button` | |
+| `Chuboe_RFQ_MPN_To_CQ_Button` | |
+| `IsActive` | auto-included |
+| `Created` | |
+| `CreatedBy` | auto-included |
+| `Updated` | |
+| `UpdatedBy` | auto-included |
+
+**Tricky casing to watch for:**
+- `Chuboe_INDIA_RFQ2BuyerQueue` — not `Chuboe_India_...`
+- `Chuboe_JAPN_RFQ2BuyerQueue` — not `Chuboe_Japn_...`
+- `Chuboe_Search_vendor` — lowercase `v` (not `Vendor`)
+- `Chuboe_Multi_RFQtoBuyerQueue` — lowercase `to` (not `RFQToBuyerQueue`)
 
 ---
 
@@ -319,4 +460,4 @@ updatedby     = 1000004
 
 1. **Always filter `isactive = 'Y'`** unless explicitly told otherwise
 2. **Always filter `ad_client_id = 1000000`** when querying shared tables like `chuboe_mfr`
-3. **Never write to `adempiere` schema** — use `ai_writeback` for all inserts
+3. **Never write to `adempiere` schema** — use the REST API via `shared/api-client.js` for all writes

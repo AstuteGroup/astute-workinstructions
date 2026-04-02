@@ -14,7 +14,9 @@ Consolidated roadmap for Trading Analysis workflows.
 | **Proactive Opportunities (Offers → Historical)** | `Market Offer Matching for RFQs/` | Partial |
 | Inventory File Cleanup | `Inventory File Cleanup/` | Operational |
 | LAM Kitting Reorder | `LAM Kitting Reorder/` | Operational |
+| LAM EPG Award | `LAM EPG Award/` | In Progress |
 | Stock Market Analysis | — | Planned |
+| CQ Writeback | `shared/cq-writer.js` | Operational (writer); QQ integration Planned |
 
 ---
 
@@ -154,7 +156,24 @@ Consolidated roadmap for Trading Analysis workflows.
 
 | # | Feature | Priority | Status |
 |---|---------|----------|--------|
-| C1 | LAM Kitting Reorder Workflow | **Next** | Planned |
+| C1 | LAM Kitting Reorder Workflow | Complete | Operational |
+| C2 | Purchase Optimizer | **Next** | Planned |
+
+---
+
+## C2. Purchase Optimizer
+
+**Status:** Planned | **Priority:** Next
+
+**Problem:** When placing POs for a full parts list, selecting the single cheapest vendor per line misses savings from splitting purchases across existing vendors and ignores vendor consolidation benefits (fewer POs, lower shipping).
+
+**Solution:** Optimization tool that runs on top of sourced output:
+1. First pass: assign full-coverage lines at best price → builds vendor list
+2. Second pass: split partial-stock lines across **existing vendors only** (don't add vendors for partials)
+3. Calculate **blended cost** for splits
+4. **Prompt user** with optimization results before applying — show savings per line, let user accept/reject
+
+**Key:** Blended cost is the primary metric. Prompt the user with options, don't auto-apply.
 
 ---
 
@@ -266,7 +285,168 @@ demand_signal_strength, recommended_action
 | 2026-03-10 | A | Full implementation: deduplication, column cleanup, MO Type fix |
 | 2026-03-17 | C | LAM Kitting Reorder: Operational |
 | 2026-03-17 | D | Added Market Offer Matching section with D1 (Live) and D2 (Proactive) workflows |
+| 2026-03-26 | E | Added Franchise API MOQ Handling section |
 
 ---
 
-*Last updated: 2026-03-17*
+# Section E: Franchise API MOQ Handling
+
+| # | Feature | Priority | Status |
+|---|---------|----------|--------|
+| E1 | MOQ-aware sourcing recommendations | **Next** | Planned |
+| E2 | Auto-reassign to next-best vendor when MOQ > need | **Next** | Planned |
+| E3 | MOQ cost analysis (buy MOQ vs skip) | Later | Planned |
+
+---
+
+## E1. MOQ-Aware Sourcing Recommendations
+
+**Status:** Planned | **Priority:** Next
+
+**Problem:** Franchise API sourcing reports recommend the cheapest vendor per MPN without checking whether the vendor's MOQ exceeds the customer's need quantity. This leads to non-viable recommendations (e.g., TTI quoting $0.22 but MOQ 1000 when we only need 625).
+
+**Current behavior:** MOQ is captured from APIs but not used to filter or adjust recommendations. The buyer discovers the issue manually when trying to order.
+
+**Solution:**
+1. When selecting best vendor per line, only consider vendors where `MOQ <= need qty` (or MOQ = 0)
+2. If no vendor meets MOQ, flag the line as "MOQ Issue" with the lowest-MOQ option shown
+3. Include MOQ column in all sourcing outputs
+4. For kitting reorder reports: same logic applies — `franchiseRfqPrice` at the MOQ-appropriate qty
+
+**Affected workflows:**
+- LAM EPG Award sourcing (`epg-full-api-run.js`, `epg-remaining.js`)
+- LAM Kitting Reorder sourcing (`lam-kitting-source.js`)
+- Any future franchise API sourcing reports
+
+---
+
+## E2. Auto-Reassign to Next-Best Vendor
+
+**Status:** Planned | **Priority:** Next
+
+**Problem:** When the cheapest vendor has MOQ > need, the report should automatically show the next-best vendor that CAN fulfill at the need quantity, rather than requiring manual re-checking.
+
+**Solution:**
+1. Sort all API hits by price
+2. Filter to `MOQ <= need qty`
+3. If filtered list is empty, show best option with MOQ flag + note "consider buying MOQ"
+4. Calculate cost differential: `(next_best_price - blocked_price) × need_qty` to quantify the MOQ penalty
+
+---
+
+## E3. MOQ Cost Analysis (Buy MOQ vs Skip)
+
+**Status:** Planned | **Priority:** Later
+
+**Problem:** Sometimes buying the MOQ is still cheaper overall even if we overbuy. For example:
+- Need 625, MOQ 1000, price $0.16/ea → total $160 (excess 375 units)
+- Next best: MOQ OK, price $0.38/ea → total $237.50
+- Buying MOQ saves $77.50 even with excess
+
+**Solution:**
+- Calculate: `MOQ × blocked_price` vs `need_qty × next_best_price`
+- If MOQ purchase is cheaper, recommend it with excess quantity noted
+- Factor in: carrying cost of excess, likelihood of future demand (kitting = recurring)
+
+---
+
+# Section F: RFQ Loading Support Workflows
+
+| # | Feature | Priority | Status |
+|---|---------|----------|--------|
+| F1 | Business Partner Creation | **Next** | Planned |
+| F2 | Contact Creation | **Next** | Planned |
+
+---
+
+## F1. Business Partner Creation
+
+**Status:** Planned | **Priority:** Next
+
+**Problem:** General Customer RFQ Loading requires a known Business Partner (BP) in OT. When a customer doesn't exist, the workflow currently halts and asks the user to create one manually.
+
+**Solution:**
+- AI-assisted BP creation workflow triggered from RFQ Loading
+- Collect required fields: company name, address, contact info, BP group
+- Write to iDempiere via REST API (`shared/api-client.js`)
+- Return the new `search_key` to the RFQ Loading workflow
+
+**Trigger:** RFQ Loading Step 4 — customer not found in DB for a General Customer RFQ.
+
+**Interim:** Draft a response to the user listing what's needed to create the BP. User creates manually in OT.
+
+---
+
+## F2. Contact Creation
+
+**Status:** Planned | **Priority:** Next
+
+**Problem:** General Customer RFQ Loading requires a contact person (`chuboe_user_id` on RFQ header). When the contact email doesn't match any `ad_user` under the resolved BP, the workflow halts.
+
+**Solution:**
+- AI-assisted contact creation under an existing BP
+- Collect: name, email, phone, title/role
+- Write to iDempiere via REST API (POST to `ad_user` with `c_bpartner_id`)
+- Return the new `ad_user_id` to the RFQ Loading workflow
+
+**Trigger:** RFQ Loading Step 7 — contact email not found under known BP.
+
+**Interim:** Draft a response to the user asking them to confirm the contact details or create manually in OT.
+
+---
+
+# Section G: CQ Writeback
+
+| # | Feature | Priority | Status |
+|---|---------|----------|--------|
+| G1 | CQ Writer shared module | **Complete** | Operational |
+| G2 | Quick Quote → CQ finalization flow | **Next** | Planned |
+| G3 | Stock RFQ → CQ pipeline step | Later | Planned |
+
+---
+
+## G1. CQ Writer Shared Module
+
+**Status:** Operational | **Priority:** Complete (2026-04-02)
+
+Shared module `shared/cq-writer.js` writes `chuboe_cq_line` records via REST API.
+
+- `writeCQ(rfqSearchKey, line)` — single line
+- `writeCQBatch(rfqSearchKey, lines)` — batch (handles 1000+ lines)
+- Resolves RFQ by search key, customer from RFQ header, lines by CPC→MPN→MPN clean
+- MFR resolution via `shared/mfr-lookup.js`
+- Flags unresolvable lines, missing prices, MFR issues
+- Tested on test instance (IDs 1254238-1254240)
+
+---
+
+## G2. Quick Quote → CQ Finalization Flow
+
+**Status:** Planned | **Priority:** Next
+
+**Problem:** Quick Quote generates a suggested resale CSV, but recording those quotes in OT requires manual CQ entry.
+
+**Solution:** Two-step flow:
+1. Quick Quote outputs CSV/Excel with suggested resale (existing workflow — unchanged)
+2. User reviews, tweaks prices, removes lines they don't want to quote
+3. User provides the final file + RFQ number → `cq-writer.js` writes to OT
+
+**Why two-step:** Pricing decisions need human judgment. The system proposes; the user disposes. Auto-writing CQs from Quick Quote would bypass critical review (margin exceptions, customer relationship context, deal strategy).
+
+**Format handling:** User's final file can be CSV, Excel, or even pasted lines. Parser normalizes to `{ mpn, qty, resale, cpc?, mfrText?, dateCode? }` before passing to `writeCQBatch`.
+
+---
+
+## G3. Stock RFQ → CQ Pipeline Step
+
+**Status:** Planned | **Priority:** Later
+
+**Problem:** Stock RFQ pipeline vision includes a "Propose Quote → Write CQ" step. Currently the pipeline stops at suggested resale.
+
+**Solution:** Same two-step as G2 — pipeline proposes, user confirms, `cq-writer.js` finalizes. For high-volume stock quoting, may eventually support auto-write for lines within defined parameters (e.g., resale > floor, margin > threshold).
+
+**Depends on:** G2 operational first.
+
+---
+
+*Last updated: 2026-04-02*

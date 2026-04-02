@@ -20,10 +20,11 @@
 | `email-fetcher.js` | Email operations: list, read, move, folders. Factory: `createFetcher(account)` | Fetching/routing emails from any inbox | VQ Loading, Stock RFQ Loading |
 | `email-tracker.js` | Processed email dedup, stats, retry queue. Factory: `createTracker(dataDir)` | Tracking processed emails in any workflow | VQ Loading, Stock RFQ Loading |
 | `notifier.js` | Email notifications via AWS WorkMail SMTP. Factory: `createNotifier({fromEmail, fromName})` | Sending notifications/attachments from any workflow | VQ Loading, Stock RFQ Loading |
-| `rfq-writer.js` | Write RFQs to `ai_writeback` schema (header + line + line_mpn). Auto IDs, MPN description enrichment, MFR ID lookup. | Writing any RFQ type to the ERP writeback | Stock RFQ Loading, (future) other RFQ workflows |
-| `offer-writeback.js` | Write market offers to `ai_writeback` schema (header + line + optional line_mpn). Auto IDs, batch write, deactivation of prior offers. | Writing any offer type to the ERP writeback | Market Offer Uploading, Inventory File Cleanup, (future) VQ Loading |
-| `api-result-writer.js` | Capture full franchise API responses (all price breaks, stock, lead time) to cache + DB. Extract qty-relevant prices for downstream consumers. | After any `searchAllDistributors()` call (write), or when Vortex/Quick Quote needs franchise pricing (read) | Franchise Screening, Suggested Resale, LAM Kitting (write); Vortex Matches, Quick Quote (read) |
-| `db-helpers.js` | Shared DB utilities: `psqlQuery`, `psqlExec`, `getNextId`, `sqlStr`, `sqlNum`, `cleanMpn`, `tableExists` | Any module writing to `ai_writeback` | offer-writeback.js, rfq-writer.js, api-result-writer.js |
+| `api-client.js` | iDempiere REST API client: auth, CRUD, batch, retry. See `api-writeback.md` for full docs. | Writing any data to iDempiere (replaces `psqlExec` for writes) | rfq-writer.js, offer-writeback.js, api-result-writer.js |
+| `rfq-writer.js` | Write RFQs via REST API (header + line + line_mpn). Server-assigned IDs, MPN description enrichment, MFR ID lookup. | Writing any RFQ type to iDempiere | Stock RFQ Loading, (future) other RFQ workflows |
+| `offer-writeback.js` | Write market offers via REST API (header + line + optional line_mpn). Server-assigned IDs, batch write, deactivation of prior offers. | Writing any offer type to iDempiere | Market Offer Uploading, Inventory File Cleanup, (future) VQ Loading |
+| `api-result-writer.js` | Capture full franchise API responses (all price breaks, stock, lead time) to cache + iDempiere. Extract qty-relevant prices for downstream consumers. | After any `searchAllDistributors()` call (write), or when Vortex/Quick Quote needs franchise pricing (read) | Franchise Screening, Suggested Resale, LAM Kitting (write); Vortex Matches, Quick Quote (read) |
+| `db-helpers.js` | Shared DB read utilities: `psqlQuery`, `sqlStr`, `sqlNum`, `cleanMpn`. Used for read queries only — writes go through `api-client.js`. | Any module reading from `adempiere` schema | rfq-writer.js, offer-writeback.js, api-result-writer.js, partner-lookup.js |
 
 ---
 
@@ -410,6 +411,123 @@ const rows = extractPriceAtQty('ADS1115IDGST', 700, { maxAgeDays: 90 });
 |----------|---------|
 | `flushCacheToDB()` | Bulk import cache → DB (run once when table ready) |
 | `pruneCache(maxAgeDays)` | Delete cache files older than N days (default 90) |
+
+---
+
+## vq-writer.js
+
+Writes VQ lines to iDempiere via REST API. Two-pass batch processing: pass 1 exact match (fast), pass 2 fuzzy resolution (held for review).
+
+### Key Design
+
+- **BP resolution:** Search key first → name fallback (case-insensitive `contains`). Cached per session. Environment-agnostic (works in test and prod).
+- **MFR resolution:** `mfr-lookup.js` normalizes name → `resolveMFR()` gets ID from target system. System records (AD_Client_ID=0) → text only, no FK.
+- **MPN→RFQ Line:** Exact match first. Pass 2 strips vendor prefixes (BK/, BK1-), packaging suffixes (-R7, -ND, #PBF↔#WTRPBF), tries # prefix.
+- **MPN cross-ref:** Packaging variants (tape/reel suffixes) → write with note. Genuine mismatches → flag for confirmation.
+
+### Usage
+
+```javascript
+const { writeVQBatch, writeReviewedItems } = require('../shared/vq-writer');
+
+// From franchise API results
+const result = await writeVQBatch('1131217', [
+  { mpn: 'ADS1115IDGST', cpc: '630-001234-001', franchiseResults },
+]);
+// result.written = [...], result.needsReview = [...], result.flagged = [...]
+
+// After user confirms fuzzy matches
+if (result.needsReview.length > 0) {
+  await writeReviewedItems('1131217', result.needsReview);
+}
+```
+
+### Flag Reasons
+
+| Flag | Meaning |
+|------|---------|
+| `BP_NOT_FOUND` | Vendor not in target system (neither search key nor name match) |
+| `MFR_NO_MATCH` | Manufacturer text couldn't be resolved |
+| `MFR_LOW_CONFIDENCE` | Fuzzy MFR match — needs verification |
+| `MPN_CROSS_REF` | API returned a different base MPN (not just packaging) |
+| `NO_RFQ_LINE` | MPN/CPC not found in RFQ after all resolution attempts |
+| `API_WRITE_ERROR` | iDempiere rejected the POST |
+
+---
+
+## cq-writer.js
+
+Writes Customer Quote lines (`chuboe_cq_line`) to iDempiere via REST API. Flat table — no header. Each CQ line links to an RFQ.
+
+```javascript
+const { writeCQ, writeCQBatch } = require('../shared/cq-writer');
+
+// Single line — provide RFQ search key + line data
+const result = await writeCQ('1141355', {
+  mpn: 'ADS1115IDGST', qty: 500, resale: 5.25,
+  cpc: 'CUST-ADC-001', dateCode: '24+', mfrText: 'Texas Instruments',
+});
+// result = { written: { cqLineId, rfqId, ... }, flagged: null, error: null }
+
+// Batch — array of lines against one RFQ
+const batch = await writeCQBatch('1141355', lines, { delayMs: 50 });
+// batch = { written: [...], flagged: [...], failed: [...], summary: { total, written, flagged, failed } }
+```
+
+### Resolution Strategy
+
+1. RFQ search key → `chuboe_rfq_id` (header)
+2. Customer from RFQ header (`c_bpartner_id`) unless overridden via `opts.bpartnerId`
+3. Each line: CPC → RFQ line ID, fallback to MPN exact → MPN clean → suffix-stripped
+4. MFR text → `chuboe_mfr_id` via `shared/mfr-lookup.js`
+
+### Line Format
+
+| Field | Required | Description |
+|-------|----------|-------------|
+| `resale` | **Yes** | Sell price to customer |
+| `mpn` | Yes* | Part number (*at least mpn or cpc required) |
+| `cpc` | No | Customer part code (preferred for resolution) |
+| `qty` | No | Quantity (default 0) |
+| `mfrText` | No | Manufacturer name |
+| `dateCode` | No | Date code |
+| `leadTime` | No | Lead time |
+| `rohs` | No | RoHS status |
+| `notePublic` | No | Customer-visible note |
+| `notePrivate` | No | Internal note |
+
+### Flag Reasons
+
+| Flag | Meaning |
+|------|---------|
+| `NO_RFQ` | RFQ search key not found |
+| `NO_RFQ_LINE` | CPC/MPN not found in RFQ lines |
+| `MISSING_PRICE` | No valid resale price |
+| `MFR_NO_MATCH` | Manufacturer text unresolvable |
+| `MFR_LOW_CONFIDENCE` | Fuzzy MFR match — write proceeds with text only |
+| `API_WRITE_ERROR` | iDempiere rejected the POST |
+
+---
+
+## api-client.js — Lookup Helpers
+
+In addition to CRUD operations, `api-client.js` exports environment-agnostic lookup functions:
+
+```javascript
+const { resolveBP, resolveBPBatch, resolveMFR } = require('../shared/api-client');
+
+// BP: search key first, name fallback
+const bp = await resolveBP('1002331', 'DigiKey');  // → { id, name, searchKey }
+
+// Batch pre-warm (at start of a write batch)
+await resolveBPBatch([{ searchKey: '1002331', name: 'DigiKey' }, { name: 'Smartel' }]);
+
+// MFR: by name, returns isSystem flag
+const mfr = await resolveMFR('Analog Devices Inc');  // → { id, name, isSystem: true }
+// If isSystem=true, don't include Chuboe_MFR_ID in POST — use text only
+```
+
+All results cached per session (one API call per unique vendor/manufacturer).
 
 ---
 
