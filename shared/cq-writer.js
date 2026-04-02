@@ -74,6 +74,27 @@ const FLAG = {
 // Mandatory fields on every CQ line
 const MANDATORY_FIELDS = ['mpn', 'mfrText', 'qty', 'resale', 'leadTime'];
 
+// ─── FIELD MAP ───────────────────────────────────────────────────────────────
+// Maps line input field name → API column name.
+// If a line has a value for any of these keys, it gets written.
+// Fields handled separately (mpn, cpc, mfr, resale, qty) are not here.
+const OPTIONAL_FIELD_MAP = {
+  dateCode:     'Chuboe_Date_Code',
+  leadTime:     'Chuboe_Lead_Time',
+  description:  'Description',
+  rohs:         'Chuboe_RoHS',
+  coo:          'Chuboe_Country_Text',
+  moq:          'Chuboe_MOQ',
+  packaging:    'Chuboe_Packaging_Text',
+  notePublic:   'Chuboe_Note_Public',
+  notePrivate:  'Chuboe_Note_Private',
+  hazmat:       'IsHazMat',
+  poReference:  'POReference',
+  leadTimeText: 'Chuboe_LeadTime_Text',
+  packagingDesc:'Chuboe_Package_Desc',
+  shippingAcct: 'Chuboe_ShippingAcct',
+};
+
 // ─── RFQ RESOLUTION ──────────────────────────────────────────────────────────
 
 let _rfqCache = new Map(); // rfqSearchKey -> { id, bpartnerId, bpName, lines, mpnToLine }
@@ -344,22 +365,22 @@ async function writeCQBatch(rfqSearchKey, lines, opts = {}) {
       Processed: 'N',
     };
 
-    // Optional fields — only include if provided
+    // CPC (needs clean variant)
     if (cpc) {
       payload.Chuboe_CPC = cpc;
       payload.Chuboe_CPC_Clean = cleanMpn(cpc);
     }
+    // MFR (resolved separately above)
     if (mfrId) payload.Chuboe_MFR_ID = mfrId;
     if (mfrCanonical) payload.Chuboe_MFR_Text = mfrCanonical;
-    if (line.dateCode) payload.Chuboe_Date_Code = line.dateCode;
-    if (line.leadTime) payload.Chuboe_Lead_Time = line.leadTime;
-    if (line.description) payload.Description = line.description;
-    if (line.rohs) payload.Chuboe_RoHS = line.rohs;
-    if (line.coo) payload.Chuboe_Country_Text = line.coo;
-    if (line.moq) payload.Chuboe_MOQ = String(line.moq);
-    if (line.packaging) payload.Chuboe_Packaging_Text = line.packaging;
-    if (line.notePublic) payload.Chuboe_Note_Public = line.notePublic;
-    if (line.notePrivate) payload.Chuboe_Note_Private = line.notePrivate;
+
+    // All other optional fields — populate anything the caller provided
+    for (const [inputKey, apiCol] of Object.entries(OPTIONAL_FIELD_MAP)) {
+      const val = line[inputKey];
+      if (val != null && val !== '') {
+        payload[apiCol] = String(val);
+      }
+    }
 
     // Write to API
     try {
@@ -426,6 +447,7 @@ module.exports = {
   clearCaches,
   FLAG,
   MANDATORY_FIELDS,
+  OPTIONAL_FIELD_MAP,
   CQ_RESOLUTIONS,
   DEFAULT_STATUS_ID,
 };
