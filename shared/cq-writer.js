@@ -61,15 +61,18 @@ const CQ_RESOLUTIONS = {
   'Lost Stock':                  1000005,
 };
 
-// Flag reason codes
+// Flag reason codes — things that prevent a write
 const FLAG = {
   NO_RFQ:            'NO_RFQ',
   NO_RFQ_LINE:       'NO_RFQ_LINE',
   MFR_NO_MATCH:      'MFR_NO_MATCH',
   MFR_LOW_CONFIDENCE: 'MFR_LOW_CONFIDENCE',
-  MISSING_PRICE:     'MISSING_PRICE',
+  MISSING_FIELDS:    'MISSING_FIELDS',
   API_WRITE_ERROR:   'API_WRITE_ERROR',
 };
+
+// Mandatory fields on every CQ line
+const MANDATORY_FIELDS = ['mpn', 'mfrText', 'qty', 'resale', 'leadTime'];
 
 // ─── RFQ RESOLUTION ──────────────────────────────────────────────────────────
 
@@ -281,12 +284,18 @@ async function writeCQBatch(rfqSearchKey, lines, opts = {}) {
     const cpc = line.cpc || '';
     const resale = line.resale;
 
-    // Validate resale price
-    if (resale == null || resale <= 0) {
+    // Validate mandatory fields
+    const missing = [];
+    if (!mpn) missing.push('mpn');
+    if (!line.mfrText) missing.push('mfrText');
+    if (line.qty == null || line.qty <= 0) missing.push('qty');
+    if (resale == null || resale <= 0) missing.push('resale');
+    if (!line.leadTime) missing.push('leadTime');
+    if (missing.length > 0) {
       flagged.push({
-        mpn, cpc, resale, lineIndex: i,
-        reason: FLAG.MISSING_PRICE,
-        detail: `No valid resale price for ${mpn || cpc}`,
+        mpn, cpc, resale, qty: line.qty, mfrText: line.mfrText, leadTime: line.leadTime, lineIndex: i,
+        reason: FLAG.MISSING_FIELDS,
+        detail: `Missing: ${missing.join(', ')}`,
       });
       continue;
     }
@@ -408,6 +417,7 @@ module.exports = {
   writeCQBatch,
   clearCaches,
   FLAG,
+  MANDATORY_FIELDS,
   CQ_RESOLUTIONS,
   DEFAULT_STATUS_ID,
 };
