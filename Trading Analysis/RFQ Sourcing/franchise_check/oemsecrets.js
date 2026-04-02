@@ -9,6 +9,15 @@
  * Results include distributor names — we filter OUT distributors already
  * covered by direct APIs (DigiKey, Arrow, Mouser, etc.) and surface
  * incremental coverage from distributors we don't have direct access to.
+ *
+ * TRUST TIERS (aggregator data is not as reliable as direct APIs):
+ *   Tier 1 = direct APIs (filtered out here, handled by franchise-api.js)
+ *   Tier 2 = authorized franchise via aggregator — pricing is reference, not confirmed
+ *   Tier 3 = broker/independent via aggregator — availability signal only, pricing suppressed
+ *   Tier 4 = MFR direct (AD, Microchip) — list price reference, never VQ
+ *
+ * Every result carries a `tier` and `source` field so downstream consumers
+ * (VQ loading, Quick Quote, screening) can decide how to use the data.
  */
 
 const https = require('https');
@@ -26,24 +35,71 @@ const OEMSECRETS_CONFIG = {
 // Matched case-insensitively against distributor_name from API
 const DIRECT_API_DISTRIBUTORS = [
   'digikey', 'digi-key',
-  'arrow',
+  'arrow',                      // also covers Verical (Arrow subsidiary), Richardson RFPD
   'mouser',
   'newark', 'farnell', 'element14',
-  'tti',
+  'tti',                        // also covers Verical (TTI subsidiary marketplace)
   'future electronics',
   'master electronics',
+  'onlinecomponents',           // Master Electronics subsidiary
+  'electro sonic',              // Master Electronics subsidiary
   'waldom',
   'sager',
   'rutronik',
 ];
+
+// Tier 2: Authorized franchise distributors we DON'T have direct APIs for.
+// Pricing is reference-grade (aggregator-sourced, may be stale) but from real franchise sources.
+// Matched case-insensitively against distributor_name from API.
+const TIER2_FRANCHISE_DISTRIBUTORS = [
+  'rs americas', 'rs uk', 'rs ',  // RS Components — has API (needs App ID from sales rep)
+  'avnet',                         // Avnet America/Silica/Asia — has API (apiportal.avnet.com)
+  'ebv elektronik', 'ebv',        // Avnet subsidiary
+  'verical',                       // Arrow/TTI subsidiary marketplace
+  'tme',                           // TME — has API (developers.tme.eu)
+  'rochester',                     // Rochester Electronics — EOL specialist
+  'chip one stop',                 // Japanese franchise
+  'conrad',                        // European franchise
+  'richardson rfpd',               // Arrow subsidiary (RF specialty)
+  'schukat',                       // German franchise
+  'buerklin', 'bürklin',          // German franchise
+  'sos electronic',                // European franchise
+  'weyland',                       // European franchise
+  'ozdisan',                       // Turkish franchise
+  'ineltek',                       // European franchise
+  'corestaff',                     // Japanese franchise
+];
+
+// Tier 4: Manufacturer-direct listings. List price reference only — can't buy direct.
+// Exception: Microchip may be purchasable but still treat as reference, not VQ.
+const TIER4_MFR_DIRECT = [
+  'analog devices',
+  'microchip',
+];
+
+/**
+ * Classify a distributor into a trust tier.
+ * @returns {'direct'|'franchise'|'broker'|'mfr_direct'} tier name
+ */
+function classifyDistributor(distributorName) {
+  if (!distributorName) return 'broker';
+  const lower = distributorName.toLowerCase();
+
+  if (DIRECT_API_DISTRIBUTORS.some(d => lower.includes(d))) return 'direct';
+  if (TIER4_MFR_DIRECT.some(d => lower.includes(d))) return 'mfr_direct';
+  if (TIER2_FRANCHISE_DISTRIBUTORS.some(d => lower.includes(d))) return 'franchise';
+
+  // Check the API's own auth status as a secondary signal (handled in parseSearchResults)
+  // Default: treat unknown distributors as brokers
+  return 'broker';
+}
 
 /**
  * Check if a distributor name matches one we already have direct API access to
  */
 function isDirectApiDistributor(distributorName) {
   if (!distributorName) return false;
-  const lower = distributorName.toLowerCase();
-  return DIRECT_API_DISTRIBUTORS.some(d => lower.includes(d));
+  return classifyDistributor(distributorName) === 'direct';
 }
 
 /**
@@ -236,18 +292,34 @@ function parseSearchResults(json, searchMpn, rfqQty, includeDirectApi) {
     const moqPrice = priceBreaks.length > 0 ? priceBreaks[0].unitPrice : null;
     const bulkPrice = priceBreaks.length > 0 ? priceBreaks[priceBreaks.length - 1].unitPrice : null;
 
+    // Classify this distributor into a trust tier
+    let tier = classifyDistributor(distName);
+    // Upgrade unknown distributors to franchise if OEMsecrets flags them as authorized
+    if (tier === 'broker' && bestPart.distributor_authorisation_status === 'authorised') {
+      tier = 'franchise';
+    }
+
     distributorResults.push({
       distributor: distName,
       distributorRegion: bestPart.distributor?.distributor_region || '',
       distributorCountry: bestPart.distributor?.distributor_country || '',
       authStatus: bestPart.distributor_authorisation_status || '',
+      // Source & trust tier — downstream consumers use these to decide how to treat the data
+      source: 'oemsecrets',
+      tier,  // 'franchise' | 'broker' | 'mfr_direct'
+      // Pricing: suppressed for broker/mfr_direct tiers (availability signal only)
       mpn: bestPart.source_part_number || bestPart.part_number || '',
       manufacturer: bestPart.manufacturer || bestPart.source_manufacturer || '',
       stock: qty,
-      moqPrice,
-      bulkPrice,
-      rfqPrice: priceAtQty,
-      priceBreaks,
+      moqPrice: tier === 'broker' ? null : moqPrice,
+      bulkPrice: tier === 'broker' ? null : bulkPrice,
+      rfqPrice: tier === 'broker' ? null : priceAtQty,
+      priceBreaks: tier === 'broker' ? [] : priceBreaks,
+      // Keep raw prices available for reference if someone explicitly needs them
+      _rawMoqPrice: moqPrice,
+      _rawBulkPrice: bulkPrice,
+      _rawRfqPrice: priceAtQty,
+      _rawPriceBreaks: priceBreaks,
       moq: parseInt(bestPart.moq || '1'),
       packaging: bestPart.packaging || bestPart.source_packaging || '',
       leadTime: bestPart.lead_time || '',
@@ -272,14 +344,26 @@ function parseSearchResults(json, searchMpn, rfqQty, includeDirectApi) {
   result.distributors = distributorResults;
   result.distributorCount = distributorResults.length;
 
-  // Aggregate: total stock, lowest price across all (non-direct) distributors
+  // Aggregate: total stock across ALL tiers (availability signal)
   const withStock = distributorResults.filter(d => d.stock > 0);
   result.franchiseQty = distributorResults.reduce((sum, d) => sum + d.stock, 0);
 
+  // Tier breakdown for consumers
+  result.tierBreakdown = {
+    franchise: distributorResults.filter(d => d.tier === 'franchise'),
+    broker: distributorResults.filter(d => d.tier === 'broker'),
+    mfrDirect: distributorResults.filter(d => d.tier === 'mfr_direct'),
+  };
+  result.franchiseStockQty = result.tierBreakdown.franchise.reduce((sum, d) => sum + d.stock, 0);
+  result.brokerStockQty = result.tierBreakdown.broker.reduce((sum, d) => sum + d.stock, 0);
+
   if (withStock.length > 0) {
-    const withPrice = withStock.filter(d => d.rfqPrice !== null);
-    if (withPrice.length > 0) {
-      const cheapest = withPrice.reduce((best, d) =>
+    // Pricing: only from Tier 2 franchise sources (not broker, not MFR direct)
+    const franchiseWithPrice = result.tierBreakdown.franchise
+      .filter(d => d.stock > 0 && d.rfqPrice !== null);
+
+    if (franchiseWithPrice.length > 0) {
+      const cheapest = franchiseWithPrice.reduce((best, d) =>
         d.rfqPrice < best.rfqPrice ? d : best
       );
       result.franchisePrice = cheapest.moqPrice;
@@ -287,7 +371,7 @@ function parseSearchResults(json, searchMpn, rfqQty, includeDirectApi) {
       result.franchiseRfqPrice = cheapest.rfqPrice;
       result.priceBreaks = cheapest.priceBreaks;
 
-      // VQ fields from cheapest with stock
+      // VQ fields from cheapest franchise source — flagged as aggregator, NOT confirmed
       result.vqPrice = cheapest.rfqPrice;
       result.vqMpn = cheapest.mpn;
       result.vqManufacturer = cheapest.manufacturer || '';
@@ -296,11 +380,19 @@ function parseSearchResults(json, searchMpn, rfqQty, includeDirectApi) {
       result.vqRohs = cheapest.rohs;
 
       const notes = [];
-      notes.push(`via OEMSecrets (${cheapest.distributor})`);
+      notes.push(`via OEMSecrets (${cheapest.distributor}) [AGGREGATOR - ref only]`);
       if (cheapest.stock > 0) notes.push(`Stock: ${cheapest.stock.toLocaleString()}`);
       if (cheapest.leadTime) notes.push(`LT: ${cheapest.leadTime}`);
       if (cheapest.lifecycle) notes.push(`Lifecycle: ${cheapest.lifecycle}`);
       result.vqVendorNotes = notes.join(' | ');
+    }
+
+    // MFR direct pricing as separate reference (not used for VQ/quoting)
+    const mfrWithPrice = result.tierBreakdown.mfrDirect
+      .filter(d => d.stock > 0 && d.rfqPrice !== null);
+    if (mfrWithPrice.length > 0) {
+      result.mfrListPrice = mfrWithPrice[0].rfqPrice;
+      result.mfrListSource = mfrWithPrice[0].distributor;
     }
 
     result.found = true;
@@ -399,7 +491,10 @@ module.exports = {
   searchParts,
   normalizeMpn,
   isDirectApiDistributor,
+  classifyDistributor,
   DIRECT_API_DISTRIBUTORS,
+  TIER2_FRANCHISE_DISTRIBUTORS,
+  TIER4_MFR_DIRECT,
 };
 
 // CLI usage
@@ -429,10 +524,19 @@ if (require.main === module) {
         console.log(`Best price at qty ${result.rfqQty}: $${result.franchiseRfqPrice.toFixed(4)}`);
       }
 
+      if (result.tierBreakdown) {
+        console.log(`\nTier breakdown: ${result.tierBreakdown.franchise.length} franchise, ${result.tierBreakdown.broker.length} broker, ${result.tierBreakdown.mfrDirect.length} MFR direct`);
+        console.log(`Franchise stock: ${result.franchiseStockQty.toLocaleString()} | Broker stock: ${result.brokerStockQty.toLocaleString()}`);
+        if (result.mfrListPrice) {
+          console.log(`MFR list price ref: $${result.mfrListPrice.toFixed(4)} (${result.mfrListSource})`);
+        }
+      }
+
       console.log('\n--- Per-Distributor Breakdown ---');
       for (const d of result.distributors) {
         const price = d.rfqPrice !== null ? `$${d.rfqPrice.toFixed(4)}` : 'N/A';
-        console.log(`  ${d.distributor}: ${d.stock.toLocaleString()} stock, ${price}, LT: ${d.leadTime || 'N/A'}, LC: ${d.lifecycle || 'N/A'}`);
+        const tierTag = `[${d.tier}]`.padEnd(13);
+        console.log(`  ${tierTag} ${d.distributor}: ${d.stock.toLocaleString()} stock, ${price}, LT: ${d.leadTime || 'N/A'}, LC: ${d.lifecycle || 'N/A'}`);
       }
 
       if (includeDirectApi) {
