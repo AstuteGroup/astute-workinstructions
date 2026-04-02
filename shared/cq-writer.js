@@ -211,14 +211,18 @@ async function resolveMfrForCQ(mfrText) {
  *
  * @param {string} rfqSearchKey - RFQ document number (e.g., '1141355')
  * @param {Object} line - Quote line data
- * @param {string} [line.mpn] - Part number
+ * @param {string} line.mpn - Part number (mandatory)
+ * @param {string} line.mfrText - Manufacturer name (mandatory)
+ * @param {number} line.qty - Quantity (mandatory)
+ * @param {number} line.resale - Sell price to customer (mandatory)
+ * @param {string} line.leadTime - Lead time (mandatory)
  * @param {string} [line.cpc] - Customer part code (preferred for line resolution)
- * @param {number} line.resale - Sell price to customer (PriceEntered)
- * @param {number} [line.qty] - Quantity
- * @param {string} [line.mfrText] - Manufacturer name
  * @param {string} [line.dateCode] - Date code
- * @param {string} [line.leadTime] - Lead time
+ * @param {string} [line.description] - Part description
  * @param {string} [line.rohs] - RoHS status
+ * @param {string} [line.coo] - Country of origin (text, e.g., 'US', 'China')
+ * @param {string} [line.moq] - Minimum order quantity
+ * @param {string} [line.packaging] - Packaging type text
  * @param {string} [line.notePublic] - Public note (visible to customer)
  * @param {string} [line.notePrivate] - Private note (internal only)
  * @param {Object} [opts]
@@ -349,7 +353,11 @@ async function writeCQBatch(rfqSearchKey, lines, opts = {}) {
     if (mfrCanonical) payload.Chuboe_MFR_Text = mfrCanonical;
     if (line.dateCode) payload.Chuboe_Date_Code = line.dateCode;
     if (line.leadTime) payload.Chuboe_Lead_Time = line.leadTime;
+    if (line.description) payload.Description = line.description;
     if (line.rohs) payload.Chuboe_RoHS = line.rohs;
+    if (line.coo) payload.Chuboe_Country_Text = line.coo;
+    if (line.moq) payload.Chuboe_MOQ = String(line.moq);
+    if (line.packaging) payload.Chuboe_Packaging_Text = line.packaging;
     if (line.notePublic) payload.Chuboe_Note_Public = line.notePublic;
     if (line.notePrivate) payload.Chuboe_Note_Private = line.notePrivate;
 
