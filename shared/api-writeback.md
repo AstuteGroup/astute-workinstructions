@@ -397,7 +397,51 @@ For each table: required fields (NOT NULL, no default), commonly-used optional f
 
 ---
 
-### 3. c_order (Sales/Purchase Order Header)
+### 3. ad_user (Contact)
+
+**Use:** Creating contacts on a business partner. Requires a parent `c_bpartner` and a `c_bpartner_location`.
+
+**IMPORTANT:** Always create the BP and location first, then the contact. Never write a contact without a location — it won't be usable in OT. When creating contacts interactively, gather all required fields (BP, location, name, email) before POSTing. If multiple locations exist on the BP, prompt the user to choose.
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `Name` | string | **Yes** | Contact name (max 60 chars) |
+| `C_BPartner_ID` | number | **Yes** | Parent business partner |
+| `C_BPartner_Location_ID` | number | **Yes** | Location/address on that BP — query existing locations and select |
+| `EMail` | string | **Yes*** | Email address (max 60 chars). *Not enforced by DB but required for usability |
+| `Phone` | string | No | Phone number (max 40 chars) |
+| `Phone2` | string | No | Secondary phone |
+| `Title` | string | No | Job title (max 40 chars) |
+| `Description` | string | No | Notes (max 255 chars) |
+| `IsFullBPAccess` | boolean | No (default Y) | Can see all BP data? |
+| `IsBillTo` | boolean | No (default N) | Bill-to contact? |
+| `IsShipTo` | boolean | No (default N) | Ship-to contact? |
+| `NotificationType` | string | No (default X) | `X` = None, `E` = Email, `N` = Notice, `B` = Both |
+| `Fax` | string | No | Fax number |
+| `Comments` | string | No | Extended comments (max 2000 chars) |
+
+**Dependency chain:** `c_bpartner` → `c_bpartner_location` → `ad_user`
+
+**Example:**
+```json
+{
+  "Name": "Jane Smith",
+  "C_BPartner_ID": 1005694,
+  "C_BPartner_Location_ID": 1007031,
+  "EMail": "jane.smith@uctec.com",
+  "Phone": "+86-755-8303-8598",
+  "Title": "Purchasing Manager",
+  "IsFullBPAccess": true
+}
+```
+
+**Server auto-assigns:** `Value` (search key, defaults to generic like `"acontact"`), `AD_Client_ID`, `AD_Org_ID`, `IsActive`, `Created/Updated/By`.
+
+**Tested:** 2026-04-03 on test instance. Both POST (create) and PUT (update) confirmed working.
+
+---
+
+### 4. c_order (Sales/Purchase Order Header)
 
 **Use:** Creating SO or PO headers. Complex — many required fields with no defaults.
 
@@ -452,7 +496,7 @@ For each table: required fields (NOT NULL, no default), commonly-used optional f
 
 ---
 
-### 4. c_orderline (Order Line)
+### 5. c_orderline (Order Line)
 
 **Use:** Adding lines to a sales/purchase order. Requires a parent `c_order`.
 
@@ -497,7 +541,7 @@ For each table: required fields (NOT NULL, no default), commonly-used optional f
 
 ---
 
-### 5. chuboe_rfq (RFQ Header)
+### 6. chuboe_rfq (RFQ Header)
 
 **Use:** Creating customer RFQ records. Primary write path for Stock RFQ Loading.
 
@@ -550,7 +594,7 @@ For each table: required fields (NOT NULL, no default), commonly-used optional f
 
 ---
 
-### 6. chuboe_rfq_line (RFQ Line — CPC Level)
+### 7. chuboe_rfq_line (RFQ Line — CPC Level)
 
 **Use:** Adding lines to an RFQ. One line per CPC.
 
@@ -574,7 +618,7 @@ For each table: required fields (NOT NULL, no default), commonly-used optional f
 
 ---
 
-### 7. chuboe_rfq_line_mpn (RFQ Line MPN — MPN/MFR Level)
+### 8. chuboe_rfq_line_mpn (RFQ Line MPN — MPN/MFR Level)
 
 **Use:** Attaching MPN/MFR details to an RFQ line. One per MPN per CPC.
 
@@ -610,7 +654,7 @@ For each table: required fields (NOT NULL, no default), commonly-used optional f
 
 ---
 
-### 8. chuboe_vq_line (Vendor Quote Line — Flat)
+### 9. chuboe_vq_line (Vendor Quote Line — Flat)
 
 **Use:** Recording vendor quotes. Flat table (no header).
 
@@ -667,7 +711,7 @@ For each table: required fields (NOT NULL, no default), commonly-used optional f
 
 ---
 
-### 9. chuboe_cq_line (Customer Quote Line — Flat)
+### 10. chuboe_cq_line (Customer Quote Line — Flat)
 
 **Use:** Recording customer quotes. Flat table (no header).
 
@@ -710,7 +754,7 @@ For each table: required fields (NOT NULL, no default), commonly-used optional f
 
 ---
 
-### 10. chuboe_offer (Offer Header)
+### 11. chuboe_offer (Offer Header)
 
 **Use:** Creating market inventory offer records. Primary write path for Market Offer Uploading.
 
@@ -741,7 +785,7 @@ For each table: required fields (NOT NULL, no default), commonly-used optional f
 
 ---
 
-### 11. chuboe_offer_line (Offer Line — CPC Level)
+### 12. chuboe_offer_line (Offer Line — CPC Level)
 
 **Use:** Adding line items to an offer. One per MPN.
 
@@ -784,7 +828,7 @@ For each table: required fields (NOT NULL, no default), commonly-used optional f
 
 ---
 
-### 12. chuboe_offer_line_mpn (Offer Line MPN — Cross-Reference)
+### 13. chuboe_offer_line_mpn (Offer Line MPN — Cross-Reference)
 
 **Use:** Adding MPN cross-references to an offer line.
 
