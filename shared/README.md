@@ -418,28 +418,37 @@ const rows = extractPriceAtQty('ADS1115IDGST', 700, { maxAgeDays: 90 });
 
 Writes VQ lines to iDempiere via REST API. Two-pass batch processing: pass 1 exact match (fast), pass 2 fuzzy resolution (held for review).
 
+**Two-tier field validation** — see [`shared/data-model.md`](data-model.md) § VQ Field Requirements by Stage:
+- **Tier 1 (VQ loading):** Mandatory fields for writing a quote. Writer validates before POST — missing fields → flagged, not written.
+- **Tier 2 (PO processing):** ALL Tier 1 fields + PO-specific fields. A VQ MUST NOT be marked `IsPurchased = Y` without all fields populated.
+
 ### Key Design
 
 - **BP resolution:** Search key first → name fallback (case-insensitive `contains`). Cached per session. Environment-agnostic (works in test and prod).
-- **MFR resolution:** `mfr-lookup.js` normalizes name → `resolveMFR()` gets ID from target system. System records (AD_Client_ID=0) → text only, no FK.
+- **MFR resolution:** `mfr-lookup.js` normalizes name → `resolveMFR()` gets ID from target system. **MFR ID is mandatory** — system records (AD_Client_ID=0) cannot be written; these are flagged as `MFR_SYSTEM_ONLY`.
 - **MPN→RFQ Line:** Exact match first. Pass 2 strips vendor prefixes (BK/, BK1-), packaging suffixes (-R7, -ND, #PBF↔#WTRPBF), tries # prefix.
 - **MPN cross-ref:** Packaging variants (tape/reel suffixes) → write with note. Genuine mismatches → flag for confirmation.
+- **Tier 1 defaults auto-populated:** UOM (Each), COO (PENDING if not provided), RoHS (Y), Traceability (from vendor type), Vendor Type (from BP), HTS/ECCN (from franchise API data when available).
 
 ### Usage
 
 ```javascript
-const { writeVQBatch, writeReviewedItems } = require('../shared/vq-writer');
+const { writeVQBatch, writeReviewedItems, validatePayload } = require('../shared/vq-writer');
 
-// From franchise API results
+// From franchise API results — must include buyerId
 const result = await writeVQBatch('1131217', [
   { mpn: 'ADS1115IDGST', cpc: '630-001234-001', franchiseResults },
-]);
+], { buyerId: 1000004 }); // Jake Harris
 // result.written = [...], result.needsReview = [...], result.flagged = [...]
 
 // After user confirms fuzzy matches
 if (result.needsReview.length > 0) {
   await writeReviewedItems('1131217', result.needsReview);
 }
+
+// Validate a payload for PO readiness (Tier 2)
+const check = validatePayload(payload, 2);
+if (!check.valid) console.log('Missing for PO:', check.missing);
 ```
 
 ### Flag Reasons
@@ -449,7 +458,9 @@ if (result.needsReview.length > 0) {
 | `BP_NOT_FOUND` | Vendor not in target system (neither search key nor name match) |
 | `MFR_NO_MATCH` | Manufacturer text couldn't be resolved |
 | `MFR_LOW_CONFIDENCE` | Fuzzy MFR match — needs verification |
+| `MFR_SYSTEM_ONLY` | MFR is system-level (AD_Client_ID=0) — no client-level record exists |
 | `MPN_CROSS_REF` | API returned a different base MPN (not just packaging) |
+| `MISSING_MANDATORY` | Payload missing required Tier 1 fields (listed in detail) |
 | `NO_RFQ_LINE` | MPN/CPC not found in RFQ after all resolution attempts |
 | `API_WRITE_ERROR` | iDempiere rejected the POST |
 

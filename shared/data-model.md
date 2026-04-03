@@ -131,6 +131,67 @@ Single source of truth for iDempiere (OT) table structures, relationships, and f
 - `chuboe_rfq_line_id` → `chuboe_rfq_line`
 - `chuboe_rfq_id` → `chuboe_rfq` (denormalized)
 
+#### VQ Field Requirements by Stage
+
+**Tier 1 — VQ Loading (writing the quote):**
+All fields required by the VQ Mass Upload Template (see `vq-loading.md`). These are the minimum to create a valid VQ record:
+
+| Field | Column | Required | Default |
+|-------|--------|----------|---------|
+| RFQ | `chuboe_rfq_id`, `chuboe_rfq_line_id` | Yes | From MPN→RFQ lookup |
+| Vendor | `c_bpartner_id` | Yes | From domain-based lookup |
+| MPN | `chuboe_mpn` | Yes | — |
+| MFR | `chuboe_mfr_id`, `chuboe_mfr_text` | Yes (ID required, not just text) | Resolved via `shared/mfr-lookup.js` |
+| Qty | `qty` | Yes | — |
+| Cost | `cost` | Yes | — |
+| Currency | `c_currency_id` | No | 100 (USD) |
+| Date Code | `chuboe_date_code` | No | — |
+| MOQ | `chuboe_moq` | No | — |
+| SPQ | `chuboe_spq` | No | — |
+| Packaging | `chuboe_packaging_id` | Yes | From vendor quote |
+| Lead Time | `chuboe_lead_time` | No | — |
+| COO | `c_country_id` | No | — |
+| RoHS | `chuboe_rohs` | No | — |
+| Vendor Notes | `chuboe_note_public` | No | — |
+| Buyer | `chuboe_buyer_id` | Yes | Astute employee who sourced |
+
+**Fields that CAN be defaulted at VQ load time** (reduces PO prep work):
+
+| Field | Column | Default | Logic |
+|-------|--------|---------|-------|
+| UOM | `c_uom_id` | 100 (Each) | Always unless otherwise noted |
+| COO | `c_country_id` | 1000001 (PENDING) | If vendor didn't specify |
+| RoHS | `chuboe_rohs` | `Y` | Unless otherwise noted |
+| Traceability | `chuboe_traceability_id` | Derived from vendor type | Franchise (1000002) → Auth Dist Certs (1000001); all others → Non-Traceable (1000003) |
+| Vendor Type | `chuboe_vendortype_id` | From BP record | Read `c_bpartner.chuboe_vendortype_id` |
+| Packaging | `chuboe_packaging_id` | From vendor quote | If provided; otherwise left blank |
+
+**Tier 2 — PO Processing (marking as purchased):**
+ALL Tier 1 fields PLUS the following. A VQ **MUST NOT** be marked `IsPurchased = Y` unless every field is populated. No partial writes.
+
+| Field | Column | Source |
+|-------|--------|--------|
+| Partner Location | `c_bpartner_location_id` | BP default (most have only 1) |
+| Warehouse Group | `chuboe_warehouse_group_id` | Deal-specific (AUSTIN, HONG KONG, etc.) |
+| Ship-to Warehouse | `chuboe_warehouse_id` | Deal-specific (SPEC BUY, ALLOCATED, consignment, etc.) |
+| Shipper | `m_shipper_id` | Default: FedEx Ground (1000003) |
+| Incoterm | `chuboe_inco_term_id` | Default: EXW (1000000) unless otherwise noted |
+| Promise Date | `datepromised` | Derived from lead time: "stock" = today + 5 business days |
+| Due Date | `duedate` | Same as promise date |
+| IsPurchased | `ispurchased` | `Y` — set ONLY after all fields validated |
+
+**Warehouse routing rules:**
+- W103, W106, W107 → always Warehouse Group: AUSTIN (1000000)
+- W111 → always Warehouse Group: BROWNSVILLE (1000008)
+- ALLOCATED/PRESOLD → most commonly AUSTIN or HONG KONG
+
+**Promise date derivation:**
+- Lead time = "stock" or "in stock" → +5 business days from today
+- Lead time = numeric (e.g., "12 weeks") → calculate from today
+- Lead time = blank → must be provided at PO time
+
+**CRITICAL: The API does NOT enforce OT's mandatory field validation.** Records can be written via API with missing fields that OT would reject on save. All validation MUST be enforced client-side before calling `apiPost`/`apiPut`.
+
 ---
 
 ### CQ (Customer Quote — Sell Side)

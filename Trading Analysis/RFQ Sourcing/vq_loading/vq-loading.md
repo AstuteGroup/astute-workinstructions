@@ -92,6 +92,8 @@ If this message doesn't appear, verification was skipped.
 
 Extract ALL available fields from each quote. Required fields must be present; optional fields capture when available.
 
+**See also:** [`shared/data-model.md`](../../../shared/data-model.md) § VQ Field Requirements by Stage for the full Tier 1 / Tier 2 field breakdown and PO processing requirements.
+
 | Field | Column Name | Required | Description |
 |-------|-------------|----------|-------------|
 | **RFQ Search Key** | `RFQ Search Key` | Yes | Matched via MPN lookup (30-day window) |
@@ -109,18 +111,39 @@ Extract ALL available fields from each quote. Required fields must be present; o
 | **Vendor** | `Business Partner Search Key` | Yes | Vendor search_key from domain-based lookup |
 | **Contact** | `Contact` | No | Vendor contact name |
 | **MPN** | `MPN` | Yes | **Customer's requested MPN** (from RFQ, NOT vendor's alternate) |
-| **Manufacturer** | `MFR Text` | No | Manufacturer name (TI, Infineon, etc.) |
+| **Manufacturer** | `MFR Text` | Yes | Manufacturer name (TI, Infineon, etc.). **MFR ID must also be resolved** — text alone is not sufficient for PO processing |
 | **Quantity** | `Quoted Quantity` | Yes | Quoted quantity available |
 | **Cost** | `Cost` | Yes | Unit price |
 | **Currency** | `Currency` | No | Blank = USD. Only specify for EUR, GBP, other |
 | **Date Code** | `Date Code` | No | Manufacturing date code (e.g., 2024, 24+) |
 | **MOQ** | `MOQ` | No | Minimum order quantity |
 | **SPQ** | `SPQ` | No | Standard pack quantity |
-| **Packaging** | `Packaging` | No | **UPPERCASE lookup field** - see Packaging Reference below |
+| **Packaging** | `Packaging` | Yes | **UPPERCASE lookup field** - see Packaging Reference below |
 | **Lead Time** | `Lead Time` | No | Default: "stock". Only specify if vendor quotes specific lead time |
 | **COO** | `COO` | No | Country of origin - use **full name** (China, Taiwan, Malaysia, United States, etc.) NOT ISO codes |
 | **RoHS** | `RoHS` | No | **Yes** / **No** / **Not Applicable** / blank (NOT Y/N) |
+| **HTS** | `HTS` | No | Harmonized Tariff Schedule code (from franchise APIs: TTI, Mouser) |
+| **ECCN** | `ECCN` | No | Export Control Classification Number (from franchise APIs: TTI, Mouser) |
 | **Vendor Notes** | `Vendor Notes` | No | Alternate MPNs, no-bid reasons, conditions |
+
+#### Tier 1 Defaults (Auto-Populated at VQ Load Time)
+
+These fields speed up PO processing by filling in predictable values at write time. The VQ writer (`shared/vq-writer.js`) sets these automatically:
+
+| Field | Column | Default | Override When |
+|-------|--------|---------|---------------|
+| **UOM** | `c_uom_id` | Each (100) | Vendor specifies different unit |
+| **COO** | `c_country_id` | PENDING (1000001) | Vendor provides manufacturing origin |
+| **RoHS** | `chuboe_rohs` | Y (Yes) | Vendor says Non-RoHS or unknown |
+| **Traceability** | `chuboe_traceability_id` | Derived from vendor type | — |
+| **Vendor Type** | `chuboe_vendortype_id` | From BP record | — |
+| **HTS/ECCN** | `chuboe_hts`, `chuboe_eccn` | From franchise API data | Not available for email-loaded VQs |
+
+**Traceability derivation:**
+- Franchise vendor (type 1000002) → Authorized Distribution Certs (1000001)
+- All other vendor types → Non-Traceable (1000003)
+
+**⚠️ CRITICAL: The iDempiere REST API does NOT enforce OT's mandatory field validation.** Records can be written via API with missing fields that OT would reject on save. The VQ writer enforces validation client-side — do NOT bypass it.
 
 **COO Reference:** ISO → iDempiere full name mapping is in [`shared/data-model.md`](../../../shared/data-model.md) § Valid Values (Enums). Always use full country names (e.g., "China" not "CN").
 
