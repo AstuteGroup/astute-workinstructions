@@ -449,4 +449,33 @@ Shared module `shared/cq-writer.js` writes `chuboe_cq_line` records via REST API
 
 ---
 
-*Last updated: 2026-04-02*
+## H1. MFR Backlog Reconciliation Workflow
+
+**Status:** Planned | **Priority:** TBD — needs scoping (see open questions)
+
+**Problem:** When `lookupMfr()` cannot resolve an MFR text to an existing `chuboe_mfr` record, the writer modules (`rfq-writer`, `vq-writer`, `offer-writeback`, `cq-writer`) preserve the text on the line but leave `chuboe_mfr_id` null. Once an admin later creates the MFR record in OT, the existing rows do **not** auto-backfill the FK — they stay disconnected from the canonical MFR for reporting, dedupe, and search.
+
+First instance surfaced 2026-04-06: Orbel Corporation on RFQ 1132040 (2 MPNs), tracked in `shared/data/mfr-records-to-add.md`.
+
+**Proposed solution sketch:**
+1. **Capture** — every writer that hits a passthrough/null-FK MFR appends an entry to `shared/data/mfr-records-to-add.md` (or a structured JSON sibling) with: MFR text, first seen, source workflow, source record ID(s), affected MPNs.
+2. **Notify** — periodic check (or session greeting) surfaces the backlog so an admin knows what to add.
+3. **Reconcile** — after the admin adds an MFR record in OT, a reconciliation script:
+   - Looks up the new `chuboe_mfr_id` by name
+   - Finds all historical `chuboe_*_mpn` rows where `chuboe_mfr_text` matches and `chuboe_mfr_id` is null
+   - PATCHes them via API to set `Chuboe_MFR_ID`
+   - Refreshes `mfr-cache.json` and removes the entry from the backlog file
+
+**Open questions (Jake to think through):**
+- **Scope of backfill** — just `chuboe_rfq_line_mpn`, or also `chuboe_vq_line`, `chuboe_offer_line_mpn`, `chuboe_cq_line`, `chuboe_pricing_api_result`? Each has its own MFR column placement.
+- **Match criteria** — exact text match? Case-insensitive? Honor `mfr-aliases.json`? What if multiple MFR texts map to one canonical (e.g., "TI" / "Texas Instruments" / "TEXAS INSTRUMENTS")?
+- **Time horizon** — only backfill recent records (last 90/180 days), or everything historical?
+- **Trigger model** — manual script run, scheduled cron, or event-driven (when admin marks an entry as "added" in the backlog file)?
+- **Permissions** — does Tsunami User role have UPDATE permission on these tables via API, or do we need a different role?
+- **Audit trail** — should backfill writes log to a separate table / file so they're distinguishable from original writes?
+
+**Depends on:** None — can start as soon as scope is decided. Probably wants to land alongside `feedback_mfr_resolution_mandatory` enforcement so new writes don't keep adding to the backlog.
+
+---
+
+*Last updated: 2026-04-06*
