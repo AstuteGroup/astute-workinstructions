@@ -1,18 +1,572 @@
 {
-  "VISHAY INTERTECHNOLOGY INC": {
-    "name": "Vishay Intertechnology Inc",
-    "id": 1000019
+  "STANDEX-MEDER ELECTRONICS INC": {
+    "name": "Standex-Meder Electronics Inc",
+    "id": 1015125,
+    "isSystem": true
   },
-  "VISHAY": {
-    "name": "Vishay Intertechnology Inc",
-    "id": 1000019
+  "STANDEX ELECTRONIC": {
+    "name": "Standex-Meder Electronics Inc",
+    "id": 1015125,
+    "isSystem": true
+  },
+  "COTO RELAYS": {
+    "name": "Coto Relays",
+    "id": 1001578,
+    "isSystem": true
+  },
+  "COTO TECHNOLOGY, INC.": {
+    "name": "Coto Relays",
+    "id": 1001578,
+    "isSystem": true
+  },
+  "XILINX INC": {
+    "name": "Xilinx Inc",
+    "id": 1000010,
+    "isSystem": true
+  },
+  "XILINX": {
+    "name": "Xilinx Inc",
+    "id": 1000010,
+    "isSystem": true
+  },
+  "SAMTEC": {
+    "name": "Samtec",
+    "id": 1019014,
+    "isSystem": false
+  },
+  "KYCON": {
+    "name": "Kycon",
+    "id": 1003407,
+    "isSystem": true
+  },
+  "KYCON, INC": {
+    "name": "Kycon",
+    "id": 1003407,
+    "isSystem": true
+  },
+  "LINEAR TECHNOLOGY": {
+    "name": "Linear Technology Corp",
+    "id": 1000037,
+    "isSystem": true
+  },
+  "ALPHA WIRE": {
+    "name": "Alpha Wire",
+    "id": 1000112,
+    "isSystem": true
+  },
+  "SENSATA TECHNOLOGIES INC.": {
+    "name": "Sensata",
+    "id": 1000113,
+    "isSystem": true
+  },
+  "3M": {
+    "name": "3M",
+    "id": 1000034,
+    "isSystem": true
+  },
+  "EATON": {
+    "name": "Eaton",
+    "id": 1018061,
+    "isSystem": false
+  },
+  "CRYDOM": {
+    "name": "Crydom",
+    "id": 1001626,
+    "isSystem": true
+  },
+  "TEXAS INSTRUMENTS": {
+    "name": "Texas Instruments",
+    "id": 1000000,
+    "isSystem": true
+  },
+  "ROHM CO LTD": {
+    "name": "Rohm Co Ltd",
+    "id": 1000090,
+    "isSystem": true
+  },
+  "ROHM": {
+    "name": "Rohm Co Ltd",
+    "id": 1000090,
+    "isSystem": true
+  },
+  "MAXIM INTEGRATED PRODUCTS INC": {
+    "name": "Maxim Integrated Products Inc",
+    "id": 1000027,
+    "isSystem": true
+  },
+  "MAXIM INTEGRATED": {
+    "name": "Maxim Integrated Products Inc",
+    "id": 1000027,
+    "isSystem": true
+  },
+  "MOLEX LLC": {
+    "name": "Molex LLC",
+    "id": 1000038,
+    "isSystem": true
+  },
+  "MOLEX, LLC": {
+    "name": "Molex LLC",
+    "id": 1000038,
+    "isSystem": true
+  },
+  "NOVACAP": {
+    "name": "Novacap",
+    "id": 1000117,
+    "isSystem": true
+  },
+  "LITTELFUSE INC": {
+    "name": "Littelfuse Inc",
+    "id": 1000069,
+    "isSystem": true
+  },
+  "LITTELFUSE": {
+    "name": "Littelfuse Inc",
+    "id": 1000069,
+    "isSystem": true
+  },
+  "MICRON TECHNOLOGY, INC.": {
+    "name": "Micron Technology, Inc.",
+    "id": 1020270,
+    "isSystem": false
+  },
+  "ANALOG DEVICES INC": {
+    "name": "Analog Devices Inc",
+    "id": 1000006,
+    "isSystem": true
+  },
+  "ANALOG DEVICES": {
+    "name": "Analog Devices Inc",
+    "id": 1000006,
+    "isSystem": true
+  },
+  "AMATOM ELECTRONIC HARDWARE": {
+    "name": "Amatom",
+    "id": 1000574,
+    "isSystem": true
+  },
+  "LATTICE SEMICONDUCTOR CORP": {
+    "name": "Lattice Semiconductor Corp",
+    "id": 1000088,
+    "isSystem": true
+  },
+  "LATTICE SEMI": {
+    "name": "Lattice Semiconductor Corp",
+    "id": 1000088,
+    "isSystem": true
+  },
+  "TE CONNECTIVITY LTD": {
+    "name": "TE Connectivity Ltd",
+    "id": 1000009,
+    "isSystem": true
+  },
+  "TE CONNECTIVITY": {
+    "name": "TE Connectivity Ltd",
+    "id": 1000009,
+    "isSystem": true
+  },
+  "RECOM": {
+    "name": "Recom",
+    "id": 1012650,
+    "isSystem": true
+  },
+  "CONEC ELEKTRONISCHE BAUELEMENTE GMBH": {
+    "name": "CONEC Elektronische Bauelemente GmbH",
+    "id": 1019389,
+    "isSystem": false
+  },
+  "AMPHENOL CONEC": {
+    "name": "CONEC Elektronische Bauelemente GmbH",
+    "id": 1019389,
+    "isSystem": false
+  },
+  "DIALIGHT": {
+    "name": "Dialight",
+    "id": 1000154,
+    "isSystem": true
+  },
+  "BEL FUSE INC.": {
+    "name": "Bel Fuse",
+    "id": 1000200,
+    "isSystem": true
+  },
+  "C&K SWITCHES": {
+    "name": "C&K Switches",
+    "id": 1001394,
+    "isSystem": true
+  },
+  "C&K COMPONENT": {
+    "name": "C&K Switches",
+    "id": 1001394,
+    "isSystem": true
   },
   "ALTERA": {
     "name": "Altera",
-    "id": 1000004
+    "id": 1000004,
+    "isSystem": true
+  },
+  "OHMITE MANUFACTURING COMPANY": {
+    "name": "Ohmite",
+    "id": 1000264,
+    "isSystem": true
+  },
+  "AMPHENOL ICC": {
+    "name": "Amphenol ICC",
+    "id": 1015582,
+    "isSystem": true
+  },
+  "CINCH CONNECTIVITY SOLUTIONS.": {
+    "name": "Cinch",
+    "id": 1000179,
+    "isSystem": true
+  },
+  "ST�UBLI ELECTRICAL CONNECTORS": {
+    "name": "St�ubli",
+    "id": 1020570,
+    "isSystem": false
+  },
+  "ODU": {
+    "name": "Odu",
+    "id": 1004256,
+    "isSystem": true
+  },
+  "PANASONIC": {
+    "name": "Panasonic",
+    "id": 1019814,
+    "isSystem": false
+  },
+  "VISHAY PRECISION GROUP INC.": {
+    "name": "Vishay",
+    "id": 1019796,
+    "isSystem": false
+  },
+  "EPCOS": {
+    "name": "Epcos",
+    "id": 1002136,
+    "isSystem": true
+  },
+  "AMERICAN TECHNICAL CERAMICS CORP": {
+    "name": "American Technical Ceramics Corp",
+    "id": 1000592,
+    "isSystem": true
+  },
+  "AMERICAN TECHNICAL CERAMIC": {
+    "name": "American Technical Ceramics Corp",
+    "id": 1000592,
+    "isSystem": true
+  },
+  "WURTH ELEKTRONIK": {
+    "name": "WURTH ELEKTRONIK",
+    "id": 1020072,
+    "isSystem": false
+  },
+  "COMPONENTS CORPORATION": {
+    "name": "Spacecraft Components Corporation",
+    "id": 1013262,
+    "isSystem": true
+  },
+  "E-T-A ENGINEERING TECHNOLOGY": {
+    "name": "E-T-A Engineering Technology",
+    "id": 1019630,
+    "isSystem": false
+  },
+  "STACKPOLE": {
+    "name": "Stackpole",
+    "id": 1013347,
+    "isSystem": true
+  },
+  "STACKPOLE ELECTRONICS": {
+    "name": "Stackpole",
+    "id": 1013347,
+    "isSystem": true
+  },
+  "COILCRAFT INC": {
+    "name": "Coilcraft Inc",
+    "id": 1000050,
+    "isSystem": true
+  },
+  "COILCRAFT": {
+    "name": "Coilcraft Inc",
+    "id": 1000050,
+    "isSystem": true
   },
   "INTEL": {
     "name": "Intel Corp",
-    "id": 1000005
+    "id": 1000005,
+    "isSystem": true
+  },
+  "SUSUMU": {
+    "name": "Susumu Co Ltd",
+    "id": 1013457,
+    "isSystem": true
+  },
+  "ANALOG DEVICES INC.": {
+    "name": "Analog",
+    "id": 1019813,
+    "isSystem": false
+  },
+  "CODACA": {
+    "name": "CODACA",
+    "id": 1020792,
+    "isSystem": false
+  },
+  "RENESAS ELECTRONICS CORP": {
+    "name": "Renesas Electronics Corp",
+    "id": 1000018,
+    "isSystem": true
+  },
+  "RENESAS": {
+    "name": "Renesas Electronics Corp",
+    "id": 1000018,
+    "isSystem": true
+  },
+  "RAF": {
+    "name": "Raf Electronics Hardware",
+    "id": 1000152,
+    "isSystem": true
+  },
+  "CADDOCK ELECTRONICS INC.": {
+    "name": "Caddock",
+    "id": 1001195,
+    "isSystem": true
+  },
+  "VISHAY INTERTECHNOLOGY INC": {
+    "name": "Vishay Intertechnology Inc",
+    "id": 1000019,
+    "isSystem": true
+  },
+  "VISHAY": {
+    "name": "Vishay Intertechnology Inc",
+    "id": 1000019,
+    "isSystem": true
+  },
+  "BOURNS INC": {
+    "name": "Bourns Inc",
+    "id": 1000178,
+    "isSystem": true
+  },
+  "BOURNS": {
+    "name": "Bourns Inc",
+    "id": 1000178,
+    "isSystem": true
+  },
+  "NIDEC": {
+    "name": "Nidec Copal",
+    "id": 1012790,
+    "isSystem": true
+  },
+  "FUTURE TECHNOLOGY DEVICES INTERNATIONAL LTD": {
+    "name": "Future Technology Devices International Ltd",
+    "id": 1002468,
+    "isSystem": true
+  },
+  "FUTURE TECHNOLOGY DEVICES INTERNATIONAL (FTDI) LTD.": {
+    "name": "Future Technology Devices International Ltd",
+    "id": 1002468,
+    "isSystem": true
+  },
+  "INTEGRATED SILICON SOLUTION": {
+    "name": "Integrated Silicon Solution Inc",
+    "id": 1003120,
+    "isSystem": true
+  },
+  "BECKHOFF AUTOMATION LLC": {
+    "name": "Beckhoff",
+    "id": 1000950,
+    "isSystem": true
+  },
+  "PENN ENGINEERING": {
+    "name": "Penn Engineering",
+    "id": 1012242,
+    "isSystem": true
+  },
+  "HENKEL": {
+    "name": "Henkel",
+    "id": 1002791,
+    "isSystem": true
+  },
+  "BROADCOM INC.": {
+    "name": "Broadcom",
+    "id": 1000040,
+    "isSystem": true
+  },
+  "KEMET ELECTRONICS CORP": {
+    "name": "Kemet Electronics Corp",
+    "id": 1000020,
+    "isSystem": true
+  },
+  "KEMET": {
+    "name": "Kemet Electronics Corp",
+    "id": 1000020,
+    "isSystem": true
+  },
+  "TRP CONNECTOR B.V.": {
+    "name": "Trp Connector",
+    "id": 1013808,
+    "isSystem": true
+  },
+  "HARTING ELECTRONICS GMBH & CO KG": {
+    "name": "Harting Electronics GmBH & Co KG",
+    "id": 1002742,
+    "isSystem": true
+  },
+  "HARTING TECHNOLOGY GROUP": {
+    "name": "Harting Electronics GmBH & Co KG",
+    "id": 1002742,
+    "isSystem": true
+  },
+  "PULSER (PULSE ELECTRONICS)": {
+    "name": "PulseR (Pulse Electronics)",
+    "id": 1015508,
+    "isSystem": true
+  },
+  "PULSER LLC.": {
+    "name": "PulseR (Pulse Electronics)",
+    "id": 1015508,
+    "isSystem": true
+  },
+  "TE CONNECTIVITY (P)": {
+    "name": "Te",
+    "id": 1013548,
+    "isSystem": true
+  },
+  "ON SEMICONDUCTOR": {
+    "name": "On Semiconductor",
+    "id": 1000075,
+    "isSystem": true
+  },
+  "IDT": {
+    "name": "Idt",
+    "id": 1000136,
+    "isSystem": true
+  },
+  "ECS INC": {
+    "name": "Ecs Inc",
+    "id": 1001979,
+    "isSystem": true
+  },
+  "ECS INC. INTERNATIONAL": {
+    "name": "Ecs Inc",
+    "id": 1001979,
+    "isSystem": true
+  },
+  "COMPUTER COMPONENTS INC": {
+    "name": "Computer Components Inc",
+    "id": 1001497,
+    "isSystem": true
+  },
+  "COMPUTER COMPONENTS,INC": {
+    "name": "Computer Components Inc",
+    "id": 1001497,
+    "isSystem": true
+  },
+  "KYCON INC.": {
+    "name": "Kycon",
+    "id": 1003407,
+    "isSystem": true
+  },
+  "KOA SPEER ELECTRONICS INC": {
+    "name": "KOA Speer Electronics Inc",
+    "id": 1000193,
+    "isSystem": true
+  },
+  "KOA SPEER": {
+    "name": "KOA Speer Electronics Inc",
+    "id": 1000193,
+    "isSystem": true
+  },
+  "FCI": {
+    "name": "Fci",
+    "id": 1000153,
+    "isSystem": true
+  },
+  "PULSE ELECTRONICS CORP": {
+    "name": "Pulse Electronics Corp",
+    "id": 1000115,
+    "isSystem": true
+  },
+  "PULSE ELECTRONICS": {
+    "name": "Pulse Electronics Corp",
+    "id": 1000115,
+    "isSystem": true
+  },
+  "NIC COMPONENTS": {
+    "name": "NIC Components Corp",
+    "id": 1004065,
+    "isSystem": true
+  },
+  "VISHAY DALE": {
+    "name": "Vishay Dale",
+    "id": 1000025,
+    "isSystem": true
+  },
+  "VISHAY/DALE": {
+    "name": "Vishay Dale",
+    "id": 1000025,
+    "isSystem": true
+  },
+  "ALLIANCE MEMORY INC": {
+    "name": "Alliance Memory Inc",
+    "id": 1000274,
+    "isSystem": true
+  },
+  "ALLIANCE MEMORY": {
+    "name": "Alliance Memory Inc",
+    "id": 1000274,
+    "isSystem": true
+  },
+  "MICRO COMMERCIAL COMPONENTS": {
+    "name": "Micro Commercial Components",
+    "id": 1000237,
+    "isSystem": true
+  },
+  "MCC": {
+    "name": "Micro Commercial Components",
+    "id": 1000237,
+    "isSystem": true
+  },
+  "NEXPERIA": {
+    "name": "Nexperia",
+    "id": 1000174,
+    "isSystem": true
+  },
+  "TDK CORP": {
+    "name": "TDK Corp",
+    "id": 1000043,
+    "isSystem": true
+  },
+  "TDK": {
+    "name": "TDK Corp",
+    "id": 1000043,
+    "isSystem": true
+  },
+  "API DELEVAN": {
+    "name": "API Delevan",
+    "id": 1000210,
+    "isSystem": true
+  },
+  "MICROCHIP TECHNOLOGY INC.": {
+    "name": "MicroChip",
+    "id": 1014322,
+    "isSystem": true
+  },
+  "JOHANSON TECHNOLOGY": {
+    "name": "Johanson",
+    "id": 1000161,
+    "isSystem": true
+  },
+  "PANCON": {
+    "name": "Pancon",
+    "id": 1012168,
+    "isSystem": true
+  },
+  "WURTH ELEKTRONIK (P)": {
+    "name": "Wurth",
+    "id": 1019793,
+    "isSystem": false
+  },
+  "ALLEGRO MICROSYSTEMS LLC": {
+    "name": "Allegro Microsystems LLC",
+    "id": 1000538,
+    "isSystem": true
   }
 }
