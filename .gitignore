@@ -1,1 +1,22 @@
+# Build artifacts
 book
+
+# Secrets
+.env
+.env.*
+!.env.example
+
+# Editor / OS noise
+*.swp
+.*.swp
+*~
+.DS_Store
+Thumbs.db
+
+# Regenerable caches (API pricing, MFR lookups)
+shared/data/api-pricing-cache/
+shared/data/mfr-cache.json
+
+# Working data — outputs and inputs (per "github vs email" rule)
+Trading Analysis/**/output/
+Trading Analysis/**/data/
