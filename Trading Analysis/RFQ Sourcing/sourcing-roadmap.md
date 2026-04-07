@@ -418,6 +418,7 @@ const AUTO_SUFFIXES = /[-#]?(Q|Q1|AEC)$/i;
 | C10 | VQ Loader Date Code & Packaging Auto-Capture | **Now** | ✅ Done |
 | C11 | Shared Field Resolver Layer (refactor 4 writers) | **Next** | Planned |
 | C12 | Universal Record Writer (config-driven) | Later | Planned |
+| C13 | Mismatched-MPN Capture for Analytics Visibility | Later | Planned |
 
 ---
 
@@ -750,6 +751,67 @@ const result = await writeRecord('chuboe_vq_line', {
 **Risk:** Over-engineering if it's too abstract. Mitigation: build C11 first (concrete refactor of 4 known writers, prove the resolver pattern works), then layer C12 on top once the resolvers are stable. Don't try to design for hypothetical future tables — design for what we know, accept that some refactoring will happen as new patterns emerge.
 
 **Connection to data-model.md:** This is the "single source of truth for schema" promise made literal in code. Today data-model.md is documentation that humans read. C12 makes it the input to a code generator / runtime registry. That's the right destination for it.
+
+---
+
+## C13. Mismatched-MPN Capture for Analytics Visibility
+
+**Status:** Planned (parked 2026-04-07) | **Priority:** Later
+
+**Problem:** When a franchise distributor API returns an MPN that differs from what we asked for (packaging variant like `ADS1115ID` → `ADS1115IDR`, or genuine substitute), `vq-writer.js` today either writes the VQ with the returned MPN + a vendor note (`crossRef.suffix` case) or holds it for human review (`crossRef.mismatch` case). The note-only approach preserves data fidelity at the VQ level but creates a gap in **analytic visibility**: the consumers we use to find historical VQs don't see these records.
+
+**Why this is broken for analytics:**
+
+Vortex Matches and Quick Quote both look up VQ history by joining on cleaned MPN equality between `chuboe_rfq_line_mpn.chuboe_mpn_clean` and `chuboe_vq_line.chuboe_mpn_clean` (via `bi_vendor_quote_line_v`):
+
+```sql
+-- Quick Quote (qq_1130895.sql:110)
+JOIN recent_vqs vq ON vq.vendor_quote_mpn_clean = rl.chuboe_mpn_clean
+
+-- Vortex Matches (vortex-matches.js:158)
+WHERE vql.vendor_quote_mpn_clean = ANY($1)
+```
+
+The join is **MPN-clean equality**, not a join via `chuboe_rfq_line_id`. So if we write a VQ for the variant `ADS1115IDR`, then:
+
+| View | Visible? |
+|---|---|
+| Originating RFQ via Vortex/QQ MPN-history | ❌ — searches `ADS1115ID`, finds nothing |
+| Other RFQs that ask for `ADS1115IDR` exactly | ✅ |
+| Other RFQs that ask for `ADS1115ID` | ❌ |
+
+The VQ "exists" in the database but is invisible to the consumers that drive the most valuable analyses, including on the very RFQ that triggered the API call. The vendor-note workaround surfaces the mismatch to humans reading the line in OT, but humans aren't the consumers we're optimizing for — Vortex / Quick Quote / future reports are.
+
+**Proposed solution (parked):**
+
+When `vq-writer.js` is about to write a VQ for a packaging variant (the `crossRef.suffix` branch), also POST a second `chuboe_rfq_line_mpn` row to the originating RFQ line carrying the variant MPN. Idempotent — check first whether a row with that `chuboe_mpn_clean` already exists on the line.
+
+This uses the schema as designed: `chuboe_rfq_line_mpn` is a 1:N child of `chuboe_rfq_line` precisely to support multiple acceptable MPN variants per line. Effects:
+
+- VQ row stays honest — records what the vendor actually quoted
+- The line gets two MPN children: the customer's ask and the variant we found
+- Future Vortex/QQ runs against this RFQ iterate both MPN children → find the VQ on the variant ✅
+- Future Vortex/QQ runs against any other RFQ asking for the variant also find this VQ ✅
+- Humans looking at the line in OT see the alt MPN explicitly
+
+**Cross-cutting implications — this is NOT just a vq-writer change:**
+
+Because the underlying problem is "the writeback shape doesn't match how analytics consume the data," the same question applies anywhere a record is written that may carry a mismatched MPN:
+
+- **VQ writeback** (this item) — packaging variants and substitutions from franchise APIs
+- **CQ writeback** (`shared/cq-writer.js`) — if we ever write CQs for variants we don't have a perfect ask for, same problem applies
+- **RFQ writeback** (`shared/rfq-writer.js`) — already handles a single MPN per line; if a customer's source data references multiple acceptable MPNs, we need the same multi-row capture
+- **Any output that surfaces VQs/CQs/RFQs to a user** (Vortex Matches, Quick Quote, Stock RFQ Loading reports, Market Offer Analysis) — these all do MPN-clean equality joins. They need to expect multiple MPN children per line and either:
+  - (a) iterate per-line over all MPN children when looking up history, or
+  - (b) flatten the line's MPN children into a `chuboe_mpn_clean IN (...)` set
+  - Either way, when we change the writeback shape we have to verify each consuming workflow handles the multi-MPN case correctly. Some do (Vortex iterates `chuboe_rfq_line_mpn`), some need to be checked (Quick Quote SQL needs review).
+
+**Why parked:** Current vendor-note approach is good enough for human-readable output today, and the writeback rate of mismatched MPNs is low. The right time to do this is when we either (a) start losing real money from invisible variant VQs in Vortex/QQ runs, or (b) tackle C11/C12 (resolver layer + universal writer) so the alt-MPN-row pattern can be implemented in one place rather than monkey-patched into every writer.
+
+**Pre-work before unparking:**
+1. Quantify the cost — query how many flagged/variant rows we've written in the last 90 days and estimate how many would have changed a Vortex/QQ outcome if visible.
+2. Audit each consuming workflow (Vortex, QQ, Stock RFQ Loading, Market Offer Analysis, BOM Monitoring) to confirm it handles N>1 `chuboe_rfq_line_mpn` rows per line correctly. Some may need SQL changes when the writeback shape changes.
+3. Decide whether genuine mismatches (not just packaging variants) get the same treatment, or stay in the `flagged[]` review queue.
 
 ---
 
