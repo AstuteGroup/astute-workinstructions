@@ -275,6 +275,16 @@ ALL Tier 1 fields PLUS the following. A VQ **MUST NOT** be marked `IsPurchased =
 
 ---
 
+## Denormalized Counters on `chuboe_rfq_line`
+
+`chuboe_rfq_line` has two denormalized counter columns: **`chuboe_vq_count`** and **`chuboe_cq_count`**. These are populated by **server-side bean callouts** in production (not in test) when an RFQ line / line MPN is created.
+
+- They are **not** maintained by a join against the live VQ/CQ table — they're a snapshot written by the callout at creation time.
+- OT does **not** associate VQs from other RFQs with new RFQs at the data layer. So `chuboe_vq_count > 0` on a freshly-created RFQ line does **not** mean live VQ rows are linked — verify with a real join (`chuboe_vq_line.chuboe_rfq_line_id = …`) before drawing conclusions.
+- Authoritative VQ counts must come from `chuboe_vq_line` joined via `chuboe_rfq_line_id`, `chuboe_rfq_id`, or `chuboe_rfq_id_multi` — never trust the counter column for analysis.
+
+---
+
 ## Price Column Names
 
 Price means different things on different tables:
