@@ -164,6 +164,8 @@ function parseSearchResults(json, searchMpn, rfqQty) {
     vqDescription: null,
     vqDigiKeyPn: null,
     vqManufacturer: null,
+    vqMoq: null,
+    vqSpq: null,
     // Raw data
     allMatches: [],
   };
@@ -207,13 +209,23 @@ function parseSearchResults(json, searchMpn, rfqQty) {
     result.franchiseRfqPrice = pricingInfo.rfqPrice;
     result.vqPrice = pricingInfo.rfqPrice;
     result.priceBreaks = pricingInfo.priceBreaks;
+    result.vqMoq = pricingInfo.moq > 1 ? pricingInfo.moq : null;
+    result.vqSpq = pricingInfo.spq || null;
     result.opportunityValue = result.franchiseRfqPrice * rfqQty;
+  }
+
+  // Lead time (from product-level ManufacturerLeadWeeks)
+  if (bestMatch.ManufacturerLeadWeeks) {
+    result.vqLeadTime = `${bestMatch.ManufacturerLeadWeeks} Weeks`;
   }
 
   // Build vendor notes
   result.vqVendorNotes = `DigiKey stock: ${result.franchiseQty.toLocaleString()}`;
   if (result.vqDigiKeyPn) {
     result.vqVendorNotes += ` | DigiKey PN: ${result.vqDigiKeyPn}`;
+  }
+  if (result.vqMoq && result.vqMoq > 1) {
+    result.vqVendorNotes += ` | MOQ: ${result.vqMoq.toLocaleString()}`;
   }
 
   // Collect all matches for reference
@@ -262,6 +274,7 @@ function selectBestPricing(variations, rfqQty) {
     bulkPrice: pricing[pricing.length - 1]?.UnitPrice || null,
     rfqPrice: getPriceAtQty(pricing, rfqQty),
     moq: selected.MinimumOrderQuantity || 1,
+    spq: selected.StandardPackage || null,
     priceBreaks: pricing.map(p => ({ qty: p.BreakQuantity, unitPrice: p.UnitPrice })).sort((a, b) => a.qty - b.qty),
   };
 }

@@ -99,6 +99,8 @@ function parseSearchResults(response, searchMpn, rfqQty) {
     vqLeadTime: null,
     vqDateCode: null,
     vqSku: null,
+    vqMoq: null,
+    vqSpq: null,
     // Raw data
     allMatches: [],
     offerCount: 0,
@@ -176,6 +178,11 @@ function parseSearchResults(response, searchMpn, rfqQty) {
   const stock = quantities.quantity_available || 0;
   result.franchiseQty = stock;
 
+  // MOQ and SPQ from quantities or attributes
+  const moqVal = quantities.minimum_order_quantity || quantities.moq || parseInt(attrMap['minimumOrderQuantity']) || null;
+  result.vqMoq = moqVal && moqVal > 1 ? moqVal : null;
+  result.vqSpq = quantities.order_multiple || quantities.spq || parseInt(attrMap['orderMultiple']) || null;
+
   // Lead time
   if (quantities.factory_leadtime) {
     const ltValue = quantities.factory_leadtime;
@@ -220,6 +227,9 @@ function parseSearchResults(response, searchMpn, rfqQty) {
   }
   if (result.vqSku) {
     notes.push(`Future PN: ${result.vqSku}`);
+  }
+  if (result.vqMoq && result.vqMoq > 1) {
+    notes.push(`MOQ: ${result.vqMoq.toLocaleString()}`);
   }
   result.vqVendorNotes = notes.join(' | ');
 

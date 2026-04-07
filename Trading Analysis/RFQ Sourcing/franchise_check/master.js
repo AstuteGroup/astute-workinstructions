@@ -170,6 +170,7 @@ function parseSearchResults(results, searchMpn, rfqQty) {
   result.vqRohs = bestMatch.roHS || '';
   result.vqCoo = bestMatch.coo || '';
   result.vqMoq = parseInt(bestMatch.moq || '1');
+  result.vqSpq = parseInt(bestMatch.multiple || '1') || null;
 
   // Get quantities (API returns strings)
   const stock = parseInt(bestMatch.quantityAvailable || '0');

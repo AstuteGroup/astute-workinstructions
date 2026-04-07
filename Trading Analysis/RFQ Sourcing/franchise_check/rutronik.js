@@ -56,6 +56,7 @@ async function searchPart(mpn, rfqQty = 1) {
               searchMpn: mpn,
               rfqQty,
               found: false,
+              franchiseQty: 0,
               error: json.error,
             });
             return;
@@ -96,6 +97,8 @@ function parseSearchResults(parts, searchMpn, rfqQty) {
     vqManufacturer: null,
     vqLeadTime: null,
     vqSku: null,
+    vqMoq: null,
+    vqSpq: null,
     // Raw data
     allMatches: [],
   };
@@ -127,8 +130,14 @@ function parseSearchResults(parts, searchMpn, rfqQty) {
   result.vqLeadTime = bestMatch.leadtime;
   result.vqSku = bestMatch.sku;
 
+  // MOQ and SPQ
+  const moqVal = bestMatch.moq || bestMatch.minorderquantity;
+  result.vqMoq = moqVal && moqVal > 1 ? parseInt(moqVal) : null;
+  result.vqSpq = bestMatch.packsize || bestMatch.spq || null;
+  if (result.vqSpq) result.vqSpq = parseInt(result.vqSpq);
+
   // Get stock and pricing
-  const stock = bestMatch.stock || 0;
+  const stock = parseInt(bestMatch.stock) || 0;
   const priceBreaks = bestMatch.pricebreaks || [];
   const basePrice = parseFloat(bestMatch.price) || null;
 
@@ -167,6 +176,9 @@ function parseSearchResults(parts, searchMpn, rfqQty) {
   }
   if (bestMatch.sku) {
     notes.push(`SKU: ${bestMatch.sku}`);
+  }
+  if (result.vqMoq && result.vqMoq > 1) {
+    notes.push(`MOQ: ${result.vqMoq.toLocaleString()}`);
   }
   result.vqVendorNotes = notes.join(' | ');
 

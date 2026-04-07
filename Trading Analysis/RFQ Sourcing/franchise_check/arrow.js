@@ -207,8 +207,17 @@ function parseSearchResults(json, searchMpn, rfqQty) {
     result.franchiseBulkPrice = bestBulkPrice;
     result.franchiseRfqPrice = bestRfqPrice;
     result.vqPrice = bestRfqPrice;
+    result.vqMoq = bestSource?.minimumOrderQuantity || null;
+    result.vqSpq = bestSource?.packSize || null;
     result.vqDateCode = bestDateCode;
     result.vqSourceType = bestSourceType;
+    // arrowLeadTime/mfrLeadTime are raw numbers (weeks) or empty strings — format for display
+    const rawLt = (bestSource?.arrowLeadTime && bestSource.arrowLeadTime !== '')
+      ? bestSource.arrowLeadTime
+      : (bestSource?.mfrLeadTime && bestSource.mfrLeadTime !== 0 && bestSource.mfrLeadTime !== '0')
+        ? bestSource.mfrLeadTime
+        : null;
+    result.vqLeadTime = rawLt ? `${rawLt} Weeks` : null;
     result.opportunityValue = bestBulkPrice ? bestBulkPrice * rfqQty : null;
     result.priceBreaks = bestSource && bestSource.Prices?.resaleList
       ? bestSource.Prices.resaleList.map(p => ({ qty: p.minQty, unitPrice: p.price })).sort((a, b) => a.qty - b.qty)

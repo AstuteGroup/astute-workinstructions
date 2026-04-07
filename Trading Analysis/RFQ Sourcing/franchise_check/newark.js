@@ -191,6 +191,9 @@ async function searchPart(mpn, rfqQty = 1) {
     vqDescription: newarkResult?.vqDescription || farnellResult?.vqDescription || null,
     vqManufacturer: newarkResult?.vqManufacturer || farnellResult?.vqManufacturer || null,
     vqDatasheetUrl: newarkResult?.vqDatasheetUrl || farnellResult?.vqDatasheetUrl || null,
+    vqMoq: newarkResult?.vqMoq || farnellResult?.vqMoq || null,
+    vqSpq: newarkResult?.vqSpq || farnellResult?.vqSpq || null,
+    vqLeadTime: newarkResult?.vqLeadTime || farnellResult?.vqLeadTime || null,
 
     // Per-store breakdown
     stores: {
@@ -237,6 +240,10 @@ function buildCombinedNotes(newark, farnell) {
   if (farnell?.found) {
     notes.push(`Farnell: ${farnell.franchiseQty.toLocaleString()} @ £${farnell.franchiseRfqPrice}`);
   }
+  const moq = newark?.vqMoq || farnell?.vqMoq;
+  if (moq && moq > 1) {
+    notes.push(`MOQ: ${moq.toLocaleString()}`);
+  }
 
   return notes.length > 0 ? notes.join(' | ') : null;
 }
@@ -264,6 +271,8 @@ function parseSearchResults(json, searchMpn, rfqQty, storeInfo) {
     vqManufacturer: null,
     vqSku: null,
     vqDatasheetUrl: null,
+    vqMoq: null,
+    vqSpq: null,
     allProducts: [],
   };
 
@@ -291,6 +300,11 @@ function parseSearchResults(json, searchMpn, rfqQty, storeInfo) {
     result.vqDatasheetUrl = bestMatch.datasheets[0].url;
   }
 
+  // MOQ and SPQ
+  const moqVal = bestMatch.translatedMinimumOrderQuality || bestMatch.minimumOrderQuantity;
+  result.vqMoq = moqVal && moqVal > 1 ? moqVal : null;
+  result.vqSpq = bestMatch.packSize || null;
+
   // Stock and pricing
   const stockLevel = bestMatch.stock?.level || 0;
   result.franchiseQty = stockLevel;
@@ -307,6 +321,13 @@ function parseSearchResults(json, searchMpn, rfqQty, storeInfo) {
   if (stockLevel > 0 || prices.length > 0) {
     result.found = true;
     result.opportunityValue = result.franchiseBulkPrice ? result.franchiseBulkPrice * rfqQty : null;
+  }
+
+  // Lead time (stock.leastLeadTime is in hours)
+  const ltHours = bestMatch.stock?.leastLeadTime;
+  if (ltHours && ltHours > 0) {
+    const ltWeeks = Math.ceil(ltHours / (24 * 7));
+    result.vqLeadTime = `${ltWeeks} Weeks`;
   }
 
   // All products for reference

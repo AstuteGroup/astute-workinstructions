@@ -312,6 +312,7 @@ async function main() {
   let quantity = 100;
   let filepath = null;
   let rfqNumber = null;
+  let apiOnly = false;
   let threshold = config.OPPORTUNITY_THRESHOLD;
   let headless = true;
   let debug = false;
@@ -347,6 +348,9 @@ async function main() {
       case '--no-digikey':  // backward compat
         useApis = false;
         break;
+      case '--api-only':
+        apiOnly = true;
+        break;
       case '--debug':
         debug = true;
         break;
@@ -367,6 +371,7 @@ Options:
   --rfq            iDempiere RFQ number
   --threshold      Opportunity value threshold (default: $${config.OPPORTUNITY_THRESHOLD})
   --no-api         Skip franchise APIs (FindChips only)
+  --api-only       Skip FindChips, use APIs only (fast)
   --no-headless    Run browser in visible mode
   --debug          Enable debug output
   -h, --help       Show this help
@@ -404,11 +409,15 @@ Options:
   console.log(`Parts to screen: ${parts.length}`);
   console.log(`Opportunity threshold: $${threshold}`);
   console.log(`Franchise APIs: ${useApis ? `Enabled (${activeDistributors.length}: ${distributorNames})` : 'Disabled'}`);
+  console.log(`Mode: ${apiOnly ? 'API-only (no FindChips)' : 'FindChips + APIs'}`);
   console.log(`Headless: ${headless}`);
   console.log();
 
-  // Launch browser for FindChips
-  const browser = await chromium.launch({ headless });
+  // Launch browser for FindChips (skip if api-only mode)
+  let browser = null;
+  if (!apiOnly) {
+    browser = await chromium.launch({ headless });
+  }
 
   const results = [];
   let skipCount = 0;
@@ -420,16 +429,23 @@ Options:
       const part = parts[i];
       console.log(`[${i + 1}/${parts.length}] Searching: ${part.mpn} (Qty: ${part.qty})`);
 
-      // 1. FindChips search (primary - for screening decision)
-      const context = await browser.newContext({
-        userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-      });
-      const page = await context.newPage();
-      const findchipsResult = await findChipsSearch(page, part.mpn, debug);
-      await context.close();
+      let evaluated;
 
-      // Evaluate screening decision based on FindChips
-      const evaluated = evaluatePart(part, findchipsResult, threshold, 'FindChips');
+      if (apiOnly) {
+        // API-only mode: skip FindChips, create empty result to populate from APIs
+        evaluated = evaluatePart(part, { found: false, totalQty: 0 }, threshold, 'API');
+      } else {
+        // 1. FindChips search (primary - for screening decision)
+        const context = await browser.newContext({
+          userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        });
+        const page = await context.newPage();
+        const findchipsResult = await findChipsSearch(page, part.mpn, debug);
+        await context.close();
+
+        // Evaluate screening decision based on FindChips
+        evaluated = evaluatePart(part, findchipsResult, threshold, 'FindChips');
+      }
 
       // 2. All franchise APIs in parallel (for VQ capture)
       if (useApis) {
@@ -480,7 +496,9 @@ Options:
           // Update data source label
           const apiSources = apiResults.found.filter(d => d.vqPrice > 0).map(d => d.name);
           if (apiSources.length > 0) {
-            evaluated.data_source = `FindChips + ${apiSources.join(' + ')}`;
+            evaluated.data_source = apiOnly
+              ? apiSources.join(' + ')
+              : `FindChips + ${apiSources.join(' + ')}`;
           }
 
           // Update summary with API aggregate data (richer than FindChips alone)
@@ -494,6 +512,29 @@ Options:
             evaluated.distributor_count,
             apiResults.summary.distributorsWithStock
           );
+
+          // In api-only mode, re-evaluate screening decision with API data
+          if (apiOnly) {
+            evaluated.franchise_available = apiResults.summary.totalStock > 0;
+            const bulkPrice = evaluated.franchise_bulk_price || part.target_price;
+            if (bulkPrice && part.qty) {
+              evaluated.opportunity_value = Math.round(bulkPrice * part.qty * 100) / 100;
+            }
+            if (evaluated.franchise_available && evaluated.franchise_qty >= part.qty) {
+              if (evaluated.opportunity_value !== null && evaluated.opportunity_value < threshold) {
+                evaluated.send_to_broker = false;
+                evaluated.reason = `Franchise OK (OV: $${evaluated.opportunity_value} < $${threshold})`;
+              } else if (evaluated.opportunity_value !== null) {
+                evaluated.reason = `High value (OV: $${evaluated.opportunity_value})`;
+              } else {
+                evaluated.reason = 'Franchise available but no price data';
+              }
+            } else if (evaluated.franchise_available) {
+              evaluated.reason = `Insufficient franchise qty (${evaluated.franchise_qty} < ${part.qty})`;
+            } else {
+              evaluated.reason = 'Not found in franchise distribution';
+            }
+          }
 
           totalVqLines += evaluated.vq_lines.length;
 
@@ -522,7 +563,7 @@ Options:
     }
 
   } finally {
-    await browser.close();
+    if (browser) await browser.close();
   }
 
   // Generate output filenames

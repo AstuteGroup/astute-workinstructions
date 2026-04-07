@@ -179,6 +179,7 @@ function parseSearchResults(response, searchMpn, rfqQty) {
   result.vqDescription = bestMatch.Description || '';
   result.vqRohs = bestMatch.Rohs || '';
   result.vqMoq = parseInt(bestMatch.MinOrderQuantity || '1');
+  result.vqSpq = parseInt(bestMatch.StandardPackQuantity || '1') || null;
 
   // Stock quantity
   const stock = bestMatch.TotalStockQuantity || 0;
