@@ -15,15 +15,19 @@
 const fs = require('fs');
 const path = require('path');
 const XLSX = require('xlsx');
-const { execSync, spawn } = require('child_process');
+const { execSync } = require('child_process');
 
 // Use shared CSV utility
 const { readCSVFile } = require('../../shared/csv-utils');
+const { createNotifier } = require('../../shared/notifier');
 
 // Email configuration - same account as Inventory File Cleanup (triggered together)
-const HIMALAYA_BIN = process.env.HIMALAYA_BIN || path.join(process.env.HOME, 'bin', 'himalaya');
 const EMAIL_ACCOUNT = 'excess';
 const NOTIFY_EMAIL = process.env.NOTIFY_EMAIL || 'jake.harris@astutegroup.com';
+const notifier = createNotifier({
+  fromEmail: `${EMAIL_ACCOUNT}@orangetsunami.com`,
+  fromName: 'LAM Kitting Reorder'
+});
 
 // -----------------------------------------------------------------------------
 // Configuration
@@ -124,6 +128,23 @@ async function main() {
   console.log('Step 5: Identifying reorder candidates...');
   const reorderAlerts = identifyReorderCandidates(aggregated, excelData, historicalData, recentPOVs);
   console.log(`  Reorder candidates: ${reorderAlerts.length} items`);
+
+  // Step 5b: Check other warehouses for available stock
+  console.log('');
+  console.log('Step 5b: Checking other warehouse stock...');
+  const reorderMPNs = reorderAlerts.map(a => a['MPN']);
+  const otherStock = loadOtherWarehouseStock(inventoryFolder, reorderMPNs);
+  const stockMatches = Object.keys(otherStock).filter(mpn => otherStock[mpn].length > 0).length;
+  console.log(`  Stock matches found: ${stockMatches} MPNs in other warehouses`);
+
+  // Enrich alerts with other warehouse stock
+  for (const alert of reorderAlerts) {
+    const matches = otherStock[alert['MPN']] || [];
+    if (matches.length > 0) {
+      alert['Available Stock (Other WH)'] = matches.map(m => m.warehouse).join(', ');
+      alert['Available Qty (Other WH)'] = matches.reduce((sum, m) => sum + m.qty, 0);
+    }
+  }
 
   // Step 6: Generate output
   console.log('');
@@ -316,52 +337,62 @@ function loadHistoricalPurchaseData(mpns) {
     return {};
   }
 
-  // Build SQL query for most recent LAM purchase per MPN
-  // LAM Research bpartner_id = 1000730
+  // Single query: most recent LAM purchase per MPN
+  // All fields from the same LAM-linked PO line (supplier, price, buyer, date, POV, RFQ)
+  // Join: c_orderline → chuboe_vq_line → chuboe_rfq (LAM Research = 1000730)
   const sql = `
-    WITH recent_purchases AS (
+    WITH lam_purchases AS (
       SELECT
-        ol.chuboe_mpn,
+        TRIM(ol.chuboe_mpn) as chuboe_mpn,
         bp.name as supplier_name,
         ol.priceentered as purchase_price,
-        o.dateordered,
+        ol.datepromised,
         u.name as buyer_name,
-        ROW_NUMBER() OVER (PARTITION BY ol.chuboe_mpn ORDER BY o.dateordered DESC) as rn
+        rfq.value as rfq_number,
+        CASE WHEN ol.chuboe_po_string LIKE 'POV%' THEN ol.chuboe_po_string ELSE '' END as pov_number,
+        ROW_NUMBER() OVER (PARTITION BY TRIM(ol.chuboe_mpn) ORDER BY ol.datepromised DESC) as rn
       FROM adempiere.c_orderline ol
       JOIN adempiere.c_order o ON ol.c_order_id = o.c_order_id
       JOIN adempiere.c_bpartner bp ON o.c_bpartner_id = bp.c_bpartner_id
       LEFT JOIN adempiere.ad_user u ON o.createdby = u.ad_user_id
-      JOIN adempiere.chuboe_rfq_line rl ON ol.chuboe_vq_line_id = rl.chuboe_rfq_line_id
-      JOIN adempiere.chuboe_rfq rfq ON rl.chuboe_rfq_id = rfq.chuboe_rfq_id
+      JOIN adempiere.chuboe_vq_line vl ON ol.chuboe_vq_line_id = vl.chuboe_vq_line_id
+      JOIN adempiere.chuboe_rfq rfq ON vl.chuboe_rfq_id = rfq.chuboe_rfq_id
       WHERE o.issotrx = 'N'
         AND o.isactive = 'Y'
+        AND o.docstatus IN ('CO', 'IP')
+        AND ol.qtyordered > 0
         AND ol.chuboe_mpn IS NOT NULL
         AND ol.chuboe_mpn != ''
-        AND (rfq.c_bpartner_id = 1000730 OR rfq.chuboe_bpartner_enduser_id = 1000730)
+        AND rfq.c_bpartner_id = 1000730
     )
-    SELECT chuboe_mpn, supplier_name, purchase_price, buyer_name, dateordered::date
-    FROM recent_purchases
+    SELECT chuboe_mpn, supplier_name, purchase_price, buyer_name,
+      datepromised::date, rfq_number, 'Lam Research' as rfq_customer, pov_number
+    FROM lam_purchases
     WHERE rn = 1;
   `;
 
   try {
-    // Execute query using psql
-    const result = execSync(`psql -t -A -F '|' -c "${sql.replace(/"/g, '\\"')}"`, {
-      encoding: 'utf8',
-      maxBuffer: 50 * 1024 * 1024  // 50MB buffer
-    });
+    // Execute query: write SQL to file, output to file, read result
+    const tmpSql = '/tmp/lam_kitting_history.sql';
+    const tmpOut = '/tmp/lam_kitting_history.out';
+    fs.writeFileSync(tmpSql, sql);
+    try { execSync(`psql -t -A -F '|' -f ${tmpSql} -o ${tmpOut}`, { encoding: 'utf8', maxBuffer: 50 * 1024 * 1024 }); } catch(e) {}
+    const result = fs.existsSync(tmpOut) ? fs.readFileSync(tmpOut, 'utf8') : '';
 
     const historicalData = {};
     const lines = result.trim().split('\n').filter(l => l.trim());
 
     for (const line of lines) {
-      const [mpn, supplier, price, buyer, dateordered] = line.split('|');
+      const [mpn, supplier, price, buyer, dateordered, rfqNum, rfqCust, povNum] = line.split('|');
       if (mpn && mpn.trim()) {
         historicalData[mpn.trim()] = {
           OT_Previous_Supplier: (supplier || '').trim(),
           Historical_Purchase_Price: parseFloat(price) || 0,
           OT_Buyer: (buyer || '').trim(),
-          Last_Purchase_Date: (dateordered || '').trim()
+          Last_Purchase_Date: (dateordered || '').trim(),
+          RFQ_Number: (rfqNum || '').trim(),
+          RFQ_Customer: (rfqCust || '').trim(),
+          POV_Number: (povNum || '').trim()
         };
       }
     }
@@ -369,7 +400,30 @@ function loadHistoricalPurchaseData(mpns) {
     return historicalData;
   } catch (err) {
     console.error('  WARNING: Could not load historical data from ERP');
-    console.error(`  ${err.message}`);
+    console.error(`  ${err.message.slice(0, 200)}`);
+    // On rbash error, stdout may still have valid data
+    const fallback = (err.stdout || '').toString();
+    if (fallback.includes('|')) {
+      console.log('  Recovering from rbash exit code — data present in stdout');
+      const historicalData = {};
+      const lines = fallback.trim().split('\n').filter(l => l.trim() && l.includes('|'));
+      for (const line of lines) {
+        const [mpn, supplier, price, buyer, dateordered, rfqNum, rfqCust, povNum] = line.split('|');
+        if (mpn && mpn.trim()) {
+          historicalData[mpn.trim()] = {
+            OT_Previous_Supplier: (supplier || '').trim(),
+            Historical_Purchase_Price: parseFloat(price) || 0,
+            OT_Buyer: (buyer || '').trim(),
+            Last_Purchase_Date: (dateordered || '').trim(),
+            RFQ_Number: (rfqNum || '').trim(),
+            RFQ_Customer: (rfqCust || '').trim(),
+            POV_Number: (povNum || '').trim()
+          };
+        }
+      }
+      console.log(`  Recovered ${Object.keys(historicalData).length} MPNs`);
+      return historicalData;
+    }
     return {};
   }
 }
@@ -379,51 +433,60 @@ function loadHistoricalPurchaseData(mpns) {
 // -----------------------------------------------------------------------------
 
 function loadRecentPOVs() {
-  // LAM Research bpartner_id = 1000730
-  // Filter POVs to only those linked to LAM RFQs (as customer or end-user)
+  // Two queries:
+  // 1) Recent POVs (vendor receipts in last 4 months)
+  // 2) On-order quantity (PO lines not fully delivered)
   const sql = `
-    WITH recent_povs AS (
+    WITH recent_orders AS (
       SELECT
-        ol.chuboe_mpn as mpn,
-        io.documentno as pov_number,
-        iol.movementqty,
-        io.movementdate::date,
+        TRIM(ol.chuboe_mpn) as mpn,
+        ol.chuboe_po_string as pov_number,
+        ol.qtyordered,
+        ol.qtydelivered,
+        ol.qtyordered - ol.qtydelivered as qty_on_order,
+        ol.datepromised::date,
         bp.name as supplier,
-        ROW_NUMBER() OVER (PARTITION BY ol.chuboe_mpn ORDER BY io.movementdate DESC) as rn
-      FROM adempiere.m_inoutline iol
-      JOIN adempiere.m_inout io ON iol.m_inout_id = io.m_inout_id
-      JOIN adempiere.c_orderline ol ON iol.c_orderline_id = ol.c_orderline_id
-      JOIN adempiere.c_bpartner bp ON io.c_bpartner_id = bp.c_bpartner_id
-      JOIN adempiere.chuboe_rfq_line rl ON ol.chuboe_vq_line_id = rl.chuboe_rfq_line_id
-      JOIN adempiere.chuboe_rfq rfq ON rl.chuboe_rfq_id = rfq.chuboe_rfq_id
-      WHERE io.issotrx = 'N'
-        AND io.isactive = 'Y'
-        AND io.movementdate >= CURRENT_DATE - INTERVAL '4 months'
+        rfq.value as rfq_number,
+        ROW_NUMBER() OVER (PARTITION BY TRIM(ol.chuboe_mpn) ORDER BY ol.datepromised DESC) as rn
+      FROM adempiere.c_orderline ol
+      JOIN adempiere.c_order o ON ol.c_order_id = o.c_order_id
+      JOIN adempiere.c_bpartner bp ON o.c_bpartner_id = bp.c_bpartner_id
+      LEFT JOIN adempiere.chuboe_vq_line vl ON ol.chuboe_vq_line_id = vl.chuboe_vq_line_id
+      LEFT JOIN adempiere.chuboe_rfq rfq ON vl.chuboe_rfq_id = rfq.chuboe_rfq_id
+      WHERE o.issotrx = 'N'
+        AND o.isactive = 'Y'
+        AND o.docstatus IN ('CO', 'IP')
+        AND ol.datepromised >= CURRENT_DATE - INTERVAL '90 days'
         AND ol.chuboe_mpn IS NOT NULL
         AND ol.chuboe_mpn != ''
-        AND (rfq.c_bpartner_id = 1000730 OR rfq.chuboe_bpartner_enduser_id = 1000730)
+        AND ol.chuboe_po_string IS NOT NULL
+        AND ol.chuboe_po_string LIKE 'POV%'
     )
-    SELECT mpn, pov_number, movementqty, movementdate, supplier
-    FROM recent_povs WHERE rn = 1;
+    SELECT mpn, pov_number, qtyordered, datepromised, supplier, rfq_number, qty_on_order
+    FROM recent_orders
+    WHERE rn = 1;
   `;
 
   try {
-    const result = execSync(`psql -t -A -F '|' -c "${sql.replace(/"/g, '\\"')}"`, {
-      encoding: 'utf8',
-      maxBuffer: 50 * 1024 * 1024
-    });
+    const tmpSql = '/tmp/lam_kitting_povs.sql';
+    const tmpOut = '/tmp/lam_kitting_povs.out';
+    fs.writeFileSync(tmpSql, sql);
+    try { execSync(`psql -t -A -F '|' -f ${tmpSql} -o ${tmpOut}`, { encoding: 'utf8', maxBuffer: 50 * 1024 * 1024 }); } catch(e) {}
+    const result = fs.existsSync(tmpOut) ? fs.readFileSync(tmpOut, 'utf8') : '';
 
     const povData = {};
     const lines = result.trim().split('\n').filter(l => l.trim());
 
     for (const line of lines) {
-      const [mpn, pov, qty, date, supplier] = line.split('|');
+      const [mpn, pov, qtyOrdered, date, supplier, rfqNum, onOrder] = line.split('|');
       if (mpn && mpn.trim()) {
         povData[mpn.trim()] = {
           POV_Number: (pov || '').trim(),
-          POV_Qty: parseFloat(qty) || 0,
+          POV_Qty: parseFloat(qtyOrdered) || 0,
           POV_Date: (date || '').trim(),
-          POV_Supplier: (supplier || '').trim()
+          POV_Supplier: (supplier || '').trim(),
+          RFQ_Number: (rfqNum || '').trim(),
+          Qty_On_Order: parseFloat(onOrder) || 0
         };
       }
     }
@@ -440,6 +503,111 @@ function loadRecentPOVs() {
 // Step 5: Identify Reorder Candidates
 // -----------------------------------------------------------------------------
 
+// Warehouses to check for available stock (exclude MAIN, W105, W111, W115)
+const OTHER_WAREHOUSE_FILES = [
+  { file: 'W102_Free_Stock_Stevenage.csv', label: 'W102 Stevenage' },
+  { file: 'W103_GE_Consignment.csv', label: 'W103 GE Consignment' },
+  { file: 'W104_Franchise_Stock.csv', label: 'W104 Franchise' },
+  { file: 'W104_W112_Free_Stock_Austin.csv', label: 'W104/W112 Austin' },
+  { file: 'W106_Taxan_Consignment.csv', label: 'W106 Taxan Consignment' },
+  { file: 'W107_Spartronics_Consignment.csv', label: 'W107 Spartronics Consignment' },
+  { file: 'W108_W113_Free_Stock_Hong_Kong.csv', label: 'W108/W113 Hong Kong' },
+  { file: 'W117_Eaton_Consignment.csv', label: 'W117 Eaton Consignment' },
+  { file: 'W118_LAM_Consignment.csv', label: 'W118 LAM Consignment' },
+];
+
+function loadOtherWarehouseStock(inventoryFolder, targetMPNs) {
+  const targetSet = new Set(targetMPNs);
+  const results = {}; // mpn → [{ warehouse, qty }]
+  for (const mpn of targetMPNs) results[mpn] = [];
+
+  for (const wh of OTHER_WAREHOUSE_FILES) {
+    const filePath = path.join(inventoryFolder, wh.file);
+    if (!fs.existsSync(filePath)) continue;
+
+    const csv = readCSVFile(filePath);
+    const mpnIdx = csv.headers.indexOf('Chuboe_MPN');
+    const qtyIdx = csv.headers.indexOf('Qty');
+    if (mpnIdx === -1 || qtyIdx === -1) continue;
+
+    // Aggregate by MPN within this warehouse
+    const whStock = {};
+    for (const row of csv.rows) {
+      const mpn = (row[mpnIdx] || '').trim();
+      if (!mpn || !targetSet.has(mpn)) continue;
+      whStock[mpn] = (whStock[mpn] || 0) + (parseFloat(row[qtyIdx]) || 0);
+    }
+
+    for (const [mpn, qty] of Object.entries(whStock)) {
+      if (qty > 0) {
+        results[mpn].push({ warehouse: wh.label, qty });
+      }
+    }
+  }
+
+  return results;
+}
+
+// Column order — single source of truth for buildAlert() and writeReorderAlerts()
+// To add/remove/reorder columns: update this array AND the buildAlert() values below
+const ALERT_COLUMNS = [
+  // Part identification
+  'Lam P/N',
+  'MPN',
+  'Manufacturer',
+  'Item Description',
+  // Inventory & priority
+  'QTY ON HAND',
+  'Lam Owned Inventory?',
+  'Reorder Threshold',
+  'Shortfall',
+  'Priority',
+  'On Order Qty',
+  'Recent POV',
+  'Last Promise Date',
+  'Last RFQ',
+  // Pricing
+  'Base Unit Price',
+  'Resale Price',
+  'Historical Purchase Price',
+  // Purchase history
+  'OT Previous Supplier',
+  'OT Buyer',
+  'Historical Buyer',
+  // Kitting DB
+  'Lead Time',
+  'MOQ',
+  // Other warehouse stock
+  'Available Stock (Other WH)',
+  'Available Qty (Other WH)',
+];
+
+function buildAlert(mpn, excel, totalQty, lamOwned, shortfall, priority, history, pov) {
+  return {
+    'Lam P/N': excel.CPC,
+    'MPN': mpn,
+    'Manufacturer': excel.Manufacturer,
+    'Item Description': excel.Description,
+    'QTY ON HAND': totalQty,
+    'Lam Owned Inventory?': lamOwned,
+    'Reorder Threshold': excel.MIN_QTY,
+    'Shortfall': shortfall,
+    'Priority': priority,
+    'On Order Qty': pov ? (pov.Qty_On_Order || '') : '',
+    'Recent POV': (pov && pov.POV_Number && pov.POV_Date) ? `${pov.POV_Number} (${pov.POV_Date}, ${pov.POV_Qty} pcs from ${pov.POV_Supplier}${pov.RFQ_Number ? ', RFQ ' + pov.RFQ_Number : ''})` : '',
+    'Base Unit Price': excel.Base_Unit_Price,
+    'Resale Price': excel.Resale_Price,
+    'Historical Purchase Price': history.Historical_Purchase_Price || '',
+    'OT Previous Supplier': history.OT_Previous_Supplier || '',
+    'OT Buyer': history.OT_Buyer || '',
+    'Historical Buyer': excel.Historical_Buyer || '',
+    'Last Promise Date': history.Last_Purchase_Date || '',
+    'Last RFQ': history.RFQ_Number ? `${history.RFQ_Number} (${history.RFQ_Customer || ''})` : '',
+    'Lead Time': excel.Lead_Time,
+    'MOQ': excel.MOQ,
+  };
+}
+
 function identifyReorderCandidates(aggregated, excelData, historicalData, recentPOVs = {}) {
   const alerts = [];
   const inventoryMPNs = new Set(Object.keys(aggregated));
@@ -447,11 +615,7 @@ function identifyReorderCandidates(aggregated, excelData, historicalData, recent
   // First: Process items WITH inventory (may be below threshold)
   for (const [mpn, invData] of Object.entries(aggregated)) {
     const excel = excelData[mpn];
-
-    if (!excel) {
-      // MPN not in Excel - skip
-      continue;
-    }
+    if (!excel) continue;
 
     const minQty = excel.MIN_QTY;
     const totalQty = invData.Total_Qty;
@@ -459,85 +623,21 @@ function identifyReorderCandidates(aggregated, excelData, historicalData, recent
     if (totalQty < minQty) {
       const shortfall = minQty - totalQty;
       const shortfallPct = minQty > 0 ? (shortfall / minQty) * 100 : 0;
-
-      // Priority based on shortfall percentage
-      let priority;
-      if (shortfallPct >= 75) {
-        priority = 'HIGH';
-      } else if (shortfallPct >= 50) {
-        priority = 'MEDIUM';
-      } else {
-        priority = 'LOW';
-      }
-
-      // LAM Owned Inventory is YES if there's any W115 qty
+      const priority = shortfallPct >= 75 ? 'HIGH' : shortfallPct >= 50 ? 'MEDIUM' : 'LOW';
       const lamOwned = invData.W115_Qty > 0 ? 'YES' : 'NO';
 
-      // Get historical data if available
-      const history = historicalData[mpn] || {};
-      const pov = recentPOVs[mpn];
-
-      alerts.push({
-        'Lam P/N': excel.CPC,
-        'MPN': mpn,
-        'Manufacturer': excel.Manufacturer,
-        'Item Description': excel.Description,
-        'Lead Time': excel.Lead_Time,
-        'QTY ON HAND': totalQty,
-        'Base Unit Price': excel.Base_Unit_Price,
-        'Resale Price': excel.Resale_Price,
-        'MIN QTY': minQty,
-        'MOQ': excel.MOQ,
-        'Lam Owned Inventory?': lamOwned,
-        'Historical Buyer': excel.Historical_Buyer || '',
-        'OT Previous Supplier': history.OT_Previous_Supplier || '',
-        'OT Buyer': history.OT_Buyer || '',
-        'Historical Purchase Price': history.Historical_Purchase_Price || '',
-        'Last Purchase Date': history.Last_Purchase_Date || '',
-        'Recent POV': pov ? `${pov.POV_Number} (${pov.POV_Date}, ${pov.POV_Qty} pcs from ${pov.POV_Supplier})` : '',
-        'Shortfall': shortfall,
-        'Priority': priority
-      });
+      alerts.push(buildAlert(mpn, excel, totalQty, lamOwned, shortfall, priority,
+        historicalData[mpn] || {}, recentPOVs[mpn]));
     }
   }
 
   // Second: Process items in Excel but NOT in inventory (zero qty - CRITICAL)
   for (const [mpn, excel] of Object.entries(excelData)) {
-    if (inventoryMPNs.has(mpn)) {
-      // Already processed above
-      continue;
-    }
+    if (inventoryMPNs.has(mpn)) continue;
+    if (excel.MIN_QTY <= 0) continue;
 
-    // This MPN is in Excel but has zero inventory (not in W111 or W115)
-    const minQty = excel.MIN_QTY;
-
-    // Skip if MIN_QTY is 0 (no reorder needed)
-    if (minQty <= 0) continue;
-
-    const history = historicalData[mpn] || {};
-    const pov = recentPOVs[mpn];
-
-    alerts.push({
-      'Lam P/N': excel.CPC,
-      'MPN': mpn,
-      'Manufacturer': excel.Manufacturer,
-      'Item Description': excel.Description,
-      'Lead Time': excel.Lead_Time,
-      'QTY ON HAND': 0,  // Zero inventory
-      'Base Unit Price': excel.Base_Unit_Price,
-      'Resale Price': excel.Resale_Price,
-      'MIN QTY': minQty,
-      'MOQ': excel.MOQ,
-      'Lam Owned Inventory?': 'NO',  // No inventory = not LAM owned
-      'Historical Buyer': excel.Historical_Buyer || '',
-      'OT Previous Supplier': history.OT_Previous_Supplier || '',
-      'OT Buyer': history.OT_Buyer || '',
-      'Historical Purchase Price': history.Historical_Purchase_Price || '',
-      'Last Purchase Date': history.Last_Purchase_Date || '',
-      'Recent POV': pov ? `${pov.POV_Number} (${pov.POV_Date}, ${pov.POV_Qty} pcs from ${pov.POV_Supplier})` : '',
-      'Shortfall': minQty,  // 100% shortfall
-      'Priority': 'CRITICAL'  // Highest priority - zero stock
-    });
+    alerts.push(buildAlert(mpn, excel, 0, 'NO', excel.MIN_QTY, 'CRITICAL',
+      historicalData[mpn] || {}, recentPOVs[mpn]));
   }
 
   // Sort by priority (CRITICAL first), then by shortfall descending
@@ -557,28 +657,8 @@ function identifyReorderCandidates(aggregated, excelData, historicalData, recent
 // -----------------------------------------------------------------------------
 
 function writeReorderAlerts(alerts, outputPath) {
-  // Output columns matching Excel A-L (minus J) plus historical + calculated
-  const headers = [
-    'Lam P/N',
-    'MPN',
-    'Manufacturer',
-    'Item Description',
-    'Lead Time',
-    'QTY ON HAND',
-    'Base Unit Price',
-    'Resale Price',
-    'MIN QTY',
-    'MOQ',
-    'Lam Owned Inventory?',
-    'Historical Buyer',
-    'OT Previous Supplier',
-    'OT Buyer',
-    'Historical Purchase Price',
-    'Last Purchase Date',
-    'Recent POV',
-    'Shortfall',
-    'Priority'
-  ];
+  // Uses ALERT_COLUMNS defined at module level — single source of truth
+  const headers = ALERT_COLUMNS;
 
   const lines = [headers.join(',')];
 
@@ -601,53 +681,16 @@ function writeReorderAlerts(alerts, outputPath) {
 // Email
 // -----------------------------------------------------------------------------
 
-async function sendEmail(to, subject, body, attachments = []) {
-  let mml = `From: ${EMAIL_ACCOUNT}@orangetsunami.com
-To: ${to}
-Subject: ${subject}
+async function sendEmail(to, subject, body, attachmentPaths = []) {
+  console.log(`  Sending email to ${to}: ${subject}`);
+  const attachments = attachmentPaths
+    .filter(p => fs.existsSync(p))
+    .map(p => ({ filename: path.basename(p), path: p }));
 
-<#part type=text/plain>
-${body}
-<#/part>`;
-
-  for (const attachment of attachments) {
-    if (fs.existsSync(attachment)) {
-      mml += `
-<#part filename="${attachment}" disposition=attachment>
-<#/part>`;
-    }
+  if (attachments.length > 0) {
+    return await notifier.sendWithAttachment(to, subject, body, attachments);
   }
-
-  return new Promise((resolve) => {
-    const proc = spawn(HIMALAYA_BIN, [
-      'template', 'send',
-      '--account', EMAIL_ACCOUNT
-    ], {
-      env: process.env,
-      stdio: ['pipe', 'pipe', 'pipe']
-    });
-
-    let stderr = '';
-    proc.stderr.on('data', (data) => { stderr += data.toString(); });
-
-    proc.on('close', (code) => {
-      if (code === 0) {
-        console.log(`  Email sent to ${to}`);
-        resolve(true);
-      } else {
-        console.error(`  Failed to send email: ${stderr}`);
-        resolve(false);
-      }
-    });
-
-    proc.on('error', (err) => {
-      console.error(`  Failed to send email: ${err.message}`);
-      resolve(false);
-    });
-
-    proc.stdin.write(mml);
-    proc.stdin.end();
-  });
+  return await notifier.sendEmail(to, subject, body);
 }
 
 // -----------------------------------------------------------------------------

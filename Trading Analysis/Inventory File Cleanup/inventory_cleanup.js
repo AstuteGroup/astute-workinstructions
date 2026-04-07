@@ -19,9 +19,10 @@
 const XLSX = require('xlsx');
 const fs = require('fs');
 const path = require('path');
-const { execFile, spawn } = require('child_process');
 const { createGzip } = require('zlib');
 const { pipeline } = require('stream/promises');
+const { createFetcher } = require('../../shared/email-fetcher');
+const { createNotifier } = require('../../shared/notifier');
 
 // =============================================================================
 // CONFIGURATION
@@ -34,9 +35,6 @@ const EMAIL_CONFIG = {
     subjectPattern: /Task finished: \[success\] \d+ AST Item Lots Report Inputs/i,
     processedFolder: 'Inventory-Processed'
 };
-
-// Himalaya binary path
-const HIMALAYA_BIN = process.env.HIMALAYA_BIN || path.join(process.env.HOME, 'bin', 'himalaya');
 
 // Rows to skip at start of file (Infor report header)
 const HEADER_ROWS_TO_SKIP = 7;
@@ -102,226 +100,76 @@ const PORTAL_COLUMNS = [
 ];
 
 // =============================================================================
-// HIMALAYA EMAIL FUNCTIONS
+// EMAIL FUNCTIONS (using shared imapflow-based modules)
 // =============================================================================
 
-function runHimalaya(args, timeout = 30000) {
-    return new Promise((resolve, reject) => {
-        const fullArgs = ['--output', 'json', ...args];
-        console.log(`  [himalaya] ${fullArgs.join(' ')}`);
-
-        execFile(HIMALAYA_BIN, fullArgs, {
-            timeout,
-            maxBuffer: 10 * 1024 * 1024,
-            env: { ...process.env }
-        }, (error, stdout, stderr) => {
-            if (error) {
-                console.error(`  [himalaya error] ${error.message}`);
-                if (stderr) console.error(`  [himalaya stderr] ${stderr}`);
-                return reject(new Error(`himalaya failed: ${error.message}`));
-            }
-            try {
-                const cleaned = stdout.replace(/\x1b\[[0-9;]*m/g, '').trim();
-                if (!cleaned) return resolve(null);
-                const parsed = JSON.parse(cleaned);
-                resolve(parsed);
-            } catch (e) {
-                resolve(stdout.trim());
-            }
-        });
-    });
-}
-
-function runHimalayaRaw(args, timeout = 30000) {
-    return new Promise((resolve, reject) => {
-        execFile(HIMALAYA_BIN, args, {
-            timeout,
-            maxBuffer: 10 * 1024 * 1024,
-            env: { ...process.env }
-        }, (error, stdout, stderr) => {
-            if (error) {
-                return reject(new Error(`himalaya failed: ${error.message}`));
-            }
-            resolve(stdout);
-        });
-    });
-}
+const fetcher = createFetcher(EMAIL_CONFIG.account);
+const notifier = createNotifier({
+    fromEmail: `${EMAIL_CONFIG.account}@orangetsunami.com`,
+    fromName: 'Inventory Cleanup',
+    smtpPass: process.env.WORKMAIL_PASS || process.env.SMTP_PASS
+});
 
 async function listEmails(folder = 'INBOX') {
-    try {
-        const result = await runHimalaya([
-            'envelope', 'list',
-            '--account', EMAIL_CONFIG.account,
-            '--folder', folder,
-            '--page-size', '100'
-        ]);
-        if (!result || !Array.isArray(result)) return [];
-        return result.map(env => ({
-            id: env.id,
-            subject: env.subject || '',
-            from: env.from || {},
-            date: env.date || '',
-            hasAttachment: env.has_attachment || false
-        }));
-    } catch (err) {
-        console.error('Failed to list emails:', err.message);
-        return [];
-    }
+    return await fetcher.listEnvelopes(folder, 100);
 }
 
 async function downloadAttachment(messageId, folder = 'INBOX') {
-    // Use 'message export' instead of 'attachment download' - more reliable
-    // This exports attachments to /tmp with their original filenames
+    console.log(`  Downloading attachments from message ${messageId}...`);
 
-    return new Promise((resolve, reject) => {
-        console.log(`  Exporting message ${messageId} to extract attachments...`);
+    // Clean up any previous ASTItemLotsReport files in /tmp to avoid stale matches
+    const oldFiles = fs.readdirSync('/tmp').filter(f => f.includes('ASTItemLotsReport'));
+    for (const f of oldFiles) {
+        try { fs.unlinkSync(path.join('/tmp', f)); } catch (e) { /* ignore */ }
+    }
 
-        // Clean up any previous ASTItemLotsReport files in /tmp to avoid stale matches
-        const oldFiles = fs.readdirSync('/tmp').filter(f => f.includes('ASTItemLotsReport'));
-        for (const f of oldFiles) {
-            try { fs.unlinkSync(path.join('/tmp', f)); } catch (e) { /* ignore */ }
+    const attachments = await fetcher.downloadAttachments(messageId, folder, '/tmp');
+    if (!attachments || attachments.length === 0) {
+        throw new Error('No attachments found in message');
+    }
+
+    // Find the xlsx attachment
+    const xlsxAtt = attachments.find(a =>
+        a.filename.includes('ASTItemLotsReport') &&
+        (a.filename.endsWith('.xlsx') || a.filename.endsWith('.xls'))
+    );
+
+    if (xlsxAtt) {
+        console.log(`  Found: ${xlsxAtt.path}`);
+        return xlsxAtt.path;
+    }
+
+    // Check if any attachment is an xlsx by content (might have wrong extension)
+    for (const att of attachments) {
+        if (att.filename.includes('ASTItemLotsReport')) {
+            // Rename to xlsx
+            const xlsxPath = att.path.replace(/\.[^.]+$/, '.xlsx');
+            if (xlsxPath !== att.path) {
+                fs.copyFileSync(att.path, xlsxPath);
+                console.log(`  Converted ${att.filename} to ${path.basename(xlsxPath)}`);
+            }
+            return xlsxPath;
         }
+    }
 
-        const proc = spawn(HIMALAYA_BIN, [
-            'message', 'export',
-            '--account', EMAIL_CONFIG.account,
-            '--folder', folder,
-            String(messageId)
-        ], {
-            cwd: '/tmp',
-            env: process.env,
-            stdio: ['ignore', 'pipe', 'pipe']
-        });
-
-        let stdout = '';
-        let stderr = '';
-
-        proc.stdout.on('data', (data) => { stdout += data.toString(); });
-        proc.stderr.on('data', (data) => { stderr += data.toString(); });
-
-        const timer = setTimeout(() => {
-            proc.kill('SIGKILL');
-            reject(new Error('Message export timeout'));
-        }, 300000); // 5 minutes
-
-        proc.on('close', (code) => {
-            clearTimeout(timer);
-
-            console.log(`  Export complete, searching for xlsx file...`);
-
-            // Find xlsx file in /tmp (himalaya exports attachments there)
-            // Files may have .aaf extension but are actually xlsx
-            const tmpFiles = fs.readdirSync('/tmp');
-
-            // First try exact xlsx match
-            let xlsxFile = tmpFiles.find(f =>
-                f.includes('ASTItemLotsReport') && (f.endsWith('.xlsx') || f.endsWith('.xls'))
-            );
-
-            // If not found, check for .aaf files (himalaya sometimes uses this extension)
-            if (!xlsxFile) {
-                const aafFile = tmpFiles.find(f =>
-                    f.includes('ASTItemLotsReport') && f.endsWith('.aaf')
-                );
-                if (aafFile) {
-                    // Rename to xlsx
-                    const aafPath = path.join('/tmp', aafFile);
-                    const xlsxPath = aafPath.replace('.aaf', '.xlsx');
-                    fs.copyFileSync(aafPath, xlsxPath);
-                    xlsxFile = path.basename(xlsxPath);
-                    console.log(`  Converted ${aafFile} to ${xlsxFile}`);
-                }
-            }
-
-            if (xlsxFile) {
-                const fullPath = path.join('/tmp', xlsxFile);
-                console.log(`  Found: ${fullPath}`);
-                resolve(fullPath);
-            } else {
-                reject(new Error('No xlsx attachment found after export'));
-            }
-        });
-
-        proc.on('error', (err) => {
-            clearTimeout(timer);
-            reject(new Error(`Export failed: ${err.message}`));
-        });
-    });
+    throw new Error('No ASTItemLotsReport attachment found. Files: ' +
+        attachments.map(a => a.filename).join(', '));
 }
 
 async function moveEmail(messageId, targetFolder, sourceFolder = 'INBOX') {
-    try {
-        // Ensure target folder exists
-        await runHimalaya(['folder', 'create', '--account', EMAIL_CONFIG.account, targetFolder])
-            .catch(() => {}); // Ignore if already exists
-
-        await runHimalaya([
-            'message', 'move',
-            '--account', EMAIL_CONFIG.account,
-            '--folder', sourceFolder,
-            targetFolder,
-            String(messageId)
-        ]);
-        console.log(`  Moved message ${messageId} to ${targetFolder}`);
-        return true;
-    } catch (err) {
-        console.error(`  Failed to move message: ${err.message}`);
-        return false;
-    }
+    return await fetcher.moveMessage(messageId, targetFolder, sourceFolder);
 }
 
-async function sendEmail(to, subject, body, attachments = []) {
-    // Build MML template with attachments
-    let mml = `From: ${EMAIL_CONFIG.account}@orangetsunami.com
-To: ${to}
-Subject: ${subject}
+async function sendEmail(to, subject, body, attachmentPaths = []) {
+    console.log(`  Sending email to ${to}: ${subject}`);
+    const attachments = attachmentPaths
+        .filter(p => fs.existsSync(p))
+        .map(p => ({ filename: path.basename(p), path: p }));
 
-<#part type=text/plain>
-${body}
-<#/part>`;
-
-    // Add attachments
-    for (const attachment of attachments) {
-        if (fs.existsSync(attachment)) {
-            mml += `
-<#part filename="${attachment}" disposition=attachment>
-<#/part>`;
-        }
+    if (attachments.length > 0) {
+        return await notifier.sendWithAttachment(to, subject, body, attachments);
     }
-
-    return new Promise((resolve) => {
-        console.log(`  Sending email to ${to}: ${subject}`);
-
-        const proc = spawn(HIMALAYA_BIN, [
-            'template', 'send',
-            '--account', EMAIL_CONFIG.account
-        ], {
-            env: process.env,
-            stdio: ['pipe', 'pipe', 'pipe']
-        });
-
-        let stderr = '';
-        proc.stderr.on('data', (data) => { stderr += data.toString(); });
-
-        proc.on('close', (code) => {
-            if (code === 0) {
-                console.log(`  Email sent successfully`);
-                resolve(true);
-            } else {
-                console.error(`  Failed to send email: ${stderr}`);
-                resolve(false);
-            }
-        });
-
-        proc.on('error', (err) => {
-            console.error(`  Failed to send email: ${err.message}`);
-            resolve(false);
-        });
-
-        // Write template to stdin and close
-        proc.stdin.write(mml);
-        proc.stdin.end();
-    });
+    return await notifier.sendEmail(to, subject, body);
 }
 
 async function sendFailureNotice(error) {

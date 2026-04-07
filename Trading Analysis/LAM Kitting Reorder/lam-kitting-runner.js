@@ -11,17 +11,21 @@
  *   node lam-kitting-runner.js
  */
 
-const { execSync, spawn } = require('child_process');
+const { execSync } = require('child_process');
 const path = require('path');
 const fs = require('fs');
+const { createNotifier } = require('../../shared/notifier');
 
 const SCRIPT_DIR = __dirname;
 const INVENTORY_CLEANUP_DIR = path.join(SCRIPT_DIR, '../Inventory File Cleanup');
 const EXCEL_PATTERN = /^Lam_Kitting_DB.*\.xlsx$/;
 
-const HIMALAYA_BIN = process.env.HIMALAYA_BIN || path.join(process.env.HOME, 'bin', 'himalaya');
 const EMAIL_ACCOUNT = 'excess';
 const NOTIFY_EMAIL = process.env.NOTIFY_EMAIL || 'jake.harris@astutegroup.com';
+const notifier = createNotifier({
+  fromEmail: `${EMAIL_ACCOUNT}@orangetsunami.com`,
+  fromName: 'LAM Kitting Reorder'
+});
 
 function getDateStamp() {
   return new Date().toISOString().split('T')[0];
@@ -31,53 +35,16 @@ function log(msg) {
   console.log(`[${new Date().toISOString()}] ${msg}`);
 }
 
-async function sendEmail(to, subject, body, attachments = []) {
-  let mml = `From: ${EMAIL_ACCOUNT}@orangetsunami.com
-To: ${to}
-Subject: ${subject}
+async function sendEmail(to, subject, body, attachmentPaths = []) {
+  log(`  Sending email to ${to}: ${subject}`);
+  const attachments = attachmentPaths
+    .filter(p => fs.existsSync(p))
+    .map(p => ({ filename: path.basename(p), path: p }));
 
-<#part type=text/plain>
-${body}
-<#/part>`;
-
-  for (const attachment of attachments) {
-    if (fs.existsSync(attachment)) {
-      mml += `
-<#part filename="${attachment}" disposition=attachment>
-<#/part>`;
-    }
+  if (attachments.length > 0) {
+    return await notifier.sendWithAttachment(to, subject, body, attachments);
   }
-
-  return new Promise((resolve) => {
-    const proc = spawn(HIMALAYA_BIN, [
-      'template', 'send',
-      '--account', EMAIL_ACCOUNT
-    ], {
-      env: process.env,
-      stdio: ['pipe', 'pipe', 'pipe']
-    });
-
-    let stderr = '';
-    proc.stderr.on('data', (data) => { stderr += data.toString(); });
-
-    proc.on('close', (code) => {
-      if (code === 0) {
-        log(`  Email sent to ${to}`);
-        resolve(true);
-      } else {
-        log(`  Failed to send email: ${stderr}`);
-        resolve(false);
-      }
-    });
-
-    proc.on('error', (err) => {
-      log(`  Failed to send email: ${err.message}`);
-      resolve(false);
-    });
-
-    proc.stdin.write(mml);
-    proc.stdin.end();
-  });
+  return await notifier.sendEmail(to, subject, body);
 }
 
 async function main() {
