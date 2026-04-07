@@ -51,6 +51,65 @@ const TRACEABILITY = {
   DEFAULT: 1000003,       // Non-Traceable (all others)
 };
 
+// Vendor types where we trust the source enough to auto-default missing date code.
+// All authorized-channel vendors (mfr direct + franchise + catalog distributors + online distributors)
+// sell new stock, so "within 2 years" is a safe assumption when the API doesn't return a specific code.
+// Brokers / non-traceable vendors must NOT get this default — DC there is meaningful.
+//
+// Note: OT classifies the major franchise distributors (DigiKey, Mouser, Newark, TTI, Waldom, Avnet)
+// as "Catalog" or "Online Distributor" rather than "Franchise". They are still authorized channels
+// for purposes of date code expectations, so they are included here.
+const MFR_DIRECT_OR_FRANCHISE = new Set([
+  1000001, // Manufacture Direct Component
+  1000002, // Franchise
+  1000007, // Manufacture Direct Assemblies
+  1000008, // Catalog (DigiKey, Mouser, Newark, TTI, Waldom, etc.)
+  1000009, // Online Distributor (Avnet, etc.)
+]);
+const DEFAULT_DATE_CODE_AUTHORIZED = 'within 2 years';
+
+// Packaging string → chuboe_packaging_id (verified against DB).
+// Inputs are normalized to lowercase with whitespace collapsed.
+// Returns null on no match — caller's opts.packagingId is the fallback.
+const PACKAGING_MAP = {
+  // REEL family → F-REEL is the universal canonical (used across all vendor types)
+  'reel': 1000001,
+  'tape and reel': 1000001,
+  'tape & reel': 1000001,
+  't&r': 1000001,
+  'tr': 1000001,
+  'digi-reel': 1000001,
+  'digireel': 1000001,
+  // CUT TAPE
+  'cut tape': 1000006,
+  'cuttape': 1000006,
+  'ct': 1000006,
+  // F-TUBE (only tube option in DB — no plain TUBE)
+  'tube': 1000003,
+  'f-tube': 1000003,
+  'ftube': 1000003,
+  // F-TRAY (universal canonical)
+  'tray': 1000002,
+  'f-tray': 1000002,
+  'ftray': 1000002,
+  // BULK family
+  'bulk': 1000008,
+  'each': 1000008,
+  'bag': 1000008,
+  'ea': 1000008,
+  // BOX
+  'box': 1000007,
+  // AMMO
+  'ammo': 1000009,
+  'ammo pack': 1000009,
+};
+
+function normalizePackaging(text) {
+  if (!text) return null;
+  const key = String(text).toLowerCase().trim().replace(/\s+/g, ' ');
+  return PACKAGING_MAP[key] || null;
+}
+
 // ─── BP Vendor Type Cache ───────────────────────────────────────────────────
 const _bpVendorTypeCache = new Map();
 
@@ -75,9 +134,14 @@ function deriveTraceability(vendorTypeId) {
 
 // ─── Mandatory Field Validation ─────────────────────────────────────────────
 
+// Tier 1 mandatory fields. Note Chuboe_MFR_ID is intentionally NOT in this list:
+// system-level MFR records (AD_Client_ID=0) cause 500 errors when posted via the REST API,
+// so we omit the ID for those cases and let the server's bean callout resolve from
+// Chuboe_MFR_Text instead. This mirrors the rfq-writer pattern proven on RFQ 1132040.
+// Chuboe_MFR_Text IS mandatory — server cannot resolve without it.
 const TIER1_MANDATORY = [
   'Chuboe_RFQ_ID', 'Chuboe_RFQ_Line_ID', 'C_BPartner_ID',
-  'Chuboe_MPN', 'Chuboe_MFR_ID', 'Cost', 'Qty', 'Chuboe_Packaging_ID',
+  'Chuboe_MPN', 'Chuboe_MFR_Text', 'Cost', 'Qty', 'Chuboe_Packaging_ID',
   'Chuboe_Buyer_ID',
 ];
 
@@ -388,31 +452,27 @@ async function writeVQFromAPI(rfqSearchKey, cpc, franchiseResults, opts = {}) {
       continue;
     }
 
-    // Resolve MFR — normalize name via mfr-lookup, then resolve ID in target system
+    // Resolve MFR — normalize via mfr-lookup, optionally enrich with live DB lookup.
+    // SYSTEM-ONLY MFRs (AD_Client_ID=0): omit Chuboe_MFR_ID and let the server's bean
+    // callout resolve from Chuboe_MFR_Text. This is the same pattern as rfq-writer.js
+    // (proven on RFQ 1132040, 2026-04-06). The text field is the load-bearing one.
     const mfrResult = lookupMfr(mfrText);
-    const mfrCheck = checkMfrConfidence(mfrResult, mfrText);
-    if (!mfrCheck.ok) {
-      flagged.push({
-        mpn, vendor: d.name, bpSearchKey, bpId: bp.id, price, qty,
-        mfrText, mfrCanonical: mfrResult.canonical, mfrId: mfrResult.id,
-        reason: mfrCheck.reason,
-        detail: `MFR '${mfrText}' → '${mfrResult.canonical}' (source: ${mfrResult.source})`
-      });
-      continue;
-    }
     const mfrCanonical = mfrResult.canonical || mfrText;
-    const mfrResolved = await resolveMFR(mfrCanonical);
 
-    // MFR ID is mandatory — if system-level only, flag instead of writing incomplete
-    if (!mfrResolved || mfrResolved.isSystem) {
-      flagged.push({
-        mpn, vendor: d.name, bpSearchKey, bpId: bp.id, price, qty,
-        mfrText, mfrCanonical: mfrResult.canonical, mfrId: mfrResult.id,
-        reason: FLAG.MFR_SYSTEM_ONLY,
-        detail: `MFR '${mfrCanonical}' is system-level (AD_Client_ID=0) — no client-level record exists. Cannot write without MFR ID.`
-      });
-      continue;
+    // Try to enrich with a non-system ID via live DB lookup. Failures here are non-fatal
+    // — we'll fall back to the cache result, and if that's also system-only we omit the ID.
+    let resolvedMfrId = null;
+    if (mfrResult.id && !mfrResult.isSystem) {
+      // Cache already has a client-level ID — trust it
+      resolvedMfrId = mfrResult.id;
+    } else {
+      try {
+        const live = await resolveMFR(mfrCanonical);
+        if (live && live.id && !live.isSystem) resolvedMfrId = live.id;
+      } catch (_) { /* ignore — fall through to text-only write */ }
     }
+    // resolvedMfrId may be null here (system-only or no match) — that's OK,
+    // the payload will omit Chuboe_MFR_ID and the server will resolve from text.
 
     // Build vendor notes — combine API notes with packaging info
     const vendorNotes = [d.vqVendorNotes, packagingNote].filter(Boolean).join(' | ');
@@ -421,17 +481,32 @@ async function writeVQFromAPI(rfqSearchKey, cpc, franchiseResults, opts = {}) {
     const vendorTypeId = await getBPVendorType(bp.id);
     const traceabilityId = deriveTraceability(vendorTypeId);
 
-    // Resolve packaging from API data
-    const packagingId = d.vqPackagingId || opts.packagingId || null;
+    // Resolve packaging — distributor data wins, then opts fallback.
+    // Accepts either an explicit ID (vqPackagingId) or a string (vqPackaging) that we normalize.
+    const packagingId = d.vqPackagingId
+      || normalizePackaging(d.vqPackaging)
+      || opts.packagingId
+      || null;
 
-    // Build payload — use searched MPN (our MPN), not the API's variant
+    // Resolve date code — distributor data wins. If empty AND vendor is mfr-direct/franchise,
+    // default to "within 2 years" (these are authorized-channel purchases of new stock).
+    // Brokers (and other vendor types) get no default — must come from caller or stay null.
+    const dateCodeFromApi = d.vqDateCode || (d.raw && d.raw.vqDateCode) || null;
+    const dateCode = dateCodeFromApi
+      || (MFR_DIRECT_OR_FRANCHISE.has(vendorTypeId) ? DEFAULT_DATE_CODE_AUTHORIZED : null)
+      || opts.dateCode
+      || null;
+
+    // Build payload — use searched MPN (our MPN), not the API's variant.
+    // Chuboe_MFR_ID is conditional: only include when we have a non-system client-level ID.
+    // Server resolves system-only / unknown MFRs from Chuboe_MFR_Text via bean callout.
     const payload = {
       Chuboe_RFQ_ID: rfq.id,
       Chuboe_RFQ_Line_ID: rfqLineId,
       C_BPartner_ID: bp.id,
       Chuboe_MPN: opts.searchedMpn || mpn,
       Chuboe_MFR_Text: mfrCanonical,
-      Chuboe_MFR_ID: mfrResolved.id,
+      ...(resolvedMfrId ? { Chuboe_MFR_ID: resolvedMfrId } : {}),
       Cost: price,
       Qty: qty,
       C_Currency_ID: 100, // USD
@@ -447,6 +522,7 @@ async function writeVQFromAPI(rfqSearchKey, cpc, franchiseResults, opts = {}) {
       Chuboe_Traceability_ID: traceabilityId,
       Chuboe_VendorType_ID: vendorTypeId,
       Chuboe_Packaging_ID: packagingId,
+      Chuboe_Date_Code: dateCode,
       Chuboe_Buyer_ID: opts.buyerId || null,
 
       // HTS/ECCN — from franchise API data when available
@@ -471,7 +547,7 @@ async function writeVQFromAPI(rfqSearchKey, cpc, franchiseResults, opts = {}) {
       const result = await apiPost('Chuboe_VQ_Line', payload);
       written.push({
         vqLineId: result.id, mpn, vendor: d.name, bpId: bp.id,
-        mfrId: mfrResolved.id, mfr: mfrResult.canonical, price, qty
+        mfrId: resolvedMfrId, mfr: mfrCanonical, price, qty
       });
     } catch (e) {
       failed.push({
@@ -562,6 +638,7 @@ async function writeVQBatch(rfqSearchKey, items, opts = {}) {
 
     // Write all distributor results for this item
     const result = await writeVQFromAPI(rfqSearchKey, item.cpc, item.franchiseResults, {
+      ...opts, // forward batch-level defaults: packagingId, buyerId, dateCode, etc.
       searchedMpn: item.mpn,
       _rfqLineIdOverride: rfqLineId, // skip internal resolution, we already matched
     });
@@ -596,6 +673,7 @@ async function writeVQBatch(rfqSearchKey, items, opts = {}) {
       if (pass2Auto) {
         // Write automatically
         const result = await writeVQFromAPI(rfqSearchKey, item.cpc, item.franchiseResults, {
+          ...opts, // forward batch-level defaults
           searchedMpn: item.mpn,
           _rfqLineIdOverride: rfqLineId,
         });
@@ -674,8 +752,12 @@ module.exports = {
   writeReviewedItems,
   clearCaches,
   validatePayload,
+  normalizePackaging,
   FLAG,
   DEFAULTS,
+  PACKAGING_MAP,
+  MFR_DIRECT_OR_FRANCHISE,
+  DEFAULT_DATE_CODE_AUTHORIZED,
   TIER1_MANDATORY,
   TIER2_MANDATORY,
 };

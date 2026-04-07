@@ -414,6 +414,10 @@ const AUTO_SUFFIXES = /[-#]?(Q|Q1|AEC)$/i;
 | C6 | Retry Tracking | Later | Planned |
 | C7 | LLM Fallback | Later | Planned |
 | C8 | MFR Text Validation | **Next** | Planned |
+| C9 | Distributor `vqPackaging` Extraction | **Next** | Planned |
+| C10 | VQ Loader Date Code & Packaging Auto-Capture | **Now** | ✅ Done |
+| C11 | Shared Field Resolver Layer (refactor 4 writers) | **Next** | Planned |
+| C12 | Universal Record Writer (config-driven) | Later | Planned |
 
 ---
 
@@ -552,6 +556,203 @@ const AUTO_SUFFIXES = /[-#]?(Q|Q1|AEC)$/i;
 
 ---
 
+## C9. Distributor `vqPackaging` Extraction
+
+**Status:** Planned | **Priority:** Next
+
+**Problem:** `shared/vq-writer.js` was patched (2026-04-07) to read `d.vqPackaging` (string) from each distributor result and normalize it to a `chuboe_packaging_id`. This works automatically for any distributor module that returns the field. But only **3 of 10** modules currently extract it:
+
+| Module | `vqPackaging` extracted? |
+|---|---|
+| `mouser.js` | ✅ Yes — from `ProductAttributes[AttributeName='Packaging']` |
+| `sager.js` | ✅ Yes |
+| `tti.js` | ✅ Yes |
+| `digikey.js` | ❌ No — has `PackageType.Name` (Cut Tape, Tape & Reel, Digi-Reel) used internally for price selection but never set as `vqPackaging` |
+| `arrow.js` | ❌ No |
+| `newark.js` | ❌ No |
+| `master.js` | ❌ No |
+| `waldom.js` | ❌ No |
+| `rutronik.js` | ❌ No |
+| `oemsecrets.js` | ❌ No |
+
+**Impact:** When VQs are loaded via the franchise API path, those 7 distributors fall back to `opts.packagingId` (or null) instead of capturing the actual packaging the supplier offered. Buyers then have to manually correct packaging at PO time.
+
+**Solution:** For each of the 7 modules, find the field in the API response that holds packaging info and extract it as `result.vqPackaging` (string — `vq-writer.js` will normalize to ID). The string only needs to match one of the keys in `PACKAGING_MAP` (case-insensitive, whitespace-collapsed):
+
+```
+reel / tape and reel / tape & reel / t&r / tr / digi-reel / digireel  → F-REEL (1000001)
+cut tape / cuttape / ct                                                → CUT TAPE (1000006)
+tube / f-tube / ftube                                                  → F-TUBE (1000003)
+tray / f-tray / ftray                                                  → F-TRAY (1000002)
+bulk / each / bag / ea                                                 → BULK (1000008)
+box                                                                    → BOX (1000007)
+ammo / ammo pack                                                       → AMMO (1000009)
+```
+
+If a distributor returns a packaging string that doesn't match the map, `normalizePackaging()` returns `null` and the row falls through to the caller's default. **Add new strings to `PACKAGING_MAP` in `shared/vq-writer.js` rather than each distributor module** — keeps the mapping in one place.
+
+**Per-Distributor Notes:**
+- **Digi-Key:** `digikey.js` already inspects `PackageType.Name` on `variations` (lines 250-264). Extract that into `result.vqPackaging` after the price-selection block.
+- **Arrow:** Check API response for a packaging or package-type field. May need to inspect the live response shape.
+- **Newark / Element 14:** Likely under `attributes` array similar to Mouser.
+- **Master:** Check `result.packaging` or similar.
+- **Waldom:** Less structured — may not have a packaging field at all.
+- **Rutronik / OEMSecrets:** Inspect live responses.
+
+**Testing per module:**
+1. Run a sample search → log the raw response
+2. Identify the packaging field
+3. Extract as `vqPackaging` string
+4. Verify `normalizePackaging()` returns a valid ID
+5. End-to-end: write a test VQ via `franchise-api → vq-writer` and confirm `chuboe_packaging_id` is populated correctly in the DB
+
+**Files:**
+- `shared/vq-writer.js` — has `normalizePackaging()` and `PACKAGING_MAP` (already implemented)
+- `shared/franchise-api.js` — already passes `vqPackaging` through (added 2026-04-07)
+- `Trading Analysis/RFQ Sourcing/franchise_check/{digikey,arrow,newark,master,waldom,rutronik,oemsecrets}.js` — modules to update
+
+---
+
+## C10. VQ Loader Date Code & Packaging Auto-Capture
+
+**Status:** ✅ Done | **Priority:** Now
+
+**Implementation (2026-04-07):**
+
+Patched `shared/vq-writer.js` and `shared/franchise-api.js` so VQ loads no longer drop date code and packaging when the source provides them, and apply sensible defaults when it doesn't.
+
+**`vq-writer.js` changes:**
+1. Added `normalizePackaging(text)` helper + `PACKAGING_MAP` (verified against `chuboe_packaging` DB values)
+2. Added `MFR_DIRECT_OR_FRANCHISE` constant (vendor types `1000001`, `1000002`, `1000007`) and `DEFAULT_DATE_CODE_AUTHORIZED = 'within 2 years'`
+3. Payload assembly now sets:
+   - `Chuboe_Packaging_ID = d.vqPackagingId || normalizePackaging(d.vqPackaging) || opts.packagingId || null`
+   - `Chuboe_Date_Code = d.vqDateCode || (mfrDirectOrFranchise(vendorTypeId) ? "within 2 years" : null) || opts.dateCode || null`
+4. Helper, map, and constants are exported for downstream loaders
+
+**`franchise-api.js` change:**
+- Added `vqPackaging: result.vqPackaging || ''` to the searchPart return shape (sits next to `vqDateCode`)
+
+**Why this matters:** Buyers were manually filling in date code and packaging at PO time on every VQ. Now the system captures them automatically when the API knows them, and applies a sensible default ("within 2 years" — only for authorized-channel vendors) when the API doesn't.
+
+**Open follow-up:** See **C9** — only Mouser, Sager, and TTI distributor modules currently populate `vqPackaging`. The other 7 need extraction added to fully realize the automation.
+
+---
+
+## C11. Shared Field Resolver Layer (refactor 4 writers)
+
+**Status:** Planned | **Priority:** Next
+
+**Problem:** We have four writer modules (`shared/rfq-writer.js`, `vq-writer.js`, `cq-writer.js`, `offer-writeback.js`) and each one duplicates the same cross-cutting field resolution logic. When we discover a new edge case (e.g., the system-only MFR ID handling on 2026-04-06, the date code/packaging auto-capture on 2026-04-07), we have to manually backport it to every writer. Today's incident: vq-writer was missing the SYSTEM_ONLY MFR fix and would have rejected ~85% of the LAM EPG load. The other three writers had it. Got lucky — next time we may not.
+
+**What's actually duplicated across the 4 writers:**
+
+| Concern | rfq | vq | cq | offer |
+|---|---|---|---|---|
+| RFQ resolution + line indexing by CPC/MPN | ✓ | ✓ | ✓ | (n/a) |
+| BP resolution by search key + vendor type lookup | ✓ | ✓ | ✓ | ✓ |
+| MFR resolution + system-only conditional ID | ✓ | ✓ (4/7) | ✓ | ✓ |
+| Date code default for authorized channels | ✗ | ✓ (4/7) | ✗ | ✗ |
+| Packaging string normalization | ✗ | ✓ (4/7) | ✗ | ✗ |
+| Validation (TIER1_MANDATORY) | partial | ✓ | partial | partial |
+| MPN cross-ref / fuzzy match | ✗ | ✓ | ✓ | ✗ |
+
+**Solution:** Extract field resolvers into `shared/resolvers/` so each writer composes them rather than reimplementing. Each resolver owns exactly one concern. Fix once, applies to all.
+
+**Proposed structure:**
+```
+shared/
+  api-client.js                  ← exists
+  mfr-lookup.js                  ← exists
+  data-model.md                  ← exists
+
+  resolvers/                     ← NEW
+    mfr-resolver.js              // resolveMfrField(text) → {text, id|null}
+    bp-resolver.js               // resolveBpField(searchKey, name) → {id, vendorTypeId, traceabilityId}
+    date-code-resolver.js        // resolveDateCodeField(provided, vendorTypeId, opts) → string|null
+    packaging-resolver.js        // resolvePackagingField(string|id, opts) → id|null
+    rfq-line-resolver.js         // resolveRfqLine(rfqId, mpn, cpc, opts) → lineId|null
+    validate-payload.js          // validatePayload(payload, table, tier) → {valid, missing}
+    README.md                    // catalog of all resolvers + field type → resolver mapping
+
+  writers/                       ← thin orchestrators
+    rfq-writer.js                // composes resolvers + table-specific assembly
+    vq-writer.js
+    cq-writer.js
+    offer-writeback.js
+```
+
+**Refactor approach (one writer at a time):**
+1. **Extract resolvers from vq-writer first** (it has the richest logic — least re-design needed). Each becomes ~30-50 lines with a clear interface.
+2. **Refactor vq-writer to use them** — should reduce from ~700 lines to ~300.
+3. **Refactor rfq-writer next** (highest user volume). Picks up date code + packaging defaults for free.
+4. **Refactor cq-writer and offer-writeback last** (lowest churn).
+
+**Test gate per writer:** Real production load through each refactored writer before deploying. Equivalence test: same inputs → same payload as the pre-refactor version (modulo new defaults that we explicitly added).
+
+**External interface unchanged.** Each writer's exported functions (`writeRFQ`, `writeVQBatch`, etc.) keep the same signature so callers don't need to update.
+
+**Why this is higher leverage than C9:** C9 fixes one feature for one workflow. C11 fixes the structural problem that *caused* C9 (and C10, and the SYSTEM_ONLY backport) to need manual maintenance in the first place. After C11, every future field-level edge case is a one-file fix in `resolvers/` and all writers benefit.
+
+---
+
+## C12. Universal Record Writer (config-driven)
+
+**Status:** Planned | **Priority:** Later (depends on C11)
+
+**Problem:** Even after C11, every new chuboe table we want to write to requires its own writer module. POs, sales orders, payments, inventory adjustments, BPs, contacts, locations, projects, charges — every one of these will eventually need writeback support, and each one is currently a hand-written module.
+
+**Vision:** A single `shared/writers/universal-writer.js` that can write to **any** chuboe table given a config:
+
+```js
+const { writeRecord } = require('../shared/writers/universal-writer');
+
+// Future writes are this simple:
+const result = await writeRecord('chuboe_vq_line', {
+  rfqSearchKey: '1132040',
+  cpc: '668-133934-120',
+  mpn: 'FOLC-130-L4-L-Q-LC',
+  mfrText: 'SAMTEC',           // mfr-resolver auto-applies
+  vendorSearchKey: '1002339',  // bp-resolver auto-applies
+  cost: 16.91,
+  qty: 500,
+  packaging: 'Cut Tape',       // packaging-resolver auto-applies
+  // dateCode omitted → date-code-resolver applies vendor-type default
+  // packagingId, buyerId can come from a workflow defaults config
+});
+```
+
+**How it works:**
+1. **Field registry** (`shared/resolvers/field-registry.js`): maps payload field names to the resolver that handles them. E.g., `Chuboe_MFR_ID` → mfr-resolver, `C_BPartner_ID` → bp-resolver, `Chuboe_Date_Code` → date-code-resolver. Generic fields (Cost, Qty, Description) pass through unchanged.
+2. **Table mandatory registry**: maps each chuboe table to its mandatory field list. Driven from `data-model.md` (or a parsed version of it). Validates before POST.
+3. **Parent-child orchestration**: for tables with hierarchies (RFQ → Line → Line MPN), the universal writer accepts nested structures and writes parents first, captures IDs, writes children. Defined by table relationships in the schema.
+4. **Bean callout awareness**: for fields that the server will resolve (e.g., system-only MFR IDs), the writer KNOWS to omit them from the payload rather than passing nulls.
+
+**Stages:**
+- **Stage 1**: Build `field-registry.js` and refactor existing 4 writers to use it as a thin wrapper. They still exist as named exports for backward compatibility.
+- **Stage 2**: Build the universal writer with table introspection + parent-child orchestration. New writes use it directly.
+- **Stage 3**: Generate the table-mandatory registry automatically from `data-model.md`. Eliminates the manual sync.
+- **Stage 4**: Optional: add a "schema watchdog" that runs against the live DB to detect when iDempiere tables change (new mandatory fields, dropped fields, type changes) so the registry stays in sync.
+
+**What this unlocks for future workflows:**
+- New writeback (PO, SO, payment, BP, contact, location, project, charge, etc.) → write a 5-line config, no new module
+- New field type (e.g., a new lookup table) → add one resolver, update the registry, all writers benefit
+- New data-validation rule → add to the registry, enforced everywhere automatically
+- LLM-driven workflows that need to write structured data → call universal-writer with a JSON payload
+
+**Discoverability:**
+- `shared/resolvers/README.md` lists every available resolver with examples
+- `shared/writers/README.md` lists every existing writer composition as a reference
+- `data-model.md` cross-references which resolvers apply to which fields per table
+- The session greeting / `CLAUDE.md` directs new workflows to read these before building anything
+
+**Why this matters at the meta level:** Right now if we discover the system-only MFR pattern, we manually update 4 writers. With C12 we'd update one resolver. If a year from now we add 6 more writers (PO, SO, BP, contact, payment, inventory), we'd update zero writers when we discover edge case #N+1 — the resolver fix flows automatically. The maintenance cost of write-back support stays flat regardless of how many workflows or tables we add.
+
+**Risk:** Over-engineering if it's too abstract. Mitigation: build C11 first (concrete refactor of 4 known writers, prove the resolver pattern works), then layer C12 on top once the resolvers are stable. Don't try to design for hypothetical future tables — design for what we know, accept that some refactoring will happen as new patterns emerge.
+
+**Connection to data-model.md:** This is the "single source of truth for schema" promise made literal in code. Today data-model.md is documentation that humans read. C12 makes it the input to a code generator / runtime registry. That's the right destination for it.
+
+---
+
 # Section D: Integration & Cross-Cutting
 
 | # | Feature | Priority | Status |
@@ -662,6 +863,7 @@ const AUTO_SUFFIXES = /[-#]?(Q|Q1|AEC)$/i;
 - [x] Automatic flag stripping in consolidate
 - [x] 14-day RFQ matching window
 - [x] Vendor ID correction (search_key vs c_bpartner_id)
+- [x] **VQ Loader Date Code & Packaging Auto-Capture (C10)** — `vq-writer.js` now reads `vqPackaging` strings, normalizes via `PACKAGING_MAP`, and auto-defaults date code to "within 2 years" for franchise/mfr-direct vendors when API doesn't return one
 
 ## Section D: Integration
 *(No completed items yet)*
@@ -678,7 +880,8 @@ const AUTO_SUFFIXES = /[-#]?(Q|Q1|AEC)$/i;
 | 2026-03-03 | C | RFQ matching window, vendor ID fix |
 | 2026-03-03 | — | Consolidated roadmaps, organized by process flow |
 | 2026-03-10 | B | B1 Cooldown tracking implemented (rfq_history.py + supplier template prioritization) |
+| 2026-04-07 | C | C10 done: vq-writer auto-captures packaging + date code; C9 added (extract vqPackaging in 7 distributor modules) |
 
 ---
 
-*Last updated: 2026-03-10*
+*Last updated: 2026-04-07*

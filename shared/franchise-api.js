@@ -145,8 +145,11 @@ async function searchPart(distributor, mpn, qty) {
       vqMpn: result.vqMpn || mpn,
       vqManufacturer: result.vqManufacturer || '',
       vqDescription: result.vqDescription || '',
+      vqMoq: result.vqMoq || null,
+      vqSpq: result.vqSpq || null,
       vqVendorNotes: result.vqVendorNotes || '',
       vqDateCode: result.vqDateCode || '',
+      vqPackaging: result.vqPackaging || '',  // Mouser/Sager/TTI populate this; vq-writer normalizes to chuboe_packaging_id
       vqLeadTime: result.vqLeadTime || '',
       // Full price break array for api-result-writer capture
       priceBreaks: result.priceBreaks || [],
@@ -227,6 +230,8 @@ async function searchAllDistributors(mpn, qty, options = {}) {
       vendorNotes: r.vqVendorNotes,
       dateCode: r.vqDateCode,
       leadTime: r.vqLeadTime,
+      moq: r.vqMoq,
+      spq: r.vqSpq,
     }));
 
   return {
@@ -253,7 +258,7 @@ function writeVQCapture(filePath, vqLines) {
   const fs = require('fs');
   if (vqLines.length === 0) return null;
 
-  const header = 'Vendor BP,Vendor Name,MPN,Manufacturer,Cost,Qty Available,Description,Vendor Notes,Date Code,Lead Time';
+  const header = 'Vendor BP,Vendor Name,MPN,Manufacturer,Cost,Qty Available,Description,Vendor Notes,Date Code,Lead Time,MOQ,SPQ';
   const rows = vqLines.map(v => [
     v.vendorBP,
     `"${v.vendorName}"`,
@@ -265,6 +270,8 @@ function writeVQCapture(filePath, vqLines) {
     `"${v.vendorNotes}"`,
     `"${v.dateCode || ''}"`,
     `"${v.leadTime || ''}"`,
+    v.moq || '',
+    v.spq || '',
   ].join(','));
 
   fs.writeFileSync(filePath, [header, ...rows].join('\n') + '\n');

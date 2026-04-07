@@ -262,6 +262,31 @@ demand_signal_strength, recommended_action
 
 ---
 
+## D3. Offer Writeback — Known Issue Pattern: System-Level MFR IDs
+
+**Status:** Already handled in `shared/offer-writeback.js` (line 167–172) — documented here so future refactors don't reintroduce the bug.
+
+**Symptom:** Offer line MPN writes return HTTP 500 with `"System ID XXXX cannot be used in Chuboe_MFR_ID"`. Caused by passing a `Chuboe_MFR_ID` that points to a system-level `chuboe_mfr` record (`AD_Client_ID=0`).
+
+**Root cause:** Most well-known MFRs (TI, Vishay, Bourns, Rohm, TDK, Coilcraft, etc.) only exist in `chuboe_mfr` at the system level. Client-level mirror records would need to be created by an iDempiere admin — impractical for hundreds of MFRs. So system-level records are the norm, not the exception.
+
+**Fix (already implemented in offer-writeback.js):**
+```js
+// Skip system-level (AD_Client_ID=0) MFR IDs - they cause:
+// "System ID XXXX cannot be used in Chuboe_MFR_ID"
+linePayload.Chuboe_MFR_Text = mfrResult.canonical;
+if (mfrResult.id && !mfrResult.isSystem) {
+  linePayload.Chuboe_MFR_ID = mfrResult.id;
+}
+```
+Always set `Chuboe_MFR_Text`. Only set `Chuboe_MFR_ID` when the resolved record is non-system. The server's bean callout resolves system-level MFRs from text at write time.
+
+**Same pattern required in:** `rfq-writer.js`, `vq-writer.js`, `cq-writer.js`, `offer-writeback.js`. All four currently implement it correctly. **If you refactor any of these writers, preserve the conditional `Chuboe_MFR_ID` logic** — see also the matching note in Section G1.
+
+**Connection to H1:** This is the immediate write-time fix. **H1 (MFR Backlog Reconciliation)** is the longer-term fix that backfills the FK on existing rows after an admin creates a client-level MFR record. Different problems, complementary solutions.
+
+---
+
 # Completed Items
 
 ## Section A: Vortex Matches
@@ -418,6 +443,27 @@ Shared module `shared/cq-writer.js` writes `chuboe_cq_line` records via REST API
 - Flags unresolvable lines, missing prices, MFR issues
 - Tested on test instance (IDs 1254238-1254240)
 
+### ⚠️ Known Issue Pattern: System-Level MFR IDs
+
+**Symptom:** Writes return HTTP 500 with `"System ID XXXX cannot be used in Chuboe_MFR_ID"`. Caused by passing a `Chuboe_MFR_ID` that points to a system-level `chuboe_mfr` record (`AD_Client_ID=0`).
+
+**Root cause:** Most well-known MFRs (TI, Vishay, Bourns, Rohm, TDK, Coilcraft, etc.) only exist in `chuboe_mfr` at the system level. Client-level mirror records would need to be created by an iDempiere admin — which is impractical for hundreds of MFRs. So system-level records are the norm, not the exception.
+
+**Fix (already implemented in cq-writer.js line 222):**
+```js
+id: (resolved && !resolved.isSystem) ? resolved.id : null,
+// Then in payload:
+if (mfrId) payload.Chuboe_MFR_ID = mfrId;  // omit when null
+```
+Always set `Chuboe_MFR_Text` (mandatory). Only set `Chuboe_MFR_ID` when the resolved record is non-system. The server's bean callout resolves system-level MFRs from text at write time.
+
+**Do not "fix" this by:**
+- Adding `Chuboe_MFR_ID` back as required — server rejects system IDs
+- Hard-rejecting MFRs that resolve to system-only — this would block ~85% of writes
+- Manually creating client-level MFR records — admin task, not scalable
+
+This same pattern is required in `rfq-writer.js`, `vq-writer.js`, and `offer-writeback.js`. All four currently implement it correctly. **If you refactor any of these writers, preserve the conditional `Chuboe_MFR_ID` logic.**
+
 ---
 
 ## G2. Quick Quote → CQ Finalization Flow
@@ -478,4 +524,4 @@ First instance surfaced 2026-04-06: Orbel Corporation on RFQ 1132040 (2 MPNs), t
 
 ---
 
-*Last updated: 2026-04-06*
+*Last updated: 2026-04-07*
