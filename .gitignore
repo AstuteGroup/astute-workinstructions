@@ -20,6 +20,7 @@ shared/data/mfr-cache.json
 # Working data — outputs and inputs (per "github vs email" rule)
 Trading Analysis/**/output/
 Trading Analysis/**/data/
+Trading Analysis/RFQ Sourcing/franchise_check/RFQ_*/
 
 # Workflow input data files (kept locally, not on GitHub)
 Trading Analysis/LAM EPG Award/Lam_EPG_SIPOC.xlsx
