@@ -1,44 +1,145 @@
 /**
  * Shared Email Fetcher
  *
- * Factory that creates an email fetcher bound to a himalaya account.
- * Wraps all himalaya email operations: list, read, move, folders.
+ * Factory that creates an email fetcher bound to a WorkMail account.
+ * Uses imapflow for direct IMAP access (no himalaya dependency).
  *
  * Usage:
  *   const { createFetcher } = require('../shared/email-fetcher');
  *   const fetcher = createFetcher('stockrfq');
  *   const envelopes = await fetcher.listEnvelopes('INBOX', 500);
  *   const body = await fetcher.readMessage(id);
+ *
+ * Credentials are loaded from environment variables:
+ *   IMAP_HOST (default: imap.mail.us-east-1.awsapps.com)
+ *   IMAP_PORT (default: 993)
+ *   WORKMAIL_PASS (default: reads from ~/.config/himalaya/config.toml)
+ *
+ * Account-to-email mapping:
+ *   vq       → vq@orangetsunami.com
+ *   excess   → excess@orangetsunami.com
+ *   stockrfq → stockRFQ@orangetsunami.com
  */
 
-const { runHimalaya } = require('./himalaya-cli');
+const { ImapFlow } = require('imapflow');
+const { simpleParser } = require('mailparser');
+const fs = require('fs');
+const path = require('path');
 const logger = require('./logger');
+
+// Account name → email address mapping
+const ACCOUNT_MAP = {
+  vq: 'vq@orangetsunami.com',
+  excess: 'excess@orangetsunami.com',
+  stockrfq: 'stockRFQ@orangetsunami.com'
+};
+
+const IMAP_HOST = process.env.IMAP_HOST || 'imap.mail.us-east-1.awsapps.com';
+const IMAP_PORT = parseInt(process.env.IMAP_PORT || '993', 10);
+
+/**
+ * Get the WorkMail password from env or himalaya config fallback
+ */
+function getPassword() {
+  if (process.env.WORKMAIL_PASS) return process.env.WORKMAIL_PASS;
+  if (process.env.SMTP_PASS) return process.env.SMTP_PASS;
+
+  // Fallback: read from himalaya config if available
+  try {
+    const configPath = path.join(process.env.HOME, '.config', 'himalaya', 'config.toml');
+    if (fs.existsSync(configPath)) {
+      const content = fs.readFileSync(configPath, 'utf-8');
+      const match = content.match(/backend\.auth\.raw\s*=\s*"([^"]+)"/);
+      if (match) return match[1];
+    }
+  } catch (e) {
+    // ignore
+  }
+  throw new Error('No WorkMail password found. Set WORKMAIL_PASS or SMTP_PASS env var.');
+}
+
+/**
+ * Create an ImapFlow client for the given account
+ */
+function createClient(account, log) {
+  const email = ACCOUNT_MAP[account.toLowerCase()];
+  if (!email) throw new Error(`Unknown account: ${account}. Valid: ${Object.keys(ACCOUNT_MAP).join(', ')}`);
+
+  return new ImapFlow({
+    host: IMAP_HOST,
+    port: IMAP_PORT,
+    secure: true,
+    auth: {
+      user: email,
+      pass: getPassword()
+    },
+    logger: false // suppress imapflow internal logging
+  });
+}
 
 function createFetcher(account) {
   if (!account) throw new Error('email-fetcher: account is required');
 
   const log = logger.createLogger ? logger.createLogger(account) : logger;
+  const email = ACCOUNT_MAP[account.toLowerCase()];
+  if (!email) throw new Error(`Unknown account: ${account}`);
+
+  /**
+   * Run an operation with a connected IMAP client.
+   * Handles connect/disconnect lifecycle automatically.
+   */
+  async function withClient(operation) {
+    const client = createClient(account, log);
+    try {
+      await client.connect();
+      return await operation(client);
+    } finally {
+      await client.logout().catch(() => {});
+    }
+  }
 
   async function listEnvelopes(folder = 'INBOX', pageSize = 500) {
     try {
-      const args = ['envelope', 'list', '--account', account, '--folder', folder, '--page-size', String(pageSize)];
-      const result = await runHimalaya(args);
-      if (!result || !Array.isArray(result)) return [];
-      return result.map(env => {
-        const flags = env.flags || [];
-        const hasAttachment = env.has_attachment ||
-                             flags.includes('attachment') ||
-                             flags.includes('@') ||
-                             (typeof flags === 'string' && flags.includes('@'));
-        return {
-          id: env.id,
-          subject: env.subject || '',
-          from: env.from || {},
-          to: env.to || {},
-          date: env.date || '',
-          flags: flags,
-          hasAttachment
-        };
+      return await withClient(async (client) => {
+        const lock = await client.getMailboxLock(folder);
+        try {
+          const envelopes = [];
+          // Fetch the most recent pageSize messages
+          const totalMessages = client.mailbox.exists;
+          if (totalMessages === 0) return [];
+
+          const startSeq = Math.max(1, totalMessages - pageSize + 1);
+          const range = `${startSeq}:*`;
+
+          for await (const msg of client.fetch(range, {
+            envelope: true,
+            flags: true,
+            bodyStructure: true
+          })) {
+            const env = msg.envelope || {};
+            const from = env.from && env.from[0] ? {
+              name: env.from[0].name || '',
+              addr: `${env.from[0].mailbox || ''}@${env.from[0].host || ''}`
+            } : {};
+
+            // Check for attachments in body structure
+            const hasAttachment = checkForAttachments(msg.bodyStructure);
+
+            envelopes.push({
+              id: msg.uid,
+              seq: msg.seq,
+              subject: env.subject || '',
+              from: from,
+              to: env.to || [],
+              date: env.date ? env.date.toISOString() : '',
+              flags: Array.from(msg.flags || []),
+              hasAttachment
+            });
+          }
+          return envelopes;
+        } finally {
+          lock.release();
+        }
       });
     } catch (err) {
       log.error('Failed to list envelopes:', err.message);
@@ -48,9 +149,18 @@ function createFetcher(account) {
 
   async function readMessage(id, folder = 'INBOX') {
     try {
-      const args = ['message', 'read', '--account', account, '--folder', folder, String(id)];
-      const result = await runHimalaya(args);
-      return result || '';
+      return await withClient(async (client) => {
+        const lock = await client.getMailboxLock(folder);
+        try {
+          const msg = await client.fetchOne(String(id), { source: true }, { uid: true });
+          if (!msg || !msg.source) return '';
+
+          const parsed = await simpleParser(msg.source);
+          return parsed.text || parsed.html || '';
+        } finally {
+          lock.release();
+        }
+      });
     } catch (err) {
       log.error(`Failed to read message ${id}:`, err.message);
       return '';
@@ -59,9 +169,19 @@ function createFetcher(account) {
 
   async function getRawMessage(id, folder = 'INBOX') {
     try {
-      const args = ['message', 'read', '--account', account, '--folder', folder, '--header', 'from,to,cc,subject,date', String(id)];
-      const result = await runHimalaya(args);
-      return result || '';
+      return await withClient(async (client) => {
+        const lock = await client.getMailboxLock(folder);
+        try {
+          const msg = await client.fetchOne(String(id), {
+            headers: ['from', 'to', 'cc', 'subject', 'date']
+          }, { uid: true });
+          if (!msg || !msg.headers) return '';
+          // headers is a Buffer
+          return msg.headers.toString();
+        } finally {
+          lock.release();
+        }
+      });
     } catch (err) {
       log.error(`Failed to read raw message ${id}:`, err.message);
       return '';
@@ -70,9 +190,20 @@ function createFetcher(account) {
 
   async function verifyMessageGone(id, sourceFolder) {
     try {
-      const envelopes = await listEnvelopes(sourceFolder, 500);
-      const stillExists = envelopes.some(e => String(e.id) === String(id));
-      return !stillExists;
+      return await withClient(async (client) => {
+        const lock = await client.getMailboxLock(sourceFolder);
+        try {
+          // Try to fetch the UID — if it doesn't exist, it's gone
+          try {
+            const msg = await client.fetchOne(String(id), { uid: true }, { uid: true });
+            return !msg; // if msg is null/undefined, it's gone
+          } catch (e) {
+            return true; // fetch failed = message gone
+          }
+        } finally {
+          lock.release();
+        }
+      });
     } catch (err) {
       log.error(`Failed to verify message ${id} moved from ${sourceFolder}:`, err.message);
       return false;
@@ -81,17 +212,30 @@ function createFetcher(account) {
 
   async function moveMessage(id, targetFolder = 'Processed', sourceFolder = 'INBOX') {
     try {
-      const args = ['message', 'move', '--account', account, '--folder', sourceFolder, targetFolder, String(id)];
-      await runHimalaya(args);
+      return await withClient(async (client) => {
+        // Ensure target folder exists
+        try {
+          await client.mailboxCreate(targetFolder);
+        } catch (e) {
+          // Ignore — folder already exists
+        }
 
-      const verified = await verifyMessageGone(id, sourceFolder);
-      if (!verified) {
-        log.error(`Move verification failed for message ${id} - still in ${sourceFolder}`);
-        return false;
-      }
+        const lock = await client.getMailboxLock(sourceFolder);
+        try {
+          await client.messageMove(String(id), targetFolder, { uid: true });
+        } finally {
+          lock.release();
+        }
 
-      log.info(`Moved and verified message ${id} to ${targetFolder}`);
-      return true;
+        const verified = await verifyMessageGone(id, sourceFolder);
+        if (!verified) {
+          log.error(`Move verification failed for message ${id} - still in ${sourceFolder}`);
+          return false;
+        }
+
+        log.info(`Moved and verified message ${id} to ${targetFolder}`);
+        return true;
+      });
     } catch (err) {
       log.error(`Failed to move message ${id}:`, err.message);
       return false;
@@ -100,10 +244,10 @@ function createFetcher(account) {
 
   async function listFolders() {
     try {
-      const args = ['folder', 'list', '--account', account];
-      const result = await runHimalaya(args);
-      if (!result || !Array.isArray(result)) return [];
-      return result.map(f => f.name || f);
+      return await withClient(async (client) => {
+        const folders = await client.list();
+        return folders.map(f => f.path || f.name);
+      });
     } catch (err) {
       log.error('Failed to list folders:', err.message);
       return [];
@@ -112,16 +256,17 @@ function createFetcher(account) {
 
   async function createFolder(name) {
     try {
-      const folders = await listFolders();
-      if (folders.includes(name)) {
-        log.debug(`Folder "${name}" already exists`);
+      return await withClient(async (client) => {
+        const folders = await client.list();
+        const exists = folders.some(f => (f.path || f.name) === name);
+        if (exists) {
+          log.debug(`Folder "${name}" already exists`);
+          return true;
+        }
+        await client.mailboxCreate(name);
+        log.info(`Created folder: ${name}`);
         return true;
-      }
-
-      const args = ['folder', 'create', '--account', account, name];
-      await runHimalaya(args);
-      log.info(`Created folder: ${name}`);
-      return true;
+      });
     } catch (err) {
       log.debug(`Folder creation note for "${name}": ${err.message}`);
       return false;
@@ -130,10 +275,30 @@ function createFetcher(account) {
 
   async function getMessageHeaders(id, folder = 'INBOX') {
     try {
-      const args = ['envelope', 'list', '--account', account, '--folder', folder, '--page-size', '100'];
-      const envelopes = await runHimalaya(args);
-      if (!envelopes || !Array.isArray(envelopes)) return null;
-      return envelopes.find(e => e.id === String(id)) || null;
+      return await withClient(async (client) => {
+        const lock = await client.getMailboxLock(folder);
+        try {
+          const msg = await client.fetchOne(String(id), {
+            envelope: true,
+            flags: true
+          }, { uid: true });
+          if (!msg) return null;
+          const env = msg.envelope || {};
+          const from = env.from && env.from[0] ? {
+            name: env.from[0].name || '',
+            addr: `${env.from[0].mailbox || ''}@${env.from[0].host || ''}`
+          } : {};
+          return {
+            id: msg.uid,
+            subject: env.subject || '',
+            from: from,
+            date: env.date ? env.date.toISOString() : '',
+            flags: Array.from(msg.flags || [])
+          };
+        } finally {
+          lock.release();
+        }
+      });
     } catch (err) {
       log.error(`Failed to get headers for message ${id}:`, err.message);
       return null;
@@ -142,25 +307,64 @@ function createFetcher(account) {
 
   async function markUnread(id, folder = 'INBOX') {
     try {
-      const args = ['flag', 'remove', '--account', account, '--folder', folder, String(id), 'Seen'];
-      await runHimalaya(args);
-      log.debug(`Marked message ${id} as unread`);
-      return true;
+      return await withClient(async (client) => {
+        const lock = await client.getMailboxLock(folder);
+        try {
+          await client.messageFlagsRemove(String(id), ['\\Seen'], { uid: true });
+          log.debug(`Marked message ${id} as unread`);
+          return true;
+        } finally {
+          lock.release();
+        }
+      });
     } catch (err) {
       log.error(`Failed to mark message ${id} as unread:`, err.message);
       return false;
     }
   }
 
+  /**
+   * Download attachments from a message.
+   * Returns array of { filename, content (Buffer), contentType, size }
+   */
   async function downloadAttachments(id, folder = 'INBOX', outputDir = '.') {
     try {
-      const args = ['attachment', 'download', '--account', account, '--folder', folder, String(id)];
-      // himalaya downloads to current dir, so we'd need to handle outputDir
-      const result = await runHimalaya(args);
-      return result;
+      return await withClient(async (client) => {
+        const lock = await client.getMailboxLock(folder);
+        try {
+          const msg = await client.fetchOne(String(id), { source: true }, { uid: true });
+          if (!msg || !msg.source) return [];
+
+          const parsed = await simpleParser(msg.source);
+          const results = [];
+
+          for (const att of (parsed.attachments || [])) {
+            const filename = att.filename || `attachment_${results.length}`;
+            const outputPath = path.join(outputDir, filename);
+
+            // Ensure output directory exists
+            if (!fs.existsSync(outputDir)) {
+              fs.mkdirSync(outputDir, { recursive: true });
+            }
+
+            fs.writeFileSync(outputPath, att.content);
+            results.push({
+              filename,
+              path: outputPath,
+              contentType: att.contentType,
+              size: att.size || att.content.length
+            });
+            log.debug(`Saved attachment: ${outputPath} (${results[results.length - 1].size} bytes)`);
+          }
+
+          return results;
+        } finally {
+          lock.release();
+        }
+      });
     } catch (err) {
       log.error(`Failed to download attachments for message ${id}:`, err.message);
-      return null;
+      return [];
     }
   }
 
@@ -177,6 +381,18 @@ function createFetcher(account) {
     markUnread,
     downloadAttachments
   };
+}
+
+/**
+ * Check body structure for attachments
+ */
+function checkForAttachments(structure) {
+  if (!structure) return false;
+  if (structure.disposition === 'attachment') return true;
+  if (structure.childNodes) {
+    return structure.childNodes.some(child => checkForAttachments(child));
+  }
+  return false;
 }
 
 module.exports = { createFetcher };
