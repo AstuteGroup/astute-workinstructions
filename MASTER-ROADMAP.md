@@ -17,7 +17,7 @@ High-level view of all initiatives and projects. Each major area links to its de
 ### Now
 - [ ] **Sourcing Automation** — Supplier deduplication, no-bid filtering, VQ parsing improvements ([details](Trading Analysis/RFQ Sourcing/sourcing-roadmap.md))
 - [ ] **PPV Analysis (Vortex Rebuild)** — Purchase price variance analysis tooling
-- [ ] **RFQ Loading through AI** — AI-assisted extraction and loading of RFQs from customer emails/documents
+- [ ] **RFQ Loading through AI** — AI-assisted extraction and loading of RFQs from customer emails/documents ([workflow](Trading Analysis/RFQ Loading/rfq-loading.md), [support workflows](Trading Analysis/trading-analysis-roadmap.md#section-f-rfq-loading-support-workflows))
 
 ### Next
 - *(add initiatives here)*

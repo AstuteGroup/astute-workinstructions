@@ -351,7 +351,7 @@ IDs are **assigned server-side** by iDempiere — do NOT include PK fields in PO
 
 Stored in `~/workspace/.env` (gitignored). Template at `shared/.env.example`. Required vars: `IDEMPIERE_BASE_URL`, `IDEMPIERE_USERNAME`, `IDEMPIERE_PASSWORD`.
 
-**Note:** Currently pointed at the TEST instance — data will NOT appear in the production replica.
+**Note:** Connected to PRODUCTION (https://172.31.7.239/api/v1). User: Claude Harris (ID: 1049524), Role: Tsunami User (1000004). Data written via the API will appear in production and replicate to this database.
 
 ---
 

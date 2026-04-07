@@ -7,7 +7,7 @@ Match new RFQs against Customer Excess inventory to identify **live fulfillment 
 
 **Direction:** RFQ → Offers (demand drives the match)
 
-**Complementary workflow:** D2 Proactive Opportunities (Offers → Historical RFQs) — triggered by Market Offer Uploading Step 9.
+**Complementary workflow:** D2 Proactive Opportunities (Offers → Historical RFQs) — triggered by Market Offer Analysis Step 9.
 
 ## Tracking
 - **File naming:** `Excess_Match_MM-DD_RFQ_[start]-[end].csv`
