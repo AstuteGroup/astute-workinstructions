@@ -1,5 +1,5 @@
 /**
- * Shared Offer Writer — writes market offers to ai_writeback schema
+ * Shared Offer Writer — writes market offers via iDempiere REST API
  *
  * Handles all offer types (Customer Excess, Broker Stock, Inventory Stock, etc.).
  * Creates records across three tables:
@@ -26,17 +26,14 @@
  *   - (Future) VQ Loading, automated offer capture
  *
  * ID MANAGEMENT:
- *   All IDs start at 9,000,000+ to avoid collisions with production.
- *   Queries ai_writeback for current max IDs before each write.
+ *   IDs are assigned server-side by iDempiere via the REST API.
+ *   Parent IDs are extracted from POST responses and passed to child records.
  */
 
-const { execSync } = require('child_process');
 const logger = require('./logger').createLogger('OfferWriter');
-const {
-  MIN_ID, IDEMPIERE_DEFAULTS,
-  psqlQuery, psqlExec, getNextId,
-  sqlStr, sqlNum, cleanMpn,
-} = require('./db-helpers');
+const { apiPost, apiGet, apiPut } = require('./api-client');
+const { psqlQuery, cleanMpn } = require('./db-helpers');
+const { lookupMfr } = require('./mfr-lookup');
 
 // Offer type name → chuboe_offer_type_id mapping
 const OFFER_TYPES = {
@@ -68,7 +65,7 @@ const OFFER_TYPES = {
 // ─── MAIN WRITER ─────────────────────────────────────────────────────────────
 
 /**
- * Write a complete offer (header + lines + optional line MPNs) to ai_writeback.
+ * Write a complete offer (header + lines + optional line MPNs) via iDempiere REST API.
  *
  * @param {object} opts
  * @param {number} opts.bpartnerId          - c_bpartner_id (required)
@@ -96,7 +93,7 @@ const OFFER_TYPES = {
  * @param {string} [opts.lines[].cpc]       - Customer part code (optional)
  * @param {string} [opts.lines[].cpcClean]  - Cleaned CPC (optional)
  * @param {number} [opts.lines[].recommendedResale] - Suggested resale price (optional)
- * @returns {object} { offerId, linesWritten, mpnsWritten, errors }
+ * @returns {object} { offerId, searchKey, linesWritten, mpnsWritten, errors }
  */
 async function writeOffer(opts) {
   const {
@@ -124,116 +121,107 @@ async function writeOffer(opts) {
     offerTypeId = Number(rawOfferType);
   }
 
-  // ── Get next IDs ──
-  let nextOfferId = getNextId('chuboe_offer', 'chuboe_offer_id');
-  let nextLineId = getNextId('chuboe_offer_line', 'chuboe_offer_line_id');
-  let nextMpnId = writeMpnRecords ? getNextId('chuboe_offer_line_mpn', 'chuboe_offer_line_mpn_id') : 0;
-
-  const offerId = nextOfferId;
   const errors = [];
   let linesWritten = 0;
   let mpnsWritten = 0;
 
-  // ── Insert Offer Header ──
-  const headerSql = `
-    INSERT INTO ai_writeback.chuboe_offer (
-      chuboe_offer_id, ad_client_id, ad_org_id, isactive,
-      created, createdby, updated, updatedby,
-      c_bpartner_id, chuboe_offer_type_id, description, datetrx,
-      chuboe_user_id, chuboe_buyer_id,
-      chuboe_csv_import, chuboe_pulllmarketofferinto,
-      add_pricing_api_vendor, chuboe_search_vendor
-    ) VALUES (
-      ${offerId}, ${IDEMPIERE_DEFAULTS.ad_client_id}, ${IDEMPIERE_DEFAULTS.ad_org_id}, '${IDEMPIERE_DEFAULTS.isactive}',
-      CURRENT_TIMESTAMP, ${IDEMPIERE_DEFAULTS.createdby}, CURRENT_TIMESTAMP, ${IDEMPIERE_DEFAULTS.updatedby},
-      ${bpartnerId}, ${offerTypeId}, ${sqlStr(description)}, ${datetrx ? sqlStr(datetrx) : 'CURRENT_TIMESTAMP'},
-      ${sqlNum(userId)}, ${sqlNum(buyerId)},
-      'N', 'N',
-      'N', 'N'
-    )
-  `;
+  // ── Insert Offer Header via API ──
+  // Column names MUST be exact PascalCase from ad_column.columnname
+  // Omit button fields — API rejects string 'N' on button columns
+  const headerPayload = {
+    C_BPartner_ID: bpartnerId,
+    Chuboe_Offer_Type_ID: offerTypeId,
+  };
+  if (description) headerPayload.Description = description;
+  if (userId) headerPayload.Chuboe_User_ID = userId;
+  if (buyerId) headerPayload.Chuboe_Buyer_ID = buyerId;
 
-  const headerOk = psqlExec(headerSql);
-  if (!headerOk) {
-    return { offerId: null, linesWritten: 0, mpnsWritten: 0, errors: ['Failed to insert offer header'] };
+  let offerId;
+  let searchKey = null;
+  try {
+    const headerResponse = await apiPost('chuboe_offer', headerPayload);
+    offerId = headerResponse.id;
+    searchKey = headerResponse.Value || headerResponse.value || null;
+    if (!offerId) throw new Error('No ID returned in response');
+  } catch (e) {
+    return { offerId: null, searchKey: null, linesWritten: 0, mpnsWritten: 0, errors: [`Failed to insert offer header: ${e.message}`] };
   }
-  logger.info(`Offer header created: chuboe_offer_id=${offerId}, BP=${bpartnerId}, type=${offerTypeId}`);
+  logger.info(`Offer header created: searchKey=${searchKey}, chuboe_offer_id=${offerId}, BP=${bpartnerId}, type=${offerTypeId}`);
 
   // ── Insert Lines ──
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
     const lineNum = (i + 1) * 10; // Line 10, 20, 30...
-    const lineId = nextLineId + i;
 
     const mpnRaw = line.mpn || '';
     const mpnCleanVal = line.mpnClean || cleanMpn(mpnRaw);
 
-    const lineSql = `
-      INSERT INTO ai_writeback.chuboe_offer_line (
-        chuboe_offer_line_id, ad_client_id, ad_org_id, isactive,
-        created, createdby, updated, updatedby,
-        chuboe_offer_id, line,
-        chuboe_mpn, chuboe_mpn_clean,
-        chuboe_mfr_id, chuboe_mfr_text,
-        qty, priceentered,
-        chuboe_date_code, chuboe_lead_time, chuboe_package_desc,
-        c_country_id, c_currency_id,
-        description,
-        chuboe_moq, chuboe_spq,
-        chuboe_cpc, chuboe_cpc_clean,
-        apl_offer_recommendedresale
-      ) VALUES (
-        ${lineId}, ${IDEMPIERE_DEFAULTS.ad_client_id}, ${IDEMPIERE_DEFAULTS.ad_org_id}, '${IDEMPIERE_DEFAULTS.isactive}',
-        CURRENT_TIMESTAMP, ${IDEMPIERE_DEFAULTS.createdby}, CURRENT_TIMESTAMP, ${IDEMPIERE_DEFAULTS.updatedby},
-        ${offerId}, ${lineNum},
-        ${sqlStr(mpnRaw)}, ${sqlStr(mpnCleanVal)},
-        ${sqlNum(line.mfrId)}, ${sqlStr(line.mfrText)},
-        ${sqlNum(line.qty)}, ${sqlNum(line.price)},
-        ${sqlStr(line.dateCode)}, ${sqlStr(line.leadTime)}, ${sqlStr(line.packageDesc)},
-        ${sqlNum(line.countryId)}, ${sqlNum(line.currencyId)},
-        ${sqlStr(line.description)},
-        ${sqlStr(line.moq)}, ${sqlStr(line.spq)},
-        ${sqlStr(line.cpc)}, ${line.cpcClean ? sqlStr(line.cpcClean) : (line.cpc ? sqlStr(cleanMpn(line.cpc)) : 'NULL')},
-        ${sqlNum(line.recommendedResale)}
-      )
-    `;
+    const linePayload = {
+      Chuboe_Offer_ID: offerId,
+      Line: lineNum,
+      Chuboe_MPN: mpnRaw,
+      Chuboe_MPN_Clean: mpnCleanVal,
+    };
+    // MFR resolution: resolve to canonical name, only set MFR ID if non-system.
+    // System-level MFR records (AD_Client_ID=0) cause 500 errors via API:
+    // "System ID XXXX cannot be used in Chuboe_MFR_ID"
+    if (line.mfrText) {
+      const mfrResult = lookupMfr(line.mfrText);
+      linePayload.Chuboe_MFR_Text = mfrResult.canonical;
+      if (mfrResult.id && !mfrResult.isSystem) {
+        linePayload.Chuboe_MFR_ID = mfrResult.id;
+      }
+    }
+    if (line.qty != null) linePayload.Qty = line.qty;
+    if (line.price != null) linePayload.PriceEntered = line.price;
+    if (line.dateCode) linePayload.Chuboe_Date_Code = line.dateCode;
+    if (line.leadTime) linePayload.Chuboe_Lead_Time = line.leadTime;
+    if (line.packageDesc) linePayload.Chuboe_Package_Desc = line.packageDesc;
+    if (line.countryId) linePayload.C_Country_ID = line.countryId;
+    if (line.currencyId) linePayload.C_Currency_ID = line.currencyId;
+    if (line.description) linePayload.Description = line.description;
+    if (line.moq) linePayload.Chuboe_MOQ = line.moq;
+    if (line.spq) linePayload.Chuboe_SPQ = line.spq;
+    if (line.cpc) linePayload.Chuboe_CPC = line.cpc;
+    if (line.cpcClean) {
+      linePayload.Chuboe_CPC_Clean = line.cpcClean;
+    } else if (line.cpc) {
+      linePayload.Chuboe_CPC_Clean = cleanMpn(line.cpc);
+    }
+    if (line.recommendedResale != null) linePayload.APL_Offer_RecommendedResale = line.recommendedResale;
 
-    if (!psqlExec(lineSql)) {
-      errors.push(`Failed to insert line ${i + 1} (${mpnRaw})`);
+    let lineId;
+    try {
+      const lineResponse = await apiPost('chuboe_offer_line', linePayload);
+      lineId = lineResponse.id;
+      if (!lineId) throw new Error('No ID returned in response');
+    } catch (e) {
+      errors.push(`Failed to insert line ${i + 1} (${mpnRaw}): ${e.message}`);
       continue;
     }
     linesWritten++;
 
-    // ── Optional: Insert chuboe_offer_line_mpn ──
+    // ── Optional: Insert chuboe_offer_line_mpn via API ──
     if (writeMpnRecords) {
-      const mpnId = nextMpnId + i;
-      const mpnSql = `
-        INSERT INTO ai_writeback.chuboe_offer_line_mpn (
-          chuboe_offer_line_mpn_id, ad_client_id, ad_org_id, isactive,
-          created, createdby, updated, updatedby,
-          chuboe_offer_line_id,
-          chuboe_mpn, chuboe_mpn_clean,
-          description
-        ) VALUES (
-          ${mpnId}, ${IDEMPIERE_DEFAULTS.ad_client_id}, ${IDEMPIERE_DEFAULTS.ad_org_id}, '${IDEMPIERE_DEFAULTS.isactive}',
-          CURRENT_TIMESTAMP, ${IDEMPIERE_DEFAULTS.createdby}, CURRENT_TIMESTAMP, ${IDEMPIERE_DEFAULTS.updatedby},
-          ${lineId},
-          ${sqlStr(mpnRaw)}, ${sqlStr(mpnCleanVal)},
-          ${sqlStr(line.description)}
-        )
-      `;
+      try {
+        const mpnPayload = {
+          chuboe_offer_line_id: lineId,
+          chuboe_mpn: mpnRaw,
+          chuboe_mpn_clean: mpnCleanVal,
+        };
+        if (line.description) mpnPayload.Description = line.description;
 
-      if (!psqlExec(mpnSql)) {
-        errors.push(`Failed to insert offer_line_mpn ${i + 1} (${mpnRaw})`);
-      } else {
+        await apiPost('chuboe_offer_line_mpn', mpnPayload);
         mpnsWritten++;
+      } catch (e) {
+        errors.push(`Failed to insert offer_line_mpn ${i + 1} (${mpnRaw}): ${e.message}`);
       }
     }
   }
 
-  logger.info(`Offer write complete: offerId=${offerId}, ${linesWritten} lines${writeMpnRecords ? `, ${mpnsWritten} MPNs` : ''}${errors.length ? `, ${errors.length} errors` : ''}`);
+  logger.info(`Offer write complete: searchKey=${searchKey}, offerId=${offerId}, ${linesWritten} lines${writeMpnRecords ? `, ${mpnsWritten} MPNs` : ''}${errors.length ? `, ${errors.length} errors` : ''}`);
 
-  return { offerId, linesWritten, mpnsWritten, errors };
+  return { offerId, searchKey, linesWritten, mpnsWritten, errors };
 }
 
 // ─── BATCH WRITER ────────────────────────────────────────────────────────────
@@ -267,52 +255,68 @@ async function writeOffers(offers) {
  * Deactivate all existing offer lines for a given partner + offer type.
  * Used before writing a fresh inventory snapshot so stale lines don't persist.
  *
- * NOTE: This updates ai_writeback records only. Production records written
- * via CSV import live in adempiere and are NOT touched here.
+ * Uses the REST API to query and deactivate records via GET + PUT.
  *
  * @param {number} bpartnerId - c_bpartner_id
  * @param {number} offerTypeId - chuboe_offer_type_id
- * @returns {object} { offersDeactivated, linesDeactivated }
+ * @returns {Promise<object>} { offersDeactivated, linesDeactivated }
  */
-function deactivatePriorOffers(bpartnerId, offerTypeId) {
-  // Deactivate lines belonging to matching offers
-  const linesSql = `
-    UPDATE ai_writeback.chuboe_offer_line ol
-    SET isactive = 'N', updated = CURRENT_TIMESTAMP, updatedby = ${IDEMPIERE_DEFAULTS.updatedby}
-    WHERE ol.chuboe_offer_id IN (
-      SELECT chuboe_offer_id FROM ai_writeback.chuboe_offer
-      WHERE c_bpartner_id = ${bpartnerId}
-        AND chuboe_offer_type_id = ${offerTypeId}
-        AND isactive = 'Y'
-    ) AND ol.isactive = 'Y'
-  `;
+async function deactivatePriorOffers(bpartnerId, offerTypeId) {
+  // Query active offers for this BP + type via API
+  let offers;
+  try {
+    const result = await apiGet('chuboe_offer', {
+      filter: `C_BPartner_ID eq ${bpartnerId} and chuboe_offer_type_id eq ${offerTypeId} and IsActive eq true`,
+      select: 'chuboe_offer_id',
+    });
+    offers = result.records || [];
+  } catch (e) {
+    logger.error(`Failed to query prior offers for BP=${bpartnerId}, type=${offerTypeId}: ${e.message}`);
+    return { offersDeactivated: 0, linesDeactivated: 0 };
+  }
 
-  // Deactivate the offer headers
-  const headerSql = `
-    UPDATE ai_writeback.chuboe_offer
-    SET isactive = 'N', updated = CURRENT_TIMESTAMP, updatedby = ${IDEMPIERE_DEFAULTS.updatedby}
-    WHERE c_bpartner_id = ${bpartnerId}
-      AND chuboe_offer_type_id = ${offerTypeId}
-      AND isactive = 'Y'
-  `;
-
-  // Count before deactivation
-  const countResult = psqlQuery(`SELECT COUNT(*) FROM ai_writeback.chuboe_offer WHERE c_bpartner_id = ${bpartnerId} AND chuboe_offer_type_id = ${offerTypeId} AND isactive = 'Y'`);
-  const priorCount = parseInt(countResult, 10) || 0;
-
-  if (priorCount === 0) {
+  if (offers.length === 0) {
     logger.info(`No prior offers to deactivate for BP=${bpartnerId}, type=${offerTypeId}`);
     return { offersDeactivated: 0, linesDeactivated: 0 };
   }
 
-  const lineCountResult = psqlQuery(`SELECT COUNT(*) FROM ai_writeback.chuboe_offer_line ol WHERE ol.chuboe_offer_id IN (SELECT chuboe_offer_id FROM ai_writeback.chuboe_offer WHERE c_bpartner_id = ${bpartnerId} AND chuboe_offer_type_id = ${offerTypeId} AND isactive = 'Y') AND ol.isactive = 'Y'`);
-  const priorLineCount = parseInt(lineCountResult, 10) || 0;
+  let linesDeactivated = 0;
 
-  psqlExec(linesSql);
-  psqlExec(headerSql);
+  // Deactivate lines for each offer, then deactivate the offer header
+  for (const offer of offers) {
+    const offerId = offer.chuboe_offer_id || offer.id;
 
-  logger.info(`Deactivated ${priorCount} offers, ${priorLineCount} lines for BP=${bpartnerId}, type=${offerTypeId}`);
-  return { offersDeactivated: priorCount, linesDeactivated: priorLineCount };
+    // Get active lines for this offer
+    try {
+      const lineResult = await apiGet('chuboe_offer_line', {
+        filter: `chuboe_offer_id eq ${offerId} and IsActive eq true`,
+        select: 'chuboe_offer_line_id',
+      });
+      const lines = lineResult.records || [];
+
+      for (const line of lines) {
+        const lineId = line.chuboe_offer_line_id || line.id;
+        try {
+          await apiPut('chuboe_offer_line', lineId, { IsActive: false });
+          linesDeactivated++;
+        } catch (e) {
+          logger.warn(`Failed to deactivate offer line ${lineId}: ${e.message}`);
+        }
+      }
+    } catch (e) {
+      logger.warn(`Failed to query lines for offer ${offerId}: ${e.message}`);
+    }
+
+    // Deactivate the offer header
+    try {
+      await apiPut('chuboe_offer', offerId, { IsActive: false });
+    } catch (e) {
+      logger.warn(`Failed to deactivate offer ${offerId}: ${e.message}`);
+    }
+  }
+
+  logger.info(`Deactivated ${offers.length} offers, ${linesDeactivated} lines for BP=${bpartnerId}, type=${offerTypeId}`);
+  return { offersDeactivated: offers.length, linesDeactivated };
 }
 
 // ─── UTILITY: MFR ID LOOKUP ─────────────────────────────────────────────────

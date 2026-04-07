@@ -30,7 +30,8 @@
 const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
-const { psqlQuery, psqlExec, getNextId, sqlStr, tableExists, IDEMPIERE_DEFAULTS } = require('./db-helpers');
+const { psqlQuery, sqlStr } = require('./db-helpers');
+const { apiPost, isApiAvailable } = require('./api-client');
 const logger = require('./logger').createLogger('APIPricing');
 
 // ─── CONSTANTS ───────────────────────────────────────────────────────────────
@@ -169,51 +170,46 @@ function readCache(mpn, maxAgeDays = 30) {
 // ─── DB OPERATIONS ──────────────────────────────────────────────────────────
 
 /**
- * Check if the ai_writeback pricing table exists.
+ * Check if the iDempiere REST API is reachable for writes.
  * Result is memoized for the process lifetime.
  */
 let _dbAvailable = null;
-function isDbAvailable() {
+async function isDbAvailable() {
   if (_dbAvailable !== null) return _dbAvailable;
-  _dbAvailable = tableExists(DB_TABLE);
+  _dbAvailable = await isApiAvailable();
   if (!_dbAvailable) {
-    logger.info('ai_writeback.chuboe_pricing_api_result not available — using cache only');
+    logger.info('iDempiere API not available — using cache only');
   }
   return _dbAvailable;
 }
 
 /**
- * Write envelope to ai_writeback.chuboe_pricing_api_result.
- * Returns the inserted ID, or null if table doesn't exist or write fails.
+ * Write envelope to chuboe_pricing_api_result via iDempiere REST API.
+ * Returns the server-assigned ID, or null if API not available or write fails.
  */
-function writeDb(mpn, envelope, rfqId) {
-  if (!isDbAvailable()) return null;
+async function writeDb(mpn, envelope, rfqId) {
+  const available = await isDbAvailable();
+  if (!available) return null;
 
   try {
-    const nextId = getNextId(DB_TABLE, 'chuboe_pricing_api_result_id');
     const uu = crypto.randomUUID();
-    const jsonStr = JSON.stringify(envelope).replace(/'/g, "''");
 
-    const sql = `INSERT INTO ai_writeback.${DB_TABLE} (
-      chuboe_pricing_api_result_id, ad_client_id, ad_org_id, isactive,
-      created, createdby, updated, updatedby,
-      chuboe_pricing_api_result_uu,
-      ad_table_id, record_id, mpns, json_info
-    ) VALUES (
-      ${nextId}, ${IDEMPIERE_DEFAULTS.ad_client_id}, ${IDEMPIERE_DEFAULTS.ad_org_id}, 'Y',
-      CURRENT_TIMESTAMP, ${IDEMPIERE_DEFAULTS.createdby}, CURRENT_TIMESTAMP, ${IDEMPIERE_DEFAULTS.updatedby},
-      '${uu}',
-      ${rfqId ? AD_TABLE_ID_RFQ : 'NULL'},
-      ${rfqId || 'NULL'},
-      ${sqlStr(mpn.substring(0, 255))},
-      '${jsonStr}'::jsonb
-    )`;
-
-    const ok = psqlExec(sql);
-    if (ok) {
-      return nextId;
+    const payload = {
+      chuboe_pricing_api_result_uu: uu,
+      mpns: mpn.substring(0, 255),
+      json_info: JSON.stringify(envelope),
+    };
+    if (rfqId) {
+      payload.AD_Table_ID = AD_TABLE_ID_RFQ;
+      payload.Record_ID = rfqId;
     }
-    logger.error(`DB write failed for ${mpn}`);
+
+    const result = await apiPost(DB_TABLE, payload);
+    const assignedId = result.id;
+    if (assignedId) {
+      return assignedId;
+    }
+    logger.error(`DB write failed for ${mpn}: no ID returned`);
     return null;
   } catch (err) {
     logger.error(`DB write error for ${mpn}: ${err.message}`);
@@ -227,10 +223,10 @@ function writeDb(mpn, envelope, rfqId) {
  */
 function readDb(mpn, maxAgeDays = 30) {
   const escaped = mpn.replace(/'/g, "''");
-  // Try ai_writeback first (our data, most recent)
-  const sources = isDbAvailable()
-    ? ['ai_writeback', 'adempiere']
-    : ['adempiere'];
+  // Read from both schemas via psql — ai_writeback may still have older data,
+  // and adempiere has Flux-written data. API writes will appear here once
+  // production is connected.
+  const sources = ['ai_writeback', 'adempiere'];
 
   for (const schema of sources) {
     const sql = `SELECT json_info::text FROM ${schema}.${DB_TABLE}
@@ -281,8 +277,8 @@ async function writePricingResult(opts) {
   // Always write to cache
   const cacheFile = writeCache(mpn, envelope);
 
-  // Write to DB if available (non-blocking — failure doesn't affect cache)
-  const dbId = writeDb(mpn, envelope, rfqId);
+  // Write to DB via API if available (non-blocking — failure doesn't affect cache)
+  const dbId = await writeDb(mpn, envelope, rfqId);
 
   const success = cacheFile !== null;
   if (success) {
@@ -360,9 +356,10 @@ function extractPriceAtQty(mpn, qty, options = {}) {
  *
  * @returns {{ imported: number, errors: number }}
  */
-function flushCacheToDB() {
-  if (!isDbAvailable()) {
-    logger.error('Cannot flush: ai_writeback.chuboe_pricing_api_result not available');
+async function flushCacheToDB() {
+  const available = await isDbAvailable();
+  if (!available) {
+    logger.error('Cannot flush: iDempiere API not available');
     return { imported: 0, errors: 0 };
   }
 
@@ -385,7 +382,7 @@ function flushCacheToDB() {
       const mpn = envelope.data?._meta?.searchedMPN || file.split('_')[0];
       const rfqId = null; // Cache files don't track RFQ IDs
 
-      const dbId = writeDb(mpn, envelope, rfqId);
+      const dbId = await writeDb(mpn, envelope, rfqId);
       if (dbId) {
         fs.renameSync(filepath, path.join(importedDir, file));
         imported++;

@@ -2,7 +2,7 @@
 
 Single source of truth for writing data to iDempiere via the REST API. Replaces the prior `ai_writeback` PostgreSQL schema approach.
 
-**Status:** Production API connected (`http://172.31.28.106:8080/api/v1`). Write operations currently blocked by role permissions (403) — see [Current Blocker](#current-blocker) below.
+**Status:** Production API connected (`https://172.31.7.239/api/v1`). Write operations currently blocked by role permissions (403) — see [Current Blocker](#current-blocker) below.
 
 **Code:** `shared/api-client.js` — shared module used by all write consumers.
 
@@ -15,11 +15,11 @@ Single source of truth for writing data to iDempiere via the REST API. Replaces 
 1. Open `~/workspace/.env`
 2. Fill in the iDempiere variables:
    ```
-   IDEMPIERE_BASE_URL=http://172.31.28.106:8080/api/v1
+   IDEMPIERE_BASE_URL=https://172.31.7.239/api/v1
    IDEMPIERE_USERNAME=your_username
    IDEMPIERE_PASSWORD=your_password
    IDEMPIERE_CLIENT_ID=1000000
-   IDEMPIERE_ROLE_ID=1000056
+   IDEMPIERE_ROLE_ID=1000060
    IDEMPIERE_ORG_ID=1000000
    ```
 3. Verify: `node -e "require('./astute-workinstructions/shared/api-client').login().then(t => console.log('OK', t.token.substring(0,20)+'...')).catch(e => console.error(e.message))"`
@@ -163,13 +163,13 @@ Content-Type: application/json
 2. **One central `.env` file** at `~/workspace/.env` stores all API keys (franchise APIs, iDempiere, etc.). Updated 2026-03-31 with real production credentials.
 3. **Role requirements:** The iDempiere user must have a role with `Role Type` set to `WebService` or blank. Current role: `WebService User` (ID 1000056).
 4. **Rotate credentials** if a token security breach is detected (refresh token reuse).
-5. **Production API** is at `http://172.31.28.106:8080/api/v1` (direct internal IP, HTTP — bypasses the expired SSL cert on `test.orangetsunami.com`).
+5. **Production API** is at `https://172.31.7.239/api/v1` (direct internal IP, HTTP — bypasses the expired SSL cert on `test.orangetsunami.com`).
 
 ### Environment Variables
 
 | Variable | Required | Description |
 |----------|----------|-------------|
-| `IDEMPIERE_BASE_URL` | Yes | API base URL: `http://172.31.28.106:8080/api/v1` (no trailing slash) |
+| `IDEMPIERE_BASE_URL` | Yes | API base URL: `https://172.31.7.239/api/v1` (no trailing slash) |
 | `IDEMPIERE_USERNAME` | Yes | iDempiere login username |
 | `IDEMPIERE_PASSWORD` | Yes | iDempiere login password |
 | `IDEMPIERE_CLIENT_ID` | No | Override AD_Client_ID (default: 1000000) |
@@ -907,7 +907,7 @@ For each table: required fields (NOT NULL, no default), commonly-used optional f
 ### 2026-03-31 — Initial API Testing Session
 
 **Connection:**
-- Production API confirmed at `http://172.31.28.106:8080/api/v1` (direct internal IP, HTTP)
+- Production API confirmed at `https://172.31.7.239/api/v1` (direct internal IP, HTTP)
 - Bypasses expired SSL cert on `test.orangetsunami.com`
 - `.env` updated with real credentials
 
