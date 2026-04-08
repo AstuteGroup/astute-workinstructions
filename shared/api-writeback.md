@@ -880,6 +880,17 @@ For each table: required fields (NOT NULL, no default), commonly-used optional f
 
 **Use:** Adding line items to an offer. One per MPN.
 
+> ⚠️ **CRITICAL — CPC bean-callout silently collapses lines.** The server-side bean callout dedups by `(chuboe_offer_id, chuboe_cpc)` strict equality, ignoring MPN. Two distinct industry MPNs sharing one CPC will be merged: the earlier survivor's `chuboe_mpn` becomes `"MPN_A,MPN_B"` (corrupting its join key), the new line is set `isactive=N`. POST returns 200 OK; the destruction happens after the response. Verified empirically 2026-04-08.
+>
+> **Mitigations:**
+> - **Per-CPC anchor pattern** — only one line per unique CPC carries `chuboe_cpc`; subsequent rows for the same CPC POST with `chuboe_cpc=''` and capture the linkage in `Description` text or a sub-row.
+> - **Sub-row alternates** for AVL/multi-MPN-per-CPC — write the primary as one `chuboe_offer_line` and put the alts in `chuboe_offer_line_mpn` sub-rows under it (sub-table is not subject to the callout).
+>
+> Also: `Chuboe_CPC` is **non-updateable on existing rows** — PATCH returns `500 "Cannot update column Chuboe_CPC"`. Set CPC at POST time only.
+>
+> See: `shared/data-model.md` § Offer Chain, `shared/offer-writeback.js` header, memory `feedback_avl_multi_mpn_loading.md`, memory `project_chuboe_offer_line_cpc_collapse.md`.
+
+
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
 | `chuboe_offer_id` | number | **Yes** | Parent offer (from POST response) |

@@ -308,8 +308,18 @@ function lookupByEmailDomain(email, partnerType = 'any') {
 
   const cleanDomain = domain.replace(/'/g, "''");
 
+  // Get the domain stem (e.g., 'sanmina' from 'sanmina.com') so we can prefer
+  // BPs whose name contains that stem when multiple BPs share the same email
+  // domain. Without this, the tiebreaker fell to created DESC and could pick
+  // an unrelated BP that happened to have one stray contact at the customer's
+  // domain (e.g., a Sanmina employee added as a contact under NEURAL DSP
+  // TECHNOLOGIES OY mismatched @sanmina.com to NEURAL DSP — even though
+  // Sanmina Corporation had 860 contacts at the same domain).
+  const domainStem = domain.split('.')[0].replace(/'/g, "''");
+
   const sql = `
-    SELECT bp.c_bpartner_id, bp.name, bp.value as search_key
+    SELECT bp.c_bpartner_id, bp.name, bp.value as search_key,
+           COUNT(u.ad_user_id) AS user_count
     FROM adempiere.ad_user u
     JOIN adempiere.c_bpartner bp ON u.c_bpartner_id = bp.c_bpartner_id
     WHERE LOWER(u.email) LIKE '%@${cleanDomain}'
@@ -318,7 +328,14 @@ function lookupByEmailDomain(email, partnerType = 'any') {
       AND bp.name NOT ILIKE 'USE %'
       ${partnerTypeFilter(partnerType)}
     GROUP BY bp.c_bpartner_id, bp.name, bp.value
-    ORDER BY MAX(bp.created) DESC
+    ORDER BY
+      -- 1. Prefer BPs whose name contains the domain stem (e.g., 'sanmina')
+      CASE WHEN LOWER(bp.name) LIKE '%${domainStem}%' THEN 0 ELSE 1 END,
+      -- 2. Prefer BPs with the most contacts at this domain (Sanmina has
+      --    860 sanmina.com contacts; NEURAL DSP has 1 — clear winner)
+      COUNT(u.ad_user_id) DESC,
+      -- 3. Final tiebreaker: most recent
+      MAX(bp.created) DESC
     LIMIT 3
   `;
 

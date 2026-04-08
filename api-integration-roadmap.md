@@ -1196,11 +1196,19 @@ Cache franchise API responses to avoid duplicate calls across workflows and with
 
 ### TTL Rules
 
-| Context | TTL | Rationale |
-|---------|-----|-----------|
-| Default | 7 days | Standard franchise pricing doesn't move fast |
-| PPV RFQ type | 30 days | PPV parts are even more stable |
-| PPV + price under customer target | Force refresh | Need to confirm inventory is still available at that price |
+Locked 2026-04-08 — used by `RFQ API Enrichment` workflow (cron-driven, every-RFQ pass). The canonical TTL-by-RFQ-type table lives here; the workflow doc references this section.
+
+| RFQ Type | TTL | Rationale |
+|----------|-----|-----------|
+| PPV | 30 days | Stable customer PPV parts — infrequent pricing churn |
+| Astute Franchised | 30 days | Franchise-sourced, stable supply chain |
+| Shortage | 7 days | Volatile inventory, needs fresher reads |
+| Stock | 7 days | Broker-to-broker, demand signal, current availability matters |
+| EOL/LTB | 7 days | Declining stock, but inventory levels shift fast |
+| 3PL/VMI | 7 days | Kitting pulls, qty-driven freshness |
+| Hot Parts | 7 days | High-urgency by definition |
+| Proactive Offer | 7 days | Market-timed, needs current reads |
+| *(any type)* + cached price < customer target | Force refresh | Confirm inventory is still available at that price |
 
 ### Interface (proposed)
 

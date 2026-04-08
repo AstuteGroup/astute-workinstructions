@@ -7,6 +7,41 @@
  *   - chuboe_offer_line (line items)
  *   - chuboe_offer_line_mpn (MPN cross-references, optional)
  *
+ * ╔══════════════════════════════════════════════════════════════════════════╗
+ * ║ ⚠️  CRITICAL — chuboe_offer_line CPC bean-callout collapse                ║
+ * ║                                                                          ║
+ * ║ iDempiere has a server-side bean callout that deduplicates                ║
+ * ║ chuboe_offer_line records by (chuboe_offer_id, chuboe_cpc) — strict       ║
+ * ║ equality, IGNORING chuboe_mpn. When two lines POST'd to the same offer    ║
+ * ║ share a non-empty CPC, the callout fires AFTER the API returns 200 OK:    ║
+ * ║                                                                          ║
+ * ║   1. The earlier line's chuboe_mpn is COMMA-MERGED in place with the      ║
+ * ║      new line's MPN ("MPN_A,MPN_B") — corrupts the survivor's join key.  ║
+ * ║   2. The new line is set isactive=N with description overwritten to       ║
+ * ║      "deactived - duplicate CPC - See Line #<survivor>".                  ║
+ * ║   3. Loaders see no error — POST returns success and a new ID.            ║
+ * ║                                                                          ║
+ * ║ Verified empirically 2026-04-08 with totally distinct MPNs                ║
+ * ║ ("5962-1620804QZC" vs "TESTAVL-COLLAPSE-CHECK") sharing one CPC.          ║
+ * ║                                                                          ║
+ * ║ MITIGATION — per-CPC anchor pattern:                                      ║
+ * ║   - For each unique CPC value in your batch, ONE line carries the CPC.    ║
+ * ║   - All other lines for that CPC must POST with chuboe_cpc = '' / NULL.   ║
+ * ║   - Capture the CPC linkage via chuboe_offer_line_mpn sub-rows OR by      ║
+ * ║     prepending "CPC=<value>" to the description (text-searchable).        ║
+ * ║                                                                          ║
+ * ║ For AVL/multi-MPN-per-CPC patterns: prefer writing alternates as          ║
+ * ║ chuboe_offer_line_mpn sub-rows under one parent chuboe_offer_line. The    ║
+ * ║ sub-table is NOT subject to the bean callout.                             ║
+ * ║                                                                          ║
+ * ║ See:  shared/data-model.md § chuboe_offer_line CPC dedup                  ║
+ * ║       memory: feedback_avl_multi_mpn_loading.md                           ║
+ * ║       memory: project_chuboe_offer_line_cpc_collapse.md                   ║
+ * ╚══════════════════════════════════════════════════════════════════════════╝
+ *
+ * ALSO: Chuboe_CPC is non-updateable on existing rows (PATCH returns 500
+ * "Cannot update column Chuboe_CPC"). CPC must be set at POST time only.
+ *
  * USAGE:
  *   const { writeOffer } = require('../shared/offer-writeback');
  *

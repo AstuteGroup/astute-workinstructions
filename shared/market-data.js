@@ -171,7 +171,7 @@ function getSalesHistory(mpnClean, options = {}) {
   const months = options.months || DEFAULTS.salesMonths;
   const rows = psql(`
     SELECT sol.chuboe_mpn as mpn, so.dateordered::date, bp.name as customer,
-           sol.priceentered as unit_price, sol.qtyordered as qty,
+           sol.priceentered as unit_price, sol.qtyentered as qty,
            bp.isvendor, bp.iscustomer,
            g.name as bp_group
     FROM adempiere.c_order so
@@ -179,7 +179,7 @@ function getSalesHistory(mpnClean, options = {}) {
     JOIN adempiere.c_bpartner bp ON so.c_bpartner_id = bp.c_bpartner_id
     LEFT JOIN adempiere.c_bp_group g ON bp.c_bp_group_id = g.c_bp_group_id
     WHERE so.isactive = 'Y' AND sol.isactive = 'Y'
-    AND so.issotrx = 'Y' AND so.docstatus IN ('CO','CL')
+    AND so.issotrx = 'Y' AND so.docstatus IN ('IP','CO','CL')
     AND so.ad_client_id = 1000000
     AND so.dateordered >= CURRENT_DATE - INTERVAL '${months} months'
     AND sol.chuboe_mpn IS NOT NULL
@@ -324,7 +324,11 @@ function getAllMarketData(mpn, options = {}) {
  *   activeRfqCount,        // last `rfqDaysActive` days
  *   historicalRfqCount,    // last `rfqMonthsHist` months
  *   demandStrength,        // HIGH / MEDIUM / LOW / NONE — derived from historicalRfqCount
- *   topBuyers: [{name, isBroker}]   // top N customers by SO frequency, broker-flagged
+ *   topBuyers: [{name, isBroker}],   // top N customers by SO frequency, broker-flagged
+ *
+ *   // Detail rows (top N most recent per MPN, for "show me actual matches" UI):
+ *   historicalRfqs: [{ rfqSearchKey, customer, rfqType, qty, targetPrice, date, isVendor, ageDays }],
+ *   historicalSales: [{ customer, qty, soldPrice, date, isBroker, ageDays }],
  * }
  *
  * Match semantics: EXACT equality on `chuboe_mpn_clean`. Partial / suffix-variant
@@ -359,6 +363,8 @@ function getBulkMarketData(mpnCleans, options = {}) {
       historicalRfqCount: 0,
       demandStrength: 'NONE',
       topBuyers: [],
+      historicalRfqs: [],   // populated by Query 5 — actual RFQ row detail
+      historicalSales: [],  // populated by Query 6 — actual SO row detail
     });
   }
 
@@ -414,7 +420,7 @@ function getBulkMarketData(mpnCleans, options = {}) {
            JOIN adempiere.c_orderline sol ON so.c_order_id = sol.c_order_id
            JOIN adempiere.c_bpartner bp ON so.c_bpartner_id = bp.c_bpartner_id
            WHERE so.isactive = 'Y' AND sol.isactive = 'Y'
-             AND so.issotrx = 'Y' AND so.docstatus IN ('CO','CL')
+             AND so.issotrx = 'Y' AND so.docstatus IN ('IP','CO','CL')
              AND so.ad_client_id = 1000000
              AND so.dateordered >= CURRENT_DATE - INTERVAL '${salesMonths} months'
              AND sol.chuboe_mpn IS NOT NULL
@@ -453,7 +459,7 @@ function getBulkMarketData(mpnCleans, options = {}) {
            JOIN adempiere.c_orderline sol ON so.c_order_id = sol.c_order_id
            JOIN adempiere.c_bpartner bp ON so.c_bpartner_id = bp.c_bpartner_id
            WHERE so.isactive = 'Y' AND sol.isactive = 'Y'
-             AND so.issotrx = 'Y' AND so.docstatus IN ('CO','CL')
+             AND so.issotrx = 'Y' AND so.docstatus IN ('IP','CO','CL')
              AND so.ad_client_id = 1000000
              AND so.dateordered >= CURRENT_DATE - INTERVAL '${salesMonths} months'
              AND sol.chuboe_mpn IS NOT NULL
@@ -528,6 +534,106 @@ function getBulkMarketData(mpnCleans, options = {}) {
     r.activeRfqCount = parseInt(active, 10) || 0;
     r.historicalRfqCount = parseInt(hist, 10) || 0;
     r.demandStrength = getDemandStrength(r.historicalRfqCount);
+  }
+
+  // ── Query 5: Historical RFQ ROW DETAIL (top N most recent per MPN) ──────
+  // Window function ranks rows by created DESC within each MPN; we keep the
+  // top 10 to show actual customer/qty/target/date in downstream output.
+  const detailLimit = options.detailLimit || 10;
+  const rfqDetailRows = psql(`
+    WITH mpns(mpn) AS (VALUES ${valuesList}),
+         ranked AS (
+           SELECT m.chuboe_mpn_clean AS mpn,
+                  r.value AS rfq_search_key,
+                  bp.name AS customer,
+                  COALESCE(rt.name, '') AS rfq_type,
+                  rl.qty AS qty,
+                  rl.priceentered AS target,
+                  r.created::date AS rfq_date,
+                  bp.isvendor,
+                  ROW_NUMBER() OVER (PARTITION BY m.chuboe_mpn_clean ORDER BY r.created DESC) AS rn
+           FROM adempiere.chuboe_rfq_line_mpn m
+           JOIN adempiere.chuboe_rfq_line rl ON m.chuboe_rfq_line_id = rl.chuboe_rfq_line_id
+           JOIN adempiere.chuboe_rfq r ON rl.chuboe_rfq_id = r.chuboe_rfq_id
+           JOIN adempiere.c_bpartner bp ON r.c_bpartner_id = bp.c_bpartner_id
+           LEFT JOIN adempiere.chuboe_rfq_type rt ON r.chuboe_rfq_type_id = rt.chuboe_rfq_type_id
+           WHERE m.isactive = 'Y' AND rl.isactive = 'Y' AND r.isactive = 'Y'
+             AND m.chuboe_mpn_clean IN (SELECT mpn FROM mpns)
+             AND r.created >= CURRENT_DATE - INTERVAL '${rfqMonthsHist} months'
+         )
+    SELECT mpn, rfq_search_key, customer, rfq_type, qty, target, rfq_date, isvendor
+    FROM ranked
+    WHERE rn <= ${detailLimit}
+    ORDER BY mpn, rn
+  `);
+  for (const row of rfqDetailRows) {
+    if (!row || row.length < 8) continue;
+    const [mpn, searchKey, customer, rfqType, qty, target, rfqDate, isVendor] = row;
+    const r = result.get(mpn);
+    if (!r) continue;
+    const date = rfqDate || '';
+    const ageDays = date ? Math.floor((Date.now() - new Date(date).getTime()) / (24 * 60 * 60 * 1000)) : null;
+    r.historicalRfqs.push({
+      rfqSearchKey: searchKey || '',
+      customer: customer || '',
+      rfqType: rfqType || '',
+      qty: parseInt(qty, 10) || 0,
+      targetPrice: parseFloat(target) || null,
+      date,
+      isVendor: isVendor === 'Y',
+      ageDays,
+    });
+  }
+
+  // ── Query 6: Historical SALE ROW DETAIL (top N most recent per MPN) ─────
+  // Same window-function pattern as Query 5. Surfaces actual buyer / price /
+  // date so the report can show "we sold X to Customer Y at $Z, N days ago"
+  // instead of just "5 historical sales."
+  const saleDetailRows = psql(`
+    WITH mpns(mpn) AS (VALUES ${valuesList}),
+         normalized AS (
+           SELECT
+             UPPER(REGEXP_REPLACE(sol.chuboe_mpn, '[-\\s\\/.:,]', '', 'g')) AS mpn,
+             bp.name AS customer,
+             sol.qtyentered AS qty,
+             sol.priceentered AS price,
+             so.dateordered::date AS sale_date,
+             bp.isvendor
+           FROM adempiere.c_order so
+           JOIN adempiere.c_orderline sol ON so.c_order_id = sol.c_order_id
+           JOIN adempiere.c_bpartner bp ON so.c_bpartner_id = bp.c_bpartner_id
+           WHERE so.isactive = 'Y' AND sol.isactive = 'Y'
+             AND so.issotrx = 'Y' AND so.docstatus IN ('IP','CO','CL')
+             AND so.ad_client_id = 1000000
+             AND so.dateordered >= CURRENT_DATE - INTERVAL '${salesMonths} months'
+             AND sol.chuboe_mpn IS NOT NULL
+             AND sol.priceentered > 0
+         ),
+         ranked AS (
+           SELECT n.*, ROW_NUMBER() OVER (PARTITION BY n.mpn ORDER BY n.sale_date DESC) AS rn
+           FROM normalized n
+           WHERE n.mpn IN (SELECT mpn FROM mpns)
+         )
+    SELECT mpn, customer, qty, price, sale_date, isvendor
+    FROM ranked
+    WHERE rn <= ${detailLimit}
+    ORDER BY mpn, rn
+  `);
+  for (const row of saleDetailRows) {
+    if (!row || row.length < 6) continue;
+    const [mpn, customer, qty, price, saleDate, isVendor] = row;
+    const r = result.get(mpn);
+    if (!r) continue;
+    const date = saleDate || '';
+    const ageDays = date ? Math.floor((Date.now() - new Date(date).getTime()) / (24 * 60 * 60 * 1000)) : null;
+    r.historicalSales.push({
+      customer: customer || '',
+      qty: parseInt(qty, 10) || 0,
+      soldPrice: parseFloat(price) || null,
+      date,
+      isBroker: isVendor === 'Y',
+      ageDays,
+    });
   }
 
   return result;

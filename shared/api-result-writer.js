@@ -181,6 +181,61 @@ function readCache(mpn, maxAgeDays = 30) {
   }
 }
 
+// ─── FRESHNESS CHECK ────────────────────────────────────────────────────────
+
+/**
+ * Check whether we have fresh API data for an MPN within the TTL window.
+ *
+ * This is the "should I call the APIs or reuse what I have?" gate used by the
+ * RFQ API Enrichment workflow and (via franchise-api.js cacheTTL option) any
+ * other consumer. TTL rules are locked in api-integration-roadmap.md § API
+ * Response Caching. Caller passes the resolved TTL for its RFQ type.
+ *
+ * Today's source of truth is the local cache file (`readCache()`) because
+ * chuboe_pricing_api_result holds only thin-pointer rows (no envelope body) —
+ * see writeDb() docstring. When the JSON column becomes writable and envelopes
+ * live in OT, extend this to prefer the DB and fall back to cache.
+ *
+ * @param {string} mpn - MPN to check
+ * @param {number} ttlDays - Max age in days to consider "fresh"
+ * @param {object} [options]
+ * @param {function} [options.bypassIf] - Optional predicate (envelope) => bool.
+ *   If returns true, force a refresh even when the cached envelope is fresh.
+ *   Used by the "PPV + cached price < customer target" force-refresh rule.
+ * @returns {{fresh: boolean, ageDays: number|null, envelope: object|null}}
+ */
+function getFreshness(mpn, ttlDays, options = {}) {
+  if (!mpn || !ttlDays) {
+    return { fresh: false, ageDays: null, envelope: null };
+  }
+
+  const envelope = readCache(mpn, ttlDays);
+  if (!envelope) {
+    return { fresh: false, ageDays: null, envelope: null };
+  }
+
+  // Compute age from envelope timestamp
+  const ts = envelope.data?._meta?.timestamp;
+  let ageDays = null;
+  if (ts) {
+    const ageMs = Date.now() - new Date(ts).getTime();
+    ageDays = Math.floor(ageMs / (1000 * 60 * 60 * 24));
+  }
+
+  // Apply optional bypass predicate (e.g., PPV-under-target force refresh)
+  if (options.bypassIf && typeof options.bypassIf === 'function') {
+    try {
+      if (options.bypassIf(envelope)) {
+        return { fresh: false, ageDays, envelope };
+      }
+    } catch (err) {
+      logger.error(`bypassIf predicate failed for ${mpn}: ${err.message}`);
+    }
+  }
+
+  return { fresh: true, ageDays, envelope };
+}
+
 // ─── DB OPERATIONS ──────────────────────────────────────────────────────────
 
 /**
@@ -460,6 +515,7 @@ function pruneCache(maxAgeDays = 90) {
 module.exports = {
   writePricingResult,
   extractPriceAtQty,
+  getFreshness,
   flushCacheToDB,
   pruneCache,
   buildEnvelope,  // exported for testing

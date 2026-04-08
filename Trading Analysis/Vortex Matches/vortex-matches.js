@@ -2,25 +2,28 @@
 /**
  * Vortex Matches - Match RFQs against market offers and vendor quotes
  *
- * Usage: node vortex-matches.js <rfq_number>
- * Example: node vortex-matches.js 1130263
+ * Two entry points:
  *
- * Generates Excel files in output/ directory:
- * - {RFQ}_Stock.xlsx - Always (if stock matches exist)
- * - {RFQ}_Good Prices.xlsx - Only if customer targets exist
- * - {RFQ}_All Prices.xlsx - Only if NO customer targets
- * - {RFQ}_No Prices.xlsx - Always (if no-price matches exist)
+ * 1. CLI (testing/manual):  node vortex-matches.js <rfq_number>
+ *    Runs in-memory and prints a summary. Does NOT write files or send mail.
+ *    Add --email to additionally email Jake the result.
+ *
+ * 2. Library: const { runVortexForRFQ } = require('./vortex-matches');
+ *    Returns { rfqNumber, customer, hasTargets, summary, attachments[] }
+ *    where attachments[] = [{ filename, content: Buffer }, ...]
+ *    Used by vortex-poller.js for inbox-driven automation.
  */
 
 const { Pool } = require('pg');
 const ExcelJS = require('exceljs');
-const path = require('path');
-const fs = require('fs');
 
-// Database connection (uses Unix socket peer authentication)
+// Database connection (uses Unix socket peer authentication).
+// `user` must be set explicitly because cron-launched processes don't
+// inherit $USER, and libpq falls back to "no PostgreSQL user name specified".
 const pool = new Pool({
   host: '/var/run/postgresql',
-  database: process.env.PGDATABASE || 'idempiere_replica'
+  database: process.env.PGDATABASE || 'idempiere_replica',
+  user: process.env.PGUSER || process.env.USER || 'analytics_user'
 });
 
 // Column definitions with format types
@@ -357,124 +360,145 @@ async function createWorkbook(data, columns, fileType) {
 }
 
 /**
- * Write workbook to file
+ * Serialize a workbook to a Buffer (in-memory, no file I/O)
  */
-async function writeWorkbook(workbook, outputPath) {
-  await workbook.xlsx.writeFile(outputPath);
-  const worksheet = workbook.getWorksheet('Matches');
-  console.log(`  Created: ${path.basename(outputPath)} (${worksheet.rowCount - 1} rows)`);
+async function workbookToBuffer(workbook) {
+  return await workbook.xlsx.writeBuffer();
 }
 
 /**
- * Main function
+ * Library entry point — runs all match logic in memory and returns
+ * attachments as Buffers. No file I/O, no SMTP.
+ *
+ * Returns:
+ *   {
+ *     rfqNumber, customer, hasTargets,
+ *     summary: { stock, goodPrices, allPrices, noPrices, totalLines, uniqueMpns },
+ *     attachments: [{ filename: '1130263_Stock.xlsx', content: Buffer }, ...]
+ *   }
+ *
+ * Throws if RFQ not found.
  */
-async function main() {
-  const rfqNumber = process.argv[2];
+async function runVortexForRFQ(rfqNumber, { log = () => {} } = {}) {
+  log(`Vortex: processing RFQ ${rfqNumber}`);
 
+  const rfqRows = await fetchRfqDetails(rfqNumber);
+  if (rfqRows.length === 0) {
+    const err = new Error(`RFQ ${rfqNumber} not found`);
+    err.code = 'RFQ_NOT_FOUND';
+    throw err;
+  }
+
+  const customer = rfqRows[0].customer_name || '';
+  const cleanMpns = [...new Set(rfqRows.map(r => r.chuboe_mpn_clean).filter(Boolean))];
+  const hasTargets = rfqRows.some(r => r.rfq_target && parseFloat(r.rfq_target) > 0);
+
+  log(`  ${rfqRows.length} lines, ${cleanMpns.length} unique MPNs, targets=${hasTargets}`);
+
+  const [marketOffers, vendorQuotes] = await Promise.all([
+    fetchMarketOffers(cleanMpns),
+    fetchVendorQuotes(cleanMpns)
+  ]);
+  const allOffers = [...marketOffers, ...vendorQuotes];
+  log(`  ${marketOffers.length} MOs + ${vendorQuotes.length} VQs = ${allOffers.length} offers`);
+
+  const joinedData = joinData(rfqRows, allOffers);
+  const { stock, goodPrices, allPrices, noPrices } = categorizeResults(joinedData, hasTargets);
+
+  const summary = {
+    customer,
+    rfqLines: rfqRows.length,
+    uniqueMpns: cleanMpns.length,
+    hasTargets,
+    stock: stock.length,
+    goodPrices: goodPrices.length,
+    allPrices: allPrices.length,
+    noPrices: noPrices.length,
+    totalMatches: joinedData.length
+  };
+
+  const attachments = [];
+
+  async function pushFile(rows, columnSet, label) {
+    if (rows.length === 0) return;
+    const wb = await createWorkbook(rows, COLUMNS[columnSet], columnSet);
+    const buf = await workbookToBuffer(wb);
+    attachments.push({ filename: `${rfqNumber}_${label}.xlsx`, content: buf });
+  }
+
+  await pushFile(stock, 'Stock', 'Stock');
+  if (hasTargets) {
+    await pushFile(goodPrices, 'Good Prices', 'Good Prices');
+  } else {
+    await pushFile(allPrices, 'All Prices', 'All Prices');
+  }
+  await pushFile(noPrices, 'No Prices', 'No Prices');
+
+  return { rfqNumber, customer, hasTargets, summary, attachments };
+}
+
+/**
+ * Build an HTML email body summarizing a vortex run.
+ */
+function buildSummaryHtml(result) {
+  const { rfqNumber, customer, hasTargets, summary } = result;
+  const priceLine = hasTargets
+    ? `<tr><td>Good Prices (≤20% above target)</td><td style="text-align:right"><b>${summary.goodPrices}</b></td></tr>`
+    : `<tr><td>All Prices (no customer targets)</td><td style="text-align:right"><b>${summary.allPrices}</b></td></tr>`;
+
+  return `<html><body style="font-family:Arial,sans-serif;font-size:13px;color:#222">
+<h2 style="margin:0 0 8px 0">Vortex Matches — RFQ ${rfqNumber}</h2>
+<p style="margin:0 0 12px 0"><b>Customer:</b> ${escapeHtml(customer)}<br/>
+<b>RFQ lines:</b> ${summary.rfqLines} &nbsp;|&nbsp; <b>Unique MPNs:</b> ${summary.uniqueMpns} &nbsp;|&nbsp; <b>Customer targets:</b> ${hasTargets ? 'Yes' : 'No'}</p>
+<table cellpadding="6" cellspacing="0" border="0" style="border-collapse:collapse;border:1px solid #ddd;min-width:340px">
+  <tr style="background:#f0f0f0;font-weight:bold"><td>Bucket</td><td style="text-align:right">Rows</td></tr>
+  <tr><td>Stock (Astute inventory)</td><td style="text-align:right"><b>${summary.stock}</b></td></tr>
+  ${priceLine}
+  <tr><td>No Prices (supply leads)</td><td style="text-align:right"><b>${summary.noPrices}</b></td></tr>
+  <tr style="background:#fafafa"><td><b>Total matches</b></td><td style="text-align:right"><b>${summary.totalMatches}</b></td></tr>
+</table>
+<p style="margin:14px 0 4px 0;color:#666;font-size:11px">Generated by Vortex Matches automation. Attached workbooks contain the full row-level detail.</p>
+</body></html>`;
+}
+
+function escapeHtml(s) {
+  return String(s || '').replace(/[&<>"']/g, c => ({
+    '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+  }[c]));
+}
+
+/**
+ * CLI entry point — for testing only. Prints summary; does not write files.
+ */
+async function cliMain() {
+  const rfqNumber = process.argv[2];
   if (!rfqNumber) {
     console.error('Usage: node vortex-matches.js <rfq_number>');
-    console.error('Example: node vortex-matches.js 1130263');
+    console.error('  Runs in-memory and prints a summary. No files written.');
+    console.error('  For email-driven automation, use vortex-poller.js.');
     process.exit(1);
   }
 
-  console.log(`\nVortex Matches - Processing RFQ ${rfqNumber}`);
-  console.log('='.repeat(50));
-
   try {
-    // Fetch RFQ details
-    console.log('\n1. Fetching RFQ details...');
-    const rfqRows = await fetchRfqDetails(rfqNumber);
-
-    if (rfqRows.length === 0) {
-      console.error(`Error: RFQ ${rfqNumber} not found`);
-      process.exit(1);
+    const result = await runVortexForRFQ(rfqNumber, { log: msg => console.log(msg) });
+    console.log('\nSummary:');
+    console.log(JSON.stringify(result.summary, null, 2));
+    console.log(`\nAttachments built: ${result.attachments.length}`);
+    for (const a of result.attachments) {
+      console.log(`  - ${a.filename}  (${a.content.length} bytes)`);
     }
-
-    console.log(`   Found ${rfqRows.length} line items`);
-
-    // Get unique cleaned MPNs
-    const cleanMpns = [...new Set(rfqRows.map(r => r.chuboe_mpn_clean).filter(Boolean))];
-    console.log(`   ${cleanMpns.length} unique MPNs to search`);
-
-    // Check if customer provided targets
-    const hasTargets = rfqRows.some(r => r.rfq_target && parseFloat(r.rfq_target) > 0);
-    console.log(`   Customer targets: ${hasTargets ? 'Yes' : 'No'}`);
-
-    // Fetch market offers
-    console.log('\n2. Searching market offers (90-day window)...');
-    const marketOffers = await fetchMarketOffers(cleanMpns);
-    console.log(`   Found ${marketOffers.length} market offers`);
-
-    // Fetch vendor quotes
-    console.log('\n3. Searching vendor quotes (90-day window)...');
-    const vendorQuotes = await fetchVendorQuotes(cleanMpns);
-    console.log(`   Found ${vendorQuotes.length} vendor quotes`);
-
-    // Combine offers
-    const allOffers = [...marketOffers, ...vendorQuotes];
-    console.log(`   Total: ${allOffers.length} offers`);
-
-    if (allOffers.length === 0) {
-      console.log('\nNo matching offers found for this RFQ.');
-      await pool.end();
-      return;
-    }
-
-    // Join data
-    console.log('\n4. Joining RFQ and offer data...');
-    const joinedData = joinData(rfqRows, allOffers);
-    console.log(`   ${joinedData.length} matched records`);
-
-    // Categorize results
-    console.log('\n5. Categorizing results...');
-    const { stock, goodPrices, allPrices, noPrices } = categorizeResults(joinedData, hasTargets);
-    console.log(`   Stock: ${stock.length}`);
-    if (hasTargets) {
-      console.log(`   Good Prices (<=20% above target): ${goodPrices.length}`);
-    } else {
-      console.log(`   All Prices: ${allPrices.length}`);
-    }
-    console.log(`   No Prices: ${noPrices.length}`);
-
-    // Ensure output directory exists
-    const outputDir = path.join(__dirname, 'output');
-    if (!fs.existsSync(outputDir)) {
-      fs.mkdirSync(outputDir, { recursive: true });
-    }
-
-    // Generate output files
-    console.log('\n6. Generating Excel files...');
-
-    if (stock.length > 0) {
-      const wb = await createWorkbook(stock, COLUMNS['Stock'], 'Stock');
-      await writeWorkbook(wb, path.join(outputDir, `${rfqNumber}_Stock.xlsx`));
-    }
-
-    if (hasTargets && goodPrices.length > 0) {
-      const wb = await createWorkbook(goodPrices, COLUMNS['Good Prices'], 'Good Prices');
-      await writeWorkbook(wb, path.join(outputDir, `${rfqNumber}_Good Prices.xlsx`));
-    }
-
-    if (!hasTargets && allPrices.length > 0) {
-      const wb = await createWorkbook(allPrices, COLUMNS['All Prices'], 'All Prices');
-      await writeWorkbook(wb, path.join(outputDir, `${rfqNumber}_All Prices.xlsx`));
-    }
-
-    if (noPrices.length > 0) {
-      const wb = await createWorkbook(noPrices, COLUMNS['No Prices'], 'No Prices');
-      await writeWorkbook(wb, path.join(outputDir, `${rfqNumber}_No Prices.xlsx`));
-    }
-
-    console.log('\nDone!');
-    console.log(`Output files in: ${outputDir}`);
-
-  } catch (error) {
-    console.error('Error:', error.message);
-    console.error(error.stack);
-    process.exit(1);
+  } catch (err) {
+    console.error('Error:', err.message);
+    if (err.code !== 'RFQ_NOT_FOUND') console.error(err.stack);
+    process.exitCode = 1;
   } finally {
     await pool.end();
   }
 }
 
-main();
+module.exports = { runVortexForRFQ, buildSummaryHtml };
+
+// Run CLI only when invoked directly
+if (require.main === module) {
+  cliMain();
+}

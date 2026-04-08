@@ -6,6 +6,42 @@
 
 ---
 
+## ⚠️ READ FIRST — Two iDempiere constraints that silently destroy data
+
+Loading offers into OT has two server-side constraints that will corrupt or drop data without any error from the loader. **Every loader script must respect these.**
+
+### 1. CPC bean-callout collapse on `chuboe_offer_line`
+
+The server dedups offer lines by `(chuboe_offer_id, chuboe_cpc)` — strict equality, ignoring MPN. When two lines on the same offer share a non-empty CPC:
+
+- The earlier survivor's `chuboe_mpn` is **comma-merged** in place (e.g., `MPN_A` becomes `MPN_A,MPN_B`) — corrupts its `chuboe_mpn_clean` join key
+- The new line is set `isactive=N` with description `"deactived - duplicate CPC - See Line #<survivor>"`
+- POST returns `200 OK` and a new ID — the loader sees no error
+
+**Verified empirically 2026-04-08** with totally distinct MPNs (`5962-1620804QZC` vs `TESTAVL-COLLAPSE-CHECK`). The collapse fires regardless of MPN difference.
+
+**Mitigation patterns (pick one based on your data shape):**
+
+| Data shape | Pattern |
+|---|---|
+| Multi-row-per-CPC (Sanmina date code/lot detail) | **Per-CPC anchor** — only the first row per unique CPC carries `chuboe_cpc`; all others POST with `chuboe_cpc=''`. Capture the linkage in `Description` text. |
+| AVL / multi-MPN-per-CPC (one part with N alternate MPNs) | **Sub-row alternates** — write the primary MPN as one `chuboe_offer_line` row, write the alts as `chuboe_offer_line_mpn` sub-rows under it. Sub-table is **not** subject to the callout. |
+| Single-MPN-per-CPC (most cases) | No mitigation needed — each line has a unique CPC value. |
+
+### 2. `Chuboe_CPC` is non-updateable on existing rows
+
+PATCH against the column returns `500 "Cannot update column Chuboe_CPC"`. CPC must be set at POST time only. There is no recovery path via the standard write API for a missing CPC.
+
+### See also
+
+- `shared/offer-writeback.js` header docstring (full warning + mitigation code)
+- `shared/data-model.md` § chuboe_offer_line CPC bean-callout (schema-level reference)
+- `shared/api-writeback.md` § 12. chuboe_offer_line (API-level reference)
+- `feedback_avl_multi_mpn_loading.md` (loading-rule rationale + workarounds)
+- `project_chuboe_offer_line_cpc_collapse.md` (incident detail + Chuck follow-up)
+
+---
+
 ## Pipeline
 
 ```

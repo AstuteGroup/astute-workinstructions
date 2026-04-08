@@ -524,4 +524,275 @@ First instance surfaced 2026-04-06: Orbel Corporation on RFQ 1132040 (2 MPNs), t
 
 ---
 
+# Section H: iDempiere / OT — Pending Fixes from Astute Side
+
+These are iDempiere field-model and bean-callout configuration issues that block clean data shapes. They're not workflow features — they're upstream blockers that need to be resolved by the OT/iDempiere team. Tracked here so they don't get lost.
+
+| # | Issue | Priority | Status | Owner |
+|---|---|---|---|---|
+| H1 | `chuboe_offer_line` CPC bean-callout collapse — strict `(offer_id, cpc)` dedup | **High** | Pending Chuck | OT team |
+| H2 | `Chuboe_CPC` non-updateable on existing rows (PATCH returns 500) | Medium | Pending Chuck | OT team |
+| H3 | `chuboe_pricing_api_result.json_info` is a virtual column — can't write JSON body via REST | Medium | Pending Chuck (workaround shipped) | OT team |
+| H4 | iDempiere column `Updateable` flags inconsistency on chuboe_* tables | Low (umbrella) | Investigation | OT team |
+
+---
+
+## H1. chuboe_offer_line CPC bean-callout — strict dedup collapse
+
+**Status:** Pending Chuck | **Priority:** High | **First reported:** 2026-04-08 (Sanmina Q2FY26 E&O load)
+
+**The bug:** A server-side bean callout on `chuboe_offer_line` deduplicates rows by `(chuboe_offer_id, chuboe_cpc)` with strict equality, **ignoring `chuboe_mpn` entirely**. When two lines POST to the same offer with the same non-empty CPC:
+
+1. The earlier survivor's `chuboe_mpn` is **comma-merged in place** (e.g., `MPN_A` → `MPN_A,MPN_B`), corrupting its `chuboe_mpn_clean` join key for all downstream analytics.
+2. The new line is set `isactive = N` with description overwritten to `"deactived - duplicate CPC - See Line #<survivor>"`.
+3. POST returns `200 OK` with a new ID — **the loader sees no error**. Destruction happens server-side after the response.
+
+**Verified empirically 2026-04-08** twice on offer 1024752 with totally distinct MPNs (`5962-1620804QZC` vs `TESTAVL-COLLAPSE-CHECK`, then `AVL-TEST-MPN-ALPHA` vs `AVL-TEST-MPN-BETA`). The collapse fires regardless of MPN difference — there is no fuzzy match, only CPC equality.
+
+**Why this matters:** When a customer sends an excess list (or AVL) where two distinct industry MPNs share one customer Component code (e.g., LFKB32-0434-01 → `XC7VX415T-L2FFG1158E` AND `XC7VX415T-L2FFG1158E4589`), they are physically different parts even if the customer uses one code to reference both. The dedup conflates them.
+
+**Why it appeared now and not before:** This issue did not exist before the `chuboe_cpc` field was added to `chuboe_offer_line`. Prior offers (e.g., chuboe_offer_id 1000000 from 2018) have multiple active rows with identical MPNs because all CPCs were null and the callout had no key to dedup against. The bean callout was introduced (or activated) at the same time as the CPC field — likely as a guardrail against accidental duplication, but the trigger condition is too coarse.
+
+**Current workaround (deployed in `shared/offer-writeback.js`):** Per-CPC anchor pattern. For each unique CPC in the load batch, only the FIRST occurrence is written with `chuboe_cpc` populated; all subsequent rows for that CPC POST with `chuboe_cpc = ''`. The non-anchor rows capture the CPC linkage in their `description` field as `CPC=<value>`. Verified working on Sanmina offer 1026035 — 1986 lines, all active, 7 CPCs with multi-MPN preserved.
+
+**Limitations of the workaround:**
+- The structured `chuboe_offer_line.chuboe_cpc` column only captures the FIRST MPN's relationship to a CPC. Alternate MPNs under the same CPC are linked by description text only — fragile, not joinable in SQL without a `LIKE '%CPC=...%'` predicate.
+- Any analysis that wants to find "all parts under CPC X" must scan descriptions, not just filter on `chuboe_cpc`.
+- AVL/multi-MPN-per-CPC patterns can't be expressed cleanly through the structured fields.
+
+**Proposed fix:** Change the bean callout's dedup key from `(chuboe_offer_id, chuboe_cpc)` to **`(chuboe_offer_id, chuboe_cpc, chuboe_mpn_clean)`**. Two distinct MPNs sharing one CPC are physically different parts and should NOT collapse. Identical MPNs sharing one CPC (true duplicates) would still collapse — preserving the original guardrail intent.
+
+**Communicated to OT team:** Email sent 2026-04-08 to Jake (for forward to Chuck). Full incident report at `project_chuboe_offer_line_cpc_collapse.md`. Loader-side mitigation documentation at `shared/data-model.md` § Offer Chain, `shared/offer-writeback.js` header, `shared/api-writeback.md` § 12, `Trading Analysis/Market Offer Loading/market-offer-loading.md`, and `CLAUDE.md`.
+
+**Once fixed:** the `feedback_avl_multi_mpn_loading.md` rule simplifies dramatically — Case A becomes "split into N lines all sharing CPC = primary, qty duplicated" with no anchor-pattern workaround needed. The structured CPC column becomes the canonical join key for AVL relationships.
+
+---
+
+## H2. Chuboe_CPC non-updateable on existing chuboe_offer_line rows
+
+**Status:** Pending Chuck | **Priority:** Medium | **First reported:** 2026-04-08 (Blue Origin surgical fix)
+
+**The bug:** PATCH against `chuboe_offer_line` with a `Chuboe_CPC` value returns:
+```
+HTTP 500 — {"title":"Update error","status":500,"detail":"Cannot update column Chuboe_CPC"}
+```
+The column has `Updateable=false` in the iDempiere field model. CPC can ONLY be set at POST time.
+
+**Why this matters:** When backfilling CPC on historical offer lines (e.g., during the Blue Origin cleanup where the original loader didn't populate CPC), there is no recovery path through the standard write API. The only options are:
+- Deactivate the old line and POST a new one (loses the original ID, breaks any audit linkage)
+- Leave CPC blank and capture the linkage in `description` text instead (lossy)
+
+**Proposed fix:** Set `Chuboe_CPC.Updateable = true` in the iDempiere field model. There's no business reason CPC should be immutable after creation — it's customer-supplied metadata, and customers occasionally correct their CPC mappings.
+
+**Bundle with H1:** Same iDempiere field-model bucket; both worth resolving in the same change window.
+
+---
+
+## H3. chuboe_pricing_api_result.json_info virtual column — can't write JSON body via REST
+
+**Status:** Workaround shipped (thin pointer pattern); proper fix Pending Chuck | **Priority:** Medium
+
+**The bug:** `chuboe_pricing_api_result.json_info` is a virtual column in iDempiere. The REST API silently ignores writes to it — POSTs succeed but the JSON body never persists. This was first hit during the Stock RFQ pipeline build-out.
+
+**Workaround:** `shared/api-result-writer.js` writes a thin header row to `chuboe_pricing_api_result` (no JSON) and stores the full envelope in a local cache file at `shared/data/api-pricing-cache/`. All read paths fall back to the cache. The DB row exists for audit linkage only.
+
+**Why this matters:** Without DB-side JSON persistence, every analyzer re-call hits the live franchise APIs again instead of replaying cached results. Cache works locally but doesn't propagate to other consumers (e.g., Hurricane Search reads from the DB column natively).
+
+**Proposed fix:** Reconfigure `json_info` from virtual to a stored JSONB column in iDempiere. Tracked in `api-integration-roadmap.md` § Pricing Envelope OT-Native Storage.
+
+---
+
+## H4. iDempiere column Updateable flags — umbrella investigation
+
+**Status:** Investigation | **Priority:** Low
+
+H2 surfaced one specific column (`Chuboe_CPC` on `chuboe_offer_line`) with a problematic `Updateable=false` setting. Worth a one-time audit of all `chuboe_*` table columns to find others that block legitimate update patterns. Likely candidates: anything with cleaned/derived semantics that probably should never be hand-updated, vs. customer-supplied metadata that should be editable.
+
+**Action:** Pull `ad_column WHERE tablename LIKE 'chuboe_%' AND isupdateable = 'N'` and review the list with Chuck.
+
+---
+
+# Section I: Mil-spec ↔ Commercial ↔ NSN Cross-Reference Enrichment
+
+| # | Feature | Priority | Status |
+|---|---|---|---|
+| I1 | MPN cross-reference table — schema + manual seed | **Next** | Planned |
+| I2 | Loader enrichment via cross-ref sub-rows (Offer / RFQ / VQ) | **Next** | Planned |
+| I3 | Auto-research workflow for new mil-spec MPNs | Later | Planned |
+| I4 | NSN integration (DLA / FedLog / NSN databases) | Later | Planned |
+
+**Origin:** Blue Origin offer 1024645 (2026-04-08) surfaced this gap. The offer included `JANS1N4109UR-1` (Microsemi mil-spec rad-hard diode) and `5962-1620804QZC` (DLA SMD drawing for Microsemi rad-hard FPGA). Each of these has a commercial equivalent and at least one NSN, but the analyzer treats them as standalone parts. We have no way to assess "what's the demand for the underlying physical part across all its industry, mil-spec, and government identifiers?" because the cross-references aren't captured anywhere in OT.
+
+**Why this matters:** Mil-spec parts are exactly the parts where the commercial-vs-government-vs-OEM demand picture is fragmented across different naming conventions. The same physical part may show up as:
+
+- Commercial industry MPN: `1N4109UR-1` (manufacturer's catalog form)
+- Mil-spec drawing: `JANS1N4109UR-1` (JAN-S grade variant)
+- DLA SMD: `5962-1620804QZC` (Standard Microcircuit Drawing reference)
+- One or more NSNs: `5961-01-XXX-XXXX`, `5961-01-YYY-YYYY`, etc. (National Stock Numbers used in government procurement)
+
+Today: each of these is a separate row that searches independently. There's no SQL join that says "these all refer to the same physical thing." A buyer sourcing the part has to know all four naming conventions to find historical demand, available supply, or active RFQs. An analyst trying to score opportunity on a market offer line can't see the full demand picture.
+
+Same problem applies on the **buy side** when sourcing — when an Astute buyer is looking for `1N4109UR-1` to fulfill an RFQ, they should automatically see VQs and offers for the JANS-grade and the 5962- drawing too, because those parts would (often) fulfill the same need.
+
+---
+
+## I1. MPN cross-reference table — schema + manual seed
+
+**Status:** Planned | **Priority:** Next
+
+**Goal:** A single canonical reference table that joins commercial, mil-spec, and NSN identifiers for the same physical part (or part family).
+
+**Schema sketch (lives in `intermediate` or `mart` schema, NOT `adempiere` — read-only-managed by us, not by iDempiere):**
+
+```sql
+CREATE TABLE intermediate.mpn_cross_reference (
+  cross_ref_id          serial PRIMARY KEY,
+  primary_mpn           text NOT NULL,        -- the canonical/commercial form
+  primary_mpn_clean     text NOT NULL,
+  primary_mfr           text,
+  primary_mfr_clean     text,
+  alt_mpn               text NOT NULL,        -- the equivalent identifier
+  alt_mpn_clean         text NOT NULL,
+  alt_form              text NOT NULL CHECK (alt_form IN
+                          ('COMMERCIAL', 'MILSPEC_JAN', 'MILSPEC_JANS', 'MILSPEC_JANTX',
+                           'MILSPEC_JANTXV', 'DLA_SMD', 'NSN', 'MFR_VARIANT', 'ALIAS')),
+  relationship          text NOT NULL CHECK (relationship IN
+                          ('IDENTICAL', 'SAME_DIE', 'SAME_FAMILY', 'CROSS_REF')),
+  source                text NOT NULL,        -- where we got this mapping (datasheet, DLA QPL, manual, ...)
+  source_date           date,
+  notes                 text,
+  created               timestamp DEFAULT now(),
+  created_by            text,
+  isactive              boolean DEFAULT true
+);
+
+CREATE INDEX ON intermediate.mpn_cross_reference(primary_mpn_clean);
+CREATE INDEX ON intermediate.mpn_cross_reference(alt_mpn_clean);
+```
+
+The `relationship` field distinguishes:
+- `IDENTICAL` — same die, same package, same screening; just different naming convention. The strongest form (a buyer can substitute one for the other freely).
+- `SAME_DIE` — same silicon, different screening grade (commercial vs JANTX vs JANS). Functionally interchangeable for many use cases but the buyer needs to know the grade difference.
+- `SAME_FAMILY` — related but not directly substitutable. Useful for proactive search but flagged as "not a 1:1 swap."
+- `CROSS_REF` — informational link only (e.g., "this datasheet mentions both forms").
+
+**Manual seed candidates:** Blue Origin offer parts (Microsemi JANS diodes, Microsemi RT4G rad-hard FPGAs, ADI RH-prefix amps, DLA 5962- references), plus any other mil-spec MPNs in active RFQs/offers. Probably 20–50 manually-curated rows to start.
+
+**Open questions:**
+- Source tagging — how granular? (datasheet URL? page number? manual review by who?)
+- Canonical form — is the commercial MPN always "primary" or do we let it vary by lookup direction?
+- Hierarchy — should `IDENTICAL` rows imply transitivity? (A↔B and B↔C → A↔C)
+- Permissions — who can edit? Should writes go through a review workflow, or just direct?
+
+---
+
+## I2. Loader enrichment via cross-reference sub-rows
+
+**Status:** Planned | **Priority:** Next | **Depends on:** I1
+
+**Goal:** When loading an offer / RFQ / VQ line, look up the MPN in the cross-reference table and write the alternate identifiers as sub-rows on `chuboe_offer_line_mpn` / `chuboe_rfq_line_mpn` / (no sub-table for VQ — see below).
+
+**Why sub-rows:** The sub-tables already exist for this exact use case, AND they sidestep the `chuboe_offer_line` CPC bean-callout entirely (which means we can write multiple alternates without anchor-pattern gymnastics). The sub-table's `chuboe_mpn_clean` index gets used by every analytics query that joins on cleaned MPN, so the cross-refs become searchable for free.
+
+**Implementation:**
+
+```javascript
+// shared/cross-ref-enrich.js (new cog)
+function enrichLineWithCrossRefs(line) {
+  const refs = lookupCrossReferences(line.mpn, line.mfr);
+  return refs.map(r => ({
+    chuboe_mpn: r.alt_mpn,
+    chuboe_mpn_clean: r.alt_mpn_clean,
+    description: `${r.alt_form} cross-ref of ${line.mpn} (${r.relationship})`,
+  }));
+}
+```
+
+Each loader (`offer-writeback.writeOffer`, `rfq-writer.writeRFQ`, `vq-writer.writeVQBatch`) calls this and POSTs the resulting sub-rows under the parent line.
+
+**Where this bites for VQ specifically:** `chuboe_vq_line` is **flat** — no sub-table for cross-refs (per `data-model.md`). For VQ enrichment, we'd need either:
+- (a) A new `chuboe_vq_line_mpn` table (Chuck-side schema change)
+- (b) Write a duplicate `chuboe_vq_line` row per cross-ref (cheap but inflates the VQ table)
+- (c) Capture cross-refs only on RFQ + Offer for now, and let VQ matching pick them up via the RFQ side (RFQ has cross-refs → vendor sources against any of them → VQ comes back → matches against the specific RFQ MPN)
+
+**The user's intuition** — "this should happen on the RFQ side as well which would translate into how a buyer would source (so maybe at vq instead?)" — points at exactly this question. Probably the right answer is:
+- **RFQ enrichment:** mandatory. Buyer sees all cross-refs when sourcing.
+- **VQ enrichment:** the FRANCHISE API pull side already returns the canonical commercial MPN; the cross-ref happens implicitly. For broker/manual VQs, no enrichment for now (option c above).
+- **Market offer enrichment:** mandatory. Offer analyzer surfaces all linked demand across forms.
+
+Worth a design conversation before building.
+
+**Side benefit:** Once cross-refs are sub-rows on `chuboe_offer_line_mpn`, the Market Offer Analyzer's three-state classification model becomes much more accurate. A `5962-` part that has its commercial JANS equivalent linked will hit franchise APIs via the alt MPN and surface a real supply picture instead of falling into NO_LISTING_MILSPEC.
+
+---
+
+## I3. Auto-research workflow for new mil-spec MPNs
+
+**Status:** Planned | **Priority:** Later | **Depends on:** I1, I2
+
+**Goal:** When a new mil-spec MPN is encountered that isn't in the cross-reference table, kick off a research task that proposes additions for human review.
+
+**Sources to crawl:**
+- Manufacturer datasheets (Microsemi, Microchip, Analog Devices, TI, etc.) — most JANS/RH/MIL-prefix parts have a "commercial equivalent" line in the datasheet
+- DLA QPL / QML lists (Qualified Products List / Qualified Manufacturers List) — public PDFs at https://qpldocs.dla.mil
+- LLM-assisted research with manual review — feed the MPN + a search prompt to an LLM, get back a structured candidate row, queue for human approval
+- Published cross-reference tables from distributors (Mouser/DigiKey/Avnet sometimes publish these)
+
+**Workflow shape:**
+1. Cron picks up new mil-spec MPNs from the last 24 hours of loaded offers/RFQs
+2. For each, queries the cross-ref table — if missing, flags for research
+3. Research worker (LLM + heuristics) proposes candidate cross-references
+4. Output: candidates queued in a `proposed_cross_references` table for daily human review
+5. Human (Jake or analyst) approves / rejects / corrects → entries land in `mpn_cross_reference`
+
+**Open questions:**
+- LLM choice — Claude API for reasoning over datasheet text? Local LLM for cost?
+- Confidence scoring — how does the worker say "I'm 95% sure this is a SAME_DIE relationship" vs "speculative"?
+- Datasheet sourcing — Octopart? Direct manufacturer URLs? Stored locally?
+
+---
+
+## I4. NSN integration
+
+**Status:** Planned | **Priority:** Later | **Depends on:** I1
+
+**Goal:** For any commercial or mil-spec MPN in our system, link all associated National Stock Numbers (NSNs). Lets us answer "is this part used in any government program we should know about?" and "what's the DLA demand history for this part?"
+
+**Sources:**
+- **NSN Center** (https://nsncenter.com) — public lookup service, may have an API
+- **FedLog** — DLA's official catalog tool, requires government access
+- **GSAAdvantage** (https://www.gsaadvantage.gov) — public procurement portal with NSN search
+- **DLA's NSN extract** — periodic public data dumps if they exist
+- **NSNLookup.com** — another public NSN search service
+
+**Why this matters:**
+- Government procurement happens at the NSN level, not the MPN level. If a customer's RFQ has an NSN reference, our matching has to expand from NSN → mil-spec MPN → commercial MPN to find any inventory we have.
+- NSN demand signals are a leading indicator for industrial demand on the underlying part — if we see DLA buying activity on an NSN, we can anticipate broker/OEM follow-on.
+- Astute could position itself as a known supplier on a specific NSN by understanding the cross-ref better than commodity brokers do.
+
+**Technical sketch:**
+- New rows in `mpn_cross_reference` with `alt_form='NSN'`
+- One MPN can have many NSNs (different government programs procure under different stock numbers)
+- A separate `nsn_demand_history` table for any DLA/government procurement signals we can ingest
+
+**Open questions:**
+- Which NSN data source has the cleanest API / bulk download?
+- Cost — most NSN lookup services are free for low-volume; bulk would need a contract
+- Refresh cadence — NSN catalog changes slowly (weeks/months), so monthly sync is probably enough
+
+---
+
+**Cross-cutting impact when I1+I2 land:**
+
+| Workflow | What changes |
+|---|---|
+| Market Offer Analysis | mil-spec lines hit franchise APIs via commercial cross-ref → real supply data instead of NO_LISTING_MILSPEC |
+| Vortex Matches | mil-spec RFQs match against commercial VQs/offers automatically |
+| Quick Quote | mil-spec parts can be quoted using commercial-equivalent VQ history as a comparable |
+| Suggested Resale | broader VQ/SO history pulls via cross-refs → tighter pricing |
+| Stock RFQ Loading | incoming customer NSN references resolve to MPNs we actually have |
+| RFQ Sourcing | buyers see all forms of a part automatically when sourcing |
+
+---
+
 *Last updated: 2026-04-07*

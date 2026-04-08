@@ -16,9 +16,12 @@
  *   ]);
  */
 
+const path = require('path');
+// Load centralized credentials from ~/workspace/.env
+require('dotenv').config({ path: path.resolve(__dirname, '../../.env') });
+
 const nodemailer = require('nodemailer');
 const fs = require('fs');
-const path = require('path');
 const logger = require('./logger');
 
 // AWS WorkMail SMTP settings (shared across all OT email accounts)

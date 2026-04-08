@@ -355,6 +355,22 @@ Stored in `~/workspace/.env` (gitignored). Template at `shared/.env.example`. Re
 
 **Note:** Connected to PRODUCTION (https://172.31.7.239/api/v1). User: Claude Harris (ID: 1049524), Role: Tsunami User (1000004). Data written via the API will appear in production and replicate to this database.
 
+#### ⚠️ CRITICAL — iDempiere bean-callout traps that silently destroy data
+
+These are server-side iDempiere callouts that fire AFTER the REST API returns 200 OK. The loader sees success and a new ID; the destruction happens server-side post-response. Every writer must respect these:
+
+1. **`chuboe_offer_line` CPC dedup collapse** — POSTing two lines to the same offer with the same `chuboe_cpc` (regardless of MPN difference) will:
+   - Comma-merge the survivor's `chuboe_mpn` field in place (corrupts join key)
+   - Set the new line `isactive=N` with description `"deactived - duplicate CPC - See Line #<survivor>"`
+   - Verified empirically 2026-04-08 with totally distinct MPNs (`5962-1620804QZC` vs `TESTAVL-COLLAPSE-CHECK`)
+   - **Mitigation:** per-CPC anchor pattern (one row per CPC carries the field, rest CPC=`''`) OR use `chuboe_offer_line_mpn` sub-rows for AVL alternates (sub-table is not subject to the callout)
+
+2. **`Chuboe_CPC` non-updateable on existing rows** — PATCH returns `500 "Cannot update column Chuboe_CPC"`. CPC must be set at POST time only.
+
+3. **Stale `mfr-cache.json`** — if the cache lacks `isSystem`, MPN POSTs may 500. See `feedback_mfr_resolution_mandatory.md`.
+
+**Full reference:** `shared/data-model.md` § chuboe_offer_line CPC bean-callout, `shared/offer-writeback.js` header, memory `feedback_avl_multi_mpn_loading.md` and `project_chuboe_offer_line_cpc_collapse.md`. Read these before writing to any offer table.
+
 ---
 
 ### Example Queries

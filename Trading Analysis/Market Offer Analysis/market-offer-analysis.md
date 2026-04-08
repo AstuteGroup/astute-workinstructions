@@ -4,6 +4,8 @@
 
 **Critical constraint:** Analysis input is a `chuboe_offer_id` (or set of IDs, or selector). It is NEVER raw extracted lines from email. This means analysis can be re-run on any historical offer at any time without re-loading.
 
+> ⚠️ **Watch for CPC bean-callout collapse artifacts in historical data.** The server-side bean callout on `chuboe_offer_line` deduplicates by `(offer_id, chuboe_cpc)` and comma-merges MPNs on the survivor row (e.g., `chuboe_mpn = "MPN_A,MPN_B"`). If you see a comma in `chuboe_mpn` during analysis, that's a collapse artifact, not real data — the underlying offer was loaded before the loader honored the per-CPC anchor pattern. The cleaned join key (`chuboe_mpn_clean`) on these rows is unmatchable. Detect with `WHERE chuboe_mpn LIKE '%,%'`. Full incident: `shared/data-model.md` § chuboe_offer_line CPC bean-callout, memory `project_chuboe_offer_line_cpc_collapse.md`.
+
 > **Forcing function:** If Analysis ever needs a field that isn't in `chuboe_offer` / `_line` / `_line_mpn`, the fix is to make [Loading](../Market%20Offer%20Loading/market-offer-loading.md) write that field, not to pass it in memory. This discipline keeps revisits possible.
 
 ---

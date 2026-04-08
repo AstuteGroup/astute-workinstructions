@@ -10,28 +10,34 @@
  *   const envelopes = await fetcher.listEnvelopes('INBOX', 500);
  *   const body = await fetcher.readMessage(id);
  *
- * Credentials are loaded from environment variables:
- *   IMAP_HOST (default: imap.mail.us-east-1.awsapps.com)
- *   IMAP_PORT (default: 993)
- *   WORKMAIL_PASS (default: reads from ~/.config/himalaya/config.toml)
+ * Credentials are loaded from ~/workspace/.env (centralized) with himalaya
+ * config.toml as a legacy fallback. Required vars:
+ *   WORKMAIL_PASS  — shared OT mailbox password
+ *   IMAP_HOST      — default: imap.mail.us-east-1.awsapps.com
+ *   IMAP_PORT      — default: 993
  *
  * Account-to-email mapping:
  *   vq       → vq@orangetsunami.com
  *   excess   → excess@orangetsunami.com
  *   stockrfq → stockRFQ@orangetsunami.com
+ *   vortex   → vortex@orangetsunami.com
  */
+
+const path = require('path');
+// Load centralized credentials from ~/workspace/.env
+require('dotenv').config({ path: path.resolve(__dirname, '../../.env') });
 
 const { ImapFlow } = require('imapflow');
 const { simpleParser } = require('mailparser');
 const fs = require('fs');
-const path = require('path');
 const logger = require('./logger');
 
 // Account name → email address mapping
 const ACCOUNT_MAP = {
   vq: 'vq@orangetsunami.com',
   excess: 'excess@orangetsunami.com',
-  stockrfq: 'stockRFQ@orangetsunami.com'
+  stockrfq: 'stockRFQ@orangetsunami.com',
+  vortex: 'vortex@orangetsunami.com'
 };
 
 const IMAP_HOST = process.env.IMAP_HOST || 'imap.mail.us-east-1.awsapps.com';

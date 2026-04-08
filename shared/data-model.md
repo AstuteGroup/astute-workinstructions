@@ -95,6 +95,34 @@ Single source of truth for iDempiere (OT) table structures, relationships, and f
 
 **Note:** Unlike RFQ, Offer MPN/MFR data primarily lives at the **Line level** (not the sub-line). `chuboe_offer_line_mpn` is for alternate MPN cross-references.
 
+#### ⚠️ chuboe_offer_line CPC bean-callout collapse — READ BEFORE WRITING OFFERS
+
+iDempiere has a server-side bean callout on `chuboe_offer_line` that **silently collapses** any two rows in the same offer that share the same `chuboe_cpc` value — strict equality on `(chuboe_offer_id, chuboe_cpc)`, **regardless of how different the MPNs are**. The destruction is invisible to API callers:
+
+1. POST returns `200 OK` with a new ID, exactly as if the line was written successfully.
+2. Server-side, after the response is sent, the callout fires:
+   - The **earlier** row's `chuboe_mpn` field is **comma-merged in place** with the new MPN: e.g., `5962-1620804QZC` becomes `5962-1620804QZC,TESTAVL-COLLAPSE-CHECK`. This corrupts the survivor's join key (`chuboe_mpn_clean`) so it stops matching anywhere.
+   - The **new** row is set `isactive = N` with description overwritten to `"deactived - duplicate CPC - See Line #<survivor_line>"`.
+
+**Verified empirically 2026-04-08** by POSTing two lines on offer 1024752 with the same CPC and totally distinct MPNs. The callout fired on completely unrelated MPN strings — there is no fuzzy match, the only key is CPC equality.
+
+**Mitigation patterns:**
+
+| Pattern | When | How |
+|---|---|---|
+| **Per-CPC anchor** | Multi-row-per-CPC customer loads (Sanmina-style date code/lot detail) | One row per unique CPC carries `chuboe_cpc` populated; all subsequent rows for that CPC POST with `chuboe_cpc = '' / NULL`. Recover the linkage from `Description` text or sub-table. |
+| **Sub-row alternates** | AVL / multi-MPN-per-CPC (Case A in `feedback_avl_multi_mpn_loading.md`) | Write the primary MPN as one `chuboe_offer_line` row, write the alt MPNs as `chuboe_offer_line_mpn` sub-rows under it. The sub-table is **not** subject to the callout. |
+| **CPC = '' or NULL** | Any time you don't strictly need CPC at the line level | The callout has no key when CPC is empty; lines stay independent. |
+
+**Also:** `Chuboe_CPC` is **non-updateable on existing rows** — PATCH returns `500 "Cannot update column Chuboe_CPC"`. The CPC must be set at POST time only. So you can't fix a missing CPC after the fact via the standard write path.
+
+**Proper fix (Chuck follow-up):** dedup key should be `(offer_id, cpc, chuboe_mpn_clean)`, not `(offer_id, cpc)`. Same iDempiere field-model bucket as the JSONB virtual-column issue on `chuboe_pricing_api_result` and the non-updateable Chuboe_CPC column.
+
+References:
+- `shared/offer-writeback.js` header docstring (full warning)
+- memory: `feedback_avl_multi_mpn_loading.md`
+- memory: `project_chuboe_offer_line_cpc_collapse.md`
+
 ---
 
 ### VQ (Vendor Quote — Supply Side)

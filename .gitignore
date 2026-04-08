@@ -25,4 +25,18 @@ Trading Analysis/RFQ Sourcing/franchise_check/RFQ_*/
 
 # Workflow input data files (kept locally, not on GitHub)
 Trading Analysis/LAM EPG Award/Lam_EPG_SIPOC.xlsx
+Trading Analysis/LAM EPG Award/*.xlsx
+Trading Analysis/LAM EPG Award/*.csv
 Trading Analysis/LAM Kitting Reorder/Lam_Kitting_DB_*.xlsx
+Trading Analysis/Market Offer Matching for RFQs/*.csv
+Trading Analysis/Market Offer Matching for RFQs/*.xlsx
+
+# Regenerable run logs (per "github vs email" rule — outputs not source)
+Trading Analysis/HTS ECCN Backfill/logs/
+Trading Analysis/**/logs/
+
+# Cache backups
+shared/data/*.bak-*
+
+# Node deps
+node_modules/

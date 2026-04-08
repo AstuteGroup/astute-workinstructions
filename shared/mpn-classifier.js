@@ -86,20 +86,24 @@ function classifyMpnNonFranchise(mpn, mfrText, cpc) {
   const m = mpn.trim();
   if (!m) return 'NO_LISTING_UNKNOWN';
 
-  // Check internal patterns first — they're the most specific
+  // Check MILSPEC patterns FIRST. A legitimate mil-spec drawing (5962-, JANTX-,
+  // M83421/, etc.) is a real industry part regardless of whether it appears as
+  // a sibling row in an AVL split (with CPC pointing to a vendor MPN). The AVL
+  // loading rule (feedback_avl_multi_mpn_loading.md) makes this case common:
+  // a 5962-* line will have CPC = the primary vendor MPN. We must NOT flag those
+  // as INTERNAL just because cpc != mpn.
+  for (const re of MILSPEC_PATTERNS) {
+    if (re.test(m)) return 'NO_LISTING_MILSPEC';
+  }
+
+  // Then check internal annotation patterns (REV markers, SCRN/PROG, etc.)
   for (const re of INTERNAL_PATTERNS) {
     if (re.test(m)) return 'NO_LISTING_INTERNAL';
   }
 
-  // CPC differs from MPN → strong internal signal (the customer has their own
-  // code AND a different MPN, meaning the MPN field probably has their CPC too)
+  // CPC differs from MPN → internal signal (only after MILSPEC has had a chance)
   if (cpc && cpc.trim() && cpc.trim() !== m) {
     return 'NO_LISTING_INTERNAL';
-  }
-
-  // Mil-spec patterns
-  for (const re of MILSPEC_PATTERNS) {
-    if (re.test(m)) return 'NO_LISTING_MILSPEC';
   }
 
   // Default — unknown
