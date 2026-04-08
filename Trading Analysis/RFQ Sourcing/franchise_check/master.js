@@ -107,8 +107,9 @@ function parseSearchResults(results, searchMpn, rfqQty) {
     vqRohs: null,
     vqCoo: null,
     vqSku: null,
-    vqHts: null,    // Master API does not return HTS — kept null for shape parity with other modules
-    vqEccn: null,   // Master returns top-level `eccn` field
+    vqHts: null,        // Master API does not return HTS — kept null for shape parity with other modules
+    vqEccn: null,       // Master returns top-level `eccn` field
+    vqPackaging: null,  // Master returns top-level `packageType` field ("Bag", "Tube", "Reel", etc.)
     // Raw data
     allMatches: [],
     matchCount: 0,
@@ -177,6 +178,9 @@ function parseSearchResults(results, searchMpn, rfqQty) {
   // Compliance — Master returns ECCN at the top level (string, often "EAR99").
   // Empty string means Master has no value on file; treat as null.
   result.vqEccn = (bestMatch.eccn && bestMatch.eccn.trim()) || null;
+
+  // Packaging — Master returns top-level packageType ("Bag", "Tube", "Reel", etc.)
+  result.vqPackaging = (bestMatch.packageType && String(bestMatch.packageType).trim()) || null;
 
   // Get quantities (API returns strings)
   const stock = parseInt(bestMatch.quantityAvailable || '0');

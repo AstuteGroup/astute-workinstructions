@@ -169,6 +169,7 @@ function parseSearchResults(json, searchMpn, rfqQty) {
     vqHts: null,
     vqEccn: null,
     vqRohs: null,
+    vqPackaging: null,  // populated from PackageType.Name on selected variation
     // Raw data
     allMatches: [],
   };
@@ -214,6 +215,10 @@ function parseSearchResults(json, searchMpn, rfqQty) {
     result.priceBreaks = pricingInfo.priceBreaks;
     result.vqMoq = pricingInfo.moq > 1 ? pricingInfo.moq : null;
     result.vqSpq = pricingInfo.spq || null;
+    // Packaging — selectBestPricing returns the PackageType.Name on the chosen
+    // variation ("Cut Tape", "Tape & Reel", "Digi-Reel"). normalizePackaging in
+    // shared/packaging-lookup.js handles all these strings via STRING_TO_FAMILY.
+    result.vqPackaging = pricingInfo.packageType || null;
     result.opportunityValue = result.franchiseRfqPrice * rfqQty;
   }
 

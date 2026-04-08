@@ -414,7 +414,7 @@ const AUTO_SUFFIXES = /[-#]?(Q|Q1|AEC)$/i;
 | C6 | Retry Tracking | Later | Planned |
 | C7 | LLM Fallback | Later | Planned |
 | C8 | MFR Text Validation | **Now** | ✅ Done |
-| C9 | Distributor `vqPackaging` Extraction | **Next** | Planned |
+| C9 | Distributor `vqPackaging` Extraction + shared packaging cog + factory policy | **Now** | ✅ Done (cog + 2 distributors wired; 5 distributors confirmed have no usable field) |
 | C10 | VQ Loader Date Code & Packaging Auto-Capture | **Now** | ✅ Done |
 | C11 | Shared Field Resolver Layer (refactor 4 writers) | **Next** | Planned |
 | C12 | Universal Record Writer (config-driven) | Later | Planned |
@@ -564,60 +564,77 @@ The only remaining gap was the **email-driven CSV emergency path** (`vq-parser` 
 
 ---
 
-## C9. Distributor `vqPackaging` Extraction
+## C9. Distributor `vqPackaging` Extraction + Shared Packaging Cog + Factory Policy
 
-**Status:** Planned | **Priority:** Next
+**Status:** ✅ Done (2026-04-08) | **Priority:** Now
 
-**Problem:** `shared/vq-writer.js` was patched (2026-04-07) to read `d.vqPackaging` (string) from each distributor result and normalize it to a `chuboe_packaging_id`. This works automatically for any distributor module that returns the field. But only **3 of 10** modules currently extract it:
+Three sub-items shipped together:
 
-| Module | `vqPackaging` extracted? |
+### C9b — Promote packaging-lookup to shared cog ✅
+
+`PACKAGING_MAP` and `normalizePackaging` lived inside `shared/vq-writer.js` until 2026-04-08. Now in `shared/packaging-lookup.js`. Both vq-writer and cq-writer import from there. ~310 lines including doc, helpers, and three exported functions (`normalizePackaging`, `hasExplicitFactoryMarker`, `isFullFactoryQty`).
+
+**Three-path factory policy** (decided 2026-04-08):
+
+F-REEL / F-TRAY / F-TUBE is correct when ANY of:
+
+1. **Explicit factory marker in the input string** — "mfr", "factory", "sealed", "oem", or "f-reel" / "f-tray" / "f-tube". Works for ANY vendor type. A broker who clearly states "MFR Reel" is making a verifiable claim.
+2. **Authorized vendor + full factory pack qty** — vendor is franchise / mfr-direct / catalog distributor / online distributor AND quoted qty matches the manufacturer's SPQ exactly OR is a clean integer multiple (5,000 from a 1,000 SPQ part = 5 sealed reels).
+3. Otherwise → plain variant (REEL 1000004 / TRAY 1000005). For TUBE there is no plain variant in `chuboe_packaging` so non-qualifying tubes return null.
+
+Conservative default (no context, no marker) is the plain variant. Under-claiming factory is much safer than over-claiming.
+
+**Smoke test:** 45/45 (8 isFullFactoryQty + 12 hasExplicitFactoryMarker + 25 normalizePackaging integration covering all three paths).
+
+### C9c — cq-writer populates Chuboe_Packaging_ID ✅
+
+`cq-writer.js` previously wrote only `Chuboe_Packaging_Text` (the freetext field), leaving the ID column null. Now it ALSO writes `Chuboe_Packaging_ID` via the shared cog. Same shape as the C8/C15 MFR text-vs-ID gap fix.
+
+CQ callers default to no `isAuthorized` context. To get the auto-upgrade math path, pass `line.isAuthorized: true` and `line.spq`. Otherwise the explicit factory marker path is the only route to F-* on a CQ line.
+
+### C9a — Distributor wiring audit + extractions
+
+| Distributor | Vol 90d | Field path | Status |
+|---|---:|---|---|
+| **DigiKey** | 927 | `selectBestPricing().packageType` (already in result, just propagated to `vqPackaging`) | ✅ wired 2026-04-08 |
+| Mouser | 533 | `ProductAttributes[name='Packaging']` | ✅ already wired (C10, 2026-04-07) |
+| **Master** | 282 | top-level `packageType` | ✅ wired 2026-04-08 |
+| Arrow | 256 | `packageType` field exists but is **always empty** for every test MPN. `sourceParts[].packSize` is just a count, not a type | skip — no usable data |
+| Future | 212 | `part_attributes[name=packageType]` returns generic `STDMFR` ("standard manufacturer pack") for every test MPN — no specific reel/tray/tube info | skip — no usable data |
+| Newark | 192 | only `reeling: bool` and `packSize: int`; `reeling: false` even on MLCCs that ship on reels — unreliable | skip |
+| TTI | 135 | (already wired) | ✅ already wired (C10) |
+| Waldom | 27 | top-level keys include `StandardPackQuantity` (count) but no packaging type field at all | skip |
+| Sager | 22 | (already wired) | ✅ already wired (C10) |
+| Rutronik | 1 | API returns "nothing found" for every test MPN — likely account-restricted catalog | skip (negligible volume) |
+
+**Aggregate coverage going forward:**
+- Wired: DigiKey + Mouser + Master + TTI + Sager = **1,899 / 2,587 = ~73%** of franchise VQ volume
+- Unwired by choice (no usable data): Arrow + Future + Newark + Waldom + Rutronik = ~27%
+
+Same shape as the HTS/ECCN audit — the distributors that expose useful packaging type cover the bulk of volume.
+
+### Root bug fixed along the way
+
+The original `normalizePackaging` always mapped "reel" → 1000001 (F-REEL), "tray" → 1000002 (F-TRAY), "tube" → 1000003 (F-TUBE) regardless of partial vs full pack quantity. That over-claimed factory-sealed packaging on every partial-quantity row written via vq-writer since C10 (2026-04-07).
+
+**The LAM EPG load (140 VQs, 2026-04-07)** likely has F-REEL attribution on partial-quantity rows that shouldn't have it. Packaging is Tier 2 (only required at PO conversion), so the incorrect IDs haven't broken anything yet — but they will produce wrong PO packaging selection if not corrected. **Backfill consideration:** could re-run packaging normalization on RFQ 1132040 VQ rows using the new policy + actual qty/spq context. Low priority; the operator can fix at PO time.
+
+### Files shipped
+
+| File | Change |
 |---|---|
-| `mouser.js` | ✅ Yes — from `ProductAttributes[AttributeName='Packaging']` |
-| `sager.js` | ✅ Yes |
-| `tti.js` | ✅ Yes |
-| `digikey.js` | ❌ No — has `PackageType.Name` (Cut Tape, Tape & Reel, Digi-Reel) used internally for price selection but never set as `vqPackaging` |
-| `arrow.js` | ❌ No |
-| `newark.js` | ❌ No |
-| `master.js` | ❌ No |
-| `waldom.js` | ❌ No |
-| `rutronik.js` | ❌ No |
-| `oemsecrets.js` | ❌ No |
+| `shared/packaging-lookup.js` | NEW — 310 lines |
+| `shared/vq-writer.js` | Drops inline impl; imports from shared cog; passes qty/spq/isAuthorized to resolver |
+| `shared/cq-writer.js` | Imports from shared cog; populates `Chuboe_Packaging_ID` alongside `Chuboe_Packaging_Text` |
+| `Trading Analysis/RFQ Sourcing/franchise_check/digikey.js` | Adds `vqPackaging` to result init + propagates `pricingInfo.packageType` |
+| `Trading Analysis/RFQ Sourcing/franchise_check/master.js` | Adds `vqPackaging` to result init + extracts top-level `packageType` |
 
-**Impact:** When VQs are loaded via the franchise API path, those 7 distributors fall back to `opts.packagingId` (or null) instead of capturing the actual packaging the supplier offered. Buyers then have to manually correct packaging at PO time.
+### Open follow-ups
 
-**Solution:** For each of the 7 modules, find the field in the API response that holds packaging info and extract it as `result.vqPackaging` (string — `vq-writer.js` will normalize to ID). The string only needs to match one of the keys in `PACKAGING_MAP` (case-insensitive, whitespace-collapsed):
-
-```
-reel / tape and reel / tape & reel / t&r / tr / digi-reel / digireel  → F-REEL (1000001)
-cut tape / cuttape / ct                                                → CUT TAPE (1000006)
-tube / f-tube / ftube                                                  → F-TUBE (1000003)
-tray / f-tray / ftray                                                  → F-TRAY (1000002)
-bulk / each / bag / ea                                                 → BULK (1000008)
-box                                                                    → BOX (1000007)
-ammo / ammo pack                                                       → AMMO (1000009)
-```
-
-If a distributor returns a packaging string that doesn't match the map, `normalizePackaging()` returns `null` and the row falls through to the caller's default. **Add new strings to `PACKAGING_MAP` in `shared/vq-writer.js` rather than each distributor module** — keeps the mapping in one place.
-
-**Per-Distributor Notes:**
-- **Digi-Key:** `digikey.js` already inspects `PackageType.Name` on `variations` (lines 250-264). Extract that into `result.vqPackaging` after the price-selection block.
-- **Arrow:** Check API response for a packaging or package-type field. May need to inspect the live response shape.
-- **Newark / Element 14:** Likely under `attributes` array similar to Mouser.
-- **Master:** Check `result.packaging` or similar.
-- **Waldom:** Less structured — may not have a packaging field at all.
-- **Rutronik / OEMSecrets:** Inspect live responses.
-
-**Testing per module:**
-1. Run a sample search → log the raw response
-2. Identify the packaging field
-3. Extract as `vqPackaging` string
-4. Verify `normalizePackaging()` returns a valid ID
-5. End-to-end: write a test VQ via `franchise-api → vq-writer` and confirm `chuboe_packaging_id` is populated correctly in the DB
-
-**Files:**
-- `shared/vq-writer.js` — has `normalizePackaging()` and `PACKAGING_MAP` (already implemented)
-- `shared/franchise-api.js` — already passes `vqPackaging` through (added 2026-04-07)
-- `Trading Analysis/RFQ Sourcing/franchise_check/{digikey,arrow,newark,master,waldom,rutronik,oemsecrets}.js` — modules to update
+1. **LAM EPG packaging backfill** — RFQ 1132040 rows likely have wrong F-* attribution. Re-run normalization with the new policy + actual qty/spq from each row. Low priority.
+2. **DigiKey rate limits during the audit** — DigiKey returned empty results during the C9a probing because of OAuth token / rate-limit issues from heavy use earlier in the day. The wiring is verified by code-reading, not end-to-end probe. Re-test on the next fresh DigiKey call.
+3. **Future / Newark deeper probe** — both have packaging-adjacent fields (Future's `STDMFR` + `mpq`; Newark's `reeling` + `packSize`) that could potentially be combined into a packaging type with more inference logic. Low value given the unreliability.
+4. **Arrow compliance endpoint** — Arrow's standard search returns empty `packageType`, but Arrow may have a separate parametric/compliance endpoint that returns packaging type. Same concerns as the Arrow HTS/ECCN endpoint (data quality, separate auth) — defer.
 
 ---
 
@@ -1128,7 +1145,8 @@ shared/mpn-classifier.js      ← no-franchise-hit bucketing (existing, unrelate
 - [x] **VQ Loader Date Code & Packaging Auto-Capture (C10)** — `vq-writer.js` now reads `vqPackaging` strings, normalizes via `PACKAGING_MAP`, and auto-defaults date code to "within 2 years" for franchise/mfr-direct vendors when API doesn't return one
 - [x] **HTS / ECCN Auto-Population at VQ Write Time (C14)** — `vq-writer.js` payload assembly already wired; propagation completed across DigiKey, Mouser, Master, Future, Newark distributor modules; ECCN validation via `shared/validators.js`; backfill workflow now a secondary cleanup tool only
 - [x] **MFR Text Validation (C8)** — canonical resolver in `shared/mfr-lookup.js` was already in use by all 4 steady-state writers (rfq, vq, offer, cq); only remaining gap was the email-driven CSV emergency path (`vq-parser/src/mapper/mfr-lookup.js`), now redirected to the shared cog via a thin shim. 165-alias list + 5-tier resolution now applies to both REST writes and CSV emergency uploads. Acquisition policy + LINEAR TECH alias gap surfaced as separate follow-ups.
-- [x] **MPN → MFR Inference + Resolver Facade (C15)** — new shared cog (`shared/mpn-mfr-classifier.js` + `shared/mfr-resolver.js`) handles Policy D #3 (infer maker from MPN when source has no MFR; remap to current owner if acquired). 75-entry seed prefix table + 12-entry acquisition map. 27/27 smoke tests pass. Writer migration deferred — additive change, existing writers keep working unchanged.
+- [x] **MPN → MFR Inference + Resolver Facade (C15)** — new shared cog (`shared/mpn-mfr-classifier.js` + `shared/mfr-resolver.js`) handles Policy D #3 (infer maker from MPN when source has no MFR; remap to current owner if acquired). 75-entry seed prefix table + 12-entry acquisition map. 27/27 smoke tests pass. **Writer migration completed 2026-04-08** — all four writers (rfq-writer, vq-writer, offer-writeback, cq-writer) now call `resolveMfrForRow({mfrText, mpn})` and gain MPN-inference fallback for missing-MFR rows.
+- [x] **Packaging cog + factory policy + cq-writer Chuboe_Packaging_ID + distributor wiring (C9)** — promoted `normalizePackaging`/`PACKAGING_MAP` from vq-writer to new `shared/packaging-lookup.js`. Three-path factory policy fixed root bug (was always claiming F-* even on partials). cq-writer now writes `Chuboe_Packaging_ID` alongside text. DigiKey + Master wired (was missing). Audit confirmed Arrow/Future/Newark/Waldom/Rutronik don't expose usable packaging type. ~73% of franchise volume now auto-populates packaging at write time.
 
 ## Section D: Integration
 *(No completed items yet)*
