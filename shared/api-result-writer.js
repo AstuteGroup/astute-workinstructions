@@ -20,6 +20,8 @@
  *   Uses data.Status[] + data.Pricings[] matching the existing Flux BI tool format
  *   in adempiere.chuboe_pricing_api_result. Adds data._meta for our query context.
  *   No RawResponse field (keeps payloads lean).
+ *   Astute extensions on Pricings[]: Description, VendorNotes, DateCode, HTSCode, ECCN
+ *   (additive — Flux readers ignore unknown fields).
  *
  * CONSUMERS:
  *   - Writers: Franchise Screening, Suggested Resale, LAM Kitting (fire-and-forget)
@@ -76,8 +78,13 @@ function buildEnvelope(searchResult, mpn, qty, source) {
       LifeCycleStatus: d.raw?.vqLifeCycle || null,
       CountryOfOrigin: d.raw?.vqCoo || null,
       DataSheetUrl: d.raw?.vqDatasheetUrl || null,
-      ProductUrl: null,
+      ProductUrl: d.raw?.vqProductUrl || d.raw?.productUrl || null,
       Packaging: d.raw?.vqPackaging || null,
+      Description: d.vqDescription || d.raw?.vqDescription || null,
+      VendorNotes: d.vqVendorNotes || d.raw?.vqVendorNotes || null,
+      DateCode: d.vqDateCode || d.raw?.vqDateCode || null,
+      HTSCode: d.raw?.vqHts || d.raw?.htsCode || null,
+      ECCN: d.raw?.vqEccn || d.raw?.eccn || null,
       Pricings: (d.priceBreaks || d.raw?.priceBreaks || []).map(pb => ({
         QtyBreak: pb.qty,
         UnitPrice: pb.unitPrice,

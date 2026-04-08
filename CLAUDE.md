@@ -346,6 +346,7 @@ IDs are **assigned server-side** by iDempiere — do NOT include PK fields in PO
 | `shared/api-result-writer.js` | `writePricingResult(opts)` | chuboe_pricing_api_result |
 | `shared/vq-writer.js` | `writeVQBatch(rfq, items)` | chuboe_vq_line (two-pass: exact → fuzzy) |
 | `shared/cq-writer.js` | `writeCQ(rfq, line)` / `writeCQBatch(rfq, lines)` | chuboe_cq_line (flat, no header) |
+| `shared/record-updater.js` | `patchRecord(table, id, payload, opts)` / `patchBatch(table, updates, opts)` | **Updates** existing rows on any chuboe_* table — idempotent backfills, enrichment passes, corrections (HTS/ECCN, alt-MPN linkage, etc.). See `api-writeback.md` § PATCH / Update Pattern. |
 
 #### Credentials
 

@@ -302,6 +302,97 @@ Content-Type: application/json
 
 ---
 
+## PATCH / Update Pattern
+
+**When to use:** Backfilling existing rows, enriching them with new data, or correcting values. Anything that's an *update*, not a *create*.
+
+**Primitive:** `apiPut(table, id, payload)` from `shared/api-client.js`. iDempiere REST treats PUT as a **partial update** — only the fields you send are touched. Fields you omit are left alone.
+
+**Higher-level helper:** `shared/record-updater.js` — wraps the GET-then-PATCH idempotency pattern, validation, throttled batching, and audit logging. Prefer this over raw `apiPut` for any backfill or batch update.
+
+### The Idempotent Backfill Recipe
+
+Every backfill (HTS/ECCN, alt-MPN linkage, dormant column populations, data quality flags, …) follows the same five steps:
+
+1. **Validate the new value** before any API call. Cheap to fail fast on garbage input.
+2. **GET the current row** to inspect existing column values.
+3. **Skip columns that are already populated** — never overwrite a value an operator may have manually corrected. This is what makes re-runs safe.
+4. **PUT only the columns whose current value is null/empty.** If everything is already populated, this is a no-op (return `skipped`, no API call).
+5. **Log every decision** — patched, skipped, validation-failed, error — to a structured audit file.
+
+### Single Record
+
+```javascript
+const { patchRecord } = require('../shared/record-updater');
+
+const result = await patchRecord('chuboe_vq_line', 2002199, {
+  Chuboe_HTS: '8542.31.0001',
+  Chuboe_ECCN: 'EAR99',
+}, {
+  skipIfNotNull: ['Chuboe_HTS', 'Chuboe_ECCN'],
+  validate: { Chuboe_ECCN: /^(EAR99|[0-9][A-E][0-9]{3}([.][a-z][0-9]?)*)$/ },
+  source: 'hts-eccn-backfill',
+});
+
+// result = {
+//   status: 'patched' | 'skipped' | 'validation-failed' | 'error',
+//   patched: { ...fields actually written },
+//   skipped: { ...fields dropped because already populated },
+//   before, after,  // for audit
+//   ...
+// }
+```
+
+### Batch with Throttling and Audit Logs
+
+```javascript
+const { patchBatch } = require('../shared/record-updater');
+
+const updates = vqRows.map(row => ({
+  id: row.chuboe_vq_line_id,
+  payload: { Chuboe_HTS: row.hts, Chuboe_ECCN: row.eccn },
+}));
+
+const summary = await patchBatch('chuboe_vq_line', updates, {
+  skipIfNotNull: ['Chuboe_HTS', 'Chuboe_ECCN'],
+  validate: { Chuboe_ECCN: ECCN_REGEX },
+  concurrency: 5,
+  source: 'hts-eccn-backfill',
+  auditDir: path.join(__dirname, 'logs'),  // writes patch-log + skip-log + error-log JSON
+  onProgress: (done, total) => process.stdout.write(`\r${done}/${total}`),
+});
+
+// summary = { total, patched, skipped, validationFailed, errors, results: [...] }
+```
+
+### Audit Files
+
+When `auditDir` is set, `patchBatch` dumps three JSON files per run:
+
+| File | Contents |
+|------|----------|
+| `{source}-{timestamp}-patch-log.json` | Every successful PATCH with before/after values |
+| `{source}-{timestamp}-skip-log.json` | Every row skipped (with which fields were already populated) |
+| `{source}-{timestamp}-error-log.json` | Every validation failure or PUT error with the offending payload |
+
+Files are only written if there are entries — clean runs leave no artifacts.
+
+### Design Notes
+
+- **`skipIfNotNull` is the idempotency guarantee.** Without it, re-running a backfill would clobber manual corrections an operator made between runs. **Always use it for backfills.**
+- **Validate before GET.** Saves an API round-trip on garbage input.
+- **Throttle concurrency.** iDempiere REST doesn't love unbounded parallelism. Default is 5; tune up only after measuring.
+- **Independent gating per field.** A row where `Chuboe_HTS` is set but `Chuboe_ECCN` is null will get only the ECCN patched — they're checked independently.
+- **Never bundle unrelated columns.** If two enrichment passes touch different columns, run them as two separate `patchBatch` calls so the audit logs stay clean.
+
+### When NOT to use record-updater
+
+- **Creating new rows** — use `apiPost` or the appropriate consumer writer (rfq-writer, vq-writer, offer-writeback).
+- **Bulk replacement of a column on every row** — that's a one-shot SQL UPDATE conceptually; if you genuinely want to overwrite existing values, drop `skipIfNotNull` and accept the risk, but think hard about whether you really want that.
+- **Cascading updates across parent-child rows** — record-updater is per-table. For multi-table backfills, run separate `patchBatch` calls in dependency order.
+
+---
+
 ## iDempiere Standard Fields (Auto-Populated)
 
 The following fields are **automatically populated by the server** from the authenticated session. Do NOT include them in POST/PUT payloads:

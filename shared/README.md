@@ -17,13 +17,14 @@
 | `csv-utils.js` | CSV parsing with proper quoting | Any CSV read/write (**NEVER** use `line.split(',')`) | All workflows |
 | `logger.js` | Timestamped logging with optional prefix | Any module needing structured logs | All workflows, all shared cogs |
 | `himalaya-cli.js` | Low-level himalaya binary wrapper (JSON output) | Any email operation | email-fetcher.js |
-| `email-fetcher.js` | Email operations: list, read, move, folders. Factory: `createFetcher(account)` | Fetching/routing emails from any inbox | VQ Loading, Stock RFQ Loading |
+| `email-fetcher.js` | Email operations: list, read, move, folders. Factory: `createFetcher(account)`. Accounts: `vq`, `excess`, `stockrfq`, `vortex`. | Fetching/routing emails from any OT inbox | VQ Loading, Stock RFQ Loading, Vortex Matches |
 | `email-tracker.js` | Processed email dedup, stats, retry queue. Factory: `createTracker(dataDir)` | Tracking processed emails in any workflow | VQ Loading, Stock RFQ Loading |
-| `notifier.js` | Email notifications via AWS WorkMail SMTP. Factory: `createNotifier({fromEmail, fromName})` | Sending notifications/attachments from any workflow | VQ Loading, Stock RFQ Loading |
+| `notifier.js` | Email notifications via AWS WorkMail SMTP. Factory: `createNotifier({fromEmail, fromName})`. For HTML body + Cc + multiple attachments, use `nodemailer` directly with the same creds. | Sending notifications/attachments from any workflow | VQ Loading, Stock RFQ Loading, Vortex Matches |
 | `api-client.js` | iDempiere REST API client: auth, CRUD, batch, retry. See `api-writeback.md` for full docs. | Writing any data to iDempiere (replaces `psqlExec` for writes) | rfq-writer.js, offer-writeback.js, api-result-writer.js |
 | `rfq-writer.js` | Write RFQs via REST API (header + line + line_mpn). Server-assigned IDs, MPN description enrichment, MFR ID lookup. | Writing any RFQ type to iDempiere | Stock RFQ Loading, (future) other RFQ workflows |
 | `offer-writeback.js` | Write market offers via REST API (header + line + optional line_mpn). Server-assigned IDs, batch write, deactivation of prior offers. | Writing any offer type to iDempiere | Market Offer Loading, Inventory File Cleanup, (future) VQ Loading |
 | `api-result-writer.js` | Capture full franchise API responses (all price breaks, stock, lead time) to cache + iDempiere. Extract qty-relevant prices for downstream consumers. | After any `searchAllDistributors()` call (write), or when Vortex/Quick Quote needs franchise pricing (read) | Franchise Screening, Suggested Resale, LAM Kitting (write); Vortex Matches, Quick Quote (read) |
+| `record-updater.js` | Generalized PATCH/PUT pattern: GET-then-PATCH idempotency, skip-if-not-null gating, validation, throttled batch, audit logs | Any backfill or enrichment that **updates** existing rows (HTS/ECCN backfill, alt-MPN linkage, dormant column populations, etc.) | HTS/ECCN backfill (W2), future enrichment passes |
 | `db-helpers.js` | Shared DB read utilities: `psqlQuery`, `sqlStr`, `sqlNum`, `cleanMpn`. Used for read queries only — writes go through `api-client.js`. | Any module reading from `adempiere` schema | rfq-writer.js, offer-writeback.js, api-result-writer.js, partner-lookup.js |
 
 ---
@@ -218,7 +219,11 @@ const result = await runHimalaya(['envelope', 'list', '--account', 'vq', '--fold
 
 ## email-fetcher.js
 
-Factory that creates an email fetcher bound to a himalaya account. All email operations (list, read, move, folders) go through this.
+Factory that creates an email fetcher bound to an OT mailbox. All email operations (list, read, move, folders) go through this.
+
+**Credentials:** Loaded from `~/workspace/.env` (centralized) — `WORKMAIL_PASS`, `IMAP_HOST`, `IMAP_PORT`. Falls back to himalaya `config.toml` for legacy installs. The same `WORKMAIL_PASS` is shared across `vq`, `excess`, `stockrfq`, and `vortex`.
+
+**Accounts** (in `ACCOUNT_MAP`): `vq`, `excess`, `stockrfq`, `vortex`.
 
 ```javascript
 const { createFetcher } = require('../shared/email-fetcher');
@@ -411,6 +416,79 @@ const rows = extractPriceAtQty('ADS1115IDGST', 700, { maxAgeDays: 90 });
 |----------|---------|
 | `flushCacheToDB()` | Bulk import cache → DB (run once when table ready) |
 | `pruneCache(maxAgeDays)` | Delete cache files older than N days (default 90) |
+
+---
+
+## record-updater.js
+
+Generalized PATCH/PUT helper for idempotent backfills, enrichments, and corrections. Sits alongside the INSERT-only writers (rfq-writer, vq-writer, offer-writeback, cq-writer, api-result-writer) and handles the *update* shape that every backfill workflow shares.
+
+**When to use:** Any time you're updating existing rows — HTS/ECCN backfill, alt-MPN linkage, dormant column populations, data quality flag writes, manual corrections at scale.
+
+**When NOT to use:** Creating new rows (use the appropriate consumer writer or `apiPost` directly).
+
+### The Idempotent Backfill Recipe
+
+Every backfill follows the same five steps; this module wraps them:
+
+1. Validate the new value (regex / function) before any API call
+2. GET the current row state
+3. Skip columns that are already populated (idempotency — never clobber manual fixes)
+4. PUT only the columns whose current value is null/empty
+5. Log every decision (patched / skipped / validation-failed / error) to audit JSON files
+
+### Single Record
+
+```javascript
+const { patchRecord } = require('../shared/record-updater');
+
+const result = await patchRecord('chuboe_vq_line', 2002199, {
+  Chuboe_HTS: '8542.31.0001',
+  Chuboe_ECCN: 'EAR99',
+}, {
+  skipIfNotNull: ['Chuboe_HTS', 'Chuboe_ECCN'],
+  validate: { Chuboe_ECCN: /^(EAR99|[0-9][A-E][0-9]{3}([.][a-z][0-9]?)*)$/ },
+  source: 'hts-eccn-backfill',
+});
+// → { status: 'patched' | 'skipped' | 'validation-failed' | 'error',
+//     patched: { ... }, skipped: { ... }, before, after, ... }
+```
+
+### Batch with Throttling and Audit Logs
+
+```javascript
+const { patchBatch } = require('../shared/record-updater');
+
+const summary = await patchBatch('chuboe_vq_line', updates, {
+  skipIfNotNull: ['Chuboe_HTS', 'Chuboe_ECCN'],
+  validate: { Chuboe_ECCN: ECCN_REGEX },
+  concurrency: 5,
+  source: 'hts-eccn-backfill',
+  auditDir: path.join(__dirname, 'logs'),
+});
+// summary = { total, patched, skipped, validationFailed, errors, results: [...] }
+```
+
+### Result Status Values
+
+| Status | Meaning |
+|--------|---------|
+| `patched` | PUT succeeded; `patched` shows fields written, `before`/`after` for audit |
+| `skipped` | All gated fields were already populated — no API call made |
+| `validation-failed` | One or more values failed `validate` regex/function — no API call made |
+| `error` | GET or PUT failed; `phase` indicates which, `error` has the message |
+
+### Audit Files (when `auditDir` is set)
+
+| File | Contents |
+|------|----------|
+| `{source}-{timestamp}-patch-log.json` | Every successful PATCH with before/after values |
+| `{source}-{timestamp}-skip-log.json` | Every row skipped (which fields were already set) |
+| `{source}-{timestamp}-error-log.json` | Validation failures + PUT errors with offending payloads |
+
+Files only written if there are entries — clean runs leave no artifacts.
+
+> See `api-writeback.md` § PATCH / Update Pattern for the full design rationale and design notes.
 
 ---
 
