@@ -25,6 +25,7 @@
 const { apiGet, apiPost, resolveBP, resolveBPBatch, resolveMFR } = require('./api-client');
 const { lookupMfr } = require('./mfr-lookup');
 const { resolveMfrForRow } = require('./mfr-resolver');
+const { normalizePackaging, PACKAGING_MAP } = require('./packaging-lookup');
 const { isValidEccn } = require('./validators');
 const logger = require('./logger').createLogger('VQWriter');
 
@@ -71,47 +72,10 @@ const MFR_DIRECT_OR_FRANCHISE = new Set([
 ]);
 const DEFAULT_DATE_CODE_AUTHORIZED = 'within 2 years';
 
-// Packaging string → chuboe_packaging_id (verified against DB).
-// Inputs are normalized to lowercase with whitespace collapsed.
-// Returns null on no match — caller's opts.packagingId is the fallback.
-const PACKAGING_MAP = {
-  // REEL family → F-REEL is the universal canonical (used across all vendor types)
-  'reel': 1000001,
-  'tape and reel': 1000001,
-  'tape & reel': 1000001,
-  't&r': 1000001,
-  'tr': 1000001,
-  'digi-reel': 1000001,
-  'digireel': 1000001,
-  // CUT TAPE
-  'cut tape': 1000006,
-  'cuttape': 1000006,
-  'ct': 1000006,
-  // F-TUBE (only tube option in DB — no plain TUBE)
-  'tube': 1000003,
-  'f-tube': 1000003,
-  'ftube': 1000003,
-  // F-TRAY (universal canonical)
-  'tray': 1000002,
-  'f-tray': 1000002,
-  'ftray': 1000002,
-  // BULK family
-  'bulk': 1000008,
-  'each': 1000008,
-  'bag': 1000008,
-  'ea': 1000008,
-  // BOX
-  'box': 1000007,
-  // AMMO
-  'ammo': 1000009,
-  'ammo pack': 1000009,
-};
-
-function normalizePackaging(text) {
-  if (!text) return null;
-  const key = String(text).toLowerCase().trim().replace(/\s+/g, ' ');
-  return PACKAGING_MAP[key] || null;
-}
+// Packaging normalization moved to shared/packaging-lookup.js (C9b, 2026-04-08).
+// PACKAGING_MAP and normalizePackaging are imported above. The shared cog
+// implements the three-path factory policy (explicit marker / authorized
+// + full pack qty / plain default) — see its docstring for details.
 
 // ─── BP Vendor Type Cache ───────────────────────────────────────────────────
 const _bpVendorTypeCache = new Map();
@@ -514,9 +478,22 @@ async function writeVQFromAPI(rfqSearchKey, cpc, franchiseResults, opts = {}) {
     const traceabilityId = deriveTraceability(vendorTypeId);
 
     // Resolve packaging — distributor data wins, then opts fallback.
-    // Accepts either an explicit ID (vqPackagingId) or a string (vqPackaging) that we normalize.
+    // Accepts either an explicit ID (vqPackagingId) or a string (vqPackaging)
+    // that we normalize via the shared packaging-lookup cog.
+    //
+    // Three paths to F-REEL/F-TRAY/F-TUBE per shared/packaging-lookup.js:
+    //   1. Explicit factory marker in the input string ("MFR Reel", "F-REEL")
+    //   2. Authorized vendor + qty matches/multiplies SPQ (factory pack math)
+    //   3. Otherwise → plain REEL/TRAY (or null for TUBE — no plain variant)
+    //
+    // Caller-side context: the qty + spq + isAuthorized signals are already
+    // available in scope from the franchise API result.
     const packagingId = d.vqPackagingId
-      || normalizePackaging(d.vqPackaging)
+      || normalizePackaging(d.vqPackaging, {
+        qty,
+        spq: spq || (d.vqSpq ? Number(d.vqSpq) : null),
+        isAuthorized: MFR_DIRECT_OR_FRANCHISE.has(vendorTypeId),
+      })
       || opts.packagingId
       || null;
 

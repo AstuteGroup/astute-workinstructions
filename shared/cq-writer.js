@@ -45,6 +45,7 @@ const { apiPost, apiGet, resolveMFR } = require('./api-client');
 const { cleanMpn } = require('./db-helpers');
 const { lookupMfr } = require('./mfr-lookup');
 const { resolveMfrForRow } = require('./mfr-resolver');
+const { normalizePackaging } = require('./packaging-lookup');
 
 // ─── CONSTANTS ───────────────────────────────────────────────────────────────
 
@@ -401,6 +402,27 @@ async function writeCQBatch(rfqSearchKey, lines, opts = {}) {
       const val = line[inputKey];
       if (val != null && val !== '') {
         payload[apiCol] = String(val);
+      }
+    }
+
+    // Packaging ID — populate Chuboe_Packaging_ID alongside the text field
+    // (which OPTIONAL_FIELD_MAP already wrote above). Uses the shared
+    // packaging-lookup cog with the three-path factory policy:
+    //   1. Explicit factory marker in the input string ("MFR Reel", "F-REEL")
+    //   2. line.isAuthorized (opt-in per-line) + qty matches/multiplies SPQ
+    //   3. Otherwise → plain variant (or null for tubes — no plain TUBE in DB)
+    //
+    // CQ callers default to no isAuthorized context. If the caller wants
+    // the auto-upgrade math, pass line.isAuthorized: true and line.spq.
+    // Otherwise rely on the explicit factory marker path.
+    if (line.packaging) {
+      const pkgId = normalizePackaging(line.packaging, {
+        qty: line.qty,
+        spq: line.spq,
+        isAuthorized: !!line.isAuthorized,
+      });
+      if (pkgId) {
+        payload.Chuboe_Packaging_ID = pkgId;
       }
     }
 
