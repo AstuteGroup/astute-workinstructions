@@ -27,6 +27,7 @@ Consolidated roadmap for Trading Analysis workflows.
 | A1 | Refine Opportunity Amount Calculation | **Next** | Planned |
 | A2 | Filter Low % of Demand Matches | **Next** | Planned |
 | A3 | MPN Variant Matching | Later | Planned |
+| A4 | Vortex output redundancy investigation + cleanup | **Next** | Planned |
 
 ---
 
@@ -67,6 +68,118 @@ Consolidated roadmap for Trading Analysis workflows.
 | < 5% | Exclude (not worth the effort) |
 | 5-50% | Include, flag as partial |
 | > 50% | Include (meaningful coverage) |
+
+---
+
+## A4. Vortex Output Redundancy Investigation + Cleanup
+
+**Status:** Planned | **Priority:** Next
+**Discovered:** 2026-04-08 — Jake ran Vortex on RFQ 1132021 (Sanmina PPV, 208 lines / 872 line-MPNs) and observed a lot of redundant data. Initial 30-second DB check confirmed: **the redundancy is real in the database, not just a Vortex display issue.**
+
+### Two distinct concerns to address (Jake's framing)
+
+1. **Are the redundant rows duplicate VQs in the DB, or is it a Vortex output/aggregation issue?** → **Both, but the DB dup is the bigger one and is brand new from today's enrichment.**
+2. **Does the Vortex output clearly distinguish stock-available pricing vs lead-time pricing?** → Unverified, needs a look. These are fundamentally different supply commitments and Jake needs to see them as such — stock = "ship now" actionable, lead-time = "contractual quote, no stock today."
+
+### Finding 1 (CORRECTED 2026-04-08): The redundancy is upstream in `chuboe_rfq_line_mpn` — pre-dates today's enrichment work
+
+Initial hypothesis was that `enrich-rfq.js` was over-writing. Verified with the DB and the picture is different: **`chuboe_rfq_line_mpn` itself has duplicate rows for the same `(chuboe_rfq_line_id, chuboe_mpn_clean)` pair**, and these dups have existed at the RFQ-load layer for an unknown period (the table has rows going back well before today). My enrichment iterates the table faithfully and writes one VQ per row, so the dup amplifies into VQ writes — but the **root cause is at RFQ load time, not at enrichment time, and was present in the database before any RFQ API Enrichment work ran.**
+
+**Important timeline distinction (corrected after Jake flagged confusion):**
+- **`chuboe_rfq_line_mpn` dup pattern:** Pre-existing, long-standing. The loader (whichever path inserts into `chuboe_rfq_line_mpn` for PPV RFQs) has been creating dup rows for weeks/months. The 30-day audit below is on this upstream source data.
+- **`chuboe_vq_line` writes from RFQ API Enrichment:** Today only. One run on RFQ 1132021, ~858 VQ writes (~490 of which are dup-amplifications of the upstream source). The cron has been **disabled** until this is resolved so no further amplification happens.
+
+**Verification on RFQ 1132021 (the original sample):**
+
+Same MPN `1843363` is on **only ONE RFQ line** (`chuboe_rfq_line_id = 3069363`, qty 4500), but appears in `chuboe_rfq_line_mpn` **4 times** as exact duplicate rows. Same vendor quoting that one line in my enrichment → 4 VQ writes per vendor per MPN. The user explicitly noted: "there are RFQ lines where the customer has the same part and different qtys so I get that, but this is more than that" — this confirms it. Same-part-different-line is a separate (legitimate) case; this is same-part-same-line dupes in the sub-table.
+
+**RFQ 1132021 totals:** 872 line-MPN rows, **377 distinct (line_id, mpn) pairs**, **495 exact duplicates (57%)**. This RFQ is severely deduplicated.
+
+**The pattern is RFQ-type-correlated, last 30 days:**
+
+| RFQ Type | RFQs | Total line-MPNs | Dups | Dup % |
+|---|---:|---:|---:|---:|
+| **PPV** | 97 | 5,104 | **675** | **13.2%** |
+| Shortage | 875 | 5,144 | 253 | 4.9% |
+| EOL/LTB | 82 | 184 | 5 | 2.7% |
+| Astute Franchised | 16 | 86 | 2 | 2.3% |
+| 3PL/VMI | 15 | 943 | 3 | 0.3% |
+| Stock / Hot Parts / Proactive | 16 | 53 | 0 | 0% |
+
+PPV is systematically duplicated and RFQ 1132021 is an extreme outlier even within PPV (57% vs 13.2% average). Strong hypothesis: PPV RFQs come from customer Excel files (often Sanmina-shaped) where the source data has duplicate rows or where the alt-MPN expansion logic emits dupes instead of distinct rows. The loader (`rfq-writer.js` or whatever ingests PPV files) doesn't dedup at insert time.
+
+### The real fix is upstream
+
+The enrichment-side defensive dedup is a band-aid. The actual fix is:
+
+1. **At RFQ load time** — whichever loader handles PPV RFQs (likely `rfq-writer.js` called from the RFQ Loading workflow, or a customer-file ingestion path) needs a UNIQUE constraint or pre-insert dedup on `(chuboe_rfq_line_id, chuboe_mpn_clean)`. Identical sub-rows for the same line+MPN serve no purpose — alt-MPNs should be DIFFERENT MPNs.
+2. **Backfill cleanup** — for the existing 938 dup rows across recent RFQs (675 PPV + 253 Shortage + a few others), mark inactive. Leave one per `(line_id, mpn)`.
+3. **Audit other consumers** — any workflow that reads `chuboe_rfq_line_mpn` (Vortex, market offer matching, RFQ API Enrichment, suggested resale, BOM monitoring) is probably double-counting silently. The user-visible Vortex redundancy is just the most obvious symptom.
+
+### Defensive dedup in enrich-rfq.js (near-term mitigation)
+
+While the upstream fix is being scoped, `enrich-rfq.js` should defensively dedup its work list:
+
+```javascript
+// In enrichRFQ(), after fetchRFQLines()
+const seen = new Set();
+const dedupedLines = lines.filter(l => {
+  const key = `${l.chuboe_rfq_line_id}|${l.chuboe_mpn_clean}`;
+  if (seen.has(key)) return false;
+  seen.add(key);
+  return true;
+});
+```
+
+~5 line change. Eliminates the 4× write amplification on PPVs immediately, while the upstream loader fix is being scoped. Doesn't fix existing dups in the DB.
+
+### Existing dup VQs from today's enrichment of 1132021
+
+Today's run wrote 858 VQs across this RFQ. With the 57% upstream dup ratio, the unique-quote count is closer to ~370. Roughly **490 dup VQ rows** from today need to be cleaned up before Vortex output will look reasonable. Cleanup query: keep `MIN(chuboe_vq_line_id) GROUP BY (chuboe_rfq_id, chuboe_rfq_line_id, chuboe_mpn, c_bpartner_id, cost)`, mark the rest inactive.
+
+### Finding 2: Vortex output / display redundancy (separate from DB dups)
+
+Even after the DB dups are fixed, Vortex may still have output-layer redundancy worth cleaning up:
+
+- **Multiple distributors quoting the same part** — legitimate, but presented row-per-distributor when the user wants row-per-MPN with distributors collapsed into a "vendors" column or sub-rows.
+- **Stock + offer + VQ + api_result** — four supply sources, may surface the same physical stock from different angles (e.g., a franchise distributor stocking a part shows up as both a "vendor with stock" AND a "VQ from today's enrichment").
+- **api_result thin-pointer rows mixing with chuboe_vq_line.** Today's RFQ API Enrichment wrote 28 thin-pointer rows for live API calls. If Vortex pulls from both tables without distinguishing audit-trail rows from real VQs, there's double counting on top of the DB dup issue.
+
+### Finding 3 (to verify): stock vs lead-time pricing clarity
+
+Tomorrow's check:
+1. Open today's Vortex xlsx for 1132021.
+2. Pick a part where multiple vendors quoted with mixed stock/lead-time states.
+3. Verify the user can tell at a glance: which rows have stock available right now (qty > 0) vs which are lead-time-only quotes (qty = 0, lead_time set).
+4. If unclear, propose a column reorg: split into "Stock Available" (qty + price) and "Lead-Time Quote" (lead time + price), or color/icon coding, or split into separate sheets.
+
+VQ-side fields involved:
+- `chuboe_vq_line.qty` — stock-on-hand at the vendor when quoted (0 = no stock)
+- `chuboe_vq_line.chuboe_lead_time` — string field, e.g. "12 weeks", "Stock", "8-10 wks ARO"
+- `chuboe_vq_line.cost` — quoted unit price
+
+### Plan of action for tomorrow's session
+
+1. **First** — pick the per-line vs per-(RFQ, MPN, vendor) call. Quick discussion, then commit to one.
+2. **Patch enrich-rfq.js** with the chosen dedup strategy.
+3. **Backfill cleanup** — mark the existing dup VQs on RFQ 1141436 inactive (keep one per (MPN, vendor)). ~712 rows to deactivate if we keep the most-recent or first one.
+4. **Re-run enrichment on a fresh test RFQ** to verify no new dups land.
+5. **Re-run Vortex on 1132021** and inspect the output for the remaining (post-DB-cleanup) redundancy classes.
+6. **Audit the stock-vs-lead-time presentation** in the Vortex xlsx. Propose layout changes if needed.
+7. **Implement Vortex collapse** in `vortex-matches.js` if redundancy persists after step 4.
+8. **Validate** by re-running on 1132021 and one un-enriched RFQ as a baseline comparison.
+
+### Out of scope
+
+- Don't change the email/recipient layer — the inbox-driven automation works fine. Output structure only.
+- Don't refactor Vortex's SQL strategy wholesale until we know the DB-side dups are gone — could mask the real Vortex bugs.
+
+### Files to look at
+
+- `Trading Analysis/RFQ API Enrichment/enrich-rfq.js` — for the dedup fix
+- `Trading Analysis/Vortex Matches/vortex-matches.js` — for output redundancy + stock/lead-time presentation
+- `Trading Analysis/Vortex Matches/vortex-matches.md` — current behavior spec
+- `shared/data-model.md` — for join patterns when reasoning about which tables Vortex pulls from
 
 ---
 
