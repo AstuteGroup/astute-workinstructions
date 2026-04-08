@@ -119,10 +119,13 @@ const result = resolvePartner({
 
 Centralized DB queries for all pricing intelligence. Queries VQ history, sales history (distinguishing broker vs customer), market offers, and RFQ demand.
 
+### Single MPN — `getAllMarketData(mpn)`
+
+Use when you need rich detail for **one** part: full VQ history, full sales rows, full offer rows, full RFQ history with customers and quantities. Uses ILIKE prefix matching so packaging-variant MPNs (`FT2232HL` → also catches `FT2232HL-REEL`) are included.
+
 ```javascript
 const { getAllMarketData, getVQHistory, getSalesHistory } = require('../shared/market-data');
 
-// Get everything for a part
 const data = getAllMarketData('ADS1115IDGST');
 console.log(data.vqSummary);        // { count, low, high, median, purchasedCost }
 console.log(data.brokerSales);       // strongest price signal
@@ -134,7 +137,44 @@ const vqs = getVQHistory('ADS1115IDGST', { months: 6 });
 const sales = getSalesHistory('ADS1115IDGST', { months: 12 });
 ```
 
-**Includes:** `cleanMpn()`, `getBaseMpn()`, `mpnWhereClause()` for MPN normalization and packaging-variant matching (e.g., FT2232HL-REEL → also searches FT2232HL).
+### Many MPNs — `getBulkMarketData(mpnCleans[])`
+
+**Use this** when you need market data for a SET of MPNs (Market Offer Analysis on a 500+-line lot, Vortex Matches batch, BOM Monitoring scoring, any future bulk analysis). Runs 4 bulk SQL queries instead of N × `getAllMarketData()` per-MPN loops.
+
+```javascript
+const { getBulkMarketData, cleanMpn } = require('../shared/market-data');
+
+const mpnCleans = lines.map(l => cleanMpn(l.mpn));
+const dataMap = getBulkMarketData(mpnCleans, { vqMonths: 12, salesMonths: 24 });
+// → Map<mpn_clean, BulkMarketRecord>
+
+for (const line of lines) {
+  const m = dataMap.get(cleanMpn(line.mpn));
+  console.log(m.vqCount, m.brokerSaleCount, m.activeRfqCount, m.demandStrength, m.topBuyers);
+}
+```
+
+**Performance:** 538 MPNs in ~12 seconds vs ~9 hours for the per-MPN loop. ~1000× speedup at 100+ MPNs.
+
+**BulkMarketRecord shape per MPN:**
+
+| Field | Type | Meaning |
+|-------|------|---------|
+| `mpnClean` | string | The cleaned key |
+| `vqCount`, `vqSummary` | int, `{count,low,high,median}` | Vendor quote history (12 mo default) |
+| `brokerSaleCount`, `customerSaleCount` | int, int | SO history split by `bp.isvendor='Y'` (broker vs customer) |
+| `lastBrokerSalePrice`, `lastCustomerSalePrice` | num, num | Most recent sold-at prices |
+| `offerCount`, `offerPriceLow`, `offerPriceHigh` | int, num, num | Active offers in window |
+| `activeRfqCount` | int | RFQs in last 90 days (`rfqDaysActive` default) |
+| `historicalRfqCount` | int | RFQs in last 12 months (`rfqMonthsHist` default) |
+| `demandStrength` | string | HIGH / MEDIUM / LOW / NONE (derived from `historicalRfqCount`) |
+| `topBuyers` | `[{name, isBroker}]` | Top N customers by SO frequency, broker-flagged |
+
+**Limitation:** Bulk uses **exact** match on `chuboe_mpn_clean` (indexed lookup). It does NOT do the ILIKE prefix matching that `mpnWhereClause()` does for packaging variants. If a caller needs `FT2232HL` to also catch `FT2232HL-REEL`, they should fall back to per-MPN `getAllMarketData()` for that specific case. The exact-match constraint is what makes the bulk version fast.
+
+### MPN Helpers
+
+**Includes:** `cleanMpn()`, `getBaseMpn()`, `mpnWhereClause()` for MPN normalization and packaging-variant matching (e.g., `FT2232HL-REEL` → also searches `FT2232HL`).
 
 ---
 

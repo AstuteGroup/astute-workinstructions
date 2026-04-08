@@ -48,7 +48,7 @@ Output       ──→  shape determined by intent
 | `shared/db-helpers.js` | `psqlQuery(...)` for fetching demand signals from `adempiere` schema | Built |
 | `shared/franchise-api.js` | `searchAllDistributors(mpn, qty)` — supply-side enrichment | Built, in production use |
 | `shared/api-result-writer.js` | `extractPriceAtQty(mpn, qty, {maxAgeDays})` — read cached franchise results before re-calling APIs | Built; DB write blocked on Chuck (cache works) |
-| `shared/market-data.js` | `getAllMarketData(mpn)` — VQ history, broker-vs-customer sales split, demand strength | Built |
+| `shared/market-data.js` | `getBulkMarketData(mpns[])` — bulk demand signals across many MPNs in one set of psql round-trips (~1000× faster than per-MPN at scale). Per-MPN `getAllMarketData()` retained for single-part deep dives. | Built (bulk version added 2026-04-08, GE Batch 1 was first user) |
 | **Intent classifier** | Rules-based: signals → Reactive / Spec Buy / Consignment | **Not yet built** |
 | **Scoring engine** | Per-line 0–100 via Supply/Price/Demand model | **Not yet built** |
 | **Output renderers** | Lot summary / spec buy ranker / reactive RFQ-match table | **Not yet built** (lot summary partially exists in `GE_Aerospace_Excess_Analysis_2026-04-02.xlsx` shape) |
@@ -157,24 +157,41 @@ for (const line of offer.lines) {
 
 **Freshness rule:** 14 days. Older than that → re-call APIs. Rationale: market intelligence shifts week-to-week for parts in active sourcing.
 
-#### 3b: Demand Side (OT history)
+#### 3b: Demand Side (OT history) — bulk pattern
+
+**Always use the bulk function** `getBulkMarketData(mpns[])`. The per-MPN `getAllMarketData()` call costs ~63 seconds per MPN (5+ separate psql spawns) and would take ~9 hours on a 500-line lot. The bulk function does the same work in one set of SQL round-trips — ~12 seconds for 500+ MPNs. ~1000× speedup.
 
 ```javascript
-const { getAllMarketData } = require('../../shared/market-data');
+const { getBulkMarketData, cleanMpn } = require('../../shared/market-data');
+
+// ONE call for the entire lot
+const mpnCleans = offer.lines.map(l => cleanMpn(l.mpn));
+const demandMap = getBulkMarketData(mpnCleans, {
+  vqMonths: 12,
+  salesMonths: 24,
+  rfqDaysActive: 90,
+  rfqMonthsHist: 12,
+});
+// → Map<mpn_clean, BulkMarketRecord>
 
 for (const line of offer.lines) {
-  const demand = getAllMarketData(line.mpn);
+  const d = demandMap.get(cleanMpn(line.mpn)) || {};
   line.enrichment.demand = {
-    openRFQs: demand.openRFQs,                  // active in last 90 days
-    activeCQs: demand.activeCQs,                // active in last 90 days
-    soHistory: demand.salesHistory,             // last 12 months
-    historicalBuyers: demand.brokerSales.concat(demand.customerSales).map(s => s.bpName),
-    demandStrength: demand.demandStrength,      // HIGH / MEDIUM / LOW / NONE
+    vqCount:           d.vqCount || 0,
+    brokerSaleCount:   d.brokerSaleCount || 0,
+    customerSaleCount: d.customerSaleCount || 0,
+    activeRfqCount:    d.activeRfqCount || 0,
+    historicalRfqCount: d.historicalRfqCount || 0,
+    demandStrength:    d.demandStrength || 'NONE',
+    historicalBuyers:  (d.topBuyers || []).map(b => b.name),
+    isBrokerHeavy:     (d.topBuyers || []).some(b => b.isBroker),
   };
 }
 ```
 
-> **Why a separate cog:** `market-data.js` already distinguishes broker sales from customer sales — broker sales are a much stronger price signal (per the `feedback_suggested_resale.md` rule).
+> **Why a separate cog:** `market-data.js` already distinguishes broker sales from customer sales — broker sales are a much stronger price signal (per the `feedback_suggested_resale.md` rule). The bulk version preserves this split via `brokerSaleCount` / `customerSaleCount` and the `isBroker` flag on each `topBuyers` entry.
+
+> **Limitation:** `getBulkMarketData` uses **exact equality** on `chuboe_mpn_clean`, not the ILIKE prefix matching the per-MPN function does. Packaging-variant suffixes (`-REEL`, `-TR`, etc.) won't be auto-included. Acceptable trade for the 1000× speedup; if a single line genuinely needs variant matching, fall back to per-MPN `getAllMarketData()` for that one case.
 
 ### Step 4: Score
 
@@ -323,7 +340,7 @@ Same columns as Reactive, plus:
 | Output renderers not yet built | Step 5 — three intent shapes need code | Reuse `GE_Aerospace_Excess_Analysis_2026-04-02.xlsx` shape for consignment as the reference template |
 | `chuboe_pricing_api_result` JSONB write blocked (Chuck) | Step 3a results don't persist to DB | Cache write works; `extractPriceAtQty()` falls back to cache; re-runs of Analysis re-call APIs more often than ideal |
 | `Market Offer Matching for RFQs/analyze-new-offers.js` only does 180-day RFQ lookback | Step 5 Reactive output is partial | Use directly for now; merge into this workflow's Step 5 once scoring engine exists |
-| Historical SO query in `market-data.js` doesn't yet split broker SOs from customer SOs in the demand-strength score | Step 3b demand signal is conservatively scored | Acceptable until we see scoring drift |
+| `getBulkMarketData()` uses exact mpn_clean equality, not the ILIKE prefix matching of the per-MPN function | Packaging variants (`-REEL`, `-TR` suffixes) won't auto-include each other in bulk runs | Acceptable trade for ~1000× speedup; for the rare single-line variant lookup case, fall back to per-MPN `getAllMarketData()` |
 
 ---
 
