@@ -420,6 +420,7 @@ const AUTO_SUFFIXES = /[-#]?(Q|Q1|AEC)$/i;
 | C12 | Universal Record Writer (config-driven) | Later | Planned |
 | C13 | Mismatched-MPN Capture for Analytics Visibility | Later | Planned |
 | C14 | HTS / ECCN Auto-Population at VQ Write Time | **Now** | ✅ Done |
+| C15 | MPN → MFR Inference + Resolver Facade | **Now** | ✅ Done (cog shipped, writer migration deferred) |
 
 ---
 
@@ -947,6 +948,73 @@ Expected per-distributor coverage on a new load:
 
 ---
 
+## C15. MPN → MFR Inference + Resolver Facade
+
+**Status:** ✅ Done (cog shipped 2026-04-08, writer migration deferred) | **Priority:** Now
+
+**Problem:** Policy D #3 says: when a row has no MFR string, infer the original maker from the MPN and (if the maker has been acquired) attribute to the current owner. This requires a different lookup than the existing brand-string normalization in `shared/mfr-lookup.js`. Inputs differ (MPN vs string), data sources differ (prefix table vs alias file), match algorithms differ (longest-prefix-match vs dictionary lookup), and failure modes differ. Building this capability into `mfr-lookup.js` would tangle two distinct maintenance disciplines into one file.
+
+**Architecture (decided 2026-04-08):**
+
+```
+shared/mfr-lookup.js          ← brand string → canonical record (existing)
+shared/mpn-mfr-classifier.js  ← MPN → original maker (new — C15)
+shared/mfr-resolver.js        ← facade combining both + acquisition policy (new — C15)
+shared/mpn-classifier.js      ← no-franchise-hit bucketing (existing, unrelated)
+```
+
+**What shipped:**
+
+1. **`shared/mpn-mfr-classifier.js`** — pattern-matching engine. Loads `shared/data/mpn-prefixes.json` (~75 hand-curated entries seeded from common semi prefixes + the OLD vq-parser stub's acquisition cases). Sorts prefixes longest-first so `LTC` wins over `LT` for `LTC1485`. Returns `{matched, mfr, prefix, source, confidence, notes}`. Confidence is `high` for prefixes ≥3 chars, `medium` for shorter (more collision-prone). Acquisitions are NOT applied here — that's the resolver's job.
+
+2. **`shared/data/mpn-prefixes.json`** — seed prefix table. Format: `{ prefix: { mfr, notes } }`. Names match canonical `chuboe_mfr.name` values. Includes top semi prefixes for TI, Maxim, ADI, Microchip (Atmel), ST, NXP, ON Semi, Infineon, IR, Altera, Xilinx, Broadcom (Avago), Micron, Samsung, ISSI, Winbond, FTDI, Murata, Vishay, Panasonic. ~75 entries — NOT comprehensive. Expand as gaps surface.
+
+3. **`shared/data/mfr-acquisitions.json`** — acquisition map. 12 entries covering well-known semi acquisitions (Linear→ADI, Maxim→ADI, Xilinx→AMD, Altera→Intel, Avago→Broadcom, IR→Infineon, Atmel→Microchip, Microsemi→Microchip, Cypress→Infineon, Freescale→NXP, Hittite→ADI, Fairchild→ON). Iterative chain resolution capped at 5 hops to guard against accidental cycles in the data file.
+
+4. **`shared/mfr-resolver.js`** — single entry point facade. `resolveMfrForRow({mfrText, mpn, applyAcquisitionMap})` dispatches to the right path:
+   - **Text path** (Policy D #1): if `mfrText` is provided, call `lookupMfr` directly. Source intent preserved — acquisition map NEVER applied. Returns the canonical iDempiere record for the brand the source named.
+   - **MPN path** (Policy D #3): if no `mfrText` but `mpn` is provided, call `classifyMpnToMfr` to find the original maker, then optionally remap via the acquisition map (default true), then resolve the final name to its iDempiere ID via `lookupMfr`. Returns `{originalMfr, acquisitionApplied: true, prefix}` so the caller can audit what happened.
+   - **Both paths**: text wins (Policy D #1).
+   - **Neither**: returns `{matched: false, source: 'no-input'}`.
+
+**Smoke test results (27/27 passing):**
+- mpn-mfr-classifier unit: 11/11 (LTC1485, LM358N, MAX232, XCVU9P, ATMEGA328P, IRFP4668, EPM240, HFBR, CRCW, GE-INTERNAL, empty)
+- applyAcquisition unit: 7/7 (Linear→ADI, Maxim→ADI, Xilinx→AMD, Altera→Intel, IR→Infineon, Avago→Broadcom, TI→TI no-change)
+- resolveMfrForRow integration: 9/9 (text path, MPN+acquisition, MPN-no-acquisition, text wins over MPN, no-input fallback)
+
+**What's NOT done (deferred to follow-up workstreams):**
+
+1. **Writer migration.** The four steady-state writers (rfq-writer, vq-writer, offer-writeback, cq-writer) still call `lookupMfr()` directly. Migration is additive — replace `lookupMfr(mfrText)` with `resolveMfrForRow({mfrText, mpn})` and the writer gains MPN inference for free without losing the text-path behavior. ~10 lines per writer. Not blocking; the existing writers keep working unchanged.
+
+2. **Prefix table expansion.** The seed list is ~75 entries. Real coverage needs 300-500+ for comprehensive semi/passive/connector coverage. Best path forward: mine `chuboe_vq_line` history for `(mpn_prefix, mfr_id)` pairs that co-occur >N times and surface candidate prefixes for review.
+   ```sql
+   -- Sketch: find candidate prefixes from VQ history
+   WITH parts AS (
+     SELECT
+       SUBSTRING(chuboe_mpn_clean FROM 1 FOR 3) AS prefix3,
+       chuboe_mfr_id,
+       COUNT(*) AS cnt
+     FROM adempiere.chuboe_vq_line
+     WHERE chuboe_mpn_clean IS NOT NULL AND chuboe_mfr_id IS NOT NULL
+     GROUP BY 1, 2
+   )
+   SELECT prefix3, mfr.name, cnt
+   FROM parts p JOIN adempiere.chuboe_mfr mfr ON mfr.chuboe_mfr_id = p.chuboe_mfr_id
+   WHERE cnt >= 20
+   ORDER BY prefix3, cnt DESC;
+   ```
+   Then review for prefixes where one MFR clearly dominates (>80% of rows for that prefix) and add to `mpn-prefixes.json`.
+
+3. **LLM/API fallback for unknown prefixes.** When the prefix table doesn't match, future enhancement could call an LLM with the MPN + a "what manufacturer is this?" prompt. Out of scope for v1 — adds latency, cost, and a different failure mode. Revisit only if prefix-table coverage proves inadequate.
+
+4. **Confidence downgrade for short prefixes.** Currently 1-2 char prefixes return `confidence: medium`, ≥3 char prefixes return `confidence: high`. No caller checks confidence today. Could be wired into `mfr-resolver` to surface low-confidence inferences for human review at write time.
+
+5. **Acquisition map maintenance.** As new acquisitions complete (semi industry consolidation continues), add entries to `mfr-acquisitions.json`. Operator alert when an MPN classifies to a freshly-acquired brand could trigger a manual review.
+
+**Cross-cutting note:** This sits ABOVE `mfr-lookup.js` in the layering — `mfr-resolver.js` imports both `mfr-lookup.js` and `mpn-mfr-classifier.js`. It does NOT depend on C11 (resolver layer for write-time field assembly) or C12 (universal writer). Once C11/C12 land, the writers' field-resolution step would call `resolveMfrForRow` instead of `lookupMfr` and gain MPN inference automatically.
+
+---
+
 # Section D: Integration & Cross-Cutting
 
 | # | Feature | Priority | Status |
@@ -1060,6 +1128,7 @@ Expected per-distributor coverage on a new load:
 - [x] **VQ Loader Date Code & Packaging Auto-Capture (C10)** — `vq-writer.js` now reads `vqPackaging` strings, normalizes via `PACKAGING_MAP`, and auto-defaults date code to "within 2 years" for franchise/mfr-direct vendors when API doesn't return one
 - [x] **HTS / ECCN Auto-Population at VQ Write Time (C14)** — `vq-writer.js` payload assembly already wired; propagation completed across DigiKey, Mouser, Master, Future, Newark distributor modules; ECCN validation via `shared/validators.js`; backfill workflow now a secondary cleanup tool only
 - [x] **MFR Text Validation (C8)** — canonical resolver in `shared/mfr-lookup.js` was already in use by all 4 steady-state writers (rfq, vq, offer, cq); only remaining gap was the email-driven CSV emergency path (`vq-parser/src/mapper/mfr-lookup.js`), now redirected to the shared cog via a thin shim. 165-alias list + 5-tier resolution now applies to both REST writes and CSV emergency uploads. Acquisition policy + LINEAR TECH alias gap surfaced as separate follow-ups.
+- [x] **MPN → MFR Inference + Resolver Facade (C15)** — new shared cog (`shared/mpn-mfr-classifier.js` + `shared/mfr-resolver.js`) handles Policy D #3 (infer maker from MPN when source has no MFR; remap to current owner if acquired). 75-entry seed prefix table + 12-entry acquisition map. 27/27 smoke tests pass. Writer migration deferred — additive change, existing writers keep working unchanged.
 
 ## Section D: Integration
 *(No completed items yet)*
