@@ -79,6 +79,12 @@ At the start of every new conversation, before addressing anything else, always 
 
 ---
 
+## Scheduled Jobs (cron)
+
+**Reference:** `crontab.md` is the source of truth for all scheduled jobs running under `analytics_user`. Update it whenever a cron entry is added, changed, or removed. Verify against `crontab -l` periodically.
+
+---
+
 ## Shared Utilities
 
 **Location:** `shared/`
