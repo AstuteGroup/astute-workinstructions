@@ -49,6 +49,7 @@ const logger = require('./logger').createLogger('RFQWriter');
 const { apiPost } = require('./api-client');
 const { psqlQuery, cleanMpn } = require('./db-helpers');
 const { lookupMfr } = require('./mfr-lookup');
+const { resolveMfrForRow } = require('./mfr-resolver');
 
 // ─── CONSTANTS ───────────────────────────────────────────────────────────────
 
@@ -227,11 +228,16 @@ async function writeRFQ(opts) {
         PriceEntered: targetPrice,
         // Omit button fields — API rejects string 'N' on button columns
       };
-      // MFR resolution: resolve to canonical name, only set MFR ID if non-system.
-      // System-level MFR records (AD_Client_ID=0) cause 500 errors via API.
-      if (line.mfrText) {
-        const mfrResult = lookupMfr(line.mfrText);
-        mpnPayload.Chuboe_MFR_Text = mfrResult.canonical;
+      // MFR resolution via the unified resolver: text path (Policy D #1) when
+      // line.mfrText is provided; MPN-prefix inference + acquisition map
+      // (Policy D #3) as fallback when text is empty. Only set Chuboe_MFR_ID
+      // for non-system records (system-level MFRs with AD_Client_ID=0 cause
+      // 500 errors via API).
+      if (line.mfrText || mpnRaw) {
+        const mfrResult = resolveMfrForRow({ mfrText: line.mfrText, mpn: mpnRaw });
+        if (mfrResult.canonical) {
+          mpnPayload.Chuboe_MFR_Text = mfrResult.canonical;
+        }
         if (mfrResult.id && !mfrResult.isSystem) {
           mpnPayload.Chuboe_MFR_ID = mfrResult.id;
         }

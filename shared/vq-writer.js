@@ -24,6 +24,7 @@
 
 const { apiGet, apiPost, resolveBP, resolveBPBatch, resolveMFR } = require('./api-client');
 const { lookupMfr } = require('./mfr-lookup');
+const { resolveMfrForRow } = require('./mfr-resolver');
 const { isValidEccn } = require('./validators');
 const logger = require('./logger').createLogger('VQWriter');
 
@@ -277,14 +278,36 @@ function resolveRFQLine(rfq, mpn, cpc) {
 // ─── MFR Confidence Check ───────────────────────────────────────────────────
 
 /**
- * Check if MFR lookup result is high enough confidence to write automatically.
+ * Check if MFR resolution result is high enough confidence to write automatically.
  * Returns { ok: boolean, reason: string|null }
+ *
+ * Accepts either the legacy lookupMfr return shape (no `path` field) or the
+ * new resolveMfrForRow shape (`path: 'text'|'mpn'|'none'`). Path-aware logic:
+ *
+ *   - text path → existing fuzzy/alias confidence rules apply
+ *   - mpn path  → confidence comes from the prefix length (classifyMpnToMfr
+ *                 returns 'high' for ≥3 chars, 'medium' for shorter — flag medium)
  */
 function checkMfrConfidence(mfrLookupResult, originalText) {
   if (!mfrLookupResult.matched) {
     return { ok: false, reason: FLAG.MFR_NO_MATCH };
   }
 
+  // MPN-path results: trust 'high' confidence (long prefix), flag 'medium'
+  // (short prefix, more collision-prone) for review.
+  if (mfrLookupResult.path === 'mpn') {
+    if (mfrLookupResult.confidence === 'medium' || mfrLookupResult.confidence === 'low') {
+      return { ok: false, reason: FLAG.MFR_LOW_CONFIDENCE };
+    }
+    // High-confidence MPN inference: still need a non-system ID to write
+    // (same rule as text path)
+    if (!mfrLookupResult.id) {
+      return { ok: false, reason: FLAG.MFR_NO_MATCH };
+    }
+    return { ok: true, reason: null };
+  }
+
+  // Text path (or legacy lookupMfr shape with no `path` field):
   // Fuzzy matches with low confidence get flagged
   if (mfrLookupResult.source.startsWith('fuzzy(')) {
     const conf = mfrLookupResult.source.match(/fuzzy\((\w+)\)/)?.[1];
@@ -454,12 +477,19 @@ async function writeVQFromAPI(rfqSearchKey, cpc, franchiseResults, opts = {}) {
       continue;
     }
 
-    // Resolve MFR — normalize via mfr-lookup, optionally enrich with live DB lookup.
-    // SYSTEM-ONLY MFRs (AD_Client_ID=0): omit Chuboe_MFR_ID and let the server's bean
-    // callout resolve from Chuboe_MFR_Text. This is the same pattern as rfq-writer.js
-    // (proven on RFQ 1132040, 2026-04-06). The text field is the load-bearing one.
-    const mfrResult = lookupMfr(mfrText);
-    const mfrCanonical = mfrResult.canonical || mfrText;
+    // Resolve MFR via the unified resolver: text path (Policy D #1) when the
+    // distributor returned a manufacturer string; MPN-prefix inference + the
+    // acquisition map (Policy D #3) as fallback when text is empty.
+    //
+    // SYSTEM-ONLY MFRs (AD_Client_ID=0): omit Chuboe_MFR_ID and let the server's
+    // bean callout resolve from Chuboe_MFR_Text. This is the same pattern as
+    // rfq-writer.js (proven on RFQ 1132040, 2026-04-06). The text field is the
+    // load-bearing one.
+    const mfrResult = resolveMfrForRow({ mfrText, mpn });
+    const mfrCanonical = mfrResult.canonical || mfrText || '';
+    if (mfrResult.acquisitionApplied) {
+      logger.info(`MFR inferred from MPN '${mpn}' via prefix '${mfrResult.prefix}' → ${mfrCanonical} (acquisition: ${mfrResult.originalMfr} → ${mfrCanonical})`);
+    }
 
     // Try to enrich with a non-system ID via live DB lookup. Failures here are non-fatal
     // — we'll fall back to the cache result, and if that's also system-only we omit the ID.

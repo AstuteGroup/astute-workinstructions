@@ -34,6 +34,7 @@ const logger = require('./logger').createLogger('OfferWriter');
 const { apiPost, apiGet, apiPut } = require('./api-client');
 const { psqlQuery, cleanMpn } = require('./db-helpers');
 const { lookupMfr } = require('./mfr-lookup');
+const { resolveMfrForRow } = require('./mfr-resolver');
 
 // Offer type name → chuboe_offer_type_id mapping
 const OFFER_TYPES = {
@@ -162,12 +163,17 @@ async function writeOffer(opts) {
       Chuboe_MPN: mpnRaw,
       Chuboe_MPN_Clean: mpnCleanVal,
     };
-    // MFR resolution: resolve to canonical name, only set MFR ID if non-system.
-    // System-level MFR records (AD_Client_ID=0) cause 500 errors via API:
-    // "System ID XXXX cannot be used in Chuboe_MFR_ID"
-    if (line.mfrText) {
-      const mfrResult = lookupMfr(line.mfrText);
-      linePayload.Chuboe_MFR_Text = mfrResult.canonical;
+    // MFR resolution via the unified resolver: text path (Policy D #1) when
+    // line.mfrText is provided; MPN-prefix inference + acquisition map
+    // (Policy D #3) as fallback when text is empty. Only set Chuboe_MFR_ID
+    // when the resolved record is non-system (system-level MFRs with
+    // AD_Client_ID=0 cause 500 errors via API: "System ID XXXX cannot be
+    // used in Chuboe_MFR_ID").
+    if (line.mfrText || mpnRaw) {
+      const mfrResult = resolveMfrForRow({ mfrText: line.mfrText, mpn: mpnRaw });
+      if (mfrResult.canonical) {
+        linePayload.Chuboe_MFR_Text = mfrResult.canonical;
+      }
       if (mfrResult.id && !mfrResult.isSystem) {
         linePayload.Chuboe_MFR_ID = mfrResult.id;
       }

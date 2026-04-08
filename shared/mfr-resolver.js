@@ -30,19 +30,27 @@
  *   // Text path — source-provided MFR, resolved to canonical record
  *   resolveMfrForRow({ mfrText: 'LINEAR TECH' });
  *   // → { matched: true, canonical: 'Linear Technology Corp', id: 1000037,
- *   //     source: 'text-alias', confidence: 'high', acquisitionApplied: false }
+ *   //     path: 'text', source: 'alias', confidence: 'high', acquisitionApplied: false }
  *
  *   // MPN path — no MFR text, inferred from prefix + acquisition map applied
  *   resolveMfrForRow({ mpn: 'LTC1485' });
  *   // → { matched: true, canonical: 'Analog Devices Inc', id: 1000006,
- *   //     source: 'mpn-prefix+acquisition', originalMfr: 'Linear Technology Corp',
- *   //     prefix: 'LTC', confidence: 'high', acquisitionApplied: true }
+ *   //     path: 'mpn', source: 'prefix+acquisition',
+ *   //     originalMfr: 'Linear Technology Corp', prefix: 'LTC',
+ *   //     confidence: 'high', acquisitionApplied: true }
  *
  *   // MPN path — inferred but NO acquisition (caller wants original brand)
  *   resolveMfrForRow({ mpn: 'LTC1485', applyAcquisitionMap: false });
  *   // → { matched: true, canonical: 'Linear Technology Corp', id: 1000037,
- *   //     source: 'mpn-prefix', prefix: 'LTC', confidence: 'high',
+ *   //     path: 'mpn', source: 'prefix', prefix: 'LTC', confidence: 'high',
  *   //     acquisitionApplied: false }
+ *
+ * SHAPE COMPATIBILITY:
+ *   The text path passes through the underlying lookupMfr `source` field
+ *   unchanged ('alias' / 'cache' / 'db' / 'fuzzy(strict)' / 'pass-through').
+ *   Existing writer logic that does `source.startsWith('fuzzy(')` or
+ *   `source === 'alias'` keeps working. Use the new `path` field
+ *   ('text' / 'mpn' / 'none') to distinguish which underlying lookup ran.
  *
  *   // Both provided — text wins (Policy D #1)
  *   resolveMfrForRow({ mfrText: 'LINEAR TECH', mpn: 'LTC1485' });
@@ -123,6 +131,13 @@ function resolveMfrForRow(opts = {}) {
   const { mfrText, mpn, applyAcquisitionMap = true } = opts;
 
   // Path 1: text provided → mfr-lookup wins (Policy D #1: preserve source intent)
+  //
+  // Return-shape note: we PASS THROUGH the underlying lookupMfr source field
+  // unchanged ('alias' / 'cache' / 'db' / 'fuzzy(strict)' / 'pass-through' /
+  // etc.) so existing writer confidence-check logic that does
+  // `source.startsWith('fuzzy(')` or `source === 'alias'` keeps working after
+  // migration. Use the `path` field to distinguish text-path from mpn-path
+  // results.
   if (mfrText && String(mfrText).trim()) {
     const result = lookupMfr(mfrText);
     return {
@@ -130,7 +145,8 @@ function resolveMfrForRow(opts = {}) {
       canonical: result.canonical || null,
       id: result.id || null,
       isSystem: !!result.isSystem,
-      source: 'text-' + (result.source || 'unknown'),
+      path: 'text',
+      source: result.source || 'unknown',
       confidence: result.matched ? 'high' : 'low',
       acquisitionApplied: false,
     };
@@ -144,7 +160,8 @@ function resolveMfrForRow(opts = {}) {
         matched: false,
         canonical: null,
         id: null,
-        source: 'mpn-no-prefix-match',
+        path: 'mpn',
+        source: 'no-prefix-match',
         prefix: null,
         confidence: 'none',
         acquisitionApplied: false,
@@ -164,7 +181,8 @@ function resolveMfrForRow(opts = {}) {
       canonical: idLookup.canonical || finalMfr,
       id: idLookup.id || null,
       isSystem: !!idLookup.isSystem,
-      source: wasRemapped ? 'mpn-prefix+acquisition' : 'mpn-prefix',
+      path: 'mpn',
+      source: wasRemapped ? 'prefix+acquisition' : 'prefix',
       prefix: classified.prefix,
       confidence: classified.confidence || 'high',
       originalMfr: wasRemapped ? originalMfr : undefined,
@@ -178,6 +196,7 @@ function resolveMfrForRow(opts = {}) {
     matched: false,
     canonical: null,
     id: null,
+    path: 'none',
     source: 'no-input',
     confidence: 'none',
     acquisitionApplied: false,

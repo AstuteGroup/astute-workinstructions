@@ -44,6 +44,7 @@ const logger = require('./logger').createLogger('CQWriter');
 const { apiPost, apiGet, resolveMFR } = require('./api-client');
 const { cleanMpn } = require('./db-helpers');
 const { lookupMfr } = require('./mfr-lookup');
+const { resolveMfrForRow } = require('./mfr-resolver');
 
 // ─── CONSTANTS ───────────────────────────────────────────────────────────────
 
@@ -196,32 +197,47 @@ function resolveRFQLine(rfq, cpc, mpn) {
 // ─── MFR RESOLUTION ──────────────────────────────────────────────────────────
 
 /**
- * Resolve MFR text to ID. Returns { id, canonical, flagReason } or null fields.
+ * Resolve MFR for a CQ line via the unified resolver. Tries the source-provided
+ * MFR text first (Policy D #1: preserve source intent), falls back to MPN-prefix
+ * inference + acquisition map when text is empty (Policy D #3).
+ *
+ * Returns { id, canonical, flagReason, path, acquisitionApplied } or null fields.
  */
-async function resolveMfrForCQ(mfrText) {
-  if (!mfrText) return { id: null, canonical: null, flagReason: null };
+async function resolveMfrForCQ(mfrText, mpn) {
+  if (!mfrText && !mpn) return { id: null, canonical: null, flagReason: null, path: 'none' };
 
-  const mfrResult = lookupMfr(mfrText);
+  const mfrResult = resolveMfrForRow({ mfrText, mpn });
 
   if (!mfrResult.matched) {
-    return { id: null, canonical: mfrText, flagReason: FLAG.MFR_NO_MATCH };
+    return { id: null, canonical: mfrText || null, flagReason: FLAG.MFR_NO_MATCH, path: mfrResult.path };
   }
 
-  // Low-confidence fuzzy → flag but still write with text
-  if (mfrResult.source.startsWith('fuzzy(')) {
+  // Low-confidence fuzzy on the text path → flag but still write with text
+  if (mfrResult.path === 'text' && mfrResult.source.startsWith('fuzzy(')) {
     const conf = mfrResult.source.match(/fuzzy\((\w+)\)/)?.[1];
     if (conf === 'low') {
-      return { id: null, canonical: mfrResult.canonical, flagReason: FLAG.MFR_LOW_CONFIDENCE };
+      return { id: null, canonical: mfrResult.canonical, flagReason: FLAG.MFR_LOW_CONFIDENCE, path: mfrResult.path };
     }
   }
 
+  // MPN-path matches with short prefix (medium confidence) → flag for review.
+  // Currently classifyMpnToMfr returns confidence='medium' for prefixes < 3 chars.
+  if (mfrResult.path === 'mpn' && mfrResult.confidence === 'medium') {
+    return { id: null, canonical: mfrResult.canonical, flagReason: FLAG.MFR_LOW_CONFIDENCE, path: mfrResult.path };
+  }
+
   const canonical = mfrResult.canonical || mfrText;
+  // Re-resolve via api-client.resolveMFR to ensure target system has the record
+  // (mfr-resolver's lookupMfr step uses the local cache; resolveMFR confirms
+  // against the live API and respects isSystem).
   const resolved = await resolveMFR(canonical);
 
   return {
     id: (resolved && !resolved.isSystem) ? resolved.id : null,
     canonical,
     flagReason: null,
+    path: mfrResult.path,
+    acquisitionApplied: !!mfrResult.acquisitionApplied,
   };
 }
 
@@ -336,16 +352,21 @@ async function writeCQBatch(rfqSearchKey, lines, opts = {}) {
       continue;
     }
 
-    // Resolve MFR (if provided)
+    // Resolve MFR — text path if provided (Policy D #1), MPN inference fallback
+    // when text is empty (Policy D #3). resolveMfrForCQ handles both.
     let mfrId = null;
     let mfrCanonical = null;
-    if (line.mfrText) {
-      const mfr = await resolveMfrForCQ(line.mfrText);
+    if (line.mfrText || mpn) {
+      const mfr = await resolveMfrForCQ(line.mfrText, mpn);
       mfrId = mfr.id;
       mfrCanonical = mfr.canonical;
       if (mfr.flagReason) {
         // MFR issues are warnings, not blockers — write with text, flag for review
-        logger.warn(`MFR warning for ${mpn}: ${mfr.flagReason} (text: '${line.mfrText}')`);
+        const sourceTag = line.mfrText ? `text: '${line.mfrText}'` : `mpn-inferred: '${mpn}'`;
+        logger.warn(`MFR warning for ${mpn}: ${mfr.flagReason} (${sourceTag})`);
+      } else if (mfr.acquisitionApplied) {
+        // Audit trail: MPN inference triggered an acquisition remap
+        logger.info(`MFR inferred from MPN '${mpn}' via prefix → ${mfrCanonical} (acquisition applied)`);
       }
     }
 
