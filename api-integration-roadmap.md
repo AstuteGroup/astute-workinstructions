@@ -1240,6 +1240,85 @@ The cache prevents duplicate API calls. The VQs build pricing history over time.
 
 ---
 
+## Pricing Envelope OT-Native Storage
+
+**Status:** Blocked on iDempiere config | **Priority:** Later | **Owner:** TBD (needs iDempiere admin)
+**Discovered:** 2026-04-08 W1 testing
+**Current workaround:** thin-pointer rows + local cache (shipped)
+
+### Background
+
+`shared/api-result-writer.js` was originally designed to write the full franchise API envelope (per-distributor price ladders, stock, lead times, HTS/ECCN, etc.) into `adempiere.chuboe_pricing_api_result.json_info` via the iDempiere REST API. The vision was that every API call would build a snapshot OT could query directly — Vortex Matches, Quick Quote, Hurricane Search, and any future "pricing trend over time" report would read from one canonical OT location.
+
+### What We Discovered (W1 Test, 2026-04-08)
+
+Running three POST tests against prod with Tsunami User credentials (role 1000004):
+
+| Test | Payload | Result |
+|---|---|---|
+| Minimal POST (linkage fields only) | `{Chuboe_Pricing_API_Result_UU, MPNs}` | ✅ **200, id assigned** |
+| POST with `Chuboe_JSON_Info_Text` (PascalCase from ad_column) | adds JSON envelope | ✗ **500: "Cannot update virtual column Chuboe_JSON_Info_Text"** |
+| POST with `json_info` (lowercase postgres) | adds JSON envelope | ✗ **500: "Column json_info does not exist"** |
+
+**Findings:**
+1. **Role permissions are NOT a blocker.** Tsunami User can create rows in `chuboe_pricing_api_result` via REST. The earlier `project_api_production_status.md` note ("blocked by WebService User role 1000056") was based on a different role than we actually use, and is moot.
+2. **The JSON column is virtual in the iDempiere data dictionary.** Postgres physically has `json_info jsonb` (the legacy Flux/CalcuQuote pipeline writes there directly via SQL — last write 2024-12-30), but `ad_column` registers it as `Chuboe_JSON_Info_Text` with `IsVirtual=Y`. Virtual columns are read-only via REST.
+3. **No writable text/json field is exposed by the REST model** for this table. The fields it exposes for write are: `AD_Table_ID`, `Record_ID`, `MPNs`, `Chuboe_Pricing_API_Result_UU`. That's enough for a thin-pointer row, not enough for an envelope.
+
+### Current Workaround (Shipped 2026-04-08)
+
+`api-result-writer.js` `writeDb()` was patched to **thin-pointer mode**:
+
+- Writes one row per pull with `MPNs` (comma-separated list, varchar 255), `AD_Table_ID + Record_ID` (linkage to source RFQ), `Chuboe_Pricing_API_Result_UU`, and the auto-populated `Created` timestamp.
+- The **full pricing envelope stays in the local cache** (`shared/data/api-pricing-cache/{MPN}_{date}.json`) and is the canonical store.
+- `extractPriceAtQty()` already falls back to cache when DB has no JSON content, so all read-side consumers (Vortex, QQ, Hurricane) keep working.
+
+What we get from the thin-pointer rows today:
+- "We pulled API data for this RFQ on this date for these MPNs" — visible in OT, joinable to the source RFQ
+- Time-series of API call activity per RFQ / MPN list / source workflow
+- Auditability of who pulled what and when
+
+What we don't get until this is unblocked:
+- Per-distributor price ladders, stock levels, lead times queryable via OT-native SQL
+- Pricing trend over time without re-pulling APIs
+- Hurricane Search reading our envelopes (it currently reads the legacy Flux data, which we don't write to)
+
+### Resolution Options
+
+**Option 1 — Un-virtualize the existing column.** Have an iDempiere admin flip `Chuboe_JSON_Info_Text` from `IsVirtual=Y` to `IsVirtual=N`. The underlying postgres column already exists as `json_info jsonb`. Risk: changes the data dictionary in a way that could affect any other consumer of the virtual definition. Need to verify nothing depends on the current virtual SQL expression.
+
+**Option 2 — Add a new physical text column.** Create a new column on `adempiere.chuboe_pricing_api_result` (e.g., `chuboe_envelope_text` or similar), register it in `ad_column` as a regular `Text` reference type, REST API will then expose it for writes. Lower-risk than un-virtualizing because it's additive.
+
+**Option 3 — Use `ai_writeback.chuboe_pricing_api_result` instead.** If the `ai_writeback` schema has a parallel table that's not bound by the production data dictionary's virtual-column constraint, we could write there. Unclear whether this schema is still active or planned for retirement.
+
+### Pre-Work Before Unblocking
+
+1. Confirm the virtual column's SQL expression — what does `Chuboe_JSON_Info_Text` actually compute today? `SELECT columnsql FROM adempiere.ad_column WHERE columnname = 'Chuboe_JSON_Info_Text';`
+2. Audit whether any Hurricane Search / OT report depends on the virtual column's current behavior (if so, un-virtualizing breaks them).
+3. Decide between Option 1 and Option 2 with whoever owns iDempiere config (Jake or Chuck).
+4. If Option 2: pick the column name carefully — if the new column is `Chuboe_JSON_Info_Text_New` and the legacy is kept around as an alias, consumers would need migration.
+
+### Definition of Done
+
+- [ ] iDempiere data dictionary change applied (Option 1 or 2)
+- [ ] `api-result-writer.js` `writeDb()` updated to include the JSON envelope in the payload
+- [ ] Smoke test: POST envelope succeeds, GET-by-id returns the envelope content
+- [ ] One real franchise screening run produces visible envelope rows in `chuboe_pricing_api_result`
+- [ ] `extractPriceAtQty()` updated to read DB-first when envelopes are present (currently falls back to cache)
+- [ ] `project_api_production_status.md` memory note updated to remove the stale role-perm theory
+- [ ] Backfill: run `flushCacheToDB()` to import accumulated cache entries into OT
+
+### Why This Is Parked
+
+The thin-pointer workaround is good enough for current consumer patterns:
+- Vortex / QQ / Hurricane all read from local cache successfully today
+- We don't have a "pricing trend over time" report yet that would benefit from OT-native queryability
+- Adding it later is a one-line change to writeDb() once the column is writable — no consumer churn
+
+The unblock has real value (especially as we accumulate more snapshots and build trend analysis), but it's not on the critical path for any current workflow.
+
+---
+
 ## Future Integrations
 
 Placeholder for other API integrations as needs arise:

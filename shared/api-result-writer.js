@@ -2,10 +2,18 @@
  * API Result Writer — captures franchise API pricing data for market intelligence
  *
  * Stores full API responses (all price breaks, stock, lead time, MOQ) from
- * franchise distributor searches. Data flows into two stores:
+ * franchise distributor searches. Two storage layers:
  *
- *   1. Local cache: shared/data/api-pricing-cache/{MPN}_{date}.json (always)
- *   2. DB: ai_writeback.chuboe_pricing_api_result (when table exists)
+ *   1. Local cache (CANONICAL): shared/data/api-pricing-cache/{MPN}_{date}.json
+ *      The full envelope lives here. All read paths fall back to cache.
+ *
+ *   2. DB thin pointer: adempiere.chuboe_pricing_api_result via REST API
+ *      A header row per pull with linkage (AD_Table_ID + Record_ID → source RFQ),
+ *      MPN list, and timestamp. **No JSON body** — see writeDb() docstring for
+ *      the iDempiere virtual-column constraint that forces this design today.
+ *      Long-term plan: api-integration-roadmap.md § Pricing Envelope OT-Native
+ *      Storage tracks the iDempiere config change to make the JSON column
+ *      writable.
  *
  * WRITE PATH (called by franchise screening, suggested-resale, lam-kitting):
  *   const { writePricingResult } = require('../shared/api-result-writer');
@@ -40,7 +48,7 @@ const logger = require('./logger').createLogger('APIPricing');
 
 const CACHE_DIR = path.resolve(__dirname, 'data/api-pricing-cache');
 const AD_TABLE_ID_RFQ = 1000002; // Chuboe_RFQ table
-const DB_TABLE = 'chuboe_pricing_api_result';
+const DB_TABLE = 'Chuboe_Pricing_API_Result'; // REST API requires PascalCase from ad_table.tablename
 
 // ─── JSON ENVELOPE BUILDER ──────────────────────────────────────────────────
 
@@ -191,8 +199,33 @@ async function isDbAvailable() {
 }
 
 /**
- * Write envelope to chuboe_pricing_api_result via iDempiere REST API.
- * Returns the server-assigned ID, or null if API not available or write fails.
+ * Write a thin-pointer row to Chuboe_Pricing_API_Result via iDempiere REST API.
+ *
+ * IMPORTANT — REST API limitation discovered 2026-04-08:
+ *   The `Chuboe_JSON_Info_Text` column registered in iDempiere ad_column metadata
+ *   is a **virtual column** — POSTing to it returns 500 "Cannot update virtual
+ *   column". The underlying postgres `json_info jsonb` column exists physically
+ *   (legacy Flux/CalcuQuote pipeline writes to it directly via SQL), but the
+ *   REST model does not expose it as a writable field.
+ *
+ *   Until iDempiere config un-virtualizes the column (or we add a new physical
+ *   text column), we write a **thin pointer** row containing only the linkage
+ *   fields (AD_Table_ID + Record_ID), the MPN list, and the timestamp. The full
+ *   pricing envelope stays in the local cache file (always written) and serves
+ *   as the canonical store. See api-integration-roadmap.md § Pricing Envelope
+ *   OT-Native Storage for the longer-term resolution.
+ *
+ * What the thin pointer gives us today:
+ *   - "We pulled API data for this RFQ on this date for these MPNs" — visible
+ *     in OT, joinable to the source RFQ via AD_Table_ID + Record_ID
+ *   - Time-series of API call activity per RFQ / per MPN list
+ *
+ * What it does NOT give us today:
+ *   - Per-distributor price ladders, stock levels, lead times — those live in
+ *     the local cache only. Vortex/QQ/etc. should fall back to cache reads
+ *     until the JSON column becomes writable.
+ *
+ * @returns Server-assigned ID on success, or null if API unreachable or write fails.
  */
 async function writeDb(mpn, envelope, rfqId) {
   const available = await isDbAvailable();
@@ -201,10 +234,11 @@ async function writeDb(mpn, envelope, rfqId) {
   try {
     const uu = crypto.randomUUID();
 
+    // Thin-pointer payload — no JSON body. Field names use exact PascalCase
+    // from ad_column.columnname (REST API requirement).
     const payload = {
-      chuboe_pricing_api_result_uu: uu,
-      mpns: mpn.substring(0, 255),
-      json_info: JSON.stringify(envelope),
+      Chuboe_Pricing_API_Result_UU: uu,
+      MPNs: mpn.substring(0, 255),
     };
     if (rfqId) {
       payload.AD_Table_ID = AD_TABLE_ID_RFQ;
