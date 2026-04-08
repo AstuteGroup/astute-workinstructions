@@ -126,8 +126,10 @@ async function enrichRFQ(rfqDocNumber, opts = {}) {
     cacheHits: 0,
     vqsWritten: 0,
     vqsFlagged: 0,
+    vqsFailed: 0,           // server-side write rejections (5xx etc.)
     flagReasonCounts: {},  // { NO_RFQ_LINE: 12, MPN_CROSS_REF: 40, ... }
     flagSamples: [],        // first 5 flag {reason, detail, mpn}
+    failSamples: [],        // first 5 failed writes {reason, detail, mpn}
     apiResultRowsWritten: 0,
     qtyMatches: 0,
     partialCoverage: 0,
@@ -186,7 +188,7 @@ async function enrichRFQ(rfqDocNumber, opts = {}) {
     // the exact line ID we loaded the MPN from.
     if (!dryRun && (result.found?.length || 0) > 0) {
       try {
-        const { written = [], flagged = [] } = await writeVQFromAPI(
+        const { written = [], flagged = [], failed = [] } = await writeVQFromAPI(
           rfqDocNumber,
           cpc || '',
           result,
@@ -197,11 +199,17 @@ async function enrichRFQ(rfqDocNumber, opts = {}) {
         );
         counters.vqsWritten += written.length;
         counters.vqsFlagged += flagged.length;
+        counters.vqsFailed += failed.length;
         for (const f of flagged) {
           const reason = f.reason || 'UNKNOWN';
           counters.flagReasonCounts[reason] = (counters.flagReasonCounts[reason] || 0) + 1;
           if (counters.flagSamples.length < 5) {
             counters.flagSamples.push({ mpn: f.mpn || mpn, reason, detail: f.detail, vendor: f.vendor });
+          }
+        }
+        for (const f of failed) {
+          if (counters.failSamples.length < 5) {
+            counters.failSamples.push({ mpn: f.mpn || mpn, reason: f.reason, detail: f.detail, vendor: f.vendor });
           }
         }
       } catch (err) {
@@ -281,6 +289,7 @@ async function main() {
     console.log(`Cache hits:   ${summary.cacheHits}`);
     console.log(`VQs written:  ${summary.vqsWritten}`);
     console.log(`VQs flagged:  ${summary.vqsFlagged}`);
+    console.log(`VQs failed:   ${summary.vqsFailed}`);
     console.log(`api_result rows: ${summary.apiResultRowsWritten}`);
     console.log(`Coverage:     FULL=${summary.qtyMatches}  PARTIAL=${summary.partialCoverage}  NONE=${summary.noCoverage}`);
     console.log(`Errors:       ${summary.errors.length}`);
@@ -295,6 +304,12 @@ async function main() {
           console.log(`  ${i + 1}. ${s.reason} [${s.vendor || '?'}] ${s.mpn}: ${s.detail || '(no detail)'}`);
         });
       }
+    }
+    if (summary.failSamples?.length) {
+      console.log('Fail samples (server-side):');
+      summary.failSamples.forEach((s, i) => {
+        console.log(`  ${i + 1}. ${s.reason || 'API_WRITE_ERROR'} [${s.vendor || '?'}] ${s.mpn}: ${s.detail || '(no detail)'}`);
+      });
     }
     if (summary.errors.length > 0) {
       console.log('\nFirst 5 errors:');

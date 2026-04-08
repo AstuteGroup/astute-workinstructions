@@ -106,10 +106,18 @@ function deriveTraceability(vendorTypeId) {
 // so we omit the ID for those cases and let the server's bean callout resolve from
 // Chuboe_MFR_Text instead. This mirrors the rfq-writer pattern proven on RFQ 1132040.
 // Chuboe_MFR_Text IS mandatory — server cannot resolve without it.
+//
+// Chuboe_Packaging_ID and Chuboe_Buyer_ID were previously in this list but were
+// causing every API→VQ consumer (Stock RFQ Loading, LAM Kitting, HTS/ECCN backfill,
+// RFQ API Enrichment, Market Offer Analysis) to silently flag MISSING_MANDATORY
+// when distributors didn't return a packaging string or no buyer was assigned.
+// Audit on 2026-04-08: in 30 days of recent prod VQs, 86% have NULL packaging
+// and 4.6% have NULL buyer (581 have both NULL and wrote successfully). The DB
+// and bean callouts accept NULL for both. The validation was stricter than
+// reality. Removed both from TIER1 to match production behavior.
 const TIER1_MANDATORY = [
   'Chuboe_RFQ_ID', 'Chuboe_RFQ_Line_ID', 'C_BPartner_ID',
-  'Chuboe_MPN', 'Chuboe_MFR_Text', 'Cost', 'Qty', 'Chuboe_Packaging_ID',
-  'Chuboe_Buyer_ID',
+  'Chuboe_MPN', 'Chuboe_MFR_Text', 'Cost', 'Qty',
 ];
 
 const TIER2_MANDATORY = [
@@ -545,9 +553,14 @@ async function writeVQFromAPI(rfqSearchKey, cpc, franchiseResults, opts = {}) {
       Chuboe_RoHS: d.vqRohs || opts.rohs || DEFAULTS.Chuboe_RoHS,
       Chuboe_Traceability_ID: traceabilityId,
       Chuboe_VendorType_ID: vendorTypeId,
-      Chuboe_Packaging_ID: packagingId,
       Chuboe_Date_Code: dateCode,
-      Chuboe_Buyer_ID: opts.buyerId || null,
+      // Conditional reference columns — iDempiere REST cannot convert null to a
+      // typed reference (AD_User, Chuboe_Packaging, etc.). Sending the field
+      // explicitly as null returns 500 "Could not convert value null for X".
+      // Omit when we don't have a resolved ID; the bean callout / DB default
+      // handles the column. Same pattern as Chuboe_MFR_ID above.
+      ...(packagingId ? { Chuboe_Packaging_ID: packagingId } : {}),
+      ...(opts.buyerId ? { Chuboe_Buyer_ID: opts.buyerId } : {}),
 
       // HTS/ECCN — from franchise API data when available (validated above)
       Chuboe_HTS: htsValue,
