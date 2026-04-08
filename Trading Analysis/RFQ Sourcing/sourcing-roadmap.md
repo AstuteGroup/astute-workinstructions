@@ -419,7 +419,7 @@ const AUTO_SUFFIXES = /[-#]?(Q|Q1|AEC)$/i;
 | C11 | Shared Field Resolver Layer (refactor 4 writers) | **Next** | Planned |
 | C12 | Universal Record Writer (config-driven) | Later | Planned |
 | C13 | Mismatched-MPN Capture for Analytics Visibility | Later | Planned |
-| C14 | HTS / ECCN Auto-Population at VQ Write Time | **Next** | Planned |
+| C14 | HTS / ECCN Auto-Population at VQ Write Time | **Now** | ✅ Done |
 
 ---
 
@@ -818,7 +818,15 @@ Because the underlying problem is "the writeback shape doesn't match how analyti
 
 ## C14. HTS / ECCN Auto-Population at VQ Write Time
 
-**Status:** Planned | **Priority:** Next | **Dependency:** none — all distributor wiring shipped 2026-04-08
+**Status:** ✅ Done (2026-04-08) | **Priority:** Now | **Dependency:** none
+
+**Resolution:** `vq-writer.js` already had `Chuboe_HTS` / `Chuboe_ECCN` in the payload assembly (lines 528-530), sourced from `d.vqHts` / `d.vqEccn`. The reason historical loads (e.g., LAM EPG 2026-04-07) showed zero coverage was that the distributor modules weren't propagating those fields yet — `d.vqHts` was always null.
+
+With the propagation patches shipped 2026-04-08 (DigiKey, Mouser, Master, Future, Newark already wired; TTI was already done), every new VQ load now auto-populates HTS/ECCN at write time. Validation via `shared/validators.js` (`isValidEccn`) was added so malformed values get dropped with a warning rather than written. The same `ECCN_REGEX` is shared between `vq-writer.js` and the backfill script.
+
+**See the validation query and per-distributor expected coverage below for what to check on the next VQ load.**
+
+---
 
 **Problem:** `vq-writer.js` doesn't populate `Chuboe_HTS` / `Chuboe_ECCN` when writing new VQ rows, even though `franchise-api.js` now surfaces `vqHts` / `vqEccn` on the standardized result shape and 6 of 7 active distributors propagate at least one of the two fields (as of 2026-04-08).
 
@@ -1043,6 +1051,7 @@ Expected per-distributor coverage on a new load:
 - [x] 14-day RFQ matching window
 - [x] Vendor ID correction (search_key vs c_bpartner_id)
 - [x] **VQ Loader Date Code & Packaging Auto-Capture (C10)** — `vq-writer.js` now reads `vqPackaging` strings, normalizes via `PACKAGING_MAP`, and auto-defaults date code to "within 2 years" for franchise/mfr-direct vendors when API doesn't return one
+- [x] **HTS / ECCN Auto-Population at VQ Write Time (C14)** — `vq-writer.js` payload assembly already wired; propagation completed across DigiKey, Mouser, Master, Future, Newark distributor modules; ECCN validation via `shared/validators.js`; backfill workflow now a secondary cleanup tool only
 
 ## Section D: Integration
 *(No completed items yet)*

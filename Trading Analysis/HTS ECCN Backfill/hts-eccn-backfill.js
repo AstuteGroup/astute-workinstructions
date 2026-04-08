@@ -46,13 +46,11 @@ const { spawnSync } = require('child_process');
 const SHARED = path.resolve(__dirname, '../../shared');
 const { searchAllDistributors } = require(path.join(SHARED, 'franchise-api'));
 const { patchBatch } = require(path.join(SHARED, 'record-updater'));
+const { ECCN_REGEX } = require(path.join(SHARED, 'validators'));
 const logger = require(path.join(SHARED, 'logger')).createLogger('HTS-ECCN');
 
 const LOGS_DIR = path.join(__dirname, 'logs');
 const SOURCE_TAG = 'hts-eccn-backfill';
-// ECCN format: EAR99, or 5A002.a.1, or EAR99-style. Loose validator — better to
-// log a malformed value than to drop one.
-const ECCN_REGEX = /^(EAR99|N\/A|[0-9][A-E][0-9]{3}([. ]?[a-z][0-9]?)*|[0-9][A-E][0-9]{3})$/i;
 
 // ─── ARG PARSING ─────────────────────────────────────────────────────────────
 

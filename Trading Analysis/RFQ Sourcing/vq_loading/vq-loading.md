@@ -122,8 +122,8 @@ Extract ALL available fields from each quote. Required fields must be present; o
 | **Lead Time** | `Lead Time` | No | Default: "stock". Only specify if vendor quotes specific lead time |
 | **COO** | `COO` | No | Country of origin - use **full name** (China, Taiwan, Malaysia, United States, etc.) NOT ISO codes |
 | **RoHS** | `RoHS` | No | **Yes** / **No** / **Not Applicable** / blank (NOT Y/N) |
-| **HTS** | `HTS` | No | Harmonized Tariff Schedule code (from franchise APIs: TTI, Mouser) |
-| **ECCN** | `ECCN` | No | Export Control Classification Number (from franchise APIs: TTI, Mouser) |
+| **HTS** | `HTS` | No | Harmonized Tariff Schedule code. Auto-populated at write time from DigiKey, Mouser, or TTI when the source returned it. Other distributors don't expose HTS in their search APIs (see HTS/ECCN Backfill workflow for after-the-fact cleanup). |
+| **ECCN** | `ECCN` | No | Export Control Classification Number. Auto-populated at write time from DigiKey, Mouser, Master, Future, Newark, or TTI. Validated client-side via `shared/validators.js` (`isValidEccn`) — malformed values are dropped with a warning rather than written. |
 | **Vendor Notes** | `Vendor Notes` | No | Alternate MPNs, no-bid reasons, conditions |
 
 #### Tier 1 Defaults (Auto-Populated at VQ Load Time)
@@ -137,7 +137,8 @@ These fields speed up PO processing by filling in predictable values at write ti
 | **RoHS** | `chuboe_rohs` | Y (Yes) | Vendor says Non-RoHS or unknown |
 | **Traceability** | `chuboe_traceability_id` | Derived from vendor type | — |
 | **Vendor Type** | `chuboe_vendortype_id` | From BP record | — |
-| **HTS/ECCN** | `chuboe_hts`, `chuboe_eccn` | From franchise API data | Not available for email-loaded VQs |
+| **HTS** | `chuboe_hts` | From `franchiseResult.vqHts` (DigiKey / Mouser / TTI). Length-guarded (varchar 25). | Email-loaded VQs (no franchise result available) |
+| **ECCN** | `chuboe_eccn` | From `franchiseResult.vqEccn` (DK / Mouser / Master / Future / Newark / TTI). Validated via `isValidEccn` — invalid values dropped with warning. | Email-loaded VQs |
 
 **Traceability derivation:**
 - Franchise vendor (type 1000002) → Authorized Distribution Certs (1000001)

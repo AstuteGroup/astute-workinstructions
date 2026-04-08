@@ -24,6 +24,8 @@
 
 const { apiGet, apiPost, resolveBP, resolveBPBatch, resolveMFR } = require('./api-client');
 const { lookupMfr } = require('./mfr-lookup');
+const { isValidEccn } = require('./validators');
+const logger = require('./logger').createLogger('VQWriter');
 
 // Flag reason codes
 const FLAG = {
@@ -497,6 +499,21 @@ async function writeVQFromAPI(rfqSearchKey, cpc, franchiseResults, opts = {}) {
       || opts.dateCode
       || null;
 
+    // HTS / ECCN — sourced from franchise API data when available, with explicit
+    // validation on ECCN (chuboe_eccn is varchar(25) and the value flows back to
+    // compliance/customs filings, so a malformed write is worse than skipping it).
+    // HTS has no regex validator (codes too varied) — only a length guard.
+    let htsValue = d.vqHts || opts.hts || null;
+    if (htsValue && String(htsValue).length > 25) {
+      logger.warn(`HTS value too long for ${d.name || 'vendor'} on ${mpn}, skipping: ${htsValue}`);
+      htsValue = null;
+    }
+    let eccnValue = d.vqEccn || opts.eccn || null;
+    if (eccnValue && !isValidEccn(eccnValue)) {
+      logger.warn(`ECCN value failed validation for ${d.name || 'vendor'} on ${mpn}, skipping: ${eccnValue}`);
+      eccnValue = null;
+    }
+
     // Build payload — use searched MPN (our MPN), not the API's variant.
     // Chuboe_MFR_ID is conditional: only include when we have a non-system client-level ID.
     // Server resolves system-only / unknown MFRs from Chuboe_MFR_Text via bean callout.
@@ -525,9 +542,9 @@ async function writeVQFromAPI(rfqSearchKey, cpc, franchiseResults, opts = {}) {
       Chuboe_Date_Code: dateCode,
       Chuboe_Buyer_ID: opts.buyerId || null,
 
-      // HTS/ECCN — from franchise API data when available
-      Chuboe_HTS: d.vqHts || opts.hts || null,
-      Chuboe_ECCN: d.vqEccn || opts.eccn || null,
+      // HTS/ECCN — from franchise API data when available (validated above)
+      Chuboe_HTS: htsValue,
+      Chuboe_ECCN: eccnValue,
     };
 
     // Validate Tier 1 mandatory fields before writing
