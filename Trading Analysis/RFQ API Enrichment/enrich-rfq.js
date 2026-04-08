@@ -126,6 +126,8 @@ async function enrichRFQ(rfqDocNumber, opts = {}) {
     cacheHits: 0,
     vqsWritten: 0,
     vqsFlagged: 0,
+    flagReasonCounts: {},  // { NO_RFQ_LINE: 12, MPN_CROSS_REF: 40, ... }
+    flagSamples: [],        // first 5 flag {reason, detail, mpn}
     apiResultRowsWritten: 0,
     qtyMatches: 0,
     partialCoverage: 0,
@@ -176,16 +178,32 @@ async function enrichRFQ(rfqDocNumber, opts = {}) {
     // per-distributor what to write). This mirrors the Stock RFQ Loading pattern
     // — we want the full franchise price surface captured as VQ history, not
     // only qty-full coverage.
+    //
+    // _rfqLineIdOverride: we already know chuboe_rfq_line_id from the SQL pull
+    // above, so bypass vq-writer's resolveRFQLine() lookup (which keys on
+    // searchedMpn + cpc and can fail on PPV RFQs where those don't round-trip
+    // cleanly). Strictly better than the lookup path — we're handing vq-writer
+    // the exact line ID we loaded the MPN from.
     if (!dryRun && (result.found?.length || 0) > 0) {
       try {
         const { written = [], flagged = [] } = await writeVQFromAPI(
           rfqDocNumber,
           cpc || '',
           result,
-          { searchedMpn: mpn }
+          {
+            searchedMpn: mpn,
+            _rfqLineIdOverride: Number(line.chuboe_rfq_line_id),
+          }
         );
         counters.vqsWritten += written.length;
         counters.vqsFlagged += flagged.length;
+        for (const f of flagged) {
+          const reason = f.reason || 'UNKNOWN';
+          counters.flagReasonCounts[reason] = (counters.flagReasonCounts[reason] || 0) + 1;
+          if (counters.flagSamples.length < 5) {
+            counters.flagSamples.push({ mpn: f.mpn || mpn, reason, detail: f.detail, vendor: f.vendor });
+          }
+        }
       } catch (err) {
         counters.errors.push({ mpn, cpc, stage: 'vq-write', message: err.message });
       }
@@ -266,6 +284,18 @@ async function main() {
     console.log(`api_result rows: ${summary.apiResultRowsWritten}`);
     console.log(`Coverage:     FULL=${summary.qtyMatches}  PARTIAL=${summary.partialCoverage}  NONE=${summary.noCoverage}`);
     console.log(`Errors:       ${summary.errors.length}`);
+    if (Object.keys(summary.flagReasonCounts || {}).length > 0) {
+      console.log('Flag reasons:');
+      for (const [reason, count] of Object.entries(summary.flagReasonCounts)) {
+        console.log(`  ${reason}: ${count}`);
+      }
+      if (summary.flagSamples?.length) {
+        console.log('Flag samples:');
+        summary.flagSamples.forEach((s, i) => {
+          console.log(`  ${i + 1}. ${s.reason} [${s.vendor || '?'}] ${s.mpn}: ${s.detail || '(no detail)'}`);
+        });
+      }
+    }
     if (summary.errors.length > 0) {
       console.log('\nFirst 5 errors:');
       summary.errors.slice(0, 5).forEach(e => console.log(`  ${e.stage}: ${e.mpn} — ${e.message}`));
