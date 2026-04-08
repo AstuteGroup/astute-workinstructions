@@ -419,6 +419,7 @@ const AUTO_SUFFIXES = /[-#]?(Q|Q1|AEC)$/i;
 | C11 | Shared Field Resolver Layer (refactor 4 writers) | **Next** | Planned |
 | C12 | Universal Record Writer (config-driven) | Later | Planned |
 | C13 | Mismatched-MPN Capture for Analytics Visibility | Later | Planned |
+| C14 | HTS / ECCN Auto-Population at VQ Write Time | **Next** | Planned |
 
 ---
 
@@ -812,6 +813,122 @@ Because the underlying problem is "the writeback shape doesn't match how analyti
 1. Quantify the cost — query how many flagged/variant rows we've written in the last 90 days and estimate how many would have changed a Vortex/QQ outcome if visible.
 2. Audit each consuming workflow (Vortex, QQ, Stock RFQ Loading, Market Offer Analysis, BOM Monitoring) to confirm it handles N>1 `chuboe_rfq_line_mpn` rows per line correctly. Some may need SQL changes when the writeback shape changes.
 3. Decide whether genuine mismatches (not just packaging variants) get the same treatment, or stay in the `flagged[]` review queue.
+
+---
+
+## C14. HTS / ECCN Auto-Population at VQ Write Time
+
+**Status:** Planned | **Priority:** Next | **Dependency:** none — all distributor wiring shipped 2026-04-08
+
+**Problem:** `vq-writer.js` doesn't populate `Chuboe_HTS` / `Chuboe_ECCN` when writing new VQ rows, even though `franchise-api.js` now surfaces `vqHts` / `vqEccn` on the standardized result shape and 6 of 7 active distributors propagate at least one of the two fields (as of 2026-04-08).
+
+Today the only path that gets HTS/ECCN onto VQ lines is the **HTS/ECCN Backfill** workflow (`Trading Analysis/HTS ECCN Backfill/hts-eccn-backfill.md`), which is an after-the-fact cleanup pass. Every new VQ load creates more cleanup debt.
+
+**Why it matters:**
+- Compliance / customs filing / customer requirements need HTS+ECCN populated
+- The data is *already* in the API response when we write the VQ — we just throw it away
+- Backfill works but is a band-aid; the steady-state fix is at write time
+- LAM EPG load (140 lines) needed a backfill run that took 20 minutes of API calls. If we'd populated at write time, those 130 API calls had already happened during sourcing — zero incremental cost.
+
+### Distributor Coverage Matrix (as of 2026-04-08)
+
+Based on actual VQ writeback volume over the trailing 90 days:
+
+| Rank | Distributor | Vol 90d | % | HTS field exposed? | ECCN field exposed? | Wiring status |
+|---|---|---:|---:|---|---|---|
+| 1 | **DigiKey** | 927 | 35.8% | ✅ `Classifications.HtsusCode` | ✅ `Classifications.ExportControlClassNumber` | ✅ wired 2026-04-08 |
+| 2 | **Mouser** | 533 | 20.6% | ✅ `ProductCompliance[USHTS]` | ✅ `ProductCompliance[ECCN]` | ✅ wired 2026-04-08 (RestrictionMessage early-return bug fixed) |
+| 3 | **Master** | 282 | 10.9% | ❌ no field | ✅ top-level `eccn` | ✅ wired 2026-04-08 |
+| 4 | Arrow | 256 | 9.9% | ❌ standard search doesn't return | ❌ standard search doesn't return | 🅿️ **PARKED** — see below |
+| 5 | **Future** | 212 | 8.2% | ❌ no field | ✅ `part_attributes[name=eccn]` (often null) | ✅ wired 2026-04-08 |
+| 6 | **Newark / Farnell** | 192 | 7.4% | ❌ no field | ✅ `attributes[label=usEccn]` | ✅ wired 2026-04-08 |
+| 7 | **TTI** | 135 | 5.2% | ✅ `hts` / `exportInformation.hts` | ✅ `exportInformation.eccn` | ✅ already extracted (catalog coverage spotty) |
+| 8 | Waldom | 27 | 1.0% | ❓ unaudited | ❓ unaudited | not wired — low volume, deferred |
+| 9 | Sager | 22 | 0.9% | ❓ unaudited | ❓ unaudited | not wired — low volume, deferred |
+| 10 | Rutronik | 1 | <0.1% | ❓ unaudited | ❓ unaudited | not wired — negligible volume |
+
+**Aggregate coverage going forward (excluding Arrow):**
+- HTS: DigiKey + Mouser + TTI = 1,595 / 2,331 = **68.4%** of non-Arrow franchise volume
+- ECCN: DK + Mouser + Master + Future + Newark + TTI = 2,281 / 2,331 = **97.9%** of non-Arrow franchise volume
+
+ECCN coverage is the bigger uplift from this work — most non-DigiKey/Mouser distributors expose ECCN but not HTS in their standard search APIs.
+
+### Why Arrow is Parked
+
+Arrow's `itemservice/v4/en/search/token` endpoint does **not** return HTS or ECCN at all. To get classification data from Arrow we'd need a separate compliance endpoint, but per ongoing experience:
+
+- **Arrow's data quality on these fields is unreliable.** Even when classification data is available via separate endpoints, customers and operators have flagged repeated mismatches with manufacturer-published values.
+- The cost of integrating Arrow's compliance endpoint (additional API calls per part, separate rate-limit profile, separate auth path) is not justified by the volume relative to the data quality risk.
+- Arrow VQ rows can still get HTS/ECCN populated via the **backfill workflow**, which queries DigiKey + Mouser by (mpn, mfr) and applies values to *all* VQ rows for that part regardless of vendor — including Arrow's.
+
+**Decision (2026-04-08):** Skip Arrow at the write-time path. Backfill is the sole channel for Arrow VQ classification data. Re-evaluate only if Arrow's data quality improves materially or volume changes significantly.
+
+### Proposed change (one writer, ~10 lines)
+
+In `shared/vq-writer.js`, when assembling the `chuboe_vq_line` POST payload, include:
+
+```javascript
+if (item.franchiseResult) {
+  if (item.franchiseResult.vqHts)  payload.Chuboe_HTS  = item.franchiseResult.vqHts;
+  if (item.franchiseResult.vqEccn) payload.Chuboe_ECCN = item.franchiseResult.vqEccn;
+}
+```
+
+Where `item.franchiseResult` is the per-distributor result from `searchAllDistributors()` that already drives the rest of the write. Tier 1 mandatory list does NOT need to include these — they remain optional, and `vq-writer` already handles undefined fields correctly.
+
+**Source priority at write time:** unlike the backfill (which queries multiple sources and resolves conflicts), at write time we already know which distributor we're writing the VQ for — DigiKey VQ row gets DigiKey's HTS, Mouser VQ row gets Mouser's HTS. No cross-source resolution needed. Disagreements are deferred to either the backfill workflow (which sees both sources for the same MPN) or to manual review.
+
+**ECCN format validation:** Use the same loose regex from `hts-eccn-backfill.js` (`ECCN_REGEX`). Skip the value if it doesn't match — log a warning but don't fail the VQ write. HTS has no validator (codes too varied to regex).
+
+### Effects
+
+- Every new VQ load auto-populates HTS/ECCN where the source returned them
+- Backfill workflow becomes a *secondary* tool — only needed for old data, parts whose original VQ source didn't return classification, multi-source disagreement consolidation, or Arrow rows
+- Per-distributor: DigiKey/Mouser/TTI write with both fields; Master/Newark write with ECCN only; Future writes with ECCN where their catalog has it (low hit rate); Arrow writes neither (handled by backfill)
+
+### What's NOT in scope
+
+- Backfilling old VQ rows (use the backfill workflow)
+- Wiring Waldom / Sager / Rutronik (low volume, audit deferred)
+- Arrow compliance endpoint integration (see "Why Arrow is Parked")
+- Running a "second pass" call against a different distributor when the source distributor returned null — that's the backfill's job, not the writer's
+
+### Implementation Steps
+
+1. Edit `shared/vq-writer.js` to copy `vqHts`/`vqEccn` from `item.franchiseResult` (or wherever `franchise-api` results land in the writer's input shape) into the POST payload
+2. Add `ECCN_REGEX` validation with warn-and-skip on failure
+3. Test on a small new RFQ load (5 lines), verify HTS/ECCN appear on the new VQ rows in OT
+4. Document in `vq-loading.md` under "Auto-populated fields"
+
+### Validation Query
+
+```sql
+-- After a new VQ load, check coverage
+SELECT
+  vl.c_bpartner_id,
+  bp.name,
+  COUNT(*) AS lines,
+  ROUND(100.0 * COUNT(*) FILTER (WHERE chuboe_hts IS NOT NULL) / COUNT(*), 1) AS hts_pct,
+  ROUND(100.0 * COUNT(*) FILTER (WHERE chuboe_eccn IS NOT NULL) / COUNT(*), 1) AS eccn_pct
+FROM adempiere.chuboe_vq_line vl
+JOIN adempiere.c_bpartner bp ON bp.c_bpartner_id = vl.c_bpartner_id
+WHERE vl.chuboe_rfq_id = <rfq_id> AND vl.isactive = 'Y'
+GROUP BY vl.c_bpartner_id, bp.name
+ORDER BY lines DESC;
+```
+
+Expected per-distributor coverage on a new load:
+- DigiKey / Mouser / TTI: ~95% on both HTS and ECCN
+- Master / Newark: ~0% HTS, ~95% ECCN
+- Future: ~0% HTS, variable ECCN (catalog dependent)
+- Arrow: 0% / 0% (deferred to backfill)
+
+### Pre-work / Risks
+
+- Confirm `vq-writer` consumers are passing the franchise result through to where the payload is assembled. Spot-check the LAM EPG path and the franchise screening → VQ path.
+- Decide whether the ECCN regex should match the one in `hts-eccn-backfill.js` or move to a shared validator. If 2+ writers need it → promote to `shared/`.
+
+**Cross-cutting note:** This is a scoped change to one writer. It does NOT depend on C11 (resolver layer) or C12 (universal writer) — just bolt the field copy onto the existing `vq-writer.js` payload assembly. When C11/C12 land later, the field copy moves to the shared resolver/writer config.
 
 ---
 

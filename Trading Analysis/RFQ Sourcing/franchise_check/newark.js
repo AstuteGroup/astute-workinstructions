@@ -194,6 +194,8 @@ async function searchPart(mpn, rfqQty = 1) {
     vqMoq: newarkResult?.vqMoq || farnellResult?.vqMoq || null,
     vqSpq: newarkResult?.vqSpq || farnellResult?.vqSpq || null,
     vqLeadTime: newarkResult?.vqLeadTime || farnellResult?.vqLeadTime || null,
+    vqHts: null,  // not exposed by element14 API
+    vqEccn: newarkResult?.vqEccn || farnellResult?.vqEccn || null,
 
     // Per-store breakdown
     stores: {
@@ -273,6 +275,8 @@ function parseSearchResults(json, searchMpn, rfqQty, storeInfo) {
     vqDatasheetUrl: null,
     vqMoq: null,
     vqSpq: null,
+    vqHts: null,    // element14 API does not return HTS — kept null for shape parity
+    vqEccn: null,   // element14 returns ECCN inside the attributes array (label='usEccn')
     allProducts: [],
   };
 
@@ -304,6 +308,11 @@ function parseSearchResults(json, searchMpn, rfqQty, storeInfo) {
   const moqVal = bestMatch.translatedMinimumOrderQuality || bestMatch.minimumOrderQuantity;
   result.vqMoq = moqVal && moqVal > 1 ? moqVal : null;
   result.vqSpq = bestMatch.packSize || null;
+
+  // Compliance — element14 stores ECCN inside the attributes array under label='usEccn'.
+  // No HTS field exposed.
+  const eccnAttr = (bestMatch.attributes || []).find(a => a.attributeLabel === 'usEccn');
+  result.vqEccn = (eccnAttr && eccnAttr.attributeValue && eccnAttr.attributeValue.trim()) || null;
 
   // Stock and pricing
   const stockLevel = bestMatch.stock?.level || 0;

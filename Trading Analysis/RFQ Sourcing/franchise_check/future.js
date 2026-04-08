@@ -101,6 +101,8 @@ function parseSearchResults(response, searchMpn, rfqQty) {
     vqSku: null,
     vqMoq: null,
     vqSpq: null,
+    vqHts: null,    // Future API does not return HTS — kept null for shape parity
+    vqEccn: null,   // Future returns ECCN as a name/value entry in part_attributes
     // Raw data
     allMatches: [],
     offerCount: 0,
@@ -172,6 +174,11 @@ function parseSearchResults(response, searchMpn, rfqQty) {
   result.vqManufacturer = attrMap['manufacturerName'] || '';
   result.vqDescription = attrMap['description (en)'] || '';
   result.vqDateCode = attrMap['dateCode'] || '';
+
+  // Compliance — Future stores ECCN under part_attributes (name='eccn').
+  // Often null in their data; treat empty string as null too.
+  const eccnRaw = attrMap['eccn'];
+  result.vqEccn = (eccnRaw && String(eccnRaw).trim()) || null;
 
   // Get quantities
   const quantities = bestMatch.quantities || {};
