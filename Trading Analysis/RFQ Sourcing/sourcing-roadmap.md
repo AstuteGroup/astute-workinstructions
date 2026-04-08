@@ -553,7 +553,7 @@ const AUTO_SUFFIXES = /[-#]?(Q|Q1|AEC)$/i;
 - Reuse `mfr-aliases.json` from Market Offer workflow (already has common aliases like TI → Texas Instruments)
 - Flag unrecognized manufacturers before upload, report in session summary
 
-**Reference:** See `Trading Analysis/Market Offer Uploading/market-offer-uploading.md` "Manufacturer Matching (CRITICAL)" section for existing implementation pattern.
+**Reference:** See `Trading Analysis/Market Offer Loading/market-offer-loading.md` "Manufacturer Matching (CRITICAL)" section for existing implementation pattern.
 
 ---
 

@@ -12,8 +12,8 @@
 |--------|---------|----------|-----------|
 | `franchise-api.js` | All 10 franchise distributor APIs (DigiKey, Arrow, Rutronik, Future, Newark, TTI, Mouser, Master, Waldom, Sager) | Need franchise stock/pricing for ANY workflow | Franchise Screening, Suggested Resale, VQ Loading, Quick Quote |
 | `market-data.js` | DB queries: VQ history, sales history (broker vs customer), market offers, RFQ demand | Need pricing intelligence from the system | Suggested Resale, Quick Quote, Vortex Matches, Market Offer Analysis |
-| `mfr-lookup.js` | Resolve manufacturer names → canonical `chuboe_mfr.name`. Aliases (165+) → DB → cache. | Normalizing MFR names from any source | VQ Loading, Market Offer Uploading, Stock RFQ Loading |
-| `partner-lookup.js` | Resolve email/name → iDempiere business partner | Matching sender to BP in any inbound email workflow | VQ Loading, Market Offer Uploading, Stock RFQ Loading |
+| `mfr-lookup.js` | Resolve manufacturer names → canonical `chuboe_mfr.name`. Aliases (165+) → DB → cache. | Normalizing MFR names from any source | VQ Loading, Market Offer Loading, Stock RFQ Loading |
+| `partner-lookup.js` | Resolve email/name → iDempiere business partner | Matching sender to BP in any inbound email workflow | VQ Loading, Market Offer Loading, Stock RFQ Loading |
 | `csv-utils.js` | CSV parsing with proper quoting | Any CSV read/write (**NEVER** use `line.split(',')`) | All workflows |
 | `logger.js` | Timestamped logging with optional prefix | Any module needing structured logs | All workflows, all shared cogs |
 | `himalaya-cli.js` | Low-level himalaya binary wrapper (JSON output) | Any email operation | email-fetcher.js |
@@ -22,7 +22,7 @@
 | `notifier.js` | Email notifications via AWS WorkMail SMTP. Factory: `createNotifier({fromEmail, fromName})` | Sending notifications/attachments from any workflow | VQ Loading, Stock RFQ Loading |
 | `api-client.js` | iDempiere REST API client: auth, CRUD, batch, retry. See `api-writeback.md` for full docs. | Writing any data to iDempiere (replaces `psqlExec` for writes) | rfq-writer.js, offer-writeback.js, api-result-writer.js |
 | `rfq-writer.js` | Write RFQs via REST API (header + line + line_mpn). Server-assigned IDs, MPN description enrichment, MFR ID lookup. | Writing any RFQ type to iDempiere | Stock RFQ Loading, (future) other RFQ workflows |
-| `offer-writeback.js` | Write market offers via REST API (header + line + optional line_mpn). Server-assigned IDs, batch write, deactivation of prior offers. | Writing any offer type to iDempiere | Market Offer Uploading, Inventory File Cleanup, (future) VQ Loading |
+| `offer-writeback.js` | Write market offers via REST API (header + line + optional line_mpn). Server-assigned IDs, batch write, deactivation of prior offers. | Writing any offer type to iDempiere | Market Offer Loading, Inventory File Cleanup, (future) VQ Loading |
 | `api-result-writer.js` | Capture full franchise API responses (all price breaks, stock, lead time) to cache + iDempiere. Extract qty-relevant prices for downstream consumers. | After any `searchAllDistributors()` call (write), or when Vortex/Quick Quote needs franchise pricing (read) | Franchise Screening, Suggested Resale, LAM Kitting (write); Vortex Matches, Quick Quote (read) |
 | `db-helpers.js` | Shared DB read utilities: `psqlQuery`, `sqlStr`, `sqlNum`, `cleanMpn`. Used for read queries only — writes go through `api-client.js`. | Any module reading from `adempiere` schema | rfq-writer.js, offer-writeback.js, api-result-writer.js, partner-lookup.js |
 
@@ -95,7 +95,7 @@ const dk = await searchPart('digikey', 'ADS1115IDGST', 700);
 
 ## partner-lookup.js
 
-Resolves business partners (vendors or customers) from email addresses and company names against iDempiere. Used by VQ Loading, Market Offer Uploading, and Stock RFQ Loading.
+Resolves business partners (vendors or customers) from email addresses and company names against iDempiere. Used by VQ Loading, Market Offer Loading, and Stock RFQ Loading.
 
 See `partner-matching.md` for full documentation.
 
@@ -155,7 +155,7 @@ const detail = lookupMfr('NEXPERIA');
 // → { canonical: 'Nexperia', source: 'alias', matched: true }
 ```
 
-**Alias file location:** `Trading Analysis/Market Offer Uploading/mfr-aliases.json`
+**Alias file location:** `Trading Analysis/Market Offer Loading/mfr-aliases.json`
 
 ---
 

@@ -474,7 +474,7 @@ The existing `Trading Analysis/Stock RFQ Loading/stock-rfq-loading.md` workflow 
 ## Related
 
 - [Stock RFQ Loading (legacy)](../Stock%20RFQ%20Loading/stock-rfq-loading.md) — Predecessor, Stock pipeline only
-- [Market Offer Uploading](../Market%20Offer%20Uploading/market-offer-uploading.md) — Sister workflow, same MFR matching and partner lookup patterns
+- [Market Offer Loading](../Market%20Offer%20Loading/market-offer-loading.md) — Sister workflow, same MFR matching and partner lookup patterns
 - [VQ Loading](../RFQ%20Sourcing/vq_loading/vq-loading.md) — Similar two-agent extraction pattern
-- MFR Aliases: `../Market Offer Uploading/mfr-aliases.json` (shared)
+- MFR Aliases: `../Market Offer Loading/mfr-aliases.json` (shared)
 - [Data Model](../../shared/data-model.md) — Schema reference for RFQ tables

@@ -1,4 +1,4 @@
-# Market Offer Uploading Workflow
+# Market Offer Loading Workflow
 
 Process customer/vendor excess inventory offers from emails into the Offer Mass Upload Template for import into OT (Orange Tsunami / iDempiere).
 
@@ -117,7 +117,7 @@ himalaya attachment download --account excess --folder INBOX [ID]
 ### Step 0: Validate MFR Aliases (if stale)
 Check `_last_validated` in `mfr-aliases.json`. If 30+ days old, run validation:
 ```bash
-node "Trading Analysis/Market Offer Uploading/validate-mfr-aliases.js"
+node "Trading Analysis/Market Offer Loading/validate-mfr-aliases.js"
 ```
 - If pass: proceeds and updates `_last_validated`
 - If failures: fix mismatches before continuing
@@ -169,7 +169,7 @@ const result = resolvePartner({
 | `YYYY-MM-DDTHH-MM-SS-erp-ready.csv` | Clean offers with `partner_search_key`, ready for import |
 | `needs-partner.csv` | Complete offers missing partner setup |
 
-**Output location:** `Trading Analysis/Market Offer Uploading/output/`
+**Output location:** `Trading Analysis/Market Offer Loading/output/`
 
 ### Step 6: Route and Move Emails
 ```bash
@@ -191,11 +191,11 @@ Subject format: `[Partner Name]/[Search Key], Market Offer Upload Ready`
 
 ```bash
 # Single file
-node "Trading Analysis/Market Offer Uploading/send-offer-email.js" \
+node "Trading Analysis/Market Offer Loading/send-offer-email.js" \
   "output/OFFER_UPLOAD_20260317_Celestica_CMY2.csv" "Celestica" "1001118"
 
 # Batch mode (multiple files)
-node "Trading Analysis/Market Offer Uploading/send-offer-email.js" --batch offers.json
+node "Trading Analysis/Market Offer Loading/send-offer-email.js" --batch offers.json
 ```
 
 **Batch JSON format:**
@@ -209,7 +209,7 @@ node "Trading Analysis/Market Offer Uploading/send-offer-email.js" --batch offer
 ### Step 8: Commit and Push
 ```bash
 cd ~/workspace/astute-workinstructions
-git add "Trading Analysis/Market Offer Uploading/"
+git add "Trading Analysis/Market Offer Loading/"
 git commit -m "Add market offers: [partner] [date]"
 git push
 ```
@@ -219,7 +219,7 @@ git push
 
 ```bash
 node "Trading Analysis/Market Offer Matching for RFQs/analyze-new-offers.js" \
-  "Trading Analysis/Market Offer Uploading/output/OFFER_UPLOAD_20260317_[Partner].csv"
+  "Trading Analysis/Market Offer Loading/output/OFFER_UPLOAD_20260317_[Partner].csv"
 ```
 
 **Output:** `RFQ_Matches_[Partner]_[date].csv` in `Trading Analysis/Market Offer Matching for RFQs/`

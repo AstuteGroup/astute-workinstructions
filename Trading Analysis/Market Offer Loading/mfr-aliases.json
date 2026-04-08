@@ -1,5 +1,5 @@
 {
-  "_comment": "Manufacturer alias mapping for Market Offer Uploading",
+  "_comment": "Manufacturer alias mapping for Market Offer Loading",
   "_usage": "Map email text → canonical name for Chuboe_MFR_Text. System auto-maps to MFR ID on import.",
   "_note": "Values are exact chuboe_mfr.name values from database.",
   "_updated": "2026-03-17",

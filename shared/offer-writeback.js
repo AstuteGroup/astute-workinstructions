@@ -21,7 +21,7 @@
  *   // result: { offerId: 9000000, linesWritten: 1, mpnsWritten: 1, errors: [] }
  *
  * CONSUMERS:
- *   - Market Offer Uploading (customer excess, broker stock)
+ *   - Market Offer Loading (customer excess, broker stock)
  *   - Inventory File Cleanup (own stock by warehouse)
  *   - (Future) VQ Loading, automated offer capture
  *

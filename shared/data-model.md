@@ -334,7 +334,7 @@ The `value` column on all chuboe header tables (`chuboe_rfq`, `chuboe_offer`, et
 - PK: `chuboe_mfr_id`
 - Key columns: `name`, `value` (short code)
 - Resolution order: `mfr-aliases.json` → DB lookup (`name ILIKE '%keyword%'`) → use as-is
-- Alias file: `Trading Analysis/Market Offer Uploading/mfr-aliases.json` (shared across workflows)
+- Alias file: `Trading Analysis/Market Offer Loading/mfr-aliases.json` (shared across workflows)
 
 ### RFQ Types (`chuboe_rfq_type`)
 | ID | Name |

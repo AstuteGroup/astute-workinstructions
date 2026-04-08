@@ -29,7 +29,7 @@
  *
  * CONSUMERS:
  *   - rfq-writer.js (Stock RFQ Loading)
- *   - offer-writeback.js (Market Offer Uploading, Inventory File Cleanup)
+ *   - offer-writeback.js (Market Offer Loading, Inventory File Cleanup)
  *   - api-result-writer.js (Franchise API pricing results)
  *
  * DOCUMENTATION: See shared/api-writeback.md for full API details and payload structures.

@@ -104,7 +104,7 @@ const MFR_MAP = {
 };
 
 // Output directory
-const OUTPUT_DIR = '/home/analytics_user/workspace/astute-workinstructions/Trading Analysis/Market Offer Uploading/output';
+const OUTPUT_DIR = '/home/analytics_user/workspace/astute-workinstructions/Trading Analysis/Market Offer Loading/output';
 
 // CSV header (template format)
 const HEADER = 'Chuboe_Offer_ID[Value],Chuboe_MPN,Chuboe_MFR_ID[Value],Chuboe_MFR_Text,Qty,Chuboe_Lead_Time,Chuboe_Package_Desc,C_Country_ID[Name],Chuboe_Date_Code,C_Currency_ID[ISO_Code],Description,IsActive,Chuboe_MPN_Clean,Chuboe_CPC,PriceEntered,Chuboe_MOQ,Chuboe_SPQ';

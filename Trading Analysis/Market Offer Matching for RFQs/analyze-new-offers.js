@@ -1,7 +1,7 @@
 /**
  * Analyze New Offers Against RFQs
  *
- * Takes a freshly extracted offer CSV (from Market Offer Uploading) and matches
+ * Takes a freshly extracted offer CSV (from Market Offer Loading) and matches
  * those MPNs against open RFQs in the database. No database import required.
  *
  * Usage:
@@ -280,7 +280,7 @@ async function main() {
         console.log('Usage: node analyze-new-offers.js <offer-csv-file>');
         console.log('');
         console.log('Example:');
-        console.log('  node analyze-new-offers.js "../Market Offer Uploading/output/OFFER_UPLOAD_20260317_Honeywell.csv"');
+        console.log('  node analyze-new-offers.js "../Market Offer Loading/output/OFFER_UPLOAD_20260317_Honeywell.csv"');
         process.exit(1);
     }
 

@@ -188,7 +188,7 @@ Workflows don't just use cogs — they feed into each other:
 
 ```
    ┌──────────────────┐
-   │ Supplier emails   │──→ Market Offer Uploading ──→ Offers in system
+   │ Supplier emails   │──→ Market Offer Loading   ──→ Offers in system
    │ (excess inbox)    │                                    │
    └──────────────────┘                                     │
                                                             ▼

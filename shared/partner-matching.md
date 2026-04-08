@@ -1,7 +1,7 @@
 # Partner Matching — Canonical Reference
 
 **Module:** `shared/partner-lookup.js`
-**Used by:** VQ Loading, Market Offer Uploading, Stock RFQ Loading
+**Used by:** VQ Loading, Market Offer Loading, Stock RFQ Loading
 
 Changes to matching logic should be made in `partner-lookup.js`. All workflows reference this single module.
 
@@ -92,7 +92,7 @@ For these, matching falls through to tier 3 (name from email body).
 |---------------|-----------|----------|
 | `'vendor'` | `AND bp.isvendor = 'Y'` | VQ Loading |
 | `'customer'` | `AND bp.iscustomer = 'Y'` | Customer-specific lookups |
-| `'any'` | (no filter) | Stock RFQ Loading, Market Offer Uploading |
+| `'any'` | (no filter) | Stock RFQ Loading, Market Offer Loading |
 
 ---
 
@@ -101,7 +101,7 @@ For these, matching falls through to tier 3 (name from email body).
 | Workflow | When `matched = false` |
 |----------|----------------------|
 | **VQ Loading** | Flag as `NEEDS-VENDOR`, move email to NeedsVendor folder |
-| **Market Offer Uploading** | Flag as `NEEDS-PARTNER`, exclude from ERP-ready output |
+| **Market Offer Loading** | Flag as `NEEDS-PARTNER`, exclude from ERP-ready output |
 | **Stock RFQ Loading** | Use `1008499` (Unqualified Broker), put company name in Description |
 
 ---

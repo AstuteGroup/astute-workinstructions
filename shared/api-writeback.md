@@ -756,7 +756,7 @@ For each table: required fields (NOT NULL, no default), commonly-used optional f
 
 ### 11. chuboe_offer (Offer Header)
 
-**Use:** Creating market inventory offer records. Primary write path for Market Offer Uploading.
+**Use:** Creating market inventory offer records. Primary write path for Market Offer Loading.
 
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|

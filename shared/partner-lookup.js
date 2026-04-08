@@ -6,7 +6,7 @@
  *
  * Used by:
  *   - VQ Loading (vendor matching)
- *   - Market Offer Uploading (partner matching)
+ *   - Market Offer Loading (partner matching)
  *   - Stock RFQ Loading (customer matching)
  *
  * IMPORTANT: Changes here apply to ALL workflows above.

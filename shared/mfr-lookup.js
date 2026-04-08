@@ -14,11 +14,11 @@
  *
  * CONSUMERS:
  *   - VQ Loading: normalize vendor-quoted manufacturer names
- *   - Market Offer Uploading: normalize offer manufacturer names
+ *   - Market Offer Loading: normalize offer manufacturer names
  *   - Stock RFQ Loading: normalize RFQ manufacturer names
  *   - Suggested Resale: display canonical MFR in output
  *
- * ALIAS FILE: ../Trading Analysis/Market Offer Uploading/mfr-aliases.json
+ * ALIAS FILE: ../Trading Analysis/Market Offer Loading/mfr-aliases.json
  *   - 165+ entries mapping common abbreviations to canonical DB names
  *   - Validated monthly via validate-mfr-aliases.js
  *   - Values MUST match exact chuboe_mfr.name in database
@@ -29,7 +29,7 @@ const fs = require('fs');
 const path = require('path');
 
 // --- Alias file (shared across all workflows) ---
-const ALIAS_FILE = path.resolve(__dirname, '../Trading Analysis/Market Offer Uploading/mfr-aliases.json');
+const ALIAS_FILE = path.resolve(__dirname, '../Trading Analysis/Market Offer Loading/mfr-aliases.json');
 
 // --- Cache file (avoids repeated DB queries) ---
 const CACHE_FILE = path.resolve(__dirname, 'data/mfr-cache.json');

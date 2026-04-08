@@ -123,7 +123,7 @@ Consolidated roadmap for Trading Analysis workflows.
 
 **Solution:**
 - Pull recent VQ data for same MPNs
-- Compare to market offers (from Market Offer Uploading)
+- Compare to market offers (from Market Offer Loading)
 - Identify parts priced above/below market
 - Factor in date codes, quantity breaks
 
@@ -235,7 +235,7 @@ Two complementary workflows for matching market offers to demand:
 - **Market Conditions:** VQ history, pricing trends, related offers (TBD)
 
 **Process:**
-1. Extract offers from CSV (Market Offer Uploading Step 1-6)
+1. Extract offers from CSV (Market Offer Loading Step 1-6)
 2. Match MPNs against ALL historical RFQs
 3. Pull market intelligence (VQ pricing, demand frequency, last activity)
 4. Identify proactive outreach opportunities

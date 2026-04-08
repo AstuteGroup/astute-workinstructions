@@ -29,7 +29,7 @@ himalaya attachment download --account stockrfq --folder INBOX [ID]
 |-----|-------------|----------|------------------|
 | A | `Chuboe_RFQ_ID[Value]` | Conditional | If user provides RFQ# → use it. If not → populate with customer's BP **search_key** from DB (so user can create the RFQ). If customer not found → `1008499` (Unqualified Broker) |
 | B | `Chuboe_CPC` | **YES** | Customer's part code if distinct from MPN. If no distinct CPC exists → use the MPN |
-| C | `Chuboe_MFR_Text` | No | Manufacturer name matched to `chuboe_mfr.name` in DB. Use `mfr-aliases.json` for normalization. Same logic as Market Offer Uploading |
+| C | `Chuboe_MFR_Text` | No | Manufacturer name matched to `chuboe_mfr.name` in DB. Use `mfr-aliases.json` for normalization. Same logic as Market Offer Loading |
 | D | `Chuboe_MPN` | **YES** | Manufacturer Part Number from the RFQ |
 | E | `Qty` | **YES** | Quantity requested |
 | F | `PriceEntered` | No | Customer's **target price** if provided. Leave blank if not stated |
@@ -201,6 +201,6 @@ Currently outputs CSV for manual import. Future state: write RFQ lines directly 
 
 ## Related
 
-- [Market Offer Uploading](../Market%20Offer%20Uploading/market-offer-uploading.md) — Sister workflow, same MFR matching and partner lookup patterns
+- [Market Offer Loading](../Market%20Offer%20Loading/market-offer-loading.md) — Sister workflow, same MFR matching and partner lookup patterns
 - [VQ Loading](../../Trading Analysis/RFQ Sourcing/vq_loading/vq-loading.md) — Similar two-agent extraction pattern
-- MFR Aliases: `../Market Offer Uploading/mfr-aliases.json` (shared)
+- MFR Aliases: `../Market Offer Loading/mfr-aliases.json` (shared)
