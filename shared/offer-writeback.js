@@ -205,9 +205,9 @@ async function writeOffer(opts) {
     if (writeMpnRecords) {
       try {
         const mpnPayload = {
-          chuboe_offer_line_id: lineId,
-          chuboe_mpn: mpnRaw,
-          chuboe_mpn_clean: mpnCleanVal,
+          Chuboe_Offer_Line_ID: lineId,
+          Chuboe_MPN: mpnRaw,
+          Chuboe_MPN_Clean: mpnCleanVal,
         };
         if (line.description) mpnPayload.Description = line.description;
 
