@@ -13,9 +13,10 @@ book
 .DS_Store
 Thumbs.db
 
-# Regenerable caches (API pricing, MFR lookups)
+# Regenerable caches (API pricing, MFR lookups, mining outputs)
 shared/data/api-pricing-cache/
 shared/data/mfr-cache.json
+shared/data/mpn-prefixes-candidates.json
 
 # Working data — outputs and inputs (per "github vs email" rule)
 Trading Analysis/**/output/
