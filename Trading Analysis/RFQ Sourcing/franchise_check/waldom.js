@@ -122,6 +122,8 @@ function parseSearchResults(response, searchMpn, rfqQty) {
     vqMoq: null,
     vqRohs: null,
     vqCoo: null,
+    vqHts: null,    // Waldom returns top-level HTSCode
+    vqEccn: null,   // Waldom returns top-level ExportControlClassificationNumber
     // Raw data
     allMatches: [],
     matchCount: 0,
@@ -180,6 +182,12 @@ function parseSearchResults(response, searchMpn, rfqQty) {
   result.vqRohs = bestMatch.Rohs || '';
   result.vqMoq = parseInt(bestMatch.MinOrderQuantity || '1');
   result.vqSpq = parseInt(bestMatch.StandardPackQuantity || '1') || null;
+
+  // Compliance — Waldom returns HTS and ECCN at the product level (both
+  // varchar-like; Waldom uses unformatted HTS like "8536694040" — vq-writer's
+  // 25-char length guard accommodates either format).
+  result.vqHts = (bestMatch.HTSCode && String(bestMatch.HTSCode).trim()) || null;
+  result.vqEccn = (bestMatch.ExportControlClassificationNumber && String(bestMatch.ExportControlClassificationNumber).trim()) || null;
 
   // Stock quantity
   const stock = bestMatch.TotalStockQuantity || 0;

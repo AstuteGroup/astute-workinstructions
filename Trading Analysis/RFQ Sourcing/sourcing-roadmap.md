@@ -856,15 +856,17 @@ Based on actual VQ writeback volume over the trailing 90 days:
 | 5 | **Future** | 212 | 8.2% | ❌ no field | ✅ `part_attributes[name=eccn]` (often null) | ✅ wired 2026-04-08 |
 | 6 | **Newark / Farnell** | 192 | 7.4% | ❌ no field | ✅ `attributes[label=usEccn]` | ✅ wired 2026-04-08 |
 | 7 | **TTI** | 135 | 5.2% | ✅ `hts` / `exportInformation.hts` | ✅ `exportInformation.eccn` | ✅ already extracted (catalog coverage spotty) |
-| 8 | Waldom | 27 | 1.0% | ❓ unaudited | ❓ unaudited | not wired — low volume, deferred |
-| 9 | Sager | 22 | 0.9% | ❓ unaudited | ❓ unaudited | not wired — low volume, deferred |
-| 10 | Rutronik | 1 | <0.1% | ❓ unaudited | ❓ unaudited | not wired — negligible volume |
+| 8 | **Waldom** | 27 | 1.0% | ✅ top-level `HTSCode` | ✅ top-level `ExportControlClassificationNumber` | ✅ wired 2026-04-08 |
+| 9 | Sager | 22 | 0.9% | ❌ none | ❌ none | confirmed — no classification fields exposed by `customer-price-availability/v1` endpoint |
+| 10 | Rutronik | 1 | <0.1% | ❓ inconclusive | ❓ inconclusive | API returned "nothing found" for all test MPNs (350712-4, CRCW2512160KJNEG, 7443551280); not worth more digging at <0.1% volume |
 
 **Aggregate coverage going forward (excluding Arrow):**
-- HTS: DigiKey + Mouser + TTI = 1,595 / 2,331 = **68.4%** of non-Arrow franchise volume
-- ECCN: DK + Mouser + Master + Future + Newark + TTI = 2,281 / 2,331 = **97.9%** of non-Arrow franchise volume
+- HTS: DigiKey + Mouser + TTI + Waldom = 1,622 / 2,331 = **69.6%** of non-Arrow franchise volume
+- ECCN: DK + Mouser + Master + Future + Newark + TTI + Waldom = 2,308 / 2,331 = **99.0%** of non-Arrow franchise volume
 
-ECCN coverage is the bigger uplift from this work — most non-DigiKey/Mouser distributors expose ECCN but not HTS in their standard search APIs.
+Waldom is small (1% volume) but it's the only non-DK/Mouser distributor that exposes BOTH HTS and ECCN, so it punches above its weight on the HTS coverage % since DK/Mouser/TTI are the only other HTS sources.
+
+ECCN coverage is now near-complete for non-Arrow volume — only Sager (0.9%) and Rutronik (<0.1%) remain unwired, both for justified reasons (Sager has no field; Rutronik returns nothing for our test queries).
 
 ### Why Arrow is Parked
 
