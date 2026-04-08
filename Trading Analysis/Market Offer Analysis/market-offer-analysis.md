@@ -1,0 +1,337 @@
+# Market Offer Analysis Workflow
+
+**Purpose:** Take an offer that's already persisted in OT and produce actionable output: enriched, scored, and shaped to match the inferred intent (Reactive / Spec Buy / Consignment).
+
+**Critical constraint:** Analysis input is a `chuboe_offer_id` (or set of IDs, or selector). It is NEVER raw extracted lines from email. This means analysis can be re-run on any historical offer at any time without re-loading.
+
+> **Forcing function:** If Analysis ever needs a field that isn't in `chuboe_offer` / `_line` / `_line_mpn`, the fix is to make [Loading](../Market%20Offer%20Loading/market-offer-loading.md) write that field, not to pass it in memory. This discipline keeps revisits possible.
+
+---
+
+## Pipeline
+
+```
+Fetch from OT  ──→  chuboe_offer + lines + line_mpn + partner
+        │
+        ▼
+Infer intent  ──→  Reactive / Spec Buy / Consignment
+        │            (rules-based, --intent override available)
+        ▼
+Enrich       ──→  Supply (franchise APIs)
+                  Demand (RFQ + CQ + SO history)
+        │
+        ▼
+Score        ──→  per-line 0–100, tier HOT/WARM/COOL/SKIP
+        │
+        ▼
+Output       ──→  shape determined by intent
+```
+
+---
+
+## Trigger Modes
+
+| Mode | When | Invocation |
+|---|---|---|
+| **Auto** (default) | Loading just wrote a new offer | Loading calls `analyzeOffer({ offerIds: [newId] })` at the end of its Step 7 |
+| **Manual revisit** | User wants to re-analyze a historical offer | `node analyze-offer.js --offer-search-key 1005525` |
+| **Bulk re-score** | Scoring model changed; want to re-run across history | `node analyze-offer.js --partner GE_Aerospace --since 2026-01-01` |
+| **Multi-offer lot** | A logical lot was loaded as multiple offers (e.g., GE rev share Batch 1 + Batch 2) | `node analyze-offer.js --offer-ids 9000123,9000124` |
+
+---
+
+## Cogs Used
+
+| Cog | Role | Status |
+|---|---|---|
+| `shared/api-client.js` | `apiGet('chuboe_offer', {filter})` for fetching offers | Built |
+| `shared/db-helpers.js` | `psqlQuery(...)` for fetching demand signals from `adempiere` schema | Built |
+| `shared/franchise-api.js` | `searchAllDistributors(mpn, qty)` — supply-side enrichment | Built, in production use |
+| `shared/api-result-writer.js` | `extractPriceAtQty(mpn, qty, {maxAgeDays})` — read cached franchise results before re-calling APIs | Built; DB write blocked on Chuck (cache works) |
+| `shared/market-data.js` | `getAllMarketData(mpn)` — VQ history, broker-vs-customer sales split, demand strength | Built |
+| **Intent classifier** | Rules-based: signals → Reactive / Spec Buy / Consignment | **Not yet built** |
+| **Scoring engine** | Per-line 0–100 via Supply/Price/Demand model | **Not yet built** |
+| **Output renderers** | Lot summary / spec buy ranker / reactive RFQ-match table | **Not yet built** (lot summary partially exists in `GE_Aerospace_Excess_Analysis_2026-04-02.xlsx` shape) |
+
+---
+
+## End-to-End Workflow (REQUIRED STEPS)
+
+**Every step must be completed in order. Do not skip steps.**
+
+### Step 1: Fetch Offer from OT
+
+Read the offer header, lines, and line MPNs from OT. **This is a read, not a load.** No email, no extraction, no partner resolution — those happened in [Loading](../Market%20Offer%20Loading/market-offer-loading.md).
+
+```javascript
+const { apiGet } = require('../../shared/api-client');
+
+// By offer ID (most common — passed from Loading)
+const header = await apiGet('chuboe_offer', { filter: `chuboe_offer_id eq ${offerId}` });
+const lines = await apiGet('chuboe_offer_line', { filter: `chuboe_offer_id eq ${offerId} and IsActive eq true` });
+const lineMpns = await apiGet('chuboe_offer_line_mpn', { filter: `chuboe_offer_id eq ${offerId} and IsActive eq true` });
+```
+
+**Or by SQL** (faster for batch reads, since `adempiere` schema is a read-only replica):
+```sql
+SELECT o.chuboe_offer_id, o.value AS offer_search_key, o.description, o.created,
+       ot.name AS offer_type, bp.name AS partner_name, bp.value AS partner_search_key,
+       ol.line, olm.chuboe_mpn, olm.chuboe_mfr_text,
+       ol.qty, ol.priceentered, ol.chuboe_date_code, ol.chuboe_cpc
+FROM adempiere.chuboe_offer o
+JOIN adempiere.chuboe_offer_type ot ON ot.chuboe_offer_type_id = o.chuboe_offer_type_id
+JOIN adempiere.c_bpartner bp ON bp.c_bpartner_id = o.c_bpartner_id
+JOIN adempiere.chuboe_offer_line ol ON ol.chuboe_offer_id = o.chuboe_offer_id
+JOIN adempiere.chuboe_offer_line_mpn olm ON olm.chuboe_offer_line_id = ol.chuboe_offer_line_id
+WHERE o.chuboe_offer_id = $offerId
+  AND o.isactive = 'Y' AND ol.isactive = 'Y' AND olm.isactive = 'Y';
+```
+
+> **Schema reference:** [`shared/data-model.md`](../../shared/data-model.md) § Offer Chain. Note that MPN and MFR text live on `chuboe_offer_line_mpn`, NOT `chuboe_offer_line`.
+
+**Output of Step 1:** Normalized offer object:
+```javascript
+{
+  offerId, searchKey, description, created,
+  offerType,                          // e.g., 'Customer Excess'
+  partner: { id, name, search_key },
+  lines: [
+    { lineNum, mpn, mfrText, qty, price, dateCode, cpc, leadTime, packaging },
+    ...
+  ]
+}
+```
+
+### Step 2: Infer Intent
+
+Rules-based classifier. Pass the offer object through the rule table; first match wins. Override with `--intent` flag if the user knows better.
+
+#### Inference Rules (first match wins)
+
+| Rule | Signal | → Intent |
+|---|---|---|
+| 1 | Override flag set (`--intent consignment`) | Use override |
+| 2 | Offer type = `LAM Kitting Inventory` (1000025) | Consignment |
+| 3 | Description contains "rev share" / "rev-share" / "revshare" / "E&O" / "buyback" | Consignment |
+| 4 | Partner is an existing OEM/EMS customer (has prior SO history as `c_bpartner` on `c_order` with `issotrx='Y'`) AND offer has 50+ lines AND ≥30% of lines have null `priceentered` | Consignment |
+| 5 | Partner is a known broker (BP type or domain hint = broker) AND offer has 5+ lines | Spec Buy |
+| 6 | Default | Reactive |
+
+**Why first-match-wins:** Reactive is the safe default — it just matches against open RFQs, which is useful for any offer. Spec Buy is opt-in (broker pattern). Consignment is most specific (named offer type or explicit language). Misclassifying down (e.g., consignment → reactive) is fine because the reactive output is still readable; misclassifying up (e.g., reactive → consignment) wastes effort on lot-level summary noise.
+
+**Edge case escalation:** If rules are ambiguous (e.g., a customer broker who sometimes consigns), the classifier returns `intent: 'reactive'` plus a `confidence: 'low'` flag. User can override with `--intent` on a re-run.
+
+### Step 3: Enrich
+
+Run on every line regardless of intent. Both passes are mandatory.
+
+#### 3a: Supply Side (franchise APIs)
+
+```javascript
+const { extractPriceAtQty } = require('../../shared/api-result-writer');
+const { searchAllDistributors } = require('../../shared/franchise-api');
+
+for (const line of offer.lines) {
+  // Read cached franchise results first
+  const cached = extractPriceAtQty(line.mpn, line.qty, { maxAgeDays: 14 });
+  let franchise;
+  if (cached.length > 0) {
+    franchise = cached;
+  } else {
+    // No recent data — call APIs
+    const result = await searchAllDistributors(line.mpn, line.qty);
+    franchise = result;
+    // Cache write happens automatically (DB write blocked, see Known Issues)
+  }
+  line.enrichment = line.enrichment || {};
+  line.enrichment.supply = {
+    totalStock: franchise.summary.totalStock,
+    distributorsWithStock: franchise.summary.distributorsWithStock,
+    lowestPrice: franchise.summary.lowestPrice,
+    coverage: franchise.summary.coverage,                  // FULL / PARTIAL / NONE
+    lifecycle: franchise.summary.lifecycle,                // Active / EOL / Obsolete / NRFND
+    leadTimeWeeks: franchise.summary.leadTimeWeeks,
+  };
+}
+```
+
+**Freshness rule:** 14 days. Older than that → re-call APIs. Rationale: market intelligence shifts week-to-week for parts in active sourcing.
+
+#### 3b: Demand Side (OT history)
+
+```javascript
+const { getAllMarketData } = require('../../shared/market-data');
+
+for (const line of offer.lines) {
+  const demand = getAllMarketData(line.mpn);
+  line.enrichment.demand = {
+    openRFQs: demand.openRFQs,                  // active in last 90 days
+    activeCQs: demand.activeCQs,                // active in last 90 days
+    soHistory: demand.salesHistory,             // last 12 months
+    historicalBuyers: demand.brokerSales.concat(demand.customerSales).map(s => s.bpName),
+    demandStrength: demand.demandStrength,      // HIGH / MEDIUM / LOW / NONE
+  };
+}
+```
+
+> **Why a separate cog:** `market-data.js` already distinguishes broker sales from customer sales — broker sales are a much stronger price signal (per the `feedback_suggested_resale.md` rule).
+
+### Step 4: Score
+
+Every line gets a 0–100 score and a tier. Three weighted categories.
+
+| Category | Weight | Range |
+|---|---|---|
+| Supply Scarcity | 40% | 0–40 |
+| Price Advantage | 35% | 0–35 |
+| Demand Signal | 25% | 0–25 |
+
+#### Supply Scarcity (0–40)
+
+| Condition | Points |
+|---|---|
+| EOL / Obsolete / NRFND lifecycle | +15 |
+| No franchise coverage (0 distributors with stock) | +12 |
+| Franchise stock < offered qty | +8 |
+| Franchise stock < 2× offered qty | +4 |
+| Lead time > 40 weeks | +8 |
+| Lead time > 20 weeks | +5 |
+| Active lifecycle + high franchise stock (>10× offered qty) | −10 |
+
+*Cap 40, floor 0.*
+
+#### Price Advantage (0–35)
+
+Compares offered price against lowest franchise price at offered qty. **Astute typically resells stock at 20–30% of lowest franchise price.** To profit on a spec buy, acquisition cost must be well below that.
+
+| Offer / Franchise Best | Signal | Points |
+|---|---|---|
+| < 5% | Suspiciously cheap — flag for verification | +30 + `VERIFY` |
+| 5–10% | Strong buy — massive margin room | +30 |
+| 10–15% | Good buy — comfortable margin under resale ceiling | +25 |
+| 15–20% | Decent — margin exists but tighter | +18 |
+| 20–25% | Marginal — at or near typical resale price | +8 |
+| 25–30% | Break-even territory | +3 |
+| > 30% | No broker value — buying at or above resale | 0 |
+| No franchise data | Flag `NEEDS PRICING DATA`, do not score | unscored |
+| No offer price (consignment, often) | Flag `NO OFFER PRICE`, do not score | unscored |
+
+*Cap 35, floor 0.*
+
+#### Demand Signal (0–25)
+
+| Condition | Points |
+|---|---|
+| Active open RFQ (last 90 days) | +10 |
+| Active open CQ (last 90 days) | +8 |
+| 3+ RFQs in last 90 days | +5 (bonus) |
+| Prior SO on this MPN (any customer, 12 months) | +7 |
+| Repeat customer demand (same MPN, same customer, 2+ SOs) | +5 (bonus) |
+| Zero historical demand | 0 |
+
+*Cap 25, floor 0.*
+
+#### Tier Assignment
+
+| Tier | Score | Meaning |
+|---|---|---|
+| **HOT** | 70+ | High-value opportunity — act immediately |
+| **WARM** | 40–69 | Worth pursuing — include in daily review |
+| **COOL** | 20–39 | Marginal — log for reference |
+| **SKIP** | < 20 | Franchise-available commodity — don't surface to sellers |
+
+### Step 5: Output (shape determined by intent)
+
+#### Reactive Output
+
+**Per-line scored list + RFQ/CQ matches + viability filter.**
+
+| Column | Source |
+|---|---|
+| MPN, MFR, Qty, Offered Price | Step 1 |
+| Partner Name, Search Key | Step 1 |
+| Score, Tier | Step 4 |
+| Franchise Best Price, Stock, Lifecycle | Step 3a |
+| Matching Open RFQs (search key + customer) | Step 3b |
+| Matching Active CQs (search key + customer + quoted price) | Step 3b |
+| Historical Buyers | Step 3b |
+| Flags | Step 4 |
+
+**Viability filter:** Suppress lines scoring < 20 (SKIP tier) from seller notifications. These are commodity parts available at franchise — not worth broker effort.
+
+**Proactive push annotation:** For lines with SO history but no open RFQ/CQ, flag as `PROACTIVE PUSH` with the historical buyer list. These are reach-out-before-they-ask opportunities.
+
+#### Spec Buy Output
+
+**Ranked buy list + known buyers + close-first flag.**
+
+Same columns as Reactive, plus:
+- `Close First?` — YES if active RFQ/CQ exists (don't buy speculatively when you can close a deal now)
+- `Est. Resale Price` — 20–30% of franchise best (the broker resale ceiling)
+- `Est. Margin` — `(Est. Resale − Offered Price) / Est. Resale`
+
+**Sort:** by score descending. Lines with `Close First = YES` floated to the top.
+
+#### Consignment Output
+
+**Lot-level portfolio summary + per-line drill-down.**
+
+**Lot Summary:**
+- Partner name, total lines, total qty, total book value (if priced)
+- % of lines scoring HOT (70+)
+- % of lines scoring WARM+ (40+)
+- % of lines with franchise scarcity (EOL, low stock, no coverage)
+- % of lines with historical demand (any RFQ/CQ/SO)
+- % commodity lines (SKIP tier) — "dead weight"
+- Top 10 highest-scoring lines (the parts that make the deal worth doing)
+- Known buyer coverage: % of lines where at least one historical buyer exists
+
+**Pursuit Signal:**
+
+| Coverage | Signal |
+|---|---|
+| 40%+ scarce/in-demand lines | Aggressive pursuit |
+| 20–40% | Moderate — cherry-pick the best lines |
+| < 20% | Pass or negotiate hard on terms |
+
+**Per-line detail:** Same as Reactive output, available as drill-down.
+
+**Multi-offer lot handling:** If the analysis was invoked with multiple offer IDs (e.g., GE rev share Batch 1 + Batch 2), the lot summary aggregates across all of them, deduplicating by `(mpn, mfr)`. Per-line detail keeps the source `offer_search_key` so you can trace any line back to its origin offer.
+
+---
+
+## Flags
+
+| Flag | Source | Meaning |
+|---|---|---|
+| `VERIFY` | Step 4 (Price Advantage) | Offer price < 5% of franchise best — check authenticity |
+| `NEEDS PRICING DATA` | Step 4 | No franchise data; can't score price advantage |
+| `NO OFFER PRICE` | Step 4 | Offer didn't include price (typical for consignment) |
+| `PROACTIVE PUSH` | Step 5 (Reactive) | SO history exists but no open RFQ/CQ — reach out |
+| `CLOSE FIRST` | Step 5 (Spec Buy) | Active RFQ/CQ exists — close before buying speculatively |
+| `EXPIRED` | Step 1 | Offer past expiration date (if known) |
+| `PRICE CHECK?` | Step 5 | Exact-stock-qty match from a Chinese broker — likely price checking, not buying |
+
+---
+
+## Known Issues / Blockers
+
+| Issue | Impact | Workaround |
+|---|---|---|
+| Intent classifier not yet built | Step 2 returns hardcoded default until built | Manual `--intent` flag for now |
+| Scoring engine not yet built | Step 4 — need to implement the model above | Manual scoring on small batches; build module after first real run reveals edge cases |
+| Output renderers not yet built | Step 5 — three intent shapes need code | Reuse `GE_Aerospace_Excess_Analysis_2026-04-02.xlsx` shape for consignment as the reference template |
+| `chuboe_pricing_api_result` JSONB write blocked (Chuck) | Step 3a results don't persist to DB | Cache write works; `extractPriceAtQty()` falls back to cache; re-runs of Analysis re-call APIs more often than ideal |
+| `Market Offer Matching for RFQs/analyze-new-offers.js` only does 180-day RFQ lookback | Step 5 Reactive output is partial | Use directly for now; merge into this workflow's Step 5 once scoring engine exists |
+| Historical SO query in `market-data.js` doesn't yet split broker SOs from customer SOs in the demand-strength score | Step 3b demand signal is conservatively scored | Acceptable until we see scoring drift |
+
+---
+
+## Related
+
+- [Market Offer Loading](../Market%20Offer%20Loading/market-offer-loading.md) — upstream Workflow A. Loading triggers Analysis by default.
+- [Market Offer Matching for RFQs](../Market%20Offer%20Matching%20for%20RFQs/market-offer-matching.md) — partial Reactive implementation. Will eventually be folded into Step 5 here.
+- [`shared/franchise-api.js`](../../shared/franchise-api.js) — supply-side enrichment cog
+- [`shared/market-data.js`](../../shared/market-data.js) — demand-side enrichment cog
+- [`shared/api-result-writer.js`](../../shared/api-result-writer.js) — franchise result cache + DB
+- [`shared/data-model.md`](../../shared/data-model.md) § Offer Chain — schema reference

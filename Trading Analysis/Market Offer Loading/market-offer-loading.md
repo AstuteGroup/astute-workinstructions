@@ -1,112 +1,46 @@
 # Market Offer Loading Workflow
 
-Process customer/vendor excess inventory offers from emails into the Offer Mass Upload Template for import into OT (Orange Tsunami / iDempiere).
+**Purpose:** Get market offers persisted in OT with full fidelity. Loading writes; it does NOT analyze, enrich, or score.
+
+**By default:** Loading triggers the [Market Offer Analysis](../Market%20Offer%20Analysis/market-offer-analysis.md) workflow on the newly written offer(s) when complete. Use `--no-analyze` to skip.
 
 ---
 
-## CRITICAL: Himalaya Pagination
+## Pipeline
 
-**ALWAYS use `--page-size 500` when listing emails!** Default pagination hides most emails.
-
-```bash
-# WRONG - only shows ~10 emails
-himalaya envelope list --account excess --folder INBOX
-
-# CORRECT - shows all emails
-himalaya envelope list --account excess --folder INBOX --page-size 500
+```
+Retrieve from inbox/file
+        │
+        ▼
+Resolve partner ──── NEEDS-PARTNER ──→ flag, route to NeedsPartner folder, STOP
+        │
+        ▼
+Resolve MFRs (per line)
+        │
+        ▼
+Write to OT  ──→  chuboe_offer (header)
+                  + chuboe_offer_line (per line)
+                  + chuboe_offer_line_mpn (optional)
+        │
+        ▼
+Move email → Processed
+        │
+        ▼
+Trigger Analysis (default)  ──→  passes new offerId(s) to Workflow B
 ```
 
 ---
 
-## Two-Agent Manual Extraction (Recommended)
+## Cogs Used
 
-Same pattern as VQ Loading. Use two-agent workflow for reliable extraction:
-
-### Process
-1. **Agent A (Extractor)**: Reads emails, extracts all offer fields (see Field Reference below)
-2. **Agent B (Verifier)**: Independently reads same emails, verifies extractions match actual content
-3. **Result**: Only verified records are saved
-
-### Field Reference (Market Offer Line Import Template)
-
-**Template file:** `Market Offer Line Import Template.csv`
-
-**CRITICAL: Do not modify the header row. Use exact headers from template.**
-
-| Col | Column Name | Required | Description |
-|-----|-------------|----------|-------------|
-| A | `Chuboe_Offer_ID[Value]` | If provided | Offer header ID. If given, populate and use for filename |
-| B | `Chuboe_MPN` | **YES** | Part number. If multiple MPNs given, split into separate lines |
-| C | `Chuboe_MFR_ID[Value]` | **DO NOT USE** | Leave blank - system auto-maps from MFR Text on import |
-| D | `Chuboe_MFR_Text` | No | Manufacturer name. **On import, system matches this text against `chuboe_mfr.name` to populate `Chuboe_MFR_ID`** |
-| E | `Qty` | **YES** | Quantity available |
-| F | `Chuboe_Lead_Time` | No | Lead time - **only if explicitly stated** |
-| G | `Chuboe_Package_Desc` | No | Rarely used. Packaging if specified |
-| H | `C_Country_ID[Name]` | No | Country of origin |
-| I | `Chuboe_Date_Code` | No | Manufacturing date code |
-| J | `C_Currency_ID[ISO_Code]` | No | Currency. Blank = USD |
-| K | `Description` | No | **Part-specific** notes only (conditions, expiry). NOT source metadata |
-| L | `IsActive` | **DO NOT USE** | Leave blank |
-| M | `Chuboe_MPN_Clean` | **DO NOT USE** | Leave blank |
-| N | `Chuboe_CPC` | No | **Customer part number** (their internal PN) |
-| O | `PriceEntered` | No | Unit price |
-| P | `Chuboe_MOQ` | No | Minimum order quantity |
-| Q | `Chuboe_SPQ` | No | Standard pack quantity |
-
-**Key Rules:**
-- **Only populate what's explicit:** Do NOT assume or default values. If lead time, date code, price, etc. are not stated in the input, leave those columns blank
-- **Multiple MPNs:** If customer lists several MPNs without specifying which they have, create a separate line for EACH MPN (same qty, same customer PN)
-- **Customer PN:** Goes in column N (Chuboe_CPC), not Description
-- **MFR Matching:**
-  - **Always use column D** (`Chuboe_MFR_Text`) for manufacturer names
-  - **Leave column C blank** - system auto-maps text to MFR ID on import
-  - Use canonical names from `mfr-aliases.json` when possible (e.g., "Broadcom" not "BRCM")
-- **Description:** Part-specific notes only (e.g., "Ships from HK", "Expires 2026-06-30"). Do NOT put source metadata (e.g., "Benchmark excess")
-
-**Offer Header:** If `Chuboe_Offer_ID[Value]` is provided, populate column A. Otherwise leave blank (will be assigned later).
-
-> **Schema reference:** For Offer table hierarchy and where MPN/MFR fields live, see [`shared/data-model.md`](../../shared/data-model.md) § Offer Chain.
-
----
-
-## Manufacturer Matching
-
-**Goal:** Populate `Chuboe_MFR_Text` (column D) with a manufacturer name that matches a `chuboe_mfr.name` value in the database.
-
-**How it works:** On import, the system takes the value in `Chuboe_MFR_Text` and looks it up against `chuboe_mfr.name`. If a match is found, it automatically populates `Chuboe_MFR_ID` with the corresponding record. This is why using canonical names (exactly as they appear in the database) improves match rates.
-
-**IMPORTANT:** Always use column D (`Chuboe_MFR_Text`). Leave column C (`Chuboe_MFR_ID[Value]`) blank — direct ID lookups have client-level visibility issues.
-
-MFR resolution follows the standard pattern. See [`shared/data-model.md`](../../shared/data-model.md) § Manufacturer for resolution order and alias file location.
-
-**Notes field usage:**
-- **Expiration**: "Offer expires 2026-03-31"
-- **Conditions**: "Subject to prior sale", "All or nothing"
-- **Location**: "Ships from Hong Kong"
-
-### Commands
-```bash
-# Get all inbox email IDs
-himalaya envelope list --account excess --folder INBOX --page-size 500 | grep -E "^\| [0-9]" | awk -F'|' '{print $2}'
-
-# Read specific email
-himalaya message read --account excess --folder INBOX [ID]
-
-# Download attachment
-himalaya attachment download --account excess --folder INBOX [ID]
-```
-
-### Batch Size
-- Process 40 emails per batch (2 agents x 20 emails each)
-- Run extraction agents in parallel, then verification agents in parallel
-
-### Skip Rules
-- **Empty forward**: No offer data in the body
-- **Inquiry only**: Asking about availability, not offering stock
-- **Duplicate**: Same partner/part/qty already extracted
-- **PDF-only**: Offer data only in attachment, queue for PDF review
-
-**IMPORTANT:** Many emails are forwards from team members. The actual offer data is BELOW the signature block at the top. Always read to the bottom of the email to find the actual offer data.
+| Cog | Role | Status |
+|---|---|---|
+| `shared/email-fetcher.js` | List/read/move emails, download attachments. Factory: `createFetcher('excess')` | Built, in production use by VQ + Stock RFQ loaders |
+| `shared/email-tracker.js` | Processed-email dedup, retry queue | Built |
+| `shared/partner-lookup.js` | 4-tier resolve (email → domain → hint → name) | Built |
+| `shared/mfr-lookup.js` | Alias → DB → cache, returns `isSystem` flag | Built |
+| `shared/offer-writeback.js` | `writeOffer({...})` — header + lines + optional `_line_mpn`, MFR resolution, system-MFR skip | **Built but untested in prod — smoke test required on first use** |
+| `shared/api-client.js` | Underlying REST client; auto-auth, batch, retry | Built |
 
 ---
 
@@ -114,224 +48,201 @@ himalaya attachment download --account excess --folder INBOX [ID]
 
 **Every step must be completed in order. Do not skip steps.**
 
-### Step 0: Validate MFR Aliases (if stale)
-Check `_last_validated` in `mfr-aliases.json`. If 30+ days old, run validation:
-```bash
-node "Trading Analysis/Market Offer Loading/validate-mfr-aliases.js"
-```
-- If pass: proceeds and updates `_last_validated`
-- If failures: fix mismatches before continuing
+### Step 0: First-Use Smoke Test (one time per environment)
 
-### Step 1: Fetch Emails
-```bash
-himalaya envelope list --account excess --folder INBOX --page-size 500
-```
-- List all unprocessed emails in INBOX
-- Note email IDs for processing
+`writeOffer()` has not yet been exercised in prod. Before any full-batch write, do a one-line smoke test against the target inbox's first offer:
 
-### Step 2: Extract Offer Data (Two-Agent Validation)
-- Agent A extracts all fields from emails/attachments
-- Agent B independently verifies extractions
-- Resolve discrepancies (re-read email if agents disagree)
-- Record: MPN, Qty, Price, Currency, Date Code, Manufacturer, Partner Email, Notes
+1. Pick the smallest line from the offer (1 MPN, 1 qty, 1 price if available)
+2. Call `writeOffer({ bpartnerId, offerTypeId, description, lines: [oneLine], writeMpnRecords: true })`
+3. Verify in OT:
+   - New `chuboe_offer` row exists with the returned `searchKey`
+   - One `chuboe_offer_line` exists under it
+   - If `writeMpnRecords: true` — one `chuboe_offer_line_mpn` exists
+   - MFR text resolved correctly (canonical name, not raw)
+4. If clean → mark Step 0 satisfied for this environment, proceed to Step 1
+5. If broken → fix the writer, void the test offer, retry. Same protocol as RFQ 1132037 → 1132040 (see `MEMORY.md` and `project_test_vs_prod_idempiere.md`)
 
-### Step 3: Resolve Partner IDs (CRITICAL - DO NOT SKIP)
-**Output CSV requires `partner_search_key` for ERP import.**
+> **Why this exists:** `offer-writeback.js` mirrors `rfq-writer.js` patterns but has never been called against prod. Same lesson as the RFQ writer's first run — bean callouts and system-MFR rejections only fire in prod, not test.
 
-**Uses shared module:** `shared/partner-lookup.js` — see `shared/partner-matching.md` for full documentation.
+### Step 1: Retrieve
 
 ```javascript
-const { resolvePartner } = require('../../shared/partner-lookup.js');
+const { createFetcher } = require('../../shared/email-fetcher');
+const fetcher = createFetcher('excess');
 
+const envelopes = await fetcher.listEnvelopes('INBOX', 500);
+// for each new envelope:
+const body = await fetcher.readMessage(id);
+await fetcher.downloadAttachments(id, downloadDir);
+```
+
+**For attachments (xlsx/csv):** parse via `xlsx` package or `shared/csv-utils.js`. **Never use `line.split(',')`.**
+
+**For body-only offers:** extract MPN/qty rows from prose. Many emails are forwards — actual offer data is BELOW the signature block. Always read to the bottom.
+
+**Output of Step 1:** Array of normalized line objects per offer:
+```javascript
+[{ mpn, mfrText, qty, price, dateCode, cpc, leadTime, packageDesc }, ...]
+```
+
+### Step 2: Resolve Partner (CRITICAL — DO NOT SKIP)
+
+```javascript
+const { resolvePartner } = require('../../shared/partner-lookup');
 const result = resolvePartner({
   email: senderEmail,
   companyName: companyNameFromSignature,
   partnerType: 'any'
 });
-// result.search_key, result.name, result.matched, result.tierName
+// → { search_key, name, matched, tier, tierName }
 ```
 
-**Matching tiers** (in order): exact email → email domain → domain hint → name match.
+**Tiers (in order):** exact email → email domain → domain hint → name match.
 
-**If partner not found:** Flag as `NEEDS-PARTNER`, do not include in ERP-ready output.
+**If `result.matched === false`:** flag offer as `NEEDS-PARTNER`, move email to `NeedsPartner` folder, **do NOT write to OT.** Loading stops here for this offer.
+
+> **Why this matters:** An offer without a resolved partner has no `c_bpartner_id`, which is mandatory on `chuboe_offer`. Trying to write would fail anyway. Stopping early prevents wasted API calls and dirty error logs.
+
+### Step 3: Resolve Manufacturers (per line)
+
+`writeOffer()` does this internally via `shared/mfr-lookup.js`, but pre-warming the cache reduces per-line latency and surfaces unresolved MFRs early:
+
+```javascript
+const { lookupMfr } = require('../../shared/mfr-lookup');
+for (const line of lines) {
+  const m = lookupMfr(line.mfrText);
+  if (!m.matched) console.warn(`Unresolved MFR: ${line.mfrText}`);
+  if (m.isSystem) {
+    // System-level MFR — writer will use text only, skip Chuboe_MFR_ID
+  }
+}
+```
+
+**Add unresolved entries to** `mfr-aliases.json` if recurring (canonical names from `chuboe_mfr.name`). See `shared/data-model.md` § Manufacturer.
 
 ### Step 4: Determine Offer Type
-| Type | Description | Use Case |
-|------|-------------|----------|
-| Customer Excess | Customer selling their surplus | Most common - customer with excess inventory |
-| Vendor Stock | Supplier broadcasting stock | Vendor pushing available inventory |
-| Market Intel | Pricing info, no actual offer | For reference only |
 
-### Step 5: Generate Output Files
-| File | Contents |
-|------|----------|
-| `YYYY-MM-DDTHH-MM-SS-extracted.csv` | All extractions with categories |
-| `YYYY-MM-DDTHH-MM-SS-erp-ready.csv` | Clean offers with `partner_search_key`, ready for import |
-| `needs-partner.csv` | Complete offers missing partner setup |
+| Type | ID | When to use |
+|---|---|---|
+| Customer Excess | 1000000 | Customer (OEM/EMS) selling their surplus, including consignment / rev-share |
+| Broker Stock Offer | 1000001 | Broker pushing a stock list (not customer) |
+| Franchise Offers | 1000002 | Authorized distributor offering excess |
+| Customer Lead Time Buy | 1000003 | Customer offering lead-time committed inventory |
+| Stock - Austin Warehouse | 1000008 | Internal Astute inventory, Austin |
+| Stock - Hong Kong Warehouse | 1000009 | Internal Astute inventory, HK |
+| Stock - Stevenage | 1000006 | Internal Astute inventory, UK |
+| Stock - Philippines Warehouse | 1000014 | Internal Astute inventory, PH |
+| LAM Kitting Inventory | 1000025 | LAM consignment inventory |
 
-**Output location:** `Trading Analysis/Market Offer Loading/output/`
+Full list of 24 types in `shared/offer-writeback.js` → `OFFER_TYPES`. Pass either the numeric ID or the string name to `writeOffer()`.
 
-### Step 6: Route and Move Emails
-```bash
-# Move processed emails
-himalaya message move --account excess --folder INBOX Processed [IDs...]
-```
-
-| Condition | Folder |
-|-----------|--------|
-| Complete offer + partner found | `Processed` |
-| Complete offer + partner NOT_FOUND | `NeedsPartner` |
-| Inquiry only / no offer | `NotOffer` |
-| Incomplete (missing data) | `NeedsReview` |
-
-### Step 7: Email Output Files (REQUIRED)
-**Send each output file to jake.harris@astutegroup.com for ERP upload.**
-
-Subject format: `[Partner Name]/[Search Key], Market Offer Upload Ready`
-
-```bash
-# Single file
-node "Trading Analysis/Market Offer Loading/send-offer-email.js" \
-  "output/OFFER_UPLOAD_20260317_Celestica_CMY2.csv" "Celestica" "1001118"
-
-# Batch mode (multiple files)
-node "Trading Analysis/Market Offer Loading/send-offer-email.js" --batch offers.json
-```
-
-**Batch JSON format:**
-```json
-[
-  {"csvPath": "output/OFFER_UPLOAD_20260317_Celestica_CMY2.csv", "partnerName": "Celestica", "searchKey": "1001118"},
-  {"csvPath": "output/OFFER_UPLOAD_20260317_GE_Healthcare.csv", "partnerName": "GE Healthcare", "searchKey": "1002736"}
-]
-```
-
-### Step 8: Commit and Push
-```bash
-cd ~/workspace/astute-workinstructions
-git add "Trading Analysis/Market Offer Loading/"
-git commit -m "Add market offers: [partner] [date]"
-git push
-```
-
-### Step 9: Run RFQ Match Analysis (AUTOMATIC TRIGGER)
-**Immediately match the new offers against open RFQs.** This runs against the CSV data — no database import required.
-
-```bash
-node "Trading Analysis/Market Offer Matching for RFQs/analyze-new-offers.js" \
-  "Trading Analysis/Market Offer Loading/output/OFFER_UPLOAD_20260317_[Partner].csv"
-```
-
-**Output:** `RFQ_Matches_[Partner]_[date].csv` in `Trading Analysis/Market Offer Matching for RFQs/`
-
-**What it does:**
-1. Reads MPNs from the just-created offer CSV
-2. Queries database for matching RFQs (last 90 days)
-3. Calculates opportunity values and coverage
-4. Tiers results (TIER_1/2/3) by value and coverage
-5. Outputs matches for immediate action
-
-**If matches found:** Review TIER_1 opportunities first — these are high-value, good-coverage matches that warrant immediate follow-up.
-
----
-
-## Partner Matching Strategy
-
-**Canonical reference:** `shared/partner-matching.md` and `shared/partner-lookup.js`
-
-Uses shared multi-tier matching: exact email → email domain → domain hint → name match.
-All tiers filter by `bp.isactive = 'Y'`. See shared docs for details.
-
----
-
-## Output Files
-
-### File Naming Convention
-
-**IMPORTANT: Each email gets its own file.** Do not consolidate multiple emails into one file.
-
-| Scenario | Filename |
-|----------|----------|
-| Offer ID provided | `OFFER_UPLOAD_[OfferID].csv` |
-| No offer ID | `OFFER_UPLOAD_YYYYMMDD_[Partner].csv` |
-
-**Examples:**
-- With offer ID: `OFFER_UPLOAD_1234567.csv`
-- Without: `OFFER_UPLOAD_20260311_Honeywell.csv`
-- Multiple emails same partner: `OFFER_UPLOAD_20260311_Honeywell.csv`, `OFFER_UPLOAD_20260312_Honeywell.csv`
-
-### Output Files
-| File | Location | Description |
-|------|----------|-------------|
-| `OFFER_UPLOAD_*.csv` | `output/` | Offer Mass Upload Template format, ready for iDempiere |
-| `needs-partner.csv` | `output/` | Complete offers needing partner setup first |
-
----
-
-## CRITICAL: search_key vs c_bpartner_id
-
-**ALWAYS use `search_key` (c_bpartner.value), NEVER use `c_bpartner_id` (database primary key).**
-
-The upload template column `Business Partner Search Key` expects the **search_key** value.
-
----
-
-## Flags and Notes
-
-| Flag | Meaning |
-|------|---------|
-| `[PARTIAL - needs: partner, qty]` | Missing required fields |
-| `[PARTNER NOT IN DB: Name]` | Partner not matched to iDempiere |
-| `[EXPIRED]` | Offer has passed expiration date |
-
----
-
-## Direct Database Write-Back
-
-The shared `offer-writeback.js` module enables writing offers directly to the ERP instead of CSV import.
-
-**Module:** `shared/offer-writeback.js` — see `shared/README.md` for full API.
-
-### Usage
+### Step 5: Write to OT
 
 ```javascript
 const { writeOffer } = require('../../shared/offer-writeback');
 
-await writeOffer({
-  bpartnerId: resolvedPartnerId,     // from partner-lookup.js
-  offerTypeId: 'Customer Excess',    // or 1000000, 'Broker Stock Offer', etc.
-  description: '03.23.2026-Celestica',
-  lines: extractedLines.map(l => ({
-    mpn: l.mpn,
-    mfrText: l.mfrText,
-    qty: l.qty,
-    price: l.price,
-    dateCode: l.dateCode,
-    cpc: l.cpc,
-  }))
+const result = await writeOffer({
+  bpartnerId: partnerResult.search_key ? Number(partnerResult.search_key) : null,
+  offerTypeId: 'Customer Excess',                      // or 1000000
+  description: '04.08.2026-GE_Aerospace_RevShare_B1',  // MM.DD.YYYY-PartnerName-context
+  writeMpnRecords: true,                                // also write _line_mpn rows
+  lines: extractedLines,
 });
+// → { offerId, searchKey, linesWritten, mpnsWritten, errors }
 ```
 
-### TODO for Integration
+**Validate:**
+- `result.offerId` is non-null
+- `result.linesWritten === lines.length`
+- `result.errors.length === 0`
+- If `writeMpnRecords: true`: `result.mpnsWritten === lines.length`
 
-- [ ] Wire `offer-writeback.js` into extraction pipeline as alternative to CSV-only output
-- [ ] Decide: write-back as replacement for CSV email, or in addition to it?
+If any of these fail, **do not move the email to `Processed`** (Step 6). Move to `NeedsReview` instead and surface errors to the user.
+
+### Step 6: Move Email
+
+| Outcome | Folder |
+|---|---|
+| Step 5 succeeded (full write, zero errors) | `Processed` |
+| Step 2 returned `NEEDS-PARTNER` | `NeedsPartner` |
+| Step 5 had errors / partial write | `NeedsReview` |
+| Email had no offer data (inquiry only, empty forward) | `NotOffer` |
+
+```javascript
+await fetcher.moveMessage(emailId, 'Processed');
+```
+
+### Step 7: Trigger Analysis (DEFAULT)
+
+Loading auto-invokes the [Market Offer Analysis](../Market%20Offer%20Analysis/market-offer-analysis.md) workflow on the newly-written offer ID(s):
+
+```javascript
+// Pseudocode — actual orchestrator TBD
+const { analyzeOffer } = require('../Market Offer Analysis/analyze-offer');
+await analyzeOffer({ offerIds: [result.offerId], source: 'loading-trigger' });
+```
+
+**Override:** `--no-analyze` flag (e.g., when loading a multi-batch lot to be analyzed as one logical group separately).
+
+> **Why this exists:** Analysis takes a `chuboe_offer_id` as input, not raw extracted memory. By the time Step 5 finishes, the canonical data lives in OT — exactly what Analysis needs. Auto-triggering keeps the new-offer path one-touch while preserving the ability to revisit any historical offer later.
 
 ---
 
-## TODO
-- [x] Get ERP upload template specification (exact column names/formats) ✓ `Market Offer Line Import Template.csv`
-- [x] Email notification to jake.harris@astutegroup.com ✓ `send-offer-email.js`
-- [x] ~~Document offer header creation (chuboe_offer parent record)~~ ✓ `shared/offer-writeback.js` handles this (2026-03-23)
-- [ ] Define validation rules (required fields, value constraints)
-- [x] Build extraction logic for common Excel/CSV formats ✓ `extract-market-offers.js`
-- [ ] Add duplicate detection (same partner + MPN within N days)
-- [x] Create email folders ✓ Processed created (others: create as needed)
-- [x] Integrate with Market Offer Matching workflow ✓ Step 9 triggers `analyze-new-offers.js`
+## File Output
+
+**Loading does NOT produce CSV files for ERP import.** That was the old (pre-writeback) pattern; with `writeOffer()` going directly to REST, no intermediate file is needed.
+
+The legacy CSVs in `output/` are kept as historical reference only. The legacy `extract-market-offers.js` and `send-offer-email.js` scripts are deprecated — kept for git history but not part of the new pipeline.
+
+---
+
+## Field Reference
+
+Loading writes to three tables: `chuboe_offer` (header), `chuboe_offer_line` (per line), and optionally `chuboe_offer_line_mpn` (cross-references).
+
+> **Schema reference:** See [`shared/data-model.md`](../../shared/data-model.md) § Offer Chain for the full field list, types, and which columns live where.
+>
+> **Payload reference:** See [`shared/api-writeback.md`](../../shared/api-writeback.md) § 11 (chuboe_offer) for the exact REST payload structure that `writeOffer()` produces.
+
+**Key rules:**
+- **Only populate what's explicit.** Do not assume defaults for lead time, date code, packaging, country, etc.
+- **Multiple MPNs in one line:** create a separate line for EACH MPN (same qty, same price).
+- **MFR:** writer always uses `Chuboe_MFR_Text` (canonical name from `mfr-lookup`). `Chuboe_MFR_ID` is only set when the resolved MFR is non-system.
+- **Description (line-level):** part-specific notes only (expiry, conditions, location). NOT source metadata.
+
+---
+
+## Skip Rules (Email Routing)
+
+| Condition | Action |
+|---|---|
+| Empty forward (no offer data in body or attachment) | Move to `NotOffer` |
+| Inquiry only (asking about availability, not offering stock) | Move to `NotOffer` |
+| Duplicate (same partner/MPN/qty already loaded recently) | Skip + flag |
+| PDF-only offer (data only in attachment, no parser yet) | Move to `NeedsReview` |
+| Body has data, attachment has more — read both | Combine before write |
+
+---
+
+## Known Issues / Blockers
+
+| Issue | Impact | Workaround |
+|---|---|---|
+| `writeOffer()` untested in prod | Unknown failure modes (callouts, schema constraints) | Step 0 smoke test mandatory on first use |
+| `writeMpnRecords: true` (the `chuboe_offer_line_mpn` write path) untested | Without it, downstream MPN-cross-ref matching is weaker | Smoke test with the flag enabled to find out before full batch |
+| `chuboe_pricing_api_result` JSONB write blocked (Chuck) | Affects Analysis enrichment persistence, NOT loading | Cache write works; `extractPriceAtQty()` falls back to cache |
+| No generalized xlsx → line normalizer cog | Each new vendor format needs ad-hoc parsing | Build `shared/offer-extractor.js` after a few real loads reveal common shapes |
+| Old `extract-market-offers.js` hardcodes MFR map duplicating `mfr-lookup.js` | Drift risk | Deprecated; not used by new path |
 
 ---
 
 ## Related
 
-- [VQ Loading](../../Trading Analysis/RFQ Sourcing/vq_loading/vq-loading.md) - Similar workflow for vendor quotes
-- [Market Offer Matching for RFQs](../Market%20Offer%20Matching%20for%20RFQs/market-offer-matching.md) - Downstream consumer of uploaded offers
+- [Market Offer Analysis](../Market%20Offer%20Analysis/market-offer-analysis.md) — downstream consumer (Workflow B). Loading triggers this by default.
+- [`shared/offer-writeback.js`](../../shared/offer-writeback.js) — the writer
+- [`shared/partner-lookup.js`](../../shared/partner-lookup.js) — partner resolution
+- [`shared/mfr-lookup.js`](../../shared/mfr-lookup.js) — MFR resolution
+- [`shared/email-fetcher.js`](../../shared/email-fetcher.js) — inbox operations
+- [`shared/data-model.md`](../../shared/data-model.md) § Offer Chain — schema reference
+- [`shared/api-writeback.md`](../../shared/api-writeback.md) § 11 — REST payload reference
+- [Inventory File Cleanup](../Inventory%20File%20Cleanup/inventory-file-cleanup.md) — sister workflow that also writes to `chuboe_offer` (own stock by warehouse)
