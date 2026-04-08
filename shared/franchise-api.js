@@ -151,6 +151,12 @@ async function searchPart(distributor, mpn, qty) {
       vqDateCode: result.vqDateCode || '',
       vqPackaging: result.vqPackaging || '',  // Mouser/Sager/TTI populate this; vq-writer normalizes to chuboe_packaging_id
       vqLeadTime: result.vqLeadTime || '',
+      // Compliance data — HTS/ECCN are properties of the part, not the seller.
+      // DigiKey + Mouser populate these reliably; Arrow's standard search doesn't
+      // (separate compliance endpoint required), TTI/Waldom inconsistent. Backfill
+      // workflows should join these onto chuboe_vq_line by (mpn, mfr).
+      vqHts: result.vqHts || null,
+      vqEccn: result.vqEccn || null,
       // Full price break array for api-result-writer capture
       priceBreaks: result.priceBreaks || [],
       // Raw result for workflow-specific needs

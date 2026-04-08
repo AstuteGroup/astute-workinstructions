@@ -166,6 +166,9 @@ function parseSearchResults(json, searchMpn, rfqQty) {
     vqManufacturer: null,
     vqMoq: null,
     vqSpq: null,
+    vqHts: null,
+    vqEccn: null,
+    vqRohs: null,
     // Raw data
     allMatches: [],
   };
@@ -218,6 +221,13 @@ function parseSearchResults(json, searchMpn, rfqQty) {
   if (bestMatch.ManufacturerLeadWeeks) {
     result.vqLeadTime = `${bestMatch.ManufacturerLeadWeeks} Weeks`;
   }
+
+  // Compliance (HTS / ECCN / RoHS) from product-level Classifications
+  // DigiKey v4 returns these on every product, even those without stock.
+  const cls = bestMatch.Classifications || {};
+  result.vqHts = cls.HtsusCode || null;
+  result.vqEccn = cls.ExportControlClassNumber || null;
+  result.vqRohs = cls.RohsStatus || null;
 
   // Build vendor notes
   result.vqVendorNotes = `DigiKey stock: ${result.franchiseQty.toLocaleString()}`;

@@ -247,6 +247,15 @@ function parseSearchResults(apiResponse, searchMpn, rfqQty) {
     bestMatch = parts[0];
   }
 
+  // Extract HTS/ECCN from ProductCompliance early so restricted parts still
+  // surface compliance data (HTS/ECCN are properties of the part, not the
+  // distributor's ability to sell it).
+  const earlyCompliance = bestMatch.ProductCompliance || [];
+  const earlyUshts = earlyCompliance.find(c => c.ComplianceName === 'USHTS');
+  const earlyEccn = earlyCompliance.find(c => c.ComplianceName === 'ECCN');
+  result.vqHts = earlyUshts ? earlyUshts.ComplianceValue : null;
+  result.vqEccn = earlyEccn ? earlyEccn.ComplianceValue : null;
+
   // Check for restriction (distributor block)
   if (bestMatch.RestrictionMessage && !bestMatch.AvailabilityInStock && (!bestMatch.PriceBreaks || bestMatch.PriceBreaks.length === 0)) {
     result.found = true;
@@ -308,12 +317,7 @@ function parseSearchResults(apiResponse, searchMpn, rfqQty) {
   result.vqRohs = bestMatch.ROHSStatus || null;
   result.vqDatasheetUrl = bestMatch.DataSheetUrl || null;
 
-  // Extract HTS and ECCN from ProductCompliance array
-  const compliance = bestMatch.ProductCompliance || [];
-  const ushts = compliance.find(c => c.ComplianceName === 'USHTS');
-  const eccn = compliance.find(c => c.ComplianceName === 'ECCN');
-  result.vqHts = ushts ? ushts.ComplianceValue : null;
-  result.vqEccn = eccn ? eccn.ComplianceValue : null;
+  // HTS/ECCN already extracted above (before restriction check).
 
   // Packaging from ProductAttributes
   const attrs = bestMatch.ProductAttributes || [];

@@ -61,6 +61,7 @@ At the start of every new conversation, before addressing anything else, always 
 > 11. **Market Offer Analysis** - Load excess offers, enrich with market intelligence, score opportunities, and analyze by intent: reactive (RFQ match), spec buy, or consignment (see `Trading Analysis/Market Offer Analysis/market-offer-analysis.md`)
 > 12. **BOM Monitoring** - Track BOM risk, commodity analysis, and excess matches (see `Trading Analysis/BOM Monitoring/`)
 > 13. **Stock RFQ Loading** - Process customer RFQ emails into ERP-ready CSV for import (see `Trading Analysis/Stock RFQ Loading/stock-rfq-loading.md`)
+> 14. **HTS / ECCN Backfill** - RFQ-scoped HTS + ECCN backfill onto chuboe_vq_line via DigiKey + Mouser APIs (see `Trading Analysis/HTS ECCN Backfill/hts-eccn-backfill.md`)
 
 3. **Review Roadmaps** (planned work):
 
