@@ -40,7 +40,6 @@
 const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
-const { psqlQuery, sqlStr } = require('./db-helpers');
 const { apiPost, isApiAvailable } = require('./api-client');
 const logger = require('./logger').createLogger('APIPricing');
 
@@ -258,35 +257,23 @@ async function writeDb(mpn, envelope, rfqId) {
   }
 }
 
-/**
- * Read the most recent API result from DB for an MPN within the age window.
- * Checks both adempiere (old Flux data) and ai_writeback (our data).
- */
-function readDb(mpn, maxAgeDays = 30) {
-  const escaped = mpn.replace(/'/g, "''");
-  // Read from both schemas via psql — ai_writeback may still have older data,
-  // and adempiere has Flux-written data. API writes will appear here once
-  // production is connected.
-  const sources = ['ai_writeback', 'adempiere'];
-
-  for (const schema of sources) {
-    const sql = `SELECT json_info::text FROM ${schema}.${DB_TABLE}
-      WHERE mpns ILIKE '%${escaped}%'
-        AND isactive = 'Y'
-        AND created >= CURRENT_DATE - INTERVAL '${maxAgeDays} days'
-      ORDER BY created DESC LIMIT 1`;
-
-    const result = psqlQuery(sql);
-    if (result) {
-      try {
-        return JSON.parse(result);
-      } catch (e) {
-        // JSON parse failed, try next source
-      }
-    }
-  }
-  return null;
-}
+// readDb() removed 2026-04-08:
+//
+// We previously tried to read pricing envelopes from
+// adempiere.chuboe_pricing_api_result.json_info (legacy Flux data) and
+// ai_writeback.chuboe_pricing_api_result (our data). Neither path is useful
+// today:
+//
+//   - Our writes never reach json_info (the column is virtual via REST — see
+//     writeDb() docstring), so there is no "our data" in either schema.
+//   - The legacy Flux data in adempiere.json_info hasn't been written since
+//     2024-12-30 and is older than any reasonable maxAgeDays window.
+//   - The ai_writeback schema is deprecated.
+//
+// extractPriceAtQty now reads from the local cache only. When iDempiere
+// un-virtualizes the JSON column (api-integration-roadmap.md § Pricing
+// Envelope OT-Native Storage), reintroduce a DB read here that uses the
+// REST GET endpoint, not direct SQL.
 
 // ─── PUBLIC API: WRITE ──────────────────────────────────────────────────────
 
@@ -334,9 +321,10 @@ async function writePricingResult(opts) {
 /**
  * Extract the qty-relevant price break for an MPN across distributors.
  *
- * Reads from DB first (if available), falls back to cache. Applies freshness
- * filter via maxAgeDays. For each distributor, selects the highest QtyBreak
- * that is <= the requested qty (standard price break logic).
+ * Reads from the local cache (canonical store today — see writeDb() docstring
+ * for why DB envelope reads don't work). Applies freshness filter via
+ * maxAgeDays. For each distributor, selects the highest QtyBreak that is
+ * <= the requested qty (standard price break logic).
  *
  * @param {string} mpn - MPN to look up
  * @param {number} qty - Quantity for price break selection
@@ -348,8 +336,7 @@ async function writePricingResult(opts) {
 function extractPriceAtQty(mpn, qty, options = {}) {
   const maxAgeDays = options.maxAgeDays || 30;
 
-  // Try DB first, then cache
-  const envelope = readDb(mpn, maxAgeDays) || readCache(mpn, maxAgeDays);
+  const envelope = readCache(mpn, maxAgeDays);
   if (!envelope || !envelope.data || !envelope.data.Pricings) {
     return [];
   }
