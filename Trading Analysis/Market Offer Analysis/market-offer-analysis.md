@@ -125,37 +125,75 @@ Rules-based classifier. Pass the offer object through the rule table; first matc
 
 Run on every line regardless of intent. Both passes are mandatory.
 
-#### 3a: Supply Side (franchise APIs)
+#### 3a: Supply Side (franchise APIs) — three-state coverage model
+
+**Critical distinction:** Not all "no franchise stock" lines mean the same thing. The franchise-api summary exposes both `distributorsCarrying` (anyone listed the part in their catalog at all) and `distributorsWithStock` (subset that has stock > 0). Combining the two gives three states, each with a different downstream meaning:
+
+| State | Condition | Meaning | Score impact | Output framing |
+|---|---|---|---|---|
+| **In stock** | `distributorsWithStock > 0` | Franchise carries it AND has inventory | Existing supply scoring (coverage % vs offered qty) | Standard "available" line |
+| **Out of stock** | `distributorsCarrying > 0 AND distributorsWithStock == 0` | Franchise carries it BUT zero inventory across all 8 | **Real scarcity opportunity** — market wants it, no authorized channel has it | +12 supply scarcity, flag `FRANCHISE_OUT_OF_STOCK` |
+| **Not listed** | `distributorsCarrying == 0` | No distributor has any catalog entry — part isn't in franchise universe at all | **Insufficient data** — don't score supply scarcity (parallel to NO_OFFER_PRICE for Price Advantage) | Flag, sub-classify (see below) |
+
+**The "Not Listed" sub-classification — internal vs mil-spec vs unknown.** Lines that no franchise has heard of fall into one of three buckets, and they need different downstream actions. Use `shared/mpn-classifier.js → classifyMpnNonFranchise(mpn, mfrText, cpc)`:
+
+| Sub-class | Heuristic | Action |
+|---|---|---|
+| `NO_LISTING_INTERNAL` | MPN contains "REV " followed by a letter; or contains internal annotations like `(SCRN)` / `(PROG)` / `(SCREENED)`; or CPC field is populated and differs from MPN; or matches a known customer-prefix pattern | **Push back on the customer** to provide an industry MPN or cross-reference. The customer should know what their internal codes are. |
+| `NO_LISTING_MILSPEC` | Matches mil-spec patterns: `5962-*`, `JANTX*`, `M[0-9]+/`, `MS[0-9]`, `MIL-*` | Note as obscure-but-legitimate. May warrant manual broker channel research. Different conversation than internals. |
+| `NO_LISTING_UNKNOWN` | Neither — no clear internal or mil-spec signal | Catch-all. Research case-by-case. |
+
+**Why this matters:** When ~65% of a partner's lot comes back with no franchise listings, the actionable pushback isn't "we can't sell this" — it's "X of those are YOUR internal AML codes, please resolve them on your side; Y are mil-spec one-offs that need a different channel; Z are genuinely unknown." Each bucket has a different conversation with the customer.
+
+**Implementation pattern:**
 
 ```javascript
-const { extractPriceAtQty } = require('../../shared/api-result-writer');
 const { searchAllDistributors } = require('../../shared/franchise-api');
+const { writePricingResult, extractPriceAtQty } = require('../../shared/api-result-writer');
+const { classifyMpnNonFranchise } = require('../../shared/mpn-classifier');
 
 for (const line of offer.lines) {
-  // Read cached franchise results first
-  const cached = extractPriceAtQty(line.mpn, line.qty, { maxAgeDays: 14 });
+  // Cache first (14-day freshness)
   let franchise;
+  const cached = extractPriceAtQty(line.mpn, line.qty || 1, { maxAgeDays: 14 });
   if (cached.length > 0) {
-    franchise = cached;
+    franchise = reconstructSummaryFromCache(cached, line.qty);
   } else {
-    // No recent data — call APIs
-    const result = await searchAllDistributors(line.mpn, line.qty);
+    const result = await searchAllDistributors(line.mpn, line.qty || 1);
+    // ALWAYS persist the cache so future runs benefit
+    await writePricingResult({
+      searchResult: result, mpn: line.mpn, qty: line.qty || 1,
+      source: 'market-offer-analysis',
+    }).catch(err => console.warn(`cache write failed for ${line.mpn}: ${err.message}`));
     franchise = result;
-    // Cache write happens automatically (DB write blocked, see Known Issues)
   }
+
+  const s = franchise.summary;
   line.enrichment = line.enrichment || {};
   line.enrichment.supply = {
-    totalStock: franchise.summary.totalStock,
-    distributorsWithStock: franchise.summary.distributorsWithStock,
-    lowestPrice: franchise.summary.lowestPrice,
-    coverage: franchise.summary.coverage,                  // FULL / PARTIAL / NONE
-    lifecycle: franchise.summary.lifecycle,                // Active / EOL / Obsolete / NRFND
-    leadTimeWeeks: franchise.summary.leadTimeWeeks,
+    distributorsCarrying:  s.distributorsCarrying,   // anyone listed it
+    distributorsWithStock: s.distributorsWithStock,  // anyone has stock
+    totalStock:            s.totalStock,
+    lowestPrice:           s.lowestPrice,
+    coverage:              s.coverage,                // FULL / PARTIAL / NONE
   };
+
+  // Classify state
+  if (s.distributorsWithStock > 0) {
+    line.franchiseState = 'IN_STOCK';
+  } else if (s.distributorsCarrying > 0) {
+    line.franchiseState = 'FRANCHISE_OUT_OF_STOCK';   // real scarcity
+  } else {
+    // Not in franchise catalog at all — sub-classify
+    const sub = classifyMpnNonFranchise(line.mpn, line.mfrText, line.cpc);
+    line.franchiseState = sub;   // NO_LISTING_INTERNAL / NO_LISTING_MILSPEC / NO_LISTING_UNKNOWN
+  }
 }
 ```
 
-**Freshness rule:** 14 days. Older than that → re-call APIs. Rationale: market intelligence shifts week-to-week for parts in active sourcing.
+**Freshness rule:** 14 days. Older than that → re-call APIs.
+
+**Cache write rule:** ALWAYS call `writePricingResult()` after a live API call. Skipping it (which happened during the GE Batch 1 first run) means the cache stays empty and every future run pays full API cost. The cache is the standard mechanism — opting out of it isn't a choice the caller gets to make.
 
 #### 3b: Demand Side (OT history) — bulk pattern
 
@@ -205,10 +243,12 @@ Every line gets a 0–100 score and a tier. Three weighted categories.
 
 #### Supply Scarcity (0–40)
 
+**Only score lines where the franchise APIs found at least one carrier** (`distributorsCarrying > 0`). Lines with no franchise listing at all (`NO_LISTING_*`) are flagged and left unscored on the supply axis — they have insufficient data for the model to mean anything (parallel to NO_OFFER_PRICE on the price axis).
+
 | Condition | Points |
 |---|---|
 | EOL / Obsolete / NRFND lifecycle | +15 |
-| No franchise coverage (0 distributors with stock) | +12 |
+| `FRANCHISE_OUT_OF_STOCK` (carrying > 0, with-stock = 0) — real scarcity | +12 |
 | Franchise stock < offered qty | +8 |
 | Franchise stock < 2× offered qty | +4 |
 | Lead time > 40 weeks | +8 |
@@ -216,6 +256,8 @@ Every line gets a 0–100 score and a tier. Three weighted categories.
 | Active lifecycle + high franchise stock (>10× offered qty) | −10 |
 
 *Cap 40, floor 0.*
+
+**Lines in `NO_LISTING_INTERNAL` / `NO_LISTING_MILSPEC` / `NO_LISTING_UNKNOWN` get supplyScore = `null` (not 0)**, so they sort to the bottom of supply rankings rather than appearing as "good scarcity opportunities" — which is the bug that the original two-state model produced.
 
 #### Price Advantage (0–35)
 
@@ -321,8 +363,12 @@ Same columns as Reactive, plus:
 
 | Flag | Source | Meaning |
 |---|---|---|
+| `FRANCHISE_OUT_OF_STOCK` | Step 3a | Franchise carries the part but zero across all distributors — real scarcity opportunity |
+| `NO_LISTING_INTERNAL` | Step 3a | No franchise listing AND MPN looks customer-internal (REV markers, parens annotations, etc.) — push back on customer to resolve |
+| `NO_LISTING_MILSPEC` | Step 3a | No franchise listing AND MPN matches mil-spec patterns (5962-, JANTX, M-prefix) — obscure but legitimate |
+| `NO_LISTING_UNKNOWN` | Step 3a | No franchise listing, no clear sub-pattern — research case-by-case |
 | `VERIFY` | Step 4 (Price Advantage) | Offer price < 5% of franchise best — check authenticity |
-| `NEEDS PRICING DATA` | Step 4 | No franchise data; can't score price advantage |
+| `NEEDS PRICING DATA` | Step 4 | No franchise pricing data; can't score price advantage |
 | `NO OFFER PRICE` | Step 4 | Offer didn't include price (typical for consignment) |
 | `PROACTIVE PUSH` | Step 5 (Reactive) | SO history exists but no open RFQ/CQ — reach out |
 | `CLOSE FIRST` | Step 5 (Spec Buy) | Active RFQ/CQ exists — close before buying speculatively |

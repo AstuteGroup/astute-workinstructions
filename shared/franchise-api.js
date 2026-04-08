@@ -203,8 +203,16 @@ async function searchAllDistributors(mpn, qty, options = {}) {
     }
   }
 
-  // Aggregate
-  const found = results.filter(r => r.found && r.franchiseQty > 0);
+  // Aggregate.
+  // Three populations matter for downstream classification:
+  //   - distributorsChecked: how many we asked (always = active count)
+  //   - distributorsCarrying: how many returned ANY catalog entry (r.found === true), regardless of stock
+  //   - distributorsWithStock: subset of carrying that have stock > 0
+  // The carrying-vs-with-stock distinction lets callers distinguish "real
+  // scarcity" (carrying > 0, with-stock = 0) from "not in franchise universe"
+  // (carrying = 0). See market-offer-analysis.md § Step 3a three-state model.
+  const carrying = results.filter(r => r.found);
+  const found = carrying.filter(r => r.franchiseQty > 0);
   const allPrices = found.map(r => r.franchiseBulkPrice).filter(p => p != null && p > 0);
   const totalStock = found.reduce((sum, r) => sum + (r.franchiseQty || 0), 0);
 
@@ -213,6 +221,7 @@ async function searchAllDistributors(mpn, qty, options = {}) {
     qty,
     totalStock,
     distributorsWithStock: found.length,
+    distributorsCarrying: carrying.length,
     distributorsChecked: results.length,
     lowestPrice: allPrices.length > 0 ? Math.min(...allPrices) : null,
     highestPrice: allPrices.length > 0 ? Math.max(...allPrices) : null,
