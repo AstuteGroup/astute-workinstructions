@@ -32,20 +32,30 @@
  * cached data, etc.).
  *
  * QUEUE LOCATION: ~/workspace/.deferred-api-queue.json
- * WORKER:        ~/workspace/scripts/process-api-queue.js
- * GREETING:      Bucket A items do NOT surface in the SessionStart greeting —
- *                they run when the worker runs. The greeting only mentions
- *                Bucket A if the worker is broken or has stale exhausted items.
+ * WORKER:        ~/workspace/scripts/process-api-queue.js (cron: */30 * * * *)
+ * GREETING:      Bucket A items do NOT surface in the SessionStart greeting
+ *                routinely — they run autonomously via cron. Only surface
+ *                in greeting if cron is missing the entry, log shows
+ *                failures, or queue has unattended exhausted items.
  *
- * SCHEDULING REALITY (2026-04-08):
- *   The Claude `schedule` skill creates REMOTE agents in Anthropic's cloud
- *   that have no access to local files. It cannot drive the worker.
- *   Run options today are:
- *     - Manual: `node ~/workspace/scripts/process-api-queue.js`
- *     - During an active session: `/loop 60m node ~/workspace/scripts/process-api-queue.js`
- *   True cloud autonomy would require moving the queue file into a git repo
- *   so a remote agent can pull/run/commit. Parked unless rate-limit fatigue
- *   becomes a real problem.
+ * SCHEDULING (corrected 2026-04-08):
+ *   Worker runs via cron every 30 min. Verify with `crontab -l` — should
+ *   include the line:
+ *     */30 * * * * /usr/bin/node "/home/analytics_user/workspace/scripts/process-api-queue.js" >> /tmp/api-queue-worker.log 2>&1
+ *
+ *   Earlier docstrings claimed cron was blocked by rbash and that the
+ *   Claude `schedule` skill was the autonomous path. Both wrong:
+ *     - Cron works fine here (proven by existing vortex-poller, lam-kitting-runner,
+ *       inventory-cleanup cron jobs in the same crontab).
+ *     - The Claude `schedule` skill creates REMOTE agents in Anthropic's
+ *       cloud that have no access to local files — useless for driving a
+ *       local worker that reads/writes a local JSON queue.
+ *
+ *   On exhausted items the worker emails the operator (jake.harris@... by
+ *   default, override via OPERATOR_EMAIL env var). On successful retries
+ *   it cascades — other pending items with the same `kind` get fast-tracked
+ *   so they're picked up on the next run instead of waiting out their full
+ *   blocked_until window.
  *
  * ─────────────────────────────────────────────────────────────────────────
  * HOW TO WIRE A NEW DISTRIBUTOR MODULE
