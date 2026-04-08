@@ -18,6 +18,22 @@
  */
 
 const https = require('https');
+const path = require('path');
+
+// Bucket A: deferred retry queue for rate-limited / transient API failures.
+// Loaded lazily so this module can still be required without astute-workinstructions
+// being on the same path (defensive — fall through if helper not present).
+let _enqueueRetry = null;
+function enqueueRetrySafe(opts) {
+  try {
+    if (!_enqueueRetry) {
+      _enqueueRetry = require(path.resolve(__dirname, '../../../shared/api-queue')).enqueueRetry;
+    }
+    return _enqueueRetry(opts);
+  } catch (e) {
+    return false;
+  }
+}
 
 // Mouser API Configuration
 const MOUSER_CONFIG = {
@@ -117,7 +133,30 @@ async function searchPart(mpn, rfqQty = 1, options = {}) {
     },
   };
 
-  const json = await mouserRequest(MOUSER_CONFIG.partSearchPath, 'POST', body);
+  let json;
+  try {
+    json = await mouserRequest(MOUSER_CONFIG.partSearchPath, 'POST', body);
+  } catch (err) {
+    // Bucket A — auto-enqueue on rate limit / quota / transient errors so
+    // the worker retries when Mouser's window resets. mouserRequest already
+    // throws "Rate limited" on HTTP 429 and "API error 5xx" on server errors.
+    const msg = err.message || '';
+    const isRateLimit = msg.includes('Rate limited') || msg.includes('429');
+    const isServerError = /API error 5\d\d/.test(msg) || msg.includes('timeout');
+    if (isRateLimit || isServerError) {
+      enqueueRetrySafe({
+        id: 'mouser-' + mpn + '-' + Date.now(),
+        kind: 'api-retry-mouser',
+        command: `node -e "require('${__dirname}/mouser').searchPart('${mpn.replace(/'/g, "\\'")}', ${rfqQty}).then(r => console.log('OK', r.found)).catch(e => { console.error(e.message); process.exit(1); })"`,
+        // Mouser daily quota = 1000 calls/day, hourly = 30/sec burst.
+        // 1h covers a transient burst limit; if it's a daily quota the
+        // worker's max_attempts (5) will eventually push to 24h territory.
+        blocked_until_hours: 1,
+        reason: `Mouser ${isRateLimit ? 'rate limit' : 'server error'} on ${mpn}: ${msg.substring(0, 120)}`,
+      });
+    }
+    throw err; // still throw so caller's error handling fires
+  }
   return parseSearchResults(json, mpn, rfqQty);
 }
 

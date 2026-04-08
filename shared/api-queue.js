@@ -34,8 +34,83 @@
  * QUEUE LOCATION: ~/workspace/.deferred-api-queue.json
  * WORKER:        ~/workspace/scripts/process-api-queue.js
  * GREETING:      Bucket A items do NOT surface in the SessionStart greeting —
- *                they run autonomously. The greeting only mentions Bucket A
- *                if the worker is broken or has stale exhausted items.
+ *                they run when the worker runs. The greeting only mentions
+ *                Bucket A if the worker is broken or has stale exhausted items.
+ *
+ * SCHEDULING REALITY (2026-04-08):
+ *   The Claude `schedule` skill creates REMOTE agents in Anthropic's cloud
+ *   that have no access to local files. It cannot drive the worker.
+ *   Run options today are:
+ *     - Manual: `node ~/workspace/scripts/process-api-queue.js`
+ *     - During an active session: `/loop 60m node ~/workspace/scripts/process-api-queue.js`
+ *   True cloud autonomy would require moving the queue file into a git repo
+ *   so a remote agent can pull/run/commit. Parked unless rate-limit fatigue
+ *   becomes a real problem.
+ *
+ * ─────────────────────────────────────────────────────────────────────────
+ * HOW TO WIRE A NEW DISTRIBUTOR MODULE
+ * ─────────────────────────────────────────────────────────────────────────
+ *
+ * Each franchise distributor module under
+ *   `Trading Analysis/RFQ Sourcing/franchise_check/{name}.js`
+ * should detect its own rate-limit / quota / transient errors and call
+ * enqueueRetry() so the failed call can be retried later. Two patterns
+ * exist depending on how the API signals failure:
+ *
+ * PATTERN 1 — explicit HTTP status (most APIs)
+ * Examples already wired: digikey.js (429 + 5xx), mouser.js (Rate limited
+ * + 5xx string detection)
+ *
+ *   const path = require('path');
+ *   let _enqueueRetry = null;
+ *   function enqueueRetrySafe(opts) {
+ *     try {
+ *       if (!_enqueueRetry) {
+ *         _enqueueRetry = require(path.resolve(__dirname, '../../../shared/api-queue')).enqueueRetry;
+ *       }
+ *       return _enqueueRetry(opts);
+ *     } catch (e) { return false; }
+ *   }
+ *
+ *   // Inside searchPart's HTTP response handler:
+ *   if (res.statusCode === 429) {
+ *     enqueueRetrySafe({
+ *       id: '<distributor>-' + mpn + '-' + Date.now(),
+ *       kind: 'api-retry-<distributor>',
+ *       command: `node -e "require('${__dirname}/<distributor>').searchPart('${mpn.replace(/'/g, "\\\\'")}', ${rfqQty}).then(r => console.log('OK', r.found)).catch(e => { console.error(e.message); process.exit(1); })"`,
+ *       blocked_until_hours: 1,  // adjust per the API's typical reset window
+ *       reason: `<Distributor> 429 rate limit on ${mpn}`,
+ *     });
+ *     reject(new Error('<Distributor> rate limit (429) — enqueued for retry'));
+ *     return;
+ *   }
+ *
+ * PATTERN 2 — silent failure (200 OK with empty results, no error)
+ * Some APIs (DigiKey OAuth/quota issue) return HTTP 200 with empty
+ * Products[] when throttled. Indistinguishable from a legit empty result
+ * on a single call. Detection requires session-wide context. See
+ * digikey.js `checkForSilentThrottle` + `runSentinel` for the reference
+ * implementation:
+ *
+ *   1. Track total calls + empty results in module-level state
+ *   2. When threshold hit (>=5 calls AND >50% empty), run ONE sentinel
+ *      call against a known-good MPN to verify
+ *   3. If sentinel returns results → false alarm, mark session healthy
+ *   4. If sentinel ALSO returns empty → confirmed throttle, enqueue +
+ *      mark session throttled (subsequent empties auto-enqueue without
+ *      re-running sentinel)
+ *   5. Sentinel cooldown (5 min) prevents thrashing
+ *
+ * Use Pattern 2 only when the API actually exhibits silent throttling.
+ * Most APIs return 429 cleanly and Pattern 1 is sufficient.
+ *
+ * STATUS — wiring coverage as of 2026-04-08:
+ *   ✅ digikey.js — Pattern 1 (429/5xx) + Pattern 2 (silent throttle B+C)
+ *   ✅ mouser.js  — Pattern 1 (Rate limited / 5xx detected via thrown error)
+ *   ⏳ master.js, future.js, newark.js, tti.js, sager.js, waldom.js,
+ *      arrow.js, rutronik.js, oemsecrets.js — not yet wired. Operator
+ *      adds Pattern 1 wiring as needed; document in `~/workspace/deferred-work.md`
+ *      if a particular distributor's rate limit becomes painful.
  */
 
 const fs = require('fs');

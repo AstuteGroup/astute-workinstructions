@@ -9,6 +9,23 @@
  */
 
 const https = require('https');
+const path = require('path');
+
+// Bucket A: deferred retry queue for rate-limited / transient API failures.
+// Loaded lazily so this module can still be required without astute-workinstructions
+// being on the same path (defensive — fall through if helper not present).
+let _enqueueRetry = null;
+function enqueueRetrySafe(opts) {
+  try {
+    if (!_enqueueRetry) {
+      _enqueueRetry = require(path.resolve(__dirname, '../../../shared/api-queue')).enqueueRetry;
+    }
+    return _enqueueRetry(opts);
+  } catch (e) {
+    // Helper not available — that's fine, just don't enqueue
+    return false;
+  }
+}
 
 // DigiKey API Configuration
 const DIGIKEY_CONFIG = {
@@ -78,6 +95,138 @@ async function getAccessToken() {
   });
 }
 
+// ─── Silent-Throttle Detection (Bucket A combo B+C) ─────────────────────────
+//
+// DigiKey has a failure mode where it silently returns HTTP 200 with empty
+// Products[] when rate-limited or having OAuth issues — instead of returning
+// 429. This is indistinguishable from a legitimate "no products found"
+// response on a single call. Detection requires session-wide context.
+//
+// Strategy:
+//   1. Track total calls + empty results in module-level state
+//   2. When suspicious threshold hit (≥5 calls AND >50% empty), run ONE
+//      sentinel call with a known-good MPN (LM358N) to verify
+//   3. If sentinel returns results → false alarm, mark session healthy,
+//      treat current empty as legit (don't enqueue)
+//   4. If sentinel ALSO returns empty → confirmed throttling, enqueue the
+//      current MPN AND mark session throttled so subsequent empties auto-
+//      enqueue without re-running sentinel
+//   5. Sentinel cooldown (5 min) prevents re-running the verification too
+//      often if the session re-enters unknown state
+//
+// Status lifecycle:
+//   unknown   → verifying → healthy   (sentinel passed, treat empties as legit)
+//                       → throttled  (sentinel failed, all empties auto-enqueue)
+//   healthy   stays healthy until reset
+//   throttled stays throttled until reset
+//
+// To reset (e.g., after fixing the underlying issue or for testing):
+//   require('./digikey').resetThrottleState()
+
+const SENTINEL_MPN = 'LM358N';
+const SENTINEL_QTY = 100;
+const SUSPICIOUS_EMPTY_RATE = 0.5;
+const MIN_CALLS_BEFORE_FLAG = 5;
+const SENTINEL_COOLDOWN_MS = 5 * 60 * 1000; // 5 minutes
+
+let _digikeyState = {
+  calls: 0,
+  empties: 0,
+  status: 'unknown',           // 'unknown' | 'verifying' | 'healthy' | 'throttled'
+  lastSentinelAt: 0,
+  sentinelInProgress: false,
+};
+
+function resetThrottleState() {
+  _digikeyState = {
+    calls: 0,
+    empties: 0,
+    status: 'unknown',
+    lastSentinelAt: 0,
+    sentinelInProgress: false,
+  };
+}
+
+function getThrottleState() {
+  return { ..._digikeyState };
+}
+
+/**
+ * Run a sentinel call against a known-good MPN. Returns true if DigiKey
+ * appears healthy (sentinel returned results), false if not (empty or
+ * error). Bypasses throttle tracking via { _internal: true } flag.
+ */
+async function runSentinel() {
+  try {
+    const result = await _searchPartImpl(SENTINEL_MPN, SENTINEL_QTY, { trackStats: false });
+    return !!(result.found && result.priceBreaks && result.priceBreaks.length > 0);
+  } catch (e) {
+    return false; // sentinel itself failed → assume throttled
+  }
+}
+
+/**
+ * Called after every searchPart result. Tracks stats, runs sentinel when
+ * threshold hit, and enqueues retries for empties when throttling is
+ * confirmed.
+ */
+async function checkForSilentThrottle(mpn, rfqQty, result) {
+  _digikeyState.calls++;
+  if (!result.found) _digikeyState.empties++;
+
+  // Already in known throttled state → enqueue any empty without re-checking
+  if (_digikeyState.status === 'throttled' && !result.found) {
+    enqueueRetrySafe({
+      id: 'digikey-silent-' + mpn + '-' + Date.now(),
+      kind: 'api-retry-digikey',
+      command: `node -e "require('${__dirname}/digikey').searchPart('${mpn.replace(/'/g, "\\'")}', ${rfqQty}).then(r => console.log('OK', r.found)).catch(e => { console.error(e.message); process.exit(1); })"`,
+      blocked_until_hours: 1,
+      reason: `DigiKey silent throttle (sentinel-confirmed) on ${mpn}`,
+    });
+    return;
+  }
+
+  // Already known healthy → trust empties as legit
+  if (_digikeyState.status === 'healthy') return;
+
+  // Status unknown — should we run the sentinel?
+  if (result.found) return; // not a suspicious data point
+  if (_digikeyState.calls < MIN_CALLS_BEFORE_FLAG) return;
+  if (_digikeyState.empties / _digikeyState.calls < SUSPICIOUS_EMPTY_RATE) return;
+
+  // Sentinel cooldown — don't re-run too soon
+  const now = Date.now();
+  if (now - _digikeyState.lastSentinelAt < SENTINEL_COOLDOWN_MS) return;
+
+  // Concurrency guard — if another call is running the sentinel, this one
+  // falls through (will be caught on the next call after sentinel finishes)
+  if (_digikeyState.sentinelInProgress) return;
+
+  _digikeyState.sentinelInProgress = true;
+  _digikeyState.status = 'verifying';
+  _digikeyState.lastSentinelAt = now;
+
+  try {
+    const sentinelOk = await runSentinel();
+    if (sentinelOk) {
+      _digikeyState.status = 'healthy';
+      // Sentinel passed → empties were legit, no enqueue needed
+    } else {
+      _digikeyState.status = 'throttled';
+      // Sentinel failed → enqueue this MPN as the first confirmed-throttled item
+      enqueueRetrySafe({
+        id: 'digikey-silent-' + mpn + '-' + Date.now(),
+        kind: 'api-retry-digikey',
+        command: `node -e "require('${__dirname}/digikey').searchPart('${mpn.replace(/'/g, "\\'")}', ${rfqQty}).then(r => console.log('OK', r.found)).catch(e => { console.error(e.message); process.exit(1); })"`,
+        blocked_until_hours: 1,
+        reason: `DigiKey silent throttle confirmed: ${_digikeyState.empties}/${_digikeyState.calls} empties + sentinel ${SENTINEL_MPN} also empty`,
+      });
+    }
+  } finally {
+    _digikeyState.sentinelInProgress = false;
+  }
+}
+
 /**
  * Search DigiKey for a part number
  * @param {string} mpn - Manufacturer part number
@@ -85,6 +234,19 @@ async function getAccessToken() {
  * @returns {Object} Screening and VQ data
  */
 async function searchPart(mpn, rfqQty = 1) {
+  const result = await _searchPartImpl(mpn, rfqQty, { trackStats: true });
+  // Throttle check runs after the result is in hand. Async but we don't
+  // need to block the caller — fire and continue. (await is ok here too;
+  // sentinel runs at most once per cooldown window so the cost is bounded.)
+  await checkForSilentThrottle(mpn, rfqQty, result);
+  return result;
+}
+
+/**
+ * Internal API call implementation. searchPart wraps this with throttle
+ * tracking; runSentinel calls it directly to avoid recursion / counter pollution.
+ */
+async function _searchPartImpl(mpn, rfqQty = 1, _opts = {}) {
   const token = await getAccessToken();
 
   return new Promise((resolve, reject) => {
@@ -118,6 +280,36 @@ async function searchPart(mpn, rfqQty = 1) {
       let data = '';
       res.on('data', chunk => data += chunk);
       res.on('end', () => {
+        // Bucket A — auto-enqueue on rate limit / transient errors so the
+        // worker retries when DigiKey's quota window resets. Detection is
+        // by HTTP status code, not response body, because DigiKey's
+        // 429 response includes X-RateLimit-* headers and (sometimes) a
+        // valid JSON body that would otherwise parse fine.
+        if (res.statusCode === 429) {
+          // Per DigiKey docs: hourly + daily limits. 1 hour retry covers hourly,
+          // we'll bump to 24h after 5 attempts via the worker's max_attempts.
+          enqueueRetrySafe({
+            id: 'digikey-' + mpn + '-' + Date.now(),
+            kind: 'api-retry-digikey',
+            command: `node -e "require('${__dirname}/digikey').searchPart('${mpn.replace(/'/g, "\\'")}', ${rfqQty}).then(r => console.log('OK', r.found)).catch(e => { console.error(e.message); process.exit(1); })"`,
+            blocked_until_hours: 1,
+            reason: `DigiKey 429 rate limit on ${mpn}`,
+          });
+          reject(new Error(`DigiKey rate limit (429) — enqueued for retry`));
+          return;
+        }
+        if (res.statusCode >= 500 && res.statusCode < 600) {
+          enqueueRetrySafe({
+            id: 'digikey-' + mpn + '-' + Date.now(),
+            kind: 'api-retry-digikey',
+            command: `node -e "require('${__dirname}/digikey').searchPart('${mpn.replace(/'/g, "\\'")}', ${rfqQty}).then(r => console.log('OK', r.found)).catch(e => { console.error(e.message); process.exit(1); })"`,
+            blocked_until_hours: 1,
+            reason: `DigiKey ${res.statusCode} server error on ${mpn}`,
+          });
+          reject(new Error(`DigiKey server error (${res.statusCode}) — enqueued for retry`));
+          return;
+        }
+
         try {
           const json = JSON.parse(data);
 
@@ -362,6 +554,9 @@ module.exports = {
   searchPart,
   searchParts,
   normalizeMpn,
+  // Silent-throttle detection (Bucket A combo B+C)
+  resetThrottleState,
+  getThrottleState,
 };
 
 // CLI usage
