@@ -158,6 +158,42 @@ VQ-side fields involved:
 - `chuboe_vq_line.chuboe_lead_time` — string field, e.g. "12 weeks", "Stock", "8-10 wks ARO"
 - `chuboe_vq_line.cost` — quoted unit price
 
+### Tomorrow's action plan to eliminate dup amplification moving forward
+
+**Cleanup status as of EOD 2026-04-08:** RFQ 1132021 already cleaned up via `scripts/dedup-vqs-1132021.js` — 502 dup VQ rows deactivated (commit `93e125f`). Pre-existing upstream dups in `chuboe_rfq_line_mpn` are still there (~938 rows over 30d, PPV-concentrated). Cron is **disabled** so no further amplification is happening.
+
+**The five things to do tomorrow to eliminate this moving forward:**
+
+1. **Find the upstream loader writing duplicate `chuboe_rfq_line_mpn` rows.** Likely candidates:
+   - `shared/rfq-writer.js` (REST API path) — check the `chuboe_rfq_line_mpn` insert logic. Does it iterate a deduped list or pass through whatever the caller hands it?
+   - The PPV / Sanmina file ingestion path — find which workflow actually loads PPV RFQs (probably under `Trading Analysis/RFQ Loading/`). Is it parsing customer Excel files where the same MPN appears on multiple rows and inserting all of them?
+   - The iDempiere UI mass-upload path (CSV uploaded through the OT UI) — outside our code, but worth knowing if that's the root.
+   - Verify which path is responsible for the actual rows on RFQ 1132021 specifically — query `chuboe_rfq_line_mpn.created` + `createdby` for clues on which user/process created them.
+
+2. **Add pre-insert dedup at the loader.** Wherever the dup-creating insert lives, dedup the input list on `(chuboe_rfq_line_id, chuboe_mpn_clean)` before writing. Optionally add a UNIQUE constraint to `chuboe_rfq_line_mpn` to make this enforceable at the DB layer (but constraint changes need iDempiere admin coordination, so the application-layer dedup is the practical fix).
+
+3. **Backfill cleanup of pre-existing `chuboe_rfq_line_mpn` dups.** Same pattern as today's VQ cleanup: identify dup rows by `(chuboe_rfq_line_id, chuboe_mpn_clean)`, keep `MIN(chuboe_rfq_line_mpn_id)` per group, mark the rest `IsActive='N'` via `record-updater.js patchBatch`. Sweep all 30+ days of dup rows. Confirm afterward by re-running the audit query.
+
+4. **Add defensive dedup to `enrich-rfq.js`.** Belt-and-suspenders — even after the upstream is fixed, the enricher should never write the same `(line_id, mpn, vendor, cost)` twice in a single run. ~5 line change in `enrichRFQ()`:
+   ```javascript
+   const seen = new Set();
+   const dedupedLines = lines.filter(l => {
+     const key = `${l.chuboe_rfq_line_id}|${l.chuboe_mpn_clean}`;
+     if (seen.has(key)) return false;
+     seen.add(key);
+     return true;
+   });
+   ```
+   This is independent of the upstream fix and protects against any future dup source.
+
+5. **Audit other consumers reading `chuboe_rfq_line_mpn`.** Vortex Matches, Market Offer Matching, BOM Monitoring, Quick Quote, and any other workflow that joins through this sub-table is probably double-counting silently. Once the source is deduped, those consumers will look correct without code changes — but confirm there are no consumers that depend on the dup-as-feature semantic before deleting rows.
+
+**Verify-after-fix checklist:**
+- [ ] `SELECT COUNT(*) FROM chuboe_rfq_line_mpn WHERE rfq_id = 1141436 GROUP BY (line_id, mpn) HAVING count(*) > 1` returns 0 rows
+- [ ] Re-run `enrich-rfq.js --rfq <fresh-test-rfq>` and confirm no `(line_id, mpn, vendor, cost)` duplicates land in `chuboe_vq_line`
+- [ ] Re-run Vortex on 1132021 — output should be materially smaller and clearer
+- [ ] Re-enable the `*/15` cron in crontab.md and `crontab -e`
+
 ### Plan of action for tomorrow's session
 
 1. **First** — pick the per-line vs per-(RFQ, MPN, vendor) call. Quick discussion, then commit to one.

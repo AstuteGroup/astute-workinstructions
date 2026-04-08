@@ -154,6 +154,35 @@ node arrow.js LM317T 100
 | Datasheet URL | Auto-attach to quotes |
 | RoHS/compliance | Compliance filtering |
 
+#### Known Issues — needs investigation 2026-04-09
+
+**Status:** Open | **Priority:** Now (blocks clean Vortex output, affects every Arrow-quoted line)
+
+Jake flagged 2026-04-08 that **Arrow's API responses are a mess** in the data we surface — unclear whether the issue is in our parser (`Trading Analysis/RFQ Sourcing/franchise_check/arrow.js`) or in what Arrow is actually returning from the upstream API.
+
+**Reproducer:** MPN `IMZ120R030M1H` (Infineon SiC MOSFET). Pull this through `node arrow.js IMZ120R030M1H` and then through `searchAllDistributors()` for comparison. Inspect:
+
+1. **Raw API response** — log the full JSON from `https://api.arrow.com/itemservice/v4/...?search_token=IMZ120R030M1H` before any parsing. How many "items" does Arrow return? Are they distinct MPNs (e.g., packaging variants, different MOQs) or duplicates of the same SKU?
+2. **Source filtering behavior** — `arrow.js` filters to arrow.com sources only (excludes Verical marketplace). Verify the filter is working AND not over-filtering. Could the mess be that our filter is dropping legit franchise rows or failing to dedupe across the 3 regional Arrow source codes (AMERICAS / EUROPE / APAC)?
+3. **Per-region aggregation** — same SKU often appears 3x (one per region). Are we summing correctly into `franchiseQty`? Picking the right region for `franchiseRfqPrice` (US-aware?)? Or are we surfacing 3 rows per Arrow result when we should be surfacing 1?
+4. **Price break parsing** — Arrow returns price ladders. Are we picking the right break for `franchiseRfqPrice` (highest break ≤ qty)? Do they come back sorted? Are quantities and prices being mapped to the right fields (qty into qty, price into price — not swapped)?
+5. **vqMpn cross-ref** — does Arrow return a normalized form of the MPN that fails our cross-ref check (e.g., `IMZ120R030M1H` vs `IMZ120R030M1HXKSA1`) and silently drops the result?
+6. **Compare to a "clean" distributor** — pull the same MPN through DigiKey or Mouser and diff the parsed output structure. Where does Arrow's deviate?
+
+**What "a mess" likely looks like in symptom form** (Jake to confirm tomorrow with the actual Vortex output):
+- Multiple rows for one part where there should be one
+- Wrong qty / wrong price / wrong currency
+- Garbled vendor notes
+- Missing date code that DigiKey/Mouser populated
+- Inconsistent unit (each vs reel) without normalization
+
+**Files to look at:**
+- `Trading Analysis/RFQ Sourcing/franchise_check/arrow.js` — the parser
+- `shared/franchise-api.js` — the per-distributor wrapper that normalizes results
+- The `searchAllDistributors()` aggregation step for how multi-region results get collapsed
+
+**Don't forget to check** whether the 5 dup VQs from yesterday's enrichment for IMZ120R030M1H are split across multiple Arrow rows — that would point to per-region aggregation issues compounding the upstream RFQ-load dup pattern.
+
 ### Rutronik API (Active)
 
 **API:** Rutronik24 REST API | **Auth:** Query parameter (apikey)
