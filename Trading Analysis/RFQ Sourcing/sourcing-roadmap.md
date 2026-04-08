@@ -421,6 +421,7 @@ const AUTO_SUFFIXES = /[-#]?(Q|Q1|AEC)$/i;
 | C13 | Mismatched-MPN Capture for Analytics Visibility | Later | Planned |
 | C14 | HTS / ECCN Auto-Population at VQ Write Time | **Now** | ✅ Done |
 | C15 | MPN → MFR Inference + Resolver Facade | **Now** | ✅ Done (cog shipped, writer migration deferred) |
+| C16 | Payload Builder Cog (typed-reference null handling) | **Now** | Planned (bundle with Stock RFQ Loading direct-write migration) |
 
 ---
 
@@ -1029,6 +1030,113 @@ shared/mpn-classifier.js      ← no-franchise-hit bucketing (existing, unrelate
 5. **Acquisition map maintenance.** As new acquisitions complete (semi industry consolidation continues), add entries to `mfr-acquisitions.json`. Operator alert when an MPN classifies to a freshly-acquired brand could trigger a manual review.
 
 **Cross-cutting note:** This sits ABOVE `mfr-lookup.js` in the layering — `mfr-resolver.js` imports both `mfr-lookup.js` and `mpn-mfr-classifier.js`. It does NOT depend on C11 (resolver layer for write-time field assembly) or C12 (universal writer). Once C11/C12 land, the writers' field-resolution step would call `resolveMfrForRow` instead of `lookupMfr` and gain MPN inference automatically.
+
+---
+
+## C16. Payload Builder Cog (typed-reference null handling)
+
+**Status:** Planned | **Priority:** Now (bundle with Stock RFQ Loading direct-write migration)
+**Discovered:** 2026-04-08 during RFQ API Enrichment first prod run
+
+### Problem (the bug story that exposed the gap)
+
+Two related bugs in `vq-writer.js` blocked **every** API→VQ write attempt on RFQ 1132021:
+
+1. **`TIER1_MANDATORY` was stricter than the DB.** `Chuboe_Buyer_ID` and `Chuboe_Packaging_ID` were marked mandatory, but a 30-day audit of `chuboe_vq_line` showed 86% of prod VQs have NULL packaging and 4.6% have NULL buyer (581 with both NULL wrote successfully). The hand-maintained list had drifted from reality.
+
+2. **POSTing `null` to a typed reference column returns 500.** When the writer included `Chuboe_Buyer_ID: null` in the payload, iDempiere REST tried to convert null → AD_User and returned `"Could not convert value null for AD_User"`. The fix: **omit the field** when null, don't send it explicitly. Same issue would have hit any writer POSTing a null `AD_*` / `Chuboe_*_ID` / `M_*` / `C_*` reference column.
+
+`vq-writer.js` already had the right pattern for `Chuboe_MFR_ID` (`...(resolvedMfrId ? { Chuboe_MFR_ID: resolvedMfrId } : {})`) — but it was hand-rolled per field, and the same pattern is duplicated across `rfq-writer.js`, `cq-writer.js`, and `offer-writeback.js` (per the cross-references in trading-analysis-roadmap.md G1 / G2). The validation policy and the column-type knowledge sit in four different files and drift independently.
+
+### Design
+
+A new `shared/payload-builder.js` cog that knows iDempiere REST's typed-reference quirks and centralizes payload construction.
+
+```javascript
+const { buildPayload } = require('../shared/payload-builder');
+
+const payload = buildPayload({
+  table: 'Chuboe_VQ_Line',
+  required: {
+    Chuboe_RFQ_ID: rfq.id,
+    Chuboe_RFQ_Line_ID: rfqLineId,
+    C_BPartner_ID: bp.id,
+    Chuboe_MPN: mpn,
+    Chuboe_MFR_Text: mfrCanonical,
+    Cost: price,
+    Qty: qty,
+  },
+  reference: {
+    // Typed reference columns — omitted from payload when null/undefined.
+    // The server's bean callout / DB default fills them.
+    Chuboe_MFR_ID: resolvedMfrId,
+    Chuboe_Buyer_ID: opts.buyerId,
+    Chuboe_Packaging_ID: packagingId,
+  },
+  optional: {
+    // Plain columns where null is acceptable in the payload (varchar, numeric, etc.).
+    Chuboe_Lead_Time: leadTime,
+    Chuboe_MOQ: moq,
+    Chuboe_SPQ: spq,
+    Chuboe_Note_Public: vendorNotes,
+  },
+});
+
+// Throws if any `required` field is null/undefined/'' — single validation site.
+// `reference` fields with null/undefined are silently omitted.
+// `optional` fields are passed through as-is (null OK).
+```
+
+### What the cog enforces
+
+- **Required → mandatory.** Throws `MissingRequiredFieldsError(table, missing[])` if any required field is null/undefined/empty string. The error type lets writers convert it to their existing flag pattern (e.g., `flagged.push({reason: 'MISSING_MANDATORY', detail: ...})`) without losing semantics.
+- **Reference → omit-when-null.** This is the typed-conversion fix from today, applied uniformly. No more 500s from null AD_User / null AD_Reference / null M_Product etc.
+- **Optional → passthrough.** Plain text/numeric columns where null is the right wire value.
+- **Returns a plain object** ready for `apiPost(table, payload)`. No magic, no hidden state.
+
+### What it does NOT do (intentionally)
+
+- Doesn't talk to the API. Writers still call `apiPost`.
+- Doesn't resolve fields (MFR, BP, packaging). That's `mfr-resolver`, `partner-lookup`, `packaging-lookup` — they run BEFORE `buildPayload`, and their output feeds in.
+- Doesn't know the iDempiere `ad_column` schema directly. The required/reference/optional split is made by the caller, not auto-detected. Writers stay in control of their domain rules; the cog just enforces the wire-format invariants.
+
+### Migration checklist
+
+| Writer | Status | When |
+|---|---|---|
+| `shared/vq-writer.js` `writeVQFromAPI()` | Has the bug fixes (C16-precursor) but still hand-rolls the spread | Migrate as part of Stock RFQ Loading direct-write conversion (see below). The `writeVQBatch()` two-pass path needs the same migration. |
+| `shared/rfq-writer.js` | Has correct conditional pattern for `Chuboe_MFR_ID`. Other reference cols may share the bug — needs audit. | Migrate when next touched. Lower urgency: this writer has been exercised in prod (RFQ 1132040 load) so any latent typed-ref nulls would have surfaced. |
+| `shared/cq-writer.js` | Same pattern as vq-writer | Migrate when next touched. |
+| `shared/offer-writeback.js` | Has its own conditional spread pattern + a CPC bean-callout trap (CLAUDE.md § iDempiere bean-callout traps). | Migrate alongside the offer CPC anchor pattern work — both touch payload construction. |
+
+**Per-writer effort:** ~30-60 min. Mechanical: identify required vs reference vs optional fields, replace the manual payload object literal with a `buildPayload({...})` call, run the writer's existing smoke test. The functional change is zero — same bytes go on the wire — but the code converges and future bugs of the same shape become impossible.
+
+### Hook for Stock RFQ Loading direct-write migration (Finding A from the C16-discovery session)
+
+Stock RFQ Loading currently writes VQs via **`writeVQCapture()`** in `shared/franchise-api.js` — that function dumps a CSV file for manual upload through the iDempiere UI. It pre-dates the REST writeback path and bypasses `vq-writer.js` entirely. Migrating Stock RFQ Loading to write VQs directly via REST (the natural successor now that `writeVQFromAPI()` works) will:
+
+1. Wire the new path through `vq-writer.js writeVQFromAPI()` (or `writeVQBatch()` for two-pass scenarios).
+2. Force the migration of `writeVQFromAPI()` to `payload-builder.js` because the same code path will be hit by both Stock RFQ Loading AND RFQ API Enrichment, and it's better to migrate once than twice.
+3. Retire `franchise-api.js writeVQCapture()` after no consumer references it. (Search before removal — there might be other CSV-outputting workflows using it.)
+
+So the order of operations when starting on Stock RFQ Loading is:
+1. Build `shared/payload-builder.js` (this section).
+2. Migrate `vq-writer.js` `writeVQFromAPI()` to use it. Re-test via `enrich-rfq.js --rfq <test-rfq>` (the only current consumer — fast feedback loop).
+3. Update Stock RFQ Loading `suggested-resale.js` to call `writeVQFromAPI()` instead of `writeVQCapture()`. Keep the CSV output as an opt-in for the few cases where the user wants a file (or retire it entirely).
+4. Search workspace for other `writeVQCapture` callers, retire if none. Confirm at https://github.com/AstuteGroup/astute-workinstructions search before deletion.
+5. Migrate `rfq-writer.js`, `cq-writer.js`, `offer-writeback.js` opportunistically the next time each is touched.
+
+### Why this cog and not just "fix the bug in each writer"
+
+The 2026-04-08 bug existed for an unknown amount of time and was only caught because RFQ API Enrichment was the **first consumer** to actually exercise `writeVQFromAPI()` end-to-end. Three other writers (`rfq-writer`, `cq-writer`, `offer-writeback`) implement the conditional-spread pattern by hand, each at slightly different fields, each with its own list of "what's mandatory." The next typed-reference column that gets added to any of those tables — or the next field that drops out of mandatory in iDempiere config — will reproduce the bug in whichever writer hasn't been exercised recently. Centralizing the wire-format invariants in one cog means the next bug surfaces once, gets fixed once, and protects all four writers.
+
+### Definition of done
+
+- [ ] `shared/payload-builder.js` exists with `buildPayload({table, required, reference, optional})`, `MissingRequiredFieldsError` class, README block in `shared/README.md`.
+- [ ] Smoke test: build a payload with all three buckets including null reference fields, assert nulls are omitted and required throws on missing.
+- [ ] `vq-writer.js writeVQFromAPI()` migrated. End-to-end re-test via `enrich-rfq.js --rfq <small-test-rfq> --max-lines 10`. VQs land, no flag/fail churn.
+- [ ] Migration checklist (other 3 writers) tracked in this section. Not blocking for Stock RFQ Loading work — those migrate opportunistically.
+- [ ] CLAUDE.md § iDempiere bean-callout traps adds a bullet: "Use `payload-builder.js` for any chuboe_* / AD_* / M_* / C_* reference column. Do NOT POST `null` to typed references."
 
 ---
 
