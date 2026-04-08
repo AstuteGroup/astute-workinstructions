@@ -413,7 +413,7 @@ const AUTO_SUFFIXES = /[-#]?(Q|Q1|AEC)$/i;
 | C5 | Attachment Handling | Later | Planned |
 | C6 | Retry Tracking | Later | Planned |
 | C7 | LLM Fallback | Later | Planned |
-| C8 | MFR Text Validation | **Next** | Planned |
+| C8 | MFR Text Validation | **Now** | ✅ Done |
 | C9 | Distributor `vqPackaging` Extraction | **Next** | Planned |
 | C10 | VQ Loader Date Code & Packaging Auto-Capture | **Now** | ✅ Done |
 | C11 | Shared Field Resolver Layer (refactor 4 writers) | **Next** | Planned |
@@ -545,16 +545,21 @@ const AUTO_SUFFIXES = /[-#]?(Q|Q1|AEC)$/i;
 
 ## C8. MFR Text Validation
 
-**Status:** Planned | **Priority:** Next
+**Status:** ✅ Done (2026-04-08) | **Priority:** Now
 
-**Problem:** VQ Loading extracts `MFR Text` as freetext with no validation. Unlike Market Offer Upload (which validates `MFR_ID` against `mfr-aliases.json`), VQ uploads may fail or require manual cleanup when MFR Text doesn't map to a known manufacturer.
+**Resolution:** This was already addressed at a higher level than the original roadmap entry assumed.
 
-**Solution:**
-- Prescreen MFR Text against manufacturer codes in iDempiere during extraction
-- Reuse `mfr-aliases.json` from Market Offer workflow (already has common aliases like TI → Texas Instruments)
-- Flag unrecognized manufacturers before upload, report in session summary
+The canonical resolver (`shared/mfr-lookup.js`) was built with a 5-tier strategy (alias → cache → DB strict → DB fuzzy inference → passthrough) and 165+ curated aliases in `mfr-aliases.json`. All four steady-state writers — `rfq-writer.js`, `vq-writer.js`, `offer-writeback.js`, `cq-writer.js` — call it via `lookupMfr()` and surface confidence flags (`MFR_NO_MATCH`, `MFR_LOW_CONFIDENCE`, `MFR_SYSTEM_ONLY`) for review. The "100% match rate" target documented in `feedback_mfr_resolution_mandatory.md` is achievable through the canonical cog.
 
-**Reference:** See `Trading Analysis/Market Offer Loading/market-offer-loading.md` "Manufacturer Matching (CRITICAL)" section for existing implementation pattern.
+The only remaining gap was the **email-driven CSV emergency path** (`vq-parser` repo): `vq-parser/src/mapper/mfr-lookup.js` had its own ~30-entry hardcoded alias map and its own DB query, separate from the canonical 165-entry shared module. CSVs uploaded through the iDempiere UI bypass `vq-writer.js` validation, so the parser-stage normalization was the only MFR check that path got — and it was using the wrong (smaller, drift-prone) alias list.
+
+**What shipped 2026-04-08:** `vq-parser/src/mapper/mfr-lookup.js` is now a thin shim that imports `normalizeMfr` from the shared resolver. The 120 lines of inline alias map + DB query are gone. `field-mapper.js` is unchanged — it still calls `normalizeMfr(text)` with the same signature, and now gets the full 5-tier resolution and 165-alias list automatically.
+
+**Open follow-ups (not blocking C8 closure):**
+
+1. **Acquisition policy.** The OLD vq-parser hardcoded a "map to parent company" policy (LINEAR → ADI, XILINX → AMD, MAXIM → ADI, ALTERA → Intel, IR → Infineon). The shared `mfr-aliases.json` has an inconsistent policy — most stay as the original brand (XILINX → "Xilinx Inc"), but AVAGO → Broadcom is the one acquisition mapping. The redirect inherits the shared policy by default, which means brands like LINEAR TECH no longer get consolidated under ADI. iDempiere has both records for each acquisition pair (`Linear Technology Corp` 1000037 AND `Analog Devices Inc` 1000006), so either policy is mechanically possible. Needs a strategic call: brand-level traceability vs parent consolidation. Track in a separate workstream — does not block C8.
+2. **Fuzzy matcher tiebreaker bug.** `LINEAR TECH` resolves to `Lineartech` (id 1003539, a different company entirely) instead of `Linear Technology Corp` (id 1000037), because the fuzzy matcher's tiebreaker is `LENGTH(name) ASC` and the shorter name wins even when the longer name has better word-boundary matching. Workaround: add an explicit `"LINEAR TECH": "..."` alias (whichever target the acquisition policy decides). Long-term fix: improve tiebreaker to prefer word-boundary matches over compound-word matches in `shared/mfr-lookup.js` `queryDBFuzzy()`.
+3. **Orphaned cache file.** `vq-parser/data/mfr-cache.json` (848 bytes, last touched 2026-03-04) is now unused by the shim — the shared resolver manages its own cache at `astute-workinstructions/shared/data/mfr-cache.json`. Left in place to avoid masking any unexpected reader; safe to delete on a future cleanup pass.
 
 ---
 
@@ -1052,6 +1057,7 @@ Expected per-distributor coverage on a new load:
 - [x] Vendor ID correction (search_key vs c_bpartner_id)
 - [x] **VQ Loader Date Code & Packaging Auto-Capture (C10)** — `vq-writer.js` now reads `vqPackaging` strings, normalizes via `PACKAGING_MAP`, and auto-defaults date code to "within 2 years" for franchise/mfr-direct vendors when API doesn't return one
 - [x] **HTS / ECCN Auto-Population at VQ Write Time (C14)** — `vq-writer.js` payload assembly already wired; propagation completed across DigiKey, Mouser, Master, Future, Newark distributor modules; ECCN validation via `shared/validators.js`; backfill workflow now a secondary cleanup tool only
+- [x] **MFR Text Validation (C8)** — canonical resolver in `shared/mfr-lookup.js` was already in use by all 4 steady-state writers (rfq, vq, offer, cq); only remaining gap was the email-driven CSV emergency path (`vq-parser/src/mapper/mfr-lookup.js`), now redirected to the shared cog via a thin shim. 165-alias list + 5-tier resolution now applies to both REST writes and CSV emergency uploads. Acquisition policy + LINEAR TECH alias gap surfaced as separate follow-ups.
 
 ## Section D: Integration
 *(No completed items yet)*
