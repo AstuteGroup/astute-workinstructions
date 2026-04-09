@@ -205,6 +205,9 @@ async function fetchMarketOffers(cleanMpns) {
         mol.market_offer_created AS created_date,
         'MO' AS record_type
       FROM adempiere.bi_market_offer_line_v mol
+      INNER JOIN adempiere.chuboe_offer_line ol
+        ON ol.chuboe_offer_line_id = mol.market_offer_line_id
+        AND ol.isactive = 'Y'
       WHERE mol.market_offer_line_mpn_clean = ANY($1)
         AND mol.market_offer_active = 'Y'
         AND (
@@ -229,6 +232,17 @@ async function fetchMarketOffers(cleanMpns) {
 
 /**
  * Fetch vendor quotes matching the cleaned MPNs (90-day window)
+ *
+ * IMPORTANT (2026-04-09): bi_vendor_quote_line_v does NOT filter by
+ * isactive — it exposes deactivated rows. Without an inner join to
+ * chuboe_vq_line on isactive='Y', any cleanup/correction work that
+ * deactivates a VQ (e.g. dedup-vqs-1132021.js for the dup amplification
+ * cleanup, or correct-arrow-vqs-1132021.js for the legacy Arrow parser
+ * correction) leaks the stale rows back into Vortex output. Verified on
+ * RFQ 1132021: 4 deactivated 'Arrow Electronics qty=19759 $2.069' rows
+ * from the broken parser were still appearing in Vortex output despite
+ * being IsActive=N in chuboe_vq_line. The inner join below eliminates
+ * those stale rows.
  */
 async function fetchVendorQuotes(cleanMpns) {
   if (cleanMpns.length === 0) return [];
@@ -247,6 +261,9 @@ async function fetchVendorQuotes(cleanMpns) {
       vql.vendor_quote_created AS created_date,
       'VQ' AS record_type
     FROM adempiere.bi_vendor_quote_line_v vql
+    INNER JOIN adempiere.chuboe_vq_line vq
+      ON vq.chuboe_vq_line_id = vql.vendor_quote_id
+      AND vq.isactive = 'Y'
     WHERE vql.vendor_quote_mpn_clean = ANY($1)
       AND vql.vendor_quote_created >= CURRENT_DATE - INTERVAL '90 days'
     ORDER BY vql.vendor_quote_created DESC
