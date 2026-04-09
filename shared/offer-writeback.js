@@ -301,39 +301,61 @@ async function writeOffers(offers) {
 // ─── DEACTIVATION (for inventory refresh) ────────────────────────────────────
 
 /**
- * Deactivate all existing offer lines for a given partner + offer type.
- * Used before writing a fresh inventory snapshot so stale lines don't persist.
+ * Deactivate prior offers for a given partner + offer type. Used before
+ * writing a fresh inventory snapshot so the previous run's records don't
+ * coexist with the new ones.
  *
- * Uses the REST API to query and deactivate records via GET + PUT.
+ * SCOPING — read this before using:
+ *   By default this deactivates EVERY active offer matching (BP, OfferType).
+ *   That is almost never what you want when multiple loaders share a BP+type
+ *   pair (e.g. Inventory File Cleanup writes both Free_Stock_Austin and
+ *   LAM_Dead_Inventory under BP 1000332 + OfferType 1000008, distinguished
+ *   only by description). To scope the deactivate to a specific
+ *   description pattern, pass `descriptionEndsWith` — only offers whose
+ *   Description ends with the given string will be deactivated. The
+ *   sentinel pattern this loader uses is `'— GroupName'`.
  *
  * @param {number} bpartnerId - c_bpartner_id
  * @param {number} offerTypeId - chuboe_offer_type_id
- * @returns {Promise<object>} { offersDeactivated, linesDeactivated }
+ * @param {object} [opts]
+ * @param {string} [opts.descriptionEndsWith] - if provided, only deactivate
+ *   offers whose Description ends with this string. Recommended for any
+ *   loader that shares (BP, OfferType) with another loader.
+ * @returns {Promise<object>} { offersDeactivated, linesDeactivated, deactivatedOffers: [{id, value, description}] }
  */
-async function deactivatePriorOffers(bpartnerId, offerTypeId) {
+async function deactivatePriorOffers(bpartnerId, offerTypeId, opts = {}) {
+  const { descriptionEndsWith = null } = opts;
   // Query active offers for this BP + type via API
   let offers;
   try {
+    let filter = `C_BPartner_ID eq ${bpartnerId} and chuboe_offer_type_id eq ${offerTypeId} and IsActive eq true`;
+    if (descriptionEndsWith) {
+      const escaped = descriptionEndsWith.replace(/'/g, "''");
+      filter += ` and endswith(Description,'${escaped}')`;
+    }
     const result = await apiGet('chuboe_offer', {
-      filter: `C_BPartner_ID eq ${bpartnerId} and chuboe_offer_type_id eq ${offerTypeId} and IsActive eq true`,
-      select: 'chuboe_offer_id',
+      filter,
+      select: 'Value,Description',
     });
     offers = result.records || [];
   } catch (e) {
     logger.error(`Failed to query prior offers for BP=${bpartnerId}, type=${offerTypeId}: ${e.message}`);
-    return { offersDeactivated: 0, linesDeactivated: 0 };
+    return { offersDeactivated: 0, linesDeactivated: 0, deactivatedOffers: [] };
   }
 
   if (offers.length === 0) {
-    logger.info(`No prior offers to deactivate for BP=${bpartnerId}, type=${offerTypeId}`);
-    return { offersDeactivated: 0, linesDeactivated: 0 };
+    logger.info(`No prior offers to deactivate for BP=${bpartnerId}, type=${offerTypeId}${descriptionEndsWith ? ` (description endswith '${descriptionEndsWith}')` : ''}`);
+    return { offersDeactivated: 0, linesDeactivated: 0, deactivatedOffers: [] };
   }
 
   let linesDeactivated = 0;
+  const deactivatedOffers = [];
 
   // Deactivate lines for each offer, then deactivate the offer header
   for (const offer of offers) {
-    const offerId = offer.chuboe_offer_id || offer.id;
+    const offerId = offer.id;
+    const offerValue = offer.Value || offer.value || null;
+    const offerDesc = offer.Description || offer.description || null;
 
     // Get active lines for this offer
     try {
@@ -359,13 +381,14 @@ async function deactivatePriorOffers(bpartnerId, offerTypeId) {
     // Deactivate the offer header
     try {
       await apiPut('chuboe_offer', offerId, { IsActive: false });
+      deactivatedOffers.push({ id: offerId, value: offerValue, description: offerDesc });
     } catch (e) {
       logger.warn(`Failed to deactivate offer ${offerId}: ${e.message}`);
     }
   }
 
-  logger.info(`Deactivated ${offers.length} offers, ${linesDeactivated} lines for BP=${bpartnerId}, type=${offerTypeId}`);
-  return { offersDeactivated: offers.length, linesDeactivated };
+  logger.info(`Deactivated ${deactivatedOffers.length} offers, ${linesDeactivated} lines for BP=${bpartnerId}, type=${offerTypeId}${descriptionEndsWith ? ` (description endswith '${descriptionEndsWith}')` : ''}`);
+  return { offersDeactivated: deactivatedOffers.length, linesDeactivated, deactivatedOffers };
 }
 
 // ─── UTILITY: MFR ID LOOKUP ─────────────────────────────────────────────────

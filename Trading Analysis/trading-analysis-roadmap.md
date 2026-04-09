@@ -244,6 +244,7 @@ VQ-side fields involved:
 | B1 | Warehouse Rotation Schedule | Later | Planned |
 | B2 | Market Price Comparison | Later | Planned |
 | B3 | Resale Price Recommendations | Later | Planned |
+| B4 | Include unreceived (open-PO) inventory in weekly market offers | **Next** | Planned |
 
 ---
 
@@ -280,6 +281,38 @@ VQ-side fields involved:
 - Warehouse inventory file (from Inventory File Cleanup)
 - VQ history (last 90 days)
 - Market offers
+
+---
+
+## B4. Include unreceived (open-PO) inventory in weekly market offers
+
+**Status:** Planned | **Priority:** Next
+
+**Problem:** The weekly Inventory File Cleanup workflow only loads physically received inventory (Infor's AST Item Lots Report). Some warehouses — notably **Eaton Consignment** and **Free Stock - Philippines** — are partially maintained on **open orders** that haven't been received into the system yet. Today's workflow ignores those parts entirely, which means we're sitting on marketable stock that nobody can see in OT, Vortex Matches, or any downstream tooling.
+
+**Evidence (2026-04-09 dry-run):** Eaton Consignment shrank from 293 lines (10/21 snapshot) → 46 lines this week — an 84% drop. Free_Stock_Philippines went from 196 lines (12/17 snapshot) → 0 this week. In both cases the physical reality is that material is in transit or sitting in receiving but not yet on the lot ledger. We should still be marketing it.
+
+**Solution:**
+- Pull open-PO data from Infor for the relevant warehouses (W117 Eaton, W109/W114 Philippines, possibly others)
+- Map each open-PO line to the same Chuboe shape used by `inventory_cleanup.js` (MPN, qty, mfr, package, etc.)
+- Tag rows with a clear status flag — e.g., `Chuboe_Lead_Time = "On order — ETA YYYY-MM-DD"` or a `Description` prefix like `[ON ORDER]` — so sellers can tell at a glance that it's not ready to ship today
+- Merge open-PO rows into the same per-warehouse `chuboe_offer` written by the weekly run, OR write them as a sibling offer (`Chuboe_Offer_Type = same physical warehouse`, description suffixed with `— On Order`)
+- Decide write-back path:
+  - **Option A:** single offer per warehouse, mixed received + on-order lines (simpler, harder to filter by status downstream)
+  - **Option B:** two offers per warehouse — `... — Received` and `... — On Order` (cleaner separation, more deactivate complexity)
+
+**Open questions:**
+- What's the Infor source for open-PO inventory? (PO line table? Need a query / report)
+- Are open POs reliable enough to surface to brokers? (Cancellation risk, ETA churn)
+- Pricing: do we surface PO cost, last-known cost, or blank?
+- Should this also apply to Free_Stock_Austin / Stevenage / HK, or only to the warehouses where open-PO is a meaningful share of total inventory?
+
+**Inputs:**
+- Open-PO export from Infor (TBD format)
+- Existing Inventory File Cleanup output for received side
+- `WAREHOUSE_WRITEBACK` mapping for offer routing
+
+**Dependencies:** Inventory File Cleanup live write-back (shipped 2026-04-09).
 
 ---
 

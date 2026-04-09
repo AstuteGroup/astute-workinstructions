@@ -337,10 +337,47 @@ function arrayToCSV(rows, headers) {
  */
 async function writeInventoryToOT(groupedRows, dateStr, dryRun = false) {
     const { writeOffer, deactivatePriorOffers } = require('../../shared/offer-writeback');
+    const { apiGet } = require('../../shared/api-client');
 
     console.log('\n' + '='.repeat(60));
     console.log(dryRun ? 'OT WRITE-BACK (DRY RUN)' : 'OT WRITE-BACK');
     console.log('='.repeat(60));
+
+    // Helper: query active chuboe_offer rows for a (BP, OfferType) pair,
+    // optionally scoped to a description suffix. Used to capture priorOffers
+    // BEFORE the deactivate call so the email summary can show OLD → NEW.
+    //
+    // IMPORTANT: iDempiere REST returns the chuboe_offer PK as `id` (not
+    // `chuboe_offer_id`). The `Value` field is the search key — a separate
+    // numeric-looking string that is NOT the PK. Always compare on `id`.
+    //
+    // The descriptionEndsWith argument is REQUIRED for inventory loaders
+    // because multiple warehouse groups share (BP, OfferType) pairs and
+    // are distinguished only by description suffix (e.g. "— Free_Stock_Austin"
+    // vs "— LAM_Dead_Inventory" both under BP 1000332 + type 1000008).
+    async function queryActiveOffers(bpartnerId, offerTypeId, descriptionEndsWith = null) {
+        try {
+            let filter = `C_BPartner_ID eq ${bpartnerId} and chuboe_offer_type_id eq ${offerTypeId} and IsActive eq true`;
+            if (descriptionEndsWith) {
+                const escaped = descriptionEndsWith.replace(/'/g, "''");
+                filter += ` and endswith(Description,'${escaped}')`;
+            }
+            const result = await apiGet('chuboe_offer', {
+                filter,
+                select: 'Value,Created,Description',
+                orderby: 'Created desc',
+            });
+            return (result.records || []).map(r => ({
+                id: r.id,                                  // PK
+                value: r.Value || r.value || null,         // search key (display)
+                created: r.Created || r.created || null,
+                description: r.Description || r.description || null,
+            }));
+        } catch (e) {
+            console.warn(`  ! Failed to query active offers for BP=${bpartnerId}, type=${offerTypeId}: ${e.message}`);
+            return [];
+        }
+    }
 
     const results = [];
 
@@ -378,12 +415,30 @@ async function writeInventoryToOT(groupedRows, dateStr, dryRun = false) {
             };
         }).filter(l => l.mpn);
 
+        // Pre-query priorOffers in BOTH dry-run and live mode so the email
+        // summary can show "OLD → NEW" mapping. In dry-run these are the
+        // offers that *would* be deactivated; in live mode they're the
+        // offers that will be deactivated by deactivatePriorOffers().
+        //
+        // SCOPE: each weekly inventory offer is written with description
+        // `Weekly inventory YYYY-MM-DD — GroupName`, so we filter the
+        // pre-query (and the deactivate below) by `endswith(Description,
+        // '— GroupName')`. This ensures Free_Stock_Austin and
+        // LAM_Dead_Inventory don't fight over the (1000332, 1000008) pair —
+        // each only sees and replaces its own prior weekly run, and any
+        // historical one-off loads with different description shapes are
+        // left alone.
+        const descriptionSuffix = `— ${groupName}`;
+        const priorOffers = await queryActiveOffers(mapping.bpartnerId, mapping.offerTypeId, descriptionSuffix);
+
         if (dryRun) {
-            console.log(`  [DRY RUN] ${groupName}: would deactivate prior offers and write ${lines.length} lines (BP ${mapping.bpartnerId}, OfferType ${mapping.offerTypeId})`);
+            const oldKeys = priorOffers.map(o => o.value || o.id).join(', ') || 'none';
+            console.log(`  [DRY RUN] ${groupName}: would deactivate ${priorOffers.length} prior offer(s) [${oldKeys}] and write ${lines.length} new lines (BP ${mapping.bpartnerId}, OfferType ${mapping.offerTypeId})`);
             results.push({
                 groupName,
                 status: 'dry-run',
                 linesPlanned: lines.length,
+                priorOffers,
                 ...mapping,
             });
             continue;
@@ -391,7 +446,11 @@ async function writeInventoryToOT(groupedRows, dateStr, dryRun = false) {
 
         // Live: deactivate then write. Failures isolated per group.
         try {
-            const deactResult = await deactivatePriorOffers(mapping.bpartnerId, mapping.offerTypeId);
+            const deactResult = await deactivatePriorOffers(
+                mapping.bpartnerId,
+                mapping.offerTypeId,
+                { descriptionEndsWith: descriptionSuffix }
+            );
             console.log(`  ${groupName}: deactivated ${deactResult.offersDeactivated} prior offer(s), ${deactResult.linesDeactivated} lines`);
 
             const writeResult = await writeOffer({
@@ -409,6 +468,7 @@ async function writeInventoryToOT(groupedRows, dateStr, dryRun = false) {
                 status,
                 offerSearchKey: writeResult.searchKey,
                 offerId: writeResult.offerId,
+                priorOffers,
                 deactivatedOffers: deactResult.offersDeactivated,
                 deactivatedLines: deactResult.linesDeactivated,
                 linesAttempted: lines.length,
@@ -422,11 +482,92 @@ async function writeInventoryToOT(groupedRows, dateStr, dryRun = false) {
                 groupName,
                 status: 'failed',
                 error: e.message,
+                priorOffers,
                 linesAttempted: lines.length,
                 ...mapping,
             });
         }
     }
+
+    // ─── Cross-BP audit ──────────────────────────────────────────────────────
+    // For each unique BP touched by this run, list ALL active offers under
+    // any of the writeback-managed offer types for that BP, then subtract
+    // the offers we just wrote (or, in dry-run, the offers we already know
+    // exist from the priorOffers query — those are the ones the live run
+    // would replace). Anything left over is a stray that lives outside the
+    // weekly cleanup loop and warrants attention.
+    const bpToManagedTypes = {};   // bpId → Set(offerTypeIds we manage)
+    const bpToExpectedIds  = {};   // bpId → Set(offerIds we just wrote OR prior IDs in dry-run)
+    for (const r of results) {
+        if (!r.bpartnerId) continue;
+        if (!bpToManagedTypes[r.bpartnerId]) bpToManagedTypes[r.bpartnerId] = new Set();
+        if (!bpToExpectedIds[r.bpartnerId])  bpToExpectedIds[r.bpartnerId]  = new Set();
+        bpToManagedTypes[r.bpartnerId].add(r.offerTypeId);
+        if (r.offerId) bpToExpectedIds[r.bpartnerId].add(r.offerId);
+        // In dry-run we have no new IDs, so the "expected" set is the priorOffers
+        // we just queried — those are the ones the live run would deactivate
+        // and we don't want to flag them as strays in dry-run.
+        if (dryRun && r.priorOffers) {
+            for (const po of r.priorOffers) bpToExpectedIds[r.bpartnerId].add(po.id);
+        }
+    }
+
+    // Build a (bpId → human name) lookup from WAREHOUSE_WRITEBACK groups so
+    // the audit table can show "Astute Electronics Inc (BP 1000332)" instead
+    // of just "BP 1000332" — easier to read at a glance.
+    const BP_NAMES = {
+        1000332: 'Astute Electronics Inc',
+        1000325: 'Astute Electronics - Franchise Stock',
+        1003236: 'Astute Electronics - GE Aviation Excess',
+        1003621: 'Astute Electronics - Taxan Excess',
+        1005225: 'Astute Electronics - Spartronics Excess',
+        1010966: 'Astute Electronics Inc - Eaton Consignment',
+        1011267: 'Astute Electronics - LAM Consignment',
+    };
+
+    const auditFindings = [];
+    for (const [bpId, typeSet] of Object.entries(bpToManagedTypes)) {
+        const typeOr = [...typeSet].map(t => `chuboe_offer_type_id eq ${t}`).join(' or ');
+        const filter = `C_BPartner_ID eq ${bpId} and IsActive eq true and (${typeOr})`;
+        let activeOffers = [];
+        try {
+            const result = await apiGet('chuboe_offer', {
+                filter,
+                select: 'Value,Created,Chuboe_Offer_Type_ID,Description',
+                orderby: 'Created desc',
+            });
+            activeOffers = result.records || [];
+        } catch (e) {
+            console.warn(`  ! Audit query failed for BP=${bpId}: ${e.message}`);
+            continue;
+        }
+        const expected = bpToExpectedIds[bpId] || new Set();
+        const strays = activeOffers
+            .map(o => ({
+                id: o.id,
+                value: o.Value || o.value || null,
+                created: o.Created || o.created || null,
+                // FK fields come back as { propertyLabel, id, identifier, ... }
+                offerTypeId: o.Chuboe_Offer_Type_ID?.id || o.chuboe_offer_type_id?.id || null,
+                offerTypeName: o.Chuboe_Offer_Type_ID?.identifier || null,
+                description: o.Description || o.description || null,
+            }))
+            .filter(o => !expected.has(o.id));
+        if (strays.length > 0) {
+            const bpIdNum = parseInt(bpId, 10);
+            const bpName = BP_NAMES[bpIdNum] || `BP ${bpIdNum}`;
+            auditFindings.push({ bpartnerId: bpIdNum, bpName, strays });
+            console.log(`  ⚠ Audit: ${bpName} (BP ${bpId}) has ${strays.length} stray active offer(s) outside this run:`);
+            for (const s of strays) {
+                console.log(`      id=${s.id} key=${s.value} type=${s.offerTypeName || s.offerTypeId} created=${String(s.created || '').split('T')[0]} desc="${s.description || ''}"`);
+            }
+        }
+    }
+    if (auditFindings.length === 0) {
+        console.log('  ✓ Audit: no stray offers under any managed BP');
+    }
+    // Stash audit findings on the results array for the email summary
+    results._audit = auditFindings;
 
     // Console summary table
     console.log('\nWrite-back summary:');
@@ -462,34 +603,84 @@ function buildWritebackSummaryHTML(results, dateStr, dryRun) {
     const totalLinesPlanned = results.reduce((s, r) => s + (r.linesPlanned || 0), 0);
     const totalDeactivated  = results.reduce((s, r) => s + (r.deactivatedLines || 0), 0);
 
+    // Format a list of priorOffers as old MO IDs
+    const fmtOldIds = (priorOffers) => {
+        if (!priorOffers || priorOffers.length === 0) return '<i style="color:#57606a">none</i>';
+        return priorOffers.map(o => `<span style="font-family:monospace">${o.value || o.id}</span>`).join(', ');
+    };
+
     const rows = results.map(r => {
         const statusColor = r.status === 'success' ? '#1a7f37'
                           : r.status === 'partial' ? '#bf8700'
                           : r.status === 'failed'  ? '#cf222e'
                           : '#57606a';
+
+        const oldIdsCell = fmtOldIds(r.priorOffers);
+        let newIdCell = '';
         let detail = '';
+
         if (r.status === 'success' || r.status === 'partial') {
-            detail = `${r.linesWritten}/${r.linesAttempted} lines → offer <b>${r.offerSearchKey || r.offerId}</b>`;
+            newIdCell = `<span style="font-family:monospace;color:#1a7f37"><b>${r.offerSearchKey || r.offerId}</b></span>`;
+            detail = `${r.linesWritten}/${r.linesAttempted} lines`;
             if (r.errors && r.errors.length) {
                 detail += `<br/><small style="color:#cf222e">${r.errors.length} line error(s): ${r.errors.slice(0, 3).join('; ')}${r.errors.length > 3 ? '…' : ''}</small>`;
             }
         } else if (r.status === 'dry-run') {
-            detail = `${r.linesPlanned} lines planned (BP ${r.bpartnerId}, type ${r.offerTypeId})`;
+            newIdCell = '<i style="color:#57606a">(dry-run)</i>';
+            detail = `${r.linesPlanned} lines planned`;
         } else if (r.status === 'failed') {
+            newIdCell = '<i style="color:#cf222e">FAILED</i>';
             detail = `<span style="color:#cf222e">${r.error}</span>`;
         } else {
+            newIdCell = '<i style="color:#57606a">—</i>';
             detail = `<i>${r.reason || 'skipped'}</i>`;
         }
+
         return `<tr>
             <td><b>${r.groupName}</b></td>
             <td style="color:${statusColor}"><b>${r.status.toUpperCase()}</b></td>
+            <td>${oldIdsCell}</td>
+            <td>${newIdCell}</td>
             <td>${detail}</td>
-            <td style="text-align:right">${r.deactivatedLines || 0}</td>
         </tr>`;
     }).join('\n');
 
+    // Cross-BP audit section
+    let auditSection = '';
+    const audit = results._audit || [];
+    if (audit.length === 0) {
+        auditSection = `<p style="color:#1a7f37"><b>✓ Cross-BP audit:</b> no stray active offers under any managed BP.</p>`;
+    } else {
+        const auditRows = audit.map(a => {
+            const strayList = a.strays.map(s => {
+                const created = s.created ? String(s.created).split('T')[0] : '?';
+                const typeLabel = s.offerTypeName ? `${s.offerTypeName} (${s.offerTypeId})` : `type ${s.offerTypeId}`;
+                return `<li><span style="font-family:monospace">id=${s.id}</span> · key ${s.value || '–'} · ${typeLabel} · created ${created}${s.description ? ` · <i>${s.description}</i>` : ''}</li>`;
+            }).join('');
+            return `<tr>
+                <td><b>${a.bpName || ('BP ' + a.bpartnerId)}</b><br/><small style="color:#57606a">BP ${a.bpartnerId}</small></td>
+                <td style="text-align:center"><b>${a.strays.length}</b></td>
+                <td><ul style="margin:0;padding-left:18px">${strayList}</ul></td>
+            </tr>`;
+        }).join('\n');
+        auditSection = `
+<h3 style="margin:18px 0 4px 0;color:#bf8700">⚠ Cross-BP audit — stray active offers</h3>
+<p style="margin:0 0 8px 0;font-size:12px;color:#57606a">
+    These offers are active under BPs this run touched, share a managed offer type, but were NOT in the set just written.
+    They may be left over from a partial prior run, manual edits, or another loader. Review and deactivate if no longer needed.
+</p>
+<table border="1" cellpadding="6" cellspacing="0" style="border-collapse:collapse;font-size:12px">
+<thead style="background:#fff8c5">
+<tr><th align="left">Business Partner</th><th align="left"># Stray</th><th align="left">Offers</th></tr>
+</thead>
+<tbody>
+${auditRows}
+</tbody>
+</table>`;
+    }
+
     const banner = dryRun
-        ? '<div style="background:#fff8c5;padding:10px;border-left:4px solid #d4a72c;margin-bottom:12px"><b>DRY RUN</b> — no records were written to OT.</div>'
+        ? '<div style="background:#fff8c5;padding:10px;border-left:4px solid #d4a72c;margin-bottom:12px"><b>DRY RUN</b> — no records were written to OT. The OLD → NEW column shows offers that <i>would</i> have been deactivated and replaced.</div>'
         : '';
 
     return `<html><body style="font-family:Arial,sans-serif;font-size:13px">
@@ -506,12 +697,19 @@ ${banner}
 </p>
 <table border="1" cellpadding="6" cellspacing="0" style="border-collapse:collapse;font-size:12px">
 <thead style="background:#f6f8fa">
-<tr><th align="left">Group</th><th align="left">Status</th><th align="left">Detail</th><th align="right">Prior Lines Deactivated</th></tr>
+<tr>
+    <th align="left">Group</th>
+    <th align="left">Status</th>
+    <th align="left">OLD Offer(s) (deactivated)</th>
+    <th align="left">NEW Offer</th>
+    <th align="left">Detail</th>
+</tr>
 </thead>
 <tbody>
 ${rows}
 </tbody>
 </table>
+${auditSection}
 </body></html>`;
 }
 
