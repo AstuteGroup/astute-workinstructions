@@ -16,6 +16,8 @@
 
 const { Pool } = require('pg');
 const ExcelJS = require('exceljs');
+const fs = require('fs');
+const path = require('path');
 
 // Database connection (uses Unix socket peer authentication).
 // `user` must be set explicitly because cron-launched processes don't
@@ -50,7 +52,11 @@ const COLUMN_DEFS = {
   'Created Date': { width: 14, format: 'date' },
   'Days Btw MO/VQ & RFQ': { width: 20, format: 'number' },
   '% of Demand': { width: 14, format: 'percent' },
-  'Opp Amount': { width: 14, format: 'currency' }
+  'Opp Amount': { width: 14, format: 'currency' },
+  // API Pricing tab columns — reference data from cached envelopes
+  'Tier Min Qty': { width: 12, format: 'number' },
+  'Pulled': { width: 12, format: 'date' },
+  'Source': { width: 14, format: 'text' }
 };
 
 // Column sets for each file type
@@ -78,6 +84,16 @@ const COLUMNS = {
     'Customer Part Number', 'MO Type', 'Supplier MPN', 'Supplier MFR',
     'Supplier/Excess Partner', 'Qty', 'Supplier Price',
     'Supply', 'lead_time', 'Date Code', 'Created Date', 'Days Btw MO/VQ & RFQ', '% of Demand', 'Opp Amount'
+  ],
+  // API Pricing — cached envelope rows. Reference data, NOT actionable VQs.
+  // Surfaces alternate price tiers + distributors that didn't make it into
+  // chuboe_vq_line. Sellers use this for context: "what other price points
+  // exist for this MPN that we already know about from prior API calls?"
+  'API Pricing': [
+    'RFQ Number', 'RFQ Created', 'RFQ Customer', 'RFQ MPN', 'RFQ MFR', 'RFQ Qty', 'RFQ Target',
+    'Customer Part Number', 'Supplier MPN', 'Supplier MFR',
+    'Supplier/Excess Partner', 'Tier Min Qty', 'Qty', 'Supplier Price',
+    'lead_time', 'Date Code', 'Pulled', 'Source'
   ]
 };
 
@@ -121,7 +137,7 @@ const STOCK_LIKE_LT = /^(stock|in[\s-]*stock|ready[\s-]*stock|ready|available|as
 
 function computeSupplyState(qty, leadTime) {
   const q = Number(qty) || 0;
-  const lt = (leadTime || '').trim();
+  const lt = String(leadTime || '').trim();
   const ltIsStockLike = lt === '' || STOCK_LIKE_LT.test(lt);
   if (q > 0 && ltIsStockLike) return 'STOCK';
   if (q > 0 && !ltIsStockLike) return 'STOCK+LT';
@@ -273,6 +289,163 @@ async function fetchVendorQuotes(cleanMpns) {
   return result.rows;
 }
 
+// ─── CACHED ENVELOPES (FILE CACHE) ──────────────────────────────────────────
+// Per the rfq-api-enrichment.md design (lines 3, 140), the file cache at
+// shared/data/api-pricing-cache/{MPN}_{YYYY-MM-DD}.json is the canonical store
+// for full distributor pricing envelopes. Vortex was always supposed to read
+// it for cross-RFQ price context — alternate tiers, distributors that didn't
+// land in chuboe_vq_line because they returned data at qtys outside the RFQ
+// window, and pricing intel from prior API calls on other RFQs. This was
+// documented but never implemented in vortex-matches.js until 2026-04-09.
+//
+// What we surface from each cached envelope:
+//   - One row per (distributor, distinct unit price) — collapses duplicate
+//     tiers at the same price (e.g., Rutronik often returns 8 tiers all at
+//     the same price; we want one row, not eight)
+//   - Tier Min Qty column shows the lowest qty needed to unlock that price
+//   - Pulled column shows when the envelope was captured
+//   - Source shows the consumer that triggered the pull (rfq-api-enrichment, etc.)
+//
+// What we DON'T surface:
+//   - Arrow / Verical rows from envelopes captured BEFORE today's parser fix
+//     (commit fa740e9, 2026-04-09). Older envelopes have the broken
+//     single-row Arrow shape (Verical merged into Arrow, qty inflated up to
+//     130x, unreachable bulk tier surfaced as best price). Surfacing them
+//     would resurrect the data we just spent the day correcting. Other
+//     distributors are unaffected by the parser fix and surface normally.
+//   - The most recent envelope per MPN only — older snapshots are skipped
+//     since they're superseded.
+const CACHE_DIR = path.resolve(__dirname, '../../shared/data/api-pricing-cache');
+const CACHE_LOOKBACK_DAYS = 90;
+// Anything Arrow/Verical from before the parser fix is unreliable. The
+// fa740e9 commit landed mid-morning 2026-04-09 UTC; we use 13:00 UTC as a
+// safe cutoff. After roughly a week of natural cache rollover, this guard
+// can be removed.
+const ARROW_PARSER_FIX_CUTOFF = new Date('2026-04-09T13:00:00Z');
+
+function cacheKeyForMpn(mpn) {
+  // Mirror api-result-writer.js cacheKey() — alphanumeric + hyphens, uppercase
+  return mpn.replace(/[^A-Za-z0-9-]/g, '_').toUpperCase();
+}
+
+// Map cached envelope SupplierName (short, e.g. "Rutronik") to the canonical
+// BP name that bi_vendor_quote_line_v exposes (e.g. "Rutronik Inc."). Without
+// this normalization the dedup against existing VQ rows misses every match
+// because the names don't string-equal, AND the displayed partner column is
+// inconsistent across tabs (cached rows show "Rutronik", VQ rows show
+// "Rutronik Inc.").
+const SUPPLIER_NAME_CANONICAL = (() => {
+  try {
+    const dists = require('../../shared/franchise-api').DISTRIBUTORS || {};
+    const map = {};
+    for (const key of Object.keys(dists)) {
+      const cfg = dists[key];
+      if (cfg.name && cfg.bpName) map[cfg.name] = cfg.bpName;
+    }
+    return map;
+  } catch (e) {
+    return {};
+  }
+})();
+
+function canonicalSupplierName(rawName) {
+  return SUPPLIER_NAME_CANONICAL[rawName] || rawName;
+}
+
+async function fetchCachedEnvelopes(cleanMpns) {
+  if (cleanMpns.length === 0) return [];
+  if (!fs.existsSync(CACHE_DIR)) return [];
+
+  const cutoffDate = new Date();
+  cutoffDate.setDate(cutoffDate.getDate() - CACHE_LOOKBACK_DAYS);
+  const cutoffStr = cutoffDate.toISOString().slice(0, 10);
+
+  let allFiles;
+  try {
+    allFiles = fs.readdirSync(CACHE_DIR).filter(f => f.endsWith('.json'));
+  } catch (err) {
+    return [];
+  }
+
+  const results = [];
+
+  for (const mpn of cleanMpns) {
+    const prefix = cacheKeyForMpn(mpn) + '_';
+    const matchingFiles = allFiles
+      .filter(f => f.startsWith(prefix))
+      .filter(f => {
+        const dateStr = f.replace(prefix, '').replace('.json', '');
+        return dateStr >= cutoffStr;
+      })
+      .sort()
+      .reverse();
+
+    if (matchingFiles.length === 0) continue;
+
+    // Take the most recent envelope per MPN — older snapshots are superseded
+    let env;
+    try {
+      env = JSON.parse(fs.readFileSync(path.join(CACHE_DIR, matchingFiles[0]), 'utf-8'));
+    } catch (e) {
+      continue;
+    }
+
+    const meta = env.data?._meta || {};
+    const pricings = env.data?.Pricings || [];
+    const envelopeTime = meta.timestamp ? new Date(meta.timestamp) : null;
+    const sourceConsumer = meta.consumer || 'unknown';
+
+    for (const p of pricings) {
+      const supplierName = p.SupplierName || '';
+      // Skip Arrow/Verical from envelopes captured before the parser fix
+      const isArrowChannel = /^(arrow|verical)/i.test(supplierName) ||
+                             supplierName === 'Arrow Electronics';
+      if (isArrowChannel && envelopeTime && envelopeTime < ARROW_PARSER_FIX_CUTOFF) {
+        continue;
+      }
+
+      // Collapse the price ladder by distinct unit price — one row per
+      // (supplier, price). For each distinct price, the qty is the LOWEST
+      // tier minQty that unlocks it. Eliminates the noise where distributors
+      // return many tiers at the same price.
+      const ladder = (p.Pricings || []).slice();
+      if (ladder.length === 0) continue;
+      const byPrice = new Map();  // price → min(qtyBreak)
+      for (const tier of ladder) {
+        const price = tier.UnitPrice;
+        if (price == null) continue;
+        const qtyBreak = tier.QtyBreak ?? 1;
+        if (!byPrice.has(price) || qtyBreak < byPrice.get(price)) {
+          byPrice.set(price, qtyBreak);
+        }
+      }
+
+      for (const [price, tierMinQty] of byPrice.entries()) {
+        results.push({
+          // Same shape as fetchMarketOffers / fetchVendorQuotes for joinData()
+          supplier_mpn: p.ManufacturerPartNumber || mpn,
+          market_offer_line_mpn_clean: mpn,
+          supplier_mfr: p.ManufacturerName || '',
+          mo_type: null,
+          // Canonical BP name so dedup keys + displayed partner match the VQ side
+          supplier_partner: canonicalSupplierName(supplierName),
+          qty: p.CurrentStockQty || 0,  // distributor stock at the time of pull
+          supplier_price: price,
+          lead_time: p.LeadTime || '',
+          date_code: p.DateCode || '',
+          created_date: envelopeTime,
+          record_type: 'API',
+          // API Pricing tab extras
+          tier_min_qty: tierMinQty,
+          source_consumer: sourceConsumer,
+        });
+      }
+    }
+  }
+
+  return results;
+}
+
 /**
  * Join RFQ data with market offers and vendor quotes
  */
@@ -327,7 +500,7 @@ function joinData(rfqRows, offers) {
       const leadTimeText = offer.lead_time || '';
       const supplyState = computeSupplyState(supplierQty, leadTimeText);
 
-      results.push({
+      const row = {
         'RFQ Number': rfq.rfq_number,
         'RFQ Created': rfqDate,
         'RFQ Customer': rfq.customer_name || '',
@@ -351,7 +524,14 @@ function joinData(rfqRows, offers) {
         'Days Btw MO/VQ & RFQ': daysBetween,
         '% of Demand': percentOfDemand,
         'Opp Amount': oppAmount
-      });
+      };
+      // API-row extras (only populated when the source is a cached envelope)
+      if (offer.record_type === 'API') {
+        row['Tier Min Qty'] = offer.tier_min_qty;
+        row['Pulled'] = offer.created_date;
+        row['Source'] = offer.source_consumer || '';
+      }
+      results.push(row);
     }
   }
 
@@ -579,15 +759,41 @@ async function runVortexForRFQ(rfqNumber, { log = () => {} } = {}) {
 
   log(`  ${rfqRows.length} lines, ${cleanMpns.length} unique MPNs, targets=${hasTargets}`);
 
-  const [marketOffers, vendorQuotes] = await Promise.all([
+  const [marketOffers, vendorQuotes, cachedEnvelopes] = await Promise.all([
     fetchMarketOffers(cleanMpns),
-    fetchVendorQuotes(cleanMpns)
+    fetchVendorQuotes(cleanMpns),
+    fetchCachedEnvelopes(cleanMpns)
   ]);
   const allOffers = [...marketOffers, ...vendorQuotes];
-  log(`  ${marketOffers.length} MOs + ${vendorQuotes.length} VQs = ${allOffers.length} offers`);
+  log(`  ${marketOffers.length} MOs + ${vendorQuotes.length} VQs + ${cachedEnvelopes.length} cached envelope rows`);
 
   const joinedData = joinData(rfqRows, allOffers);
   const { stock, goodPrices, allPrices, noPrices } = categorizeResults(joinedData, hasTargets);
+
+  // ── Cached envelope rows (API Pricing tab) ────────────────────────────────
+  // Run cached envelope rows through the same join logic so they pick up the
+  // RFQ context (RFQ Number, Qty, Target, etc.) but keep them in their own
+  // bucket — they're reference data, not actionable supply offers, and should
+  // never get mixed into Stock/Good Prices/etc.
+  //
+  // Dedup against the actionable VQ data so we don't show the same
+  // (supplier, mpn, price) twice when a cached row matches an existing VQ
+  // row. Key: (mpn_clean, supplier_partner, supplier_price). Tolerant to
+  // tiny float differences via toFixed(6) on price.
+  // Dedup key: (mpn_clean, supplier_partner_normalized, price.toFixed(6)).
+  // Normalize partner with trim() because the bi_vendor_quote_line_v view
+  // returns BP names with trailing whitespace ("Rutronik Inc. ") that won't
+  // string-match the cached envelope's canonical name ("Rutronik Inc.").
+  const dedupKey = (mpn, partner, price) =>
+    `${String(mpn || '').trim()}|${String(partner || '').trim()}|${Number(price).toFixed(6)}`;
+  const vqDedupKeys = new Set();
+  for (const vq of vendorQuotes) {
+    vqDedupKeys.add(dedupKey(vq.market_offer_line_mpn_clean, vq.supplier_partner, vq.supplier_price));
+  }
+  const apiOnlyEnvelopes = cachedEnvelopes.filter(c =>
+    !vqDedupKeys.has(dedupKey(c.market_offer_line_mpn_clean, c.supplier_partner, c.supplier_price))
+  );
+  const apiPricing = joinData(rfqRows, apiOnlyEnvelopes);
 
   // Sort each tab by (part, supply state, price) so STOCK rows lead each
   // part's group and lead-time-only rows stay visible right below them
@@ -596,6 +802,7 @@ async function runVortexForRFQ(rfqNumber, { log = () => {} } = {}) {
   sortByPartAndSupply(goodPrices);
   sortByPartAndSupply(allPrices);
   sortByPartAndSupply(noPrices);
+  sortByPartAndSupply(apiPricing);
 
   const summary = {
     customer,
@@ -606,6 +813,7 @@ async function runVortexForRFQ(rfqNumber, { log = () => {} } = {}) {
     goodPrices: goodPrices.length,
     allPrices: allPrices.length,
     noPrices: noPrices.length,
+    apiPricing: apiPricing.length,
     totalMatches: joinedData.length
   };
 
@@ -625,6 +833,7 @@ async function runVortexForRFQ(rfqNumber, { log = () => {} } = {}) {
     await pushFile(allPrices, 'All Prices', 'All Prices');
   }
   await pushFile(noPrices, 'No Prices', 'No Prices');
+  await pushFile(apiPricing, 'API Pricing', 'API Pricing');
 
   return { rfqNumber, customer, hasTargets, summary, attachments };
 }
@@ -647,6 +856,7 @@ function buildSummaryHtml(result) {
   <tr><td>Stock (Astute inventory)</td><td style="text-align:right"><b>${summary.stock}</b></td></tr>
   ${priceLine}
   <tr><td>No Prices (supply leads)</td><td style="text-align:right"><b>${summary.noPrices}</b></td></tr>
+  <tr><td>API Pricing (cached envelope reference data)</td><td style="text-align:right"><b>${summary.apiPricing || 0}</b></td></tr>
   <tr style="background:#fafafa"><td><b>Total matches</b></td><td style="text-align:right"><b>${summary.totalMatches}</b></td></tr>
 </table>
 <p style="margin:14px 0 4px 0;color:#666;font-size:11px">Generated by Vortex Matches automation. Attached workbooks contain the full row-level detail.</p>
