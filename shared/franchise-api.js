@@ -129,6 +129,123 @@ const DISTRIBUTORS = {
 };
 
 /**
+ * Pick the highest tier price ≤ buyQty from a sorted price breaks list.
+ * Mirror of arrow.js priceForBuy. Returns null if no tier is reachable.
+ *
+ * @param {Array<{qty: number, unitPrice: number}>} breaks
+ * @param {number} buyQty
+ * @returns {number|null}
+ */
+function priceAtQty(breaks, buyQty) {
+  if (!Array.isArray(breaks) || breaks.length === 0 || buyQty <= 0) return null;
+  const sorted = breaks.slice().sort((a, b) => (a.qty || 0) - (b.qty || 0));
+  let chosen = null;
+  for (const tier of sorted) {
+    if ((tier.qty || 0) <= buyQty) chosen = tier;
+    else break;
+  }
+  return chosen?.unitPrice ?? null;
+}
+
+/**
+ * Synthesize stock + lead-time vqLines from a normalized distributor result.
+ *
+ * Per the spec clarification 2026-04-09 (operator): when a single distributor
+ * returns BOTH stock AND a lead-time field for additional qty, we should
+ * write TWO VQs from that source — one stock row and one lead-time row —
+ * because they represent two distinct supply offers the seller needs to
+ * compare independently. The stock row is "what they have today at this
+ * price"; the lead-time row is "what they can deliver in N weeks at a
+ * different (often better) tier price."
+ *
+ * Rules:
+ *   stockQty > 0, no leadTime              → 1 row (stock only)
+ *   stockQty > 0, leadTime, stock ≥ rfqQty → 1 row (stock fully covers, no separate LT row needed)
+ *   stockQty > 0, leadTime, stock < rfqQty → 2 rows (stock at stock-tier price + LT at rfqQty-tier price)
+ *   stockQty = 0, leadTime                 → 1 row (lead-time only, qty=0 + leadTime set)
+ *   stockQty = 0, no leadTime              → 0 rows (nothing to quote)
+ *
+ * The stock row's price = price tier reachable at min(rfqQty, stockQty)
+ * The lead-time row's price = price tier reachable at rfqQty (potentially a
+ *   better/deeper tier than the stock row)
+ *
+ * Pricing follows the same "tier must be reachable" rule arrow.js uses:
+ * priceAtQty(breaks, buyQty) picks the highest tier ≤ buyQty.
+ *
+ * Skipped when result.vqLines is already populated (arrow.js handles its own
+ * multi-source split via the parser-level vqLines path).
+ */
+function synthesizeStockLtVqLines(result, mpn, qty, config) {
+  if (Array.isArray(result.vqLines) && result.vqLines.length > 0) return null;
+
+  const stockQty = Number(result.franchiseQty) || 0;
+  const leadTime = result.vqLeadTime || '';
+  const hasLeadTime = String(leadTime).trim() !== '';
+  const breaks = result.priceBreaks || [];
+
+  if (stockQty === 0 && !hasLeadTime) return null;  // nothing to quote
+
+  const lines = [];
+
+  // Stock row
+  if (stockQty > 0) {
+    const stockBuyQty = Math.min(qty, stockQty);
+    const stockPrice = priceAtQty(breaks, stockBuyQty)
+      || result.franchiseRfqPrice
+      || result.vqPrice
+      || result.franchisePrice;
+    if (stockPrice != null && stockPrice > 0) {
+      lines.push({
+        vendorBP: config.bpValue,
+        vendorName: config.bpName,
+        channel: config.name,
+        mpn: result.vqMpn || mpn,
+        manufacturer: result.vqManufacturer || '',
+        description: result.vqDescription || '',
+        qty: stockQty,           // surface the lot's available stock
+        cost: stockPrice,
+        moq: result.vqMoq || null,
+        spq: result.vqSpq || null,
+        dateCode: result.vqDateCode || null,
+        leadTime: null,           // stock row → no LT
+        vendorNotes: result.vqVendorNotes || '',
+        priceBreaks: breaks,
+      });
+    }
+  }
+
+  // Lead-time row — only when stock can't fully cover the RFQ qty
+  // (otherwise the stock row already serves the demand and a separate LT row
+  // is just noise). For stockQty=0 + leadTime, this is the only row.
+  if (hasLeadTime && stockQty < qty) {
+    const ltPrice = priceAtQty(breaks, qty)
+      || result.franchiseRfqPrice
+      || result.vqPrice
+      || result.franchisePrice;
+    if (ltPrice != null && ltPrice > 0) {
+      lines.push({
+        vendorBP: config.bpValue,
+        vendorName: config.bpName,
+        channel: config.name,
+        mpn: result.vqMpn || mpn,
+        manufacturer: result.vqManufacturer || '',
+        description: result.vqDescription || '',
+        qty: qty,                 // full RFQ qty deliverable on lead time
+        cost: ltPrice,
+        moq: result.vqMoq || null,
+        spq: result.vqSpq || null,
+        dateCode: result.vqDateCode || null,
+        leadTime: String(leadTime),
+        vendorNotes: result.vqVendorNotes || '',
+        priceBreaks: breaks,
+      });
+    }
+  }
+
+  return lines.length > 0 ? lines : null;
+}
+
+/**
  * Call a single distributor API
  * Each script exports searchPart(mpn, qty) → result object
  */
@@ -172,10 +289,17 @@ async function searchPart(distributor, mpn, qty) {
       vqEccn: result.vqEccn || null,
       // Full price break array for api-result-writer capture
       priceBreaks: result.priceBreaks || [],
-      // Multi-source split (Arrow only — splits into Arrow + Verical channels).
-      // When present, the master vqLines builder spreads these instead of
-      // emitting one default row from the top-level fields.
-      vqLines: result.vqLines || null,
+      // Multi-source split. Two paths populate this:
+      //   1. Parser-native (arrow.js) — emits one entry per real source-with-stock,
+      //      tagged with the right vendor BP. Used for the Arrow + Verical channel
+      //      split where one API call returns multiple distinct lots.
+      //   2. Wrapper-synthesized (synthesizeStockLtVqLines below) — for parsers
+      //      that return a single normalized result (digikey, mouser, tti, future,
+      //      etc.), splits into stock + lead-time rows when the supplier has both.
+      //      Per spec clarification 2026-04-09: stock and lead-time are two
+      //      distinct supply offers from the same supplier and the seller needs
+      //      to see them as separate VQ rows, not one row with a lead_time note.
+      vqLines: result.vqLines || synthesizeStockLtVqLines(result, mpn, qty, config),
       // Raw result for workflow-specific needs
       raw: result,
     };
