@@ -144,6 +144,7 @@ function computeSupplyState(qty, leadTime) {
 async function fetchRfqDetails(rfqNumber) {
   const query = `
     SELECT DISTINCT ON (rlm.chuboe_mpn_clean, COALESCE(rlm.chuboe_mfr_id, 0), rlm.qty, rlm.priceentered, COALESCE(rlm.chuboe_cpc, ''))
+      r.chuboe_rfq_id AS rfq_id,
       r.value AS rfq_number,
       r.created AS rfq_created,
       bp.name AS customer_name,
@@ -164,6 +165,34 @@ async function fetchRfqDetails(rfqNumber) {
 
   const result = await pool.query(query, [rfqNumber]);
   return result.rows;
+}
+
+/**
+ * Find MPNs whose franchise API cache was triggered by THIS RFQ.
+ *
+ * Cross-RFQ context is the whole point of surfacing cached envelopes — if
+ * the cached data was pulled for THIS RFQ's enrichment (which is the case
+ * for any RFQ that's been through enrich-poller), the alternate price tiers
+ * in the envelope are just "the rest of the same supplier's ladder we
+ * already collected when we wrote the VQ row." That's noise, not insight.
+ *
+ * This query pulls the MPN list from chuboe_pricing_api_result thin-pointer
+ * rows linked to the current RFQ (record_id = rfq_id, ad_table_id = chuboe_rfq).
+ * fetchCachedEnvelopes() skips envelopes for those MPNs entirely. Only MPNs
+ * whose cache came from a DIFFERENT RFQ's enrichment surface as API CACHE
+ * rows in the output.
+ */
+async function fetchSelfRfqCachedMpns(rfqId) {
+  if (!rfqId) return new Set();
+  const query = `
+    SELECT DISTINCT mpns
+    FROM adempiere.chuboe_pricing_api_result
+    WHERE record_id = $1
+      AND isactive = 'Y'
+      AND mpns IS NOT NULL
+  `;
+  const result = await pool.query(query, [rfqId]);
+  return new Set(result.rows.map(r => r.mpns));
 }
 
 /**
@@ -338,7 +367,7 @@ function canonicalSupplierName(rawName) {
   return SUPPLIER_NAME_CANONICAL[rawName] || rawName;
 }
 
-async function fetchCachedEnvelopes(cleanMpns) {
+async function fetchCachedEnvelopes(cleanMpns, skipMpns = new Set()) {
   if (cleanMpns.length === 0) return [];
   if (!fs.existsSync(CACHE_DIR)) return [];
 
@@ -356,6 +385,10 @@ async function fetchCachedEnvelopes(cleanMpns) {
   const results = [];
 
   for (const mpn of cleanMpns) {
+    // Skip MPNs whose cache was triggered by THIS RFQ's enrichment — they're
+    // already represented by the VQ rows from the same API call. Surfacing
+    // their alternate tiers would be noise, not cross-RFQ insight.
+    if (skipMpns.has(mpn)) continue;
     const prefix = cacheKeyForMpn(mpn) + '_';
     const matchingFiles = allFiles
       .filter(f => f.startsWith(prefix))
@@ -733,15 +766,25 @@ async function runVortexForRFQ(rfqNumber, { log = () => {} } = {}) {
   }
 
   const customer = rfqRows[0].customer_name || '';
+  const rfqId = rfqRows[0].rfq_id;
   const cleanMpns = [...new Set(rfqRows.map(r => r.chuboe_mpn_clean).filter(Boolean))];
   const hasTargets = rfqRows.some(r => r.rfq_target && parseFloat(r.rfq_target) > 0);
 
   log(`  ${rfqRows.length} lines, ${cleanMpns.length} unique MPNs, targets=${hasTargets}`);
 
+  // Find MPNs whose cache was triggered by THIS RFQ — skip them when reading
+  // cached envelopes since their alternate tiers are noise (the VQ writer
+  // already captured the qty-relevant tier and the rest are unreachable
+  // alternates from the same fresh API call).
+  const selfRfqMpns = await fetchSelfRfqCachedMpns(rfqId);
+  if (selfRfqMpns.size > 0) {
+    log(`  ${selfRfqMpns.size} MPNs cached by THIS RFQ — skipped from API CACHE surfacing`);
+  }
+
   const [marketOffers, vendorQuotes, cachedEnvelopes] = await Promise.all([
     fetchMarketOffers(cleanMpns),
     fetchVendorQuotes(cleanMpns),
-    fetchCachedEnvelopes(cleanMpns)
+    fetchCachedEnvelopes(cleanMpns, selfRfqMpns)
   ]);
 
   // Cached envelope rows are additional supply data — alternate price tiers
