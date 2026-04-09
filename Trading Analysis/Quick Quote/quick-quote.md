@@ -5,9 +5,37 @@ Generate baseline quotes from recent vendor quotes (VQs) for a given RFQ, applyi
 ## Quick Start
 
 ```bash
-# Run the query (replace RFQ number)
+# 1. Run the SQL query (replace RFQ number) — produces the actionable QQ output
 psql -f qq_RFQNUM_sales.sql > "Quick Quote RFQNUM YYYY-MM-DD CUSTOMER.csv"
+
+# 2. Optional: pull cached API pricing context for the same RFQ
+node "Trading Analysis/Quick Quote/qq-cache-context.js" RFQNUM
+# → writes ./qq_RFQNUM_cache_context.csv
 ```
+
+## Cache Context (supplementary)
+
+`qq-cache-context.js` reads the franchise API file cache at
+`shared/data/api-pricing-cache/{MPN}_{YYYY-MM-DD}.json` for every MPN on
+the RFQ and outputs a supplementary CSV with the alternate price tiers
++ distributors that aren't in `chuboe_vq_line` (because the VQ writer
+only captures the qty-relevant break, not the full ladder).
+
+Use case: when reviewing QQ output, the cache context CSV tells you what
+ELSE the franchise APIs know about each MPN — bulk discount tiers for
+larger qtys, distributors that returned data but didn't get a VQ row,
+historical pricing from prior API calls on other RFQs.
+
+The output is **NOT** deduped against the VQs in the main QQ CSV — both
+sources are intentionally complete so the operator can compare them
+independently.
+
+**Arrow / Verical safety filter:** envelopes captured before
+2026-04-09T13:00 UTC have the broken legacy parser shape (Arrow inflated
+130x by Verical-mirror double-counting, unreachable bulk tier surfaced).
+Those Arrow + Verical entries are skipped. Other distributors are not
+affected and surface unconditionally within the 90-day window. The guard
+can be removed after roughly a week of natural cache rollover.
 
 ## Input
 
