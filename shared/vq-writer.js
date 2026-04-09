@@ -855,6 +855,7 @@ module.exports = {
   clearCaches,
   validatePayload,
   normalizePackaging,
+  checkMpnCrossRef,
   FLAG,
   DEFAULTS,
   PACKAGING_MAP,
