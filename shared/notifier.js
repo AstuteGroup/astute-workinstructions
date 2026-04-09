@@ -101,7 +101,7 @@ function createNotifier({ fromEmail, fromName, smtpUser, smtpPass } = {}) {
     }
   }
 
-  async function sendWithAttachment(to, subject, body, attachments) {
+  async function sendWithAttachment(to, subject, body, attachments, opts = {}) {
     if (!to) {
       logger.warn('No recipient specified');
       return false;
@@ -111,14 +111,21 @@ function createNotifier({ fromEmail, fromName, smtpUser, smtpPass } = {}) {
       return false;
     }
 
+    // opts.html=true → send `body` as HTML instead of plain text
+    const mailPayload = {
+      from: `"${displayName}" <${fromEmail}>`,
+      to: to,
+      subject: subject,
+      attachments: attachments,
+    };
+    if (opts.html) {
+      mailPayload.html = body;
+    } else {
+      mailPayload.text = body;
+    }
+
     try {
-      await transporter.sendMail({
-        from: `"${displayName}" <${fromEmail}>`,
-        to: to,
-        subject: subject,
-        text: body,
-        attachments: attachments
-      });
+      await transporter.sendMail(mailPayload);
       logger.info(`Email with attachment sent to ${to}: ${subject}`);
       return true;
     } catch (err) {

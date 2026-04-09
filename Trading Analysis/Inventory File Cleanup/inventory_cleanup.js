@@ -92,6 +92,32 @@ const CONSIGNMENT_GROUPS = [
     'LAM_Consignment', 'Eaton_Consignment'
 ];
 
+// Static carryover offers — manually loaded inventory that lives outside the
+// weekly Infor export but still needs to be marketed in OT. Each weekly run
+// re-creates these offers under fresh chuboe_offer IDs so the Created date
+// stays current and they remain visible in date-sensitive consumers (Vortex
+// Matches, etc.).
+//
+// Lookup strategy: each refreshed offer is written with description
+// `[Carryover] {label} — refreshed YYYY-MM-DD`, so subsequent runs find them
+// via `startswith(Description, '[Carryover] {label}')`. The bootstrapId is
+// only used on the very first run before any refresh has happened — once
+// the description prefix lands, the bootstrap ID is irrelevant.
+//
+// To stop refreshing one of these (e.g. it's been received into Infor and
+// no longer needs the carryover), remove its entry from this list. The
+// existing offer will stay in OT but stop being refreshed; manually
+// deactivate it via the OT UI when ready.
+//
+// Roadmap B4 (open-PO inventory) is the long-term replacement for this
+// workaround — once the loader can pull from Infor's open-PO data the
+// static carryover list should empty out.
+const STATIC_CARRYOVER_OFFERS = [
+    { label: 'Eaton Consignment',           bootstrapId: 1024798 },
+    { label: 'Free Stock - Philippines',    bootstrapId: 1025258 },
+    { label: 'Incoming Lot bid from Marvell', bootstrapId: 1024030 },
+];
+
 // Warehouse Group → OT write-back mapping
 // Each entry produces one chuboe_offer (header) per weekly run, with the
 // week's lots posted as chuboe_offer_line rows. Prior week's offers for the
@@ -589,9 +615,239 @@ async function writeInventoryToOT(groupedRows, dateStr, dryRun = false) {
 }
 
 /**
+ * Refresh static carryover offers — read each, deactivate it, write a fresh
+ * copy with a new Created timestamp. Also cross-reference the carryover
+ * MPNs against this week's pending Infor inventory so the user gets flagged
+ * when a previously-unreceived part finally lands in the inventory report.
+ *
+ * @param {Array<{label, bootstrapId}>} carryovers - STATIC_CARRYOVER_OFFERS
+ * @param {string} dateStr      - YYYY-MM-DD for new description suffix
+ * @param {boolean} dryRun
+ * @param {Map<string, Array<{warehouse, warehouseName, qty, lot}>>} pendingMpnDetails
+ *   - For each MPN in this week's full Infor export, the warehouses + lot
+ *     details where it appears. Used to enrich the overlap CSV so the user
+ *     can see exactly where in OT each carryover MPN now lives.
+ */
+async function refreshStaticCarryoverOffers(carryovers, dateStr, dryRun, pendingMpnDetails) {
+    const { writeOffer, deactivateOfferById } = require('../../shared/offer-writeback');
+    const { apiGet } = require('../../shared/api-client');
+
+    console.log('\n' + '='.repeat(60));
+    console.log(dryRun ? 'STATIC CARRYOVER REFRESH (DRY RUN)' : 'STATIC CARRYOVER REFRESH');
+    console.log('='.repeat(60));
+
+    const results = [];
+
+    for (const cfg of carryovers) {
+        const labelEsc = cfg.label.replace(/'/g, "''");
+        let currentOfferId = null;
+        let currentHeader = null;
+
+        // Look up by description prefix first (subsequent runs)
+        try {
+            const lookup = await apiGet('chuboe_offer', {
+                filter: `IsActive eq true and startswith(Description,'[Carryover] ${labelEsc}')`,
+                select: 'Value,Description,C_BPartner_ID,Chuboe_Offer_Type_ID',
+                orderby: 'Created desc',
+            });
+            const found = lookup.records || [];
+            if (found.length > 0) {
+                currentOfferId = found[0].id;
+                currentHeader = found[0];
+                if (found.length > 1) {
+                    console.warn(`  ! ${cfg.label}: ${found.length} carryover offers match — using newest (${currentOfferId}). Investigate.`);
+                }
+            }
+        } catch (e) {
+            console.warn(`  ! ${cfg.label}: prefix lookup failed (${e.message}) — falling back to bootstrap`);
+        }
+
+        // Bootstrap fallback: fetch by PK (first run only)
+        if (!currentOfferId) {
+            try {
+                const bootstrap = await apiGet('chuboe_offer', { id: cfg.bootstrapId });
+                if (bootstrap && bootstrap.id && bootstrap.IsActive !== false) {
+                    currentOfferId = bootstrap.id;
+                    currentHeader = bootstrap;
+                    console.log(`  ${cfg.label}: bootstrap from PK ${cfg.bootstrapId}`);
+                }
+            } catch (e) {
+                results.push({ label: cfg.label, status: 'failed', error: `bootstrap lookup failed: ${e.message}` });
+                console.error(`  ${cfg.label}: FAILED — bootstrap lookup error: ${e.message}`);
+                continue;
+            }
+        }
+
+        if (!currentOfferId) {
+            results.push({ label: cfg.label, status: 'failed', error: 'offer not found by prefix or bootstrap' });
+            console.error(`  ${cfg.label}: FAILED — offer not found`);
+            continue;
+        }
+
+        // Pull BP + OfferType from FK objects
+        const bpId = currentHeader.C_BPartner_ID?.id || currentHeader.C_BPartner_ID;
+        const offerTypeId = currentHeader.Chuboe_Offer_Type_ID?.id || currentHeader.Chuboe_Offer_Type_ID;
+        if (!bpId || !offerTypeId) {
+            results.push({ label: cfg.label, status: 'failed', error: 'missing BP or OfferType on source offer' });
+            console.error(`  ${cfg.label}: FAILED — header missing BP/OfferType`);
+            continue;
+        }
+
+        // Fetch all active lines (paginated). For READ-only loops we must
+        // advance $skip — the deactivate loop in deactivatePriorOffers gets
+        // away with not skipping because each PUT IsActive=false changes
+        // the active set, but a pure read needs explicit pagination.
+        // iDempiere REST caps $top at 100 server-side regardless of value.
+        const allLines = [];
+        let pageNum = 0;
+        let skip = 0;
+        try {
+            while (true) {
+                const lineResult = await apiGet('chuboe_offer_line', {
+                    filter: `chuboe_offer_id eq ${currentOfferId} and IsActive eq true`,
+                    select: 'Chuboe_MPN,Chuboe_MPN_Clean,Chuboe_MFR_Text,Qty,PriceEntered,Chuboe_Date_Code,Chuboe_Lead_Time,Chuboe_Package_Desc,Description,Chuboe_MOQ,Chuboe_SPQ',
+                    skip,
+                    top: 100,
+                });
+                const batch = lineResult.records || [];
+                if (batch.length === 0) break;
+                allLines.push(...batch);
+                skip += batch.length;
+                pageNum++;
+                // If we got fewer than the page size, we've reached the end
+                if (batch.length < 100) break;
+                if (pageNum > 100) {
+                    console.error(`  ${cfg.label}: hit page cap (100) reading lines — investigate`);
+                    break;
+                }
+            }
+        } catch (e) {
+            results.push({ label: cfg.label, status: 'failed', error: `line read failed: ${e.message}`, currentOfferId });
+            console.error(`  ${cfg.label}: FAILED — line read error: ${e.message}`);
+            continue;
+        }
+
+        // Cross-reference MPNs against this week's full Infor export.
+        // overlapDetails captures one row per (carryover line, this-week match)
+        // pair so the user can see exactly where each overlapping part now
+        // lives in OT (warehouse code, this week's lot quantity, etc.).
+        const overlapMpnSet = new Set();
+        const overlapDetails = [];
+        for (const line of allLines) {
+            const mpn = String(line.Chuboe_MPN || '').trim();
+            if (!mpn) continue;
+            const matches = pendingMpnDetails.get(mpn);
+            if (!matches || matches.length === 0) continue;
+            overlapMpnSet.add(mpn);
+            overlapDetails.push({
+                mpn,
+                carryoverMfr:        line.Chuboe_MFR_Text || '',
+                carryoverQty:        line.Qty || 0,
+                carryoverDateCode:   line.Chuboe_Date_Code || '',
+                carryoverPackageDesc: line.Chuboe_Package_Desc || '',
+                thisWeekMatches:     matches,  // [{warehouse, warehouseName, qty, lot}]
+            });
+        }
+        const overlapMpns = [...overlapMpnSet];
+
+        if (allLines.length === 0) {
+            // Empty header — leave alone, log for visibility
+            console.log(`  ${cfg.label}: source offer ${currentOfferId} has 0 active lines — leaving as-is`);
+            results.push({
+                label: cfg.label,
+                status: 'empty',
+                currentOfferId,
+                currentValue: currentHeader.Value || null,
+                bpId,
+                offerTypeId,
+                overlapMpns,
+                overlapDetails,
+            });
+            continue;
+        }
+
+        if (dryRun) {
+            console.log(`  [DRY RUN] ${cfg.label}: would refresh offer ${currentOfferId} (${allLines.length} lines${overlapMpns.length ? ', ' + overlapMpns.length + ' MPN overlap with this week!' : ''})`);
+            results.push({
+                label: cfg.label,
+                status: 'dry-run',
+                currentOfferId,
+                currentValue: currentHeader.Value || null,
+                bpId,
+                offerTypeId,
+                linesPlanned: allLines.length,
+                overlapMpns,
+                overlapDetails,
+            });
+            continue;
+        }
+
+        // LIVE: deactivate old, write fresh
+        try {
+            const newLines = allLines.map(l => ({
+                mpn: l.Chuboe_MPN,
+                mpnClean: l.Chuboe_MPN_Clean,
+                mfrText: l.Chuboe_MFR_Text,
+                qty: l.Qty,
+                price: l.PriceEntered,
+                dateCode: l.Chuboe_Date_Code,
+                leadTime: l.Chuboe_Lead_Time,
+                packageDesc: l.Chuboe_Package_Desc,
+                description: l.Description,
+                moq: l.Chuboe_MOQ,
+                spq: l.Chuboe_SPQ,
+            }));
+
+            const deactResult = await deactivateOfferById(currentOfferId);
+            if (!deactResult.success) {
+                throw new Error(`deactivate failed: ${deactResult.error}`);
+            }
+            console.log(`  ${cfg.label}: deactivated old offer ${currentOfferId} (${deactResult.linesDeactivated} lines)`);
+
+            const writeResult = await writeOffer({
+                bpartnerId: bpId,
+                offerTypeId,
+                description: `[Carryover] ${cfg.label} — refreshed ${dateStr}`,
+                lines: newLines,
+            });
+
+            console.log(`  ${cfg.label}: wrote new offer ${writeResult.searchKey || writeResult.offerId} (${writeResult.linesWritten}/${newLines.length} lines)${writeResult.errors.length ? ' [' + writeResult.errors.length + ' line errors]' : ''}`);
+            results.push({
+                label: cfg.label,
+                status: writeResult.errors.length === 0 ? 'success' : 'partial',
+                oldOfferId: currentOfferId,
+                oldValue: currentHeader.Value || null,
+                newOfferId: writeResult.offerId,
+                newSearchKey: writeResult.searchKey,
+                bpId,
+                offerTypeId,
+                linesAttempted: newLines.length,
+                linesWritten: writeResult.linesWritten,
+                errors: writeResult.errors,
+                overlapMpns,
+                overlapDetails,
+            });
+        } catch (e) {
+            console.error(`  ${cfg.label}: FAILED — ${e.message}`);
+            results.push({ label: cfg.label, status: 'failed', error: e.message, currentOfferId, overlapMpns, overlapDetails });
+        }
+    }
+
+    // Console summary
+    const totalOverlap = results.reduce((s, r) => s + (r.overlapMpns?.length || 0), 0);
+    if (totalOverlap > 0) {
+        console.log(`\n  🚨 ATTENTION: ${totalOverlap} carryover MPN(s) now appear in this week's Infor inventory — these parts may have been received and may no longer need a carryover.`);
+    } else {
+        console.log('\n  ✓ No carryover MPNs overlap with this week\'s Infor inventory.');
+    }
+
+    return results;
+}
+
+/**
  * Build an HTML summary email body for the write-back results.
  */
-function buildWritebackSummaryHTML(results, dateStr, dryRun) {
+function buildWritebackSummaryHTML(results, dateStr, dryRun, carryoverResults = []) {
     const totals = {
         success: results.filter(r => r.status === 'success').length,
         partial: results.filter(r => r.status === 'partial').length,
@@ -683,7 +939,71 @@ ${auditRows}
         ? '<div style="background:#fff8c5;padding:10px;border-left:4px solid #d4a72c;margin-bottom:12px"><b>DRY RUN</b> — no records were written to OT. The OLD → NEW column shows offers that <i>would</i> have been deactivated and replaced.</div>'
         : '';
 
+    // ─── Carryover refresh section ───────────────────────────────────────────
+    let carryoverSection = '';
+    let carryoverBanner = '';
+    if (carryoverResults && carryoverResults.length > 0) {
+        const totalOverlap = carryoverResults.reduce((s, r) => s + (r.overlapMpns?.length || 0), 0);
+        if (totalOverlap > 0) {
+            const overlapDetails = carryoverResults
+                .filter(r => r.overlapMpns && r.overlapMpns.length > 0)
+                .map(r => `<li><b>${r.label}</b>: ${r.overlapMpns.length} MPN(s) — ${r.overlapMpns.slice(0, 8).map(m => `<code>${m}</code>`).join(', ')}${r.overlapMpns.length > 8 ? ` <i>(+${r.overlapMpns.length - 8} more)</i>` : ''}</li>`)
+                .join('');
+            carryoverBanner = `<div style="background:#ffebe9;padding:12px;border-left:4px solid #cf222e;margin-bottom:12px;font-size:14px">
+                <b style="color:#cf222e">🚨 ATTENTION:</b> ${totalOverlap} carryover MPN(s) now appear in this week's Infor inventory report. These parts may have been physically received and may no longer need a static carryover. Investigate:
+                <ul style="margin:6px 0 0 0">${overlapDetails}</ul>
+            </div>`;
+        }
+
+        const carryoverRows = carryoverResults.map(r => {
+            const statusColor = r.status === 'success' ? '#1a7f37'
+                              : r.status === 'partial' ? '#bf8700'
+                              : r.status === 'failed'  ? '#cf222e'
+                              : r.status === 'empty'   ? '#57606a'
+                              : '#57606a';
+            let detail = '';
+            if (r.status === 'success' || r.status === 'partial') {
+                detail = `${r.linesWritten}/${r.linesAttempted} lines · old <span style="font-family:monospace">${r.oldValue || r.oldOfferId}</span> → new <span style="font-family:monospace;color:#1a7f37"><b>${r.newSearchKey || r.newOfferId}</b></span>`;
+                if (r.errors && r.errors.length) {
+                    detail += `<br/><small style="color:#cf222e">${r.errors.length} line errors</small>`;
+                }
+            } else if (r.status === 'dry-run') {
+                detail = `${r.linesPlanned} lines, would refresh offer <span style="font-family:monospace">${r.currentValue || r.currentOfferId}</span>`;
+            } else if (r.status === 'empty') {
+                detail = `<i>source offer ${r.currentValue || r.currentOfferId} has 0 active lines — left as-is</i>`;
+            } else if (r.status === 'failed') {
+                detail = `<span style="color:#cf222e">${r.error}</span>`;
+            }
+            const overlap = (r.overlapMpns && r.overlapMpns.length > 0)
+                ? `<b style="color:#cf222e">${r.overlapMpns.length} MPN match(es)</b>`
+                : '<span style="color:#1a7f37">none</span>';
+            return `<tr>
+                <td><b>${r.label}</b></td>
+                <td style="color:${statusColor}"><b>${r.status.toUpperCase()}</b></td>
+                <td>${detail}</td>
+                <td>${overlap}</td>
+            </tr>`;
+        }).join('\n');
+
+        carryoverSection = `
+<h3 style="margin:18px 0 4px 0">Static carryover refresh</h3>
+<p style="margin:0 0 8px 0;font-size:12px;color:#57606a">
+    Inventory loaded outside the Infor export (open-PO Eaton, open-PO Philippines, Marvell incoming bid).
+    Re-created weekly with fresh Created date until roadmap B4 (open-PO inventory) replaces this workaround.
+    Each carryover's MPNs are cross-referenced against this week's Infor data — any overlap means the part may have been received.
+</p>
+<table border="1" cellpadding="6" cellspacing="0" style="border-collapse:collapse;font-size:12px">
+<thead style="background:#f6f8fa">
+<tr><th align="left">Carryover</th><th align="left">Status</th><th align="left">Detail</th><th align="left">In Infor this week?</th></tr>
+</thead>
+<tbody>
+${carryoverRows}
+</tbody>
+</table>`;
+    }
+
     return `<html><body style="font-family:Arial,sans-serif;font-size:13px">
+${carryoverBanner}
 ${banner}
 <h2 style="margin:0 0 8px 0">OT Inventory Write-back — ${dateStr}</h2>
 <p>
@@ -710,6 +1030,7 @@ ${rows}
 </tbody>
 </table>
 ${auditSection}
+${carryoverSection}
 </body></html>`;
 }
 
@@ -1009,6 +1330,77 @@ async function fetchAndProcess(opts = {}) {
         console.log(`\nStep 5: Writing inventory to OT (${dryRun ? 'DRY RUN' : 'LIVE'})...`);
         const writebackResults = await writeInventoryToOT(result.groups, dateStr, dryRun);
 
+        // Step 5b: Refresh static carryover offers (Eaton/PH/Marvell — manually
+        // loaded inventory living outside the Infor export). Build a rich
+        // mpn → [{warehouse, qty, lot}] map from the FULL processed inventory
+        // (every warehouse, not just write-back groups) so the carryover
+        // overlap CSV can show exactly where each matching part now lives.
+        const pendingMpnDetails = new Map();
+        for (const groupName in result.groups) {
+            for (const row of result.groups[groupName]) {
+                const mpn = String(row['Item'] || '').trim();
+                if (!mpn) continue;
+                const detail = {
+                    warehouse:     String(row['Warehouse'] || '').trim(),
+                    warehouseName: String(row['Warehouse Name'] || '').trim(),
+                    qty:           cleanNumeric(row['Lot Quantity']),
+                    lot:           String(row['Lot'] || '').trim(),
+                    location:      String(row['Location'] || '').trim(),
+                };
+                if (!pendingMpnDetails.has(mpn)) pendingMpnDetails.set(mpn, []);
+                pendingMpnDetails.get(mpn).push(detail);
+            }
+        }
+        console.log(`\nStep 5b: Refreshing static carryover offers (${dryRun ? 'DRY RUN' : 'LIVE'}) — comparing against ${pendingMpnDetails.size} unique MPNs from this week's Infor data...`);
+        const carryoverResults = await refreshStaticCarryoverOffers(STATIC_CARRYOVER_OFFERS, dateStr, dryRun, pendingMpnDetails);
+
+        // Build overlap CSV if any carryover MPNs match this week's inventory
+        let overlapCsvPath = null;
+        const totalOverlapCount = carryoverResults.reduce((s, r) => s + (r.overlapDetails?.length || 0), 0);
+        if (totalOverlapCount > 0) {
+            const csvHeaders = [
+                'Carryover',
+                'New Offer Search Key',
+                'New Offer ID',
+                'MPN',
+                'Carryover MFR',
+                'Carryover Qty',
+                'Carryover Date Code',
+                'Carryover Package',
+                'This Week Warehouse',
+                'This Week Warehouse Name',
+                'This Week Qty',
+                'This Week Lot',
+                'This Week Location',
+            ];
+            const csvRows = [];
+            for (const r of carryoverResults) {
+                if (!r.overlapDetails || r.overlapDetails.length === 0) continue;
+                for (const od of r.overlapDetails) {
+                    for (const m of od.thisWeekMatches) {
+                        csvRows.push({
+                            'Carryover':                r.label,
+                            'New Offer Search Key':     r.newSearchKey || r.currentValue || '',
+                            'New Offer ID':             r.newOfferId || r.currentOfferId || '',
+                            'MPN':                      od.mpn,
+                            'Carryover MFR':            od.carryoverMfr,
+                            'Carryover Qty':            od.carryoverQty,
+                            'Carryover Date Code':      od.carryoverDateCode,
+                            'Carryover Package':        od.carryoverPackageDesc,
+                            'This Week Warehouse':      m.warehouse,
+                            'This Week Warehouse Name': m.warehouseName,
+                            'This Week Qty':            m.qty,
+                            'This Week Lot':            m.lot,
+                            'This Week Location':       m.location,
+                        });
+                    }
+                }
+            }
+            overlapCsvPath = path.join(result.outputDir, `carryover_overlap_${dateStr}.csv`);
+            fs.writeFileSync(overlapCsvPath, arrayToCSV(csvRows, csvHeaders));
+            console.log(`  Carryover overlap CSV: ${overlapCsvPath} (${csvRows.length} rows across ${totalOverlapCount} unique MPN match(es))`);
+        }
+
         // Step 6: Send emails
         console.log('\nStep 6: Sending notification emails...');
 
@@ -1029,15 +1421,29 @@ Date: ${dateStr}`,
         const writebackOk    = writebackResults.filter(r => r.status === 'success').length;
         const writebackPart  = writebackResults.filter(r => r.status === 'partial').length;
         const writebackFail  = writebackResults.filter(r => r.status === 'failed').length;
-        const summarySubject = `${dryRun ? '[DRY RUN] ' : ''}OT Inventory Write-back — ${dateStr} (${writebackOk} ok, ${writebackPart} partial, ${writebackFail} failed)`;
-        const summaryHtml    = buildWritebackSummaryHTML(writebackResults, dateStr, dryRun);
+        const carryoverOverlap = carryoverResults.reduce((s, r) => s + (r.overlapMpns?.length || 0), 0);
+        const overlapTag = carryoverOverlap > 0 ? ` 🚨 ${carryoverOverlap} CARRYOVER MPNS NOW IN INFOR` : '';
+        const summarySubject = `${dryRun ? '[DRY RUN] ' : ''}OT Inventory Write-back — ${dateStr} (${writebackOk} ok, ${writebackPart} partial, ${writebackFail} failed)${overlapTag}`;
+        const summaryHtml    = buildWritebackSummaryHTML(writebackResults, dateStr, dryRun, carryoverResults);
 
-        const sent2 = await notifier.sendEmail(
-            EMAIL_CONFIG.recipient,
-            summarySubject,
-            summaryHtml,
-            { html: true }
-        );
+        // If we have an overlap CSV, attach it; otherwise send html-only
+        let sent2;
+        if (overlapCsvPath && fs.existsSync(overlapCsvPath)) {
+            sent2 = await notifier.sendWithAttachment(
+                EMAIL_CONFIG.recipient,
+                summarySubject,
+                summaryHtml,
+                [{ filename: path.basename(overlapCsvPath), path: overlapCsvPath }],
+                { html: true }
+            );
+        } else {
+            sent2 = await notifier.sendEmail(
+                EMAIL_CONFIG.recipient,
+                summarySubject,
+                summaryHtml,
+                { html: true }
+            );
+        }
 
         // Step 7: Move processed email (skip on dry-run so the source can be replayed)
         if (!dryRun) {

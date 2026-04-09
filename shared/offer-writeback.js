@@ -413,6 +413,63 @@ async function deactivatePriorOffers(bpartnerId, offerTypeId, opts = {}) {
   return { offersDeactivated: deactivatedOffers.length, linesDeactivated, deactivatedOffers };
 }
 
+// ─── DEACTIVATION BY ID ─────────────────────────────────────────────────────
+
+/**
+ * Deactivate a single offer by ID — header + all active lines, paginated.
+ *
+ * Use this when you already know the offer's PK (e.g. for static-carryover
+ * refresh: read header + lines, deactivate by ID, write a new copy). This
+ * is a sibling to `deactivatePriorOffers` which scopes by (BP, OfferType, …).
+ *
+ * Lines are deactivated in paginated batches because the iDempiere REST API
+ * caps GETs at 100 records server-side regardless of `top`. See the comment
+ * on `deactivatePriorOffers` for the empirical evidence.
+ *
+ * @param {number} offerId - chuboe_offer_id (PK)
+ * @returns {Promise<{success: boolean, linesDeactivated: number, error?: string}>}
+ */
+async function deactivateOfferById(offerId) {
+  let linesDeactivated = 0;
+  let pageNum = 0;
+  try {
+    while (true) {
+      const lineResult = await apiGet('chuboe_offer_line', {
+        filter: `chuboe_offer_id eq ${offerId} and IsActive eq true`,
+        select: 'Line',
+      });
+      const lines = lineResult.records || [];
+      if (lines.length === 0) break;
+      pageNum++;
+      for (const line of lines) {
+        try {
+          await apiPut('chuboe_offer_line', line.id, { IsActive: false });
+          linesDeactivated++;
+        } catch (e) {
+          logger.warn(`deactivateOfferById: failed to deactivate line ${line.id} on offer ${offerId}: ${e.message}`);
+        }
+      }
+      if (pageNum > 100) {
+        logger.error(`deactivateOfferById: hit page cap (100) on offer ${offerId} — investigate`);
+        break;
+      }
+    }
+  } catch (e) {
+    logger.error(`deactivateOfferById: failed to query lines for offer ${offerId}: ${e.message}`);
+    return { success: false, linesDeactivated, error: e.message };
+  }
+
+  try {
+    await apiPut('chuboe_offer', offerId, { IsActive: false });
+  } catch (e) {
+    logger.error(`deactivateOfferById: failed to deactivate offer header ${offerId}: ${e.message}`);
+    return { success: false, linesDeactivated, error: e.message };
+  }
+
+  logger.info(`deactivateOfferById: deactivated offer ${offerId} + ${linesDeactivated} lines`);
+  return { success: true, linesDeactivated };
+}
+
 // ─── UTILITY: MFR ID LOOKUP ─────────────────────────────────────────────────
 
 /**
@@ -437,6 +494,7 @@ module.exports = {
   writeOffer,
   writeOffers,
   deactivatePriorOffers,
+  deactivateOfferById,
   lookupMfrId,
   cleanMpn,
   OFFER_TYPES,
