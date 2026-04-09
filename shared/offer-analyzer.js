@@ -53,7 +53,8 @@ function fetchOfferFromOT(offerIds) {
                     `WHERE o.chuboe_offer_id IN (${idList}) AND o.isactive = 'Y'`;
   // Use ASCII Unit Separator (\x1f, never appears in real text) so descriptions
   // containing | / , / tab don't break field splitting. Bash needed for $'...' quoting.
-  const headerRaw = execSync(`psql -t -A -F $'\\x1f' -c "${headerSql}"`, { encoding: 'utf-8', shell: '/bin/bash' });
+  // -U analytics_user is required under cron (cron doesn't pass $USER)
+  const headerRaw = execSync(`psql -U analytics_user -t -A -F $'\\x1f' -c "${headerSql}"`, { encoding: 'utf-8', shell: '/bin/bash' });
   const offers = headerRaw.split('\n')
     .map(l => l.trim())
     .filter(l => l && !l.startsWith('rbash') && !l.includes('/dev/null') && !l.includes('/tmp/claude'))
@@ -80,7 +81,7 @@ function fetchOfferFromOT(offerIds) {
                   `FROM adempiere.chuboe_offer_line ol ` +
                   `WHERE ol.chuboe_offer_id IN (${idList}) AND ol.isactive = 'Y' ` +
                   `ORDER BY ol.chuboe_offer_id, ol.line`;
-  const linesRaw = execSync(`psql -t -A -F $'\\x1f' -c "${lineSql}"`, { encoding: 'utf-8', maxBuffer: 100 * 1024 * 1024, shell: '/bin/bash' });
+  const linesRaw = execSync(`psql -U analytics_user -t -A -F $'\\x1f' -c "${lineSql}"`, { encoding: 'utf-8', maxBuffer: 100 * 1024 * 1024, shell: '/bin/bash' });
   const lines = linesRaw.split('\n')
     .map(l => l.trim())
     .filter(l => l && !l.startsWith('rbash') && !l.includes('/dev/null') && !l.includes('/tmp/claude'))

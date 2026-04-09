@@ -32,7 +32,8 @@ const IDEMPIERE_DEFAULTS = {
  */
 function psqlQuery(sql, timeout = 15000) {
   try {
-    const result = execSync(`psql -t -A -F '|' -c "${sql.replace(/"/g, '\\"')}"`, {
+    // -U analytics_user is required under cron (cron doesn't pass $USER)
+    const result = execSync(`psql -U analytics_user -t -A -F '|' -c "${sql.replace(/"/g, '\\"')}"`, {
       encoding: 'utf-8',
       timeout,
     });
@@ -60,7 +61,8 @@ function psqlQuery(sql, timeout = 15000) {
  */
 function psqlExec(sql, timeout = 15000) {
   try {
-    const result = execSync(`psql -c "${sql.replace(/"/g, '\\"')}"`, {
+    // -U analytics_user is required under cron (cron doesn't pass $USER)
+    const result = execSync(`psql -U analytics_user -c "${sql.replace(/"/g, '\\"')}"`, {
       encoding: 'utf-8',
       timeout,
     });

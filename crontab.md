@@ -4,6 +4,18 @@ Single source of truth for scheduled jobs running under `analytics_user`. Update
 
 Last verified: **2026-04-09**
 
+## Environment
+
+```cron
+PGUSER=analytics_user
+```
+
+Set as a global variable at the top of the crontab. **Required for any job that touches Postgres** because cron does NOT pass `$USER` and libpq has no other way to determine the auth identity for Unix-socket peer auth — without it, every `psql` call (including `pg.Pool` connections that don't pass `user` explicitly AND every `execSync('psql ...')` child process call) fails with `fe_sendauth: no password supplied`.
+
+Discovered the hard way 2026-04-09 evening: enrich-poller cron tick at 17:30 ran successfully but VQ writes were silently degraded because `shared/mfr-lookup.js` (and 4 other shared modules) call `execSync('psql ...')` for MFR resolution and were getting auth failures. Some VQs wrote, most didn't, "0 errors" reported. Fixed in two layers: (1) `PGUSER=analytics_user` at top of crontab, (2) `-U analytics_user` added to every `execSync psql` call in `shared/mfr-lookup.js`, `shared/db-helpers.js`, `shared/market-data.js`, `shared/offer-analyzer.js`, `shared/partner-lookup.js` so they work regardless of cron env.
+
+When adding new cron jobs that touch the DB, neither layer is strictly required (the other one covers you), but having both is the belt-and-suspenders default.
+
 ## Active jobs
 
 | Schedule | Job | What it does | Script | Log |

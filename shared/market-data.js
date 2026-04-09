@@ -38,7 +38,8 @@ const DEFAULTS = {
 
 function psql(query) {
   try {
-    const result = execSync(`psql -t -A -F '|' -c "${query.replace(/"/g, '\\"')}"`, {
+    // -U analytics_user is required under cron (cron doesn't pass $USER)
+    const result = execSync(`psql -U analytics_user -t -A -F '|' -c "${query.replace(/"/g, '\\"')}"`, {
       encoding: 'utf-8',
       timeout: 30000
     });

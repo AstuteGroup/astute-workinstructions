@@ -127,7 +127,12 @@ function queryDBFuzzy(mfrName) {
 
       const sql = `SELECT chuboe_mfr_id, name, ad_client_id FROM adempiere.chuboe_mfr WHERE isactive='Y' AND ${conditions} ORDER BY LENGTH(name) ASC LIMIT 5`;
 
-      const result = execSync(`psql -t -A -F '|' -c "${sql.replace(/"/g, '\\"')}"`, {
+      // -U analytics_user is REQUIRED under cron — cron doesn't pass $USER
+      // and libpq has no other way to determine the auth identity. Without
+      // it, the call fails with "fe_sendauth: no password supplied" and the
+      // MFR resolution silently degrades. Same root cause as the pg.Pool
+      // fix in feedback_cron_pg_user.md but for child-process psql calls.
+      const result = execSync(`psql -U analytics_user -t -A -F '|' -c "${sql.replace(/"/g, '\\"')}"`, {
         encoding: 'utf-8',
         timeout: 10000,
       });
@@ -176,7 +181,8 @@ function queryDB(mfrName) {
     const escaped = mfrName.replace(/'/g, "''");
     const sql = `SELECT chuboe_mfr_id, name, ad_client_id FROM adempiere.chuboe_mfr WHERE isactive='Y' AND (UPPER(name) = UPPER('${escaped}') OR name ILIKE '${escaped} %' OR name ILIKE '% ${escaped}' OR name ILIKE '${escaped},%' OR '${escaped}' ILIKE name || ' %') ORDER BY CASE WHEN UPPER(name) = UPPER('${escaped}') THEN 0 WHEN name ILIKE '${escaped}%' THEN 1 ELSE 2 END, LENGTH(name) ASC LIMIT 1`;
 
-    const result = execSync(`psql -t -A -F '|' -c "${sql.replace(/"/g, '\\"')}"`, {
+    // -U analytics_user is required under cron (cron doesn't pass $USER)
+    const result = execSync(`psql -U analytics_user -t -A -F '|' -c "${sql.replace(/"/g, '\\"')}"`, {
       encoding: 'utf-8',
       timeout: 10000,
     });

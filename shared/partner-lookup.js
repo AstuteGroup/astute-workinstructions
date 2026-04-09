@@ -37,7 +37,8 @@ const DOMAIN_SUFFIXES = ['electronics', 'electronic', 'elec', 'intl', 'internati
  */
 function psqlQuery(sql, timeout = 10000) {
   try {
-    return execSync(`psql -t -A -F '|' -c "${sql.replace(/"/g, '\\"')}"`, {
+    // -U analytics_user is required under cron (cron doesn't pass $USER)
+    return execSync(`psql -U analytics_user -t -A -F '|' -c "${sql.replace(/"/g, '\\"')}"`, {
       encoding: 'utf-8',
       timeout
     }).trim();
