@@ -44,6 +44,7 @@ const COLUMN_DEFS = {
   'Qty': { width: 12, format: 'number' },
   'Supplier Price': { width: 14, format: 'currency_precise' },
   '% Under Target': { width: 14, format: 'percent' },
+  'Supply': { width: 11, format: 'text' },
   'lead_time': { width: 14, format: 'text' },
   'Date Code': { width: 14, format: 'text' },
   'Created Date': { width: 14, format: 'date' },
@@ -58,25 +59,25 @@ const COLUMNS = {
     'RFQ Number', '% Under Target', 'RFQ Created', 'RFQ Customer', 'RFQ MPN', 'RFQ MFR', 'RFQ Qty', 'RFQ Target',
     'Customer Part Number', 'Type', 'MO Type', 'Supplier MPN', 'Supplier MFR',
     'Supplier/Excess Partner', 'Qty', 'Supplier Price',
-    'lead_time', 'Date Code', 'Created Date', 'Days Btw MO/VQ & RFQ', '% of Demand', 'Opp Amount'
+    'Supply', 'lead_time', 'Date Code', 'Created Date', 'Days Btw MO/VQ & RFQ', '% of Demand', 'Opp Amount'
   ],
   'All Prices': [
     'RFQ Number', 'RFQ Created', 'RFQ Customer', 'RFQ MPN', 'RFQ MFR', 'RFQ Qty',
     'Customer Part Number', 'Type', 'MO Type', 'Supplier MPN', 'Supplier MFR',
     'Supplier/Excess Partner', 'Qty', 'Supplier Price',
-    'lead_time', 'Date Code', 'Created Date', 'Days Btw MO/VQ & RFQ', '% of Demand', 'Opp Amount'
+    'Supply', 'lead_time', 'Date Code', 'Created Date', 'Days Btw MO/VQ & RFQ', '% of Demand', 'Opp Amount'
   ],
   'No Prices': [
     'RFQ Number', 'RFQ Created', 'RFQ Customer', 'RFQ MPN', 'RFQ MFR', 'RFQ Qty', 'RFQ Target',
     'Customer Part Number', 'Type', 'MO Type', 'Supplier MPN', 'Supplier MFR',
     'Supplier/Excess Partner', 'Qty',
-    'lead_time', 'Date Code', 'Created Date', 'Days Btw MO/VQ & RFQ', '% of Demand'
+    'Supply', 'lead_time', 'Date Code', 'Created Date', 'Days Btw MO/VQ & RFQ', '% of Demand'
   ],
   'Stock': [
     'RFQ Number', 'RFQ Created', 'RFQ Customer', 'RFQ MPN', 'RFQ MFR', 'RFQ Qty', 'RFQ Target',
     'Customer Part Number', 'MO Type', 'Supplier MPN', 'Supplier MFR',
     'Supplier/Excess Partner', 'Qty', 'Supplier Price',
-    'lead_time', 'Date Code', 'Created Date', 'Days Btw MO/VQ & RFQ', '% of Demand', 'Opp Amount'
+    'Supply', 'lead_time', 'Date Code', 'Created Date', 'Days Btw MO/VQ & RFQ', '% of Demand', 'Opp Amount'
   ]
 };
 
@@ -87,6 +88,46 @@ const COLUMNS = {
 // → alias file → acquisitions chain). See that module's header for the full
 // pipeline, the rules for adding new equivalences, and the supported callers.
 const { computeMfrMatch } = require('../../shared/mfr-equivalence');
+
+// ─── SUPPLY STATE ───────────────────────────────────────────────────────────
+// Categorical scan-aid for the seller. Today the seller has to read (Qty,
+// lead_time) together and infer what the row means. With ~50% of rows on a
+// PPV RFQ showing both qty>0 AND a lead_time string, the inference is wrong
+// often enough to cause confidence-affecting mistakes:
+//   - STOCK+LT misread as pure stock → seller commits to a delivery they
+//     can't make
+//   - LEAD TIME (qty=0) dismissed as "0 = nothing" → real opportunity
+//     written off
+//
+// Supply state collapses (qty, lead_time) into one of four categorical values
+// rendered in its own column right next to lead_time:
+//
+//   STOCK     — qty > 0, lt blank or stock-like (ship now, no caveats)
+//   STOCK+LT  — qty > 0, lt set with a non-stock value (legitimate but
+//               investigate why — could be franchise restock, partial stock,
+//               or broker shipping/customs window)
+//   LEAD TIME — qty = 0, lt set (contract quote, future delivery only —
+//               valid for PPV, NOT to be written off)
+//   ?         — qty = 0, lt blank (vendor told us neither — broker noise)
+//
+// "Stock-like" in lt: blank, "stock", "in stock", "ready", "available",
+// "asap", "ship now". Case-insensitive.
+//
+// Applied uniformly to MO and VQ rows, broker and franchise alike — see the
+// 2026-04-09 design discussion for the trade-off (the categorization is most
+// reliable on API-sourced franchise data; broker free-text rows in STOCK+LT
+// state may need a manual look at lead_time, same as today).
+const STOCK_LIKE_LT = /^(stock|in[\s-]*stock|ready[\s-]*stock|ready|available|asap|ship[\s-]*now)\s*$/i;
+
+function computeSupplyState(qty, leadTime) {
+  const q = Number(qty) || 0;
+  const lt = (leadTime || '').trim();
+  const ltIsStockLike = lt === '' || STOCK_LIKE_LT.test(lt);
+  if (q > 0 && ltIsStockLike) return 'STOCK';
+  if (q > 0 && !ltIsStockLike) return 'STOCK+LT';
+  if (q === 0 && !ltIsStockLike) return 'LEAD TIME';
+  return '?';  // qty=0 AND lt blank/stock-like — vendor gave us nothing
+}
 
 /**
  * Fetch RFQ details from database
@@ -266,6 +307,9 @@ function joinData(rfqRows, offers) {
         oppAmount = rfqTarget * rfqQty;
       }
 
+      const leadTimeText = offer.lead_time || '';
+      const supplyState = computeSupplyState(supplierQty, leadTimeText);
+
       results.push({
         'RFQ Number': rfq.rfq_number,
         'RFQ Created': rfqDate,
@@ -283,7 +327,8 @@ function joinData(rfqRows, offers) {
         'Qty': supplierQty,
         'Supplier Price': supplierPrice,
         '% Under Target': percentUnderTarget,
-        'lead_time': offer.lead_time || '',
+        'Supply': supplyState,
+        'lead_time': leadTimeText,
         'Date Code': offer.date_code || '',
         'Created Date': offerDate,
         'Days Btw MO/VQ & RFQ': daysBetween,
@@ -341,6 +386,37 @@ function categorizeResults(joinedData, hasTargets) {
   }
 
   return { stock, goodPrices, allPrices, noPrices };
+}
+
+/**
+ * Sort rows so the seller's top-down scan surfaces the most actionable rows
+ * first per part. Three keys:
+ *   1. (RFQ MPN, RFQ MFR) — group all rows for the same part together
+ *   2. Supply state — STOCK first, then STOCK+LT, then LEAD TIME, then ?
+ *      so ship-now rows lead each part's group, but lead-time-only rows
+ *      stay visible immediately below (NOT buried at the end of an
+ *      unsorted list — important for PPV where LT is acceptable)
+ *   3. Supplier Price ascending — within a supply state, cheapest wins
+ *
+ * Sorts in place; returns the same array for chaining.
+ */
+const SUPPLY_ORDINAL = { 'STOCK': 1, 'STOCK+LT': 2, 'LEAD TIME': 3, '?': 4 };
+
+function sortByPartAndSupply(rows) {
+  return rows.sort((a, b) => {
+    const mpnCmp = String(a['RFQ MPN'] || '').localeCompare(String(b['RFQ MPN'] || ''));
+    if (mpnCmp !== 0) return mpnCmp;
+    const mfrCmp = String(a['RFQ MFR'] || '').localeCompare(String(b['RFQ MFR'] || ''));
+    if (mfrCmp !== 0) return mfrCmp;
+    const supplyCmp = (SUPPLY_ORDINAL[a.Supply] || 9) - (SUPPLY_ORDINAL[b.Supply] || 9);
+    if (supplyCmp !== 0) return supplyCmp;
+    const priceA = a['Supplier Price'];
+    const priceB = b['Supplier Price'];
+    if (priceA == null && priceB == null) return 0;
+    if (priceA == null) return 1;   // null/missing prices to the end
+    if (priceB == null) return -1;
+    return priceA - priceB;
+  });
 }
 
 /**
@@ -428,6 +504,25 @@ async function createWorkbook(data, columns, fileType) {
     }
   }
 
+  // % of Demand: for LEAD TIME rows the seller's qty=0 produces 0% which
+  // visually equates the row with "no opportunity" and risks the seller
+  // writing it off. Override the cell with the literal text "LT" so the
+  // row is unambiguously a lead-time quote — same protection the Supply
+  // column gives, but in the demand-coverage column where the 0% confusion
+  // would otherwise live.
+  const demandColIndex = columns.indexOf('% of Demand');
+  if (demandColIndex >= 0) {
+    const colNum = demandColIndex + 1;
+    for (let i = 0; i < data.length; i++) {
+      if (data[i].Supply === 'LEAD TIME') {
+        const cell = worksheet.getCell(i + 2, colNum);
+        cell.value = 'LT';
+        cell.numFmt = '@';  // text format — overrides the column-level percent format
+        cell.alignment = { horizontal: 'center' };
+      }
+    }
+  }
+
   return workbook;
 }
 
@@ -476,6 +571,14 @@ async function runVortexForRFQ(rfqNumber, { log = () => {} } = {}) {
 
   const joinedData = joinData(rfqRows, allOffers);
   const { stock, goodPrices, allPrices, noPrices } = categorizeResults(joinedData, hasTargets);
+
+  // Sort each tab by (part, supply state, price) so STOCK rows lead each
+  // part's group and lead-time-only rows stay visible right below them
+  // ranked by price — see sortByPartAndSupply for the rationale.
+  sortByPartAndSupply(stock);
+  sortByPartAndSupply(goodPrices);
+  sortByPartAndSupply(allPrices);
+  sortByPartAndSupply(noPrices);
 
   const summary = {
     customer,
