@@ -2,7 +2,7 @@
 
 Single source of truth for scheduled jobs running under `analytics_user`. Update this file whenever a cron entry is added, changed, or removed. Verify against `crontab -l` periodically.
 
-Last verified: **2026-04-08**
+Last verified: **2026-04-09**
 
 ## Active jobs
 
@@ -12,7 +12,7 @@ Last verified: **2026-04-08**
 | `0 12 * * 1` | **LAM Kitting Reorder** | Weekly Mon 12:00 — runs LAM Kitting reorder analysis (BOM → demand → franchise sourcing) | `Trading Analysis/LAM Kitting Reorder/lam-kitting-runner.js` | `Trading Analysis/LAM Kitting Reorder/data/cron.log` |
 | `*/20 * * * *` | **Vortex Matches Poller** | Every 20 min — polls `vortex@orangetsunami.com` inbox for forwarded RFQ emails, runs Vortex Matches (supply-vs-demand match across VQs/offers/stock), emails results back to original requestor + Cc list | `Trading Analysis/Vortex Matches/vortex-poller.js` | `/tmp/vortex-poller.log` |
 | `*/30 * * * *` | **API Queue Worker** | Every 30 min — drains Bucket A queue (rate-limited / failed franchise API calls scheduled for retry) | `scripts/process-api-queue.js` | `/tmp/api-queue-worker.log` |
-| ~~`*/15 * * * *`~~ **DISABLED 2026-04-08** | **RFQ API Enrichment Poller** | Every 15 min — polls `chuboe_rfq` for new RFQs since watermark, routes each through all 7 franchise APIs (TTL cache: PPV/Astute Franchised 30d, others 7d), writes VQ lines + thin-pointer audit rows. **Disabled pending A4 investigation** — upstream `chuboe_rfq_line_mpn` has duplicate rows on PPV RFQs (Sanmina especially) and the enricher amplifies the dups into VQ writes. See `Trading Analysis/trading-analysis-roadmap.md` § A4. | `Trading Analysis/RFQ API Enrichment/enrich-poller.js` | `/tmp/enrich-poller.log` |
+| `*/15 * * * *` | **RFQ API Enrichment Poller** | Every 15 min — polls `chuboe_rfq` for new RFQs since watermark, routes each through all 7 franchise APIs (TTL cache: PPV/Astute Franchised 30d, others 7d), writes VQ lines + thin-pointer audit rows. **Re-enabled 2026-04-09** after A4 dup amplification fixes shipped in commit `3fbd0fb` (writer-layer natural-key check-before-retry + enrich-rfq read-side dedup on `(line_id, mpn_clean, mfr_id)`). Also depends on Arrow / Verical channel split (commit `fa740e9`) and vq-writer Buyer_ID/Packaging_ID null handling (commit `05d03e1`). | `Trading Analysis/RFQ API Enrichment/enrich-poller.js` | `/tmp/enrich-poller.log` |
 
 ## Watermark / state files
 
