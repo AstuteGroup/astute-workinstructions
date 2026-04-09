@@ -25,6 +25,7 @@
  */
 
 const { execSync } = require('child_process');
+const { isInfrastructureError } = require('./db-helpers');
 
 // --- Config ---
 const DEFAULTS = {
@@ -45,6 +46,9 @@ function psql(query) {
     });
     return parsePsqlOutput(result);
   } catch (e) {
+    // Re-throw infrastructure errors so callers can't confuse "broken
+    // lookup" with "no rows." See db-helpers.isInfrastructureError.
+    if (isInfrastructureError(e)) throw e;
     const combined = ((e.stdout || '') + '\n' + (e.stderr || '')).trim();
     return parsePsqlOutput(combined);
   }

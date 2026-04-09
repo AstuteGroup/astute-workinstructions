@@ -27,6 +27,7 @@
 const { execSync } = require('child_process');
 const fs = require('fs');
 const path = require('path');
+const { isInfrastructureError } = require('./db-helpers');
 
 // --- Alias file (shared across all workflows) ---
 const ALIAS_FILE = path.resolve(__dirname, '../Trading Analysis/Market Offer Loading/mfr-aliases.json');
@@ -164,7 +165,16 @@ function queryDBFuzzy(mfrName) {
         }
       }
     } catch (e) {
-      // Fall through
+      // Re-throw infrastructure errors (auth/connection/etc.) so callers see
+      // them as broken-lookup, NOT as no-result. Without this re-throw, a
+      // cron-launched run with no PGUSER would silently degrade — psql fails,
+      // we return null, vq-writer treats null as "no MFR found" and the row
+      // gets skipped or written without an MFR ID. The 17:30 cron tick on
+      // 2026-04-09 hit exactly this pattern. Now infrastructure failures
+      // bubble up loudly so the writer can mark the row as failed and
+      // surface the count in the run summary.
+      if (isInfrastructureError(e)) throw e;
+      // Otherwise (parse errors, no rows, etc.) fall through legitimately.
     }
   }
 
@@ -201,7 +211,11 @@ function queryDB(mfrName) {
       return { id: null, name: parts[0], isSystem: false };
     }
   } catch (e) {
-    // Also check stderr for rbash environments
+    // Re-throw infrastructure errors so callers see them as broken-lookup,
+    // not as no-result. See the matching comment in fuzzyMatch above.
+    if (isInfrastructureError(e)) throw e;
+    // Otherwise: parse stderr for rbash noise the way we did stdout (some
+    // environments emit psql output to stderr) and try to recover any rows.
     const combined = ((e.stdout || '') + '\n' + (e.stderr || '')).trim();
     const lines = combined.split('\n').filter(l => {
       const t = l.trim();

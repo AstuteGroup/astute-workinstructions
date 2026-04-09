@@ -110,6 +110,23 @@ function renderSummaryHtml(batchResults, sinceIso, untilIso) {
   const totalDurationSec = batchResults.reduce((s, r) => s + ((r.durationMs || 0) / 1000), 0);
   const cacheHitPct = totalLines > 0 ? Math.round(100 * totalCacheHits / totalLines) : 0;
 
+  // Anomaly warnings — collect across all RFQs in the batch.
+  // SILENT_NO_VQS / LOW_VQ_YIELD patterns get surfaced as a banner BEFORE
+  // the per-RFQ table so the operator can't miss them when scanning the
+  // email. The 2026-04-09 17:30 cron tick was the canonical example: 24
+  // RFQs processed, "0 errors" reported, but only a handful of VQs landed.
+  const allWarnings = batchResults.flatMap(r =>
+    (r.warnings || []).map(w => ({ ...w, rfq: r.rfq, customer: r.customer }))
+  );
+  const warningBanner = allWarnings.length === 0 ? '' : `
+    <div style="border:2px solid #c00;padding:10px 14px;background:#fff5f5;margin-bottom:14px;font-size:13px">
+      <b style="color:#c00;font-size:14px">⚠ ${allWarnings.length} ANOMALY WARNING${allWarnings.length === 1 ? '' : 'S'} — investigate before next tick</b>
+      <ul style="margin:6px 0 0 18px;padding:0">
+        ${allWarnings.map(w => `<li><b>[${w.severity}] ${w.pattern}</b> — RFQ ${w.rfq} (${w.customer || '?'}): ${w.detail}</li>`).join('')}
+      </ul>
+    </div>
+  `;
+
   const rows = batchResults.map(r => `
     <tr>
       <td>${r.rfq}</td>
@@ -130,6 +147,7 @@ function renderSummaryHtml(batchResults, sinceIso, untilIso) {
     <html><body style="font-family:Arial,sans-serif">
     <h3>RFQ API Enrichment — batch summary</h3>
     <p>Window: ${sinceIso} → ${untilIso}</p>
+    ${warningBanner}
     <table border="1" cellpadding="6" cellspacing="0" style="border-collapse:collapse">
       <tr style="background:#f0f0f0"><th colspan="2">Totals</th></tr>
       <tr><td>RFQs processed</td><td style="text-align:right">${totalRfqs}</td></tr>
@@ -247,12 +265,19 @@ async function main() {
     }
   }
 
-  // Send summary email
+  // Send summary email — surface anomaly warnings in the SUBJECT so the
+  // operator notices in their inbox without opening the message.
   try {
     const totalErrors = batchResults.reduce((s, r) => s + (r.errors?.length || 0), 0);
-    const subject = totalErrors > 0
-      ? `RFQ API Enrichment — ${batchResults.length} RFQs, ${totalErrors} errors`
-      : `RFQ API Enrichment — ${batchResults.length} RFQs processed`;
+    const totalWarnings = batchResults.reduce((s, r) => s + (r.warnings?.length || 0), 0);
+    let subject;
+    if (totalWarnings > 0) {
+      subject = `⚠ RFQ API Enrichment — ${batchResults.length} RFQs, ${totalWarnings} ANOMALY WARNING${totalWarnings === 1 ? '' : 'S'} (${totalErrors} errors)`;
+    } else if (totalErrors > 0) {
+      subject = `RFQ API Enrichment — ${batchResults.length} RFQs, ${totalErrors} errors`;
+    } else {
+      subject = `RFQ API Enrichment — ${batchResults.length} RFQs processed`;
+    }
     const html = renderSummaryHtml(batchResults, sinceIso, untilIso);
     await sendEmail(subject, html);
     log('Summary email sent');

@@ -14,6 +14,7 @@
  */
 
 const { execSync } = require('child_process');
+const { isInfrastructureError } = require('./db-helpers');
 
 // Generic domains where the domain itself gives no company info
 const GENERIC_DOMAINS = new Set([
@@ -43,6 +44,11 @@ function psqlQuery(sql, timeout = 10000) {
       timeout
     }).trim();
   } catch (err) {
+    // Re-throw infrastructure errors so callers can't confuse "broken
+    // lookup" with "no partner found." See db-helpers.isInfrastructureError
+    // for the rationale and the 2026-04-09 cron incident that motivated
+    // surfacing these loudly instead of returning empty.
+    if (isInfrastructureError(err)) throw err;
     return '';
   }
 }

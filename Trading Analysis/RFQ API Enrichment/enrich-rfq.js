@@ -203,6 +203,16 @@ async function enrichRFQ(rfqDocNumber, opts = {}) {
     mfrUnknown: 0,
     mfrMismatchSamples: [],  // first 5 {mpn, rfqMfr, supplierMfr, distributor}
     errors: [],
+    // Anomaly warnings — populated AFTER the loop in finalizeAndDetectAnomalies()
+    // below. The smoking-gun pattern is "we processed N lines, made API calls
+    // OR got cache hits, the writer reported 0 errors, but ZERO VQs landed."
+    // That happened on the 17:30 cron tick on 2026-04-09 because mfr-lookup
+    // was silently degrading under cron's no-PGUSER environment. The shared
+    // module catches now re-throw infrastructure errors so this should bubble
+    // as real failures, but the anomaly detector is the second line of
+    // defense — it catches ANY future silent-skip pattern (not just psql
+    // auth failures) by comparing inputs to outputs.
+    warnings: [],
   };
 
   for (let i = 0; i < lines.length; i++) {
@@ -338,6 +348,64 @@ async function enrichRFQ(rfqDocNumber, opts = {}) {
     }
   }
 
+  // ── Anomaly detection ────────────────────────────────────────────────────
+  // Catch silent-degradation patterns where the run "looked successful" but
+  // produced no work. The smoking-gun signature from the 2026-04-09 17:30
+  // cron tick:
+  //   - we processed >0 lines
+  //   - we made API calls OR got cache hits (so we DID query distributors)
+  //   - the writer reported 0 errors AND 0 flagged
+  //   - BUT 0 VQs landed in chuboe_vq_line
+  //
+  // That combination is structurally impossible if everything works — at
+  // minimum every line should produce a flagged row if it couldn't write.
+  // 0/0/0 means rows are being silently dropped somewhere in the pipeline.
+  // Surface as a loud warning so the operator can investigate before the
+  // pattern compounds across hundreds of RFQs.
+  const totalAttempts = counters.apiCalls + counters.cacheHits;
+  // "Lines that actually had supply to quote" — FULL or PARTIAL coverage
+  // means searchAllDistributors found at least one distributor with stock
+  // for that line. NONE means the APIs returned nothing, in which case
+  // 0 VQs is the legitimate outcome (not a silent skip).
+  const linesWithSupply = counters.qtyMatches + counters.partialCoverage;
+
+  if (
+    counters.lines > 0 &&
+    totalAttempts > 0 &&
+    linesWithSupply > 0 &&  // ← gate: only flag when we DID find supply
+    counters.vqsWritten === 0 &&
+    counters.vqsFailed === 0 &&
+    counters.vqsFlagged === 0 &&
+    counters.errors.length === 0 &&
+    !dryRun
+  ) {
+    counters.warnings.push({
+      severity: 'HIGH',
+      pattern: 'SILENT_NO_VQS',
+      detail: `${counters.lines} lines, ${counters.apiCalls} API calls + ${counters.cacheHits} cache hits, ${linesWithSupply} lines had supply (FULL/PARTIAL coverage), 0 VQs written, 0 errors, 0 flagged. Structurally impossible if the writer is healthy — investigate the MFR/BP/packaging resolution path for silent failures.`,
+    });
+  }
+
+  // Lower-severity warning: yield ratio < 25% with no errors. Same gate —
+  // only consider lines that had supply (NONE-coverage lines are
+  // legitimately 0-VQ and shouldn't drag down the ratio).
+  if (
+    linesWithSupply >= 10 &&
+    counters.vqsWritten > 0 &&
+    counters.vqsFailed === 0 &&
+    counters.errors.length === 0 &&
+    !dryRun
+  ) {
+    const yieldRatio = counters.vqsWritten / linesWithSupply;
+    if (yieldRatio < 0.25) {
+      counters.warnings.push({
+        severity: 'MEDIUM',
+        pattern: 'LOW_VQ_YIELD',
+        detail: `${counters.vqsWritten} VQs written from ${linesWithSupply} lines with supply (${(yieldRatio * 100).toFixed(0)}% yield). Expected ratio depends on supplier count but <25% with 0 errors suggests silent skips somewhere — verify against api_pricing_cache for the same MPNs.`,
+      });
+    }
+  }
+
   return {
     rfq: rfqDocNumber,
     customer,
@@ -404,6 +472,16 @@ async function main() {
       }
     }
     console.log(`Errors:       ${summary.errors.length}`);
+    // Anomaly warnings — surface BEFORE the regular flag/fail samples so the
+    // operator sees them at eye level. Silent-skip patterns matter even when
+    // (and ESPECIALLY when) "errors=0".
+    if (summary.warnings?.length > 0) {
+      console.log('\n⚠ ANOMALY WARNINGS:');
+      summary.warnings.forEach((w, i) => {
+        console.log(`  [${w.severity}] ${w.pattern}: ${w.detail}`);
+      });
+      console.log('');
+    }
     if (Object.keys(summary.flagReasonCounts || {}).length > 0) {
       console.log('Flag reasons:');
       for (const [reason, count] of Object.entries(summary.flagReasonCounts)) {

@@ -24,11 +24,57 @@ const IDEMPIERE_DEFAULTS = {
   updatedby: 1000004,
 };
 
+// ─── INFRASTRUCTURE ERROR DETECTION ──────────────────────────────────────────
+
+/**
+ * Classify a thrown error from execSync('psql ...') as either:
+ *   - INFRASTRUCTURE BROKEN (auth failed, connection refused, psql missing,
+ *     permission denied, network error, etc.) → callers MUST re-throw or
+ *     surface loudly. Returning null/empty would silently degrade upstream
+ *     consumers (e.g., vq-writer's MFR resolution returning null, then the
+ *     writer treating that as "no MFR found" instead of "lookup is broken").
+ *   - DATA / NO-RESULT (empty result set, parse error on returned rows,
+ *     SQL syntax error in caller's query, etc.) → safe for the caller to
+ *     swallow and return null/empty.
+ *
+ * Discovered the hard way 2026-04-09: cron-launched enrich-poller had
+ * shared/mfr-lookup.js calling psql under a no-PGUSER environment. psql
+ * failed with "fe_sendauth: no password supplied", mfr-lookup caught it and
+ * returned null, vq-writer treated null as "no MFR" and silently degraded.
+ * The cron tick reported "0 errors" because no exception bubbled up. This
+ * helper is the structural protection so the next infra failure can't hide
+ * the same way — callers MUST distinguish "lookup ran cleanly, no match"
+ * from "lookup couldn't run."
+ *
+ * @param {Error} e - Caught exception from execSync('psql ...')
+ * @returns {boolean} true if the error indicates broken infrastructure
+ */
+function isInfrastructureError(e) {
+  if (!e) return false;
+  // execSync failures expose stderr on the error object
+  const haystack = String(
+    (e.stderr || '') + '\n' +
+    (e.stdout || '') + '\n' +
+    (e.message || '')
+  );
+  // Patterns that mean "the call couldn't reach a working DB":
+  //   - libpq auth/connection failures
+  //   - missing binary
+  //   - filesystem permission issues on the unix socket
+  //   - process termination from environment (timeout, killed)
+  return /fe_sendauth|no password supplied|password authentication failed|connection (refused|to server.*failed|terminated)|could not connect|psql: command not found|permission denied|FATAL:|server closed the connection unexpectedly|SSL error|timeout/i.test(haystack);
+}
+
 // ─── DATABASE HELPERS ────────────────────────────────────────────────────────
 
 /**
  * Run a psql query and return raw output.
  * Filters out rbash noise lines.
+ *
+ * THROWS on infrastructure errors (auth/connection/etc.) so callers can't
+ * confuse "lookup is broken" with "lookup returned no rows." Swallows data
+ * errors (parse failures, SQL syntax) and returns whatever stdout was
+ * captured — same legacy behavior for the not-our-problem cases.
  */
 function psqlQuery(sql, timeout = 15000) {
   try {
@@ -45,6 +91,16 @@ function psqlQuery(sql, timeout = 15000) {
     });
     return lines.join('\n').trim();
   } catch (e) {
+    if (isInfrastructureError(e)) {
+      // Re-throw with a clearly tagged error so callers see it as a broken-
+      // infrastructure failure, not a no-result. Preserves the original
+      // stderr in the message for diagnostics.
+      const stderr = String(e.stderr || e.message || '').trim().split('\n').slice(0, 3).join(' ');
+      const wrapped = new Error(`psql infrastructure failure: ${stderr}`);
+      wrapped.code = 'PSQL_INFRA';
+      wrapped.cause = e;
+      throw wrapped;
+    }
     const combined = ((e.stdout || '') + '\n' + (e.stderr || '')).trim();
     const lines = combined.split('\n').filter(l => {
       const t = l.trim();
@@ -68,6 +124,15 @@ function psqlExec(sql, timeout = 15000) {
     });
     return result.includes('INSERT') || result.includes('UPDATE') || result.includes('DELETE');
   } catch (e) {
+    if (isInfrastructureError(e)) {
+      // Don't silently report failure as "false" — that hides the broken
+      // infrastructure. Re-throw so callers see the real problem.
+      const stderr = String(e.stderr || e.message || '').trim().split('\n').slice(0, 3).join(' ');
+      const wrapped = new Error(`psql infrastructure failure: ${stderr}`);
+      wrapped.code = 'PSQL_INFRA';
+      wrapped.cause = e;
+      throw wrapped;
+    }
     return false;
   }
 }
@@ -129,4 +194,5 @@ module.exports = {
   sqlNum,
   cleanMpn,
   tableExists,
+  isInfrastructureError,
 };
