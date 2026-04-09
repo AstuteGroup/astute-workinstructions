@@ -113,9 +113,21 @@ const CONSIGNMENT_GROUPS = [
 // workaround — once the loader can pull from Infor's open-PO data the
 // static carryover list should empty out.
 const STATIC_CARRYOVER_OFFERS = [
-    { label: 'Eaton Consignment',           bootstrapId: 1024798 },
-    { label: 'Free Stock - Philippines',    bootstrapId: 1025258 },
-    { label: 'Incoming Lot bid from Marvell', bootstrapId: 1024030 },
+    {
+        label: 'Eaton Consignment',
+        bootstrapId: 1024798,
+        portalWarehouseName: 'Astute Electronics Inc. - Eaton (Carryover)',
+    },
+    {
+        label: 'Free Stock - Philippines',
+        bootstrapId: 1025258,
+        portalWarehouseName: 'Astute Electronics Inc. - Philippines (Carryover)',
+    },
+    {
+        label: 'Incoming Lot bid from Marvell',
+        bootstrapId: 1024030,
+        portalWarehouseName: 'Marvell Lot Bid - Incoming (Carryover)',
+    },
 ];
 
 // Warehouse Group → OT write-back mapping
@@ -676,11 +688,19 @@ async function refreshStaticCarryoverOffers(carryovers, dateStr, dryRun, pending
         }
         const overlapMpns = [...overlapMpnSet];
 
+        // Pass the carryover config (portalWarehouseName etc.) through to
+        // every result so the downstream portal-CSV builder doesn't have to
+        // re-look up STATIC_CARRYOVER_OFFERS by label.
+        const cfgPassthrough = {
+            label: cfg.label,
+            portalWarehouseName: cfg.portalWarehouseName,
+        };
+
         if (allLines.length === 0) {
             // Empty header — leave alone, log for visibility
             console.log(`  ${cfg.label}: source offer ${currentOfferId} has 0 active lines — leaving as-is`);
             results.push({
-                label: cfg.label,
+                ...cfgPassthrough,
                 status: 'empty',
                 currentOfferId,
                 currentValue: currentHeader.Value || null,
@@ -688,6 +708,7 @@ async function refreshStaticCarryoverOffers(carryovers, dateStr, dryRun, pending
                 offerTypeId,
                 overlapMpns,
                 overlapDetails,
+                sourceLines: [],
             });
             continue;
         }
@@ -695,7 +716,7 @@ async function refreshStaticCarryoverOffers(carryovers, dateStr, dryRun, pending
         if (dryRun) {
             console.log(`  [DRY RUN] ${cfg.label}: would refresh offer ${currentOfferId} (${allLines.length} lines${overlapMpns.length ? ', ' + overlapMpns.length + ' MPN overlap with this week!' : ''})`);
             results.push({
-                label: cfg.label,
+                ...cfgPassthrough,
                 status: 'dry-run',
                 currentOfferId,
                 currentValue: currentHeader.Value || null,
@@ -704,6 +725,7 @@ async function refreshStaticCarryoverOffers(carryovers, dateStr, dryRun, pending
                 linesPlanned: allLines.length,
                 overlapMpns,
                 overlapDetails,
+                sourceLines: allLines,
             });
             continue;
         }
@@ -739,7 +761,7 @@ async function refreshStaticCarryoverOffers(carryovers, dateStr, dryRun, pending
 
             console.log(`  ${cfg.label}: wrote new offer ${writeResult.searchKey || writeResult.offerId} (${writeResult.linesWritten}/${newLines.length} lines)${writeResult.errors.length ? ' [' + writeResult.errors.length + ' line errors]' : ''}`);
             results.push({
-                label: cfg.label,
+                ...cfgPassthrough,
                 status: writeResult.errors.length === 0 ? 'success' : 'partial',
                 oldOfferId: currentOfferId,
                 oldValue: currentHeader.Value || null,
@@ -752,10 +774,11 @@ async function refreshStaticCarryoverOffers(carryovers, dateStr, dryRun, pending
                 errors: writeResult.errors,
                 overlapMpns,
                 overlapDetails,
+                sourceLines: allLines,
             });
         } catch (e) {
             console.error(`  ${cfg.label}: FAILED — ${e.message}`);
-            results.push({ label: cfg.label, status: 'failed', error: e.message, currentOfferId, overlapMpns, overlapDetails });
+            results.push({ ...cfgPassthrough, status: 'failed', error: e.message, currentOfferId, overlapMpns, overlapDetails, sourceLines: allLines });
         }
     }
 
@@ -1410,6 +1433,64 @@ async function fetchAndProcess(opts = {}) {
         // just refreshed in 5b).
         console.log('\nStep 5c: Cross-BP audit...');
         writebackResults._audit = await auditCrossBpStrays(writebackResults, carryoverResults, dryRun);
+
+        // Step 5d: Append carryover lines to the NetComponents portal CSV.
+        // The portal CSV is built in processInventoryFile from Infor data
+        // only. Until roadmap B4 ships, the carryover stock (Eaton, PH,
+        // Marvell) lives outside the Infor export but still needs to be
+        // marketed via NetComponents — so we read those lines from the
+        // carryover offers and append them to the portal CSV here.
+        try {
+            const carryoverPortalRows = [];
+            for (const r of carryoverResults) {
+                if (!r.sourceLines || r.sourceLines.length === 0) continue;
+                const wn = r.portalWarehouseName || `Carryover - ${r.label}`;
+                for (const line of r.sourceLines) {
+                    // chuboe_package_desc is `Lot;Location` from the writer.
+                    // Split it back so the portal CSV's Location column gets
+                    // a single value (matching Infor's row shape).
+                    const pkg = String(line.Chuboe_Package_Desc || '').trim();
+                    const semicolon = pkg.indexOf(';');
+                    const location = semicolon >= 0 ? pkg.substring(semicolon + 1) : pkg;
+                    carryoverPortalRows.push({
+                        'Item':           String(line.Chuboe_MPN || '').trim(),
+                        'ItemDescription': String(line.Description || '').trim(),
+                        'Name':           String(line.Chuboe_MFR_Text || '').trim(),
+                        'Lot Quantity':   String(line.Qty != null ? line.Qty : ''),
+                        'Date Code':      String(line.Chuboe_Date_Code || '').trim(),
+                        'Lot Unit Cost':  String(line.PriceEntered != null ? line.PriceEntered : ''),
+                        'Currency':       'USD',
+                        'Warehouse Name': wn,
+                        'Location':       location,
+                    });
+                }
+            }
+            if (carryoverPortalRows.length > 0) {
+                // Read the existing portal CSV's header line so we append
+                // rows in the exact same column order processInventoryFile
+                // chose (which depends on which PORTAL_COLUMNS were found
+                // in the Infor source headers).
+                const existingCsv = fs.readFileSync(result.portalFile, 'utf-8');
+                const firstNL = existingCsv.indexOf('\n');
+                const headerLine = firstNL >= 0 ? existingCsv.slice(0, firstNL) : existingCsv;
+                const finalHeaders = headerLine.replace(/^\uFEFF/, '').split(',').map(h => h.replace(/^"|"$/g, ''));
+                const appendCsv = '\n' + carryoverPortalRows.map(row =>
+                    finalHeaders.map(h => {
+                        const v = String(row[h] != null ? row[h] : '');
+                        if (v.includes(',') || v.includes('"') || v.includes('\n')) {
+                            return '"' + v.replace(/"/g, '""') + '"';
+                        }
+                        return v;
+                    }).join(',')
+                ).join('\n');
+                fs.appendFileSync(result.portalFile, appendCsv);
+                console.log(`\nStep 5d: Appended ${carryoverPortalRows.length} carryover lines to ${path.basename(result.portalFile)}`);
+            } else {
+                console.log('\nStep 5d: No carryover lines to append to portal CSV');
+            }
+        } catch (e) {
+            console.error(`Step 5d: failed to append carryover to portal CSV: ${e.message}`);
+        }
 
         // Build overlap CSV if any carryover MPNs match this week's inventory
         let overlapCsvPath = null;
