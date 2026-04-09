@@ -193,37 +193,21 @@ See `MEMORY.md` for full list. Key terms:
 
 **Location:** `~/workspace/astute-workinstructions/Trading Analysis/Inventory File Cleanup/`
 
-Processes Infor ERP inventory exports (AST Item Lots Report) for loading into iDempiere and industry portals.
+**BEFORE STARTING:** Read the full workflow documentation at `Trading Analysis/Inventory File Cleanup/inventory-file-cleanup.md`.
 
-### Quick Start
+Processes the weekly Infor AST Item Lots Report into:
+1. **OT inventory offers** — written directly to iDempiere via REST API (`shared/offer-writeback.js`), one `chuboe_offer` per warehouse group, prior week deactivated first. 11 groups in `WAREHOUSE_WRITEBACK`.
+2. **Netcomponents portal CSV** — consolidated, emailed as "Netcomponents Upload"
+3. **Per-warehouse Chuboe CSVs** on disk (`Inventory YYYY-MM-DD/`) — audit trail / manual replay path
+
+**Quick commands** (run from the workflow folder):
 ```bash
-python inventory_cleanup.py "ASTItemLotsReportInputs_*.csv" ./output
+node inventory_cleanup.js fetch              # live: fetch + process + OT write-back
+node inventory_cleanup.js fetch --dry-run    # preview write-back without API calls
+node inventory_cleanup.js <file.xlsx> --writeback [--dry-run]   # manual mode
 ```
 
-### What It Does
-1. **Clean** - Removes header rows (1-7) and footer (Page x of y, username)
-2. **Dedupe** - Removes duplicates based on Item+Lot+Location+Warehouse Name+Site+Date Lot
-3. **Split** - Groups by warehouse (W103, W104, W105, etc.) into 14 warehouse groups
-4. **Export Chuboe** - Creates `*_chuboe.csv` files for iDempiere import (one per warehouse group)
-5. **Export Portal** - Creates consolidated file for NetComponents/IC Source *(template TBD)*
-
-### Output Files
-| File | Description |
-|------|-------------|
-| `*_chuboe.csv` | Chuboe format for iDempiere import (one per warehouse group) |
-| `consolidated_portal_*.csv` | Combined file for portal upload *(format TBD)* |
-| `inventory_cleaned_*.csv` | Full cleaned/deduped master file |
-| `duplicates_*.csv` | Duplicate rows removed (for review) |
-
-### Warehouse Groups
-- **Free Stock:** Austin (W104/W112), Stevenage (W102), Hong Kong (W108/W113), Philippines (W109/W114)
-- **Consignment:** GE (W103), Taxan (W106), Spartronics (W107), LAM (W118), Eaton (W117) - prices blanked
-- **Other:** Franchise Stock (W104+Positronic), LAM Dead (W115), LAM 3PL (W111), Main (MAIN), HK (W105)
-
-### TODO
-- [ ] Define NetComponents upload template format
-- [ ] Define IC Source upload template format
-- [ ] Add portal-specific export transformations
+Cron: every Monday 6 AM EST. See `crontab.md`.
 
 ---
 

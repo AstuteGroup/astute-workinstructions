@@ -13,11 +13,17 @@ The workflow runs **automatically every Monday at 6 AM EST** via cron job. No ma
 1. **Infor sends** the AST Item Lots Report via automated task every Monday morning
 2. **Email auto-forwards** to `excess@orangetsunami.com` inbox
 3. **Cron job runs** at 6 AM EST, fetches the email, downloads attachment
-4. **Script processes** the file (clean, dedupe, split, export)
-5. **Two emails sent** to jake.harris@astutegroup.com:
-   - **"Netcomponents Upload"** — consolidated portal CSV attached
-   - **"OT Inventory Upload"** — zipped Chuboe files for iDempiere
-6. **Source email moved** to `Inventory-Processed` folder
+4. **Script processes** the file (clean, dedupe, split, export CSVs)
+5. **OT write-back** — for each warehouse group in `WAREHOUSE_WRITEBACK`, the script:
+   - Deactivates the prior week's `chuboe_offer` (+ lines) for the same `(BP, OfferType)` pair via the iDempiere REST API
+   - Posts a fresh `chuboe_offer` header + one `chuboe_offer_line` per lot
+   - Failures are isolated per group (one group failing does not block the others)
+6. **Two emails sent** to jake.harris@astutegroup.com:
+   - **"Netcomponents Upload"** — consolidated portal CSV attached (unchanged)
+   - **"OT Inventory Write-back — YYYY-MM-DD"** — HTML summary table showing per-group status, lines written, lines deactivated, and any errors. No attachment.
+7. **Source email moved** to `Inventory-Processed` folder
+
+> **Migration note (2026-04-09):** The historical "OT Inventory Upload" email — which sent a zipped bundle of `*_chuboe.csv` files for manual import to iDempiere — has been **retired**. Inventory now flows directly into OT via REST API. The per-warehouse Chuboe CSVs are still produced on disk under `Inventory YYYY-MM-DD/` for audit and as a manual recovery path if the API write-back ever needs to be replayed.
 
 ### Email Configuration
 
@@ -39,8 +45,16 @@ To run the automated fetch manually (e.g., to test or reprocess):
 
 ```bash
 cd ~/workspace/astute-workinstructions/Trading\ Analysis/Inventory\ File\ Cleanup
+
+# Live: full fetch + process + OT write-back
 node inventory_cleanup.js fetch
+
+# Dry-run: fetch + process, but skip the API write-back (preview only).
+# Source email is left in Inventory Reports so you can replay against it.
+node inventory_cleanup.js fetch --dry-run
 ```
+
+The summary email will be tagged `[DRY RUN]` in the subject and banner when run with `--dry-run`.
 
 ### Cron Job
 
@@ -59,7 +73,14 @@ Check `/tmp/inventory-cleanup.log` for cron execution history.
 For processing files manually (e.g., ad-hoc reports, testing):
 
 ```bash
+# CSVs only — no OT write-back
 node inventory_cleanup.js "ASTItemLotsReportInputs_USS_XXXXXXX.xlsx"
+
+# CSVs + dry-run write-back (logs what would be written, no API calls)
+node inventory_cleanup.js "ASTItemLotsReportInputs_USS_XXXXXXX.xlsx" --writeback --dry-run
+
+# CSVs + live write-back to OT
+node inventory_cleanup.js "ASTItemLotsReportInputs_USS_XXXXXXX.xlsx" --writeback
 ```
 
 ---
@@ -149,9 +170,9 @@ Check the console output for:
 
 ### Step 4: Load to iDempiere
 
-Upload the `{WarehouseCode}_{GroupName}.csv` files via Chuboe import process (one file per warehouse group).
+In **automated mode**, the script writes inventory directly to OT via the iDempiere REST API — no manual upload step is required. See the **OT Write-Back** section below for the warehouse → BP/OfferType mapping and per-group flow.
 
-In automated mode, these files are zipped and emailed as "OT Inventory Upload".
+The per-warehouse `{WarehouseCode}_{GroupName}.csv` files are still produced on disk under `Inventory YYYY-MM-DD/` for audit and as a manual recovery path. To replay a single warehouse via the legacy CSV import path, drop that file into the Chuboe import wizard.
 
 ### Step 5: Upload to Portals (TBD)
 
@@ -422,11 +443,11 @@ The shared `offer-writeback.js` module enables writing inventory directly to the
 
 **Module:** `shared/offer-writeback.js` — see `shared/README.md` for full API.
 
-### Warehouse → Offer Mapping
+### Warehouse → Offer Mapping (live, 11 groups)
 
-Each warehouse group maps to a specific offer type and business partner (as used in production):
+Each warehouse group in the table below produces **one `chuboe_offer` per weekly run**, with the lots posted as `chuboe_offer_line` rows. The prior week's offer for the same `(BP, OfferType)` pair is deactivated (header + lines) before the new write. The live mapping is the `WAREHOUSE_WRITEBACK` constant in `inventory_cleanup.js` — keep this table in sync if it changes.
 
-| Warehouse Group | Offer Type (ID) | Business Partner (ID) | Search Key |
+| Warehouse Group | Offer Type (ID) | Business Partner (ID) | BP Search Key |
 |---|---|---|---|
 | Free_Stock_Austin | Stock - Austin Warehouse (1000008) | Astute Electronics Inc (1000332) | 1002336 |
 | Free_Stock_Stevenage | Stock - Stevenage (1000006) | Astute Electronics Inc (1000332) | 1002336 |
@@ -437,29 +458,46 @@ Each warehouse group maps to a specific offer type and business partner (as used
 | Taxan_Consignment | Stock - Austin Warehouse (1000008) | Astute Electronics - Taxan Excess (1003621) | 1005619 |
 | Spartronics_Consignment | Stock - Austin Warehouse (1000008) | Astute Electronics - Spartronics Excess (1005225) | 1007221 |
 | Eaton_Consignment | Stock - Philippines Warehouse (1000014) | Astute Electronics Inc - Eaton Consignment (1010966) | 1012832 |
+| LAM_Consignment | Stock - Philippines Warehouse (1000014) | Astute Electronics - LAM Consignment (1011267) | 1013066 |
+| LAM_Dead_Inventory | Stock - Austin Warehouse (1000008) | Astute Electronics Inc (1000332) | 1002336 |
 
-### Usage (Future Integration)
+**Groups intentionally NOT in the write-back** (CSVs still produced under `Inventory YYYY-MM-DD/`, but no OT records are created):
+- `LAM_3PL` (W111)
+- `Allocated_Warehouse` (MAIN)
+- `HK_Allocated_Warehouse` (W105)
+
+**Removed group:** `SPE_ATX` was deleted from `WAREHOUSE_GROUPS` on 2026-04-09. It was dead code — `Free_Stock_Austin` (`['W104','W112']`) appears earlier in the iteration order and matched W112 first, so SPE_ATX never received any rows. W112 inventory still flows into Free_Stock_Austin.
+
+### Implementation
+
+`inventory_cleanup.js` exports `writeInventoryToOT(groupedRows, dateStr, dryRun)` which iterates `WAREHOUSE_WRITEBACK` and, for each group present in the input data:
 
 ```javascript
-const { writeOffer, deactivatePriorOffers } = require('../../shared/offer-writeback');
+// 1. Deactivate the prior week's offer (header + lines) for this BP+OfferType
+await deactivatePriorOffers(mapping.bpartnerId, mapping.offerTypeId);
 
-// 1. Deactivate previous week's inventory for this warehouse
-deactivatePriorOffers(1000332, 1000008);
-
-// 2. Write fresh inventory
+// 2. Write fresh inventory as a single offer with one line per lot
 await writeOffer({
-  bpartnerId: 1000332,
-  offerTypeId: 1000008,
-  description: 'Weekly inventory 2026-03-23',
-  lines: chuboeRows  // already mapped by inventory_cleanup.js
+  bpartnerId:  mapping.bpartnerId,
+  offerTypeId: mapping.offerTypeId,
+  description: `Weekly inventory ${dateStr} — ${groupName}`,
+  lines: rows.map(row => ({
+    mpn:         row['Item'],
+    mfrText:     row['Name'],
+    qty:         parseFloat(row['Lot Quantity']),
+    price:       isConsignment ? null : parseFloat(row['Lot Unit Cost']),
+    dateCode:    row['Date Code'],
+    packageDesc: `${row['Lot']};${row['Location']}`,
+    description: row['ItemDescription'],
+  })),
 });
 ```
 
-### TODO for Integration
+Failures are isolated per group: a single bad line is reported in the email summary; a whole-group failure (e.g., API timeout during deactivation) is logged and the script continues with the next group.
 
-- [ ] Wire `offer-writeback.js` into `inventory_cleanup.js` as post-processing step
-- [ ] Add deactivation of prior week's offers before writing new ones
-- [ ] Decide: write-back as replacement for CSV email, or in addition to it?
+### MFR placeholder scrubbing
+
+Source rows with `Name` matching `/^(not known( yet)?)$/i` (case-insensitive) are written to OT with `Chuboe_MFR_Text = NULL` rather than the literal placeholder string. This avoids junk MFR text in OT and prevents the MFR resolver from canonicalizing nonsense values. Real MFR strings pass through unchanged. Roughly 3% of rows in a typical weekly export carry this placeholder, concentrated in consignment groups (notably GE_Consignment).
 
 ---
 
@@ -467,6 +505,6 @@ await writeOffer({
 
 - [ ] Define and implement NetComponents upload template
 - [ ] Define and implement IC Source upload template
-- [x] ~~Add direct iDempiere write-back (bypass CSV import)~~ ✓ Module built: `shared/offer-writeback.js` (2026-03-23). Wiring into inventory_cleanup.js pending.
+- [x] ~~Add direct iDempiere write-back (bypass CSV import)~~ ✓ Module built: `shared/offer-writeback.js` (2026-03-23). Wired into inventory_cleanup.js + zipped CSV email retired (2026-04-09).
 - [x] ~~Add email notification on completion~~ ✓ Implemented 2026-03-16
 - [x] ~~Add scheduling for automated runs~~ ✓ Cron job added 2026-03-16

@@ -61,7 +61,6 @@ const WAREHOUSE_GROUPS = [
     ['LAM_Consignment', ['W118'], null],
     ['Eaton_Consignment', ['W117'], null],
     ['LAM_3PL', ['W111'], null],
-    ['SPE_ATX', ['W112'], null],
     ['Allocated_Warehouse', ['MAIN'], null],
     ['HK_Allocated_Warehouse', ['W105'], null],
 ];
@@ -92,6 +91,27 @@ const CONSIGNMENT_GROUPS = [
     'GE_Consignment', 'Taxan_Consignment', 'Spartronics_Consignment',
     'LAM_Consignment', 'Eaton_Consignment'
 ];
+
+// Warehouse Group → OT write-back mapping
+// Each entry produces one chuboe_offer (header) per weekly run, with the
+// week's lots posted as chuboe_offer_line rows. Prior week's offers for the
+// same (BP, OfferType) pair are deactivated before the new write.
+//
+// Groups intentionally NOT in this map (CSV-only, no OT write-back):
+//   LAM_3PL, Allocated_Warehouse, HK_Allocated_Warehouse
+const WAREHOUSE_WRITEBACK = {
+    'Free_Stock_Austin':       { bpartnerId: 1000332, offerTypeId: 1000008 }, // Astute Electronics Inc → Austin
+    'Free_Stock_Stevenage':    { bpartnerId: 1000332, offerTypeId: 1000006 }, // Astute Electronics Inc → Stevenage
+    'Free_Stock_Hong_Kong':    { bpartnerId: 1000332, offerTypeId: 1000009 }, // Astute Electronics Inc → Hong Kong
+    'Free_Stock_Philippines':  { bpartnerId: 1000332, offerTypeId: 1000014 }, // Astute Electronics Inc → Philippines
+    'Franchise_Stock':         { bpartnerId: 1000325, offerTypeId: 1000008 }, // Astute - Franchise Stock → Austin
+    'GE_Consignment':          { bpartnerId: 1003236, offerTypeId: 1000008 }, // Astute - GE Aviation Excess → Austin
+    'Taxan_Consignment':       { bpartnerId: 1003621, offerTypeId: 1000008 }, // Astute - Taxan Excess → Austin
+    'Spartronics_Consignment': { bpartnerId: 1005225, offerTypeId: 1000008 }, // Astute - Spartronics Excess → Austin
+    'Eaton_Consignment':       { bpartnerId: 1010966, offerTypeId: 1000014 }, // Astute Inc - Eaton Consignment → Philippines
+    'LAM_Consignment':         { bpartnerId: 1011267, offerTypeId: 1000014 }, // Astute - LAM Consignment → Philippines
+    'LAM_Dead_Inventory':      { bpartnerId: 1000332, offerTypeId: 1000008 }, // Astute Electronics Inc → Austin (separate offer)
+};
 
 // Portal export columns
 const PORTAL_COLUMNS = [
@@ -299,6 +319,200 @@ function arrayToCSV(rows, headers) {
         lines.push(headers.map(h => escape(row[h])).join(','));
     }
     return lines.join('\n');
+}
+
+// =============================================================================
+// OT WRITE-BACK
+// =============================================================================
+
+/**
+ * Write the week's inventory to OT (iDempiere) via the REST API.
+ * One chuboe_offer per warehouse group in WAREHOUSE_WRITEBACK. Prior week's
+ * offers for the same (BP, OfferType) are deactivated before each new write.
+ *
+ * @param {object} groupedRows  - { groupName: [rawRow, rawRow, ...] } from processInventoryFile
+ * @param {string} dateStr      - YYYY-MM-DD for offer description
+ * @param {boolean} dryRun      - If true, log what would happen without calling the API
+ * @returns {Array<object>}     - Per-group result records (status, counts, errors, offer ID)
+ */
+async function writeInventoryToOT(groupedRows, dateStr, dryRun = false) {
+    const { writeOffer, deactivatePriorOffers } = require('../../shared/offer-writeback');
+
+    console.log('\n' + '='.repeat(60));
+    console.log(dryRun ? 'OT WRITE-BACK (DRY RUN)' : 'OT WRITE-BACK');
+    console.log('='.repeat(60));
+
+    const results = [];
+
+    for (const [groupName, mapping] of Object.entries(WAREHOUSE_WRITEBACK)) {
+        const rows = groupedRows[groupName] || [];
+        const isConsignment = CONSIGNMENT_GROUPS.includes(groupName);
+
+        if (rows.length === 0) {
+            console.log(`  ${groupName}: 0 rows — skipping`);
+            results.push({ groupName, status: 'skipped', reason: 'no rows', ...mapping });
+            continue;
+        }
+
+        // Map raw inventory rows → offer-writeback line shape.
+        // MFR placeholders ("Not Known Yet" / "Not Known") are scrubbed to
+        // null so OT records don't carry junk MFR text — the MFR resolver
+        // would otherwise fail to canonicalize them and write the raw string.
+        const MFR_PLACEHOLDER_RE = /^(not known( yet)?)$/i;
+        const lines = rows.map(row => {
+            const lot = String(row['Lot'] || '').trim();
+            const loc = String(row['Location'] || '').trim();
+            const packageDesc = [lot, loc].filter(Boolean).join(';');
+            const qty = parseFloat(cleanNumeric(row['Lot Quantity']));
+            const rawPrice = parseFloat(cleanNumeric(row['Lot Unit Cost']));
+            const mfrRaw = String(row['Name'] || '').trim();
+            const mfrText = (!mfrRaw || MFR_PLACEHOLDER_RE.test(mfrRaw)) ? null : mfrRaw;
+            return {
+                mpn: String(row['Item'] || '').trim(),
+                mfrText,
+                qty: isNaN(qty) ? null : qty,
+                price: isConsignment || isNaN(rawPrice) ? null : rawPrice,
+                dateCode: String(row['Date Code'] || '').trim() || null,
+                packageDesc: packageDesc || null,
+                description: String(row['ItemDescription'] || '').trim() || null,
+            };
+        }).filter(l => l.mpn);
+
+        if (dryRun) {
+            console.log(`  [DRY RUN] ${groupName}: would deactivate prior offers and write ${lines.length} lines (BP ${mapping.bpartnerId}, OfferType ${mapping.offerTypeId})`);
+            results.push({
+                groupName,
+                status: 'dry-run',
+                linesPlanned: lines.length,
+                ...mapping,
+            });
+            continue;
+        }
+
+        // Live: deactivate then write. Failures isolated per group.
+        try {
+            const deactResult = await deactivatePriorOffers(mapping.bpartnerId, mapping.offerTypeId);
+            console.log(`  ${groupName}: deactivated ${deactResult.offersDeactivated} prior offer(s), ${deactResult.linesDeactivated} lines`);
+
+            const writeResult = await writeOffer({
+                bpartnerId: mapping.bpartnerId,
+                offerTypeId: mapping.offerTypeId,
+                description: `Weekly inventory ${dateStr} — ${groupName}`,
+                lines,
+            });
+
+            const status = writeResult.errors.length === 0 ? 'success' : 'partial';
+            console.log(`  ${groupName}: wrote ${writeResult.linesWritten}/${lines.length} lines → offer ${writeResult.searchKey || writeResult.offerId}${writeResult.errors.length ? ` (${writeResult.errors.length} line errors)` : ''}`);
+
+            results.push({
+                groupName,
+                status,
+                offerSearchKey: writeResult.searchKey,
+                offerId: writeResult.offerId,
+                deactivatedOffers: deactResult.offersDeactivated,
+                deactivatedLines: deactResult.linesDeactivated,
+                linesAttempted: lines.length,
+                linesWritten: writeResult.linesWritten,
+                errors: writeResult.errors,
+                ...mapping,
+            });
+        } catch (e) {
+            console.error(`  ${groupName}: FAILED — ${e.message}`);
+            results.push({
+                groupName,
+                status: 'failed',
+                error: e.message,
+                linesAttempted: lines.length,
+                ...mapping,
+            });
+        }
+    }
+
+    // Console summary table
+    console.log('\nWrite-back summary:');
+    for (const r of results) {
+        const tag = r.status === 'success' ? '✓'
+                  : r.status === 'partial' ? '⚠'
+                  : r.status === 'failed'  ? '✗'
+                  : r.status === 'dry-run' ? '·'
+                  : '–';
+        const detail = r.status === 'success' || r.status === 'partial'
+            ? `${r.linesWritten}/${r.linesAttempted} lines, offer ${r.offerSearchKey || r.offerId}`
+            : r.status === 'dry-run' ? `${r.linesPlanned} lines planned`
+            : r.status === 'failed'  ? r.error
+            : r.reason || '';
+        console.log(`  ${tag} ${r.groupName.padEnd(28)} ${detail}`);
+    }
+
+    return results;
+}
+
+/**
+ * Build an HTML summary email body for the write-back results.
+ */
+function buildWritebackSummaryHTML(results, dateStr, dryRun) {
+    const totals = {
+        success: results.filter(r => r.status === 'success').length,
+        partial: results.filter(r => r.status === 'partial').length,
+        failed:  results.filter(r => r.status === 'failed').length,
+        skipped: results.filter(r => r.status === 'skipped').length,
+        dryRun:  results.filter(r => r.status === 'dry-run').length,
+    };
+    const totalLinesWritten = results.reduce((s, r) => s + (r.linesWritten || 0), 0);
+    const totalLinesPlanned = results.reduce((s, r) => s + (r.linesPlanned || 0), 0);
+    const totalDeactivated  = results.reduce((s, r) => s + (r.deactivatedLines || 0), 0);
+
+    const rows = results.map(r => {
+        const statusColor = r.status === 'success' ? '#1a7f37'
+                          : r.status === 'partial' ? '#bf8700'
+                          : r.status === 'failed'  ? '#cf222e'
+                          : '#57606a';
+        let detail = '';
+        if (r.status === 'success' || r.status === 'partial') {
+            detail = `${r.linesWritten}/${r.linesAttempted} lines → offer <b>${r.offerSearchKey || r.offerId}</b>`;
+            if (r.errors && r.errors.length) {
+                detail += `<br/><small style="color:#cf222e">${r.errors.length} line error(s): ${r.errors.slice(0, 3).join('; ')}${r.errors.length > 3 ? '…' : ''}</small>`;
+            }
+        } else if (r.status === 'dry-run') {
+            detail = `${r.linesPlanned} lines planned (BP ${r.bpartnerId}, type ${r.offerTypeId})`;
+        } else if (r.status === 'failed') {
+            detail = `<span style="color:#cf222e">${r.error}</span>`;
+        } else {
+            detail = `<i>${r.reason || 'skipped'}</i>`;
+        }
+        return `<tr>
+            <td><b>${r.groupName}</b></td>
+            <td style="color:${statusColor}"><b>${r.status.toUpperCase()}</b></td>
+            <td>${detail}</td>
+            <td style="text-align:right">${r.deactivatedLines || 0}</td>
+        </tr>`;
+    }).join('\n');
+
+    const banner = dryRun
+        ? '<div style="background:#fff8c5;padding:10px;border-left:4px solid #d4a72c;margin-bottom:12px"><b>DRY RUN</b> — no records were written to OT.</div>'
+        : '';
+
+    return `<html><body style="font-family:Arial,sans-serif;font-size:13px">
+${banner}
+<h2 style="margin:0 0 8px 0">OT Inventory Write-back — ${dateStr}</h2>
+<p>
+    <b>${totals.success}</b> success ·
+    <b style="color:#bf8700">${totals.partial}</b> partial ·
+    <b style="color:#cf222e">${totals.failed}</b> failed ·
+    <b style="color:#57606a">${totals.skipped}</b> skipped${dryRun ? ` · <b>${totals.dryRun}</b> dry-run` : ''}
+    <br/>
+    Lines ${dryRun ? 'planned' : 'written'}: <b>${dryRun ? totalLinesPlanned : totalLinesWritten}</b>
+    ${dryRun ? '' : ` · Lines deactivated (prior week): <b>${totalDeactivated}</b>`}
+</p>
+<table border="1" cellpadding="6" cellspacing="0" style="border-collapse:collapse;font-size:12px">
+<thead style="background:#f6f8fa">
+<tr><th align="left">Group</th><th align="left">Status</th><th align="left">Detail</th><th align="right">Prior Lines Deactivated</th></tr>
+</thead>
+<tbody>
+${rows}
+</tbody>
+</table>
+</body></html>`;
 }
 
 // =============================================================================
@@ -516,7 +730,7 @@ function processInventoryFile(inputFile, outputDir) {
         totalRows: allRows.length,
         uniqueRows: uniqueRows.length,
         duplicates: duplicateRows.length,
-        groups: groupedRows,
+        groups: groupedRows,        // raw rows by group (used by writeInventoryToOT)
         unmatched: unmatchedRows.length,
         outputDir: outputDir,
         portalFile: portalFile,
@@ -529,7 +743,8 @@ function processInventoryFile(inputFile, outputDir) {
 // FETCH COMMAND - Email automation
 // =============================================================================
 
-async function fetchAndProcess() {
+async function fetchAndProcess(opts = {}) {
+    const dryRun = !!opts.dryRun;
     console.log('='.repeat(60));
     console.log('INVENTORY CLEANUP - AUTOMATED FETCH');
     console.log('='.repeat(60));
@@ -590,16 +805,16 @@ async function fetchAndProcess() {
         const scriptDir = path.dirname(__filename);
         const result = processInventoryFile(attachmentPath, null);
 
-        // Step 5: Create zip of Chuboe files
-        console.log('\nStep 5: Creating zip archive of Chuboe files...');
         const dateStr = new Date().toISOString().split('T')[0];
-        const zipPath = path.join(result.outputDir, `OT_Chuboe_Files_${dateStr}.zip`);
-        await createZipArchive(result.chuboeFiles, zipPath);
+
+        // Step 5: Write inventory to OT via API (replaces zipped CSV upload path)
+        console.log(`\nStep 5: Writing inventory to OT (${dryRun ? 'DRY RUN' : 'LIVE'})...`);
+        const writebackResults = await writeInventoryToOT(result.groups, dateStr, dryRun);
 
         // Step 6: Send emails
         console.log('\nStep 6: Sending notification emails...');
 
-        // Email 1: Netcomponents Upload
+        // Email 1: Netcomponents Upload (consolidated portal CSV — unchanged)
         const sent1 = await sendEmail(
             EMAIL_CONFIG.recipient,
             'Netcomponents Upload',
@@ -612,23 +827,27 @@ Date: ${dateStr}`,
             [result.portalFile]
         );
 
-        // Email 2: OT Inventory Upload
-        const sent2 = await sendEmail(
+        // Email 2: OT Write-back Summary (HTML, no attachment)
+        const writebackOk    = writebackResults.filter(r => r.status === 'success').length;
+        const writebackPart  = writebackResults.filter(r => r.status === 'partial').length;
+        const writebackFail  = writebackResults.filter(r => r.status === 'failed').length;
+        const summarySubject = `${dryRun ? '[DRY RUN] ' : ''}OT Inventory Write-back — ${dateStr} (${writebackOk} ok, ${writebackPart} partial, ${writebackFail} failed)`;
+        const summaryHtml    = buildWritebackSummaryHTML(writebackResults, dateStr, dryRun);
+
+        const sent2 = await notifier.sendEmail(
             EMAIL_CONFIG.recipient,
-            'OT Inventory Upload',
-            `Inventory cleanup completed successfully.
-
-Attached: Zipped Chuboe files for iDempiere import (${result.chuboeFiles.length} warehouse groups).
-
-Processed: ${result.uniqueRows.toLocaleString()} unique rows
-Warehouse groups: ${Object.keys(result.groups).length}
-Date: ${dateStr}`,
-            [zipPath]
+            summarySubject,
+            summaryHtml,
+            { html: true }
         );
 
-        // Step 7: Move processed email
-        console.log('\nStep 7: Moving email to processed folder...');
-        await moveEmail(matchingEmail.id, EMAIL_CONFIG.processedFolder, 'Inventory Reports');
+        // Step 7: Move processed email (skip on dry-run so the source can be replayed)
+        if (!dryRun) {
+            console.log('\nStep 7: Moving email to processed folder...');
+            await moveEmail(matchingEmail.id, EMAIL_CONFIG.processedFolder, 'Inventory Reports');
+        } else {
+            console.log('\nStep 7: [DRY RUN] leaving source email in Inventory Reports');
+        }
 
         // Step 8: Cleanup attachment
         console.log('\nStep 8: Cleaning up temp files...');
@@ -640,9 +859,10 @@ Date: ${dateStr}`,
         console.log('FETCH AND PROCESS COMPLETE');
         console.log('='.repeat(60));
         console.log(`Emails sent: ${sent1 && sent2 ? 'Yes' : 'Partial'}`);
+        console.log(`Write-back: ${writebackOk} ok, ${writebackPart} partial, ${writebackFail} failed`);
         console.log(`Output: ${result.outputDir}`);
 
-        return { success: true, result };
+        return { success: true, result, writebackResults };
 
     } catch (err) {
         console.error('\n' + '='.repeat(60));
@@ -662,22 +882,31 @@ Date: ${dateStr}`,
 // =============================================================================
 
 if (require.main === module) {
-    const args = process.argv.slice(2);
+    const argv     = process.argv.slice(2);
+    const flags    = new Set(argv.filter(a => a.startsWith('--')));
+    const args     = argv.filter(a => !a.startsWith('--'));
+    const dryRun   = flags.has('--dry-run');
+    const writeback = flags.has('--writeback');
 
     if (args.length < 1) {
-        console.log('Usage: node inventory_cleanup.js <input_file.xlsx|csv> [output_directory]');
-        console.log('       node inventory_cleanup.js fetch');
+        console.log('Usage: node inventory_cleanup.js <input_file.xlsx|csv> [output_directory] [--writeback] [--dry-run]');
+        console.log('       node inventory_cleanup.js fetch [--dry-run]');
         console.log('\nCommands:');
-        console.log('  fetch                    Fetch from email inbox and process automatically');
-        console.log('  <file.xlsx>              Process a specific file');
+        console.log('  fetch                    Fetch from email inbox, process, and write back to OT');
+        console.log('  fetch --dry-run          Same, but skip the API write-back (preview only)');
+        console.log('  <file.xlsx>              Process a specific file (CSVs only)');
+        console.log('  <file.xlsx> --writeback  Process and also write back to OT');
+        console.log('  <file.xlsx> --writeback --dry-run');
+        console.log('                           Process and dry-run write-back (preview only)');
         console.log('\nExamples:');
         console.log('  node inventory_cleanup.js fetch');
-        console.log('  node inventory_cleanup.js ASTItemLotsReportInputs_USS_4544132.xlsx');
+        console.log('  node inventory_cleanup.js fetch --dry-run');
+        console.log('  node inventory_cleanup.js ASTItemLotsReportInputs_USS_4544132.xlsx --writeback --dry-run');
         process.exit(1);
     }
 
     if (args[0] === 'fetch') {
-        fetchAndProcess()
+        fetchAndProcess({ dryRun })
             .then(result => {
                 process.exit(result.success ? 0 : 1);
             })
@@ -688,8 +917,17 @@ if (require.main === module) {
     } else {
         const inputFile = args[0];
         const outputDir = args[1] || null;
-        processInventoryFile(inputFile, outputDir);
+        const result = processInventoryFile(inputFile, outputDir);
+        if (writeback) {
+            const dateStr = new Date().toISOString().split('T')[0];
+            writeInventoryToOT(result.groups, dateStr, dryRun)
+                .then(() => process.exit(0))
+                .catch(err => {
+                    console.error('Write-back failed:', err);
+                    process.exit(1);
+                });
+        }
     }
 }
 
-module.exports = { processInventoryFile, fetchAndProcess };
+module.exports = { processInventoryFile, fetchAndProcess, writeInventoryToOT, WAREHOUSE_WRITEBACK };
