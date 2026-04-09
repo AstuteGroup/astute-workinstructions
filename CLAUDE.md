@@ -118,6 +118,39 @@ const total = csv.sumColumn('Lot Cost', row => row[warehouseIdx] === 'W111');
 
 See `shared/README.md` for full API.
 
+### MFR Equivalence Comparison (REQUIRED for any "is this the same company?" check)
+
+**When comparing two manufacturer strings — customer ask vs supplier label, RFQ MFR vs VQ MFR, RFQ MFR vs franchise API response — ALWAYS use `shared/mfr-equivalence.js`. Do not roll your own normalization.**
+
+```javascript
+const { computeMfrMatch, canonicalMfr } = require('../shared/mfr-equivalence');
+
+const flag = computeMfrMatch(rfqMfr, supplierMfr);
+//   ''         → same company (or both blank)
+//   'MISMATCH' → both populated, different companies
+//   '?'        → exactly one side blank
+```
+
+The pipeline (prenormalize → alias file → acquisitions chain) handles:
+- **Formatting variants** (`DIODES  INC` / `DIODES`, `Phoenix Contact Inc.` / `Phoenix Contact`, `WURTH ELEKTRONIK GMBH` / `WURTH ELEKTRONIK`, `HRS(??)` / `Hirose Electric`) — structural, no entries needed
+- **Nomenclature aliases** (`TI` / `Texas Instruments`, `TYCO` / `TE Connectivity`, `ON SEMI` / `On Semiconductor`) — via `Trading Analysis/Market Offer Loading/mfr-aliases.json` (200+ curated entries, validated monthly)
+- **Acquisitions** (`Linear` → `ADI`, `IR` → `Infineon`, `Atmel` → `Microchip`, `Sprague` → `Vishay`, `Fairchild` → `Onsemi`, `Numonyx` → `Micron`, etc.) — via `shared/data/mfr-acquisitions.json`
+
+**Adding new equivalences:**
+- New nomenclature alias → edit `mfr-aliases.json` (uppercase key → canonical brand name)
+- New acquisition → edit `mfr-acquisitions.json` (original brand → current owner; only when fully absorbed)
+- New formatting/punctuation issue → already handled by `prenormalizeMfr`, no edits needed
+
+Both data files are also consumed by `shared/mfr-lookup.js` and `shared/mfr-resolver.js` (which power every writer that resolves MFR), so any addition compounds across writers, Vortex Matches, Quick Quote, Market Offer Matching, RFQ API Enrichment, and any future workflow.
+
+**Current consumers (always check this list before building a new MFR comparison):**
+- `Trading Analysis/Vortex Matches/vortex-matches.js` — red-flags Supplier MFR cells on MISMATCH
+- `Trading Analysis/RFQ API Enrichment/enrich-rfq.js` — counts MFR mismatches in the run summary
+- `Trading Analysis/Market Offer Matching for RFQs/analyze-new-offers.js` — adds `mfr_match` column to opportunity CSV
+- `Trading Analysis/Quick Quote/qq_*.sql` — pulls `rfq_mfr` + `vq_mfr` for the (planned) Node-wrapper to compare
+
+If you're building a new workflow that needs MFR comparison, add yourself to this list when you do.
+
 ---
 
 ## Documentation Standards

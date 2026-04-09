@@ -32,12 +32,14 @@ const COLUMN_DEFS = {
   'RFQ Created': { width: 14, format: 'date' },
   'RFQ Customer': { width: 28, format: 'text' },
   'RFQ MPN': { width: 22, format: 'text' },
+  'RFQ MFR': { width: 18, format: 'text' },
   'RFQ Qty': { width: 12, format: 'number' },
   'RFQ Target': { width: 14, format: 'currency_precise' },
   'Customer Part Number': { width: 20, format: 'text' },
   'Type': { width: 8, format: 'text' },
   'MO Type': { width: 28, format: 'text' },
   'Supplier MPN': { width: 22, format: 'text' },
+  'Supplier MFR': { width: 18, format: 'text' },
   'Supplier/Excess Partner': { width: 28, format: 'text' },
   'Qty': { width: 12, format: 'number' },
   'Supplier Price': { width: 14, format: 'currency_precise' },
@@ -53,51 +55,68 @@ const COLUMN_DEFS = {
 // Column sets for each file type
 const COLUMNS = {
   'Good Prices': [
-    'RFQ Number', '% Under Target', 'RFQ Created', 'RFQ Customer', 'RFQ MPN', 'RFQ Qty', 'RFQ Target',
-    'Customer Part Number', 'Type', 'MO Type', 'Supplier MPN',
+    'RFQ Number', '% Under Target', 'RFQ Created', 'RFQ Customer', 'RFQ MPN', 'RFQ MFR', 'RFQ Qty', 'RFQ Target',
+    'Customer Part Number', 'Type', 'MO Type', 'Supplier MPN', 'Supplier MFR',
     'Supplier/Excess Partner', 'Qty', 'Supplier Price',
     'lead_time', 'Date Code', 'Created Date', 'Days Btw MO/VQ & RFQ', '% of Demand', 'Opp Amount'
   ],
   'All Prices': [
-    'RFQ Number', 'RFQ Created', 'RFQ Customer', 'RFQ MPN', 'RFQ Qty',
-    'Customer Part Number', 'Type', 'MO Type', 'Supplier MPN',
+    'RFQ Number', 'RFQ Created', 'RFQ Customer', 'RFQ MPN', 'RFQ MFR', 'RFQ Qty',
+    'Customer Part Number', 'Type', 'MO Type', 'Supplier MPN', 'Supplier MFR',
     'Supplier/Excess Partner', 'Qty', 'Supplier Price',
     'lead_time', 'Date Code', 'Created Date', 'Days Btw MO/VQ & RFQ', '% of Demand', 'Opp Amount'
   ],
   'No Prices': [
-    'RFQ Number', 'RFQ Created', 'RFQ Customer', 'RFQ MPN', 'RFQ Qty', 'RFQ Target',
-    'Customer Part Number', 'Type', 'MO Type', 'Supplier MPN',
+    'RFQ Number', 'RFQ Created', 'RFQ Customer', 'RFQ MPN', 'RFQ MFR', 'RFQ Qty', 'RFQ Target',
+    'Customer Part Number', 'Type', 'MO Type', 'Supplier MPN', 'Supplier MFR',
     'Supplier/Excess Partner', 'Qty',
     'lead_time', 'Date Code', 'Created Date', 'Days Btw MO/VQ & RFQ', '% of Demand'
   ],
   'Stock': [
-    'RFQ Number', 'RFQ Created', 'RFQ Customer', 'RFQ MPN', 'RFQ Qty', 'RFQ Target',
-    'Customer Part Number', 'MO Type', 'Supplier MPN',
+    'RFQ Number', 'RFQ Created', 'RFQ Customer', 'RFQ MPN', 'RFQ MFR', 'RFQ Qty', 'RFQ Target',
+    'Customer Part Number', 'MO Type', 'Supplier MPN', 'Supplier MFR',
     'Supplier/Excess Partner', 'Qty', 'Supplier Price',
     'lead_time', 'Date Code', 'Created Date', 'Days Btw MO/VQ & RFQ', '% of Demand', 'Opp Amount'
   ]
 };
 
+// ─── MFR MATCH ──────────────────────────────────────────────────────────────
+// Manufacturer equivalence comparison lives in shared/mfr-equivalence.js so
+// every workflow that needs to compare a customer's MFR ask against a
+// supplier's MFR label uses the same canonicalization pipeline (prenormalize
+// → alias file → acquisitions chain). See that module's header for the full
+// pipeline, the rules for adding new equivalences, and the supported callers.
+const { computeMfrMatch } = require('../../shared/mfr-equivalence');
+
 /**
  * Fetch RFQ details from database
- * Dedupes RFQ lines with identical MPN + qty + target + customer part number
+ *
+ * Dedupes RFQ lines on (mpn_clean, mfr_id, qty, target, cpc). MFR is included
+ * in the key so legitimate cross-MFR AVL alternates (e.g., DG441DY from both
+ * Renesas and Vishay on the same customer line) are NOT collapsed — buyers
+ * need to see both manufacturers as separate sourcing options. Without MFR
+ * in the key, Vortex was silently hiding ~1% of alternate-manufacturer rows
+ * on every RFQ run.
  */
 async function fetchRfqDetails(rfqNumber) {
   const query = `
-    SELECT DISTINCT ON (rlm.chuboe_mpn_clean, rlm.qty, rlm.priceentered, COALESCE(rlm.chuboe_cpc, ''))
+    SELECT DISTINCT ON (rlm.chuboe_mpn_clean, COALESCE(rlm.chuboe_mfr_id, 0), rlm.qty, rlm.priceentered, COALESCE(rlm.chuboe_cpc, ''))
       r.value AS rfq_number,
       r.created AS rfq_created,
       bp.name AS customer_name,
       rlm.chuboe_mpn AS rfq_mpn,
       rlm.chuboe_mpn_clean,
+      rlm.chuboe_mfr_id AS rfq_mfr_id,
+      COALESCE(mfr.name, rlm.chuboe_mfr_text, '') AS rfq_mfr,
       rlm.qty AS rfq_qty,
       rlm.priceentered AS rfq_target,
       rlm.chuboe_cpc AS customer_part_number
     FROM adempiere.chuboe_rfq r
     JOIN adempiere.chuboe_rfq_line_mpn rlm ON r.chuboe_rfq_id = rlm.chuboe_rfq_id
     LEFT JOIN adempiere.c_bpartner bp ON r.c_bpartner_id = bp.c_bpartner_id
+    LEFT JOIN adempiere.chuboe_mfr mfr ON mfr.chuboe_mfr_id = rlm.chuboe_mfr_id
     WHERE r.value = $1
-    ORDER BY rlm.chuboe_mpn_clean, rlm.qty, rlm.priceentered, COALESCE(rlm.chuboe_cpc, ''), rlm.chuboe_rfq_line_mpn_id
+    ORDER BY rlm.chuboe_mpn_clean, COALESCE(rlm.chuboe_mfr_id, 0), rlm.qty, rlm.priceentered, COALESCE(rlm.chuboe_cpc, ''), rlm.chuboe_rfq_line_mpn_id
   `;
 
   const result = await pool.query(query, [rfqNumber]);
@@ -108,31 +127,59 @@ async function fetchRfqDetails(rfqNumber) {
  * Fetch market offers matching the cleaned MPNs
  * - Stock (offer_type LIKE 'Stock -%'): No time filter (our inventory, always current)
  * - Other offers: 90-day window
+ *
+ * DEDUP: chuboe_offer_line frequently contains exact-duplicate rows for the
+ * same content within a single offer (loader/wizard amplification — verified
+ * 804 dup groups in last 30 days, with one MPN/vendor combo at 148× dups).
+ * Without dedup, Vortex emits one output row per dup, which is the visible
+ * redundancy operators see. We dedup at read on
+ * (offer_id, mpn_clean, qty, price, lead_time, date_code) — same offer,
+ * identical line content = dup; different offer = legitimately separate
+ * opportunity (we keep those). Backfill of the upstream dups is intentionally
+ * out of scope; the read-side dedup is sufficient for output quality.
  */
 async function fetchMarketOffers(cleanMpns) {
   if (cleanMpns.length === 0) return [];
 
   const query = `
-    SELECT
-      mol.market_offer_line_mpn AS supplier_mpn,
-      mol.market_offer_line_mpn_clean,
-      mol.offer_type_name AS mo_type,
-      mol.market_offer_bpartner_name AS supplier_partner,
-      mol.market_offer_bpartner_ehs_grade AS vendor_grade,
-      mol.market_offer_line_quantity AS qty,
-      mol.market_offer_line_price AS supplier_price,
-      mol.market_offer_line_lead_time AS lead_time,
-      mol.market_offer_line_date_code AS date_code,
-      mol.market_offer_created AS created_date,
-      'MO' AS record_type
-    FROM adempiere.bi_market_offer_line_v mol
-    WHERE mol.market_offer_line_mpn_clean = ANY($1)
-      AND mol.market_offer_active = 'Y'
-      AND (
-        mol.offer_type_name LIKE 'Stock -%'  -- Astute stock: no time filter
-        OR mol.market_offer_created >= CURRENT_DATE - INTERVAL '90 days'  -- Others: 90-day window
+    SELECT * FROM (
+      SELECT DISTINCT ON (
+        mol.market_offer_id,
+        mol.market_offer_line_mpn_clean,
+        mol.market_offer_line_quantity,
+        mol.market_offer_line_price,
+        COALESCE(mol.market_offer_line_lead_time, ''),
+        COALESCE(mol.market_offer_line_date_code, '')
       )
-    ORDER BY mol.market_offer_created DESC
+        mol.market_offer_line_mpn AS supplier_mpn,
+        mol.market_offer_line_mpn_clean,
+        COALESCE(mol.manufacturer_name, '') AS supplier_mfr,
+        mol.offer_type_name AS mo_type,
+        mol.market_offer_bpartner_name AS supplier_partner,
+        mol.market_offer_bpartner_ehs_grade AS vendor_grade,
+        mol.market_offer_line_quantity AS qty,
+        mol.market_offer_line_price AS supplier_price,
+        mol.market_offer_line_lead_time AS lead_time,
+        mol.market_offer_line_date_code AS date_code,
+        mol.market_offer_created AS created_date,
+        'MO' AS record_type
+      FROM adempiere.bi_market_offer_line_v mol
+      WHERE mol.market_offer_line_mpn_clean = ANY($1)
+        AND mol.market_offer_active = 'Y'
+        AND (
+          mol.offer_type_name LIKE 'Stock -%'  -- Astute stock: no time filter
+          OR mol.market_offer_created >= CURRENT_DATE - INTERVAL '90 days'  -- Others: 90-day window
+        )
+      ORDER BY
+        mol.market_offer_id,
+        mol.market_offer_line_mpn_clean,
+        mol.market_offer_line_quantity,
+        mol.market_offer_line_price,
+        COALESCE(mol.market_offer_line_lead_time, ''),
+        COALESCE(mol.market_offer_line_date_code, ''),
+        mol.market_offer_line_id  -- tiebreak: keep lowest line_id (oldest insert)
+    ) deduped
+    ORDER BY created_date DESC
   `;
 
   const result = await pool.query(query, [cleanMpns]);
@@ -149,6 +196,7 @@ async function fetchVendorQuotes(cleanMpns) {
     SELECT
       vql.vendor_quote_mpn AS supplier_mpn,
       vql.vendor_quote_mpn_clean AS market_offer_line_mpn_clean,
+      COALESCE(vql.vendor_quote_manufacturer_name, '') AS supplier_mfr,
       NULL AS mo_type,
       vql.vendor_quote_bpartner_name AS supplier_partner,
       vql.vendor_quote_quantity AS qty,
@@ -223,12 +271,14 @@ function joinData(rfqRows, offers) {
         'RFQ Created': rfqDate,
         'RFQ Customer': rfq.customer_name || '',
         'RFQ MPN': rfq.rfq_mpn || '',
+        'RFQ MFR': rfq.rfq_mfr || '',
         'RFQ Qty': rfqQty,
         'RFQ Target': rfqTarget,
         'Customer Part Number': rfq.customer_part_number || '',
         'Type': offer.record_type,
         'MO Type': offer.mo_type || '',
         'Supplier MPN': offer.supplier_mpn || '',
+        'Supplier MFR': offer.supplier_mfr || '',
         'Supplier/Excess Partner': offer.supplier_partner || '',
         'Qty': supplierQty,
         'Supplier Price': supplierPrice,
@@ -355,6 +405,28 @@ async function createWorkbook(data, columns, fileType) {
         break;
     }
   });
+
+  // Per-cell red flag on the Supplier MFR cell when the supplier's MFR is a
+  // genuinely DIFFERENT manufacturer than what the customer asked for.
+  // 'Genuinely different' is determined via computeMfrMatch which uses an
+  // equivalence table to recognize known nomenclature variations and
+  // acquisitions (TE/Tyco, Vishay/Intertechnology, etc.) — those are NOT
+  // flagged. Only true cross-MFR cases get the red treatment.
+  // Cell-only (not row-level) so the rest of the data stays readable.
+  const supplierMfrColIndex = columns.indexOf('Supplier MFR');
+  if (supplierMfrColIndex >= 0) {
+    const colNum = supplierMfrColIndex + 1;
+    for (let i = 0; i < data.length; i++) {
+      const row = data[i];
+      const flag = computeMfrMatch(row['RFQ MFR'], row['Supplier MFR']);
+      if (flag === 'MISMATCH') {
+        // Worksheet row index = i + 2 (header is row 1, data starts at row 2)
+        const cell = worksheet.getCell(i + 2, colNum);
+        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFCC0000' } };
+        cell.font = { bold: true, color: { argb: 'FFFFFFFF' } };
+      }
+    }
+  }
 
   return workbook;
 }

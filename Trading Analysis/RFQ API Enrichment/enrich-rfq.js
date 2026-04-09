@@ -30,6 +30,7 @@ const { Pool } = require('pg');
 const { searchAllDistributors } = require('../../shared/franchise-api');
 const { writePricingResult } = require('../../shared/api-result-writer');
 const { writeVQFromAPI } = require('../../shared/vq-writer');
+const { computeMfrMatch } = require('../../shared/mfr-equivalence');
 
 // ─── TTL TABLE ───────────────────────────────────────────────────────────────
 // Source of truth: api-integration-roadmap.md § API Response Caching.
@@ -69,6 +70,7 @@ async function fetchRFQLines(rfqDocNumber) {
            rlm.chuboe_rfq_line_id,
            rlm.chuboe_rfq_line_mpn_id,
            rlm.chuboe_mpn_clean  AS mpn,
+           rlm.chuboe_mfr_id     AS mfr_id,
            rlm.chuboe_mfr_text   AS mfr,
            rlm.chuboe_cpc_clean  AS cpc,
            rl.qty,
@@ -103,14 +105,71 @@ async function enrichRFQ(rfqDocNumber, opts = {}) {
   const { dryRun = false, force = false, maxLines = null, onProgress = null } = opts;
   const startedAt = new Date();
 
-  const rows = await fetchRFQLines(rfqDocNumber);
-  if (rows.length === 0) {
+  const rawRows = await fetchRFQLines(rfqDocNumber);
+  if (rawRows.length === 0) {
     return {
       rfq: rfqDocNumber,
       error: 'RFQ not found or has no active line-MPNs',
       startedAt,
       finishedAt: new Date(),
     };
+  }
+
+  // ── Defensive dedup at read ──
+  // Source table chuboe_rfq_line_mpn frequently contains duplicate rows for
+  // the same (line_id, mpn_clean, mfr_id) tuple — pre-existing upstream
+  // (typically from the iDempiere mass-import wizard being run multiple times
+  // on PPV RFQs, often with the same Sanmina Excel file containing the same
+  // MPN at different qtys across summary/detail rows). If we don't dedup here,
+  // we make N duplicate franchise-API calls and write N duplicate VQs.
+  //
+  // KEY: (line_id, mpn_clean, mfr_id). MFR is included so legitimate cross-MFR
+  // AVL alternates (e.g., DG441DY from both Renesas and Vishay on the same
+  // line) are NOT collapsed — only same-MFR dups are.
+  //
+  // QTY TIE-BREAKING: when a group contains rows with different qty values
+  // (the wizard-replay-with-different-qty pattern), we keep the largest qty.
+  // Larger qty gives the most conservative coverage check — if API coverage
+  // is FULL at the larger qty, it's definitely FULL at the smaller qty too.
+  // We log when this happens so the operator knows there was ambiguity.
+  //
+  // This dedup is independent of the api-client.js check-before-retry safety
+  // net; both layers exist together (one prevents source amplification, the
+  // other prevents POST retry amplification).
+  const groups = new Map(); // key -> chosen row
+  const qtyAmbiguous = []; // groups where qty varies within
+  for (const r of rawRows) {
+    const key = `${r.chuboe_rfq_line_id}|${r.mpn}|${r.mfr_id || 0}`;
+    const existing = groups.get(key);
+    if (!existing) {
+      groups.set(key, r);
+      continue;
+    }
+    const rQty = Number(r.qty) || 0;
+    const eQty = Number(existing.qty) || 0;
+    if (rQty !== eQty) {
+      // Track first occurrence per key, not per row
+      if (!qtyAmbiguous.find(a => a.key === key)) {
+        qtyAmbiguous.push({ key, mpn: r.mpn, line_id: r.chuboe_rfq_line_id, qtys: new Set([eQty, rQty]) });
+      } else {
+        qtyAmbiguous.find(a => a.key === key).qtys.add(rQty);
+      }
+    }
+    // Keep the larger qty; tiebreak by larger (later) chuboe_rfq_line_mpn_id
+    if (rQty > eQty || (rQty === eQty && r.chuboe_rfq_line_mpn_id > existing.chuboe_rfq_line_mpn_id)) {
+      groups.set(key, r);
+    }
+  }
+  const rows = Array.from(groups.values());
+  const dupesSkipped = rawRows.length - rows.length;
+  if (dupesSkipped > 0) {
+    console.log(`[enrich-rfq] Deduped ${dupesSkipped} duplicate (line_id, mpn, mfr) rows from source (${rawRows.length} → ${rows.length}). Upstream chuboe_rfq_line_mpn dups; skipping to avoid amplification.`);
+  }
+  if (qtyAmbiguous.length > 0) {
+    console.log(`[enrich-rfq] WARNING: ${qtyAmbiguous.length} (line, mpn, mfr) groups have multiple qty values upstream — kept the largest (most conservative for coverage). Sample:`);
+    for (const a of qtyAmbiguous.slice(0, 3)) {
+      console.log(`  - line ${a.line_id} ${a.mpn}: qtys ${Array.from(a.qtys).sort((x,y) => y-x).join(', ')}`);
+    }
   }
 
   const rfqType = rows[0].rfq_type;
@@ -134,6 +193,15 @@ async function enrichRFQ(rfqDocNumber, opts = {}) {
     qtyMatches: 0,
     partialCoverage: 0,
     noCoverage: 0,
+    // MFR comparison via shared/mfr-equivalence — informational only, no
+    // behavior change. Counts how many distributor responses come back with
+    // a manufacturer that doesn't match what the customer asked for.
+    // 'mismatch' = both populated, different companies (after alias +
+    // acquisitions resolution). '?' = one side blank.
+    mfrMatch: 0,
+    mfrMismatch: 0,
+    mfrUnknown: 0,
+    mfrMismatchSamples: [],  // first 5 {mpn, rfqMfr, supplierMfr, distributor}
     errors: [],
   };
 
@@ -175,6 +243,38 @@ async function enrichRFQ(rfqDocNumber, opts = {}) {
     if (result.summary.coverage === 'FULL') counters.qtyMatches++;
     else if (result.summary.coverage === 'PARTIAL') counters.partialCoverage++;
     else counters.noCoverage++;
+
+    // MFR comparison — for each distributor response, check whether the
+    // supplier's manufacturer matches the customer's RFQ MFR ask. Uses the
+    // shared mfr-equivalence module so the comparison rules are identical
+    // to Vortex Matches and any other consumer. Informational only — does
+    // NOT change what gets written. Surfaced in the run summary.
+    const rfqMfr = line.mfr || '';
+    const distributors = Array.isArray(result.distributors) ? result.distributors : [];
+    for (const d of distributors) {
+      if (!d.found) continue;
+      // Check vqLines first (Arrow splits into franchise + Verical sub-lines);
+      // fall back to d.vqManufacturer for single-result distributors.
+      const supplierMfrs = Array.isArray(d.vqLines) && d.vqLines.length > 0
+        ? d.vqLines.map(s => s.manufacturer || d.vqManufacturer || '')
+        : [d.vqManufacturer || ''];
+      for (const supplierMfr of supplierMfrs) {
+        const flag = computeMfrMatch(rfqMfr, supplierMfr);
+        if (flag === '') counters.mfrMatch++;
+        else if (flag === 'MISMATCH') {
+          counters.mfrMismatch++;
+          if (counters.mfrMismatchSamples.length < 5) {
+            counters.mfrMismatchSamples.push({
+              mpn,
+              rfqMfr,
+              supplierMfr,
+              distributor: d.name || d.distributor || '?',
+            });
+          }
+        }
+        else counters.mfrUnknown++;
+      }
+    }
 
     // Write VQs for this MPN (all distributors with price; vq-writer.js decides
     // per-distributor what to write). This mirrors the Stock RFQ Loading pattern
@@ -292,6 +392,17 @@ async function main() {
     console.log(`VQs failed:   ${summary.vqsFailed}`);
     console.log(`api_result rows: ${summary.apiResultRowsWritten}`);
     console.log(`Coverage:     FULL=${summary.qtyMatches}  PARTIAL=${summary.partialCoverage}  NONE=${summary.noCoverage}`);
+    const mfrTotal = summary.mfrMatch + summary.mfrMismatch + summary.mfrUnknown;
+    if (mfrTotal > 0) {
+      const mismatchPct = mfrTotal > 0 ? ((summary.mfrMismatch / mfrTotal) * 100).toFixed(1) : '0.0';
+      console.log(`MFR check:    MATCH=${summary.mfrMatch}  MISMATCH=${summary.mfrMismatch} (${mismatchPct}%)  UNKNOWN=${summary.mfrUnknown}`);
+      if (summary.mfrMismatchSamples?.length) {
+        console.log('MFR mismatch samples:');
+        summary.mfrMismatchSamples.forEach((s, i) => {
+          console.log(`  ${i + 1}. ${s.mpn}: customer asked '${s.rfqMfr}', ${s.distributor} returned '${s.supplierMfr}'`);
+        });
+      }
+    }
     console.log(`Errors:       ${summary.errors.length}`);
     if (Object.keys(summary.flagReasonCounts || {}).length > 0) {
       console.log('Flag reasons:');

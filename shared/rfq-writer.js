@@ -208,7 +208,9 @@ async function writeRFQ(opts) {
         PriceEntered: targetPrice,
       };
       if (line.cpc) linePayload.Chuboe_CPC = line.cpc;
-      const lineResponse = await apiPost('chuboe_rfq_line', linePayload);
+      const lineResponse = await apiPost('chuboe_rfq_line', linePayload, {
+        naturalKeyFields: ['Chuboe_RFQ_ID', 'Line'],
+      });
       lineId = lineResponse.id;
       if (!lineId) throw new Error('No ID returned in response');
     } catch (e) {
@@ -245,7 +247,14 @@ async function writeRFQ(opts) {
       if (mpnDescription) mpnPayload.Description = mpnDescription;
       if (dateCode) mpnPayload.Chuboe_Date_Code = dateCode;
 
-      await apiPost('chuboe_rfq_line_mpn', mpnPayload);
+      // Natural key includes MFR so legitimate cross-MFR AVL alternates
+      // (e.g., DG441DY from both Renesas and Vishay on the same line) are
+      // not collapsed. If MFR is unset on the payload, the verify path is
+      // skipped — apiPost will throw on transient errors instead of risking
+      // a dup retry, which is the safer default.
+      await apiPost('chuboe_rfq_line_mpn', mpnPayload, {
+        naturalKeyFields: ['Chuboe_RFQ_Line_ID', 'Chuboe_MPN_Clean', 'Chuboe_MFR_ID'],
+      });
     } catch (e) {
       errors.push(`Failed to insert line_mpn ${i + 1} (${mpnRaw}): ${e.message}`);
       continue;

@@ -1,6 +1,7 @@
 {
   "_comment": "Acquisition map: original maker → current owner. Used by shared/mfr-resolver.js when applying Policy D #3 (infer current owner for parts where the source has no MFR specified). Format: { 'Original Brand Name': 'Current Owner Brand Name' }. Names MUST match canonical chuboe_mfr.name values, same convention as mfr-aliases.json. ONLY applied via mfr-resolver.resolveMfrForRow({applyAcquisitionMap: true}) — never applied to source-provided MFR text (Policy D #1 says preserve source intent).",
   "_seeded": "2026-04-08 — initial set covering well-known semi acquisitions. Not exhaustive. Add new entries as new acquisitions complete or as operators surface gaps.",
+  "_extended": "2026-04-09 — added Numonyx, Steward, IXYS, Teccor, Faraday, Nichia, Aeroflex, Pericom after surfacing as Vortex MFR Match false positives in real RFQ data.",
   "_policy_note": "Map only when the original brand has been FULLY absorbed by the parent (no longer ships under its own name). Brands that still ship under their original name even though the parent owns them should NOT be in this map (e.g., Maxim still ships as 'Maxim' even though it's part of ADI — that's a Policy B/C consolidation decision, not a 'current owner' fact).",
   "acquisitions": {
     "Linear Technology Corp": "Analog Devices Inc",
@@ -14,6 +15,13 @@
     "Atmel": "Microchip Technology Inc",
     "Microsemi": "Microchip Technology Inc",
     "Freescale": "NXP Semiconductors",
-    "Fairchild Semiconductor": "On Semiconductor"
+    "Fairchild Semiconductor": "On Semiconductor",
+    "Numonyx": "Micron Technology Inc",
+    "Steward": "Laird Technologies",
+    "IXYS": "Littelfuse Inc",
+    "Teccor": "Littelfuse Inc",
+    "Littelfuse Teccor": "Littelfuse Inc",
+    "Sprague": "Vishay Intertechnology Inc",
+    "Sprague / Vishay": "Vishay Intertechnology Inc"
   }
 }

@@ -218,18 +218,31 @@ async function logout() {
 // ─── HTTP HELPERS ───────────────────────────────────────────────────────────
 
 /**
- * Make an authenticated HTTP request with retry logic.
+ * Make an authenticated HTTP request.
+ *
+ * Auto-retry policy (POST is intentionally excluded — see apiPost):
+ *   - GET / PUT-with-ID / DELETE-with-ID: auto-retry on 5xx and network errors.
+ *     These verbs are idempotent — re-issuing them does not create duplicate rows.
+ *   - POST: NEVER auto-retried here. iDempiere can return 5xx *after* committing
+ *     a row (e.g., when a server-side bean callout throws post-commit), so a
+ *     blind POST retry doubles data. apiPost() handles POST retry on its own
+ *     with check-before-retry via a caller-supplied natural key.
+ *   - 401 token-refresh-and-retry is safe for all verbs (a 401 means the
+ *     request was rejected, not processed) and is preserved.
+ *
  * @param {string} method - HTTP method
- * @param {string} urlPath - Path relative to BASE_URL (e.g., '/models/c_bpartner')
- * @param {object|null} body - Request body (for POST/PUT)
- * @param {number} attempt - Current retry attempt
+ * @param {string} urlPath - Path relative to BASE_URL
+ * @param {object|null} body - Request body
+ * @param {object} [opts]
+ * @param {number} [opts.attempt=1] - Current retry attempt (internal)
  * @returns {Promise<object>} Parsed JSON response
  */
-async function request(method, urlPath, body = null, attempt = 1) {
+async function request(method, urlPath, body = null, opts = {}) {
+  const { attempt = 1 } = opts;
   const token = await getToken();
   const url = `${BASE_URL}${urlPath}`;
 
-  const options = {
+  const fetchOptions = {
     method,
     headers: {
       'Authorization': `Bearer ${token}`,
@@ -238,35 +251,42 @@ async function request(method, urlPath, body = null, attempt = 1) {
   };
 
   if (body && (method === 'POST' || method === 'PUT')) {
-    options.body = JSON.stringify(body);
+    fetchOptions.body = JSON.stringify(body);
   }
+
+  // POST is never auto-retried inside request() — see apiPost for the
+  // safe-retry path. All other verbs are idempotent and can be auto-retried.
+  const isUnsafeForRetry = method === 'POST';
 
   let res;
   try {
-    res = await fetch(url, options);
+    res = await fetch(url, fetchOptions);
   } catch (networkError) {
-    if (attempt < MAX_RETRIES) {
+    if (!isUnsafeForRetry && attempt < MAX_RETRIES) {
       const delay = BASE_DELAY_MS * Math.pow(2, attempt - 1);
       logger.warn(`Network error on ${method} ${urlPath}, retrying in ${delay}ms (attempt ${attempt}/${MAX_RETRIES}): ${networkError.message}`);
       await sleep(delay);
-      return request(method, urlPath, body, attempt + 1);
+      return request(method, urlPath, body, { attempt: attempt + 1 });
     }
-    throw new Error(`api-client network error after ${MAX_RETRIES} attempts: ${networkError.message}`);
+    const wrapped = new Error(`api-client ${method} ${urlPath} network error: ${networkError.message}`);
+    wrapped.cause = networkError;
+    wrapped.isNetworkError = true;
+    throw wrapped;
   }
 
-  // Handle 401 — token expired, refresh and retry once
+  // Handle 401 — token expired, refresh and retry once (safe for all verbs)
   if (res.status === 401 && attempt === 1) {
     logger.debug('Got 401, refreshing token and retrying');
     await refreshTokenFn();
-    return request(method, urlPath, body, attempt + 1);
+    return request(method, urlPath, body, { attempt: attempt + 1 });
   }
 
-  // Handle 5xx — retry with backoff
-  if (res.status >= 500 && attempt < MAX_RETRIES) {
+  // Handle 5xx — auto-retry only for idempotent verbs
+  if (res.status >= 500 && !isUnsafeForRetry && attempt < MAX_RETRIES) {
     const delay = BASE_DELAY_MS * Math.pow(2, attempt - 1);
     logger.warn(`Server error ${res.status} on ${method} ${urlPath}, retrying in ${delay}ms (attempt ${attempt}/${MAX_RETRIES})`);
     await sleep(delay);
-    return request(method, urlPath, body, attempt + 1);
+    return request(method, urlPath, body, { attempt: attempt + 1 });
   }
 
   // Handle other errors
@@ -293,25 +313,141 @@ function sleep(ms) {
 // ─── CRUD OPERATIONS ────────────────────────────────────────────────────────
 
 /**
- * Create a record via POST.
+ * Build an OData $filter expression from a list of payload field names.
+ * Used by apiPost's check-before-retry path. Returns null if any required
+ * field is missing/null/empty — in that case the verify path is skipped
+ * (we can't safely identify the row, so we don't claim to have found it).
+ *
+ * @param {string[]} fields - Field names to include in the filter
+ * @param {object} body - Payload object
+ * @param {string} [sinceTimestamp] - ISO timestamp; if provided, adds Created ge <ts>
+ * @returns {string|null}
+ */
+function buildNaturalKeyFilter(fields, body, sinceTimestamp) {
+  if (!Array.isArray(fields) || fields.length === 0) return null;
+  const clauses = [];
+  for (const field of fields) {
+    const value = body[field];
+    if (value === null || value === undefined || value === '') {
+      // Can't safely build a verify filter if any key field is missing.
+      return null;
+    }
+    if (typeof value === 'number' || typeof value === 'boolean') {
+      clauses.push(`${field} eq ${value}`);
+    } else {
+      const escaped = String(value).replace(/'/g, "''");
+      clauses.push(`${field} eq '${escaped}'`);
+    }
+  }
+  if (sinceTimestamp) {
+    clauses.push(`Created ge '${sinceTimestamp}'`);
+  }
+  return clauses.join(' and ');
+}
+
+/**
+ * Create a record via POST. Includes a generic check-before-retry facility:
+ * if the caller supplies `naturalKeyFields`, then on a 5xx or network error
+ * after a POST, apiPost issues a GET filtered by those fields (plus a
+ * pre-POST timestamp guard) to check whether the row was actually committed
+ * server-side. If so, it returns the existing row instead of retrying — which
+ * prevents the duplicate-row trap when iDempiere returns 5xx after a
+ * successful commit (e.g., from a post-commit bean-callout exception).
+ *
+ * Without `naturalKeyFields`, apiPost does NOT auto-retry on 5xx/network
+ * errors — that's the safer default given the dup risk. Callers wanting
+ * resilient writes should pass naturalKeyFields.
+ *
  * Automatically includes IDEMPIERE_DEFAULTS fields.
  *
  * @param {string} table - Table name (e.g., 'chuboe_rfq', 'c_bpartner')
  * @param {object} payload - Record fields (without standard iDempiere fields)
  * @param {object} [options]
  * @param {boolean} [options.includeDefaults=true] - Include IDEMPIERE_DEFAULTS in payload
+ * @param {string[]} [options.naturalKeyFields] - Payload field names that
+ *   uniquely identify this row. Enables safe retry via check-before-retry.
+ *   Example: ['Chuboe_RFQ_Line_ID', 'Chuboe_MPN_Clean', 'Chuboe_MFR_ID']
+ * @param {number} [options.maxRetries] - Max attempts when naturalKeyFields
+ *   is set. Defaults to MAX_RETRIES. Ignored when naturalKeyFields is absent.
  * @returns {Promise<object>} Created record with server-assigned ID
  */
 async function apiPost(table, payload, options = {}) {
-  const { includeDefaults = true } = options;
+  const {
+    includeDefaults = true,
+    naturalKeyFields = null,
+    maxRetries = MAX_RETRIES,
+  } = options;
 
   const body = includeDefaults
     ? { ...IDEMPIERE_DEFAULTS, ...payload }
     : { ...payload };
 
-  const result = await request('POST', `/models/${table}`, body);
-  logger.debug(`Created ${table} record: id=${result.id || 'unknown'}`);
-  return result;
+  // No natural key → single attempt, no retry. This is the safer default
+  // because the previous behavior (blind 5xx retry) silently double-wrote
+  // rows when iDempiere committed and then returned 5xx from a post-commit
+  // bean callout. Callers that need resilience should pass naturalKeyFields.
+  if (!naturalKeyFields) {
+    const result = await request('POST', `/models/${table}`, body);
+    logger.debug(`Created ${table} record: id=${result.id || 'unknown'}`);
+    return result;
+  }
+
+  // With natural key: capture pre-POST timestamp and run up to maxRetries
+  // attempts, verifying after each failure whether the row actually committed.
+  // The timestamp guard ensures the verify GET only matches rows we may have
+  // just created — never an unrelated older row.
+  const preTimestamp = new Date().toISOString();
+  let lastError;
+
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    try {
+      const result = await request('POST', `/models/${table}`, body);
+      logger.debug(`Created ${table} record: id=${result.id || 'unknown'}${attempt > 1 ? ` (attempt ${attempt})` : ''}`);
+      return result;
+    } catch (e) {
+      lastError = e;
+
+      // Only retry on transient failures: 5xx or network errors. Don't retry
+      // on 4xx (those are client errors — payload validation, auth, etc.,
+      // and won't fix themselves on retry).
+      const isTransient = e.isNetworkError || (e.statusCode >= 500 && e.statusCode < 600);
+      if (!isTransient) throw e;
+
+      // Check whether the failed POST actually committed despite the error.
+      // SAFETY RULE: we only retry when verification CONFIRMS the row was not
+      // committed. Any uncertainty (can't build filter, verify itself errored)
+      // → throw and let the caller investigate. Blind retry is how the
+      // duplicate-row trap happened in the first place.
+      const filter = buildNaturalKeyFilter(naturalKeyFields, body, preTimestamp);
+      if (!filter) {
+        logger.warn(`POST ${table} failed (${e.statusCode || 'network error'}) and natural key has missing/null fields — cannot verify, not retrying to avoid dup risk`);
+        throw e;
+      }
+
+      let verify;
+      try {
+        verify = await apiGet(table, { filter, top: 1, orderby: 'Created desc' });
+      } catch (verifyErr) {
+        logger.warn(`Verify-after-error for ${table} failed: ${verifyErr.message} — not retrying to avoid dup risk`);
+        throw e;
+      }
+
+      const found = verify.records && verify.records[0];
+      if (found) {
+        logger.warn(`POST ${table} returned ${e.statusCode || 'network error'} but row was committed: id=${found.id} (attempt ${attempt}) — treating as success`);
+        return found;
+      }
+
+      // Verified that the row was NOT committed → safe to retry with backoff.
+      if (attempt < maxRetries) {
+        const delay = BASE_DELAY_MS * Math.pow(2, attempt - 1);
+        logger.warn(`POST ${table} failed (${e.statusCode || 'network error'}) and row not committed — retrying in ${delay}ms (attempt ${attempt}/${maxRetries})`);
+        await sleep(delay);
+      }
+    }
+  }
+
+  throw lastError;
 }
 
 /**
@@ -557,6 +693,7 @@ module.exports = {
   apiPut,
   apiDelete,
   apiBatch,
+  buildNaturalKeyFilter,
 
   // Lookups
   resolveBP,

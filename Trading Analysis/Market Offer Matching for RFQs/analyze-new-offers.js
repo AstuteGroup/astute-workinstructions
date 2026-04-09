@@ -16,6 +16,7 @@
 const { execSync } = require('child_process');
 const fs = require('fs');
 const path = require('path');
+const { computeMfrMatch } = require('../../shared/mfr-equivalence');
 
 // Configuration
 const OUTPUT_DIR = __dirname;
@@ -95,6 +96,12 @@ function extractMPNsFromOfferCSV(csvPath) {
         h.toLowerCase().includes('partner') ||
         h.toLowerCase().includes('business')
     );
+    // Detect MFR column — usually Chuboe_MFR_Text in market offer CSVs, but
+    // accept any column whose name contains 'mfr' or 'manufacturer'.
+    const mfrIdx = headers.findIndex(h => {
+        const l = h.toLowerCase();
+        return l === 'chuboe_mfr_text' || l === 'mfr' || l.includes('manufacturer') || l.endsWith('_mfr');
+    });
 
     const offers = [];
     for (const row of rows) {
@@ -104,7 +111,8 @@ function extractMPNsFromOfferCSV(csvPath) {
                 mpn: mpn,
                 qty: qtyIdx >= 0 ? parseFloat(row[qtyIdx]) || 0 : 0,
                 price: priceIdx >= 0 ? parseFloat(row[priceIdx]) || 0 : 0,
-                partner: partnerIdx >= 0 ? row[partnerIdx]?.trim() : 'Unknown'
+                partner: partnerIdx >= 0 ? row[partnerIdx]?.trim() : 'Unknown',
+                mfr: mfrIdx >= 0 ? (row[mfrIdx]?.trim() || '') : ''
             });
         }
     }
@@ -133,6 +141,7 @@ function matchOffersToRFQs(offers) {
             bp.name as customer_name,
             bp.c_bpartner_id as customer_id,
             rl.chuboe_mpn as rfq_mpn,
+            COALESCE(mfr.name, rl.chuboe_mfr_text, '') as rfq_mfr,
             rl.qty as rfq_qty,
             rl.priceentered as rfq_target_price,
             u.name as salesperson
@@ -141,6 +150,7 @@ function matchOffersToRFQs(offers) {
         LEFT JOIN adempiere.chuboe_rfq_type rt ON r.chuboe_rfq_type_id = rt.chuboe_rfq_type_id
         LEFT JOIN adempiere.c_bpartner bp ON r.c_bpartner_id = bp.c_bpartner_id
         LEFT JOIN adempiere.ad_user u ON r.salesrep_id = u.ad_user_id
+        LEFT JOIN adempiere.chuboe_mfr mfr ON mfr.chuboe_mfr_id = rl.chuboe_mfr_id
         WHERE r.isactive = 'Y'
         AND rl.isactive = 'Y'
         AND r.created >= CURRENT_DATE - INTERVAL '${RFQ_LOOKBACK_DAYS} days'
@@ -161,9 +171,10 @@ function matchOffersToRFQs(offers) {
             customer_name: parts[3],
             customer_id: parts[4],
             rfq_mpn: parts[5],
-            rfq_qty: parseFloat(parts[6]) || 0,
-            rfq_target_price: parseFloat(parts[7]) || 0,
-            salesperson: parts[8]
+            rfq_mfr: parts[6] || '',
+            rfq_qty: parseFloat(parts[7]) || 0,
+            rfq_target_price: parseFloat(parts[8]) || 0,
+            salesperson: parts[9]
         };
     });
 
@@ -211,6 +222,9 @@ function calculateOpportunities(offers, rfqMatches) {
             }
 
             if (est_value >= MIN_OPPORTUNITY_VALUE) {
+                // MFR comparison via shared/mfr-equivalence — flag genuine
+                // cross-MFR cases (different companies) and one-sided unknowns.
+                const mfrMatch = computeMfrMatch(rfq.rfq_mfr || '', offer.mfr || '');
                 opportunities.push({
                     tier,
                     tier_reason,
@@ -220,10 +234,13 @@ function calculateOpportunities(offers, rfqMatches) {
                     customer_name: rfq.customer_name,
                     salesperson: rfq.salesperson,
                     rfq_mpn: rfq.rfq_mpn,
+                    rfq_mfr: rfq.rfq_mfr || '',
                     rfq_qty: rfq.rfq_qty,
                     rfq_target_price: rfq.rfq_target_price,
                     offer_partner: offer.partner,
                     offer_mpn: offer.mpn,
+                    offer_mfr: offer.mfr || '',
+                    mfr_match: mfrMatch,  // '', 'MISMATCH', or '?'
                     offer_qty: offer.qty,
                     offer_price: offer.price,
                     coverage_pct,
@@ -254,8 +271,8 @@ function writeOutputCSV(opportunities, sourceName) {
 
     const headers = [
         'tier', 'tier_reason', 'rfq_search_key', 'rfq_date', 'rfq_type',
-        'customer_name', 'salesperson', 'rfq_mpn', 'rfq_qty', 'rfq_target_price',
-        'offer_partner', 'offer_mpn', 'offer_qty', 'offer_price',
+        'customer_name', 'salesperson', 'rfq_mpn', 'rfq_mfr', 'rfq_qty', 'rfq_target_price',
+        'offer_partner', 'offer_mpn', 'offer_mfr', 'mfr_match', 'offer_qty', 'offer_price',
         'coverage_pct', 'est_opportunity_value', 'flag_low_coverage', 'flag_no_pricing'
     ];
 

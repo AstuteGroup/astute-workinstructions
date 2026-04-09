@@ -12,7 +12,8 @@
 |--------|---------|----------|-----------|
 | `franchise-api.js` | All 10 franchise distributor APIs (DigiKey, Arrow, Rutronik, Future, Newark, TTI, Mouser, Master, Waldom, Sager) | Need franchise stock/pricing for ANY workflow | Franchise Screening, Suggested Resale, VQ Loading, Quick Quote |
 | `market-data.js` | DB queries: VQ history, sales history (broker vs customer), market offers, RFQ demand | Need pricing intelligence from the system | Suggested Resale, Quick Quote, Vortex Matches, Market Offer Analysis |
-| `mfr-lookup.js` | Resolve manufacturer names → canonical `chuboe_mfr.name`. Aliases (165+) → DB → cache. | Normalizing MFR names from any source | VQ Loading, Market Offer Loading, Stock RFQ Loading |
+| `mfr-lookup.js` | Resolve manufacturer names → canonical `chuboe_mfr.name`. Aliases (200+) → DB → cache. | Normalizing MFR names from any source | VQ Loading, Market Offer Loading, Stock RFQ Loading, mfr-equivalence.js |
+| `mfr-equivalence.js` | "Are these two MFR strings the same company?" Pipeline: prenormalize (strip Inc/Corp/Ltd/GmbH + punctuation) → mfr-lookup alias resolve → walk acquisitions chain. Exports `canonicalMfr`, `computeMfrMatch`, `prenormalizeMfr`. | Comparing customer MFR ask vs supplier MFR label in any workflow (Vortex Matches, Quick Quote, Market Offer Matching, RFQ API Enrichment, etc.) | Vortex Matches |
 | `partner-lookup.js` | Resolve email/name → iDempiere business partner | Matching sender to BP in any inbound email workflow | VQ Loading, Market Offer Loading, Stock RFQ Loading |
 | `csv-utils.js` | CSV parsing with proper quoting | Any CSV read/write (**NEVER** use `line.split(',')`) | All workflows |
 | `logger.js` | Timestamped logging with optional prefix | Any module needing structured logs | All workflows, all shared cogs |

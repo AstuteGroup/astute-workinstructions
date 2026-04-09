@@ -2,11 +2,23 @@
 -- Generated: 2026-03-10
 -- Parameters: 15% min margin, $250 min GP, 30% fat margin fallback
 
+-- Defensive dedup on (line_id, mpn_clean, mfr_id) — chuboe_rfq_line_mpn
+-- frequently has exact-duplicate rows from upstream loader/wizard re-runs
+-- (especially on PPV RFQs). MFR is included so legitimate cross-MFR AVL
+-- alternates (e.g., DG441DY from Renesas + Vishay) are NOT collapsed.
+-- Also filter rlm.isactive='Y' so previously-cleaned-up dups are excluded.
+--
+-- rfq_mfr is exposed for downstream MFR-match comparison via the shared
+-- mfr-equivalence module. Today QQ is pure SQL so the comparison happens
+-- when the operator visually inspects the output; the planned QQ Node
+-- wrapper (TODO in quick-quote.md) will compute the flag automatically
+-- using shared/mfr-equivalence.computeMfrMatch(rfq_mfr, vq_mfr).
 WITH rfq_lines AS (
-  SELECT
+  SELECT DISTINCT ON (rlm.chuboe_rfq_line_id, rlm.chuboe_mpn_clean, COALESCE(rlm.chuboe_mfr_id, 0))
     COALESCE(rlm.chuboe_cpc, rlm.chuboe_mpn) AS cpc,
     rlm.chuboe_mpn AS rfq_mpn,
     rlm.chuboe_mpn_clean,
+    COALESCE(mfr.name, rlm.chuboe_mfr_text, '') AS rfq_mfr,
     rlm.qty AS rfq_qty,
     rlm.priceentered AS rfq_target,
     r.created AS rfq_created,
@@ -15,14 +27,20 @@ WITH rfq_lines AS (
   FROM adempiere.chuboe_rfq r
   JOIN adempiere.chuboe_rfq_line_mpn rlm ON r.chuboe_rfq_id = rlm.chuboe_rfq_id
   LEFT JOIN adempiere.c_bpartner bp ON r.c_bpartner_id = bp.c_bpartner_id
+  LEFT JOIN adempiere.chuboe_mfr mfr ON mfr.chuboe_mfr_id = rlm.chuboe_mfr_id
   WHERE r.value = '1130895'
+    AND r.isactive = 'Y'
+    AND rlm.isactive = 'Y'
     AND rlm.priceentered > 0
+  ORDER BY rlm.chuboe_rfq_line_id, rlm.chuboe_mpn_clean, COALESCE(rlm.chuboe_mfr_id, 0), rlm.chuboe_rfq_line_mpn_id
 ),
 
+-- vq_mfr exposed for downstream MFR-match comparison (see rfq_lines comment).
 recent_vqs AS (
   SELECT
     vql.vendor_quote_mpn_clean,
     vql.vendor_quote_mpn AS vq_mpn,
+    COALESCE(vql.vendor_quote_manufacturer_name, '') AS vq_mfr,
     vql.vendor_quote_bpartner_name AS supplier,
     vql.vendor_quote_cost AS vq_cost,
     vql.vendor_quote_quantity AS vq_qty,
@@ -58,15 +76,20 @@ sales_history AS (
     AND ol.priceentered > 0
 ),
 
+-- rfq_mfr + vq_mfr propagated through so they reach the final SELECT.
+-- The match comparison itself happens in the (planned) Node wrapper, which
+-- will call shared/mfr-equivalence.computeMfrMatch(rfq_mfr, vq_mfr) per row.
 vq_matches AS (
   SELECT
     rl.cpc,
     rl.rfq_mpn,
+    rl.rfq_mfr,
     rl.rfq_target,
     rl.rfq_qty,
     rl.rfq_customer_id,
     rl.rfq_customer,
     vq.vq_mpn AS source_mpn,
+    vq.vq_mfr,
     vq.supplier,
     vq.vq_cost,
     vq.vq_qty AS source_qty,
@@ -152,7 +175,9 @@ SELECT
   END AS "vs Target",
   ROUND(pv.rfq_target::numeric, 4) AS "RFQ Target",
   pv.rfq_qty AS "RFQ Qty",
+  pv.rfq_mfr AS "RFQ MFR",
   pv.source_mpn AS "Source MPN",
+  pv.vq_mfr AS "Supplier MFR",
   pv.supplier AS "Supplier",
   ROUND(pv.vq_cost::numeric, 4) AS "VQ Cost",
   pv.source_qty AS "Source Qty",

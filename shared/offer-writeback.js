@@ -233,7 +233,13 @@ async function writeOffer(opts) {
 
     let lineId;
     try {
-      const lineResponse = await apiPost('chuboe_offer_line', linePayload);
+      // Natural key uses (Offer_ID, MPN) since every offer line has an MPN
+      // and not all have CPC. Note: this does NOT protect against the
+      // server-side CPC bean-callout collapse (separate concern documented
+      // in shared/data-model.md and project_chuboe_offer_line_cpc_collapse.md).
+      const lineResponse = await apiPost('chuboe_offer_line', linePayload, {
+        naturalKeyFields: ['Chuboe_Offer_ID', 'Chuboe_MPN'],
+      });
       lineId = lineResponse.id;
       if (!lineId) throw new Error('No ID returned in response');
     } catch (e) {
@@ -252,7 +258,9 @@ async function writeOffer(opts) {
         };
         if (line.description) mpnPayload.Description = line.description;
 
-        await apiPost('chuboe_offer_line_mpn', mpnPayload);
+        await apiPost('chuboe_offer_line_mpn', mpnPayload, {
+          naturalKeyFields: ['Chuboe_Offer_Line_ID', 'Chuboe_MPN_Clean'],
+        });
         mpnsWritten++;
       } catch (e) {
         errors.push(`Failed to insert offer_line_mpn ${i + 1} (${mpnRaw}): ${e.message}`);
