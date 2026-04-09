@@ -515,85 +515,11 @@ async function writeInventoryToOT(groupedRows, dateStr, dryRun = false) {
         }
     }
 
-    // ─── Cross-BP audit ──────────────────────────────────────────────────────
-    // For each unique BP touched by this run, list ALL active offers under
-    // any of the writeback-managed offer types for that BP, then subtract
-    // the offers we just wrote (or, in dry-run, the offers we already know
-    // exist from the priorOffers query — those are the ones the live run
-    // would replace). Anything left over is a stray that lives outside the
-    // weekly cleanup loop and warrants attention.
-    const bpToManagedTypes = {};   // bpId → Set(offerTypeIds we manage)
-    const bpToExpectedIds  = {};   // bpId → Set(offerIds we just wrote OR prior IDs in dry-run)
-    for (const r of results) {
-        if (!r.bpartnerId) continue;
-        if (!bpToManagedTypes[r.bpartnerId]) bpToManagedTypes[r.bpartnerId] = new Set();
-        if (!bpToExpectedIds[r.bpartnerId])  bpToExpectedIds[r.bpartnerId]  = new Set();
-        bpToManagedTypes[r.bpartnerId].add(r.offerTypeId);
-        if (r.offerId) bpToExpectedIds[r.bpartnerId].add(r.offerId);
-        // In dry-run we have no new IDs, so the "expected" set is the priorOffers
-        // we just queried — those are the ones the live run would deactivate
-        // and we don't want to flag them as strays in dry-run.
-        if (dryRun && r.priorOffers) {
-            for (const po of r.priorOffers) bpToExpectedIds[r.bpartnerId].add(po.id);
-        }
-    }
-
-    // Build a (bpId → human name) lookup from WAREHOUSE_WRITEBACK groups so
-    // the audit table can show "Astute Electronics Inc (BP 1000332)" instead
-    // of just "BP 1000332" — easier to read at a glance.
-    const BP_NAMES = {
-        1000332: 'Astute Electronics Inc',
-        1000325: 'Astute Electronics - Franchise Stock',
-        1003236: 'Astute Electronics - GE Aviation Excess',
-        1003621: 'Astute Electronics - Taxan Excess',
-        1005225: 'Astute Electronics - Spartronics Excess',
-        1010966: 'Astute Electronics Inc - Eaton Consignment',
-        1011267: 'Astute Electronics - LAM Consignment',
-    };
-
-    const auditFindings = [];
-    for (const [bpId, typeSet] of Object.entries(bpToManagedTypes)) {
-        const typeOr = [...typeSet].map(t => `chuboe_offer_type_id eq ${t}`).join(' or ');
-        const filter = `C_BPartner_ID eq ${bpId} and IsActive eq true and (${typeOr})`;
-        let activeOffers = [];
-        try {
-            const result = await apiGet('chuboe_offer', {
-                filter,
-                select: 'Value,Created,Chuboe_Offer_Type_ID,Description',
-                orderby: 'Created desc',
-            });
-            activeOffers = result.records || [];
-        } catch (e) {
-            console.warn(`  ! Audit query failed for BP=${bpId}: ${e.message}`);
-            continue;
-        }
-        const expected = bpToExpectedIds[bpId] || new Set();
-        const strays = activeOffers
-            .map(o => ({
-                id: o.id,
-                value: o.Value || o.value || null,
-                created: o.Created || o.created || null,
-                // FK fields come back as { propertyLabel, id, identifier, ... }
-                offerTypeId: o.Chuboe_Offer_Type_ID?.id || o.chuboe_offer_type_id?.id || null,
-                offerTypeName: o.Chuboe_Offer_Type_ID?.identifier || null,
-                description: o.Description || o.description || null,
-            }))
-            .filter(o => !expected.has(o.id));
-        if (strays.length > 0) {
-            const bpIdNum = parseInt(bpId, 10);
-            const bpName = BP_NAMES[bpIdNum] || `BP ${bpIdNum}`;
-            auditFindings.push({ bpartnerId: bpIdNum, bpName, strays });
-            console.log(`  ⚠ Audit: ${bpName} (BP ${bpId}) has ${strays.length} stray active offer(s) outside this run:`);
-            for (const s of strays) {
-                console.log(`      id=${s.id} key=${s.value} type=${s.offerTypeName || s.offerTypeId} created=${String(s.created || '').split('T')[0]} desc="${s.description || ''}"`);
-            }
-        }
-    }
-    if (auditFindings.length === 0) {
-        console.log('  ✓ Audit: no stray offers under any managed BP');
-    }
-    // Stash audit findings on the results array for the email summary
-    results._audit = auditFindings;
+    // The cross-BP audit moved out of this function — see auditCrossBpStrays
+    // below. The audit needs to see BOTH writeback results AND carryover
+    // refresh results so it can correctly identify what's actually a stray
+    // vs an intentional carryover offer. fetchAndProcess calls it after
+    // both Step 5 and Step 5b complete.
 
     // Console summary table
     console.log('\nWrite-back summary:');
@@ -842,6 +768,131 @@ async function refreshStaticCarryoverOffers(carryovers, dateStr, dryRun, pending
     }
 
     return results;
+}
+
+/**
+ * Cross-BP audit pass: for each unique (BP, OfferType) the loader manages
+ * (via either writeback or carryover paths), list every active chuboe_offer
+ * not in the just-written set. Anything left over is a stray that lives
+ * outside the loader's control loop and warrants attention.
+ *
+ * Excluded from "stray" status:
+ *   - Offers we just wrote in Step 5 (writebackResults[*].offerId)
+ *   - Offers we just wrote in Step 5b (carryoverResults[*].newOfferId)
+ *   - Static carryover bootstrap offers we DIDN'T refresh because they're
+ *     empty (carryoverResults[*].currentOfferId where status === 'empty')
+ *   - Any active offer with description starting `[Carryover]` — these are
+ *     historical refreshed carryovers from prior weeks that the loader
+ *     manages via the description-prefix lookup pathway, not via the
+ *     writeback BP+OfferType+suffix pathway. They're intentional and
+ *     shouldn't pollute the audit just because their description shape
+ *     differs from the writeback offers.
+ *
+ * @param {Array} writebackResults  - results from writeInventoryToOT
+ * @param {Array} carryoverResults  - results from refreshStaticCarryoverOffers
+ * @param {boolean} dryRun
+ * @returns {Promise<Array<{bpartnerId, bpName, strays}>>}
+ */
+async function auditCrossBpStrays(writebackResults, carryoverResults, dryRun) {
+    const { apiGet } = require('../../shared/api-client');
+
+    const BP_NAMES = {
+        1000332: 'Astute Electronics Inc',
+        1000325: 'Astute Electronics - Franchise Stock',
+        1003236: 'Astute Electronics - GE Aviation Excess',
+        1003621: 'Astute Electronics - Taxan Excess',
+        1005225: 'Astute Electronics - Spartronics Excess',
+        1010966: 'Astute Electronics Inc - Eaton Consignment',
+        1011267: 'Astute Electronics - LAM Consignment',
+    };
+
+    // Build (BP → managed offer types) and (BP → expected offer IDs)
+    const bpToManagedTypes = {};
+    const bpToExpectedIds  = {};
+
+    const addManaged = (bpId, offerTypeId) => {
+        if (!bpId || !offerTypeId) return;
+        if (!bpToManagedTypes[bpId]) bpToManagedTypes[bpId] = new Set();
+        if (!bpToExpectedIds[bpId])  bpToExpectedIds[bpId]  = new Set();
+        bpToManagedTypes[bpId].add(offerTypeId);
+    };
+    const addExpected = (bpId, offerId) => {
+        if (!bpId || !offerId) return;
+        if (!bpToExpectedIds[bpId]) bpToExpectedIds[bpId] = new Set();
+        bpToExpectedIds[bpId].add(offerId);
+    };
+
+    // Writeback path
+    for (const r of writebackResults) {
+        if (!r.bpartnerId) continue;
+        addManaged(r.bpartnerId, r.offerTypeId);
+        if (r.offerId) addExpected(r.bpartnerId, r.offerId);
+        // Dry-run: priorOffers stand in for "what would be written" so they
+        // don't get falsely flagged
+        if (dryRun && r.priorOffers) {
+            for (const po of r.priorOffers) addExpected(r.bpartnerId, po.id);
+        }
+    }
+
+    // Carryover path
+    for (const r of carryoverResults || []) {
+        if (!r.bpId) continue;
+        addManaged(r.bpId, r.offerTypeId);
+        if (r.newOfferId)     addExpected(r.bpId, r.newOfferId);
+        if (r.currentOfferId) addExpected(r.bpId, r.currentOfferId); // empty/failed cases
+        // Dry-run carryover: bootstrap offer is what would be replaced
+        if (dryRun && r.currentOfferId) addExpected(r.bpId, r.currentOfferId);
+    }
+
+    // Per-BP audit query
+    const auditFindings = [];
+    for (const [bpId, typeSet] of Object.entries(bpToManagedTypes)) {
+        const typeOr = [...typeSet].map(t => `chuboe_offer_type_id eq ${t}`).join(' or ');
+        const filter = `C_BPartner_ID eq ${bpId} and IsActive eq true and (${typeOr})`;
+        let activeOffers = [];
+        try {
+            const result = await apiGet('chuboe_offer', {
+                filter,
+                select: 'Value,Created,Chuboe_Offer_Type_ID,Description',
+                orderby: 'Created desc',
+            });
+            activeOffers = result.records || [];
+        } catch (e) {
+            console.warn(`  ! Audit query failed for BP=${bpId}: ${e.message}`);
+            continue;
+        }
+
+        const expected = bpToExpectedIds[bpId] || new Set();
+        const strays = activeOffers
+            .map(o => ({
+                id: o.id,
+                value: o.Value || o.value || null,
+                created: o.Created || o.created || null,
+                offerTypeId: o.Chuboe_Offer_Type_ID?.id || o.chuboe_offer_type_id?.id || null,
+                offerTypeName: o.Chuboe_Offer_Type_ID?.identifier || null,
+                description: o.Description || o.description || null,
+            }))
+            // Drop anything we just wrote / would-write
+            .filter(o => !expected.has(o.id))
+            // Drop anything that's a refreshed carryover (managed via the
+            // description-prefix pathway, not the writeback pathway)
+            .filter(o => !String(o.description || '').startsWith('[Carryover]'));
+
+        if (strays.length > 0) {
+            const bpIdNum = parseInt(bpId, 10);
+            const bpName = BP_NAMES[bpIdNum] || `BP ${bpIdNum}`;
+            auditFindings.push({ bpartnerId: bpIdNum, bpName, strays });
+            console.log(`  ⚠ Audit: ${bpName} (BP ${bpId}) has ${strays.length} stray active offer(s) outside this run:`);
+            for (const s of strays) {
+                console.log(`      id=${s.id} key=${s.value} type=${s.offerTypeName || s.offerTypeId} created=${String(s.created || '').split('T')[0]} desc="${s.description || ''}"`);
+            }
+        }
+    }
+    if (auditFindings.length === 0) {
+        console.log('  ✓ Audit: no stray offers under any managed BP');
+    }
+
+    return auditFindings;
 }
 
 /**
@@ -1353,6 +1404,12 @@ async function fetchAndProcess(opts = {}) {
         }
         console.log(`\nStep 5b: Refreshing static carryover offers (${dryRun ? 'DRY RUN' : 'LIVE'}) — comparing against ${pendingMpnDetails.size} unique MPNs from this week's Infor data...`);
         const carryoverResults = await refreshStaticCarryoverOffers(STATIC_CARRYOVER_OFFERS, dateStr, dryRun, pendingMpnDetails);
+
+        // Step 5c: Cross-BP audit (runs after both writeback and carryover so
+        // it sees the full picture and doesn't false-positive on offers we
+        // just refreshed in 5b).
+        console.log('\nStep 5c: Cross-BP audit...');
+        writebackResults._audit = await auditCrossBpStrays(writebackResults, carryoverResults, dryRun);
 
         // Build overlap CSV if any carryover MPNs match this week's inventory
         let overlapCsvPath = null;
