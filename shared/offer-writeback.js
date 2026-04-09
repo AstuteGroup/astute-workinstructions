@@ -351,27 +351,49 @@ async function deactivatePriorOffers(bpartnerId, offerTypeId, opts = {}) {
   let linesDeactivated = 0;
   const deactivatedOffers = [];
 
-  // Deactivate lines for each offer, then deactivate the offer header
+  // Deactivate lines for each offer, then deactivate the offer header.
+  //
+  // PAGINATION: iDempiere REST caps GET responses at 100 records server-side
+  // regardless of the `top` parameter. We must loop, fetching the current
+  // active-line batch and deactivating it, until the query returns empty.
+  // Without this loop, large offers (e.g. inventory weekly runs with 1000+
+  // lines per group) leave orphaned active lines under deactivated headers.
+  // Verified empirically 2026-04-09 against the 07/21 historical strays —
+  // a single naive query returned only the first 100 lines of a 1521-line
+  // GE Consignment offer.
   for (const offer of offers) {
     const offerId = offer.id;
     const offerValue = offer.Value || offer.value || null;
     const offerDesc = offer.Description || offer.description || null;
 
-    // Get active lines for this offer
+    // Get active lines for this offer in paginated batches and deactivate
+    // them as we go. Loop until the active-line query returns empty (which
+    // it will after the previous batch's PUTs land).
     try {
-      const lineResult = await apiGet('chuboe_offer_line', {
-        filter: `chuboe_offer_id eq ${offerId} and IsActive eq true`,
-        select: 'chuboe_offer_line_id',
-      });
-      const lines = lineResult.records || [];
-
-      for (const line of lines) {
-        const lineId = line.chuboe_offer_line_id || line.id;
-        try {
-          await apiPut('chuboe_offer_line', lineId, { IsActive: false });
-          linesDeactivated++;
-        } catch (e) {
-          logger.warn(`Failed to deactivate offer line ${lineId}: ${e.message}`);
+      let pageNum = 0;
+      while (true) {
+        const lineResult = await apiGet('chuboe_offer_line', {
+          filter: `chuboe_offer_id eq ${offerId} and IsActive eq true`,
+          select: 'Line',
+        });
+        const lines = lineResult.records || [];
+        if (lines.length === 0) break;
+        pageNum++;
+        for (const line of lines) {
+          const lineId = line.id;
+          try {
+            await apiPut('chuboe_offer_line', lineId, { IsActive: false });
+            linesDeactivated++;
+          } catch (e) {
+            logger.warn(`Failed to deactivate offer line ${lineId}: ${e.message}`);
+          }
+        }
+        // Defensive cap — if iDempiere ever returns an unbounded set we
+        // don't want to loop forever. 100 pages × 100/page = 10,000 lines
+        // per offer is well above any realistic inventory snapshot.
+        if (pageNum > 100) {
+          logger.error(`deactivatePriorOffers: hit page cap (100) on offer ${offerId} — investigate`);
+          break;
         }
       }
     } catch (e) {
