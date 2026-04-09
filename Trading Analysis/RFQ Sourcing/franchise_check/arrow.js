@@ -1,11 +1,30 @@
 /**
- * Arrow API Integration for Franchise Screening
+ * Arrow API Integration — Multi-Source Parser
  *
  * Uses Arrow Pricing & Availability API v4
  * Auth: Query parameters (login + apikey)
  *
- * Note: Arrow API returns both arrow.com (franchise) and Verical (marketplace) sources.
- * For franchise screening, we filter to arrow.com sources only.
+ * Channel split (2026-04-09 fix):
+ *   Arrow's API returns inventory under TWO webSite trees: `arrow.com` (Arrow
+ *   franchise: Europe / Americas / APAC) and `Verical.com` (Verical broker).
+ *   The parser:
+ *     1. Walks every sourcePart across both trees.
+ *     2. Drops `arrow.com` rows whose sourcePartId starts with "V" — these
+ *        are Verical mirrors that the API double-publishes under arrow.com,
+ *        causing 2x stock counts in the legacy parser.
+ *     3. Classifies the remainder as 'Arrow' (Europe/Americas/APAC) or
+ *        'Verical' channel.
+ *     4. For each source-with-stock, computes price-at-qty bounded by
+ *        on-hand stock (a $2 break at qty>=240 is unreachable from a 120pcs
+ *        lot — the legacy parser surfaced these as "best bulk price").
+ *     5. Emits one entry per qualifying source into `vqLines[]`, tagged
+ *        with the right vendor BP. franchise-api spreads these into the
+ *        master vqLines so each opportunity is surfaced and actionable.
+ *
+ * Top-level legacy fields (`franchiseQty`, `franchiseBulkPrice`, etc.) reflect
+ * ARROW franchise only — Verical no longer leaks into screening. Verical
+ * stock/price are exposed as `vericalQty`/`vericalBestPrice` for callers
+ * that want a single number for the broker channel.
  */
 
 const https = require('https');
@@ -17,14 +36,15 @@ const ARROW_CONFIG = {
   baseUrl: 'api.arrow.com',
   searchPath: '/itemservice/v4/en/search/token',
 
-  // iDempiere Business Partner for VQ loading
+  // iDempiere Business Partner — Arrow franchise channel
   bpId: 1000386,
   bpValue: '1002390',
   bpName: 'Arrow Electronics',
 
-  // Source types for categorization
-  franchiseSources: ['AMERICAS', 'EUROPE', 'APAC', 'ASIA'],  // arrow.com franchise
-  marketplaceSources: ['VERICAL'],  // Verical marketplace
+  // iDempiere Business Partner — Verical broker channel (Arrow's marketplace arm)
+  vericalBpId: 1001436,
+  vericalBpValue: '1003440',
+  vericalBpName: 'Verical',
 };
 
 /**
@@ -71,188 +91,374 @@ async function searchPart(mpn, rfqQty = 1) {
 }
 
 /**
- * Parse Arrow search results into screening + VQ format
+ * Parse Arrow search results.
+ *
+ * Returns: {
+ *   ...legacy top-level fields (Arrow franchise only),
+ *   vqLines: [{vendorBP, vendorName, channel, mpn, ...}, ...]  // one per source-with-stock
+ * }
  */
 function parseSearchResults(json, searchMpn, rfqQty) {
   const result = {
     searchMpn,
     rfqQty,
     found: false,
-    // Screening fields
+    // Screening fields — ARROW FRANCHISE ONLY (Verical excluded)
     franchiseQty: 0,
-    franchisePrice: null,      // Unit price at qty 1
-    franchiseBulkPrice: null,  // Lowest price break
-    franchiseRfqPrice: null,   // Price at RFQ qty
+    franchisePrice: null,
+    franchiseBulkPrice: null,
+    franchiseRfqPrice: null,
     opportunityValue: null,
-    // VQ fields
+    // Verical channel — separate so screening doesn't conflate
+    vericalQty: 0,
+    vericalBestPrice: null,
+    // Legacy single-VQ fields (best Arrow source — kept for backwards-compat)
     vqPrice: null,
     vqVendorNotes: null,
     vqMpn: null,
     vqDescription: null,
     vqManufacturer: null,
     vqDateCode: null,
+    vqLeadTime: null,
+    vqMoq: null,
+    vqSpq: null,
     vqArrowSourcePartId: null,
-    // Raw data
+    vqSourceType: null,
+    priceBreaks: [],
+    // NEW: per-source VQ rows — Arrow + Verical, one entry per real source-with-stock
+    vqLines: [],
+    // Diagnostic
     allSources: [],
+    droppedMirrorSources: [],
   };
 
-  // Navigate to part list
   const data = json?.itemserviceresult?.data?.[0];
-  if (!data || !data.PartList || data.PartList.length === 0) {
-    return result;
-  }
+  if (!data || !data.PartList || data.PartList.length === 0) return result;
 
-  // Find best match - prefer exact MPN match
+  // Pick best part-level match (kept simple — exact normalized match, else first)
   const normalizedSearch = normalizeMpn(searchMpn);
-  let bestMatch = null;
-
-  for (const part of data.PartList) {
-    const normalizedResult = normalizeMpn(part.partNum);
-    if (normalizedResult === normalizedSearch) {
-      bestMatch = part;
-      break;
-    }
-  }
-
-  // Fall back to first result if no exact match
-  if (!bestMatch) {
-    bestMatch = data.PartList[0];
-  }
+  let bestMatch = data.PartList.find(p => normalizeMpn(p.partNum) === normalizedSearch)
+                || data.PartList[0];
 
   result.vqMpn = bestMatch.partNum;
   result.vqDescription = bestMatch.desc || '';
   result.vqManufacturer = bestMatch.manufacturer?.mfrName || '';
 
-  // Collect inventory from all sources (arrow.com + Verical)
   const invOrg = bestMatch.InvOrg;
-  if (!invOrg || !invOrg.webSites) {
-    return result;
-  }
+  if (!invOrg || !invOrg.webSites) return result;
 
-  let arrowQty = 0;      // arrow.com franchise stock
-  let vericalQty = 0;    // Verical marketplace stock
-  let bestPrice = null;
-  let bestBulkPrice = null;
-  let bestRfqPrice = null;
-  let bestSource = null;
-  let bestDateCode = null;
-  let bestSourceType = null;  // 'Arrow' or 'Verical'
-
+  // ── Walk every sourcePart, classify, dedup ────────────────────────────────
+  // Channel rules:
+  //   webSite.code === 'Verical.com'  → 'Verical'
+  //   webSite.code === 'arrow.com' AND sourcePartId starts with 'V'
+  //                                   → DROP (Verical mirror, dup of Verical.com row)
+  //   webSite.code === 'arrow.com' AND any other prefix  → 'Arrow'
+  const candidates = [];
   for (const website of invOrg.webSites) {
-    const isVerical = website.code === 'Verical.com';
-    const isArrow = website.code === 'arrow.com';
-
+    const websiteCode = website.code;
     for (const source of website.sources || []) {
-      for (const sourcePart of source.sourceParts || []) {
-        // Get availability
-        const availability = sourcePart.Availability?.[0];
-        const qty = availability?.fohQty || 0;
+      for (const sp of source.sourceParts || []) {
+        const fohQty = sp.Availability?.[0]?.fohQty || 0;
+        const priceList = (sp.Prices?.resaleList || [])
+          .slice()
+          .sort((a, b) => a.minQty - b.minQty);
 
-        if (isArrow) {
-          arrowQty += qty;
-        } else if (isVerical) {
-          vericalQty += qty;
-        }
+        const sourcePartId = sp.sourcePartId || '';
+        const isVericalMirrorOnArrowTree =
+          websiteCode === 'arrow.com' && /^V/i.test(sourcePartId);
 
-        // Get pricing
-        const priceList = sourcePart.Prices?.resaleList || [];
-        if (priceList.length > 0) {
-          // First tier (unit price)
-          const unitPrice = priceList[0]?.price;
-          // Last tier (bulk price)
-          const bulkPrice = priceList[priceList.length - 1]?.price;
-          // Price at RFQ qty
-          const rfqPrice = getPriceAtQty(priceList, rfqQty);
-
-          // Track best pricing (lowest bulk price with stock)
-          // Prefer Arrow franchise over Verical at same price
-          if (qty > 0 && bulkPrice) {
-            const isBetter = bestBulkPrice === null ||
-              bulkPrice < bestBulkPrice ||
-              (bulkPrice === bestBulkPrice && isArrow && bestSourceType === 'Verical');
-
-            if (isBetter) {
-              bestPrice = unitPrice;
-              bestBulkPrice = bulkPrice;
-              bestRfqPrice = rfqPrice;
-              bestSource = sourcePart;
-              bestDateCode = sourcePart.dateCode || null;
-              bestSourceType = isVerical ? 'Verical' : 'Arrow';
-            }
-          }
-        }
-
-        // Collect all sources for reference
-        result.allSources.push({
-          website: website.code,
+        // Diagnostic: capture every sourcePart we saw, even dropped ones
+        const diag = {
+          website: websiteCode,
           source: source.displayName,
-          qty,
-          unitPrice: priceList[0]?.price,
-          bulkPrice: priceList[priceList.length - 1]?.price,
-          dateCode: sourcePart.dateCode,
-          shipsFrom: sourcePart.shipsFrom,
+          sourcePartId,
+          fohQty,
+          firstPrice: priceList[0]?.price ?? null,
+          lastPrice: priceList[priceList.length - 1]?.price ?? null,
+          dateCode: sp.dateCode || null,
+          shipsFrom: sp.shipsFrom || null,
+        };
+        result.allSources.push(diag);
+
+        if (isVericalMirrorOnArrowTree) {
+          result.droppedMirrorSources.push(diag);
+          continue;
+        }
+
+        const channel = websiteCode === 'Verical.com' ? 'Verical' : 'Arrow';
+
+        candidates.push({
+          channel,
+          regionLabel: source.displayName,
+          sourcePartId,
+          fohQty,
+          priceList,
+          dateCode: sp.dateCode || null,
+          shipsFrom: sp.shipsFrom || null,
+          arrowLeadTime: sp.arrowLeadTime,
+          mfrLeadTime: sp.mfrLeadTime,
+          moq: sp.minimumOrderQuantity || null,
+          spq: sp.packSize || null,
+          rawSourcePart: sp,
         });
       }
     }
   }
 
-  const totalQty = arrowQty + vericalQty;
-
-  if (totalQty > 0) {
-    result.found = true;
-    result.franchiseQty = totalQty;
-    result.arrowQty = arrowQty;
-    result.vericalQty = vericalQty;
-    result.franchisePrice = bestPrice;
-    result.franchiseBulkPrice = bestBulkPrice;
-    result.franchiseRfqPrice = bestRfqPrice;
-    result.vqPrice = bestRfqPrice;
-    result.vqMoq = bestSource?.minimumOrderQuantity || null;
-    result.vqSpq = bestSource?.packSize || null;
-    result.vqDateCode = bestDateCode;
-    result.vqSourceType = bestSourceType;
-    // arrowLeadTime/mfrLeadTime are raw numbers (weeks) or empty strings — format for display
-    const rawLt = (bestSource?.arrowLeadTime && bestSource.arrowLeadTime !== '')
-      ? bestSource.arrowLeadTime
-      : (bestSource?.mfrLeadTime && bestSource.mfrLeadTime !== 0 && bestSource.mfrLeadTime !== '0')
-        ? bestSource.mfrLeadTime
-        : null;
-    result.vqLeadTime = rawLt ? `${rawLt} Weeks` : null;
-    result.opportunityValue = bestBulkPrice ? bestBulkPrice * rfqQty : null;
-    result.priceBreaks = bestSource && bestSource.Prices?.resaleList
-      ? bestSource.Prices.resaleList.map(p => ({ qty: p.minQty, unitPrice: p.price })).sort((a, b) => a.qty - b.qty)
-      : [];
-
-    // Build vendor notes - distinguish Arrow vs Verical
-    const notes = [];
-    if (arrowQty > 0) notes.push(`Arrow: ${arrowQty.toLocaleString()}`);
-    if (vericalQty > 0) notes.push(`Verical: ${vericalQty.toLocaleString()}`);
-    if (bestDateCode) notes.push(`DC: ${bestDateCode}`);
-    if (bestSourceType) notes.push(`Best: ${bestSourceType}`);
-    if (bestSource?.sourcePartId) {
-      result.vqArrowSourcePartId = bestSource.sourcePartId;
+  // ── Cross-channel duplicate detection ─────────────────────────────────────
+  // Arrow's API sometimes lists the same physical inventory under both
+  // channels — Arrow Europe direct AND a Verical broker mirror — when the
+  // sourcePartId-prefix dedup (V* on arrow.com) doesn't catch it. The
+  // remaining duplicates show up as separate sourceParts that share:
+  //
+  //   - identical fohQty
+  //   - identical shipsFrom region
+  //   - identical price-break ladder structure (same minQty values)
+  //   - prices within ~2% on every break (channel markup spread)
+  //
+  // Example seen on IMZ120R030M1H: Verical sp[3] (88769791, Netherlands, 150)
+  // and Arrow Europe sp[0] (E02:0323_13903138, Netherlands, 150) share an
+  // identical 5-tier ladder with ~0.09% spread on every break — same pile of
+  // parts, different sale channel.
+  //
+  // We do NOT auto-drop these — the buyer may have a procurement preference
+  // (Arrow franchise vs Verical broker on the same stock). Instead we tag
+  // both rows with a possibleDupOf cross-reference and a note. Lets the
+  // human decide whether to consolidate.
+  for (let i = 0; i < candidates.length; i++) {
+    const a = candidates[i];
+    for (let j = i + 1; j < candidates.length; j++) {
+      const b = candidates[j];
+      if (likelyDuplicateLot(a, b)) {
+        a.possibleDupOf = b.sourcePartId;
+        a.possibleDupChannel = b.channel;
+        b.possibleDupOf = a.sourcePartId;
+        b.possibleDupChannel = a.channel;
+      }
     }
-    result.vqVendorNotes = notes.join(' | ');
+  }
+
+  // ── Build vqLines: one row per source-with-stock ──────────────────────────
+  // Pricing constraint: a price tier only counts if it's reachable from the
+  // on-hand quantity. The legacy parser surfaced "qty>=240 $2.069" from a 120pc
+  // lot as the bulk price — that's a lie because you can't buy 240 from a
+  // lot of 120. priceForBuy() enforces minQty ≤ buyQty.
+  //
+  // Two-phase pricing:
+  //   Phase 1 — try the buyer's requested qty (capped at lot stock). Standard
+  //             case for any lot whose tiers ladder cleanly down from qty 1.
+  //   Phase 2 — fallback for lots whose ONLY tiers require more than rfqQty
+  //             but are achievable from the lot itself (e.g. fohQty=120, sole
+  //             tier qty>=120 $2.069). Surface the lot at the cheapest reachable
+  //             tier; flag with `requiresBumpQty` so the buyer sees they'd need
+  //             to take 120 instead of 100 to unlock that price. These are real
+  //             opportunities — silently dropping them was the bug.
+  for (const c of candidates) {
+    if (c.fohQty <= 0 || c.priceList.length === 0) continue;
+
+    let buyQty = Math.min(rfqQty, c.fohQty);
+    let unitPrice = priceForBuy(c.priceList, buyQty);
+    let requiresBumpQty = false;
+    let bumpFromQty = null;
+
+    if (unitPrice == null) {
+      // No tier unlocked at the customer's requested qty.
+      // Look for the cheapest tier that the LOT itself can unlock (minQty ≤ fohQty).
+      const reachable = c.priceList.filter(t => t.minQty <= c.fohQty);
+      if (reachable.length > 0) {
+        const cheapest = reachable.reduce((a, b) => (a.price <= b.price ? a : b));
+        unitPrice = cheapest.price;
+        // To unlock this tier the buyer must take at least cheapest.minQty units;
+        // they get whatever's on hand up to fohQty. Surface buyQty = the bump
+        // target so vq-writer's Qty field reflects "this is the deal size".
+        buyQty = Math.min(c.fohQty, Math.max(cheapest.minQty, 1));
+        requiresBumpQty = buyQty > rfqQty;
+        bumpFromQty = requiresBumpQty ? rfqQty : null;
+      }
+    }
+
+    if (unitPrice == null) continue;
+
+    // "achievable bulk price" = cheapest tier the lot can unlock
+    const achievableBulk = priceForBuy(c.priceList, c.fohQty);
+    // Lead time only meaningful when fohQty=0; for stocked rows we suppress it.
+    const leadTime = null;
+
+    const vendorBP = c.channel === 'Verical' ? ARROW_CONFIG.vericalBpValue : ARROW_CONFIG.bpValue;
+    const vendorName = c.channel === 'Verical' ? ARROW_CONFIG.vericalBpName : ARROW_CONFIG.bpName;
+
+    // Vendor notes go into Chuboe_Note_Public on the VQ row. Two facts must
+    // land there because they change how a buyer reads the price:
+    //
+    //   1. STOCK ONLY (Verical / broker channel) — the quoted price applies
+    //      only to the on-hand lot. Verical is Arrow's broker marketplace, not
+    //      franchise; there's no lead-time fulfillment at this price. Without
+    //      this tag the buyer can't tell whether the price scales.
+    //
+    //   2. MIN BUY — bump-tier case (lot's only achievable tier requires more
+    //      than rfqQty). Note text is for human reading; the structured value
+    //      also goes into the MOQ field below so OT's MOQ column reflects the
+    //      tier minimum.
+    //
+    // % of demand is NOT recorded here — Vortex Matches calculates it on the
+    // output side from VQ.qty / RFQ.qty.
+    const noteParts = [];
+    if (c.channel === 'Verical') {
+      noteParts.push(`STOCK ONLY`);
+    }
+    const regionStr = c.regionLabel && c.regionLabel !== c.channel
+      ? `${c.channel} ${c.regionLabel}`
+      : c.channel;
+    noteParts.push(regionStr);
+    if (requiresBumpQty) {
+      noteParts.push(`MIN BUY ${buyQty.toLocaleString()} for $${unitPrice}`);
+    }
+    if (c.possibleDupOf) {
+      noteParts.push(`LIKELY SAME LOT as ${c.possibleDupChannel} ${c.possibleDupOf}`);
+    }
+    if (c.dateCode) noteParts.push(`DC: ${c.dateCode}`);
+    if (c.shipsFrom) noteParts.push(`ships: ${c.shipsFrom}`);
+    noteParts.push(`src: ${c.sourcePartId}`);
+
+    // MOQ: when the lot is tier-locked, the bump qty IS the minimum order
+    // quantity for the surfaced price. Override Arrow's minimumOrderQuantity
+    // (which is the API's default MOQ, often 1) so OT's MOQ column carries
+    // the actionable number.
+    const effectiveMoq = requiresBumpQty ? buyQty : c.moq;
+
+    result.vqLines.push({
+      vendorBP,
+      vendorName,
+      channel: c.channel,
+      mpn: result.vqMpn,
+      manufacturer: result.vqManufacturer,
+      description: result.vqDescription,
+      // Qty represents the deal size: lot stock for normal lots, or the
+      // bump-to-tier qty when the lot's only achievable tier requires more
+      // than rfqQty. Either way, this is what the supplier is offering at
+      // `cost` per unit. Vortex Matches divides this by RFQ qty to get
+      // % of demand on its own; we don't precompute it here.
+      qty: requiresBumpQty ? buyQty : c.fohQty,
+      cost: unitPrice,
+      // MOQ — for tier-locked bump lots this is the bump qty (the price's
+      // minimum order); for normal lots it's whatever Arrow's API reported.
+      moq: effectiveMoq,
+      spq: c.spq,
+      // Diagnostic fields used by the parser test harness; not written to OT.
+      lotQty: c.fohQty,
+      bulkPrice: achievableBulk,
+      requiresBumpQty,
+      dateCode: c.dateCode,
+      leadTime,
+      shipsFrom: c.shipsFrom,
+      sourcePartId: c.sourcePartId,
+      vendorNotes: noteParts.join(' | '),
+      priceBreaks: c.priceList.map(p => ({ qty: p.minQty, unitPrice: p.price })),
+    });
+  }
+
+  // ── Aggregate top-level (legacy) fields ───────────────────────────────────
+  // franchiseQty / franchiseBulkPrice / franchiseRfqPrice = ARROW ONLY.
+  // Verical surfaced separately as vericalQty / vericalBestPrice.
+  const arrowLines = result.vqLines.filter(v => v.channel === 'Arrow');
+  const vericalLines = result.vqLines.filter(v => v.channel === 'Verical');
+
+  result.franchiseQty = arrowLines.reduce((s, v) => s + v.qty, 0);
+  result.vericalQty = vericalLines.reduce((s, v) => s + v.qty, 0);
+
+  if (arrowLines.length > 0) {
+    // "best Arrow source" by lowest cost-at-rfqQty
+    const bestArrow = arrowLines.slice().sort((a, b) => a.cost - b.cost)[0];
+    result.found = true;
+    result.franchisePrice = bestArrow.priceBreaks[0]?.unitPrice ?? null;
+    result.franchiseBulkPrice = bestArrow.bulkPrice;
+    result.franchiseRfqPrice = bestArrow.cost;
+    result.vqPrice = bestArrow.cost;
+    result.vqMoq = bestArrow.moq;
+    result.vqSpq = bestArrow.spq;
+    result.vqDateCode = bestArrow.dateCode;
+    result.vqLeadTime = null;
+    result.vqSourceType = 'Arrow';
+    result.vqArrowSourcePartId = bestArrow.sourcePartId;
+    result.priceBreaks = bestArrow.priceBreaks;
+    result.opportunityValue = bestArrow.cost * rfqQty;
+    result.vqVendorNotes = bestArrow.vendorNotes;
+  } else if (vericalLines.length > 0) {
+    // No Arrow franchise — surface best Verical so legacy single-VQ consumers
+    // still see something. Mark sourceType so they know it's broker channel.
+    const bestVerical = vericalLines.slice().sort((a, b) => a.cost - b.cost)[0];
+    result.found = true;
+    result.franchisePrice = null;          // not Arrow franchise
+    result.franchiseBulkPrice = null;
+    result.franchiseRfqPrice = null;
+    result.vqPrice = bestVerical.cost;
+    result.vqDateCode = bestVerical.dateCode;
+    result.vqMoq = bestVerical.moq;
+    result.vqSpq = bestVerical.spq;
+    result.vqSourceType = 'Verical';
+    result.vqArrowSourcePartId = bestVerical.sourcePartId;
+    result.priceBreaks = bestVerical.priceBreaks;
+    result.opportunityValue = bestVerical.cost * rfqQty;
+    result.vqVendorNotes = bestVerical.vendorNotes;
+  }
+
+  if (vericalLines.length > 0) {
+    result.vericalBestPrice = Math.min(...vericalLines.map(v => v.cost));
   }
 
   return result;
 }
 
 /**
- * Get price at a specific quantity from price breaks
+ * Heuristic: do these two source-parts look like the same physical lot sold
+ * under different channels (Arrow Europe direct vs Verical broker mirror)?
+ *
+ * Returns true when:
+ *   - opposite channels
+ *   - identical on-hand qty
+ *   - identical shipsFrom region
+ *   - identical ladder structure (same length AND same minQty per tier)
+ *   - prices within 2% on every tier
+ *
+ * The 2% threshold accommodates the typical broker-channel markup spread
+ * (observed ~0.09% on IMZ120R030M1H, but anything under a few percent is
+ * almost certainly the same pile of parts).
  */
-function getPriceAtQty(priceList, qty) {
-  if (!priceList || priceList.length === 0) return null;
-
-  let price = priceList[0].price;  // Default to first tier
-
-  for (const tier of priceList) {
-    if (qty >= tier.minQty) {
-      price = tier.price;
-    }
+function likelyDuplicateLot(a, b) {
+  if (a.channel === b.channel) return false;
+  if (a.fohQty !== b.fohQty) return false;
+  if ((a.shipsFrom || '') !== (b.shipsFrom || '')) return false;
+  if (!a.priceList || !b.priceList) return false;
+  if (a.priceList.length !== b.priceList.length) return false;
+  if (a.priceList.length === 0) return false;
+  for (let i = 0; i < a.priceList.length; i++) {
+    if (a.priceList[i].minQty !== b.priceList[i].minQty) return false;
+    const pa = a.priceList[i].price;
+    const pb = b.priceList[i].price;
+    if (pa <= 0 || pb <= 0) return false;
+    const spread = Math.abs(pa - pb) / Math.max(pa, pb);
+    if (spread > 0.02) return false;
   }
+  return true;
+}
 
-  return price;
+/**
+ * Pick the unit price for buying `buyQty` units, given a sorted price-break list.
+ * Returns the price at the highest tier whose minQty <= buyQty.
+ *
+ * Critical rule: the legacy parser would return the lowest-tier price regardless
+ * of whether buyQty actually unlocked that tier. A 120-piece lot can NOT buy at
+ * a "qty>=240" tier — that price is unreachable. This function enforces the
+ * constraint, so what you see is what you can actually pay.
+ */
+function priceForBuy(priceList, buyQty) {
+  if (!priceList || priceList.length === 0 || buyQty <= 0) return null;
+  let chosen = null;
+  for (const tier of priceList) {
+    if (tier.minQty <= buyQty) chosen = tier;
+    else break;
+  }
+  return chosen?.price ?? null;
 }
 
 /**

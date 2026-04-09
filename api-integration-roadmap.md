@@ -134,7 +134,7 @@ node digikey.js LM317 100
 node arrow.js LM317T 100
 ```
 
-**Source filtering:** Arrow API returns both arrow.com (franchise) and Verical.com (marketplace). We filter to arrow.com sources only (AMERICAS, EUROPE, APAC).
+**Source filtering (2026-04-09 fix):** Arrow API returns both `arrow.com` (Arrow franchise: Europe / Americas / APAC) and `Verical.com` (Verical broker marketplace). The parser splits these into separate VQ rows tagged with the right business partner — Arrow Electronics (`1000386`) for franchise, Verical (`1001436`) for broker. Verical lots that Arrow's API also publishes under the `arrow.com` tree (sourcePartId starts with `V`) are dropped to avoid double-counting.
 
 **Current Use (Active):**
 | Field | Use |
@@ -154,34 +154,35 @@ node arrow.js LM317T 100
 | Datasheet URL | Auto-attach to quotes |
 | RoHS/compliance | Compliance filtering |
 
-#### Known Issues — needs investigation 2026-04-09
+#### RESOLVED 2026-04-09 — Arrow / Verical channel split + stock-bounded pricing
 
-**Status:** Open | **Priority:** Now (blocks clean Vortex output, affects every Arrow-quoted line)
+**Status:** Fixed | **Verified on:** `IMZ120R030M1H` qty=100
 
-Jake flagged 2026-04-08 that **Arrow's API responses are a mess** in the data we surface — unclear whether the issue is in our parser (`Trading Analysis/RFQ Sourcing/franchise_check/arrow.js`) or in what Arrow is actually returning from the upstream API.
+Diagnostic run on the reproducer surfaced six concrete bugs in `arrow.js`:
 
-**Reproducer:** MPN `IMZ120R030M1H` (Infineon SiC MOSFET). Pull this through `node arrow.js IMZ120R030M1H` and then through `searchAllDistributors()` for comparison. Inspect:
+1. **`franchiseQty` overstated 130x.** Doc claimed "filter to arrow.com only" — code did the opposite: it summed `arrowQty + vericalQty` into `franchiseQty`. Real Arrow franchise = 150 pcs (Europe). Reported = 19,759.
+2. **Verical lots double-counted.** Arrow's API mirrors Verical inventory under both the `Verical.com` webSite tree AND the `arrow.com → Arrow Americas` source. The mirrors are identifiable by sourcePartId prefix (`V*`). Legacy parser counted them twice.
+3. **`franchiseBulkPrice` was unreachable.** Parser surfaced the lowest tier price regardless of whether on-hand stock could unlock it (`qty>=240 $2.069` from a 120pc lot). Buyers can't actually pay that.
+4. **`franchiseRfqPrice` from wrong source.** "Best source" was picked by lowest bulk break, not by best stock-bounded price-at-rfqQty.
+5. **Lead time leaked onto stocked rows.** `mfrLeadTime` (OEM replenishment) was reported alongside `fohQty>0`, contradicting itself.
+6. **MPN substitution silent.** Searched `IMZ120R030M1H`, Arrow returned only `IMZ120R030M1HXKSA1` (tube variant). Parser fell back to `PartList[0]` and surfaced the wrong SKU with no warning.
 
-1. **Raw API response** — log the full JSON from `https://api.arrow.com/itemservice/v4/...?search_token=IMZ120R030M1H` before any parsing. How many "items" does Arrow return? Are they distinct MPNs (e.g., packaging variants, different MOQs) or duplicates of the same SKU?
-2. **Source filtering behavior** — `arrow.js` filters to arrow.com sources only (excludes Verical marketplace). Verify the filter is working AND not over-filtering. Could the mess be that our filter is dropping legit franchise rows or failing to dedupe across the 3 regional Arrow source codes (AMERICAS / EUROPE / APAC)?
-3. **Per-region aggregation** — same SKU often appears 3x (one per region). Are we summing correctly into `franchiseQty`? Picking the right region for `franchiseRfqPrice` (US-aware?)? Or are we surfacing 3 rows per Arrow result when we should be surfacing 1?
-4. **Price break parsing** — Arrow returns price ladders. Are we picking the right break for `franchiseRfqPrice` (highest break ≤ qty)? Do they come back sorted? Are quantities and prices being mapped to the right fields (qty into qty, price into price — not swapped)?
-5. **vqMpn cross-ref** — does Arrow return a normalized form of the MPN that fails our cross-ref check (e.g., `IMZ120R030M1H` vs `IMZ120R030M1HXKSA1`) and silently drops the result?
-6. **Compare to a "clean" distributor** — pull the same MPN through DigiKey or Mouser and diff the parsed output structure. Where does Arrow's deviate?
+**Fixes shipped:**
+- `arrow.js` rewritten to walk every sourcePart, classify by webSite + sourcePartId prefix (drop V* mirrors on arrow.com), bound prices by reachable on-hand qty (`priceForBuy(breaks, min(rfqQty, fohQty))`), and emit one entry per real source-with-stock into a new `vqLines[]` array tagged with the right vendor BP (Arrow `1000386` or Verical `1001436`).
+- `shared/franchise-api.js` — added Verical to DISTRIBUTORS map (inactive, for cache reconstitution). Master vqLines builder spreads `r.vqLines` when present so each Arrow + Verical opportunity surfaces as its own row.
+- `shared/api-result-writer.js` — envelope `Pricings[]` now captures one row per source with `SupplierName` set to "Arrow Electronics" or "Verical", plus new `SourceChannel`/`SourcePartId` fields. Cache hits preserve the per-source detail.
+- `shared/vq-writer.js` — `writeVQFromAPI()` and `writeVQBatch()` pre-warm both pass over `d.vqLines`; one VQ written per sub-line. Natural key (`Chuboe_RFQ_Line_ID, Chuboe_MPN, C_BPartner_ID, Cost`) gives a separate VQ row per lot since costs differ across lots.
 
-**What "a mess" likely looks like in symptom form** (Jake to confirm tomorrow with the actual Vortex output):
-- Multiple rows for one part where there should be one
-- Wrong qty / wrong price / wrong currency
-- Garbled vendor notes
-- Missing date code that DigiKey/Mouser populated
-- Inconsistent unit (each vs reel) without normalization
+**Verified output for `IMZ120R030M1H` qty=100:**
+- 4 vqLines: 3 Verical (18,799 / 210 / 150 pcs at \$10.45 / \$8.943 / \$9.5388) + 1 Arrow Europe (150 pcs Netherlands at \$9.5477)
+- 3 V-prefix mirrors dropped from arrow.com Americas (210 / 120 / 0 pcs)
+- Top-level `franchiseQty=150` (Arrow only, was 19,759); `vericalQty=19,159` exposed separately
+- The 120pc lot whose only tier was `qty>=240 $2.069` is correctly excluded at rfqQty=100 (unreachable)
 
-**Files to look at:**
-- `Trading Analysis/RFQ Sourcing/franchise_check/arrow.js` — the parser
-- `shared/franchise-api.js` — the per-distributor wrapper that normalizes results
-- The `searchAllDistributors()` aggregation step for how multi-region results get collapsed
-
-**Don't forget to check** whether the 5 dup VQs from yesterday's enrichment for IMZ120R030M1H are split across multiple Arrow rows — that would point to per-region aggregation issues compounding the upstream RFQ-load dup pattern.
+**Followups (not done in this pass):**
+- MPN substitution: still silent. `IMZ120R030M1HXKSA1` is surfaced as `vqMpn` with no `mpnSubstituted` flag. If buyers need bare-base only, add a packaging-suffix stripper to `normalizeMpn` and warn on fallback.
+- "Lots that exist but are unreachable at this rfqQty" (e.g., the 120pc/$2.069 lot) are silently dropped. Could surface them as `unreachableOpportunities[]` so a buyer asking for 100 can see "you could get \$2.069 if you bumped to 120."
+- Cache invalidation: any cached arrow envelopes captured before today still have the legacy single-row shape. They'll naturally roll over within 7d (non-PPV TTL); no manual purge.
 
 ### Rutronik API (Active)
 

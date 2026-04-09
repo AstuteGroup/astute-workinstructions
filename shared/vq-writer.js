@@ -403,19 +403,68 @@ async function writeVQFromAPI(rfqSearchKey, cpc, franchiseResults, opts = {}) {
     return { written, flagged, failed };
   }
 
-  // Process each distributor result
+  // Process each distributor result.
+  //
+  // Most distributors emit one row per result. Arrow's API returns BOTH
+  // Arrow franchise stock and Verical broker stock under a single API call —
+  // arrow.js splits these into d.vqLines, one per real source-with-stock,
+  // tagged with the right BP. When d.vqLines is present we iterate sub-lines
+  // and write one VQ per source; otherwise we use the legacy single-row
+  // top-level fields.
   const distributors = franchiseResults.distributors || [];
   for (const d of distributors) {
-    if (!d.found || !d.franchiseRfqPrice || d.franchiseRfqPrice <= 0) continue;
+    if (!d.found) continue;
 
-    const mpn = d.vqMpn || d.raw?.vqMpn || opts.searchedMpn || '';
-    const mfrText = d.vqManufacturer || d.raw?.vqManufacturer || '';
-    const price = d.vqPrice || d.franchiseRfqPrice;
-    const qty = d.franchiseQty || 0;
-    const leadTime = d.vqLeadTime || d.raw?.vqLeadTime || '';
-    const moq = d.vqMoq || d.raw?.vqMoq || null;
-    const spq = d.vqSpq || d.raw?.vqSpq || null;
-    const bpSearchKey = d.bpValue;
+    // Build the list of "rows to write" for this distributor.
+    // Each row carries the per-VQ fields the writer needs.
+    let rowsToWrite;
+    if (Array.isArray(d.vqLines) && d.vqLines.length > 0) {
+      // Multi-source split (Arrow → Arrow + Verical channels)
+      rowsToWrite = d.vqLines
+        .filter(sub => sub.cost != null && sub.cost > 0 && sub.qty > 0)
+        .map(sub => ({
+          mpn: sub.mpn || opts.searchedMpn || '',
+          mfrText: sub.manufacturer || d.vqManufacturer || '',
+          price: sub.cost,
+          qty: sub.qty,
+          leadTime: sub.leadTime || '',
+          moq: sub.moq || null,
+          spq: sub.spq || null,
+          bpSearchKey: sub.vendorBP,
+          vendorName: sub.vendorName,
+          vendorNotes: sub.vendorNotes || '',
+          dateCode: sub.dateCode || null,
+          channel: sub.channel || null,
+        }));
+    } else {
+      // Legacy single-row distributor
+      if (!d.franchiseRfqPrice || d.franchiseRfqPrice <= 0) continue;
+      rowsToWrite = [{
+        mpn: d.vqMpn || d.raw?.vqMpn || opts.searchedMpn || '',
+        mfrText: d.vqManufacturer || d.raw?.vqManufacturer || '',
+        price: d.vqPrice || d.franchiseRfqPrice,
+        qty: d.franchiseQty || 0,
+        leadTime: d.vqLeadTime || d.raw?.vqLeadTime || '',
+        moq: d.vqMoq || d.raw?.vqMoq || null,
+        spq: d.vqSpq || d.raw?.vqSpq || null,
+        bpSearchKey: d.bpValue,
+        vendorName: d.name,
+        vendorNotes: d.vqVendorNotes || '',
+        dateCode: d.vqDateCode || (d.raw && d.raw.vqDateCode) || null,
+        channel: null,
+      }];
+    }
+
+    for (const row of rowsToWrite) {
+      const mpn = row.mpn;
+      const mfrText = row.mfrText;
+      const price = row.price;
+      const qty = row.qty;
+      const leadTime = row.leadTime;
+      const moq = row.moq;
+      const spq = row.spq;
+      const bpSearchKey = row.bpSearchKey;
+      const vendorDisplay = row.vendorName || d.name;
 
     // Cross-reference check: is the API-returned MPN the same part?
     // Packaging variants → write with note. Genuine mismatches → flag with full payload for user review.
@@ -425,7 +474,7 @@ async function writeVQFromAPI(rfqSearchKey, cpc, franchiseResults, opts = {}) {
       if (crossRef.mismatch) {
         // Don't write — hold for user confirmation. Include full payload so it can be written later.
         flagged.push({
-          mpn, searchedMpn: opts.searchedMpn, vendor: d.name, bpSearchKey,
+          mpn, searchedMpn: opts.searchedMpn, vendor: vendorDisplay, bpSearchKey,
           price, qty, mfrText, leadTime, moq, spq,
           cpc, rfqId: rfq.id, rfqLineId,
           reason: FLAG.MPN_CROSS_REF,
@@ -439,12 +488,12 @@ async function writeVQFromAPI(rfqSearchKey, cpc, franchiseResults, opts = {}) {
     }
 
     // Resolve BP — search key first, name fallback, same path for all vendors
-    const bp = await resolveBP(bpSearchKey, d.name);
+    const bp = await resolveBP(bpSearchKey, vendorDisplay);
     if (!bp) {
       flagged.push({
-        mpn, vendor: d.name, bpSearchKey, price, qty,
+        mpn, vendor: vendorDisplay, bpSearchKey, price, qty,
         reason: FLAG.BP_NOT_FOUND,
-        detail: `Vendor '${d.name}' (SK: ${bpSearchKey || 'none'}) not found in target system`
+        detail: `Vendor '${vendorDisplay}' (SK: ${bpSearchKey || 'none'}) not found in target system`
       });
       continue;
     }
@@ -478,8 +527,9 @@ async function writeVQFromAPI(rfqSearchKey, cpc, franchiseResults, opts = {}) {
     // resolvedMfrId may be null here (system-only or no match) — that's OK,
     // the payload will omit Chuboe_MFR_ID and the server will resolve from text.
 
-    // Build vendor notes — combine API notes with packaging info
-    const vendorNotes = [d.vqVendorNotes, packagingNote].filter(Boolean).join(' | ');
+    // Build vendor notes — combine API notes (per-row when available) with packaging info
+    const baseNotes = row.vendorNotes || d.vqVendorNotes || '';
+    const vendorNotes = [baseNotes, packagingNote].filter(Boolean).join(' | ');
 
     // Resolve vendor type and traceability from BP
     const vendorTypeId = await getBPVendorType(bp.id);
@@ -505,10 +555,11 @@ async function writeVQFromAPI(rfqSearchKey, cpc, franchiseResults, opts = {}) {
       || opts.packagingId
       || null;
 
-    // Resolve date code — distributor data wins. If empty AND vendor is mfr-direct/franchise,
-    // default to "within 2 years" (these are authorized-channel purchases of new stock).
-    // Brokers (and other vendor types) get no default — must come from caller or stay null.
-    const dateCodeFromApi = d.vqDateCode || (d.raw && d.raw.vqDateCode) || null;
+    // Resolve date code — per-row first (multi-source split), then distributor-level,
+    // then default. If empty AND vendor is mfr-direct/franchise, default to
+    // "within 2 years" (authorized-channel purchases of new stock). Brokers
+    // (and other vendor types) get no default — must come from caller or stay null.
+    const dateCodeFromApi = row.dateCode || d.vqDateCode || (d.raw && d.raw.vqDateCode) || null;
     const dateCode = dateCodeFromApi
       || (MFR_DIRECT_OR_FRANCHISE.has(vendorTypeId) ? DEFAULT_DATE_CODE_AUTHORIZED : null)
       || opts.dateCode
@@ -520,12 +571,12 @@ async function writeVQFromAPI(rfqSearchKey, cpc, franchiseResults, opts = {}) {
     // HTS has no regex validator (codes too varied) — only a length guard.
     let htsValue = d.vqHts || opts.hts || null;
     if (htsValue && String(htsValue).length > 25) {
-      logger.warn(`HTS value too long for ${d.name || 'vendor'} on ${mpn}, skipping: ${htsValue}`);
+      logger.warn(`HTS value too long for ${vendorDisplay || 'vendor'} on ${mpn}, skipping: ${htsValue}`);
       htsValue = null;
     }
     let eccnValue = d.vqEccn || opts.eccn || null;
     if (eccnValue && !isValidEccn(eccnValue)) {
-      logger.warn(`ECCN value failed validation for ${d.name || 'vendor'} on ${mpn}, skipping: ${eccnValue}`);
+      logger.warn(`ECCN value failed validation for ${vendorDisplay || 'vendor'} on ${mpn}, skipping: ${eccnValue}`);
       eccnValue = null;
     }
 
@@ -571,7 +622,7 @@ async function writeVQFromAPI(rfqSearchKey, cpc, franchiseResults, opts = {}) {
     const validation = validatePayload(payload, 1);
     if (!validation.valid) {
       flagged.push({
-        mpn, vendor: d.name, bpId: bp.id, price, qty,
+        mpn, vendor: vendorDisplay, bpId: bp.id, price, qty,
         reason: FLAG.MISSING_MANDATORY,
         detail: `Missing mandatory fields: ${validation.missing.join(', ')}`,
         payload, // include for manual completion
@@ -581,18 +632,22 @@ async function writeVQFromAPI(rfqSearchKey, cpc, franchiseResults, opts = {}) {
 
     // Write
     try {
-      const result = await apiPost('Chuboe_VQ_Line', payload);
+      const result = await apiPost('Chuboe_VQ_Line', payload, {
+        naturalKeyFields: ['Chuboe_RFQ_Line_ID', 'Chuboe_MPN', 'C_BPartner_ID', 'Cost'],
+      });
       written.push({
-        vqLineId: result.id, mpn, vendor: d.name, bpId: bp.id,
-        mfrId: resolvedMfrId, mfr: mfrCanonical, price, qty
+        vqLineId: result.id, mpn, vendor: vendorDisplay, bpId: bp.id,
+        mfrId: resolvedMfrId, mfr: mfrCanonical, price, qty,
+        channel: row.channel || null,
       });
     } catch (e) {
       failed.push({
-        mpn, vendor: d.name, bpId: bp.id, price, qty,
+        mpn, vendor: vendorDisplay, bpId: bp.id, price, qty,
         reason: FLAG.API_WRITE_ERROR,
         detail: e.message.substring(0, 200)
       });
     }
+    } // end row loop
   }
 
   return { written, flagged, failed };
@@ -640,14 +695,24 @@ async function writeVQBatch(rfqSearchKey, items, opts = {}) {
   // Pre-warm: resolve RFQ (loads CPC and MPN maps)
   const rfq = await resolveRFQ(rfqSearchKey);
 
-  // Pre-warm: resolve all BPs and MFRs
+  // Pre-warm: resolve all BPs and MFRs.
+  // Multi-source distributors (Arrow → Arrow + Verical via d.vqLines) need
+  // BOTH the top-level BP and each sub-line BP pre-resolved.
   const vendorSet = new Map();
   const mfrSet = new Set();
   for (const item of items) {
     for (const d of (item.franchiseResults?.distributors || [])) {
       if (!d.found) continue;
-      const key = d.bpValue || d.name || '';
-      if (!vendorSet.has(key)) vendorSet.set(key, { searchKey: d.bpValue, name: d.name });
+      if (Array.isArray(d.vqLines) && d.vqLines.length > 0) {
+        for (const sub of d.vqLines) {
+          const key = sub.vendorBP || sub.vendorName || '';
+          if (!vendorSet.has(key)) vendorSet.set(key, { searchKey: sub.vendorBP, name: sub.vendorName });
+          if (sub.manufacturer) mfrSet.add(sub.manufacturer);
+        }
+      } else {
+        const key = d.bpValue || d.name || '';
+        if (!vendorSet.has(key)) vendorSet.set(key, { searchKey: d.bpValue, name: d.name });
+      }
       const mfrText = d.vqManufacturer || d.raw?.vqManufacturer || '';
       if (mfrText) mfrSet.add(mfrText);
     }

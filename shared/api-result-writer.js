@@ -69,34 +69,78 @@ function buildEnvelope(searchResult, mpn, qty, source) {
     FailedReason: d.error || null,
   }));
 
-  const pricingsArray = searchResult.distributors
-    .filter(d => d.found)
-    .map(d => ({
-      SupplierName: d.name || d.distributor,
-      ManufacturerName: d.vqManufacturer || d.raw?.vqManufacturer || '',
-      ManufacturerPartNumber: d.vqMpn || d.raw?.vqMpn || mpn,
-      RequestedPartNumber: mpn,
-      CurrentStockQty: d.franchiseQty || 0,
-      MinimumBuy: d.raw?.vqMoq ? parseInt(d.raw.vqMoq) || 1 : d.raw?.moq || 1,
-      Multiplier: d.raw?.vqSpq ? parseInt(d.raw.vqSpq) || 1 : 1,
-      LeadTime: d.vqLeadTime || d.raw?.vqLeadTime || null,
-      Currency: d.raw?.currency || 'USD',
-      RoHS: d.raw?.vqRohs || null,
-      LifeCycleStatus: d.raw?.vqLifeCycle || null,
-      CountryOfOrigin: d.raw?.vqCoo || null,
-      DataSheetUrl: d.raw?.vqDatasheetUrl || null,
-      ProductUrl: d.raw?.vqProductUrl || d.raw?.productUrl || null,
-      Packaging: d.raw?.vqPackaging || null,
-      Description: d.vqDescription || d.raw?.vqDescription || null,
-      VendorNotes: d.vqVendorNotes || d.raw?.vqVendorNotes || null,
-      DateCode: d.vqDateCode || d.raw?.vqDateCode || null,
-      HTSCode: d.raw?.vqHts || d.raw?.htsCode || null,
-      ECCN: d.raw?.vqEccn || d.raw?.eccn || null,
-      Pricings: (d.priceBreaks || d.raw?.priceBreaks || []).map(pb => ({
-        QtyBreak: pb.qty,
-        UnitPrice: pb.unitPrice,
-      })),
-    }));
+  // Build Pricings[] from distributor results.
+  // Most distributors emit one row per result. Arrow splits into multiple
+  // (Arrow franchise + Verical broker) via d.vqLines — when present, we emit
+  // one Pricings entry per sub-line, each with the right SupplierName so the
+  // cache reconstitution path resolves the row back to the correct BP.
+  const pricingsArray = [];
+  for (const d of searchResult.distributors) {
+    if (!d.found) continue;
+
+    if (Array.isArray(d.vqLines) && d.vqLines.length > 0) {
+      for (const sub of d.vqLines) {
+        pricingsArray.push({
+          SupplierName: sub.vendorName || (sub.channel === 'Verical' ? 'Verical' : (d.name || d.distributor)),
+          ManufacturerName: sub.manufacturer || d.vqManufacturer || '',
+          ManufacturerPartNumber: sub.mpn || d.vqMpn || mpn,
+          RequestedPartNumber: mpn,
+          CurrentStockQty: sub.qty || 0,
+          MinimumBuy: sub.moq ? parseInt(sub.moq) || 1 : 1,
+          Multiplier: sub.spq ? parseInt(sub.spq) || 1 : 1,
+          LeadTime: sub.leadTime || null,
+          Currency: 'USD',
+          RoHS: null,
+          LifeCycleStatus: null,
+          CountryOfOrigin: sub.shipsFrom || null,
+          DataSheetUrl: null,
+          ProductUrl: null,
+          Packaging: null,
+          Description: sub.description || d.vqDescription || null,
+          VendorNotes: sub.vendorNotes || null,
+          DateCode: sub.dateCode || null,
+          HTSCode: null,
+          ECCN: null,
+          // Channel-aware extensions (new) — preserved across cache hits so
+          // downstream consumers can distinguish Arrow franchise from Verical
+          // broker even after reconstitution.
+          SourceChannel: sub.channel || null,
+          SourcePartId: sub.sourcePartId || null,
+          Pricings: (sub.priceBreaks || []).map(pb => ({
+            QtyBreak: pb.qty,
+            UnitPrice: pb.unitPrice,
+          })),
+        });
+      }
+    } else {
+      pricingsArray.push({
+        SupplierName: d.name || d.distributor,
+        ManufacturerName: d.vqManufacturer || d.raw?.vqManufacturer || '',
+        ManufacturerPartNumber: d.vqMpn || d.raw?.vqMpn || mpn,
+        RequestedPartNumber: mpn,
+        CurrentStockQty: d.franchiseQty || 0,
+        MinimumBuy: d.raw?.vqMoq ? parseInt(d.raw.vqMoq) || 1 : d.raw?.moq || 1,
+        Multiplier: d.raw?.vqSpq ? parseInt(d.raw.vqSpq) || 1 : 1,
+        LeadTime: d.vqLeadTime || d.raw?.vqLeadTime || null,
+        Currency: d.raw?.currency || 'USD',
+        RoHS: d.raw?.vqRohs || null,
+        LifeCycleStatus: d.raw?.vqLifeCycle || null,
+        CountryOfOrigin: d.raw?.vqCoo || null,
+        DataSheetUrl: d.raw?.vqDatasheetUrl || null,
+        ProductUrl: d.raw?.vqProductUrl || d.raw?.productUrl || null,
+        Packaging: d.raw?.vqPackaging || null,
+        Description: d.vqDescription || d.raw?.vqDescription || null,
+        VendorNotes: d.vqVendorNotes || d.raw?.vqVendorNotes || null,
+        DateCode: d.vqDateCode || d.raw?.vqDateCode || null,
+        HTSCode: d.raw?.vqHts || d.raw?.htsCode || null,
+        ECCN: d.raw?.vqEccn || d.raw?.eccn || null,
+        Pricings: (d.priceBreaks || d.raw?.priceBreaks || []).map(pb => ({
+          QtyBreak: pb.qty,
+          UnitPrice: pb.unitPrice,
+        })),
+      });
+    }
+  }
 
   return {
     data: {
@@ -299,7 +343,11 @@ async function writeDb(mpn, envelope, rfqId) {
       payload.Record_ID = rfqId;
     }
 
-    const result = await apiPost(DB_TABLE, payload);
+    // Natural key is the client-generated UU — guaranteed unique and known
+    // pre-POST, so check-before-retry has a perfect identity match.
+    const result = await apiPost(DB_TABLE, payload, {
+      naturalKeyFields: ['Chuboe_Pricing_API_Result_UU'],
+    });
     const assignedId = result.id;
     if (assignedId) {
       return assignedId;

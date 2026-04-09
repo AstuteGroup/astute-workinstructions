@@ -113,6 +113,19 @@ const DISTRIBUTORS = {
     bpId: 1000335,
     active: true,
   },
+  // Verical is Arrow's broker marketplace — not searched directly (no separate API),
+  // but Arrow's response surfaces Verical stock under a separate webSite tree.
+  // arrow.js splits those into vqLines tagged with this BP. Listed here (inactive)
+  // so cache reconstitution and SupplierName lookups can resolve "Verical" back
+  // to the correct iDempiere business partner.
+  verical: {
+    name: 'Verical',
+    script: null,
+    bpValue: '1003440',
+    bpName: 'Verical',
+    bpId: 1001436,
+    active: false,
+  },
 };
 
 /**
@@ -159,6 +172,10 @@ async function searchPart(distributor, mpn, qty) {
       vqEccn: result.vqEccn || null,
       // Full price break array for api-result-writer capture
       priceBreaks: result.priceBreaks || [],
+      // Multi-source split (Arrow only — splits into Arrow + Verical channels).
+      // When present, the master vqLines builder spreads these instead of
+      // emitting one default row from the top-level fields.
+      vqLines: result.vqLines || null,
       // Raw result for workflow-specific needs
       raw: result,
     };
@@ -288,22 +305,48 @@ function envelopeToResult(envelope, mpn, qty) {
       : null,
   };
 
-  const vqLines = found
-    .filter(r => r.vqPrice != null && r.vqPrice > 0)
-    .map(r => ({
-      vendorBP: r.bpValue,
-      vendorName: r.bpName,
-      mpn: r.vqMpn,
-      manufacturer: r.vqManufacturer,
-      cost: r.vqPrice,
-      qty: r.franchiseQty,
-      description: r.vqDescription,
-      vendorNotes: r.vqVendorNotes,
-      dateCode: r.vqDateCode,
-      leadTime: r.vqLeadTime,
-      moq: r.vqMoq,
-      spq: r.vqSpq,
-    }));
+  // Build master vqLines. Most distributors emit ONE row per result. Arrow
+  // splits into multiple (Arrow franchise + Verical broker channels) and
+  // exposes them via r.vqLines — when present, we spread those instead of
+  // collapsing the multi-source response into a single row.
+  const vqLines = [];
+  for (const r of found) {
+    if (Array.isArray(r.vqLines) && r.vqLines.length > 0) {
+      for (const sub of r.vqLines) {
+        vqLines.push({
+          vendorBP: sub.vendorBP,
+          vendorName: sub.vendorName,
+          mpn: sub.mpn,
+          manufacturer: sub.manufacturer,
+          cost: sub.cost,
+          qty: sub.qty,
+          description: sub.description,
+          vendorNotes: sub.vendorNotes,
+          dateCode: sub.dateCode,
+          leadTime: sub.leadTime,
+          moq: sub.moq,
+          spq: sub.spq,
+          channel: sub.channel,
+          sourcePartId: sub.sourcePartId,
+        });
+      }
+    } else if (r.vqPrice != null && r.vqPrice > 0) {
+      vqLines.push({
+        vendorBP: r.bpValue,
+        vendorName: r.bpName,
+        mpn: r.vqMpn,
+        manufacturer: r.vqManufacturer,
+        cost: r.vqPrice,
+        qty: r.franchiseQty,
+        description: r.vqDescription,
+        vendorNotes: r.vqVendorNotes,
+        dateCode: r.vqDateCode,
+        leadTime: r.vqLeadTime,
+        moq: r.vqMoq,
+        spq: r.vqSpq,
+      });
+    }
+  }
 
   return { summary, distributors: results, found, vqLines };
 }
@@ -446,22 +489,48 @@ async function searchAllDistributors(mpn, qty, options = {}) {
   };
 
   // Generate VQ lines for each distributor with stock+pricing (API data = confirmed → log as VQ)
-  const vqLines = found
-    .filter(r => r.vqPrice != null && r.vqPrice > 0)
-    .map(r => ({
-      vendorBP: r.bpValue,
-      vendorName: r.bpName,
-      mpn: r.vqMpn,
-      manufacturer: r.vqManufacturer,
-      cost: r.vqPrice,
-      qty: r.franchiseQty,
-      description: r.vqDescription,
-      vendorNotes: r.vqVendorNotes,
-      dateCode: r.vqDateCode,
-      leadTime: r.vqLeadTime,
-      moq: r.vqMoq,
-      spq: r.vqSpq,
-    }));
+  // Build master vqLines. Most distributors emit ONE row per result. Arrow
+  // splits into multiple (Arrow franchise + Verical broker channels) and
+  // exposes them via r.vqLines — when present, we spread those instead of
+  // collapsing the multi-source response into a single row.
+  const vqLines = [];
+  for (const r of found) {
+    if (Array.isArray(r.vqLines) && r.vqLines.length > 0) {
+      for (const sub of r.vqLines) {
+        vqLines.push({
+          vendorBP: sub.vendorBP,
+          vendorName: sub.vendorName,
+          mpn: sub.mpn,
+          manufacturer: sub.manufacturer,
+          cost: sub.cost,
+          qty: sub.qty,
+          description: sub.description,
+          vendorNotes: sub.vendorNotes,
+          dateCode: sub.dateCode,
+          leadTime: sub.leadTime,
+          moq: sub.moq,
+          spq: sub.spq,
+          channel: sub.channel,
+          sourcePartId: sub.sourcePartId,
+        });
+      }
+    } else if (r.vqPrice != null && r.vqPrice > 0) {
+      vqLines.push({
+        vendorBP: r.bpValue,
+        vendorName: r.bpName,
+        mpn: r.vqMpn,
+        manufacturer: r.vqManufacturer,
+        cost: r.vqPrice,
+        qty: r.franchiseQty,
+        description: r.vqDescription,
+        vendorNotes: r.vqVendorNotes,
+        dateCode: r.vqDateCode,
+        leadTime: r.vqLeadTime,
+        moq: r.vqMoq,
+        spq: r.vqSpq,
+      });
+    }
+  }
 
   return {
     summary,
