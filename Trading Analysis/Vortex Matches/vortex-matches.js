@@ -52,11 +52,7 @@ const COLUMN_DEFS = {
   'Created Date': { width: 14, format: 'date' },
   'Days Btw MO/VQ & RFQ': { width: 20, format: 'number' },
   '% of Demand': { width: 14, format: 'percent' },
-  'Opp Amount': { width: 14, format: 'currency' },
-  // API Pricing tab columns — reference data from cached envelopes
-  'Tier Min Qty': { width: 12, format: 'number' },
-  'Pulled': { width: 12, format: 'date' },
-  'Source': { width: 14, format: 'text' }
+  'Opp Amount': { width: 14, format: 'currency' }
 };
 
 // Column sets for each file type
@@ -84,16 +80,6 @@ const COLUMNS = {
     'Customer Part Number', 'MO Type', 'Supplier MPN', 'Supplier MFR',
     'Supplier/Excess Partner', 'Qty', 'Supplier Price',
     'Supply', 'lead_time', 'Date Code', 'Created Date', 'Days Btw MO/VQ & RFQ', '% of Demand', 'Opp Amount'
-  ],
-  // API Pricing — cached envelope rows. Reference data, NOT actionable VQs.
-  // Surfaces alternate price tiers + distributors that didn't make it into
-  // chuboe_vq_line. Sellers use this for context: "what other price points
-  // exist for this MPN that we already know about from prior API calls?"
-  'API Pricing': [
-    'RFQ Number', 'RFQ Created', 'RFQ Customer', 'RFQ MPN', 'RFQ MFR', 'RFQ Qty', 'RFQ Target',
-    'Customer Part Number', 'Supplier MPN', 'Supplier MFR',
-    'Supplier/Excess Partner', 'Tier Min Qty', 'Qty', 'Supplier Price',
-    'lead_time', 'Date Code', 'Pulled', 'Source'
   ]
 };
 
@@ -434,10 +420,10 @@ async function fetchCachedEnvelopes(cleanMpns) {
           lead_time: p.LeadTime || '',
           date_code: p.DateCode || '',
           created_date: envelopeTime,
-          record_type: 'API',
-          // API Pricing tab extras
-          tier_min_qty: tierMinQty,
-          source_consumer: sourceConsumer,
+          // Distinct from VQ / MO so provenance is clear in the Type column.
+          // The existing "Days Btw MO/VQ & RFQ" column shows envelope age vs
+          // the RFQ date, giving sellers a freshness signal.
+          record_type: 'API CACHE',
         });
       }
     }
@@ -500,7 +486,7 @@ function joinData(rfqRows, offers) {
       const leadTimeText = offer.lead_time || '';
       const supplyState = computeSupplyState(supplierQty, leadTimeText);
 
-      const row = {
+      results.push({
         'RFQ Number': rfq.rfq_number,
         'RFQ Created': rfqDate,
         'RFQ Customer': rfq.customer_name || '',
@@ -524,14 +510,7 @@ function joinData(rfqRows, offers) {
         'Days Btw MO/VQ & RFQ': daysBetween,
         '% of Demand': percentOfDemand,
         'Opp Amount': oppAmount
-      };
-      // API-row extras (only populated when the source is a cached envelope)
-      if (offer.record_type === 'API') {
-        row['Tier Min Qty'] = offer.tier_min_qty;
-        row['Pulled'] = offer.created_date;
-        row['Source'] = offer.source_consumer || '';
-      }
-      results.push(row);
+      });
     }
   }
 
@@ -764,26 +743,24 @@ async function runVortexForRFQ(rfqNumber, { log = () => {} } = {}) {
     fetchVendorQuotes(cleanMpns),
     fetchCachedEnvelopes(cleanMpns)
   ]);
-  const allOffers = [...marketOffers, ...vendorQuotes];
-  log(`  ${marketOffers.length} MOs + ${vendorQuotes.length} VQs + ${cachedEnvelopes.length} cached envelope rows`);
 
-  const joinedData = joinData(rfqRows, allOffers);
-  const { stock, goodPrices, allPrices, noPrices } = categorizeResults(joinedData, hasTargets);
-
-  // ── Cached envelope rows (API Pricing tab) ────────────────────────────────
-  // Run cached envelope rows through the same join logic so they pick up the
-  // RFQ context (RFQ Number, Qty, Target, etc.) but keep them in their own
-  // bucket — they're reference data, not actionable supply offers, and should
-  // never get mixed into Stock/Good Prices/etc.
+  // Cached envelope rows are additional supply data — alternate price tiers
+  // and distributors that didn't land in chuboe_vq_line as actionable VQs.
+  // Mix them into the same offer pool as MO + VQ so they flow through
+  // joinData → categorizeResults and naturally land in Good Prices /
+  // All Prices alongside the rest, filtered by the same target threshold,
+  // sorted by the same Supply state + price logic.
   //
-  // Dedup against the actionable VQ data so we don't show the same
-  // (supplier, mpn, price) twice when a cached row matches an existing VQ
-  // row. Key: (mpn_clean, supplier_partner, supplier_price). Tolerant to
-  // tiny float differences via toFixed(6) on price.
-  // Dedup key: (mpn_clean, supplier_partner_normalized, price.toFixed(6)).
-  // Normalize partner with trim() because the bi_vendor_quote_line_v view
-  // returns BP names with trailing whitespace ("Rutronik Inc. ") that won't
-  // string-match the cached envelope's canonical name ("Rutronik Inc.").
+  // Sellers see them as Type='API' rows in the existing tabs — distinct
+  // from VQ and MO so the provenance is clear. The existing
+  // "Days Btw MO/VQ & RFQ" column shows the age of the cached envelope
+  // vs the RFQ date, giving the seller a freshness signal so they can
+  // decide whether to refresh the data before quoting.
+  //
+  // Dedup against existing VQs so we don't show the same (supplier, mpn,
+  // price) twice. Normalized with .trim() because bi_vendor_quote_line_v
+  // returns BP names with trailing whitespace ("Rutronik Inc. ") that
+  // won't string-match the cached envelope's canonical name.
   const dedupKey = (mpn, partner, price) =>
     `${String(mpn || '').trim()}|${String(partner || '').trim()}|${Number(price).toFixed(6)}`;
   const vqDedupKeys = new Set();
@@ -793,7 +770,12 @@ async function runVortexForRFQ(rfqNumber, { log = () => {} } = {}) {
   const apiOnlyEnvelopes = cachedEnvelopes.filter(c =>
     !vqDedupKeys.has(dedupKey(c.market_offer_line_mpn_clean, c.supplier_partner, c.supplier_price))
   );
-  const apiPricing = joinData(rfqRows, apiOnlyEnvelopes);
+
+  const allOffers = [...marketOffers, ...vendorQuotes, ...apiOnlyEnvelopes];
+  log(`  ${marketOffers.length} MOs + ${vendorQuotes.length} VQs + ${apiOnlyEnvelopes.length} API (${cachedEnvelopes.length - apiOnlyEnvelopes.length} cached deduped against VQs) = ${allOffers.length} offers`);
+
+  const joinedData = joinData(rfqRows, allOffers);
+  const { stock, goodPrices, allPrices, noPrices } = categorizeResults(joinedData, hasTargets);
 
   // Sort each tab by (part, supply state, price) so STOCK rows lead each
   // part's group and lead-time-only rows stay visible right below them
@@ -802,7 +784,6 @@ async function runVortexForRFQ(rfqNumber, { log = () => {} } = {}) {
   sortByPartAndSupply(goodPrices);
   sortByPartAndSupply(allPrices);
   sortByPartAndSupply(noPrices);
-  sortByPartAndSupply(apiPricing);
 
   const summary = {
     customer,
@@ -813,7 +794,6 @@ async function runVortexForRFQ(rfqNumber, { log = () => {} } = {}) {
     goodPrices: goodPrices.length,
     allPrices: allPrices.length,
     noPrices: noPrices.length,
-    apiPricing: apiPricing.length,
     totalMatches: joinedData.length
   };
 
@@ -833,7 +813,6 @@ async function runVortexForRFQ(rfqNumber, { log = () => {} } = {}) {
     await pushFile(allPrices, 'All Prices', 'All Prices');
   }
   await pushFile(noPrices, 'No Prices', 'No Prices');
-  await pushFile(apiPricing, 'API Pricing', 'API Pricing');
 
   return { rfqNumber, customer, hasTargets, summary, attachments };
 }
@@ -856,7 +835,6 @@ function buildSummaryHtml(result) {
   <tr><td>Stock (Astute inventory)</td><td style="text-align:right"><b>${summary.stock}</b></td></tr>
   ${priceLine}
   <tr><td>No Prices (supply leads)</td><td style="text-align:right"><b>${summary.noPrices}</b></td></tr>
-  <tr><td>API Pricing (cached envelope reference data)</td><td style="text-align:right"><b>${summary.apiPricing || 0}</b></td></tr>
   <tr style="background:#fafafa"><td><b>Total matches</b></td><td style="text-align:right"><b>${summary.totalMatches}</b></td></tr>
 </table>
 <p style="margin:14px 0 4px 0;color:#666;font-size:11px">Generated by Vortex Matches automation. Attached workbooks contain the full row-level detail.</p>
