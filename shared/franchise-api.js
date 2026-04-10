@@ -126,6 +126,18 @@ const DISTRIBUTORS = {
     bpId: 1001436,
     active: false,
   },
+  // Farnell is queried via the Newark/element14 API (same API, different store).
+  // newark.js emits per-store vqLines tagged with the correct BP. Listed here
+  // (inactive) so cache reconstitution and SupplierName lookups can resolve
+  // "Farnell Element 14" back to the correct iDempiere business partner.
+  farnell: {
+    name: 'Farnell Element 14',
+    script: null,
+    bpValue: '1002310',
+    bpName: 'Farnell Element 14',
+    bpId: 1000306,
+    active: false,
+  },
 };
 
 /**
@@ -763,6 +775,55 @@ function writeVQCapture(filePath, vqLines) {
   return filePath;
 }
 
+/**
+ * Public extractor: take a single distributor result (as returned by
+ * searchAllDistributors().distributors[i]) plus mpn + rfq qty, and return
+ * the normalized stock and/or lead-time rows the same way the VQ writer
+ * does internally.
+ *
+ * Use this in any consumer that needs the "what's the right cost at this
+ * qty break, and what's the stock vs LT split" — DO NOT roll your own
+ * field access (`d.franchiseRfqPrice || d.vqPrice` etc) in caller code.
+ *
+ * Returns null if the distributor has nothing to quote (no stock, no LT).
+ *
+ * Each row in the returned array has:
+ *   {
+ *     vendorBP, vendorName, channel,
+ *     mpn, manufacturer, description,
+ *     qty,           // stock qty for stock row, rfq qty for LT row
+ *     cost,          // unit price at the correct qty-break tier
+ *     moq, spq,
+ *     dateCode,
+ *     leadTime,      // null for stock row, string for LT row
+ *     vendorNotes,
+ *     priceBreaks,   // full break ladder for downstream display
+ *   }
+ *
+ * Consumers SHOULD also surface row-level fields they need (vqHts, vqEccn,
+ * vqRohs, vqCooCountryId, vqPackaging) directly off the distributor result —
+ * those are not part of the row shape because they're attributes of the
+ * distributor's quote, not the stock-vs-LT split.
+ */
+function extractStockAndLtRows(distributorResult, mpn, qty) {
+  if (!distributorResult || !distributorResult.found) return null;
+
+  // If the distributor module already produced its own vqLines (arrow.js does
+  // this for the Arrow + Verical multi-source split), return those directly.
+  // The shape matches what synthesizeStockLtVqLines produces, so callers
+  // can treat both paths uniformly.
+  if (Array.isArray(distributorResult.vqLines) && distributorResult.vqLines.length > 0) {
+    return distributorResult.vqLines;
+  }
+
+  const config = {
+    name: distributorResult.name,
+    bpValue: distributorResult.bpValue,
+    bpName: distributorResult.bpName,
+  };
+  return synthesizeStockLtVqLines(distributorResult, mpn, qty, config);
+}
+
 module.exports = {
   searchPart,
   searchAllDistributors,
@@ -770,4 +831,9 @@ module.exports = {
   getActiveDistributors,
   writeVQCapture,
   DISTRIBUTORS,
+  // Centralized parsing primitives — use these instead of rolling your own
+  // field-access patterns in caller code (per architectural guidance 2026-04-09).
+  extractStockAndLtRows,
+  synthesizeStockLtVqLines,
+  priceAtQty,
 };

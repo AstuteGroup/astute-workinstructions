@@ -25,8 +25,10 @@ const NEWARK_CONFIG = {
 
   // Active stores (queried by default)
   activeStores: [
-    { id: 'www.newark.com', name: 'Newark', region: 'US', currency: 'USD', bpId: 1000390 },
-    { id: 'uk.farnell.com', name: 'Farnell', region: 'UK', currency: 'GBP', bpId: 1000390 },  // Same BP
+    { id: 'www.newark.com', name: 'Newark', region: 'US', currency: 'USD',
+      bpId: 1000390, bpValue: '1002394', bpName: 'Newark in One (Element 14)' },
+    { id: 'uk.farnell.com', name: 'Farnell', region: 'UK', currency: 'GBP',
+      bpId: 1000306, bpValue: '1002310', bpName: 'Farnell Element 14' },
   ],
 
   // Stores to investigate (not queried by default)
@@ -223,6 +225,10 @@ async function searchPart(mpn, rfqQty = 1) {
     // Price breaks from primary store (Newark preferred)
     priceBreaks: newarkResult?.priceBreaks || farnellResult?.priceBreaks || [],
 
+    // Per-store VQ lines — each store writes under its own BP (like Arrow/Verical).
+    // franchise-api.js uses vqLines[] when present instead of the single-row fallback.
+    vqLines: buildPerStoreVqLines(newarkResult, farnellResult, mpn, rfqQty, GBP_TO_USD),
+
     // Errors if any
     errors: errors.length > 0 ? errors : undefined,
   };
@@ -248,6 +254,56 @@ function buildCombinedNotes(newark, farnell) {
   }
 
   return notes.length > 0 ? notes.join(' | ') : null;
+}
+
+/**
+ * Build per-store vqLines so each store writes VQs under its own BP.
+ * Follows the same pattern as Arrow/Verical (parser-native vqLines).
+ * franchise-api.js uses vqLines[] when present instead of the single-row fallback.
+ */
+function buildPerStoreVqLines(newarkResult, farnellResult, mpn, rfqQty, gbpToUsd) {
+  const lines = [];
+  const newarkStore = NEWARK_CONFIG.activeStores.find(s => s.name === 'Newark');
+  const farnellStore = NEWARK_CONFIG.activeStores.find(s => s.name === 'Farnell');
+
+  // Newark VQ line (USD, no conversion needed)
+  if (newarkResult && newarkResult.found && newarkResult.vqPrice > 0) {
+    lines.push({
+      vendorBP: newarkStore.bpValue,
+      vendorName: newarkStore.bpName,
+      mpn: newarkResult.vqMpn || mpn,
+      manufacturer: newarkResult.vqManufacturer || '',
+      cost: newarkResult.vqPrice,
+      qty: newarkResult.franchiseQty || 0,
+      leadTime: newarkResult.vqLeadTime || '',
+      moq: newarkResult.vqMoq || null,
+      spq: newarkResult.vqSpq || null,
+      packaging: newarkResult.vqPackaging || '',
+      vendorNotes: `Newark: ${(newarkResult.franchiseQty || 0).toLocaleString()} @ $${newarkResult.vqPrice}`,
+      channel: 'STOCK',
+    });
+  }
+
+  // Farnell VQ line (GBP → USD conversion)
+  if (farnellResult && farnellResult.found && farnellResult.vqPrice > 0) {
+    const costUsd = farnellResult.vqPrice * gbpToUsd;
+    lines.push({
+      vendorBP: farnellStore.bpValue,
+      vendorName: farnellStore.bpName,
+      mpn: farnellResult.vqMpn || mpn,
+      manufacturer: farnellResult.vqManufacturer || '',
+      cost: Math.round(costUsd * 100000) / 100000, // 5 decimal places
+      qty: farnellResult.franchiseQty || 0,
+      leadTime: farnellResult.vqLeadTime || '',
+      moq: farnellResult.vqMoq || null,
+      spq: farnellResult.vqSpq || null,
+      packaging: farnellResult.vqPackaging || '',
+      vendorNotes: `Farnell UK: ${(farnellResult.franchiseQty || 0).toLocaleString()} @ £${farnellResult.vqPrice} (≈$${costUsd.toFixed(4)})`,
+      channel: 'STOCK',
+    });
+  }
+
+  return lines.length > 0 ? lines : null;
 }
 
 /**
