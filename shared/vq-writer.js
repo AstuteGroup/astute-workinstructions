@@ -23,6 +23,7 @@
  */
 
 const { apiGet, apiPost, resolveBP, resolveBPBatch, resolveMFR } = require('./api-client');
+const { extractStockAndLtRows } = require('./franchise-api');
 const { lookupMfr } = require('./mfr-lookup');
 const { resolveMfrForRow } = require('./mfr-resolver');
 const { normalizePackaging, PACKAGING_MAP } = require('./packaging-lookup');
@@ -183,13 +184,19 @@ async function resolveRFQ(rfqSearchKey) {
     skip += 100;
   }
   const mpnToLine = new Map();
+  // lineIdToQty: needed by extractStockAndLtRows so it can pick the right
+  // qty-break tier when computing per-distributor row prices. Without this,
+  // the centralized helper would fall back to qty=1 pricing on every line
+  // for callers that don't pass an explicit rfqQty.
+  const lineIdToQty = new Map();
   for (const m of allMpns) {
     const mpn = (m.Chuboe_MPN || '').toUpperCase();
     const lineId = m.Chuboe_RFQ_Line_ID?.id || m.Chuboe_RFQ_Line_ID;
     if (mpn && lineId) mpnToLine.set(mpn, lineId);
+    if (lineId && m.Qty != null) lineIdToQty.set(lineId, Number(m.Qty));
   }
 
-  const entry = { id: rfqId, lines: cpcToLine, mpnToLine };
+  const entry = { id: rfqId, lines: cpcToLine, mpnToLine, lineIdToQty };
   _rfqCache.set(rfqSearchKey, entry);
   console.log(`[vq-writer] RFQ ${rfqSearchKey} resolved: ID ${rfqId}, ${cpcToLine.size} CPC lines, ${mpnToLine.size} MPNs`);
   return entry;
@@ -403,57 +410,55 @@ async function writeVQFromAPI(rfqSearchKey, cpc, franchiseResults, opts = {}) {
     return { written, flagged, failed };
   }
 
-  // Process each distributor result.
+  // Process each distributor result via the centralized extractor.
   //
-  // Most distributors emit one row per result. Arrow's API returns BOTH
-  // Arrow franchise stock and Verical broker stock under a single API call —
-  // arrow.js splits these into d.vqLines, one per real source-with-stock,
-  // tagged with the right BP. When d.vqLines is present we iterate sub-lines
-  // and write one VQ per source; otherwise we use the legacy single-row
-  // top-level fields.
+  // extractStockAndLtRows() in shared/franchise-api.js handles all the cases:
+  //   - Arrow's pre-built vqLines (multi-source Arrow + Verical split)
+  //   - Synthesized stock + lead-time split for distributors that return both
+  //   - Single-row stock-only or LT-only distributors
+  //
+  // Per architectural guidance 2026-04-09: do NOT roll your own field access
+  // (`d.franchiseRfqPrice || d.vqPrice` etc) — always go through the helper.
+  // Centralizes qty-break tier logic in one place.
+  //
+  // The rfq qty for tier selection: prefer caller-provided opts.rfqQty,
+  // then look it up from the resolved RFQ line (rfq.lineIdToQty), then
+  // fall back to 1. The fallback will cause priceAtQty to pick the unit-1
+  // tier — synthesizeStockLtVqLines's fallback chain (priceAtQty → cached
+  // franchiseRfqPrice → vqPrice) will still surface the correct cached
+  // price as long as the distributor module computed it at the right qty
+  // when searchAllDistributors was called.
+  const rfqQtyForTier = (opts.rfqQty != null && opts.rfqQty > 0)
+    ? Number(opts.rfqQty)
+    : (rfq.lineIdToQty?.get(rfqLineId) || 1);
+
   const distributors = franchiseResults.distributors || [];
   for (const d of distributors) {
     if (!d.found) continue;
 
-    // Build the list of "rows to write" for this distributor.
-    // Each row carries the per-VQ fields the writer needs.
-    let rowsToWrite;
-    if (Array.isArray(d.vqLines) && d.vqLines.length > 0) {
-      // Multi-source split (Arrow → Arrow + Verical channels)
-      rowsToWrite = d.vqLines
-        .filter(sub => sub.cost != null && sub.cost > 0 && sub.qty > 0)
-        .map(sub => ({
-          mpn: sub.mpn || opts.searchedMpn || '',
-          mfrText: sub.manufacturer || d.vqManufacturer || '',
-          price: sub.cost,
-          qty: sub.qty,
-          leadTime: sub.leadTime || '',
-          moq: sub.moq || null,
-          spq: sub.spq || null,
-          bpSearchKey: sub.vendorBP,
-          vendorName: sub.vendorName,
-          vendorNotes: sub.vendorNotes || '',
-          dateCode: sub.dateCode || null,
-          channel: sub.channel || null,
-        }));
-    } else {
-      // Legacy single-row distributor
-      if (!d.franchiseRfqPrice || d.franchiseRfqPrice <= 0) continue;
-      rowsToWrite = [{
-        mpn: d.vqMpn || d.raw?.vqMpn || opts.searchedMpn || '',
-        mfrText: d.vqManufacturer || d.raw?.vqManufacturer || '',
-        price: d.vqPrice || d.franchiseRfqPrice,
-        qty: d.franchiseQty || 0,
-        leadTime: d.vqLeadTime || d.raw?.vqLeadTime || '',
-        moq: d.vqMoq || d.raw?.vqMoq || null,
-        spq: d.vqSpq || d.raw?.vqSpq || null,
-        bpSearchKey: d.bpValue,
-        vendorName: d.name,
-        vendorNotes: d.vqVendorNotes || '',
-        dateCode: d.vqDateCode || (d.raw && d.raw.vqDateCode) || null,
-        channel: null,
-      }];
-    }
+    // extractStockAndLtRows returns rows in the canonical shape:
+    //   { vendorBP, vendorName, channel, mpn, manufacturer, description,
+    //     qty, cost, moq, spq, dateCode, leadTime, vendorNotes, priceBreaks }
+    const extractedRows = extractStockAndLtRows(d, opts.searchedMpn || '', rfqQtyForTier) || [];
+    if (extractedRows.length === 0) continue;
+
+    const rowsToWrite = extractedRows
+      .filter(sub => sub.cost != null && sub.cost > 0 && sub.qty > 0)
+      .map(sub => ({
+        mpn: sub.mpn || opts.searchedMpn || '',
+        mfrText: sub.manufacturer || d.vqManufacturer || '',
+        price: sub.cost,
+        qty: sub.qty,
+        leadTime: sub.leadTime || '',
+        moq: sub.moq || null,
+        spq: sub.spq || null,
+        bpSearchKey: sub.vendorBP,
+        vendorName: sub.vendorName,
+        vendorNotes: sub.vendorNotes || '',
+        dateCode: sub.dateCode || null,
+        channel: sub.channel || null,
+        currencyId: sub.currencyId || null,
+      }));
 
     for (const row of rowsToWrite) {
       const mpn = row.mpn;
@@ -592,7 +597,7 @@ async function writeVQFromAPI(rfqSearchKey, cpc, franchiseResults, opts = {}) {
       ...(resolvedMfrId ? { Chuboe_MFR_ID: resolvedMfrId } : {}),
       Cost: price,
       Qty: qty,
-      C_Currency_ID: 100, // USD
+      C_Currency_ID: row.currencyId || 100, // default USD; Farnell = 114 (GBP)
       Chuboe_Lead_Time: leadTime || null,
       Chuboe_MOQ: moq ? String(moq) : null,
       Chuboe_SPQ: spq ? String(spq) : null,

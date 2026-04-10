@@ -266,7 +266,7 @@ function buildPerStoreVqLines(newarkResult, farnellResult, mpn, rfqQty, gbpToUsd
   const newarkStore = NEWARK_CONFIG.activeStores.find(s => s.name === 'Newark');
   const farnellStore = NEWARK_CONFIG.activeStores.find(s => s.name === 'Farnell');
 
-  // Newark VQ line (USD, no conversion needed)
+  // Newark VQ line (USD)
   if (newarkResult && newarkResult.found && newarkResult.vqPrice > 0) {
     lines.push({
       vendorBP: newarkStore.bpValue,
@@ -275,6 +275,7 @@ function buildPerStoreVqLines(newarkResult, farnellResult, mpn, rfqQty, gbpToUsd
       manufacturer: newarkResult.vqManufacturer || '',
       cost: newarkResult.vqPrice,
       qty: newarkResult.franchiseQty || 0,
+      currencyId: 100, // USD
       leadTime: newarkResult.vqLeadTime || '',
       moq: newarkResult.vqMoq || null,
       spq: newarkResult.vqSpq || null,
@@ -284,21 +285,21 @@ function buildPerStoreVqLines(newarkResult, farnellResult, mpn, rfqQty, gbpToUsd
     });
   }
 
-  // Farnell VQ line (GBP → USD conversion)
+  // Farnell VQ line — stored in GBP (quoted currency), converted at analytics layer
   if (farnellResult && farnellResult.found && farnellResult.vqPrice > 0) {
-    const costUsd = farnellResult.vqPrice * gbpToUsd;
     lines.push({
       vendorBP: farnellStore.bpValue,
       vendorName: farnellStore.bpName,
       mpn: farnellResult.vqMpn || mpn,
       manufacturer: farnellResult.vqManufacturer || '',
-      cost: Math.round(costUsd * 100000) / 100000, // 5 decimal places
+      cost: farnellResult.vqPrice, // raw GBP — not converted
       qty: farnellResult.franchiseQty || 0,
+      currencyId: 114, // GBP — c_currency_id in iDempiere
       leadTime: farnellResult.vqLeadTime || '',
       moq: farnellResult.vqMoq || null,
       spq: farnellResult.vqSpq || null,
       packaging: farnellResult.vqPackaging || '',
-      vendorNotes: `Farnell UK: ${(farnellResult.franchiseQty || 0).toLocaleString()} @ £${farnellResult.vqPrice} (≈$${costUsd.toFixed(4)})`,
+      vendorNotes: `Farnell UK: ${(farnellResult.franchiseQty || 0).toLocaleString()} @ £${farnellResult.vqPrice}`,
       channel: 'STOCK',
     });
   }
