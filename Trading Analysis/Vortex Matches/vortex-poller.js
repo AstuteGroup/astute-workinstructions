@@ -211,7 +211,8 @@ async function processMessage(client, uid) {
 
   // We're in forward-from-Jake mode: only process forwards from Jake himself
   if (senderAddr.toLowerCase() !== JAKE_EMAIL.toLowerCase()) {
-    log(`  UID ${uid}: sender ${senderAddr} not Jake, skipping (not marking Seen)`);
+    log(`  UID ${uid}: sender ${senderAddr} not Jake, marking Seen and skipping`);
+    if (!DRY_RUN) await client.messageFlagsAdd(String(uid), ['\\Seen'], { uid: true });
     return { uid, status: 'skipped', reason: `sender ${senderAddr}` };
   }
 

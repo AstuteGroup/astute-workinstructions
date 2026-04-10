@@ -27,6 +27,20 @@ function enqueueRetrySafe(opts) {
   }
 }
 
+// DigiKey quota state — capture X-RateLimit-Remaining on every response so the
+// enrichment poller can make informed tier-4 backlog drain decisions.
+let _writeQuotaState = null;
+function updateQuotaStateSafe(patch) {
+  try {
+    if (!_writeQuotaState) {
+      _writeQuotaState = require(path.resolve(__dirname, '../../RFQ API Enrichment/rfq-quota-state')).writeQuotaState;
+    }
+    _writeQuotaState(patch);
+  } catch {
+    // Not available — that's fine, quota tracking is best-effort
+  }
+}
+
 // DigiKey API Configuration
 const DIGIKEY_CONFIG = {
   clientId: process.env.DIGIKEY_CLIENT_ID || 'ivtDsDLOQ6l4TgHiKzRJeI42BUrw5ZRq',
@@ -280,19 +294,30 @@ async function _searchPartImpl(mpn, rfqQty = 1, _opts = {}) {
       let data = '';
       res.on('data', chunk => data += chunk);
       res.on('end', () => {
+        // Capture DigiKey rate-limit headers on every response for quota tracking.
+        const rlRemaining = parseInt(res.headers['x-ratelimit-remaining'] || '', 10);
+        const blRemaining = parseInt(res.headers['x-burstlimit-remaining'] || '', 10);
+        const retryAfterSec = parseInt(res.headers['retry-after'] || '', 10);
+        if (!isNaN(rlRemaining)) {
+          const patch = { remainingCalls: rlRemaining };
+          if (!isNaN(blRemaining)) patch.burstRemaining = blRemaining;
+          updateQuotaStateSafe(patch);
+        }
+
         // Bucket A — auto-enqueue on rate limit / transient errors so the
-        // worker retries when DigiKey's quota window resets. Detection is
-        // by HTTP status code, not response body, because DigiKey's
-        // 429 response includes X-RateLimit-* headers and (sometimes) a
-        // valid JSON body that would otherwise parse fine.
+        // worker retries when DigiKey's quota window resets.
         if (res.statusCode === 429) {
-          // Per DigiKey docs: hourly + daily limits. 1 hour retry covers hourly,
-          // we'll bump to 24h after 5 attempts via the worker's max_attempts.
+          // Honor Retry-After header if present; fall back to 1 hour.
+          const blockHours = !isNaN(retryAfterSec) ? Math.max(retryAfterSec / 3600, 0.25) : 1;
+          updateQuotaStateSafe({
+            remainingCalls: 0,
+            retryAfter: new Date(Date.now() + (blockHours * 3600 * 1000)).toISOString(),
+          });
           enqueueRetrySafe({
             id: 'digikey-' + mpn + '-' + Date.now(),
             kind: 'api-retry-digikey',
             command: `node -e "require('${__dirname}/digikey').searchPart('${mpn.replace(/'/g, "\\'")}', ${rfqQty}).then(r => console.log('OK', r.found)).catch(e => { console.error(e.message); process.exit(1); })"`,
-            blocked_until_hours: 1,
+            blocked_until_hours: blockHours,
             reason: `DigiKey 429 rate limit on ${mpn}`,
           });
           reject(new Error(`DigiKey rate limit (429) — enqueued for retry`));
