@@ -42,13 +42,27 @@ recent_vqs AS (
     vql.vendor_quote_mpn AS vq_mpn,
     COALESCE(vql.vendor_quote_manufacturer_name, '') AS vq_mfr,
     vql.vendor_quote_bpartner_name AS supplier,
-    vql.vendor_quote_cost AS vq_cost,
+    -- FX: convert to USD using iDempiere conversion rates; fallback to raw cost if no rate
+    CASE WHEN vq_raw.c_currency_id = 100 OR vq_raw.c_currency_id IS NULL
+         THEN vql.vendor_quote_cost
+         ELSE vql.vendor_quote_cost * COALESCE(cr.multiplyrate, 1)
+    END AS vq_cost,
+    COALESCE(cur.iso_code, 'USD') AS vq_currency,
+    vql.vendor_quote_cost AS vq_cost_original,
     vql.vendor_quote_quantity AS vq_qty,
     vql.vendor_quote_date_code AS date_code,
     vql.vendor_quote_lead_time AS lead_time,
     vql.vendor_quote_created AS vq_created,
     EXTRACT(DAY FROM CURRENT_TIMESTAMP - vql.vendor_quote_created)::int AS days_old
   FROM adempiere.bi_vendor_quote_line_v vql
+  INNER JOIN adempiere.chuboe_vq_line vq_raw
+    ON vq_raw.chuboe_vq_line_id = vql.vendor_quote_id AND vq_raw.isactive = 'Y'
+  LEFT JOIN adempiere.c_currency cur ON cur.c_currency_id = vq_raw.c_currency_id
+  LEFT JOIN adempiere.c_conversion_rate cr
+    ON cr.c_currency_id = vq_raw.c_currency_id
+    AND cr.c_currency_id_to = 100
+    AND CURRENT_DATE BETWEEN cr.validfrom AND cr.validto
+    AND cr.ad_org_id IN (0, vq_raw.ad_org_id)
   WHERE vql.vendor_quote_created >= CURRENT_DATE - INTERVAL '30 days'
     AND vql.vendor_quote_cost > 0
 ),
@@ -92,6 +106,7 @@ vq_matches AS (
     vq.vq_mfr,
     vq.supplier,
     vq.vq_cost,
+    vq.vq_currency,
     vq.vq_qty AS source_qty,
     vq.date_code,
     vq.lead_time,
@@ -179,7 +194,8 @@ SELECT
   pv.source_mpn AS "Source MPN",
   pv.vq_mfr AS "Supplier MFR",
   pv.supplier AS "Supplier",
-  ROUND(pv.vq_cost::numeric, 4) AS "VQ Cost",
+  ROUND(pv.vq_cost::numeric, 4) AS "VQ Cost (USD)",
+  pv.vq_currency AS "Currency",
   pv.source_qty AS "Source Qty",
   pv.date_code AS "Date Code",
   ROUND(pv.floor_price::numeric, 4) AS "Floor Price",

@@ -18,6 +18,7 @@ const { Pool } = require('pg');
 const ExcelJS = require('exceljs');
 const fs = require('fs');
 const path = require('path');
+const { getRate } = require('../../shared/fx-rates');
 
 // Database connection (uses Unix socket peer authentication).
 // `user` must be set explicitly because cron-launched processes don't
@@ -45,6 +46,7 @@ const COLUMN_DEFS = {
   'Supplier/Excess Partner': { width: 28, format: 'text' },
   'Qty': { width: 12, format: 'number' },
   'Supplier Price': { width: 14, format: 'currency_precise' },
+  'Currency': { width: 8, format: 'text' },
   '% Under Target': { width: 14, format: 'percent' },
   'Supply': { width: 11, format: 'text' },
   'lead_time': { width: 14, format: 'text' },
@@ -60,13 +62,13 @@ const COLUMNS = {
   'Good Prices': [
     'RFQ Number', '% Under Target', 'RFQ Created', 'RFQ Customer', 'RFQ MPN', 'RFQ MFR', 'RFQ Qty', 'RFQ Target',
     'Customer Part Number', 'Type', 'MO Type', 'Supplier MPN', 'Supplier MFR',
-    'Supplier/Excess Partner', 'Qty', 'Supplier Price',
+    'Supplier/Excess Partner', 'Qty', 'Supplier Price', 'Currency',
     'Supply', 'lead_time', 'Date Code', 'Created Date', 'Days Btw MO/VQ & RFQ', '% of Demand', 'Opp Amount'
   ],
   'All Prices': [
     'RFQ Number', 'RFQ Created', 'RFQ Customer', 'RFQ MPN', 'RFQ MFR', 'RFQ Qty',
     'Customer Part Number', 'Type', 'MO Type', 'Supplier MPN', 'Supplier MFR',
-    'Supplier/Excess Partner', 'Qty', 'Supplier Price',
+    'Supplier/Excess Partner', 'Qty', 'Supplier Price', 'Currency',
     'Supply', 'lead_time', 'Date Code', 'Created Date', 'Days Btw MO/VQ & RFQ', '% of Demand', 'Opp Amount'
   ],
   'No Prices': [
@@ -78,7 +80,7 @@ const COLUMNS = {
   'Stock': [
     'RFQ Number', 'RFQ Created', 'RFQ Customer', 'RFQ MPN', 'RFQ MFR', 'RFQ Qty', 'RFQ Target',
     'Customer Part Number', 'MO Type', 'Supplier MPN', 'Supplier MFR',
-    'Supplier/Excess Partner', 'Qty', 'Supplier Price',
+    'Supplier/Excess Partner', 'Qty', 'Supplier Price', 'Currency',
     'Supply', 'lead_time', 'Date Code', 'Created Date', 'Days Btw MO/VQ & RFQ', '% of Demand', 'Opp Amount'
   ]
 };
@@ -290,11 +292,14 @@ async function fetchVendorQuotes(cleanMpns) {
       vql.vendor_quote_lead_time AS lead_time,
       vql.vendor_quote_date_code AS date_code,
       vql.vendor_quote_created AS created_date,
-      'VQ' AS record_type
+      'VQ' AS record_type,
+      COALESCE(cur.iso_code, 'USD') AS currency
     FROM adempiere.bi_vendor_quote_line_v vql
     INNER JOIN adempiere.chuboe_vq_line vq
       ON vq.chuboe_vq_line_id = vql.vendor_quote_id
       AND vq.isactive = 'Y'
+    LEFT JOIN adempiere.c_currency cur
+      ON cur.c_currency_id = vq.c_currency_id
     WHERE vql.vendor_quote_mpn_clean = ANY($1)
       AND vql.vendor_quote_created >= CURRENT_DATE - INTERVAL '90 days'
     ORDER BY vql.vendor_quote_created DESC
@@ -535,6 +540,7 @@ function joinData(rfqRows, offers) {
         'Supplier/Excess Partner': offer.supplier_partner || '',
         'Qty': supplierQty,
         'Supplier Price': supplierPrice,
+        'Currency': offer._originalCurrency || 'USD',
         '% Under Target': percentUnderTarget,
         'Supply': supplyState,
         'lead_time': leadTimeText,
@@ -816,6 +822,24 @@ async function runVortexForRFQ(rfqNumber, { log = () => {} } = {}) {
 
   const allOffers = [...marketOffers, ...vendorQuotes, ...apiOnlyEnvelopes];
   log(`  ${marketOffers.length} MOs + ${vendorQuotes.length} VQs + ${apiOnlyEnvelopes.length} API (${cachedEnvelopes.length - apiOnlyEnvelopes.length} cached deduped against VQs) = ${allOffers.length} offers`);
+
+  // FX conversion: normalize non-USD supplier prices to USD for comparison.
+  // Stash original currency + price so Excel can show both.
+  const fxCache = {}; // iso → rate, cached for this run
+  let fxConverted = 0;
+  for (const offer of allOffers) {
+    const cur = offer.currency || 'USD';
+    offer._originalCurrency = cur;
+    offer._originalPrice = offer.supplier_price;
+    if (cur !== 'USD' && offer.supplier_price != null && offer.supplier_price > 0) {
+      try {
+        if (!fxCache[cur]) fxCache[cur] = await getRate(cur);
+        offer.supplier_price = Number((offer.supplier_price * fxCache[cur]).toFixed(6));
+        fxConverted++;
+      } catch { /* leave as-is if FX unavailable */ }
+    }
+  }
+  if (fxConverted > 0) log(`  FX: converted ${fxConverted} non-USD prices to USD`);
 
   const joinedData = joinData(rfqRows, allOffers);
   const { stock, goodPrices, allPrices, noPrices } = categorizeResults(joinedData, hasTargets);
