@@ -298,7 +298,13 @@ For each manufacturer in the extracted data:
 
 ### Step 9: Output — Choose Path
 
-Two output paths are available. **Default to Path A (API) unless the user requests CSV.**
+Three output paths are available. Choose based on RFQ size:
+
+| RFQ size | Path | Notes |
+|---|---|---|
+| < 500 lines | **Path A** (rfq-writer.js) | MFR + description enriched inline, sequential |
+| 500+ lines | **Path A-Fast** (daemon queue) | Concurrent (10 workers, ~20 lines/s), no enrichment — MFR resolved later by reconciler |
+| Any (fallback) | **Path B** (CSV) | Manual import into OT |
 
 #### Path A: Direct Write-Back via API (Preferred)
 
@@ -324,6 +330,36 @@ The first prod run of `rfq-writer.js` (LAM EPG, RFQ 1132037, voided) had ~80% of
 - `shared/data/mfr-cache.json` — rebuilt fresh
 
 **If you ever rebuild or hand-edit the MFR cache, every entry must carry `{name, id, isSystem}`.** Omitting `isSystem` will silently poison subsequent writes. See memory `feedback_mfr_text_only_api` and `project_test_vs_prod_idempiere`.
+
+#### Path A-Fast: Queue via Loader Daemon (for 500+ line RFQs)
+
+Use when the RFQ has 500+ lines. Loads concurrently with 10 workers (~20 lines/s). No MFR ID resolution at load time — MFR text is written raw, and the MFR reconciler cron (J4, Wed+Sun) resolves IDs system-wide later. Franchise API enrichment happens via `enrich-poller.js` (every 15 min) after loading.
+
+See [`shared/rfq-fast-loader.js`](../../shared/rfq-fast-loader.js) and [`shared/rfq-load-queue.js`](../../shared/rfq-load-queue.js).
+
+1. **Build the payload** — same fields as Path A: `bpartnerId`, `type`, `userId`, `salesrepId`, `description`, `lines[]`
+2. **Enqueue the job:**
+   ```javascript
+   const { enqueue } = require('../../shared/rfq-load-queue');
+   const jobId = enqueue({
+     bpartnerId, type, description, salesrepId, userId,
+     lines, // raw: { mpn, mfrText, qty, targetPrice, cpc, description, dateCode }
+   });
+   console.log(`Queued as ${jobId} — daemon loads within 10 seconds`);
+   ```
+3. **Monitor progress:**
+   ```bash
+   node astute-workinstructions/scripts/rfq-loader-daemon.js --status
+   ```
+4. **When status = `loaded` or `partial`:**
+   - `rfqId` and `searchKey` are in the queue item
+   - `errors[]` contains line-level failures (header + most lines are complete)
+   - `enrich-poller.js` picks up the new RFQ on its next 15-min tick for franchise API enrichment
+   - MFR reconciler (Wed+Sun) resolves `Chuboe_MFR_ID` from raw text
+
+**Priority:** RFQs under 500 lines = high priority (loaded first). 500+ = low priority (preempted by small RFQs arriving mid-load). The daemon resumes large jobs from checkpoint after small jobs complete.
+
+**Daemon lifecycle:** Cron healthcheck every 5 min starts the daemon if not running. PID file prevents duplicates. Graceful shutdown on SIGTERM writes checkpoint for resume.
 
 #### Path B: Generate CSV for Manual Import
 

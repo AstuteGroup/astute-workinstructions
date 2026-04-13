@@ -977,4 +977,119 @@ Worth a design conversation before building.
 
 ---
 
-*Last updated: 2026-04-07*
+---
+
+# Section J: RFQ Loading Pipeline — Fast Loader + Priority Queue
+
+| # | Feature | Priority | Status |
+|---|---------|----------|--------|
+| J1 | Fast loader (load-first, enrich-later) | **Next** | Planned |
+| J2 | Priority queue daemon with size-based preemption | **Next** | Planned |
+| J3 | Concurrent API workers (configurable concurrency) | **Next** | Proven (Honeywell load, 10 workers, ~20 lines/s) |
+| J4 | MFR Reconciler — system-wide text→ID resolution | **Next** | Planned |
+
+---
+
+## J1. Fast Loader — Decouple Loading from Enrichment
+
+**Status:** Planned | **Priority:** Next
+
+**Problem:** Current `writeRFQ` resolves MFR IDs and descriptions per line before POSTing. For volume RFQs (1K+ lines), this blocks entry for hours. If multiple RFQs land simultaneously, everything queues behind the slow enrichment.
+
+**Solution:** Two-phase pipeline:
+
+1. **`rfq-fast-loader.js`** — POSTs header + lines + line_mpns with raw text only. No MFR ID resolution, no description lookup. Gets lines into OT in minutes.
+2. **`rfq-enricher.js`** — Async follow-on. Reads freshly loaded lines from DB, resolves MFR IDs via `mfr-lookup.js`, looks up descriptions, calls franchise APIs, PATCHes records via `record-updater.js`.
+
+**Key constraint:** Enrichment must NEVER block loading. Load lane always has priority over enrich lane.
+
+**`writeRFQ` stays as-is** for small/manual loads where all-in-one is fine. The fast-loader is the daemon/queued path.
+
+---
+
+## J2. Priority Queue Daemon with Size-Based Preemption
+
+**Status:** Planned | **Priority:** Next
+
+**Problem:** When a 9K-line RFQ and a 50-line RFQ arrive at the same time, the 50-line RFQ shouldn't wait 3 hours. The trading team needs both visible in OT ASAP, but the small one should finish first.
+
+**Solution:** Long-running daemon (`rfq-loader-daemon.js`) with:
+
+- **File-based queue** (JSON, like `.deferred-api-queue.json`) — survives restarts, visible/debuggable
+- **Two lanes:**
+  - **Load lane** (high priority, 10-15 concurrent workers) — POST headers + lines + MPNs
+  - **Enrich lane** (lower priority, 5-10 concurrent workers) — PATCH MFR IDs, descriptions, API data. Only runs when Load lane is idle.
+- **Size-based priority within Load lane:**
+  - Small RFQs (< 500 lines) → high priority, loaded immediately
+  - Large RFQs (500+ lines) → low priority, yield workers when small RFQs enqueue
+- **Preemption:** Large RFQ drops to 2-3 workers when a small RFQ arrives, resumes full concurrency when small RFQ finishes
+
+**Daemon lifecycle:**
+- cron (`*/5 * * * *`) healthcheck launches daemon if not running
+- Daemon writes logs to `/tmp/rfq-loader-daemon.log`
+- Queue entry points: email poller, manual CLI, conversation trigger
+
+**Entry format (queue file):**
+```json
+{
+  "id": "honeywell-americas-20260413",
+  "source": "rfqloading-email-4",
+  "bpartnerId": 1000383,
+  "type": "PPV",
+  "lines": 3973,
+  "priority": "low",
+  "status": "loading",
+  "rfqId": null,
+  "enqueuedAt": "2026-04-13T13:55:00Z"
+}
+```
+
+---
+
+## J3. Concurrent API Workers
+
+**Status:** Planned | **Priority:** Next
+
+**Problem:** `writeRFQ` processes lines strictly sequentially — one API call at a time. Even without enrichment, 9K lines × 2 POSTs each = 18K sequential calls.
+
+**Solution:** Configurable concurrency pool for API writes:
+- Each worker processes one line: POST `chuboe_rfq_line` → get `lineId` → POST `chuboe_rfq_line_mpn`
+- N workers run in parallel (default 10-15, tunable)
+- Back-off on 429/5xx responses (reduce concurrency temporarily)
+- Lines within a single RFQ are independent once the header exists
+
+**Expected improvement:** 9K lines at 15 concurrent workers ≈ 12-15 minutes (vs 3+ hours sequential).
+
+---
+
+## J4. MFR Reconciler — System-Wide MFR Text → ID Resolution
+
+**Status:** Planned | **Priority:** Next
+
+**Problem:** MFR text is loaded raw across all tables (rfq_line_mpn, vq_line, offer_line_mpn, cq_line). `Chuboe_MFR_ID` is often NULL because:
+- Each customer/vendor uses different naming conventions (legal names, abbreviations, regional variants)
+- Aliases are added reactively, so older rows stay unresolved
+- The fast loader (J1) deliberately skips MFR ID resolution at load time
+
+**Solution:** Standalone cron cog (`mfr-reconciler.js`) that sweeps the entire system:
+
+1. **Collect** all distinct `chuboe_mfr_text` where `chuboe_mfr_id IS NULL` across all relevant tables
+2. **Resolve** via pre-built in-memory map: exact → alias (`mfr-aliases.json`) → acquisition (`mfr-acquisitions.json`) → normalized (strip suffixes)
+3. **PATCH** matched rows with `Chuboe_MFR_ID` via `record-updater.js`
+4. **Flag distributors-as-MFR** (Arrow, Future, Avnet, Newark, etc.) — wrong data, can't resolve, flag for review
+5. **Report** remaining unresolved texts ranked by frequency, with auto-suggested alias mappings
+6. **Email report** to operator — top unresolved candidates, suggested aliases, PATCHed counts
+
+**Cadence:** Twice weekly — Wednesday 6 AM EST + Sunday 6 AM EST via cron.
+
+**Why system-wide, not per-RFQ:** A per-RFQ enrichment pass only fixes one RFQ. The reconciler fixes everything retroactively — as the alias file grows, older rows across all tables get resolved automatically.
+
+**Key design:**
+- Pre-build normalized lookup map from `chuboe_mfr` (O(1) per lookup, not O(n) per-line DB queries)
+- MPN-prefix inference as fallback (e.g., "STM32..." → STMicroelectronics)
+- Auto-suggest aliases: texts appearing 10+ times with a close normalized match → suggest for `mfr-aliases.json`
+- Operator approves suggestions → next run resolves them all
+
+---
+
+*Last updated: 2026-04-13*
