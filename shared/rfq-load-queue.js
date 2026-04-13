@@ -28,7 +28,7 @@ const path = require('path');
 const crypto = require('crypto');
 
 const QUEUE_FILE = path.resolve(process.env.HOME || '/home/analytics_user', 'workspace/.rfq-load-queue.json');
-const SMALL_THRESHOLD = 500; // lines — below this = high priority
+const SMALL_THRESHOLD = 100; // lines — below this = high priority
 
 // ─── FILE I/O ────────────────────────────────────────────────────────────────
 

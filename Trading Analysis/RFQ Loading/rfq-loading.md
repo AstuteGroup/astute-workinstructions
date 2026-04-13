@@ -302,8 +302,8 @@ Three output paths are available. Choose based on RFQ size:
 
 | RFQ size | Path | Notes |
 |---|---|---|
-| < 500 lines | **Path A** (rfq-writer.js) | MFR + description enriched inline, sequential |
-| 500+ lines | **Path A-Fast** (daemon queue) | Concurrent (10 workers, ~20 lines/s), no enrichment — MFR resolved later by reconciler |
+| < 100 lines | **Path A** (rfq-writer.js) | MFR + description enriched inline, sequential |
+| 100+ lines | **Path A-Fast** (fast loader / daemon queue) | Concurrent (10 workers, ~12 lines/s), no enrichment — MFR resolved later by reconciler |
 | Any (fallback) | **Path B** (CSV) | Manual import into OT |
 
 #### Path A: Direct Write-Back via API (Preferred)
@@ -333,7 +333,7 @@ The first prod run of `rfq-writer.js` (LAM EPG, RFQ 1132037, voided) had ~80% of
 
 #### Path A-Fast: Queue via Loader Daemon (for 500+ line RFQs)
 
-Use when the RFQ has 500+ lines. Loads concurrently with 10 workers (~20 lines/s). No MFR ID resolution at load time — MFR text is written raw, and the MFR reconciler cron (J4, Wed+Sun) resolves IDs system-wide later. Franchise API enrichment happens via `enrich-poller.js` (every 15 min) after loading.
+Use when the RFQ has 100+ lines. Loads concurrently with 10 workers (~20 lines/s). No MFR ID resolution at load time — MFR text is written raw, and the MFR reconciler cron (J4, Wed+Sun) resolves IDs system-wide later. Franchise API enrichment happens via `enrich-poller.js` (every 15 min) after loading.
 
 See [`shared/rfq-fast-loader.js`](../../shared/rfq-fast-loader.js) and [`shared/rfq-load-queue.js`](../../shared/rfq-load-queue.js).
 
@@ -357,7 +357,7 @@ See [`shared/rfq-fast-loader.js`](../../shared/rfq-fast-loader.js) and [`shared/
    - `enrich-poller.js` picks up the new RFQ on its next 15-min tick for franchise API enrichment
    - MFR reconciler (Wed+Sun) resolves `Chuboe_MFR_ID` from raw text
 
-**Priority:** RFQs under 500 lines = high priority (loaded first). 500+ = low priority (preempted by small RFQs arriving mid-load). The daemon resumes large jobs from checkpoint after small jobs complete.
+**Priority:** RFQs under 100 lines = high priority (loaded first). 100+ = low priority (preempted by small RFQs arriving mid-load). The daemon resumes large jobs from checkpoint after small jobs complete.
 
 **Daemon lifecycle:** Cron healthcheck every 5 min starts the daemon if not running. PID file prevents duplicates. Graceful shutdown on SIGTERM writes checkpoint for resume.
 
