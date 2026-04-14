@@ -36,6 +36,7 @@ When adding new cron jobs that touch the DB, all three layers are belt-and-suspe
 | `*/30 * * * *` | **API Queue Worker** | Every 30 min — drains Bucket A queue (rate-limited / failed franchise API calls scheduled for retry) | `scripts/process-api-queue.js` | `/tmp/api-queue-worker.log` |
 | `*/15 * * * *` | **RFQ API Enrichment Poller** | Every 15 min — polls `chuboe_rfq` for new RFQs since watermark, routes each through all 7 franchise APIs (TTL cache: PPV/Astute Franchised 30d, others 7d), writes VQ lines + thin-pointer audit rows. **Re-enabled 2026-04-09** after A4 dup amplification fixes shipped in commit `3fbd0fb` (writer-layer natural-key check-before-retry + enrich-rfq read-side dedup on `(line_id, mpn_clean, mfr_id)`). Also depends on Arrow / Verical channel split (commit `fa740e9`) and vq-writer Buyer_ID/Packaging_ID null handling (commit `05d03e1`). | `Trading Analysis/RFQ API Enrichment/enrich-poller.js` | `/tmp/enrich-poller.log` |
 | `*/5 * * * *` | **RFQ Loader Daemon** | Every 5 min healthcheck — starts daemon if not running, no-ops if alive. Daemon loads queued RFQs concurrently (10 workers, ~20 lines/s), small RFQs (<500 lines) preempt large ones. Queue file: `~/.rfq-load-queue.json`. PID file: `~/.rfq-loader-daemon.pid`. **Added 2026-04-13** as part of J1/J2 fast-loader architecture. | `scripts/rfq-loader-daemon.js` | `/tmp/rfq-loader-daemon.log` |
+| `0 6 * * *` | **MFR Reconciler** | Daily 6 AM UTC — backfills `Chuboe_MFR_ID` on rows created since last successful run where text is set but FK is null. Sweeps `chuboe_rfq_line_mpn`, `chuboe_vq_line`, `chuboe_cq_line`. Skips system-MFR rows (REST can't write system IDs to client tables) and distributor-as-MFR data-entry errors. Watermark: `~/.last-mfr-reconcile`. PID file: `~/.mfr-reconciler.pid`. Single-instance + pause-file aware. **Added 2026-04-14** as J4 (forward-only). Historical backfill of ~2.5M legacy rows is parked as J4-backfill in trading roadmap. | `Trading Analysis/MFR Reconciler/mfr-reconciler.js` | `/tmp/mfr-reconciler.log` |
 
 ## Watermark / state files
 
@@ -44,6 +45,8 @@ When adding new cron jobs that touch the DB, all three layers are belt-and-suspe
 | `~/workspace/.last-rfq-enrich` | RFQ API Enrichment Poller | ISO timestamp of last successful poll. First run (no file) processes the last 1 hour. |
 | `~/workspace/.rfq-load-queue.json` | RFQ Loader Daemon | Priority queue of RFQ load jobs. Items persist across restarts for resume. |
 | `~/workspace/.rfq-loader-daemon.pid` | RFQ Loader Daemon | PID file for single-instance guard. Cron checks this before launching. |
+| `~/workspace/.last-mfr-reconcile` | MFR Reconciler | ISO timestamp of last successful run. First run (no file) processes the last 24 hours. |
+| `~/workspace/.mfr-reconciler.pid` | MFR Reconciler | PID file for single-instance guard. |
 
 ## Operations
 
@@ -58,7 +61,7 @@ crontab -e
 tail -f /tmp/enrich-poller.log
 
 # Check that all 5 jobs are still installed
-crontab -l | grep -c '^[^#]'   # should print 6
+crontab -l | grep -c '^[^#]'   # should print 7
 ```
 
 **Note:** `crontab -l/-e` work fine under `analytics_user`'s `rbash` despite the restricted shell — see `reference_crontab_works_under_rbash.md` in memory.

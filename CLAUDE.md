@@ -62,6 +62,7 @@ At the start of every new conversation, before addressing anything else, always 
 > 12. **BOM Monitoring** - Track BOM risk, commodity analysis, and excess matches (see `Trading Analysis/BOM Monitoring/`)
 > 13. **Stock RFQ Loading** - Process customer RFQ emails into ERP-ready CSV for import (see `Trading Analysis/Stock RFQ Loading/stock-rfq-loading.md`)
 > 14. **HTS / ECCN Backfill** - RFQ-scoped HTS + ECCN backfill onto chuboe_vq_line via DigiKey + Mouser APIs (see `Trading Analysis/HTS ECCN Backfill/hts-eccn-backfill.md`)
+> 15. **MFR Reconciler** - Daily cron that backfills `Chuboe_MFR_ID` on rows where text is set but FK is null. Runs at 6 AM UTC; sweeps rfq_line_mpn / vq_line / cq_line for rows created since last run (see `Trading Analysis/MFR Reconciler/mfr-reconciler.md`)
 
 3. **Review Roadmaps** (planned work):
 

@@ -986,7 +986,8 @@ Worth a design conversation before building.
 | J1 | Fast loader (load-first, enrich-later) | **Next** | Planned |
 | J2 | Priority queue daemon with size-based preemption | **Next** | Planned |
 | J3 | Concurrent API workers (configurable concurrency) | **Next** | Proven (Honeywell load, 10 workers, ~20 lines/s) |
-| J4 | MFR Reconciler — system-wide text→ID resolution | **Next** | Planned |
+| J4 | MFR Reconciler — forward-only daily cron | Done | Shipped 2026-04-14 |
+| J4-backfill | One-time historical backfill of 2.5M legacy NULL-ID rows | Later | Planned |
 | J5 | Pause-file coordination — foreground workflows yield enricher | **Next** | Planned |
 | J6 | Refactor RFQ Sourcing/franchise screening to downstream consumer | Later | Planned |
 | J7 | Market Offer Analysis tier hierarchy (always below RFQs) | Later | Planned |
@@ -1067,33 +1068,57 @@ Worth a design conversation before building.
 
 ---
 
-## J4. MFR Reconciler — System-Wide MFR Text → ID Resolution
+## J4. MFR Reconciler — Forward-Only Daily Cron (SHIPPED 2026-04-14)
 
-**Status:** Planned | **Priority:** Next
+**Status:** Shipped | **Cadence:** Daily 6 AM UTC
 
-**Problem:** MFR text is loaded raw across all tables (rfq_line_mpn, vq_line, offer_line_mpn, cq_line). `Chuboe_MFR_ID` is often NULL because:
-- Each customer/vendor uses different naming conventions (legal names, abbreviations, regional variants)
-- Aliases are added reactively, so older rows stay unresolved
-- The fast loader (J1) deliberately skips MFR ID resolution at load time
+Forward-only daily cron `mfr-reconciler.js` that backfills `Chuboe_MFR_ID` on rows created since last run where text is set but FK is null. Sweeps three tables (`chuboe_rfq_line_mpn`, `chuboe_vq_line`, `chuboe_cq_line`) and PATCHes via `record-updater.patchBatch()`.
 
-**Solution:** Standalone cron cog (`mfr-reconciler.js`) that sweeps the entire system:
+**Resolution chain (existing `lookupMfr()` in `shared/mfr-lookup.js`):**
+- Alias (`mfr-aliases.json`)
+- Cache (`mfr-cache.json`)
+- DB strict match
+- DB fuzzy match (word-overlap scoring)
+- Passthrough (unresolved — surfaced in email report)
 
-1. **Collect** all distinct `chuboe_mfr_text` where `chuboe_mfr_id IS NULL` across all relevant tables
-2. **Resolve** via pre-built in-memory map: exact → alias (`mfr-aliases.json`) → acquisition (`mfr-acquisitions.json`) → normalized (strip suffixes)
-3. **PATCH** matched rows with `Chuboe_MFR_ID` via `record-updater.js`
-4. **Flag distributors-as-MFR** (Arrow, Future, Avnet, Newark, etc.) — wrong data, can't resolve, flag for review
-5. **Report** remaining unresolved texts ranked by frequency, with auto-suggested alias mappings
-6. **Email report** to operator — top unresolved candidates, suggested aliases, PATCHed counts
+**Skip rules:**
+- System MFR (`AD_Client_ID = 0` like TI, Vishay, Bourns) — REST rejects system IDs in client tables
+- Distributor-as-MFR (Arrow, Future, Avnet, Newark, etc.) — data-entry errors, flagged not patched
+- `processed = 'Y'` rows — iDempiere business rule blocks PATCHes
 
-**Cadence:** Twice weekly — Wednesday 6 AM EST + Sunday 6 AM EST via cron.
+**Email summary:** per-table counts (scanned, patched, skipped-system, skipped-distributor, unresolved, errors) + top 20 unresolved texts ranked by frequency for alias-candidate review.
 
-**Why system-wide, not per-RFQ:** A per-RFQ enrichment pass only fixes one RFQ. The reconciler fixes everything retroactively — as the alias file grows, older rows across all tables get resolved automatically.
+**Lifecycle:**
+- PID file at `~/workspace/.mfr-reconciler.pid` (single-instance guard)
+- Watermark at `~/workspace/.last-mfr-reconcile`
+- Pause-file aware (J5) — yields to foreground workflows
+- Audit logs to `~/workspace/logs/mfr-reconciler/<run-stamp>/`
 
-**Key design:**
-- Pre-build normalized lookup map from `chuboe_mfr` (O(1) per lookup, not O(n) per-line DB queries)
-- MPN-prefix inference as fallback (e.g., "STM32..." → STMicroelectronics)
-- Auto-suggest aliases: texts appearing 10+ times with a close normalized match → suggest for `mfr-aliases.json`
-- Operator approves suggestions → next run resolves them all
+**Files:**
+- `Trading Analysis/MFR Reconciler/mfr-reconciler.js`
+- `Trading Analysis/MFR Reconciler/mfr-reconciler.md`
+
+**Verified results from initial dry+live runs (2026-04-14):**
+- Window: 2026-04-13 to present
+- Scanned: 8,628 rows | Resolvable: 369 (4.3%) | System-skip: 3,413 | Distributor-skip: 19 | Unresolved: 316 unique texts
+- The system-MFR ceiling is the dominant constraint, as expected. Forward cron prevents future debt accumulation.
+
+---
+
+## J4-backfill. One-Time Historical MFR Reconciliation
+
+**Status:** Planned | **Priority:** Later
+
+**Problem:** ~2.48M legacy rows have NULL `chuboe_mfr_id` despite populated `chuboe_mfr_text`:
+- `chuboe_rfq_line_mpn`: 2.23M unresolved (57.6% of active)
+- `chuboe_vq_line`: 226K unresolved (22.5%)
+- `chuboe_cq_line`: 19K unresolved (7.4%)
+
+The forward-only J4 cron prevents new debt but doesn't address the historical gap. Downstream analytics (Vortex, Quick Quote, Market Offer Matching) work on text via `mfr-equivalence.js` so this isn't blocking workflows — but FK-based BI/ETL queries see a 48% gap and OT UI MFR filters return incomplete results.
+
+**Solution:** Reuse `mfr-reconciler.js` with `--since '2020-01-01'` (or similar wide window) as a one-time run. Estimated 8-15 hours wall time at safe concurrency. Schedule for a weekend when iDempiere has no other load. Most rows will skip due to system-MFR ceiling — actual writable count is probably 200K-400K.
+
+**No new code needed.** The forward cron's `--since` override + `--table` filter already handle the backfill case.
 
 ---
 
