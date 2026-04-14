@@ -278,11 +278,48 @@ async function sendEmail(subject, html) {
   });
 }
 
+// Single-instance guard — cron fires every 15 min, but a tick may still be
+// running Honeywell-scale backlog work. Without a PID file, stacked enrichers
+// accumulate (20+ seen in production), all racing the same backlog items.
+// The guard matches the rfq-loader-daemon.js pattern: check PID, exit 0 if
+// alive, claim if stale. Dry runs bypass the guard for diagnostic use.
+const PID_FILE = path.resolve(process.env.HOME || '/home/analytics_user', 'workspace/.enrich-poller.pid');
+
+function claimPid() {
+  if (fs.existsSync(PID_FILE)) {
+    const existingPid = parseInt(fs.readFileSync(PID_FILE, 'utf-8').trim(), 10);
+    try {
+      process.kill(existingPid, 0); // existence check
+      log(`Enricher already running (PID ${existingPid}), exiting cleanly.`);
+      return false;
+    } catch (e) {
+      log(`Stale PID file (${existingPid} not running), claiming.`);
+    }
+  }
+  fs.writeFileSync(PID_FILE, String(process.pid), 'utf-8');
+  return true;
+}
+
+function releasePid() {
+  try { fs.unlinkSync(PID_FILE); } catch (e) { /* ignore */ }
+}
+
 async function main() {
   const argv = process.argv.slice(2);
   const DRY_RUN = argv.includes('--dry-run');
   const sinceOverrideIdx = argv.indexOf('--since');
   const sinceOverride = sinceOverrideIdx >= 0 ? argv[sinceOverrideIdx + 1] : null;
+
+  // Single-instance guard (skipped for dry runs)
+  if (!DRY_RUN) {
+    if (!claimPid()) {
+      process.exit(0);
+    }
+    // Release PID on graceful exit and any signal
+    process.on('exit', releasePid);
+    process.on('SIGINT', () => { releasePid(); process.exit(130); });
+    process.on('SIGTERM', () => { releasePid(); process.exit(143); });
+  }
 
   // Phase 0: Prune backlog (drop items >7 days old and completed items)
   const pruned = pruneBacklog();
