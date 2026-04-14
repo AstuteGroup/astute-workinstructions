@@ -993,6 +993,7 @@ Worth a design conversation before building.
 | J7 | Market Offer Analysis tier hierarchy (always below RFQs) | Later | Planned |
 | J8 | Refactor enricher tier logic — express/main lanes, drop region | **Next** | Planned |
 | J9 | Distributor offer row consistency (stock vs lead-time rows) | **Next** | Planned |
+| J10 | API enrichment ROI tracker — did API-enriched RFQs convert to sales? | **Next** | Planned |
 
 ---
 
@@ -1364,6 +1365,44 @@ is practical.
 Medium. Each parser is ~50 lines of change to identify the two offerings
 from the API response (most APIs clearly separate "in-stock" from "factory
 lead time"). No schema change; no writer change; just parser output shape.
+
+---
+
+## J10. API Enrichment ROI Tracker — Did Enriched RFQs Produce Sales?
+
+**Status:** Planned | **Priority:** Next
+
+**Problem:** We've automated API enrichment of new RFQs (writes ~5K VQs/day at steady state), but we have no measurement of whether the enrichment actually contributes to closing business. Without that feedback loop, we don't know:
+- Which customer types / RFQ types benefit most from API data
+- Whether API-only RFQs (no manual VQ load) ever convert
+- Whether the enricher's tier priority (J8) reflects actual business value
+
+**Key scope refinement (operator clarification 2026-04-14):** Track "did the RFQ line sell?" not "did our specific API VQ win?" The API VQ might not be the row that ultimately won the order — the seller may have used a different vendor or an internally-loaded VQ — but the API enrichment may still have surfaced the price point, made the part viable, or informed the quoting decision. Track presence-of-API-VQ → presence-of-sale at the line level.
+
+**Solution:** Standalone weekly cron `scripts/vq-enrichment-roi-tracker.js`:
+
+1. **Find API-enriched lines:** All distinct `chuboe_rfq_line_id` where any `chuboe_vq_line.createdby = 1049524` exists, created in trailing 30-day window.
+2. **Check sale activity per line:** For each enriched line, look for:
+   - CQs created against the line (via `chuboe_cq_line.chuboe_rfq_line_id`)
+   - SOs linked from those CQs (via `c_orderline` join chain)
+   - Whether the SO's `chuboe_vq_line_id` happens to point to one of OUR API VQs (informational — "we directly won")
+3. **Aggregate per RFQ + per customer + per RFQ type.** Conversion rate = lines with sale / lines API-enriched.
+4. **Email weekly digest** (Monday 7 AM UTC):
+   - Trailing 30d window stats: # RFQs enriched, # converted, conversion %
+   - Per-customer breakdown
+   - Per-RFQ-type breakdown
+   - "Direct wins" — where our API VQ was the actual order line (subset of total wins)
+   - Top conversion examples (customer / MPN / GP)
+   - Stale enriched RFQs > 30d with no activity (candidates for the trading team to action or close)
+
+**Implementation reuses existing patterns:**
+- Daemon shape from `enrich-poller.js` / `mfr-reconciler.js` (PID guard, watermark, signal handlers, email)
+- All data from existing tables — no schema changes, no new flags on RFQ records (the breadcrumb `vq_line.createdby = 1049524` already implicitly flags API-touched lines)
+- `shared/notifier.js` for email
+
+**Cadence:** Weekly digest Monday 7 AM UTC (after MFR reconciler at 6 AM, before US business hours).
+
+**Effort:** ~1-2 hours. Same shape as J4 MFR reconciler.
 
 ---
 
