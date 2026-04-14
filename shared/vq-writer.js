@@ -22,7 +22,7 @@
  *   - LAM Kitting reorder sourcing (future)
  */
 
-const { apiGet, apiPost, resolveBP, resolveBPBatch, resolveMFR } = require('./api-client');
+const { apiGet, apiPost, resolveBP, resolveBPBatch, resolveMFR, buildNaturalKeyFilter } = require('./api-client');
 const { extractStockAndLtRows } = require('./franchise-api');
 const { lookupMfr } = require('./mfr-lookup');
 const { resolveMfrForRow } = require('./mfr-resolver');
@@ -635,10 +635,47 @@ async function writeVQFromAPI(rfqSearchKey, cpc, franchiseResults, opts = {}) {
       continue;
     }
 
+    // Check-before-post idempotency guard.
+    //
+    // apiPost's `naturalKeyFields` only guards against retry-after-failure
+    // duplicates (re-POST after a 5xx). It does NOT prevent distinct callers
+    // (stacked enrichers, concurrent manual + cron, etc.) from each writing
+    // a fresh row for the same logical VQ.
+    //
+    // Root cause of the 2026-04-14 Honeywell duplicate incident: 20 stacked
+    // enricher processes each called writeVQFromAPI for the same RFQ lines,
+    // all succeeding independently → 64K duplicate rows.
+    //
+    // Fix: GET with the natural-key filter before POSTing. If a row already
+    // exists, skip (don't double-write). Adds one GET per VQ write but is
+    // the only defense against concurrent distinct actors writing the same
+    // logical row. Costs ~50-100ms per VQ, acceptable for data integrity.
+    const NATURAL_KEY_FIELDS = ['Chuboe_RFQ_Line_ID', 'Chuboe_MPN', 'C_BPartner_ID', 'Cost'];
+    try {
+      const filter = buildNaturalKeyFilter(NATURAL_KEY_FIELDS, payload);
+      if (filter) {
+        const existing = await apiGet('Chuboe_VQ_Line', { filter, top: 1 });
+        if (existing.records && existing.records.length > 0) {
+          // Already written by another caller — skip without error
+          written.push({
+            vqLineId: existing.records[0].id, mpn, vendor: vendorDisplay, bpId: bp.id,
+            mfrId: resolvedMfrId, mfr: mfrCanonical, price, qty,
+            channel: row.channel || null,
+            _skippedAsDuplicate: true,
+          });
+          continue;
+        }
+      }
+    } catch (checkErr) {
+      // If the pre-check GET fails, log and fall through to POST —
+      // better to risk a duplicate than to lose a legitimate write.
+      // apiPost's naturalKeyFields retry guard is still active below.
+    }
+
     // Write
     try {
       const result = await apiPost('Chuboe_VQ_Line', payload, {
-        naturalKeyFields: ['Chuboe_RFQ_Line_ID', 'Chuboe_MPN', 'C_BPartner_ID', 'Cost'],
+        naturalKeyFields: NATURAL_KEY_FIELDS,
       });
       written.push({
         vqLineId: result.id, mpn, vendor: vendorDisplay, bpId: bp.id,
