@@ -223,9 +223,16 @@ async function enrichRFQ(rfqDocNumber, opts = {}) {
     warnings: [],
   };
 
+  // Yield to foreground workflows (LAM Kitting Reorder, Stock RFQ pricing, etc.)
+  // Check at every MPN boundary — cheap; sleep 30s if a pause is active.
+  const apiPause = require('../../shared/api-pause');
+
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
     const { mpn, cpc, qty, target_price: targetPrice } = line;
+
+    // Pause-file yield — if a foreground workflow is running, sleep until it's done.
+    await apiPause.waitIfPaused({ log: (msg) => console.log(`[enrich-rfq] ${msg}`) });
 
     if (onProgress) onProgress(line, i, lines.length);
 

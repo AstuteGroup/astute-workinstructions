@@ -987,6 +987,9 @@ Worth a design conversation before building.
 | J2 | Priority queue daemon with size-based preemption | **Next** | Planned |
 | J3 | Concurrent API workers (configurable concurrency) | **Next** | Proven (Honeywell load, 10 workers, ~20 lines/s) |
 | J4 | MFR Reconciler — system-wide text→ID resolution | **Next** | Planned |
+| J5 | Pause-file coordination — foreground workflows yield enricher | **Next** | Planned |
+| J6 | Refactor RFQ Sourcing/franchise screening to downstream consumer | Later | Planned |
+| J7 | Market Offer Analysis tier hierarchy (always below RFQs) | Later | Planned |
 
 ---
 
@@ -1092,4 +1095,91 @@ Worth a design conversation before building.
 
 ---
 
-*Last updated: 2026-04-13*
+## J5. Pause-File Coordination — Foreground Workflows Yield Enricher
+
+**Status:** Planned | **Priority:** Next
+
+**Problem:** The enrich-poller (every 15 min cron) burns DigiKey quota and iDempiere connection pool processing the T4 backlog. When a user runs a foreground workflow (Stock RFQ pricing, manual enrich-rfq, LAM EPG ad-hoc sweep), they compete with the enricher for the same APIs and server. User-initiated work should preempt opportunistic background work.
+
+**Solution:** Cross-process coordination via pause file `~/workspace/.api-pause`.
+
+**Pause file schema:**
+```json
+{
+  "until": "2026-04-14T13:00:00.000Z",
+  "owner": "lam-kitting-source",
+  "size": 73,
+  "createdAt": "2026-04-14T12:50:00.000Z"
+}
+```
+
+**Behavior:**
+
+| Workflow size | Action |
+|---|---|
+| Foreground < 100 MPNs | Write pause file (TTL 10 min), refresh every 5 min while running, delete on exit |
+| Foreground >= 100 MPNs | **Don't pause** — run alongside, accept quota competition |
+| Background (enricher) | Check pause file at every MPN boundary, sleep 30s if active |
+
+**Why size threshold:** Small foreground = user is actively waiting (e.g., Stock RFQ pricing for a quote). Large foreground (LAM Kitting Reorder = hundreds of MPNs) shouldn't kick the enricher's can down the street indefinitely — better to share quota and let cache hits dedupe.
+
+**Workflows that write the pause file (foreground, when small):**
+- LAM Kitting Reorder (Monday cron)
+- Stock RFQ Loading suggested-resale
+- HTS/ECCN Backfill
+- enrich-rfq.js manual CLI invocation
+- Market Offer Analysis batch scripts
+- LAM EPG ad-hoc scripts (load-digikey-vqs, avl-alternates-sweep, sweep-remaining-58, etc.)
+
+**Workflows that respect the pause file (background):**
+- enrich-poller.js (the only one)
+
+**Vortex Matches** does NOT call APIs (verified — only reads DISTRIBUTORS dict for BP lookup), so no pause needed.
+
+**Implementation:**
+- `shared/api-pause.js` module with `claimPause(owner, sizeMpns)`, `refreshPause()`, `releasePause()`, `isPaused()` API
+- TTL default 10 min; refresh every 5 min during long-running foreground jobs
+- Enricher polls every MPN; sleeps 30s + re-checks if paused
+- Operator can manually inspect via `cat ~/workspace/.api-pause`
+
+---
+
+## J6. Refactor RFQ Sourcing / Franchise Screening — Downstream Consumer
+
+**Status:** Planned | **Priority:** Later
+
+**Problem:** RFQ Sourcing's franchise screening workflow (`Trading Analysis/RFQ Sourcing/franchise_check/main.js`) currently calls franchise APIs directly. With enrich-poller running automatically on RFQ entry (T1 for non-PPV, immediate; T4 for PPV, backlog), franchise data is already cached/written by the time a user wants to screen.
+
+**Solution:** Refactor franchise screening to query existing cached enrichment data:
+- Query `chuboe_pricing_api_result` (cached envelopes) and `chuboe_vq_line` (written VQs) for the RFQ
+- Aggregate by distributor for the franchise picture
+- Run the same opportunity analysis on cached data
+- For RFQs that haven't been enriched yet (e.g., < 15 min old): either wait for next tick OR trigger immediate `enrichRFQ()` call
+
+**Benefits:**
+- Eliminates duplicate API calls (cache savings)
+- Faster screening (DB query vs sequential API calls)
+- One source of truth for franchise data
+
+**Effort:** Medium — workflow doc rewrite, query layer, removal of API call paths.
+
+---
+
+## J7. Market Offer Analysis — Tier Hierarchy (Below RFQs)
+
+**Status:** Planned | **Priority:** Later
+
+**Problem:** Market Offer Analysis (`Trading Analysis/Market Offer Analysis/`) calls franchise APIs but has no tier/priority distinction. When market offer enrichment runs alongside RFQ enrichment, both compete equally for quota. Market offers are always lower priority than RFQs (RFQs are active demand; market offers are opportunistic supply).
+
+**Solution:** Add a Market Offer tier hierarchy mirroring the RFQ tiers, but always sitting **below** RFQ tiers in priority:
+- **MO-1**: New offers from key customers/programs (immediate enrichment)
+- **MO-2**: Standard offers (rolling backlog)
+- **MO-3**: Speculative spec-buy candidates (deferred)
+
+All MO tiers drain only AFTER all RFQ tiers are clear (or run with reduced concurrency). Could share the same backlog file format with a `category: 'rfq' | 'offer'` field.
+
+**Effort:** Medium — depends on whether we share the RFQ backlog or build a parallel one.
+
+---
+
+*Last updated: 2026-04-14*
