@@ -83,12 +83,26 @@ function writeWatermark(iso) {
  * Select RFQs created after the watermark. Returns newest-last so we process
  * in creation order. Priority is assigned later based on rfq_type + line_mpns
  * (no region/country — J8 model). Size + type drive dispatch.
+ *
+ * TIMEZONE NOTE:
+ *   iDempiere writes `created` as America/Chicago local time into a TZ-naive
+ *   `timestamp without time zone` column. The replica session runs in UTC.
+ *   We pass the watermark as a UTC ISO string, so we must convert `created`
+ *   to UTC on-the-fly before comparing. Without this the filter silently
+ *   misses every new RFQ — verified 2026-04-14 when GE Aerospace 1132340
+ *   (loaded at 18:20 UTC = 13:20 CDT) never appeared in poll results whose
+ *   watermark was 18:15 UTC.
+ *
+ *   Expression: (r.created AT TIME ZONE 'America/Chicago') AT TIME ZONE 'UTC'
+ *   - First AT TIME ZONE: "this naked timestamp is in Chicago" → returns tstz
+ *   - Second AT TIME ZONE: "show me that in UTC" → returns naked timestamp in UTC
+ *   Result is directly comparable to the ISO UTC watermark string.
  */
 async function findNewRFQs(sinceIso) {
   const { rows } = await pool.query(`
     SELECT r.value AS rfq_number,
            r.chuboe_rfq_id,
-           r.created,
+           (r.created AT TIME ZONE 'America/Chicago' AT TIME ZONE 'UTC') AS created,
            bp.name AS customer,
            rt.name AS rfq_type,
            COUNT(rlm.chuboe_rfq_line_mpn_id) AS line_mpns
@@ -103,7 +117,7 @@ async function findNewRFQs(sinceIso) {
           AND rlm.chuboe_mpn_clean IS NOT NULL
           AND rlm.chuboe_mpn_clean <> ''
     WHERE r.isactive='Y'
-      AND r.created > $1
+      AND (r.created AT TIME ZONE 'America/Chicago' AT TIME ZONE 'UTC') > $1
     GROUP BY r.value, r.chuboe_rfq_id, r.created, bp.name, rt.name
     HAVING COUNT(rlm.chuboe_rfq_line_mpn_id) > 0
     ORDER BY r.created ASC
