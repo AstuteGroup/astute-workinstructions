@@ -991,6 +991,7 @@ Worth a design conversation before building.
 | J6 | Refactor RFQ Sourcing/franchise screening to downstream consumer | Later | Planned |
 | J7 | Market Offer Analysis tier hierarchy (always below RFQs) | Later | Planned |
 | J8 | Refactor enricher tier logic — express/main lanes, drop region | **Next** | Planned |
+| J9 | Distributor offer row consistency (stock vs lead-time rows) | **Next** | Planned |
 
 ---
 
@@ -1258,6 +1259,86 @@ A 4K-line PPV from Mexico and a 4K-line PPV from Texas should be treated identic
 - Smoke test with existing backlog to verify ordering
 
 Low-risk refactor — the underlying enrichment mechanics don't change, only the dispatch order.
+
+---
+
+## J9. Distributor Offer Row Consistency — Stock vs Lead-Time Rows
+
+**Status:** Planned | **Priority:** Next
+
+**Problem:** When a distributor returns BOTH stock availability AND a lead-time
+price offering for the same part (common for DigiKey, Newark, Mouser, TTI,
+Future, Master, Rutronik, Waldom, Sager), our parsers collapse them into a
+single VQ row that mixes fields from both offerings. The result is rows like:
+
+| Vendor | Qty | Cost | Lead Time | Problem |
+|--------|-----|------|-----------|---------|
+| DigiKey | 1,055 (stock) | $1.40 (LT price) | "10 Weeks" | Stock qty + LT price — misleading |
+| Newark | 131 (stock) | $12.83 (stock price) | "1 Weeks" | LT field used for ship-out time |
+| Verical | 1,796 (stock) | $12.00 | blank | Clean stock row |
+| Mouser | 0 (no stock) | $13.56 | "62 Days" | Clean LT-only row |
+
+A buyer reading the DigiKey row sees "1,055 @ $1.40" when in reality only 1,055
+is stocked (probably at a smaller-volume stock-tier price), and $1.40 is what
+you'd pay for the 10-week manufacturer lead-time portion.
+
+Verified on RFQ 1132222 line LCSFPCAP (2026-04-14). The parser
+in `digikey.js` lines 417-441:
+- `franchiseQty = bestMatch.QuantityAvailable` → 1,055 (stock)
+- `vqPrice = pricingInfo.rfqPrice` → $1.4031 (price at full RFQ qty, which requires LT)
+- `vqLeadTime = "10 Weeks"` → manufacturer LT
+
+Three fields mashed together as if they describe one coherent offering. They don't.
+
+### Solution: one row per offering type, strict field consistency
+
+**Semantic rule: `chuboe_lead_time` means "this order does NOT ship from stock."**
+- Blank → ships from stock
+- Populated → order is on lead time
+
+Ship-out times (Newark UK→US, Farnell AU→US, etc.) go to `chuboe_note_public`
+as a note, NOT into `chuboe_lead_time`. Keeps the LT field semantically clean.
+
+**Per distributor response, emit up to two VQ rows:**
+
+| Offer | Qty | Cost | Lead Time | Notes |
+|-------|-----|------|-----------|-------|
+| **Stock** | `min(stockQty, rfqQty)` | price at that qty | `null` | `"In stock from {vendor}"` + ship-out days if applicable |
+| **Lead-time** | `0` (LT-only convention, matching existing Mouser behavior) | LT price | `"X Weeks"` | `"Manufacturer LT"` or `"Vendor LT"` |
+
+**When to emit which:**
+- `stockQty >= rfqQty`: one stock row only (ordering fully from stock)
+- `stockQty > 0 AND stockQty < rfqQty`: TWO rows (split demand between stock + LT)
+- `stockQty == 0 AND LT available`: one LT row only (qty=0 signals LT-only)
+- `stockQty == 0 AND no LT`: skip (nothing to offer)
+
+### Implementation Scope
+
+Each distributor parser in `Trading Analysis/RFQ Sourcing/franchise_check/*.js`
+emits `result.vqLines` as an array (Arrow already does this for Franchise+Verical
+split). The aggregator in `shared/franchise-api.js` already knows how to spread
+`vqLines` when present — no aggregator change needed.
+
+Parsers to update:
+- digikey.js — worst offender, mixes all three fields
+- newark.js — puts ship-out time in LT field
+- mouser.js — already clean for LT-only; needs stock + LT split
+- tti.js, future.js, master.js, rutronik.js, waldom.js, sager.js — each audit + update
+- arrow.js — already correct (franchise + verical split)
+
+### Backfill Consideration
+
+The ~5,000 unique VQ rows written by our API so far include some mashed ones
+(observed in Honeywell, LAM, and smaller RFQs). These don't have the right
+field alignment and would benefit from a one-time re-enrichment pass once J9
+ships. Scope is small enough (5K rows vs 60K dups) that a targeted re-run
+is practical.
+
+### Effort
+
+Medium. Each parser is ~50 lines of change to identify the two offerings
+from the API response (most APIs clearly separate "in-stock" from "factory
+lead time"). No schema change; no writer change; just parser output shape.
 
 ---
 
