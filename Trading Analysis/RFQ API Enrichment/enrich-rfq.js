@@ -202,6 +202,14 @@ async function enrichRFQ(rfqDocNumber, opts = {}) {
     mfrMismatch: 0,
     mfrUnknown: 0,
     mfrMismatchSamples: [],  // first 5 {mpn, rfqMfr, supplierMfr, distributor}
+    // Per-distributor health aggregated across all lines in this RFQ.
+    // distinguishes "we tried 7 APIs, got nothing" from "we skipped".
+    // Schema: { name: { calls, found, errors, withStock } }
+    //   calls   = number of times we asked this distributor (live API only, not cache)
+    //   found   = times distributor returned ANY catalog entry (carrying)
+    //   withStock = times distributor returned stock > 0
+    //   errors  = times distributor errored (rate-limited, network failure, etc.)
+    distributorStats: {},
     errors: [],
     // Anomaly warnings — populated AFTER the loop in finalizeAndDetectAnomalies()
     // below. The smoking-gun pattern is "we processed N lines, made API calls
@@ -253,6 +261,23 @@ async function enrichRFQ(rfqDocNumber, opts = {}) {
     if (result.summary.coverage === 'FULL') counters.qtyMatches++;
     else if (result.summary.coverage === 'PARTIAL') counters.partialCoverage++;
     else counters.noCoverage++;
+
+    // Per-distributor stats — only count live API calls, not cache hits
+    // (cache hits don't tell us anything about current distributor health).
+    // Tracks "we tried 7 distributors" vs "we got cache and skipped".
+    if (!fromCache && Array.isArray(result.distributors)) {
+      for (const d of result.distributors) {
+        const name = d.name || d.distributor || 'unknown';
+        if (!counters.distributorStats[name]) {
+          counters.distributorStats[name] = { calls: 0, found: 0, withStock: 0, errors: 0 };
+        }
+        const s = counters.distributorStats[name];
+        s.calls++;
+        if (d.error || d.errorState) s.errors++;
+        if (d.found) s.found++;
+        if (d.found && (d.franchiseQty || 0) > 0) s.withStock++;
+      }
+    }
 
     // MFR comparison — for each distributor response, check whether the
     // supplier's manufacturer matches the customer's RFQ MFR ask. Uses the

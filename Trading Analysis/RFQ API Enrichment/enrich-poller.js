@@ -153,6 +153,18 @@ function renderSummaryHtml(batchResults, sinceIso, untilIso, backlog, quotaState
 
   const rows = batchResults.map(r => {
     const tierLabel = r._fromBacklog ? 'T4(B)' : `T${r._tier || '?'}`;
+    // "Distributors touched" — how many distinct distributors we actually called
+    // for this RFQ. Cache hits don't count. 0 = we skipped APIs entirely
+    // (all-cache run or run aborted). 7 = we exercised the full distributor set.
+    const distTouched = r.distributorStats ? Object.keys(r.distributorStats).length : 0;
+    const distErrored = r.distributorStats
+      ? Object.values(r.distributorStats).filter(s => s.errors > 0).length
+      : 0;
+    const distCell = distTouched === 0
+      ? '<span style="color:#888">0 (cache only)</span>'
+      : (distErrored > 0
+          ? `${distTouched} <span style="color:#c00">(${distErrored} err)</span>`
+          : `${distTouched}`);
     return `
     <tr>
       <td>${r.rfq}</td>
@@ -163,6 +175,7 @@ function renderSummaryHtml(batchResults, sinceIso, untilIso, backlog, quotaState
       <td style="text-align:right">${r.lines}</td>
       <td style="text-align:right">${r.apiCalls}</td>
       <td style="text-align:right">${r.cacheHits}</td>
+      <td style="text-align:center">${distCell}</td>
       <td style="text-align:right">${r.apiResultRowsWritten}</td>
       <td style="text-align:right">${r.vqsWritten}</td>
       <td style="text-align:right">${r.qtyMatches}/${r.partialCoverage}/${r.noCoverage}</td>
@@ -173,6 +186,33 @@ function renderSummaryHtml(batchResults, sinceIso, untilIso, backlog, quotaState
   // Quota + backlog info
   const quotaRemaining = quotaState?.remainingCalls != null ? quotaState.remainingCalls : '?';
   const quotaUpdated = quotaState?.updatedAt ? new Date(quotaState.updatedAt).toISOString().slice(11, 16) : '?';
+
+  // Per-distributor health — aggregate across all RFQs in this batch
+  const distAgg = {};
+  for (const r of batchResults) {
+    if (!r.distributorStats) continue;
+    for (const [name, s] of Object.entries(r.distributorStats)) {
+      if (!distAgg[name]) distAgg[name] = { calls: 0, found: 0, withStock: 0, errors: 0 };
+      distAgg[name].calls += s.calls;
+      distAgg[name].found += s.found;
+      distAgg[name].withStock += s.withStock;
+      distAgg[name].errors += s.errors;
+    }
+  }
+  const distRows = Object.entries(distAgg)
+    .sort((a, b) => b[1].calls - a[1].calls)
+    .map(([name, s]) => {
+      const errPct = s.calls > 0 ? Math.round(100 * s.errors / s.calls) : 0;
+      const foundPct = s.calls > 0 ? Math.round(100 * s.found / s.calls) : 0;
+      const errFlag = errPct >= 50 ? ` <span style="color:#c00">⚠ ${errPct}% errors</span>` : '';
+      return `<tr><td>${name}</td><td style="text-align:right">${s.calls.toLocaleString()}</td><td style="text-align:right">${s.found.toLocaleString()} (${foundPct}%)</td><td style="text-align:right">${s.withStock.toLocaleString()}</td><td style="text-align:right">${s.errors}${errFlag}</td></tr>`;
+    }).join('');
+  const distHealthSection = Object.keys(distAgg).length === 0 ? '' : `
+    <br/><h4>Distributor health (live API calls only — cache hits not counted)</h4>
+    <table border="1" cellpadding="4" cellspacing="0" style="border-collapse:collapse;font-size:12px">
+      <tr style="background:#f0f0f0"><th>Distributor</th><th>Calls</th><th>Found (carrying)</th><th>With stock</th><th>Errors</th></tr>
+      ${distRows}
+    </table>`;
 
   return `
     <html><body style="font-family:Arial,sans-serif">
@@ -199,11 +239,12 @@ function renderSummaryHtml(batchResults, sinceIso, untilIso, backlog, quotaState
     <table border="1" cellpadding="4" cellspacing="0" style="border-collapse:collapse;font-size:12px">
       <tr style="background:#f0f0f0">
         <th>RFQ</th><th>Customer</th><th>Type</th><th>Tier</th><th>TTL</th>
-        <th>Lines</th><th>API</th><th>Cache</th><th>Rows</th><th>VQs</th>
+        <th>Lines</th><th>API</th><th>Cache</th><th>Dist&nbsp;hit</th><th>Rows</th><th>VQs</th>
         <th>FULL/PART/NONE</th><th>Err</th>
       </tr>
       ${rows}
     </table>
+    ${distHealthSection}
     </body></html>
   `;
 }
@@ -314,40 +355,47 @@ async function main() {
     }
   }
 
-  // Phase 4: Drain Tier 4 backlog with remaining quota
-  if (!isQuotaBlocked()) {
-    const candidates = nextBatch(BACKLOG_BATCH_SIZE);
-    if (candidates.length > 0) {
-      log(`Draining Tier 4 backlog: ${candidates.length} candidate(s)...`);
+  // Phase 4: Drain Tier 4 backlog
+  //
+  // Important: we ALWAYS attempt the drain. The DigiKey quota state is one
+  // signal among many — if DigiKey is throttled, the other 6 distributors
+  // (Mouser, TTI, Newark, Farnell, Arrow, Future) still have independent
+  // quotas. searchAllDistributors gracefully handles per-distributor errors
+  // (captured in distributorHealth), so a 429 on DigiKey just means that
+  // particular distributor returns no data — the rest of the run proceeds.
+  //
+  // We log the DigiKey state as a heads-up but do NOT use it to gate.
+  const dkBlocked = isQuotaBlocked();
+  const dkQuota = readQuotaState();
+  const dkRemaining = dkQuota?.remainingCalls ?? '?';
+
+  const candidates = nextBatch(BACKLOG_BATCH_SIZE);
+  if (candidates.length > 0) {
+    const dkNote = dkBlocked
+      ? ` (note: DigiKey 429-blocked — other 6 distributors will still run)`
+      : ` (DigiKey: ${dkRemaining} remaining)`;
+    log(`Draining Tier 4 backlog: ${candidates.length} candidate(s)${dkNote}`);
+  }
+  for (const item of candidates) {
+    log(`  Backlog: enriching ${item.rfq_number} (${item.customer}, ${item.line_mpns} MPNs, queued ${item.queuedAt})...`);
+    try {
+      const result = await enrichRFQ(String(item.rfq_number));
+      result._tier = 4;
+      result._fromBacklog = true;
+      batchResults.push(result);
+      markAttempted(item.rfq_number, 'success');
+      log(`    done: ${result.apiCalls} API, ${result.cacheHits} cache, ${result.vqsWritten} VQs`);
+    } catch (err) {
+      log(`    ERROR: ${err.message}`);
+      markAttempted(item.rfq_number, 'error');
+      batchResults.push({
+        rfq: item.rfq_number, customer: item.customer, rfqType: item.rfq_type,
+        _tier: 4, _fromBacklog: true, error: err.message,
+        lines: 0, apiCalls: 0, cacheHits: 0, apiResultRowsWritten: 0,
+        vqsWritten: 0, qtyMatches: 0, partialCoverage: 0, noCoverage: 0,
+        errors: [{ stage: 'enrich', message: err.message }], durationMs: 0,
+      });
     }
-    for (const item of candidates) {
-      if (!hasAdequateQuota(QUOTA_FLOOR)) {
-        const qs = readQuotaState();
-        log(`  Quota low (${qs?.remainingCalls ?? '?'} remaining) — pausing backlog drain`);
-        break;
-      }
-      log(`  Backlog: enriching ${item.rfq_number} (${item.customer}, ${item.line_mpns} MPNs, queued ${item.queuedAt})...`);
-      try {
-        const result = await enrichRFQ(String(item.rfq_number));
-        result._tier = 4;
-        result._fromBacklog = true;
-        batchResults.push(result);
-        markAttempted(item.rfq_number, 'success');
-        log(`    done: ${result.apiCalls} API, ${result.cacheHits} cache, ${result.vqsWritten} VQs`);
-      } catch (err) {
-        log(`    ERROR: ${err.message}`);
-        markAttempted(item.rfq_number, 'error');
-        batchResults.push({
-          rfq: item.rfq_number, customer: item.customer, rfqType: item.rfq_type,
-          _tier: 4, _fromBacklog: true, error: err.message,
-          lines: 0, apiCalls: 0, cacheHits: 0, apiResultRowsWritten: 0,
-          vqsWritten: 0, qtyMatches: 0, partialCoverage: 0, noCoverage: 0,
-          errors: [{ stage: 'enrich', message: err.message }], durationMs: 0,
-        });
-      }
-    }
-  } else {
-    log('DigiKey quota blocked (429 Retry-After active) — skipping backlog drain');
   }
 
   // Phase 5: Send summary email (only if we processed anything)
@@ -375,10 +423,11 @@ async function main() {
       log('WARN: email send failed:', err.message);
     }
   } else if (newRFQs.length === 0) {
-    // No new RFQs and nothing from backlog — check if backlog has items we should mention
+    // No new RFQs and nothing from backlog drained this tick.
     const bl = backlogStats();
-    if (bl.pending > 0 && isQuotaBlocked()) {
-      log(`Backlog has ${bl.pending} items but quota is blocked — will drain on next tick`);
+    if (bl.pending > 0) {
+      const dkNote = isQuotaBlocked() ? ' (DigiKey 429-blocked, but other distributors should still be running)' : '';
+      log(`Backlog has ${bl.pending} items pending${dkNote}`);
     }
   }
 
