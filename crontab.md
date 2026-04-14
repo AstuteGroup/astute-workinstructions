@@ -2,19 +2,29 @@
 
 Single source of truth for scheduled jobs running under `analytics_user`. Update this file whenever a cron entry is added, changed, or removed. Verify against `crontab -l` periodically.
 
-Last verified: **2026-04-13**
+Last verified: **2026-04-14**
 
 ## Environment
 
 ```cron
 PGUSER=analytics_user
+LOGNAME=analytics_user
 ```
 
-Set as a global variable at the top of the crontab. **Required for any job that touches Postgres** because cron does NOT pass `$USER` and libpq has no other way to determine the auth identity for Unix-socket peer auth — without it, every `psql` call (including `pg.Pool` connections that don't pass `user` explicitly AND every `execSync('psql ...')` child process call) fails with `fe_sendauth: no password supplied`.
+Both set as global variables at the top of the crontab. **Required for any job that touches Postgres** because cron does NOT pass `$USER` or `$LOGNAME`, and Postgres peer auth (over Unix socket) uses `LOGNAME` / `USER` to determine the OS identity before checking `pg_hba.conf`. Without `LOGNAME=analytics_user`, peer auth fails and libpq falls back to requesting a password — which, in non-interactive mode (cron, execSync), becomes `fe_sendauth: no password supplied`.
 
-Discovered the hard way 2026-04-09 evening: enrich-poller cron tick at 17:30 ran successfully but VQ writes were silently degraded because `shared/mfr-lookup.js` (and 4 other shared modules) call `execSync('psql ...')` for MFR resolution and were getting auth failures. Some VQs wrote, most didn't, "0 errors" reported. Fixed in two layers: (1) `PGUSER=analytics_user` at top of crontab, (2) `-U analytics_user` added to every `execSync psql` call in `shared/mfr-lookup.js`, `shared/db-helpers.js`, `shared/market-data.js`, `shared/offer-analyzer.js`, `shared/partner-lookup.js` so they work regardless of cron env.
+**`PGUSER` alone is not enough.** `PGUSER` tells libpq which DB role to request, but peer auth's decision to accept vs. ask for password happens based on OS identity. If `LOGNAME` isn't set, libpq thinks it's a different OS user and falls back to password auth.
 
-When adding new cron jobs that touch the DB, neither layer is strictly required (the other one covers you), but having both is the belt-and-suspenders default.
+**Layered defenses in place:**
+1. `PGUSER=analytics_user` at top of crontab (DB role request)
+2. `LOGNAME=analytics_user` at top of crontab (peer-auth OS identity) — **added 2026-04-14**
+3. `-U analytics_user` on every `execSync('psql ...')` call in `shared/mfr-lookup.js`, `shared/db-helpers.js`, `shared/market-data.js`, `shared/offer-analyzer.js`, `shared/partner-lookup.js` (belt-and-suspenders DB role)
+
+**History:**
+- **2026-04-09:** Discovered silent VQ write degradation from `fe_sendauth` failures. Added `PGUSER` to crontab + `-U analytics_user` to shared modules. Believed fixed.
+- **2026-04-14:** `fe_sendauth` errors reappeared under cron. Root cause was that peer auth needs `LOGNAME` set, which `PGUSER` doesn't provide. Fixed by adding `LOGNAME=analytics_user` to crontab.
+
+When adding new cron jobs that touch the DB, all three layers are belt-and-suspenders; the crontab env vars (1 + 2) cover the common case.
 
 ## Active jobs
 
