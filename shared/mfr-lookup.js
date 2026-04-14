@@ -199,7 +199,7 @@ function queryDB(mfrName) {
     // Parse through rbash noise
     const lines = result.split('\n').filter(l => {
       const t = l.trim();
-      return t && !t.includes('rbash') && !t.includes('bashrc') && !t.includes('/dev/null') && !t.includes('restricted:') && !t.includes('/tmp/claude');
+      return t && !t.includes('rbash') && !t.includes('bashrc') && !t.includes('/dev/null') && !t.includes('restricted:') && !t.includes('/tmp/claude') && !t.startsWith('Password for') && !t.includes('fe_sendauth') && !t.includes('psql:');
     });
     if (lines.length > 0) {
       const parts = lines[0].trim().split('|');
@@ -207,8 +207,12 @@ function queryDB(mfrName) {
         const clientId = parts.length >= 3 ? parseInt(parts[2], 10) : null;
         return { id: parseInt(parts[0], 10), name: parts[1], isSystem: clientId === 0 };
       }
-      // Fallback: single column (shouldn't happen but be safe)
-      return { id: null, name: parts[0], isSystem: false };
+      // No fallback for single-column rows — if the SQL is `SELECT id|name|client`
+      // and we got a row without pipes, it's not a real result. Could be an
+      // error message, prompt, or noise that slipped past the filter. Return
+      // null rather than treat the noise as a valid MFR name (caused the
+      // 2026-04-14 incident where 1,500+ VQ rows had MFR text =
+      // "Password for user analytics_user:" from a psql auth prompt).
     }
   } catch (e) {
     // Re-throw infrastructure errors so callers see them as broken-lookup,

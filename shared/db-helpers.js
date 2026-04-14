@@ -87,7 +87,8 @@ function psqlQuery(sql, timeout = 15000) {
       const t = l.trim();
       return t && !t.includes('rbash') && !t.includes('bashrc') &&
              !t.includes('/dev/null') && !t.includes('restricted:') &&
-             !t.includes('/tmp/claude');
+             !t.includes('/tmp/claude') &&
+             !t.startsWith('Password for') && !t.includes('fe_sendauth') && !t.includes('psql:');
     });
     return lines.join('\n').trim();
   } catch (e) {
@@ -106,7 +107,8 @@ function psqlQuery(sql, timeout = 15000) {
       const t = l.trim();
       return t && !t.includes('rbash') && !t.includes('bashrc') &&
              !t.includes('/dev/null') && !t.includes('restricted:') &&
-             !t.includes('/tmp/claude') && !t.includes('ERROR:');
+             !t.includes('/tmp/claude') && !t.includes('ERROR:') &&
+             !t.startsWith('Password for') && !t.includes('fe_sendauth') && !t.includes('psql:');
     });
     return lines.join('\n').trim();
   }
