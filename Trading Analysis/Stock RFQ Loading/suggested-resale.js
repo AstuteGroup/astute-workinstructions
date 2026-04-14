@@ -501,6 +501,20 @@ async function main() {
   const uniqueMpns = [...new Set(lines.map(l => l.mpn))];
   console.log(`Unique MPNs: ${uniqueMpns.length}\n`);
 
+  // J5 pause — Stock RFQ suggested-resale is foreground (user waiting on pricing
+  // for a quote). Claim pause for small batches; large batches run alongside.
+  const apiPause = require('../../shared/api-pause');
+  let pauseClaimed = false;
+  let pauseRefreshTimer = null;
+  if (apiPause.shouldPause(uniqueMpns.length)) {
+    apiPause.claimPause('stock-rfq-suggested-resale', uniqueMpns.length);
+    pauseClaimed = true;
+    pauseRefreshTimer = setInterval(() => apiPause.refreshPause(), 5 * 60 * 1000);
+    console.log(`[pause] claimed (${uniqueMpns.length} MPNs < 100, TTL 10m) — enricher will yield\n`);
+  } else {
+    console.log(`[pause] skipped (${uniqueMpns.length} MPNs ≥ 100) — running alongside enricher\n`);
+  }
+
   // Collect data for each MPN
   const mpnData = {};
   const allVqLines = []; // VQ capture from ALL API results
@@ -658,6 +672,15 @@ async function main() {
   }
 
   console.log('\n' + '='.repeat(80));
+
+  // Release pause claim if we made one
+  if (pauseClaimed) {
+    try {
+      clearInterval(pauseRefreshTimer);
+      apiPause.releasePause();
+      console.log('[pause] released');
+    } catch (e) { /* ignore */ }
+  }
 }
 
 main().catch(err => {

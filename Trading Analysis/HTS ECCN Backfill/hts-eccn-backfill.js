@@ -230,6 +230,20 @@ async function main() {
   }
   console.log(`Distinct (mpn, mfr) tuples to query: ${groups.size}\n`);
 
+  // J5 pause — HTS/ECCN Backfill is user-initiated. Claim pause for small
+  // batches; large batches run alongside the enricher (cache helps dedupe).
+  const apiPause = require(path.join(SHARED, 'api-pause'));
+  let pauseClaimed = false;
+  let pauseRefreshTimer = null;
+  if (!opts.dryRun && apiPause.shouldPause(groups.size)) {
+    apiPause.claimPause('hts-eccn-backfill', groups.size);
+    pauseClaimed = true;
+    pauseRefreshTimer = setInterval(() => apiPause.refreshPause(), 5 * 60 * 1000);
+    console.log(`[pause] claimed (${groups.size} tuples < 100, TTL 10m) — enricher will yield\n`);
+  } else if (!opts.dryRun) {
+    console.log(`[pause] skipped (${groups.size} tuples ≥ 100) — running alongside enricher\n`);
+  }
+
   // Step 4: For each group, call DigiKey + Mouser, resolve
   const resolutions = [];
   const disagreements = [];
@@ -383,6 +397,15 @@ async function main() {
   console.log(`\nAudit logs in:         ${LOGS_DIR}`);
   const elapsed = ((Date.now() - startedAt.getTime()) / 1000).toFixed(1);
   console.log(`Elapsed:               ${elapsed}s`);
+
+  // Release pause claim if we made one
+  if (pauseClaimed) {
+    try {
+      clearInterval(pauseRefreshTimer);
+      apiPause.releasePause();
+      console.log('[pause] released');
+    } catch (e) { /* ignore */ }
+  }
 }
 
 main().catch(err => {

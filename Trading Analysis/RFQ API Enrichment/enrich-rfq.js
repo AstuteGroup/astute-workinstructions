@@ -451,6 +451,29 @@ async function enrichRFQ(rfqDocNumber, opts = {}) {
 }
 
 // ─── CLI ─────────────────────────────────────────────────────────────────────
+
+// Probe an RFQ's MPN count — used to decide whether to claim the pause file.
+// Returns 0 if RFQ not found or query fails (will skip pause).
+async function psqlProbeRfqSize(rfqDocNumber) {
+  const probePool = new (require('pg').Pool)({
+    user: process.env.PGUSER || process.env.USER || 'analytics_user',
+    host: '/var/run/postgresql',
+    database: 'idempiere_replica',
+  });
+  try {
+    const { rows } = await probePool.query(`
+      SELECT COUNT(rlm.chuboe_rfq_line_mpn_id)::int AS n
+      FROM adempiere.chuboe_rfq r
+      LEFT JOIN adempiere.chuboe_rfq_line rl ON rl.chuboe_rfq_id = r.chuboe_rfq_id AND rl.isactive='Y'
+      LEFT JOIN adempiere.chuboe_rfq_line_mpn rlm ON rlm.chuboe_rfq_line_id = rl.chuboe_rfq_line_id AND rlm.isactive='Y'
+      WHERE r.value = $1 AND r.isactive='Y'
+    `, [String(rfqDocNumber)]);
+    return rows[0]?.n || 0;
+  } finally {
+    await probePool.end();
+  }
+}
+
 async function main() {
   const argv = process.argv.slice(2);
   const getArg = (flag) => {
@@ -477,6 +500,29 @@ async function main() {
   };
 
   console.log(`\nEnriching RFQ ${rfq}${opts.dryRun ? ' (DRY RUN)' : ''}${opts.force ? ' (FORCE — cache bypassed)' : ''}${opts.maxLines ? ` (max ${opts.maxLines} lines)` : ''}\n`);
+
+  // J5 pause — CLI invocations are user-initiated (foreground). For small RFQs
+  // claim the pause so the background enricher yields; for large RFQs run
+  // alongside (cache hits dedupe most competition). Size-gated via shouldPause().
+  // Probe the RFQ size before enriching so we know which mode.
+  let pauseRefreshTimer = null;
+  let pauseClaimed = false;
+  if (!opts.dryRun) {
+    try {
+      const apiPause = require('../../shared/api-pause');
+      const sizeProbe = await psqlProbeRfqSize(rfq);
+      if (apiPause.shouldPause(sizeProbe)) {
+        apiPause.claimPause('enrich-rfq-cli', sizeProbe);
+        pauseClaimed = true;
+        pauseRefreshTimer = setInterval(() => apiPause.refreshPause(), 5 * 60 * 1000);
+        console.log(`[pause] claimed (${sizeProbe} MPNs < 100, TTL 10m) — background enricher will yield`);
+      } else {
+        console.log(`[pause] skipped (${sizeProbe} MPNs ≥ 100) — running alongside enricher`);
+      }
+    } catch (e) {
+      console.log(`[pause] probe failed: ${e.message} — running without pause`);
+    }
+  }
 
   try {
     const summary = await enrichRFQ(rfq, opts);
@@ -539,6 +585,14 @@ async function main() {
     console.log(`Duration:     ${(summary.durationMs / 1000).toFixed(1)}s`);
   } finally {
     await pool.end();
+    // Release pause claim (if we made one)
+    if (pauseClaimed) {
+      try {
+        clearInterval(pauseRefreshTimer);
+        require('../../shared/api-pause').releasePause();
+        console.log('[pause] released');
+      } catch (e) { /* ignore */ }
+    }
   }
 }
 
