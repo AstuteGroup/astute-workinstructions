@@ -36,7 +36,7 @@ require('dotenv').config({ path: path.resolve(__dirname, '../../../.env') });
 const { Pool } = require('pg');
 const nodemailer = require('nodemailer');
 const { enrichRFQ } = require('./enrich-rfq');
-const { classifyRegion, assignTier } = require('./rfq-region');
+const { assignPriority, isImmediate, PRIORITY } = require('./rfq-priority');
 const { readQuotaState, isQuotaBlocked, hasAdequateQuota } = require('./rfq-quota-state');
 const { addToBacklog, nextBatch, markAttempted, pruneBacklog, backlogStats } = require('./rfq-backlog');
 
@@ -80,8 +80,9 @@ function writeWatermark(iso) {
 }
 
 /**
- * Select RFQs created after the watermark, including the contact's country
- * for tier classification. Returns newest-last so we process in creation order.
+ * Select RFQs created after the watermark. Returns newest-last so we process
+ * in creation order. Priority is assigned later based on rfq_type + line_mpns
+ * (no region/country — J8 model). Size + type drive dispatch.
  */
 async function findNewRFQs(sinceIso) {
   const { rows } = await pool.query(`
@@ -90,16 +91,10 @@ async function findNewRFQs(sinceIso) {
            r.created,
            bp.name AS customer,
            rt.name AS rfq_type,
-           co.name AS contact_country,
            COUNT(rlm.chuboe_rfq_line_mpn_id) AS line_mpns
     FROM adempiere.chuboe_rfq r
     JOIN adempiere.chuboe_rfq_type rt ON r.chuboe_rfq_type_id = rt.chuboe_rfq_type_id
     LEFT JOIN adempiere.c_bpartner bp ON r.c_bpartner_id = bp.c_bpartner_id
-    LEFT JOIN adempiere.ad_user u ON r.chuboe_user_id = u.ad_user_id
-    LEFT JOIN adempiere.c_bpartner_location bpl
-           ON u.c_bpartner_location_id = bpl.c_bpartner_location_id
-    LEFT JOIN adempiere.c_location loc ON bpl.c_location_id = loc.c_location_id
-    LEFT JOIN adempiere.c_country co ON loc.c_country_id = co.c_country_id
     LEFT JOIN adempiere.chuboe_rfq_line rl
            ON rl.chuboe_rfq_id = r.chuboe_rfq_id AND rl.isactive='Y'
     LEFT JOIN adempiere.chuboe_rfq_line_mpn rlm
@@ -109,7 +104,7 @@ async function findNewRFQs(sinceIso) {
           AND rlm.chuboe_mpn_clean <> ''
     WHERE r.isactive='Y'
       AND r.created > $1
-    GROUP BY r.value, r.chuboe_rfq_id, r.created, bp.name, rt.name, co.name
+    GROUP BY r.value, r.chuboe_rfq_id, r.created, bp.name, rt.name
     HAVING COUNT(rlm.chuboe_rfq_line_mpn_id) > 0
     ORDER BY r.created ASC
   `, [sinceIso]);
@@ -131,11 +126,11 @@ function renderSummaryHtml(batchResults, sinceIso, untilIso, backlog, quotaState
   const totalDurationSec = batchResults.reduce((s, r) => s + ((r.durationMs || 0) / 1000), 0);
   const cacheHitPct = totalLines > 0 ? Math.round(100 * totalCacheHits / totalLines) : 0;
 
-  // Tier breakdown
-  const tierCounts = { 1: 0, 2: 0, 3: 0, 4: 0, '4B': 0 };
+  // Priority breakdown
+  const priorityCounts = { P1: 0, P2: 0, P3: 0, P3B: 0 };
   for (const r of batchResults) {
-    if (r._fromBacklog) tierCounts['4B']++;
-    else tierCounts[r._tier || 1]++;
+    if (r._fromBacklog) priorityCounts.P3B++;
+    else priorityCounts[r._priority || 'P1']++;
   }
 
   // Anomaly warnings
@@ -152,7 +147,7 @@ function renderSummaryHtml(batchResults, sinceIso, untilIso, backlog, quotaState
   `;
 
   const rows = batchResults.map(r => {
-    const tierLabel = r._fromBacklog ? 'T4(B)' : `T${r._tier || '?'}`;
+    const tierLabel = r._fromBacklog ? 'P3(B)' : (r._priority || '?');
     // "Distributors touched" — how many distinct distributors we actually called
     // for this RFQ. Cache hits don't count. 0 = we skipped APIs entirely
     // (all-cache run or run aborted). 7 = we exercised the full distributor set.
@@ -222,7 +217,7 @@ function renderSummaryHtml(batchResults, sinceIso, untilIso, backlog, quotaState
     <table border="1" cellpadding="6" cellspacing="0" style="border-collapse:collapse">
       <tr style="background:#f0f0f0"><th colspan="2">Totals</th></tr>
       <tr><td>RFQs processed</td><td style="text-align:right">${totalRfqs}</td></tr>
-      <tr><td>Tiers</td><td style="text-align:right">T1:${tierCounts[1]} T2:${tierCounts[2]} T3:${tierCounts[3]} T4:${tierCounts[4]} T4(backlog):${tierCounts['4B']}</td></tr>
+      <tr><td>Priorities</td><td style="text-align:right">P1(express):${priorityCounts.P1} P2(main):${priorityCounts.P2} P3(backlog-new):${priorityCounts.P3} P3(backlog-drain):${priorityCounts.P3B}</td></tr>
       <tr><td>Line-MPNs</td><td style="text-align:right">${totalLines.toLocaleString()}</td></tr>
       <tr><td>Live API calls</td><td style="text-align:right">${totalApiCalls.toLocaleString()}</td></tr>
       <tr><td>Cache hits</td><td style="text-align:right">${totalCacheHits.toLocaleString()} (${cacheHitPct}%)</td></tr>
@@ -303,28 +298,37 @@ async function main() {
     process.exit(1);
   }
 
-  // Phase 1: Classify new RFQs into tiers
+  // Phase 1: Assign priority (P1 Express / P2 Main / P3 Backlog) based on
+  // size + type. Region is no longer a signal — Astute operates 24/7 across
+  // Mexico, Texas, China, India, Singapore, South Korea so there are no true
+  // "off hours" to defer to. See Section J8 of trading-analysis-roadmap.md.
   for (const r of newRFQs) {
-    r.region = classifyRegion(r.contact_country);
-    r.tier = assignTier(r.rfq_type, r.region);
+    r.priority = assignPriority(r.rfq_type, r.line_mpns);
   }
 
-  const immediate = newRFQs.filter(r => r.tier <= 3);
-  const tier4New = newRFQs.filter(r => r.tier === 4);
+  // Sort immediate work so P1 (express) runs before P2 (main), FIFO within tier
+  const immediate = newRFQs
+    .filter(r => isImmediate(r.priority))
+    .sort((a, b) => {
+      if (a.priority !== b.priority) return a.priority.localeCompare(b.priority);
+      return new Date(a.created) - new Date(b.created);
+    });
+  const backlogNew = newRFQs.filter(r => r.priority === PRIORITY.BACKLOG);
 
   if (newRFQs.length > 0) {
-    log(`Found ${newRFQs.length} new RFQ(s): T1-3=${immediate.length}, T4=${tier4New.length}`);
+    const pCounts = newRFQs.reduce((acc, r) => { acc[r.priority] = (acc[r.priority] || 0) + 1; return acc; }, {});
+    log(`Found ${newRFQs.length} new RFQ(s): P1=${pCounts.P1 || 0}, P2=${pCounts.P2 || 0}, P3=${pCounts.P3 || 0}`);
     for (const r of newRFQs) {
-      log(`  ${r.rfq_number} — ${r.customer || '?'} (${r.rfq_type}) T${r.tier} [${r.region}] — ${r.line_mpns} MPNs`);
+      log(`  ${r.rfq_number} — ${r.customer || '?'} (${r.rfq_type}) ${r.priority} — ${r.line_mpns} MPNs`);
     }
   } else {
     log('No new RFQs.');
   }
 
   // Phase 2: Queue new Tier 4 to backlog
-  if (tier4New.length > 0) {
-    const added = addToBacklog(tier4New);
-    log(`Queued ${added} new Tier 4 RFQ(s) to backlog`);
+  if (backlogNew.length > 0) {
+    const added = addToBacklog(backlogNew);
+    log(`Queued ${added} new P3 RFQ(s) to backlog`);
   }
 
   if (DRY_RUN) {
@@ -337,17 +341,17 @@ async function main() {
   // Phase 3: Process Tier 1-3 immediately
   const batchResults = [];
   for (const r of immediate) {
-    log(`Enriching ${r.rfq_number} (${r.rfq_type} T${r.tier} [${r.region}], ${r.line_mpns} MPNs)...`);
+    log(`Enriching ${r.rfq_number} (${r.rfq_type} ${r.priority}, ${r.line_mpns} MPNs)...`);
     try {
       const result = await enrichRFQ(String(r.rfq_number));
-      result._tier = r.tier;
+      result._priority = r.priority;
       batchResults.push(result);
       log(`  done: ${result.apiCalls} API, ${result.cacheHits} cache, ${result.vqsWritten} VQs, ${result.errors?.length || 0} err`);
     } catch (err) {
       log(`  ERROR: ${err.message}`);
       batchResults.push({
         rfq: r.rfq_number, customer: r.customer, rfqType: r.rfq_type,
-        _tier: r.tier, error: err.message,
+        _priority: r.priority, error: err.message,
         lines: 0, apiCalls: 0, cacheHits: 0, apiResultRowsWritten: 0,
         vqsWritten: 0, qtyMatches: 0, partialCoverage: 0, noCoverage: 0,
         errors: [{ stage: 'enrich', message: err.message }], durationMs: 0,
@@ -380,7 +384,7 @@ async function main() {
     log(`  Backlog: enriching ${item.rfq_number} (${item.customer}, ${item.line_mpns} MPNs, queued ${item.queuedAt})...`);
     try {
       const result = await enrichRFQ(String(item.rfq_number));
-      result._tier = 4;
+      result._priority = 'P3';
       result._fromBacklog = true;
       batchResults.push(result);
       markAttempted(item.rfq_number, 'success');
@@ -390,7 +394,7 @@ async function main() {
       markAttempted(item.rfq_number, 'error');
       batchResults.push({
         rfq: item.rfq_number, customer: item.customer, rfqType: item.rfq_type,
-        _tier: 4, _fromBacklog: true, error: err.message,
+        _priority: 'P3', _fromBacklog: true, error: err.message,
         lines: 0, apiCalls: 0, cacheHits: 0, apiResultRowsWritten: 0,
         vqsWritten: 0, qtyMatches: 0, partialCoverage: 0, noCoverage: 0,
         errors: [{ stage: 'enrich', message: err.message }], durationMs: 0,

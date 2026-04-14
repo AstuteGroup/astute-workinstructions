@@ -1,13 +1,20 @@
 /**
- * RFQ Region Classifier + Tier Assignment
+ * RFQ Region Classifier + Tier Assignment — DEPRECATED
  *
- * Pure functions — no DB, no side effects.
- * Used by enrich-poller.js to prioritize API enrichment.
+ * Replaced by `rfq-priority.js` (J8 refactor, 2026-04-14).
  *
- * Tier 1: Non-PPV (Shortage, EOL/LTB, Stock, etc.) — all regions
- * Tier 2: PPV + APAC/EMEA contact
- * Tier 3: PPV + MX contact
- * Tier 4: PPV + US/CA contact (or unknown)
+ * The old tier model assumed "US is sleeping, prioritize regions that are in
+ * their workday." That premise doesn't hold for Astute's 24/7 footprint
+ * (Mexico + Texas core commercial + China + India + Singapore + South Korea).
+ * Region-based tiering is no longer a useful urgency signal.
+ *
+ * The new model in rfq-priority.js uses demand signals:
+ *   P1 Express — any RFQ < 100 MPNs (any type)
+ *   P2 Main    — non-PPV ≥ 100 MPNs (Shortage, EOL, 3PL/VMI, Hot Parts, Stock)
+ *   P3 Backlog — PPV ≥ 100 MPNs, Proactive Offer, etc.
+ *
+ * This file is retained only for historical reference. Do not import.
+ * Old tier numbering (T1-T4) → new priority codes (P1-P3).
  */
 
 const REGION = { APAC: 'APAC', EMEA: 'EMEA', MX: 'MX', US_CA: 'US_CA', UNKNOWN: 'UNKNOWN' };
