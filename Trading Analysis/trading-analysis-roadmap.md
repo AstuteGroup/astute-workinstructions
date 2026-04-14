@@ -990,6 +990,7 @@ Worth a design conversation before building.
 | J5 | Pause-file coordination — foreground workflows yield enricher | **Next** | Planned |
 | J6 | Refactor RFQ Sourcing/franchise screening to downstream consumer | Later | Planned |
 | J7 | Market Offer Analysis tier hierarchy (always below RFQs) | Later | Planned |
+| J8 | Refactor enricher tier logic — express/main lanes, drop region | **Next** | Planned |
 
 ---
 
@@ -1179,6 +1180,84 @@ Worth a design conversation before building.
 All MO tiers drain only AFTER all RFQ tiers are clear (or run with reduced concurrency). Could share the same backlog file format with a `category: 'rfq' | 'offer'` field.
 
 **Effort:** Medium — depends on whether we share the RFQ backlog or build a parallel one.
+
+---
+
+## J8. Refactor Enricher Tier Logic — Express/Main Lanes, Drop Region
+
+**Status:** Planned | **Priority:** Next
+
+**Problem:** The current tier logic (see `Trading Analysis/RFQ API Enrichment/rfq-region.js`) is region-based:
+- T1: Non-PPV any region → immediate
+- T2: PPV + APAC/EMEA → immediate
+- T3: PPV + MX → immediate
+- T4: PPV + US/CA → backlog
+
+The premise was "prioritize regions that are in their workday." But Astute's team footprint is effectively 24/7:
+- Mexico + Texas (core commercial team) cover US hours
+- China + India + Singapore + South Korea cover nights
+- There are no true "off hours" to defer to
+
+A 4K-line PPV from Mexico and a 4K-line PPV from Texas should be treated identically. Region is not a useful urgency signal.
+
+**Solution:** Two-lane, four-priority model driven by demand signals, not geography.
+
+### Priority Model
+
+| Lane | Priority | Trigger |
+|------|----------|---------|
+| **Express** | P1 | Any RFQ < 100 MPNs (any type) |
+| **Main** | P2 | Non-PPV any size ≥ 100 (Shortage, EOL/LTB, 3PL/VMI, Hot Parts, Stock) |
+|  | P3 | PPV with close date within 7 days |
+|  | P4 — backlog | Large PPV without deadline, Proactive Offer, etc. |
+
+### Dispatch Rules
+
+1. **Express lane always drains first.** Small RFQs (< 100 MPNs) finish in seconds. A 10-line RFQ of any type never waits behind a 5,000-line anything. This matches the "user is waiting on a quick answer" signal.
+2. **Within main lane, type + deadline decide order.** Large Shortage > Large PPV with deadline > Large PPV without deadline.
+3. **Tiebreak by enqueue time (FIFO).** Two P1 RFQs that land simultaneously drain in arrival order.
+4. **Backlog (P4) drains rolling across ticks**, respecting the J5 pause file.
+
+### Signal Hierarchy
+
+1. **Size class** (express vs main) — "is someone waiting for a fast answer?"
+2. **Type** (non-PPV > PPV with deadline > PPV without)
+3. **Deadline** (tiebreaker within PPV)
+4. **Enqueue time** (FIFO fairness)
+
+### Scenarios
+
+| Scenario | Order |
+|----------|-------|
+| 10-line PPV + 5K-line Shortage land together | PPV first (express), then Shortage |
+| 5K-line Shortage + 5K-line PPV land together | Shortage first (type wins among larges) |
+| 5K-line PPV with 3-day close + 5K-line PPV no deadline | Close-date PPV first (deadline wins) |
+| Three 50-line RFQs of any type | FIFO order |
+
+### Implementation
+
+- **`rfq-region.js` → rename to `rfq-priority.js`** — region classification removed, replaced with priority assignment based on size/type/deadline.
+- **`assignTier()` returns P1/P2/P3/P4** instead of T1/T2/T3/T4.
+- **`chuboe_rfq` deadline field** — need to identify the right column. Candidates: `datepromised`, `daterequired`, or a custom close-date field. Requires a small schema investigation before coding.
+- **Backlog file** — already supports priority ordering (`rfq-backlog.js`); may need schema tweak for the new priority values.
+- **Email summary** — update tier column to show P1/P2/P3/P4 instead of T1-T4.
+
+### What We Keep from the Current Model
+
+- **TTL cache gating** (PPV/Astute Franchised 30d, others 7d) stays as-is
+- **Backlog drain with cache-first approach** stays as-is
+- **Distributor health tracking** (from J5 fix) stays as-is
+- **Pause-file yield** (J5) stays as-is
+
+### Effort
+
+- Rename + rewrite `rfq-region.js` → `rfq-priority.js`
+- Update `enrich-poller.js` references (tier labels, log lines, email summary)
+- Identify deadline column on `chuboe_rfq`
+- Update memory: `feedback_enricher_tier_logic.md` capturing the rationale
+- Smoke test with existing backlog to verify ordering
+
+Low-risk refactor — the underlying enrichment mechanics don't change, only the dispatch order.
 
 ---
 
