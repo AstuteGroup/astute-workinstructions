@@ -229,12 +229,26 @@ function synthesizeStockLtVqLines(result, mpn, qty, config) {
   // Lead-time row — only when stock can't fully cover the RFQ qty
   // (otherwise the stock row already serves the demand and a separate LT row
   // is just noise). For stockQty=0 + leadTime, this is the only row.
+  //
+  // MOQ enforcement: factory-order parts often have a MOQ much larger than the
+  // RFQ qty (e.g. Mouser QII-0.006-00-61 → MOQ 9,217 against a 100-pc RFQ).
+  // The synthesized line's `qty` is the ACTUAL commit qty (max of remaining
+  // demand and MOQ), and `vendorNotes` carries a loud ⚠ MOQ warning so no
+  // downstream report can render the line as if the RFQ qty were buyable.
   if (hasLeadTime && stockQty < qty) {
-    const ltPrice = priceAtQty(breaks, qty)
+    const moq = Number(result.vqMoq) || 1;
+    const remainingDemand = Math.max(qty - stockQty, 1);
+    const ltBuyQty = Math.max(remainingDemand, moq);
+    const ltPrice = priceAtQty(breaks, ltBuyQty)
       || result.franchiseRfqPrice
       || result.vqPrice
       || result.franchisePrice;
     if (ltPrice != null && ltPrice > 0) {
+      let notes = result.vqVendorNotes || '';
+      if (moq > remainingDemand) {
+        const warn = `⚠ MOQ ${moq.toLocaleString()} (RFQ ${qty.toLocaleString()})`;
+        notes = notes ? `${warn} | ${notes}` : warn;
+      }
       lines.push({
         vendorBP: config.bpValue,
         vendorName: config.bpName,
@@ -242,13 +256,13 @@ function synthesizeStockLtVqLines(result, mpn, qty, config) {
         mpn: result.vqMpn || mpn,
         manufacturer: result.vqManufacturer || '',
         description: result.vqDescription || '',
-        qty: qty,                 // full RFQ qty deliverable on lead time
+        qty: ltBuyQty,            // actual commit qty (honors MOQ)
         cost: ltPrice,
         moq: result.vqMoq || null,
         spq: result.vqSpq || null,
         dateCode: result.vqDateCode || null,
         leadTime: String(leadTime),
-        vendorNotes: result.vqVendorNotes || '',
+        vendorNotes: notes,
         priceBreaks: breaks,
       });
     }
@@ -261,7 +275,7 @@ function synthesizeStockLtVqLines(result, mpn, qty, config) {
  * Call a single distributor API
  * Each script exports searchPart(mpn, qty) → result object
  */
-async function searchPart(distributor, mpn, qty) {
+async function searchPart(distributor, mpn, qty, opts = {}) {
   const config = DISTRIBUTORS[distributor];
   if (!config || !config.active) {
     return { distributor, name: config?.name || distributor, found: false, error: 'Not configured or inactive' };
@@ -269,7 +283,10 @@ async function searchPart(distributor, mpn, qty) {
 
   try {
     const mod = require(config.script);
-    const result = await mod.searchPart(mpn, qty);
+    // opts.mfr — searched MFR — enables the MPN-match MFR veto (rejects
+    // candidates whose MFR is MISMATCH per shared/mfr-equivalence). Optional;
+    // existing call sites that don't pass it get the old behavior (no veto).
+    const result = await mod.searchPart(mpn, qty, opts);
 
     return {
       distributor,
@@ -278,6 +295,10 @@ async function searchPart(distributor, mpn, qty) {
       bpName: config.bpName,
       bpId: config.bpId,
       found: result.found || false,
+      // 'exact' = MPN normalized-equal to searched, 'variant' = packaging-suffix
+      // prefix relationship (e.g., LM358N ↔ LM358N/NOPB), null = no MPN match
+      // attempted (legacy parsers that haven't been retrofitted yet)
+      matchType: result.matchType || null,
       franchiseQty: result.franchiseQty || 0,
       franchisePrice: result.franchisePrice || null,       // unit price (qty=1)
       franchiseBulkPrice: result.franchiseBulkPrice || null, // lowest price break
@@ -498,7 +519,12 @@ function envelopeToResult(envelope, mpn, qty) {
  * summary includes { fromCache: true, cacheAgeDays }.
  */
 async function searchAllDistributors(mpn, qty, options = {}) {
-  const { parallel = true, exclude = [], onResult = null, cacheTTL = null, cacheBypassIf = null } = options;
+  const { parallel = true, exclude = [], onResult = null, cacheTTL = null, cacheBypassIf = null, mfr = null } = options;
+  // `mfr` — the searched MFR (typically the RFQ's MFR text). When provided,
+  // each distributor's parser applies the MFR veto via shared/mpn-match.js,
+  // rejecting candidates whose MFR resolves to MISMATCH. Opt-in — existing
+  // callers that don't pass mfr get the old behavior (MPN match only, no veto).
+  const perCallOpts = mfr ? { mfr } : {};
 
   // ── Cache gate ───────────────────────────────────────────────────────────
   // If caller supplied a cacheTTL, consult getFreshness() first. On a hit we
@@ -526,7 +552,7 @@ async function searchAllDistributors(mpn, qty, options = {}) {
     // Run all APIs concurrently
     results = await Promise.all(
       activeDistributors.map(async (d) => {
-        const result = await searchPart(d, mpn, qty);
+        const result = await searchPart(d, mpn, qty, perCallOpts);
         if (onResult) onResult(result); // callback for progress reporting
         return result;
       })
@@ -535,7 +561,7 @@ async function searchAllDistributors(mpn, qty, options = {}) {
     // Sequential (for rate-limit-sensitive scenarios)
     results = [];
     for (const d of activeDistributors) {
-      const result = await searchPart(d, mpn, qty);
+      const result = await searchPart(d, mpn, qty, perCallOpts);
       if (onResult) onResult(result);
       results.push(result);
     }

@@ -270,6 +270,22 @@ node future.js LM317 100 contains  # search variants
 }
 ```
 
+**⚠ KNOWN GAP — Non-stock MOQ/SPQ extraction (2026-04-14):**
+Future parser returns price + LT on non-stocked/factory-order items but leaves `stock`, `moq`, and `spq` empty. Same pattern as Mouser (see Mouser section above). Confirmed on:
+- `RNCF0805TKT10K0` — Future $0.605 (13 wks) — no MOQ/stock extracted
+- `RNCF0805TTT10K0` — Future $0.587 (13 wks) — no MOQ/stock extracted
+- `TNPW1206198RBEEA` — Future $0.143 (8 wks) — no MOQ
+
+**Hypothesis:** Factory-order qty info lives in `quantities` object (likely `minimum_order_quantity` / `order_multiple` / similar) that the extractor doesn't pull when `quantity_available=0`. Check:
+1. Raw Future response for non-stock MPN vs stocked MPN
+2. Identify factory-order MOQ/SPQ fields in `quantities` object
+3. Update `future.js` to extract them
+4. Add defensive warning if price returned without MOQ on non-stock items
+
+**Impact:** Can't compare MOQs across vendors when only one (Master) returns it. Buyers can't make informed decisions on factory-order MOQ overage.
+
+**Code:** `Trading Analysis/RFQ Sourcing/franchise_check/future.js`
+
 ---
 
 ### Newark / Farnell / element14 API (Unified)
@@ -621,6 +637,40 @@ node mouser.js C0805 100 --partial
 - API key goes in query string, not header.
 - Mouser has Cart and Order APIs too (27 endpoints total) — not used yet but available for future procurement automation.
 
+**✅ RESOLVED 2026-04-14 — Factory-order MOQ now flagged in synthesized LT lines:**
+Original report was that Mouser/Future returned "viable" lines for parts whose MOQ greatly exceeds the RFQ qty. Probe of raw API responses showed the parsers were already extracting `vqMoq`, `vqLeadTime`, and price breaks correctly — the actual gap was in `shared/franchise-api.js → synthesizeStockLtVqLines`, which built the lead-time row using `qty: rfqQty` and ignored MOQ. So a 100-pc RFQ on `QII-0.006-00-61` (Mouser MOQ 9,217) was rendered as a viable "100 @ $0.082" line.
+
+**Fix:** synthesizer now sets `qty = max(rfqDemand, vqMoq)`, re-prices at that buy qty (often unlocks a deeper tier), and prepends `⚠ MOQ N (RFQ q)` to `vendorNotes` when MOQ forces over-buy. Lives in shared, so applies to **every** consumer of `vqLines` (Mouser, Future, DigiKey, TTI, Master, etc.) — not LAM-specific.
+
+**Verified:**
+- `QII-0.006-00-61` @ qty 100 → `qty: 9217, cost: $0.082, vendorNotes: "⚠ MOQ 9,217 (RFQ 100) | …"`
+- `K202XHT-E9S-N` @ qty 100 (MOQ 1) → `qty: 100, cost: $3.07, vendorNotes: "LT: 175 Days | Mfr: Kycon"` (no warning, picks right price tier)
+
+**Separate observation — `XEL6060-821MEC` API genuinely returns `RestrictionMessage: "Not available for purchase by distributors."`** This isn't a parser bug; the API key sees a distributor-restricted view. If the Mouser web page shows it as buyable, that's a region/account difference worth investigating separately before treating as a fixable gap.
+
+**✅ RESOLVED 2026-04-14 — Wrong-match fallback ("recommendation as result") killed across all parsers:**
+Every active parser had the same antipattern: when the searched MPN didn't match any candidate, fall back to `products[0]` (the first thing the distributor's keyword search returned, often a "you might also like" recommendation). Then populate `vqMpn`, `vqManufacturer`, `vqPrice` etc. from that wrong part as if it were the searched MPN. Confirmed empirically in `EPG_Comprehensive_Sourcing_20260402.xlsx`: Newark/Farnell quoted $0.018/43,650 stk for `500-231` from MFR "COMPUTER COMPONENTS,INC" (a totally different part), while DigiKey on the same row correctly identified it as Yageo at $0.27292.
+
+**Fix:** new `shared/mpn-match.js` helper:
+- `mpnMatch(searched, candidate, opts)` returns `'exact'` (normalized equal), `'variant'` (one side prefix-contains the other, both ≥5 chars — catches packaging suffixes like `LM358N`/`LM358N/NOPB`, `CRCW0402-T/R`/`CRCW0402` without enumerating per-distributor suffix lists), or `null`
+- `pickBestCandidate()` filters to MPN-matching candidates only, ranks by exact > variant then by stock, returns `null` if none — parsers fail closed instead of falling back
+- Optional MFR veto via `opts.mfr`: rejects candidates where `computeMfrMatch(rfqMfr, candidateMfr) === 'MISMATCH'`. Uses existing acquisition + alias resolution from `shared/mfr-equivalence.js` so legit relabels (Linear → ADI, TI → Texas Instruments, Stackpole independent of Vishay, etc.) don't false-veto
+
+All 10 active parsers patched: `digikey.js`, `arrow.js`, `rutronik.js`, `future.js`, `newark.js`, `tti.js`, `mouser.js`, `master.js`, `waldom.js`, `sager.js`. `searchPart()` signatures extended to `(mpn, qty, opts)` with the third arg backwards-compat. `shared/franchise-api.js` plumbs `opts.mfr` through and surfaces `result.matchType`.
+
+**Bonus bugs surfaced during the audit:**
+- **TTI** was matching against `ttiPartNumber` (TTI's internal SKU like `TTI-LM358N`), not `manufacturerPartNumber` (the real MPN). So exact-MPN tier almost never hit and parser fell straight to "any with stock" — silently wrong-matching for years. Now uses `manufacturerPartNumber || ttiPartNumber`.
+- **Sager** never attempted MPN matching at all — just picked the highest-stock product from whatever Sager's keyword search returned. Now uses the same matcher as everyone else.
+
+**Verified:**
+- `LM358N` ↔ `LM358N/NOPB` → variant match (no false negative on packaging suffixes)
+- `500-231` vs `RC0805FR-07330RL` → null (no false positive on unrelated parts)
+- `LM78` vs `LM7805` → null (MIN_LEN floor blocks too-short prefix matches)
+- `LM6172` Linear vs ADI → exact (acquisition resolved)
+- `LM358N` TI vs Yageo → null (MFR veto fires)
+
+**MFR veto is opt-in.** Existing call sites that don't pass `opts.mfr` get the old behavior minus the wrong-match fallback. To activate the MFR layer, sourcing call sites (LAM EPG, RFQ enrichment, Vortex Matches, etc.) need to pass `{ mfr: rfqMfr }` when calling `searchPart`. Roadmap candidate.
+
 ---
 
 ### Master Electronics API (Active)
@@ -820,15 +870,24 @@ node master.js LM317 100 --in-stock   # in-stock only
 
 ---
 
-### Heilind Electronics (No Public API)
+### Heilind Electronics (Pursuing EDI Feed)
 
 **iDempiere Vendor:**
 - BP ID: `1000351`
 - Name: `Heilind Electronics`
 
-**Note:** Major interconnect/electromech distributor (connectors, relays, sensors). No public API or developer portal found. May offer EDI for large accounts. Site protected by WAF (Incapsula/Imperva).
+**Note:** Major interconnect/electromech distributor (connectors, relays, sensors). No public REST API or developer portal. Strong on TE, Molex, Amphenol — overlap with existing API coverage should be measured before further investment.
 
-**Status:** No API available. Monitor for future availability.
+**Scraping recon (2026-04-14):** estore.heilind.com is protected by Imperva/Incapsula WAF. Login form POSTs to `/api/` with hidden action key; submit handler is jQuery-bound. Headless Chromium triggers WAF tarpit (200 OK with empty body, no session cookie issued). Catalog search powered by Coveo; CAD models by SamacSys (`componentsearchengine.com`) — both **public-only**, neither exposes account-tier pricing or committed inventory. Stealth-plugin + residential-proxy approach is technically feasible (~85% success) but high-maintenance and breaks whenever Imperva updates rules. Manual cookie bootstrap lasts only 24-72h — not viable as long-term automation. **Decision:** scraping is not a durable path for login-gated data.
+
+**Active path — EDI 832 / 846 feeds (Jake, 2026-04-14):**
+- Distributors often have EDI price catalog (832) and inventory advice (846) feeds for accounts that ask, even when reps reflexively say "no API"
+- Jake checking with colleagues whether Heilind EDI is already wired up on someone else's setup
+- If yes: extend that feed to our pipeline; if no: rep ask via account team
+
+**Fallback if EDI unavailable:** measure how many Heilind-only MPNs (not covered by TTI/Mouser/DigiKey/Newark/Arrow/Avnet/Master) actually appear in monthly RFQ flow. If <50/mo, manual lookups beat any automated solution. If hundreds, revisit stealth-plus-proxy scraping with eyes open to maintenance cost.
+
+**Status:** Scraping ruled out. Pursuing EDI 832/846 — pending colleague check on existing setup.
 
 ---
 

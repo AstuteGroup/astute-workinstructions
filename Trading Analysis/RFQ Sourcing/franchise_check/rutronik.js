@@ -27,7 +27,7 @@ const RUTRONIK_CONFIG = {
  * @param {number} rfqQty - Customer requested quantity (for price break selection)
  * @returns {Object} Screening and VQ data
  */
-async function searchPart(mpn, rfqQty = 1) {
+async function searchPart(mpn, rfqQty = 1, searchOptions = {}) {
   return new Promise((resolve, reject) => {
     const queryParams = new URLSearchParams({
       searchterm: mpn,
@@ -62,7 +62,7 @@ async function searchPart(mpn, rfqQty = 1) {
             return;
           }
 
-          const result = parseSearchResults(json, mpn, rfqQty);
+          const result = parseSearchResults(json, mpn, rfqQty, searchOptions);
           resolve(result);
         } catch (e) {
           reject(new Error(`Parse error: ${e.message}`));
@@ -78,7 +78,7 @@ async function searchPart(mpn, rfqQty = 1) {
 /**
  * Parse Rutronik search results into screening + VQ format
  */
-function parseSearchResults(parts, searchMpn, rfqQty) {
+function parseSearchResults(parts, searchMpn, rfqQty, searchOptions = {}) {
   const result = {
     searchMpn,
     rfqQty,
@@ -107,22 +107,19 @@ function parseSearchResults(parts, searchMpn, rfqQty) {
     return result;
   }
 
-  // Find best match - prefer exact MPN match
-  const normalizedSearch = normalizeMpn(searchMpn);
-  let bestMatch = null;
-
-  for (const part of parts) {
-    const normalizedResult = normalizeMpn(part.mpn);
-    if (normalizedResult === normalizedSearch) {
-      bestMatch = part;
-      break;
-    }
-  }
-
-  // Fall back to first result if no exact match
-  if (!bestMatch) {
-    bestMatch = parts[0];
-  }
+  // Restrict to MPN-matching candidates (exact or packaging-suffix variant).
+  // Never fall back to parts[0] — see shared/mpn-match.js.
+  const { pickBestCandidate } = require('../../../shared/mpn-match');
+  const picked = pickBestCandidate(parts, {
+    getMpn: p => p.mpn,
+    getMfr: p => p.manufacturer,
+    getStock: p => p.stock || p.quantity_available,
+    searched: searchMpn,
+    opts: { mfr: searchOptions?.mfr },
+  });
+  if (!picked) return result;
+  const bestMatch = picked.candidate;
+  result.matchType = picked.matchType;
 
   result.vqMpn = bestMatch.mpn;
   result.vqDescription = bestMatch.description || bestMatch.matchcode || '';

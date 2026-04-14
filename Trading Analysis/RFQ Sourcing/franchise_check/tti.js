@@ -120,7 +120,7 @@ async function searchPart(mpn, rfqQty = 1, options = {}) {
 
   const path = `${TTI_CONFIG.searchPath}?${params.toString()}`;
   const json = await ttiRequest(path, TTI_CONFIG.searchKey);
-  const result = parseSearchResults(json, mpn, rfqQty);
+  const result = parseSearchResults(json, mpn, rfqQty, options);
 
   // Optionally enrich with Lead Time API data (lifecycle, CoO, on-order)
   if (options.enrichLeadTime && result.found) {
@@ -177,7 +177,7 @@ async function searchPart(mpn, rfqQty = 1, options = {}) {
  *   "recordCount": 2
  * }
  */
-function parseSearchResults(apiResponse, searchMpn, rfqQty) {
+function parseSearchResults(apiResponse, searchMpn, rfqQty, searchOptions = {}) {
   const result = {
     searchMpn,
     rfqQty,
@@ -215,39 +215,22 @@ function parseSearchResults(apiResponse, searchMpn, rfqQty) {
   if (parts.length === 0) return result;
 
   result.matchCount = parts.length;
-  const normalizedSearch = normalizeMpn(searchMpn);
 
-  // Find best match: exact MPN with highest stock
-  let bestMatch = null;
-
-  // First: exact match with stock
-  const exactWithStock = parts.filter(p =>
-    normalizeMpn(p.ttiPartNumber) === normalizedSearch &&
-    (p.availableToSell || 0) > 0
-  );
-  if (exactWithStock.length > 0) {
-    exactWithStock.sort((a, b) => (b.availableToSell || 0) - (a.availableToSell || 0));
-    bestMatch = exactWithStock[0];
-  }
-
-  // Second: exact match (no stock requirement)
-  if (!bestMatch) {
-    bestMatch = parts.find(p => normalizeMpn(p.ttiPartNumber) === normalizedSearch);
-  }
-
-  // Third: any match with highest stock
-  if (!bestMatch) {
-    const withStock = parts.filter(p => (p.availableToSell || 0) > 0);
-    if (withStock.length > 0) {
-      withStock.sort((a, b) => (b.availableToSell || 0) - (a.availableToSell || 0));
-      bestMatch = withStock[0];
-    }
-  }
-
-  // Fallback: first result
-  if (!bestMatch) {
-    bestMatch = parts[0];
-  }
+  // Restrict to MPN-matching candidates (exact or packaging-suffix variant).
+  // Match against manufacturerPartNumber (the real MPN), not ttiPartNumber
+  // (TTI's internal SKU, which the prior code was matching by mistake).
+  // Never fall back to parts[0] — see shared/mpn-match.js.
+  const { pickBestCandidate } = require('../../../shared/mpn-match');
+  const picked = pickBestCandidate(parts, {
+    getMpn: p => p.manufacturerPartNumber || p.ttiPartNumber,
+    getMfr: p => p.manufacturer,
+    getStock: p => p.availableToSell,
+    searched: searchMpn,
+    opts: { mfr: searchOptions?.mfr },
+  });
+  if (!picked) return result;
+  const bestMatch = picked.candidate;
+  result.matchType = picked.matchType;
 
   result.found = true;
 

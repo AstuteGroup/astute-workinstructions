@@ -27,7 +27,14 @@ const FUTURE_CONFIG = {
  * @param {string} lookupType - 'exact', 'contains', or 'default' (starts with)
  * @returns {Object} Screening and VQ data
  */
-async function searchPart(mpn, rfqQty = 1, lookupType = 'exact') {
+async function searchPart(mpn, rfqQty = 1, lookupTypeOrOpts = 'exact') {
+  // Backwards-compat: third arg used to be `lookupType` string. Accept either
+  // a string or an options object { lookupType, mfr } so callers can pass the
+  // searched MFR for the MPN-match veto without breaking existing call sites.
+  const searchOptions = (typeof lookupTypeOrOpts === 'object' && lookupTypeOrOpts !== null)
+    ? lookupTypeOrOpts
+    : { lookupType: lookupTypeOrOpts };
+  const lookupType = searchOptions.lookupType || 'exact';
   return new Promise((resolve, reject) => {
     const queryParams = new URLSearchParams({
       part_number: mpn,
@@ -63,7 +70,7 @@ async function searchPart(mpn, rfqQty = 1, lookupType = 'exact') {
             return;
           }
 
-          const result = parseSearchResults(json, mpn, rfqQty);
+          const result = parseSearchResults(json, mpn, rfqQty, searchOptions);
           resolve(result);
         } catch (e) {
           reject(new Error(`Parse error: ${e.message}`));
@@ -79,7 +86,7 @@ async function searchPart(mpn, rfqQty = 1, lookupType = 'exact') {
 /**
  * Parse Future Electronics search results into screening + VQ format
  */
-function parseSearchResults(response, searchMpn, rfqQty) {
+function parseSearchResults(response, searchMpn, rfqQty, searchOptions = {}) {
   const result = {
     searchMpn,
     rfqQty,
@@ -115,50 +122,20 @@ function parseSearchResults(response, searchMpn, rfqQty) {
 
   result.offerCount = offers.length;
 
-  // Find best match - prefer exact MPN match with highest stock
-  const normalizedSearch = normalizeMpn(searchMpn);
-  let bestMatch = null;
-
-  // First pass: exact MPN matches with stock - pick highest stock
-  const exactMatches = offers.filter(o =>
-    normalizeMpn(o.part_id?.mpn || '') === normalizedSearch &&
-    (o.quantities?.quantity_available || 0) > 0
-  );
-
-  if (exactMatches.length > 0) {
-    // Sort by stock descending
-    exactMatches.sort((a, b) =>
-      (b.quantities?.quantity_available || 0) - (a.quantities?.quantity_available || 0)
-    );
-    bestMatch = exactMatches[0];
-  }
-
-  // Second pass: exact MPN match (no stock requirement)
-  if (!bestMatch) {
-    for (const offer of offers) {
-      const offerMpn = offer.part_id?.mpn || '';
-      if (normalizeMpn(offerMpn) === normalizedSearch) {
-        bestMatch = offer;
-        break;
-      }
-    }
-  }
-
-  // Third pass: any offer with highest stock
-  if (!bestMatch) {
-    const withStock = offers.filter(o => (o.quantities?.quantity_available || 0) > 0);
-    if (withStock.length > 0) {
-      withStock.sort((a, b) =>
-        (b.quantities?.quantity_available || 0) - (a.quantities?.quantity_available || 0)
-      );
-      bestMatch = withStock[0];
-    }
-  }
-
-  // Fall back to first result
-  if (!bestMatch) {
-    bestMatch = offers[0];
-  }
+  // Restrict to MPN-matching candidates (exact or packaging-suffix variant).
+  // Never fall back to offers[0] — see shared/mpn-match.js.
+  const { pickBestCandidate } = require('../../../shared/mpn-match');
+  const attrLookup = (attrs, name) => (attrs || []).find(a => a.name === name)?.value;
+  const picked = pickBestCandidate(offers, {
+    getMpn: o => o.part_id?.mpn,
+    getMfr: o => attrLookup(o.part_attributes, 'manufacturerName'),
+    getStock: o => o.quantities?.quantity_available,
+    searched: searchMpn,
+    opts: { mfr: searchOptions?.mfr },
+  });
+  if (!picked) return result;
+  const bestMatch = picked.candidate;
+  result.matchType = picked.matchType;
 
   // Extract part info
   result.vqMpn = bestMatch.part_id?.mpn || '';
@@ -185,10 +162,23 @@ function parseSearchResults(response, searchMpn, rfqQty) {
   const stock = quantities.quantity_available || 0;
   result.franchiseQty = stock;
 
-  // MOQ and SPQ from quantities or attributes
-  const moqVal = quantities.minimum_order_quantity || quantities.moq || parseInt(attrMap['minimumOrderQuantity']) || null;
+  // MOQ and SPQ from quantities or attributes.
+  // Future's actual field names are quantity_minimum + order_mult_qty (verified
+  // against live API 2026-04-14). Other names kept as defensive fallbacks in
+  // case Future's schema varies by API version / part class.
+  const moqVal = quantities.quantity_minimum
+    || quantities.minimum_order_quantity
+    || quantities.moq
+    || parseInt(attrMap['quantity_minimum'])
+    || parseInt(attrMap['purchaseOrderQty'])
+    || parseInt(attrMap['minimumOrderQuantity'])
+    || null;
   result.vqMoq = moqVal && moqVal > 1 ? moqVal : null;
-  result.vqSpq = quantities.order_multiple || quantities.spq || parseInt(attrMap['orderMultiple']) || null;
+  result.vqSpq = quantities.order_mult_qty
+    || quantities.order_multiple
+    || quantities.spq
+    || parseInt(attrMap['orderMultiple'])
+    || null;
 
   // Lead time
   if (quantities.factory_leadtime) {

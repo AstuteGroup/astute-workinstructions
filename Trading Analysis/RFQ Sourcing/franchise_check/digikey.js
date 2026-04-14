@@ -247,7 +247,7 @@ async function checkForSilentThrottle(mpn, rfqQty, result) {
  * @param {number} rfqQty - Customer requested quantity (for price break selection)
  * @returns {Object} Screening and VQ data
  */
-async function searchPart(mpn, rfqQty = 1) {
+async function searchPart(mpn, rfqQty = 1, searchOptions = {}) {
   const result = await _searchPartImpl(mpn, rfqQty, { trackStats: true });
   // Throttle check runs after the result is in hand. Async but we don't
   // need to block the caller — fire and continue. (await is ok here too;
@@ -346,7 +346,7 @@ async function _searchPartImpl(mpn, rfqQty = 1, _opts = {}) {
             return;
           }
 
-          const result = parseSearchResults(json, mpn, rfqQty);
+          const result = parseSearchResults(json, mpn, rfqQty, searchOptions);
           resolve(result);
         } catch (e) {
           reject(new Error(`Parse error: ${e.message}`));
@@ -363,7 +363,7 @@ async function _searchPartImpl(mpn, rfqQty = 1, _opts = {}) {
 /**
  * Parse DigiKey search results into screening + VQ format
  */
-function parseSearchResults(json, searchMpn, rfqQty) {
+function parseSearchResults(json, searchMpn, rfqQty, searchOptions = {}) {
   const result = {
     searchMpn,
     rfqQty,
@@ -395,22 +395,19 @@ function parseSearchResults(json, searchMpn, rfqQty) {
     return result;
   }
 
-  // Find best match - prefer exact MPN match
-  const normalizedSearch = normalizeMpn(searchMpn);
-  let bestMatch = null;
-
-  for (const product of json.Products) {
-    const normalizedResult = normalizeMpn(product.ManufacturerProductNumber);
-    if (normalizedResult === normalizedSearch) {
-      bestMatch = product;
-      break;
-    }
-  }
-
-  // Fall back to first result if no exact match
-  if (!bestMatch) {
-    bestMatch = json.Products[0];
-  }
+  // Restrict to MPN-matching candidates (exact or packaging-suffix variant).
+  // Never fall back to Products[0] — see shared/mpn-match.js.
+  const { pickBestCandidate } = require('../../../shared/mpn-match');
+  const picked = pickBestCandidate(json.Products, {
+    getMpn: p => p.ManufacturerProductNumber,
+    getMfr: p => p.Manufacturer?.Name,
+    getStock: p => p.QuantityAvailable,
+    searched: searchMpn,
+    opts: { mfr: searchOptions?.mfr },
+  });
+  if (!picked) return result;
+  const bestMatch = picked.candidate;
+  result.matchType = picked.matchType;
 
   result.found = true;
   result.vqMpn = bestMatch.ManufacturerProductNumber;

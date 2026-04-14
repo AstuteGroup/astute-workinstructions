@@ -114,7 +114,7 @@ function getPriceAtQty(pricings, qty) {
  * @param {number} rfqQty - Customer requested quantity (for price break selection)
  * @returns {Object} Screening and VQ data (matches franchise-api.js standard interface)
  */
-async function searchPart(mpn, rfqQty = 1) {
+async function searchPart(mpn, rfqQty = 1, searchOptions = {}) {
   const result = {
     searchMpn: mpn,
     rfqQty,
@@ -160,10 +160,22 @@ async function searchPart(mpn, rfqQty = 1) {
   result.matchCount = validProducts.length;
   result.allMatches = validProducts;
 
-  // Pick best match: highest stock
-  const bestMatch = validProducts.reduce((best, p) =>
-    (p.currentStockQty || 0) > (best.currentStockQty || 0) ? p : best
-  , validProducts[0]);
+  // Restrict to MPN-matching candidates (exact or packaging-suffix variant).
+  // PRIOR BUG: this parser did NOT check MPN at all — it just picked the
+  // highest-stock product from whatever Sager's keyword search returned, so
+  // any "you might also like" result was surfaced as if it were the searched
+  // part. See shared/mpn-match.js.
+  const { pickBestCandidate } = require('../../../shared/mpn-match');
+  const picked = pickBestCandidate(validProducts, {
+    getMpn: p => p.manufacturerPartNumber,
+    getMfr: p => p.manufacturerName,
+    getStock: p => p.currentStockQty,
+    searched: mpn,
+    opts: { mfr: searchOptions?.mfr },
+  });
+  if (!picked) return result;
+  const bestMatch = picked.candidate;
+  result.matchType = picked.matchType;
 
   result.found = true;
 

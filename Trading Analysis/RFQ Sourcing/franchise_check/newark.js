@@ -345,11 +345,19 @@ function parseSearchResults(json, searchMpn, rfqQty, storeInfo) {
 
   const products = searchReturn.products;
 
-  // Find exact match or fall back to first result
-  const normalizedSearch = normalizeMpn(searchMpn);
-  let bestMatch = products.find(p =>
-    normalizeMpn(p.translatedManufacturerPartNumber) === normalizedSearch
-  ) || products[0];
+  // Reject "you might also like" recommendations — never fall back to products[0].
+  // Accept only exact MPN matches or packaging-suffix variants. See shared/mpn-match.js.
+  const { pickBestCandidate } = require('../../../shared/mpn-match');
+  const picked = pickBestCandidate(products, {
+    getMpn: p => p.translatedManufacturerPartNumber,
+    getMfr: p => p.brandName,
+    getStock: p => p.stock?.level,
+    searched: searchMpn,
+    opts: { mfr: storeInfo?.searchMfr },
+  });
+  if (!picked) return result;
+  const bestMatch = picked.candidate;
+  result.matchType = picked.matchType;
 
   // Extract product details
   result.vqMpn = bestMatch.translatedManufacturerPartNumber || bestMatch.sku;

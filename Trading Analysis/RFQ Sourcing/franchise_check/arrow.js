@@ -53,7 +53,7 @@ const ARROW_CONFIG = {
  * @param {number} rfqQty - Customer requested quantity (for price break selection)
  * @returns {Object} Screening and VQ data
  */
-async function searchPart(mpn, rfqQty = 1) {
+async function searchPart(mpn, rfqQty = 1, searchOptions = {}) {
   return new Promise((resolve, reject) => {
     const queryParams = new URLSearchParams({
       login: ARROW_CONFIG.login,
@@ -77,7 +77,7 @@ async function searchPart(mpn, rfqQty = 1) {
       res.on('end', () => {
         try {
           const json = JSON.parse(data);
-          const result = parseSearchResults(json, mpn, rfqQty);
+          const result = parseSearchResults(json, mpn, rfqQty, searchOptions);
           resolve(result);
         } catch (e) {
           reject(new Error(`Parse error: ${e.message}`));
@@ -98,7 +98,7 @@ async function searchPart(mpn, rfqQty = 1) {
  *   vqLines: [{vendorBP, vendorName, channel, mpn, ...}, ...]  // one per source-with-stock
  * }
  */
-function parseSearchResults(json, searchMpn, rfqQty) {
+function parseSearchResults(json, searchMpn, rfqQty, searchOptions = {}) {
   const result = {
     searchMpn,
     rfqQty,
@@ -135,10 +135,20 @@ function parseSearchResults(json, searchMpn, rfqQty) {
   const data = json?.itemserviceresult?.data?.[0];
   if (!data || !data.PartList || data.PartList.length === 0) return result;
 
-  // Pick best part-level match (kept simple — exact normalized match, else first)
-  const normalizedSearch = normalizeMpn(searchMpn);
-  let bestMatch = data.PartList.find(p => normalizeMpn(p.partNum) === normalizedSearch)
-                || data.PartList[0];
+  // Pick best part-level match. Restrict to MPN matches (exact or
+  // packaging-suffix variant). Never fall back to PartList[0] — see
+  // shared/mpn-match.js.
+  const { pickBestCandidate } = require('../../../shared/mpn-match');
+  const picked = pickBestCandidate(data.PartList, {
+    getMpn: p => p.partNum,
+    getMfr: p => p.manufacturer?.mfrName,
+    getStock: () => 0,  // Arrow stock is per-source under InvOrg, not part-level
+    searched: searchMpn,
+    opts: { mfr: searchOptions?.mfr },
+  });
+  if (!picked) return result;
+  const bestMatch = picked.candidate;
+  result.matchType = picked.matchType;
 
   result.vqMpn = bestMatch.partNum;
   result.vqDescription = bestMatch.desc || '';

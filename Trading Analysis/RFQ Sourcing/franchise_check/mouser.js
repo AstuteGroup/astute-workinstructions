@@ -157,7 +157,7 @@ async function searchPart(mpn, rfqQty = 1, options = {}) {
     }
     throw err; // still throw so caller's error handling fires
   }
-  return parseSearchResults(json, mpn, rfqQty);
+  return parseSearchResults(json, mpn, rfqQty, options);
 }
 
 /**
@@ -191,7 +191,7 @@ async function searchPart(mpn, rfqQty = 1, options = {}) {
  *   }
  * }
  */
-function parseSearchResults(apiResponse, searchMpn, rfqQty) {
+function parseSearchResults(apiResponse, searchMpn, rfqQty, options = {}) {
   const result = {
     searchMpn,
     rfqQty,
@@ -228,63 +228,21 @@ function parseSearchResults(apiResponse, searchMpn, rfqQty) {
   if (parts.length === 0) return result;
 
   result.matchCount = parts.length;
-  const normalizedSearch = normalizeMpn(searchMpn);
 
-  // Find best match: prioritize exact MPN with stock and pricing
-  let bestMatch = null;
-
-  // First: exact MPN match with stock AND pricing
-  const exactWithStockAndPrice = parts.filter(p =>
-    normalizeMpn(p.ManufacturerPartNumber) === normalizedSearch &&
-    parseAvailability(p.AvailabilityInStock) > 0 &&
-    p.PriceBreaks && p.PriceBreaks.length > 0
-  );
-  if (exactWithStockAndPrice.length > 0) {
-    exactWithStockAndPrice.sort((a, b) =>
-      parseAvailability(b.AvailabilityInStock) - parseAvailability(a.AvailabilityInStock)
-    );
-    bestMatch = exactWithStockAndPrice[0];
-  }
-
-  // Second: exact MPN match with stock (no pricing requirement)
-  if (!bestMatch) {
-    const exactWithStock = parts.filter(p =>
-      normalizeMpn(p.ManufacturerPartNumber) === normalizedSearch &&
-      parseAvailability(p.AvailabilityInStock) > 0
-    );
-    if (exactWithStock.length > 0) {
-      exactWithStock.sort((a, b) =>
-        parseAvailability(b.AvailabilityInStock) - parseAvailability(a.AvailabilityInStock)
-      );
-      bestMatch = exactWithStock[0];
-    }
-  }
-
-  // Third: exact MPN match (no stock)
-  if (!bestMatch) {
-    bestMatch = parts.find(p =>
-      normalizeMpn(p.ManufacturerPartNumber) === normalizedSearch
-    );
-  }
-
-  // Fourth: any match with stock + pricing
-  if (!bestMatch) {
-    const withStock = parts.filter(p =>
-      parseAvailability(p.AvailabilityInStock) > 0 &&
-      p.PriceBreaks && p.PriceBreaks.length > 0
-    );
-    if (withStock.length > 0) {
-      withStock.sort((a, b) =>
-        parseAvailability(b.AvailabilityInStock) - parseAvailability(a.AvailabilityInStock)
-      );
-      bestMatch = withStock[0];
-    }
-  }
-
-  // Fallback: first result
-  if (!bestMatch) {
-    bestMatch = parts[0];
-  }
+  // Restrict to MPN-matching candidates (exact or packaging-suffix variant).
+  // Never fall back to parts[0] — that surfaces "you might also like"
+  // recommendations as if they were the searched part. See shared/mpn-match.js.
+  const { pickBestCandidate } = require('../../../shared/mpn-match');
+  const picked = pickBestCandidate(parts, {
+    getMpn: p => p.ManufacturerPartNumber,
+    getMfr: p => p.Manufacturer,
+    getStock: p => parseAvailability(p.AvailabilityInStock),
+    searched: searchMpn,
+    opts: { mfr: options?.mfr },
+  });
+  if (!picked) return result;
+  const bestMatch = picked.candidate;
+  result.matchType = picked.matchType;
 
   // Extract HTS/ECCN from ProductCompliance early so restricted parts still
   // surface compliance data (HTS/ECCN are properties of the part, not the

@@ -65,7 +65,7 @@ async function searchPart(mpn, rfqQty = 1, options = {}) {
           }
 
           const json = JSON.parse(data);
-          const result = parseSearchResults(json, mpn, rfqQty);
+          const result = parseSearchResults(json, mpn, rfqQty, options);
           resolve(result);
         } catch (e) {
           reject(new Error(`Parse error: ${e.message}`));
@@ -85,7 +85,7 @@ async function searchPart(mpn, rfqQty = 1, options = {}) {
 /**
  * Parse Master Electronics search results into screening + VQ format
  */
-function parseSearchResults(results, searchMpn, rfqQty) {
+function parseSearchResults(results, searchMpn, rfqQty, searchOptions = {}) {
   const result = {
     searchMpn,
     rfqQty,
@@ -122,49 +122,19 @@ function parseSearchResults(results, searchMpn, rfqQty) {
 
   result.matchCount = results.length;
 
-  // Find best match - prefer exact MPN match with highest stock
-  const normalizedSearch = normalizeMpn(searchMpn);
-  let bestMatch = null;
-
-  // First pass: exact MPN matches with stock
-  const exactWithStock = results.filter(r =>
-    normalizeMpn(r.partNumber) === normalizedSearch &&
-    parseInt(r.quantityAvailable || '0') > 0
-  );
-
-  if (exactWithStock.length > 0) {
-    // Sort by stock descending
-    exactWithStock.sort((a, b) =>
-      parseInt(b.quantityAvailable || '0') - parseInt(a.quantityAvailable || '0')
-    );
-    bestMatch = exactWithStock[0];
-  }
-
-  // Second pass: exact MPN match (no stock requirement)
-  if (!bestMatch) {
-    for (const item of results) {
-      if (normalizeMpn(item.partNumber) === normalizedSearch) {
-        bestMatch = item;
-        break;
-      }
-    }
-  }
-
-  // Third pass: any item with highest stock
-  if (!bestMatch) {
-    const withStock = results.filter(r => parseInt(r.quantityAvailable || '0') > 0);
-    if (withStock.length > 0) {
-      withStock.sort((a, b) =>
-        parseInt(b.quantityAvailable || '0') - parseInt(a.quantityAvailable || '0')
-      );
-      bestMatch = withStock[0];
-    }
-  }
-
-  // Fall back to first result
-  if (!bestMatch) {
-    bestMatch = results[0];
-  }
+  // Restrict to MPN-matching candidates (exact or packaging-suffix variant).
+  // Never fall back to results[0] — see shared/mpn-match.js.
+  const { pickBestCandidate } = require('../../../shared/mpn-match');
+  const picked = pickBestCandidate(results, {
+    getMpn: r => r.partNumber,
+    getMfr: r => r.manufacturer,
+    getStock: r => parseInt(r.quantityAvailable || '0'),
+    searched: searchMpn,
+    opts: { mfr: searchOptions?.mfr },
+  });
+  if (!picked) return result;
+  const bestMatch = picked.candidate;
+  result.matchType = picked.matchType;
 
   // Extract part info
   result.vqMpn = bestMatch.partNumber || '';
