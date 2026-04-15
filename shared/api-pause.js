@@ -150,31 +150,31 @@ function isPaused() {
 }
 
 /**
- * Block until the pause is released (or expired). Used by the enricher at
- * MPN boundaries. Logs activity via optional logger callback.
+ * Block until the pause is released or its TTL expires. Used by the enricher
+ * at MPN boundaries. Logs activity via optional logger callback.
+ *
+ * IMPORTANT: respects the pause file's own `until` TTL — does NOT impose a
+ * separate caller-side cap. Crash recovery is already handled by the TTL
+ * (caller picks a sane TTL when they claim). A separate maxWaitMs cap (the
+ * pre-2026-04-15 design) silently broke the pause contract and let the
+ * enricher resume early — see the Honeywell incident 2026-04-14/15 where
+ * a 24h pause got bypassed every 30 min and produced 108 new dup rows.
  *
  * @param {object} [opts]
  * @param {Function} [opts.log] - Logger function (called on sleep + wake)
- * @param {number} [opts.maxWaitMs] - Max total wait (safety cap). Default 30 min.
  * @returns {Promise<boolean>} true if we waited, false if not paused
  */
 async function waitIfPaused(opts = {}) {
-  const { log = null, maxWaitMs = 30 * 60 * 1000 } = opts;
+  const { log = null } = opts;
   const active = isPaused();
   if (!active) return false;
 
-  const startWait = Date.now();
   if (log) log(`Paused by '${active.owner}' (size ${active.size}, until ${active.until}) — yielding`);
 
   while (true) {
     await new Promise(r => setTimeout(r, POLL_INTERVAL_MS));
-    const stillPaused = isPaused();
-    if (!stillPaused) {
-      if (log) log(`Pause released (was owned by '${active.owner}') — resuming`);
-      return true;
-    }
-    if (Date.now() - startWait > maxWaitMs) {
-      if (log) log(`Pause wait exceeded ${maxWaitMs / 1000}s — force-resuming (stale pause by '${stillPaused.owner}')`);
+    if (!isPaused()) {
+      if (log) log(`Pause cleared (was owned by '${active.owner}') — resuming`);
       return true;
     }
   }
