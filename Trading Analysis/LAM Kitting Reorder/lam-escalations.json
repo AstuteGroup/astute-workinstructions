@@ -10,6 +10,11 @@
       "mpn": "SN74LVC125ARGYR",
       "reason": "New base price approval needed — franchise quotes 250 @ $0.236 (Mouser) or 200 @ $0.306 (TTI) vs current base $0.200",
       "date": "2026-04-20"
+    },
+    {
+      "mpn": "65100516121",
+      "reason": "Mouser pricing: $1.17 @ 4,315 qty (vs base $1.148 — 1.9% above, effectively at-cost). Review Kitting DB MOQ of 60 — not reflected on Mouser listing; may be stale LAM-internal setting rather than vendor min.",
+      "date": "2026-04-20"
     }
   ]
 }
