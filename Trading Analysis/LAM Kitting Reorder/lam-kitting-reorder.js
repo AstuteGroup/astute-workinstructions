@@ -336,6 +336,17 @@ function loadExcelData(excelPath) {
 // Step 4: Load Historical Purchase Data from ERP
 // -----------------------------------------------------------------------------
 
+// Canonical MPN form for cross-source matching — strips leading zeros so variants
+// like "9552156612741" (Kitting DB) and "09552156612741" (Infor/ERP PO line) hash
+// to the same key. Safe on all-numeric MPNs; for mixed MPNs the stripped form
+// almost never collides with a real other part. Applied on BOTH write and lookup
+// sides of the enrichment maps so either form finds the data.
+function canonicalMpn(mpn) {
+  const t = (mpn || '').trim();
+  if (!t) return '';
+  return t.replace(/^0+/, '') || t;   // fallback: if MPN is literally "0..0", keep original
+}
+
 // Run a psql query via temp file; return stdout as string. Errors are logged, not swallowed.
 function runPsql(sql, label) {
   const tmpSql = `/tmp/lam_kitting_${label}.sql`;
@@ -416,8 +427,9 @@ function loadHistoricalPurchaseData(mpns) {
   const closedResult = runPsql(sqlClosedPO, 'history');
   for (const line of closedResult.trim().split('\n').filter(l => l.trim() && l.includes('|'))) {
     const [mpn, supplier, price, buyer, dateordered, povNum] = line.split('|');
-    if (mpn && mpn.trim()) {
-      historicalData[mpn.trim()] = {
+    const key = canonicalMpn(mpn);
+    if (key) {
+      historicalData[key] = {
         OT_Previous_Supplier: (supplier || '').trim(),
         Historical_Purchase_Price: parseFloat(price) || 0,
         OT_Buyer: (buyer || '').trim(),
@@ -433,8 +445,8 @@ function loadHistoricalPurchaseData(mpns) {
   const rfqResult = runPsql(sqlLastRFQ, 'last_rfq');
   for (const line of rfqResult.trim().split('\n').filter(l => l.trim() && l.includes('|'))) {
     const [mpn, rfqNum, rfqDate] = line.split('|');
-    if (mpn && mpn.trim()) {
-      const key = mpn.trim();
+    const key = canonicalMpn(mpn);
+    if (key) {
       if (!historicalData[key]) {
         historicalData[key] = {
           OT_Previous_Supplier: '', Historical_Purchase_Price: 0, OT_Buyer: '',
@@ -543,11 +555,12 @@ function loadRecentPOVs() {
   const recencyMs = 90 * 24 * 60 * 60 * 1000;
   for (const line of result.trim().split('\n').filter(l => l.trim() && l.includes('|'))) {
     const [mpn, pov, otPo, qty, totalQty, promiseDate, poCreated, latestActivity, supplier, rfqNum, state] = line.split('|');
-    if (mpn && mpn.trim()) {
+    const key = canonicalMpn(mpn);
+    if (key) {
       // Is the MOST RECENT activity for this MPN within 90 days? Drives PENDING RECEIPT override.
       const latest = (latestActivity || '').trim();
       const isRecent = latest && (today - new Date(latest)) <= recencyMs;
-      povData[mpn.trim()] = {
+      povData[key] = {
         State: (state || '').trim(),                    // 'PO' or 'VQ_TICKED'
         POV_Number: (pov || '').trim(),                 // populated once Infor stamps
         OT_PO_Number: (otPo || '').trim(),              // OT PO# (pre-Infor-stamp fallback)
@@ -717,11 +730,12 @@ function identifyReorderCandidates(aggregated, excelData, historicalData, recent
       const shortfall = minQty - totalQty;
       const shortfallPct = minQty > 0 ? (shortfall / minQty) * 100 : 0;
       const basePriority = shortfallPct >= 75 ? 'HIGH' : shortfallPct >= 50 ? 'MEDIUM' : 'LOW';
-      const priority = resolvePriority(basePriority, recentPOVs[mpn]);
+      const key = canonicalMpn(mpn);
+      const priority = resolvePriority(basePriority, recentPOVs[key]);
       const lamOwned = invData.W115_Qty > 0 ? 'YES' : 'NO';
 
       alerts.push(buildAlert(mpn, excel, totalQty, lamOwned, shortfall, priority,
-        historicalData[mpn] || {}, recentPOVs[mpn]));
+        historicalData[key] || {}, recentPOVs[key]));
     }
   }
 
@@ -730,9 +744,10 @@ function identifyReorderCandidates(aggregated, excelData, historicalData, recent
     if (inventoryMPNs.has(mpn)) continue;
     if (excel.MIN_QTY <= 0) continue;
 
-    const priority = resolvePriority('CRITICAL', recentPOVs[mpn]);
+    const key = canonicalMpn(mpn);
+    const priority = resolvePriority('CRITICAL', recentPOVs[key]);
     alerts.push(buildAlert(mpn, excel, 0, 'NO', excel.MIN_QTY, priority,
-      historicalData[mpn] || {}, recentPOVs[mpn]));
+      historicalData[key] || {}, recentPOVs[key]));
   }
 
   // Sort: CRITICAL first (must source now), shortfall-based severity next,
