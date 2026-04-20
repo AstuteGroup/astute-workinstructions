@@ -162,10 +162,12 @@ async function main() {
     const highPriority = reorderAlerts.filter(r => r.Priority === 'HIGH').length;
     const medPriority = reorderAlerts.filter(r => r.Priority === 'MEDIUM').length;
     const lowPriority = reorderAlerts.filter(r => r.Priority === 'LOW').length;
-    console.log(`  CRITICAL priority (zero stock): ${criticalPriority}`);
+    const pendingReceipt = reorderAlerts.filter(r => r.Priority === 'PENDING RECEIPT').length;
+    console.log(`  CRITICAL priority (zero stock, no recent PO): ${criticalPriority}`);
     console.log(`  HIGH priority: ${highPriority}`);
     console.log(`  MEDIUM priority: ${medPriority}`);
     console.log(`  LOW priority: ${lowPriority}`);
+    console.log(`  PENDING RECEIPT (recent PO in flight, informational): ${pendingReceipt}`);
 
     const withHistory = reorderAlerts.filter(r => r['OT Previous Supplier']).length;
     console.log(`  With historical purchase data: ${withHistory}`);
@@ -193,14 +195,16 @@ async function main() {
     const highCount = reorderAlerts.filter(r => r.Priority === 'HIGH').length;
     const medCount = reorderAlerts.filter(r => r.Priority === 'MEDIUM').length;
     const lowCount = reorderAlerts.filter(r => r.Priority === 'LOW').length;
+    const pendingCount = reorderAlerts.filter(r => r.Priority === 'PENDING RECEIPT').length;
 
     const emailBody = `LAM Kitting Reorder Alerts generated ${getDateStamp()}.
 
 ${reorderAlerts.length} items below threshold:
-- CRITICAL (zero stock): ${critCount}
+- CRITICAL (zero stock, no recent PO): ${critCount}
 - HIGH: ${highCount}
 - MEDIUM: ${medCount}
 - LOW: ${lowCount}
+- PENDING RECEIPT (recent PO in flight, informational): ${pendingCount}
 
 Inventory source: ${path.basename(inventoryFolder)}`;
 
@@ -459,6 +463,10 @@ function loadRecentPOVs() {
   //
   // On Order Qty = total open qty across all open activity for the MPN (summed across all POs + any pre-PO ticks).
   // Recent POV cell shows the single most-recent activity row (preferring PO over VQ_TICKED).
+  // "Recent" activity for priority purposes = PO cut (c_order.created) within 90 days.
+  // Anything older still shows in the cell (so buyers can see stale 2024/2025 PO#s and triage),
+  // but doesn't trigger the PENDING RECEIPT priority override. Filter tuning is deferred until
+  // buyers have reviewed stale cases (promise-date-based rule is a candidate for round 2).
   const sql = `
     WITH all_activity AS (
       -- Open POs (with or without Infor POV stamp)
@@ -468,6 +476,7 @@ function loadRecentPOVs() {
         o.documentno AS ot_po_number,
         (ol.qtyordered - ol.qtydelivered) AS qty,
         ol.datepromised::date AS promise_date,
+        o.created::date AS po_created_date,
         bp.name AS supplier,
         rfq.value AS rfq_number,
         'PO' AS state,
@@ -495,6 +504,7 @@ function loadRecentPOVs() {
         '' AS ot_po_number,
         vl.qty AS qty,
         vl.datepromised::date AS promise_date,
+        rfq.created::date AS po_created_date,
         bp.name AS supplier,
         rfq.value AS rfq_number,
         'VQ_TICKED' AS state,
@@ -516,28 +526,38 @@ function loadRecentPOVs() {
     ranked AS (
       SELECT *,
         ROW_NUMBER() OVER (PARTITION BY mpn ORDER BY preference ASC, sort_date DESC NULLS LAST) AS rn,
-        SUM(qty) OVER (PARTITION BY mpn) AS total_qty
+        SUM(qty) OVER (PARTITION BY mpn) AS total_qty,
+        -- most-recent activity per MPN (regardless of PO vs VQ_TICKED) for recency gate
+        MAX(po_created_date) OVER (PARTITION BY mpn) AS latest_activity_date
       FROM all_activity
     )
-    SELECT mpn, pov_number, ot_po_number, qty, total_qty, promise_date, supplier, rfq_number, state
+    SELECT mpn, pov_number, ot_po_number, qty, total_qty, promise_date, po_created_date,
+           latest_activity_date, supplier, rfq_number, state
     FROM ranked
     WHERE rn = 1;
   `;
 
   const result = runPsql(sql, 'povs');
   const povData = {};
+  const today = new Date();
+  const recencyMs = 90 * 24 * 60 * 60 * 1000;
   for (const line of result.trim().split('\n').filter(l => l.trim() && l.includes('|'))) {
-    const [mpn, pov, otPo, qty, totalQty, date, supplier, rfqNum, state] = line.split('|');
+    const [mpn, pov, otPo, qty, totalQty, promiseDate, poCreated, latestActivity, supplier, rfqNum, state] = line.split('|');
     if (mpn && mpn.trim()) {
+      // Is the MOST RECENT activity for this MPN within 90 days? Drives PENDING RECEIPT override.
+      const latest = (latestActivity || '').trim();
+      const isRecent = latest && (today - new Date(latest)) <= recencyMs;
       povData[mpn.trim()] = {
         State: (state || '').trim(),                    // 'PO' or 'VQ_TICKED'
         POV_Number: (pov || '').trim(),                 // populated once Infor stamps
         OT_PO_Number: (otPo || '').trim(),              // OT PO# (pre-Infor-stamp fallback)
         POV_Qty: parseFloat(qty) || 0,                  // qty on the displayed row
-        POV_Date: (date || '').trim(),
+        POV_Date: (promiseDate || '').trim(),           // vendor promise date on the displayed row
+        PO_Created_Date: (poCreated || '').trim(),      // when we cut the PO (recency anchor)
         POV_Supplier: (supplier || '').trim(),
         RFQ_Number: (rfqNum || '').trim(),
-        Qty_On_Order: parseFloat(totalQty) || 0         // total across all open activity for the MPN
+        Qty_On_Order: parseFloat(totalQty) || 0,        // total across all open activity for the MPN
+        Is_Recent: isRecent                              // most-recent PO/VQ cut within 90 days
       };
     }
   }
@@ -673,6 +693,14 @@ function buildAlert(mpn, excel, totalQty, lamOwned, shortfall, priority, history
   };
 }
 
+// If the MPN has recent in-flight purchase activity (PO or ticked VQ within the last 90 days)
+// the row is informational — "stock is likely inbound, don't act" — rather than a severity.
+// Shortfall-based priority is retained when no recent activity exists.
+function resolvePriority(shortfallBasedPriority, pov) {
+  if (pov && pov.Is_Recent) return 'PENDING RECEIPT';
+  return shortfallBasedPriority;
+}
+
 function identifyReorderCandidates(aggregated, excelData, historicalData, recentPOVs = {}) {
   const alerts = [];
   const inventoryMPNs = new Set(Object.keys(aggregated));
@@ -688,7 +716,8 @@ function identifyReorderCandidates(aggregated, excelData, historicalData, recent
     if (totalQty < minQty) {
       const shortfall = minQty - totalQty;
       const shortfallPct = minQty > 0 ? (shortfall / minQty) * 100 : 0;
-      const priority = shortfallPct >= 75 ? 'HIGH' : shortfallPct >= 50 ? 'MEDIUM' : 'LOW';
+      const basePriority = shortfallPct >= 75 ? 'HIGH' : shortfallPct >= 50 ? 'MEDIUM' : 'LOW';
+      const priority = resolvePriority(basePriority, recentPOVs[mpn]);
       const lamOwned = invData.W115_Qty > 0 ? 'YES' : 'NO';
 
       alerts.push(buildAlert(mpn, excel, totalQty, lamOwned, shortfall, priority,
@@ -696,17 +725,19 @@ function identifyReorderCandidates(aggregated, excelData, historicalData, recent
     }
   }
 
-  // Second: Process items in Excel but NOT in inventory (zero qty - CRITICAL)
+  // Second: Process items in Excel but NOT in inventory (zero qty - CRITICAL unless recent activity)
   for (const [mpn, excel] of Object.entries(excelData)) {
     if (inventoryMPNs.has(mpn)) continue;
     if (excel.MIN_QTY <= 0) continue;
 
-    alerts.push(buildAlert(mpn, excel, 0, 'NO', excel.MIN_QTY, 'CRITICAL',
+    const priority = resolvePriority('CRITICAL', recentPOVs[mpn]);
+    alerts.push(buildAlert(mpn, excel, 0, 'NO', excel.MIN_QTY, priority,
       historicalData[mpn] || {}, recentPOVs[mpn]));
   }
 
-  // Sort by priority (CRITICAL first), then by shortfall descending
-  const priorityOrder = { 'CRITICAL': 0, 'HIGH': 1, 'MEDIUM': 2, 'LOW': 3 };
+  // Sort: CRITICAL first (must source now), shortfall-based severity next,
+  // PENDING RECEIPT last (informational — stock is likely inbound, no action needed)
+  const priorityOrder = { 'CRITICAL': 0, 'HIGH': 1, 'MEDIUM': 2, 'LOW': 3, 'PENDING RECEIPT': 4 };
   alerts.sort((a, b) => {
     if (priorityOrder[a.Priority] !== priorityOrder[b.Priority]) {
       return priorityOrder[a.Priority] - priorityOrder[b.Priority];

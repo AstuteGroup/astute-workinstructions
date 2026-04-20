@@ -39,12 +39,13 @@ async function flushOutput() {
   if (!_outputState) return;
   const { results, totalItems, headers, outputFile } = _outputState;
 
-  const sourcedCount = results.filter(r => r.sourcingStatus === 'SOURCED').length;
-  const isPartial = sourcedCount < totalItems;
+  // "Processed" = anything other than the SKIPPED error state (SOURCED + NO COVERAGE both count)
+  const processedCount = results.filter(r => r.sourcingStatus !== 'SKIPPED - TIMEOUT/ERROR').length;
+  const isPartial = processedCount < totalItems;
 
   if (isPartial) {
     console.log('');
-    console.log(`⚠️  PARTIAL SOURCING: ${sourcedCount}/${totalItems} items processed`);
+    console.log(`⚠️  PARTIAL SOURCING: ${processedCount}/${totalItems} items processed`);
   }
 
   console.log('');
@@ -70,11 +71,11 @@ async function flushOutput() {
   const sourced = results.filter(r => r.sourcingStatus === 'SOURCED');
   const inStock = sourced.filter(r => r.franchise.inStockSupplier).length;
   const leadTimeOnly = sourced.filter(r => !r.franchise.inStockSupplier && r.franchise.leadTimeSupplier).length;
-  const noCoverage = sourced.filter(r => !r.franchise.inStockSupplier && !r.franchise.leadTimeSupplier).length;
+  const noCoverage = results.filter(r => r.sourcingStatus === 'NO COVERAGE').length;
   const notSourced = results.filter(r => r.sourcingStatus === 'SKIPPED - TIMEOUT/ERROR').length;
   console.log(`  In Stock: ${inStock}`);
   console.log(`  Lead Time Only: ${leadTimeOnly}`);
-  console.log(`  No franchise coverage: ${noCoverage}`);
+  console.log(`  NO COVERAGE (APIs returned no match): ${noCoverage}`);
   if (notSourced > 0) {
     console.log(`  SKIPPED - TIMEOUT/ERROR (interrupted): ${notSourced}`);
   }
@@ -192,8 +193,12 @@ async function main() {
       const inStockOption = findBestInStock(trimmed, queryQty);
       const leadTimeOption = findBestLeadTime(trimmed);
 
-      // Update the pre-built entry
-      results[i].sourcingStatus = 'SOURCED';
+      // Update the pre-built entry. Distinguish "APIs returned coverage" (SOURCED) from
+      // "APIs returned cleanly but zero matches" (NO COVERAGE) — the latter is the genuine
+      // signal that the part needs manual franchise sourcing or broker routing, and was
+      // previously mis-labeled SOURCED (misleading when buyer scans column AG).
+      const foundAny = !!(inStockOption || leadTimeOption);
+      results[i].sourcingStatus = foundAny ? 'SOURCED' : 'NO COVERAGE';
       results[i].franchise = {
         inStockSupplier: inStockOption?.supplier || '',
         inStockPrice: inStockOption?.price || '',
@@ -231,7 +236,7 @@ async function main() {
   if (pauseClaimed) {
     try {
       clearInterval(pauseRefreshTimer);
-      apiPause.releasePause();
+      apiPause.releasePause('lam-kitting-source');
       console.log('  [pause] released');
     } catch (e) { /* ignore */ }
   }
@@ -448,16 +453,19 @@ async function writeEnrichedOutput(results, originalHeaders, outputPath) {
       };
     }
 
-    // Sourcing Status cell — highlight SKIPPED - TIMEOUT/ERROR in red
+    // Sourcing Status cell — color-code the three states
+    //   SKIPPED - TIMEOUT/ERROR → red (needs re-run)
+    //   NO COVERAGE             → orange (APIs clean but zero match — manual sourcing/broker)
+    //   SOURCED                 → no fill (default, nothing actionable)
     const statusCol = allHeaders.indexOf('Sourcing Status') + 1;
     const statusVal = row[statusCol - 1];
     if (statusVal === 'SKIPPED - TIMEOUT/ERROR') {
       const cell = excelRow.getCell(statusCol);
-      cell.fill = {
-        type: 'pattern',
-        pattern: 'solid',
-        fgColor: { argb: 'FFFF9999' }  // Light red
-      };
+      cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFF9999' } };
+      cell.font = { bold: true };
+    } else if (statusVal === 'NO COVERAGE') {
+      const cell = excelRow.getCell(statusCol);
+      cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFD580' } };
       cell.font = { bold: true };
     }
   }
