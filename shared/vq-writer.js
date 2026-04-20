@@ -58,8 +58,9 @@ const TRACEABILITY = {
 
 // Vendor types where we trust the source enough to auto-default missing date code.
 // All authorized-channel vendors (mfr direct + franchise + catalog distributors + online distributors)
-// sell new stock, so "within 2 years" is a safe assumption when the API doesn't return a specific code.
-// Brokers / non-traceable vendors must NOT get this default — DC there is meaningful.
+// sell new stock, so a current-year-minus-2 floor is a safe assumption when the
+// API doesn't return a specific code. Brokers / non-traceable vendors must NOT
+// get this default — DC there is meaningful.
 //
 // Note: OT classifies the major franchise distributors (DigiKey, Mouser, Newark, TTI, Waldom, Avnet)
 // as "Catalog" or "Online Distributor" rather than "Franchise". They are still authorized channels
@@ -71,7 +72,30 @@ const MFR_DIRECT_OR_FRANCHISE = new Set([
   1000008, // Catalog (DigiKey, Mouser, Newark, TTI, Waldom, etc.)
   1000009, // Online Distributor (Avnet, etc.)
 ]);
-const DEFAULT_DATE_CODE_AUTHORIZED = 'within 2 years';
+
+// Default date code for authorized-channel rows when API doesn't return one.
+// Two-digit year format ("YY+") so it lines up with the standard YYWW
+// week-code convention buyers see on actual parts. Two different defaults:
+//
+//   - Stock row (no lead time): YY = current year - 2.
+//     In-stock parts are reasonably up to 2 years old.
+//
+//   - Lead-time row (has lead time): YY = current year.
+//     LT items are newly manufactured against the order, so the date code
+//     should be the current year or fresher.
+//
+// Computed at module-load time so the floor auto-rolls each January.
+// Replaces the prior hard-coded "within 2 years" string per operator
+// feedback 2026-04-14 — buyers want a concrete YY+ floor that aligns with
+// week codes (YYWW), not a vague window applied uniformly to both row types.
+const _yy2 = (n) => String(n).slice(-2);
+const DEFAULT_DATE_CODE_STOCK = `${_yy2(new Date().getFullYear() - 2)}+`;          // e.g. "24+"
+const DEFAULT_DATE_CODE_LEAD_TIME = `${_yy2(new Date().getFullYear())}+`;           // e.g. "26+"
+
+// Backward-compat name (some callers may import this) — points to the stock
+// default since that was the historical behavior. New code should pick stock
+// vs LT based on whether the row has a lead time.
+const DEFAULT_DATE_CODE_AUTHORIZED = DEFAULT_DATE_CODE_STOCK;
 
 // Packaging normalization moved to shared/packaging-lookup.js (C9b, 2026-04-08).
 // PACKAGING_MAP and normalizePackaging are imported above. The shared cog
@@ -532,9 +556,13 @@ async function writeVQFromAPI(rfqSearchKey, cpc, franchiseResults, opts = {}) {
     // resolvedMfrId may be null here (system-only or no match) — that's OK,
     // the payload will omit Chuboe_MFR_ID and the server will resolve from text.
 
-    // Build vendor notes — combine API notes (per-row when available) with packaging info
+    // Build internal enrichment notes — combine parser-built notes (per-row or
+    // top-level) with packaging context. Despite the legacy "vendorNotes" field
+    // name, the content is buyer-internal (stock counts, MOQ, MFR tags, packaging
+    // confirmations) — NONE of it is vendor-facing. Goes to Chuboe_Note_Private.
+    // Anything genuinely vendor-safe should be added via opts.publicNote instead.
     const baseNotes = row.vendorNotes || d.vqVendorNotes || '';
-    const vendorNotes = [baseNotes, packagingNote].filter(Boolean).join(' | ');
+    const internalNotes = [baseNotes, packagingNote].filter(Boolean).join(' | ');
 
     // Resolve vendor type and traceability from BP
     const vendorTypeId = await getBPVendorType(bp.id);
@@ -561,12 +589,21 @@ async function writeVQFromAPI(rfqSearchKey, cpc, franchiseResults, opts = {}) {
       || null;
 
     // Resolve date code — per-row first (multi-source split), then distributor-level,
-    // then default. If empty AND vendor is mfr-direct/franchise, default to
-    // "within 2 years" (authorized-channel purchases of new stock). Brokers
-    // (and other vendor types) get no default — must come from caller or stay null.
+    // then default. If empty AND vendor is mfr-direct/franchise, pick the right
+    // default based on whether this is a stock or LT row:
+    //   - Stock row (no leadTime): YY+ (current year - 2). 2-yr-old in-stock
+    //     is fine.
+    //   - LT row (has leadTime): YY+ (current year). Newly-built parts must
+    //     have a current-year date code at minimum.
+    // Brokers (and other vendor types) get no default — must come from
+    // caller or stay null.
     const dateCodeFromApi = row.dateCode || d.vqDateCode || (d.raw && d.raw.vqDateCode) || null;
+    const isLeadTimeRow = !!(row.leadTime && String(row.leadTime).trim());
+    const authorizedDefault = isLeadTimeRow
+      ? DEFAULT_DATE_CODE_LEAD_TIME
+      : DEFAULT_DATE_CODE_STOCK;
     const dateCode = dateCodeFromApi
-      || (MFR_DIRECT_OR_FRANCHISE.has(vendorTypeId) ? DEFAULT_DATE_CODE_AUTHORIZED : null)
+      || (MFR_DIRECT_OR_FRANCHISE.has(vendorTypeId) ? authorizedDefault : null)
       || opts.dateCode
       || null;
 
@@ -601,7 +638,10 @@ async function writeVQFromAPI(rfqSearchKey, cpc, franchiseResults, opts = {}) {
       Chuboe_Lead_Time: leadTime || null,
       Chuboe_MOQ: moq ? String(moq) : null,
       Chuboe_SPQ: spq ? String(spq) : null,
-      Chuboe_Note_Public: vendorNotes || null,
+      // Note routing — Public flows to the POV that the vendor receives, so it must
+      // be vendor-safe (or null). Parser-built enrichment ALWAYS goes to Private.
+      Chuboe_Note_Public: opts.publicNote || null,
+      Chuboe_Note_Private: internalNotes || null,
 
       // Tier 1 defaults — populated at VQ load time
       C_UOM_ID: opts.uomId || DEFAULTS.C_UOM_ID,
@@ -902,7 +942,9 @@ module.exports = {
   DEFAULTS,
   PACKAGING_MAP,
   MFR_DIRECT_OR_FRANCHISE,
-  DEFAULT_DATE_CODE_AUTHORIZED,
+  DEFAULT_DATE_CODE_AUTHORIZED, // backward-compat alias for DEFAULT_DATE_CODE_STOCK
+  DEFAULT_DATE_CODE_STOCK,
+  DEFAULT_DATE_CODE_LEAD_TIME,
   TIER1_MANDATORY,
   TIER2_MANDATORY,
 };
