@@ -143,14 +143,73 @@ Bad:
 - `Please approve the following...` (unclear)
 
 ### Chuboe_Approval_Text format
-This is the "Text to Approve" field. Keep it structured and scannable. For multi-line approvals, use one row per line with columns aligned by spaces:
+
+**MUST match OT's "Copy Text" output.** OT's RFQ view has a Copy Text feature that emits a structured, multi-section block (RFQ → RFQ Line → Customer Quote → Customer Quote Reference → Vendor Quote) containing every field support/managers need to approve. Support and managers pattern-match on this exact structure — custom shorthand formats break their scan.
+
+**How to use it:**
+1. Buyer pastes the full OT copy text into the conversation.
+2. Script/agent extracts ONLY the lines relevant to the vendor/part being approved (copy text contains ALL lines on the RFQ, not just the new ones — see `feedback_copy_text_context.md`).
+3. The extracted block becomes the `Chuboe_Approval_Text` body.
+4. ONE-OFF context (auto-approval disclosure, compliance note, excess-qty caveat) gets appended AFTER the block, not woven into it.
+
+**DO NOT synthesize the block from raw DB queries.** Walking the RFQ tree to reproduce OT's format introduces drift (field ordering, whitespace, nested indentation) that support will notice. Always source from an actual OT copy-text paste.
+
+**Canonical block shape (from OT copy text, reproduced verbatim):**
+
+```
+RFQ
+  Customer: <name>
+  Total Revenue: <amount>
+  Total Cost: <amount>
+  Gross Profit: <amount>
+  Profit Margin: <pct>%
+
+RFQ Line
+  RFQ Line #: <n>
+  Purchase Qty: <n>
+  Sold Qty: <n>
+  ...
+  Sales Rep: <name>
+  Public Customer Notes:
+  Private Customer Notes:
+
+Customer Quote
+  MPN: <mpn>
+  Customer PO#: <po>
+  Customer Part Code: <cpc>
+  Quantity: <n>
+  Sale Price: <amount> USD
+  ...
+  Packaging: <type>
+  Shipper: <carrier>
+  Inco Term: <term>
+  Ship-From Warehouse: <group>
+  Lead Time: <text>
+
+Customer Quote Reference
+  COO: <country or PENDING>
+  UOM: Each
+  Product Code: <category>
+  MFR: <mfr>
+  RoHS: Y|N
+  Hazardous: Y|N
+
+Vendor Quote
+  Vendor: <name>
+  Vendor Type: <type>
+  Traceability: <tier>
+  Contact: <name>
+  ...
+```
+
+**Short single-line shorthand (fallback ONLY for edge cases where copy text isn't available — e.g., back-dated approvals, data-quality fixes):**
 
 ```
 Line 60    XCZU4CG-1SFVC784E   5pcs @ $342.00   DC 22+   Xilinx (ECCN 5A992.c / HTS 8542390090)
-Line 1740  REF3012AIDBZR       400pcs @ $0.12   DC 25+   TI
-Line 1930  TLK110PTR           35pcs @ $3.58    DC 24+   TI
 Vendor: SMARTEL ELECTRONICS (ASIA) CO LTD
 ```
+
+Use this only when explicitly confirmed by the buyer that copy text isn't available for the specific context. For all routine approvals (auto-purchase flow included), the full copy-text block is the standard.
 
 ---
 
