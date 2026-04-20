@@ -23,7 +23,17 @@
     },
     {
       "mpn": "LMZ14202TZ-ADJ/NOPB",
-      "reason": "New base price approval: $14.58. Current base $10.025 — new base is +45.4%. Franchise coverage this week: Arrow only at $11.28 lead-time. Significant jump — confirm vendor source before approving.",
+      "reason": "New base price approval: $14.58. Current base $10.025 — new base is +45.4%. Franchise coverage this week: Arrow only at $11.28 lead-time. TI Store VQ written at $10.31 × 250 (VQ 2134141) — consider as procurement basis against updated base.",
+      "date": "2026-04-20"
+    },
+    {
+      "mpn": "1424241",
+      "reason": "New base price approval: $18.47. Current base $16.716 — new base is +10.5%. Matches TTI/Sager/Master consensus. DigiKey has stock per buyer — VQ pending (API 504 + no historical DigiKey VQ to reference; awaiting manual price/qty).",
+      "date": "2026-04-20"
+    },
+    {
+      "mpn": "PATT0603E2001BGT1",
+      "reason": "New base price approval: $0.82824. Current base $0.5235 — new base is +58.2%. Franchise coverage this week below current resale ($0.638), which implied stale base; new base realigns resale math. Confirm source before approving.",
       "date": "2026-04-20"
     }
   ]
