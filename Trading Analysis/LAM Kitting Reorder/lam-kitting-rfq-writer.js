@@ -19,6 +19,8 @@ const path = require('path');
 const { readCSVFile } = require('../../shared/csv-utils');
 const { writeRFQ } = require('../../shared/rfq-writer');
 const { writeVQBatch } = require('../../shared/vq-writer');
+const { tickVQForPurchase } = require('../../shared/vq-patcher');
+const { postApproveOrder } = require('../../shared/r-request-writer');
 
 // ─── Constants ──────────────────────────────────────────────────────────────
 
@@ -26,6 +28,24 @@ const LAM_BPARTNER_ID = 1000730;       // Lam Research
 const LAM_CONTACT_ID = 1033762;        // Rob Johnson
 const SALESREP_ID = 1007049;           // Josh Syre (internal employee record)
 const RFQ_TYPE = '3PL/VMI';
+
+// Auto-purchase threshold — ticks IsPurchased='Y' + posts approve-order R_Request
+// when the best in-stock franchise margin is at-or-above this percentage AND the
+// vendor's available stock covers the LAM MOQ. 18% = the green band on the report.
+const AUTO_PURCHASE_MARGIN_PCT = 18.0;
+
+// Add N US business days to a date (skips Sat/Sun). Used for promise date default
+// when a franchise vendor says "STOCK" / "In Stock" — convention per data-model.md.
+function addBusinessDays(date, days) {
+  const d = new Date(date);
+  let added = 0;
+  while (added < days) {
+    d.setDate(d.getDate() + 1);
+    const dow = d.getDay();
+    if (dow !== 0 && dow !== 6) added++;
+  }
+  return d;
+}
 
 // ─── Main ───────────────────────────────────────────────────────────────────
 
@@ -172,8 +192,9 @@ async function main() {
     vqItemsWithoutData.forEach(c => console.log(`    ${c.mpn}`));
   }
 
+  let vqResult = null;
   if (vqItems.length > 0) {
-    const vqResult = await writeVQBatch(rfqResult.searchKey, vqItems, {
+    vqResult = await writeVQBatch(rfqResult.searchKey, vqItems, {
       delayMs: 100,
     });
 
@@ -195,7 +216,91 @@ async function main() {
     console.log('  No franchise data available — skipping VQ write.');
   }
 
-  // ── Step 3: Write mapping file for email step ──
+  // ── Step 3: Auto-purchase — tick best-in-stock VQ + post approve-order R_Request
+  // for lines where the franchise margin comfortably clears the 18% green-band
+  // threshold AND the vendor has enough stock to fill LAM MOQ in a single shot.
+  // Everything else stays on the manual-review path.
+  const autoRequests = {};   // mpn → R_Request documentNo
+
+  if (vqResult && (vqResult.written || vqResult.allWritten)) {
+    console.log('\nStep 3: Auto-purchase pass (margin ≥ 18%, stock ≥ LAM MOQ)...');
+    const writtenVQs = vqResult.allWritten || vqResult.written || [];
+    const stockSupplierIdx = headers.indexOf('In Stock Supplier');
+    const stockPriceIdx    = headers.indexOf('In Stock Price');
+    const stockQtyIdx      = headers.indexOf('In Stock Qty');
+    const stockMarginIdx   = headers.indexOf('In Stock Margin %');
+    const moqIdx           = headers.indexOf('LAM MOQ');
+    const mfrIdxAuto       = headers.indexOf('Manufacturer');
+
+    const promiseDate = addBusinessDays(new Date(), 5).toISOString().split('T')[0];
+
+    for (const row of csv.rows) {
+      const mpn = (row[mpnIdx] || '').trim();
+      if (!mpn) continue;
+
+      const marginRaw = String(row[stockMarginIdx] || '').replace('%', '').trim();
+      const margin = parseFloat(marginRaw);
+      const stockQty = parseInt(row[stockQtyIdx], 10) || 0;
+      const lamMoq = parseInt(row[moqIdx], 10) || 0;
+      const stockSupplier = (row[stockSupplierIdx] || '').trim();
+      const stockPrice = parseFloat(row[stockPriceIdx]) || 0;
+
+      if (!isFinite(margin) || margin < AUTO_PURCHASE_MARGIN_PCT) continue;
+      if (stockQty < lamMoq || lamMoq <= 0) continue;
+      if (!stockSupplier || !stockPrice) continue;
+
+      // Find the matching VQ row (mpn + vendor substring + price). Vendor names
+      // in the franchise CSV and the VQ writer's output occasionally differ in
+      // punctuation (e.g., "Sager" vs "Sager - v3004"), so match on the first
+      // word of the supplier and an exact-ish price.
+      const vendorKey = stockSupplier.split(/[\s\-]/)[0].toLowerCase();
+      const matchVQ = writtenVQs.find(w =>
+        w.mpn === mpn
+        && (w.vendor || '').toLowerCase().includes(vendorKey)
+        && Math.abs(Number(w.price) - stockPrice) < 0.01);
+      if (!matchVQ) {
+        console.log(`  [skip] ${mpn} — no VQ match for "${stockSupplier}" @ $${stockPrice}`);
+        continue;
+      }
+
+      const rfqLineNo = lineMappingForAuto(rfqCandidates, mpn);
+      const approvalText =
+        `Line ${rfqLineNo}  ${mpn}  ${lamMoq}pcs @ $${stockPrice}  DC 24+  ${row[mfrIdxAuto] || ''}\n` +
+        `Vendor: ${stockSupplier}\n` +
+        `Auto-approved — in-stock margin ${margin.toFixed(1)}% ≥ ${AUTO_PURCHASE_MARGIN_PCT}%, stock ${stockQty} ≥ LAM MOQ ${lamMoq}`;
+
+      try {
+        await tickVQForPurchase(matchVQ.vqLineId, {
+          program: 'LAM_KITTING',
+          extra: {
+            Chuboe_Lead_Time:          'STOCK',
+            DatePromised:              promiseDate,
+            Chuboe_Warehouse_ID:       1000015,   // W111 LAM KITTING
+            Chuboe_Warehouse_Group_ID: 1000008,   // BROWNSVILLE
+            M_Shipper_ID:              1000003,   // FedEx Ground
+            Chuboe_Inco_Term_ID:       1000000,   // EXW
+          },
+        });
+        const r = await postApproveOrder({
+          vqId:         matchVQ.vqLineId,
+          program:      'LAM_KITTING',
+          rfqId:        rfqResult.rfqId,
+          summary:      `approve order — ${stockSupplier} ${mpn} (LAM Kitting)`,
+          approvalText,
+        });
+        autoRequests[mpn] = r.documentNo;
+        console.log(`  ✓ ${mpn} — VQ ${matchVQ.vqLineId} ticked; R_Request ${r.documentNo} (margin ${margin.toFixed(1)}%)`);
+      } catch (err) {
+        console.log(`  ✗ ${mpn} — auto-purchase failed: ${err.message}`);
+        if (err.violations) err.violations.forEach(v => console.log(`      - ${v}`));
+      }
+    }
+
+    const count = Object.keys(autoRequests).length;
+    console.log(`Step 3 complete — ${count} auto-approved`);
+  }
+
+  // ── Step 4: Write mapping file for email step ──
   const lineMapping = {};
   rfqCandidates.forEach((c, i) => {
     lineMapping[c.mpn] = (i + 1) * 10; // Line 10, 20, 30...
@@ -203,11 +308,12 @@ async function main() {
 
   const mappingFile = sourcedCsvPath.replace('_sourced.csv', '_rfq_mapping.json');
   const mapping = {
-    rfqSearchKey: rfqResult.searchKey,
-    rfqId: rfqResult.rfqId,
-    linesWritten: rfqResult.linesWritten,
-    vqItems: vqItems.length,
-    lines: lineMapping,
+    rfqSearchKey:  rfqResult.searchKey,
+    rfqId:         rfqResult.rfqId,
+    linesWritten:  rfqResult.linesWritten,
+    vqItems:       vqItems.length,
+    lines:         lineMapping,
+    autoRequests,                    // mpn → R_Request documentNo for auto-approved lines
   };
   fs.writeFileSync(mappingFile, JSON.stringify(mapping, null, 2));
   console.log(`\nMapping written to: ${mappingFile}`);
@@ -220,6 +326,14 @@ async function main() {
   console.log(`  Salesrep: Josh Syre`);
   console.log(`  Lines: ${rfqResult.linesWritten}`);
   console.log(`  VQ items sourced: ${vqItems.length}`);
+  console.log(`  Auto-approved: ${Object.keys(autoRequests).length}`);
+}
+
+// Small helper so the main loop stays readable — maps an MPN to its RFQ line
+// number using the same incremental-by-10 scheme as the Step 4 mapping write.
+function lineMappingForAuto(rfqCandidates, mpn) {
+  const idx = rfqCandidates.findIndex(c => c.mpn === mpn);
+  return idx >= 0 ? (idx + 1) * 10 : '?';
 }
 
 main().catch(err => {

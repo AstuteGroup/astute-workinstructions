@@ -161,6 +161,7 @@ function applyColumnFormats(sheet, headers) {
     else if (h === 'Priority') col.width = 18;
     else if (h.includes('Margin') || h === 'Sourcing Status') col.width = 18;
     else if (h === 'RFQ Line #') col.width = 12;
+    else if (h === 'Request to Purchase') col.width = 18;
     else col.width = 18;
     if (CURRENCY_COLS.includes(h)) col.numFmt = '$#,##0.0000';
     else if (INT_COLS.includes(h)) col.numFmt = '#,##0';
@@ -176,13 +177,15 @@ function applyColumnFormats(sheet, headers) {
 // one place — keeps the main tab focused on actionable buys.
 function buildEscalationsTab(workbook, state, csv, allHeaders, rfqMapping) {
   const mpnIdx = csv.headers.indexOf('MPN');
-  // Build lookup: MPN → CSV row (with RFQ Line # spliced in at index 1 to match main tab)
+  const autoRequests = (rfqMapping && rfqMapping.autoRequests) || {};
+  // Build lookup: MPN → CSV row (with RFQ Line # + Request to Purchase spliced in
+  // at columns 2-3 to match the main tab's column layout)
   const byMpn = {};
   for (const row of csv.rows) {
     const mpn = (row[mpnIdx] || '').trim();
     if (!mpn) continue;
     const rowData = [...row];
-    rowData.splice(1, 0, rfqMapping.lines[mpn] || '');
+    rowData.splice(1, 0, rfqMapping.lines[mpn] || '', autoRequests[mpn] || '');
     byMpn[mpn] = rowData;
   }
 
@@ -215,9 +218,12 @@ async function rebuildExcelWithRfqLines(sourcedCsvPath, xlsxPath, rfqMapping) {
   const csv = readCSVFile(sourcedCsvPath);
   const mpnIdx = csv.headers.indexOf('MPN');
 
-  // Insert "RFQ Line #" as the second column (after Lam P/N, before MPN)
+  // Insert "RFQ Line #" + "Request to Purchase" as columns 2 and 3 (after Lam P/N).
+  // Request to Purchase is populated only for auto-approved lines (in-stock margin
+  // >= 18% AND stock >= LAM MOQ); blank for manual-review lines.
   const allHeaders = [...csv.headers];
-  allHeaders.splice(1, 0, 'RFQ Line #');
+  allHeaders.splice(1, 0, 'RFQ Line #', 'Request to Purchase');
+  const autoRequests = (rfqMapping && rfqMapping.autoRequests) || {};
 
   // Load escalations FIRST so main-tab rendering can skip escalated MPNs.
   // Each item lives in exactly one place — if it's flagged for escalation,
@@ -243,8 +249,9 @@ async function rebuildExcelWithRfqLines(sourcedCsvPath, xlsxPath, rfqMapping) {
     if (escalatedMPNs.has(mpn)) { skippedForEscalation++; continue; }
 
     const rfqLine = rfqMapping.lines[mpn] || '';
+    const reqDocNo = autoRequests[mpn] || '';
     const rowData = [...row];
-    rowData.splice(1, 0, rfqLine);
+    rowData.splice(1, 0, rfqLine, reqDocNo);
     const excelRowData = rowData.map((v, idx) => parseCellForExcel(v, allHeaders[idx]));
     const excelRow = ws.addRow(excelRowData);
     applyRowShading(excelRow, allHeaders);
@@ -442,8 +449,10 @@ async function main() {
     ? `\n⚠️  PARTIAL SOURCING: ${sourcedCount}/${totalAlerts} items were sourced. ${notSourcedCount} items marked "SKIPPED - TIMEOUT/ERROR" in the file (highlighted red). These items were not processed due to a timeout or error — re-run manually if needed.\n`
     : '';
 
+  const autoCount = rfqMapping && rfqMapping.autoRequests
+    ? Object.keys(rfqMapping.autoRequests).length : 0;
   const rfqSection = rfqMapping && rfqMapping.rfqSearchKey
-    ? `\nRFQ Created: ${rfqMapping.rfqSearchKey} (3PL/VMI)\n  ${rfqMapping.linesWritten} lines written, ${rfqMapping.vqItems} items with VQ data\n  Contact: Rob Johnson | Salesrep: Josh Syre\n`
+    ? `\nRFQ Created: ${rfqMapping.rfqSearchKey} (3PL/VMI)\n  ${rfqMapping.linesWritten} lines written, ${rfqMapping.vqItems} items with VQ data\n  Contact: Rob Johnson | Salesrep: Josh Syre\n  Auto-approved (margin ≥ 18% + stock ≥ LAM MOQ): ${autoCount}\n`
     : '';
 
   // Escalation summary — reflects state AFTER this run's auto-resolution pass.
