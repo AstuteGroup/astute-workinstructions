@@ -75,12 +75,106 @@ function persistResolvedEscalations(state, csv, mpnIdx) {
   log(`  Remaining open escalations: ${stillActive.length} (was ${before})`);
 }
 
+// Column classification — shared between the main tab and the Escalations tab.
+const CURRENCY_COLS = ['Base Unit Price', 'Resale Price', 'Historical Purchase Price', 'In Stock Price', 'Lead Time Price'];
+const INT_COLS = ['Reorder Threshold', 'LAM MOQ', 'QTY ON HAND', 'Shortfall', 'In Stock Qty', 'On Order Qty', 'Available Qty (Other WH)', 'RFQ Line #'];
+const PCT_COLS = ['In Stock Margin %', 'Lead Time Margin %'];
+
+function getMarginColor(margin) {
+  if (margin > 18) return 'FF90EE90';
+  if (margin >= 0) return 'FFFFFF99';
+  return 'FFFF9999';
+}
+
+// Coerce a CSV value to the Excel-ready type for its column. Numeric columns
+// parse to numbers; percentage columns strip the '%' and divide by 100 so Excel's
+// '0.0%' format renders correctly. Non-numeric cells pass through as strings.
+function parseCellForExcel(v, header) {
+  if (CURRENCY_COLS.includes(header) || INT_COLS.includes(header)) {
+    const n = parseFloat(v); return isNaN(n) ? v : n;
+  }
+  if (PCT_COLS.includes(header)) {
+    const n = parseFloat(String(v).replace('%', ''));
+    return isNaN(n) ? v : n / 100;
+  }
+  return v;
+}
+
+// Color-coding applied consistently to the main tab AND the Escalations tab.
+// Margin cells get traffic-light shading, Sourcing Status gets state colors,
+// and Priority gets severity colors. Column positions are computed from the
+// sheet's own headers array so the same helper works on both tabs (Escalations
+// has a 2-column offset for Escalation Reason + Escalation Date).
+function applyRowShading(excelRow, headers) {
+  const inStockMarginCol = headers.indexOf('In Stock Margin %') + 1;
+  const leadTimeMarginCol = headers.indexOf('Lead Time Margin %') + 1;
+  const statusCol = headers.indexOf('Sourcing Status') + 1;
+  const priorityCol = headers.indexOf('Priority') + 1;
+
+  if (inStockMarginCol > 0) {
+    const cell = excelRow.getCell(inStockMarginCol);
+    if (typeof cell.value === 'number') {
+      cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: getMarginColor(cell.value * 100) } };
+    }
+  }
+  if (leadTimeMarginCol > 0) {
+    const cell = excelRow.getCell(leadTimeMarginCol);
+    if (typeof cell.value === 'number') {
+      cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: getMarginColor(cell.value * 100) } };
+    }
+  }
+  if (statusCol > 0) {
+    const cell = excelRow.getCell(statusCol);
+    if (cell.value === 'SKIPPED - TIMEOUT/ERROR') {
+      cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFF9999' } };
+      cell.font = { bold: true };
+    } else if (cell.value === 'NO COVERAGE') {
+      cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFD580' } };
+      cell.font = { bold: true };
+    }
+  }
+  if (priorityCol > 0) {
+    const cell = excelRow.getCell(priorityCol);
+    if (cell.value === 'CRITICAL') {
+      cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFF9999' } };
+      cell.font = { bold: true };
+    } else if (cell.value === 'PENDING RECEIPT') {
+      cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFD5F4E6' } };
+    } else if (cell.value === 'HIGH') {
+      cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFF2CC' } };
+    }
+  }
+}
+
+// Apply column widths + number formats to a worksheet given its headers array.
+// Shared so both tabs get the same visual treatment (number formatting was
+// previously duplicated between buildEscalationsTab and rebuildExcelWithRfqLines).
+function applyColumnFormats(sheet, headers) {
+  headers.forEach((h, i) => {
+    const col = sheet.getColumn(i + 1);
+    if (h === 'Escalation Reason') col.width = 60;
+    else if (h === 'Escalation Date') col.width = 14;
+    else if (h === 'Item Description') col.width = 45;
+    else if (h === 'Manufacturer' || h.includes('Supplier')) col.width = 25;
+    else if (h === 'MPN' || h === 'Lam P/N') col.width = 25;
+    else if (h === 'Recent POV') col.width = 55;
+    else if (h === 'Priority') col.width = 18;
+    else if (h.includes('Margin') || h === 'Sourcing Status') col.width = 18;
+    else if (h === 'RFQ Line #') col.width = 12;
+    else col.width = 18;
+    if (CURRENCY_COLS.includes(h)) col.numFmt = '$#,##0.0000';
+    else if (INT_COLS.includes(h)) col.numFmt = '#,##0';
+    else if (PCT_COLS.includes(h)) col.numFmt = '0.0%';
+  });
+}
+
 // Build the Escalations worksheet — one row per open escalation entry, populated
 // from this week's reorder-alert data keyed by MPN. Columns A/B carry the
 // buyer-supplied Escalation Reason and Escalation Date; the rest mirrors the
-// main tab so the buyer has full context in one view.
+// main tab so the buyer has full context in one view. Escalated rows are REMOVED
+// from the main tab (see rebuildExcelWithRfqLines) so each item lives in exactly
+// one place — keeps the main tab focused on actionable buys.
 function buildEscalationsTab(workbook, state, csv, allHeaders, rfqMapping) {
-  const ExcelJS = require('exceljs');
   const mpnIdx = csv.headers.indexOf('MPN');
   // Build lookup: MPN → CSV row (with RFQ Line # spliced in at index 1 to match main tab)
   const byMpn = {};
@@ -99,37 +193,16 @@ function buildEscalationsTab(workbook, state, csv, allHeaders, rfqMapping) {
   hdr.font = { bold: true };
   hdr.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFCE4D6' } };
 
-  const currencyCols = ['Base Unit Price', 'Resale Price', 'Historical Purchase Price', 'In Stock Price', 'Lead Time Price'];
-  const intCols = ['Reorder Threshold', 'LAM MOQ', 'QTY ON HAND', 'Shortfall', 'In Stock Qty', 'On Order Qty', 'Available Qty (Other WH)', 'RFQ Line #'];
-  const pctCols = ['In Stock Margin %', 'Lead Time Margin %'];
-
   for (const entry of state.entries) {
     const rowData = byMpn[entry.mpn];
     if (!rowData) continue; // defensive — auto-resolved by the caller
-    const excelRowData = [entry.reason || '', entry.date || '', ...rowData.map((v, idx) => {
-      const h = allHeaders[idx];
-      if (currencyCols.includes(h) || intCols.includes(h)) { const n = parseFloat(v); return isNaN(n) ? v : n; }
-      if (pctCols.includes(h)) { const n = parseFloat(String(v).replace('%', '')); return isNaN(n) ? v : n / 100; }
-      return v;
-    })];
-    ws.addRow(excelRowData);
+    const excelRowData = [entry.reason || '', entry.date || '',
+      ...rowData.map((v, idx) => parseCellForExcel(v, allHeaders[idx]))];
+    const excelRow = ws.addRow(excelRowData);
+    applyRowShading(excelRow, escHeaders);
   }
 
-  escHeaders.forEach((h, i) => {
-    const col = ws.getColumn(i + 1);
-    if (h === 'Escalation Reason') col.width = 60;
-    else if (h === 'Escalation Date') col.width = 14;
-    else if (h === 'Item Description') col.width = 45;
-    else if (h === 'Manufacturer' || h.includes('Supplier')) col.width = 25;
-    else if (h === 'MPN' || h === 'Lam P/N') col.width = 25;
-    else if (h === 'Recent POV') col.width = 55;
-    else if (h.includes('Margin') || h === 'Sourcing Status') col.width = 18;
-    else if (h === 'RFQ Line #') col.width = 12;
-    else col.width = 18;
-    if (currencyCols.includes(h)) col.numFmt = '$#,##0.0000';
-    else if (intCols.includes(h)) col.numFmt = '#,##0';
-    else if (pctCols.includes(h)) col.numFmt = '0.0%';
-  });
+  applyColumnFormats(ws, escHeaders);
   ws.views = [{ state: 'frozen', ySplit: 1 }];
 }
 
@@ -146,6 +219,14 @@ async function rebuildExcelWithRfqLines(sourcedCsvPath, xlsxPath, rfqMapping) {
   const allHeaders = [...csv.headers];
   allHeaders.splice(1, 0, 'RFQ Line #');
 
+  // Load escalations FIRST so main-tab rendering can skip escalated MPNs.
+  // Each item lives in exactly one place — if it's flagged for escalation,
+  // it moves to the Escalations tab and disappears from the main list.
+  const escalationsState = loadEscalationsState();
+  const escalatedMPNs = new Set(
+    (escalationsState && escalationsState.entries) ? escalationsState.entries.map(e => e.mpn) : []
+  );
+
   const workbook = new ExcelJS.Workbook();
   const ws = workbook.addWorksheet('Sourced Reorder Alerts');
 
@@ -155,110 +236,34 @@ async function rebuildExcelWithRfqLines(sourcedCsvPath, xlsxPath, rfqMapping) {
   headerRow.font = { bold: true };
   headerRow.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFD9E1F2' } };
 
-  // Margin color helper
-  function getMarginColor(margin) {
-    if (margin > 18) return 'FF90EE90';
-    if (margin >= 0) return 'FFFFFF99';
-    return 'FFFF9999';
-  }
-
-  const inStockMarginCol = allHeaders.indexOf('In Stock Margin %') + 1;
-  const leadTimeMarginCol = allHeaders.indexOf('Lead Time Margin %') + 1;
-  const statusCol = allHeaders.indexOf('Sourcing Status') + 1;
-
+  let skippedForEscalation = 0;
   for (let i = 0; i < csv.rows.length; i++) {
     const row = csv.rows[i];
-    const mpn = row[mpnIdx];
-    const rfqLine = rfqMapping.lines[mpn] || '';
+    const mpn = (row[mpnIdx] || '').trim();
+    if (escalatedMPNs.has(mpn)) { skippedForEscalation++; continue; }
 
-    // Insert RFQ line # as second column
+    const rfqLine = rfqMapping.lines[mpn] || '';
     const rowData = [...row];
     rowData.splice(1, 0, rfqLine);
-
-    // Parse numeric values
-    const excelRowData = rowData.map((v, idx) => {
-      const h = allHeaders[idx];
-      if (['Base Unit Price', 'Resale Price', 'Historical Purchase Price', 'In Stock Price', 'Lead Time Price'].includes(h)) {
-        const n = parseFloat(v); return isNaN(n) ? v : n;
-      }
-      if (['Reorder Threshold', 'LAM MOQ', 'QTY ON HAND', 'Shortfall', 'In Stock Qty', 'On Order Qty', 'Available Qty (Other WH)', 'RFQ Line #'].includes(h)) {
-        const n = parseFloat(v); return isNaN(n) ? v : n;
-      }
-      if (['In Stock Margin %', 'Lead Time Margin %'].includes(h)) {
-        // CSV has values like "63.8%" — parse to decimal for Excel
-        const s = String(v).replace('%', '');
-        const n = parseFloat(s);
-        return isNaN(n) ? v : n / 100;
-      }
-      return v;
-    });
-
+    const excelRowData = rowData.map((v, idx) => parseCellForExcel(v, allHeaders[idx]));
     const excelRow = ws.addRow(excelRowData);
-
-    // Margin coloring
-    if (inStockMarginCol > 0) {
-      const cell = excelRow.getCell(inStockMarginCol);
-      const val = typeof cell.value === 'number' ? cell.value * 100 : null;
-      if (val !== null) {
-        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: getMarginColor(val) } };
-      }
-    }
-    if (leadTimeMarginCol > 0) {
-      const cell = excelRow.getCell(leadTimeMarginCol);
-      const val = typeof cell.value === 'number' ? cell.value * 100 : null;
-      if (val !== null) {
-        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: getMarginColor(val) } };
-      }
-    }
-
-    // Sourcing Status highlighting (matches lam-kitting-source.js):
-    //   SKIPPED - TIMEOUT/ERROR → red;  NO COVERAGE → orange;  SOURCED → no fill
-    if (statusCol > 0) {
-      const cell = excelRow.getCell(statusCol);
-      if (cell.value === 'SKIPPED - TIMEOUT/ERROR') {
-        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFF9999' } };
-        cell.font = { bold: true };
-      } else if (cell.value === 'NO COVERAGE') {
-        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFD580' } };
-        cell.font = { bold: true };
-      }
-    }
+    applyRowShading(excelRow, allHeaders);
+  }
+  if (skippedForEscalation > 0) {
+    log(`  Moved ${skippedForEscalation} row(s) to Escalations tab — hidden from main tab for clarity`);
   }
 
-  // Number formats
-  const currencyCols = ['Base Unit Price', 'Resale Price', 'Historical Purchase Price', 'In Stock Price', 'Lead Time Price'];
-  const intCols = ['Reorder Threshold', 'LAM MOQ', 'QTY ON HAND', 'Shortfall', 'In Stock Qty', 'On Order Qty', 'Available Qty (Other WH)', 'RFQ Line #'];
-  const pctCols = ['In Stock Margin %', 'Lead Time Margin %'];
-
-  allHeaders.forEach((h, idx) => {
-    const colNum = idx + 1;
-    if (currencyCols.includes(h)) ws.getColumn(colNum).numFmt = '$#,##0.0000';
-    else if (intCols.includes(h)) ws.getColumn(colNum).numFmt = '#,##0';
-    else if (pctCols.includes(h)) ws.getColumn(colNum).numFmt = '0.0%';
-  });
-
-  // Column widths
-  ws.columns.forEach((col, idx) => {
-    const h = allHeaders[idx];
-    if (h === 'Item Description') col.width = 45;
-    else if (h === 'Manufacturer' || h.includes('Supplier')) col.width = 25;
-    else if (h === 'MPN' || h === 'Lam P/N') col.width = 25;
-    else if (h.includes('Margin') || h === 'Sourcing Status') col.width = 18;
-    else if (h === 'RFQ Line #') col.width = 12;
-    else col.width = 18;
-  });
+  applyColumnFormats(ws, allHeaders);
+  ws.views = [{ state: 'frozen', ySplit: 1 }];
 
   // Escalations tab — state-file driven. Manual review surface: items the buyer
   // has flagged for deeper investigation (price approvals, vendor changes, etc.)
   // carried forward week-over-week until the MPN drops off the reorder list.
-  const escalationsState = loadEscalationsState();
   if (escalationsState && escalationsState.entries && escalationsState.entries.length > 0) {
     buildEscalationsTab(workbook, escalationsState, csv, allHeaders, rfqMapping);
     // Auto-resolve: drop entries whose MPN is no longer on the reorder list.
     persistResolvedEscalations(escalationsState, csv, mpnIdx);
   }
-
-  ws.views = [{ state: 'frozen', ySplit: 1 }];
 
   await workbook.xlsx.writeFile(xlsxPath);
 }
@@ -480,7 +485,22 @@ Kitting DB: ${path.basename(excelFile)}`;
   log('============================================================');
 }
 
-main().catch(err => {
-  log(`FATAL: ${err.message}`);
-  process.exit(1);
-});
+// Run main() only when invoked directly (`node lam-kitting-runner.js`).
+// Requiring this module from a test driver or one-off script exposes the
+// helper functions without triggering the full cron flow.
+if (require.main === module) {
+  main().catch(err => {
+    log(`FATAL: ${err.message}`);
+    process.exit(1);
+  });
+}
+
+module.exports = {
+  rebuildExcelWithRfqLines,
+  buildEscalationsTab,
+  loadEscalationsState,
+  persistResolvedEscalations,
+  applyRowShading,
+  applyColumnFormats,
+  parseCellForExcel,
+};
