@@ -35,6 +35,11 @@
       "mpn": "PATT0603E2001BGT1",
       "reason": "New base price approval: $0.82824. Current base $0.5235 — new base is +58.2%. Franchise coverage this week below current resale ($0.638), which implied stale base; new base realigns resale math. Confirm source before approving.",
       "date": "2026-04-20"
+    },
+    {
+      "mpn": "101628-000",
+      "reason": "New base price approval: $4.66 from Mouser (14,643 in stock). Current base $4.40 — new base is +5.9%. Historical purchase $4.32. TTI also quoted $4.05 × 19wk lead time (24.5% margin) if a lower-cost lead-time option is preferred.",
+      "date": "2026-04-20"
     }
   ]
 }
