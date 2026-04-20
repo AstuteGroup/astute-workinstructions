@@ -332,15 +332,32 @@ function loadExcelData(excelPath) {
 // Step 4: Load Historical Purchase Data from ERP
 // -----------------------------------------------------------------------------
 
+// Run a psql query via temp file; return stdout as string. Errors are logged, not swallowed.
+function runPsql(sql, label) {
+  const tmpSql = `/tmp/lam_kitting_${label}.sql`;
+  const tmpOut = `/tmp/lam_kitting_${label}.out`;
+  fs.writeFileSync(tmpSql, sql);
+  try {
+    execSync(`psql -U analytics_user -d idempiere_replica -t -A -F '|' -f ${tmpSql} -o ${tmpOut}`,
+      { encoding: 'utf8', maxBuffer: 50 * 1024 * 1024 });
+  } catch (e) {
+    // rbash often returns non-zero even on success; only treat as a real failure if no output file
+    if (!fs.existsSync(tmpOut) || fs.statSync(tmpOut).size === 0) {
+      console.error(`  WARNING: psql ${label} failed: ${(e.message || '').slice(0, 300)}`);
+      if (e.stderr) console.error(`    stderr: ${e.stderr.toString().slice(0, 500)}`);
+    }
+  }
+  return fs.existsSync(tmpOut) ? fs.readFileSync(tmpOut, 'utf8') : '';
+}
+
 function loadHistoricalPurchaseData(mpns) {
   if (!mpns || mpns.length === 0) {
     return {};
   }
 
-  // Single query: most recent LAM purchase per MPN
-  // All fields from the same LAM-linked PO line (supplier, price, buyer, date, POV, RFQ)
-  // Join: c_orderline → chuboe_vq_line → chuboe_rfq (LAM Research = 1000730)
-  const sql = `
+  // Query A: most recent *closed* LAM PO per MPN — supplier, price, buyer, promise date, POV
+  // Driven by c_orderline so it only fires when a PO has actually been cut.
+  const sqlClosedPO = `
     WITH lam_purchases AS (
       SELECT
         TRIM(ol.chuboe_mpn) as chuboe_mpn,
@@ -348,15 +365,14 @@ function loadHistoricalPurchaseData(mpns) {
         ol.priceentered as purchase_price,
         ol.datepromised,
         u.name as buyer_name,
-        rfq.value as rfq_number,
         CASE WHEN ol.chuboe_po_string LIKE 'POV%' THEN ol.chuboe_po_string ELSE '' END as pov_number,
-        ROW_NUMBER() OVER (PARTITION BY TRIM(ol.chuboe_mpn) ORDER BY ol.datepromised DESC) as rn
+        ROW_NUMBER() OVER (PARTITION BY TRIM(ol.chuboe_mpn) ORDER BY ol.datepromised DESC NULLS LAST) as rn
       FROM adempiere.c_orderline ol
       JOIN adempiere.c_order o ON ol.c_order_id = o.c_order_id
       JOIN adempiere.c_bpartner bp ON o.c_bpartner_id = bp.c_bpartner_id
       LEFT JOIN adempiere.ad_user u ON o.createdby = u.ad_user_id
-      JOIN adempiere.chuboe_vq_line vl ON ol.chuboe_vq_line_id = vl.chuboe_vq_line_id
-      JOIN adempiere.chuboe_rfq rfq ON vl.chuboe_rfq_id = rfq.chuboe_rfq_id
+      LEFT JOIN adempiere.chuboe_vq_line vl ON ol.chuboe_vq_line_id = vl.chuboe_vq_line_id
+      LEFT JOIN adempiere.chuboe_rfq rfq ON vl.chuboe_rfq_id = rfq.chuboe_rfq_id
       WHERE o.issotrx = 'N'
         AND o.isactive = 'Y'
         AND o.docstatus IN ('CO', 'IP')
@@ -366,66 +382,68 @@ function loadHistoricalPurchaseData(mpns) {
         AND rfq.c_bpartner_id = 1000730
     )
     SELECT chuboe_mpn, supplier_name, purchase_price, buyer_name,
-      datepromised::date, rfq_number, 'Lam Research' as rfq_customer, pov_number
+      datepromised::date, pov_number
     FROM lam_purchases
     WHERE rn = 1;
   `;
 
-  try {
-    // Execute query: write SQL to file, output to file, read result
-    const tmpSql = '/tmp/lam_kitting_history.sql';
-    const tmpOut = '/tmp/lam_kitting_history.out';
-    fs.writeFileSync(tmpSql, sql);
-    try { execSync(`psql -t -A -F '|' -f ${tmpSql} -o ${tmpOut}`, { encoding: 'utf8', maxBuffer: 50 * 1024 * 1024 }); } catch(e) {}
-    const result = fs.existsSync(tmpOut) ? fs.readFileSync(tmpOut, 'utf8') : '';
+  // Query B: most recent LAM RFQ per MPN — sourced from chuboe_rfq directly, no PO required.
+  // This is what "Last RFQ" actually means: the latest LAM RFQ we asked vendors about.
+  // Excludes today's run so the cell shows the *prior* RFQ (the one with purchase activity to chase).
+  const sqlLastRFQ = `
+    SELECT DISTINCT ON (TRIM(rlm.chuboe_mpn))
+      TRIM(rlm.chuboe_mpn) as mpn,
+      rfq.value as rfq_number,
+      rfq.created::date as rfq_date
+    FROM adempiere.chuboe_rfq rfq
+    JOIN adempiere.chuboe_rfq_line rl ON rl.chuboe_rfq_id = rfq.chuboe_rfq_id
+    JOIN adempiere.chuboe_rfq_line_mpn rlm ON rlm.chuboe_rfq_line_id = rl.chuboe_rfq_line_id
+    WHERE rfq.c_bpartner_id = 1000730
+      AND rfq.isactive = 'Y'
+      AND rfq.created::date < CURRENT_DATE
+      AND rlm.chuboe_mpn IS NOT NULL
+      AND rlm.chuboe_mpn != ''
+    ORDER BY TRIM(rlm.chuboe_mpn), rfq.created DESC;
+  `;
 
-    const historicalData = {};
-    const lines = result.trim().split('\n').filter(l => l.trim());
+  const historicalData = {};
 
-    for (const line of lines) {
-      const [mpn, supplier, price, buyer, dateordered, rfqNum, rfqCust, povNum] = line.split('|');
-      if (mpn && mpn.trim()) {
-        historicalData[mpn.trim()] = {
-          OT_Previous_Supplier: (supplier || '').trim(),
-          Historical_Purchase_Price: parseFloat(price) || 0,
-          OT_Buyer: (buyer || '').trim(),
-          Last_Purchase_Date: (dateordered || '').trim(),
-          RFQ_Number: (rfqNum || '').trim(),
-          RFQ_Customer: (rfqCust || '').trim(),
-          POV_Number: (povNum || '').trim()
+  // Closed-PO history
+  const closedResult = runPsql(sqlClosedPO, 'history');
+  for (const line of closedResult.trim().split('\n').filter(l => l.trim() && l.includes('|'))) {
+    const [mpn, supplier, price, buyer, dateordered, povNum] = line.split('|');
+    if (mpn && mpn.trim()) {
+      historicalData[mpn.trim()] = {
+        OT_Previous_Supplier: (supplier || '').trim(),
+        Historical_Purchase_Price: parseFloat(price) || 0,
+        OT_Buyer: (buyer || '').trim(),
+        Last_Purchase_Date: (dateordered || '').trim(),
+        POV_Number: (povNum || '').trim(),
+        RFQ_Number: '',
+        RFQ_Customer: 'Lam Research'
+      };
+    }
+  }
+
+  // Latest LAM RFQ (separate lookup — survives even when no PO has been cut)
+  const rfqResult = runPsql(sqlLastRFQ, 'last_rfq');
+  for (const line of rfqResult.trim().split('\n').filter(l => l.trim() && l.includes('|'))) {
+    const [mpn, rfqNum, rfqDate] = line.split('|');
+    if (mpn && mpn.trim()) {
+      const key = mpn.trim();
+      if (!historicalData[key]) {
+        historicalData[key] = {
+          OT_Previous_Supplier: '', Historical_Purchase_Price: 0, OT_Buyer: '',
+          Last_Purchase_Date: '', POV_Number: '',
+          RFQ_Number: '', RFQ_Customer: 'Lam Research'
         };
       }
+      historicalData[key].RFQ_Number = (rfqNum || '').trim();
+      historicalData[key].RFQ_Date = (rfqDate || '').trim();
     }
-
-    return historicalData;
-  } catch (err) {
-    console.error('  WARNING: Could not load historical data from ERP');
-    console.error(`  ${err.message.slice(0, 200)}`);
-    // On rbash error, stdout may still have valid data
-    const fallback = (err.stdout || '').toString();
-    if (fallback.includes('|')) {
-      console.log('  Recovering from rbash exit code — data present in stdout');
-      const historicalData = {};
-      const lines = fallback.trim().split('\n').filter(l => l.trim() && l.includes('|'));
-      for (const line of lines) {
-        const [mpn, supplier, price, buyer, dateordered, rfqNum, rfqCust, povNum] = line.split('|');
-        if (mpn && mpn.trim()) {
-          historicalData[mpn.trim()] = {
-            OT_Previous_Supplier: (supplier || '').trim(),
-            Historical_Purchase_Price: parseFloat(price) || 0,
-            OT_Buyer: (buyer || '').trim(),
-            Last_Purchase_Date: (dateordered || '').trim(),
-            RFQ_Number: (rfqNum || '').trim(),
-            RFQ_Customer: (rfqCust || '').trim(),
-            POV_Number: (povNum || '').trim()
-          };
-        }
-      }
-      console.log(`  Recovered ${Object.keys(historicalData).length} MPNs`);
-      return historicalData;
-    }
-    return {};
   }
+
+  return historicalData;
 }
 
 // -----------------------------------------------------------------------------
@@ -433,21 +451,28 @@ function loadHistoricalPurchaseData(mpns) {
 // -----------------------------------------------------------------------------
 
 function loadRecentPOVs() {
-  // Two queries:
-  // 1) Recent POVs (vendor receipts in last 4 months)
-  // 2) On-order quantity (PO lines not fully delivered)
+  // Surface ALL open LAM purchase activity per MPN, regardless of whether:
+  //   - the OT PO has been cut yet (VQ_TICKED state bridges the gap)
+  //   - the Infor POV has been stamped yet (OT_PO state bridges the gap)
+  // "Open" means: for POs, qtyordered > qtydelivered; for VQs, ispurchased = 'Y' with no PO line yet.
+  // Receipts in Infor close POs naturally (qtydelivered catches up) and the row drops off the report.
+  //
+  // On Order Qty = total open qty across all open activity for the MPN (summed across all POs + any pre-PO ticks).
+  // Recent POV cell shows the single most-recent activity row (preferring PO over VQ_TICKED).
   const sql = `
-    WITH recent_orders AS (
+    WITH all_activity AS (
+      -- Open POs (with or without Infor POV stamp)
       SELECT
-        TRIM(ol.chuboe_mpn) as mpn,
-        ol.chuboe_po_string as pov_number,
-        ol.qtyordered,
-        ol.qtydelivered,
-        ol.qtyordered - ol.qtydelivered as qty_on_order,
-        ol.datepromised::date,
-        bp.name as supplier,
-        rfq.value as rfq_number,
-        ROW_NUMBER() OVER (PARTITION BY TRIM(ol.chuboe_mpn) ORDER BY ol.datepromised DESC) as rn
+        TRIM(ol.chuboe_mpn) AS mpn,
+        CASE WHEN ol.chuboe_po_string LIKE 'POV%' THEN ol.chuboe_po_string ELSE '' END AS pov_number,
+        o.documentno AS ot_po_number,
+        (ol.qtyordered - ol.qtydelivered) AS qty,
+        ol.datepromised::date AS promise_date,
+        bp.name AS supplier,
+        rfq.value AS rfq_number,
+        'PO' AS state,
+        1 AS preference,
+        COALESCE(ol.datepromised, o.created) AS sort_date
       FROM adempiere.c_orderline ol
       JOIN adempiere.c_order o ON ol.c_order_id = o.c_order_id
       JOIN adempiere.c_bpartner bp ON o.c_bpartner_id = bp.c_bpartner_id
@@ -455,48 +480,68 @@ function loadRecentPOVs() {
       LEFT JOIN adempiere.chuboe_rfq rfq ON vl.chuboe_rfq_id = rfq.chuboe_rfq_id
       WHERE o.issotrx = 'N'
         AND o.isactive = 'Y'
-        AND o.docstatus IN ('CO', 'IP')
-        AND ol.datepromised >= CURRENT_DATE - INTERVAL '90 days'
+        AND o.docstatus IN ('CO', 'IP', 'DR')
+        AND ol.qtyordered > ol.qtydelivered
         AND ol.chuboe_mpn IS NOT NULL
         AND ol.chuboe_mpn != ''
-        AND ol.chuboe_po_string IS NOT NULL
-        AND ol.chuboe_po_string LIKE 'POV%'
+        AND rfq.c_bpartner_id = 1000730
+
+      UNION ALL
+
+      -- VQs ticked (ispurchased='Y') but no PO cut yet → buyer committed, procurement catching up
+      SELECT
+        TRIM(vl.chuboe_mpn) AS mpn,
+        '' AS pov_number,
+        '' AS ot_po_number,
+        vl.qty AS qty,
+        vl.datepromised::date AS promise_date,
+        bp.name AS supplier,
+        rfq.value AS rfq_number,
+        'VQ_TICKED' AS state,
+        2 AS preference,
+        rfq.created AS sort_date
+      FROM adempiere.chuboe_vq_line vl
+      JOIN adempiere.chuboe_rfq rfq ON vl.chuboe_rfq_id = rfq.chuboe_rfq_id
+      JOIN adempiere.c_bpartner bp ON vl.c_bpartner_id = bp.c_bpartner_id
+      LEFT JOIN adempiere.c_orderline ol2
+        ON ol2.chuboe_vq_line_id = vl.chuboe_vq_line_id AND ol2.isactive = 'Y'
+      WHERE vl.ispurchased = 'Y'
+        AND vl.isactive = 'Y'
+        AND rfq.c_bpartner_id = 1000730
+        AND rfq.isactive = 'Y'
+        AND ol2.c_orderline_id IS NULL
+        AND vl.chuboe_mpn IS NOT NULL
+        AND vl.chuboe_mpn != ''
+    ),
+    ranked AS (
+      SELECT *,
+        ROW_NUMBER() OVER (PARTITION BY mpn ORDER BY preference ASC, sort_date DESC NULLS LAST) AS rn,
+        SUM(qty) OVER (PARTITION BY mpn) AS total_qty
+      FROM all_activity
     )
-    SELECT mpn, pov_number, qtyordered, datepromised, supplier, rfq_number, qty_on_order
-    FROM recent_orders
+    SELECT mpn, pov_number, ot_po_number, qty, total_qty, promise_date, supplier, rfq_number, state
+    FROM ranked
     WHERE rn = 1;
   `;
 
-  try {
-    const tmpSql = '/tmp/lam_kitting_povs.sql';
-    const tmpOut = '/tmp/lam_kitting_povs.out';
-    fs.writeFileSync(tmpSql, sql);
-    try { execSync(`psql -t -A -F '|' -f ${tmpSql} -o ${tmpOut}`, { encoding: 'utf8', maxBuffer: 50 * 1024 * 1024 }); } catch(e) {}
-    const result = fs.existsSync(tmpOut) ? fs.readFileSync(tmpOut, 'utf8') : '';
-
-    const povData = {};
-    const lines = result.trim().split('\n').filter(l => l.trim());
-
-    for (const line of lines) {
-      const [mpn, pov, qtyOrdered, date, supplier, rfqNum, onOrder] = line.split('|');
-      if (mpn && mpn.trim()) {
-        povData[mpn.trim()] = {
-          POV_Number: (pov || '').trim(),
-          POV_Qty: parseFloat(qtyOrdered) || 0,
-          POV_Date: (date || '').trim(),
-          POV_Supplier: (supplier || '').trim(),
-          RFQ_Number: (rfqNum || '').trim(),
-          Qty_On_Order: parseFloat(onOrder) || 0
-        };
-      }
+  const result = runPsql(sql, 'povs');
+  const povData = {};
+  for (const line of result.trim().split('\n').filter(l => l.trim() && l.includes('|'))) {
+    const [mpn, pov, otPo, qty, totalQty, date, supplier, rfqNum, state] = line.split('|');
+    if (mpn && mpn.trim()) {
+      povData[mpn.trim()] = {
+        State: (state || '').trim(),                    // 'PO' or 'VQ_TICKED'
+        POV_Number: (pov || '').trim(),                 // populated once Infor stamps
+        OT_PO_Number: (otPo || '').trim(),              // OT PO# (pre-Infor-stamp fallback)
+        POV_Qty: parseFloat(qty) || 0,                  // qty on the displayed row
+        POV_Date: (date || '').trim(),
+        POV_Supplier: (supplier || '').trim(),
+        RFQ_Number: (rfqNum || '').trim(),
+        Qty_On_Order: parseFloat(totalQty) || 0         // total across all open activity for the MPN
+      };
     }
-
-    return povData;
-  } catch (err) {
-    console.error('  WARNING: Could not load recent POV data from ERP');
-    console.error(`  ${err.message}`);
-    return {};
   }
+  return povData;
 }
 
 // -----------------------------------------------------------------------------
@@ -582,6 +627,26 @@ const ALERT_COLUMNS = [
   'Available Qty (Other WH)',
 ];
 
+// Render the "Recent POV" cell based on the activity state reported by loadRecentPOVs.
+// Three states, in descending procurement maturity:
+//   PO + POV stamp: "POV0075568 (2026-04-13, 60 pcs from Master, RFQ 1132328)"
+//   PO only:        "OT PO809630 pending Infor stamp (2026-04-13, 60 pcs from Master, RFQ 1132328)"
+//   VQ ticked only: "VQ ticked — PO pending (60 pcs from Master, RFQ 1132328)"
+function formatPOVCell(pov) {
+  if (!pov || !pov.State) return '';
+  const rfqTag = pov.RFQ_Number ? `, RFQ ${pov.RFQ_Number}` : '';
+  if (pov.State === 'PO') {
+    const id = pov.POV_Number || (pov.OT_PO_Number ? `OT ${pov.OT_PO_Number} pending Infor stamp` : '');
+    if (!id) return '';
+    const datePart = pov.POV_Date ? `${pov.POV_Date}, ` : '';
+    return `${id} (${datePart}${pov.POV_Qty} pcs from ${pov.POV_Supplier}${rfqTag})`;
+  }
+  if (pov.State === 'VQ_TICKED') {
+    return `VQ ticked — PO pending (${pov.POV_Qty} pcs from ${pov.POV_Supplier}${rfqTag})`;
+  }
+  return '';
+}
+
 function buildAlert(mpn, excel, totalQty, lamOwned, shortfall, priority, history, pov) {
   return {
     'Lam P/N': excel.CPC,
@@ -594,7 +659,7 @@ function buildAlert(mpn, excel, totalQty, lamOwned, shortfall, priority, history
     'Shortfall': shortfall,
     'Priority': priority,
     'On Order Qty': pov ? (pov.Qty_On_Order || '') : '',
-    'Recent POV': (pov && pov.POV_Number && pov.POV_Date) ? `${pov.POV_Number} (${pov.POV_Date}, ${pov.POV_Qty} pcs from ${pov.POV_Supplier}${pov.RFQ_Number ? ', RFQ ' + pov.RFQ_Number : ''})` : '',
+    'Recent POV': formatPOVCell(pov),
     'Base Unit Price': excel.Base_Unit_Price,
     'Resale Price': excel.Resale_Price,
     'Historical Purchase Price': history.Historical_Purchase_Price || '',
