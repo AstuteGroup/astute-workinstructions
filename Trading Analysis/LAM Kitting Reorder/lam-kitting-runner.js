@@ -48,6 +48,91 @@ async function sendEmail(to, subject, body, attachmentPaths = []) {
   return await notifier.sendEmail(to, subject, body);
 }
 
+const ESCALATIONS_STATE_FILE = path.join(SCRIPT_DIR, 'lam-escalations.json');
+
+function loadEscalationsState() {
+  if (!fs.existsSync(ESCALATIONS_STATE_FILE)) return null;
+  try {
+    return JSON.parse(fs.readFileSync(ESCALATIONS_STATE_FILE, 'utf-8'));
+  } catch (err) {
+    log(`  WARNING: could not parse ${ESCALATIONS_STATE_FILE}: ${err.message}`);
+    return null;
+  }
+}
+
+// Drop entries whose MPN no longer appears on the weekly reorder list — implicit
+// resolution (inventory came back above threshold, Kitting DB was updated, etc.).
+// Writes the trimmed state back in place so next week starts clean.
+function persistResolvedEscalations(state, csv, mpnIdx) {
+  const currentMPNs = new Set(csv.rows.map(r => (r[mpnIdx] || '').trim()));
+  const before = state.entries.length;
+  const stillActive = state.entries.filter(e => currentMPNs.has(e.mpn));
+  const resolved = state.entries.filter(e => !currentMPNs.has(e.mpn));
+  if (resolved.length === 0) return;
+  const updated = { ...state, entries: stillActive };
+  fs.writeFileSync(ESCALATIONS_STATE_FILE, JSON.stringify(updated, null, 2) + '\n');
+  log(`  Auto-resolved ${resolved.length} escalation(s) (no longer on reorder list): ${resolved.map(e => e.mpn).join(', ')}`);
+  log(`  Remaining open escalations: ${stillActive.length} (was ${before})`);
+}
+
+// Build the Escalations worksheet — one row per open escalation entry, populated
+// from this week's reorder-alert data keyed by MPN. Columns A/B carry the
+// buyer-supplied Escalation Reason and Escalation Date; the rest mirrors the
+// main tab so the buyer has full context in one view.
+function buildEscalationsTab(workbook, state, csv, allHeaders, rfqMapping) {
+  const ExcelJS = require('exceljs');
+  const mpnIdx = csv.headers.indexOf('MPN');
+  // Build lookup: MPN → CSV row (with RFQ Line # spliced in at index 1 to match main tab)
+  const byMpn = {};
+  for (const row of csv.rows) {
+    const mpn = (row[mpnIdx] || '').trim();
+    if (!mpn) continue;
+    const rowData = [...row];
+    rowData.splice(1, 0, rfqMapping.lines[mpn] || '');
+    byMpn[mpn] = rowData;
+  }
+
+  const escHeaders = ['Escalation Reason', 'Escalation Date', ...allHeaders];
+  const ws = workbook.addWorksheet('Escalations');
+  ws.addRow(escHeaders);
+  const hdr = ws.getRow(1);
+  hdr.font = { bold: true };
+  hdr.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFCE4D6' } };
+
+  const currencyCols = ['Base Unit Price', 'Resale Price', 'Historical Purchase Price', 'In Stock Price', 'Lead Time Price'];
+  const intCols = ['Reorder Threshold', 'MOQ', 'QTY ON HAND', 'Shortfall', 'In Stock Qty', 'On Order Qty', 'Available Qty (Other WH)', 'RFQ Line #'];
+  const pctCols = ['In Stock Margin %', 'Lead Time Margin %'];
+
+  for (const entry of state.entries) {
+    const rowData = byMpn[entry.mpn];
+    if (!rowData) continue; // defensive — auto-resolved by the caller
+    const excelRowData = [entry.reason || '', entry.date || '', ...rowData.map((v, idx) => {
+      const h = allHeaders[idx];
+      if (currencyCols.includes(h) || intCols.includes(h)) { const n = parseFloat(v); return isNaN(n) ? v : n; }
+      if (pctCols.includes(h)) { const n = parseFloat(String(v).replace('%', '')); return isNaN(n) ? v : n / 100; }
+      return v;
+    })];
+    ws.addRow(excelRowData);
+  }
+
+  escHeaders.forEach((h, i) => {
+    const col = ws.getColumn(i + 1);
+    if (h === 'Escalation Reason') col.width = 60;
+    else if (h === 'Escalation Date') col.width = 14;
+    else if (h === 'Item Description') col.width = 45;
+    else if (h === 'Manufacturer' || h.includes('Supplier')) col.width = 25;
+    else if (h === 'MPN' || h === 'Lam P/N') col.width = 25;
+    else if (h === 'Recent POV') col.width = 55;
+    else if (h.includes('Margin') || h === 'Sourcing Status') col.width = 18;
+    else if (h === 'RFQ Line #') col.width = 12;
+    else col.width = 18;
+    if (currencyCols.includes(h)) col.numFmt = '$#,##0.0000';
+    else if (intCols.includes(h)) col.numFmt = '#,##0';
+    else if (pctCols.includes(h)) col.numFmt = '0.0%';
+  });
+  ws.views = [{ state: 'frozen', ySplit: 1 }];
+}
+
 /**
  * Rebuild the sourced Excel with an "RFQ Line #" column and RFQ search key.
  * Items with on-order/recent POV get blank RFQ Line (they were skipped).
@@ -162,6 +247,16 @@ async function rebuildExcelWithRfqLines(sourcedCsvPath, xlsxPath, rfqMapping) {
     else if (h === 'RFQ Line #') col.width = 12;
     else col.width = 18;
   });
+
+  // Escalations tab — state-file driven. Manual review surface: items the buyer
+  // has flagged for deeper investigation (price approvals, vendor changes, etc.)
+  // carried forward week-over-week until the MPN drops off the reorder list.
+  const escalationsState = loadEscalationsState();
+  if (escalationsState && escalationsState.entries && escalationsState.entries.length > 0) {
+    buildEscalationsTab(workbook, escalationsState, csv, allHeaders, rfqMapping);
+    // Auto-resolve: drop entries whose MPN is no longer on the reorder list.
+    persistResolvedEscalations(escalationsState, csv, mpnIdx);
+  }
 
   ws.views = [{ state: 'frozen', ySplit: 1 }];
 
@@ -346,12 +441,22 @@ async function main() {
     ? `\nRFQ Created: ${rfqMapping.rfqSearchKey} (3PL/VMI)\n  ${rfqMapping.linesWritten} lines written, ${rfqMapping.vqItems} items with VQ data\n  Contact: Rob Johnson | Salesrep: Josh Syre\n`
     : '';
 
+  // Escalation summary — reflects state AFTER this run's auto-resolution pass.
+  let escalationSection = '';
+  try {
+    const escState = loadEscalationsState();
+    const openCount = escState?.entries?.length || 0;
+    if (openCount > 0) {
+      escalationSection = `\nOpen Escalations: ${openCount} — see the "Escalations" tab in the attached xlsx.\n`;
+    }
+  } catch (_) { /* non-fatal */ }
+
   const emailSubject = isPartial
     ? `⚠️ LAM Kitting Reorder - PARTIAL Sourced ${dateStr}`
     : `LAM Kitting Reorder - Sourced ${dateStr}`;
 
   const emailBody = `LAM Kitting Reorder - Sourced Report ${dateStr}
-${partialWarning}${rfqSection}
+${partialWarning}${rfqSection}${escalationSection}
 ${totalAlerts} items below threshold:
 - CRITICAL (zero stock, no recent PO): ${critCount}
 - HIGH: ${highCount}

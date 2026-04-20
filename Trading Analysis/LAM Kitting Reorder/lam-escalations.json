@@ -1,0 +1,15 @@
+{
+  "_comment": "Manual escalation tracker for LAM Kitting Reorder. Add entries here; each weekly run renders them on the Escalations tab of the sourced xlsx using the current week's row data. Entries whose MPN no longer appears on the reorder list are silently dropped (auto-resolved). To resolve manually, delete the entry.",
+  "_schema": {
+    "mpn": "the MPN as it appears on the Reorder Alerts sheet",
+    "reason": "short free-text describing why this is escalated (price approval, vendor change, etc.)",
+    "date": "YYYY-MM-DD of first escalation"
+  },
+  "entries": [
+    {
+      "mpn": "SN74LVC125ARGYR",
+      "reason": "New base price approval needed — franchise quotes 250 @ $0.236 (Mouser) or 200 @ $0.306 (TTI) vs current base $0.200",
+      "date": "2026-04-20"
+    }
+  ]
+}
