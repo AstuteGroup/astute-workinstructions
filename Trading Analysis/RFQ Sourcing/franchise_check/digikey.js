@@ -248,7 +248,7 @@ async function checkForSilentThrottle(mpn, rfqQty, result) {
  * @returns {Object} Screening and VQ data
  */
 async function searchPart(mpn, rfqQty = 1, searchOptions = {}) {
-  const result = await _searchPartImpl(mpn, rfqQty, { trackStats: true });
+  const result = await _searchPartImpl(mpn, rfqQty, { trackStats: true, searchOptions });
   // Throttle check runs after the result is in hand. Async but we don't
   // need to block the caller — fire and continue. (await is ok here too;
   // sentinel runs at most once per cooldown window so the cost is bounded.)
@@ -262,6 +262,7 @@ async function searchPart(mpn, rfqQty = 1, searchOptions = {}) {
  */
 async function _searchPartImpl(mpn, rfqQty = 1, _opts = {}) {
   const token = await getAccessToken();
+  const searchOptions = _opts.searchOptions || {};
 
   return new Promise((resolve, reject) => {
     const postData = JSON.stringify({
