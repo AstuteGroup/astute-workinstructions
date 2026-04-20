@@ -218,7 +218,16 @@ ALL Tier 1 fields PLUS the following. A VQ **MUST NOT** be marked `IsPurchased =
 - Lead time = numeric (e.g., "12 weeks") → calculate from today
 - Lead time = blank → must be provided at PO time
 
-**CRITICAL: The API does NOT enforce OT's mandatory field validation.** Records can be written via API with missing fields that OT would reject on save. All validation MUST be enforced client-side before calling `apiPost`/`apiPut`.
+**CRITICAL: The API does NOT enforce OT's mandatory field validation.** Records can be written via API with missing fields that OT would reject on save. All validation is enforced **client-side via `shared/vq-purchase-validator.js`**, which is the canonical source of truth for the Tier 2 checklist (date code, lead time, promise date, packaging, traceability, warehouse + warehouse_group pair per program, shipper, incoterm, public/private note split, competing-VQ untick).
+
+**Required writer paths — do not bypass:**
+
+| Operation | Use | NOT |
+|---|---|---|
+| Tick `IsPurchased='Y'` | `shared/vq-patcher.js` → `tickVQForPurchase(vqId, {program, extra})` | `patchRecord('chuboe_vq_line', id, {IsPurchased: 'Y'})` |
+| POST approve-order R_Request | `shared/r-request-writer.js` → `postApproveOrder({vqId, program, rfqId, summary, approvalText})` | `apiPost('r_request', {...})` directly |
+
+Both wrappers run the validator internally and abort on any violation. The "don't bypass" rule exists because we empirically did bypass it on 2026-04-20 and shipped an approval with null promise date, null lead time, buyer-internal content in the public note, and Austin (1000000) where Brownsville (1000008) was expected.
 
 ---
 
@@ -552,6 +561,18 @@ Note: `ad_table.tablename` is also PascalCase (e.g., `Chuboe_RFQ`, not `chuboe_r
 - `Chuboe_JAPN_RFQ2BuyerQueue` — not `Chuboe_Japn_...`
 - `Chuboe_Search_vendor` — lowercase `v` (not `Vendor`)
 - `Chuboe_Multi_RFQtoBuyerQueue` — lowercase `to` (not `RFQToBuyerQueue`)
+
+---
+
+## Vendor BP Overrides (Do Not Skip)
+
+Some vendors have multiple BPs in OT. **Always use the correct one:**
+
+| Vendor | Use This BP | Search Key | c_bpartner_id | Do NOT Use |
+|--------|------------|------------|---------------|------------|
+| Avnet (web orders) | **Avnet EM** | 1002340 | 1000336 | Avnet (1001051 / 1000051) |
+
+**Why:** Avnet EM is the web ordering entity. Using the generic "Avnet" BP causes downstream processing issues. This applies to all VQ loading — `vq-writer.js`, `lib-load-vq-row.js`, franchise API enrichment, and any manual VQ creation.
 
 ---
 

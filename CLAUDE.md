@@ -372,6 +372,17 @@ IDs are **assigned server-side** by iDempiere — do NOT include PK fields in PO
 | `shared/vq-writer.js` | `writeVQBatch(rfq, items)` | chuboe_vq_line (two-pass: exact → fuzzy) |
 | `shared/cq-writer.js` | `writeCQ(rfq, line)` / `writeCQBatch(rfq, lines)` | chuboe_cq_line (flat, no header) |
 | `shared/record-updater.js` | `patchRecord(table, id, payload, opts)` / `patchBatch(table, updates, opts)` | **Updates** existing rows on any chuboe_* table — idempotent backfills, enrichment passes, corrections (HTS/ECCN, alt-MPN linkage, etc.). See `api-writeback.md` § PATCH / Update Pattern. |
+| `shared/vq-patcher.js` | `tickVQForPurchase(vqId, {program, extra})` | **PATCH IsPurchased='Y'** on a VQ — enforced path. Runs `vq-purchase-validator.js` first, aborts on failure, auto-unticks competing VQs. **DO NOT `patchRecord('chuboe_vq_line', id, {IsPurchased: 'Y'})` directly.** |
+| `shared/r-request-writer.js` | `postApproveOrder({vqId, program, rfqId, summary, approvalText})` | **POST approve-order R_Request** — enforced path. Validates linked VQ first, forces Jake routing + Submitted status + Approve Order type. **DO NOT `apiPost('r_request', ...)` directly for approvals.** |
+| `shared/vq-purchase-validator.js` | `validateVQForPurchase(vqId, {program})` | Pre-flight checker (called internally by the two wrappers above). Returns `{ok, violations, vq}`. Useful on its own for dry-run diagnostics. |
+
+### R_Requests (Approve Order + related)
+
+**Documentation:** `shared/r-requests.md` — canonical reference for all request types, with detailed focus on Approve-Order requests (the pattern support/managers see). Covers field → UI mapping (Summary, Chuboe_Approval_Text, Result), routing (AD_User_ID 1000004 = Jake), Submitted status requirement (R_Status_ID = 1000000), non-updateable fields, and the canonical POST payload.
+
+**Always go through `shared/r-request-writer.js` (`postApproveOrder()`) for approve-order R_Requests.** It wraps `apiPost('r_request', ...)` with the VQ validator + canonical routing. Direct `apiPost` for approvals is an anti-pattern — it has skipped the validator every time we've tried it.
+
+**READ `shared/r-requests.md` BEFORE POSTING ANY NON-APPROVE R_REQUEST** — gotchas around `Chuboe_Approval_Text` (non-updateable after POST, must be set at create time), routing defaults (API auto-assigns to Claude 1049524 unless overridden), and status defaults have burned us multiple times.
 
 #### Credentials
 
