@@ -28,7 +28,7 @@
     },
     {
       "mpn": "1424241",
-      "reason": "New base price approval: $18.47. Current base $16.716 — new base is +10.5%. Matches TTI/Sager/Master consensus. DigiKey has stock per buyer — VQ pending (API 504 + no historical DigiKey VQ to reference; awaiting manual price/qty).",
+      "reason": "New base price approval: $18.47. Current base $16.716 — new base is +10.5%. Matches TTI/Sager/Master consensus. DigiKey VQ written at $18.47 × 50 (VQ 2134147).",
       "date": "2026-04-20"
     },
     {
