@@ -13,7 +13,17 @@
     },
     {
       "mpn": "65100516121",
-      "reason": "Mouser pricing: $1.17 @ 4,315 qty (vs base $1.148 — 1.9% above, effectively at-cost). Review Kitting DB MOQ of 60 — not reflected on Mouser listing; may be stale LAM-internal setting rather than vendor min.",
+      "reason": "Mouser pricing: $1.17 @ 4,315 qty (vs base $1.148 — 1.9% above, effectively at-cost). Review LAM MOQ of 60 — not reflected on Mouser cut-tape availability; likely stale LAM-internal/contract setting rather than vendor minimum. Candidate to lower toward real demand.",
+      "date": "2026-04-20"
+    },
+    {
+      "mpn": "ADS8688IDBTR",
+      "reason": "New base price approval: $13.345 from TI Store (direct TI). Current base $12.806 — new base is +4.2%. Note: NO COVERAGE on this week's franchise sweep (TI Store module pending / APIs returned nothing); quote is manual from TI direct.",
+      "date": "2026-04-20"
+    },
+    {
+      "mpn": "LMZ14202TZ-ADJ/NOPB",
+      "reason": "New base price approval: $14.58. Current base $10.025 — new base is +45.4%. Franchise coverage this week: Arrow only at $11.28 lead-time. Significant jump — confirm vendor source before approving.",
       "date": "2026-04-20"
     }
   ]

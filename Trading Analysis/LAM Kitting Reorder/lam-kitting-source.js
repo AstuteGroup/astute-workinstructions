@@ -123,7 +123,7 @@ async function main() {
   const csv = readCSVFile(inputFile);
   const headers = csv.headers;
   const mpnIdx = headers.indexOf('MPN');
-  const moqIdx = headers.indexOf('MOQ');
+  const moqIdx = headers.indexOf('LAM MOQ');
   const shortfallIdx = headers.indexOf('Shortfall');
 
   if (mpnIdx === -1) {
@@ -371,7 +371,7 @@ async function writeEnrichedOutput(results, originalHeaders, outputPath) {
         const num = parseFloat(v);
         if (!isNaN(num)) return num;
       }
-      if (['Reorder Threshold', 'MOQ', 'QTY ON HAND', 'Shortfall', 'On Order Qty', 'Available Qty (Other WH)'].includes(header)) {
+      if (['Reorder Threshold', 'LAM MOQ', 'QTY ON HAND', 'Shortfall', 'On Order Qty', 'Available Qty (Other WH)'].includes(header)) {
         const num = parseFloat(v);
         if (!isNaN(num)) return num;
       }
@@ -472,7 +472,7 @@ async function writeEnrichedOutput(results, originalHeaders, outputPath) {
 
   // Apply number formats to currency and quantity columns
   const currencyCols = ['Base Unit Price', 'Resale Price', 'Historical Purchase Price', 'In Stock Price', 'Lead Time Price'];
-  const intCols = ['Reorder Threshold', 'MOQ', 'QTY ON HAND', 'Shortfall', 'In Stock Qty', 'On Order Qty', 'Available Qty (Other WH)'];
+  const intCols = ['Reorder Threshold', 'LAM MOQ', 'QTY ON HAND', 'Shortfall', 'In Stock Qty', 'On Order Qty', 'Available Qty (Other WH)'];
   const pctCols = ['In Stock Margin %', 'Lead Time Margin %'];
 
   allHeaders.forEach((header, idx) => {

@@ -641,7 +641,7 @@ const ALERT_COLUMNS = [
   'Historical Buyer',
   // Kitting DB
   'Lead Time',
-  'MOQ',
+  'LAM MOQ',
   // Other warehouse stock
   'Available Stock (Other WH)',
   'Available Qty (Other WH)',
@@ -689,7 +689,7 @@ function buildAlert(mpn, excel, totalQty, lamOwned, shortfall, priority, history
     'Last Promise Date': history.Last_Purchase_Date || '',
     'Last RFQ': history.RFQ_Number ? `${history.RFQ_Number} (${history.RFQ_Customer || ''})` : '',
     'Lead Time': excel.Lead_Time,
-    'MOQ': excel.MOQ,
+    'LAM MOQ': excel.MOQ,
   };
 }
 

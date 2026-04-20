@@ -100,7 +100,7 @@ function buildEscalationsTab(workbook, state, csv, allHeaders, rfqMapping) {
   hdr.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFCE4D6' } };
 
   const currencyCols = ['Base Unit Price', 'Resale Price', 'Historical Purchase Price', 'In Stock Price', 'Lead Time Price'];
-  const intCols = ['Reorder Threshold', 'MOQ', 'QTY ON HAND', 'Shortfall', 'In Stock Qty', 'On Order Qty', 'Available Qty (Other WH)', 'RFQ Line #'];
+  const intCols = ['Reorder Threshold', 'LAM MOQ', 'QTY ON HAND', 'Shortfall', 'In Stock Qty', 'On Order Qty', 'Available Qty (Other WH)', 'RFQ Line #'];
   const pctCols = ['In Stock Margin %', 'Lead Time Margin %'];
 
   for (const entry of state.entries) {
@@ -181,7 +181,7 @@ async function rebuildExcelWithRfqLines(sourcedCsvPath, xlsxPath, rfqMapping) {
       if (['Base Unit Price', 'Resale Price', 'Historical Purchase Price', 'In Stock Price', 'Lead Time Price'].includes(h)) {
         const n = parseFloat(v); return isNaN(n) ? v : n;
       }
-      if (['Reorder Threshold', 'MOQ', 'QTY ON HAND', 'Shortfall', 'In Stock Qty', 'On Order Qty', 'Available Qty (Other WH)', 'RFQ Line #'].includes(h)) {
+      if (['Reorder Threshold', 'LAM MOQ', 'QTY ON HAND', 'Shortfall', 'In Stock Qty', 'On Order Qty', 'Available Qty (Other WH)', 'RFQ Line #'].includes(h)) {
         const n = parseFloat(v); return isNaN(n) ? v : n;
       }
       if (['In Stock Margin %', 'Lead Time Margin %'].includes(h)) {
@@ -227,7 +227,7 @@ async function rebuildExcelWithRfqLines(sourcedCsvPath, xlsxPath, rfqMapping) {
 
   // Number formats
   const currencyCols = ['Base Unit Price', 'Resale Price', 'Historical Purchase Price', 'In Stock Price', 'Lead Time Price'];
-  const intCols = ['Reorder Threshold', 'MOQ', 'QTY ON HAND', 'Shortfall', 'In Stock Qty', 'On Order Qty', 'Available Qty (Other WH)', 'RFQ Line #'];
+  const intCols = ['Reorder Threshold', 'LAM MOQ', 'QTY ON HAND', 'Shortfall', 'In Stock Qty', 'On Order Qty', 'Available Qty (Other WH)', 'RFQ Line #'];
   const pctCols = ['In Stock Margin %', 'Lead Time Margin %'];
 
   allHeaders.forEach((h, idx) => {

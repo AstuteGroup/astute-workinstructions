@@ -62,7 +62,7 @@ One email with the final sourced Excel (color-coded margins). No intermediate un
 
 | File | Sheet | Key Columns |
 |------|-------|-------------|
-| `Lam_Kitting_DB_*.xlsx` | INVENTORY | Lam P/N (A), MPN (B), Reorder Threshold (H), MOQ (I), Buyer (J), Notes (K) |
+| `Lam_Kitting_DB_*.xlsx` | INVENTORY | Lam P/N (A), MPN (B), Reorder Threshold (H), LAM MOQ (I), Buyer (J), Notes (K) |
 
 ### From ERP (LAM Purchases Only)
 
@@ -164,14 +164,14 @@ For items needing reorder:
 | 18 | History | OT Buyer | ERP (who created PO) |
 | 19 | History | Historical Buyer | Excel (Column J) |
 | 20 | Kitting | Lead Time | Excel |
-| 21 | Kitting | MOQ | Excel |
+| 21 | Kitting | LAM MOQ | Excel |
 
 ### Sourced Columns (added by lam-kitting-source.js)
 
 | Column | Description |
 |--------|-------------|
 | In Stock Supplier | Best franchise with stock (lowest price) |
-| In Stock Price | Price at MOQ |
+| In Stock Price | Price at LAM MOQ quantity |
 | In Stock Qty | Available quantity |
 | In Stock Margin % | (Resale - Price) / Resale |
 | Lead Time Supplier | Alternative with lead time |
@@ -183,7 +183,7 @@ For items needing reorder:
 
 ## Franchise APIs (via shared/franchise-api.js)
 
-All 8 active distributors, queried at MOQ quantity:
+All 8 active distributors, queried at LAM MOQ quantity:
 
 | API | Module |
 |-----|--------|
@@ -254,7 +254,7 @@ The rbash environment causes non-zero exit codes even on successful queries. The
 - [x] Email report to jake.harris@astutegroup.com
 - [x] Add franchise sourcing with margin analysis
 - [x] Excel output with color-coded margins (green/yellow/red)
-- [x] Query at MOQ for accurate bulk pricing
+- [x] Query at LAM MOQ for accurate bulk pricing
 - [x] Integrate as cron job (Monday 12pm, after Inventory Cleanup at 11am)
 - [x] LAM-only purchase history filter (chuboe_vq_line → chuboe_rfq join)
 - [x] Infor POV numbers (chuboe_po_string)
