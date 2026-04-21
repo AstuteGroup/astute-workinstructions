@@ -264,10 +264,16 @@ async function main() {
       }
 
       const rfqLineNo = lineMappingForAuto(rfqCandidates, mpn);
+      // approvalText = OT Copy Text block (fallback shorthand since we can't
+      // synthesize the full block from DB — the buyer can edit if needed).
+      // message = one-off auto-approval disclosure (goes to Result / "Message
+      // to User"), keeps the approval panel clean.
       const approvalText =
         `Line ${rfqLineNo}  ${mpn}  ${lamMoq}pcs @ $${stockPrice}  DC 24+  ${row[mfrIdxAuto] || ''}\n` +
-        `Vendor: ${stockSupplier}\n` +
-        `Auto-approved — in-stock margin ${margin.toFixed(1)}% ≥ ${AUTO_PURCHASE_MARGIN_PCT}%, stock ${stockQty} ≥ LAM MOQ ${lamMoq}`;
+        `Vendor: ${stockSupplier}`;
+      const autoApprovalMessage =
+        `Auto-approved via lam-kitting-rfq-writer — in-stock margin ${margin.toFixed(1)}% ≥ ${AUTO_PURCHASE_MARGIN_PCT}%, ` +
+        `vendor stock ${stockQty} ≥ LAM MOQ ${lamMoq}.`;
 
       try {
         await tickVQForPurchase(matchVQ.vqLineId, {
@@ -295,6 +301,7 @@ async function main() {
           rfqId:        rfqResult.rfqId,
           summary:      `approve order — ${stockSupplier} ${mpn} (LAM Kitting)`,
           approvalText,
+          message:      autoApprovalMessage,
         });
         autoRequests[mpn] = r.documentNo;
         console.log(`  ✓ ${mpn} — VQ ${matchVQ.vqLineId} ticked; R_Request ${r.documentNo} (margin ${margin.toFixed(1)}%)`);

@@ -25,9 +25,16 @@
  *     program:        'LAM_KITTING',
  *     rfqId:          1142189,
  *     summary:        'approve order — Master R-78C3.3-1.0 (LAM Kitting)',
- *     approvalText:   'Line 270  R-78C3.3-1.0  5pcs @ $8.38  DC 24+  RECOM\nVendor: Master Electronics',
+ *     approvalText:   '<OT Copy Text block — RFQ / RFQ Line / Vendor Quote sections>',
+ *     message:        'Auto-approved — in-stock margin 26.8% ≥ 18%, stock 619 ≥ LAM MOQ 100',
  *     priority:       '5',            // optional: 1 High / 5 Medium / 9 Low
  *   });
+ *
+ * `approvalText` → `Chuboe_Approval_Text` ("Text to Approve" — non-updateable).
+ * `message`      → `Result` ("Message to User" — updateable). Use this for the
+ *                  one-off rationale / context / supersession notes. DO NOT
+ *                  duplicate the copy text here; support reads both panels
+ *                  separately and the duplication is clutter.
  *
  * DO NOT skip the validator. The history behind this gate is three
  * manually-caught approval bugs on 2026-04-20 (blank lead time, blank
@@ -54,14 +61,17 @@ const AD_TABLE_CHUBOE_RFQ   = 1000002;
  * @param {string} opts.program       'LAM_KITTING' | 'LAM_EPG' | null
  * @param {number} opts.rfqId         chuboe_rfq_id (Record_ID for AD_Table_ID=1000002)
  * @param {string} opts.summary       Queue-list one-liner. Must start with "approve order — ".
- * @param {string} opts.approvalText  "Text to Approve" body. Use the canonical
- *                                    "Line N  MPN  Npcs @ $price  DC ..  MFR" format.
+ * @param {string} opts.approvalText  OT Copy Text block — goes to Chuboe_Approval_Text
+ *                                    ("Text to Approve"). Non-updateable after POST.
+ * @param {string} [opts.message]     One-off rationale / context — goes to Result
+ *                                    ("Message to User"). Optional. Do NOT duplicate
+ *                                    the approval text here.
  * @param {string} [opts.priority='5'] '1' | '5' | '9'
  * @returns {object} { id, documentNo }
  * @throws {Error} if validator fails or required fields are missing
  */
 async function postApproveOrder(opts = {}) {
-  const { vqId, program = null, rfqId, summary, approvalText, priority = '5' } = opts;
+  const { vqId, program = null, rfqId, summary, approvalText, message = '', priority = '5' } = opts;
 
   if (!vqId)          throw new Error('postApproveOrder: vqId is required');
   if (!rfqId)         throw new Error('postApproveOrder: rfqId is required');
@@ -102,7 +112,7 @@ async function postApproveOrder(opts = {}) {
     Priority:             priority,
     Summary:              summary,
     Chuboe_Approval_Text: approvalText,   // "Text to Approve" — non-updateable post-POST
-    Result:               approvalText,   // "Message to User" — mirrors approval text
+    Result:               message || '',  // "Message to User" — one-off rationale, optional
   });
 
   return { id: result.id, documentNo: result.DocumentNo };
