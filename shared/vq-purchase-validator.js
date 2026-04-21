@@ -114,16 +114,27 @@ async function validateVQForPurchase(vqId, opts = {}) {
   if (!vq.chuboe_packaging_id) violations.push('Chuboe_Packaging_ID is blank (required — REEL, CUT TAPE, BULK, TRAY, etc.)');
   if (!vq.chuboe_traceability_id) violations.push('Chuboe_Traceability_ID is blank (Franchise=1000001 / Non-Traceable=1000003)');
 
-  // Note-field sanity — catch the public/private mix-up
-  if (vq.chuboe_note_public) {
+  // Note-field sanity — catch buyer-internal content in vendor-facing fields.
+  // Three note fields exist on chuboe_vq_line, in ascending internal-ness:
+  //   chuboe_note_public  → "Public Vendor Order Notes" (flows to POV — vendor sees it)
+  //   chuboe_note_private → "Notes to Inspector" (QC/receiving team sees it)
+  //   chuboe_note_user    → "Buyer Internal Notes" (correct destination for our enrichment)
+  // Stock counts, MOQ tags, MFR names, etc. belong in chuboe_note_user. They
+  // must NOT leak into the public note (vendor-visible) and also shouldn't
+  // pollute the inspector note (QC doesn't need the sourcing narrative).
+  for (const [field, label] of [
+    ['chuboe_note_public',  'Chuboe_Note_Public (Public Vendor Order Notes)'],
+    ['chuboe_note_private', 'Chuboe_Note_Private (Notes to Inspector)'],
+  ]) {
+    const content = vq[field];
+    if (!content) continue;
     for (const rx of INTERNAL_MARKERS) {
-      if (rx.test(vq.chuboe_note_public)) {
+      if (rx.test(content)) {
         violations.push(
-          `Chuboe_Note_Public contains buyer-internal content (pattern ${rx}): ` +
-          `"${vq.chuboe_note_public.slice(0, 120)}". Move to Chuboe_Note_Private — ` +
-          `the public note flows to the POV the vendor receives.`
+          `${label} contains buyer-internal content (pattern ${rx}): ` +
+          `"${content.slice(0, 120)}". Move to Chuboe_Note_User (Buyer Internal Notes).`
         );
-        break; // one violation per field is enough — buyer will fix the whole string
+        break; // one violation per field is enough
       }
     }
   }

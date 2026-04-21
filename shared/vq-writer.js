@@ -638,10 +638,14 @@ async function writeVQFromAPI(rfqSearchKey, cpc, franchiseResults, opts = {}) {
       Chuboe_Lead_Time: leadTime || null,
       Chuboe_MOQ: moq ? String(moq) : null,
       Chuboe_SPQ: spq ? String(spq) : null,
-      // Note routing — Public flows to the POV that the vendor receives, so it must
-      // be vendor-safe (or null). Parser-built enrichment ALWAYS goes to Private.
+      // Note routing — three distinct fields on chuboe_vq_line:
+      //   Chuboe_Note_Public  → "Public Vendor Order Notes" (flows to POV; vendor sees it)
+      //   Chuboe_Note_Private → "Notes to Inspector" (QC/receiving; NOT buyer-internal)
+      //   Chuboe_Note_User    → "Buyer Internal Notes" (where our enrichment goes)
+      // Parser-built enrichment ALWAYS goes to Chuboe_Note_User. Caller supplies
+      // opts.publicNote only if the content is genuinely vendor-safe.
       Chuboe_Note_Public: opts.publicNote || null,
-      Chuboe_Note_Private: internalNotes || null,
+      Chuboe_Note_User:   internalNotes || null,
 
       // Tier 1 defaults — populated at VQ load time
       C_UOM_ID: opts.uomId || DEFAULTS.C_UOM_ID,

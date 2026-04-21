@@ -85,7 +85,11 @@ What the validator enforces (expanded from the prose checklist that was repeated
 1. **VQ is active** and has a valid MPN, vendor BP, cost > 0, qty > 0
 2. **Date fields populated:** `Chuboe_Date_Code`, `Chuboe_Lead_Time`, `DatePromised` — all three required (most-missed trio)
 3. **Packaging + traceability populated:** `Chuboe_Packaging_ID` (REEL / CUT TAPE / BULK / TRAY / etc.), `Chuboe_Traceability_ID` (Franchise=1000001 / Non-Traceable=1000003)
-4. **Notes split correctly:** `Chuboe_Note_Public` flows to the POV the vendor receives — must be vendor-safe. Buyer-internal content (stock counts, MOQ, Mfr tags, our enrichment) goes to `Chuboe_Note_Private`. The validator regex-sweeps the public field and rejects known internal markers.
+4. **Notes split correctly (three fields on `chuboe_vq_line`):**
+   - `Chuboe_Note_Public` → "Public Vendor Order Notes" — flows to the POV that the vendor receives. Must be vendor-safe or empty.
+   - `Chuboe_Note_Private` → "Notes to Inspector" — QC / receiving team sees this on intake. Not a buyer-internal dump.
+   - `Chuboe_Note_User` → "Buyer Internal Notes" — this is where our sourcing enrichment (stock counts, MOQ, MFR tags, auto-purchase rationale, etc.) goes.
+   The validator regex-sweeps `Chuboe_Note_Public` AND `Chuboe_Note_Private` for internal markers and rejects either if they leak the sourcing narrative.
 5. **Program-specific ship-to matches:** `Chuboe_Warehouse_ID`, `Chuboe_Warehouse_Group_ID`, `M_Shipper_ID`, `Chuboe_Inco_Term_ID` must hit the values encoded for the program (e.g., LAM Kitting → warehouse 1000015 W111 + **group 1000008 BROWNSVILLE**, FedEx Ground shipper, EXW incoterm). Warehouse alone doesn't determine ship-to; the group ID is the actual location pointer (don't confuse 1000000 AUSTIN with 1000008 BROWNSVILLE).
 6. **Competing VQs unticked:** any other `IsPurchased='Y'` on the same RFQ line must be flipped back to `N` before the new winner is ticked.
 
@@ -93,7 +97,15 @@ What the validator enforces (expanded from the prose checklist that was repeated
 
 ### History — why this gate exists
 
-Before the validator, we repeatedly posted approvals with: missing promise date, missing lead time, "Master stock: 619 | MOQ: 5 | Mfr: RECOM" in the vendor-facing public note, wrong warehouse_group_id (Austin vs Brownsville). Each mistake required a manual fix in OT by the buyer. The prose checklist existed in this file; it wasn't followed. The validator is the forcing function.
+Before the validator, we repeatedly posted approvals with: missing promise date, missing lead time, "Master stock: 619 | MOQ: 5 | Mfr: RECOM" in the vendor-facing public note, wrong warehouse_group_id (Austin vs Brownsville), and — after the first fix — the same enrichment note mistakenly routed to `Chuboe_Note_Private` (Notes to Inspector) instead of `Chuboe_Note_User` (Buyer Internal Notes). Each mistake required a manual fix in OT by the buyer. The prose checklist existed in this file; it wasn't followed. The validator is the forcing function.
+
+### Domestic shipping flag (`ischuboedomesticshipping`)
+
+Defaults to `N` in OT. Should be `Y` when both supplier and ship-to warehouse are in the same country. For LAM Kitting (ship-to W111 Brownsville TX):
+- US franchise distributors (Master, TTI, DigiKey, Mouser, Sager, Arrow, Waldom, Future US, Newark) → `Y`
+- APAC brokers (SMARTEL, Chip Energy, HK Firsttop, Dragon Core, etc.) → `N`
+
+The validator doesn't auto-enforce this because the inference is supplier-dependent. Auto-purchase flows that only target franchise stock (e.g., `Trading Analysis/LAM Kitting Reorder/lam-kitting-rfq-writer.js`) set it explicitly.
 
 ---
 

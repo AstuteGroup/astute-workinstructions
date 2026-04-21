@@ -274,11 +274,13 @@ async function main() {
           program: 'LAM_KITTING',
           extra: {
             // VQ qty must reflect the PURCHASE qty (LAM MOQ), not the vendor's
-            // total stock. Stock count stays visible in the private note for
-            // sourcing context. Without this PATCH the PO would cut at the
-            // franchise API's reported stock level (often 500-15,000+ pcs).
+            // total stock. Stock count goes into the BUYER-INTERNAL note (not
+            // the Inspector/Private note) for sourcing context. Without this
+            // PATCH the PO would cut at the franchise API's reported stock
+            // level (often 500-15,000+ pcs).
             Qty:                       lamMoq,
-            Chuboe_Note_Private:       `Auto-purchase — Master stock at tick: ${stockQty} pcs (buying LAM MOQ ${lamMoq})`,
+            Chuboe_Note_User:          `Auto-purchase — ${stockSupplier} stock at tick: ${stockQty} pcs (buying LAM MOQ ${lamMoq})`,
+            IsChuboeDomesticShipping:  'Y',  // LAM Kitting ships to Brownsville from franchise distributors = domestic
             Chuboe_Lead_Time:          'STOCK',
             DatePromised:              promiseDate,
             Chuboe_Warehouse_ID:       1000015,   // W111 LAM KITTING
