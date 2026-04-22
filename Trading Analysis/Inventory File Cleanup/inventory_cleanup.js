@@ -117,11 +117,28 @@ const STATIC_CARRYOVER_OFFERS = [
         label: 'Eaton Consignment',
         bootstrapId: 1024798,
         portalWarehouseName: 'Astute Electronics Inc. - Eaton (Carryover)',
+        // Eaton consignment stock lands in Infor W117 once received — pair for
+        // auto-retire of carryover MPNs that show up in the weekly Infor export.
+        // Re-enabled 2026-04-22 after one-off cleanup; reconcileCarryover
+        // treats MFR mismatches as informational (Infor's W117 MFR tag is
+        // unreliable — see project_chuboe_warehouse_group_unreliable.md).
+        pairedWarehouses: ['W117'],
     },
     {
         label: 'Free Stock - Philippines',
         bootstrapId: 1025258,
         portalWarehouseName: 'Astute Electronics Inc. - Philippines (Carryover)',
+        // Philippines (W109/W114) is NOT in the weekly Infor export — no
+        // paired warehouse available. Carryover propagates forward as-is.
+    },
+    {
+        label: 'LAM Consignment',
+        bootstrapId: 1026158,
+        portalWarehouseName: 'Astute Electronics Inc. - LAM (Carryover)',
+        // LAM consignment stock lands in Infor W118 once received — pair for
+        // auto-retire as lines are received (same pattern as Eaton). Seeded
+        // 2026-04-22 from master static file (POV0071878, 103 MPNs, $2.14M).
+        pairedWarehouses: ['W118'],
     },
     {
         label: 'Incoming Lot bid from Marvell',
@@ -129,6 +146,11 @@ const STATIC_CARRYOVER_OFFERS = [
         portalWarehouseName: 'Marvell Lot Bid - Incoming (Carryover)',
     },
 ];
+
+// reconcileCarryover threshold — if Infor paired-warehouse qty ≥ this fraction
+// of the carryover qty, the line is considered fully received and is retired
+// from next week's carryover. 0.95 accounts for minor lot/count drift.
+const RECONCILE_QTY_THRESHOLD = 0.95;
 
 // Warehouse Group → OT write-back mapping
 // Each entry produces one chuboe_offer (header) per weekly run, with the
@@ -553,6 +575,113 @@ async function writeInventoryToOT(groupedRows, dateStr, dryRun = false) {
 }
 
 /**
+ * Reconcile carryover lines against this week's paired-warehouse inventory.
+ *
+ * For each MPN on the carryover:
+ *   - Sum the carryover qty across all date-code lines → carryoverQty
+ *   - Sum this week's qty in the paired warehouses for the same MPN → infoQty
+ *   - MFR comparison via shared/mfr-equivalence (handles aliases + acquisitions)
+ *
+ * Decision:
+ *   - MPN not in paired warehouses          → keep all lines
+ *   - infoQty >= RECONCILE_QTY_THRESHOLD
+ *     AND MFR match (or either blank)       → RETIRE all DC lines for this MPN
+ *   - infoQty < threshold                    → keep + flag 'partial'
+ *   - MFR mismatch (both populated)          → keep + flag 'mfr-mismatch'
+ *
+ * @param {Array} allLines - carryover lines from OT
+ * @param {Array<string>|null} pairedWarehouses - Infor warehouse codes to pair
+ * @param {Map<string, Array>} pendingMpnDetails - this week's MPN → [{warehouse, warehouseName, qty, ...}]
+ * @returns {{keptLines, retired, flagged}}
+ */
+function reconcileCarryover(allLines, pairedWarehouses, pendingMpnDetails) {
+    // Null pairing → no reconciliation, keep everything
+    if (!pairedWarehouses || pairedWarehouses.length === 0) {
+        return { keptLines: allLines, retired: [], flagged: [] };
+    }
+
+    const { computeMfrMatch } = require('../../shared/mfr-equivalence');
+    const pairedSet = new Set(pairedWarehouses);
+
+    // Group carryover lines by MPN
+    const byMpn = new Map();  // mpn → [lines]
+    for (const line of allLines) {
+        const mpn = String(line.Chuboe_MPN || '').trim();
+        if (!mpn) continue;
+        if (!byMpn.has(mpn)) byMpn.set(mpn, []);
+        byMpn.get(mpn).push(line);
+    }
+
+    // Decide per MPN
+    const retireMpns = new Set();
+    const retired = [];
+    const flagged = [];
+
+    for (const [mpn, lines] of byMpn) {
+        const thisWeek = (pendingMpnDetails.get(mpn) || []).filter(d => pairedSet.has(d.warehouse));
+        if (thisWeek.length === 0) continue;  // no paired-warehouse match → keep
+
+        const carryoverQty = lines.reduce((s, l) => s + (Number(l.Qty) || 0), 0);
+        const infoQty = thisWeek.reduce((s, d) => s + (Number(d.qty) || 0), 0);
+
+        // MFR check — carryover has one MFR per line (usually all same for one MPN),
+        // this-week detail doesn't carry MFR, so pull from pendingMpnDetails raw.
+        // Actually pendingMpnDetails is built without MFR — fall back to comparing
+        // across all carryover-line MFRs: if ANY carryover line's MFR matches
+        // (or either is blank), treat as MFR-OK.
+        const carryoverMfrs = [...new Set(lines.map(l => String(l.Chuboe_MFR_Text || '').trim()))];
+        const thisWeekMfrs = [...new Set(thisWeek.map(d => String(d.mfr || '').trim()).filter(Boolean))];
+
+        let mfrMatch = true;  // default permissive when we can't compare
+        if (thisWeekMfrs.length > 0 && carryoverMfrs.some(m => m)) {
+            mfrMatch = carryoverMfrs.some(cMfr => {
+                if (!cMfr) return true;  // blank carryover MFR → skip check
+                return thisWeekMfrs.some(tMfr => computeMfrMatch(cMfr, tMfr) !== 'MISMATCH');
+            });
+        }
+
+        const fullyReceived = infoQty >= RECONCILE_QTY_THRESHOLD * carryoverQty;
+
+        // MFR gate is informational only — Infor's MFR ("Name") field on
+        // W117 is unreliable (confirmed 2026-04-22: 37/271 Eaton carryover
+        // MPNs show random wrong MFRs on Infor side — e.g. PMV450ENEAR
+        // tagged "Microchip" when it's Nexperia). The MPN+qty match is the
+        // real signal; we log mismatches so the operator can review, but
+        // they don't block retirement.
+        if (fullyReceived) {
+            retireMpns.add(mpn);
+            retired.push({
+                mpn,
+                carryoverQty,
+                infoQty,
+                qtyRatio: infoQty / carryoverQty,
+                carryoverMfrs,
+                thisWeekMfrs,
+                mfrMatch,
+                dcLineCount: lines.length,
+                pairedWarehouses: [...pairedSet],
+            });
+        } else {
+            flagged.push({
+                mpn,
+                reason: 'partial',
+                carryoverQty,
+                infoQty,
+                qtyRatio: infoQty / carryoverQty,
+                carryoverMfrs,
+                thisWeekMfrs,
+                mfrMatch,
+                dcLineCount: lines.length,
+                pairedWarehouses: [...pairedSet],
+            });
+        }
+    }
+
+    const keptLines = allLines.filter(l => !retireMpns.has(String(l.Chuboe_MPN || '').trim()));
+    return { keptLines, retired, flagged };
+}
+
+/**
  * Refresh static carryover offers — read each, deactivate it, write a fresh
  * copy with a new Created timestamp. Also cross-reference the carryover
  * MPNs against this week's pending Infor inventory so the user gets flagged
@@ -665,6 +794,29 @@ async function refreshStaticCarryoverOffers(carryovers, dateStr, dryRun, pending
             continue;
         }
 
+        // Pre-filter reconciliation: for carryovers with a paired Infor
+        // warehouse, compare carryover MPNs against this week's paired-wh
+        // rows (MPN-aggregate qty). Fully received MPNs are RETIRED from
+        // the fresh write; partials are KEPT but logged. MFR differences
+        // are informational only (Infor MFR tagging unreliable on W117).
+        const { keptLines, retired, flagged } = reconcileCarryover(
+            allLines, cfg.pairedWarehouses, pendingMpnDetails
+        );
+        if (cfg.pairedWarehouses) {
+            const retiredQty = retired.reduce((s, r) => s + r.carryoverQty, 0);
+            const mfrDiff = retired.filter(r => !r.mfrMatch).length;
+            console.log(`  ${cfg.label}: reconcile vs ${cfg.pairedWarehouses.join(',')} → retire ${retired.length} MPN(s)/${retiredQty.toLocaleString()} pc${mfrDiff ? ` (${mfrDiff} w/ MFR diff)` : ''}, flag ${flagged.length} MPN(s), keep ${keptLines.length}/${allLines.length} line(s)`);
+            for (const r of retired.slice(0, 10)) {
+                const mfrTag = r.mfrMatch ? '' : ` ⚠ MFR: ${r.carryoverMfrs.join('/')} vs ${r.thisWeekMfrs.join('/')}`;
+                console.log(`    ✓ retire ${r.mpn.padEnd(25)} carryover=${String(r.carryoverQty).padStart(7)} infor=${String(r.infoQty).padStart(7)} (${(r.qtyRatio * 100).toFixed(0)}%)${mfrTag}`);
+            }
+            if (retired.length > 10) console.log(`    ... +${retired.length - 10} more retired`);
+            for (const f of flagged) {
+                const mfrTag = f.mfrMatch ? '' : ` MFR: ${f.carryoverMfrs.join('/')} vs ${f.thisWeekMfrs.join('/')}`;
+                console.log(`    ⚠ flag   ${f.mpn.padEnd(25)} ${f.reason.padEnd(13)} ${(f.qtyRatio * 100).toFixed(0)}% received${mfrTag}`);
+            }
+        }
+
         // Cross-reference MPNs against this week's full Infor export.
         // overlapDetails captures one row per (carryover line, this-week match)
         // pair so the user can see exactly where each overlapping part now
@@ -708,13 +860,18 @@ async function refreshStaticCarryoverOffers(carryovers, dateStr, dryRun, pending
                 offerTypeId,
                 overlapMpns,
                 overlapDetails,
+                retired,
+                flagged,
                 sourceLines: [],
             });
             continue;
         }
 
         if (dryRun) {
-            console.log(`  [DRY RUN] ${cfg.label}: would refresh offer ${currentOfferId} (${allLines.length} lines${overlapMpns.length ? ', ' + overlapMpns.length + ' MPN overlap with this week!' : ''})`);
+            const reconcileNote = cfg.pairedWarehouses
+                ? `, retire ${retired.length}, flag ${flagged.length}, write ${keptLines.length}/${allLines.length}`
+                : ` (${allLines.length} lines)`;
+            console.log(`  [DRY RUN] ${cfg.label}: would refresh offer ${currentOfferId}${reconcileNote}${overlapMpns.length ? ` — ${overlapMpns.length} MPN overlap with full Infor export` : ''}`);
             results.push({
                 ...cfgPassthrough,
                 status: 'dry-run',
@@ -722,17 +879,20 @@ async function refreshStaticCarryoverOffers(carryovers, dateStr, dryRun, pending
                 currentValue: currentHeader.Value || null,
                 bpId,
                 offerTypeId,
-                linesPlanned: allLines.length,
+                linesPlanned: keptLines.length,
+                linesOriginal: allLines.length,
                 overlapMpns,
                 overlapDetails,
-                sourceLines: allLines,
+                retired,
+                flagged,
+                sourceLines: keptLines,
             });
             continue;
         }
 
         // LIVE: deactivate old, write fresh
         try {
-            const newLines = allLines.map(l => ({
+            const newLines = keptLines.map(l => ({
                 mpn: l.Chuboe_MPN,
                 mpnClean: l.Chuboe_MPN_Clean,
                 mfrText: l.Chuboe_MFR_Text,
@@ -770,23 +930,31 @@ async function refreshStaticCarryoverOffers(carryovers, dateStr, dryRun, pending
                 bpId,
                 offerTypeId,
                 linesAttempted: newLines.length,
+                linesOriginal: allLines.length,
                 linesWritten: writeResult.linesWritten,
                 errors: writeResult.errors,
                 overlapMpns,
                 overlapDetails,
-                sourceLines: allLines,
+                retired,
+                flagged,
+                sourceLines: keptLines,
             });
         } catch (e) {
             console.error(`  ${cfg.label}: FAILED — ${e.message}`);
-            results.push({ ...cfgPassthrough, status: 'failed', error: e.message, currentOfferId, overlapMpns, overlapDetails, sourceLines: allLines });
+            results.push({ ...cfgPassthrough, status: 'failed', error: e.message, currentOfferId, overlapMpns, overlapDetails, retired, flagged, sourceLines: allLines });
         }
     }
 
     // Console summary
+    const totalRetired = results.reduce((s, r) => s + (r.retired?.length || 0), 0);
+    const totalFlagged = results.reduce((s, r) => s + (r.flagged?.length || 0), 0);
     const totalOverlap = results.reduce((s, r) => s + (r.overlapMpns?.length || 0), 0);
+    if (totalRetired > 0 || totalFlagged > 0) {
+        console.log(`\n  Reconciliation: ${totalRetired} MPN(s) retired, ${totalFlagged} flagged (partial/MFR mismatch)`);
+    }
     if (totalOverlap > 0) {
-        console.log(`\n  🚨 ATTENTION: ${totalOverlap} carryover MPN(s) now appear in this week's Infor inventory — these parts may have been received and may no longer need a carryover.`);
-    } else {
+        console.log(`  ℹ️  ${totalOverlap} carryover MPN(s) also appear elsewhere in Infor (non-paired warehouses) — informational only.`);
+    } else if (totalRetired === 0 && totalFlagged === 0) {
         console.log('\n  ✓ No carryover MPNs overlap with this week\'s Infor inventory.');
     }
 
@@ -1417,6 +1585,7 @@ async function fetchAndProcess(opts = {}) {
                 const detail = {
                     warehouse:     String(row['Warehouse'] || '').trim(),
                     warehouseName: String(row['Warehouse Name'] || '').trim(),
+                    mfr:           String(row['Name'] || '').trim(),
                     qty:           cleanNumeric(row['Lot Quantity']),
                     lot:           String(row['Lot'] || '').trim(),
                     location:      String(row['Location'] || '').trim(),

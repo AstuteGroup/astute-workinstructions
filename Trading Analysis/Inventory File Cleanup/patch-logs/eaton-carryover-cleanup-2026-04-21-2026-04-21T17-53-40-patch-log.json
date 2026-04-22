@@ -1,0 +1,62 @@
+[
+  {
+    "status": "patched",
+    "table": "chuboe_offer_line",
+    "id": 34981725,
+    "source": "eaton-carryover-cleanup-2026-04-21",
+    "startedAt": "2026-04-21T17:53:39.588Z",
+    "patched": {
+      "IsActive": false
+    },
+    "skipped": {},
+    "before": null,
+    "after": {
+      "IsActive": false
+    }
+  },
+  {
+    "status": "patched",
+    "table": "chuboe_offer_line",
+    "id": 34981728,
+    "source": "eaton-carryover-cleanup-2026-04-21",
+    "startedAt": "2026-04-21T17:53:39.737Z",
+    "patched": {
+      "IsActive": false
+    },
+    "skipped": {},
+    "before": null,
+    "after": {
+      "IsActive": false
+    }
+  },
+  {
+    "status": "patched",
+    "table": "chuboe_offer_line",
+    "id": 34981774,
+    "source": "eaton-carryover-cleanup-2026-04-21",
+    "startedAt": "2026-04-21T17:53:39.739Z",
+    "patched": {
+      "IsActive": false
+    },
+    "skipped": {},
+    "before": null,
+    "after": {
+      "IsActive": false
+    }
+  },
+  {
+    "status": "patched",
+    "table": "chuboe_offer_line",
+    "id": 34981815,
+    "source": "eaton-carryover-cleanup-2026-04-21",
+    "startedAt": "2026-04-21T17:53:40.675Z",
+    "patched": {
+      "Qty": 480
+    },
+    "skipped": {},
+    "before": null,
+    "after": {
+      "Qty": 480
+    }
+  }
+]

@@ -1,0 +1,32 @@
+[
+  {
+    "status": "patched",
+    "table": "chuboe_offer_line",
+    "id": 34982000,
+    "source": "philippines-carryover-cleanup-2026-04-21",
+    "startedAt": "2026-04-22T14:21:27.666Z",
+    "patched": {
+      "Qty": 1340
+    },
+    "skipped": {},
+    "before": null,
+    "after": {
+      "Qty": 1340
+    }
+  },
+  {
+    "status": "patched",
+    "table": "chuboe_offer_line",
+    "id": 34982126,
+    "source": "philippines-carryover-cleanup-2026-04-21",
+    "startedAt": "2026-04-22T14:21:27.842Z",
+    "patched": {
+      "IsActive": false
+    },
+    "skipped": {},
+    "before": null,
+    "after": {
+      "IsActive": false
+    }
+  }
+]
