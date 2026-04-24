@@ -63,6 +63,7 @@ At the start of every new conversation, before addressing anything else, always 
 > 13. **Stock RFQ Loading** - Process customer RFQ emails into ERP-ready CSV for import (see `Trading Analysis/Stock RFQ Loading/stock-rfq-loading.md`)
 > 14. **HTS / ECCN Backfill** - RFQ-scoped HTS + ECCN backfill onto chuboe_vq_line via DigiKey + Mouser APIs (see `Trading Analysis/HTS ECCN Backfill/hts-eccn-backfill.md`)
 > 15. **MFR Reconciler** - Daily cron that backfills `Chuboe_MFR_ID` on rows where text is set but FK is null. Runs at 6 AM UTC; sweeps rfq_line_mpn / vq_line / cq_line for rows created since last run (see `Trading Analysis/MFR Reconciler/mfr-reconciler.md`)
+> 16. **CRMA Form Filling** - Fill the customer-RMA xlsx (`CRMA Request Form 2023.06`) from an OT SO# when buyer forwards a blank form to stockRFQ@. Cell map + dropdown source ranges + naming gotchas (Astute COV = Infor COV, not OT SO#) (see `Trading Analysis/CRMA Form/crma-form.md`)
 
 3. **Review Roadmaps** (planned work):
 
@@ -375,6 +376,8 @@ IDs are **assigned server-side** by iDempiere — do NOT include PK fields in PO
 | `shared/vq-patcher.js` | `tickVQForPurchase(vqId, {program, extra})` | **PATCH IsPurchased='Y'** on a VQ — enforced path. Runs `vq-purchase-validator.js` first, aborts on failure, auto-unticks competing VQs. **DO NOT `patchRecord('chuboe_vq_line', id, {IsPurchased: 'Y'})` directly.** |
 | `shared/r-request-writer.js` | `postApproveOrder({vqId, program, rfqId, summary, approvalText})` | **POST approve-order R_Request** — enforced path. Validates linked VQ first, forces Jake routing + Submitted status + Approve Order type. **DO NOT `apiPost('r_request', ...)` directly for approvals.** |
 | `shared/vq-purchase-validator.js` | `validateVQForPurchase(vqId, {program})` | Pre-flight checker (called internally by the two wrappers above). Returns `{ok, violations, vq}`. Useful on its own for dry-run diagnostics. |
+| `shared/cq-patcher.js` | `markCQSold(cqId, {poReference, extra})` | **PATCH IsSold='Y' + R_Status_ID=Closed** on a CQ — enforced path. Mirrors operational fields (DatePromised, Chuboe_Lead_Time, Chuboe_Date_Code, Chuboe_Packaging_ID, Chuboe_RoHS, C_Country_ID) from the winning VQ on the same RFQ line, then validates. **DO NOT `patchRecord('chuboe_cq_line', id, {IsSold: 'Y'})` directly.** |
+| `shared/cq-sold-validator.js` | `validateCQForSold(cqId)` | Pre-flight checker (called internally by `markCQSold`). Flags missing `POReference` / `DatePromised` / `Chuboe_Lead_Time`, missing-or-mismatched winning-VQ link, competing sold CQs. |
 
 ### R_Requests (Approve Order + related)
 
