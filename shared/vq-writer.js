@@ -28,6 +28,7 @@ const { lookupMfr } = require('./mfr-lookup');
 const { resolveMfrForRow } = require('./mfr-resolver');
 const { normalizePackaging, PACKAGING_MAP } = require('./packaging-lookup');
 const { isValidEccn } = require('./validators');
+const { isRestrictedMfrName, isRestrictedMfrId } = require('./restricted-mfrs');
 const logger = require('./logger').createLogger('VQWriter');
 
 // Flag reason codes
@@ -39,6 +40,7 @@ const FLAG = {
   MPN_CROSS_REF: 'MPN_CROSS_REF',
   MISSING_MANDATORY: 'MISSING_MANDATORY',
   API_WRITE_ERROR: 'API_WRITE_ERROR',
+  RESTRICTED_MFR: 'RESTRICTED_MFR',
 };
 
 // ─── Tier 1 Defaults (set at VQ load time) ─────────────────────────────────
@@ -424,6 +426,7 @@ async function writeVQFromAPI(rfqSearchKey, cpc, franchiseResults, opts = {}) {
   const written = [];
   const flagged = [];
   const failed = [];
+  const skipped = [];
 
   // Resolve RFQ and line
   const rfq = await resolveRFQ(rfqSearchKey);
@@ -431,7 +434,7 @@ async function writeVQFromAPI(rfqSearchKey, cpc, franchiseResults, opts = {}) {
   if (!rfqLineId) {
     flagged.push({ cpc, mpn: opts.searchedMpn, reason: 'NO_RFQ_LINE',
       detail: `MPN '${opts.searchedMpn}' / CPC '${cpc}' not found in RFQ lines` });
-    return { written, flagged, failed };
+    return { written, flagged, failed, skipped };
   }
 
   // Process each distributor result via the centralized extractor.
@@ -485,6 +488,33 @@ async function writeVQFromAPI(rfqSearchKey, cpc, franchiseResults, opts = {}) {
       }));
 
     for (const row of rowsToWrite) {
+      // Restricted-MFR gate — OPT-IN via opts.applyRestrictedMfrGate.
+      // Franchise-restricted MFRs (ADI, Maxim, Linear Tech, TI) cannot be
+      // bought through franchise distribution. When the caller is a
+      // franchise-API path (enrich-rfq, LAM Kitting sourcing, etc.),
+      // it passes applyRestrictedMfrGate=true: we still capture API data
+      // via chuboe_pricing_api_result (independent path) for market intel,
+      // but skip the VQ write.
+      //
+      // Manual / vendor-direct loaders (LAM EPG lib-load-vq-row.js,
+      // load-ti-store-vqs.js, broker VQ loads, etc.) DO NOT pass the flag
+      // — TI Store is manufacturer-direct, brokers are non-franchise, and
+      // those flows must continue writing VQs for restricted MFRs.
+      // Single source of truth: shared/restricted-mfrs.json
+      if (opts.applyRestrictedMfrGate) {
+        const restrictedCanonical = isRestrictedMfrName(row.mfrText);
+        if (restrictedCanonical) {
+          skipped.push({
+            mpn: row.mpn, vendor: row.vendorName || d.name, price: row.price, qty: row.qty,
+            mfrText: row.mfrText, canonical: restrictedCanonical,
+            cpc, rfqId: rfq.id, rfqLineId,
+            reason: FLAG.RESTRICTED_MFR,
+            detail: `MFR '${restrictedCanonical}' franchise-restricted — VQ skipped; pricing captured in chuboe_pricing_api_result`
+          });
+          continue;
+        }
+      }
+
       const mpn = row.mpn;
       const mfrText = row.mfrText;
       const price = row.price;
@@ -736,7 +766,7 @@ async function writeVQFromAPI(rfqSearchKey, cpc, franchiseResults, opts = {}) {
     } // end row loop
   }
 
-  return { written, flagged, failed };
+  return { written, flagged, failed, skipped };
 }
 
 // ─── Batch Write (Two-Pass) ──────────────────────────────────────────────────
@@ -776,6 +806,7 @@ async function writeVQBatch(rfqSearchKey, items, opts = {}) {
   const allWritten = [];
   const allFlagged = [];
   const allFailed = [];
+  const allSkipped = [];
   const allNeedsReview = [];
 
   // Pre-warm: resolve RFQ (loads CPC and MPN maps)
@@ -834,6 +865,7 @@ async function writeVQBatch(rfqSearchKey, items, opts = {}) {
     allWritten.push(...result.written);
     allFlagged.push(...result.flagged);
     allFailed.push(...result.failed);
+    if (result.skipped) allSkipped.push(...result.skipped);
 
     if (i < items.length - 1 && result.written.length > 0) await new Promise(r => setTimeout(r, delayMs));
   }
@@ -868,6 +900,7 @@ async function writeVQBatch(rfqSearchKey, items, opts = {}) {
         allWritten.push(...result.written);
         allFlagged.push(...result.flagged);
         allFailed.push(...result.failed);
+        if (result.skipped) allSkipped.push(...result.skipped);
       } else {
         // Hold for review — include the resolved line ID so caller can write later
         allNeedsReview.push({
@@ -887,6 +920,7 @@ async function writeVQBatch(rfqSearchKey, items, opts = {}) {
     written: allWritten.length,
     flagged: allFlagged.length,
     failed: allFailed.length,
+    skipped: allSkipped.length,
     needsReview: allNeedsReview.length,
     byReason: {},
   };
@@ -896,9 +930,10 @@ async function writeVQBatch(rfqSearchKey, items, opts = {}) {
     summary.byReason[f.reason]++;
   }
 
-  console.log(`[vq-writer] Done: ${summary.written} written (${pass1Written} pass1), ${summary.needsReview} needs review, ${summary.flagged} flagged, ${summary.failed} failed`);
+  const skippedMsg = allSkipped.length > 0 ? `, ${allSkipped.length} skipped (restricted MFR)` : '';
+  console.log(`[vq-writer] Done: ${summary.written} written (${pass1Written} pass1), ${summary.needsReview} needs review, ${summary.flagged} flagged, ${summary.failed} failed${skippedMsg}`);
 
-  return { written: allWritten, flagged: allFlagged, failed: allFailed, needsReview: allNeedsReview, summary };
+  return { written: allWritten, flagged: allFlagged, failed: allFailed, skipped: allSkipped, needsReview: allNeedsReview, summary };
 }
 
 /**

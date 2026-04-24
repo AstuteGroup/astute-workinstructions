@@ -196,6 +196,10 @@ async function main() {
   if (vqItems.length > 0) {
     vqResult = await writeVQBatch(rfqResult.searchKey, vqItems, {
       delayMs: 100,
+      // LAM Kitting buys franchise-only — restricted MFRs (ADI/Maxim/Linear/TI)
+      // cannot be sourced here; skip VQ writes, keep chuboe_pricing_api_result
+      // capture. See shared/restricted-mfrs.json.
+      applyRestrictedMfrGate: true,
     });
 
     const vqWritten = vqResult.written?.length || vqResult.allWritten?.length || 0;

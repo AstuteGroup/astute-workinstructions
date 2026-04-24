@@ -1,0 +1,34 @@
+{
+  "description": "MFRs we cannot buy through franchise distribution. API data is still captured (chuboe_pricing_api_result) for market intel, but VQs are NOT written, and RFQ enrichment runs these lines LAST so quota-limited APIs (DigiKey 1000/day etc.) spend budget on actionable parts first.",
+  "policy": {
+    "write_vq": false,
+    "capture_pricing_api_result": true,
+    "enrichment_priority": "last"
+  },
+  "restricted_mfrs": [
+    {
+      "canonical": "Analog Devices",
+      "mfr_ids": [1000006],
+      "name_patterns": ["analog devices", "^adi$"],
+      "notes": "Acquired Linear Tech (2017) and Maxim (2021). Listed independently below for explicit match."
+    },
+    {
+      "canonical": "Maxim Integrated",
+      "mfr_ids": [1000027],
+      "name_patterns": ["maxim integrated", "^maxim$"],
+      "notes": "Rolled into ADI 2021. Matches MAX* and DS* MPN prefixes — but use MFR match, not prefix."
+    },
+    {
+      "canonical": "Linear Technology",
+      "mfr_ids": [1000037],
+      "name_patterns": ["linear tech", "^linear$", "^lt$", "^ltc$"],
+      "notes": "Rolled into ADI 2017. Matches LT*/LTC* MPN prefixes — but use MFR match, not prefix."
+    },
+    {
+      "canonical": "Texas Instruments",
+      "mfr_ids": [1000000, 1020269],
+      "name_patterns": ["texas instruments", "^ti$"],
+      "notes": "TI Store (manufacturer-direct) is NOT in the franchise-api distributor list, so this rule does not affect TI Store VQs (e.g., 2134141/2134142)."
+    }
+  ]
+}

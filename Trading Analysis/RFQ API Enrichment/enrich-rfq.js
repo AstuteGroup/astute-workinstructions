@@ -31,6 +31,7 @@ const { searchAllDistributors } = require('../../shared/franchise-api');
 const { writePricingResult } = require('../../shared/api-result-writer');
 const { writeVQFromAPI } = require('../../shared/vq-writer');
 const { computeMfrMatch } = require('../../shared/mfr-equivalence');
+const { isRestrictedMfr } = require('../../shared/restricted-mfrs');
 
 // ─── TTL TABLE ───────────────────────────────────────────────────────────────
 // Source of truth: api-integration-roadmap.md § API Response Caching.
@@ -102,7 +103,21 @@ async function fetchRFQLines(rfqDocNumber) {
  * @returns {Promise<object>} summary
  */
 async function enrichRFQ(rfqDocNumber, opts = {}) {
-  const { dryRun = false, force = false, maxLines = null, onProgress = null } = opts;
+  // Scope guard — Layer 1. enrichRFQ() is explicitly single-RFQ. An empty or
+  // non-string rfqDocNumber is a bug in the caller: it means scope wasn't
+  // resolved before invocation (or an array was passed by mistake). Refuse
+  // to run so we don't silently enrich nothing or, worse, fan out to multiple
+  // RFQs via a malformed caller. See 2026-04-15 JCI incident where scope
+  // creep spilled enrichment across three RFQs.
+  if (typeof rfqDocNumber !== 'string' || rfqDocNumber.trim() === '') {
+    throw new Error(
+      `enrichRFQ: rfqDocNumber must be a non-empty string (the RFQ search key, ` +
+      `e.g. "1132593"). Got: ${JSON.stringify(rfqDocNumber)}. Callers must ` +
+      `resolve scope to a single RFQ before invoking.`
+    );
+  }
+
+  const { dryRun = false, force = false, maxLines = null, onProgress = null, ignorePause = false } = opts;
   const startedAt = new Date();
 
   const rawRows = await fetchRFQLines(rfqDocNumber);
@@ -177,7 +192,28 @@ async function enrichRFQ(rfqDocNumber, opts = {}) {
   const rfqId = Number(rows[0].chuboe_rfq_id);
   const ttlDays = force ? 0 : ttlForRfqType(rfqType);
 
-  const lines = maxLines ? rows.slice(0, maxLines) : rows;
+  // Restricted-MFR ordering — lines whose MFR is franchise-restricted
+  // (ADI, Maxim, Linear Tech, TI) run LAST so that quota-limited APIs
+  // (e.g., DigiKey 1,000/day) spend their budget on parts we can actually
+  // purchase first. Restricted lines still get the full API sweep and
+  // chuboe_pricing_api_result capture when budget remains; they just
+  // don't produce VQ writes (see shared/vq-writer.js restricted-MFR gate).
+  // Single source of truth: shared/restricted-mfrs.json
+  const nonRestrictedLines = [];
+  const restrictedLines = [];
+  for (const r of rows) {
+    if (isRestrictedMfr({ mfrId: r.mfr_id, mfrName: r.mfr })) {
+      restrictedLines.push(r);
+    } else {
+      nonRestrictedLines.push(r);
+    }
+  }
+  if (restrictedLines.length > 0) {
+    console.log(`[enrich-rfq] ${restrictedLines.length} of ${rows.length} lines are franchise-restricted MFRs (ADI/Maxim/Linear/TI) — deferred to end of run; VQ writes will be skipped (data still captured to chuboe_pricing_api_result).`);
+  }
+  const orderedRows = [...nonRestrictedLines, ...restrictedLines];
+
+  const lines = maxLines ? orderedRows.slice(0, maxLines) : orderedRows;
 
   const counters = {
     lines: lines.length,
@@ -186,6 +222,8 @@ async function enrichRFQ(rfqDocNumber, opts = {}) {
     vqsWritten: 0,
     vqsFlagged: 0,
     vqsFailed: 0,           // server-side write rejections (5xx etc.)
+    vqsSkippedRestricted: 0, // restricted-MFR rows: data captured to chuboe_pricing_api_result, VQ write skipped
+    restrictedLines: restrictedLines.length,
     flagReasonCounts: {},  // { NO_RFQ_LINE: 12, MPN_CROSS_REF: 40, ... }
     flagSamples: [],        // first 5 flag {reason, detail, mpn}
     failSamples: [],        // first 5 failed writes {reason, detail, mpn}
@@ -232,7 +270,10 @@ async function enrichRFQ(rfqDocNumber, opts = {}) {
     const { mpn, cpc, qty, target_price: targetPrice } = line;
 
     // Pause-file yield — if a foreground workflow is running, sleep until it's done.
-    await apiPause.waitIfPaused({ log: (msg) => console.log(`[enrich-rfq] ${msg}`) });
+    // ignorePause=true bypasses (manual ops invocations that need to run despite an active pause).
+    if (!ignorePause) {
+      await apiPause.waitIfPaused({ log: (msg) => console.log(`[enrich-rfq] ${msg}`) });
+    }
 
     if (onProgress) onProgress(line, i, lines.length);
 
@@ -330,18 +371,20 @@ async function enrichRFQ(rfqDocNumber, opts = {}) {
     // the exact line ID we loaded the MPN from.
     if (!dryRun && (result.found?.length || 0) > 0) {
       try {
-        const { written = [], flagged = [], failed = [] } = await writeVQFromAPI(
+        const { written = [], flagged = [], failed = [], skipped = [] } = await writeVQFromAPI(
           rfqDocNumber,
           cpc || '',
           result,
           {
             searchedMpn: mpn,
             _rfqLineIdOverride: Number(line.chuboe_rfq_line_id),
+            applyRestrictedMfrGate: true,
           }
         );
         counters.vqsWritten += written.length;
         counters.vqsFlagged += flagged.length;
         counters.vqsFailed += failed.length;
+        counters.vqsSkippedRestricted += skipped.length;
         for (const f of flagged) {
           const reason = f.reason || 'UNKNOWN';
           counters.flagReasonCounts[reason] = (counters.flagReasonCounts[reason] || 0) + 1;
@@ -491,6 +534,7 @@ async function main() {
   const opts = {
     dryRun: hasFlag('--dry-run'),
     force: hasFlag('--force'),
+    ignorePause: hasFlag('--ignore-pause'),
     maxLines: getArg('--max-lines') ? parseInt(getArg('--max-lines'), 10) : null,
     onProgress: (line, idx, total) => {
       if ((idx + 1) % 25 === 0 || idx === total - 1) {
@@ -589,7 +633,7 @@ async function main() {
     if (pauseClaimed) {
       try {
         clearInterval(pauseRefreshTimer);
-        require('../../shared/api-pause').releasePause();
+        require('../../shared/api-pause').releasePause('enrich-rfq-cli');
         console.log('[pause] released');
       } catch (e) { /* ignore */ }
     }
