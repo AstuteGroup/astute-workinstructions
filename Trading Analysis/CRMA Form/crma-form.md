@@ -82,12 +82,31 @@ The buyer almost always wants you to make the call, but two picks are recurring 
 ### Step 4 — Fill the form
 
 ```bash
-node fill-form.js --so SO506499 --qty 8 --src tmp/crma-<ts>/CRMA*.xlsx --out tmp/CRMA_<so>_<customer>_<mpn>_<qty>pc.xlsx
+node fill-form.js --so SO506499 --rma-qty 8 --reason 'DMG - Damaged item(s)' --root-cause Carrier --disposition 'Credit and Replace' --src tmp/crma-<ts>/CRMA*.xlsx --out tmp/CRMA_<so>_<customer>_<mpn>_<qty>pc.xlsx
 ```
 
-Cell map (form rev 2023.06 — see "Cell map" section below for the full table). Only first cell of each merge needs to be set.
+**CRITICAL — surgical zip-level patch only.** This form goes straight to operations; their tooling depends on the file's zip structure being byte-identical to the template except for the patched cell values. `fill-form.js` uses `xlsx-patcher.js` which:
 
-**Do not skip:** when writing values, drop `cell.w` (cached display) so Excel re-formats numbers/dates per the cell's `z` format. Otherwise Excel shows the old cached string.
+- Opens the source xlsx as a zip
+- Modifies ONLY `xl/worksheets/sheet1.xml` (the cell values)
+- Leaves all other entries (`customXml/*`, `xl/printerSettings/*`, `xl/styles.xml`, `xl/theme/*`, `xl/drawings/*`, etc.) byte-for-byte unchanged
+- Preserves existing `s="N"` style indices on each patched cell (cells keep their formatting)
+- Writes strings as `t="inlineStr"` so `xl/sharedStrings.xml` is also untouched
+
+**DO NOT use the `xlsx` (SheetJS) library to read + write the form.** Round-tripping through SheetJS Community is destructive: it dropped all 16 data validations (dropdowns broken), stripped 95% of `xl/styles.xml`, dropped `customXml/*`, dropped `xl/printerSettings/*`, dropped `xl/sharedStrings.xml`, and bloated `sheet1.xml` 40× by inlining everything. Verified empirically 2026-04-24 — operations would have rejected the file.
+
+Verification step (run after generating):
+```bash
+node -e "
+const AdmZip = require('adm-zip');
+const orig = '<original>'; const out = '<filled>';
+const a = new Map(new AdmZip(orig).getEntries().map(e => [e.entryName, e.header.size]));
+const b = new Map(new AdmZip(out).getEntries().map(e => [e.entryName, e.header.size]));
+let lost=0, changed=0;
+for (const [n,s] of a) { if (!b.has(n)) {lost++; console.log('LOST '+n);} else if (b.get(n)!==s && n!=='xl/worksheets/sheet1.xml') {changed++; console.log('UNEXPECTED CHANGE '+n);} }
+console.log('lost='+lost+' unexpected_changes='+changed+' (must both be 0)');
+"
+```
 
 ---
 
@@ -104,15 +123,18 @@ Send via stockRFQ@ notifier. Subject pattern: `CRMA Draft - <SO> / <COV> - <Cust
 
 ---
 
-## Naming Gotchas (DO NOT GUESS)
+## Naming / Formatting Gotchas (DO NOT GUESS)
 
 | Form label | Actual source | Wrong source (common mistake) |
 |---|---|---|
 | **"Astute COV"** | `c_orderline.chuboe_co_string` (e.g. `COV0021316`) | OT `c_order.documentno` (e.g. `SO506499`) |
-| **"Customer Code"** | `c_bpartner.referenceno` — Infor C-format (e.g. `C002971`); often blank → leave blank for buyer | OT `c_bpartner.value` (numeric search key) |
-| **"Infor Item Number"** | Infor product code (buyer provides) | OT `m_product.value` (usually `GenSalesProd` for trading lines) |
+| **"Astute COV Line"** | **Infor numbering** (1, 2, 3…). OT lines are 10, 20, 30… — divide by 10 | OT `c_orderline.line` |
+| **"Customer Code"** | `c_bpartner.referenceno` (Infor C-format, e.g. `C002971`) → fall back to `c_bpartner.value` (BP search key) when `referenceno` is blank. **Always populate.** | Leaving blank when `referenceno` is empty |
+| **"Infor Item Number"** | `c_orderline.chuboe_mpn` — i.e. the part number / MPN. Trading lines all stock under `GenSalesProd`; the real identifier is the chuboe_mpn. | OT `m_product.value` (always `GenSalesProd`) |
 | **"Lot Number(s)"** | Buyer provides (consignment lots are allocated by Infor at ship time, not in OT replica). For stock warehouses, look up via the inventory report. | Anything in OT — there is no lot column on the orderline |
 | **"QTY" (R12 area)** | The **RMA** qty (broken/affected pieces) | Order qty / shipped qty |
+| **"RMA Request Date"** (`C8`) | Write as `mm/dd/yyyy` **string**. The form has no custom date numFmt; the C8 style index `s="51"` resolves to `numFmtId="0"` (General), which would render an Excel date serial as a raw number. | Passing a Date object or Excel serial |
+| **"Package Type" + "Quantity"** | Always populate (defaults: `Box` / `1`). Even for scrap-in-place where there's no return shipment, ops requires both fields. | Leaving blank for "no return" scenarios |
 
 ---
 
@@ -125,11 +147,11 @@ Answer cells (write to the **first cell** of each merge):
 | Astute Salesperson | `C3` | text | `ad_user.name` via `c_order.salesrep_id` |
 | Customer Name | `H3` | text | `c_bpartner.name` |
 | Astute COV | `C5` | text | `c_orderline.chuboe_co_string` |
-| Customer Code | `H5` | text | `c_bpartner.referenceno` (often blank → leave) |
-| Astute COV Line | `C6` | number | `c_orderline.line` |
-| RMA Request Date | `C8` | date `mm/dd/yyyy` | today |
+| Customer Code | `H5` | text | `c_bpartner.referenceno` (Infor C-code) → fall back to `c_bpartner.value` |
+| Astute COV Line | `C6` | number | `c_orderline.line / 10` (Infor numbering) |
+| RMA Request Date | `C8` | text `mm/dd/yyyy` | today (string, not Date — see Gotchas) |
 | Astute Invoice Number | `H8` | text | buyer provides |
-| Infor Item Number | `C10` | text | buyer provides |
+| Infor Item Number | `C10` | text | `c_orderline.chuboe_mpn` |
 | Lot Number(s) | `C13` | text | buyer provides (or inventory report for stock warehouses) |
 | QTY | `E13` | number `#,##0` | RMA qty |
 | Selling Unit Price | `F13` | currency `$#,##0.00` | `c_orderline.priceentered` |
@@ -142,8 +164,8 @@ Answer cells (write to the **first cell** of each merge):
 | Customer Contact Name | `C28` | text | `ad_user.name` |
 | Customer Contact Email | `C29` | text | `ad_user.email` |
 | Customer Contact Phone | `C30` | text | `ad_user.phone` |
-| Package Type | `H28` | dropdown | blank if no return |
-| Package Quantity | `H29` | number | blank if no return |
+| Package Type | `H28` | dropdown | default `Box` (always populate) |
+| Package Quantity | `H29` | number | default `1` (always populate) |
 
 VRMA section (rows 37+) — only when returning physical pieces to an external supplier. Internal consignment (Taxan, Eaton, GE, LAM, etc.) = SKIP.
 
@@ -198,8 +220,7 @@ Located in this folder:
 | Script | Purpose |
 |---|---|
 | `fetch-form.js` | Pull the blank form from stockRFQ inbox |
-| `inspect-form.js` | Dump merges + dataValidation XML (re-run when form revs) |
-| `fill-form.js` | Fill cells, preserve styles |
+| `inspect-form.js` | Dump merges + dataValidation XML (re-run when form revs) — uses `xlsx` for read-only inspection only |
+| `xlsx-patcher.js` | **Surgical zip-level cell patcher.** The only sanctioned way to write into the form. |
+| `fill-form.js` | SO lookup → cell update map → `xlsx-patcher.patchXlsx()` |
 | `email-form.js` | Email filled draft back to buyer via stockRFQ notifier |
-
-All four use `xlsx` with `cellStyles: true` and the shared `email-fetcher` / `notifier` modules.
