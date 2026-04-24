@@ -1030,10 +1030,12 @@ async function buildXlsxBuffer(buckets) {
 async function main() {
   const args = process.argv.slice(2);
   const toFlag = args.indexOf('--to');
+  const ccFlag = args.indexOf('--cc');
   const recipient = toFlag >= 0 ? args[toFlag + 1] : DEFAULT_RECIPIENT;
+  const cc = ccFlag >= 0 ? args[ccFlag + 1] : null;
   const inputPath = args.find(a => a.endsWith('.xlsx'));
   if (!inputPath) {
-    console.error('Usage: node bos-metrics.js <infor-export.xlsx> [--to email]');
+    console.error('Usage: node bos-report.js <infor-export.xlsx> [--to email] [--cc email]');
     process.exit(1);
   }
   if (!fs.existsSync(inputPath)) {
@@ -1067,14 +1069,16 @@ async function main() {
   });
 
   const subject = `Leah's BOS Report — ${runDate}`;
+  const sendOpts = { html: true };
+  if (cc) sendOpts.cc = cc;
   const ok = await notifier.sendWithAttachment(
     recipient,
     subject,
     html,
     attachments,
-    { html: true }
+    sendOpts
   );
-  console.log(ok ? `Sent to ${recipient}` : 'Send failed');
+  console.log(ok ? `Sent to ${recipient}${cc ? ` (CC: ${cc})` : ''}` : 'Send failed');
 }
 
 main().catch(e => { console.error(e); process.exit(1); });

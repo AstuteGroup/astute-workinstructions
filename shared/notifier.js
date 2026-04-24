@@ -80,11 +80,15 @@ function createNotifier({ fromEmail, fromName, smtpUser, smtpPass } = {}) {
     }
 
     // opts.html=true → send `body` as HTML instead of plain text
+    // opts.cc, opts.bcc, opts.replyTo → passthrough to nodemailer
     const mailPayload = {
       from: `"${displayName}" <${fromEmail}>`,
       to: to,
       subject: subject,
     };
+    if (opts.cc) mailPayload.cc = opts.cc;
+    if (opts.bcc) mailPayload.bcc = opts.bcc;
+    if (opts.replyTo) mailPayload.replyTo = opts.replyTo;
     if (opts.html) {
       mailPayload.html = body;
     } else {
@@ -112,12 +116,16 @@ function createNotifier({ fromEmail, fromName, smtpUser, smtpPass } = {}) {
     }
 
     // opts.html=true → send `body` as HTML instead of plain text
+    // opts.cc, opts.bcc, opts.replyTo → passthrough to nodemailer
     const mailPayload = {
       from: `"${displayName}" <${fromEmail}>`,
       to: to,
       subject: subject,
       attachments: attachments,
     };
+    if (opts.cc) mailPayload.cc = opts.cc;
+    if (opts.bcc) mailPayload.bcc = opts.bcc;
+    if (opts.replyTo) mailPayload.replyTo = opts.replyTo;
     if (opts.html) {
       mailPayload.html = body;
     } else {
