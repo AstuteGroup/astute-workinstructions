@@ -78,7 +78,20 @@ Thresholds live in `bos-report.js :: detectSignals()` — adjust there.
 | `Pivot BOS x ISE` | Flat pivot: Bucket · Region · BOS · ISE · Aging · Count |
 
 ### Email sender
-`stockRFQ@orangetsunami.com` — displayed as "Leah's BOS Report". Default recipient is `jake.harris@Astutegroup.com` (overridable via `--to`).
+`stockRFQ@orangetsunami.com` — displayed as "Leah's BOS Report". Default recipient is `leah.griffin@astutegroup.com` (flipped from Jake on 2026-04-28). Override per-run with `--to`. Use `--no-send` to write the rendered email + xlsx into a `debug/` folder beside the script without dispatching, useful for verifying changes.
+
+---
+
+## Week-over-Week Trends
+
+After every run, the script writes a snapshot to `snapshots/YYYY-MM-DD.json` capturing bucket totals, by-region counts, by-BOS counts, and past-due aging counts. On the next run it loads the most recent prior snapshot (any date < today) and renders deltas:
+
+- **Email body** — a "Movement vs {priorDate}" panel just above the Signals block, showing bucket totals ▲▼, aging shift, top region past-due movers, top BOS past-due movers, and top region placeholder movers. Up arrow (red) = more flagged lines = bad. Down arrow (green) = fewer = good.
+- **xlsx `All BOS` tab** — extra `Δ vs {priorDate}` column with red/green cell shading. BOS that fully cleared since last week (prior > 0, current = 0) appear in italics with a green Δ for visibility.
+- **xlsx `By Region` tab** — same `Δ vs {priorDate}` column.
+- **First run / no prior snapshot** — renders a "Baseline week" block instead of deltas; today's snapshot becomes the baseline for next week.
+
+The snapshot file is committed to git so the trend history persists across operator sessions.
 
 ---
 
@@ -114,9 +127,9 @@ Open the email body. The Signals block at the top summarizes anomalies — read 
 
 If an ISE is tagged to the wrong region, edit `ise-regions.json` and rerun Step 3. The mapping file is the single source of truth — do not hardcode region strings in the .js.
 
-### Step 6 (weekly): Forward to Leah / BOS team
+### Step 6 (weekly): Email goes to Leah
 
-Once the format is stable, switch the default recipient (`--to leah.griffin@astutegroup.com`) or wire into a cron.
+Default recipient is now `leah.griffin@astutegroup.com` (flipped 2026-04-28). Plain `node bos-report.js <file.xlsx>` sends to her. To redirect to Jake (or anyone else) for ad-hoc tests, pass `--to jake.harris@Astutegroup.com`. Use `--no-send` to render to `debug/` without emailing anyone.
 
 ### Step 7 (future): Monthly carryover
 
@@ -140,8 +153,7 @@ Leah's second ask: a monthly email showing what hasn't been resolved within the 
 
 - **Watched-folder automation** — Leah drops the Infor xlsx, cron picks it up, emails out
 - **Direct Infor pull** — skip the manual drop if IT opens an ODBC / scheduled-report endpoint (big ask; evaluate once format is stable)
-- **Monthly carryover tracking** — snapshot-based diff, shows which lines have been open 4+ weeks
-- **Week-over-week deltas** — "APAC placeholder ↑ 12 vs last week" inside signals
+- **Monthly carryover tracking** — line-level snapshot diff (vs. the count-level snapshot we have now), shows which lines have been open 4+ weeks. Reuses the `snapshots/` folder; would extend the JSON shape with per-COV+line entries.
 - **Per-CSE emails** — each BOS gets a personal email with just their tab (once Leah wants to push rather than forward)
 - **Customer/ISE concentration signals** — "Abaco drives 6 of julie.white's 42 past-due"
 - **Signal muting** — acknowledge a signal (e.g., the EXPEDITE FEE) to suppress until resolved
@@ -154,6 +166,7 @@ Leah's second ask: a monthly email showing what hasn't been resolved within the 
 |---|---|
 | `bos-report.js` | Main script — reads xlsx, buckets, renders email + xlsx, sends |
 | `ise-regions.json` | ISE login → region mapping (source of truth) |
+| `snapshots/YYYY-MM-DD.json` | Per-run snapshot (bucket × region × BOS × aging counts) — drives week-over-week deltas. Committed to git. |
 | `leahs-bos-report.md` | This doc |
 
 ## Dependencies

@@ -23,9 +23,10 @@ const XLSX = require('xlsx');
 const ExcelJS = require('exceljs');
 const { createNotifier } = require('../../shared/notifier');
 
-const DEFAULT_RECIPIENT = 'jake.harris@Astutegroup.com';
+const DEFAULT_RECIPIENT = 'leah.griffin@astutegroup.com';
 const TODAY = new Date();
 const TODAY_UTC = new Date(Date.UTC(TODAY.getFullYear(), TODAY.getMonth(), TODAY.getDate()));
+const SNAPSHOT_DIR = path.join(__dirname, 'snapshots');
 
 function isoDate(d) {
   return d.toISOString().slice(0, 10);
@@ -284,6 +285,158 @@ function stackedBarConfig(title, nestedMap) {
       }
     }
   };
+}
+
+// -- Snapshot persistence + week-over-week deltas ---------------------------------
+// Saves bucket × region × BOS counts to snapshots/YYYY-MM-DD.json after each run.
+// On the next run, loads the most recent prior snapshot and renders deltas at the
+// top of the email + as a "Δ Total" column on the All BOS / By Region xlsx tabs.
+
+function tallyBy(rows, accessor) {
+  const m = {};
+  for (const r of rows) {
+    const k = accessor(r);
+    m[k] = (m[k] || 0) + 1;
+  }
+  return m;
+}
+
+function buildSnapshot(buckets, runDate) {
+  const byCse = (r) => (r['Customer CSE'] || '(blank)').toString().trim() || '(blank)';
+  const byRegion = (r) => r._region;
+  return {
+    runDate,
+    totals: {
+      query: buckets.query.length,
+      placeholder: buckets.placeholder.length,
+      pastDue: buckets.pastDue.length,
+    },
+    byRegion: {
+      query: tallyBy(buckets.query, byRegion),
+      placeholder: tallyBy(buckets.placeholder, byRegion),
+      pastDue: tallyBy(buckets.pastDue, byRegion),
+    },
+    byBos: {
+      query: tallyBy(buckets.query, byCse),
+      placeholder: tallyBy(buckets.placeholder, byCse),
+      pastDue: tallyBy(buckets.pastDue, byCse),
+    },
+    aging: {
+      fresh:   buckets.pastDue.filter(r => r._agingBand === AGING_BANDS[0].label).length,
+      stale:   buckets.pastDue.filter(r => r._agingBand === AGING_BANDS[1].label).length,
+      chronic: buckets.pastDue.filter(r => r._agingBand === AGING_BANDS[2].label).length,
+    }
+  };
+}
+
+function saveSnapshot(snapshot) {
+  if (!fs.existsSync(SNAPSHOT_DIR)) fs.mkdirSync(SNAPSHOT_DIR, { recursive: true });
+  const outPath = path.join(SNAPSHOT_DIR, `${snapshot.runDate}.json`);
+  fs.writeFileSync(outPath, JSON.stringify(snapshot, null, 2));
+  return outPath;
+}
+
+function loadPriorSnapshot(currentRunDate) {
+  if (!fs.existsSync(SNAPSHOT_DIR)) return null;
+  const files = fs.readdirSync(SNAPSHOT_DIR).filter(f => /^\d{4}-\d{2}-\d{2}\.json$/.test(f));
+  const sorted = files.sort().reverse(); // most recent first
+  for (const f of sorted) {
+    const date = f.replace('.json', '');
+    if (date < currentRunDate) {
+      try {
+        return JSON.parse(fs.readFileSync(path.join(SNAPSHOT_DIR, f), 'utf-8'));
+      } catch (e) {
+        console.warn(`Skipping corrupt snapshot ${f}: ${e.message}`);
+      }
+    }
+  }
+  return null;
+}
+
+function diffMaps(curMap, priorMap) {
+  const out = {};
+  const keys = new Set([...Object.keys(curMap || {}), ...Object.keys(priorMap || {})]);
+  for (const k of keys) {
+    const cur = (curMap || {})[k] || 0;
+    const prev = (priorMap || {})[k] || 0;
+    out[k] = { current: cur, prior: prev, delta: cur - prev };
+  }
+  return out;
+}
+
+function computeDeltas(current, prior) {
+  if (!prior) return null;
+  const d = (a, b) => (a || 0) - (b || 0);
+  return {
+    priorDate: prior.runDate,
+    totals: {
+      query:       d(current.totals.query,       prior.totals?.query),
+      placeholder: d(current.totals.placeholder, prior.totals?.placeholder),
+      pastDue:     d(current.totals.pastDue,     prior.totals?.pastDue),
+    },
+    byRegion: {
+      query:       diffMaps(current.byRegion.query,       prior.byRegion?.query),
+      placeholder: diffMaps(current.byRegion.placeholder, prior.byRegion?.placeholder),
+      pastDue:     diffMaps(current.byRegion.pastDue,     prior.byRegion?.pastDue),
+    },
+    byBos: {
+      query:       diffMaps(current.byBos.query,       prior.byBos?.query),
+      placeholder: diffMaps(current.byBos.placeholder, prior.byBos?.placeholder),
+      pastDue:     diffMaps(current.byBos.pastDue,     prior.byBos?.pastDue),
+    },
+    aging: {
+      fresh:   d(current.aging.fresh,   prior.aging?.fresh),
+      stale:   d(current.aging.stale,   prior.aging?.stale),
+      chronic: d(current.aging.chronic, prior.aging?.chronic),
+    }
+  };
+}
+
+function fmtDeltaHtml(n) {
+  if (!n) return '<span style="color:#999">±0</span>';
+  const arrow = n > 0 ? '↑' : '↓';
+  // Up = more flagged lines = bad (red). Down = fewer = good (green).
+  const color = n > 0 ? '#c0392b' : '#27ae60';
+  return `<span style="color:${color};font-weight:600">${arrow} ${Math.abs(n)}</span>`;
+}
+
+function fmtDeltaText(n) {
+  if (!n) return '±0';
+  return `${n > 0 ? '+' : '-'}${Math.abs(n)}`;
+}
+
+function topMoversHtml(label, mapping, limit = 5) {
+  const arr = Object.entries(mapping || {})
+    .map(([k, v]) => ({ k, ...v }))
+    .filter(e => e.delta !== 0)
+    .sort((x, y) => Math.abs(y.delta) - Math.abs(x.delta))
+    .slice(0, limit);
+  if (arr.length === 0) return '';
+  return `<li><b>${label}:</b> ${arr.map(e => `${e.k} ${fmtDeltaHtml(e.delta)}`).join(' &nbsp;·&nbsp; ')}</li>`;
+}
+
+function renderTrendsHtml(deltas) {
+  if (!deltas) {
+    return `
+    <div style="background:#eef5fb;border:1px solid #c8dff0;padding:12px 16px;margin:6px 0 22px 0;border-radius:4px">
+      <h3 style="margin:0 0 4px 0;color:#2874a6">Baseline week</h3>
+      <p style="margin:0;font-size:13px;color:#444">No prior snapshot found — this run establishes the baseline. Week-over-week movement will appear in the next run.</p>
+    </div>`;
+  }
+  const t = deltas.totals;
+  const a = deltas.aging;
+  return `
+  <div style="background:#eef5fb;border:1px solid #c8dff0;padding:12px 16px;margin:6px 0 22px 0;border-radius:4px">
+    <h3 style="margin:0 0 6px 0;color:#2874a6">Movement vs ${deltas.priorDate}</h3>
+    <p style="margin:0 0 6px 0;font-size:12px;color:#666">Up arrow (red) = more flagged lines this week. Down arrow (green) = fewer.</p>
+    <ul style="margin:0;padding-left:22px;font-size:13px;line-height:1.8">
+      <li><b>Bucket totals:</b> Query ${fmtDeltaHtml(t.query)} &nbsp;·&nbsp; Placeholder ${fmtDeltaHtml(t.placeholder)} &nbsp;·&nbsp; Past Due ${fmtDeltaHtml(t.pastDue)}</li>
+      <li><b>Past-due aging shift:</b> Fresh ${fmtDeltaHtml(a.fresh)} &nbsp;·&nbsp; Stale ${fmtDeltaHtml(a.stale)} &nbsp;·&nbsp; Chronic ${fmtDeltaHtml(a.chronic)}</li>
+      ${topMoversHtml('Region past-due movers', deltas.byRegion.pastDue)}
+      ${topMoversHtml('BOS past-due movers',    deltas.byBos.pastDue)}
+      ${topMoversHtml('Region placeholder movers', deltas.byRegion.placeholder)}
+    </ul>
+  </div>`;
 }
 
 // -- Signal detection -------------------------------------------------------------
@@ -553,7 +706,7 @@ async function buildBucketSection(label, sentinelDesc, rows, slug, attachments) 
   </section>`;
 }
 
-async function buildHtml(buckets, fileName, attachments) {
+async function buildHtml(buckets, fileName, attachments, deltas) {
   const runDate = isoDate(TODAY_UTC);
 
   // Region summary strip + chart (fetched in parallel with section charts)
@@ -566,13 +719,23 @@ async function buildHtml(buckets, fileName, attachments) {
   const regionPng = await regionChartPromise;
   attachments.push({ filename: 'region-overview.png', content: regionPng, cid: 'bos-region-overview', contentDisposition: 'inline' });
 
-  // Region summary table
+  // Region summary table (includes Δ Total column when prior snapshot exists)
+  const priorRegionTotal = (reg) => {
+    if (!deltas) return 0;
+    const q = (deltas.byRegion.query[reg]?.prior) || 0;
+    const p = (deltas.byRegion.placeholder[reg]?.prior) || 0;
+    const pd = (deltas.byRegion.pastDue[reg]?.prior) || 0;
+    return q + p + pd;
+  };
   const regionRows = REGION_ORDER.map(reg => {
     const q = buckets.query.filter(r => r._region === reg).length;
     const p = buckets.placeholder.filter(r => r._region === reg).length;
     const pd = buckets.pastDue.filter(r => r._region === reg).length;
-    return { reg, q, p, pd, tot: q + p + pd };
-  }).filter(r => r.tot > 0);
+    const tot = q + p + pd;
+    const totDelta = deltas ? tot - priorRegionTotal(reg) : null;
+    return { reg, q, p, pd, tot, totDelta };
+  }).filter(r => r.tot > 0 || (r.totDelta != null && r.totDelta !== 0));
+  const deltaHeader = deltas ? `<th style="padding:6px 10px;border:1px solid #c8dff0;text-align:right">Δ Total</th>` : '';
   const regionTableHtml = `
     <table style="border-collapse:collapse;margin:6px 0 20px 0;font-size:13px">
       <thead><tr style="background:#eef5fb">
@@ -581,6 +744,7 @@ async function buildHtml(buckets, fileName, attachments) {
         <th style="padding:6px 10px;border:1px solid #c8dff0;text-align:right">Placeholder (8/8)</th>
         <th style="padding:6px 10px;border:1px solid #c8dff0;text-align:right">Past Due</th>
         <th style="padding:6px 10px;border:1px solid #c8dff0;text-align:right">Total</th>
+        ${deltaHeader}
       </tr></thead>
       <tbody>${regionRows.map(r => `
         <tr>
@@ -589,6 +753,7 @@ async function buildHtml(buckets, fileName, attachments) {
           <td style="padding:4px 10px;border:1px solid #eed;text-align:right">${r.p}</td>
           <td style="padding:4px 10px;border:1px solid #eed;text-align:right">${r.pd}</td>
           <td style="padding:4px 10px;border:1px solid #eed;text-align:right"><b>${r.tot}</b></td>
+          ${deltas ? `<td style="padding:4px 10px;border:1px solid #eed;text-align:right">${fmtDeltaHtml(r.totDelta)}</td>` : ''}
         </tr>`).join('')}
       </tbody>
     </table>`;
@@ -605,6 +770,7 @@ async function buildHtml(buckets, fileName, attachments) {
       <tr><td style="padding:6px 10px;border:1px solid #eed">3 · Past Due</td><td style="padding:6px 10px;border:1px solid #eed;text-align:right">${buckets.pastDue.length}</td></tr>
     </tbody>
   </table>
+  ${renderTrendsHtml(deltas)}
   <h2 style="margin:18px 0 4px 0">Region overview</h2>
   ${regionTableHtml}
   <div style="margin:6px 0 20px 0"><img src="cid:bos-region-overview" alt="region overview" style="max-width:100%;border:1px solid #eee"/></div>
@@ -657,10 +823,22 @@ function stackedBarForBos(bosName, bosBuckets) {
   };
 }
 
-async function buildXlsxBuffer(buckets) {
+async function buildXlsxBuffer(buckets, deltas) {
   const wb = new ExcelJS.Workbook();
   wb.creator = "Leah's BOS Report";
   wb.created = new Date();
+  const priorBosTotal = (bos) => {
+    if (!deltas) return 0;
+    return ((deltas.byBos.query[bos]?.prior) || 0)
+      + ((deltas.byBos.placeholder[bos]?.prior) || 0)
+      + ((deltas.byBos.pastDue[bos]?.prior) || 0);
+  };
+  const priorRegionTotal = (reg) => {
+    if (!deltas) return 0;
+    return ((deltas.byRegion.query[reg]?.prior) || 0)
+      + ((deltas.byRegion.placeholder[reg]?.prior) || 0)
+      + ((deltas.byRegion.pastDue[reg]?.prior) || 0);
+  };
 
   // Group all rows by BOS (Customer CSE)
   const bosList = new Set();
@@ -683,7 +861,7 @@ async function buildXlsxBuffer(buckets) {
 
   // --- Tab 1: All BOS rollup ---
   const summary = wb.addWorksheet('All BOS');
-  summary.columns = [
+  const summaryCols = [
     { header: 'BOS (Customer CSE)', key: 'bos', width: 22 },
     { header: 'Query (7/7)', key: 'q', width: 12 },
     { header: 'Placeholder (8/8)', key: 'p', width: 18 },
@@ -693,23 +871,55 @@ async function buildXlsxBuffer(buckets) {
     { header: 'PD Chronic (30+d)', key: 'pdc', width: 18 },
     { header: 'Total', key: 'tot', width: 10 },
   ];
+  if (deltas) summaryCols.push({ header: `Δ vs ${deltas.priorDate}`, key: 'tDelta', width: 14 });
+  summary.columns = summaryCols;
   summary.getRow(1).font = { bold: true };
   summary.getRow(1).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFF8C6' } };
+  // Track BOS that appeared in the prior snapshot but are absent now (resolved/handed off)
+  const priorBosSeen = new Set();
   for (const { bos, total, b } of bosOrdered) {
     const pdf = b.pastDue.filter(r => r._agingBand === AGING_BANDS[0].label).length;
     const pds = b.pastDue.filter(r => r._agingBand === AGING_BANDS[1].label).length;
     const pdc = b.pastDue.filter(r => r._agingBand === AGING_BANDS[2].label).length;
-    const row = summary.addRow({ bos, q: b.query.length, p: b.placeholder.length, pd: b.pastDue.length, pdf, pds, pdc, tot: total });
+    const rowData = { bos, q: b.query.length, p: b.placeholder.length, pd: b.pastDue.length, pdf, pds, pdc, tot: total };
+    if (deltas) rowData.tDelta = total - priorBosTotal(bos);
+    const row = summary.addRow(rowData);
     if (pdc > 0) row.getCell('pdc').fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFDECEA' } };
     if (pds > 0) row.getCell('pds').fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFF8E1' } };
+    if (deltas) {
+      const cell = row.getCell('tDelta');
+      if (rowData.tDelta > 0) cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFDECEA' } };
+      else if (rowData.tDelta < 0) cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFEAF7EE' } };
+      priorBosSeen.add(bos);
+    }
   }
-  const totalRow = summary.addRow({
+  // Surface BOS that fully cleared since last week (prior > 0, current = 0)
+  if (deltas) {
+    const allPriorBos = new Set([
+      ...Object.keys(deltas.byBos.query || {}),
+      ...Object.keys(deltas.byBos.placeholder || {}),
+      ...Object.keys(deltas.byBos.pastDue || {}),
+    ]);
+    for (const bos of allPriorBos) {
+      if (priorBosSeen.has(bos)) continue;
+      const pTotal = priorBosTotal(bos);
+      if (pTotal === 0) continue;
+      const row = summary.addRow({ bos, q: 0, p: 0, pd: 0, pdf: 0, pds: 0, pdc: 0, tot: 0, tDelta: -pTotal });
+      row.font = { italic: true, color: { argb: 'FF666666' } };
+      row.getCell('tDelta').fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFEAF7EE' } };
+    }
+  }
+  const totalRowData = {
     bos: 'TOTAL',
     q: buckets.query.length,
     p: buckets.placeholder.length,
     pd: buckets.pastDue.length,
     tot: buckets.query.length + buckets.placeholder.length + buckets.pastDue.length,
-  });
+  };
+  if (deltas) {
+    totalRowData.tDelta = (deltas.totals.query || 0) + (deltas.totals.placeholder || 0) + (deltas.totals.pastDue || 0);
+  }
+  const totalRow = summary.addRow(totalRowData);
   totalRow.font = { bold: true };
   totalRow.border = { top: { style: 'thin' } };
 
@@ -954,7 +1164,7 @@ async function buildXlsxBuffer(buckets) {
 
   // --- By Region rollup tab ---
   const byRegion = wb.addWorksheet('By Region');
-  byRegion.columns = [
+  const byRegionCols = [
     { header: 'Region', key: 'region', width: 14 },
     { header: 'Query (7/7)', key: 'q', width: 14 },
     { header: 'Placeholder (8/8)', key: 'p', width: 18 },
@@ -964,6 +1174,8 @@ async function buildXlsxBuffer(buckets) {
     { header: 'PD Chronic (30+d)', key: 'pdc', width: 18 },
     { header: 'Total', key: 'tot', width: 10 },
   ];
+  if (deltas) byRegionCols.push({ header: `Δ vs ${deltas.priorDate}`, key: 'tDelta', width: 14 });
+  byRegion.columns = byRegionCols;
   byRegion.getRow(1).font = { bold: true };
   byRegion.getRow(1).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFEEF5FB' } };
   for (const reg of REGION_ORDER) {
@@ -973,12 +1185,21 @@ async function buildXlsxBuffer(buckets) {
     const pdf = pd.filter(r => r._agingBand === AGING_BANDS[0].label).length;
     const pds = pd.filter(r => r._agingBand === AGING_BANDS[1].label).length;
     const pdc = pd.filter(r => r._agingBand === AGING_BANDS[2].label).length;
-    if (q + p + pd.length === 0) continue;
-    const row = byRegion.addRow({ region: reg, q, p, pd: pd.length, pdf, pds, pdc, tot: q + p + pd.length });
+    const tot = q + p + pd.length;
+    const tDelta = deltas ? tot - priorRegionTotal(reg) : null;
+    if (tot === 0 && (!deltas || tDelta === 0)) continue;
+    const rowData = { region: reg, q, p, pd: pd.length, pdf, pds, pdc, tot };
+    if (deltas) rowData.tDelta = tDelta;
+    const row = byRegion.addRow(rowData);
     if (pds > 0) row.getCell('pds').fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFF8E1' } };
     if (pdc > 0) row.getCell('pdc').fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFDECEA' } };
+    if (deltas) {
+      const cell = row.getCell('tDelta');
+      if (tDelta > 0) cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFDECEA' } };
+      else if (tDelta < 0) cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFEAF7EE' } };
+    }
   }
-  const totRow = byRegion.addRow({
+  const totRowData = {
     region: 'TOTAL',
     q: buckets.query.length,
     p: buckets.placeholder.length,
@@ -987,7 +1208,11 @@ async function buildXlsxBuffer(buckets) {
     pds: buckets.pastDue.filter(r => r._agingBand === AGING_BANDS[1].label).length,
     pdc: buckets.pastDue.filter(r => r._agingBand === AGING_BANDS[2].label).length,
     tot: buckets.query.length + buckets.placeholder.length + buckets.pastDue.length,
-  });
+  };
+  if (deltas) {
+    totRowData.tDelta = (deltas.totals.query || 0) + (deltas.totals.placeholder || 0) + (deltas.totals.pastDue || 0);
+  }
+  const totRow = byRegion.addRow(totRowData);
   totRow.font = { bold: true };
   totRow.border = { top: { style: 'thin' } };
 
@@ -1031,11 +1256,12 @@ async function main() {
   const args = process.argv.slice(2);
   const toFlag = args.indexOf('--to');
   const ccFlag = args.indexOf('--cc');
+  const noSend = args.includes('--no-send');
   const recipient = toFlag >= 0 ? args[toFlag + 1] : DEFAULT_RECIPIENT;
   const cc = ccFlag >= 0 ? args[ccFlag + 1] : null;
   const inputPath = args.find(a => a.endsWith('.xlsx'));
   if (!inputPath) {
-    console.error('Usage: node bos-report.js <infor-export.xlsx> [--to email] [--cc email]');
+    console.error('Usage: node bos-report.js <infor-export.xlsx> [--to email] [--cc email] [--no-send]');
     process.exit(1);
   }
   if (!fs.existsSync(inputPath)) {
@@ -1052,14 +1278,26 @@ async function main() {
   const buckets = bucketize(rows);
   console.log(`Buckets: query=${buckets.query.length}, placeholder=${buckets.placeholder.length}, pastDue=${buckets.pastDue.length}`);
 
+  const runDate = isoDate(TODAY_UTC);
+  const currentSnapshot = buildSnapshot(buckets, runDate);
+  const priorSnapshot = loadPriorSnapshot(runDate);
+  const deltas = computeDeltas(currentSnapshot, priorSnapshot);
+  if (priorSnapshot) {
+    console.log(`Comparing against prior snapshot ${priorSnapshot.runDate} (Δ totals: query=${fmtDeltaText(deltas.totals.query)}, placeholder=${fmtDeltaText(deltas.totals.placeholder)}, pastDue=${fmtDeltaText(deltas.totals.pastDue)})`);
+  } else {
+    console.log('No prior snapshot — establishing baseline.');
+  }
+
   const attachments = [];
   console.log('Fetching chart images from quickchart.io...');
-  const html = await buildHtml(buckets, path.basename(inputPath), attachments);
+  const html = await buildHtml(buckets, path.basename(inputPath), attachments, deltas);
   console.log(`Fetched ${attachments.length} chart PNGs`);
   console.log('Building xlsx (per-BOS tabs w/ embedded charts)...');
-  const xlsxBuf = await buildXlsxBuffer(buckets);
+  const xlsxBuf = await buildXlsxBuffer(buckets, deltas);
   console.log(`xlsx ready (${xlsxBuf.length} bytes)`);
-  const runDate = isoDate(TODAY_UTC);
+
+  const snapshotPath = saveSnapshot(currentSnapshot);
+  console.log(`Saved snapshot: ${snapshotPath}`);
 
   attachments.push({ filename: `BOS_Metrics_${runDate}.xlsx`, content: xlsxBuf });
 
@@ -1069,6 +1307,16 @@ async function main() {
   });
 
   const subject = `Leah's BOS Report — ${runDate}`;
+  if (noSend) {
+    const debugDir = path.join(__dirname, 'debug');
+    if (!fs.existsSync(debugDir)) fs.mkdirSync(debugDir, { recursive: true });
+    const htmlPath = path.join(debugDir, `email-${runDate}.html`);
+    const xlsxPath = path.join(debugDir, `BOS_Metrics_${runDate}.xlsx`);
+    fs.writeFileSync(htmlPath, html);
+    fs.writeFileSync(xlsxPath, xlsxBuf);
+    console.log(`--no-send: wrote ${htmlPath} and ${xlsxPath}`);
+    return;
+  }
   const sendOpts = { html: true };
   if (cc) sendOpts.cc = cc;
   const ok = await notifier.sendWithAttachment(
