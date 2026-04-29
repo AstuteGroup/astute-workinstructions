@@ -35,9 +35,18 @@ function enqueueRetrySafe(opts) {
   }
 }
 
-// Mouser API Configuration
+// Mouser API Configuration.
+//
+// API key is loaded from MOUSER_API_KEY in ~/workspace/.env (canonical).
+// The hardcoded fallback is kept as an emergency reference only — it points
+// to the key that was working on 2026-04-17 after the previous one was
+// rotated silently by Mouser. DO NOT rely on this fallback: if the env var
+// is missing, the code fails loudly on the first call (see mouserRequest)
+// so rotations don't cause silent 3-day outages like Apr 14-17. If you need
+// to rotate, update ~/workspace/.env, not this file.
 const MOUSER_CONFIG = {
-  apiKey: process.env.MOUSER_API_KEY || 'd73312c1-9675-4406-b0b5-d96241d46a5c',
+  apiKey: process.env.MOUSER_API_KEY || '',  // fail at call time if unset
+  apiKeyFallbackReference: 'd73312c1-9675-4406-b0b5-d96241d46a5c',  // historical reference only
 
   // Base URL
   baseUrl: 'api.mouser.com',
@@ -58,6 +67,12 @@ const MOUSER_CONFIG = {
  */
 function mouserRequest(path, method = 'POST', body = null) {
   return new Promise((resolve, reject) => {
+    // Fail loud if MOUSER_API_KEY is empty — don't silently send an unauth'd
+    // request that returns 401 and burns retry queue slots. The auth-failure
+    // alerter in shared/franchise-api.js will still pick this up and email.
+    if (!MOUSER_CONFIG.apiKey) {
+      return reject(new Error('MOUSER_API_KEY not configured in ~/workspace/.env — rotate or restore key'));
+    }
     const bodyStr = body ? JSON.stringify(body) : null;
 
     // API key goes in query string

@@ -34,7 +34,7 @@ const fs = require('fs');
 require('dotenv').config({ path: path.resolve(__dirname, '../../../.env') });
 
 const { Pool } = require('pg');
-const nodemailer = require('nodemailer');
+const { sendWithFallback } = require('../../shared/verified-send');
 const { enrichRFQ } = require('./enrich-rfq');
 const { assignPriority, isImmediate, PRIORITY } = require('./rfq-priority');
 const { readQuotaState, isQuotaBlocked, hasAdequateQuota } = require('./rfq-quota-state');
@@ -43,6 +43,7 @@ const { addToBacklog, nextBatch, markAttempted, pruneBacklog, backlogStats } = r
 const WATERMARK_FILE = path.resolve(process.env.HOME || '/home/analytics_user', 'workspace/.last-rfq-enrich');
 const JAKE_EMAIL = 'jake.harris@astutegroup.com';
 const FROM_EMAIL = process.env.VORTEX_EMAIL || 'vortex@orangetsunami.com';
+const FALLBACK_EMAIL = process.env.VORTEX_FALLBACK_SENDER || 'excess@orangetsunami.com';
 
 // How many Tier 4 backlog items to drain per tick. Aggressive so backlog
 // doesn't accumulate — cache hits mean most won't burn much quota.
@@ -80,9 +81,7 @@ function writeWatermark(iso) {
 }
 
 /**
- * Select RFQs created after the watermark. Returns newest-last so we process
- * in creation order. Priority is assigned later based on rfq_type + line_mpns
- * (no region/country — J8 model). Size + type drive dispatch.
+ * Select RFQs whose line_mpn rows landed inside (sinceIso, untilIso].
  *
  * TIMEZONE NOTE:
  *   iDempiere writes `created` as America/Chicago local time into a TZ-naive
@@ -97,12 +96,33 @@ function writeWatermark(iso) {
  *   - First AT TIME ZONE: "this naked timestamp is in Chicago" → returns tstz
  *   - Second AT TIME ZONE: "show me that in UTC" → returns naked timestamp in UTC
  *   Result is directly comparable to the ISO UTC watermark string.
+ *
+ * HEADER/LINE RACE:
+ *   iDempiere commits the RFQ header and its line_mpn rows in separate
+ *   transactions, typically ~1 minute apart. If the filter keys off
+ *   `r.created`, an RFQ whose header lands before a poll but whose lines
+ *   land after gets permanently orphaned: the first poll drops it via
+ *   HAVING COUNT(line_mpn) = 0, and the next poll's watermark has already
+ *   advanced past `r.created`.
+ *
+ *   Fix: anchor both the filter AND the watermark on MAX(line_mpn.created).
+ *   An RFQ becomes eligible the moment its lines exist, regardless of how
+ *   late that is relative to the header. `untilIso` (captured at poll start)
+ *   bounds the upper edge so anything written during the poll itself is
+ *   caught by the next one.
+ *
+ *   Incident: RFQ 1132998 (Sanmina, PSC150W-110-S24) lost ~11h of market
+ *   enrichment on 2026-04-24. Poll ran at 03:15:01Z; header was at
+ *   03:14:39Z but line_mpn landed at 03:15:47Z — 46s after the poll.
+ *   Watermark then advanced past 03:15:01Z and the RFQ was never seen.
+ *   Buyer keyed 3 VQs manually without API context.
  */
-async function findNewRFQs(sinceIso) {
+async function findNewRFQs(sinceIso, untilIso) {
   const { rows } = await pool.query(`
     SELECT r.value AS rfq_number,
            r.chuboe_rfq_id,
            (r.created AT TIME ZONE 'America/Chicago' AT TIME ZONE 'UTC') AS created,
+           MAX(rlm.created AT TIME ZONE 'America/Chicago' AT TIME ZONE 'UTC') AS line_mpn_created,
            bp.name AS customer,
            rt.name AS rfq_type,
            COUNT(rlm.chuboe_rfq_line_mpn_id) AS line_mpns
@@ -117,11 +137,12 @@ async function findNewRFQs(sinceIso) {
           AND rlm.chuboe_mpn_clean IS NOT NULL
           AND rlm.chuboe_mpn_clean <> ''
     WHERE r.isactive='Y'
-      AND (r.created AT TIME ZONE 'America/Chicago' AT TIME ZONE 'UTC') > $1
     GROUP BY r.value, r.chuboe_rfq_id, r.created, bp.name, rt.name
     HAVING COUNT(rlm.chuboe_rfq_line_mpn_id) > 0
-    ORDER BY r.created ASC
-  `, [sinceIso]);
+       AND MAX(rlm.created AT TIME ZONE 'America/Chicago' AT TIME ZONE 'UTC') >  $1::timestamp
+       AND MAX(rlm.created AT TIME ZONE 'America/Chicago' AT TIME ZONE 'UTC') <= $2::timestamp
+    ORDER BY MAX(rlm.created AT TIME ZONE 'America/Chicago' AT TIME ZONE 'UTC') ASC
+  `, [sinceIso, untilIso]);
   return rows;
 }
 
@@ -264,18 +285,14 @@ async function sendEmail(subject, html) {
     log('WARN: WORKMAIL_PASS not set — skipping email');
     return;
   }
-  const transporter = nodemailer.createTransport({
-    host: process.env.SMTP_HOST || 'smtp.mail.us-east-1.awsapps.com',
-    port: parseInt(process.env.SMTP_PORT || '465', 10),
-    secure: true,
-    auth: { user: FROM_EMAIL, pass },
+  const result = await sendWithFallback({
+    primary:  { from: FROM_EMAIL,     pass, displayName: 'RFQ API Enrichment' },
+    fallback: { from: FALLBACK_EMAIL, pass, displayName: 'RFQ API Enrichment' },
+    mail: { to: JAKE_EMAIL, subject, html },
+    log,
   });
-  await transporter.sendMail({
-    from: FROM_EMAIL,
-    to: JAKE_EMAIL,
-    subject,
-    html,
-  });
+  log(`sendEmail: delivered via ${result.delivered}` +
+      (result.bounceDetected ? ' (primary bounced, fallback used)' : ''));
 }
 
 // Single-instance guard — cron fires every 15 min, but a tick may still be
@@ -338,11 +355,11 @@ async function main() {
     }
   }
   const untilIso = new Date().toISOString();
-  log(`Polling for RFQs created after ${sinceIso}`);
+  log(`Polling for RFQs with line_mpn created in (${sinceIso}, ${untilIso}]`);
 
   let newRFQs;
   try {
-    newRFQs = await findNewRFQs(sinceIso);
+    newRFQs = await findNewRFQs(sinceIso, untilIso);
   } catch (err) {
     log('FATAL: query failed:', err.message);
     await pool.end();

@@ -281,12 +281,101 @@ async function searchPart(distributor, mpn, qty, opts = {}) {
     return { distributor, name: config?.name || distributor, found: false, error: 'Not configured or inactive' };
   }
 
+  // Negative cache check — serves prior "not carried" results without burning
+  // a live API call. Skipped when opts.skipCache is true (for callers that
+  // explicitly need fresh data — probes, debugging, intentional refresh).
+  // Errors from the cache layer MUST never block the live API call.
+  let _negCache = null;
+  try { _negCache = require('./api-negative-cache'); } catch { /* module optional */ }
+  // Pre-call peek captures cache state BEFORE any API call or record.
+  // Used by shadow-mode audit below to compare "what we would have served"
+  // vs "what the live API actually returned" on THIS call.
+  let _preCallCacheState = null;
+  if (_negCache && !opts.skipCache) {
+    try {
+      _preCallCacheState = _negCache.peek({ mpn, mfr: opts.mfr, disty: distributor });
+      const hit = _negCache.check({ mpn, mfr: opts.mfr, disty: distributor });
+      if (hit && hit.result === 'not_carried') {
+        return {
+          distributor,
+          name: config.name,
+          bpValue: config.bpValue,
+          bpName: config.bpName,
+          bpId: config.bpId,
+          found: false,
+          cached: true,
+          cachedAt: hit.cached_at,
+          cacheExpires: hit.expires_at,
+          matchType: null,
+          franchiseQty: 0,
+          franchisePrice: null,
+          franchiseBulkPrice: null,
+          franchiseRfqPrice: null,
+          priceBreaks: [],
+          vqLines: null,
+        };
+      }
+    } catch { /* swallow cache errors */ }
+  }
+
   try {
     const mod = require(config.script);
     // opts.mfr — searched MFR — enables the MPN-match MFR veto (rejects
     // candidates whose MFR is MISMATCH per shared/mfr-equivalence). Optional;
     // existing call sites that don't pass it get the old behavior (no veto).
     const result = await mod.searchPart(mpn, qty, opts);
+
+    // Auth-failure alerting — if the cog returned result.error and it matches
+    // auth patterns, fire the debounced alerter. Non-blocking, swallows its
+    // own errors. See shared/auth-failure-alerts.js for the pattern list.
+    if (result?.error) {
+      try {
+        require('./auth-failure-alerts')
+          .alertIfAuthFailure({ distributor, error: result.error, mpn })
+          .catch(() => {});
+      } catch { /* module optional */ }
+    }
+
+    // Negative cache record — only cache clean outcomes (no error field).
+    // Upstream errors (429/5xx/timeouts) are NOT cached — the retry queue
+    // handles them. Per-disty envelope/context gates are enforced inside
+    // the cache module; missing metadata = safe no-op.
+    if (_negCache && !opts.skipCache && !result?.error) {
+      try {
+        const hasPriceBreaks = Array.isArray(result?.priceBreaks) && result.priceBreaks.length > 0;
+        if (result?.found === true && hasPriceBreaks) {
+          _negCache.record({
+            mpn,
+            mfr: opts.mfr,
+            disty: distributor,
+            result: 'carried',
+            priceBreaksN: result.priceBreaks.length,
+            stockQty: result.franchiseQty || result.inventoryQty || null,
+            costUnit: result.franchisePrice || result.franchiseRfqPrice || null,
+          });
+        } else if (result?.found === false) {
+          // Clean 200-empty. Envelope / context flow through for per-disty gates.
+          _negCache.record({
+            mpn,
+            mfr: opts.mfr,
+            disty: distributor,
+            result: 'not_carried',
+            envelope: result?.envelope,
+            context: opts.cacheContext,
+            reason: result?.cacheExcludeReason,
+          });
+        }
+        // Shadow audit: compare what cache WOULD have served (pre-call peek)
+        // to what the live API actually returned on THIS call.
+        if (_negCache.SHADOW_MODE) {
+          _negCache.logShadow({
+            mpn, mfr: opts.mfr, disty: distributor,
+            cachedResult: _preCallCacheState?.result || null,
+            actualResult: result?.found ? 'carried' : 'not_carried',
+          });
+        }
+      } catch { /* cache errors never block the result path */ }
+    }
 
     return {
       distributor,
@@ -337,6 +426,14 @@ async function searchPart(distributor, mpn, qty, opts = {}) {
       raw: result,
     };
   } catch (err) {
+    // Auth-failure alerting on thrown errors (e.g. the cog rejects before
+    // returning a structured result — Mouser's "Unauthorized" path throws).
+    try {
+      require('./auth-failure-alerts')
+        .alertIfAuthFailure({ distributor, error: err, mpn })
+        .catch(() => {});
+    } catch { /* module optional */ }
+
     return {
       distributor,
       name: config.name,
@@ -518,8 +615,35 @@ function envelopeToResult(envelope, mpn, qty) {
  * When a fresh cache hit occurs, returns the same shape as a live call and the
  * summary includes { fromCache: true, cacheAgeDays }.
  */
+const DEFAULT_PER_DISTRIBUTOR_TIMEOUT_MS = 60_000;
+
+function withTimeout(promise, ms, distributor, mpn) {
+  let timer;
+  const timeout = new Promise((resolve) => {
+    timer = setTimeout(() => {
+      resolve({
+        distributor,
+        mpn,
+        found: false,
+        franchiseQty: 0,
+        errorState: 'timeout',
+        errorMessage: `Timed out after ${ms}ms`,
+        timedOut: true,
+      });
+    }, ms);
+  });
+  return Promise.race([
+    promise.then(r => { clearTimeout(timer); return r; }),
+    timeout,
+  ]);
+}
+
 async function searchAllDistributors(mpn, qty, options = {}) {
-  const { parallel = true, exclude = [], onResult = null, cacheTTL = null, cacheBypassIf = null, mfr = null } = options;
+  const {
+    parallel = true, exclude = [], onResult = null,
+    cacheTTL = null, cacheBypassIf = null, mfr = null,
+    perDistributorTimeoutMs = DEFAULT_PER_DISTRIBUTOR_TIMEOUT_MS,
+  } = options;
   // `mfr` — the searched MFR (typically the RFQ's MFR text). When provided,
   // each distributor's parser applies the MFR veto via shared/mpn-match.js,
   // rejecting candidates whose MFR resolves to MISMATCH. Opt-in — existing
@@ -549,11 +673,17 @@ async function searchAllDistributors(mpn, qty, options = {}) {
 
   let results;
   if (parallel) {
-    // Run all APIs concurrently
+    // Run all APIs concurrently; each wrapped in a hard timeout so a single
+    // stuck distributor can't hang the entire MPN. Observed 2026-04-14: a
+    // single API call hung for 23h on RFQ 1132340 because there was no
+    // timeout anywhere in the stack.
     results = await Promise.all(
       activeDistributors.map(async (d) => {
-        const result = await searchPart(d, mpn, qty, perCallOpts);
-        if (onResult) onResult(result); // callback for progress reporting
+        const result = await withTimeout(
+          searchPart(d, mpn, qty, perCallOpts),
+          perDistributorTimeoutMs, d, mpn,
+        );
+        if (onResult) onResult(result);
         return result;
       })
     );
@@ -561,7 +691,10 @@ async function searchAllDistributors(mpn, qty, options = {}) {
     // Sequential (for rate-limit-sensitive scenarios)
     results = [];
     for (const d of activeDistributors) {
-      const result = await searchPart(d, mpn, qty, perCallOpts);
+      const result = await withTimeout(
+        searchPart(d, mpn, qty, perCallOpts),
+        perDistributorTimeoutMs, d, mpn,
+      );
       if (onResult) onResult(result);
       results.push(result);
     }
@@ -594,8 +727,9 @@ async function searchAllDistributors(mpn, qty, options = {}) {
   const distributorHealth = results.reduce((acc, r) => {
     const name = r.name || r.distributor;
     if (!name) return acc;
-    if (!acc[name]) acc[name] = { errors: 0, empties: 0, found: 0 };
-    if (r.error) acc[name].errors++;
+    if (!acc[name]) acc[name] = { errors: 0, empties: 0, found: 0, timeouts: 0 };
+    if (r.timedOut) acc[name].timeouts++;
+    else if (r.error) acc[name].errors++;
     else if (!r.found) acc[name].empties++;
     else acc[name].found++;
     return acc;

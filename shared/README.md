@@ -27,6 +27,10 @@
 | `api-result-writer.js` | Capture full franchise API responses (all price breaks, stock, lead time) to cache + iDempiere. Extract qty-relevant prices for downstream consumers. | After any `searchAllDistributors()` call (write), or when Vortex/Quick Quote needs franchise pricing (read) | Franchise Screening, Suggested Resale, LAM Kitting (write); Vortex Matches, Quick Quote (read) |
 | `record-updater.js` | Generalized PATCH/PUT pattern: GET-then-PATCH idempotency, skip-if-not-null gating, validation, throttled batch, audit logs | Any backfill or enrichment that **updates** existing rows (HTS/ECCN backfill, alt-MPN linkage, dormant column populations, etc.) | HTS/ECCN backfill (W2), future enrichment passes |
 | `db-helpers.js` | Shared DB read utilities: `psqlQuery`, `sqlStr`, `sqlNum`, `cleanMpn`. Used for read queries only — writes go through `api-client.js`. | Any module reading from `adempiere` schema | rfq-writer.js, offer-writeback.js, api-result-writer.js, partner-lookup.js |
+| `api-negative-cache.js` | Global, cross-RFQ, persistent cache of franchise API outcomes (primarily "not carried"). SQLite-backed at `shared/data/negative-cache.sqlite`. Per-disty TTL + confirm-count + envelope/context gates in `DISTY_RULES`. Shadow mode via `NEG_CACHE_SHADOW=1`. | Before any `searchPart()` call — dedup across RFQs so we stop burning quota on repeat parts | franchise-api.js (integration point for all 10 disty cogs) |
+| `auth-failure-alerts.js` | Detects auth-style errors (`401`, `403`, `Unauthorized`, `invalid_client`, etc.) from any disty, emails operator with 24h debounce per disty. State file: `shared/data/auth-failure-state.json`. | Automatic — called from franchise-api.js::searchPart on any thrown or result.error. No per-cog changes needed. | franchise-api.js |
+| `linecards/` | Per-disty franchise MFR list fetchers. `digikey.js` + `mouser.js` (API-based), orchestrator at `scripts/linecard-refresh.js` diffs month-over-month and cascade-invalidates negative-cache entries on adds/drops. Snapshots in `shared/data/linecards/`. | Monthly via cron (1st of month) to catch franchise portfolio changes | scripts/linecard-refresh.js |
+| `hts-api.js` | USITC Harmonized Tariff Schedule client. Lookup duty rates (general/special/Col-2), units, and Section 301/232/AD footnote references by HTS code. Walks the hierarchy so 10-digit statistical suffixes inherit duty from their 8-digit tariff line. Lazy chapter-level cache at `shared/data/hts-cache.json` (30d TTL). No auth, free public endpoint. | Validating HTS codes from DigiKey/Mouser, surfacing tariff implications (Section 301 on China origin is the real value-add — neither franchise API returns this), descriptions for disagreement resolution. NOT a classification engine — cannot map MPN → HTS. | (planned) HTS / ECCN Backfill enrichment, Quick Quote landed-cost view |
 
 ---
 
@@ -658,6 +662,56 @@ const mfr = await resolveMFR('Analog Devices Inc');  // → { id, name, isSystem
 ```
 
 All results cached per session (one API call per unique vendor/manufacturer).
+
+---
+
+## hts-api.js
+
+USITC Harmonized Tariff Schedule REST API client. Free, public, no auth.
+
+**What it adds beyond DigiKey/Mouser:** Both franchise APIs return only the HTS code itself. USITC returns the actual *duty schedule* attached to that code — General MFN rate, Special FTA preferences, Column 2 rate, and crucially the **Section 301 / 232 / AD footnote references** that determine real landed cost on China-origin parts.
+
+**What it is NOT:** a classification engine. The USITC API is keyword search over schedule text — it cannot map an MPN to an HTS code. Use franchise APIs for the per-MPN code; use this module to resolve what that code *means* for tariff purposes.
+
+```javascript
+const { lookupHts, searchHts, parseFootnotes } = require('../shared/hts-api');
+
+const row = await lookupHts('8542.33.00.01');  // also accepts '8542330001'
+// {
+//   htsno: '8542.33.00.01',
+//   description: 'Amplifiers',
+//   dutyHtsno: '8542.33.00',         // duty rates inherited from this ancestor
+//   general: 'Free',                 // MFN rate (most countries)
+//   special: '',                     // FTA preferences (USMCA, KORUS, etc.)
+//   other: '35%',                    // Column 2 (Cuba, North Korea)
+//   units: ['No.'],
+//   sec301Refs: ['9903.91.05'],      // China — resolve via lookupHts() for actual rate
+//   sec232Refs: [],
+//   antidumpingRefs: [],
+//   footnotes: [...],
+// }
+
+// Resolve Section 301 supplementary line for actual stacked duty
+const sec301 = await lookupHts('9903.91.05');
+// → "+50% on articles of [country] origin..." (effective 2025-01-01 for ICs)
+```
+
+### Caching
+
+Lazy chapter-level fetch on first lookup. A query for any 8542.* code triggers one fetch of the entire chapter 8542 (~50KB), cached at `shared/data/hts-cache.json` for 30 days. ~15 chapters cover most semis trading.
+
+Force refresh after annual revision (Jan) or known Section 301 list updates:
+```javascript
+const { refreshChapter } = require('../shared/hts-api');
+await refreshChapter('8542');
+```
+
+### Known scope
+
+- **Hierarchy walking:** 10-digit statistical suffixes carry no duty of their own — `lookupHts` walks up to the closest ancestor with a non-empty `general` field. `dutyHtsno` records which ancestor contributed the rate.
+- **Footnote parsing:** `parseFootnotes()` extracts `9903.xx.xx` (Section 301), `9902.xx.xx` (Section 232 / special), and `Axxx-xxx` (AD/CVD case numbers). Surfaced as `sec301Refs`, `sec232Refs`, `antidumpingRefs` arrays on every `lookupHts` result.
+- **Origin-aware landed cost is NOT included.** The module exposes raw rates; combining with a part's `c_country_id` to compute total duty is a downstream concern (see Quick Quote / Vortex landed-cost roadmap).
+- **Section 301 *exclusions* are not detected.** Many ICs have part-specific exclusions under 9903.88.* — those require manual review.
 
 ---
 

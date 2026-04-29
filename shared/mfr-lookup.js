@@ -25,6 +25,21 @@
  */
 
 const { execSync } = require('child_process');
+
+// Force connection params on every psql child. Root cause verified
+// 2026-04-15 after vortex-poller (12:20) + mfr-reconciler (06:30) both
+// hit fe_sendauth: pg_hba.conf only grants peer auth for database
+// `idempiere_replica`. Without `-d` or PGDATABASE set, libpq defaults
+// the dbname to the username (`analytics_user`), matching a different
+// pg_hba rule that requires a password. Interactive shells export
+// PGDATABASE from ~/.bashrc, so the bug is invisible outside cron.
+const PSQL_ENV = {
+  ...process.env,
+  PGDATABASE: 'idempiere_replica',
+  PGUSER: 'analytics_user',
+  LOGNAME: 'analytics_user',
+  USER: 'analytics_user',
+};
 const fs = require('fs');
 const path = require('path');
 const { isInfrastructureError } = require('./db-helpers');
@@ -136,6 +151,7 @@ function queryDBFuzzy(mfrName) {
       const result = execSync(`psql -U analytics_user -t -A -F '|' -c "${sql.replace(/"/g, '\\"')}"`, {
         encoding: 'utf-8',
         timeout: 10000,
+        env: PSQL_ENV,
       });
       const lines = result.split('\n').filter(l => {
         const t = l.trim();
@@ -195,6 +211,7 @@ function queryDB(mfrName) {
     const result = execSync(`psql -U analytics_user -t -A -F '|' -c "${sql.replace(/"/g, '\\"')}"`, {
       encoding: 'utf-8',
       timeout: 10000,
+      env: PSQL_ENV,
     });
     // Parse through rbash noise
     const lines = result.split('\n').filter(l => {
