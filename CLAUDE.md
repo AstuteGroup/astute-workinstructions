@@ -65,6 +65,7 @@ At the start of every new conversation, before addressing anything else, always 
 > 15. **MFR Reconciler** - Daily cron that backfills `Chuboe_MFR_ID` on rows where text is set but FK is null. Runs at 6 AM UTC; sweeps rfq_line_mpn / vq_line / cq_line for rows created since last run (see `Trading Analysis/MFR Reconciler/mfr-reconciler.md`)
 > 16. **CRMA Form Filling** - Fill the customer-RMA xlsx (`CRMA Request Form 2023.06`) from an OT SO# when buyer forwards a blank form to stockRFQ@. Cell map + dropdown source ranges + naming gotchas (Astute COV = Infor COV, not OT SO#) (see `Trading Analysis/CRMA Form/crma-form.md`)
 > 17. **Leah's BOS Report** - Weekly open-order report for Leah Griffin / BOS team. Processes Infor xlsx export into 3-bucket (Query 7/7, Placeholder 8/8, Past Due) × 3-aging (Fresh/Stale/Chronic) × region (APAC/US/MX/EMEA) breakdown with auto-detected signals. Emailed from stockRFQ@ (see `Trading Analysis/Leah's BOS Report/leahs-bos-report.md`)
+> 18. **Price Intelligence Dashboard** - Per-MPN price-trend dashboard overlaying VQ quotes, market offers, and customer targets. Trigger phrases: "price intelligence on \<MPN\>", "price trend for \<MPN\>", "part trend analysis on \<MPN\>" (see `Trading Analysis/Price Intelligence Dashboard/price-intelligence.md`)
 
 3. **Review Roadmaps** (planned work):
 
