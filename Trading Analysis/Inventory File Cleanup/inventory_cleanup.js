@@ -145,6 +145,17 @@ const STATIC_CARRYOVER_OFFERS = [
         bootstrapId: 1024030,
         portalWarehouseName: 'Marvell Lot Bid - Incoming (Carryover)',
     },
+    {
+        label: 'GM Stock',
+        bootstrapId: 1026173,
+        portalWarehouseName: 'Astute Electronics Inc. - GM Stock',
+        // Bootstrapped 2026-04-28 from Josh Pucci's "GM Inventory" email
+        // (4/27, attachment "Ready To Ship - GM GP 11.14.25.xlsx", tab
+        // "1120 Price Update"). 19 MPNs / 2,628,000 pcs (Nexperia + Onsemi).
+        // Posted under Astute Electronics Inc → Stock - Austin Warehouse.
+        // No paired Infor warehouse — this stock lives outside the weekly
+        // export and propagates forward as-is until retired.
+    },
 ];
 
 // reconcileCarryover threshold — if Infor paired-warehouse qty ≥ this fraction
@@ -1444,11 +1455,42 @@ function processInventoryFile(inputFile, outputDir) {
 
     // ==========================================================================
     // STEP 5: Export consolidated portal file
+    //
+    // CONTRACT: The portal CSV must mirror exactly what gets written to OT —
+    // same warehouse groups, same lines. NetComponents and OT must never
+    // drift. The OT-eligible groups are the keys of WAREHOUSE_WRITEBACK;
+    // groups outside that map (HK_Allocated_Warehouse / W105,
+    // Allocated_Warehouse / MAIN, LAM_3PL / W111) are intentionally excluded
+    // from both OT and the portal — they are internal-only and not marketed
+    // externally.
+    //
+    // Static carryover offers (STATIC_CARRYOVER_OFFERS) are refreshed in OT
+    // by refreshStaticCarryoverOffers() and appended to this CSV by Step 5d
+    // in fetchAndProcess(), keeping that side of the mirror intact too.
+    //
+    // If you ever need a portal upload that does NOT match OT, do not edit
+    // this step — derive a separate file from `inventory_cleaned_*.csv`
+    // (the master) so the contract here stays explicit.
     // ==========================================================================
     console.log('\nStep 5: Exporting consolidated portal file...');
 
+    const otGroupNames = Object.keys(WAREHOUSE_WRITEBACK);
+    const portalSourceRows = [];
+    for (const groupName of otGroupNames) {
+        const rows = groupedRows[groupName] || [];
+        portalSourceRows.push(...rows);
+    }
+    const droppedRowCount = uniqueRows.length - portalSourceRows.length;
+    if (droppedRowCount > 0) {
+        const droppedGroups = Object.keys(groupedRows)
+            .filter(g => !otGroupNames.includes(g))
+            .map(g => `${g} (${groupedRows[g].length})`)
+            .join(', ');
+        console.log(`  - Excluding ${droppedRowCount} rows from non-OT groups: ${droppedGroups || '(none)'}`);
+    }
+
     const portalHeaders = PORTAL_COLUMNS.filter(col => headers.includes(col));
-    const portalRows = uniqueRows.map(row => {
+    const portalRows = portalSourceRows.map(row => {
         const out = {};
         for (const col of portalHeaders) {
             let val = String(row[col] || '').trim();
@@ -1462,7 +1504,7 @@ function processInventoryFile(inputFile, outputDir) {
 
     const portalFile = path.join(outputDir, `consolidated_portal_${timestamp}.csv`);
     fs.writeFileSync(portalFile, arrayToCSV(portalRows, portalHeaders));
-    console.log(`  - Saved: consolidated_portal_${timestamp}.csv (${uniqueRows.length} rows)`);
+    console.log(`  - Saved: consolidated_portal_${timestamp}.csv (${portalRows.length} rows)`);
 
     // ==========================================================================
     // STEP 6: Save cleaned master file
@@ -1841,4 +1883,4 @@ if (require.main === module) {
     }
 }
 
-module.exports = { processInventoryFile, fetchAndProcess, writeInventoryToOT, WAREHOUSE_WRITEBACK };
+module.exports = { processInventoryFile, fetchAndProcess, writeInventoryToOT, WAREHOUSE_WRITEBACK, STATIC_CARRYOVER_OFFERS };

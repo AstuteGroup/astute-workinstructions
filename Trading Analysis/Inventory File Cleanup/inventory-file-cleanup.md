@@ -264,7 +264,14 @@ The Chuboe format is used for iDempiere Market Offer import. Column mapping:
 
 ### Current Output (Generic)
 
-The `consolidated_portal_*.csv` contains all deduplicated inventory with these columns:
+**Contract: portal CSV mirrors OT exactly.** The `consolidated_portal_*.csv` is the NetComponents upload and must contain the same lines that the script writes into iDempiere — no more, no less. That means:
+
+- **Included:** all rows from the warehouse groups in `WAREHOUSE_WRITEBACK` (the 11-group OT mapping below) plus the static carryover offers appended in Step 5d.
+- **Excluded:** `HK_Allocated_Warehouse` (W105), `Allocated_Warehouse` (MAIN), and `LAM_3PL` (W111). These warehouses are internal-only — not posted to OT and not posted to NetComponents.
+
+If you need a different selection for a portal upload, derive it from `inventory_cleaned_*.csv` (the full deduped master) — do not loosen this contract in Step 5.
+
+The CSV has these columns:
 
 | Column | Source |
 |--------|--------|
@@ -461,7 +468,7 @@ Each warehouse group in the table below produces **one `chuboe_offer` per weekly
 | LAM_Consignment | Stock - Philippines Warehouse (1000014) | Astute Electronics - LAM Consignment (1011267) | 1013066 |
 | LAM_Dead_Inventory | Stock - Austin Warehouse (1000008) | Astute Electronics Inc (1000332) | 1002336 |
 
-**Groups intentionally NOT in the write-back** (CSVs still produced under `Inventory YYYY-MM-DD/`, but no OT records are created):
+**Groups intentionally NOT in the write-back** (per-warehouse audit CSVs still produced under `Inventory YYYY-MM-DD/`, but no OT records are created **and these groups are also excluded from the NetComponents portal CSV** — the portal upload must mirror OT exactly):
 - `LAM_3PL` (W111)
 - `Allocated_Warehouse` (MAIN)
 - `HK_Allocated_Warehouse` (W105)
