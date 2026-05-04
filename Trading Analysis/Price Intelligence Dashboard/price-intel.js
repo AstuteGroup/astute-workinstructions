@@ -158,6 +158,7 @@ const moRows = psql(`
   LEFT JOIN adempiere.chuboe_mfr mfr ON mfr.chuboe_mfr_id = ol.chuboe_mfr_id
   WHERE ol.isactive = 'Y'
     AND o.isactive  = 'Y'
+    AND o.chuboe_offer_type_id <> 1000025  -- exclude LAM Kitting Inventory (LAM consigned, not ours)
     AND ol.priceentered > 0
     AND ${matchClause('ol.chuboe_mpn_clean')}
     ${dateRange(offerDateCol)}

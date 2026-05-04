@@ -158,6 +158,7 @@ function getMarketOffers(mpnClean, options = {}) {
     JOIN adempiere.c_bpartner bp ON o.c_bpartner_id = bp.c_bpartner_id
     JOIN adempiere.chuboe_offer_type ot ON o.chuboe_offer_type_id = ot.chuboe_offer_type_id
     WHERE ol.isactive = 'Y' AND o.isactive = 'Y'
+    AND o.chuboe_offer_type_id <> 1000025  -- exclude LAM Kitting Inventory (LAM consigned, not ours)
     AND ${mpnWhereClause('ol.chuboe_mpn_clean', mpnClean)}
     AND o.created >= CURRENT_DATE - INTERVAL '${days} days'
     ORDER BY o.created DESC LIMIT 15
@@ -503,6 +504,7 @@ function getBulkMarketData(mpnCleans, options = {}) {
     FROM adempiere.chuboe_offer_line ol
     JOIN adempiere.chuboe_offer o ON ol.chuboe_offer_id = o.chuboe_offer_id
     WHERE ol.isactive = 'Y' AND o.isactive = 'Y'
+      AND o.chuboe_offer_type_id <> 1000025  -- exclude LAM Kitting Inventory (LAM consigned, not ours)
       AND ol.chuboe_mpn_clean IN (SELECT mpn FROM mpns)
       AND o.created >= CURRENT_DATE - INTERVAL '${offerDays} days'
     GROUP BY ol.chuboe_mpn_clean
