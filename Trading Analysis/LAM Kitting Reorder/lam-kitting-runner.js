@@ -128,6 +128,9 @@ function applyRowShading(excelRow, headers) {
     if (cell.value === 'SKIPPED - TIMEOUT/ERROR') {
       cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFF9999' } };
       cell.font = { bold: true };
+    } else if (typeof cell.value === 'string' && cell.value.startsWith('RESTRICTED')) {
+      cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFD9D9D9' } };
+      cell.font = { bold: true };
     } else if (cell.value === 'NO COVERAGE') {
       cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFD580' } };
       cell.font = { bold: true };
@@ -374,6 +377,8 @@ async function main() {
   const rfqMappingFile = alertsFile.replace('.csv', '_rfq_mapping.json');
   let rfqMapping = null;
 
+  let rfqWriteFailed = false;
+  let rfqWriteError = null;
   if (fs.existsSync(sourcedCsv) && fs.existsSync(franchiseJson)) {
     log('Step 4b: Writing RFQ + VQ lines for items without on-order...');
     try {
@@ -390,7 +395,11 @@ async function main() {
       log(`  ERROR: RFQ writing failed: ${err.message}`);
       if (err.stdout) console.log(err.stdout);
       if (err.stderr) console.error(err.stderr);
-      // Non-fatal — email still goes out with sourced report
+      // Email still goes out so the buyer sees the sourced report, but
+      // mark the run as failed so cron-runner doesn't advance the sentinel.
+      // Next hourly tick will retry once OT is back.
+      rfqWriteFailed = true;
+      rfqWriteError = err.message;
     }
   } else {
     log('Step 4b: Skipping RFQ write — sourced CSV or franchise data not found.');
@@ -398,15 +407,25 @@ async function main() {
 
   // Step 5: Rebuild the sourced Excel with RFQ line numbers, then email
   log('Step 5: Preparing and emailing sourced report...');
-  const sourcedXlsx = alertsFile.replace('.csv', '_sourced.xlsx');
+  const defaultSourcedXlsx = alertsFile.replace('.csv', '_sourced.xlsx');
+  let sourcedXlsx = defaultSourcedXlsx;
 
-  // If we have an RFQ mapping, rebuild the Excel with RFQ Line # column
+  // If we have an RFQ mapping, rebuild the Excel with the RFQ Line # column AND
+  // bake the RFQ number into the filename so the buyer can grep their inbox /
+  // Downloads folder by RFQ. Also clean up the plain _sourced.xlsx that
+  // lam-kitting-source.js wrote so there's only one file on disk per run.
   if (rfqMapping && rfqMapping.rfqSearchKey && fs.existsSync(sourcedCsv)) {
+    sourcedXlsx = alertsFile.replace('.csv', `_RFQ${rfqMapping.rfqSearchKey}_sourced.xlsx`);
     try {
       await rebuildExcelWithRfqLines(sourcedCsv, sourcedXlsx, rfqMapping);
-      log(`  Excel rebuilt with RFQ line numbers (RFQ ${rfqMapping.rfqSearchKey})`);
+      log(`  Excel rebuilt with RFQ line numbers → ${path.basename(sourcedXlsx)}`);
+      if (fs.existsSync(defaultSourcedXlsx) && defaultSourcedXlsx !== sourcedXlsx) {
+        fs.unlinkSync(defaultSourcedXlsx);
+      }
     } catch (err) {
       log(`  WARNING: Could not rebuild Excel with RFQ lines: ${err.message}`);
+      // Fall back to the plain file the source script left behind.
+      sourcedXlsx = defaultSourcedXlsx;
     }
   }
 
@@ -425,12 +444,15 @@ async function main() {
   }
 
   // Detect partial sourcing — check the sourced CSV for SKIPPED - TIMEOUT/ERROR lines
+  // and count RESTRICTED lines separately (those are working-as-designed, not failures).
   let notSourcedCount = 0;
   let sourcedCount = 0;
+  let restrictedCount = 0;
   if (fs.existsSync(sourcedCsv)) {
     const sourcedContent = fs.readFileSync(sourcedCsv, 'utf-8');
     const sourcedLines = sourcedContent.split('\n').filter(l => l.trim());
     notSourcedCount = sourcedLines.filter(l => l.includes('SKIPPED - TIMEOUT/ERROR')).length;
+    restrictedCount = sourcedLines.filter(l => l.includes(',RESTRICTED - ')).length;
     sourcedCount = sourcedLines.length - 1 - notSourcedCount; // minus header
   }
   const isPartial = notSourcedCount > 0;
@@ -465,12 +487,21 @@ async function main() {
     }
   } catch (_) { /* non-fatal */ }
 
-  const emailSubject = isPartial
+  const emailSubject = rfqWriteFailed
+    ? `❌ LAM Kitting Reorder - RFQ WRITE FAILED ${dateStr}`
+    : isPartial
     ? `⚠️ LAM Kitting Reorder - PARTIAL Sourced ${dateStr}`
     : `LAM Kitting Reorder - Sourced ${dateStr}`;
+  const rfqFailWarning = rfqWriteFailed
+    ? `\n❌ RFQ WRITE FAILED — no RFQs/VQs created in OT this run.\n   Cause: ${rfqWriteError}\n   The cron-runner will retry on the next hourly tick once OT is healthy.\n`
+    : '';
+
+  const restrictedSection = restrictedCount > 0
+    ? `\nRestricted MFRs (franchise pricing hidden, manual sourcing required): ${restrictedCount}\n`
+    : '';
 
   const emailBody = `LAM Kitting Reorder - Sourced Report ${dateStr}
-${partialWarning}${rfqSection}${escalationSection}
+${rfqFailWarning}${partialWarning}${rfqSection}${escalationSection}${restrictedSection}
 ${totalAlerts} items below threshold:
 - CRITICAL (zero stock, no recent PO): ${critCount}
 - HIGH: ${highCount}
@@ -490,8 +521,14 @@ Kitting DB: ${path.basename(excelFile)}`;
   );
 
   log('============================================================');
-  log('LAM KITTING REORDER - COMPLETE');
-  log('============================================================');
+  if (rfqWriteFailed) {
+    log('LAM KITTING REORDER - FAILED (RFQ write step)');
+    log('============================================================');
+    process.exitCode = 1;
+  } else {
+    log('LAM KITTING REORDER - COMPLETE');
+    log('============================================================');
+  }
 }
 
 // Run main() only when invoked directly (`node lam-kitting-runner.js`).

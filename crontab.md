@@ -1,8 +1,10 @@
 # Crontab Reference
 
-Single source of truth for scheduled jobs running under `analytics_user`. Update this file whenever a cron entry is added, changed, or removed. Verify against `crontab -l` periodically.
+> **NOTE — 2026-05-04:** The source of truth for scheduled jobs is now `cron-jobs.js` (registry) + `scripts/install-crons.js` (installer). The crontab is auto-generated; do not hand-edit. This file is retained for the institutional knowledge below (PGUSER/LOGNAME peer-auth requirements that the installer preserves in the crontab header).
+>
+> To add or change a scheduled activity, update `cron-jobs.js` and run `node scripts/install-crons.js --apply`. See workspace `CLAUDE.md` § Scheduling New Activities for the required Resilience Checklist flow.
 
-Last verified: **2026-04-14**
+Last verified: **2026-04-15** (pre-registry. Live state: `crontab -l` + `node scripts/check-cron-drift.js`.)
 
 ## Environment
 
@@ -37,6 +39,7 @@ When adding new cron jobs that touch the DB, all three layers are belt-and-suspe
 | `*/15 * * * *` | **RFQ API Enrichment Poller** | Every 15 min — polls `chuboe_rfq` for new RFQs since watermark, routes each through all 7 franchise APIs (TTL cache: PPV/Astute Franchised 30d, others 7d), writes VQ lines + thin-pointer audit rows. **Re-enabled 2026-04-09** after A4 dup amplification fixes shipped in commit `3fbd0fb` (writer-layer natural-key check-before-retry + enrich-rfq read-side dedup on `(line_id, mpn_clean, mfr_id)`). Also depends on Arrow / Verical channel split (commit `fa740e9`) and vq-writer Buyer_ID/Packaging_ID null handling (commit `05d03e1`). | `Trading Analysis/RFQ API Enrichment/enrich-poller.js` | `/tmp/enrich-poller.log` |
 | `*/5 * * * *` | **RFQ Loader Daemon** | Every 5 min healthcheck — starts daemon if not running, no-ops if alive. Daemon loads queued RFQs concurrently (10 workers, ~20 lines/s), small RFQs (<500 lines) preempt large ones. Queue file: `~/.rfq-load-queue.json`. PID file: `~/.rfq-loader-daemon.pid`. **Added 2026-04-13** as part of J1/J2 fast-loader architecture. | `scripts/rfq-loader-daemon.js` | `/tmp/rfq-loader-daemon.log` |
 | `0 6 * * *` | **MFR Reconciler** | Daily 6 AM UTC — backfills `Chuboe_MFR_ID` on rows created since last successful run where text is set but FK is null. Sweeps `chuboe_rfq_line_mpn`, `chuboe_vq_line`, `chuboe_cq_line`. Skips system-MFR rows (REST can't write system IDs to client tables) and distributor-as-MFR data-entry errors. Watermark: `~/.last-mfr-reconcile`. PID file: `~/.mfr-reconciler.pid`. Single-instance + pause-file aware. **Added 2026-04-14** as J4 (forward-only). Historical backfill of ~2.5M legacy rows is parked as J4-backfill in trading roadmap. | `Trading Analysis/MFR Reconciler/mfr-reconciler.js` | `/tmp/mfr-reconciler.log` |
+| `0 7 * * 1` | **VQ Enrichment ROI Tracker** | Weekly Mon 7 AM UTC — queries all RFQ lines that received any API-written VQ (`createdby=1049524`) in trailing 30d, joins CQ/SO activity, emails conversion digest: per-customer, per-RFQ-type, direct-win subset. Read-only (no PATCH). **Added 2026-04-15** as J10 — feedback loop on whether enrichment contributes to sales. | `scripts/vq-enrichment-roi-tracker.js` | `/tmp/vq-enrichment-roi.log` |
 
 ## Watermark / state files
 
@@ -61,7 +64,7 @@ crontab -e
 tail -f /tmp/enrich-poller.log
 
 # Check that all 5 jobs are still installed
-crontab -l | grep -c '^[^#]'   # should print 7
+crontab -l | grep -c '^[^#]'   # should print 8
 ```
 
 **Note:** `crontab -l/-e` work fine under `analytics_user`'s `rbash` despite the restricted shell — see `reference_crontab_works_under_rbash.md` in memory.

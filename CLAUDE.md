@@ -50,7 +50,7 @@ At the start of every new conversation, before addressing anything else, always 
 > **Available Workflows:**
 > 1. **Franchise Screening** - Screen RFQs against FindChips to filter low-value parts before broker sourcing (see `Trading Analysis/RFQ Sourcing/franchise_check/franchise-screening.md`)
 > 2. **RFQ Sourcing** - Submit RFQs to NetComponents suppliers (see `Trading Analysis/RFQ Sourcing/netcomponents/rfq-sourcing-netcomponents.md`)
-> 3. **VQ Loading** - Process supplier quote emails into ERP-ready CSV (see `Trading Analysis/RFQ Sourcing/vq_loading/vq-loading.md`)
+> 3. **VQ Loading** - Process supplier quote emails into VQ records. Type 2 bulk summaries write directly to OT via REST API (`load-bulk-summary-cli.js`); Type 1 single-vendor quotes still flow through `vq-parser fetch` (legacy CSV path). See `Trading Analysis/RFQ Sourcing/vq_loading/vq-loading.md`.
 > 4. **RFQ Loading through AI** - AI-assisted extraction and loading of RFQs from customer emails/documents (see `Trading Analysis/RFQ Loading/rfq-loading.md`)
 > 5. **Market Offer Analysis for RFQs** - Match new RFQs against customer excess and stock offers (see `Trading Analysis/Market Offer Matching for RFQs/market-offer-matching.md`)
 > 6. **Quick Quote** - Generate baseline quotes from recent VQs (0-30 days) with margin/GP/rebate pricing logic
@@ -65,7 +65,8 @@ At the start of every new conversation, before addressing anything else, always 
 > 15. **MFR Reconciler** - Daily cron that backfills `Chuboe_MFR_ID` on rows where text is set but FK is null. Runs at 6 AM UTC; sweeps rfq_line_mpn / vq_line / cq_line for rows created since last run (see `Trading Analysis/MFR Reconciler/mfr-reconciler.md`)
 > 16. **CRMA Form Filling** - Fill the customer-RMA xlsx (`CRMA Request Form 2023.06`) from an OT SO# when buyer forwards a blank form to stockRFQ@. Cell map + dropdown source ranges + naming gotchas (Astute COV = Infor COV, not OT SO#) (see `Trading Analysis/CRMA Form/crma-form.md`)
 > 17. **Leah's BOS Report** - Weekly open-order report for Leah Griffin / BOS team. Processes Infor xlsx export into 3-bucket (Query 7/7, Placeholder 8/8, Past Due) × 3-aging (Fresh/Stale/Chronic) × region (APAC/US/MX/EMEA) breakdown with auto-detected signals. Emailed from stockRFQ@ (see `Trading Analysis/Leah's BOS Report/leahs-bos-report.md`)
-> 18. **Price Intelligence Dashboard** - Per-MPN price-trend dashboard overlaying VQ quotes, market offers, and customer targets. Trigger phrases: "price intelligence on \<MPN\>", "price trend for \<MPN\>", "part trend analysis on \<MPN\>" (see `Trading Analysis/Price Intelligence Dashboard/price-intelligence.md`)
+> 18. **AMAT RFQ Management** - Pull RFQ data from Applied Materials' Supplier Collaboration Vault 2.0 (https://myapp.amat.com) so RFQs can flow into OT without manual portal click-through. **PAUSED** pending IT confirmation of credentials + ToU + 2FA channel (see `Trading Analysis/AMAT RFQ Management/amat-rfq-management.md`)
+> 19. **Price Intelligence Dashboard** - Per-MPN price-trend dashboard overlaying VQ quotes, market offers, and customer targets. Trigger phrases: "price intelligence on \<MPN\>", "price trend for \<MPN\>", "part trend analysis on \<MPN\>" (see `Trading Analysis/Price Intelligence Dashboard/price-intelligence.md`)
 
 3. **Review Roadmaps** (planned work):
 
@@ -85,7 +86,24 @@ At the start of every new conversation, before addressing anything else, always 
 
 ## Scheduled Jobs (cron)
 
-**Reference:** `crontab.md` is the source of truth for all scheduled jobs running under `analytics_user`. Update it whenever a cron entry is added, changed, or removed. Verify against `crontab -l` periodically.
+**Source of truth:** `cron-jobs.js` (registry) — every scheduled activity is declared there. Crontab is auto-generated from it; never hand-edit `crontab -e`.
+
+**Workflow for adding a scheduled activity:**
+
+1. Print the Resilience Checklist (required — see workspace `CLAUDE.md` § Scheduling New Activities).
+2. Add an entry to `cron-jobs.js`.
+3. `node scripts/install-crons.js --apply` (backs up the prior crontab, regenerates from registry).
+4. Verify with `crontab -l` and `node scripts/check-cron-drift.js`.
+
+**Resilience pattern (built in via `cron-runner.js`):**
+
+- **Sentinel** — per-job state at `~/workspace/.cron-sentinels/{name}.json` records `lastSuccess` and `nextDue`. Weekly/daily jobs are scheduled hourly in cron, but only execute when the sentinel says they're due.
+- **OT health gate** — jobs with `needsOT: true` probe `/api/v1/` before running. On 5xx, exit cleanly without advancing the sentinel — next hourly tick retries.
+- **Drift check** — `scripts/check-cron-drift.js` runs at session start, surfacing raw cron lines, missing registry entries, orphan sentinels, and stale jobs.
+
+**Job-level idempotency requirement:** Catch-up runs are gated by the sentinel (cadence elapses before next run), but if the script is `--force`-invoked or run manually, it should ideally be safe to re-run within the cadence window. `inventory_cleanup.js` is fully idempotent (deactivate-then-write). `lam-kitting-rfq-writer.js` is NOT (each call creates a fresh RFQ) — relies on sentinel cadence for safety.
+
+**Historic context (`crontab.md`):** Retains the institutional knowledge about `PGUSER` / `LOGNAME` peer-auth requirements that are baked into the install-crons.js header. Read it if you're debugging cron-DB auth failures.
 
 ---
 
@@ -221,20 +239,30 @@ Cron: every Monday 6 AM EST. See `crontab.md`.
 
 This includes:
 - **Two-Agent Validation** (REQUIRED) - Extractor agent + Verifier agent
+- **Type 2 Direct API Load** (canonical for bulk summaries) — `load-bulk-summary-cli.js` writes VQs directly to OT, no CSV mass-upload step
 - Field reference for VQ Mass Upload Template
 - Vendor matching strategy (domain-based, not exact email)
 - Session file workflow
 - Skip rules and categorization
 
-**Code:** `~/workspace/vq-parser/`
+**Code:**
+- `~/workspace/vq-parser/` — Type 1 fetcher + template engine
+- `shared/load-bulk-summary.js` — Type 2 library (resolves vendors / matches MPNs / writes VQs)
+- `Trading Analysis/RFQ Sourcing/vq_loading/load-bulk-summary-cli.js` — Type 2 CLI wrapper
+
 **Repo:** https://github.com/AstuteGroup/vq-parser (private)
 
 **Quick commands:**
 ```bash
-# Fetch emails and generate session file
+# Type 1 (single-vendor): fetch + extract via template engine
 node vq-parser/src/index.js fetch
 
-# List sessions
+# Type 2 (bulk summary): write extracted quotes directly to OT
+node "Trading Analysis/RFQ Sourcing/vq_loading/load-bulk-summary-cli.js" \
+  quotes.json --rfq <searchKey> --buyer <userId> --dry-run
+# then re-run with --commit
+
+# List vq-parser sessions
 node vq-parser/src/index.js sessions --list
 ```
 
