@@ -328,10 +328,22 @@ async function searchPart(distributor, mpn, qty, opts = {}) {
     // Auth-failure alerting — if the cog returned result.error and it matches
     // auth patterns, fire the debounced alerter. Non-blocking, swallows its
     // own errors. See shared/auth-failure-alerts.js for the pattern list.
+    //
+    // Clean responses (no result.error) clear any prior alerted-failure state
+    // for this disty and trigger a one-time recovery email. Without this,
+    // `firstFailureAt` is sticky across recoveries — a failure today + a
+    // recovery + a failure 4 days later reads in the day-5 alert as "first
+    // detected 4 days ago" even though the disty was actually clean for 4 days.
     if (result?.error) {
       try {
         require('./auth-failure-alerts')
           .alertIfAuthFailure({ distributor, error: result.error, mpn })
+          .catch(() => {});
+      } catch { /* module optional */ }
+    } else if (result) {
+      try {
+        require('./auth-failure-alerts')
+          .noteAuthSuccess({ distributor })
           .catch(() => {});
       } catch { /* module optional */ }
     }

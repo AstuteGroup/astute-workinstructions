@@ -58,7 +58,7 @@ At the start of every new conversation, before addressing anything else, always 
 > 8. **Order/Shipment Tracking** - Look up tracking by COV, SO, MPN, customer PO, or salesperson (see `saved-queries/order-shipment-tracking.md`)
 > 9. **Inventory File Cleanup** - Process Infor inventory exports into Chuboe format for iDempiere import (see `Trading Analysis/Inventory File Cleanup/inventory-file-cleanup.md`)
 > 10. **Vortex Matches** - Surface VQs/offers under customer targets, stock matches, and market intelligence (see `Trading Analysis/Vortex Matches/vortex-matches.md`)
-> 11. **Market Offer Analysis** - Load excess offers, enrich with market intelligence, score opportunities, and analyze by intent: reactive (RFQ match), spec buy, or consignment (see `Trading Analysis/Market Offer Analysis/market-offer-analysis.md`)
+> 11. **Customer Excess Analysis** - Universal offer pipeline: 30-min inbox poll → writeOffer → type-router → Customer Excess Analysis (intent: Spec Buy / Proactive Customer / Reactive RFQ-match) for types 1000000/1000003, or broker/franchise data-capture for 1000001/1000002. Operator digest 3×/day (7am/12pm/4pm EDT) with reply-parser feedback loop (see `Trading Analysis/Customer Excess Analysis/customer-excess-analysis.md`)
 > 12. **BOM Monitoring** - Track BOM risk, commodity analysis, and excess matches (see `Trading Analysis/BOM Monitoring/`)
 > 13. **Stock RFQ Loading** - Process customer RFQ emails into ERP-ready CSV for import (see `Trading Analysis/Stock RFQ Loading/stock-rfq-loading.md`)
 > 14. **HTS / ECCN Backfill** - RFQ-scoped HTS + ECCN backfill onto chuboe_vq_line via DigiKey + Mouser APIs (see `Trading Analysis/HTS ECCN Backfill/hts-eccn-backfill.md`)
@@ -104,6 +104,18 @@ At the start of every new conversation, before addressing anything else, always 
 **Job-level idempotency requirement:** Catch-up runs are gated by the sentinel (cadence elapses before next run), but if the script is `--force`-invoked or run manually, it should ideally be safe to re-run within the cadence window. `inventory_cleanup.js` is fully idempotent (deactivate-then-write). `lam-kitting-rfq-writer.js` is NOT (each call creates a fresh RFQ) — relies on sentinel cadence for safety.
 
 **Historic context (`crontab.md`):** Retains the institutional knowledge about `PGUSER` / `LOGNAME` peer-auth requirements that are baked into the install-crons.js header. Read it if you're debugging cron-DB auth failures.
+
+### Reporting cadence (default for any new scheduled report)
+
+**Anomaly-immediate + 3×/day digest at 11/16/20 UTC (7am/12pm/4pm EDT).** Apply this to any scheduled background job that produces routine activity reports — unless the operator says otherwise.
+
+- **Immediate email:** any tick with warnings or errors → fire that tick's batch as an anomaly email. Don't wait.
+- **Digest email:** roll all activity into `~/workspace/.<job>-rollup.json`; deliver once per slot (11/16/20 UTC). Mark the slot fired *before* sending so a transient send failure doesn't loop on the next 15-min tick.
+- **Cron tick frequency stays the same** — only the email cadence changes.
+- **Reference implementation:** `Trading Analysis/RFQ API Enrichment/enrich-poller.js` Phase 5 (constant `DIGEST_UTC_HOURS = [11, 16, 20]`, helpers `readRollup` / `writeRollup`).
+- **Scope:** scheduled background reports only. Inbox-driven request/response (vortex-poller, rfq-loader-daemon, excess-poller acks, reply-parser confirms), anomaly-only emitters (auth-failure-alerts), and one-shot operator scripts are exempt — they need to send when the work happens.
+
+DST drift is acceptable (slots shift 1h in EST winter); don't bake DST handling into individual jobs.
 
 ---
 

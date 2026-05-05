@@ -451,13 +451,14 @@ async function enrichRFQ(rfqDocNumber, opts = {}) {
     counters.vqsWritten === 0 &&
     counters.vqsFailed === 0 &&
     counters.vqsFlagged === 0 &&
+    counters.vqsSkippedRestricted === 0 &&  // ← restricted-MFR is a known, expected outcome (TI/ADI/Maxim/Linear): pricing captured to chuboe_pricing_api_result, VQ write deliberately skipped. NOT a silent failure.
     counters.errors.length === 0 &&
     !dryRun
   ) {
     counters.warnings.push({
       severity: 'HIGH',
       pattern: 'SILENT_NO_VQS',
-      detail: `${counters.lines} lines, ${counters.apiCalls} API calls + ${counters.cacheHits} cache hits, ${linesWithSupply} lines had supply (FULL/PARTIAL coverage), 0 VQs written, 0 errors, 0 flagged. Structurally impossible if the writer is healthy — investigate the MFR/BP/packaging resolution path for silent failures.`,
+      detail: `${counters.lines} lines, ${counters.apiCalls} API calls + ${counters.cacheHits} cache hits, ${linesWithSupply} lines had supply (FULL/PARTIAL coverage), 0 VQs written, 0 errors, 0 flagged, 0 restricted-skipped. Structurally impossible if the writer is healthy — investigate the MFR/BP/packaging resolution path for silent failures.`,
     });
   }
 

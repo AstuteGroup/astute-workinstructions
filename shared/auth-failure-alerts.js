@@ -177,9 +177,110 @@ async function alertIfAuthFailure({ distributor, error, mpn }) {
   }
 }
 
+/**
+ * Mark a distributor as successful. If we previously had an open failure
+ * state (an alert had been sent and not yet cleared), record the recovery,
+ * fire ONE recovery email, and remove the state entry.
+ *
+ * Why this exists: pre-2026-05-05 the alerter only mutated state on failure
+ * detection. `firstFailureAt` was reset on each successful alert send, but
+ * never cleared on disty recovery. Result: an alert at T0 on day 1 would
+ * leave `firstFailureAt = T0`. If the disty recovered, ran clean for 4 days,
+ * then auth-failed again on day 5, the day-5 alert email body still showed
+ * "First detected: <T0 four days ago>" because `if (!entry.firstFailureAt)`
+ * never re-armed. Operator reads "failing for 4 days" when really it's
+ * "failed briefly twice with a 4-day gap."
+ *
+ * Recognized recovery: state[disty] exists AND has either an alerted failure
+ * (lastAlertAt set) OR a recent failure (lastFailureAt within 24h). On any
+ * other state, this is a no-op (don't spam recovery emails for distys that
+ * never alerted).
+ *
+ * Never throws. Email send failures are swallowed; the state is cleared
+ * regardless so the next failure cycle starts clean.
+ *
+ * @param {object} opts
+ * @param {string} opts.distributor - 'digikey' | 'mouser' | ...
+ * @returns {Promise<boolean>} - true if a recovery was processed, false if no-op
+ */
+async function noteAuthSuccess({ distributor }) {
+  if (!distributor) return false;
+  const state = readState();
+  const entry = state[distributor];
+  if (!entry) return false;
+
+  // Only treat as a recovery if we'd previously alerted, OR if the failure
+  // is recent enough that the operator was actively watching for it.
+  const now = Date.now();
+  const wasAlerted = !!entry.lastAlertAt;
+  const recentFailure = entry.lastFailureAt && (now - entry.lastFailureAt) < 24 * 60 * 60 * 1000;
+  if (!wasAlerted && !recentFailure) {
+    // Stale entry that never alerted and is >24h old — clear silently
+    delete state[distributor];
+    writeState(state);
+    return false;
+  }
+
+  // Snapshot for the email body before we wipe the entry
+  const summary = {
+    firstFailureAt: entry.firstFailureAt,
+    lastFailureAt: entry.lastFailureAt,
+    failureCount: entry.count,
+    lastError: entry.lastError,
+    lastAlertAt: entry.lastAlertAt,
+  };
+
+  // Always clear state — recovery is "starting clean"
+  delete state[distributor];
+  writeState(state);
+
+  // Only email if we'd previously alerted (otherwise nothing to "recover from")
+  if (!wasAlerted) return true;
+
+  // Skip the recovery email for stale state (>48h since last failure). The
+  // entry is more likely "Waldom hasn't been called in a week" than "Waldom
+  // recovered" and the email would mislead. State is still cleared above so
+  // the next genuine outage cycle starts fresh.
+  if (summary.lastFailureAt && (now - summary.lastFailureAt) > 48 * 60 * 60 * 1000) {
+    return true;
+  }
+
+  const notifier = getNotifier();
+  if (!notifier) return true;
+
+  const durationMin = summary.firstFailureAt && summary.lastFailureAt
+    ? Math.max(0, Math.round((summary.lastFailureAt - summary.firstFailureAt) / 60000))
+    : 0;
+  const recoveredAfterMin = summary.lastFailureAt
+    ? Math.round((now - summary.lastFailureAt) / 60000)
+    : 0;
+  const subject = `Franchise API auth recovered: ${distributor.toUpperCase()}`;
+  const body = [
+    `${distributor.toUpperCase()} API is responding successfully again.`,
+    '',
+    `Recovered at:    ${new Date(now).toISOString()}`,
+    `Last failure:    ${summary.lastFailureAt ? new Date(summary.lastFailureAt).toISOString() : '(unknown)'}`,
+    `Quiet for:       ${recoveredAfterMin} min before this success`,
+    `First detected:  ${summary.firstFailureAt ? new Date(summary.firstFailureAt).toISOString() : '(unknown)'}`,
+    `Failure span:    ${durationMin} min from first to last detection`,
+    `Failures during outage: ${summary.failureCount || 0}`,
+    `Last error:      ${summary.lastError || '(none)'}`,
+    '',
+    'State has been cleared — the next auth failure on ' + distributor + ' will alert immediately.',
+    '',
+    'Source: shared/auth-failure-alerts.js noteAuthSuccess()',
+  ].join('\n');
+
+  try {
+    await notifier.sendEmail(OPERATOR_EMAIL, subject, body);
+  } catch { /* best effort */ }
+  return true;
+}
+
 module.exports = {
   looksLikeAuthFailure,
   alertIfAuthFailure,
+  noteAuthSuccess,
   _STATE_FILE: STATE_FILE,
   _OPERATOR_EMAIL: OPERATOR_EMAIL,
   _AUTH_PATTERNS: AUTH_PATTERNS,

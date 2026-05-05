@@ -41,9 +41,15 @@ const { readQuotaState, isQuotaBlocked, hasAdequateQuota } = require('./rfq-quot
 const { addToBacklog, nextBatch, markAttempted, pruneBacklog, backlogStats } = require('./rfq-backlog');
 
 const WATERMARK_FILE = path.resolve(process.env.HOME || '/home/analytics_user', 'workspace/.last-rfq-enrich');
+const ROLLUP_FILE = path.resolve(process.env.HOME || '/home/analytics_user', 'workspace/.enrich-poller-rollup.json');
 const JAKE_EMAIL = 'jake.harris@astutegroup.com';
 const FROM_EMAIL = process.env.VORTEX_EMAIL || 'vortex@orangetsunami.com';
 const FALLBACK_EMAIL = process.env.VORTEX_FALLBACK_SENDER || 'excess@orangetsunami.com';
+
+// Reporting cadence — workspace standard (anomalies immediate + 3×/day digest).
+// 11/16/20 UTC = 7am/12pm/4pm EDT, matching offer-digest. EST shifts these by 1h
+// for ~5 months/year; that's an acceptable seasonal drift for a digest.
+const DIGEST_UTC_HOURS = [11, 16, 20];
 
 // How many Tier 4 backlog items to drain per tick. Aggressive so backlog
 // doesn't accumulate — cache hits mean most won't burn much quota.
@@ -77,6 +83,37 @@ function writeWatermark(iso) {
     fs.writeFileSync(WATERMARK_FILE, iso, 'utf-8');
   } catch (err) {
     log('WARN: failed to write watermark:', err.message);
+  }
+}
+
+// ─── Digest rollup state ────────────────────────────────────────────────────
+// Anomaly-immediate + digest-rollup pattern. Each tick that processes RFQs
+// appends batchResults to the rollup; the digest fires at the first tick of
+// each DIGEST_UTC_HOURS slot per day, then resets. The slot marker is written
+// BEFORE the email attempt so a transient send failure doesn't cause the same
+// digest to re-fire 15 minutes later (next slot covers the gap).
+function readRollup() {
+  try {
+    const obj = JSON.parse(fs.readFileSync(ROLLUP_FILE, 'utf-8'));
+    return {
+      results: Array.isArray(obj.results) ? obj.results : [],
+      windowSince: obj.windowSince || null,
+      windowUntil: obj.windowUntil || null,
+      lastDigestAt: obj.lastDigestAt || null,
+      lastDigestUtcHour: obj.lastDigestUtcHour ?? null,
+      lastDigestUtcDay: obj.lastDigestUtcDay || null,
+    };
+  } catch {
+    return { results: [], windowSince: null, windowUntil: null,
+             lastDigestAt: null, lastDigestUtcHour: null, lastDigestUtcDay: null };
+  }
+}
+
+function writeRollup(r) {
+  try {
+    fs.writeFileSync(ROLLUP_FILE, JSON.stringify(r, null, 2), 'utf-8');
+  } catch (err) {
+    log('WARN: failed to write rollup:', err.message);
   }
 }
 
@@ -470,36 +507,92 @@ async function main() {
     }
   }
 
-  // Phase 5: Send summary email (only if we processed anything)
-  if (batchResults.length > 0) {
-    try {
-      const totalErrors = batchResults.reduce((s, r) => s + (r.errors?.length || 0), 0);
-      const totalWarnings = batchResults.reduce((s, r) => s + (r.warnings?.length || 0), 0);
-      const bl = backlogStats();
-      let subject;
-      if (totalWarnings > 0) {
-        subject = `⚠ RFQ API Enrichment — ${batchResults.length} RFQs, ${totalWarnings} ANOMALY WARNING${totalWarnings === 1 ? '' : 'S'} (${totalErrors} errors)`;
-      } else if (totalErrors > 0) {
-        subject = `RFQ API Enrichment — ${batchResults.length} RFQs, ${totalErrors} errors`;
-      } else {
-        subject = `RFQ API Enrichment — ${batchResults.length} RFQs processed`;
-      }
-      if (bl.pending > 0) {
-        subject += ` [backlog: ${bl.pending}]`;
-      }
-      const quotaState = readQuotaState();
-      const html = renderSummaryHtml(batchResults, sinceIso, untilIso, bl, quotaState);
-      await sendEmail(subject, html);
-      log('Summary email sent');
-    } catch (err) {
-      log('WARN: email send failed:', err.message);
+  // Phase 5: Email reporting — anomaly immediate + 3×/day digest cadence
+  //
+  // Workspace reporting standard (see MEMORY.md feedback_reporting_cadence_standard):
+  //   - Anomalies (warnings or errors) email immediately, every tick.
+  //   - Quiet ticks roll into the rollup and only deliver at the next digest slot.
+  //   - Digest slots: 11/16/20 UTC = 7am/12pm/4pm EDT (DIGEST_UTC_HOURS).
+  //
+  // Anomaly emails do NOT empty the rollup — the digest still gives a comprehensive
+  // periodic view. Operator gets a fast signal (anomaly) and a complete one (digest).
+  {
+    const totalErrors = batchResults.reduce((s, r) => s + (r.errors?.length || 0), 0);
+    const totalWarnings = batchResults.reduce((s, r) => s + (r.warnings?.length || 0), 0);
+    const isAnomalous = totalWarnings > 0 || totalErrors > 0;
+
+    const rollup = readRollup();
+    if (batchResults.length > 0) {
+      rollup.results.push(...batchResults);
+      if (!rollup.windowSince) rollup.windowSince = sinceIso;
+      rollup.windowUntil = untilIso;
     }
-  } else if (newRFQs.length === 0) {
-    // No new RFQs and nothing from backlog drained this tick.
-    const bl = backlogStats();
-    if (bl.pending > 0) {
-      const dkNote = isQuotaBlocked() ? ' (DigiKey 429-blocked, but other distributors should still be running)' : '';
-      log(`Backlog has ${bl.pending} items pending${dkNote}`);
+
+    // ── Anomaly path (immediate) ──
+    if (batchResults.length > 0 && isAnomalous) {
+      try {
+        const bl = backlogStats();
+        let subject = totalWarnings > 0
+          ? `⚠ RFQ API Enrichment — ${batchResults.length} RFQs, ${totalWarnings} ANOMALY WARNING${totalWarnings === 1 ? '' : 'S'} (${totalErrors} errors)`
+          : `RFQ API Enrichment — ${batchResults.length} RFQs, ${totalErrors} errors`;
+        if (bl.pending > 0) subject += ` [backlog: ${bl.pending}]`;
+        const quotaState = readQuotaState();
+        const html = renderSummaryHtml(batchResults, sinceIso, untilIso, bl, quotaState);
+        await sendEmail(subject, html);
+        log('Anomaly email sent (immediate)');
+      } catch (err) {
+        log('WARN: anomaly email send failed:', err.message);
+      }
+    }
+
+    // ── Digest path (3×/day at 11/16/20 UTC) ──
+    const now = new Date();
+    const utcHour = now.getUTCHours();
+    const utcDay = now.toISOString().slice(0, 10);
+    const inDigestSlot = DIGEST_UTC_HOURS.includes(utcHour);
+    const slotAlreadyFired = rollup.lastDigestUtcDay === utcDay && rollup.lastDigestUtcHour === utcHour;
+
+    if (inDigestSlot && !slotAlreadyFired && rollup.results.length > 0) {
+      // Snapshot then mark slot fired BEFORE sending. If email send fails, we
+      // forfeit this digest rather than re-fire 15 min later — the next slot
+      // (5h away) catches up. Persistent send infra failures shouldn't loop.
+      const digestResults = rollup.results.slice();
+      const digestWindowSince = rollup.windowSince;
+      const digestWindowUntil = rollup.windowUntil;
+
+      rollup.results = [];
+      rollup.windowSince = null;
+      rollup.windowUntil = null;
+      rollup.lastDigestAt = new Date().toISOString();
+      rollup.lastDigestUtcHour = utcHour;
+      rollup.lastDigestUtcDay = utcDay;
+      writeRollup(rollup);
+
+      try {
+        const bl = backlogStats();
+        const tErr = digestResults.reduce((s, r) => s + (r.errors?.length || 0), 0);
+        const tWarn = digestResults.reduce((s, r) => s + (r.warnings?.length || 0), 0);
+        let subject = `RFQ API Enrichment digest — ${digestResults.length} RFQs since ${digestWindowSince ? digestWindowSince.slice(5, 16) + 'Z' : '?'}`;
+        if (tWarn > 0) subject = `⚠ ${subject} (${tWarn} warnings)`;
+        if (tErr > 0) subject = `${subject} [${tErr} errors]`;
+        if (bl.pending > 0) subject += ` [backlog: ${bl.pending}]`;
+        const quotaState = readQuotaState();
+        const html = renderSummaryHtml(digestResults, digestWindowSince, digestWindowUntil, bl, quotaState);
+        await sendEmail(subject, html);
+        log(`Digest email sent (UTC slot ${utcHour}h, ${digestResults.length} RFQs covered)`);
+      } catch (err) {
+        log('WARN: digest email send failed (slot still marked):', err.message);
+      }
+    } else {
+      // Persist any rollup append from this tick (no digest fired)
+      writeRollup(rollup);
+      if (newRFQs.length === 0 && batchResults.length === 0) {
+        const bl = backlogStats();
+        if (bl.pending > 0) {
+          const dkNote = isQuotaBlocked() ? ' (DigiKey 429-blocked, but other distributors should still be running)' : '';
+          log(`Backlog has ${bl.pending} items pending${dkNote}`);
+        }
+      }
     }
   }
 
