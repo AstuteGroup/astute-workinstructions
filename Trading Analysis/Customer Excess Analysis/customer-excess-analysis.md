@@ -1,6 +1,64 @@
-# Market Offer Analysis Workflow
+# Customer Excess Analysis Workflow
 
-**Purpose:** Take an offer that's already persisted in OT and produce actionable output: enriched, scored, and shaped to match the inferred intent (Reactive / Spec Buy / Consignment).
+> **Folder rename, 2026-05-04**: this workflow was previously known as "Market Offer Analysis." It was scoped down to **Customer Excess** (and Customer Lead Time Buy) only because broker/franchise offers are handled by a lighter data-capture path inside the same universal pipeline. See section "Pipeline architecture (V1 spine)" below.
+
+**Purpose:** Take a Customer Excess offer that's already persisted in OT and produce actionable output: enriched, scored, and shaped to match the inferred intent (Reactive / Spec Buy / Proactive Customer Offer).
+
+---
+
+## Pipeline architecture (V1 spine)
+
+The universal offer pipeline is a chain of cogs that all communicate via a single JSONL breadcrumb file at `~/workspace/.offer-pipeline/breadcrumbs.jsonl`. Each cog owns its own concern; the only shared contract is the breadcrumb format.
+
+```
+inbox(es)
+   │
+   ▼  every 30 min, lockfile-guarded
+[shared/offer-poller.js]      ← cog 1, universal
+   │   • partner resolution (BP hint → forward → outer From → name)
+   │   • line extraction (xlsx → csv → pdf → tabular body)
+   │   • writeOffer() to OT (chuboe_offer + line + line_mpn)
+   │   • routes failures to NeedsPartner / NeedsReview folders
+   ▼
+[shared/offer-router.js]      ← cog 3, type-driven dispatch
+   │
+   ├─→ Customer Excess (1000000) / Lead Time Buy (1000003) → analyze-offer.js (THIS WORKFLOW)
+   ├─→ Broker Stock Offer (1000001) → broker-data-capture (breadcrumb only)
+   └─→ Franchise Offers (1000002)   → franchise-data-capture (breadcrumb only)
+
+[Customer Excess Analysis]      ← cog 4, this workflow
+   │   • Step 2: intent classifier (rules-based) — STUB IN V1
+   │   • Step 3: enrich (franchise APIs + OT history)
+   │   • Step 4: score (supply scarcity / price advantage / demand signal)
+   │   • Step 5: render (Spec Buy ranked list / Proactive Customer table / Reactive RFQ-match)
+   ▼
+[breadcrumbs.jsonl]
+
+[digest-builder.js]            ← cog 7, consumes breadcrumbs
+   │   • runs at 11/16/20 UTC (7am/12pm/4pm EDT)
+   │   • emails operator a 4-section HTML summary
+   ▼
+operator inbox
+   │  reply with PARTNER:/INTENT:/SKIP: directives
+   ▼
+[reply-parser.js]              ← cog 8, feeds back into pipeline
+   │   • writes to feedback-overrides.json
+   │   • offer-poller consumes overrides on next run
+   ▼
+loop back to top
+```
+
+**Reply directives (operator → reply parser):**
+```
+PARTNER: <uid> = <BP id (6-8 digits) OR company name>     # resolves NeedsPartner
+INTENT:  <searchKey> = <spec-buy | proactive | reactive>  # overrides classifier (V1: noted only)
+SKIP:    <searchKey>                                       # excludes from drill-down (V1: noted only)
+```
+Anything from the Astute domain that doesn't match grammar gets a clarification reply.
+
+**V1 status:** Spine is live. Cog 4 (this workflow's intent classifier + scoring + renderers, Steps 2–5 below) is still a stub — `analyze-offer.js` writes a "queued" breadcrumb only. The downstream cogs (digest, reply parser) work end-to-end already; cog 4 builds out incrementally without touching them.
+
+---
 
 **Critical constraint:** Analysis input is a `chuboe_offer_id` (or set of IDs, or selector). It is NEVER raw extracted lines from email. This means analysis can be re-run on any historical offer at any time without re-loading.
 
