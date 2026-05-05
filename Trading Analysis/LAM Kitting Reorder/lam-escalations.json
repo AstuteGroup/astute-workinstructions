@@ -40,6 +40,31 @@
       "mpn": "101628-000",
       "reason": "New base price approval: $4.66 from Mouser (14,643 in stock). Current base $4.40 — new base is +5.9%. Historical purchase $4.32. TTI also quoted $4.05 × 19wk lead time (24.5% margin) if a lower-cost lead-time option is preferred.",
       "date": "2026-04-20"
+    },
+    {
+      "mpn": "LTM8074EY#PBF",
+      "reason": "Restricted MFR (ADI) — LAM Kitting franchise-only. Sent to Tracy 2026-04-28 for direct sourcing. LAM MOQ 80.",
+      "date": "2026-04-28"
+    },
+    {
+      "mpn": "MAX16029TG+",
+      "reason": "Restricted MFR (Maxim) — LAM Kitting franchise-only. Sent to Tracy 2026-04-28 for direct sourcing. LAM MOQ 75.",
+      "date": "2026-04-28"
+    },
+    {
+      "mpn": "LTM4632EV#PBF",
+      "reason": "Restricted MFR (ADI) — LAM Kitting franchise-only. Sent to Tracy 2026-04-28 for direct sourcing. LAM MOQ 80.",
+      "date": "2026-04-28"
+    },
+    {
+      "mpn": "AD9467BCPZ-250",
+      "reason": "Restricted MFR (ADI) — LAM Kitting franchise-only. Sent to Tracy 2026-04-28 for direct sourcing. LAM MOQ 100.",
+      "date": "2026-04-28"
+    },
+    {
+      "mpn": "LT1491ACS#PBF",
+      "reason": "Restricted MFR (ADI/Linear) — LAM Kitting franchise-only. Sent to Tracy 2026-04-28 for direct sourcing. LAM MOQ 60.",
+      "date": "2026-04-28"
     }
   ]
 }

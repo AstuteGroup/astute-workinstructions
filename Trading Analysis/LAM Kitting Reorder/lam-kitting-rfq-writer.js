@@ -85,13 +85,14 @@ async function main() {
   const franchiseData = JSON.parse(fs.readFileSync(franchiseJsonPath, 'utf-8'));
 
   // ── Filter: items that need an RFQ ──
-  // Skip PENDING RECEIPT — stock is likely inbound (recent PO within 90 days);
-  // the emailed report is sufficient visibility for those and a second RFQ
-  // would just clutter OT.
+  // Skip PENDING RECEIPT and PENDING ORDER PLACEMENT — both have in-flight activity:
+  //   - PENDING RECEIPT          → POV stamped, waiting on vendor shipment
+  //   - PENDING ORDER PLACEMENT  → no POV stamp yet (OT PO pending Infor stamp,
+  //                                 or VQ ticked with no PO at all)
+  // Either way a second RFQ would clutter OT — the emailed report is sufficient.
   //
-  // Include CRITICAL/HIGH/MEDIUM/LOW — even if they show a stale 2024/2025
-  // POV in the Recent POV cell. Stale POs don't qualify as "recent activity"
-  // under the 90-day rule, so those items genuinely need a fresh RFQ.
+  // Include CRITICAL/HIGH/MEDIUM/LOW — those failed the recency gate (PO cut > 90d
+  // ago AND promise date in the past), so they genuinely need a fresh RFQ.
   //
   // Skip SKIPPED - TIMEOUT/ERROR — no VQ data to write.
   const rfqCandidates = [];
@@ -100,8 +101,8 @@ async function main() {
     const priority = (row[priorityIdx] || '').toString().trim();
     const status = (row[statusIdx] || '').toString().trim();
 
-    if (priority === 'PENDING RECEIPT') {
-      console.log(`  SKIP ${row[mpnIdx]} — PENDING RECEIPT (recent PO in flight)`);
+    if (priority === 'PENDING RECEIPT' || priority === 'PENDING ORDER PLACEMENT') {
+      console.log(`  SKIP ${row[mpnIdx]} — ${priority} (activity in flight)`);
       continue;
     }
 
@@ -120,8 +121,8 @@ async function main() {
     });
   }
 
-  console.log(`\n${rfqCandidates.length} items need RFQ (CRITICAL/HIGH/MEDIUM/LOW with no recent PO activity)`);
-  console.log(`${csv.rows.length - rfqCandidates.length} items skipped (PENDING RECEIPT or sourcing incomplete)\n`);
+  console.log(`\n${rfqCandidates.length} items need RFQ (CRITICAL/HIGH/MEDIUM/LOW with no in-flight activity)`);
+  console.log(`${csv.rows.length - rfqCandidates.length} items skipped (PENDING ORDER PLACEMENT / PENDING RECEIPT / sourcing incomplete)\n`);
 
   if (rfqCandidates.length === 0) {
     console.log('Nothing to write — all items have orders in flight.');

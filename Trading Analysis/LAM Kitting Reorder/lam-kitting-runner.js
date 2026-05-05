@@ -60,18 +60,49 @@ function loadEscalationsState() {
   }
 }
 
-// Drop entries whose MPN no longer appears on the weekly reorder list — implicit
-// resolution (inventory came back above threshold, Kitting DB was updated, etc.).
-// Writes the trimmed state back in place so next week starts clean.
-function persistResolvedEscalations(state, csv, mpnIdx) {
+// Sidecar written by lam-kitting-reorder.js. Contains current inventory + POV
+// state for every manual-escalation MPN regardless of whether they're below
+// threshold. Used to synthesize Escalations rows for above-threshold-with-stock
+// MPNs (Josh action: contract resale renegotiation still pending).
+function loadEscalationsContext(sourcedCsvPath) {
+  const ctxPath = sourcedCsvPath.replace('_sourced.csv', '.csv').replace('.csv', '_escalations_context.json');
+  if (!fs.existsSync(ctxPath)) {
+    log(`  WARNING: no escalations context file at ${ctxPath}`);
+    return { entries: [] };
+  }
+  try { return JSON.parse(fs.readFileSync(ctxPath, 'utf-8')); }
+  catch (err) {
+    log(`  WARNING: could not parse ${ctxPath}: ${err.message}`);
+    return { entries: [] };
+  }
+}
+
+// Resolve manual entries — drop only when BOTH conditions hold:
+//   1. MPN is no longer on the weekly reorder list (above threshold), AND
+//   2. There's no W111+W115 stock currently on hand
+// "Stock arrived" entries (above threshold, qty > 0) are KEPT — their lifecycle
+// is operator-controlled (Jake removes from JSON when LAM approves new resale
+// pricing). Stock presence alone doesn't imply approval — we may have eaten
+// the margin compression to keep the line moving while contract is renegotiated.
+function persistResolvedEscalations(state, csv, mpnIdx, escalationsContext) {
   const currentMPNs = new Set(csv.rows.map(r => (r[mpnIdx] || '').trim()));
+  const ctxByMpn = {};
+  for (const e of (escalationsContext && escalationsContext.entries) || []) {
+    ctxByMpn[e.mpn] = e;
+  }
   const before = state.entries.length;
-  const stillActive = state.entries.filter(e => currentMPNs.has(e.mpn));
-  const resolved = state.entries.filter(e => !currentMPNs.has(e.mpn));
+  const isResolvable = e => {
+    if (currentMPNs.has(e.mpn)) return false;            // still on reorder list — keep
+    const ctx = ctxByMpn[e.mpn];
+    if (ctx && ctx.stock && ctx.stock.total > 0) return false; // stock arrived — keep
+    return true;
+  };
+  const stillActive = state.entries.filter(e => !isResolvable(e));
+  const resolved = state.entries.filter(isResolvable);
   if (resolved.length === 0) return;
   const updated = { ...state, entries: stillActive };
   fs.writeFileSync(ESCALATIONS_STATE_FILE, JSON.stringify(updated, null, 2) + '\n');
-  log(`  Auto-resolved ${resolved.length} escalation(s) (no longer on reorder list): ${resolved.map(e => e.mpn).join(', ')}`);
+  log(`  Auto-resolved ${resolved.length} escalation(s) (off reorder list, zero stock): ${resolved.map(e => e.mpn).join(', ')}`);
   log(`  Remaining open escalations: ${stillActive.length} (was ${before})`);
 }
 
@@ -141,8 +172,13 @@ function applyRowShading(excelRow, headers) {
     if (cell.value === 'CRITICAL') {
       cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFF9999' } };
       cell.font = { bold: true };
-    } else if (cell.value === 'PENDING RECEIPT') {
+    } else if (cell.value === 'PENDING RECEIPT' || cell.value === 'PENDING ORDER PLACEMENT') {
+      // Same shade for both — the bucket should read as one visual group;
+      // the Priority text itself distinguishes the two states.
       cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFD5F4E6' } };
+    } else if (cell.value === 'STOCK ARRIVED') {
+      cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFCCE5FF' } };
+      cell.font = { bold: true };
     } else if (cell.value === 'HIGH') {
       cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFF2CC' } };
     }
@@ -178,7 +214,7 @@ function applyColumnFormats(sheet, headers) {
 // main tab so the buyer has full context in one view. Escalated rows are REMOVED
 // from the main tab (see rebuildExcelWithRfqLines) so each item lives in exactly
 // one place — keeps the main tab focused on actionable buys.
-function buildEscalationsTab(workbook, state, csv, allHeaders, rfqMapping) {
+function buildEscalationsTab(workbook, state, csv, allHeaders, rfqMapping, escalationsContext) {
   const mpnIdx = csv.headers.indexOf('MPN');
   const autoRequests = (rfqMapping && rfqMapping.autoRequests) || {};
   // Build lookup: MPN → CSV row (with RFQ Line # + Request to Purchase spliced in
@@ -191,6 +227,12 @@ function buildEscalationsTab(workbook, state, csv, allHeaders, rfqMapping) {
     rowData.splice(1, 0, rfqMapping.lines[mpn] || '', autoRequests[mpn] || '');
     byMpn[mpn] = rowData;
   }
+  // Sidecar context — used to synthesize rows for above-threshold-with-stock
+  // MPNs that wouldn't otherwise appear in the CSV.
+  const ctxByMpn = {};
+  for (const e of (escalationsContext && escalationsContext.entries) || []) {
+    ctxByMpn[e.mpn] = e;
+  }
 
   const escHeaders = ['Escalation Reason', 'Escalation Date', ...allHeaders];
   const ws = workbook.addWorksheet('Escalations');
@@ -199,17 +241,82 @@ function buildEscalationsTab(workbook, state, csv, allHeaders, rfqMapping) {
   hdr.font = { bold: true };
   hdr.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFCE4D6' } };
 
+  let stockArrivedCount = 0;
   for (const entry of state.entries) {
-    const rowData = byMpn[entry.mpn];
-    if (!rowData) continue; // defensive — auto-resolved by the caller
-    const excelRowData = [entry.reason || '', entry.date || '',
+    const reason = entry.reason || '';
+    const ctx = ctxByMpn[entry.mpn];
+    let rowData = byMpn[entry.mpn];
+    let renderReason = reason;
+
+    if (!rowData) {
+      // MPN not on this week's reorder CSV. Synthesize a row from the sidecar
+      // context if there's stock on hand (Josh-action-pending case).
+      if (ctx && ctx.stockArrived) {
+        rowData = synthesizeRowFromContext(ctx, allHeaders);
+        renderReason = (reason ? reason + '\n' : '') +
+          `✓ Stock arrived (W111+W115: ${ctx.stock.total} pcs). Action with seller — new LAM resale still pending.`;
+        stockArrivedCount++;
+      } else {
+        continue; // truly resolved (off list + zero stock); persistResolvedEscalations will drop
+      }
+    }
+
+    const excelRowData = [renderReason, entry.date || '',
       ...rowData.map((v, idx) => parseCellForExcel(v, allHeaders[idx]))];
     const excelRow = ws.addRow(excelRowData);
     applyRowShading(excelRow, escHeaders);
+    if (ctx && ctx.stockArrived) {
+      // Highlight the synthesized rows so Josh can scan for them quickly.
+      excelRow.getCell(1).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFCCE5FF' } };
+    }
+  }
+  if (stockArrivedCount > 0) {
+    log(`  Escalations tab: ${stockArrivedCount} synthesized "stock arrived" row(s) for resale-pending follow-up`);
   }
 
   applyColumnFormats(ws, escHeaders);
   ws.views = [{ state: 'frozen', ySplit: 1 }];
+}
+
+// Build an alert-style row from a sidecar context entry — used when an
+// escalation MPN is no longer on the reorder list (above threshold) but still
+// has stock on hand. Mirrors the columns from ALERT_COLUMNS so the row layout
+// matches the rest of the Escalations tab.
+function synthesizeRowFromContext(ctx, allHeaders) {
+  const stock = ctx.stock || {};
+  const povCell = ctx.pov && (ctx.pov.POV_Number || ctx.pov.OT_PO_Number)
+    ? `${ctx.pov.POV_Number || 'OT ' + ctx.pov.OT_PO_Number} (${ctx.pov.POV_Date || ''}, ${ctx.pov.POV_Qty || ''} pcs from ${ctx.pov.POV_Supplier || ''})`
+    : '';
+  const valueByHeader = {
+    'RFQ Line #': '', 'Request to Purchase': '',
+    'Lam P/N': ctx.lamPN || '',
+    'MPN': ctx.mpn,
+    'Manufacturer': ctx.mfr || '',
+    'Item Description': ctx.itemDescription || '',
+    'QTY ON HAND': stock.total || 0,
+    'Lam Owned Inventory?': (stock.w115 > 0) ? 'YES' : 'NO',
+    'Reorder Threshold': ctx.threshold || '',
+    'Shortfall': '', // above threshold — no shortfall to report
+    'Priority': 'STOCK ARRIVED',
+    'On Order Qty': ctx.pov ? (ctx.pov.Qty_On_Order || '') : '',
+    'Recent POV': povCell,
+    'Last Promise Date': '',
+    'Last RFQ': '',
+    'Base Unit Price': ctx.basePrice || '',
+    'Resale Price': ctx.resalePrice || '',
+    'Historical Purchase Price': '',
+    'OT Previous Supplier': ctx.historicalSupplier || '',
+    'OT Buyer': '',
+    'Historical Buyer': '',
+    'Lead Time': ctx.leadTime || '',
+    'LAM MOQ': ctx.lamMoq || '',
+    'Available Stock (Other WH)': '',
+    'Available Qty (Other WH)': '',
+    'Sourcing Status': '', // not sourced (above threshold, skipped)
+    'In Stock Supplier': '', 'In Stock Price': '', 'In Stock Qty': '', 'In Stock Margin %': '',
+    'Lead Time Supplier': '', 'Lead Time Price': '', 'Lead Time (Weeks)': '', 'Lead Time Margin %': '',
+  };
+  return allHeaders.map(h => valueByHeader[h] !== undefined ? valueByHeader[h] : '');
 }
 
 /**
@@ -232,6 +339,7 @@ async function rebuildExcelWithRfqLines(sourcedCsvPath, xlsxPath, rfqMapping) {
   // Each item lives in exactly one place — if it's flagged for escalation,
   // it moves to the Escalations tab and disappears from the main list.
   const escalationsState = loadEscalationsState();
+  const escalationsContext = loadEscalationsContext(sourcedCsvPath);
   const escalatedMPNs = new Set(
     (escalationsState && escalationsState.entries) ? escalationsState.entries.map(e => e.mpn) : []
   );
@@ -268,11 +376,13 @@ async function rebuildExcelWithRfqLines(sourcedCsvPath, xlsxPath, rfqMapping) {
 
   // Escalations tab — state-file driven. Manual review surface: items the buyer
   // has flagged for deeper investigation (price approvals, vendor changes, etc.)
-  // carried forward week-over-week until the MPN drops off the reorder list.
+  // carried forward week-over-week. Now also surfaces "stock arrived" cases
+  // (MPN above threshold but stock on hand → contract resale renegotiation
+  // still owed by Josh). The sidecar context drives synthetic rows for those.
   if (escalationsState && escalationsState.entries && escalationsState.entries.length > 0) {
-    buildEscalationsTab(workbook, escalationsState, csv, allHeaders, rfqMapping);
-    // Auto-resolve: drop entries whose MPN is no longer on the reorder list.
-    persistResolvedEscalations(escalationsState, csv, mpnIdx);
+    buildEscalationsTab(workbook, escalationsState, csv, allHeaders, rfqMapping, escalationsContext);
+    // Auto-resolve: drop entries that are off the reorder list AND have zero stock.
+    persistResolvedEscalations(escalationsState, csv, mpnIdx, escalationsContext);
   }
 
   await workbook.xlsx.writeFile(xlsxPath);
@@ -465,7 +575,8 @@ async function main() {
   const highCount = lines.filter(l => /,HIGH[,\s]*$/i.test(l) || l.includes(',HIGH,')).length;
   const medCount = lines.filter(l => l.includes(',MEDIUM,')).length;
   const lowCount = lines.filter(l => /,LOW[,\s]*$/i.test(l) || l.includes(',LOW,')).length;
-  const pendingCount = lines.filter(l => l.includes(',PENDING RECEIPT,')).length;
+  const pendingOrderCount = lines.filter(l => l.includes(',PENDING ORDER PLACEMENT,')).length;
+  const pendingReceiptCount = lines.filter(l => l.includes(',PENDING RECEIPT,')).length;
 
   const partialWarning = isPartial
     ? `\n⚠️  PARTIAL SOURCING: ${sourcedCount}/${totalAlerts} items were sourced. ${notSourcedCount} items marked "SKIPPED - TIMEOUT/ERROR" in the file (highlighted red). These items were not processed due to a timeout or error — re-run manually if needed.\n`
@@ -507,7 +618,8 @@ ${totalAlerts} items below threshold:
 - HIGH: ${highCount}
 - MEDIUM: ${medCount}
 - LOW: ${lowCount}
-- PENDING RECEIPT (recent PO in flight, informational): ${pendingCount}
+- PENDING ORDER PLACEMENT (no POV stamp yet — chase the PO): ${pendingOrderCount}
+- PENDING RECEIPT (POV stamped, waiting on vendor): ${pendingReceiptCount}
 
 Attached: ${attachmentLabel}
 Inventory source: Inventory ${dateStr}

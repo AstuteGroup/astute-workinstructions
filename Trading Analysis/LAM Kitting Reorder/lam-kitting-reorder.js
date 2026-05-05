@@ -152,6 +152,12 @@ async function main() {
   writeReorderAlerts(reorderAlerts, outputFile);
   console.log(`  Output written to: ${outputFile}`);
 
+  // Step 6b: Escalations sidecar (current inventory + POV state for every
+  // manual-escalation MPN, even those now above threshold). Drives the
+  // "stock arrived — resale renegotiation still pending" surface in the runner.
+  const escalationsContextFile = outputFile.replace('.csv', '_escalations_context.json');
+  writeEscalationsContext(escalationsContextFile, aggregated, excelData, recentPOVs, historicalData, reorderAlerts);
+
   // Summary
   console.log('');
   console.log('=== Summary ===');
@@ -162,12 +168,14 @@ async function main() {
     const highPriority = reorderAlerts.filter(r => r.Priority === 'HIGH').length;
     const medPriority = reorderAlerts.filter(r => r.Priority === 'MEDIUM').length;
     const lowPriority = reorderAlerts.filter(r => r.Priority === 'LOW').length;
+    const pendingOrder = reorderAlerts.filter(r => r.Priority === 'PENDING ORDER PLACEMENT').length;
     const pendingReceipt = reorderAlerts.filter(r => r.Priority === 'PENDING RECEIPT').length;
     console.log(`  CRITICAL priority (zero stock, no recent PO): ${criticalPriority}`);
     console.log(`  HIGH priority: ${highPriority}`);
     console.log(`  MEDIUM priority: ${medPriority}`);
     console.log(`  LOW priority: ${lowPriority}`);
-    console.log(`  PENDING RECEIPT (recent PO in flight, informational): ${pendingReceipt}`);
+    console.log(`  PENDING ORDER PLACEMENT (no POV stamp yet — chase the PO): ${pendingOrder}`);
+    console.log(`  PENDING RECEIPT (POV stamped, waiting on vendor): ${pendingReceipt}`);
 
     const withHistory = reorderAlerts.filter(r => r['OT Previous Supplier']).length;
     console.log(`  With historical purchase data: ${withHistory}`);
@@ -195,7 +203,8 @@ async function main() {
     const highCount = reorderAlerts.filter(r => r.Priority === 'HIGH').length;
     const medCount = reorderAlerts.filter(r => r.Priority === 'MEDIUM').length;
     const lowCount = reorderAlerts.filter(r => r.Priority === 'LOW').length;
-    const pendingCount = reorderAlerts.filter(r => r.Priority === 'PENDING RECEIPT').length;
+    const pendingOrderCount = reorderAlerts.filter(r => r.Priority === 'PENDING ORDER PLACEMENT').length;
+    const pendingReceiptCount = reorderAlerts.filter(r => r.Priority === 'PENDING RECEIPT').length;
 
     const emailBody = `LAM Kitting Reorder Alerts generated ${getDateStamp()}.
 
@@ -204,7 +213,8 @@ ${reorderAlerts.length} items below threshold:
 - HIGH: ${highCount}
 - MEDIUM: ${medCount}
 - LOW: ${lowCount}
-- PENDING RECEIPT (recent PO in flight, informational): ${pendingCount}
+- PENDING ORDER PLACEMENT (no POV stamp yet — chase the PO): ${pendingOrderCount}
+- PENDING RECEIPT (POV stamped, waiting on vendor): ${pendingReceiptCount}
 
 Inventory source: ${path.basename(inventoryFolder)}`;
 
@@ -467,18 +477,24 @@ function loadHistoricalPurchaseData(mpns) {
 // -----------------------------------------------------------------------------
 
 function loadRecentPOVs() {
-  // Surface ALL open LAM purchase activity per MPN, regardless of whether:
-  //   - the OT PO has been cut yet (VQ_TICKED state bridges the gap)
-  //   - the Infor POV has been stamped yet (OT_PO state bridges the gap)
-  // "Open" means: for POs, qtyordered > qtydelivered; for VQs, ispurchased = 'Y' with no PO line yet.
-  // Receipts in Infor close POs naturally (qtydelivered catches up) and the row drops off the report.
+  // Surface RECENT open LAM purchase activity per MPN, where "recent" means either:
+  //   - the PO was cut in the last 90 days (normal lead-time case), OR
+  //   - the promise date is today or in the future (long-lead-time case where the
+  //     PO is older but the vendor commitment is still live)
+  // Open POs that fail BOTH tests (e.g., 2024 cut + 2024 promise, never received,
+  // never cancelled) are dropped entirely — they're stuck/orphan POs that need
+  // Infor cleanup, not signals for current reorder decisions.
   //
-  // On Order Qty = total open qty across all open activity for the MPN (summed across all POs + any pre-PO ticks).
+  // VQ_TICKED branch (ispurchased='Y' with no PO cut yet) gets the same treatment
+  // using rfq.created and vl.datepromised.
+  //
+  // Once a row passes the SQL filter it qualifies for PENDING RECEIPT (POV stamped)
+  // or PENDING ORDER PLACEMENT (no POV stamp yet — OT PO without Infor stamp,
+  // or VQ ticked with no PO at all). Both states are informational at the
+  // bottom of the priority sort.
+  //
+  // On Order Qty = SUM of open qty across all RECENT activity for the MPN.
   // Recent POV cell shows the single most-recent activity row (preferring PO over VQ_TICKED).
-  // "Recent" activity for priority purposes = PO cut (c_order.created) within 90 days.
-  // Anything older still shows in the cell (so buyers can see stale 2024/2025 PO#s and triage),
-  // but doesn't trigger the PENDING RECEIPT priority override. Filter tuning is deferred until
-  // buyers have reviewed stale cases (promise-date-based rule is a candidate for round 2).
   const sql = `
     WITH all_activity AS (
       -- Open POs (with or without Infor POV stamp)
@@ -506,6 +522,11 @@ function loadRecentPOVs() {
         AND ol.chuboe_mpn IS NOT NULL
         AND ol.chuboe_mpn != ''
         AND rfq.c_bpartner_id = 1000730
+        -- Drop stale orphans: keep iff PO cut recently OR promise date still ≥ today
+        AND (
+          o.created::date >= CURRENT_DATE - INTERVAL '90 days'
+          OR ol.datepromised::date >= CURRENT_DATE
+        )
 
       UNION ALL
 
@@ -534,43 +555,41 @@ function loadRecentPOVs() {
         AND ol2.c_orderline_id IS NULL
         AND vl.chuboe_mpn IS NOT NULL
         AND vl.chuboe_mpn != ''
+        -- Same recency rule: keep iff RFQ created recently OR VQ promise date still ≥ today
+        AND (
+          rfq.created::date >= CURRENT_DATE - INTERVAL '90 days'
+          OR vl.datepromised::date >= CURRENT_DATE
+        )
     ),
     ranked AS (
       SELECT *,
         ROW_NUMBER() OVER (PARTITION BY mpn ORDER BY preference ASC, sort_date DESC NULLS LAST) AS rn,
-        SUM(qty) OVER (PARTITION BY mpn) AS total_qty,
-        -- most-recent activity per MPN (regardless of PO vs VQ_TICKED) for recency gate
-        MAX(po_created_date) OVER (PARTITION BY mpn) AS latest_activity_date
+        SUM(qty) OVER (PARTITION BY mpn) AS total_qty
       FROM all_activity
     )
     SELECT mpn, pov_number, ot_po_number, qty, total_qty, promise_date, po_created_date,
-           latest_activity_date, supplier, rfq_number, state
+           supplier, rfq_number, state
     FROM ranked
     WHERE rn = 1;
   `;
 
   const result = runPsql(sql, 'povs');
   const povData = {};
-  const today = new Date();
-  const recencyMs = 90 * 24 * 60 * 60 * 1000;
   for (const line of result.trim().split('\n').filter(l => l.trim() && l.includes('|'))) {
-    const [mpn, pov, otPo, qty, totalQty, promiseDate, poCreated, latestActivity, supplier, rfqNum, state] = line.split('|');
+    const [mpn, pov, otPo, qty, totalQty, promiseDate, poCreated, supplier, rfqNum, state] = line.split('|');
     const key = canonicalMpn(mpn);
     if (key) {
-      // Is the MOST RECENT activity for this MPN within 90 days? Drives PENDING RECEIPT override.
-      const latest = (latestActivity || '').trim();
-      const isRecent = latest && (today - new Date(latest)) <= recencyMs;
+      // Recency is enforced in SQL — anything returned here is by definition still relevant.
       povData[key] = {
         State: (state || '').trim(),                    // 'PO' or 'VQ_TICKED'
         POV_Number: (pov || '').trim(),                 // populated once Infor stamps
         OT_PO_Number: (otPo || '').trim(),              // OT PO# (pre-Infor-stamp fallback)
         POV_Qty: parseFloat(qty) || 0,                  // qty on the displayed row
         POV_Date: (promiseDate || '').trim(),           // vendor promise date on the displayed row
-        PO_Created_Date: (poCreated || '').trim(),      // when we cut the PO (recency anchor)
+        PO_Created_Date: (poCreated || '').trim(),      // when we cut the PO
         POV_Supplier: (supplier || '').trim(),
         RFQ_Number: (rfqNum || '').trim(),
-        Qty_On_Order: parseFloat(totalQty) || 0,        // total across all open activity for the MPN
-        Is_Recent: isRecent                              // most-recent PO/VQ cut within 90 days
+        Qty_On_Order: parseFloat(totalQty) || 0,        // total across all RECENT open activity for the MPN
       };
     }
   }
@@ -706,12 +725,15 @@ function buildAlert(mpn, excel, totalQty, lamOwned, shortfall, priority, history
   };
 }
 
-// If the MPN has recent in-flight purchase activity (PO or ticked VQ within the last 90 days)
-// the row is informational — "stock is likely inbound, don't act" — rather than a severity.
+// If the MPN has recent in-flight purchase activity (gated by SQL: PO cut in last 90d
+// OR promise date still ≥ today), the row is informational — split into:
+//   - PENDING RECEIPT          → Infor POV stamp exists, waiting on shipment
+//   - PENDING ORDER PLACEMENT  → no POV stamp yet (OT PO without Infor stamp,
+//                                 or VQ ticked with no PO at all) — chase the PO
 // Shortfall-based priority is retained when no recent activity exists.
 function resolvePriority(shortfallBasedPriority, pov) {
-  if (pov && pov.Is_Recent) return 'PENDING RECEIPT';
-  return shortfallBasedPriority;
+  if (!pov) return shortfallBasedPriority;
+  return pov.POV_Number ? 'PENDING RECEIPT' : 'PENDING ORDER PLACEMENT';
 }
 
 function identifyReorderCandidates(aggregated, excelData, historicalData, recentPOVs = {}) {
@@ -751,11 +773,23 @@ function identifyReorderCandidates(aggregated, excelData, historicalData, recent
   }
 
   // Sort: CRITICAL first (must source now), shortfall-based severity next,
-  // PENDING RECEIPT last (informational — stock is likely inbound, no action needed)
-  const priorityOrder = { 'CRITICAL': 0, 'HIGH': 1, 'MEDIUM': 2, 'LOW': 3, 'PENDING RECEIPT': 4 };
+  // then the PENDING bucket last (informational). Within the PENDING bucket,
+  // PENDING ORDER PLACEMENT comes before PENDING RECEIPT — chasing an unplaced
+  // PO is more actionable than waiting on a vendor that's already been ordered from.
+  const priorityOrder = {
+    'CRITICAL': 0, 'HIGH': 1, 'MEDIUM': 2, 'LOW': 3,
+    'PENDING ORDER PLACEMENT': 4,
+    'PENDING RECEIPT': 4,
+  };
+  // Within the PENDING bucket only, sub-order ORDER_PLACEMENT before RECEIPT.
+  const pendingSubOrder = { 'PENDING ORDER PLACEMENT': 0, 'PENDING RECEIPT': 1 };
   alerts.sort((a, b) => {
     if (priorityOrder[a.Priority] !== priorityOrder[b.Priority]) {
       return priorityOrder[a.Priority] - priorityOrder[b.Priority];
+    }
+    if (pendingSubOrder[a.Priority] !== undefined && pendingSubOrder[b.Priority] !== undefined) {
+      const sub = pendingSubOrder[a.Priority] - pendingSubOrder[b.Priority];
+      if (sub !== 0) return sub;
     }
     return b.Shortfall - a.Shortfall;
   });
@@ -786,6 +820,57 @@ function writeReorderAlerts(alerts, outputPath) {
   }
 
   fs.writeFileSync(outputPath, lines.join('\n'));
+}
+
+// Write a sidecar JSON capturing the current state of every MPN listed in
+// lam-escalations.json — even MPNs that are above threshold and therefore NOT
+// on the reorder list. The runner consumes this to render synthetic Escalations
+// rows for "stock arrived but resale negotiation still pending" cases (Josh action).
+function writeEscalationsContext(outputPath, aggregated, excelData, recentPOVs, historicalData, reorderAlerts) {
+  const escalationsPath = path.join(__dirname, 'lam-escalations.json');
+  if (!fs.existsSync(escalationsPath)) {
+    fs.writeFileSync(outputPath, JSON.stringify({ entries: [] }, null, 2) + '\n');
+    return;
+  }
+  let state;
+  try { state = JSON.parse(fs.readFileSync(escalationsPath, 'utf-8')); }
+  catch (err) { console.log(`  WARNING: could not parse ${escalationsPath}: ${err.message}`); return; }
+  const entries = (state && state.entries) || [];
+  const reorderMpns = new Set(reorderAlerts.map(a => (a.MPN || '').trim()));
+
+  const ctx = entries.map(e => {
+    const raw = e.mpn;
+    const key = canonicalMpn(raw);
+    const inv = aggregated[raw] || aggregated[key] || { Total_Qty: 0, W111_Qty: 0, W115_Qty: 0 };
+    const excel = excelData[raw] || excelData[key] || {};
+    const pov = recentPOVs[key] || null;
+    const hist = historicalData[key] || {};
+    const onReorderList = reorderMpns.has(raw);
+    const stockArrived = !onReorderList && (inv.Total_Qty > 0);
+    return {
+      mpn: raw,
+      onReorderList,
+      stockArrived,
+      stock: { total: inv.Total_Qty, w111: inv.W111_Qty || 0, w115: inv.W115_Qty || 0 },
+      threshold: excel.MIN_QTY ?? null,
+      lamMoq: excel.MOQ ?? null,
+      resalePrice: excel.Resale_Price ?? null,
+      basePrice: excel.Base_Unit_Price ?? null,
+      lamPN: excel.CPC || '',
+      mfr: excel.Manufacturer || '',
+      itemDescription: excel.Description || '',
+      leadTime: excel.Lead_Time || '',
+      historicalSupplier: hist.Last_Supplier || '',
+      pov, // null or full pov object (POV_Number, POV_Date, POV_Supplier, etc.)
+    };
+  });
+
+  const aboveThresholdStocked = ctx.filter(c => c.stockArrived).length;
+  fs.writeFileSync(outputPath, JSON.stringify({
+    generated: new Date().toISOString(),
+    entries: ctx,
+  }, null, 2) + '\n');
+  console.log(`  Escalations context written: ${ctx.length} manual entries (${aboveThresholdStocked} above-threshold with stock arrived)`);
 }
 
 // -----------------------------------------------------------------------------
