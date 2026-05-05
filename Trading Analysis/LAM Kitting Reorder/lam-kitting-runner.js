@@ -16,6 +16,7 @@ const path = require('path');
 const fs = require('fs');
 const { createNotifier } = require('../../shared/notifier');
 const { readCSVFile } = require('../../shared/csv-utils');
+const restrictedMfr = require('../../shared/restricted-mfrs');
 
 const SCRIPT_DIR = __dirname;
 const INVENTORY_CLEANUP_DIR = path.join(SCRIPT_DIR, '../Inventory File Cleanup');
@@ -104,6 +105,87 @@ function persistResolvedEscalations(state, csv, mpnIdx, escalationsContext) {
   fs.writeFileSync(ESCALATIONS_STATE_FILE, JSON.stringify(updated, null, 2) + '\n');
   log(`  Auto-resolved ${resolved.length} escalation(s) (off reorder list, zero stock): ${resolved.map(e => e.mpn).join(', ')}`);
   log(`  Remaining open escalations: ${stillActive.length} (was ${before})`);
+}
+
+// Auto-escalation pass for restricted-MFR margin compression.
+// LAM contract resale is anchored on disty (franchise) pricing — when franchise
+// pricing rises so margin against current contract resale falls below 18%, the
+// seller (Josh) needs to push a new resale to LAM. We surface that signal here.
+//
+// The check is deliberately INDEPENDENT of broker corroboration: brokers may
+// supply at much better margins (often the actual procurement path for
+// restricted MFRs via Tracy direct), but the contractual anchor stays on
+// franchise pricing. Stock-arrived signals on these escalations come through
+// the manual flow (this auto-pass only writes ephemeral entries; the buyer
+// promotes one to lam-escalations.json once they're tracking it.)
+//
+// Skips:
+//   - non-restricted MFRs (handled by normal margin/auto-purchase flow)
+//   - MPNs already in lam-escalations.json (manual reason takes precedence)
+//
+// Returns array of { mpn, reason, date, auto: true, kind: 'renegotiate'|'no_route' }.
+function computeAutoEscalations(csv, sourcedCsvPath, escalationsState, dateStamp) {
+  const franchiseDataPath = sourcedCsvPath.replace('_sourced.csv', '_sourced_franchise_data.json');
+  if (!fs.existsSync(franchiseDataPath)) {
+    log(`  WARNING: no franchise data at ${path.basename(franchiseDataPath)} — skipping auto-escalations`);
+    return [];
+  }
+  let franchiseData;
+  try { franchiseData = JSON.parse(fs.readFileSync(franchiseDataPath, 'utf-8')); }
+  catch (err) { log(`  WARNING: could not parse franchise data: ${err.message}`); return []; }
+
+  const manualMpns = new Set(((escalationsState && escalationsState.entries) || []).map(e => e.mpn));
+  const idx = h => csv.headers.indexOf(h);
+  const iMpn = idx('MPN');
+  const iMfr = idx('Manufacturer');
+  const iResale = idx('Resale Price');
+  const iMoq = idx('LAM MOQ');
+
+  const auto = [];
+  for (const row of csv.rows) {
+    const mpn = (row[iMpn] || '').trim();
+    const mfrName = (row[iMfr] || '').trim();
+    if (!mpn || !mfrName) continue;
+    if (!restrictedMfr.isRestrictedMfr({ mfrName })) continue;
+    if (manualMpns.has(mpn)) continue;  // manual entry takes precedence — no override
+
+    const resale = parseFloat(row[iResale]) || 0;
+    const moq = parseFloat(row[iMoq]) || 0;
+    if (resale <= 0) continue;  // can't compute margin without a resale
+
+    const fr = franchiseData[mpn];
+    const summary = fr && fr.summary;
+    const refPrice = summary && (summary.lowestStockedPrice || summary.lowestPrice);
+
+    if (!refPrice || refPrice <= 0) {
+      auto.push({
+        mpn, auto: true, kind: 'no_route', date: dateStamp,
+        reason: `[AUTO] Restricted MFR (${mfrName}) — no franchise route this run. ` +
+          `APIs returned no usable pricing. Escalate to direct supplier (Tracy / authorized non-franchise channel).`,
+      });
+      continue;
+    }
+
+    const margin = (resale - refPrice) / resale;
+    if (margin < 0.18) {
+      // Pull the supplier name from the matching distributor entry, falling
+      // back to whichever distributor is listed first.
+      let supplier = 'best franchise';
+      if (Array.isArray(fr.found) && fr.found.length > 0) {
+        const match = fr.found.find(d => Math.abs((d.franchisePrice || d.vqPrice || 0) - refPrice) < 1e-6);
+        supplier = (match && match.bpName) || fr.found[0].bpName || supplier;
+      }
+      auto.push({
+        mpn, auto: true, kind: 'renegotiate', date: dateStamp,
+        reason: `[AUTO] Restricted MFR (${mfrName}) — franchise ref @ LAM MOQ ${moq || 'n/a'} = ` +
+          `$${refPrice.toFixed(4)} (${supplier}) → margin ${(margin * 100).toFixed(1)}% vs current ` +
+          `LAM resale $${resale.toFixed(4)}. Push new LAM resale based on franchise ref.`,
+      });
+    }
+    // margin >= 18% on a restricted MFR → no signal; LAM contract still works,
+    // procurement happens through broker (Tracy) separately. No auto entry.
+  }
+  return auto;
 }
 
 // Column classification — shared between the main tab and the Escalations tab.
@@ -214,7 +296,7 @@ function applyColumnFormats(sheet, headers) {
 // main tab so the buyer has full context in one view. Escalated rows are REMOVED
 // from the main tab (see rebuildExcelWithRfqLines) so each item lives in exactly
 // one place — keeps the main tab focused on actionable buys.
-function buildEscalationsTab(workbook, state, csv, allHeaders, rfqMapping, escalationsContext) {
+function buildEscalationsTab(workbook, state, csv, allHeaders, rfqMapping, escalationsContext, autoEntries) {
   const mpnIdx = csv.headers.indexOf('MPN');
   const autoRequests = (rfqMapping && rfqMapping.autoRequests) || {};
   // Build lookup: MPN → CSV row (with RFQ Line # + Request to Purchase spliced in
@@ -242,6 +324,7 @@ function buildEscalationsTab(workbook, state, csv, allHeaders, rfqMapping, escal
   hdr.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFCE4D6' } };
 
   let stockArrivedCount = 0;
+  // Block 1 — manual entries (with stock-arrived synthesis when off list).
   for (const entry of state.entries) {
     const reason = entry.reason || '';
     const ctx = ctxByMpn[entry.mpn];
@@ -272,6 +355,26 @@ function buildEscalationsTab(workbook, state, csv, allHeaders, rfqMapping, escal
   }
   if (stockArrivedCount > 0) {
     log(`  Escalations tab: ${stockArrivedCount} synthesized "stock arrived" row(s) for resale-pending follow-up`);
+  }
+
+  // Block 2 — auto entries (restricted-MFR margin compression). Always live
+  // ABOVE main-tab MPNs in the CSV, so byMpn lookup always succeeds for these.
+  const auto = Array.isArray(autoEntries) ? autoEntries : [];
+  let autoRendered = 0;
+  for (const entry of auto) {
+    const rowData = byMpn[entry.mpn];
+    if (!rowData) continue; // defensive
+    const excelRowData = [entry.reason || '', entry.date || '',
+      ...rowData.map((v, idx) => parseCellForExcel(v, allHeaders[idx]))];
+    const excelRow = ws.addRow(excelRowData);
+    applyRowShading(excelRow, escHeaders);
+    // Tint the reason cell amber so auto entries are visually distinct from
+    // manual ones (manual = uncolored, stock-arrived = light blue, auto = amber).
+    excelRow.getCell(1).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFE699' } };
+    autoRendered++;
+  }
+  if (autoRendered > 0) {
+    log(`  Escalations tab: ${autoRendered} auto entry row(s) (restricted-MFR margin compression)`);
   }
 
   applyColumnFormats(ws, escHeaders);
@@ -340,9 +443,14 @@ async function rebuildExcelWithRfqLines(sourcedCsvPath, xlsxPath, rfqMapping) {
   // it moves to the Escalations tab and disappears from the main list.
   const escalationsState = loadEscalationsState();
   const escalationsContext = loadEscalationsContext(sourcedCsvPath);
+  // Auto-escalation pass: restricted-MFR margin compression. These rows also
+  // belong on Escalations only — pull their MPNs into the main-tab skip set.
+  const dateStamp = (path.basename(sourcedCsvPath).match(/\d{4}-\d{2}-\d{2}/) || [''])[0];
+  const autoEntries = computeAutoEscalations(csv, sourcedCsvPath, escalationsState, dateStamp);
   const escalatedMPNs = new Set(
     (escalationsState && escalationsState.entries) ? escalationsState.entries.map(e => e.mpn) : []
   );
+  for (const e of autoEntries) escalatedMPNs.add(e.mpn);
 
   const workbook = new ExcelJS.Workbook();
   const ws = workbook.addWorksheet('Sourced Reorder Alerts');
@@ -374,15 +482,19 @@ async function rebuildExcelWithRfqLines(sourcedCsvPath, xlsxPath, rfqMapping) {
   applyColumnFormats(ws, allHeaders);
   ws.views = [{ state: 'frozen', ySplit: 1 }];
 
-  // Escalations tab — state-file driven. Manual review surface: items the buyer
-  // has flagged for deeper investigation (price approvals, vendor changes, etc.)
-  // carried forward week-over-week. Now also surfaces "stock arrived" cases
-  // (MPN above threshold but stock on hand → contract resale renegotiation
-  // still owed by Josh). The sidecar context drives synthetic rows for those.
-  if (escalationsState && escalationsState.entries && escalationsState.entries.length > 0) {
-    buildEscalationsTab(workbook, escalationsState, csv, allHeaders, rfqMapping, escalationsContext);
-    // Auto-resolve: drop entries that are off the reorder list AND have zero stock.
-    persistResolvedEscalations(escalationsState, csv, mpnIdx, escalationsContext);
+  // Escalations tab — driven by three sources:
+  //   1. Manual entries in lam-escalations.json (buyer-curated)
+  //   2. Stock-arrived synthesis from sidecar context (resale renegotiation
+  //      still owed by Josh after PO landed)
+  //   3. Auto entries: restricted-MFR margin compression detected this run
+  // Render whenever any of those produce content.
+  const stateForRender = (escalationsState && escalationsState.entries) ? escalationsState : { entries: [] };
+  if (stateForRender.entries.length > 0 || autoEntries.length > 0) {
+    buildEscalationsTab(workbook, stateForRender, csv, allHeaders, rfqMapping, escalationsContext, autoEntries);
+    // Auto-resolve manual entries: drop only when off reorder list AND zero stock.
+    if (stateForRender.entries.length > 0) {
+      persistResolvedEscalations(escalationsState, csv, mpnIdx, escalationsContext);
+    }
   }
 
   await workbook.xlsx.writeFile(xlsxPath);
@@ -589,12 +701,42 @@ async function main() {
     : '';
 
   // Escalation summary — reflects state AFTER this run's auto-resolution pass.
+  // Surfaces three categories: manual (curated by Jake), auto (restricted-MFR
+  // margin compression detected this run), stock-arrived (manual MPN above
+  // threshold but stock on hand → Josh action: confirm new LAM resale).
   let escalationSection = '';
   try {
     const escState = loadEscalationsState();
-    const openCount = escState?.entries?.length || 0;
-    if (openCount > 0) {
-      escalationSection = `\nOpen Escalations: ${openCount} — see the "Escalations" tab in the attached xlsx.\n`;
+    const escContext = loadEscalationsContext(sourcedCsv);
+    const manualCount = escState?.entries?.length || 0;
+    const stockArrivedCount = (escContext?.entries || []).filter(e => e.stockArrived).length;
+
+    let autoCount = 0;
+    let autoMpnLines = [];
+    if (fs.existsSync(sourcedCsv)) {
+      try {
+        const csv = readCSVFile(sourcedCsv);
+        const ds = (path.basename(sourcedCsv).match(/\d{4}-\d{2}-\d{2}/) || [''])[0];
+        const auto = computeAutoEscalations(csv, sourcedCsv, escState, ds);
+        autoCount = auto.length;
+        // Surface up to 5 MPN-level Josh action items in the email body so he
+        // doesn't have to open the xlsx to know whose resale to chase.
+        autoMpnLines = auto.slice(0, 5).map(e => `    • ${e.mpn} — ${e.kind === 'no_route' ? 'no franchise route' : 'margin compressed'}`);
+      } catch (_) { /* non-fatal */ }
+    }
+
+    const lines = [];
+    if (manualCount > 0) lines.push(`Open Escalations: ${manualCount} manual entry(ies)`);
+    if (autoCount > 0) {
+      lines.push(`  + ${autoCount} auto-flagged this run (restricted-MFR margin <18% — Josh: push new LAM resale):`);
+      lines.push(...autoMpnLines);
+      if (autoCount > 5) lines.push(`    • ...and ${autoCount - 5} more`);
+    }
+    if (stockArrivedCount > 0) {
+      lines.push(`  + ${stockArrivedCount} stock-arrived (above threshold, resale renegotiation still pending — see "Escalations" tab)`);
+    }
+    if (lines.length > 0) {
+      escalationSection = `\n${lines.join('\n')}\nFull detail in the "Escalations" tab.\n`;
     }
   } catch (_) { /* non-fatal */ }
 
@@ -657,7 +799,9 @@ module.exports = {
   rebuildExcelWithRfqLines,
   buildEscalationsTab,
   loadEscalationsState,
+  loadEscalationsContext,
   persistResolvedEscalations,
+  computeAutoEscalations,
   applyRowShading,
   applyColumnFormats,
   parseCellForExcel,
