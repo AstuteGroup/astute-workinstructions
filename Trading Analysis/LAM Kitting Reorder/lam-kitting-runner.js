@@ -627,6 +627,45 @@ async function main() {
     log('Step 4b: Skipping RFQ write — sourced CSV or franchise data not found.');
   }
 
+  // Step 4c: Refresh customer-facing LAM Kitting Inventory market offer.
+  // Powers the LAM customer BI dashboard (queries by offer type 1000025 +
+  // isactive='Y'). Roster-driven from Kitting DB INVENTORY sheet — every
+  // program part appears with current qty (zero-stock parts included for
+  // full visibility). See lam-kitting-customer-offer.js header for details.
+  // Isolated try/catch — a failure here logs + surfaces in the email body
+  // but does NOT block the buyer email or fail the runner.
+  let customerOfferResult = null;
+  let customerOfferError = null;
+  log('Step 4c: Refreshing customer-facing LAM Kitting Inventory offer...');
+  try {
+    const customerOfferArgs = [
+      `"${path.join(SCRIPT_DIR, 'lam-kitting-customer-offer.js')}"`,
+      `"${inventoryFolder}"`,
+      `"${excelFile}"`,
+    ];
+    if (fs.existsSync(sourcedCsv)) {
+      customerOfferArgs.push('--sourced-csv', `"${sourcedCsv}"`);
+    } else {
+      customerOfferArgs.push('--no-fresh-lt');
+    }
+    const result = execSync(`node ${customerOfferArgs.join(' ')}`, {
+      encoding: 'utf-8',
+      timeout: 600000, // 10 min — 945 line POSTs at ~200ms each = ~3 min, plus deactivation
+    });
+    console.log(result);
+    // Pull the sidecar JSON for status reporting in the email
+    const sidecar = path.join(SCRIPT_DIR, 'output', `LAM_Customer_Offer_${dateStr}.json`);
+    if (fs.existsSync(sidecar)) {
+      customerOfferResult = JSON.parse(fs.readFileSync(sidecar, 'utf-8'));
+    }
+  } catch (err) {
+    log(`  WARNING: Customer offer refresh failed: ${err.message}`);
+    if (err.stdout) console.log(err.stdout);
+    if (err.stderr) console.error(err.stderr);
+    customerOfferError = err.message;
+    // Continue — buyer email still goes out
+  }
+
   // Step 5: Rebuild the sourced Excel with RFQ line numbers, then email
   log('Step 5: Preparing and emailing sourced report...');
   const defaultSourcedXlsx = alertsFile.replace('.csv', '_sourced.xlsx');
@@ -753,8 +792,33 @@ async function main() {
     ? `\nRestricted MFRs (franchise pricing hidden, manual sourcing required): ${restrictedCount}\n`
     : '';
 
+  // Customer-facing offer status — surfaces in the email so Jake sees
+  // whether the BI dashboard refresh hit OT this Monday. Single source of
+  // truth for the customer-offer outcome (no separate notification).
+  let customerOfferSection = '';
+  if (customerOfferError) {
+    customerOfferSection = `\n──────────────────────────────────────────────\nCustomer LAM Kitting Inventory offer: ❌ FAILED\n──────────────────────────────────────────────\nError: ${customerOfferError}\nState UNKNOWN — depending on where the script failed, the prior\noffer may or may not have been deactivated. Verify in OT:\n  SELECT chuboe_offer_id, value, isactive FROM adempiere.chuboe_offer\n  WHERE chuboe_offer_type_id=1000025 AND c_bpartner_id=1000730\n  AND isactive='Y';\nIf zero rows: dashboard is BLANK until next run. Reactivate the\nlast offer (PATCH IsActive='Y') or run the script manually.\n──────────────────────────────────────────────\n`;
+  } else if (customerOfferResult) {
+    const r = customerOfferResult;
+    const s = r.stats || {};
+    const deactList = Array.isArray(r.deactivatedOfferKeys) && r.deactivatedOfferKeys.length > 0
+      ? r.deactivatedOfferKeys.join(', ')
+      : '(none)';
+    // Offer-type safety check — confirms the offer landed on the customer-
+    // visible type (1000025 LAM Kitting Inventory) and not on a staging /
+    // wrong type. r.isStaging is true whenever offerTypeId !== 1000025.
+    const typeOk = r.offerTypeId === 1000025 && !r.isStaging;
+    const typeLine = typeOk
+      ? `Offer type:           ${r.offerTypeId} — LAM Kitting Inventory ✅ (customer-visible)`
+      : `Offer type:           ${r.offerTypeId} — ⚠️  NOT 1000025 — dashboard will NOT see this offer (likely a staging run)`;
+    const headline = typeOk
+      ? 'Customer LAM Kitting Inventory offer: ✅ REFRESHED'
+      : 'Customer LAM Kitting Inventory offer: ⚠️  WROTE TO WRONG TYPE';
+    customerOfferSection = `\n──────────────────────────────────────────────\n${headline}\n──────────────────────────────────────────────\n${typeLine}\nNew offer search key: ${r.searchKey}\nLines written:        ${r.linesWritten} / ${r.lineCount}${r.errorCount ? ` (${r.errorCount} line errors — review sidecar JSON)` : ''}\nIn-stock parts:       ${(r.lineCount || 0) - (s.zeroStock || 0)}\nZero-stock parts:     ${s.zeroStock || 0}  (visible on dashboard with qty=0)\nLead-time refreshes:  ${s.refreshed || 0}  (from this week's franchise sourcing)\nManual codes kept:    ${s.preservedManual || 0}  (LTB / Obsolete / EOL / etc.)\nDeactivated prior:    ${r.deactivatedPriorOffers || 0} offer(s) — search keys: ${deactList}\nDescription:          "${r.description}"\n──────────────────────────────────────────────\n`;
+  }
+
   const emailBody = `LAM Kitting Reorder - Sourced Report ${dateStr}
-${rfqFailWarning}${partialWarning}${rfqSection}${escalationSection}${restrictedSection}
+${rfqFailWarning}${partialWarning}${rfqSection}${escalationSection}${restrictedSection}${customerOfferSection}
 ${totalAlerts} items below threshold:
 - CRITICAL (zero stock, no recent PO): ${critCount}
 - HIGH: ${highCount}
