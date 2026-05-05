@@ -44,6 +44,12 @@ const fs = require('fs');
 
 const STATE_FILE = path.resolve(__dirname, 'data/auth-failure-state.json');
 const DEBOUNCE_MS = 24 * 60 * 60 * 1000;  // 24 hours
+// Flap-suppression window: if a "recovery" lands within this window of the
+// alert email, treat the cycle as a flap — suppress the recovery email AND
+// preserve lastAlertAt so the next failure stays debounced. Without this, a
+// disty that auth-flaps 12× during a burst run sends 24 emails (alert + recovery
+// each cycle). Observed 2026-05-05 with Mouser at concurrency=4.
+const FLAP_WINDOW_MS = 15 * 60 * 1000;  // 15 min
 const OPERATOR_EMAIL = process.env.OPERATOR_EMAIL || 'jake.harris@astutegroup.com';
 
 // Sender: excess@ is unblocked (vortex@ has been bouncing since ~2026-04-18
@@ -221,6 +227,19 @@ async function noteAuthSuccess({ distributor }) {
     return false;
   }
 
+  // Flap-suppression: if the alert was sent very recently (within FLAP_WINDOW_MS),
+  // this is likely a transient flap rather than a sustained recovery. Suppress the
+  // recovery email AND preserve `lastAlertAt` so the next failure stays debounced
+  // (alertIfAuthFailure gates on entry.lastAlertAt). Without this, alert+recovery
+  // pairs fire on every flap cycle — observed 2026-05-05 with Mouser flapping
+  // ~12× during a burst run, generating ~24 emails.
+  if (wasAlerted && (now - entry.lastAlertAt) < FLAP_WINDOW_MS) {
+    entry.lastSilentRecoveryAt = now;
+    entry.flapCount = (entry.flapCount || 0) + 1;
+    writeState(state);
+    return true;
+  }
+
   // Snapshot for the email body before we wipe the entry
   const summary = {
     firstFailureAt: entry.firstFailureAt,
@@ -228,6 +247,7 @@ async function noteAuthSuccess({ distributor }) {
     failureCount: entry.count,
     lastError: entry.lastError,
     lastAlertAt: entry.lastAlertAt,
+    flapCount: entry.flapCount || 0,
   };
 
   // Always clear state — recovery is "starting clean"
@@ -264,6 +284,7 @@ async function noteAuthSuccess({ distributor }) {
     `First detected:  ${summary.firstFailureAt ? new Date(summary.firstFailureAt).toISOString() : '(unknown)'}`,
     `Failure span:    ${durationMin} min from first to last detection`,
     `Failures during outage: ${summary.failureCount || 0}`,
+    `Silent flap cycles suppressed: ${summary.flapCount}`,
     `Last error:      ${summary.lastError || '(none)'}`,
     '',
     'State has been cleared — the next auth failure on ' + distributor + ' will alert immediately.',
