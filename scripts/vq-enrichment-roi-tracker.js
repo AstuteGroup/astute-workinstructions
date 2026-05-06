@@ -61,6 +61,19 @@ const STOCK_RFQ_TYPE_ID = 1000007;  // Stock RFQ type — broker-to-broker sales
                                     // mechanic is selling-from-stock, not enriching for purchase.
 const UNASSIGNED_USER_ID = 1046201; // OT placeholder user — exclude from "human took over" signal
 
+// Vendor types Claude's franchise APIs should cover. If an alt-route win went
+// to one of these but Claude didn't quote that vendor on the line, it's a
+// "missed franchise" — a bot coverage gap worth investigating. Anything else
+// is broker-side supply (not actionable for the bot).
+const FRANCHISE_VENDOR_TYPE_IDS = [
+  1000001, // Manufacture Direct Component
+  1000002, // Franchise
+  1000007, // Manufacture Direct Assemblies
+  1000008, // Catalog (DigiKey, Mouser, Newark, Farnell)
+  1000009, // Online Distributor (Arrow, Future, Verical)
+  1000011, // Manufacture/Franchise w/ no QA accreditation
+];
+
 // ─── LOGGING ─────────────────────────────────────────────────────────────────
 
 function log(...args) {
@@ -213,7 +226,16 @@ async function queryEnrichedLines(windowDays) {
                SELECT 1 FROM bot_vendors_by_line bv
                WHERE bv.chuboe_rfq_line_id = vq.chuboe_rfq_line_id
                  AND bv.c_bpartner_id = vq.c_bpartner_id
-             )) AS alternate_won
+             )) AS alternate_won,
+             -- "Missed franchise": alt-route IsPurchased VQ on a vendor type
+             -- Claude's franchise APIs should have covered, but didn't quote.
+             BOOL_OR(vq.ispurchased = 'Y' AND vq.c_bpartner_id IS NOT NULL
+               AND vq.chuboe_vendortype_id IN (1000001,1000002,1000007,1000008,1000009,1000011)
+               AND NOT EXISTS (
+                 SELECT 1 FROM bot_vendors_by_line bv
+                 WHERE bv.chuboe_rfq_line_id = vq.chuboe_rfq_line_id
+                   AND bv.c_bpartner_id = vq.c_bpartner_id
+               )) AS alternate_won_franchise
       FROM adempiere.chuboe_vq_line vq
       WHERE vq.isactive = 'Y'
         AND vq.createdby <> $1
@@ -256,7 +278,8 @@ async function queryEnrichedLines(windowDays) {
            COALESCE(hv.mirror_vendors, 0)    AS mirror_vendors,
            COALESCE(hv.alternate_vendors, 0) AS alternate_vendors,
            COALESCE(hv.mirror_won, false)    AS mirror_won,
-           COALESCE(hv.alternate_won, false) AS alternate_won
+           COALESCE(hv.alternate_won, false) AS alternate_won,
+           COALESCE(hv.alternate_won_franchise, false) AS alternate_won_franchise
     FROM api_lines al
     JOIN adempiere.chuboe_rfq_line rl ON rl.chuboe_rfq_line_id = al.chuboe_rfq_line_id
     JOIN adempiere.chuboe_rfq r ON r.chuboe_rfq_id = rl.chuboe_rfq_id
@@ -362,6 +385,16 @@ function aggregate(rows) {
     purchasedBuyerSelfNet: 0,
     purchasedBuyerHumanLines: 0,
     purchasedBuyerHumanNet: 0,
+    // Mirror activity — humans wrote a VQ on the same vendor as Claude
+    // (regardless of whether it was ticked or whether the line sold).
+    // "Claude got noticed" signal across the full enriched population.
+    mirrorActivityLines: 0,
+    mirrorActivitySoldLines: 0,
+    mirrorActivitySoldNet: 0,
+    // Missed franchise — alt-route sold lines where the winning vendor type
+    // is one Claude's franchise APIs should have covered. Bot coverage gap.
+    missedFranchiseLines: 0,
+    missedFranchiseNet: 0,
     // States
     matched: 0,
     procOnlyRecent: 0,
@@ -380,9 +413,11 @@ function aggregate(rows) {
     salesOnlyNoProc: [],
     soldButPoVoided: [],
     poVoidedOnly: [],
-    botSoleAdopted: [],  // Claude won where a human was demonstrably involved (adoption signal)
-    botSoleSolo: [],     // Claude won with no human involvement (internal/autonomous)
-    splitDetail: [],     // Sold lines with multiple winners — show what was bought
+    botSoleAdopted: [],   // Claude won where a human was demonstrably involved (adoption signal)
+    botSoleSolo: [],      // Claude won with no human involvement (internal/autonomous)
+    botSoleStock: [],     // Claude won on a Stock RFQ — broker-to-broker, separate from adoption
+    splitDetail: [],      // Sold lines with multiple winners — show what was bought
+    missedFranchise: [],  // Lines where buyer found a franchise Claude didn't quote
   };
 
   // Per-RFQ rollup: which RFQs had POs cut from bot's VQs (procurement wins)
@@ -472,6 +507,7 @@ function aggregate(rows) {
         } else if (isStock) {
           totals.winBotSoleByStock++;
           totals.winBotSoleByStockNet += cqSoldNetHere;
+          flagLists.botSoleStock.push(r);
         } else {
           // Adoption segment: classify Adopted vs Solo
           const humanCompeted  = Number(r.human_vq_count) > 0;
@@ -505,6 +541,23 @@ function aggregate(rows) {
         totals.purchasedBuyerHumanLines++;
         totals.purchasedBuyerHumanNet += poNetHere;
       }
+    }
+
+    // Mirror activity (across ALL enriched lines, not just sold)
+    if (Number(r.mirror_vendors) > 0) {
+      totals.mirrorActivityLines++;
+      if (cqSoldHere) {
+        totals.mirrorActivitySoldLines++;
+        totals.mirrorActivitySoldNet += cqSoldNetHere;
+      }
+    }
+
+    // Missed franchise: sold + alt-route + winning vendor was a franchise type
+    // Claude should have surfaced. Coverage-gap signal — ignore broker losses.
+    if (cqSoldHere && (r.alternate_won_franchise === true || r.alternate_won_franchise === 't')) {
+      totals.missedFranchiseLines++;
+      totals.missedFranchiseNet += cqSoldNetHere;
+      flagLists.missedFranchise.push(r);
     }
 
     // Per-RFQ rollup for "wins" detail (procurement-side)
@@ -713,10 +766,58 @@ function renderEmail({ totals, flagLists, byCustomer, byType, rfqRollup }, windo
     <td style="font-size:12px">Sold without IsPurchased flag. Procurement-side process gap.</td></tr>
 </table>
 
-${totals.winBotSoleAdopted > 0 ? `
-<h4>🏆 Adopted bot wins — drill-in</h4>
+<h4 style="background:#fffbe6;padding:8px;border-left:4px solid #d4a017">🪞 Mirror activity — Claude getting noticed</h4>
 <p style="color:#666;font-size:12px">
-  Lines where Claude's VQ was ticked AND a human either wrote a competing VQ (mirror duplicate / stub / alternate) or took over the buyer assignment. The strongest adoption signal — human did work on the line and chose Claude's quote.
+  Lines where a human wrote a VQ on the same vendor as Claude (mirror VQ),
+  regardless of whether it was ticked or whether the line sold. This is the
+  broadest "Claude's data was reviewed" signal — humans saw Claude's quote
+  and engaged with it.
+</p>
+<table border="1" cellpadding="6" cellspacing="0" style="border-collapse:collapse">
+<tr style="background:#f0f0f0"><th>Mirror activity scope</th><th>Lines</th><th>Note</th></tr>
+<tr><td>All enriched lines with human mirror VQ</td>
+    <td style="text-align:right">${fmtInt(totals.mirrorActivityLines)}</td>
+    <td style="font-size:12px">Out of ${fmtInt(totals.lines)} enriched (${fmtPct(totals.mirrorActivityLines, totals.lines)})</td></tr>
+<tr style="background:#fffbe6"><td><b>Lines that mirrored AND sold</b></td>
+    <td style="text-align:right">${fmtInt(totals.mirrorActivitySoldLines)}</td>
+    <td style="text-align:right">${fmtUsd(totals.mirrorActivitySoldNet)} sold revenue</td></tr>
+</table>
+
+${totals.missedFranchiseLines > 0 ? `
+<h4 style="background:#ffe6e6;padding:8px;border-left:4px solid #c0392b">⚠️ Missed franchise opportunities — Claude API coverage gap</h4>
+<p style="color:#666;font-size:12px">
+  Sold lines where the winning vendor is a franchise/catalog type (DigiKey,
+  Mouser, Newark, Arrow, etc.) but Claude's enrichment didn't quote that
+  vendor on the line. Buyer found the franchise Claude missed.
+  <b>Bot coverage gap, not a broker loss</b> — these are actionable.
+</p>
+${flagTable(flagLists.missedFranchise, [
+  { label: 'RFQ',      value: r => r.rfq_value },
+  { label: 'Customer', value: r => r.customer || '—' },
+  { label: 'Type',     value: r => r.rfq_type || '—' },
+  { label: 'MPN',      value: r => r.mpn || '—' },
+  { label: 'Sold $',   value: r => fmtUsd(r.cq_sold_net), align: 'right', raw: true },
+])}
+<p style="font-size:12px;color:#888">Total at-risk revenue from missed franchises: <b>${fmtUsd(totals.missedFranchiseNet)}</b></p>
+` : ''}
+
+${totals.winBotSoleByStock > 0 ? `
+<h4 style="background:#e6f0ff;padding:8px;border-left:4px solid #3498db">📋 Stock RFQ wins — Claude end-to-end on broker-to-broker</h4>
+<p style="color:#666;font-size:12px">
+  Stock RFQ lines where Claude wrote the VQ AND ticked IsPurchased AND the line sold. Operationally these are handled by us (broker-to-broker), but they're real wins of Claude's data flowing all the way through.
+</p>
+${flagTable(flagLists.botSoleStock, [
+  { label: 'RFQ',      value: r => r.rfq_value },
+  { label: 'Customer', value: r => r.customer || '—' },
+  { label: 'MPN',      value: r => r.mpn || '—' },
+  { label: 'Sold $',   value: r => fmtUsd(r.cq_sold_net), align: 'right', raw: true },
+])}
+` : ''}
+
+${totals.winBotSoleAdopted > 0 ? `
+<h4 style="background:#e6ffe6;padding:8px;border-left:4px solid #27ae60">🏆 Adopted Claude wins — buyer used Claude's data to purchase</h4>
+<p style="color:#666;font-size:12px">
+  Adoption-segment lines where Claude's VQ was ticked AND a human either wrote a competing VQ (mirror duplicate / stub / alternate) or took over the buyer assignment. Strongest adoption signal — human did work on the line and chose Claude's quote.
 </p>
 ${flagTable(flagLists.botSoleAdopted, [
   { label: 'RFQ',      value: r => r.rfq_value },
@@ -901,16 +1002,14 @@ async function main() {
   const { totals } = agg;
   log(
     `RFQs=${totals.rfqs.size} lines=${totals.lines} ` +
+    `mirror(activity=${totals.mirrorActivityLines} sold=${totals.mirrorActivitySoldLines}/${totals.mirrorActivitySoldNet.toFixed(2)}) ` +
+    `missedFranchise=${totals.missedFranchiseLines}/${totals.missedFranchiseNet.toFixed(2)} ` +
     `proc(LAM)=${totals.lam.poCount}/${totals.lam.poNet.toFixed(2)} ` +
     `proc(Stock)=${totals.stock.poCount}/${totals.stock.poNet.toFixed(2)} ` +
     `proc(Adoption)=${totals.adoption.poCount}/${totals.adoption.poNet.toFixed(2)} ` +
-    `buyer: self=${totals.purchasedBuyerSelfLines}/${totals.purchasedBuyerSelfNet.toFixed(2)} human=${totals.purchasedBuyerHumanLines}/${totals.purchasedBuyerHumanNet.toFixed(2)} ` +
     `cqSold=${totals.cqSold}/${totals.cqSoldNet.toFixed(2)} ` +
-    `wins: botSole=${totals.winBotSole}(LAM=${totals.winBotSoleByLam}/${totals.winBotSoleByLamNet.toFixed(2)} Stock=${totals.winBotSoleByStock}/${totals.winBotSoleByStockNet.toFixed(2)} adopted=${totals.winBotSoleAdopted}/${totals.winBotSoleAdoptedNet.toFixed(2)} solo=${totals.winBotSoleSolo}/${totals.winBotSoleSoloNet.toFixed(2)}) ` +
-    `mirrorSole=${totals.winMirrorSole}/${totals.winMirrorSoleNet.toFixed(2)} altSole=${totals.winAlternateSole}/${totals.winAlternateSoleNet.toFixed(2)} split=${totals.winSplit}/${totals.winSplitNet.toFixed(2)} ` +
-    `flags: matched=${totals.matched} procStale=${totals.procOnlyStale} salesNoProc=${totals.salesOnlyNoProc} ` +
-    `soldPoVoided=${totals.soldButPoVoided} poVoidedOnly=${totals.poVoidedOnly} ` +
-    `directWin=${totals.directWinLines}`
+    `wins: stock=${totals.winBotSoleByStock}/${totals.winBotSoleByStockNet.toFixed(2)} adopted=${totals.winBotSoleAdopted}/${totals.winBotSoleAdoptedNet.toFixed(2)} ` +
+    `flags: matched=${totals.matched} procStale=${totals.procOnlyStale} soldPoVoided=${totals.soldButPoVoided}`
   );
 
   if (dryRun) {
@@ -918,9 +1017,10 @@ async function main() {
   } else if (rows.length > 0) {
     const notifier = createNotifier({ fromEmail: FROM_EMAIL, fromName: 'Claude Harris Enrichment ROI' });
     const subject =
-      `Claude Harris ROI — proc: ${fmtUsd(totals.lam.poNet)} LAM + ${fmtUsd(totals.stock.poNet)} Stock + ${fmtUsd(totals.adoption.poNet)} Adoption · ` +
-      `sales: ${fmtInt(totals.cqSold)} CQs sold ${fmtUsd(totals.cqSoldNet)} (${fmtUsd(totals.winBotSoleAdoptedNet)} 🏆 adopted)` +
-      (totals.soldButPoVoided > 0 ? ` · ⚠️ ${totals.soldButPoVoided} PO-voided` : '');
+      `Claude Harris ROI — 🪞 ${fmtInt(totals.mirrorActivityLines)} mirror lines (${fmtUsd(totals.mirrorActivitySoldNet)} sold) · ` +
+      `🏆 ${fmtUsd(totals.winBotSoleAdoptedNet)} adopted · 📋 ${fmtUsd(totals.winBotSoleByStockNet)} Stock` +
+      (totals.missedFranchiseLines > 0 ? ` · ⚠️ ${totals.missedFranchiseLines} missed franchise` : '') +
+      (totals.soldButPoVoided > 0 ? ` · 🔴 ${totals.soldButPoVoided} PO-voided` : '');
     const html = renderEmail(agg, windowDays);
     try {
       await notifier.sendEmail(NOTIFY_EMAIL, subject, html, { html: true });
