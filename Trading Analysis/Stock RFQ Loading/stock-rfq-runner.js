@@ -250,43 +250,39 @@ async function extractWithCLI(emailBody, subject) {
  * We want the FIRST forwarded From: after the forwarding separator.
  */
 function extractOriginalSender(body) {
-  // Look for forwarded separator then From: line
-  const fwdSeparators = [
-    /_{3,}/,                           // _____ (Outlook style)
-    /^-{3,}\s*Forwarded/im,            // --- Forwarded message
-    /^-{3,}\s*Original Message/im,     // --- Original Message
-    /^From:/m                          // Direct From: line (after envelope headers)
-  ];
-
-  // Find the first From: line that appears in the body (not the envelope)
-  // Skip the envelope From: (first line) and find the forwarded one
+  // Find a forwarded `From:` line. It may or may not be preceded by a separator
+  // (`____`, `--- Forwarded`) — some Outlook clients (mobile, web rules) strip
+  // the separator and just leave the sig block followed by the forward header.
+  // Heuristic: look for any `From:` line followed within 5 lines by `Sent:` or
+  // `To:` or `Subject:` — that's the forwarded header block.
   const lines = body.split('\n');
-  let pastEnvelopeHeaders = false;
-  let pastSeparator = false;
 
-  for (const line of lines) {
-    // Detect when we're past envelope headers (blank line or separator)
-    if (!pastEnvelopeHeaders && (line.trim() === '' || /^_{3,}/.test(line.trim()))) {
-      pastEnvelopeHeaders = true;
+  for (let i = 0; i < lines.length; i++) {
+    const trimmed = lines[i].trim();
+    if (!/^From:/i.test(trimmed)) continue;
+    const emailMatch = trimmed.match(/[\w.\-+]+@[\w.\-]+\.\w+/);
+    if (!emailMatch) continue;
+
+    const lookahead = lines.slice(i + 1, i + 6).join('\n');
+    const isForwardHeader =
+      /^\s*Sent:/im.test(lookahead) ||
+      /^\s*To:/im.test(lookahead) ||
+      /^\s*Subject:/im.test(lookahead);
+    if (!isForwardHeader) continue;
+
+    // Skip Astute internal addresses — we never want to bucket the RFQ to ourselves
+    if (/@astutegroup\.com$/i.test(emailMatch[0])) continue;
+
+    // For NetComponents: real sender is in the `[real@addr]` brackets, not the
+    // outer messagesend@netcomponents.com envelope address.
+    let email = emailMatch[0];
+    const ncMatch = trimmed.match(/\[([\w.\-+]+@[\w.\-]+\.\w+)\]/);
+    if (ncMatch && /netcomponents\.com$/i.test(email)) {
+      email = ncMatch[1];
     }
 
-    // Detect forwarding separator
-    if (pastEnvelopeHeaders && /_{3,}|^-{3,}/.test(line.trim())) {
-      pastSeparator = true;
-      continue;
-    }
-
-    // Look for From: after separator
-    if (pastSeparator && /^From:/i.test(line.trim())) {
-      const emailMatch = line.match(/[\w.\-+]+@[\w.\-]+\.\w+/);
-      const nameMatch = line.match(/From:\s*(.+?)\s*</i) || line.match(/From:\s*(.+?)(?:\s*<|\s*$)/i);
-      if (emailMatch) {
-        return {
-          email: emailMatch[0],
-          name: nameMatch ? nameMatch[1].trim() : ''
-        };
-      }
-    }
+    const nameMatch = trimmed.match(/From:\s*(.+?)\s*[<\[]/i) || trimmed.match(/From:\s*(.+?)$/i);
+    return { email, name: nameMatch ? nameMatch[1].trim() : '' };
   }
 
   return null;
@@ -455,7 +451,9 @@ async function run() {
           senderEmail = originalSender.email;
           senderName = originalSender.name || senderName;
         } else {
-          log.warn(`  Forwarded email but could not extract original sender`);
+          log.warn(`  Forwarded email but could not extract original sender — falling through to Unqualified Broker`);
+          senderEmail = '';
+          senderName = '';
         }
       }
 
