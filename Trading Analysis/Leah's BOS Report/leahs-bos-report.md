@@ -78,7 +78,7 @@ Thresholds live in `bos-report.js :: detectSignals()` — adjust there.
 | `Pivot BOS x ISE` | Flat pivot: Bucket · Region · BOS · ISE · Aging · Count |
 
 ### Email sender
-`stockRFQ@orangetsunami.com` — displayed as "Leah's BOS Report". Default recipient is `leah.griffin@astutegroup.com` (flipped from Jake on 2026-04-28). Override per-run with `--to`. Use `--no-send` to write the rendered email + xlsx into a `debug/` folder beside the script without dispatching, useful for verifying changes.
+`stockRFQ@orangetsunami.com` — displayed as "Leah's BOS Report". Default recipient is `leah.griffin@astutegroup.com` (flipped from Jake on 2026-04-28). Default CC is `jake.harris@astutegroup.com` (added 2026-05-06 — Jake stays on the thread to see what Leah sees). Override per-run with `--to` / `--cc`. Use `--no-send` to write the rendered email + xlsx into a `debug/` folder beside the script without dispatching, useful for verifying changes.
 
 ---
 
@@ -129,7 +129,7 @@ If an ISE is tagged to the wrong region, edit `ise-regions.json` and rerun Step 
 
 ### Step 6 (weekly): Email goes to Leah
 
-Default recipient is now `leah.griffin@astutegroup.com` (flipped 2026-04-28). Plain `node bos-report.js <file.xlsx>` sends to her. To redirect to Jake (or anyone else) for ad-hoc tests, pass `--to jake.harris@Astutegroup.com`. Use `--no-send` to render to `debug/` without emailing anyone.
+Default recipient is now `leah.griffin@astutegroup.com` (flipped 2026-04-28) with `jake.harris@astutegroup.com` CC'd by default (added 2026-05-06). Plain `node bos-report.js <file.xlsx>` sends to her with Jake on CC. To redirect to Jake (or anyone else) for ad-hoc tests, pass `--to jake.harris@astutegroup.com`. Pass `--cc ''` to suppress the CC. Use `--no-send` to render to `debug/` without emailing anyone.
 
 ### Step 7 (future): Monthly carryover
 

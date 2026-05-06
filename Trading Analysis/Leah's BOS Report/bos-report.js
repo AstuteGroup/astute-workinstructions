@@ -24,6 +24,7 @@ const ExcelJS = require('exceljs');
 const { createNotifier } = require('../../shared/notifier');
 
 const DEFAULT_RECIPIENT = 'leah.griffin@astutegroup.com';
+const DEFAULT_CC = 'jake.harris@astutegroup.com';
 const TODAY = new Date();
 const TODAY_UTC = new Date(Date.UTC(TODAY.getFullYear(), TODAY.getMonth(), TODAY.getDate()));
 const SNAPSHOT_DIR = path.join(__dirname, 'snapshots');
@@ -1258,7 +1259,7 @@ async function main() {
   const ccFlag = args.indexOf('--cc');
   const noSend = args.includes('--no-send');
   const recipient = toFlag >= 0 ? args[toFlag + 1] : DEFAULT_RECIPIENT;
-  const cc = ccFlag >= 0 ? args[ccFlag + 1] : null;
+  const cc = ccFlag >= 0 ? args[ccFlag + 1] : DEFAULT_CC;
   const inputPath = args.find(a => a.endsWith('.xlsx'));
   if (!inputPath) {
     console.error('Usage: node bos-report.js <infor-export.xlsx> [--to email] [--cc email] [--no-send]');

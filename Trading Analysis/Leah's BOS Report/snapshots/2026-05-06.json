@@ -1,0 +1,55 @@
+{
+  "runDate": "2026-05-06",
+  "totals": {
+    "query": 29,
+    "placeholder": 118,
+    "pastDue": 87
+  },
+  "byRegion": {
+    "query": {
+      "US": 13,
+      "MX": 2,
+      "APAC": 14
+    },
+    "placeholder": {
+      "US": 52,
+      "APAC": 66
+    },
+    "pastDue": {
+      "APAC": 23,
+      "US": 49,
+      "(Unmapped)": 1,
+      "MX": 14
+    }
+  },
+  "byBos": {
+    "query": {
+      "julie.white": 8,
+      "bhuvan": 5,
+      "(blank)": 2,
+      "vimal": 10,
+      "mohan": 2,
+      "Astute": 2
+    },
+    "placeholder": {
+      "julie.white": 29,
+      "Astute": 16,
+      "bhuvan": 11,
+      "vimal": 57,
+      "mohan": 5
+    },
+    "pastDue": {
+      "mohan": 21,
+      "julie.white": 46,
+      "bhuvan": 8,
+      "(blank)": 4,
+      ".": 1,
+      "vimal": 7
+    }
+  },
+  "aging": {
+    "fresh": 87,
+    "stale": 0,
+    "chronic": 0
+  }
+}
