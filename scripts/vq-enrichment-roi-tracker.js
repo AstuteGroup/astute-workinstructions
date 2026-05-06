@@ -54,6 +54,8 @@ const API_WRITER_USER_ID = 1049524;
 const DEFAULT_WINDOW_DAYS = 30;
 const STALE_PROC_DAYS = 2;          // bought-but-not-sold beyond this = stale
 const VOIDED_DOCSTATUS = ['VO', 'RE']; // exclude from "real conversion" counts
+const LAM_BP_ID = 1000730;          // Lam Research — split out from non-LAM since
+                                    // LAM Kitting is the autonomous Mon cron, not adoption
 
 // ─── LOGGING ─────────────────────────────────────────────────────────────────
 
@@ -84,6 +86,7 @@ async function queryEnrichedLines(windowDays) {
              vl.chuboe_mpn,
              vl.cost,
              vl.qty,
+             vl.c_bpartner_id,
              vl.created AS vq_created
       FROM adempiere.chuboe_vq_line vl
       WHERE vl.createdby = $1
@@ -163,10 +166,41 @@ async function queryEnrichedLines(windowDays) {
       WHERE isactive = 'Y'
         AND chuboe_rfq_line_id IN (SELECT chuboe_rfq_line_id FROM api_lines)
       ORDER BY chuboe_rfq_line_id, chuboe_rfq_line_mpn_id
+    ),
+    -- Distinct vendors quoted by the bot, per line
+    bot_vendors_by_line AS (
+      SELECT chuboe_rfq_line_id, c_bpartner_id
+      FROM api_vq
+      WHERE c_bpartner_id IS NOT NULL
+      GROUP BY 1, 2
+    ),
+    -- Human VQ supply-route classification per line:
+    --   mirror   = human re-quoted same vendor as bot
+    --   alternate= human used vendor bot didn't quote (different supply chain)
+    human_vqs_by_line AS (
+      SELECT vq.chuboe_rfq_line_id,
+             COUNT(*) AS human_vq_count,
+             COUNT(DISTINCT vq.c_bpartner_id) FILTER (WHERE EXISTS (
+               SELECT 1 FROM bot_vendors_by_line bv
+               WHERE bv.chuboe_rfq_line_id = vq.chuboe_rfq_line_id
+                 AND bv.c_bpartner_id = vq.c_bpartner_id
+             )) AS mirror_vendors,
+             COUNT(DISTINCT vq.c_bpartner_id) FILTER (WHERE NOT EXISTS (
+               SELECT 1 FROM bot_vendors_by_line bv
+               WHERE bv.chuboe_rfq_line_id = vq.chuboe_rfq_line_id
+                 AND bv.c_bpartner_id = vq.c_bpartner_id
+             )) AS alternate_vendors
+      FROM adempiere.chuboe_vq_line vq
+      WHERE vq.isactive = 'Y'
+        AND vq.createdby <> $1
+        AND vq.chuboe_rfq_line_id IN (SELECT chuboe_rfq_line_id FROM api_lines)
+        AND vq.c_bpartner_id IS NOT NULL
+      GROUP BY 1
     )
     SELECT rl.chuboe_rfq_line_id,
            r.chuboe_rfq_id,
            r.value AS rfq_value,
+           r.c_bpartner_id AS bp_id,
            rt.name AS rfq_type,
            bp.name AS customer,
            r.created AS rfq_created,
@@ -190,7 +224,10 @@ async function queryEnrichedLines(windowDays) {
            COALESCE(sc.so_lines, 0)        AS so_lines,
            COALESCE(sc.so_net, 0)          AS so_net,
            COALESCE(dw.direct_so_lines, 0) AS direct_so_lines,
-           COALESCE(dw.direct_so_net, 0)   AS direct_so_net
+           COALESCE(dw.direct_so_net, 0)   AS direct_so_net,
+           COALESCE(hv.human_vq_count, 0)    AS human_vq_count,
+           COALESCE(hv.mirror_vendors, 0)    AS mirror_vendors,
+           COALESCE(hv.alternate_vendors, 0) AS alternate_vendors
     FROM api_lines al
     JOIN adempiere.chuboe_rfq_line rl ON rl.chuboe_rfq_line_id = al.chuboe_rfq_line_id
     JOIN adempiere.chuboe_rfq r ON r.chuboe_rfq_id = rl.chuboe_rfq_id
@@ -201,6 +238,7 @@ async function queryEnrichedLines(windowDays) {
     LEFT JOIN cq_agg cq   ON cq.chuboe_rfq_line_id = al.chuboe_rfq_line_id
     LEFT JOIN so_via_cq sc ON sc.chuboe_rfq_line_id = al.chuboe_rfq_line_id
     LEFT JOIN direct_win dw ON dw.chuboe_rfq_line_id = al.chuboe_rfq_line_id
+    LEFT JOIN human_vqs_by_line hv ON hv.chuboe_rfq_line_id = al.chuboe_rfq_line_id
     WHERE rl.isactive = 'Y' AND r.isactive = 'Y'
   `;
   const { rows } = await pool.query(sql, [API_WRITER_USER_ID, String(windowDays)]);
@@ -231,6 +269,12 @@ function classify(r) {
 }
 
 function aggregate(rows) {
+  const blankBucket = () => ({
+    purchasedLines: 0, poLines: 0, poCount: 0, poNet: 0,
+    poVoidedLines: 0, poVoidedNet: 0,
+    cqSold: 0, cqSoldNet: 0, linesWithSoldCq: 0, soNet: 0,
+  });
+
   const totals = {
     lines: rows.length,
     rfqs: new Set(),
@@ -251,6 +295,18 @@ function aggregate(rows) {
     soNet: 0,
     directWinLines: 0,
     directWinNet: 0,
+    // LAM vs non-LAM split (procurement & sales)
+    lam: blankBucket(),
+    nonLam: blankBucket(),
+    // Sales-side supply-route classification (sold lines only)
+    routeBotOnly: 0,        // bot enrichment was the only VQ population
+    routeMirrorOnly: 0,     // human re-quoted same vendor as bot
+    routeAlternateOnly: 0,  // human used vendor bot didn't quote
+    routeBoth: 0,           // both mirror and alternate present
+    routeBotOnlyNet: 0,
+    routeMirrorOnlyNet: 0,
+    routeAlternateOnlyNet: 0,
+    routeBothNet: 0,
     // States
     matched: 0,
     procOnlyRecent: 0,
@@ -270,33 +326,93 @@ function aggregate(rows) {
     poVoidedOnly: [],
   };
 
+  // Per-RFQ rollup: which RFQs had POs cut from bot's VQs (procurement wins)
+  // and which had sold CQs (sales wins)
+  const rfqRollup = new Map();
+
   const byCustomer = new Map();
   const byType = new Map();
 
   for (const r of rows) {
     totals.rfqs.add(r.chuboe_rfq_id);
 
-    if (Number(r.api_vq_purchased) > 0) {
+    const isLam = Number(r.bp_id) === LAM_BP_ID;
+    const bucket = isLam ? totals.lam : totals.nonLam;
+
+    const purchasedHere = Number(r.api_vq_purchased) > 0;
+    const cqSoldHere    = Number(r.cq_sold) > 0;
+    const cqSoldNetHere = Number(r.cq_sold_net) || 0;
+    const poNetHere     = Number(r.po_net) || 0;
+
+    if (purchasedHere) {
       totals.purchasedLines++;
       totals.purchasedExtended += Number(r.purchased_extended) || 0;
+      bucket.purchasedLines++;
     }
     totals.poLines       += Number(r.po_lines) || 0;
     totals.poCount       += Number(r.po_count) || 0;
-    totals.poNet         += Number(r.po_net) || 0;
+    totals.poNet         += poNetHere;
     totals.poVoidedLines += Number(r.po_voided_lines) || 0;
     totals.poVoidedNet   += Number(r.po_voided_net) || 0;
+    bucket.poLines       += Number(r.po_lines) || 0;
+    bucket.poCount       += Number(r.po_count) || 0;
+    bucket.poNet         += poNetHere;
+    bucket.poVoidedLines += Number(r.po_voided_lines) || 0;
+    bucket.poVoidedNet   += Number(r.po_voided_net) || 0;
 
     if (Number(r.cq_count) > 0) totals.linesWithCq++;
-    if (Number(r.cq_sold) > 0) {
+    if (cqSoldHere) {
       totals.linesWithSoldCq++;
       totals.cqSold     += Number(r.cq_sold) || 0;
-      totals.cqSoldNet  += Number(r.cq_sold_net) || 0;
+      totals.cqSoldNet  += cqSoldNetHere;
+      bucket.linesWithSoldCq++;
+      bucket.cqSold     += Number(r.cq_sold) || 0;
+      bucket.cqSoldNet  += cqSoldNetHere;
     }
     totals.soLines       += Number(r.so_lines) || 0;
     totals.soNet         += Number(r.so_net) || 0;
+    bucket.soNet         += Number(r.so_net) || 0;
     if (Number(r.direct_so_lines) > 0) {
       totals.directWinLines++;
       totals.directWinNet += Number(r.direct_so_net) || 0;
+    }
+
+    // Supply-route classification on sold lines only
+    if (cqSoldHere) {
+      const humans   = Number(r.human_vq_count) || 0;
+      const mirror   = Number(r.mirror_vendors) || 0;
+      const alt      = Number(r.alternate_vendors) || 0;
+      if (humans === 0) {
+        totals.routeBotOnly++;
+        totals.routeBotOnlyNet += cqSoldNetHere;
+      } else if (mirror > 0 && alt === 0) {
+        totals.routeMirrorOnly++;
+        totals.routeMirrorOnlyNet += cqSoldNetHere;
+      } else if (alt > 0 && mirror === 0) {
+        totals.routeAlternateOnly++;
+        totals.routeAlternateOnlyNet += cqSoldNetHere;
+      } else if (mirror > 0 && alt > 0) {
+        totals.routeBoth++;
+        totals.routeBothNet += cqSoldNetHere;
+      }
+    }
+
+    // Per-RFQ rollup for "wins" detail (procurement-side)
+    const rfqKey = r.rfq_value;
+    if (purchasedHere || Number(r.po_lines) > 0) {
+      if (!rfqRollup.has(rfqKey)) {
+        rfqRollup.set(rfqKey, {
+          rfq_value: r.rfq_value,
+          customer: r.customer || 'UNKNOWN',
+          isLam,
+          lines: 0, poLines: 0, poNet: 0, poVoidedLines: 0,
+        });
+      }
+      const w = rfqRollup.get(rfqKey);
+      w.lines++;
+      w.poLines       += Number(r.po_lines) || 0;
+      w.poNet         += poNetHere;
+      w.poVoidedLines += Number(r.po_voided_lines) || 0;
     }
 
     const state = classify(r);
@@ -309,10 +425,10 @@ function aggregate(rows) {
     });
     const c = byCustomer.get(cust);
     c.lines++;
-    if (Number(r.api_vq_purchased) > 0) c.purchased++;
-    c.poNet     += Number(r.po_net) || 0;
-    if (Number(r.cq_sold) > 0) c.soldCq++;
-    c.cqSoldNet += Number(r.cq_sold_net) || 0;
+    if (purchasedHere) c.purchased++;
+    c.poNet     += poNetHere;
+    if (cqSoldHere) c.soldCq++;
+    c.cqSoldNet += cqSoldNetHere;
     c.soNet     += Number(r.so_net) || 0;
 
     const t = r.rfq_type || 'UNKNOWN';
@@ -321,14 +437,14 @@ function aggregate(rows) {
     });
     const bt = byType.get(t);
     bt.lines++;
-    if (Number(r.api_vq_purchased) > 0) bt.purchased++;
-    bt.poNet     += Number(r.po_net) || 0;
-    if (Number(r.cq_sold) > 0) bt.soldCq++;
-    bt.cqSoldNet += Number(r.cq_sold_net) || 0;
+    if (purchasedHere) bt.purchased++;
+    bt.poNet     += poNetHere;
+    if (cqSoldHere) bt.soldCq++;
+    bt.cqSoldNet += cqSoldNetHere;
     bt.soNet     += Number(r.so_net) || 0;
   }
 
-  return { totals, flagLists, byCustomer, byType };
+  return { totals, flagLists, byCustomer, byType, rfqRollup };
 }
 
 // ─── EMAIL ───────────────────────────────────────────────────────────────────
@@ -370,8 +486,9 @@ function flagTable(rows, columns) {
   return html;
 }
 
-function renderEmail({ totals, flagLists, byCustomer, byType }, windowDays) {
+function renderEmail({ totals, flagLists, byCustomer, byType, rfqRollup }, windowDays) {
   const rfqCount = totals.rfqs.size;
+  const soldLines = totals.linesWithSoldCq;
 
   let html = `<html><body style="font-family:Arial,sans-serif;max-width:1000px">
 <h3>API Enrichment ROI — trailing ${windowDays} days</h3>
@@ -388,20 +505,28 @@ function renderEmail({ totals, flagLists, byCustomer, byType }, windowDays) {
 <tr style="background:#f0f0f0"><th>Metric</th><th>Count</th><th>%</th><th>$</th></tr>
 <tr><td>RFQs touched by enricher</td><td style="text-align:right">${fmtInt(rfqCount)}</td><td></td><td></td></tr>
 <tr><td>Enriched lines</td><td style="text-align:right">${fmtInt(totals.lines)}</td><td></td><td></td></tr>
-<tr style="background:#eef"><td colspan="4"><b>Procurement (direct)</b></td></tr>
+<tr style="background:#eef"><td colspan="4"><b>Procurement (direct attribution — buyer ticked bot's VQ)</b></td></tr>
 <tr><td>Lines with bot VQ ticked IsPurchased</td>
     <td style="text-align:right">${fmtInt(totals.purchasedLines)}</td>
     <td style="text-align:right">${fmtPct(totals.purchasedLines, totals.lines)}</td>
     <td style="text-align:right">${fmtUsd(totals.purchasedExtended)} (cost)</td></tr>
-<tr><td>POs cut from bot's VQs</td>
+<tr><td>POs cut from bot's VQs (total)</td>
     <td style="text-align:right">${fmtInt(totals.poCount)} (${fmtInt(totals.poLines)} lines)</td>
     <td></td>
     <td style="text-align:right">${fmtUsd(totals.poNet)}</td></tr>
+<tr><td>&nbsp;&nbsp;&nbsp;↳ <b>LAM Research</b> (autonomous Mon cron)</td>
+    <td style="text-align:right">${fmtInt(totals.lam.poCount)} (${fmtInt(totals.lam.poLines)} lines)</td>
+    <td></td>
+    <td style="text-align:right">${fmtUsd(totals.lam.poNet)}</td></tr>
+<tr><td>&nbsp;&nbsp;&nbsp;↳ <b>Non-LAM</b> (adoption-driven)</td>
+    <td style="text-align:right">${fmtInt(totals.nonLam.poCount)} (${fmtInt(totals.nonLam.poLines)} lines)</td>
+    <td></td>
+    <td style="text-align:right">${fmtUsd(totals.nonLam.poNet)}</td></tr>
 <tr style="color:#a00"><td>POs voided</td>
     <td style="text-align:right">${fmtInt(totals.poVoidedLines)} lines</td>
     <td></td>
     <td style="text-align:right">${fmtUsd(totals.poVoidedNet)}</td></tr>
-<tr style="background:#efe"><td colspan="4"><b>Sales (correlative)</b></td></tr>
+<tr style="background:#efe"><td colspan="4"><b>Sales (correlative — bot enriched the line, but seller usually wrote CQ off a different VQ)</b></td></tr>
 <tr><td>Lines with any CQ</td>
     <td style="text-align:right">${fmtInt(totals.linesWithCq)}</td>
     <td style="text-align:right">${fmtPct(totals.linesWithCq, totals.lines)}</td>
@@ -418,6 +543,30 @@ function renderEmail({ totals, flagLists, byCustomer, byType }, windowDays) {
     <td style="text-align:right">${fmtInt(totals.directWinLines)} lines</td>
     <td style="text-align:right">${fmtPct(totals.directWinLines, totals.lines)}</td>
     <td style="text-align:right">${fmtUsd(totals.directWinNet)}</td></tr>
+</table>
+
+<h4>Sold lines — supply-route attribution (where did the supply actually come from?)</h4>
+<p style="color:#666;font-size:12px">
+  Of the ${fmtInt(soldLines)} bot-enriched lines that resulted in a sold CQ, classification by VQ population on the line:
+</p>
+<table border="1" cellpadding="6" cellspacing="0" style="border-collapse:collapse">
+<tr style="background:#f0f0f0"><th>Supply route</th><th>Lines</th><th>Revenue</th><th>Bot's role</th></tr>
+<tr style="background:#dfd"><td><b>Bot enrichment ONLY</b> (no other VQ on line)</td>
+    <td style="text-align:right">${fmtInt(totals.routeBotOnly)}</td>
+    <td style="text-align:right">${fmtUsd(totals.routeBotOnlyNet)}</td>
+    <td style="font-size:12px">Seller had no other choice — strongest attribution</td></tr>
+<tr style="background:#dfd"><td><b>Mirror only</b> (human re-quoted bot's vendor)</td>
+    <td style="text-align:right">${fmtInt(totals.routeMirrorOnly)}</td>
+    <td style="text-align:right">${fmtUsd(totals.routeMirrorOnlyNet)}</td>
+    <td style="font-size:12px">Bot found vendor first, human re-typed — strong attribution</td></tr>
+<tr><td>Both (mirror + alternate present)</td>
+    <td style="text-align:right">${fmtInt(totals.routeBoth)}</td>
+    <td style="text-align:right">${fmtUsd(totals.routeBothNet)}</td>
+    <td style="font-size:12px">Bot's vendor was an option; can't tell which won</td></tr>
+<tr><td>Alternate route only (different supply chain)</td>
+    <td style="text-align:right">${fmtInt(totals.routeAlternateOnly)}</td>
+    <td style="text-align:right">${fmtUsd(totals.routeAlternateOnlyNet)}</td>
+    <td style="font-size:12px">Bot enriched but seller sourced elsewhere (broker/APAC)</td></tr>
 </table>
 
 <h4>Per-line state breakdown</h4>
@@ -477,6 +626,28 @@ function renderEmail({ totals, flagLists, byCustomer, byType }, windowDays) {
     html += `<h4 style="color:#b80">🟡 Sales only — sold without bot procurement — ${fmtInt(totals.salesOnlyNoProc)} line(s)</h4>`;
     html += `<p style="font-size:12px;color:#666">Bot enriched the line and a sale occurred, but the bot's VQ wasn't ticked IsPurchased — sourced elsewhere or seller picked a non-bot VQ. Adoption-gap signal.</p>`;
     html += flagTable(flagLists.salesOnlyNoProc, salesOnlyCols);
+  }
+
+  // RFQ-level procurement wins (where bot's VQ was actually used end-to-end)
+  const wins = [...rfqRollup.values()]
+    .filter(w => w.poLines > 0)
+    .sort((a, b) => b.poNet - a.poNet);
+  const winsLam    = wins.filter(w => w.isLam);
+  const winsNonLam = wins.filter(w => !w.isLam);
+  if (wins.length > 0) {
+    html += `<h4>RFQs where bot's VQ won — POs cut end-to-end (${fmtInt(wins.length)} RFQs)</h4>`;
+    html += `<p style="color:#666;font-size:12px">
+      Procurement-side direct attribution: bot wrote the VQ → buyer ticked IsPurchased → support cut a PO. ${fmtInt(winsLam.length)} LAM, ${fmtInt(winsNonLam.length)} non-LAM.
+    </p>`;
+    const winCols = [
+      { label: 'Source',   value: w => w.isLam ? 'LAM (cron)' : 'Non-LAM (adoption)' },
+      { label: 'RFQ',      value: w => w.rfq_value },
+      { label: 'Customer', value: w => w.customer },
+      { label: 'Lines',    value: w => fmtInt(w.poLines), align: 'right', raw: true },
+      { label: 'PO Net',   value: w => fmtUsd(w.poNet), align: 'right', raw: true },
+      { label: 'Voided?',  value: w => w.poVoidedLines > 0 ? `${w.poVoidedLines} ⚠` : '', align: 'right', raw: true },
+    ];
+    html += flagTable(wins, winCols);
   }
 
   // Per-customer
@@ -541,11 +712,13 @@ async function main() {
   const { totals } = agg;
   log(
     `RFQs=${totals.rfqs.size} lines=${totals.lines} ` +
-    `procPurchased=${totals.purchasedLines} POs=${totals.poCount} POnet=${totals.poNet.toFixed(2)} ` +
-    `cqSold=${totals.cqSold} cqSoldNet=${totals.cqSoldNet.toFixed(2)} ` +
-    `directWin=${totals.directWinLines} ` +
+    `proc(LAM)=${totals.lam.poCount}/${totals.lam.poNet.toFixed(2)} ` +
+    `proc(nonLAM)=${totals.nonLam.poCount}/${totals.nonLam.poNet.toFixed(2)} ` +
+    `cqSold=${totals.cqSold}/${totals.cqSoldNet.toFixed(2)} ` +
+    `routes: botOnly=${totals.routeBotOnly} mirror=${totals.routeMirrorOnly} both=${totals.routeBoth} alt=${totals.routeAlternateOnly} ` +
     `flags: matched=${totals.matched} procStale=${totals.procOnlyStale} salesNoProc=${totals.salesOnlyNoProc} ` +
-    `soldPoVoided=${totals.soldButPoVoided} poVoidedOnly=${totals.poVoidedOnly}`
+    `soldPoVoided=${totals.soldButPoVoided} poVoidedOnly=${totals.poVoidedOnly} ` +
+    `directWin=${totals.directWinLines}`
   );
 
   if (dryRun) {
@@ -553,9 +726,9 @@ async function main() {
   } else if (rows.length > 0) {
     const notifier = createNotifier({ fromEmail: FROM_EMAIL, fromName: 'Enrichment ROI' });
     const subject =
-      `Enrichment ROI — ${fmtInt(totals.poCount)} POs ${fmtUsd(totals.poNet)} (proc) · ` +
-      `${fmtInt(totals.cqSold)} CQs sold ${fmtUsd(totals.cqSoldNet)} (sales)` +
-      (totals.soldButPoVoided > 0 ? ` · ⚠️ ${totals.soldButPoVoided} PO-voided fulfillment risks` : '');
+      `Enrichment ROI — proc: ${fmtUsd(totals.lam.poNet)} LAM + ${fmtUsd(totals.nonLam.poNet)} non-LAM · ` +
+      `sales: ${fmtInt(totals.cqSold)} CQs sold ${fmtUsd(totals.cqSoldNet)}` +
+      (totals.soldButPoVoided > 0 ? ` · ⚠️ ${totals.soldButPoVoided} PO-voided` : '');
     const html = renderEmail(agg, windowDays);
     try {
       await notifier.sendEmail(NOTIFY_EMAIL, subject, html, { html: true });
