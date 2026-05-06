@@ -257,21 +257,91 @@ async function searchPart(mpn, rfqQty = 1, searchOptions = {}) {
 }
 
 /**
+ * Generate a small set of common MPN variants to try when a search misses.
+ * Targets the TR / tape-and-reel ↔ canonical pattern that DigiKey indexes
+ * under the TR variant only (case in point 2026-05-06: IRFR15N20DPBF returns
+ * 0 hits but IRFR15N20DTRPBF exists). Capped at 2 variants to avoid quota
+ * blowups — these are catalog-realignment fixes, not exhaustive search.
+ */
+function _mpnVariants(mpn) {
+  const out = [];
+  if (!mpn) return out;
+  const M = mpn.toUpperCase();
+
+  // ADI / Linear / TI convention: canonical XX#PBF ↔ TR-variant XX#TRPBF.
+  if (/#TRPBF$/.test(M))   out.push(M.replace(/#TRPBF$/, '#PBF'));
+  else if (/#PBF$/.test(M)) out.push(M.replace(/#PBF$/, '#TRPBF'));
+
+  // Infineon / IR convention: canonical XXPBF ↔ TR-variant XXTRPBF
+  // (no # between body and PBF). Guard against double-applying when #PBF
+  // already matched above.
+  if (!/#PBF$/.test(M) && !/#TRPBF$/.test(M)) {
+    if (/TRPBF$/.test(M))      out.push(M.replace(/TRPBF$/, 'PBF'));
+    else if (/PBF$/.test(M))   out.push(M.replace(/PBF$/, 'TRPBF'));
+  }
+
+  return out.filter(v => v && v !== M).slice(0, 2);
+}
+
+/**
  * Internal API call implementation. searchPart wraps this with throttle
  * tracking; runSentinel calls it directly to avoid recursion / counter pollution.
+ *
+ * Multi-pass search to avoid two miss patterns documented 2026-05-06:
+ *   pass 1: in-stock-only (MinimumQuantityAvailable=1) — prefer real stock
+ *   pass 2: catalog-wide (no filter) — runs only if pass 1 returns 0 products,
+ *           catches parts DK carries but with 0 current stock. Result tagged
+ *           outOfStock=true so callers know it's a lead-time reference.
+ *           (FOD8314 / PRM48AF480T400A00 case)
+ *   pass 3: variant fallback — runs only if passes 1 + 2 both return 0,
+ *           tries TR ↔ non-TR variant (DK catalog entry exists under one
+ *           form but not the other). (IRFR15N20DPBF / IRFR15N20DTRPBF case)
  */
 async function _searchPartImpl(mpn, rfqQty = 1, _opts = {}) {
   const token = await getAccessToken();
   const searchOptions = _opts.searchOptions || {};
 
+  // Pass 1 — in-stock only (the original behavior)
+  const inStock = await _digikeyHttpSearch(token, mpn, rfqQty, searchOptions, /*minQty*/ 1);
+  if (inStock.found || inStock.productsReturned > 0) {
+    return inStock;
+  }
+
+  // Pass 2 — catalog-wide, no in-stock filter
+  const fallback = await _digikeyHttpSearch(token, mpn, rfqQty, searchOptions, /*minQty*/ 0);
+  if (fallback.found) {
+    fallback.outOfStock = true;
+    fallback.fallbackUsed = true;
+    return fallback;
+  }
+  if (fallback.productsReturned > 0) {
+    // Catalog has products under this exact MPN but mpn-match couldn't pick
+    // one — variant fallback won't help, return as-is.
+    return fallback;
+  }
+
+  // Pass 3 — variant fallback (TR / non-TR). Returns the original-MPN result
+  // if all variants miss too, to preserve cache-write semantics.
+  for (const variant of _mpnVariants(mpn)) {
+    const variantResult = await _digikeyHttpSearch(token, variant, rfqQty, searchOptions, /*minQty*/ 0);
+    if (variantResult.found) {
+      variantResult.variantUsed = variant;
+      variantResult.searchMpn = mpn;  // preserve original for cache key
+      if ((variantResult.franchiseQty || 0) === 0) variantResult.outOfStock = true;
+      return variantResult;
+    }
+  }
+
+  return fallback;
+}
+
+function _digikeyHttpSearch(token, mpn, rfqQty, searchOptions, minQty) {
   return new Promise((resolve, reject) => {
+    const filterRequest = minQty > 0 ? { MinimumQuantityAvailable: minQty } : undefined;
     const postData = JSON.stringify({
       Keywords: mpn,
-      Limit: 10,  // Get top matches
-      FilterOptionsRequest: {
-        // Only in-stock items
-        MinimumQuantityAvailable: 1,
-      },
+      Limit: 10,
+      ...(filterRequest ? { FilterOptionsRequest: filterRequest } : {}),
     });
 
     const options = {
@@ -295,7 +365,6 @@ async function _searchPartImpl(mpn, rfqQty = 1, _opts = {}) {
       let data = '';
       res.on('data', chunk => data += chunk);
       res.on('end', () => {
-        // Capture DigiKey rate-limit headers on every response for quota tracking.
         const rlRemaining = parseInt(res.headers['x-ratelimit-remaining'] || '', 10);
         const blRemaining = parseInt(res.headers['x-burstlimit-remaining'] || '', 10);
         const retryAfterSec = parseInt(res.headers['retry-after'] || '', 10);
@@ -305,34 +374,17 @@ async function _searchPartImpl(mpn, rfqQty = 1, _opts = {}) {
           updateQuotaStateSafe(patch);
         }
 
-        // Bucket A — auto-enqueue on rate limit / transient errors so the
-        // worker retries when DigiKey's quota window resets.
         if (res.statusCode === 429) {
-          // Honor Retry-After header if present; fall back to 1 hour.
           const blockHours = !isNaN(retryAfterSec) ? Math.max(retryAfterSec / 3600, 0.25) : 1;
           updateQuotaStateSafe({
             remainingCalls: 0,
             retryAfter: new Date(Date.now() + (blockHours * 3600 * 1000)).toISOString(),
           });
-          enqueueRetrySafe({
-            id: 'digikey-' + mpn + '-' + Date.now(),
-            kind: 'api-retry-digikey',
-            command: `node -e "require('${__dirname}/digikey').searchPart('${mpn.replace(/'/g, "\\'")}', ${rfqQty}).then(r => console.log('OK', r.found)).catch(e => { console.error(e.message); process.exit(1); })"`,
-            blocked_until_hours: blockHours,
-            reason: `DigiKey 429 rate limit on ${mpn}`,
-          });
-          reject(new Error(`DigiKey rate limit (429) — enqueued for retry`));
+          reject(new Error(`DigiKey rate limit (429)`));
           return;
         }
         if (res.statusCode >= 500 && res.statusCode < 600) {
-          enqueueRetrySafe({
-            id: 'digikey-' + mpn + '-' + Date.now(),
-            kind: 'api-retry-digikey',
-            command: `node -e "require('${__dirname}/digikey').searchPart('${mpn.replace(/'/g, "\\'")}', ${rfqQty}).then(r => console.log('OK', r.found)).catch(e => { console.error(e.message); process.exit(1); })"`,
-            blocked_until_hours: 1,
-            reason: `DigiKey ${res.statusCode} server error on ${mpn}`,
-          });
-          reject(new Error(`DigiKey server error (${res.statusCode}) — enqueued for retry`));
+          reject(new Error(`DigiKey API error ${res.statusCode}`));
           return;
         }
 
@@ -340,7 +392,6 @@ async function _searchPartImpl(mpn, rfqQty = 1, _opts = {}) {
           const json = JSON.parse(data);
 
           if (json.status === 401) {
-            // Token expired, clear cache and retry
             cachedToken = null;
             tokenExpiry = null;
             reject(new Error('Token expired'));
@@ -348,6 +399,7 @@ async function _searchPartImpl(mpn, rfqQty = 1, _opts = {}) {
           }
 
           const result = parseSearchResults(json, mpn, rfqQty, searchOptions);
+          result.productsReturned = (json.Products && json.Products.length) || 0;
           resolve(result);
         } catch (e) {
           reject(new Error(`Parse error: ${e.message}`));
