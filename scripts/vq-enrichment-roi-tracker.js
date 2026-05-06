@@ -369,6 +369,7 @@ function aggregate(rows) {
     procPendingPo: 0,
     salesOnlyNoProc: 0,
     soldButPoVoided: 0,
+    soldButPoVoidedNet: 0,  // sold revenue at risk from supplier-side cancellation
     poVoidedOnly: 0,
     noActivity: 0,
   };
@@ -444,7 +445,15 @@ function aggregate(rows) {
       const mirrorWon = r.mirror_won === true || r.mirror_won === 't';
       const altWon    = r.alternate_won === true || r.alternate_won === 't';
       const winSignals = [botWon, mirrorWon, altWon].filter(Boolean).length;
-      if (winSignals === 0) {
+      // If line is in soldButPoVoided state (sold + bot's PO got voided + no
+      // live PO), don't count as a win — supplier-side cancellation, not a
+      // genuine fulfillment. Already surfaced in the soldButPoVoided flag.
+      const isFulfillmentVoided = botWon
+        && Number(r.po_voided_lines) > 0
+        && Number(r.po_lines) === 0;
+      if (isFulfillmentVoided) {
+        // Tracked under soldButPoVoided flag, not under wins.
+      } else if (winSignals === 0) {
         totals.winNoPurchase++;
         totals.winNoPurchaseNet += cqSoldNetHere;
       } else if (winSignals > 1) {
@@ -519,6 +528,7 @@ function aggregate(rows) {
 
     const state = classify(r);
     totals[state] = (totals[state] || 0) + 1;
+    if (state === 'soldButPoVoided') totals.soldButPoVoidedNet += cqSoldNetHere;
     if (flagLists[state]) flagLists[state].push(r);
 
     const cust = r.customer || 'UNKNOWN';
@@ -752,7 +762,7 @@ ${flagTable(flagLists.splitDetail, [
 <tr style="color:#b80"><td>🟡 Procurement only — stale (≥ ${STALE_PROC_DAYS}d)</td><td style="text-align:right">${fmtInt(totals.procOnlyStale)}</td></tr>
 <tr><td>🟢 Procurement pending PO (ticked, no PO yet)</td><td style="text-align:right">${fmtInt(totals.procPendingPo)}</td></tr>
 <tr style="color:#b80"><td>🟡 Sales only — no bot procurement</td><td style="text-align:right">${fmtInt(totals.salesOnlyNoProc)}</td></tr>
-<tr style="color:#a00;font-weight:bold"><td>🔴 Sold but bot's PO voided</td><td style="text-align:right">${fmtInt(totals.soldButPoVoided)}</td></tr>
+<tr style="color:#a00;font-weight:bold"><td>🔴 Sold but Claude's PO voided (supplier cancellation)</td><td style="text-align:right">${fmtInt(totals.soldButPoVoided)} (${fmtUsd(totals.soldButPoVoidedNet)} sold revenue at risk)</td></tr>
 <tr style="color:#a00"><td>🔴 PO voided (no sale)</td><td style="text-align:right">${fmtInt(totals.poVoidedOnly)}</td></tr>
 <tr style="color:#666"><td>⚪ No activity</td><td style="text-align:right">${fmtInt(totals.noActivity)}</td></tr>
 </table>`;
