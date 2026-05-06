@@ -56,6 +56,10 @@ const STALE_PROC_DAYS = 2;          // bought-but-not-sold beyond this = stale
 const VOIDED_DOCSTATUS = ['VO', 'RE']; // exclude from "real conversion" counts
 const LAM_BP_ID = 1000730;          // Lam Research — split out from non-LAM since
                                     // LAM Kitting is the autonomous Mon cron, not adoption
+const STOCK_RFQ_TYPE_ID = 1000007;  // Stock RFQ type — broker-to-broker sales from inventory.
+                                    // Bucketed separately from "real" sourcing RFQs since the
+                                    // mechanic is selling-from-stock, not enriching for purchase.
+const UNASSIGNED_USER_ID = 1046201; // OT placeholder user — exclude from "human took over" signal
 
 // ─── LOGGING ─────────────────────────────────────────────────────────────────
 
@@ -87,6 +91,7 @@ async function queryEnrichedLines(windowDays) {
              vl.cost,
              vl.qty,
              vl.c_bpartner_id,
+             vl.chuboe_buyer_id,
              vl.created AS vq_created
       FROM adempiere.chuboe_vq_line vl
       WHERE vl.createdby = $1
@@ -100,6 +105,11 @@ async function queryEnrichedLines(windowDays) {
              COUNT(DISTINCT chuboe_vq_line_id) AS api_vq_count,
              COUNT(DISTINCT chuboe_vq_line_id) FILTER (WHERE ispurchased = 'Y') AS api_vq_purchased,
              SUM(CASE WHEN ispurchased = 'Y' THEN COALESCE(cost,0) * COALESCE(qty,0) ELSE 0 END) AS purchased_extended,
+             -- Buyer-field signal on Claude Harris's purchased VQs:
+             --   purchased_buyer_self  = ticked while Claude is still the buyer (no human took over)
+             --   purchased_buyer_human = a human took over the buyer assignment, then ticked
+             BOOL_OR(ispurchased = 'Y' AND chuboe_buyer_id = 1049524) AS purchased_buyer_self,
+             BOOL_OR(ispurchased = 'Y' AND chuboe_buyer_id IS NOT NULL AND chuboe_buyer_id NOT IN (1049524, 1046201)) AS purchased_buyer_human,
              MIN(vq_created) AS first_vq_created
       FROM api_vq
       GROUP BY chuboe_rfq_line_id
@@ -174,29 +184,32 @@ async function queryEnrichedLines(windowDays) {
       WHERE c_bpartner_id IS NOT NULL
       GROUP BY 1, 2
     ),
-    -- Human VQ supply-route classification per line:
-    --   mirror   = human re-quoted same vendor as bot
-    --   alternate= human used vendor bot didn't quote (different supply chain)
-    --   *_won    = same as above but limited to VQs ticked IsPurchased (the win signal)
+    -- Human VQ supply-route classification per line.
+    -- Notable patterns:
+    --   mirror_vendor  = human VQ on same vendor as bot (= duplicate quote)
+    --   alternate      = human VQ on vendor bot didn't quote
+    --   stub           = human VQ with no vendor (started writing, didn't finish)
+    --   *_won          = same patterns but limited to VQs ticked IsPurchased
     human_vqs_by_line AS (
       SELECT vq.chuboe_rfq_line_id,
              COUNT(*) AS human_vq_count,
-             COUNT(DISTINCT vq.c_bpartner_id) FILTER (WHERE EXISTS (
+             COUNT(*) FILTER (WHERE vq.c_bpartner_id IS NULL) AS stub_count,
+             COUNT(DISTINCT vq.c_bpartner_id) FILTER (WHERE vq.c_bpartner_id IS NOT NULL AND EXISTS (
                SELECT 1 FROM bot_vendors_by_line bv
                WHERE bv.chuboe_rfq_line_id = vq.chuboe_rfq_line_id
                  AND bv.c_bpartner_id = vq.c_bpartner_id
              )) AS mirror_vendors,
-             COUNT(DISTINCT vq.c_bpartner_id) FILTER (WHERE NOT EXISTS (
+             COUNT(DISTINCT vq.c_bpartner_id) FILTER (WHERE vq.c_bpartner_id IS NOT NULL AND NOT EXISTS (
                SELECT 1 FROM bot_vendors_by_line bv
                WHERE bv.chuboe_rfq_line_id = vq.chuboe_rfq_line_id
                  AND bv.c_bpartner_id = vq.c_bpartner_id
              )) AS alternate_vendors,
-             BOOL_OR(vq.ispurchased = 'Y' AND EXISTS (
+             BOOL_OR(vq.ispurchased = 'Y' AND vq.c_bpartner_id IS NOT NULL AND EXISTS (
                SELECT 1 FROM bot_vendors_by_line bv
                WHERE bv.chuboe_rfq_line_id = vq.chuboe_rfq_line_id
                  AND bv.c_bpartner_id = vq.c_bpartner_id
              )) AS mirror_won,
-             BOOL_OR(vq.ispurchased = 'Y' AND NOT EXISTS (
+             BOOL_OR(vq.ispurchased = 'Y' AND vq.c_bpartner_id IS NOT NULL AND NOT EXISTS (
                SELECT 1 FROM bot_vendors_by_line bv
                WHERE bv.chuboe_rfq_line_id = vq.chuboe_rfq_line_id
                  AND bv.c_bpartner_id = vq.c_bpartner_id
@@ -205,13 +218,13 @@ async function queryEnrichedLines(windowDays) {
       WHERE vq.isactive = 'Y'
         AND vq.createdby <> $1
         AND vq.chuboe_rfq_line_id IN (SELECT chuboe_rfq_line_id FROM api_lines)
-        AND vq.c_bpartner_id IS NOT NULL
       GROUP BY 1
     )
     SELECT rl.chuboe_rfq_line_id,
            r.chuboe_rfq_id,
            r.value AS rfq_value,
            r.c_bpartner_id AS bp_id,
+           r.chuboe_rfq_type_id AS rfq_type_id,
            rt.name AS rfq_type,
            bp.name AS customer,
            r.created AS rfq_created,
@@ -222,6 +235,8 @@ async function queryEnrichedLines(windowDays) {
            al.api_vq_count,
            al.api_vq_purchased,
            COALESCE(al.purchased_extended, 0) AS purchased_extended,
+           COALESCE(al.purchased_buyer_self, false) AS purchased_buyer_self,
+           COALESCE(al.purchased_buyer_human, false) AS purchased_buyer_human,
            al.first_vq_created,
            COALESCE(po.po_lines, 0)        AS po_lines,
            COALESCE(po.po_count, 0)        AS po_count,
@@ -237,6 +252,7 @@ async function queryEnrichedLines(windowDays) {
            COALESCE(dw.direct_so_lines, 0) AS direct_so_lines,
            COALESCE(dw.direct_so_net, 0)   AS direct_so_net,
            COALESCE(hv.human_vq_count, 0)    AS human_vq_count,
+           COALESCE(hv.stub_count, 0)        AS stub_count,
            COALESCE(hv.mirror_vendors, 0)    AS mirror_vendors,
            COALESCE(hv.alternate_vendors, 0) AS alternate_vendors,
            COALESCE(hv.mirror_won, false)    AS mirror_won,
@@ -308,13 +324,17 @@ function aggregate(rows) {
     soNet: 0,
     directWinLines: 0,
     directWinNet: 0,
-    // LAM vs non-LAM split (procurement & sales)
-    lam: blankBucket(),
-    nonLam: blankBucket(),
+    // 3-way segment split (priority: LAM > Stock > Adoption):
+    //   lam      = customer = Lam Research (autonomous Mon cron)
+    //   stock    = RFQ type = Stock (broker-to-broker sales-from-inventory)
+    //   adoption = everything else (true seller-driven sourcing)
+    lam:      blankBucket(),
+    stock:    blankBucket(),
+    adoption: blankBucket(),
     // Sales-side win attribution (sold lines only — based on which VQ was IsPurchased)
-    winBotSole: 0,        // bot VQ was the only purchase
-    winMirrorSole: 0,     // human won, on a vendor bot also quoted
-    winAlternateSole: 0,  // human won, on a vendor bot didn't quote
+    winBotSole: 0,        // Claude Harris VQ was the only purchase
+    winMirrorSole: 0,     // human won, on a vendor Claude also quoted
+    winAlternateSole: 0,  // human won, on a vendor Claude didn't quote
     winSplit: 0,          // multiple categories co-purchased
     winNoPurchase: 0,     // sold but no IsPurchased VQ on the line
     winBotSoleNet: 0,
@@ -322,6 +342,21 @@ function aggregate(rows) {
     winAlternateSoleNet: 0,
     winSplitNet: 0,
     winNoPurchaseNet: 0,
+    // Sub-classification of Claude Harris sole wins:
+    //   adopted = a human VQ exists on the line (mirror duplicate, stub, or alternate)
+    //             AND/OR a human took over the buyer assignment before ticking.
+    //             Strong adoption signal — human acknowledged Claude's quote.
+    //   solo    = no competing human VQ AND Claude is still the buyer.
+    //             Usually internal allocations or autonomous cron flows.
+    winBotSoleAdopted: 0,
+    winBotSoleSolo: 0,
+    winBotSoleAdoptedNet: 0,
+    winBotSoleSoloNet: 0,
+    // Procurement-side buyer field rollup (across all Claude-purchased lines)
+    purchasedBuyerSelfLines: 0,
+    purchasedBuyerSelfNet: 0,
+    purchasedBuyerHumanLines: 0,
+    purchasedBuyerHumanNet: 0,
     // States
     matched: 0,
     procOnlyRecent: 0,
@@ -339,6 +374,9 @@ function aggregate(rows) {
     salesOnlyNoProc: [],
     soldButPoVoided: [],
     poVoidedOnly: [],
+    botSoleAdopted: [],  // Claude won where a human was demonstrably involved (adoption signal)
+    botSoleSolo: [],     // Claude won with no human involvement (internal/autonomous)
+    splitDetail: [],     // Sold lines with multiple winners — show what was bought
   };
 
   // Per-RFQ rollup: which RFQs had POs cut from bot's VQs (procurement wins)
@@ -351,8 +389,10 @@ function aggregate(rows) {
   for (const r of rows) {
     totals.rfqs.add(r.chuboe_rfq_id);
 
-    const isLam = Number(r.bp_id) === LAM_BP_ID;
-    const bucket = isLam ? totals.lam : totals.nonLam;
+    const isLam   = Number(r.bp_id) === LAM_BP_ID;
+    const isStock = !isLam && Number(r.rfq_type_id) === STOCK_RFQ_TYPE_ID;
+    const segment = isLam ? 'lam' : isStock ? 'stock' : 'adoption';
+    const bucket  = totals[segment];
 
     const purchasedHere = Number(r.api_vq_purchased) > 0;
     const cqSoldHere    = Number(r.cq_sold) > 0;
@@ -405,15 +445,40 @@ function aggregate(rows) {
       } else if (winSignals > 1) {
         totals.winSplit++;
         totals.winSplitNet += cqSoldNetHere;
+        flagLists.splitDetail.push(r);
       } else if (botWon) {
         totals.winBotSole++;
         totals.winBotSoleNet += cqSoldNetHere;
+        // Sub-classify: was a human involved (competing VQ or buyer-field switch)?
+        const humanCompeted   = Number(r.human_vq_count) > 0;
+        const humanTookBuyer  = r.purchased_buyer_human === true || r.purchased_buyer_human === 't';
+        if (humanCompeted || humanTookBuyer) {
+          totals.winBotSoleAdopted++;
+          totals.winBotSoleAdoptedNet += cqSoldNetHere;
+          flagLists.botSoleAdopted.push(r);
+        } else {
+          totals.winBotSoleSolo++;
+          totals.winBotSoleSoloNet += cqSoldNetHere;
+          flagLists.botSoleSolo.push(r);
+        }
       } else if (mirrorWon) {
         totals.winMirrorSole++;
         totals.winMirrorSoleNet += cqSoldNetHere;
       } else if (altWon) {
         totals.winAlternateSole++;
         totals.winAlternateSoleNet += cqSoldNetHere;
+      }
+    }
+
+    // Procurement-side buyer-field rollup (across ALL Claude-purchased lines)
+    if (purchasedHere) {
+      if (r.purchased_buyer_self === true || r.purchased_buyer_self === 't') {
+        totals.purchasedBuyerSelfLines++;
+        totals.purchasedBuyerSelfNet += poNetHere;
+      }
+      if (r.purchased_buyer_human === true || r.purchased_buyer_human === 't') {
+        totals.purchasedBuyerHumanLines++;
+        totals.purchasedBuyerHumanNet += poNetHere;
       }
     }
 
@@ -424,7 +489,8 @@ function aggregate(rows) {
         rfqRollup.set(rfqKey, {
           rfq_value: r.rfq_value,
           customer: r.customer || 'UNKNOWN',
-          isLam,
+          rfq_type: r.rfq_type || 'UNKNOWN',
+          segment,
           lines: 0, poLines: 0, poNet: 0, poVoidedLines: 0,
         });
       }
@@ -511,26 +577,26 @@ function renderEmail({ totals, flagLists, byCustomer, byType, rfqRollup }, windo
   const soldLines = totals.linesWithSoldCq;
 
   let html = `<html><body style="font-family:Arial,sans-serif;max-width:1000px">
-<h3>API Enrichment ROI — trailing ${windowDays} days</h3>
+<h3>Claude Harris API Enrichment ROI — trailing ${windowDays} days</h3>
 <p style="color:#666;font-size:13px">
-  "Enriched" = RFQ lines with at least one VQ written by the API enricher (createdby=Claude Harris).<br/>
+  "Enriched" = RFQ lines with at least one VQ written by Claude Harris (the API enricher, createdby=1049524).<br/>
   Two funnels are tracked separately because attribution differs:
-  <b>procurement</b> is direct (buyer ticked the bot's VQ), <b>sales</b> is correlative
-  (bot enriched the line; CQ may have been written off any VQ — the "direct win"
-  subset is where the SO points at the bot's VQ specifically).
+  <b>procurement</b> is direct (buyer ticked Claude Harris's VQ), <b>sales</b> is correlative
+  (Claude Harris enriched the line; CQ may have been written off any VQ — the "direct win"
+  subset is where the SO points at Claude Harris's VQ specifically).
 </p>
 
 <h4>Headline</h4>
 <table border="1" cellpadding="6" cellspacing="0" style="border-collapse:collapse">
 <tr style="background:#f0f0f0"><th>Metric</th><th>Count</th><th>%</th><th>$</th></tr>
-<tr><td>RFQs touched by enricher</td><td style="text-align:right">${fmtInt(rfqCount)}</td><td></td><td></td></tr>
+<tr><td>RFQs touched by Claude Harris</td><td style="text-align:right">${fmtInt(rfqCount)}</td><td></td><td></td></tr>
 <tr><td>Enriched lines</td><td style="text-align:right">${fmtInt(totals.lines)}</td><td></td><td></td></tr>
-<tr style="background:#eef"><td colspan="4"><b>Procurement (direct attribution — buyer ticked bot's VQ)</b></td></tr>
-<tr><td>Lines with bot VQ ticked IsPurchased</td>
+<tr style="background:#eef"><td colspan="4"><b>Procurement (direct attribution — buyer ticked Claude Harris's VQ)</b></td></tr>
+<tr><td>Lines with Claude Harris VQ ticked IsPurchased</td>
     <td style="text-align:right">${fmtInt(totals.purchasedLines)}</td>
     <td style="text-align:right">${fmtPct(totals.purchasedLines, totals.lines)}</td>
     <td style="text-align:right">${fmtUsd(totals.purchasedExtended)} (cost)</td></tr>
-<tr><td>POs cut from bot's VQs (total)</td>
+<tr><td>POs cut from Claude Harris's VQs (total)</td>
     <td style="text-align:right">${fmtInt(totals.poCount)} (${fmtInt(totals.poLines)} lines)</td>
     <td></td>
     <td style="text-align:right">${fmtUsd(totals.poNet)}</td></tr>
@@ -538,10 +604,22 @@ function renderEmail({ totals, flagLists, byCustomer, byType, rfqRollup }, windo
     <td style="text-align:right">${fmtInt(totals.lam.poCount)} (${fmtInt(totals.lam.poLines)} lines)</td>
     <td></td>
     <td style="text-align:right">${fmtUsd(totals.lam.poNet)}</td></tr>
-<tr><td>&nbsp;&nbsp;&nbsp;↳ <b>Non-LAM</b> (adoption-driven)</td>
-    <td style="text-align:right">${fmtInt(totals.nonLam.poCount)} (${fmtInt(totals.nonLam.poLines)} lines)</td>
+<tr><td>&nbsp;&nbsp;&nbsp;↳ <b>Stock RFQ</b> (broker-to-broker, sales-from-inventory)</td>
+    <td style="text-align:right">${fmtInt(totals.stock.poCount)} (${fmtInt(totals.stock.poLines)} lines)</td>
     <td></td>
-    <td style="text-align:right">${fmtUsd(totals.nonLam.poNet)}</td></tr>
+    <td style="text-align:right">${fmtUsd(totals.stock.poNet)}</td></tr>
+<tr><td>&nbsp;&nbsp;&nbsp;↳ <b>Adoption</b> (Non-LAM, non-Stock — seller-driven sourcing)</td>
+    <td style="text-align:right">${fmtInt(totals.adoption.poCount)} (${fmtInt(totals.adoption.poLines)} lines)</td>
+    <td></td>
+    <td style="text-align:right">${fmtUsd(totals.adoption.poNet)}</td></tr>
+<tr><td>&nbsp;&nbsp;&nbsp;↳ Buyer-field at tick time: <b>human took over</b></td>
+    <td style="text-align:right">${fmtInt(totals.purchasedBuyerHumanLines)} lines</td>
+    <td style="text-align:right">${fmtPct(totals.purchasedBuyerHumanLines, totals.purchasedLines)}</td>
+    <td style="text-align:right">${fmtUsd(totals.purchasedBuyerHumanNet)}</td></tr>
+<tr><td>&nbsp;&nbsp;&nbsp;↳ Buyer-field at tick time: <b>Claude still buyer</b></td>
+    <td style="text-align:right">${fmtInt(totals.purchasedBuyerSelfLines)} lines</td>
+    <td style="text-align:right">${fmtPct(totals.purchasedBuyerSelfLines, totals.purchasedLines)}</td>
+    <td style="text-align:right">${fmtUsd(totals.purchasedBuyerSelfNet)}</td></tr>
 <tr style="color:#a00"><td>POs voided</td>
     <td style="text-align:right">${fmtInt(totals.poVoidedLines)} lines</td>
     <td></td>
@@ -567,31 +645,80 @@ function renderEmail({ totals, flagLists, byCustomer, byType, rfqRollup }, windo
 
 <h4>Sold lines — win attribution (which VQ was actually purchased?)</h4>
 <p style="color:#666;font-size:12px">
-  Of the ${fmtInt(soldLines)} bot-enriched lines that resulted in a sold CQ, classification by which VQ on the line was ticked <code>IsPurchased</code> (the actual procurement winner):
+  Of the ${fmtInt(soldLines)} Claude-enriched lines that resulted in a sold CQ, classification by which VQ on the line was ticked <code>IsPurchased</code> (the actual procurement winner):
 </p>
 <table border="1" cellpadding="6" cellspacing="0" style="border-collapse:collapse">
 <tr style="background:#f0f0f0"><th>Win attribution</th><th>Lines</th><th>Revenue</th><th>Note</th></tr>
-<tr style="background:#dfd"><td><b>✅ Bot VQ won — sole purchase</b></td>
+<tr style="background:#dfd"><td><b>✅ Claude Harris VQ won — sole purchase</b></td>
     <td style="text-align:right">${fmtInt(totals.winBotSole)}</td>
     <td style="text-align:right">${fmtUsd(totals.winBotSoleNet)}</td>
-    <td style="font-size:12px">Bot wrote the VQ that buyer ticked. Direct attribution.</td></tr>
+    <td style="font-size:12px">Claude Harris wrote the VQ that buyer ticked. Direct attribution.</td></tr>
+<tr style="background:#dfd"><td>&nbsp;&nbsp;&nbsp;↳ 🏆 <b>Adopted</b> (human wrote competing VQ or took over buyer field)</td>
+    <td style="text-align:right">${fmtInt(totals.winBotSoleAdopted)}</td>
+    <td style="text-align:right">${fmtUsd(totals.winBotSoleAdoptedNet)}</td>
+    <td style="font-size:12px">Strongest adoption: human acknowledged Claude's quote and ticked it.</td></tr>
+<tr style="background:#dfd"><td>&nbsp;&nbsp;&nbsp;↳ 📦 <b>Solo</b> (no competing human VQ, Claude is still buyer)</td>
+    <td style="text-align:right">${fmtInt(totals.winBotSoleSolo)}</td>
+    <td style="text-align:right">${fmtUsd(totals.winBotSoleSoloNet)}</td>
+    <td style="font-size:12px">Pure cron / internal-allocation pattern.</td></tr>
 <tr style="background:#dfd"><td><b>🟢 Human VQ won — mirror vendor</b></td>
     <td style="text-align:right">${fmtInt(totals.winMirrorSole)}</td>
     <td style="text-align:right">${fmtUsd(totals.winMirrorSoleNet)}</td>
-    <td style="font-size:12px">Human re-typed bot's vendor. Bot informed the choice.</td></tr>
+    <td style="font-size:12px">Human re-typed Claude's vendor and bought from there.</td></tr>
 <tr><td>🔵 Split — multiple winners co-purchased</td>
     <td style="text-align:right">${fmtInt(totals.winSplit)}</td>
     <td style="text-align:right">${fmtUsd(totals.winSplitNet)}</td>
-    <td style="font-size:12px">Multi-vendor buy across categories. Partial attribution.</td></tr>
+    <td style="font-size:12px">Multi-vendor buy across categories. See drill-in below.</td></tr>
 <tr><td>🟡 Human VQ won — alternate supply</td>
     <td style="text-align:right">${fmtInt(totals.winAlternateSole)}</td>
     <td style="text-align:right">${fmtUsd(totals.winAlternateSoleNet)}</td>
-    <td style="font-size:12px">Bot enriched but seller sourced from a vendor bot didn't quote (broker/APAC).</td></tr>
+    <td style="font-size:12px">Claude enriched but seller sourced from a vendor Claude didn't quote (broker/APAC).</td></tr>
 <tr style="color:#666"><td>⚪ No purchased VQ on sold line</td>
     <td style="text-align:right">${fmtInt(totals.winNoPurchase)}</td>
     <td style="text-align:right">${fmtUsd(totals.winNoPurchaseNet)}</td>
     <td style="font-size:12px">Sold without IsPurchased flag. Procurement-side process gap.</td></tr>
 </table>
+
+${totals.winBotSoleAdopted > 0 ? `
+<h4>🏆 Adopted bot wins — drill-in</h4>
+<p style="color:#666;font-size:12px">
+  Lines where Claude's VQ was ticked AND a human either wrote a competing VQ (mirror duplicate / stub / alternate) or took over the buyer assignment. The strongest adoption signal — human did work on the line and chose Claude's quote.
+</p>
+${flagTable(flagLists.botSoleAdopted, [
+  { label: 'RFQ',      value: r => r.rfq_value },
+  { label: 'Customer', value: r => r.customer || '—' },
+  { label: 'Type',     value: r => r.rfq_type || '—' },
+  { label: 'MPN',      value: r => r.mpn || '—' },
+  { label: 'Sold $',   value: r => fmtUsd(r.cq_sold_net), align: 'right', raw: true },
+  { label: 'Human signal', value: r => {
+      const parts = [];
+      if (Number(r.mirror_vendors) > 0) parts.push(`${r.mirror_vendors} mirror VQ`);
+      if (Number(r.alternate_vendors) > 0) parts.push(`${r.alternate_vendors} alt VQ`);
+      if (Number(r.stub_count) > 0) parts.push(`${r.stub_count} stub`);
+      if (r.purchased_buyer_human === true || r.purchased_buyer_human === 't') parts.push('buyer switched');
+      return parts.join(' · ') || '—';
+    }, raw: false },
+])}` : ''}
+
+${totals.winSplit > 0 ? `
+<h4>🔵 Split wins — drill-in (what Claude wrote vs what was actually purchased)</h4>
+<p style="color:#666;font-size:12px">
+  Lines where multiple categories co-purchased. The signal column shows the win composition (which categories were ticked).
+</p>
+${flagTable(flagLists.splitDetail, [
+  { label: 'RFQ',      value: r => r.rfq_value },
+  { label: 'Customer', value: r => r.customer || '—' },
+  { label: 'Type',     value: r => r.rfq_type || '—' },
+  { label: 'MPN',      value: r => r.mpn || '—' },
+  { label: 'Sold $',   value: r => fmtUsd(r.cq_sold_net), align: 'right', raw: true },
+  { label: 'Win composition', value: r => {
+      const parts = [];
+      if (Number(r.api_vq_purchased) > 0) parts.push('✅ Claude');
+      if (r.mirror_won === true || r.mirror_won === 't') parts.push('🟢 mirror');
+      if (r.alternate_won === true || r.alternate_won === 't') parts.push('🟡 alternate');
+      return parts.join(' + ');
+    }, raw: false },
+])}` : ''}
 
 <h4>Per-line state breakdown</h4>
 <table border="1" cellpadding="6" cellspacing="0" style="border-collapse:collapse">
@@ -652,21 +779,25 @@ function renderEmail({ totals, flagLists, byCustomer, byType, rfqRollup }, windo
     html += flagTable(flagLists.salesOnlyNoProc, salesOnlyCols);
   }
 
-  // RFQ-level procurement wins (where bot's VQ was actually used end-to-end)
+  // RFQ-level procurement wins (where Claude's VQ was actually used end-to-end)
   const wins = [...rfqRollup.values()]
     .filter(w => w.poLines > 0)
     .sort((a, b) => b.poNet - a.poNet);
-  const winsLam    = wins.filter(w => w.isLam);
-  const winsNonLam = wins.filter(w => !w.isLam);
+  const segLabel = s => s === 'lam' ? 'LAM (cron)' : s === 'stock' ? 'Stock RFQ' : 'Adoption';
+  const winsLam      = wins.filter(w => w.segment === 'lam');
+  const winsStock    = wins.filter(w => w.segment === 'stock');
+  const winsAdoption = wins.filter(w => w.segment === 'adoption');
   if (wins.length > 0) {
-    html += `<h4>RFQs where bot's VQ won — POs cut end-to-end (${fmtInt(wins.length)} RFQs)</h4>`;
+    html += `<h4>RFQs where Claude Harris's VQ won — POs cut end-to-end (${fmtInt(wins.length)} RFQs)</h4>`;
     html += `<p style="color:#666;font-size:12px">
-      Procurement-side direct attribution: bot wrote the VQ → buyer ticked IsPurchased → support cut a PO. ${fmtInt(winsLam.length)} LAM, ${fmtInt(winsNonLam.length)} non-LAM.
+      Procurement-side direct attribution: Claude wrote the VQ → buyer ticked IsPurchased → support cut a PO.
+      ${fmtInt(winsLam.length)} LAM, ${fmtInt(winsStock.length)} Stock, ${fmtInt(winsAdoption.length)} Adoption.
     </p>`;
     const winCols = [
-      { label: 'Source',   value: w => w.isLam ? 'LAM (cron)' : 'Non-LAM (adoption)' },
+      { label: 'Segment',  value: w => segLabel(w.segment) },
       { label: 'RFQ',      value: w => w.rfq_value },
       { label: 'Customer', value: w => w.customer },
+      { label: 'Type',     value: w => w.rfq_type },
       { label: 'Lines',    value: w => fmtInt(w.poLines), align: 'right', raw: true },
       { label: 'PO Net',   value: w => fmtUsd(w.poNet), align: 'right', raw: true },
       { label: 'Voided?',  value: w => w.poVoidedLines > 0 ? `${w.poVoidedLines} ⚠` : '', align: 'right', raw: true },
@@ -737,9 +868,12 @@ async function main() {
   log(
     `RFQs=${totals.rfqs.size} lines=${totals.lines} ` +
     `proc(LAM)=${totals.lam.poCount}/${totals.lam.poNet.toFixed(2)} ` +
-    `proc(nonLAM)=${totals.nonLam.poCount}/${totals.nonLam.poNet.toFixed(2)} ` +
+    `proc(Stock)=${totals.stock.poCount}/${totals.stock.poNet.toFixed(2)} ` +
+    `proc(Adoption)=${totals.adoption.poCount}/${totals.adoption.poNet.toFixed(2)} ` +
+    `buyer: self=${totals.purchasedBuyerSelfLines}/${totals.purchasedBuyerSelfNet.toFixed(2)} human=${totals.purchasedBuyerHumanLines}/${totals.purchasedBuyerHumanNet.toFixed(2)} ` +
     `cqSold=${totals.cqSold}/${totals.cqSoldNet.toFixed(2)} ` +
-    `wins: botSole=${totals.winBotSole}/${totals.winBotSoleNet.toFixed(2)} mirrorSole=${totals.winMirrorSole}/${totals.winMirrorSoleNet.toFixed(2)} altSole=${totals.winAlternateSole}/${totals.winAlternateSoleNet.toFixed(2)} split=${totals.winSplit}/${totals.winSplitNet.toFixed(2)} ` +
+    `wins: botSole=${totals.winBotSole}(adopted=${totals.winBotSoleAdopted}/${totals.winBotSoleAdoptedNet.toFixed(2)} solo=${totals.winBotSoleSolo}/${totals.winBotSoleSoloNet.toFixed(2)}) ` +
+    `mirrorSole=${totals.winMirrorSole}/${totals.winMirrorSoleNet.toFixed(2)} altSole=${totals.winAlternateSole}/${totals.winAlternateSoleNet.toFixed(2)} split=${totals.winSplit}/${totals.winSplitNet.toFixed(2)} ` +
     `flags: matched=${totals.matched} procStale=${totals.procOnlyStale} salesNoProc=${totals.salesOnlyNoProc} ` +
     `soldPoVoided=${totals.soldButPoVoided} poVoidedOnly=${totals.poVoidedOnly} ` +
     `directWin=${totals.directWinLines}`
@@ -748,10 +882,10 @@ async function main() {
   if (dryRun) {
     log('DRY RUN — skipping email');
   } else if (rows.length > 0) {
-    const notifier = createNotifier({ fromEmail: FROM_EMAIL, fromName: 'Enrichment ROI' });
+    const notifier = createNotifier({ fromEmail: FROM_EMAIL, fromName: 'Claude Harris Enrichment ROI' });
     const subject =
-      `Enrichment ROI — proc: ${fmtUsd(totals.lam.poNet)} LAM + ${fmtUsd(totals.nonLam.poNet)} non-LAM · ` +
-      `sales: ${fmtInt(totals.cqSold)} CQs sold ${fmtUsd(totals.cqSoldNet)}` +
+      `Claude Harris ROI — proc: ${fmtUsd(totals.lam.poNet)} LAM + ${fmtUsd(totals.stock.poNet)} Stock + ${fmtUsd(totals.adoption.poNet)} Adoption · ` +
+      `sales: ${fmtInt(totals.cqSold)} CQs sold ${fmtUsd(totals.cqSoldNet)} (${fmtUsd(totals.winBotSoleAdoptedNet)} 🏆 adopted)` +
       (totals.soldButPoVoided > 0 ? ` · ⚠️ ${totals.soldButPoVoided} PO-voided` : '');
     const html = renderEmail(agg, windowDays);
     try {
