@@ -32,6 +32,20 @@ const DOMAIN_SUFFIXES = ['electronics', 'electronic', 'elec', 'intl', 'internati
   'corp', 'inc', 'ltd', 'technology', 'tech', 'usa', 'uk', 'eu', 'semi', 'semiconductor',
   'global', 'trading', 'co', 'hk', 'cn'];
 
+// Generic role words that should never be used as a Tier-3 companyName match.
+// Brokers commonly set their email display-name to a role rather than a real
+// name (e.g., `From: saLes <sales@globalingg.com>`). Without this filter,
+// Tier 3 runs `bp.name ILIKE '%sales%'` and any BP with "Sales" in its name
+// (e.g. "Magnet Sales & Manufacturing") becomes a false positive. Discovered
+// 2026-05-06 after globalingg.com → Magnet Sales mismatch.
+const GENERIC_ROLE_NAMES = new Set([
+  'sales', 'info', 'rfq', 'rfqs', 'purchasing', 'purchase', 'procurement',
+  'quote', 'quotes', 'order', 'orders', 'support', 'admin', 'administrator',
+  'contact', 'noreply', 'no-reply', 'mailer', 'webmaster', 'office',
+  'enquiry', 'inquiries', 'inquiry', 'team', 'service', 'services',
+  'hello', 'hi', 'mail', 'email',
+]);
+
 /**
  * Execute a psql query and return raw result string.
  * Returns empty string on error.
@@ -273,6 +287,10 @@ function lookupByDomainHint(email, partnerType = 'any') {
  */
 function lookupByName(companyName, partnerType = 'any') {
   if (!companyName || companyName.length < 3) return null;
+  // Reject generic role words (sales, info, support, etc.) — these match too
+  // many real BPs as substrings and produce false positives.
+  const normalized = companyName.toLowerCase().trim().replace(/[^a-z]/g, '');
+  if (GENERIC_ROLE_NAMES.has(normalized)) return null;
   const cleanName = companyName.replace(/'/g, "''").trim();
 
   const sql = `
