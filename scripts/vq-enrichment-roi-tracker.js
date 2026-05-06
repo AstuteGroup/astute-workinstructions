@@ -342,12 +342,17 @@ function aggregate(rows) {
     winAlternateSoleNet: 0,
     winSplitNet: 0,
     winNoPurchaseNet: 0,
-    // Sub-classification of Claude Harris sole wins:
-    //   adopted = a human VQ exists on the line (mirror duplicate, stub, or alternate)
-    //             AND/OR a human took over the buyer assignment before ticking.
-    //             Strong adoption signal — human acknowledged Claude's quote.
-    //   solo    = no competing human VQ AND Claude is still the buyer.
-    //             Usually internal allocations or autonomous cron flows.
+    // Claude-sole wins by segment (split first by segment, only Adoption is
+    // subject to Adopted/Solo classification — LAM and Stock are handled by us
+    // and don't represent adoption progression).
+    winBotSoleByLam: 0,        // LAM-segment Claude-sole wins (cron, not adoption)
+    winBotSoleByLamNet: 0,
+    winBotSoleByStock: 0,      // Stock-segment Claude-sole wins (handled by us)
+    winBotSoleByStockNet: 0,
+    // Adoption-segment Claude-sole wins, sub-classified:
+    //   adopted = human wrote competing VQ OR (non-Stock) human took over buyer.
+    //             Strongest adoption signal.
+    //   solo    = no human signal at all (likely internal allocation or PPV one-off).
     winBotSoleAdopted: 0,
     winBotSoleSolo: 0,
     winBotSoleAdoptedNet: 0,
@@ -449,17 +454,28 @@ function aggregate(rows) {
       } else if (botWon) {
         totals.winBotSole++;
         totals.winBotSoleNet += cqSoldNetHere;
-        // Sub-classify: was a human involved (competing VQ or buyer-field switch)?
-        const humanCompeted   = Number(r.human_vq_count) > 0;
-        const humanTookBuyer  = r.purchased_buyer_human === true || r.purchased_buyer_human === 't';
-        if (humanCompeted || humanTookBuyer) {
-          totals.winBotSoleAdopted++;
-          totals.winBotSoleAdoptedNet += cqSoldNetHere;
-          flagLists.botSoleAdopted.push(r);
+        // Segment first — Adopted/Solo only applies to Adoption-segment wins.
+        // LAM and Stock segments are autonomous/handled-by-us, not part of
+        // adoption progression analysis.
+        if (isLam) {
+          totals.winBotSoleByLam++;
+          totals.winBotSoleByLamNet += cqSoldNetHere;
+        } else if (isStock) {
+          totals.winBotSoleByStock++;
+          totals.winBotSoleByStockNet += cqSoldNetHere;
         } else {
-          totals.winBotSoleSolo++;
-          totals.winBotSoleSoloNet += cqSoldNetHere;
-          flagLists.botSoleSolo.push(r);
+          // Adoption segment: classify Adopted vs Solo
+          const humanCompeted  = Number(r.human_vq_count) > 0;
+          const humanTookBuyer = r.purchased_buyer_human === true || r.purchased_buyer_human === 't';
+          if (humanCompeted || humanTookBuyer) {
+            totals.winBotSoleAdopted++;
+            totals.winBotSoleAdoptedNet += cqSoldNetHere;
+            flagLists.botSoleAdopted.push(r);
+          } else {
+            totals.winBotSoleSolo++;
+            totals.winBotSoleSoloNet += cqSoldNetHere;
+            flagLists.botSoleSolo.push(r);
+          }
         }
       } else if (mirrorWon) {
         totals.winMirrorSole++;
@@ -612,7 +628,7 @@ function renderEmail({ totals, flagLists, byCustomer, byType, rfqRollup }, windo
     <td style="text-align:right">${fmtInt(totals.adoption.poCount)} (${fmtInt(totals.adoption.poLines)} lines)</td>
     <td></td>
     <td style="text-align:right">${fmtUsd(totals.adoption.poNet)}</td></tr>
-<tr><td>&nbsp;&nbsp;&nbsp;↳ Buyer-field at tick time: <b>human took over</b></td>
+<tr><td>&nbsp;&nbsp;&nbsp;↳ Buyer-field at tick time: <b>human took over</b><br/><span style="font-size:11px;color:#888">(non-Stock only — buyer change on Stock is commission routing, not adoption)</span></td>
     <td style="text-align:right">${fmtInt(totals.purchasedBuyerHumanLines)} lines</td>
     <td style="text-align:right">${fmtPct(totals.purchasedBuyerHumanLines, totals.purchasedLines)}</td>
     <td style="text-align:right">${fmtUsd(totals.purchasedBuyerHumanNet)}</td></tr>
@@ -653,14 +669,22 @@ function renderEmail({ totals, flagLists, byCustomer, byType, rfqRollup }, windo
     <td style="text-align:right">${fmtInt(totals.winBotSole)}</td>
     <td style="text-align:right">${fmtUsd(totals.winBotSoleNet)}</td>
     <td style="font-size:12px">Claude Harris wrote the VQ that buyer ticked. Direct attribution.</td></tr>
-<tr style="background:#dfd"><td>&nbsp;&nbsp;&nbsp;↳ 🏆 <b>Adopted</b> (human wrote competing VQ or took over buyer field)</td>
+<tr style="background:#eef"><td>&nbsp;&nbsp;&nbsp;↳ 💼 <b>LAM segment</b> (autonomous cron — not adoption)</td>
+    <td style="text-align:right">${fmtInt(totals.winBotSoleByLam)}</td>
+    <td style="text-align:right">${fmtUsd(totals.winBotSoleByLamNet)}</td>
+    <td style="font-size:12px">Reported separately — LAM Kitting cron.</td></tr>
+<tr style="background:#eef"><td>&nbsp;&nbsp;&nbsp;↳ 📋 <b>Stock RFQ segment</b> (handled by us — not adoption)</td>
+    <td style="text-align:right">${fmtInt(totals.winBotSoleByStock)}</td>
+    <td style="text-align:right">${fmtUsd(totals.winBotSoleByStockNet)}</td>
+    <td style="font-size:12px">Reported separately — broker-to-broker Stock RFQ flow.</td></tr>
+<tr style="background:#dfd"><td>&nbsp;&nbsp;&nbsp;↳ 🏆 <b>Adopted</b> (Adoption segment — human wrote competing VQ or took over buyer)</td>
     <td style="text-align:right">${fmtInt(totals.winBotSoleAdopted)}</td>
     <td style="text-align:right">${fmtUsd(totals.winBotSoleAdoptedNet)}</td>
-    <td style="font-size:12px">Strongest adoption: human acknowledged Claude's quote and ticked it.</td></tr>
-<tr style="background:#dfd"><td>&nbsp;&nbsp;&nbsp;↳ 📦 <b>Solo</b> (no competing human VQ, Claude is still buyer)</td>
+    <td style="font-size:12px">Adoption signal: human acknowledged Claude's quote and ticked it.</td></tr>
+<tr style="background:#dfd"><td>&nbsp;&nbsp;&nbsp;↳ 📦 <b>Solo</b> (Adoption segment — no human signal)</td>
     <td style="text-align:right">${fmtInt(totals.winBotSoleSolo)}</td>
     <td style="text-align:right">${fmtUsd(totals.winBotSoleSoloNet)}</td>
-    <td style="font-size:12px">Pure cron / internal-allocation pattern.</td></tr>
+    <td style="font-size:12px">Adoption-bucket but no human engagement (likely internal allocation / PPV one-off).</td></tr>
 <tr style="background:#dfd"><td><b>🟢 Human VQ won — mirror vendor</b></td>
     <td style="text-align:right">${fmtInt(totals.winMirrorSole)}</td>
     <td style="text-align:right">${fmtUsd(totals.winMirrorSoleNet)}</td>
@@ -872,7 +896,7 @@ async function main() {
     `proc(Adoption)=${totals.adoption.poCount}/${totals.adoption.poNet.toFixed(2)} ` +
     `buyer: self=${totals.purchasedBuyerSelfLines}/${totals.purchasedBuyerSelfNet.toFixed(2)} human=${totals.purchasedBuyerHumanLines}/${totals.purchasedBuyerHumanNet.toFixed(2)} ` +
     `cqSold=${totals.cqSold}/${totals.cqSoldNet.toFixed(2)} ` +
-    `wins: botSole=${totals.winBotSole}(adopted=${totals.winBotSoleAdopted}/${totals.winBotSoleAdoptedNet.toFixed(2)} solo=${totals.winBotSoleSolo}/${totals.winBotSoleSoloNet.toFixed(2)}) ` +
+    `wins: botSole=${totals.winBotSole}(LAM=${totals.winBotSoleByLam}/${totals.winBotSoleByLamNet.toFixed(2)} Stock=${totals.winBotSoleByStock}/${totals.winBotSoleByStockNet.toFixed(2)} adopted=${totals.winBotSoleAdopted}/${totals.winBotSoleAdoptedNet.toFixed(2)} solo=${totals.winBotSoleSolo}/${totals.winBotSoleSoloNet.toFixed(2)}) ` +
     `mirrorSole=${totals.winMirrorSole}/${totals.winMirrorSoleNet.toFixed(2)} altSole=${totals.winAlternateSole}/${totals.winAlternateSoleNet.toFixed(2)} split=${totals.winSplit}/${totals.winSplitNet.toFixed(2)} ` +
     `flags: matched=${totals.matched} procStale=${totals.procOnlyStale} salesNoProc=${totals.salesOnlyNoProc} ` +
     `soldPoVoided=${totals.soldButPoVoided} poVoidedOnly=${totals.poVoidedOnly} ` +
