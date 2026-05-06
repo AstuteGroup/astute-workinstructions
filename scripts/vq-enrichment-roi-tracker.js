@@ -177,6 +177,7 @@ async function queryEnrichedLines(windowDays) {
     -- Human VQ supply-route classification per line:
     --   mirror   = human re-quoted same vendor as bot
     --   alternate= human used vendor bot didn't quote (different supply chain)
+    --   *_won    = same as above but limited to VQs ticked IsPurchased (the win signal)
     human_vqs_by_line AS (
       SELECT vq.chuboe_rfq_line_id,
              COUNT(*) AS human_vq_count,
@@ -189,7 +190,17 @@ async function queryEnrichedLines(windowDays) {
                SELECT 1 FROM bot_vendors_by_line bv
                WHERE bv.chuboe_rfq_line_id = vq.chuboe_rfq_line_id
                  AND bv.c_bpartner_id = vq.c_bpartner_id
-             )) AS alternate_vendors
+             )) AS alternate_vendors,
+             BOOL_OR(vq.ispurchased = 'Y' AND EXISTS (
+               SELECT 1 FROM bot_vendors_by_line bv
+               WHERE bv.chuboe_rfq_line_id = vq.chuboe_rfq_line_id
+                 AND bv.c_bpartner_id = vq.c_bpartner_id
+             )) AS mirror_won,
+             BOOL_OR(vq.ispurchased = 'Y' AND NOT EXISTS (
+               SELECT 1 FROM bot_vendors_by_line bv
+               WHERE bv.chuboe_rfq_line_id = vq.chuboe_rfq_line_id
+                 AND bv.c_bpartner_id = vq.c_bpartner_id
+             )) AS alternate_won
       FROM adempiere.chuboe_vq_line vq
       WHERE vq.isactive = 'Y'
         AND vq.createdby <> $1
@@ -227,7 +238,9 @@ async function queryEnrichedLines(windowDays) {
            COALESCE(dw.direct_so_net, 0)   AS direct_so_net,
            COALESCE(hv.human_vq_count, 0)    AS human_vq_count,
            COALESCE(hv.mirror_vendors, 0)    AS mirror_vendors,
-           COALESCE(hv.alternate_vendors, 0) AS alternate_vendors
+           COALESCE(hv.alternate_vendors, 0) AS alternate_vendors,
+           COALESCE(hv.mirror_won, false)    AS mirror_won,
+           COALESCE(hv.alternate_won, false) AS alternate_won
     FROM api_lines al
     JOIN adempiere.chuboe_rfq_line rl ON rl.chuboe_rfq_line_id = al.chuboe_rfq_line_id
     JOIN adempiere.chuboe_rfq r ON r.chuboe_rfq_id = rl.chuboe_rfq_id
@@ -298,15 +311,17 @@ function aggregate(rows) {
     // LAM vs non-LAM split (procurement & sales)
     lam: blankBucket(),
     nonLam: blankBucket(),
-    // Sales-side supply-route classification (sold lines only)
-    routeBotOnly: 0,        // bot enrichment was the only VQ population
-    routeMirrorOnly: 0,     // human re-quoted same vendor as bot
-    routeAlternateOnly: 0,  // human used vendor bot didn't quote
-    routeBoth: 0,           // both mirror and alternate present
-    routeBotOnlyNet: 0,
-    routeMirrorOnlyNet: 0,
-    routeAlternateOnlyNet: 0,
-    routeBothNet: 0,
+    // Sales-side win attribution (sold lines only — based on which VQ was IsPurchased)
+    winBotSole: 0,        // bot VQ was the only purchase
+    winMirrorSole: 0,     // human won, on a vendor bot also quoted
+    winAlternateSole: 0,  // human won, on a vendor bot didn't quote
+    winSplit: 0,          // multiple categories co-purchased
+    winNoPurchase: 0,     // sold but no IsPurchased VQ on the line
+    winBotSoleNet: 0,
+    winMirrorSoleNet: 0,
+    winAlternateSoleNet: 0,
+    winSplitNet: 0,
+    winNoPurchaseNet: 0,
     // States
     matched: 0,
     procOnlyRecent: 0,
@@ -377,23 +392,28 @@ function aggregate(rows) {
       totals.directWinNet += Number(r.direct_so_net) || 0;
     }
 
-    // Supply-route classification on sold lines only
+    // Sales-side win attribution: classify sold lines by WHICH VQ was ticked
+    // IsPurchased (the actual procurement winner), not which VQs existed.
     if (cqSoldHere) {
-      const humans   = Number(r.human_vq_count) || 0;
-      const mirror   = Number(r.mirror_vendors) || 0;
-      const alt      = Number(r.alternate_vendors) || 0;
-      if (humans === 0) {
-        totals.routeBotOnly++;
-        totals.routeBotOnlyNet += cqSoldNetHere;
-      } else if (mirror > 0 && alt === 0) {
-        totals.routeMirrorOnly++;
-        totals.routeMirrorOnlyNet += cqSoldNetHere;
-      } else if (alt > 0 && mirror === 0) {
-        totals.routeAlternateOnly++;
-        totals.routeAlternateOnlyNet += cqSoldNetHere;
-      } else if (mirror > 0 && alt > 0) {
-        totals.routeBoth++;
-        totals.routeBothNet += cqSoldNetHere;
+      const botWon    = purchasedHere;
+      const mirrorWon = r.mirror_won === true || r.mirror_won === 't';
+      const altWon    = r.alternate_won === true || r.alternate_won === 't';
+      const winSignals = [botWon, mirrorWon, altWon].filter(Boolean).length;
+      if (winSignals === 0) {
+        totals.winNoPurchase++;
+        totals.winNoPurchaseNet += cqSoldNetHere;
+      } else if (winSignals > 1) {
+        totals.winSplit++;
+        totals.winSplitNet += cqSoldNetHere;
+      } else if (botWon) {
+        totals.winBotSole++;
+        totals.winBotSoleNet += cqSoldNetHere;
+      } else if (mirrorWon) {
+        totals.winMirrorSole++;
+        totals.winMirrorSoleNet += cqSoldNetHere;
+      } else if (altWon) {
+        totals.winAlternateSole++;
+        totals.winAlternateSoleNet += cqSoldNetHere;
       }
     }
 
@@ -545,28 +565,32 @@ function renderEmail({ totals, flagLists, byCustomer, byType, rfqRollup }, windo
     <td style="text-align:right">${fmtUsd(totals.directWinNet)}</td></tr>
 </table>
 
-<h4>Sold lines — supply-route attribution (where did the supply actually come from?)</h4>
+<h4>Sold lines — win attribution (which VQ was actually purchased?)</h4>
 <p style="color:#666;font-size:12px">
-  Of the ${fmtInt(soldLines)} bot-enriched lines that resulted in a sold CQ, classification by VQ population on the line:
+  Of the ${fmtInt(soldLines)} bot-enriched lines that resulted in a sold CQ, classification by which VQ on the line was ticked <code>IsPurchased</code> (the actual procurement winner):
 </p>
 <table border="1" cellpadding="6" cellspacing="0" style="border-collapse:collapse">
-<tr style="background:#f0f0f0"><th>Supply route</th><th>Lines</th><th>Revenue</th><th>Bot's role</th></tr>
-<tr style="background:#dfd"><td><b>Bot enrichment ONLY</b> (no other VQ on line)</td>
-    <td style="text-align:right">${fmtInt(totals.routeBotOnly)}</td>
-    <td style="text-align:right">${fmtUsd(totals.routeBotOnlyNet)}</td>
-    <td style="font-size:12px">Seller had no other choice — strongest attribution</td></tr>
-<tr style="background:#dfd"><td><b>Mirror only</b> (human re-quoted bot's vendor)</td>
-    <td style="text-align:right">${fmtInt(totals.routeMirrorOnly)}</td>
-    <td style="text-align:right">${fmtUsd(totals.routeMirrorOnlyNet)}</td>
-    <td style="font-size:12px">Bot found vendor first, human re-typed — strong attribution</td></tr>
-<tr><td>Both (mirror + alternate present)</td>
-    <td style="text-align:right">${fmtInt(totals.routeBoth)}</td>
-    <td style="text-align:right">${fmtUsd(totals.routeBothNet)}</td>
-    <td style="font-size:12px">Bot's vendor was an option; can't tell which won</td></tr>
-<tr><td>Alternate route only (different supply chain)</td>
-    <td style="text-align:right">${fmtInt(totals.routeAlternateOnly)}</td>
-    <td style="text-align:right">${fmtUsd(totals.routeAlternateOnlyNet)}</td>
-    <td style="font-size:12px">Bot enriched but seller sourced elsewhere (broker/APAC)</td></tr>
+<tr style="background:#f0f0f0"><th>Win attribution</th><th>Lines</th><th>Revenue</th><th>Note</th></tr>
+<tr style="background:#dfd"><td><b>✅ Bot VQ won — sole purchase</b></td>
+    <td style="text-align:right">${fmtInt(totals.winBotSole)}</td>
+    <td style="text-align:right">${fmtUsd(totals.winBotSoleNet)}</td>
+    <td style="font-size:12px">Bot wrote the VQ that buyer ticked. Direct attribution.</td></tr>
+<tr style="background:#dfd"><td><b>🟢 Human VQ won — mirror vendor</b></td>
+    <td style="text-align:right">${fmtInt(totals.winMirrorSole)}</td>
+    <td style="text-align:right">${fmtUsd(totals.winMirrorSoleNet)}</td>
+    <td style="font-size:12px">Human re-typed bot's vendor. Bot informed the choice.</td></tr>
+<tr><td>🔵 Split — multiple winners co-purchased</td>
+    <td style="text-align:right">${fmtInt(totals.winSplit)}</td>
+    <td style="text-align:right">${fmtUsd(totals.winSplitNet)}</td>
+    <td style="font-size:12px">Multi-vendor buy across categories. Partial attribution.</td></tr>
+<tr><td>🟡 Human VQ won — alternate supply</td>
+    <td style="text-align:right">${fmtInt(totals.winAlternateSole)}</td>
+    <td style="text-align:right">${fmtUsd(totals.winAlternateSoleNet)}</td>
+    <td style="font-size:12px">Bot enriched but seller sourced from a vendor bot didn't quote (broker/APAC).</td></tr>
+<tr style="color:#666"><td>⚪ No purchased VQ on sold line</td>
+    <td style="text-align:right">${fmtInt(totals.winNoPurchase)}</td>
+    <td style="text-align:right">${fmtUsd(totals.winNoPurchaseNet)}</td>
+    <td style="font-size:12px">Sold without IsPurchased flag. Procurement-side process gap.</td></tr>
 </table>
 
 <h4>Per-line state breakdown</h4>
@@ -715,7 +739,7 @@ async function main() {
     `proc(LAM)=${totals.lam.poCount}/${totals.lam.poNet.toFixed(2)} ` +
     `proc(nonLAM)=${totals.nonLam.poCount}/${totals.nonLam.poNet.toFixed(2)} ` +
     `cqSold=${totals.cqSold}/${totals.cqSoldNet.toFixed(2)} ` +
-    `routes: botOnly=${totals.routeBotOnly} mirror=${totals.routeMirrorOnly} both=${totals.routeBoth} alt=${totals.routeAlternateOnly} ` +
+    `wins: botSole=${totals.winBotSole}/${totals.winBotSoleNet.toFixed(2)} mirrorSole=${totals.winMirrorSole}/${totals.winMirrorSoleNet.toFixed(2)} altSole=${totals.winAlternateSole}/${totals.winAlternateSoleNet.toFixed(2)} split=${totals.winSplit}/${totals.winSplitNet.toFixed(2)} ` +
     `flags: matched=${totals.matched} procStale=${totals.procOnlyStale} salesNoProc=${totals.salesOnlyNoProc} ` +
     `soldPoVoided=${totals.soldButPoVoided} poVoidedOnly=${totals.poVoidedOnly} ` +
     `directWin=${totals.directWinLines}`
