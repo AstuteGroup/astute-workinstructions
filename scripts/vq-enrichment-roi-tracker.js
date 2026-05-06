@@ -148,7 +148,8 @@ async function queryEnrichedLines(windowDays) {
       SELECT chuboe_rfq_line_id,
              COUNT(*) AS cq_count,
              SUM(CASE WHEN issold = 'Y' THEN 1 ELSE 0 END) AS cq_sold,
-             SUM(CASE WHEN issold = 'Y' THEN COALESCE(priceentered,0) * COALESCE(qty,0) ELSE 0 END) AS cq_sold_net
+             SUM(CASE WHEN issold = 'Y' THEN COALESCE(priceentered,0) * COALESCE(qty,0) ELSE 0 END) AS cq_sold_net,
+             MIN(created) AS first_cq_created
       FROM adempiere.chuboe_cq_line
       WHERE isactive = 'Y'
         AND chuboe_rfq_line_id IN (SELECT chuboe_rfq_line_id FROM api_lines)
@@ -235,7 +236,8 @@ async function queryEnrichedLines(windowDays) {
                  SELECT 1 FROM bot_vendors_by_line bv
                  WHERE bv.chuboe_rfq_line_id = vq.chuboe_rfq_line_id
                    AND bv.c_bpartner_id = vq.c_bpartner_id
-               )) AS alternate_won_franchise
+               )) AS alternate_won_franchise,
+             MIN(vq.created) AS first_human_vq_created
       FROM adempiere.chuboe_vq_line vq
       WHERE vq.isactive = 'Y'
         AND vq.createdby <> $1
@@ -269,6 +271,7 @@ async function queryEnrichedLines(windowDays) {
            COALESCE(cq.cq_count, 0)        AS cq_count,
            COALESCE(cq.cq_sold, 0)         AS cq_sold,
            COALESCE(cq.cq_sold_net, 0)     AS cq_sold_net,
+           cq.first_cq_created             AS first_cq_created,
            COALESCE(sc.so_lines, 0)        AS so_lines,
            COALESCE(sc.so_net, 0)          AS so_net,
            COALESCE(dw.direct_so_lines, 0) AS direct_so_lines,
@@ -279,7 +282,8 @@ async function queryEnrichedLines(windowDays) {
            COALESCE(hv.alternate_vendors, 0) AS alternate_vendors,
            COALESCE(hv.mirror_won, false)    AS mirror_won,
            COALESCE(hv.alternate_won, false) AS alternate_won,
-           COALESCE(hv.alternate_won_franchise, false) AS alternate_won_franchise
+           COALESCE(hv.alternate_won_franchise, false) AS alternate_won_franchise,
+           hv.first_human_vq_created           AS first_human_vq_created
     FROM api_lines al
     JOIN adempiere.chuboe_rfq_line rl ON rl.chuboe_rfq_line_id = al.chuboe_rfq_line_id
     JOIN adempiere.chuboe_rfq r ON r.chuboe_rfq_id = rl.chuboe_rfq_id
@@ -418,6 +422,7 @@ function aggregate(rows) {
     botSoleStock: [],     // Claude won on a Stock RFQ — broker-to-broker, separate from adoption
     splitDetail: [],      // Sold lines with multiple winners — show what was bought
     missedFranchise: [],  // Lines where buyer found a franchise Claude didn't quote
+    mirrorActivitySold: [], // Sold lines where humans wrote a mirror VQ (any state)
   };
 
   // Per-RFQ rollup: which RFQs had POs cut from bot's VQs (procurement wins)
@@ -549,6 +554,7 @@ function aggregate(rows) {
       if (cqSoldHere) {
         totals.mirrorActivitySoldLines++;
         totals.mirrorActivitySoldNet += cqSoldNetHere;
+        flagLists.mirrorActivitySold.push(r);
       }
     }
 
@@ -627,6 +633,61 @@ function esc(s) {
 function fmtDate(d) {
   if (!d) return '—';
   return new Date(d).toISOString().slice(0, 10);
+}
+function fmtTimestamp(d) {
+  if (!d) return '—';
+  return new Date(d).toISOString().slice(0, 16).replace('T', ' ');
+}
+// "+10m", "+3h", "+2d 4h" — relative delta from base. Returns '—' on missing data.
+function fmtDelta(base, target) {
+  if (!base || !target) return '—';
+  const ms = new Date(target).getTime() - new Date(base).getTime();
+  if (ms < 0) return `−${fmtDelta(target, base).slice(1)}`;
+  const mins = Math.round(ms / 60000);
+  if (mins < 60)        return `+${mins}m`;
+  if (mins < 60 * 24)   return `+${Math.floor(mins/60)}h ${mins%60}m`.replace(' 0m', '');
+  const days  = Math.floor(mins / 1440);
+  const remH  = Math.floor((mins % 1440) / 60);
+  return `+${days}d ${remH}h`.replace(' 0h', '');
+}
+
+// Inference text for missed-franchise / mirror-sold lines — heuristic guess
+// at why Claude didn't win or didn't quote, based on creation timing.
+function diagnoseMissedOrMirror(r) {
+  const rfq    = r.rfq_created;
+  const botVq  = r.first_vq_created;
+  const humVq  = r.first_human_vq_created;
+  const cq     = r.first_cq_created;
+  const notes  = [];
+
+  // RFQ → first CQ delta (transactional vs sourcing)
+  if (cq && rfq) {
+    const dMin = (new Date(cq).getTime() - new Date(rfq).getTime()) / 60000;
+    if (dMin < 30) notes.push('🏃 Transactional RFQ (CQ < 30 min after RFQ — created to process an order, no sourcing window)');
+    else if (dMin < 60 * 4) notes.push('⏱ Short window (CQ within 4h of RFQ)');
+  }
+
+  // Did Claude even run on this line?
+  if (!botVq) {
+    notes.push('⚠️ Claude wrote NO VQ on this line — enricher skipped or timed out');
+  } else if (rfq && botVq) {
+    const dMin = (new Date(botVq).getTime() - new Date(rfq).getTime()) / 60000;
+    if (dMin > 60 * 6) notes.push(`Claude enriched ${Math.floor(dMin/60)}h after RFQ — slow enrichment cycle`);
+  }
+
+  // Buyer-first signal
+  if (humVq && botVq && new Date(humVq) < new Date(botVq)) {
+    notes.push('Buyer wrote VQ before Claude enriched — buyer had the answer');
+  }
+
+  // For missed franchise specifically — Claude's enrichment ran but the
+  // winning vendor was not in the bot's VQ population. Likely API search miss.
+  // (Inferred when bot VQs exist on the line but didn't include the winning vendor.)
+  if (botVq && Number(r.api_vq_count) > 0) {
+    notes.push(`Claude quoted ${r.api_vq_count} vendor(s) on this line but missed the winning one — likely DigiKey/Mouser API search miss`);
+  }
+
+  return notes.join(' · ') || '—';
 }
 
 function flagTable(rows, columns) {
@@ -783,6 +844,19 @@ function renderEmail({ totals, flagLists, byCustomer, byType, rfqRollup }, windo
     <td style="text-align:right">${fmtUsd(totals.mirrorActivitySoldNet)} sold revenue</td></tr>
 </table>
 
+${totals.mirrorActivitySoldLines > 0 ? `
+<p style="margin-top:14px;color:#666;font-size:12px">Sold lines where humans wrote a mirror VQ — drill-in with timestamps:</p>
+${flagTable(flagLists.mirrorActivitySold, [
+  { label: 'RFQ',          value: r => r.rfq_value },
+  { label: 'Customer',     value: r => r.customer || '—' },
+  { label: 'MPN',          value: r => r.mpn || '—' },
+  { label: 'Sold $',       value: r => fmtUsd(r.cq_sold_net), align: 'right', raw: true },
+  { label: 'RFQ created',  value: r => fmtTimestamp(r.rfq_created) },
+  { label: 'Claude VQ',    value: r => fmtDelta(r.rfq_created, r.first_vq_created) },
+  { label: 'First CQ',     value: r => fmtDelta(r.rfq_created, r.first_cq_created) },
+  { label: 'Inferred reason', value: r => diagnoseMissedOrMirror(r) },
+])}` : ''}
+
 ${totals.missedFranchiseLines > 0 ? `
 <h4 style="background:#ffe6e6;padding:8px;border-left:4px solid #c0392b">⚠️ Missed franchise opportunities — Claude API coverage gap</h4>
 <p style="color:#666;font-size:12px">
@@ -790,13 +864,18 @@ ${totals.missedFranchiseLines > 0 ? `
   Mouser, Newark, Arrow, etc.) but Claude's enrichment didn't quote that
   vendor on the line. Buyer found the franchise Claude missed.
   <b>Bot coverage gap, not a broker loss</b> — these are actionable.
+  Timestamps and inferred reason help distinguish API misses from
+  transactional RFQs that simply didn't give Claude a window.
 </p>
 ${flagTable(flagLists.missedFranchise, [
-  { label: 'RFQ',      value: r => r.rfq_value },
-  { label: 'Customer', value: r => r.customer || '—' },
-  { label: 'Type',     value: r => r.rfq_type || '—' },
-  { label: 'MPN',      value: r => r.mpn || '—' },
-  { label: 'Sold $',   value: r => fmtUsd(r.cq_sold_net), align: 'right', raw: true },
+  { label: 'RFQ',          value: r => r.rfq_value },
+  { label: 'Customer',     value: r => r.customer || '—' },
+  { label: 'MPN',          value: r => r.mpn || '—' },
+  { label: 'Sold $',       value: r => fmtUsd(r.cq_sold_net), align: 'right', raw: true },
+  { label: 'RFQ created',  value: r => fmtTimestamp(r.rfq_created) },
+  { label: 'Claude VQ',    value: r => r.first_vq_created ? fmtDelta(r.rfq_created, r.first_vq_created) : '(none)' },
+  { label: 'First CQ',     value: r => fmtDelta(r.rfq_created, r.first_cq_created) },
+  { label: 'Inferred reason', value: r => diagnoseMissedOrMirror(r) },
 ])}
 <p style="font-size:12px;color:#888">Total at-risk revenue from missed franchises: <b>${fmtUsd(totals.missedFranchiseNet)}</b></p>
 ` : ''}
@@ -807,10 +886,13 @@ ${totals.winBotSoleByStock > 0 ? `
   Stock RFQ lines where Claude wrote the VQ AND ticked IsPurchased AND the line sold. Operationally these are handled by us (broker-to-broker), but they're real wins of Claude's data flowing all the way through.
 </p>
 ${flagTable(flagLists.botSoleStock, [
-  { label: 'RFQ',      value: r => r.rfq_value },
-  { label: 'Customer', value: r => r.customer || '—' },
-  { label: 'MPN',      value: r => r.mpn || '—' },
-  { label: 'Sold $',   value: r => fmtUsd(r.cq_sold_net), align: 'right', raw: true },
+  { label: 'RFQ',          value: r => r.rfq_value },
+  { label: 'Customer',     value: r => r.customer || '—' },
+  { label: 'MPN',          value: r => r.mpn || '—' },
+  { label: 'Sold $',       value: r => fmtUsd(r.cq_sold_net), align: 'right', raw: true },
+  { label: 'RFQ created',  value: r => fmtTimestamp(r.rfq_created) },
+  { label: 'Claude VQ',    value: r => fmtDelta(r.rfq_created, r.first_vq_created) },
+  { label: 'First CQ',     value: r => fmtDelta(r.rfq_created, r.first_cq_created) },
 ])}
 ` : ''}
 
@@ -820,11 +902,14 @@ ${totals.winBotSoleAdopted > 0 ? `
   Adoption-segment lines where Claude's VQ was ticked AND a human either wrote a competing VQ (mirror duplicate / stub / alternate) or took over the buyer assignment. Strongest adoption signal — human did work on the line and chose Claude's quote.
 </p>
 ${flagTable(flagLists.botSoleAdopted, [
-  { label: 'RFQ',      value: r => r.rfq_value },
-  { label: 'Customer', value: r => r.customer || '—' },
-  { label: 'Type',     value: r => r.rfq_type || '—' },
-  { label: 'MPN',      value: r => r.mpn || '—' },
-  { label: 'Sold $',   value: r => fmtUsd(r.cq_sold_net), align: 'right', raw: true },
+  { label: 'RFQ',          value: r => r.rfq_value },
+  { label: 'Customer',     value: r => r.customer || '—' },
+  { label: 'Type',         value: r => r.rfq_type || '—' },
+  { label: 'MPN',          value: r => r.mpn || '—' },
+  { label: 'Sold $',       value: r => fmtUsd(r.cq_sold_net), align: 'right', raw: true },
+  { label: 'RFQ created',  value: r => fmtTimestamp(r.rfq_created) },
+  { label: 'Claude VQ',    value: r => fmtDelta(r.rfq_created, r.first_vq_created) },
+  { label: 'First CQ',     value: r => fmtDelta(r.rfq_created, r.first_cq_created) },
   { label: 'Human signal', value: r => {
       const parts = [];
       if (Number(r.mirror_vendors) > 0) parts.push(`${r.mirror_vendors} mirror VQ`);
