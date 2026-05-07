@@ -231,7 +231,7 @@ See `MEMORY.md` for full list. Key terms:
 
 Processes the weekly Infor AST Item Lots Report into:
 1. **OT inventory offers** — written directly to iDempiere via REST API (`shared/offer-writeback.js`), one `chuboe_offer` per warehouse group, prior week deactivated first. 11 groups in `WAREHOUSE_WRITEBACK`.
-2. **Netcomponents portal CSV** — consolidated, emailed as "Netcomponents Upload"
+2. **NetComponents portal CSVs** — split by account, emailed separately: non-authorized #1167233 (all OT groups except Franchise_Stock + carryovers) and franchised #1126121 (Franchise_Stock only). Both files use 5-column friendly headers (`MPN, Description, Manufacturer, Qty, D/C`).
 3. **Per-warehouse Chuboe CSVs** on disk (`Inventory YYYY-MM-DD/`) — audit trail / manual replay path
 
 **Quick commands** (run from the workflow folder):

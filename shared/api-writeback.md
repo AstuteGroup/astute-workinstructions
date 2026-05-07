@@ -242,6 +242,32 @@ await apiPost('chuboe_rfq_line_mpn', { ...mpnPayload, chuboe_rfq_line_id: lineId
 | Delete | DELETE | `/models/{table}/{id}` | Permanent delete |
 | Batch | POST | `/batch` | Multiple independent operations |
 
+### Print / Document Retrieval
+
+| Operation | Method | Endpoint | Notes |
+|-----------|--------|----------|-------|
+| Print record | GET | `/models/{table}/{id}/print` | Returns JSON with `exportFile` (base64-encoded PDF) |
+| List attachments | GET | `/models/{table}/{id}/attachments` | Returns `{"attachments":[...]}` with file metadata |
+| Download all (zip) | GET | `/models/{table}/{id}/attachments/zip` | Returns zip of all attachments |
+| Download one | GET | `/models/{table}/{id}/attachments/{filename}` | Returns raw file content |
+
+**Print endpoint** — works for any printable record (POs, SOs, invoices). Returns JSON:
+```json
+{
+  "AD_PInstance_ID": 2536471,
+  "process": "purchaseorder",
+  "summary": "Process completed successfully",
+  "isError": false,
+  "exportFile": "JVBERi0xLjUK..."   // base64-encoded PDF
+}
+```
+
+Decode with: `Buffer.from(data.exportFile, 'base64')` → write to `.pdf` file.
+
+**Attachments (Document Explorer)** — requires role read access to `AD_Attachment` table. Without it, the endpoint returns `{"attachments":[]}` even when files exist (no error, just empty). As of 2026-04-10, Tsunami User role (1000004) does NOT have this access — request pending with iDempiere admin.
+
+**Tested 2026-04-10:** Print endpoint confirmed working on `C_Order`. Retrieved 4 PO PDFs (PO809585–PO809593) for LAM EPG broker orders. Attachments endpoint returns empty due to role permissions.
+
 ### Required Headers
 
 ```

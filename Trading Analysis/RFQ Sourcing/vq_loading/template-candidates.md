@@ -40,7 +40,7 @@ Pull 3-5 sample emails from vendor and check:
 
 ## Cumulative Vendor Counts
 
-**Last updated:** 2026-03-13
+**Last updated:** 2026-04-27
 
 | Search Key | Vendor | Cumulative | Format | Priority | Sessions |
 |------------|--------|------------|--------|----------|----------|
@@ -63,6 +63,39 @@ Pull 3-5 sample emails from vendor and check:
 | 1002495 | Cyclops/Lantek | 1 | STRUCTURED | - | Mar 13 (1 PDF) |
 | 1003723 | 4Source | 1 | STRUCTURED | - | Mar 13 (1 PDF) |
 | 1006201 | IBH Elektrotechnik | 1 | STRUCTURED | - | Mar 13 (1 PDF) |
+
+### APAC bulk-summary brokers (not per-email — embedded in Type 2 summaries)
+
+These brokers don't send direct emails to vq@ — they're quoted via Elaine Liang's bulk-summary format ("crazy format" prose). A per-broker template would not apply; the right template target is the **Elaine Liang APAC bulk-summary parser** (see Type 2 Format below).
+
+| Search Key | Vendor | RFQ 1132932 (4/27) | Cumulative |
+|------------|--------|---|---|
+| 1007571 | Howeher Co. | 20 | 20 |
+| 1003648 | PGC-IC Ltd | 14 | 14 |
+| 1002391 | Fixchips Global | 12 | 12 |
+| 1006037 | Corerine Technology | 10 | 10 |
+| 1005363 | MTO Technology | 4 | 4 |
+| 1008484 | CMARCH Electronics (HK) | 4 | 4 |
+| 1011368 | Valley Electronics (HK) | 2 | 2 |
+| 1002407 | Macroquest | 2 | 2 |
+| 1004485 | Topray Technology (HK) | 2 | 2 |
+| 1002301 | Archermind Technology (HK) | 2 | 2 |
+| 1003688 | Wafer Electronic Technology | 1 | 1 |
+| 1003643 | Onway (HK) Technology | 1 | 1 |
+| 1003803 | Hong Kong Ruifan | 1 | 1 |
+| 1007351 | SSF Group (Asia) | 1 | 1 |
+| 1003610 | Hang Lung Tenda Technology | 1 | 1 |
+| 1002629 | Saviliter Technology | 1 | 1 |
+
+### Type 2 Format candidate: Elaine Liang APAC bulk-summary
+
+Format: 4-line group header (`RFQ / MPN / MFG / QTY`) followed by slash-delimited broker entries `<broker> <vendorMPN> <MFR> <qty> <DC>+ $<price> <leadTime>, <COO/notes>`. Continuation chunks inherit the prior broker. Heavy on COO codes (CN/TW/MY/TH), DC+, $price patterns.
+
+If Elaine sends ≥3 of these, build a parser at `~/workspace/vq-parser/templates/elaine-apac-bulk.js` with:
+- Match by sender chain (elaine.liang@astutegroup.com forwarded into the inbox)
+- Group splitter by `\d{7,}\n[A-Z0-9].+\n[A-Za-z].+\n[\d,]+\n`
+- Quote splitter by `/` with broker-name leading-token detection (16 known brokers above, fall through to "unknown")
+- Cumulative count (sessions): RFQ 1132932 (4/27, 78 quotes)
 
 ## PDF Extraction Notes (Mar 13)
 

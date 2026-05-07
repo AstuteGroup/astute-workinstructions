@@ -2,7 +2,7 @@
 
 **Purpose:** Get market offers persisted in OT with full fidelity. Loading writes; it does NOT analyze, enrich, or score.
 
-**By default:** Loading triggers the [Market Offer Analysis](../Market%20Offer%20Analysis/market-offer-analysis.md) workflow on the newly written offer(s) when complete. Use `--no-analyze` to skip.
+**By default:** Loading triggers the [Customer Excess Analysis](../Customer%20Excess%20Analysis/customer-excess-analysis.md) workflow on the newly written offer(s) when complete. Use `--no-analyze` to skip.
 
 ---
 
@@ -210,11 +210,11 @@ await fetcher.moveMessage(emailId, 'Processed');
 
 ### Step 7: Trigger Analysis (DEFAULT)
 
-Loading auto-invokes the [Market Offer Analysis](../Market%20Offer%20Analysis/market-offer-analysis.md) workflow on the newly-written offer ID(s):
+Loading auto-invokes the [Customer Excess Analysis](../Customer%20Excess%20Analysis/customer-excess-analysis.md) workflow on the newly-written offer ID(s):
 
 ```javascript
 // Pseudocode — actual orchestrator TBD
-const { analyzeOffer } = require('../Market Offer Analysis/analyze-offer');
+const { analyzeOffer } = require('../Customer Excess Analysis/analyze-offer');
 await analyzeOffer({ offerIds: [result.offerId], source: 'loading-trigger' });
 ```
 
@@ -274,7 +274,7 @@ Loading writes to three tables: `chuboe_offer` (header), `chuboe_offer_line` (pe
 
 ## Related
 
-- [Market Offer Analysis](../Market%20Offer%20Analysis/market-offer-analysis.md) — downstream consumer (Workflow B). Loading triggers this by default.
+- [Customer Excess Analysis](../Customer%20Excess%20Analysis/customer-excess-analysis.md) — downstream consumer (Workflow B). Loading triggers this by default.
 - [`shared/offer-writeback.js`](../../shared/offer-writeback.js) — the writer
 - [`shared/partner-lookup.js`](../../shared/partner-lookup.js) — partner resolution
 - [`shared/mfr-lookup.js`](../../shared/mfr-lookup.js) — MFR resolution

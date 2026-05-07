@@ -422,6 +422,7 @@ const AUTO_SUFFIXES = /[-#]?(Q|Q1|AEC)$/i;
 | C14 | HTS / ECCN Auto-Population at VQ Write Time | **Now** | ✅ Done |
 | C15 | MPN → MFR Inference + Resolver Facade | **Now** | ✅ Done (cog shipped, writer migration deferred) |
 | C16 | Payload Builder Cog (typed-reference null handling) | **Now** | Planned (bundle with Stock RFQ Loading direct-write migration) |
+| C17 | Text to Review in OT refresh | Potential | Approved for refinement |
 
 ---
 
@@ -1137,6 +1138,20 @@ The 2026-04-08 bug existed for an unknown amount of time and was only caught bec
 - [ ] `vq-writer.js writeVQFromAPI()` migrated. End-to-end re-test via `enrich-rfq.js --rfq <small-test-rfq> --max-lines 10`. VQs land, no flag/fail churn.
 - [ ] Migration checklist (other 3 writers) tracked in this section. Not blocking for Stock RFQ Loading work — those migrate opportunistically.
 - [ ] CLAUDE.md § iDempiere bean-callout traps adds a bullet: "Use `payload-builder.js` for any chuboe_* / AD_* / M_* / C_* reference column. Do NOT POST `null` to typed references."
+
+---
+
+## C17. Text to Review in OT refresh
+
+**Status:** Approved for refinement | **Priority:** Potential
+
+Placeholder entry — scope to be refined. Intent: surface quote/VQ text that needs human review when the OT (Orange Tsunami) data refresh runs.
+
+**Open questions (to resolve during refinement):**
+- What triggers a row as "needs review"? (parser confidence, MFR mismatch, missing fields, LLM flag?)
+- Where does the review queue live — dedicated table, flag on `chuboe_vq_line`, or external worklist?
+- Who is the reviewer, and what's the SLA?
+- How does this interact with existing NeedsReview folder + C7 (LLM Fallback)?
 
 ---
 
