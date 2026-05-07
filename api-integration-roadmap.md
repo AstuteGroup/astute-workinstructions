@@ -184,6 +184,19 @@ Diagnostic run on the reproducer surfaced six concrete bugs in `arrow.js`:
 - "Lots that exist but are unreachable at this rfqQty" (e.g., the 120pc/$2.069 lot) are silently dropped. Could surface them as `unreachableOpportunities[]` so a buyer asking for 100 can see "you could get \$2.069 if you bumped to 120."
 - Cache invalidation: any cached arrow envelopes captured before today still have the legacy single-row shape. They'll naturally roll over within 7d (non-PPV TTL); no manual purge.
 
+#### TODO — Verical channel surfacing gap (open 2026-05-07)
+Found while investigating ROI-tracker missed-franchise hits: Arrow's API returns `not_carried` for parts that Verical actually stocks. Concrete case: `Q6004D3RP` — buyer purchased 2,500 from Verical at \$0.7608 (Sanmina, RFQ 1132985), but Arrow's API search returned no hits, cached as `not_carried` with 2 confirms.
+
+**Hypothesis:** Verical inventory is partially exposed via Arrow's standard product API. Some MPNs surface (the rewrite on 4/09 confirmed this works for parts that DO surface) but not all. May require a different endpoint, query parameter, or marketplace-specific call.
+
+**To investigate:**
+1. Pull a list of recent broker-purchased MPNs where Arrow's API returned `not_carried`. Check Verical.com directly for stock — confirm the gap is real (not just Verical-doesn't-stock-it).
+2. Test Arrow API with different parameters: `RetailChecksumOptions`, `TaxOptions`, alt endpoints (`/products/v3/search` vs current).
+3. Check Arrow's documentation for a Verical-specific channel flag.
+4. If Arrow truly has no API surface for Verical's full catalog, evaluate if Verical has its own API or web scrape pathway.
+
+**Why it matters:** ROI tracker flags these as "missed franchise" — but if Verical's surface is structurally limited via Arrow, these aren't bugs we can fix on our side. Worth knowing the bound. Already excluded from the DigiKey miss fix (commit `c6ae2e5`) since it's an Arrow-side gap, not DigiKey.
+
 ### Rutronik API (Active)
 
 **API:** Rutronik24 REST API | **Auth:** Query parameter (apikey)
