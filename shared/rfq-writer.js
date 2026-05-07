@@ -157,7 +157,15 @@ async function writeRFQ(opts) {
   let rfqId;
   let searchKey = null; // Value field — the user-facing RFQ number in OT
   try {
-    const rfqResponse = await apiPost('chuboe_rfq', rfqPayload);
+    // naturalKeyFields enables apiPost's verify-after-error retry path:
+    // on a transient network/5xx, it GETs back any row created since the
+    // POST started matching (BP, type, salesrep) — if found, returns it
+    // (no dup); if not, retries the POST. Without this, intermittent
+    // network flaps left emails in INBOX with no header written.
+    // Discovered 2026-05-06 during the 50% POST-failure run.
+    const rfqResponse = await apiPost('chuboe_rfq', rfqPayload, {
+      naturalKeyFields: ['C_BPartner_ID', 'Chuboe_RFQ_Type_ID', 'SalesRep_ID'],
+    });
     rfqId = rfqResponse.id;
     searchKey = rfqResponse.Value || rfqResponse.value || null;
     if (!rfqId) throw new Error('No ID returned in response');
