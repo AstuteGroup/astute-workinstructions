@@ -74,6 +74,10 @@ function shouldRun(jobName, cadence) {
   if (isSubHourly) {
     return { run: true, reason: 'sub-hourly cadence — runs every tick', sentinel: readSentinel(jobName) };
   }
+  // 'fixed' = fire at exact cron schedule, no sentinel gating (digests, time-of-day reports)
+  if (cadence === 'fixed') {
+    return { run: true, reason: 'fixed cadence — runs whenever cron fires', sentinel: readSentinel(jobName) };
+  }
 
   const sentinel = readSentinel(jobName);
   if (!sentinel) {

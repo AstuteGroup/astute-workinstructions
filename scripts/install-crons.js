@@ -34,8 +34,12 @@ const HEADER = [
   '# Drift check at session start will surface any out-of-band edits.',
   '',
   '# Required for cron jobs touching Postgres (peer-auth — see crontab.md).',
+  '# PGDATABASE is load-bearing: pg_hba peer-auth is per-DB, and without it',
+  '# psql under cron fails with "fe_sendauth: no password supplied" even when',
+  '# PGUSER is set. Discovered 2026-05-04 from offer-poller-excess failures.',
   'PGUSER=analytics_user',
   'LOGNAME=analytics_user',
+  'PGDATABASE=idempiere_replica',
   '',
 ];
 
@@ -59,7 +63,11 @@ function buildCrontabBody() {
 function printResilienceChecklist(job) {
   const otGate = job.needsOT ? 'yes — health-gated' : 'no — independent of OT';
   const subHourly = /^every \d+m$/.test(job.cadence);
-  const catchup = subHourly ? 'n/a — sub-hourly self-heals' : 'yes — sentinel-gated';
+  const fixed = job.cadence === 'fixed';
+  let catchup;
+  if (subHourly) catchup = 'n/a — sub-hourly self-heals';
+  else if (fixed) catchup = 'no — fires at exact cron times only';
+  else catchup = 'yes — sentinel-gated';
   const installSched = installCron(job);
   console.log('');
   console.log(`  Scheduling activity: ${job.name}`);

@@ -32,16 +32,19 @@
  * cached data, etc.).
  *
  * QUEUE LOCATION: ~/workspace/.deferred-api-queue.json
- * WORKER:        ~/workspace/scripts/process-api-queue.js (cron: */30 * * * *)
+ * WORKER:        ~/workspace/scripts/process-api-queue.js (cron: every 30 min)
  * GREETING:      Bucket A items do NOT surface in the SessionStart greeting
  *                routinely — they run autonomously via cron. Only surface
  *                in greeting if cron is missing the entry, log shows
  *                failures, or queue has unattended exhausted items.
  *
  * SCHEDULING (corrected 2026-04-08):
- *   Worker runs via cron every 30 min. Verify with `crontab -l` — should
- *   include the line:
- *     */30 * * * * /usr/bin/node "/home/analytics_user/workspace/scripts/process-api-queue.js" >> /tmp/api-queue-worker.log 2>&1
+ *   Worker runs via cron every 30 min. Verify with `crontab -l` — the entry
+ *   uses minute "every 30" (the cron syntax cannot be reproduced inline here
+ *   because the slash-asterisk pair would terminate this JSDoc block comment;
+ *   that exact bug silently broke this file's parse from creation through
+ *   2026-05-06, hiding all enqueue calls behind the lazy-require try/catch
+ *   in every cog. Fixed 2026-05-06 by paraphrasing).
  *
  *   Earlier docstrings claimed cron was blocked by rbash and that the
  *   Claude `schedule` skill was the autonomous path. Both wrong:

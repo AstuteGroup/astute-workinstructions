@@ -78,10 +78,18 @@ function isInfrastructureError(e) {
  */
 function psqlQuery(sql, timeout = 15000) {
   try {
-    // -U analytics_user is required under cron (cron doesn't pass $USER)
+    // Defensive env vars: even with PGUSER / PGDATABASE / LOGNAME set in the
+    // crontab header, we've observed propagation failures (offer-poller
+    // 2026-05-04). Force them here so peer-auth always has what it needs.
     const result = execSync(`psql -U analytics_user -t -A -F '|' -c "${sql.replace(/"/g, '\\"')}"`, {
       encoding: 'utf-8',
       timeout,
+      env: {
+        ...process.env,
+        PGUSER: process.env.PGUSER || 'analytics_user',
+        LOGNAME: process.env.LOGNAME || 'analytics_user',
+        PGDATABASE: process.env.PGDATABASE || 'idempiere_replica',
+      },
     });
     const lines = result.split('\n').filter(l => {
       const t = l.trim();
