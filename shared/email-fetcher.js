@@ -37,7 +37,8 @@ const ACCOUNT_MAP = {
   vq: 'vq@orangetsunami.com',
   excess: 'excess@orangetsunami.com',
   stockrfq: 'stockRFQ@orangetsunami.com',
-  vortex: 'vortex@orangetsunami.com'
+  vortex: 'vortex@orangetsunami.com',
+  rfqloading: 'rfqloading@orangetsunami.com'
 };
 
 const IMAP_HOST = process.env.IMAP_HOST || 'imap.mail.us-east-1.awsapps.com';
@@ -128,8 +129,14 @@ function createFetcher(account) {
               addr: `${env.from[0].mailbox || ''}@${env.from[0].host || ''}`
             } : {};
 
-            // Check for attachments in body structure
-            const hasAttachment = checkForAttachments(msg.bodyStructure);
+            // Enumerate attachments in body structure (filename + content type + disposition)
+            const attachments = enumerateAttachments(msg.bodyStructure);
+            // "real" attachments: disposition=attachment AND has a filename AND not an inline image
+            const realAttachments = attachments.filter(a =>
+              a.disposition === 'attachment' &&
+              a.filename &&
+              !/^image\//i.test(a.contentType || '')
+            );
 
             envelopes.push({
               id: msg.uid,
@@ -139,7 +146,10 @@ function createFetcher(account) {
               to: env.to || [],
               date: env.date ? env.date.toISOString() : '',
               flags: Array.from(msg.flags || []),
-              hasAttachment
+              hasAttachment: realAttachments.length > 0,
+              attachments: realAttachments,              // [{filename, contentType, disposition}]
+              attachmentNames: realAttachments.map(a => a.filename),
+              inlineAttachmentCount: attachments.length - realAttachments.length
             });
           }
           return envelopes;
@@ -162,6 +172,13 @@ function createFetcher(account) {
           if (!msg || !msg.source) return '';
 
           const parsed = await simpleParser(msg.source);
+          // Warn if message has attachments the caller may miss
+          const realAtts = (parsed.attachments || []).filter(a =>
+            a.filename && !/^image\//i.test(a.contentType || '')
+          );
+          if (realAtts.length > 0) {
+            log.warn(`readMessage(${id}): ${realAtts.length} attachment(s) present — use downloadAttachments() to retrieve: ${realAtts.map(a=>a.filename).join(', ')}`);
+          }
           return parsed.text || parsed.html || '';
         } finally {
           lock.release();
@@ -399,6 +416,29 @@ function checkForAttachments(structure) {
     return structure.childNodes.some(child => checkForAttachments(child));
   }
   return false;
+}
+
+// Walk the BODYSTRUCTURE tree and collect every leaf part with an attachment-like signal.
+// Returns [{filename, contentType, disposition, size}]
+function enumerateAttachments(structure, out = []) {
+  if (!structure) return out;
+  if (structure.childNodes) {
+    for (const child of structure.childNodes) enumerateAttachments(child, out);
+    return out;
+  }
+  // Leaf part — capture if it's marked attachment or has an explicit filename
+  const params = structure.parameters || {};
+  const dispParams = structure.dispositionParameters || {};
+  const filename = dispParams.filename || params.name || null;
+  if (structure.disposition === 'attachment' || filename) {
+    out.push({
+      filename,
+      contentType: structure.type && structure.subtype ? `${structure.type}/${structure.subtype}` : '',
+      disposition: structure.disposition || 'inline',
+      size: structure.size || 0
+    });
+  }
+  return out;
 }
 
 module.exports = { createFetcher };

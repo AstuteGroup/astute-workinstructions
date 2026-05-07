@@ -56,6 +56,23 @@ SKIP:    <searchKey>                                       # excludes from drill
 ```
 Anything from the Astute domain that doesn't match grammar gets a clarification reply.
 
+**Seller forwarding conventions (subject → BP):** When a seller forwards a customer excess email to `excess@`, they put the OT search key in the subject so the poller doesn't have to guess from the multi-hop forward chain. Recognized patterns (case-insensitive, both 6-8 digit search keys and `MO_` IDs):
+
+```
+FW: Upload MO_Search Key 1008289     → BP search key 1008289
+FW: Upload MO_1002733                → BP search key 1002733
+FW: Matrix comsec - Search key#1009991 → BP search key 1009991
+FW: <whatever> [#1234567]             → BP search key 1234567
+```
+
+The subject hint takes precedence over the body's `BP:`/`Partner:` hint and over forward-chain From-line resolution. If no subject hint is present, the poller walks all `From:` lines in the body and prefers the deepest **non-`@astutegroup.com`** sender — this avoids latching onto the prior internal hop on multi-hop chains.
+
+**`Upload MO_*` emails are NOT offers.** Subject pattern `Upload MO_*` flags an internal seller notification confirming a manual market-offer upload — body has no real MPN data. The junk-classifier auto-routes these to NotOffer.
+
+**Vendor-only BP ⇒ Broker Stock Offer.** When a forwarded "excess" email resolves to a vendor-only BP (e.g., Future Electronics' "Daily Liquidation List"), the poller flips the offer type from Customer Excess (1000000) to Broker Stock Offer (1000001). The body hint `Type: Broker` works as an explicit override.
+
+**Cross-forward dedup.** If the same source email is forwarded by two employees within 6 hours, the poller writes the first one and skip-with-breadcrumb on the second (matched by BP + offer-type + line count + first/last MPN).
+
 **V1 status:** Spine is live. Cog 4 (this workflow's intent classifier + scoring + renderers, Steps 2–5 below) is still a stub — `analyze-offer.js` writes a "queued" breadcrumb only. The downstream cogs (digest, reply parser) work end-to-end already; cog 4 builds out incrementally without touching them.
 
 ---

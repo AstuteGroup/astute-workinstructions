@@ -479,6 +479,61 @@ git -C ~/workspace/astute-workinstructions push
 
 ---
 
+## Automation (Claude-driven, General Customer RFQ)
+
+**Pattern:** This workflow is the reference implementation for the email-driven workflow architecture. **All email-driven workflows in this codebase use the same pattern.** See [`email-workflow-architecture.md`](../../email-workflow-architecture.md) (top-level) for the full spec.
+
+**CLI:** `shared/email-workflow-poller.js` (generic) — invoked with `--workflow rfq-loading`. The legacy entry point `Trading Analysis/RFQ Loading/rfq-loading-poller.js` is preserved as a delegating shim for the existing `/schedule` routine; both paths produce identical output.
+
+**Workflow module:** `shared/workflow-actions/rfq-loading.js` — owns the inbox name, notifier config, and routing-action handlers (the per-workflow logic).
+
+**Extraction:** performed by Claude in-session (not by an external API call). The CLI exposes IMAP + routing primitives only.
+
+### How it works
+
+The poller CLI has three commands (all require `--workflow rfq-loading`, or use the legacy shim which auto-injects it):
+
+| Command | Purpose |
+|---|---|
+| `list` | Prints UNSEEN envelopes in `rfqloading@orangetsunami.com` as JSON (uid, subject, from, attachment names) |
+| `read <uid>` | Prints the full email as JSON: body, parsed forwarded-message headers, external sender (vs. internal forwarder), attachment list |
+| `route <uid> <action> --payload <json\|file>` | Executes a routing decision and moves the email to the matching folder |
+
+Claude drives the workflow by calling `list`, then `read` per email, performing the extraction + BP/contact resolution in-session, and calling `route` with one of four actions:
+
+| Action | Payload | Effect |
+|---|---|---|
+| `enqueue` | `{ bpartnerId, type, userId, description, lines[] }` | Enqueues to `rfq-load-queue` (picked up by the fast-loader daemon within 5 min); moves email → `Processed` |
+| `need_info` | `{ recipient, missing[], subject }` | Auto-replies to the external sender with the specific missing-info list (Jake on CC, Reply-To: Jake); moves email → `NeedInfo` |
+| `needs_review` | `{ reason, details, subject, from }` | Emails Jake diagnostics for manual triage; moves email → `NeedsReview` |
+| `not_rfq` | `{}` | Silent move → `NotRFQ` |
+
+The `missing[]` array accepts: `mpn`, `qty`, `rfq_type`, `contact`, `customer`.
+
+### Scheduling
+
+The expected pattern is a **scheduled remote agent** (see `/schedule`) that runs every 2 minutes, fetches the unseen list, and processes each one end-to-end. On-demand invocation (operator asks "process rfqloading inbox") works identically.
+
+### Flags
+
+- `--dry-run` — prints what would happen; does not enqueue, send email, or move messages
+
+### Dependencies
+
+- `shared/email-fetcher.js` (ImapFlow) — reused transitively by the shared auth pattern
+- `shared/notifier.js` — extended 2026-04-15 with `cc` / `bcc` / `replyTo` opts
+- `shared/rfq-load-queue.js` — `enqueue()` for the fast-loader daemon
+- `shared/partner-lookup.js` — `resolvePartner()` (Claude calls this during extraction)
+- `~/workspace/.env` → `WORKMAIL_PASS`, `IMAP_HOST`, `IMAP_PORT`
+
+### v1 scope / known limits
+
+- **Attachment RFQs (PDF/xlsx):** the poller surfaces attachment names in `list` and `read` output. Claude reads attachments via the standard Read tool (for PDFs, paged). No separate extraction pipeline.
+- **Stock RFQ pipeline not yet wired.** The `rfqloading` account is hardcoded; generalize to accept an `--account` flag if we want to reuse for `stockrfq`.
+- **Auto-sends customer replies.** The `need_info` action sends immediately. If approval-first is needed, add a `draft_need_info` action that mails Jake the proposed reply.
+
+---
+
 ## Future Workflows (see Roadmap)
 
 These workflows are referenced above but not yet built:
