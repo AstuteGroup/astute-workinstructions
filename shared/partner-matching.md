@@ -88,11 +88,41 @@ For these, matching falls through to tier 3 (name from email body).
 
 ## Partner Type Filtering
 
+Every tier appends an employee-exclusion clause regardless of `partnerType` (see § Employee Exclusion below).
+
 | `partnerType` | SQL Filter | Use Case |
 |---------------|-----------|----------|
-| `'vendor'` | `AND bp.isvendor = 'Y'` | VQ Loading |
-| `'customer'` | `AND bp.iscustomer = 'Y'` | Customer-specific lookups |
-| `'any'` | (no filter) | Stock RFQ Loading, Market Offer Loading |
+| `'vendor'` | `AND bp.isvendor = 'Y' AND COALESCE(bp.isemployee,'N') != 'Y'` | VQ Loading |
+| `'customer'` | `AND bp.iscustomer = 'Y' AND COALESCE(bp.isemployee,'N') != 'Y'` | Stock RFQ Loading, customer-specific lookups |
+| `'any'` | `AND COALESCE(bp.isemployee,'N') != 'Y'` | Market Offer Loading (vendor or customer offers) |
+
+**Stock RFQ Loading uses `'customer'`**, not `'any'` (tightened 2026-05-07) — incoming senders are customers/brokers, never vendors. Using `'any'` allowed stray vendor-only BPs to match customer emails.
+
+---
+
+## Employee Exclusion (added 2026-05-07)
+
+**Every matching tier filters out `IsEmployee='Y'` BPs.** Internal Astute records (sales reps, payroll BPs, hybrid customer/employee accounts) are never returned by automated email/name matching.
+
+**Why:** On 2026-05-06, six stock RFQs got attributed to internal employees as the customer:
+- **Tier-1 exact-email** matched broker emails after `extractOriginalSender` pulled an internal `@astutegroup.com` address from a quoted reply chain (Edgar Santana, hybrid `IsCustomer=Y AND IsEmployee=Y` BP).
+- **Tier-3 fuzzy name** matched broker first-name displays — `Daisy <daisy@igzrc.cn>` → ILIKE '%Daisy%' → "Daisy Mendoza" employee BP.
+
+The fix is in `partnerTypeFilter()` (covers all tiers) plus `lookupById()` (USE-redirect targets).
+
+**Edge case:** if an employee BP genuinely is the right answer for a transaction (employee buys parts through their own BP record), the operator must set the BP explicitly — the automated matcher will never return one. This is by design: silent misattribution is worse than visible "no match → Unqualified Broker" fallback.
+
+---
+
+## Tiebreaker: Infor C0xxxxx Code
+
+When the matcher returns multiple plausible BPs (e.g., a broker has both a name-matched record and a stray contact at the same domain pointing elsewhere), the canonical record is the one with `C0xxxxx-Billing` / `C0xxxxx-Shipping` in `c_bpartner_location.name`. That's the fully-set-up record in our ERP and Infor.
+
+**Example:** broker `chenpeng@xinyuanxin.net` matched two BPs:
+- `Shenzhen xinyuanxin Electronics Co., Ltd` — has `C006328-Billing` + `C006328-Shipping` → **canonical**
+- `XiaoChen Appliance Maintenance` — no Infor code, just a stray contact at xinyuanxin.net → not the right record
+
+The matcher itself doesn't currently apply this tiebreaker; it's an operator/manual disambiguation rule. Future enhancement candidate: prefer BPs with C0xxxxx locations in the SQL ORDER BY.
 
 ---
 
