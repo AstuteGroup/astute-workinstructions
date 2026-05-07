@@ -113,9 +113,20 @@ function refreshPause(ttlMs = DEFAULT_TTL_MS) {
 /**
  * Remove the pause file. Called by foreground workflows on exit.
  * No-op if file doesn't exist.
+ *
+ * Owner-safe: only deletes if the caller's owner matches the file's owner.
+ * This prevents a small foreground job from nuking a longer-lived review
+ * pause claimed by a different owner (incident 2026-04-15).
+ *
+ * @param {string} [owner] - Only release if this matches the file's owner.
+ *   Omit for unconditional release (legacy callers / manual cleanup).
  */
-function releasePause() {
+function releasePause(owner) {
   try {
+    if (owner) {
+      const current = readPause();
+      if (current && current.owner !== owner) return; // not ours — leave it
+    }
     fs.unlinkSync(PAUSE_FILE);
   } catch (e) {
     if (e.code !== 'ENOENT') throw e;

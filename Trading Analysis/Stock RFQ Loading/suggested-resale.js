@@ -187,6 +187,7 @@ function getMarketOffers(mpnClean) {
     JOIN adempiere.c_bpartner bp ON o.c_bpartner_id = bp.c_bpartner_id
     JOIN adempiere.chuboe_offer_type ot ON o.chuboe_offer_type_id = ot.chuboe_offer_type_id
     WHERE ol.isactive = 'Y' AND o.isactive = 'Y'
+    AND o.chuboe_offer_type_id <> 1000025  -- exclude LAM Kitting Inventory (LAM consigned, not ours)
     AND ${mpnWhereClause('ol.chuboe_mpn_clean', mpnClean)}
     AND o.created >= CURRENT_DATE - INTERVAL '${OFFER_LOOKBACK_DAYS} days'
     ORDER BY o.created DESC LIMIT 15
@@ -677,7 +678,7 @@ async function main() {
   if (pauseClaimed) {
     try {
       clearInterval(pauseRefreshTimer);
-      apiPause.releasePause();
+      apiPause.releasePause('stock-rfq-suggested-resale');
       console.log('[pause] released');
     } catch (e) { /* ignore */ }
   }

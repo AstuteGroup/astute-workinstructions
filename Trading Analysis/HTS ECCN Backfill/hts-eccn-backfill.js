@@ -402,7 +402,7 @@ async function main() {
   if (pauseClaimed) {
     try {
       clearInterval(pauseRefreshTimer);
-      apiPause.releasePause();
+      apiPause.releasePause('hts-eccn-backfill');
       console.log('[pause] released');
     } catch (e) { /* ignore */ }
   }
