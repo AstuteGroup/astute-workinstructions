@@ -52,10 +52,20 @@ const GENERIC_ROLE_NAMES = new Set([
  */
 function psqlQuery(sql, timeout = 10000) {
   try {
-    // -U analytics_user is required under cron (cron doesn't pass $USER)
+    // Under cron, PGDATABASE / PGUSER / LOGNAME may or may not propagate via
+    // crontab env-vars — empirically, even with them set in the crontab header
+    // we observed ~34 fe_sendauth failures across 100 minutes. Defensive fix:
+    // explicitly set them on this exec call so peer-auth always has what it
+    // needs regardless of crontab propagation oddities.
     return execSync(`psql -U analytics_user -t -A -F '|' -c "${sql.replace(/"/g, '\\"')}"`, {
       encoding: 'utf-8',
-      timeout
+      timeout,
+      env: {
+        ...process.env,
+        PGUSER: process.env.PGUSER || 'analytics_user',
+        LOGNAME: process.env.LOGNAME || 'analytics_user',
+        PGDATABASE: process.env.PGDATABASE || 'idempiere_replica',
+      },
     }).trim();
   } catch (err) {
     // Re-throw infrastructure errors so callers can't confuse "broken
@@ -89,10 +99,20 @@ function parseResults(result, fields) {
  * @returns {string} SQL fragment
  */
 function partnerTypeFilter(partnerType) {
+  // Always exclude IsEmployee='Y' BPs from automated matching. These are
+  // internal Astute records (sales reps, payroll BPs, hybrid customer/employee
+  // accounts) and silently misattribute when the matcher returns them.
+  // Discovered 2026-05-07: 6 stock RFQs got assigned to Edgar Santana / Daisy
+  // Mendoza employee BPs — Edgar via Tier-1 exact-email after extractOriginalSender
+  // pulled an internal address from a quoted reply chain, Daisy via Tier-3 fuzzy
+  // name match on the broker's first-name display ("Daisy <daisy@igzrc.cn>").
+  // Edge cases where an employee BP is genuinely the right customer should be
+  // set explicitly by the operator, not via this matcher.
+  const employeeFilter = "AND COALESCE(bp.isemployee, 'N') != 'Y'";
   switch (partnerType) {
-    case 'vendor': return "AND bp.isvendor = 'Y'";
-    case 'customer': return "AND bp.iscustomer = 'Y'";
-    default: return ''; // 'any' — no filter
+    case 'vendor':   return `AND bp.isvendor = 'Y' ${employeeFilter}`;
+    case 'customer': return `AND bp.iscustomer = 'Y' ${employeeFilter}`;
+    default:         return employeeFilter; // 'any' — still exclude employees
   }
 }
 
@@ -111,7 +131,9 @@ function lookupByEmail(email, partnerType = 'any') {
   const cleanEmail = email.toLowerCase().trim().replace(/'/g, "''");
 
   const sql = `
-    SELECT bp.c_bpartner_id, bp.name, bp.value as search_key
+    SELECT bp.c_bpartner_id, bp.name, bp.value as search_key,
+           COALESCE(bp.iscustomer,'N') as iscustomer,
+           COALESCE(bp.isvendor,'N') as isvendor
     FROM adempiere.ad_user u
     JOIN adempiere.c_bpartner bp ON u.c_bpartner_id = bp.c_bpartner_id
     WHERE LOWER(u.email) = '${cleanEmail}'
@@ -122,7 +144,7 @@ function lookupByEmail(email, partnerType = 'any') {
     LIMIT 5
   `;
 
-  const results = parseResults(psqlQuery(sql), ['c_bpartner_id', 'name', 'search_key']);
+  const results = parseResults(psqlQuery(sql), ['c_bpartner_id', 'name', 'search_key', 'iscustomer', 'isvendor']);
 
   for (const r of results) {
     // Handle "USE XXXXX" redirects
@@ -141,14 +163,20 @@ function lookupByEmail(email, partnerType = 'any') {
  * Look up partner by c_bpartner_id (used for "USE XXXXX" redirects).
  */
 function lookupById(bpId) {
+  // USE-redirect targets: still filter employees — same rationale as
+  // partnerTypeFilter (silent misattribution if a USE stub points to an
+  // internal employee record).
   const sql = `
-    SELECT c_bpartner_id, name, value as search_key
+    SELECT c_bpartner_id, name, value as search_key,
+           COALESCE(iscustomer,'N') as iscustomer,
+           COALESCE(isvendor,'N') as isvendor
     FROM adempiere.c_bpartner
     WHERE c_bpartner_id = ${parseInt(bpId, 10)}
       AND isactive = 'Y'
+      AND COALESCE(isemployee, 'N') != 'Y'
     LIMIT 1
   `;
-  const results = parseResults(psqlQuery(sql), ['c_bpartner_id', 'name', 'search_key']);
+  const results = parseResults(psqlQuery(sql), ['c_bpartner_id', 'name', 'search_key', 'iscustomer', 'isvendor']);
   return results[0] || null;
 }
 
@@ -244,7 +272,9 @@ function lookupByDomainHint(email, partnerType = 'any') {
       : `LOWER(bp.name) LIKE '%${cleanHint}%'`;
 
     const sql = `
-      SELECT bp.c_bpartner_id, bp.name, bp.value as search_key
+      SELECT bp.c_bpartner_id, bp.name, bp.value as search_key,
+             COALESCE(bp.iscustomer,'N') as iscustomer,
+             COALESCE(bp.isvendor,'N') as isvendor
       FROM adempiere.c_bpartner bp
       WHERE ${nameCondition}
         AND bp.isactive = 'Y'
@@ -256,7 +286,7 @@ function lookupByDomainHint(email, partnerType = 'any') {
       LIMIT 3
     `;
 
-    const results = parseResults(psqlQuery(sql), ['c_bpartner_id', 'name', 'search_key']);
+    const results = parseResults(psqlQuery(sql), ['c_bpartner_id', 'name', 'search_key', 'iscustomer', 'isvendor']);
 
     if (results.length > 0) {
       if (derived) {
@@ -294,7 +324,9 @@ function lookupByName(companyName, partnerType = 'any') {
   const cleanName = companyName.replace(/'/g, "''").trim();
 
   const sql = `
-    SELECT bp.c_bpartner_id, bp.name, bp.value as search_key
+    SELECT bp.c_bpartner_id, bp.name, bp.value as search_key,
+           COALESCE(bp.iscustomer,'N') as iscustomer,
+           COALESCE(bp.isvendor,'N') as isvendor
     FROM adempiere.c_bpartner bp
     WHERE bp.name ILIKE '%${cleanName}%'
       AND bp.isactive = 'Y'
@@ -306,7 +338,7 @@ function lookupByName(companyName, partnerType = 'any') {
     LIMIT 5
   `;
 
-  const results = parseResults(psqlQuery(sql), ['c_bpartner_id', 'name', 'search_key']);
+  const results = parseResults(psqlQuery(sql), ['c_bpartner_id', 'name', 'search_key', 'iscustomer', 'isvendor']);
   return results[0] || null;
 }
 
@@ -344,6 +376,8 @@ function lookupByEmailDomain(email, partnerType = 'any') {
 
   const sql = `
     SELECT bp.c_bpartner_id, bp.name, bp.value as search_key,
+           COALESCE(bp.iscustomer,'N') as iscustomer,
+           COALESCE(bp.isvendor,'N') as isvendor,
            COUNT(u.ad_user_id) AS user_count
     FROM adempiere.ad_user u
     JOIN adempiere.c_bpartner bp ON u.c_bpartner_id = bp.c_bpartner_id
@@ -352,7 +386,7 @@ function lookupByEmailDomain(email, partnerType = 'any') {
       AND bp.isactive = 'Y'
       AND bp.name NOT ILIKE 'USE %'
       ${partnerTypeFilter(partnerType)}
-    GROUP BY bp.c_bpartner_id, bp.name, bp.value
+    GROUP BY bp.c_bpartner_id, bp.name, bp.value, bp.iscustomer, bp.isvendor
     ORDER BY
       -- 1. Prefer BPs whose name contains the domain stem (e.g., 'sanmina')
       CASE WHEN LOWER(bp.name) LIKE '%${domainStem}%' THEN 0 ELSE 1 END,
@@ -364,7 +398,7 @@ function lookupByEmailDomain(email, partnerType = 'any') {
     LIMIT 3
   `;
 
-  const results = parseResults(psqlQuery(sql), ['c_bpartner_id', 'name', 'search_key']);
+  const results = parseResults(psqlQuery(sql), ['c_bpartner_id', 'name', 'search_key', 'iscustomer', 'isvendor']);
 
   for (const r of results) {
     const useMatch = r.name.match(/^USE\s+(\d+)/i);
