@@ -128,8 +128,15 @@ const STATIC_CARRYOVER_OFFERS = [
         label: 'Free Stock - Philippines',
         bootstrapId: 1025258,
         portalWarehouseName: 'Astute Electronics Inc. - Philippines (Carryover)',
-        // Philippines (W109/W114) is NOT in the weekly Infor export — no
-        // paired warehouse available. Carryover propagates forward as-is.
+        // Philippines (W109/W114) currently has no live Infor data — both
+        // warehouses have been empty for at least 2 weeks (verified 5/07,
+        // master CSV has 0 rows in W109 and 0 in W114). Carryover holds the
+        // 195 active lines as a manual-add. When stock physically moves in
+        // and Infor starts reporting W109/W114 again, reconcileCarryover
+        // will auto-retire matching MPNs at the 95% qty threshold, same
+        // pattern as Eaton (W117) and LAM (W118). Until then the loop
+        // finds 0 paired-warehouse rows for every MPN and keeps everything.
+        pairedWarehouses: ['W109', 'W114'],
     },
     {
         label: 'LAM Consignment',
@@ -140,11 +147,13 @@ const STATIC_CARRYOVER_OFFERS = [
         // 2026-04-22 from master static file (POV0071878, 103 MPNs, $2.14M).
         pairedWarehouses: ['W118'],
     },
-    {
-        label: 'Incoming Lot bid from Marvell',
-        bootstrapId: 1024030,
-        portalWarehouseName: 'Marvell Lot Bid - Incoming (Carryover)',
-    },
+    // 'Incoming Lot bid from Marvell' was removed 2026-05-07 — bootstrap
+    // 1024030 was created 2025-07-17 but NEVER seeded with any lines (0
+    // active, 0 inactive ever). The slot was placeholder-only; nobody ever
+    // followed through to populate it with a won-lot's lines, so the weekly
+    // refresh has been "leaving as-is" for 10 months. Removing the dead
+    // entry. Open business question — see deferred-work.md "Marvell carryover
+    // — should we be tracking incoming lot bids at all?"
     {
         label: 'GM Stock',
         bootstrapId: 1026173,
@@ -184,11 +193,35 @@ const WAREHOUSE_WRITEBACK = {
     'LAM_Dead_Inventory':      { bpartnerId: 1000332, offerTypeId: 1000008 }, // Astute Electronics Inc → Austin (separate offer)
 };
 
-// Portal export columns
+// Groups intentionally excluded from BOTH OT write-back AND the NetComponents
+// portal CSVs. Internal-only — MAIN allocation, W105 HK allocated, W111 LAM
+// 3PL transit. Not marketed externally, not represented as customer-facing
+// chuboe_offer records.
+//
+// Any group present in result.groups that is NEITHER in WAREHOUSE_WRITEBACK
+// NOR in this set will trip assertRoutingInvariants and abort the run. This
+// is the tripwire that catches a new warehouse being added to the splitter
+// without the dev consciously deciding which side it belongs on.
+const KNOWN_INTERNAL_GROUPS = new Set([
+    'HK_Allocated_Warehouse',
+    'Allocated_Warehouse',
+    'LAM_3PL',
+]);
+
+// Portal export columns — source columns from the cleaned Infor data.
+// The output CSV uses friendlier headers via PORTAL_COLUMN_LABELS below.
 const PORTAL_COLUMNS = [
-    'Item', 'ItemDescription', 'Name', 'Lot Quantity', 'Date Code',
-    'Lot Unit Cost', 'Currency', 'Warehouse Name', 'Location'
+    'Item', 'ItemDescription', 'Name', 'Lot Quantity', 'Date Code'
 ];
+
+// Source column → output header in the NetComponents upload CSV.
+const PORTAL_COLUMN_LABELS = {
+    'Item':          'MPN',
+    'ItemDescription': 'Description',
+    'Name':          'Manufacturer',
+    'Lot Quantity':  'Qty',
+    'Date Code':     'D/C',
+};
 
 // =============================================================================
 // EMAIL FUNCTIONS (using shared imapflow-based modules)
@@ -406,6 +439,169 @@ function arrayToCSV(rows, headers) {
  * @param {boolean} dryRun      - If true, log what would happen without calling the API
  * @returns {Array<object>}     - Per-group result records (status, counts, errors, offer ID)
  */
+/**
+ * Routing invariant tripwire — verifies the portal CSVs and the OT write-back
+ * have stayed in lockstep. Catches the failure mode that creeps in over time
+ * as new warehouse groups, carryovers, or routing rules get added: one side
+ * of the pipeline (portal vs OT) gets wired up without mirroring the other.
+ *
+ * Hard-throws on:
+ *   1. A data-bearing group not in WAREHOUSE_WRITEBACK and not in
+ *      KNOWN_INTERNAL_GROUPS — caller has to consciously route it.
+ *   2. Per-group portal vs OT-attempted row count mismatch — both sides
+ *      should attempt the same rows for every WAREHOUSE_WRITEBACK group.
+ *
+ * Returns soft-warn data (no throw) for runtime degradation cases:
+ *   - mainShortfall      → OT wrote fewer lines than attempted (per-line errors)
+ *   - carryoverPartial   → Step 5d appended carryover rows to portal but OT
+ *                          refresh failed/partial — portal advertises stock
+ *                          OT doesn't actually hold
+ *
+ * @param {object} args
+ * @param {object} args.result            - return of processInventoryFile
+ * @param {Array}  args.writebackResults  - return of writeInventoryToOT
+ * @param {Array}  [args.carryoverResults] - return of refreshStaticCarryoverOffers (fetch mode only)
+ * @param {'fetch'|'manual'} args.mode    - which entrypoint is calling
+ * @returns {object} reconciliation totals + soft-warn data for the email
+ */
+function assertRoutingInvariants({ result, writebackResults, carryoverResults = [], mode }) {
+    const otGroupNames = new Set(Object.keys(WAREHOUSE_WRITEBACK));
+    const errors = [];
+
+    // ─── Check 1: every data-bearing group is intentionally routed ──────────
+    const orphans = [];
+    for (const groupName of Object.keys(result.groups || {})) {
+        const rowCount = (result.groups[groupName] || []).length;
+        if (rowCount === 0) continue;
+        if (otGroupNames.has(groupName)) continue;
+        if (KNOWN_INTERNAL_GROUPS.has(groupName)) continue;
+        orphans.push({ groupName, rowCount });
+    }
+    if (orphans.length > 0) {
+        errors.push(
+            `Group(s) not routed to OT and not in KNOWN_INTERNAL_GROUPS: ` +
+            orphans.map(o => `${o.groupName} (${o.rowCount} rows)`).join(', ') +
+            `. Add to WAREHOUSE_WRITEBACK (writes to OT + portal) or ` +
+            `KNOWN_INTERNAL_GROUPS (excluded from both).`
+        );
+    }
+
+    // ─── Check 2: per-group portal-vs-OT row counts agree on attempted ─────
+    let portalMainTotal = 0;
+    let otMainAttempted = 0;
+    let otMainWritten = 0;
+    const groupGaps = [];
+
+    for (const groupName of otGroupNames) {
+        // Mirror the writer's `.filter(l => l.mpn)` so the count compares
+        // what each side actually attempts (rows w/ no Item value get
+        // dropped on the OT side at line ~498).
+        const inputCount = (result.groups[groupName] || []).filter(
+            r => String(r['Item'] || '').trim()
+        ).length;
+
+        const wb = writebackResults.find(r => r.groupName === groupName);
+        let otAttempted = 0;
+        let otWritten = 0;
+        if (wb) {
+            if (wb.status === 'dry-run') {
+                otAttempted = wb.linesPlanned || 0;
+            } else if (wb.status === 'success' || wb.status === 'partial' || wb.status === 'failed') {
+                otAttempted = wb.linesAttempted || 0;
+                otWritten = wb.linesWritten || 0;
+            }
+            // 'skipped' → 0/0
+        }
+
+        portalMainTotal += inputCount;
+        otMainAttempted += otAttempted;
+        otMainWritten += otWritten;
+
+        if (inputCount !== otAttempted) {
+            groupGaps.push({
+                groupName,
+                portalCount: inputCount,
+                otAttempted,
+                gap: inputCount - otAttempted,
+            });
+        }
+    }
+
+    if (groupGaps.length > 0) {
+        const detail = groupGaps.map(g =>
+            `${g.groupName}: portal=${g.portalCount}, ot-attempted=${g.otAttempted} (gap ${g.gap >= 0 ? '+' : ''}${g.gap})`
+        ).join('; ');
+        errors.push(
+            `Per-group portal/OT row count mismatch on attempted writes: ${detail}. ` +
+            `Both sides should attempt the same rows for every WAREHOUSE_WRITEBACK group.`
+        );
+    }
+
+    // ─── Throw on hard errors before computing carryover summary ───────────
+    if (errors.length > 0) {
+        const message = `[Inventory routing invariant] ${errors.length} issue(s):\n  • ` + errors.join('\n  • ');
+        const err = new Error(message);
+        err.routingErrors = errors;
+        err.orphanGroups = orphans;
+        err.groupGaps = groupGaps;
+        throw err;
+    }
+
+    // ─── Carryover reconciliation (soft-warn only, fetch mode only) ────────
+    let carryoverPortalTotal = 0;
+    let carryoverOtAttempted = 0;
+    let carryoverOtWritten = 0;
+    const carryoverPartial = [];
+
+    if (mode === 'fetch') {
+        for (const r of carryoverResults) {
+            // Step 5d portal append iterates r.sourceLines unconditionally,
+            // so this is "how many carryover lines hit the portal CSV".
+            const portalLines = (r.sourceLines || []).length;
+            let otAttempted = 0;
+            let otWritten = 0;
+
+            if (r.status === 'success' || r.status === 'partial') {
+                otAttempted = r.linesAttempted || 0;
+                otWritten = r.linesWritten || 0;
+            } else if (r.status === 'dry-run') {
+                otAttempted = r.linesPlanned || 0;
+            } else if (r.status === 'failed') {
+                // Step 5d still appended sourceLines to portal, OT wrote 0.
+                otAttempted = portalLines;
+            }
+            // 'empty' → both 0, no divergence
+
+            carryoverPortalTotal += portalLines;
+            carryoverOtAttempted += otAttempted;
+            carryoverOtWritten += otWritten;
+
+            if (r.status !== 'dry-run' && portalLines > 0 && otWritten < portalLines) {
+                carryoverPartial.push({
+                    label: r.label,
+                    portalLines,
+                    otWritten,
+                    gap: portalLines - otWritten,
+                    status: r.status,
+                    error: r.error || null,
+                });
+            }
+        }
+    }
+
+    return {
+        portalMainTotal,
+        otMainAttempted,
+        otMainWritten,
+        mainShortfall: otMainAttempted - otMainWritten,
+        carryoverPortalTotal,
+        carryoverOtAttempted,
+        carryoverOtWritten,
+        carryoverShortfall: carryoverOtAttempted - carryoverOtWritten,
+        carryoverPartial,
+    };
+}
+
 async function writeInventoryToOT(groupedRows, dateStr, dryRun = false) {
     const { writeOffer, deactivatePriorOffers } = require('../../shared/offer-writeback');
     const { apiGet } = require('../../shared/api-client');
@@ -1100,7 +1296,7 @@ async function auditCrossBpStrays(writebackResults, carryoverResults, dryRun) {
 /**
  * Build an HTML summary email body for the write-back results.
  */
-function buildWritebackSummaryHTML(results, dateStr, dryRun, carryoverResults = []) {
+function buildWritebackSummaryHTML(results, dateStr, dryRun, carryoverResults = [], routingInvariants = null) {
     const totals = {
         success: results.filter(r => r.status === 'success').length,
         partial: results.filter(r => r.status === 'partial').length,
@@ -1108,6 +1304,63 @@ function buildWritebackSummaryHTML(results, dateStr, dryRun, carryoverResults = 
         skipped: results.filter(r => r.status === 'skipped').length,
         dryRun:  results.filter(r => r.status === 'dry-run').length,
     };
+
+    // ─── Routing reconciliation block ────────────────────────────────────────
+    // Always rendered when routingInvariants is provided. Shows portal vs OT
+    // attempted vs OT written totals. Tripwires for drift in routing logic
+    // (hard-thrown before this email is built) — this block exists to reassure
+    // on a clean run and to surface runtime divergence (OT under-wrote what
+    // both sides attempted) when it happens.
+    let reconciliationSection = '';
+    if (routingInvariants) {
+        const ri = routingInvariants;
+        const mainGap = ri.otMainAttempted - ri.otMainWritten;
+        const cGap    = ri.carryoverOtAttempted - ri.carryoverOtWritten;
+
+        const cell = (n, gap) => {
+            const color = gap > 0 ? '#cf222e' : '#1a7f37';
+            const weight = gap > 0 ? 'b' : 'span';
+            return `<td style="text-align:right;font-family:monospace;color:${color}"><${weight}>${n.toLocaleString()}</${weight}></td>`;
+        };
+        const plainCell = (n) => `<td style="text-align:right;font-family:monospace">${n.toLocaleString()}</td>`;
+
+        const totalPortal     = ri.portalMainTotal + ri.carryoverPortalTotal;
+        const totalAttempted  = ri.otMainAttempted + ri.carryoverOtAttempted;
+        const totalWritten    = ri.otMainWritten + ri.carryoverOtWritten;
+        const totalGap        = totalAttempted - totalWritten;
+
+        const headerColor = (totalGap > 0) ? '#cf222e' : '#1a7f37';
+        const headerLabel = (totalGap > 0) ? `⚠ Routing reconciliation — OT under-wrote ${totalGap.toLocaleString()} line(s)` : '✓ Routing reconciliation — all sides agree';
+
+        let partialRows = '';
+        if (ri.carryoverPartial && ri.carryoverPartial.length > 0) {
+            const items = ri.carryoverPartial.map(cp =>
+                `<li><b>${cp.label}</b>: portal got ${cp.portalLines} line(s), OT wrote ${cp.otWritten} (gap ${cp.gap}, status=${cp.status})${cp.error ? ` — <i style="color:#cf222e">${cp.error}</i>` : ''}</li>`
+            ).join('');
+            partialRows = `
+<div style="background:#ffebe9;padding:10px;border-left:4px solid #cf222e;margin:8px 0;font-size:13px">
+    <b style="color:#cf222e">Carryover divergence:</b> the portal CSV advertises stock that OT does not actually hold this week. Affected carryovers:
+    <ul style="margin:6px 0 0 0">${items}</ul>
+</div>`;
+        }
+
+        reconciliationSection = `
+<h3 style="margin:12px 0 4px 0;color:${headerColor}">${headerLabel}</h3>
+<table border="1" cellpadding="6" cellspacing="0" style="border-collapse:collapse;font-size:12px;margin-bottom:10px">
+<thead style="background:#f6f8fa">
+<tr><th align="left">Source</th><th align="right">Portal CSV</th><th align="right">OT attempted</th><th align="right">OT written</th></tr>
+</thead>
+<tbody>
+<tr><td><b>Main routing</b><br/><small style="color:#57606a">WAREHOUSE_WRITEBACK groups</small></td>
+    ${plainCell(ri.portalMainTotal)}${plainCell(ri.otMainAttempted)}${cell(ri.otMainWritten, mainGap)}</tr>
+<tr><td><b>Carryovers</b><br/><small style="color:#57606a">STATIC_CARRYOVER_OFFERS</small></td>
+    ${plainCell(ri.carryoverPortalTotal)}${plainCell(ri.carryoverOtAttempted)}${cell(ri.carryoverOtWritten, cGap)}</tr>
+<tr style="background:#f6f8fa"><td><b>Total</b></td>
+    ${plainCell(totalPortal)}${plainCell(totalAttempted)}${cell(totalWritten, totalGap)}</tr>
+</tbody>
+</table>
+${partialRows}`;
+    }
     const totalLinesWritten = results.reduce((s, r) => s + (r.linesWritten || 0), 0);
     const totalLinesPlanned = results.reduce((s, r) => s + (r.linesPlanned || 0), 0);
     const totalDeactivated  = results.reduce((s, r) => s + (r.deactivatedLines || 0), 0);
@@ -1259,6 +1512,7 @@ ${carryoverRows}
 ${carryoverBanner}
 ${banner}
 <h2 style="margin:0 0 8px 0">OT Inventory Write-back — ${dateStr}</h2>
+${reconciliationSection}
 <p>
     <b>${totals.success}</b> success ·
     <b style="color:#bf8700">${totals.partial}</b> partial ·
@@ -1454,33 +1708,42 @@ function processInventoryFile(inputFile, outputDir) {
     }
 
     // ==========================================================================
-    // STEP 5: Export consolidated portal file
+    // STEP 5: Export NetComponents portal files (split: non-authorized + franchise)
     //
-    // CONTRACT: The portal CSV must mirror exactly what gets written to OT —
-    // same warehouse groups, same lines. NetComponents and OT must never
-    // drift. The OT-eligible groups are the keys of WAREHOUSE_WRITEBACK;
-    // groups outside that map (HK_Allocated_Warehouse / W105,
+    // Two CSVs go to NetComponents under different accounts:
+    //   - Non-authorized account #1167233 — all OT-eligible groups EXCEPT
+    //     Franchise_Stock. Carryover lines (Eaton/PH/LAM/Marvell/GM Stock)
+    //     are appended to this file in Step 5d.
+    //   - Franchised account #1126121 — Franchise_Stock only.
+    //
+    // This split mirrors how OT already represents the inventory: each
+    // WAREHOUSE_WRITEBACK key becomes its own chuboe_offer (Franchise_Stock
+    // under BP 1000325 "Astute - Franchise Stock", non-franchise free stock
+    // under BP 1000332 "Astute Electronics Inc"). The pre-2026-05-05 single
+    // portal CSV was lumping these together; the split brings the portal
+    // output into line with OT's structure.
+    //
+    // Groups outside WAREHOUSE_WRITEBACK (HK_Allocated_Warehouse / W105,
     // Allocated_Warehouse / MAIN, LAM_3PL / W111) are intentionally excluded
-    // from both OT and the portal — they are internal-only and not marketed
-    // externally.
-    //
-    // Static carryover offers (STATIC_CARRYOVER_OFFERS) are refreshed in OT
-    // by refreshStaticCarryoverOffers() and appended to this CSV by Step 5d
-    // in fetchAndProcess(), keeping that side of the mirror intact too.
-    //
-    // If you ever need a portal upload that does NOT match OT, do not edit
-    // this step — derive a separate file from `inventory_cleaned_*.csv`
-    // (the master) so the contract here stays explicit.
+    // from both OT and both portal files — they are internal-only and not
+    // marketed externally.
     // ==========================================================================
-    console.log('\nStep 5: Exporting consolidated portal file...');
+    console.log('\nStep 5: Exporting NetComponents portal files...');
 
     const otGroupNames = Object.keys(WAREHOUSE_WRITEBACK);
-    const portalSourceRows = [];
-    for (const groupName of otGroupNames) {
-        const rows = groupedRows[groupName] || [];
-        portalSourceRows.push(...rows);
-    }
-    const droppedRowCount = uniqueRows.length - portalSourceRows.length;
+    const FRANCHISE_GROUP = 'Franchise_Stock';
+    const nonAuthGroupNames = otGroupNames.filter(g => g !== FRANCHISE_GROUP);
+
+    const collectRows = (groupNames) => {
+        const out = [];
+        for (const g of groupNames) out.push(...(groupedRows[g] || []));
+        return out;
+    };
+    const nonAuthSourceRows  = collectRows(nonAuthGroupNames);
+    const franchiseSourceRows = collectRows([FRANCHISE_GROUP]);
+
+    const totalPortalRows = nonAuthSourceRows.length + franchiseSourceRows.length;
+    const droppedRowCount = uniqueRows.length - totalPortalRows;
     if (droppedRowCount > 0) {
         const droppedGroups = Object.keys(groupedRows)
             .filter(g => !otGroupNames.includes(g))
@@ -1489,22 +1752,29 @@ function processInventoryFile(inputFile, outputDir) {
         console.log(`  - Excluding ${droppedRowCount} rows from non-OT groups: ${droppedGroups || '(none)'}`);
     }
 
-    const portalHeaders = PORTAL_COLUMNS.filter(col => headers.includes(col));
-    const portalRows = portalSourceRows.map(row => {
+    const portalSourceCols = PORTAL_COLUMNS.filter(col => headers.includes(col));
+    const portalOutputHeaders = portalSourceCols.map(c => PORTAL_COLUMN_LABELS[c] || c);
+    const toPortalRows = (sourceRows) => sourceRows.map(row => {
         const out = {};
-        for (const col of portalHeaders) {
+        for (const col of portalSourceCols) {
             let val = String(row[col] || '').trim();
-            if (['Lot Quantity', 'Lot Unit Cost'].includes(col)) {
-                val = cleanNumeric(val);
-            }
-            out[col] = val;
+            if (col === 'Lot Quantity') val = cleanNumeric(val);
+            out[PORTAL_COLUMN_LABELS[col] || col] = val;
         }
         return out;
     });
 
-    const portalFile = path.join(outputDir, `consolidated_portal_${timestamp}.csv`);
-    fs.writeFileSync(portalFile, arrayToCSV(portalRows, portalHeaders));
-    console.log(`  - Saved: consolidated_portal_${timestamp}.csv (${portalRows.length} rows)`);
+    const mmdd = `${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+
+    const portalFile = path.join(outputDir, `Netcomponents 1167233 ${mmdd}.csv`);
+    const nonAuthRows = toPortalRows(nonAuthSourceRows);
+    fs.writeFileSync(portalFile, arrayToCSV(nonAuthRows, portalOutputHeaders));
+    console.log(`  - Saved: ${path.basename(portalFile)} (${nonAuthRows.length} rows)`);
+
+    const franchisePortalFile = path.join(outputDir, `Netcomponents 1126121 ${mmdd}.csv`);
+    const franchiseRows = toPortalRows(franchiseSourceRows);
+    fs.writeFileSync(franchisePortalFile, arrayToCSV(franchiseRows, portalOutputHeaders));
+    console.log(`  - Saved: ${path.basename(franchisePortalFile)} (${franchiseRows.length} rows)`);
 
     // ==========================================================================
     // STEP 6: Save cleaned master file
@@ -1537,6 +1807,7 @@ function processInventoryFile(inputFile, outputDir) {
         unmatched: unmatchedRows.length,
         outputDir: outputDir,
         portalFile: portalFile,
+        franchisePortalFile: franchisePortalFile,
         chuboeFiles: chuboeFiles,
         timestamp: timestamp
     };
@@ -1655,24 +1926,13 @@ async function fetchAndProcess(opts = {}) {
             const carryoverPortalRows = [];
             for (const r of carryoverResults) {
                 if (!r.sourceLines || r.sourceLines.length === 0) continue;
-                const wn = r.portalWarehouseName || `Carryover - ${r.label}`;
                 for (const line of r.sourceLines) {
-                    // chuboe_package_desc is `Lot;Location` from the writer.
-                    // Split it back so the portal CSV's Location column gets
-                    // a single value (matching Infor's row shape).
-                    const pkg = String(line.Chuboe_Package_Desc || '').trim();
-                    const semicolon = pkg.indexOf(';');
-                    const location = semicolon >= 0 ? pkg.substring(semicolon + 1) : pkg;
                     carryoverPortalRows.push({
-                        'Item':           String(line.Chuboe_MPN || '').trim(),
-                        'ItemDescription': String(line.Description || '').trim(),
-                        'Name':           String(line.Chuboe_MFR_Text || '').trim(),
-                        'Lot Quantity':   String(line.Qty != null ? line.Qty : ''),
-                        'Date Code':      String(line.Chuboe_Date_Code || '').trim(),
-                        'Lot Unit Cost':  String(line.PriceEntered != null ? line.PriceEntered : ''),
-                        'Currency':       'USD',
-                        'Warehouse Name': wn,
-                        'Location':       location,
+                        'MPN':          String(line.Chuboe_MPN || '').trim(),
+                        'Description':  String(line.Description || '').trim(),
+                        'Manufacturer': String(line.Chuboe_MFR_Text || '').trim(),
+                        'Qty':          String(line.Qty != null ? line.Qty : ''),
+                        'D/C':          String(line.Chuboe_Date_Code || '').trim(),
                     });
                 }
             }
@@ -1701,6 +1961,28 @@ async function fetchAndProcess(opts = {}) {
             }
         } catch (e) {
             console.error(`Step 5d: failed to append carryover to portal CSV: ${e.message}`);
+        }
+
+        // Step 5e: Routing invariant tripwire. Hard-throws if portal & OT
+        // routing have drifted (new group not on both sides, or per-group
+        // attempted-row counts disagree). Returns reconciliation totals for
+        // the summary email and soft-warn rows for any carryover where the
+        // portal CSV got rows but OT failed to write them.
+        console.log('\nStep 5e: Routing invariant check...');
+        const routingInvariants = assertRoutingInvariants({
+            result,
+            writebackResults,
+            carryoverResults,
+            mode: 'fetch',
+        });
+        const reconLine = `  portal=${routingInvariants.portalMainTotal + routingInvariants.carryoverPortalTotal}, ot-attempted=${routingInvariants.otMainAttempted + routingInvariants.carryoverOtAttempted}, ot-written=${routingInvariants.otMainWritten + routingInvariants.carryoverOtWritten}`;
+        if (routingInvariants.mainShortfall === 0 && routingInvariants.carryoverShortfall === 0) {
+            console.log(`  ✓ Routing OK · ${reconLine.trim()}`);
+        } else {
+            console.log(`  ⚠ Runtime divergence (routing intact) · ${reconLine.trim()} · main shortfall ${routingInvariants.mainShortfall}, carryover shortfall ${routingInvariants.carryoverShortfall}`);
+            for (const cp of routingInvariants.carryoverPartial) {
+                console.log(`    · ${cp.label}: portal=${cp.portalLines}, ot-written=${cp.otWritten} (status=${cp.status}${cp.error ? ', ' + cp.error : ''})`);
+            }
         }
 
         // Build overlap CSV if any carryover MPNs match this week's inventory
@@ -1753,17 +2035,29 @@ async function fetchAndProcess(opts = {}) {
         // Step 6: Send emails
         console.log('\nStep 6: Sending notification emails...');
 
-        // Email 1: Netcomponents Upload (consolidated portal CSV — unchanged)
+        // Email 1: NetComponents upload — non-authorized account #1167233
         const sent1 = await sendEmail(
             EMAIL_CONFIG.recipient,
-            'Netcomponents Upload',
+            'Data Upload - Non Authorized Account #1167233',
             `Inventory cleanup completed successfully.
 
-Attached: Consolidated portal file for Netcomponents upload.
+Attached: ${path.basename(result.portalFile)}
 
 Processed: ${result.uniqueRows.toLocaleString()} unique rows
 Date: ${dateStr}`,
             [result.portalFile]
+        );
+
+        // Email 1b: NetComponents upload — franchised account #1126121
+        const sent1b = await sendEmail(
+            EMAIL_CONFIG.recipient,
+            'Data Upload - Franchised account #1126121',
+            `Inventory cleanup completed successfully.
+
+Attached: ${path.basename(result.franchisePortalFile)}
+
+Date: ${dateStr}`,
+            [result.franchisePortalFile]
         );
 
         // Email 2: OT Write-back Summary (HTML, no attachment)
@@ -1773,7 +2067,7 @@ Date: ${dateStr}`,
         const carryoverOverlap = carryoverResults.reduce((s, r) => s + (r.overlapMpns?.length || 0), 0);
         const overlapTag = carryoverOverlap > 0 ? ` 🚨 ${carryoverOverlap} CARRYOVER MPNS NOW IN INFOR` : '';
         const summarySubject = `${dryRun ? '[DRY RUN] ' : ''}OT Inventory Write-back — ${dateStr} (${writebackOk} ok, ${writebackPart} partial, ${writebackFail} failed)${overlapTag}`;
-        const summaryHtml    = buildWritebackSummaryHTML(writebackResults, dateStr, dryRun, carryoverResults);
+        const summaryHtml    = buildWritebackSummaryHTML(writebackResults, dateStr, dryRun, carryoverResults, routingInvariants);
 
         // If we have an overlap CSV, attach it; otherwise send html-only
         let sent2;
@@ -1794,12 +2088,23 @@ Date: ${dateStr}`,
             );
         }
 
-        // Step 7: Move processed email (skip on dry-run so the source can be replayed)
-        if (!dryRun) {
+        // Determine whether the run completed cleanly enough to consume the
+        // source email. Any partial / failed writeback group OR any failed
+        // carryover refresh leaves the email in `Inventory Reports` so the
+        // next cron tick retries (inventory_cleanup is idempotent —
+        // deactivate-then-write per group). On retry, partial offers get
+        // deactivated and re-written fresh.
+        const carryoverFail = carryoverResults.filter(r => r.status === 'failed').length;
+        const runOk = (writebackPart === 0) && (writebackFail === 0) && (carryoverFail === 0);
+
+        // Step 7: Move processed email — only on a clean run.
+        if (dryRun) {
+            console.log('\nStep 7: [DRY RUN] leaving source email in Inventory Reports');
+        } else if (runOk) {
             console.log('\nStep 7: Moving email to processed folder...');
             await moveEmail(matchingEmail.id, EMAIL_CONFIG.processedFolder, 'Inventory Reports');
         } else {
-            console.log('\nStep 7: [DRY RUN] leaving source email in Inventory Reports');
+            console.log(`\nStep 7: Leaving source email in Inventory Reports for retry — write-back: ${writebackPart} partial, ${writebackFail} failed; carryover: ${carryoverFail} failed`);
         }
 
         // Step 8: Cleanup attachment
@@ -1809,13 +2114,14 @@ Date: ${dateStr}`,
         } catch (e) { /* ignore */ }
 
         console.log('\n' + '='.repeat(60));
-        console.log('FETCH AND PROCESS COMPLETE');
+        console.log(runOk ? 'FETCH AND PROCESS COMPLETE' : 'FETCH AND PROCESS — INCOMPLETE (will retry)');
         console.log('='.repeat(60));
-        console.log(`Emails sent: ${sent1 && sent2 ? 'Yes' : 'Partial'}`);
+        console.log(`Emails sent: ${sent1 && sent1b && sent2 ? 'Yes' : 'Partial'}`);
         console.log(`Write-back: ${writebackOk} ok, ${writebackPart} partial, ${writebackFail} failed`);
+        console.log(`Carryover failed: ${carryoverFail}`);
         console.log(`Output: ${result.outputDir}`);
 
-        return { success: true, result, writebackResults };
+        return { success: runOk, result, writebackResults, carryoverResults };
 
     } catch (err) {
         console.error('\n' + '='.repeat(60));
@@ -1874,7 +2180,17 @@ if (require.main === module) {
         if (writeback) {
             const dateStr = new Date().toISOString().split('T')[0];
             writeInventoryToOT(result.groups, dateStr, dryRun)
-                .then(() => process.exit(0))
+                .then(writebackResults => {
+                    // Routing invariant tripwire — same check as the cron path,
+                    // minus the carryover side which only runs in fetch mode.
+                    const ri = assertRoutingInvariants({
+                        result,
+                        writebackResults,
+                        mode: 'manual',
+                    });
+                    console.log(`\n✓ Routing OK · portal=${ri.portalMainTotal}, ot-attempted=${ri.otMainAttempted}, ot-written=${ri.otMainWritten}${ri.mainShortfall ? ` (shortfall ${ri.mainShortfall})` : ''}`);
+                    process.exit(0);
+                })
                 .catch(err => {
                     console.error('Write-back failed:', err);
                     process.exit(1);
@@ -1883,4 +2199,4 @@ if (require.main === module) {
     }
 }
 
-module.exports = { processInventoryFile, fetchAndProcess, writeInventoryToOT, WAREHOUSE_WRITEBACK, STATIC_CARRYOVER_OFFERS };
+module.exports = { processInventoryFile, fetchAndProcess, writeInventoryToOT, WAREHOUSE_WRITEBACK, STATIC_CARRYOVER_OFFERS, assertRoutingInvariants, KNOWN_INTERNAL_GROUPS, buildWritebackSummaryHTML };

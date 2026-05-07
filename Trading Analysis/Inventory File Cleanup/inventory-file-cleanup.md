@@ -18,8 +18,9 @@ The workflow runs **automatically every Monday at 6 AM EST** via cron job. No ma
    - Deactivates the prior week's `chuboe_offer` (+ lines) for the same `(BP, OfferType)` pair via the iDempiere REST API
    - Posts a fresh `chuboe_offer` header + one `chuboe_offer_line` per lot
    - Failures are isolated per group (one group failing does not block the others)
-6. **Two emails sent** to jake.harris@astutegroup.com:
-   - **"Netcomponents Upload"** — consolidated portal CSV attached (unchanged)
+6. **Three emails sent** to jake.harris@astutegroup.com:
+   - **"Data Upload - Non Authorized Account #1167233"** — `Netcomponents 1167233 MM-DD.csv` attached. All OT-eligible groups EXCEPT Franchise_Stock, with the static carryover lines (Eaton/PH/LAM/GM Stock) appended.
+   - **"Data Upload - Franchised account #1126121"** — `Netcomponents 1126121 MM-DD.csv` attached. Franchise_Stock only.
    - **"OT Inventory Write-back — YYYY-MM-DD"** — HTML summary table showing per-group status, lines written, lines deactivated, and any errors. No attachment.
 7. **Source email moved** to `Inventory-Processed` folder
 
@@ -155,8 +156,9 @@ The script will:
 - Remove footer rows (Page x of y, username patterns)
 - Deduplicate based on composite key: `Item|Lot|Location|Warehouse Name|Site|Date Lot`
 - Split into warehouse groups
-- Export Chuboe-formatted CSVs
-- Export consolidated portal file
+- Export Chuboe-formatted CSVs (per warehouse, audit / manual replay path)
+- Export NetComponents non-authorized portal file (`Netcomponents 1167233 MM-DD.csv`)
+- Export NetComponents franchised portal file (`Netcomponents 1126121 MM-DD.csv`)
 - Export cleaned master file
 - Export duplicates file (for review)
 
@@ -174,11 +176,18 @@ In **automated mode**, the script writes inventory directly to OT via the iDempi
 
 The per-warehouse `{WarehouseCode}_{GroupName}.csv` files are still produced on disk under `Inventory YYYY-MM-DD/` for audit and as a manual recovery path. To replay a single warehouse via the legacy CSV import path, drop that file into the Chuboe import wizard.
 
-### Step 5: Upload to Portals (TBD)
+### Step 5: Upload to NetComponents
 
-The `consolidated_portal_*.csv` file needs to be transformed to match portal-specific templates:
-- **NetComponents:** Template format TBD
-- **IC Source:** Template format TBD
+Two CSVs are produced for NetComponents, one per account:
+
+| File | Account | Contents |
+|------|---------|----------|
+| `Netcomponents 1167233 MM-DD.csv` | Non-Authorized #1167233 | All OT-eligible groups except Franchise_Stock + static carryovers |
+| `Netcomponents 1126121 MM-DD.csv` | Franchised #1126121 | Franchise_Stock only |
+
+Both files share the same 5-column structure: `MPN, Description, Manufacturer, Qty, D/C`. They are emailed separately with subjects matching the account label (see Email Configuration above). Manually upload each to its respective NetComponents account.
+
+**IC Source:** Template format TBD — derive from `inventory_cleaned_*.csv` (the full deduped master) once the spec is obtained.
 
 ---
 
@@ -262,36 +271,32 @@ The Chuboe format is used for iDempiere Market Offer import. Column mapping:
 
 ## Portal Export Format
 
-### Current Output (Generic)
+### NetComponents (split: non-authorized + franchise)
 
-**Contract: portal CSV mirrors OT exactly.** The `consolidated_portal_*.csv` is the NetComponents upload and must contain the same lines that the script writes into iDempiere — no more, no less. That means:
+Two CSVs are produced per run — one per NetComponents account — both with the same column structure:
 
-- **Included:** all rows from the warehouse groups in `WAREHOUSE_WRITEBACK` (the 11-group OT mapping below) plus the static carryover offers appended in Step 5d.
-- **Excluded:** `HK_Allocated_Warehouse` (W105), `Allocated_Warehouse` (MAIN), and `LAM_3PL` (W111). These warehouses are internal-only — not posted to OT and not posted to NetComponents.
+| Output Header | Source Column |
+|---------------|---------------|
+| MPN | Item |
+| Description | ItemDescription |
+| Manufacturer | Name |
+| Qty | Lot Quantity |
+| D/C | Date Code |
 
-If you need a different selection for a portal upload, derive it from `inventory_cleaned_*.csv` (the full deduped master) — do not loosen this contract in Step 5.
+| File | Account | Source Groups |
+|------|---------|---------------|
+| `Netcomponents 1167233 MM-DD.csv` | Non-Authorized #1167233 | All `WAREHOUSE_WRITEBACK` groups EXCEPT `Franchise_Stock` + static carryovers (Eaton/PH/LAM/GM Stock) appended in Step 5d |
+| `Netcomponents 1126121 MM-DD.csv` | Franchised #1126121 | `Franchise_Stock` only |
 
-The CSV has these columns:
+**Why split:** OT already represents these as separate `chuboe_offer` records (see WAREHOUSE_WRITEBACK in `inventory_cleanup.js` — Franchise_Stock under BP `1000325 = Astute - Franchise Stock`, non-franchise free stock under BP `1000332 = Astute Electronics Inc`). The pre-2026-05-05 single portal CSV lumped these together; the split brings the portal output into line with OT's structure.
 
-| Column | Source |
-|--------|--------|
-| Item | Item |
-| ItemDescription | ItemDescription |
-| Name | Name |
-| Lot Quantity | Lot Quantity |
-| Date Code | Date Code |
-| Lot Unit Cost | Lot Unit Cost |
-| Currency | Currency |
-| Warehouse Name | Warehouse Name |
-| Location | Location |
+**Always excluded from both files:** `HK_Allocated_Warehouse` (W105), `Allocated_Warehouse` (MAIN), and `LAM_3PL` (W111). Internal-only — not posted to OT and not posted to NetComponents.
 
-### NetComponents Template (TBD)
-
-Required columns and format to be documented once spec is obtained.
+If you need a different selection for an ad-hoc portal upload, derive it from `inventory_cleaned_*.csv` (the full deduped master) — do not loosen the contract in Step 5.
 
 ### IC Source Template (TBD)
 
-Required columns and format to be documented once spec is obtained.
+Required columns and format to be documented once spec is obtained. Derive from `inventory_cleaned_*.csv` (the full deduped master).
 
 ---
 
@@ -301,9 +306,9 @@ All output files are saved to a dated folder: `Inventory YYYY-MM-DD/`
 
 | File | Description |
 |------|-------------|
-| `{WarehouseCode}_{GroupName}.csv` | Chuboe format for iDempiere (one per warehouse group) |
-| `OT_Chuboe_Files_YYYY-MM-DD.zip` | Zipped archive of all Chuboe CSVs (emailed) |
-| `consolidated_portal_{timestamp}.csv` | All inventory for portal upload (emailed) |
+| `{WarehouseCode}_{GroupName}.csv` | Chuboe format for iDempiere (one per warehouse group, audit / manual replay path) |
+| `Netcomponents 1167233 MM-DD.csv` | Non-authorized account upload (emailed) — all OT groups except Franchise_Stock + carryovers |
+| `Netcomponents 1126121 MM-DD.csv` | Franchised account upload (emailed) — Franchise_Stock only |
 | `inventory_cleaned_{timestamp}.csv` | Full cleaned/deduped master file |
 | `duplicates_{timestamp}.csv` | Removed duplicates (for audit/review) |
 
@@ -402,8 +407,9 @@ Step 4: Exporting Chuboe format files...
   - Saved: W105_HK_Allocated_Warehouse.csv (631 rows)
   ...
 
-Step 5: Exporting consolidated portal file...
-  - Saved: consolidated_portal_20260316194633.csv (5694 rows)
+Step 5: Exporting NetComponents portal files...
+  - Saved: Netcomponents 1167233 03-16.csv (5612 rows)
+  - Saved: Netcomponents 1126121 03-16.csv (82 rows)
 
 Step 6: Saving cleaned master file...
   - Saved: inventory_cleaned_20260316194633.csv (5694 rows)
@@ -468,7 +474,7 @@ Each warehouse group in the table below produces **one `chuboe_offer` per weekly
 | LAM_Consignment | Stock - Philippines Warehouse (1000014) | Astute Electronics - LAM Consignment (1011267) | 1013066 |
 | LAM_Dead_Inventory | Stock - Austin Warehouse (1000008) | Astute Electronics Inc (1000332) | 1002336 |
 
-**Groups intentionally NOT in the write-back** (per-warehouse audit CSVs still produced under `Inventory YYYY-MM-DD/`, but no OT records are created **and these groups are also excluded from the NetComponents portal CSV** — the portal upload must mirror OT exactly):
+**Groups intentionally NOT in the write-back** (per-warehouse audit CSVs still produced under `Inventory YYYY-MM-DD/`, but no OT records are created **and these groups are also excluded from both NetComponents portal CSVs** — internal-only, not marketed externally):
 - `LAM_3PL` (W111)
 - `Allocated_Warehouse` (MAIN)
 - `HK_Allocated_Warehouse` (W105)
@@ -502,6 +508,60 @@ await writeOffer({
 
 Failures are isolated per group: a single bad line is reported in the email summary; a whole-group failure (e.g., API timeout during deactivation) is logged and the script continues with the next group.
 
+### Static Carryovers (manual-add inventory)
+
+Some inventory lives outside the weekly Infor export but still needs to be marketed in OT and on NetComponents — open POs awaiting receipt, won lot bids being staged, gifted/consigned stock not tracked in Infor warehouses. The `STATIC_CARRYOVER_OFFERS` constant in `inventory_cleanup.js` is the registry for these. Each weekly run **deactivates the prior carryover offer and writes a fresh copy** so the Created date stays current (consumers like Vortex Matches filter on age).
+
+**Live entries (verified 2026-05-07):**
+
+| Label | Bootstrap ID | Paired Infor Warehouse(s) | Notes |
+|---|---|---|---|
+| `Eaton Consignment` | 1024798 | W117 | Auto-retire as Eaton stock arrives. Infor's W117 MFR tag is unreliable — `reconcileCarryover` treats MFR mismatches as informational, not blocking. See `project_chuboe_warehouse_group_unreliable.md`. |
+| `Free Stock - Philippines` | 1025258 | W109, W114 | W109/W114 currently empty in Infor (verified 2026-05-07). Carryover holds 195 lines as a manual-add. Pairing is in place so when stock physically returns to W109/W114, matching MPNs auto-retire from carryover at the 95% qty threshold. |
+| `LAM Consignment` | 1026158 | W118 | Seeded 2026-04-22 from POV0071878 master static (103 MPNs / $2.14M). Auto-retire as LAM stock arrives in W118. |
+| `GM Stock` | 1026173 | *(none — no Infor pairing)* | Bootstrapped 2026-04-28 from Josh Pucci's `Ready To Ship - GM GP 11.14.25.xlsx` (19 MPNs / 2,628,000 pcs Nexperia + Onsemi). Posted under Astute Electronics Inc → Stock - Austin Warehouse. Propagates forward as-is until manually retired. |
+
+**Lifecycle per carryover (Step 5b):**
+
+1. **Bootstrap** — first ever load is a manual `apiPost` against `chuboe_offer` + lines, capturing the new `chuboe_offer_id` as `bootstrapId` in the registry. After the first weekly refresh lands, `bootstrapId` becomes irrelevant — subsequent runs find the offer by description prefix `[Carryover] {label}`.
+2. **Weekly refresh** — `refreshStaticCarryoverOffers` reads the prior week's lines, deactivates the offer, posts a fresh `chuboe_offer` with description `[Carryover] {label} — refreshed YYYY-MM-DD` and the same lines (minus any retired in step 3 below).
+3. **Paired-warehouse reconciliation** — for entries with `pairedWarehouses`, `reconcileCarryover` compares each carryover MPN against this week's qty in the paired warehouse(s):
+   - `infoQty ≥ 0.95 × carryoverQty` → MPN **retired** from next week's carryover (assumed received). Threshold absorbs minor lot drift.
+   - `0 < infoQty < 0.95 × carryoverQty` → MPN **flagged** for operator review (partial receipt, surfaced in `carryover_overlap_*.csv`).
+   - `infoQty = 0` or MPN absent from paired warehouse → kept on carryover unchanged.
+4. **Portal append** — Step 5d appends the (post-reconciliation) carryover lines to `Netcomponents 1167233 MM-DD.csv` so the non-authorized portal CSV reflects total marketable stock = OT live offers + carryovers.
+
+**MFR comparison during reconciliation** uses `shared/mfr-equivalence.js` (alias + acquisition aware), but Infor warehouse-tag MFR is known unreliable across the consignment warehouses, so a MFR mismatch alone never blocks retirement — it only annotates the overlap CSV.
+
+**Adding a carryover entry:**
+
+1. Bootstrap the offer manually (one-off apiPost or use `bootstrap_*.js` pattern in `Trading Analysis/Inventory File Cleanup/`).
+2. Capture the new `chuboe_offer_id` and add an entry to `STATIC_CARRYOVER_OFFERS` with `label`, `bootstrapId`, `portalWarehouseName`, and (if applicable) `pairedWarehouses`.
+3. Run `node inventory_cleanup.js <fresh_export>.xlsx --writeback --dry-run` to verify the entry resolves correctly before next Monday's cron.
+
+**Removing a carryover entry:** delete the entry from `STATIC_CARRYOVER_OFFERS`. The existing OT offer stays active but stops being refreshed — manually deactivate via the OT UI when ready. (Removing only stops the auto-refresh; it does NOT deactivate the current offer.)
+
+**Historical:** `Incoming Lot bid from Marvell` (bootstrap 1024030, 2025-07-17) was removed 2026-05-07. The slot was placeholder-only — never seeded with any lines, so 10 months of weekly refresh ran as no-ops on an empty source. Open business question (see `deferred-work.md`): should won-lot bids be tracked as static carryovers at all, or as something else?
+
+**Long-term replacement:** Roadmap B4 (open-PO inventory loader) — once the loader can pull from Infor's open-PO data, the static carryover mechanism becomes redundant for the Eaton/LAM cases and the registry should empty out.
+
+### Routing invariant tripwire (Step 5e)
+
+After Step 5d completes, `assertRoutingInvariants` runs as a hard tripwire to guard against drift between the NetComponents portal CSVs and the OT write-back as new warehouses or carryovers get added over time.
+
+**Hard-throws (aborts the run, fires `sendFailureNotice`):**
+
+1. A data-bearing group is in `result.groups` but is neither in `WAREHOUSE_WRITEBACK` nor in `KNOWN_INTERNAL_GROUPS` (`HK_Allocated_Warehouse` / `Allocated_Warehouse` / `LAM_3PL`). Whoever added the group has to consciously route it to one side or the other.
+2. Per-group portal vs OT-attempted row counts disagree for any `WAREHOUSE_WRITEBACK` group. Both sides should attempt the same rows.
+
+**Soft-warns (emits a red banner in the summary email, does NOT abort):**
+
+- A static carryover's Step 5d portal append succeeded but its Step 5b OT refresh failed/partial. The portal CSV advertises stock OT does not actually hold this week. The carryover label, line gap, and underlying error get rendered in a "Carryover divergence" callout near the top of the email.
+
+**Reconciliation table** is rendered at the top of the OT Inventory Write-back email on every run, showing portal vs OT-attempted vs OT-written totals for both Main routing and Carryover sources. On a clean run the totals match in green; on shortfall the OT-written cell goes red.
+
+The same routing check runs in manual mode (`node inventory_cleanup.js <file> --writeback`), minus the carryover side which only fires in fetch mode. A clean manual run prints `✓ Routing OK · portal=N, ot-attempted=N, ot-written=N` to the console.
+
 ### MFR placeholder scrubbing
 
 Source rows with `Name` matching `/^(not known( yet)?)$/i` (case-insensitive) are written to OT with `Chuboe_MFR_Text = NULL` rather than the literal placeholder string. This avoids junk MFR text in OT and prevents the MFR resolver from canonicalizing nonsense values. Real MFR strings pass through unchanged. Roughly 3% of rows in a typical weekly export carry this placeholder, concentrated in consignment groups (notably GE_Consignment).
@@ -510,7 +570,7 @@ Source rows with `Name` matching `/^(not known( yet)?)$/i` (case-insensitive) ar
 
 ## Future Enhancements
 
-- [ ] Define and implement NetComponents upload template
+- [x] ~~Define and implement NetComponents upload template~~ ✓ Implemented 2026-05-05. Two CSVs (non-auth #1167233 + franchise #1126121), 5 user-friendly columns (`MPN, Description, Manufacturer, Qty, D/C`).
 - [ ] Define and implement IC Source upload template
 - [x] ~~Add direct iDempiere write-back (bypass CSV import)~~ ✓ Module built: `shared/offer-writeback.js` (2026-03-23). Wired into inventory_cleanup.js + zipped CSV email retired (2026-04-09).
 - [x] ~~Add email notification on completion~~ ✓ Implemented 2026-03-16
