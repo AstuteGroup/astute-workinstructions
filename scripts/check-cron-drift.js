@@ -98,6 +98,7 @@ function detectDrift() {
   // 5. Stale jobs — lastSuccess older than 2× cadence
   for (const job of REGISTRY) {
     if (typeof job !== 'object' || !job.name) continue;
+    if (job.cadence === 'fixed') continue; // fixed jobs fire only at cron times; cadenceToMs is a 60s placeholder, so the 2× heuristic doesn't apply
     const sentinel = sentinels.find((s) => s.jobName === job.name);
     if (!sentinel || !sentinel.lastSuccess) continue; // never run yet — handled at install
     const lastMs = new Date(sentinel.lastSuccess).getTime();
