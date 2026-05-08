@@ -2,7 +2,7 @@
 
 Parts that cannot be sourced per LAM's current agreement. Need LAM approval for MOQ, price, lead-time, or MPN variant deviations.
 
-**Last updated:** 2026-04-15
+**Last updated:** 2026-04-21
 
 ## Escalation Table
 
@@ -14,7 +14,7 @@ Parts that cannot be sourced per LAM's current agreement. Need LAM approval for 
 | 644-059699-005 | Comus Group | 500-231 | 750 | $0.3500 | 12 wks | Relays Unltd pending | TBD | TBD | No franchise source | TBD | No online purchase path. MFR acquisition gap (Computer Components → Comus Group). |
 | 630-087790-001 | Beckhoff | ET1100 | 1,750 | $0.1598 | 0 wks | Tracy APAC pending | TBD | TBD | No online source | TBD | Beckhoff direct only; sent to Tracy. |
 | 630-120971-001 | Micron | MT47H128M16RT-25E:C **TR** | 20 | $14.7792 | 7 wks | Astute own stock **non-TR** @ $5.00 orig | Stock 2,000 | In-house | MPN variant deviation | Way under base, but reel vs non-reel substitution | 🚨 LAM approved MPN is TR (tape-reel); Astute has 2,000 of non-TR in Austin. LAM approval needed. |
-| 630-A92150-002 | Micron | MTFC64GBCAQTC-WT | 30 | $65.38 | 33 wks | Newark $116.46 | Stock 200 (Newark) | Stock | Price | +$51.08/unit at Newark (78% uplift) | ✅ **PO PLACED 2026-04-20** — PO809809 / POV0075745, Newark 30 @ $116.46 (VQ 2122438). Pending Newark confirmation they'll sell. LAM approved cost deviation; approval req 1156822 closed. |
+| 630-A92150-002 | Micron | MTFC64GBCAQTC-WT | 30 | $65.38 | 33 wks | Newark $116.46 (at risk) | Stock 200 (Newark, at risk) | Stock | Price + Supply | +$51.08/unit at Newark (78% uplift) | ⚠ **LIKELY CANCELLATION 2026-04-21** — PO809809 / POV0075745 still IP in OT but Newark signaling cancellation. No Astute internal stock. Franchise alternatives: none at original pull. Broker offers are -IT/-AAT/-AIT substrate variants ONLY; LAM has NOT approved an alt variant. If Newark confirms cancel: (a) re-sweep all 10 franchise APIs fresh, (b) LAM escalation for alt-variant approval (-IT closest spec), or (c) accept delay. LAM cost deviation already approved for -WT (req 1156822) — re-approval needed if variant changes. |
 | 630-257348-001 | Analog Devices | LTC2312HTS8-14#TRMPBF | 100 | $18.49 | 18 wks | DigiKey $19.68 / 261 stock (fresh) | Stock 261 | Stock | Price | +$1.19/unit over base (~6.5% uplift) | **Check with Amalfi** — DigiKey has 261 in stock at $19.68 (over base). Our API parser missed it; confirmed via direct DigiKey fetch. Broker alts DC 16+ (rejected). |
 | 630-260287-001 | Analog Devices | LTC2313CTS8-12#TRMPBF | 30 | $10.67 | 22 wks | DigiKey stock confirmed per Jake (price TBD) | Stock (Jake saw on DigiKey site) | Stock | Franchise — price pending | TBD | **Check with Amalfi** — DigiKey has stock per Jake (parser returning not-found, confirmed broken for this LT family). Amalfi to pull fresh price. |
 | 723-008848-003 | Amatom | 9724-SS-7 | 50 | $34.80 | 10 wks | Amatom direct (pending) | TBD | TBD | **Incomplete MPN** | TBD | **Waiting on LAM to confirm full MPN** — 9724-SS-7 is incomplete per Amatom nomenclature; can't source without full part number. |
@@ -30,7 +30,8 @@ Parts that cannot be sourced per LAM's current agreement. Need LAM approval for 
 - [ ] Tracy APAC response for ET1100
 - [ ] Requote decision on QII-0.006-00-61
 - [ ] LAM approval on MT47H128M16RT non-TR substitution
-- [x] LAM approval on MTFC64GBCAQTC-WT cost deviation ($116.46 Newark vs $65.38 base) — approved; PO809809 placed 2026-04-20
+- [x] LAM approval on MTFC64GBCAQTC-WT cost deviation ($116.46 Newark vs $65.38 base) — approved 2026-04-17; PO809809 placed 2026-04-20
+- [ ] ⚠ **MTFC64GBCAQTC-WT — Newark likely cancelling (2026-04-21)**: on confirm, run fresh franchise sweep + escalate to LAM for either alt-variant approval (-IT) or delay acceptance
 
 ## Workflow Context
 

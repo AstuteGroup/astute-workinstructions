@@ -421,8 +421,28 @@ async def main():
             # Process each part
             for i, part in enumerate(parts):
                 print(f'\n[{i + 1}/{len(parts)}] Processing {part["part_number"]} x {part["quantity"]:,}')
-                results = await process_part(page, part['part_number'], part['quantity'], timing_data)
-                all_results.extend(results)
+                # Reset to search page between parts (previous iteration leaves us on RFQ confirmation)
+                if i > 0:
+                    try:
+                        await page.goto(config.BASE_URL)
+                        await asyncio.sleep(2)
+                    except Exception as reset_err:
+                        print(f'    WARN: reset navigation failed: {reset_err}')
+                try:
+                    results = await process_part(page, part['part_number'], part['quantity'], timing_data)
+                    all_results.extend(results)
+                except Exception as part_err:
+                    print(f'    ERROR on {part["part_number"]}: {part_err}')
+                    all_results.append({
+                        'part_number': part['part_number'],
+                        'qty_requested': part['quantity'],
+                        'supplier': '',
+                        'region': '',
+                        'supplier_qty': 0,
+                        'status': 'ERROR',
+                        'timestamp': datetime.now().isoformat(),
+                        'error': str(part_err),
+                    })
 
         except Exception as e:
             print(f'\nFATAL ERROR: {e}')

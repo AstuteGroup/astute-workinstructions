@@ -569,10 +569,14 @@ node tti.js --manufacturers
 
 ---
 
-### Avnet API (Pending Docs)
+### Avnet API (Blocked — APIM unrouted 404)
 
 **Subscription Key:** `067a6c51a2b04ca3ae39c85fd27f7fe2`
-**Auth Header:** `Ocp-Apim-Subscription-Key: <key>`
+**Auth Header:** `ocp-apim-subscription-key: <key>`
+**Gateway base:** `https://apigw.avnet.com`
+**Documented endpoint (per Roshan Tamrakar 2026-04-29):** `GET https://apigw.avnet.com/external/getDEXFetchProducts?mpn=<MPN>`
+
+**Entitlement caveat:** Our Product & Pricing API request was **rejected**; Avnet granted the **Product Information** API only — returns enrichment + web resale price, not contract pricing. Worth a separate push to Alberto Rosales for P&P access once Product Info is unblocked.
 
 **iDempiere Vendor:**
 - BP ID: `1000051` (primary, 6,971 VQ lines) — also `1000002` (legacy, 1 VQ line from 2018)
@@ -580,7 +584,7 @@ node tti.js --manufacturers
 - Combined VQ volume: ~9,800 lines
 - Name: `Avnet`
 
-**Status:** Have subscription key but need Avnet to grant access to endpoint docs at [apiportal.avnet.com](https://apiportal.avnet.com/). Portal mentions `getPriceAndQty` API but exact path is behind login. Awaiting Avnet approval (as of 2026-03-26). Once approved, build `avnet.js` module, add `priceBreaks`, register in `franchise-api.js`.
+**Status (2026-05-07):** Docs received from Roshan 2026-04-29 with full endpoint path, auth method, and curl example. Smoke test against `getDEXFetchProducts` returns `404 {"statusCode": 404, "message": "Resource not found"}` — APIM's canonical "no operation matched" response. Bad/missing keys return the **same** 404 (would expect 401 if it were an auth issue), so the gateway never reaches our key — our subscription product has no operation registered at this path. Reply sent to Roshan 2026-05-07 asking him to verify subscription entitlement and operation publish status. Once unblocked, build `shared/franchise-apis/avnet.js` matching `tti.js`/`mouser.js` interface and register in `franchise-api.js`.
 
 ---
 

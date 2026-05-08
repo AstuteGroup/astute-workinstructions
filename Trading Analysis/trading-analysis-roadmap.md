@@ -17,6 +17,7 @@ Consolidated roadmap for Trading Analysis workflows.
 | LAM EPG Award | `LAM EPG Award/` | In Progress |
 | Stock Market Analysis | — | Planned |
 | CQ Writeback | `shared/cq-writer.js` | Operational (writer); QQ integration Planned |
+| AMAT RFQ Management | `AMAT RFQ Management/` | Paused (IT-blocked, Phase 1) |
 
 ---
 
@@ -481,6 +482,14 @@ Always set `Chuboe_MFR_Text`. Only set `Chuboe_MFR_ID` when the resolved record 
 - [x] % Under Target moved to column B in Good Prices
 - [x] Decimal precision preserved for prices
 - [x] % of Demand as actual percent format
+- [x] `--vq-rfq-id` flag — scope VQs to a specific RFQ (skip MOs + cache), for franchise-only shadow analysis (2026-04-16)
+- [x] **A5. MFR equivalence — suffix/descriptor stripping** — SHIPPED 2026-04-17. Extended `prenormalizeMfr()` suffix list to strip `Products`, `Components`, `Electronics`, `Semiconductor(s)`, `Mfg`, `Manufacturing`, `Technologies`, `Technology`. Fixes Fair-Rite Products Corp. ↔ Fair-Rite and similar.
+- [x] **A7. Vortex data source filters** — SHIPPED 2026-04-17. Three modes via CLI flags:
+  - **Standard** (default) — MOs + VQs (90-day) + API cache. Full market picture.
+  - **`--vq-rfq-id <id>`** — VQs from a specific RFQ only (skip MOs + cache). For franchise-only shadow/mirror analysis.
+  - **`--exclude-vq-rfq-id <id>`** — Standard minus VQs from a specific RFQ. For seeing the market without franchise enrichment data.
+  - Future: `--rfq-only` — RFQ data only (no MOs, no cache, only VQs tied to this RFQ's own lines). For pure demand-vs-existing-supply view.
+- [ ] **A6. Graph-based MFR equivalence — replace whack-a-mole** — Current `mfr-equivalence.js` uses a flat alias file + flat acquisitions map. Every new MFR pair that should match requires a manual entry in one of two files. This doesn't scale — the JCI RFQ 1132586 Vortex run surfaced 6 broken pairs in a single session (TDK/EPCOS, Stackpole/SEI, C&K Components/Switches, Microchip/Micrel, Fair-Rite suffix, NXP/Nexperia). The problem has three categories that the flat model handles poorly: (1) **Acquisitions** — brand absorbed by parent (EPCOS→TDK, Micrel→Microchip); (2) **Suffix/naming noise** — same company, different legal-entity decoration (Fair-Rite Products Corp. vs Fair-Rite); (3) **Subsidiaries/brand families** — different brand names under same parent (Stackpole/SEI, C&K Components/C&K Switches). **Proposed fix:** Replace flat alias + acquisitions with a **graph-based equivalence model**. Each MFR is a node; edges carry typed relationships (`alias`, `acquisition`, `subsidiary`, `spinoff`). `computeMfrMatch()` walks the graph: if two brands share any connected path, they're equivalent (with edge-type annotation: "MATCH (acquisition)" vs "MATCH (subsidiary)"). **Seeding:** Mine the 1,026 MFR mismatches from the JCI 1132586 enrichment run + historical VQ/RFQ mismatch data to auto-seed relationships. **Maintenance:** New mismatches from Vortex runs feed a review queue — operator confirms or rejects, graph updates. Eliminates manual whack-a-mole. **Scope:** Medium — data model + migration of existing alias/acquisition files + graph traversal in `canonicalMfr()` + review queue CLI. Compounds across every workflow that uses `mfr-equivalence.js` (Vortex, Quick Quote, Market Offer Matching, RFQ API Enrichment, MFR Reconciler).
 
 ---
 
@@ -993,7 +1002,7 @@ Worth a design conversation before building.
 | J7 | Market Offer Analysis tier hierarchy (always below RFQs) | Later | Planned |
 | J8 | Refactor enricher tier logic — express/main lanes, drop region | **Next** | Planned |
 | J9 | Distributor offer row consistency (stock vs lead-time rows) | **Next** | Planned |
-| J10 | API enrichment ROI tracker — did API-enriched RFQs convert to sales? | **Next** | Planned |
+| J10 | API enrichment ROI tracker — did API-enriched RFQs convert to sales? | **Next** | **Shipped 2026-04-15** |
 
 ---
 
@@ -1370,7 +1379,9 @@ lead time"). No schema change; no writer change; just parser output shape.
 
 ## J10. API Enrichment ROI Tracker — Did Enriched RFQs Produce Sales?
 
-**Status:** Planned | **Priority:** Next
+**Status:** Shipped 2026-04-15 | **Priority:** Next
+
+**Shipped:** `scripts/vq-enrichment-roi-tracker.js` · cron `0 7 * * 1`. Dry-run baseline (trailing 30d, 2026-04-15): 22 RFQs / 1,341 enriched lines, 7 with CQ activity, 0 SO yet (expected — enricher was only re-enabled 2026-04-09). First live digest emails Monday 2026-04-20.
 
 **Problem:** We've automated API enrichment of new RFQs (writes ~5K VQs/day at steady state), but we have no measurement of whether the enrichment actually contributes to closing business. Without that feedback loop, we don't know:
 - Which customer types / RFQ types benefit most from API data
@@ -1406,4 +1417,70 @@ lead time"). No schema change; no writer change; just parser output shape.
 
 ---
 
-*Last updated: 2026-04-14*
+## K1. Stealth Qty Cog — `shared/qty-stealth.js`
+
+**Status:** Planned | **Priority:** Next (unblocks Market Offer Spec Buy workflow)
+
+**Problem:** When analyzing a market offer as a spec-buy candidate and soliciting broker-market prices to benchmark our bid (NetComponents RFQs, direct broker asks, Vortex probes, internal analysis RFQs), sending the partner's exact offered quantity telegraphs too much:
+- Brokers reverse-engineer which supplier we're working with (exact qty appears on the supplier's list somewhere)
+- It signals we have a definite lot to move, weakening our negotiating position
+- Large exact qtys (e.g., 226,842 pcs) advertise a whole-lot motivated buyer is in play, distorting the market response
+
+We need a consistent way to transform real offered qtys into **market-natural "nice" qtys** that:
+1. **Round DOWN** so we can always fulfill with less than the offered lot
+2. **Land on common trade-qty buckets** (100 / 250 / 500 / 1K / 2.5K / 5K / 10K / 25K / 50K / 100K / 250K)
+3. Respect package-standard reel/tape sizes when known (3K / 5K / 10K for reels)
+4. Never go below a sensible floor (~100pcs — smaller reads as a sample request)
+
+**Not the same as:** The existing `netcomponents/` supplier-stock rounding ("nearest 5/10/25/100 by magnitude"). That rule *fits the ask to a supplier's available stock* — different purpose.
+
+**Proposed API:**
+```javascript
+const { stealthQty } = require('../shared/qty-stealth');
+
+stealthQty(226842);           // → 100000
+stealthQty(403);              // → 500    (bumped up; 400 is awkward)
+stealthQty(1837);             // → 1500
+stealthQty(4571);             // → 4000
+
+stealthQty(4571, { reelSize: 3000 });         // → 3000  (package-aware)
+stealthQty(60);                                // → 100    (floor)
+stealthQty(226842, { explain: true });
+// → { originalQty: 226842, stealthQty: 100000, reason: '...' }
+```
+
+**Bucket ladder (draft, validate with brokers):**
+
+| Actual Qty | Bucket |
+|---|---|
+| 1–99 | FLOOR → 100 (or skip if truly sample-scale) |
+| 100–499 | 100 / 250 / 500 |
+| 500–999 | 500 |
+| 1K–2.4K | 1000 / 1500 / 2000 |
+| 2.5K–4.9K | 2500 / 3000 / 4000 |
+| 5K–9.9K | 5000 |
+| 10K–24K | 10000 |
+| 25K–49K | 25000 |
+| 50K–99K | 50000 |
+| 100K–249K | 100000 |
+| 250K–499K | 250000 |
+| 500K+ | 500000 (or 250000 with note "asking in waves") |
+
+**Consumers (initial):**
+- `Trading Analysis/Market Offer Analysis/` spec-buy workflow — internal analysis RFQ qtys
+- `Trading Analysis/RFQ Sourcing/netcomponents/` — for the "broker RFQ to benchmark a spec-buy" path (distinct from existing supplier-fit rounding)
+- `Trading Analysis/Stock RFQ Loading/` — broker-to-broker stock RFQs where real lot size should be hidden
+
+**Workflow integration (Spec Buy doc update needed):** When Market Offer Analysis produces a spec-buy candidate needing broker-market benchmarking, call `stealthQty()` on every line when creating the analysis RFQ. Real qty stays in `chuboe_offer_line.qty` (source of truth); stealth qty lives on the derived `chuboe_rfq_line.qty`. Never modify the offer. Real qty is recovered by joining back to the source offer for line-value math.
+
+**Open questions:**
+- Per-package vs universal buckets? (Start universal; add per-package override)
+- Floor <100 for obscure mil-spec samples?
+- Allow `mode: 'up' | 'nearest'` in addition to default `'down'`?
+- Persist stealth→real mapping for audit (`chuboe_rfq.description` tag, or a new `chuboe_rfq.stealth_source_offer_id` field?)
+
+**Effort:** ~2h for cog + unit tests, ~1h to wire into Market Offer Analysis workflow doc + spec-buy invocation point.
+
+---
+
+*Last updated: 2026-04-15*
