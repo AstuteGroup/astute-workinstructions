@@ -44,7 +44,7 @@ const { patchRecord } = require('./record-updater');
  * @throws {Error} with a `violations` list if the VQ can't be ticked
  */
 async function tickVQForPurchase(vqId, opts = {}) {
-  const { program = null, extra = {}, skipUntickCompeting = false } = opts;
+  const { program = null, extra = {}, skipUntickCompeting = false, allowCompetingTicked = false } = opts;
 
   // Apply extras FIRST so the validator sees the final state.
   // This lets callers supply missing fields (lead time, promise date, etc.)
@@ -55,7 +55,7 @@ async function tickVQForPurchase(vqId, opts = {}) {
   }
 
   // Validate. If the VQ still has violations after extras, abort.
-  const report = await validateVQForPurchase(vqId, { program });
+  const report = await validateVQForPurchase(vqId, { program, allowCompetingTicked });
 
   // The validator flags competing ticked VQs as a violation. Unless the caller
   // opts out, auto-untick them first and re-validate. This is the documented

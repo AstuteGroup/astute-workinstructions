@@ -1,0 +1,37 @@
+{
+  "verifiedAt": "2026-04-27T00:00:00Z",
+  "ownExtractCount": 78,
+  "phase1Count": 78,
+  "discrepancies": [
+    {
+      "rfqMpn": "XCF02SVOG20C",
+      "vendor": "topray",
+      "field": "spq",
+      "phase1Value": 74,
+      "verifierValue": 74,
+      "severity": "minor",
+      "note": "Phase 1 captured `74/tube` as spq=74 with packaging=F-TUBE. Source: `topray XCF02SVOG20C  60   3-4d 20+ 74/tube  14usd COO Philippines`. Cost correctly extracted as $14 (not $74). Agree with Phase 1 interpretation but flagging because 74-per-tube is unusual SPQ — could just be label noise. Non-blocking."
+    },
+    {
+      "rfqMpn": "85411AMILF",
+      "vendor": "fixchip",
+      "field": "leadTime",
+      "phase1Value": "stock",
+      "verifierValue": "In Stock",
+      "severity": "minor",
+      "note": "Source uses literal `In Stock`. Phase 1 normalized to lowercase `stock`. Both acceptable; flag for consistency review against the leadTime normalization rules in vq-loading.md."
+    },
+    {
+      "rfqMpn": "W25Q32JVSSIQ",
+      "vendor": "onway",
+      "field": "packaging",
+      "phase1Value": "REEL",
+      "verifierValue": "REEL",
+      "severity": "minor",
+      "note": "Source: `2000/reel` — Phase 1 captured spq=2000, packaging=REEL. Reasonable inference (`2000/reel` implies reel packaging) but technically the per-reel count is the only explicit signal; packaging=REEL is derived. Agree with the inference."
+    }
+  ],
+  "phase1MissingRecords": [],
+  "phase1ExtraRecords": [],
+  "summary": "Phase 1 extraction is a clean match: 78/78 records align with independent re-extraction. All 20 RFQ-MPN groups have correct per-line record counts. Critical traps were handled correctly: (1) howeher DH82029PCH dual-DC quotes split into 2 records, (2) corerine N25Q032A11EF440F dual-tier split into 2, (3) corerine 83021AMILFT dual-tier split into 2, (4) howeher 83021AMILFT dual-DC split into 2, (5) howeher 85411AMILF triple-tier split into 3, (6) mto 85411AMILF dual-tier split into 2, (7) howeher MT40A2G8NRE-083E:B dual-qty split into 2, (8) corerine MT40A2G8NRE-083E:B dual-qty split into 2, (9) pgc MT40A2G8NRE-083E:B at qty=400 (not 30000) captured as 2 partials, (10) cmarch 841N254BKILF dual-DC split into 2, (11) howeher N25Q032A13EF640E dual-DC split into 2, (12) howeher N25Q032A11EF440F dual-DC split into 2, (13) valley W25Q32JVSSIQ mislabel under W25Q32FVSSIG group preserved with note, (14) fixchip W25Q32FVSSIG duplicate preserved with flag, (15) topray XCF02SVOG20C cost=$14 not $74, (16) corerine S29GL032N90BFI033 $23 correctly extracted (variant -BFI033, not source error). Vendor MPN variants (DH82029PCH SLKM8, XC2C512-7FTG256I, 85411AMILFT) preserved in vendorNotes. COO normalization (TW→Taiwan, CN→China, MY→Malaysia, TH→Thailand, NON-CN→blank+note, cannot verify→blank+note) consistent throughout. Lead time normalization consistent (3-4d → '3-4 days', 1-2days → '1-2 days', 1-2weeks → '1-2 weeks'). 0 blocker discrepancies, 3 minor stylistic flags. Phase 1 is approved for the next workflow step."
+}

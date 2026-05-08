@@ -18,6 +18,7 @@ const path = require('path');
 // Use shared franchise API module (single source of truth for all distributor APIs)
 const { searchAllDistributors } = require('../../shared/franchise-api');
 const { writePricingResult } = require('../../shared/api-result-writer');
+const { isRestrictedMfr } = require('../../shared/restricted-mfrs');
 
 // Use shared CSV utility
 const { readCSVFile } = require('../../shared/csv-utils');
@@ -125,6 +126,7 @@ async function main() {
   const mpnIdx = headers.indexOf('MPN');
   const moqIdx = headers.indexOf('LAM MOQ');
   const shortfallIdx = headers.indexOf('Shortfall');
+  const mfrIdx = headers.indexOf('Manufacturer');
 
   if (mpnIdx === -1) {
     console.error('ERROR: MPN column not found');
@@ -186,8 +188,17 @@ async function main() {
     console.log(`[${i + 1}/${csv.rows.length}] ${mpn} (qty: ${queryQty}, MOQ: ${moq}, shortfall: ${shortfall})`);
 
     try {
-      // Query all franchise APIs at MOQ
+      // Query all franchise APIs at MOQ — sourcing workflow runs unchanged for
+      // every line so chuboe_pricing_api_result captures market intel even on
+      // restricted MFRs (per shared/restricted-mfrs.json policy). The
+      // RESTRICTED display masking below is LAM-Kitting-specific because this
+      // is a franchise-only program — the buyer can't act on the franchise
+      // pricing. Other programs (Stock RFQ, RFQ Sourcing, Market Offer) keep
+      // showing the data as-is.
       const { trimmed, raw } = await queryFranchiseAPIs(mpn, queryQty);
+
+      const mfrText = mfrIdx >= 0 ? row[mfrIdx] : '';
+      const restrictedCanonical = isRestrictedMfr({ mfrName: mfrText });
 
       // Find best in-stock option and best lead time option
       const inStockOption = findBestInStock(trimmed, queryQty);
@@ -198,20 +209,35 @@ async function main() {
       // signal that the part needs manual franchise sourcing or broker routing, and was
       // previously mis-labeled SOURCED (misleading when buyer scans column AG).
       const foundAny = !!(inStockOption || leadTimeOption);
-      results[i].sourcingStatus = foundAny ? 'SOURCED' : 'NO COVERAGE';
-      results[i].franchise = {
-        inStockSupplier: inStockOption?.supplier || '',
-        inStockPrice: inStockOption?.price || '',
-        inStockQty: inStockOption?.qty || '',
-        leadTimeSupplier: leadTimeOption?.supplier || '',
-        leadTimePrice: leadTimeOption?.price || '',
-        leadTimeWeeks: leadTimeOption?.leadTime || '',
-      };
+
+      if (restrictedCanonical) {
+        // LAM is franchise-only and cannot purchase ADI/Maxim/Linear/TI through
+        // distribution. Hide the franchise pricing so the buyer doesn't act on
+        // it; rawFranchise stays populated for chuboe_pricing_api_result and
+        // for the rfq-writer (which applies its own write-side gate).
+        results[i].sourcingStatus = `RESTRICTED - ${restrictedCanonical}`;
+        results[i].franchise = {
+          inStockSupplier: '', inStockPrice: '', inStockQty: '',
+          leadTimeSupplier: '', leadTimePrice: '', leadTimeWeeks: '',
+        };
+      } else {
+        results[i].sourcingStatus = foundAny ? 'SOURCED' : 'NO COVERAGE';
+        results[i].franchise = {
+          inStockSupplier: inStockOption?.supplier || '',
+          inStockPrice: inStockOption?.price || '',
+          inStockQty: inStockOption?.qty || '',
+          leadTimeSupplier: leadTimeOption?.supplier || '',
+          leadTimePrice: leadTimeOption?.price || '',
+          leadTimeWeeks: leadTimeOption?.leadTime || '',
+        };
+      }
       // Save raw franchise results for VQ writing downstream
       results[i].rawFranchise = raw;
 
       // Brief status
-      if (inStockOption) {
+      if (restrictedCanonical) {
+        console.log(`    ⊘ RESTRICTED (${restrictedCanonical}) — franchise pricing hidden, manual sourcing required`);
+      } else if (inStockOption) {
         console.log(`    ✓ In Stock: ${inStockOption.supplier} - $${inStockOption.price} x ${inStockOption.qty}`);
       } else if (leadTimeOption) {
         console.log(`    ~ Lead Time: ${leadTimeOption.supplier} - $${leadTimeOption.price} (${leadTimeOption.leadTime})`);
@@ -453,8 +479,9 @@ async function writeEnrichedOutput(results, originalHeaders, outputPath) {
       };
     }
 
-    // Sourcing Status cell — color-code the three states
+    // Sourcing Status cell — color-code the four states
     //   SKIPPED - TIMEOUT/ERROR → red (needs re-run)
+    //   RESTRICTED - <MFR>      → gray (franchise-only program can't buy this — manual)
     //   NO COVERAGE             → orange (APIs clean but zero match — manual sourcing/broker)
     //   SOURCED                 → no fill (default, nothing actionable)
     const statusCol = allHeaders.indexOf('Sourcing Status') + 1;
@@ -462,6 +489,10 @@ async function writeEnrichedOutput(results, originalHeaders, outputPath) {
     if (statusVal === 'SKIPPED - TIMEOUT/ERROR') {
       const cell = excelRow.getCell(statusCol);
       cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFF9999' } };
+      cell.font = { bold: true };
+    } else if (typeof statusVal === 'string' && statusVal.startsWith('RESTRICTED')) {
+      const cell = excelRow.getCell(statusCol);
+      cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFD9D9D9' } };
       cell.font = { bold: true };
     } else if (statusVal === 'NO COVERAGE') {
       const cell = excelRow.getCell(statusCol);

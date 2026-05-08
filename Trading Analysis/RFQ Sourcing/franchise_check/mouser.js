@@ -20,20 +20,10 @@
 const https = require('https');
 const path = require('path');
 
-// Bucket A: deferred retry queue for rate-limited / transient API failures.
-// Loaded lazily so this module can still be required without astute-workinstructions
-// being on the same path (defensive — fall through if helper not present).
-let _enqueueRetry = null;
-function enqueueRetrySafe(opts) {
-  try {
-    if (!_enqueueRetry) {
-      _enqueueRetry = require(path.resolve(__dirname, '../../../shared/api-queue')).enqueueRetry;
-    }
-    return _enqueueRetry(opts);
-  } catch (e) {
-    return false;
-  }
-}
+// Note: per-cog retry-enqueue logic was removed 2026-05-06. All retry decisions
+// now happen centrally in shared/franchise-api.js via shared/api-retry-policy.js.
+// `path` is kept because the diagnostic logging in mouserRequest below uses it
+// (and to remain consistent with sibling cogs that need it for module resolution).
 
 // Mouser API Configuration.
 //
@@ -98,8 +88,60 @@ function mouserRequest(path, method = 'POST', body = null) {
       let data = '';
       res.on('data', chunk => data += chunk);
       res.on('end', () => {
-        if (res.statusCode === 401 || res.statusCode === 403) {
-          reject(new Error('Unauthorized - check API key'));
+        // Diagnostic: every non-200 gets logged with full status + headers + body
+        // to ~/workspace/.mouser-failures.ndjson so we can determine whether the
+        // "auth flap" investigation (5/6) is actually 401, 403, 429, or something
+        // else, and whether Mouser surfaces quota/rate-limit headers we're ignoring.
+        // Remove this block once we have evidence + a real fix in place.
+        if (res.statusCode !== 200) {
+          try {
+            const fs = require('fs');
+            const line = JSON.stringify({
+              ts: new Date().toISOString(),
+              status: res.statusCode,
+              path: path.split('?')[0],
+              mpn: body?.SearchByPartRequest?.mouserPartNumber || null,
+              hdrs: {
+                date: res.headers.date,
+                'retry-after': res.headers['retry-after'],
+                'x-rate-limit-limit': res.headers['x-rate-limit-limit'],
+                'x-rate-limit-remaining': res.headers['x-rate-limit-remaining'],
+                'x-rate-limit-reset': res.headers['x-rate-limit-reset'],
+                'x-quota-limit': res.headers['x-quota-limit'],
+                'x-quota-remaining': res.headers['x-quota-remaining'],
+                'x-ratelimit-remaining': res.headers['x-ratelimit-remaining'],
+                'x-ratelimit-reset': res.headers['x-ratelimit-reset'],
+                'www-authenticate': res.headers['www-authenticate'],
+              },
+              body: data.substring(0, 500),
+            }) + '\n';
+            fs.appendFileSync('/home/analytics_user/workspace/.mouser-failures.ndjson', line);
+          } catch { /* don't break the request path on logging failure */ }
+        }
+        if (res.statusCode === 401) {
+          reject(new Error('Unauthorized 401 - check API key'));
+          return;
+        }
+        if (res.statusCode === 403) {
+          // Mouser uses 403 (not 429) for rate limiting — confirmed 2026-05-06
+          // via diagnostic log. Body shape:
+          //   {"Errors":[{"Code":"TooManyRequests","Message":"Maximum calls per minute exceeded.",
+          //               "ResourceKey":"MaxCallPerMinute"}]}
+          // We parse out ResourceKey/Code so the centralized classifier can
+          // route per-minute limits to a short backoff (~2 min) instead of
+          // the generic 1h RATE_LIMIT backoff.
+          let detail = 'permissions issue';
+          try {
+            const body = JSON.parse(data);
+            const e0 = body?.Errors?.[0];
+            const key = e0?.ResourceKey;
+            const code = e0?.Code;
+            if (key === 'MaxCallPerMinute') detail = 'per-minute rate limit (MaxCallPerMinute)';
+            else if (key === 'MaxCallPerDay' || code === 'MaxCallPerDay') detail = 'daily quota exhausted (MaxCallPerDay)';
+            else if (code === 'TooManyRequests') detail = 'too many requests (' + (key || 'no key') + ')';
+            else if (key || code) detail = 'forbidden (' + (key || code) + ')';
+          } catch { /* keep default detail */ }
+          reject(new Error('Mouser HTTP 403 — ' + detail));
           return;
         }
         if (res.statusCode === 429) {
@@ -148,30 +190,10 @@ async function searchPart(mpn, rfqQty = 1, options = {}) {
     },
   };
 
-  let json;
-  try {
-    json = await mouserRequest(MOUSER_CONFIG.partSearchPath, 'POST', body);
-  } catch (err) {
-    // Bucket A — auto-enqueue on rate limit / quota / transient errors so
-    // the worker retries when Mouser's window resets. mouserRequest already
-    // throws "Rate limited" on HTTP 429 and "API error 5xx" on server errors.
-    const msg = err.message || '';
-    const isRateLimit = msg.includes('Rate limited') || msg.includes('429');
-    const isServerError = /API error 5\d\d/.test(msg) || msg.includes('timeout');
-    if (isRateLimit || isServerError) {
-      enqueueRetrySafe({
-        id: 'mouser-' + mpn + '-' + Date.now(),
-        kind: 'api-retry-mouser',
-        command: `node -e "require('${__dirname}/mouser').searchPart('${mpn.replace(/'/g, "\\'")}', ${rfqQty}).then(r => console.log('OK', r.found)).catch(e => { console.error(e.message); process.exit(1); })"`,
-        // Mouser daily quota = 1000 calls/day, hourly = 30/sec burst.
-        // 1h covers a transient burst limit; if it's a daily quota the
-        // worker's max_attempts (5) will eventually push to 24h territory.
-        blocked_until_hours: 1,
-        reason: `Mouser ${isRateLimit ? 'rate limit' : 'server error'} on ${mpn}: ${msg.substring(0, 120)}`,
-      });
-    }
-    throw err; // still throw so caller's error handling fires
-  }
+  // Retry-on-failure logic lives centrally in shared/franchise-api.js +
+  // shared/api-retry-policy.js. This cog just throws descriptive errors;
+  // the wrapper classifies and enqueues uniformly across all distys.
+  const json = await mouserRequest(MOUSER_CONFIG.partSearchPath, 'POST', body);
   return parseSearchResults(json, mpn, rfqQty, options);
 }
 

@@ -1,0 +1,79 @@
+RFQ Search Key,Buyer,Business Partner Search Key,Contact,MPN,MFR Text,Quoted Quantity,Cost,Currency,Date Code,MOQ,SPQ,Packaging,Lead Time,COO,RoHS,Vendor Notes
+1132932,Elaine Liang,1007571,,DH82029PCH S LKM8,Intel Corp,330,62.21,,18+,,,,3-4 days,,,reconfirm COO after PO
+1132932,Elaine Liang,1007571,,DH82029PCH S LKM8,Intel Corp,330,73.7,,22+,,,,3-4 days,,,reconfirm COO after PO
+1132932,Elaine Liang,1003688,,DH82029PCH S LKM8,Intel Corp,330,66,,20+,,,REEL,3 days,Malaysia,,Quoted MPN: DH82029PCH SLKM8; cut tape
+1132932,Elaine Liang,1003648,,DH82029PCH S LKM8,Intel,330,84.56,,22+,,,,3-4 days,Malaysia,,Quoted MPN: DH82029PCH SLKM8
+1132932,Elaine Liang,1002391,,DH82029PCH S LKM8,Intel,330,81.2,,20+,,,REEL,3-4 days,Malaysia,,Quoted MPN: DH82029PCH SLKM8; FCBGA836; New and Original
+1132932,Elaine Liang,1002391,,DH82029PCH S LKM8,Intel,330,95.32,,22+,,,REEL,3-4 days,Malaysia,,Quoted MPN: DH82029PCHSLKM8; FCBGA836; New and Original
+1132932,Elaine Liang,1003648,,W25Q32BVSSIG,Winbond,2250,1.853,,10+,,,,3-4 days,China,,
+1132932,Elaine Liang,1003643,,W25Q32JVSSIQ,Winbond,4000,0.52,,25+,,2000,REEL,1-2 days,Taiwan,,
+1132932,Elaine Liang,1003648,,W25Q32JVSSIQ,Winbond,2250,0.6,,25+,,,,3-4 days,Taiwan,,
+1132932,Elaine Liang,1002391,,W25Q32JVSSIQ,Winbond,2250,0.7,,25+,,,REEL,3-4 days,,,SOP8; New and Original
+1132932,Elaine Liang,1003803,,W25Q32JVSSIQ,Winbond,4000,0.71,,25+,,2000,REEL,3-4 days,Taiwan,,
+1132932,Elaine Liang,1007571,,W25Q32FVSSIG,Winbond,2250,0.635,,16+,,,,3-4 days,,,reconfirm COO
+1132932,Elaine Liang,1007571,,W25Q32FVSSIG,Winbond,2250,0.811,,20+,,,,3-4 days,,,reconfirm COO
+1132932,Elaine Liang,1011368,,W25Q32FVSSIG,Winbond,2250,0.683,,25+,,,,1-2 days,,,Quoted MPN: W25Q32JVSSIQ; MPN mismatch in source — vendor quoted W25Q32JVSSIQ under W25Q32FVSSIG group
+1132932,Elaine Liang,1011368,,W25Q32FVSSIG,Winbond,2250,0.76,,25+,,,,1-2 days,,,
+1132932,Elaine Liang,1003648,,W25Q32FVSSIG,Winbond,2250,0.75,,25+,,,,3-4 days,China,,
+1132932,Elaine Liang,1007351,,W25Q32FVSSIG,Winbond,2250,0.88,,25+,,,,1-2 days,,,reconfirm
+1132932,Elaine Liang,1002391,,W25Q32FVSSIG,Winbond,2250,0.774,,25+,,,REEL,3-4 days,Taiwan,,SOP8; New and Original
+1132932,Elaine Liang,1002391,,W25Q32FVSSIG,Winbond,2250,0.774,,25+,,,REEL,3-4 days,Taiwan,,SOP8; New and Original; duplicate of prior fixchip entry in source
+1132932,Elaine Liang,1002407,,XC2C512-7FT256I,AMD,30,314.28,,12+,,,,1-2 days,,,dual marking 7FT256C/7FT256I; COO NON-CN
+1132932,Elaine Liang,1003610,,XC2C512-7FT256I,AMD,30,878,,24+,,,,3-4 days,,,Quoted MPN: XC2C512-7FTG256I; -G suffix; COO reconfirm
+1132932,Elaine Liang,1004485,,XC2C512-7FT256I,AMD,30,940,,24+,,,,3-4 days,,,Quoted MPN: XC2C512-7FTG256I; Lead free; -G suffix; COO reconfirm
+1132932,Elaine Liang,1005363,,XC3S50A-4FT256I,AMD,70,24,,10+,,,,3-4 days,,,NO LABEL; cannot verify COO; reconfirm quality
+1132932,Elaine Liang,1002407,,XC3S50A-4FT256I,AMD,70,132.36,,15+,,,,1-2 weeks,,,COO NON-CN
+1132932,Elaine Liang,1004485,,XCF02SVOG20C,AMD,60,14,,20+,,74,F-TUBE,3-4 days,Philippines,,
+1132932,Elaine Liang,1006037,,XCF02SVOG20C,AMD,60,15.67,,21+,,,,3-4 days,,,reconfirm COO
+1132932,Elaine Liang,1002629,,XCF02SVOG20C,AMD,60,14.8,,21+,,,,3-4 days,China,,
+1132932,Elaine Liang,1002391,,XCF02SVOG20C,Xilinx,60,17.5,,21+,,,F-TUBE,3-4 days,,,TSSOP20; New and Original; COO NO China
+1132932,Elaine Liang,1006037,,N25Q032A11EF440F,Micron Technology Inc,2113,1.54,,16+,,,,3-4 days,,,reconfirm COO before PO
+1132932,Elaine Liang,1006037,,N25Q032A11EF440F,Micron Technology Inc,2256,1.845,,16+,,,,3-4 days,,,reconfirm COO before PO
+1132932,Elaine Liang,1002391,,N25Q032A11EF440F,Micron,6113,1.62,,16+,,,REEL,3-4 days,,,DFN8; cannot verify COO; New and Original
+1132932,Elaine Liang,1007571,,N25Q032A11EF440F,Micron Technology Inc,2113,1.595,,16+,,,,3-4 days,Taiwan,,
+1132932,Elaine Liang,1007571,,N25Q032A11EF440F,Micron Technology Inc,4000,1.98,,17+,,,,3-4 days,Taiwan,,
+1132932,Elaine Liang,1007571,,PC28F00AP30EFA,Micron Technology Inc,50,42.09,,18+,,,,3-4 days,,,reconfirm COO after PO
+1132932,Elaine Liang,1003648,,PC28F00AP30EFA,Micron,50,45.882,,18+,,,,3-4 days,China,,
+1132932,Elaine Liang,1002391,,PC28F00AP30EFA,Micron,50,46.42,,18+,,,TRAY,3-4 days,Taiwan,,BGA; New and Original
+1132932,Elaine Liang,1003648,,MT41K256M8DA-125 AIT:K,Micron,10000,8.53,,22+,,,,3-4 days,Taiwan,,
+1132932,Elaine Liang,1006037,,MT41K256M8DA-125 AIT:K,Micron,10000,9.24,,22+,,,,3-4 days,Taiwan,,
+1132932,Elaine Liang,1002391,,MT41K256M8DA-125 AIT:K,Micron,10000,9.46,,22+,,,TRAY,3-4 days,China,,BGA78; New and Original
+1132932,Elaine Liang,1007571,,MT41K256M8DA-125 AIT:K,Micron,10080,9.6,,22+,,,,3-4 days,Taiwan,,
+1132932,Elaine Liang,1007571,,841N254BKILF,Renesas,113,11.04,,20+,,,,3-4 days,Taiwan,,
+1132932,Elaine Liang,1008484,,841N254BKILF,IDT,113,11.5,,21+,,490,TRAY,3-4 days,,,reconfirm COO
+1132932,Elaine Liang,1008484,,841N254BKILF,IDT,113,16,,23+,,490,TRAY,3-4 days,,,reconfirm COO
+1132932,Elaine Liang,1003648,,2304NZGI-1LFT,Renesas,1430,9,,18+,,,,3-4 days,,,reconfirm COO after PO
+1132932,Elaine Liang,1007571,,2304NZGI-1LFT,Renesas,1430,9.305,,18+,,,,3-4 days,Taiwan,,
+1132932,Elaine Liang,1005363,,2304NZGI-1LFT,Renesas,2500,9.5,,18+,,,,3-4 days,,,
+1132932,Elaine Liang,1002391,,2304NZGI-1LFT,IDT,2869,9.55,,18+,,,,3-4 days,Taiwan,,TSSOP8; New and Original
+1132932,Elaine Liang,1008484,,2304NZGI-1LF,IDT,1430,32,,21+,,96,F-TUBE,3-4 days,,,reconfirm COO
+1132932,Elaine Liang,1003648,,83021AMILFT,IDT,1660,3.15,,18+,,,,3-4 days,Taiwan,,
+1132932,Elaine Liang,1007571,,83021AMILFT,Renesas,1660,5.428,,18+,,,,3-4 days,Taiwan,,
+1132932,Elaine Liang,1007571,,83021AMILFT,Renesas,1025,4.341,,21+,,,,3-4 days,Taiwan,,
+1132932,Elaine Liang,1006037,,83021AMILFT,Renesas,1025,7.69,,21+,,,,3-4 days,Taiwan,,
+1132932,Elaine Liang,1006037,,83021AMILFT,Renesas,1660,7.69,,18+,,,,3-4 days,Taiwan,,
+1132932,Elaine Liang,1008484,,83021AMILFT,IDT,1660,8.8,,21+,,3000,REEL,3-4 days,,,reconfirm COO
+1132932,Elaine Liang,1003648,,85411AMILF,IDT,830,10.809,,19+,,,,3-4 days,,,cannot verify COO
+1132932,Elaine Liang,1007571,,85411AMILF,Renesas,830,11.08,,19+,,,,3-4 days,Taiwan,,Quoted MPN: 85411AMILFT
+1132932,Elaine Liang,1007571,,85411AMILF,Renesas,606,13.8,,21+,,,,3-4 days,Taiwan,,
+1132932,Elaine Liang,1007571,,85411AMILF,Renesas,830,15.21,,23+,,,,3-4 days,Taiwan,,
+1132932,Elaine Liang,1002391,,85411AMILF,Renesas,830,12.73,,19+,,,REEL,stock,Taiwan,,Quoted MPN: 85411AMILFT; SOP8; New and Original; EOL
+1132932,Elaine Liang,1005363,,85411AMILF,Renesas,830,15.9,,23+,,,,3-4 days,Taiwan,,
+1132932,Elaine Liang,1005363,,85411AMILF,Renesas,113,23,,22+,,,,3-4 days,,,
+1132932,Elaine Liang,1007571,,S29GL032N90BFI032,Infineon,690,3.82,,23+,,,,3-4 days,,,reconfirm COO after PO
+1132932,Elaine Liang,1003648,,S29GL032N90BFI032,Infineon,690,4.544,,23+,,,,3-4 days,Thailand,,
+1132932,Elaine Liang,1006037,,S29GL032N90BFI032,Infineon,690,5.48,,23+,,,,3-4 days,Thailand,,
+1132932,Elaine Liang,1006037,,S29GL032N90BFI033,Infineon,690,23,,18+,,,,3-4 days,Thailand,,
+1132932,Elaine Liang,1003648,,N25Q032A13EF640F,Micron,400,0.779,,19+,,,,3-4 days,China,,
+1132932,Elaine Liang,1002301,,N25Q032A13EF640F,Micron Technology Inc,400,0.8,,18+,,4000,REEL,3-4 days,,,
+1132932,Elaine Liang,1002391,,N25Q032A13EF640F,Micron,400,0.811,,18+,,,REEL,3-4 days,China,,VDFN8; New and Original
+1132932,Elaine Liang,1003648,,N25Q032A13EF640E,Micron,359,2.878,,17+,,,,3-4 days,China,,
+1132932,Elaine Liang,1007571,,N25Q032A13EF640E,Micron,107,3.24,,18+,,,,3-4 days,Taiwan,,
+1132932,Elaine Liang,1007571,,N25Q032A13EF640E,Micron,115,3.249,,14+,,,,3-4 days,Taiwan,,
+1132932,Elaine Liang,1007571,,MT40A2G8NRE-083E:B,Micron Technology Inc,2000,27.5,,20+,,,,3-4 days,Taiwan,,
+1132932,Elaine Liang,1007571,,MT40A2G8NRE-083E:B,Micron Technology Inc,8000,49.5,,20+,,,,3-4 days,Taiwan,,
+1132932,Elaine Liang,1006037,,MT40A2G8NRE-083E:B,Micron Technology Inc,2000,29,,20+,,,,3-4 days,Taiwan,,
+1132932,Elaine Liang,1006037,,MT40A2G8NRE-083E:B,Micron Technology Inc,8000,49.3,,20+,,,,3-4 days,Taiwan,,
+1132932,Elaine Liang,1002301,,MT40A2G8NRE-083E:B,Micron Technology Inc,2000,44,,20+,,,,3-4 days,,,
+1132932,Elaine Liang,1003648,,MT40A2G8NRE-083E:B,Micron,400,37.5,,19+,,,,3-4 days,,,partial qty (400 of 30000 RFQ qty)
+1132932,Elaine Liang,1003648,,MT40A2G8NRE-083E:B,Micron,400,66.17,,20+,,,,3-4 days,,,partial qty (400 of 30000 RFQ qty); cannot verify COO

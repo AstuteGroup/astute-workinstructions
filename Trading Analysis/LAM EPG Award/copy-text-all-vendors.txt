@@ -1,0 +1,1614 @@
+RFQ
+  Customer: Lam Research
+  Total Revenue:
+  Total Cost: 129.26
+  Gross Profit:
+  Profit Margin: 0%
+
+RFQ
+  Customer: Lam Research
+  Total Revenue:
+  Total Cost: 296.05
+  Gross Profit:
+  Profit Margin: 0%
+
+RFQ
+  Customer: Lam Research
+  Total Revenue:
+  Total Cost: 1057.35
+  Gross Profit:
+  Profit Margin: 0%
+
+RFQ
+  Customer: Lam Research
+  Total Revenue:
+  Total Cost: 28.42
+  Gross Profit:
+  Profit Margin: 0%
+
+RFQ
+  Customer: Lam Research
+  Total Revenue:
+  Total Cost: 745.00
+  Gross Profit:
+  Profit Margin: 0%
+
+RFQ
+  Customer: Lam Research
+  Total Revenue:
+  Total Cost: 411.40
+  Gross Profit:
+  Profit Margin: 0%
+
+RFQ
+  Customer: Lam Research
+  Total Revenue:
+  Total Cost: 11.94
+  Gross Profit:
+  Profit Margin: 0%
+
+RFQ
+  Customer: Lam Research
+  Total Revenue:
+  Total Cost: 720.92
+  Gross Profit:
+  Profit Margin: 0%
+
+RFQ
+  Customer: Lam Research
+  Total Revenue:
+  Total Cost: 130.20
+  Gross Profit:
+  Profit Margin: 0%
+
+RFQ
+  Customer: Lam Research
+  Total Revenue:
+  Total Cost: 61.80
+  Gross Profit:
+  Profit Margin: 0%
+
+RFQ
+  Customer: Lam Research
+  Total Revenue:
+  Total Cost: 245.91
+  Gross Profit:
+  Profit Margin: 0%
+
+RFQ
+  Customer: Lam Research
+  Total Revenue:
+  Total Cost: 123.54
+  Gross Profit:
+  Profit Margin: 0%
+
+RFQ
+  Customer: Lam Research
+  Total Revenue:
+  Total Cost: 220.72
+  Gross Profit:
+  Profit Margin: 0%
+
+RFQ
+  Customer: Lam Research
+  Total Revenue:
+  Total Cost: 1914.00
+  Gross Profit:
+  Profit Margin: 0%
+
+RFQ
+  Customer: Lam Research
+  Total Revenue:
+  Total Cost: 216.30
+  Gross Profit:
+  Profit Margin: 0%
+
+RFQ
+  Customer: Lam Research
+  Total Revenue:
+  Total Cost: 603.10
+  Gross Profit:
+  Profit Margin: 0%
+
+RFQ
+  Customer: Lam Research
+  Total Revenue:
+  Total Cost:
+  Gross Profit:
+  Profit Margin: 0%
+
+RFQ
+  Customer: Lam Research
+  Total Revenue:
+  Total Cost: 256.49
+  Gross Profit:
+  Profit Margin: 0%
+
+RFQ
+  Customer: Lam Research
+  Total Revenue:
+  Total Cost: 231.12
+  Gross Profit:
+  Profit Margin: 0%
+
+RFQ
+  Customer: Lam Research
+  Total Revenue:
+  Total Cost: 382.96
+  Gross Profit:
+  Profit Margin: 0%
+
+RFQ
+  Customer: Lam Research
+  Total Revenue:
+  Total Cost: 196.00
+  Gross Profit:
+  Profit Margin: 0%
+
+RFQ
+  Customer: Lam Research
+  Total Revenue:
+  Total Cost: 1036.15
+  Gross Profit:
+  Profit Margin: 0%
+
+RFQ
+  Customer: Lam Research
+  Total Revenue:
+  Total Cost: 64.35
+  Gross Profit:
+  Profit Margin: 0%
+
+RFQ
+  Customer: Lam Research
+  Total Revenue:
+  Total Cost: 115.75
+  Gross Profit:
+  Profit Margin: 0%
+
+RFQ
+  Customer: Lam Research
+  Total Revenue:
+  Total Cost: 1187.10
+  Gross Profit:
+  Profit Margin: 0%
+
+RFQ
+  Customer: Lam Research
+  Total Revenue:
+  Total Cost: 192.00
+  Gross Profit:
+  Profit Margin: 0%
+
+RFQ
+  Customer: Lam Research
+  Total Revenue:
+  Total Cost: 147.20
+  Gross Profit:
+  Profit Margin: 0%
+
+RFQ
+  Customer: Lam Research
+  Total Revenue:
+  Total Cost: 228.75
+  Gross Profit:
+  Profit Margin: 0%
+
+RFQ
+  Customer: Lam Research
+  Total Revenue:
+  Total Cost: 292.34
+  Gross Profit:
+  Profit Margin: 0%
+
+RFQ
+  Customer: Lam Research
+  Total Revenue:
+  Total Cost: 534.46
+  Gross Profit:
+  Profit Margin: 0%
+
+RFQ
+  Customer: Lam Research
+  Total Revenue:
+  Total Cost: 654.50
+  Gross Profit:
+  Profit Margin: 0%
+
+RFQ
+  Customer: Lam Research
+  Total Revenue:
+  Total Cost: 447.80
+  Gross Profit:
+  Profit Margin: 0%
+
+RFQ
+  Customer: Lam Research
+  Total Revenue:
+  Total Cost: 301.14
+  Gross Profit:
+  Profit Margin: 0%
+
+RFQ
+  Customer: Lam Research
+  Total Revenue:
+  Total Cost: 124.80
+  Gross Profit:
+  Profit Margin: 0%
+
+RFQ
+  Customer: Lam Research
+  Total Revenue:
+  Total Cost: 263.00
+  Gross Profit:
+  Profit Margin: 0%
+
+RFQ
+  Customer: Lam Research
+  Total Revenue:
+  Total Cost: 265.50
+  Gross Profit:
+  Profit Margin: 0%
+
+RFQ
+  Customer: Lam Research
+  Total Revenue:
+  Total Cost: 1089.00
+  Gross Profit:
+  Profit Margin: 0%
+
+RFQ Line
+  RFQ Line #: 50
+  Purchase Qty: 2000
+  Sold Qty:
+  Total Revenue:
+  Total Cost: 1914.00
+  Gross Profit:
+  Profit Margin: 0%
+  Sales Rep: Josh Syre
+  Public Customer Notes:
+  Private Customer Notes:
+
+Vendor Quote
+  Vendor: Master Electronics
+  Vendor Type: Franchise
+  Traceability: Authorized Distribution Certs
+  Contact:
+  Contact Email:
+  Contact Phone:
+  MPN: DLS1XS4AA35X
+  Ship-To Warehouse: BROWNSVILLE
+  Inventory Group Identifier: W111: LAM KITTING
+  Cost: 0.957 USD
+  Quantity: 2000
+  Date Code: within 2 years
+  COO: PENDING
+  Lead Time: 10 Week(s)
+  Packaging: OTHER
+  Shipper: FedEx Ground
+  RoHS: Y
+  Public Vendor Order Notes: AVL alternate to K85X-ED-9S-CBR; Master at LAM target $3.545
+  Private Vendor Order Notes:
+  Inco Term: The seller makes the goods available at its location, so the buyer can take over all the transportation costs and also bears the risks of bringing the goods to their final destination.
+  MFR: CONEC Elektronische Bauelemente GmbH
+  Buyer: Jake Harris
+
+RFQ Line
+  RFQ Line #: 110
+  Purchase Qty: 30
+  Sold Qty:
+  Total Revenue:
+  Total Cost: 720.92
+  Gross Profit:
+  Profit Margin: 0%
+  Sales Rep: Josh Syre
+  Public Customer Notes:
+  Private Customer Notes:
+
+Vendor Quote
+  Vendor: Fuses Unlimited
+  Vendor Type: Catalog
+  Traceability: Authorized Distribution Certs
+  Contact:
+  Contact Email:
+  Contact Phone:
+  MPN: LP-CC-30
+  Ship-To Warehouse: BROWNSVILLE
+  Inventory Group Identifier: W111: LAM KITTING
+  Cost: 24.0308 USD
+  Quantity: 30
+  Date Code: within 2 years
+  COO: PENDING
+  Lead Time: stock
+  Packaging: OTHER
+  Shipper: FedEx Ground
+  RoHS: Y
+  Public Vendor Order Notes:
+  Private Vendor Order Notes:
+  Inco Term: The seller makes the goods available at its location, so the buyer can take over all the transportation costs and also bears the risks of bringing the goods to their final destination.
+  MFR: Eaton
+  Buyer: Jake Harris
+
+RFQ Line
+  RFQ Line #: 130
+  Purchase Qty: 142
+  Sold Qty:
+  Total Revenue:
+  Total Cost: 123.54
+  Gross Profit:
+  Profit Margin: 0%
+  Sales Rep: Josh Syre
+  Public Customer Notes:
+  Private Customer Notes:
+
+Vendor Quote
+  Vendor: Waldom Electronics
+  Vendor Type: Catalog
+  Traceability: Authorized Distribution Certs
+  Contact:
+  Contact Email:
+  Contact Phone:
+  MPN: DLS2XS4AA35X
+  Ship-To Warehouse: BROWNSVILLE
+  Inventory Group Identifier: W111: LAM KITTING
+  Cost: 0.87 USD
+  Quantity: 142
+  Date Code: within 2 years
+  COO: PENDING
+  Lead Time:
+  Packaging: OTHER
+  Shipper: FedEx Ground
+  RoHS: Y
+  Public Vendor Order Notes: AVL alternate to K85X-AD-15S-CBR; PARTIAL 142/1000 from stock; 858 ea remaining
+  Private Vendor Order Notes:
+  Inco Term: The seller makes the goods available at its location, so the buyer can take over all the transportation costs and also bears the risks of bringing the goods to their final destination.
+  MFR: CONEC Elektronische Bauelemente GmbH
+  Buyer: Jake Harris
+
+RFQ Line
+  RFQ Line #: 150
+  Purchase Qty: 10
+  Sold Qty:
+  Total Revenue:
+  Total Cost: 534.46
+  Gross Profit:
+  Profit Margin: 0%
+  Sales Rep: Josh Syre
+  Public Customer Notes:
+  Private Customer Notes:
+
+Vendor Quote
+  Vendor: SMARTEL ELECTRONICS (ASIA) CO LTD
+  Vendor Type: Global Sourcing
+  Traceability: Non-Traceable
+  Contact:
+  Contact Email:
+  Contact Phone:
+  MPN: XC6SLX100-3FGG484C
+  Ship-To Warehouse: HONG KONG
+  Inventory Group Identifier: ALLOCATED/PRESOLD
+  Cost: 53.4463 USD
+  Quantity: 10
+  Date Code: 22+
+  COO: PENDING
+  Lead Time: stock
+  Packaging: OTHER
+  Shipper: FedEx International Economy (2-5 day)
+  RoHS: Y
+  Public Vendor Order Notes: STOCK (absorbs rebalance from EPM240+LTC4231; real Smartel $41.00)
+  Private Vendor Order Notes:
+  Inco Term: The seller makes the goods available at its location, so the buyer can take over all the transportation costs and also bears the risks of bringing the goods to their final destination.
+  MFR: Xilinx Inc
+  Buyer: Tracy Xie
+
+RFQ Line
+  RFQ Line #: 210
+  Purchase Qty: 20
+  Sold Qty:
+  Total Revenue:
+  Total Cost: 382.96
+  Gross Profit:
+  Profit Margin: 0%
+  Sales Rep: Josh Syre
+  Public Customer Notes:
+  Private Customer Notes:
+
+Vendor Quote
+  Vendor: Fuses Unlimited
+  Vendor Type: Catalog
+  Traceability: Authorized Distribution Certs
+  Contact:
+  Contact Email:
+  Contact Phone:
+  MPN: KLKR007.T
+  Ship-To Warehouse: BROWNSVILLE
+  Inventory Group Identifier: W111: LAM KITTING
+  Cost: 19.148 USD
+  Quantity: 20
+  Date Code: within 2 years
+  COO: PENDING
+  Lead Time: stock
+  Packaging: OTHER
+  Shipper: FedEx Ground
+  RoHS: Y
+  Public Vendor Order Notes:
+  Private Vendor Order Notes:
+  Inco Term: The seller makes the goods available at its location, so the buyer can take over all the transportation costs and also bears the risks of bringing the goods to their final destination.
+  MFR: Littelfuse Inc
+  Buyer: Jake Harris
+
+RFQ Line
+  RFQ Line #: 240
+  Purchase Qty: 105
+  Sold Qty:
+  Total Revenue:
+  Total Cost: 1057.35
+  Gross Profit:
+  Profit Margin: 0%
+  Sales Rep: Josh Syre
+  Public Customer Notes:
+  Private Customer Notes:
+
+Vendor Quote
+  Vendor: Amatom
+  Vendor Type: New/Ungraded Vendor
+  Traceability: Non-Traceable
+  Contact:
+  Contact Email:
+  Contact Phone:
+  MPN: 18130B-S-0632-28
+  Ship-To Warehouse: BROWNSVILLE
+  Inventory Group Identifier: W111: LAM KITTING
+  Cost: 10.07 USD
+  Quantity: 105
+  Date Code: within 2 years
+  COO: PENDING
+  Lead Time: stock
+  Packaging: OTHER
+  Shipper: FedEx Ground
+  RoHS: Y
+  Public Vendor Order Notes: STOCK (3800 on hand at Amatom; LAM target $17.50)
+  Private Vendor Order Notes:
+  Inco Term: The seller makes the goods available at its location, so the buyer can take over all the transportation costs and also bears the risks of bringing the goods to their final destination.
+  MFR: Amatom
+  Buyer: Jake Harris
+
+RFQ Line
+  RFQ Line #: 270
+  Purchase Qty: 85
+  Sold Qty:
+  Total Revenue:
+  Total Cost: 1036.15
+  Gross Profit:
+  Profit Margin: 0%
+  Sales Rep: Josh Syre
+  Public Customer Notes:
+  Private Customer Notes:
+
+Vendor Quote
+  Vendor: Amatom
+  Vendor Type: New/Ungraded Vendor
+  Traceability: Non-Traceable
+  Contact:
+  Contact Email:
+  Contact Phone:
+  MPN: 18126B-S-0632-28
+  Ship-To Warehouse: BROWNSVILLE
+  Inventory Group Identifier: W111: LAM KITTING
+  Cost: 12.19 USD
+  Quantity: 85
+  Date Code: within 2 years
+  COO: PENDING
+  Lead Time: 9-10 weeks
+  Packaging: OTHER
+  Shipper: FedEx Ground
+  RoHS: Y
+  Public Vendor Order Notes: 9-10 week lead time; LAM target $19.75; NCNR per quote
+  Private Vendor Order Notes:
+  Inco Term: The seller makes the goods available at its location, so the buyer can take over all the transportation costs and also bears the risks of bringing the goods to their final destination.
+  MFR: Amatom
+  Buyer: Jake Harris
+
+RFQ Line
+  RFQ Line #: 280
+  Purchase Qty: 210
+  Sold Qty:
+  Total Revenue:
+  Total Cost: 1187.10
+  Gross Profit:
+  Profit Margin: 0%
+  Sales Rep: Josh Syre
+  Public Customer Notes:
+  Private Customer Notes:
+
+Vendor Quote
+  Vendor: Digi-Key Electronics
+  Vendor Type: Catalog
+  Traceability: Authorized Distribution Certs
+  Contact:
+  Contact Email:
+  Contact Phone:
+  MPN: K86X-AD-26S-BR
+  Ship-To Warehouse: BROWNSVILLE
+  Inventory Group Identifier: W111: LAM KITTING
+  Cost: 5.65286 USD
+  Quantity: 210
+  Date Code: within 2 years
+  COO: PENDING
+  Lead Time:
+  Packaging: OTHER
+  Shipper: FedEx Ground
+  RoHS: Y
+  Public Vendor Order Notes: AVL alt to K86X-AD-26S-CBR; DigiKey stock; MOQ 1 SPQ 42
+  Private Vendor Order Notes:
+  Inco Term: The seller makes the goods available at its location, so the buyer can take over all the transportation costs and also bears the risks of bringing the goods to their final destination.
+  MFR: Kycon
+  Buyer: Jake Harris
+
+RFQ Line
+  RFQ Line #: 300
+  Purchase Qty: 30
+  Sold Qty:
+  Total Revenue:
+  Total Cost: 1089.00
+  Gross Profit:
+  Profit Margin: 0%
+  Sales Rep: Josh Syre
+  Public Customer Notes:
+  Private Customer Notes:
+
+Vendor Quote
+  Vendor: Digi-Key Electronics
+  Vendor Type: Catalog
+  Traceability: Authorized Distribution Certs
+  Contact:
+  Contact Email:
+  Contact Phone:
+  MPN: LCMXO2280C-3FTN256C
+  Ship-To Warehouse: BROWNSVILLE
+  Inventory Group Identifier: W111: LAM KITTING
+  Cost: 36.3 USD
+  Quantity: 30
+  Date Code: within 2 years
+  COO: PENDING
+  Lead Time:
+  Packaging: OTHER
+  Shipper: FedEx Ground
+  RoHS: Y
+  Public Vendor Order Notes: DigiKey stock: 30 | DigiKey PN: 220-1183-ND
+  Private Vendor Order Notes:
+  Inco Term: The seller makes the goods available at its location, so the buyer can take over all the transportation costs and also bears the risks of bringing the goods to their final destination.
+  MFR: Lattice Semiconductor Corp
+  Buyer: Jake Harris
+
+RFQ Line
+  RFQ Line #: 430
+  Purchase Qty: 10
+  Sold Qty:
+  Total Revenue:
+  Total Cost: 745.00
+  Gross Profit:
+  Profit Margin: 0%
+  Sales Rep: Josh Syre
+  Public Customer Notes:
+  Private Customer Notes:
+
+Vendor Quote
+  Vendor: SMARTEL ELECTRONICS (ASIA) CO LTD
+  Vendor Type: Global Sourcing
+  Traceability: Non-Traceable
+  Contact:
+  Contact Email:
+  Contact Phone:
+  MPN: EPM1270T144C4N
+  Ship-To Warehouse: HONG KONG
+  Inventory Group Identifier: ALLOCATED/PRESOLD
+  Cost: 74.5 USD
+  Quantity: 10
+  Date Code: 25+
+  COO: PENDING
+  Lead Time: stock
+  Packaging: OTHER
+  Shipper: FedEx International Economy (2-5 day)
+  RoHS: Y
+  Public Vendor Order Notes: Listed as INTEL manufacturer; STOCK
+  Private Vendor Order Notes:
+  Inco Term: The seller makes the goods available at its location, so the buyer can take over all the transportation costs and also bears the risks of bringing the goods to their final destination.
+  MFR: Altera
+  Buyer: Tracy Xie
+
+RFQ Line
+  RFQ Line #: 480
+  Purchase Qty: 50
+  Sold Qty:
+  Total Revenue:
+  Total Cost: 603.10
+  Gross Profit:
+  Profit Margin: 0%
+  Sales Rep: Josh Syre
+  Public Customer Notes:
+  Private Customer Notes:
+
+Vendor Quote
+  Vendor: CHIP ENERGY INTERNATIONAL CO.,LIMITED
+  Vendor Type: Global Sourcing
+  Traceability: Non-Traceable
+  Contact:
+  Contact Email:
+  Contact Phone:
+  MPN: LT1499CS#PBF
+  Ship-To Warehouse: HONG KONG
+  Inventory Group Identifier: ALLOCATED/PRESOLD
+  Cost: 12.062 USD
+  Quantity: 50
+  Date Code: 23+
+  COO: Malaysia
+  Lead Time: stock
+  Packaging: OTHER
+  Shipper: FedEx International Economy (2-5 day)
+  RoHS: Y
+  Public Vendor Order Notes:
+  Private Vendor Order Notes:
+  Inco Term: The seller makes the goods available at its location, so the buyer can take over all the transportation costs and also bears the risks of bringing the goods to their final destination.
+  MFR: Analog Devices Inc
+  Buyer: Tracy Xie
+
+RFQ Line
+  RFQ Line #: 640
+  Purchase Qty: 155
+  Sold Qty:
+  Total Revenue:
+  Total Cost: 296.05
+  Gross Profit:
+  Profit Margin: 0%
+  Sales Rep: Josh Syre
+  Public Customer Notes:
+  Private Customer Notes:
+
+Vendor Quote
+  Vendor: Texas Instruments
+  Vendor Type: Franchise
+  Traceability: Authorized Distribution Certs
+  Contact:
+  Contact Email:
+  Contact Phone:
+  MPN: LM5069MMX-2/NOPB
+  Ship-To Warehouse: BROWNSVILLE
+  Inventory Group Identifier: W111: LAM KITTING
+  Cost: 1.91 USD
+  Quantity: 155
+  Date Code: within 2 years
+  COO: PENDING
+  Lead Time:
+  Packaging: OTHER
+  Shipper: FedEx Ground
+  RoHS: Y
+  Public Vendor Order Notes: TI Store stock; ordering LM5069MMX-2/NOPB — X = large reel (2500pc) variant, acceptable alternate per buyer
+  Private Vendor Order Notes:
+  Inco Term: The seller makes the goods available at its location, so the buyer can take over all the transportation costs and also bears the risks of bringing the goods to their final destination.
+  MFR: Texas Instruments
+  Buyer: Jake Harris
+
+RFQ Line
+  RFQ Line #: 660
+  Purchase Qty: 20
+  Sold Qty:
+  Total Revenue:
+  Total Cost: 447.80
+  Gross Profit:
+  Profit Margin: 0%
+  Sales Rep: Josh Syre
+  Public Customer Notes:
+  Private Customer Notes:
+
+Vendor Quote
+  Vendor: SMARTEL ELECTRONICS (ASIA) CO LTD
+  Vendor Type: Global Sourcing
+  Traceability: Non-Traceable
+  Contact:
+  Contact Email:
+  Contact Phone:
+  MPN: EPM240T100C4N
+  Ship-To Warehouse: HONG KONG
+  Inventory Group Identifier: ALLOCATED/PRESOLD
+  Cost: 22.39 USD
+  Quantity: 20
+  Date Code: 19+
+  COO: PENDING
+  Lead Time: stock
+  Packaging: OTHER
+  Shipper: FedEx International Economy (2-5 day)
+  RoHS: Y
+  Public Vendor Order Notes: STOCK (booked at LAM target; rebalanced from $27)
+  Private Vendor Order Notes:
+  Inco Term: The seller makes the goods available at its location, so the buyer can take over all the transportation costs and also bears the risks of bringing the goods to their final destination.
+  MFR: Altera
+  Buyer: Tracy Xie
+
+RFQ Line
+  RFQ Line #: 690
+  Purchase Qty: 500
+  Sold Qty:
+  Total Revenue:
+  Total Cost: 265.50
+  Gross Profit:
+  Profit Margin: 0%
+  Sales Rep: Josh Syre
+  Public Customer Notes:
+  Private Customer Notes:
+
+Vendor Quote
+  Vendor: Master Electronics
+  Vendor Type: Franchise
+  Traceability: Authorized Distribution Certs
+  Contact:
+  Contact Email:
+  Contact Phone:
+  MPN: RNCF0805TKT20K0
+  Ship-To Warehouse: BROWNSVILLE
+  Inventory Group Identifier: W111: LAM KITTING
+  Cost: 0.531 USD
+  Quantity: 500
+  Date Code: within 2 years
+  COO: PENDING
+  Lead Time:
+  Packaging: OTHER
+  Shipper: FedEx Ground
+  RoHS: Y
+  Public Vendor Order Notes: AVL alt to RNCF0805TTT20K0; Master stock; MOQ 500 SPQ 1; PARTIAL 500/530, 30 rem
+  Private Vendor Order Notes:
+  Inco Term: The seller makes the goods available at its location, so the buyer can take over all the transportation costs and also bears the risks of bringing the goods to their final destination.
+  MFR: Stackpole
+  Buyer: Jake Harris
+
+RFQ Line
+  RFQ Line #: 720
+  Purchase Qty: 85
+  Sold Qty:
+  Total Revenue:
+  Total Cost: 411.40
+  Gross Profit:
+  Profit Margin: 0%
+  Sales Rep: Josh Syre
+  Public Customer Notes:
+  Private Customer Notes:
+
+Vendor Quote
+  Vendor: Sager - v3004
+  Vendor Type: Franchise
+  Traceability: Authorized Distribution Certs
+  Contact:
+  Contact Email:
+  Contact Phone:
+  MPN: K86X-AD-26P-BR
+  Ship-To Warehouse: BROWNSVILLE
+  Inventory Group Identifier: W111: LAM KITTING
+  Cost: 4.84 USD
+  Quantity: 85
+  Date Code: within 2 years
+  COO: PENDING
+  Lead Time:
+  Packaging: OTHER
+  Shipper: FedEx Ground
+  RoHS: Y
+  Public Vendor Order Notes: AVL alt to K86X-AD-26P-BR; Sager 154 days; MOQ 42 SPQ 1
+  Private Vendor Order Notes:
+  Inco Term: The seller makes the goods available at its location, so the buyer can take over all the transportation costs and also bears the risks of bringing the goods to their final destination.
+  MFR: Kycon
+  Buyer: Jake Harris
+
+RFQ Line
+  RFQ Line #: 770
+  Purchase Qty: 10
+  Sold Qty:
+  Total Revenue:
+  Total Cost: 61.80
+  Gross Profit:
+  Profit Margin: 0%
+  Sales Rep: Josh Syre
+  Public Customer Notes:
+  Private Customer Notes:
+
+Vendor Quote
+  Vendor: Dragon Core Electronics (HK) Co., Limited
+  Vendor Type: Suspended
+  Traceability: Non-Traceable
+  Contact:
+  Contact Email:
+  Contact Phone:
+  MPN: 5M1270ZT144C5N
+  Ship-To Warehouse: HONG KONG
+  Inventory Group Identifier: ALLOCATED/PRESOLD
+  Cost: 6.18 USD
+  Quantity: 10
+  Date Code: 22+
+  COO: PENDING
+  Lead Time: stock
+  Packaging: OTHER
+  Shipper: FedEx International Economy (2-5 day)
+  RoHS: Y
+  Public Vendor Order Notes: STOCK
+  Private Vendor Order Notes:
+  Inco Term: The seller makes the goods available at its location, so the buyer can take over all the transportation costs and also bears the risks of bringing the goods to their final destination.
+  MFR: Altera
+  Buyer: Tracy Xie
+
+RFQ Line
+  RFQ Line #: 830
+  Purchase Qty: 55
+  Sold Qty:
+  Total Revenue:
+  Total Cost: 64.35
+  Gross Profit:
+  Profit Margin: 0%
+  Sales Rep: Josh Syre
+  Public Customer Notes:
+  Private Customer Notes:
+
+Vendor Quote
+  Vendor: Waldom Electronics
+  Vendor Type: Catalog
+  Traceability: Authorized Distribution Certs
+  Contact:
+  Contact Email:
+  Contact Phone:
+  MPN: DLS 3XP4AA35X
+  Ship-To Warehouse: BROWNSVILLE
+  Inventory Group Identifier: W111: LAM KITTING
+  Cost: 1.17 USD
+  Quantity: 55
+  Date Code: within 2 years
+  COO: PENDING
+  Lead Time:
+  Packaging: OTHER
+  Shipper: FedEx Ground
+  RoHS: Y
+  Public Vendor Order Notes: AVL alt to K85X-BD-25P-CBR; Waldom stock; MOQ 45 SPQ 1
+  Private Vendor Order Notes:
+  Inco Term: The seller makes the goods available at its location, so the buyer can take over all the transportation costs and also bears the risks of bringing the goods to their final destination.
+  MFR: CONEC Elektronische Bauelemente GmbH
+  Buyer: Jake Harris
+
+RFQ Line
+  RFQ Line #: 880
+  Purchase Qty: 25
+  Sold Qty:
+  Total Revenue:
+  Total Cost: 263.00
+  Gross Profit:
+  Profit Margin: 0%
+  Sales Rep: Josh Syre
+  Public Customer Notes:
+  Private Customer Notes:
+
+Vendor Quote
+  Vendor: Digi-Key Electronics
+  Vendor Type: Catalog
+  Traceability: Authorized Distribution Certs
+  Contact:
+  Contact Email:
+  Contact Phone:
+  MPN: 163A16959X
+  Ship-To Warehouse: BROWNSVILLE
+  Inventory Group Identifier: W111: LAM KITTING
+  Cost: 10.52 USD
+  Quantity: 25
+  Date Code: within 2 years
+  COO: PENDING
+  Lead Time:
+  Packaging: OTHER
+  Shipper: FedEx Ground
+  RoHS: Y
+  Public Vendor Order Notes: DigiKey stock: 372 | DigiKey PN: 626-1892-ND
+  Private Vendor Order Notes:
+  Inco Term: The seller makes the goods available at its location, so the buyer can take over all the transportation costs and also bears the risks of bringing the goods to their final destination.
+  MFR: CONEC Elektronische Bauelemente GmbH
+  Buyer: Jake Harris
+
+RFQ Line
+  RFQ Line #: 920
+  Purchase Qty: 120
+  Sold Qty:
+  Total Revenue:
+  Total Cost: 124.80
+  Gross Profit:
+  Profit Margin: 0%
+  Sales Rep: Josh Syre
+  Public Customer Notes:
+  Private Customer Notes:
+
+Vendor Quote
+  Vendor: HK Firsttop Technology Ltd
+  Vendor Type: Global Sourcing
+  Traceability: Non-Traceable
+  Contact:
+  Contact Email:
+  Contact Phone:
+  MPN: ADA4891-2ARZ
+  Ship-To Warehouse: HONG KONG
+  Inventory Group Identifier: ALLOCATED/PRESOLD
+  Cost: 1.04 USD
+  Quantity: 120
+  Date Code: 21+
+  COO: Philippines
+  Lead Time: stock
+  Packaging: OTHER
+  Shipper: FedEx International Economy (2-5 day)
+  RoHS: Y
+  Public Vendor Order Notes: Quoted MPN: ADA4891-2ARZ-R7
+  Private Vendor Order Notes:
+  Inco Term: The seller makes the goods available at its location, so the buyer can take over all the transportation costs and also bears the risks of bringing the goods to their final destination.
+  MFR: Analog Devices Inc
+  Buyer: Tracy Xie
+
+RFQ Line
+  RFQ Line #: 940
+  Purchase Qty: 25
+  Sold Qty:
+  Total Revenue:
+  Total Cost: 292.34
+  Gross Profit:
+  Profit Margin: 0%
+  Sales Rep: Josh Syre
+  Public Customer Notes:
+  Private Customer Notes:
+
+Vendor Quote
+  Vendor: Digi-Key Electronics
+  Vendor Type: Catalog
+  Traceability: Authorized Distribution Certs
+  Contact:
+  Contact Email:
+  Contact Phone:
+  MPN: 163A17059X
+  Ship-To Warehouse: BROWNSVILLE
+  Inventory Group Identifier: W111: LAM KITTING
+  Cost: 11.6936 USD
+  Quantity: 25
+  Date Code: within 2 years
+  COO: PENDING
+  Lead Time:
+  Packaging: OTHER
+  Shipper: FedEx Ground
+  RoHS: Y
+  Public Vendor Order Notes: DigiKey stock: 61 | DigiKey PN: 626-1893-ND
+  Private Vendor Order Notes:
+  Inco Term: The seller makes the goods available at its location, so the buyer can take over all the transportation costs and also bears the risks of bringing the goods to their final destination.
+  MFR: CONEC Elektronische Bauelemente GmbH
+  Buyer: Jake Harris
+
+RFQ Line
+  RFQ Line #: 960
+  Purchase Qty: 25
+  Sold Qty:
+  Total Revenue:
+  Total Cost: 115.75
+  Gross Profit:
+  Profit Margin: 0%
+  Sales Rep: Josh Syre
+  Public Customer Notes:
+  Private Customer Notes:
+
+Vendor Quote
+  Vendor: Dragon Core Electronics (HK) Co., Limited
+  Vendor Type: Suspended
+  Traceability: Non-Traceable
+  Contact:
+  Contact Email:
+  Contact Phone:
+  MPN: LT8645SEV#PBF
+  Ship-To Warehouse: HONG KONG
+  Inventory Group Identifier: ALLOCATED/PRESOLD
+  Cost: 4.63 USD
+  Quantity: 25
+  Date Code: 22+
+  COO: PENDING
+  Lead Time: stock
+  Packaging: OTHER
+  Shipper: FedEx International Economy (2-5 day)
+  RoHS: Y
+  Public Vendor Order Notes: STOCK
+  Private Vendor Order Notes:
+  Inco Term: The seller makes the goods available at its location, so the buyer can take over all the transportation costs and also bears the risks of bringing the goods to their final destination.
+  MFR: Analog Devices Inc
+  Buyer: Tracy Xie
+
+RFQ Line
+  RFQ Line #: 1000
+  Purchase Qty: 15
+  Sold Qty:
+  Total Revenue:
+  Total Cost: 228.75
+  Gross Profit:
+  Profit Margin: 0%
+  Sales Rep: Josh Syre
+  Public Customer Notes:
+  Private Customer Notes:
+
+Vendor Quote
+  Vendor: SMARTEL ELECTRONICS (ASIA) CO LTD
+  Vendor Type: Global Sourcing
+  Traceability: Non-Traceable
+  Contact:
+  Contact Email:
+  Contact Phone:
+  MPN: AD5696RBRUZ
+  Ship-To Warehouse: HONG KONG
+  Inventory Group Identifier: ALLOCATED/PRESOLD
+  Cost: 15.25 USD
+  Quantity: 15
+  Date Code: 22+
+  COO: PENDING
+  Lead Time: stock
+  Packaging: OTHER
+  Shipper: FedEx International Economy (2-5 day)
+  RoHS: Y
+  Public Vendor Order Notes: Quoted MPN: AD5696RBRUZ-RL7; COO exclusion: not China
+  Private Vendor Order Notes:
+  Inco Term: The seller makes the goods available at its location, so the buyer can take over all the transportation costs and also bears the risks of bringing the goods to their final destination.
+  MFR: Analog Devices Inc
+  Buyer: Tracy Xie
+
+RFQ Line
+  RFQ Line #: 1100
+  Purchase Qty: 20
+  Sold Qty:
+  Total Revenue:
+  Total Cost: 192.00
+  Gross Profit:
+  Profit Margin: 0%
+  Sales Rep: Josh Syre
+  Public Customer Notes:
+  Private Customer Notes:
+
+Vendor Quote
+  Vendor: SMARTEL ELECTRONICS (ASIA) CO LTD
+  Vendor Type: Global Sourcing
+  Traceability: Non-Traceable
+  Contact:
+  Contact Email:
+  Contact Phone:
+  MPN: LT1376HVIS#PBF
+  Ship-To Warehouse: HONG KONG
+  Inventory Group Identifier: ALLOCATED/PRESOLD
+  Cost: 9.6 USD
+  Quantity: 20
+  Date Code: 22+
+  COO: PENDING
+  Lead Time: stock
+  Packaging: OTHER
+  Shipper: FedEx International Economy (2-5 day)
+  RoHS: Y
+  Public Vendor Order Notes: STOCK
+  Private Vendor Order Notes:
+  Inco Term: The seller makes the goods available at its location, so the buyer can take over all the transportation costs and also bears the risks of bringing the goods to their final destination.
+  MFR: Analog Devices Inc
+  Buyer: Tracy Xie
+
+RFQ Line
+  RFQ Line #: 1110
+  Purchase Qty: 25
+  Sold Qty:
+  Total Revenue:
+  Total Cost: 207.75
+  Gross Profit:
+  Profit Margin: 0%
+  Sales Rep: Josh Syre
+  Public Customer Notes:
+  Private Customer Notes:
+
+Vendor Quote
+  Vendor: SMARTEL ELECTRONICS (ASIA) CO LTD
+  Vendor Type: Global Sourcing
+  Traceability: Non-Traceable
+  Contact:
+  Contact Email:
+  Contact Phone:
+  MPN: AD586KRZ
+  Ship-To Warehouse: HONG KONG
+  Inventory Group Identifier: ALLOCATED/PRESOLD
+  Cost: 8.31 USD
+  Quantity: 25
+  Date Code: 25+
+  COO: PENDING
+  Lead Time: stock
+  Packaging: OTHER
+  Shipper: FedEx International Economy (2-5 day)
+  RoHS: Y
+  Public Vendor Order Notes: Quoted MPN: AD586KRZ-REEL7; STOCK
+  Private Vendor Order Notes:
+  Inco Term: The seller makes the goods available at its location, so the buyer can take over all the transportation costs and also bears the risks of bringing the goods to their final destination.
+  MFR: Analog Devices Inc
+  Buyer: Tracy Xie
+
+RFQ Line
+  RFQ Line #: 1280
+  Purchase Qty: 550
+  Sold Qty:
+  Total Revenue:
+  Total Cost: 11.94
+  Gross Profit:
+  Profit Margin: 0%
+  Sales Rep: Josh Syre
+  Public Customer Notes:
+  Private Customer Notes:
+
+Vendor Quote
+  Vendor: Digi-Key Electronics
+  Vendor Type: Catalog
+  Traceability: Authorized Distribution Certs
+  Contact:
+  Contact Email:
+  Contact Phone:
+  MPN: C0603C333K5RAC
+  Ship-To Warehouse: BROWNSVILLE
+  Inventory Group Identifier: W111: LAM KITTING
+  Cost: 0.0217 USD
+  Quantity: 550
+  Date Code: within 2 years
+  COO: PENDING
+  Lead Time:
+  Packaging: OTHER
+  Shipper: FedEx Ground
+  RoHS: Y
+  Public Vendor Order Notes: AVL alt to C0603T333K5RACTU; DigiKey stock; MOQ 1 SPQ 1
+  Private Vendor Order Notes:
+  Inco Term: The seller makes the goods available at its location, so the buyer can take over all the transportation costs and also bears the risks of bringing the goods to their final destination.
+  MFR: Kemet Electronics Corp
+  Buyer: Jake Harris
+
+RFQ Line
+  RFQ Line #: 1390
+  Purchase Qty: 50
+  Sold Qty:
+  Total Revenue:
+  Total Cost: 654.50
+  Gross Profit:
+  Profit Margin: 0%
+  Sales Rep: Josh Syre
+  Public Customer Notes:
+  Private Customer Notes:
+
+Vendor Quote
+  Vendor: TTI Inc
+  Vendor Type: Catalog
+  Traceability: Authorized Distribution Certs
+  Contact:
+  Contact Email:
+  Contact Phone:
+  MPN: X-1569
+  Ship-To Warehouse: BROWNSVILLE
+  Inventory Group Identifier: W111: LAM KITTING
+  Cost: 13.09 USD
+  Quantity: 50
+  Date Code: within 2 years
+  COO: PENDING
+  Lead Time:
+  Packaging: OTHER
+  Shipper: FedEx Ground
+  RoHS: Y
+  Public Vendor Order Notes: TTI stock: 2,950 | LT: 99 Weeks | MOQ: 50 | Mfr: iNRCORE | Tariff May Apply
+  Private Vendor Order Notes:
+  Inco Term: The seller makes the goods available at its location, so the buyer can take over all the transportation costs and also bears the risks of bringing the goods to their final destination.
+  MFR: INRCORE
+  Buyer: Jake Harris
+
+RFQ Line
+  RFQ Line #: 1430
+  Purchase Qty: 80
+  Sold Qty:
+  Total Revenue:
+  Total Cost: 196.00
+  Gross Profit:
+  Profit Margin: 0%
+  Sales Rep: Josh Syre
+  Public Customer Notes:
+  Private Customer Notes:
+
+Vendor Quote
+  Vendor: SMARTEL ELECTRONICS (ASIA) CO LTD
+  Vendor Type: Global Sourcing
+  Traceability: Non-Traceable
+  Contact:
+  Contact Email:
+  Contact Phone:
+  MPN: 524MILF
+  Ship-To Warehouse: HONG KONG
+  Inventory Group Identifier: ALLOCATED/PRESOLD
+  Cost: 2.45 USD
+  Quantity: 80
+  Date Code: 22+
+  COO: PENDING
+  Lead Time: stock
+  Packaging: OTHER
+  Shipper: FedEx International Economy (2-5 day)
+  RoHS: Y
+  Public Vendor Order Notes: Quoted MPN: 524MILFT; STOCK
+  Private Vendor Order Notes:
+  Inco Term: The seller makes the goods available at its location, so the buyer can take over all the transportation costs and also bears the risks of bringing the goods to their final destination.
+  MFR: Idt
+  Buyer: Tracy Xie
+
+RFQ Line
+  RFQ Line #: 1530
+  Purchase Qty: 35
+  Sold Qty:
+  Total Revenue:
+  Total Cost: 216.30
+  Gross Profit:
+  Profit Margin: 0%
+  Sales Rep: Josh Syre
+  Public Customer Notes:
+  Private Customer Notes:
+
+Vendor Quote
+  Vendor: Dragon Core Electronics (HK) Co., Limited
+  Vendor Type: Suspended
+  Traceability: Non-Traceable
+  Contact:
+  Contact Email:
+  Contact Phone:
+  MPN: ADG431BRZ
+  Ship-To Warehouse: HONG KONG
+  Inventory Group Identifier: ALLOCATED/PRESOLD
+  Cost: 6.18 USD
+  Quantity: 35
+  Date Code: 22+
+  COO: PENDING
+  Lead Time: stock
+  Packaging: OTHER
+  Shipper: FedEx International Economy (2-5 day)
+  RoHS: Y
+  Public Vendor Order Notes: Quoted MPN: ADG431BRZ-REEL7; STOCK
+  Private Vendor Order Notes:
+  Inco Term: The seller makes the goods available at its location, so the buyer can take over all the transportation costs and also bears the risks of bringing the goods to their final destination.
+  MFR: Analog Devices Inc
+  Buyer: Tracy Xie
+
+RFQ Line
+  RFQ Line #: 1540
+  Purchase Qty: 105
+  Sold Qty:
+  Total Revenue:
+  Total Cost: 28.42
+  Gross Profit:
+  Profit Margin: 0%
+  Sales Rep: Josh Syre
+  Public Customer Notes:
+  Private Customer Notes:
+
+Vendor Quote
+  Vendor: Fuses Unlimited
+  Vendor Type: Catalog
+  Traceability: Authorized Distribution Certs
+  Contact:
+  Contact Email:
+  Contact Phone:
+  MPN: #ABC-12
+  Ship-To Warehouse: BROWNSVILLE
+  Inventory Group Identifier: W111: LAM KITTING
+  Cost: 0.2707 USD
+  Quantity: 105
+  Date Code: within 2 years
+  COO: PENDING
+  Lead Time: stock
+  Packaging: OTHER
+  Shipper: FedEx Ground
+  RoHS: Y
+  Public Vendor Order Notes: BK/ABC-12-R part number accepted
+  Private Vendor Order Notes:
+  Inco Term: The seller makes the goods available at its location, so the buyer can take over all the transportation costs and also bears the risks of bringing the goods to their final destination.
+  MFR: Eaton
+  Buyer: Jake Harris
+
+RFQ Line
+  RFQ Line #: 1610
+  Purchase Qty: 40
+  Sold Qty:
+  Total Revenue:
+  Total Cost: 147.20
+  Gross Profit:
+  Profit Margin: 0%
+  Sales Rep: Josh Syre
+  Public Customer Notes:
+  Private Customer Notes:
+
+Vendor Quote
+  Vendor: Digi-Key Electronics
+  Vendor Type: Catalog
+  Traceability: Authorized Distribution Certs
+  Contact:
+  Contact Email:
+  Contact Phone:
+  MPN: IS61WV25616BLL-10TL
+  Ship-To Warehouse: BROWNSVILLE
+  Inventory Group Identifier: W111: LAM KITTING
+  Cost: 3.68 USD
+  Quantity: 40
+  Date Code: within 2 years
+  COO: PENDING
+  Lead Time:
+  Packaging: OTHER
+  Shipper: FedEx Ground
+  RoHS: Y
+  Public Vendor Order Notes: AVL alt to AS7C34098A-10TCN; DigiKey stock; MOQ 1 SPQ 135
+  Private Vendor Order Notes:
+  Inco Term: The seller makes the goods available at its location, so the buyer can take over all the transportation costs and also bears the risks of bringing the goods to their final destination.
+  MFR: Integrated Silicon Solution Inc
+  Buyer: Jake Harris
+
+RFQ Line
+  RFQ Line #: 1640
+  Purchase Qty: 900
+  Sold Qty:
+  Total Revenue:
+  Total Cost: 129.26
+  Gross Profit:
+  Profit Margin: 0%
+  Sales Rep: Josh Syre
+  Public Customer Notes:
+  Private Customer Notes:
+
+Vendor Quote
+  Vendor: Digi-Key Electronics
+  Vendor Type: Catalog
+  Traceability: Authorized Distribution Certs
+  Contact:
+  Contact Email:
+  Contact Phone:
+  MPN: ERA-8AEB1743V
+  Ship-To Warehouse: BROWNSVILLE
+  Inventory Group Identifier: W111: LAM KITTING
+  Cost: 0.14362 USD
+  Quantity: 602
+  Date Code: within 2 years
+  COO: PENDING
+  Lead Time:
+  Packaging: OTHER
+  Shipper: FedEx Ground
+  RoHS: Y
+  Public Vendor Order Notes: AVL alt; STOCK portion of stock+LT split (need 900: 602 stock + 298 LT)
+  Private Vendor Order Notes:
+  Inco Term: The seller makes the goods available at its location, so the buyer can take over all the transportation costs and also bears the risks of bringing the goods to their final destination.
+  MFR: Panasonic
+  Buyer: Jake Harris
+
+Vendor Quote
+  Vendor: Digi-Key Electronics
+  Vendor Type: Catalog
+  Traceability: Authorized Distribution Certs
+  Contact:
+  Contact Email:
+  Contact Phone:
+  MPN: ERA-8AEB1743V
+  Ship-To Warehouse: BROWNSVILLE
+  Inventory Group Identifier: W111: LAM KITTING
+  Cost: 0.14362 USD
+  Quantity: 298
+  Date Code: within 2 years
+  COO: PENDING
+  Lead Time:
+  Packaging: OTHER
+  Shipper: FedEx Ground
+  RoHS: Y
+  Public Vendor Order Notes: AVL alt; LT portion of stock+LT split (need 900: 602 stock + 298 LT)
+  Private Vendor Order Notes:
+  Inco Term: The seller makes the goods available at its location, so the buyer can take over all the transportation costs and also bears the risks of bringing the goods to their final destination.
+  MFR: Panasonic
+  Buyer: Jake Harris
+
+RFQ Line
+  RFQ Line #: 1700
+  Purchase Qty: 35
+  Sold Qty:
+  Total Revenue:
+  Total Cost: 256.49
+  Gross Profit:
+  Profit Margin: 0%
+  Sales Rep: Josh Syre
+  Public Customer Notes:
+  Private Customer Notes:
+
+Vendor Quote
+  Vendor: SMARTEL ELECTRONICS (ASIA) CO LTD
+  Vendor Type: Global Sourcing
+  Traceability: Non-Traceable
+  Contact:
+  Contact Email:
+  Contact Phone:
+  MPN: LTC4231HMS-1#PBF
+  Ship-To Warehouse: HONG KONG
+  Inventory Group Identifier: ALLOCATED/PRESOLD
+  Cost: 7.3282 USD
+  Quantity: 35
+  Date Code: 21+
+  COO: PENDING
+  Lead Time: stock
+  Packaging: OTHER
+  Shipper: FedEx International Economy (2-5 day)
+  RoHS: Y
+  Public Vendor Order Notes: STOCK (booked at LAM target; rebalanced from $8.25)
+  Private Vendor Order Notes:
+  Inco Term: The seller makes the goods available at its location, so the buyer can take over all the transportation costs and also bears the risks of bringing the goods to their final destination.
+  MFR: Analog Devices Inc
+  Buyer: Tracy Xie
+
+RFQ Line
+  RFQ Line #: 1730
+  Purchase Qty: 40
+  Sold Qty:
+  Total Revenue:
+  Total Cost: 231.12
+  Gross Profit:
+  Profit Margin: 0%
+  Sales Rep: Josh Syre
+  Public Customer Notes:
+  Private Customer Notes:
+
+Vendor Quote
+  Vendor: CHIP ENERGY INTERNATIONAL CO.,LIMITED
+  Vendor Type: Global Sourcing
+  Traceability: Non-Traceable
+  Contact:
+  Contact Email:
+  Contact Phone:
+  MPN: AD5292BRUZ-20
+  Ship-To Warehouse: HONG KONG
+  Inventory Group Identifier: ALLOCATED/PRESOLD
+  Cost: 5.778 USD
+  Quantity: 40
+  Date Code: 23+
+  COO: Malaysia
+  Lead Time: stock
+  Packaging: OTHER
+  Shipper: FedEx International Economy (2-5 day)
+  RoHS: Y
+  Public Vendor Order Notes: Quoted MPN: AD5292BRUZ-20-RL7; OWN STK
+  Private Vendor Order Notes:
+  Inco Term: The seller makes the goods available at its location, so the buyer can take over all the transportation costs and also bears the risks of bringing the goods to their final destination.
+  MFR: Analog Devices Inc
+  Buyer: Tracy Xie
+
+RFQ Line
+  RFQ Line #: 1810
+  Purchase Qty: 35
+  Sold Qty:
+  Total Revenue:
+  Total Cost: 301.14
+  Gross Profit:
+  Profit Margin: 0%
+  Sales Rep: Josh Syre
+  Public Customer Notes:
+  Private Customer Notes:
+
+Vendor Quote
+  Vendor: Texas Instruments
+  Vendor Type: Franchise
+  Traceability: Authorized Distribution Certs
+  Contact:
+  Contact Email:
+  Contact Phone:
+  MPN: UC2825AQDWREP
+  Ship-To Warehouse: BROWNSVILLE
+  Inventory Group Identifier: W111: LAM KITTING
+  Cost: 8.604 USD
+  Quantity: 35
+  Date Code: within 2 years
+  COO: PENDING
+  Lead Time:
+  Packaging: OTHER
+  Shipper: FedEx Ground
+  RoHS: Y
+  Public Vendor Order Notes: TI Store stock; PREMIUM — cost $8.604 > base $7.27, seller to update pricing with customer
+  Private Vendor Order Notes:
+  Inco Term: The seller makes the goods available at its location, so the buyer can take over all the transportation costs and also bears the risks of bringing the goods to their final destination.
+  MFR: Texas Instruments
+  Buyer: Jake Harris
+
+RFQ Line
+  RFQ Line #: 1950
+  Purchase Qty: 35
+  Sold Qty:
+  Total Revenue:
+  Total Cost: 245.91
+  Gross Profit:
+  Profit Margin: 0%
+  Sales Rep: Josh Syre
+  Public Customer Notes:
+  Private Customer Notes:
+
+Vendor Quote
+  Vendor: Digi-Key Electronics
+  Vendor Type: Catalog
+  Traceability: Authorized Distribution Certs
+  Contact:
+  Contact Email:
+  Contact Phone:
+  MPN: 163A16159X
+  Ship-To Warehouse: BROWNSVILLE
+  Inventory Group Identifier: W111: LAM KITTING
+  Cost: 7.026 USD
+  Quantity: 35
+  Date Code: within 2 years
+  COO: PENDING
+  Lead Time:
+  Packaging: OTHER
+  Shipper: FedEx Ground
+  RoHS: Y
+  Public Vendor Order Notes: DigiKey stock: 370 | DigiKey PN: 626-1798-ND
+  Private Vendor Order Notes:
+  Inco Term: The seller makes the goods available at its location, so the buyer can take over all the transportation costs and also bears the risks of bringing the goods to their final destination.
+  MFR: CONEC Elektronische Bauelemente GmbH
+  Buyer: Jake Harris
+
+RFQ Line
+  RFQ Line #: 2020
+  Purchase Qty: 200
+  Sold Qty:
+  Total Revenue:
+  Total Cost: 220.72
+  Gross Profit:
+  Profit Margin: 0%
+  Sales Rep: Josh Syre
+  Public Customer Notes:
+  Private Customer Notes:
+
+Vendor Quote
+  Vendor: Fuses Unlimited
+  Vendor Type: Catalog
+  Traceability: Authorized Distribution Certs
+  Contact:
+  Contact Email:
+  Contact Phone:
+  MPN: S505H-500-R
+  Ship-To Warehouse: BROWNSVILLE
+  Inventory Group Identifier: W111: LAM KITTING
+  Cost: 1.1036 USD
+  Quantity: 200
+  Date Code: within 2 years
+  COO: PENDING
+  Lead Time: stock
+  Packaging: OTHER
+  Shipper: FedEx Ground
+  RoHS: Y
+  Public Vendor Order Notes: BK1-S505H-500-R part number accepted
+  Private Vendor Order Notes:
+  Inco Term: The seller makes the goods available at its location, so the buyer can take over all the transportation costs and also bears the risks of bringing the goods to their final destination.
+  MFR: Eaton
+  Buyer: Jake Harris
+
+RFQ Line
+  RFQ Line #: 2040
+  Purchase Qty: 105
+  Sold Qty:
+  Total Revenue:
+  Total Cost: 130.20
+  Gross Profit:
+  Profit Margin: 0%
+  Sales Rep: Josh Syre
+  Public Customer Notes:
+  Private Customer Notes:
+
+Vendor Quote
+  Vendor: Waldom Electronics
+  Vendor Type: Catalog
+  Traceability: Authorized Distribution Certs
+  Contact:
+  Contact Email:
+  Contact Phone:
+  MPN: 84WR500KLF
+  Ship-To Warehouse: BROWNSVILLE
+  Inventory Group Identifier: W111: LAM KITTING
+  Cost: 1.24 USD
+  Quantity: 105
+  Date Code: within 2 years
+  COO: PENDING
+  Lead Time:
+  Packaging: OTHER
+  Shipper: FedEx Ground
+  RoHS: Y
+  Public Vendor Order Notes: AVL alt to TS63Y504KR10; Waldom stock; MOQ 51 SPQ 1
+  Private Vendor Order Notes:
+  Inco Term: The seller makes the goods available at its location, so the buyer can take over all the transportation costs and also bears the risks of bringing the goods to their final destination.
+  MFR: Bi Technologies
+  Buyer: Jake Harris

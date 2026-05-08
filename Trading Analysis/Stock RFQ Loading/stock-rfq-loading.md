@@ -1,206 +1,171 @@
 # Stock RFQ Loading Workflow
 
-Process customer RFQ emails received at `stockRFQ@orangetsunami.com` into the RFQ Import Template for loading into OT (iDempiere).
+> **Architecture migration, 2026-05-08**: this workflow is migrating from the static `stock-rfq-runner` daemon (with the failed `claude -p` cron lineage) to the **agent pattern** defined in [`email-workflow-architecture.md`](../../email-workflow-architecture.md). The "Agent operating instructions" section below is the new contract. The legacy daemon will be deleted once the `/schedule` routine is verified.
+
+Process customer + broker RFQ emails received at `stockRFQ@orangetsunami.com` into `chuboe_rfq` records (header + lines + line_mpn) in OT.
 
 ---
 
-## Email Account
+## Agent operating instructions (read first)
 
-```bash
-# List inbox
-himalaya envelope list --account stockrfq --folder INBOX --page-size 500
+### Your goal
 
-# Read email
-himalaya message read --account stockrfq --folder INBOX [ID]
+Your job is to **load each RFQ to OT under the correct customer BP**, capturing the demand signal even when the customer can't be cleanly resolved (fall back to Unqualified Broker). The decision tree below codifies the patterns we've seen most often, but the tree may have gaps and broker emails arrive in unpredictable shapes.
 
-# Download attachment
-himalaya attachment download --account stockrfq --folder INBOX [ID]
-```
+When the tree's prescribed steps don't fit:
+- **Use judgment.** If a customer is named in the subject, body prose, or attachment filename — even when not in any `From:` line — try to resolve them by name before falling back to Unqualified Broker.
+- **Don't let an incomplete tree override evidence in the email.** Steps below are descriptive, not exhaustive.
+- **Unqualified Broker is the right fallback only when you've genuinely exhausted resolution.** It's a default for unclear senders, not the fallback for "the tree didn't have a step for what I'm seeing."
+- **`needs_review` is a last resort.** Use it only when MPNs are ambiguous, write-back fails, or the body genuinely has no parseable signal.
 
-**Himalaya config:** `~/.config/himalaya/config.toml` (account: `stockrfq`)
+### Before any escalation, sanity-check yourself
 
----
+Before you fall back to Unqualified Broker or call `needs_review`, re-read the email and ask:
+- Is the customer named in the **subject**? (e.g., `FW: <Company> RFQ`, `<Company> shortage list`)
+- Is the customer named in the **body prose** outside the `From:` lines? (e.g., `Customer: <Company>`, `Quoting for <Company>`, `<Company> needs`)
+- Is the customer named in an **attachment filename**? (e.g., `Microsemi_RFQ_2026-04.xlsx`)
+- Did I dismiss **plain-prose line listings** (MPN + qty mentions in narrative) because they weren't a structured table?
 
-## Template: RFQ Import Template
+If yes to any of these, try the obvious thing — `resolvePartner({ companyName: '<name>', partnerType: 'customer' })` or extract the prose lines — before settling for the fallback.
 
-**File:** `RFQ Import Template.csv`
+### CLI primitives
 
-| Col | Column Name | Required | Population Logic |
-|-----|-------------|----------|------------------|
-| A | `Chuboe_RFQ_ID[Value]` | Conditional | If user provides RFQ# → use it. If not → populate with customer's BP **search_key** from DB (so user can create the RFQ). If customer not found → `1008499` (Unqualified Broker) |
-| B | `Chuboe_CPC` | **YES** | Customer's part code if distinct from MPN. If no distinct CPC exists → use the MPN |
-| C | `Chuboe_MFR_Text` | No | Manufacturer name matched to `chuboe_mfr.name` in DB. Use `mfr-aliases.json` for normalization. Same logic as Market Offer Loading |
-| D | `Chuboe_MPN` | **YES** | Manufacturer Part Number from the RFQ |
-| E | `Qty` | **YES** | Quantity requested |
-| F | `PriceEntered` | No | Customer's **target price** if provided. Leave blank if not stated |
-| G | `Description` | No | Part-specific notes. **If customer is Unqualified Broker (1008499):** put the actual customer/company name here |
-
-> **Schema reference:** For RFQ table hierarchy and where MPN/MFR/CPC fields live, see [`shared/data-model.md`](../../shared/data-model.md) § RFQ Chain.
-
-### Column A Logic (Chuboe_RFQ_ID)
+This is the contract the `/schedule` routine reads each tick. Per [`email-workflow-architecture.md`](../../email-workflow-architecture.md), the agent uses the four CLI primitives:
 
 ```
-IF user provides RFQ# → use RFQ#
-ELSE IF customer found in DB → customer BP search_key
-ELSE → "1008499" (Unqualified Broker)
+node shared/email-workflow-poller.js list                       --workflow stockrfq
+node shared/email-workflow-poller.js read <uid>                 --workflow stockrfq
+node shared/email-workflow-poller.js download-attachments <uid> --workflow stockrfq
+node shared/email-workflow-poller.js route <uid> <action> --workflow stockrfq --payload <json|file>
 ```
 
-**Why search_key?** The user needs to create the RFQ in OT first. Having the customer ID lets them quickly create the RFQ and then bulk-import the lines.
+### Per-message decision tree
 
-### Column B Logic (Chuboe_CPC)
+For each unseen message, the agent picks **one** routing action. Order of checks:
 
-```
-IF customer provides a distinct internal part code → use CPC
-ELSE → use MPN (same value as column D)
-```
+1. **Not an RFQ** → `not_rfq`
+   - Subject is a PO / order confirmation / shipping notification (`PO 12345`, `COV12345`, `SO12345`, `tracking`, `shipped`, `invoice`, `payment`, `remittance`)
+   - Subject is a follow-up (`following up`, `checking in`)
+   - Subject is OOO / auto-reply / undeliverable / bounce / read-receipt / newsletter / unsubscribe
+   - Subject is news/marketing (no MPNs in body, just headlines or promo language)
+   - Body has zero extractable MPN+qty pairs
 
-### Column C Logic (Chuboe_MFR_Text)
+2. **Customer resolution** — try in order, first match wins. Use `shared/partner-lookup.js` `resolvePartner({email, companyName, partnerType: 'customer'})` (the `'customer'` filter + the IsEmployee filter inside the resolver are the fix for the 2026-05-07 wrong-BP incident — do not weaken).
+   - **Direct send:** outer From is not `@astutegroup.com` → use that address as the lookup key.
+   - **Forwarded send (`FW:` / `Fwd:`):** parse `From:` lines in the body. Walk all of them and pick the first **non-`@astutegroup.com`** sender (skip employees who forwarded the email to us). For NetComponents-style envelopes (`From: Real Sender [real@addr] <messagesend@netcomponents.com>`), use the bracketed address.
+   - **Match found** → use `result.c_bpartner_id` (integer) as `bpartnerId`. Record `result.name` for the description if helpful.
+   - **No match** → fall back to **Unqualified Broker** (`bpartnerId: 1006505`, search key `1008499`). Capture the customer name + email and pass them as `customerName` in the payload — the handler prepends them to each line's description so the broker is discoverable in OT. **This is the default behavior, not an error.** Every RFQ with a part number is signal worth capturing.
 
-MFR resolution follows the standard pattern. See [`shared/data-model.md`](../../shared/data-model.md) § Manufacturer for resolution order.
+3. **Line extraction:**
+   - Run `download-attachments` if `has_attachment` is true. xlsx > csv > pdf preferred.
+   - For xlsx/csv: walk the first ~10 header rows looking for an MPN column. Header synonyms: mpn / part number / mfr part / aml / p/n. Other columns: qty, mfr, cpc, target price, date code, notes.
+   - If no attachment yields lines, parse the body. Inline MPN+qty tables, prose lists ("we need 5k of X, 2k of Y"), NetComponents-formatted RFQ blocks all count.
+   - Quantity normalization: strip `pcs`/`ea`/`units`; expand `5k` → `5000`. If a line has an MPN but no quantity, set qty = 0 (still load it as demand signal).
+   - **Filter junk MPNs:** reject lines whose "MPN" cell is a URL fragment (`<HTTPS://...>`, `^WWW.`, anchor-tag fragments).
+   - If 0 valid lines → `needs_review` with reason `"no parseable lines"`.
 
----
+4. **MFR resolution (per line):** Use `shared/mfr-lookup.js` `lookupMfr(mfrText)` to get canonical name + chuboe_mfr_id. If unresolved, leave both blank — the server will accept and the MFR Reconciler cron will fill the FK overnight.
 
-## Customer/Partner Matching (DO NOT SKIP)
+5. **Write to OT** → `load_rfq` with payload `{ bpartnerId, type: 'Stock', lines, customerName? }`. The handler calls `writeRFQ()` which writes the header, lines, and `chuboe_rfq_line_mpn` AVL sub-rows.
 
-**Uses shared module:** `shared/partner-lookup.js` — see `shared/partner-matching.md` for full documentation.
+### Routing actions (full payload reference)
 
-```javascript
-const { resolvePartner } = require('../../shared/partner-lookup.js');
+| Action | Required payload | Folder | Side effect |
+|---|---|---|---|
+| `load_rfq` | `{ bpartnerId, lines[] }` (also `type, description, salesrepId, userId, sourceUid, customerName`) | `Processed` | `writeRFQ()` to OT + `loaded` breadcrumb |
+| `needs_review` | `{ reason }` (also `subject, outerFrom, details`) | `NeedsReview` | Email Jake diagnostics + `needs-review` breadcrumb |
+| `not_rfq` | `{ reason }` | `NotRFQ` | Silent move + `not-rfq` breadcrumb |
 
-const result = resolvePartner({
-  email: senderEmail,
-  companyName: companyNameFromSignature,
-  partnerType: 'any'
-});
+### Line shape for `load_rfq.lines[]`
 
-if (result.matched) {
-  // Use result.search_key for Chuboe_RFQ_ID column
-} else {
-  // Use '1008499' (Unqualified Broker), put company name in Description
+```json
+{
+  "mpn": "ADS7953SDBT",       // required
+  "qty": 5000,                 // required (use 0 if not stated)
+  "mfrText": "Texas Instruments",  // optional, canonical name from lookupMfr
+  "mfrId": 1000123,                // optional, FK from lookupMfr
+  "targetPrice": 2.45,             // optional
+  "dateCode": null,                // optional
+  "cpc": "ADS7953SDBT"             // optional; default to MPN if no distinct customer code
 }
 ```
 
-**Fallback:** If no match after all tiers → use `1008499` (Unqualified Broker) and put customer name + email in Description.
+### Constants
+
+- **Unqualified Broker fallback:** `bpartnerId: 1006505` (search_key `1008499`)
+- **Default salesrep / userId:** `1000004` (Jake)
+- **Default RFQ type:** `'Stock'`
+
+These live in `shared/workflow-actions/stockrfq.js` `module.exports.constants` and should not be hardcoded by the agent — pull from the module if scripting around it.
+
+### Schedule
+
+The expected pattern is a **`/schedule` routine** that runs every 30 minutes. Recommended prompt for the routine:
+
+```
+Process all unseen messages in the stockRFQ@orangetsunami.com inbox.
+
+1. Read Trading Analysis/Stock RFQ Loading/stock-rfq-loading.md section
+   "Agent operating instructions" before starting (the .md is the source of
+   truth — do not work from prior-session memory).
+2. Run `node shared/email-workflow-poller.js list --workflow stockrfq` to
+   see unseen envelopes.
+3. For each envelope, follow the per-message decision tree in section
+   "Per-message decision tree" and dispatch via `route` with the right
+   action + payload.
+4. Default to falling back to Unqualified Broker (bpartnerId 1006505) when
+   a customer can't be confidently resolved — this is correct behavior, not
+   an error. Use needs_review only for true ambiguity (e.g., MPNs present
+   but unparseable) or write-back failure.
+5. If any single message hits a transient error, log it and continue with
+   the next message. Do not abort the batch. Email Jake a one-line summary
+   at the end if any errored.
+6. If the inbox has 0 unseen messages, exit silently.
+```
+
+On-demand invocation (operator asks "process stockrfq inbox") works identically — the agent should follow the same per-message decision tree.
+
+### Key shared modules (tools the agent calls in-session)
+
+- `shared/partner-lookup.js` — `resolvePartner({email, companyName, partnerType: 'customer'})`. The IsEmployee filter is built in (committed 2026-05-07 — do not bypass).
+- `shared/mfr-lookup.js` — `lookupMfr(mfrText)` returns `{ canonical, id }`.
+- `shared/data-model.md` — schema reference for `chuboe_rfq` chain. Read before constructing the `lines[]` payload.
+- `shared/api-writeback.md` § RFQ — REST payload structure for `writeRFQ` (the handler does this; the agent supplies the line shape).
 
 ---
 
-## Skip / Flag Rules
+## Why we process everything
+
+Every RFQ with a part number represents **activity around that part** — someone in the market wants it. Even broker blasts get loaded under Unqualified Broker (1006505) so the trading team has visibility into demand. **Not in the system ≠ junk.** The trading team decides whether to quote — that's a business decision, not a data-capture decision. Our job is to make sure the part activity is recorded.
+
+The only true skip is emails with zero extractable part data (orders, shipping notifications, marketing, newsletters, follow-ups).
+
+---
+
+## Skip / Flag Rules (summary)
 
 | Condition | Action |
-|-----------|--------|
-| Any email with MPN + quantity | **Process** — even broker blasts. Use `1008499` (Unqualified Broker) if customer not in DB |
-| Inquiry only (no parts listed) | **Skip** — move to `NotRFQ` |
-| Duplicate (same customer + parts already processed) | **Skip** — move to `Duplicates` |
-| PDF/attachment only (no inline data) | **Queue** for attachment extraction |
-| No extractable part data (pure marketing, newsletters) | **Skip** — move to `Junk` |
-
-### Why we process everything
-
-Every RFQ with a part number represents **activity around that part** — someone in the market wants it. Even if we won't quote a particular sender, capturing the MPN + quantity as an RFQ line gives the trading team visibility into demand. This data feeds into sourcing decisions, pricing intelligence, and inventory positioning.
-
-**Not in the system ≠ junk.** A sender not matching a DB partner just means they're loaded under Unqualified Broker (1008499). The trading team decides whether to quote — that's a business decision, not a data-capture decision. Our job is to make sure the part activity is recorded.
-
-**The only true skip** is emails with zero extractable part data (marketing, newsletters, general inquiries with no MPNs).
-
----
-
-## End-to-End Workflow (REQUIRED STEPS)
-
-**Every step must be completed in order. Do not skip steps.**
-
-### Step 1: Fetch Emails
-```bash
-himalaya envelope list --account stockrfq --folder INBOX --page-size 500
-```
-- List all unprocessed emails in INBOX
-- Note email IDs for processing
-
-### Step 2: Read and Categorize Emails
-- Read each email body (and attachments if needed)
-- Categorize: **Process** / **NotRFQ** / **Duplicate**
-- If it has an MPN + quantity, it gets processed — even broker blasts (see "Why we don't junk broker RFQs" above)
-
-### Step 3: Extract RFQ Line Items (Two-Agent Validation)
-- **Agent A (Extractor):** Reads emails, extracts: MPN, Qty, MFR, CPC (if distinct), target price (if given), customer name/email
-- **Agent B (Verifier):** Independently reads same emails, verifies extractions
-- Resolve discrepancies by re-reading the email
-
-### Step 4: Resolve Customer IDs (CRITICAL - DO NOT SKIP)
-For each email's sender:
-1. Extract sender email domain
-2. Look up in DB using domain-based partner matching query
-3. If found → record `search_key`
-4. If NOT found → use `1008499`, record customer name for Description
-
-### Step 5: MFR Matching
-For each manufacturer in the extracted data:
-1. Check `mfr-aliases.json` for canonical name
-2. If no alias, search DB: `SELECT name FROM adempiere.chuboe_mfr WHERE ad_client_id = 1000000 AND name ILIKE '%keyword%'`
-3. If new alias found, add to `mfr-aliases.json`
-
-### Step 6: Generate Output CSV
-- **One consolidated file per run** (not per email)
-- Filename: `RFQ_UPLOAD_YYYYMMDD.csv`
-- Template format: 7 columns matching `RFQ Import Template.csv`
-- Populate `Chuboe_RFQ_ID[Value]` with RFQ# (if given) or customer search_key
-- Populate Description with customer name if using Unqualified Broker (1008499)
-
-**Output location:** `Trading Analysis/Stock RFQ Loading/output/`
-
-### Step 7: Route and Move Emails
-```bash
-# Move processed emails (includes broker RFQs loaded as 1008499)
-himalaya message move --account stockrfq --folder INBOX Processed [IDs...]
-```
-
-| Condition | Folder |
-|-----------|--------|
-| Processed (any email with MPN+qty, including brokers) | `Processed` |
-| Not an RFQ (no parts data) | `NotRFQ` |
-| Needs manual review | `NeedsReview` |
-
-### Step 8: Email Output File
-Send consolidated CSV to jake.harris@astutegroup.com.
-
-Subject: `Stock RFQ Upload Ready - YYYY-MM-DD`
-
-### Step 9: Commit and Push
-```bash
-git -C ~/workspace/astute-workinstructions add "Trading Analysis/Stock RFQ Loading/"
-git -C ~/workspace/astute-workinstructions commit -m "Add stock RFQ upload: YYYY-MM-DD"
-git -C ~/workspace/astute-workinstructions push
-```
+|---|---|
+| Any email with MPN + quantity | **`load_rfq`** — even broker blasts. Use `bpartnerId: 1006505` (Unqualified Broker) if customer not in DB |
+| Order / shipping / follow-up / newsletter / OOO | **`not_rfq`** |
+| MPNs present but ambiguous (no qty, signature-only, write-back failed) | **`needs_review`** |
 
 ---
 
 ## Cadence
 
-Steady inflow, not high volume. Process on a regular cadence (TBD — daily? every few days?). Consolidate all emails from a run into one output file.
+Every 30 minutes via `/schedule`. Steady inflow, not high volume — most ticks process 0–5 emails. The agent can also be invoked on demand when the operator asks ("process stockrfq inbox now").
 
 ---
 
-## Future: Direct Database Write-Back
+## Future: tighter customer matching
 
-Currently outputs CSV for manual import. Future state: write RFQ lines directly to the database, eliminating the template step. This will require:
-- [ ] INSERT permissions on RFQ tables
-- [ ] RFQ header auto-creation (or API call)
-- [ ] Validation rules matching iDempiere business logic
-
----
-
-## TODO
-- [x] Get RFQ Import Template ✓ `RFQ Import Template.csv`
-- [x] Configure `stockRFQ@orangetsunami.com` in Himalaya ✓
-- [x] Create email folders (Processed, NotRFQ, NeedsReview) in stockRFQ mailbox ✓ 2026-03-19
-- [ ] Build email notification script (like market offer `send-offer-email.js`)
-- [ ] Define cadence with user
-- [ ] Add common junk sender domain list for auto-skip
-- [ ] Direct database write-back (future)
+The current fall-back-to-Unqualified-Broker behavior is permissive by design. If we want a tighter conversation with the trading team about ambiguous senders, the agent can add a `needs_partner` action (mirroring customer-excess) — but the daemon never had this, so we're holding it out until a real ambiguity case demands it.
 
 ---
 
 ## Related
 
-- [Market Offer Loading](../Market%20Offer%20Loading/market-offer-loading.md) — Sister workflow, same MFR matching and partner lookup patterns
-- [VQ Loading](../../Trading Analysis/RFQ Sourcing/vq_loading/vq-loading.md) — Similar two-agent extraction pattern
-- MFR Aliases: `../Market Offer Loading/mfr-aliases.json` (shared)
+- [Customer Excess Analysis](../Customer%20Excess%20Analysis/customer-excess-analysis.md) — sister workflow on the same agent pattern
+- [Email-Driven Workflow Architecture](../../email-workflow-architecture.md) — top-level pattern doc
+- MFR Aliases: `../Customer Excess Analysis/Market Offer Loading/mfr-aliases.json` (shared)

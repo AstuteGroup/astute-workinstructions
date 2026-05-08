@@ -1,0 +1,230 @@
+[dotenv@17.3.1] injecting env (26) from .env -- tip: 🛠️  run anywhere with `dotenvx run -- yourcommand`
+Searching 41 unsourced lines (59 total MPNs including alternates)
+
+=== 630-337692-004 — XCZU5CG-1SFVC784E (need 15, base $1532.5950) ===
+
+=== 630-337692-003 — XCZU4CG-1SFVC784E (need 5, base $1354.0000) ===
+  XCZU4CG-1SFVC784E @ DigiKey: $1112.5400 stock=1 LT: 40 Weeks
+
+=== 630-262333-001 — LTC2986CLX#PBF (need 200, base $29.6962) ===
+  LTC2986CLX#PBF @ DigiKey: $32.0076 stock=263 ✓ STOCK
+  LTC2986CLX#PBF @ Newark/Farnell: $32.9700 stock=202 ✓ STOCK
+
+=== 630-A59915-001 — MAX14915AFM+ (need 250, base $8.8840) ===
+  MAX14915AFM+ @ DigiKey: $8.9264 stock=1593 ✓ STOCK
+  MAX14915AFM+ @ Newark/Farnell: $8.8900 stock=1258 ✓ STOCK
+
+=== 630-A92150-002 — MTFC64GBCAQTC-WT (need 30, base $65.3800) ===
+  MTFC64GBCAQTC-WT @ Newark/Farnell: $116.4600 stock=220 ✓ STOCK
+  MTFC64GBCAQTC-IT @ Newark/Farnell: $55.6300 stock=0 LT: 3 Weeks
+
+=== 630-257348-001 — LTC2312HTS8-14#TRMPBF (need 100, base $18.4892) ===
+  LTC2312HTS8-14#TRMPBF @ DigiKey: $19.6758 stock=261 ✓ STOCK
+  LTC2312HTS8-14#TRMPBF @ Newark/Farnell: $28.2100 stock=110 ✓ STOCK
+
+=== 723-008848-003 — 9724-SS-7 (need 50, base $34.8000) ===
+
+=== 668-096777-009 — K85X-ED-9P-CBR (need 300, base $5.6200) ===
+
+=== 668-096776-025 — DLS3XS4AA35X (need 750, base $1.7897) ===
+  DLS3XS4AA35X @ Newark/Farnell: $1.5700 stock=0 LT: 1 Weeks
+  DLS3XS4AA35X @ Mouser: $1.7500 stock=0 LT: 62 Days
+  DLS3XS4AA35X @ Master: $1.8300 stock=0 LT: 9 Week(s)
+  DSS3XSRAA56X @ Mouser: $10.7900 stock=0 
+  DSS3XSRAA56X @ Master: $8.7200 stock=0 LT: 9 Week(s)
+
+=== 630-323468-001 — MAX5903NNETT+T (need 200, base $4.7610) ===
+  MAX5903NNETT+T @ DigiKey: $4.6801 stock=6484 ✓ STOCK
+
+=== 668-096776-037 — DLS4XS4AA35X (need 355, base $2.1000) ===
+  DLS4XS4AA35X @ Newark/Farnell: $4.1100 stock=41 LT: 2 Weeks
+  DLS4XS4AA35X @ Mouser: $2.2500 stock=0 LT: 96 Days
+  DLS4XS4AA35X @ Master: $2.2100 stock=0 LT: 10 Week(s)
+  DSS4XSRAA56X @ Arrow: $13.2000 stock=0 
+  DSS4XSRAA56X @ Newark/Farnell: $15.6300 stock=5 LT: 1 Weeks
+  DSS4XSRAA56X @ Mouser: $13.9100 stock=0 
+  DSS4XSRAA56X @ Master: $12.0100 stock=5 LT: 9 Week(s)
+  DSS4XSRAA56X @ Waldom: $10.5600 stock=5 LT: 8 Week(s)
+
+=== 669-121789-001 — 172-978-100-201 (need 50, base $13.8700) ===
+
+=== 648-004248-471 — 100E471GW2500X (need 10, base $47.5100) ===
+
+=== 671-096377-010 — TP-105-01-00 (need 2950, base $0.1500) ===
+
+=== 630-223433-001 — MAX7325ATG+ (need 150, base $2.3800) ===
+  MAX7325ATG+ @ DigiKey: $2.3672 stock=933 ✓ STOCK
+
+=== 615-049171-124 — RG2012P-1242-B-T5 (need 2000, base $0.1607) ===
+  RG2012P-1242-B-T5 @ Future: $0.0536 stock=0 LT: 20 Weeks
+  RG2012P-1242-B-T5 @ Mouser: $0.0770 stock=0 LT: 140 Days
+  TNPW080512K4BEEA @ DigiKey: $0.2094 stock=4798 ✓ STOCK
+  TNPW080512K4BEEA @ Future: $0.1240 stock=5000 ✓ STOCK
+  TNPW080512K4BEEA @ Newark/Farnell: $0.2270 stock=0 LT: 1 Weeks
+  TNPW080512K4BEEA @ TTI: $0.1250 stock=10000 ✓ STOCK
+  TNPW080512K4BEEA @ Mouser: $0.2090 stock=5697 ✓ STOCK
+
+=== 630-260287-001 — LTC2313CTS8-12#TRMPBF (need 30, base $10.6700) ===
+  LTC2313CTS8-12#TRMPBF @ DigiKey: $7.5476 stock=514 ✓ STOCK
+
+=== 630-120971-001 — MT47H128M16RT-25E:C TR (need 20, base $14.7792) ===
+  MT47H128M16RT-25E:C TR @ DigiKey: $18.0820 stock=970 ✓ STOCK
+  MT47H128M16RT-25E:C @ DigiKey: $18.0820 stock=970 ✓ STOCK
+  MT47H128M16RT-25E:C @ Newark/Farnell: $28.5839 stock=3 LT: 3 Weeks
+
+=== 669-C00309-007 — 203263-0066 (need 75, base $3.8000) ===
+  203263-0066 @ Mouser: $4.4800 stock=0 LT: 70 Days
+
+=== 615-122309-612 — RNCF0805TTT61K2 (need 350, base $0.8140) ===
+  RNCF0805TTT61K2 @ Future: $0.5870 stock=0 LT: 13 Weeks
+  RNCF0805TTT61K2 @ Mouser: $0.5970 stock=0 LT: 105 Days
+  RNCF0805TTT61K2 @ Master: $1.1440 stock=0 LT: 13 Week(s)
+  RNCF0805TKT61K2 @ Future: $0.6050 stock=0 LT: 13 Weeks
+  RNCF0805TKT61K2 @ Mouser: $0.6550 stock=0 LT: 105 Days
+  RNCF0805TKT61K2 @ Master: $0.6880 stock=0 LT: 13 Week(s)
+
+=== 630-268428-001 — FT234XD-R (need 125, base $2.2502) ===
+  FT234XD-R @ Newark/Farnell: $3.1200 stock=0 LT: 3 Weeks
+
+=== 668-096777-037 — K85X-CD-37P-CBR (need 50, base $5.6200) ===
+  DLS 4XP4AA35X @ Newark/Farnell: $2.3500 stock=0 LT: 1 Weeks
+
+=== 630-248896-001 — IS25LP128-JBLE (need 130, base $2.1596) ===
+  IS25LP128-JBLE @ Newark/Farnell: $4.0900 stock=908 ✓ STOCK
+
+=== 630-087790-001 — ET1100 (need 1750, base $0.1598) ===
+
+=== 630-228108-001 — MAX13035EETE+ (need 30, base $9.2415) ===
+  MAX13035EETE+ @ DigiKey: $9.9910 stock=470 ✓ STOCK
+  MAX13035EETE+ @ Newark/Farnell: $9.8500 stock=159 ✓ STOCK
+
+=== 779-002694-001 — QII-0.006-00-61 (need 500, base $0.5500) ===
+  QII-0.006-00-61 @ Mouser: $0.0820 stock=0 LT: 197 Days
+
+=== 630-026177-001 — MAX5917AESE+ (need 40, base $6.8188) ===
+  MAX5917AESE+ @ Newark/Farnell: $1.6900 stock=16 LT: 2 Weeks
+  MAX5917AESE+T @ Newark/Farnell: $1.6900 stock=16 LT: 2 Weeks
+
+=== 631-099701-003 — HFBR-1531ETZ (need 15, base $17.7206) ===
+  HFBR-1531ETZ @ Newark/Farnell: $16.2367 stock=324 ✓ STOCK
+
+=== 668-B94693-003 — 172043-0302 (need 55, base $4.8060) ===
+  172043-0302 @ DigiKey: $3.5160 stock=1155 ✓ STOCK
+  172043-0302 @ Arrow: $2.4680 stock=0 
+  172043-0302 @ Newark/Farnell: $4.1700 stock=0 LT: 1 Weeks
+  172043-0302 @ TTI: $2.0100 stock=0 LT: 11 Weeks
+  172043-0302 @ Mouser: $3.3800 stock=865 ✓ STOCK
+  172043-0302 @ Master: $2.2500 stock=0 LT: 19 Week(s)
+  172043-0302 @ Waldom: $2.0200 stock=0 LT: 11 Week(s)
+  172043-0302 @ Sager: $2.3000 stock=0 LT: 238 days
+
+=== 615-041833-203 — ERJ-12SF2002U (need 800, base $0.3286) ===
+  ERJ-12SF2002U @ Future: $0.0741 stock=0 LT: 12 Weeks
+  ERJ-12SF2002U @ Mouser: $0.1330 stock=0 LT: 84 Days
+  ERJ-12SF2002U @ Master: $0.0774 stock=0 LT: 12 Week(s)
+  CRCW201020K0FKTF @ Future: $0.1075 stock=0 LT: 12 Weeks
+  CRCW201020K0FKTF @ Newark/Farnell: $0.0852 stock=4000 ✓ STOCK
+  CRCW201020K0FKTF @ TTI: $0.1040 stock=0 LT: 12 Weeks
+  CRCW201020K0FKTF @ Mouser: $0.1510 stock=3423 ✓ STOCK
+
+=== 644-059699-005 — 500-231 (need 750, base $0.3500) ===
+  500-231 @ Newark/Farnell: $0.0180 stock=43140 ✓ STOCK
+
+=== 667-B77583-001 — K202XHT-E9S-N (need 85, base $3.0828) ===
+  K202XHT-E9S-N @ Mouser: $3.0700 stock=0 LT: 175 Days
+  K202XHT-E9S-N @ Sager: $3.2500 stock=0 LT: 154 days
+
+=== 648-051878-224 — NMC0603X7R224K50TRPF (need 13000, base $0.0199) ===
+  NMC0603X7R224K50TRPF @ Arrow: $0.0239 stock=0 
+  NMC0603X7R224K50TRPF @ Future: $0.0159 stock=0 LT: 17 Weeks
+  CC0603KRX7R9BB224 @ DigiKey: $0.0532 stock=53643 ✓ STOCK
+  CC0603KRX7R9BB224 @ Arrow: $0.0280 stock=2880000 ✓ STOCK
+  CC0603KRX7R9BB224 @ Rutronik: $0.0064 stock=476000 ✓ STOCK
+  CC0603KRX7R9BB224 @ Future: $0.0126 stock=456000 ✓ STOCK
+  CC0603KRX7R9BB224 @ Newark/Farnell: $0.2310 stock=4000 LT: 1 Weeks
+  CC0603KRX7R9BB224 @ TTI: $0.0129 stock=7476000 ✓ STOCK
+  CC0603KRX7R9BB224 @ Mouser: $0.2520 stock=6579 LT: 140 Days
+  CC0603KRX7R9BB224 @ Waldom: $0.0134 stock=4000 LT: 8 Week(s)
+
+=== 670-A39955-001 — 1A1119-10-R (need 850, base $0.3024) ===
+  1A1119-10-R @ Newark/Farnell: $0.4220 stock=1000 ✓ STOCK
+  1A1119-10-R @ Master: $0.3226 stock=0 LT: 10 Week(s)
+
+=== 630-259131-001 — REF3012AIDBZR (need 400, base $0.6395) ===
+  REF3012AIDBZR @ Newark/Farnell: $1.3300 stock=0 LT: 3 Weeks
+
+=== 615-080142-198 — TNPW1206198RBEEA (need 275, base $0.9300) ===
+  TNPW1206198RBEEA @ Rutronik: $0.1785 stock=0 LT: 10
+  TNPW1206198RBEEA @ Future: $0.1430 stock=0 LT: 8 Weeks
+  TNPW1206198RBEEA @ TTI: $0.2810 stock=0 LT: 8 Weeks
+  TNPW1206198RBEEA @ Mouser: $0.4420 stock=0 LT: 56 Days
+
+=== 615-122309-100 — RNCF0805TTT10K0 (need 310, base $0.8230) ===
+  RNCF0805TTT10K0 @ Future: $0.5870 stock=0 LT: 13 Weeks
+  RNCF0805TTT10K0 @ Mouser: $0.5970 stock=0 LT: 105 Days
+  RNCF0805TTT10K0 @ Master: $1.1440 stock=0 LT: 13 Week(s)
+  RNCF0805TKT10K0 @ Future: $0.6050 stock=0 LT: 13 Weeks
+  RNCF0805TKT10K0 @ Mouser: $0.6550 stock=0 LT: 105 Days
+  RNCF0805TKT10K0 @ Master: $0.6880 stock=0 LT: 13 Week(s)
+
+=== 639-004556-390 — 4922R-32L (need 60, base $4.2500) ===
+  4922R-32L @ Future: $2.5500 stock=0 LT: 22 Weeks
+  4922R-32L @ TTI: $2.7400 stock=0 LT: 24 Weeks
+  4922R-32L @ Mouser: $3.4000 stock=0 LT: 168 Days
+
+=== 630-340553-001 — 551SCMGI (need 150, base $1.6822) ===
+  551SCMGI @ Future: $1.0700 stock=0 LT: 33 Weeks
+  551SCMGI8 @ Future: $0.9760 stock=0 LT: 33 Weeks
+
+=== 630-121394-001 — TLK110PTR (need 35, base $7.1955) ===
+  TLK110PTR @ DigiKey: $6.5736 stock=2213 ✓ STOCK
+  TLK110PTR @ Arrow: $4.7940 stock=0 
+
+=== 639-311328-002 — XEL6060-821MEC (need 85, base $2.9476) ===
+  XEL6060-821MEC @ DigiKey: $4.3100 stock=353 ✓ STOCK
+
+
+========== SUMMARY ==========
+630-337692-004 | XCZU5CG-1SFVC784E | NO FRANCHISE HITS
+630-337692-003 | XCZU4CG-1SFVC784E | Best: DigiKey $1112.5400 (40 Weeks) | ✓ UNDER base
+630-262333-001 | LTC2986CLX#PBF | Best: DigiKey $32.0076 (STOCK) | ⚠ OVER base
+630-A59915-001 | MAX14915AFM+ | Best: Newark/Farnell $8.8900 (STOCK) | ⚠ OVER base
+630-A92150-002 | MTFC64GBCAQTC-WT | Best: Newark/Farnell $55.6300 (3 Weeks) | ✓ UNDER base
+630-257348-001 | LTC2312HTS8-14#TRMPBF | Best: DigiKey $19.6758 (STOCK) | ⚠ OVER base
+723-008848-003 | 9724-SS-7 | NO FRANCHISE HITS
+668-096777-009 | K85X-ED-9P-CBR | NO FRANCHISE HITS
+668-096776-025 | DLS3XS4AA35X | Best: Newark/Farnell $1.5700 (1 Weeks) | ✓ UNDER base
+630-323468-001 | MAX5903NNETT+T | Best: DigiKey $4.6801 (STOCK) | ✓ UNDER base
+668-096776-037 | DLS4XS4AA35X | Best: Master $2.2100 (10 Week(s)) | ⚠ OVER base
+669-121789-001 | 172-978-100-201 | NO FRANCHISE HITS
+648-004248-471 | 100E471GW2500X | NO FRANCHISE HITS
+671-096377-010 | TP-105-01-00 | NO FRANCHISE HITS
+630-223433-001 | MAX7325ATG+ | Best: DigiKey $2.3672 (STOCK) | ✓ UNDER base
+615-049171-124 | RG2012P-1242-B-T5 | Best: Future $0.0536 (20 Weeks) | ✓ UNDER base
+630-260287-001 | LTC2313CTS8-12#TRMPBF | Best: DigiKey $7.5476 (STOCK) | ✓ UNDER base
+630-120971-001 | MT47H128M16RT-25E:C TR | Best: DigiKey $18.0820 (STOCK) | ⚠ OVER base
+669-C00309-007 | 203263-0066 | Best: Mouser $4.4800 (70 Days) | ⚠ OVER base
+615-122309-612 | RNCF0805TTT61K2 | Best: Future $0.5870 (13 Weeks) | ✓ UNDER base
+630-268428-001 | FT234XD-R | Best: Newark/Farnell $3.1200 (3 Weeks) | ⚠ OVER base
+668-096777-037 | K85X-CD-37P-CBR | Best: Newark/Farnell $2.3500 (1 Weeks) | ✓ UNDER base
+630-248896-001 | IS25LP128-JBLE | Best: Newark/Farnell $4.0900 (STOCK) | ⚠ OVER base
+630-087790-001 | ET1100 | NO FRANCHISE HITS
+630-228108-001 | MAX13035EETE+ | Best: Newark/Farnell $9.8500 (STOCK) | ⚠ OVER base
+779-002694-001 | QII-0.006-00-61 | Best: Mouser $0.0820 (197 Days) | ✓ UNDER base
+630-026177-001 | MAX5917AESE+ | Best: Newark/Farnell $1.6900 (2 Weeks) | ✓ UNDER base
+631-099701-003 | HFBR-1531ETZ | Best: Newark/Farnell $16.2367 (STOCK) | ✓ UNDER base
+668-B94693-003 | 172043-0302 | Best: TTI $2.0100 (11 Weeks) | ✓ UNDER base
+615-041833-203 | ERJ-12SF2002U | Best: Future $0.0741 (12 Weeks) | ✓ UNDER base
+644-059699-005 | 500-231 | Best: Newark/Farnell $0.0180 (STOCK) | ✓ UNDER base
+667-B77583-001 | K202XHT-E9S-N | Best: Mouser $3.0700 (175 Days) | ✓ UNDER base
+648-051878-224 | NMC0603X7R224K50TRPF | Best: Rutronik $0.0064 (STOCK) | ✓ UNDER base
+670-A39955-001 | 1A1119-10-R | Best: Master $0.3226 (10 Week(s)) | ⚠ OVER base
+630-259131-001 | REF3012AIDBZR | Best: Newark/Farnell $1.3300 (3 Weeks) | ⚠ OVER base
+615-080142-198 | TNPW1206198RBEEA | Best: Future $0.1430 (8 Weeks) | ✓ UNDER base
+615-122309-100 | RNCF0805TTT10K0 | Best: Future $0.5870 (13 Weeks) | ✓ UNDER base
+639-004556-390 | 4922R-32L | Best: Future $2.5500 (22 Weeks) | ✓ UNDER base
+630-340553-001 | 551SCMGI | Best: Future $0.9760 (33 Weeks) | ✓ UNDER base
+630-121394-001 | TLK110PTR | Best: Arrow $4.7940 (LT) | ✓ UNDER base
+639-311328-002 | XEL6060-821MEC | Best: DigiKey $4.3100 (STOCK) | ⚠ OVER base
+
+Sourceable: 34 | No hits: 7

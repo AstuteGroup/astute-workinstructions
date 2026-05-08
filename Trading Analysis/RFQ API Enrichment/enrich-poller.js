@@ -281,6 +281,14 @@ function renderSummaryHtml(batchResults, sinceIso, untilIso, backlog, quotaState
       ${distRows}
     </table>`;
 
+  // Rolling 24h API health — pulls from the wrapper-level failure log and the
+  // auth-failure state file. Distinct from distHealthSection above (which
+  // covers only this digest window's live calls). This view tells the
+  // operator "what's been broken across all my workflows in the last 24h"
+  // — including failures from rfq-loader-daemon, vortex-poller, market-offer
+  // matching, etc., not just enrich-poller.
+  const apiHealthSection = renderApiHealthSection();
+
   return `
     <html><body style="font-family:Arial,sans-serif">
     <h3>RFQ API Enrichment — batch summary</h3>
@@ -312,8 +320,103 @@ function renderSummaryHtml(batchResults, sinceIso, untilIso, backlog, quotaState
       ${rows}
     </table>
     ${distHealthSection}
+    ${apiHealthSection}
     </body></html>
   `;
+}
+
+/**
+ * Render the rolling 24h Franchise API health section for the digest.
+ *
+ * Sources:
+ *   ~/workspace/.api-failures.ndjson           — every cog failure (wrapper-logged)
+ *   shared/data/auth-failure-state.json        — current outage / mute state
+ *
+ * Per-disty breakdown: total failures (last 24h), by category, last error sample,
+ * current state (healthy / outage-active / muted). Returns '' if no failures
+ * AND no active outages (i.e., everything's healthy — no need to noise the digest).
+ */
+function renderApiHealthSection() {
+  try {
+    const home = process.env.HOME || '/home/analytics_user';
+    const failuresPath = path.join(home, 'workspace/.api-failures.ndjson');
+    const statePath = path.resolve(__dirname, '../../shared/data/auth-failure-state.json');
+
+    // Parse failure log (last 24h)
+    const cutoff = Date.now() - 24 * 60 * 60 * 1000;
+    const byDisty = {};
+    if (fs.existsSync(failuresPath)) {
+      const lines = fs.readFileSync(failuresPath, 'utf-8').split('\n').filter(Boolean);
+      for (const line of lines) {
+        try {
+          const entry = JSON.parse(line);
+          if (new Date(entry.ts).getTime() < cutoff) continue;
+          const d = entry.distributor;
+          if (!byDisty[d]) byDisty[d] = { count: 0, byCategory: {}, lastTs: null, lastErr: null, lastMpn: null };
+          byDisty[d].count++;
+          byDisty[d].byCategory[entry.category] = (byDisty[d].byCategory[entry.category] || 0) + 1;
+          if (!byDisty[d].lastTs || entry.ts > byDisty[d].lastTs) {
+            byDisty[d].lastTs = entry.ts;
+            byDisty[d].lastErr = entry.errorMessage;
+            byDisty[d].lastMpn = entry.mpn;
+          }
+        } catch { /* skip malformed lines */ }
+      }
+    }
+
+    // Parse current alert state (active outages + manual mutes)
+    let state = {};
+    try { state = JSON.parse(fs.readFileSync(statePath, 'utf-8')); } catch {}
+
+    const allDistys = new Set([...Object.keys(byDisty), ...Object.keys(state)]);
+    if (allDistys.size === 0) return '';  // nothing to report
+
+    const rows = [...allDistys].sort().map(d => {
+      const stats = byDisty[d] || { count: 0, byCategory: {}, lastTs: null, lastErr: null, lastMpn: null };
+      const s = state[d];
+      let stateLabel = '<span style="color:#080">healthy</span>';
+      if (s) {
+        if (s.suppressed) {
+          stateLabel = `<span style="color:#888">🔇 muted (${s.suppressedReason ? s.suppressedReason.slice(0, 60) : 'no reason'})</span>`;
+        } else if (s.firstCleanAt) {
+          const minIntoWindow = Math.round((Date.now() - new Date(s.firstCleanAt).getTime()) / 60000);
+          stateLabel = `<span style="color:#a60">recovering (${minIntoWindow}min clean)</span>`;
+        } else if (s.lastFailureAt) {
+          const minSinceLast = Math.round((Date.now() - s.lastFailureAt) / 60000);
+          stateLabel = `<span style="color:#c00">outage active (last fail ${minSinceLast}min ago)</span>`;
+        }
+      }
+      const catBreakdown = Object.entries(stats.byCategory)
+        .map(([k, v]) => `${k}:${v}`).join(' ') || '—';
+      const lastSample = stats.lastErr
+        ? `<code style="font-size:11px">${stats.lastErr.slice(0, 100).replace(/[<>&]/g, c => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;' }[c]))}</code>`
+        : '—';
+      return `<tr>
+        <td>${d}</td>
+        <td style="text-align:right">${stats.count.toLocaleString()}</td>
+        <td>${catBreakdown}</td>
+        <td>${stateLabel}</td>
+        <td>${stats.lastMpn || '—'}</td>
+        <td>${lastSample}</td>
+      </tr>`;
+    }).join('');
+
+    return `
+      <br/><h4>Franchise API health — rolling 24h (all workflows)</h4>
+      <p style="font-size:11px;color:#666;margin:0 0 4px 0">
+        Failures across every cog (mouser, digikey, tti, arrow, etc.) sourced from <code>~/workspace/.api-failures.ndjson</code>.
+        State column shows current alerter status from <code>shared/data/auth-failure-state.json</code>.
+        "Recovering" means an outage was detected and we're inside the 4h sustained-clean observation window before declaring recovery.
+      </p>
+      <table border="1" cellpadding="4" cellspacing="0" style="border-collapse:collapse;font-size:12px">
+        <tr style="background:#f0f0f0">
+          <th>Distributor</th><th>Failures (24h)</th><th>By category</th><th>State</th><th>Last MPN</th><th>Last error sample</th>
+        </tr>
+        ${rows}
+      </table>`;
+  } catch (err) {
+    return `<br/><p style="color:#888;font-size:11px">[Franchise API health section render failed: ${(err.message || String(err)).replace(/[<>&]/g, c => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;' }[c]))}]</p>`;
+  }
 }
 
 async function sendEmail(subject, html) {

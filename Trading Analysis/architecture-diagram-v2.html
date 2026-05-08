@@ -1,0 +1,584 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Astute Analytics — Workflow Architecture (v2)</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #0f1419; color: #e1e8ed; padding: 20px; }
+  h1 { text-align: center; font-size: 1.6em; margin-bottom: 5px; color: #fff; }
+  .subtitle { text-align: center; font-size: 0.85em; color: #8899a6; margin-bottom: 25px; }
+
+  .legend { display: flex; justify-content: center; gap: 25px; margin-bottom: 20px; flex-wrap: wrap; }
+  .legend-item { display: flex; align-items: center; gap: 6px; font-size: 0.8em; color: #8899a6; }
+  .legend-dot { width: 12px; height: 12px; border-radius: 3px; }
+
+  .architecture { max-width: 1400px; margin: 0 auto; }
+
+  .section { margin-bottom: 20px; border-radius: 12px; padding: 18px; position: relative; }
+  .section-label { font-size: 0.7em; font-weight: 700; letter-spacing: 1.5px; text-transform: uppercase; margin-bottom: 12px; }
+
+  .inbound { background: rgba(29, 161, 242, 0.08); border: 1px solid rgba(29, 161, 242, 0.2); }
+  .inbound .section-label { color: #1da1f2; }
+
+  .system { background: rgba(255, 255, 255, 0.04); border: 1px solid rgba(255, 255, 255, 0.1); }
+  .system .section-label { color: #8899a6; }
+
+  .intelligence { background: rgba(23, 191, 99, 0.08); border: 1px solid rgba(23, 191, 99, 0.2); }
+  .intelligence .section-label { color: #17bf63; }
+
+  .sourcing { background: rgba(244, 93, 34, 0.08); border: 1px solid rgba(244, 93, 34, 0.2); }
+  .sourcing .section-label { color: #f45d22; }
+
+  .reporting { background: rgba(153, 102, 255, 0.08); border: 1px solid rgba(153, 102, 255, 0.2); }
+  .reporting .section-label { color: #9966ff; }
+
+  .writeback { background: rgba(255, 173, 31, 0.08); border: 1px solid rgba(255, 173, 31, 0.25); }
+  .writeback .section-label { color: #ffad1f; }
+
+  .workflow-row { display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 12px; }
+  .workflow { border-radius: 8px; padding: 12px 14px; flex: 1; min-width: 180px; cursor: pointer; transition: all 0.2s; position: relative; }
+  .workflow:hover { transform: translateY(-2px); }
+  .workflow.active { outline: 2px solid #fff; outline-offset: 2px; }
+  .workflow h3 { font-size: 0.85em; margin-bottom: 4px; }
+  .workflow .wf-desc { font-size: 0.7em; color: #8899a6; line-height: 1.3; }
+  .workflow .wf-status { font-size: 0.6em; position: absolute; top: 8px; right: 10px; padding: 2px 6px; border-radius: 3px; }
+
+  .wf-blue { background: rgba(29, 161, 242, 0.15); border: 1px solid rgba(29, 161, 242, 0.3); }
+  .wf-blue h3 { color: #1da1f2; }
+  .wf-green { background: rgba(23, 191, 99, 0.15); border: 1px solid rgba(23, 191, 99, 0.3); }
+  .wf-green h3 { color: #17bf63; }
+  .wf-orange { background: rgba(244, 93, 34, 0.15); border: 1px solid rgba(244, 93, 34, 0.3); }
+  .wf-orange h3 { color: #f45d22; }
+  .wf-purple { background: rgba(153, 102, 255, 0.15); border: 1px solid rgba(153, 102, 255, 0.3); }
+  .wf-purple h3 { color: #9966ff; }
+  .wf-yellow { background: rgba(255, 173, 31, 0.15); border: 1px solid rgba(255, 173, 31, 0.3); }
+  .wf-yellow h3 { color: #ffad1f; }
+
+  .status-active { background: rgba(23, 191, 99, 0.3); color: #17bf63; }
+  .status-planned { background: rgba(255, 173, 31, 0.3); color: #ffad1f; }
+  .status-cron { background: rgba(29, 161, 242, 0.3); color: #1da1f2; }
+
+  .cogs-section { margin-top: 15px; }
+  .cogs-label { font-size: 0.65em; font-weight: 600; color: #8899a6; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px; }
+  .cog-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 8px; }
+  .cog { padding: 8px 12px; border-radius: 6px; font-size: 0.75em; cursor: pointer; transition: all 0.2s; border: 1px solid; }
+  .cog:hover { transform: scale(1.03); }
+  .cog-name { font-weight: 600; }
+  .cog-desc { font-size: 0.85em; color: #8899a6; margin-top: 2px; }
+
+  .cog-exists { background: rgba(23, 191, 99, 0.12); border-color: rgba(23, 191, 99, 0.3); }
+  .cog-exists .cog-name { color: #17bf63; }
+  .cog-writeback { background: rgba(255, 173, 31, 0.12); border-color: rgba(255, 173, 31, 0.3); }
+  .cog-writeback .cog-name { color: #ffad1f; }
+  .cog-gap { background: rgba(120, 120, 120, 0.1); border-color: rgba(255,255,255,0.15); }
+  .cog-gap .cog-name { color: #8899a6; }
+
+  .flow-section { display: flex; align-items: center; justify-content: center; padding: 8px 0; }
+  .flow-arrow { color: #556; font-size: 1.2em; }
+  .flow-label { font-size: 0.7em; color: #667; margin: 0 10px; }
+
+  .lifecycle { margin-top: 20px; }
+  .lifecycle-label { font-size: 0.7em; font-weight: 700; letter-spacing: 1.5px; text-transform: uppercase; color: #8899a6; margin-bottom: 10px; }
+  .pipeline { display: flex; align-items: center; gap: 0; flex-wrap: wrap; justify-content: center; }
+  .pipeline-step { padding: 10px 16px; font-size: 0.75em; font-weight: 600; position: relative; }
+  .pipeline-step::after { content: '→'; position: absolute; right: -8px; top: 50%; transform: translateY(-50%); color: #556; font-size: 1.2em; }
+  .pipeline-step:last-child::after { display: none; }
+  .ps-blue { background: rgba(29,161,242,0.2); color: #1da1f2; border-radius: 6px 0 0 6px; }
+  .ps-orange { background: rgba(244,93,34,0.2); color: #f45d22; }
+  .ps-blue2 { background: rgba(29,161,242,0.15); color: #5ba0d0; }
+  .ps-green { background: rgba(23,191,99,0.2); color: #17bf63; }
+  .ps-purple { background: rgba(153,102,255,0.2); color: #9966ff; border-radius: 0 6px 6px 0; }
+  .pipeline-cog { font-size: 0.6em; display: block; color: #8899a6; font-weight: 400; margin-top: 2px; }
+
+  .matrix { margin-top: 20px; overflow-x: auto; }
+  .matrix table { border-collapse: collapse; width: 100%; font-size: 0.7em; }
+  .matrix th { padding: 6px 8px; text-align: left; border-bottom: 1px solid rgba(255,255,255,0.1); color: #8899a6; font-weight: 600; }
+  .matrix td { padding: 5px 8px; border-bottom: 1px solid rgba(255,255,255,0.05); }
+  .matrix .op-name { white-space: nowrap; font-weight: 500; }
+  .matrix .check { color: #17bf63; text-align: center; font-weight: 700; }
+  .matrix .planned { color: #ffad1f; text-align: center; font-size: 0.9em; }
+  .matrix tr:hover { background: rgba(255,255,255,0.03); }
+  .matrix .cog-col { color: #17bf63; font-size: 0.85em; white-space: nowrap; }
+  .matrix .gap-col { color: #ffad1f; font-size: 0.85em; white-space: nowrap; }
+
+  .tabs { display: flex; gap: 0; margin-top: 20px; flex-wrap: wrap; }
+  .tab { padding: 10px 20px; font-size: 0.8em; cursor: pointer; border: 1px solid rgba(255,255,255,0.1); background: rgba(255,255,255,0.03); color: #8899a6; transition: all 0.15s; }
+  .tab:first-child { border-radius: 8px 0 0 0; }
+  .tab:last-child { border-radius: 0 8px 0 0; }
+  .tab.active { background: rgba(255,255,255,0.08); color: #fff; border-bottom-color: transparent; }
+  .tab-content { border: 1px solid rgba(255,255,255,0.1); border-top: none; border-radius: 0 0 8px 8px; padding: 18px; background: rgba(255,255,255,0.02); display: none; }
+  .tab-content.active { display: block; }
+
+  .warning-box { background: rgba(244, 93, 34, 0.1); border: 1px solid rgba(244, 93, 34, 0.3); border-radius: 8px; padding: 12px 16px; margin: 15px 0; font-size: 0.8em; }
+  .warning-box strong { color: #f45d22; }
+
+  .timestamp { text-align: center; font-size: 0.65em; color: #556; margin-top: 20px; }
+</style>
+</head>
+<body>
+
+<h1>Astute Analytics — Workflow Architecture</h1>
+<p class="subtitle">v2 — April 2026 · Now with live iDempiere REST API write-back</p>
+
+<div class="legend">
+  <div class="legend-item"><div class="legend-dot" style="background:#1da1f2"></div> Inbound Email</div>
+  <div class="legend-item"><div class="legend-dot" style="background:#17bf63"></div> Market Intelligence</div>
+  <div class="legend-item"><div class="legend-dot" style="background:#f45d22"></div> Screening / Sourcing</div>
+  <div class="legend-item"><div class="legend-dot" style="background:#ffad1f"></div> ERP Write-back</div>
+  <div class="legend-item"><div class="legend-dot" style="background:#9966ff"></div> Reporting / Ops</div>
+</div>
+
+<div class="architecture">
+
+<!-- LIFECYCLE PIPELINE -->
+<div class="lifecycle">
+  <div class="lifecycle-label">Full Lifecycle: Email → RFQ → Source → VQ → Quote → Sale</div>
+  <div class="pipeline">
+    <div class="pipeline-step ps-blue">Customer RFQ<span class="pipeline-cog">Stock RFQ Loading / RFQ Loading AI</span></div>
+    <div class="pipeline-step ps-orange">Screen<span class="pipeline-cog">Franchise Screening</span></div>
+    <div class="pipeline-step ps-orange">Source<span class="pipeline-cog">RFQ Sourcing · RFQ API Enrichment</span></div>
+    <div class="pipeline-step ps-blue2">VQ Captured<span class="pipeline-cog">VQ Loading · vq-writer</span></div>
+    <div class="pipeline-step ps-green">Quote<span class="pipeline-cog">Quick Quote · Suggested Resale · cq-writer</span></div>
+    <div class="pipeline-step ps-purple">Sale<span class="pipeline-cog">Sales Order (OT)</span></div>
+  </div>
+</div>
+
+<!-- INBOUND EMAIL PIPELINES -->
+<div class="section inbound">
+  <div class="section-label">Inbound Email Pipelines — Same Pattern, Different Direction</div>
+  <div class="workflow-row">
+    <div class="workflow wf-blue">
+      <span class="wf-status status-active">Active</span>
+      <h3>VQ Loading</h3>
+      <div class="wf-desc">Supplier quote emails → chuboe_vq_line via API (two-pass: exact → fuzzy)</div>
+    </div>
+    <div class="workflow wf-blue">
+      <span class="wf-status status-active">Active</span>
+      <h3>Market Offer Loading</h3>
+      <div class="wf-desc">Excess inventory emails → chuboe_offer / line / line_mpn via API</div>
+    </div>
+    <div class="workflow wf-blue">
+      <span class="wf-status status-active">Active</span>
+      <h3>Stock RFQ Loading</h3>
+      <div class="wf-desc">Broker RFQ emails → chuboe_rfq via API + Suggested Resale</div>
+    </div>
+    <div class="workflow wf-blue">
+      <span class="wf-status status-active">Active</span>
+      <h3>RFQ Loading (AI)</h3>
+      <div class="wf-desc">AI extraction from customer emails/attachments → RFQ via API (load-first, enrich-later)</div>
+    </div>
+  </div>
+  <div style="font-size:0.75em; color:#5ba0d0; padding: 6px 0 2px;">
+    Shared steps: email-fetcher → AI extract → partner-lookup → mfr-resolver → writer → notifier → commit
+  </div>
+</div>
+
+<div class="flow-section">
+  <span class="flow-arrow">▼</span>
+  <span class="flow-label">Write-back via iDempiere REST API (no direct DB writes)</span>
+  <span class="flow-arrow">▼</span>
+</div>
+
+<!-- WRITE-BACK LAYER (NEW) -->
+<div class="section writeback">
+  <div class="section-label">ERP Write-back — iDempiere REST API (PRODUCTION · 172.31.7.239)</div>
+  <div class="workflow-row">
+    <div class="workflow wf-yellow">
+      <span class="wf-status status-active">Live</span>
+      <h3>rfq-writer</h3>
+      <div class="wf-desc">chuboe_rfq + lines + line_mpn (parent→child ID chaining)</div>
+    </div>
+    <div class="workflow wf-yellow">
+      <span class="wf-status status-active">Live</span>
+      <h3>offer-writeback</h3>
+      <div class="wf-desc">chuboe_offer + lines + line_mpn · per-CPC anchor to dodge bean-callout</div>
+    </div>
+    <div class="workflow wf-yellow">
+      <span class="wf-status status-active">Live</span>
+      <h3>vq-writer</h3>
+      <div class="wf-desc">chuboe_vq_line · two-pass MPN match (exact → fuzzy)</div>
+    </div>
+    <div class="workflow wf-yellow">
+      <span class="wf-status status-active">Live</span>
+      <h3>cq-writer</h3>
+      <div class="wf-desc">chuboe_cq_line (flat, no header)</div>
+    </div>
+    <div class="workflow wf-yellow">
+      <span class="wf-status status-active">Live</span>
+      <h3>record-updater</h3>
+      <div class="wf-desc">PATCH any chuboe_* row · backfills, HTS/ECCN, alt-MPN linkage</div>
+    </div>
+    <div class="workflow wf-yellow">
+      <span class="wf-status status-active">Live</span>
+      <h3>api-result-writer</h3>
+      <div class="wf-desc">chuboe_pricing_api_result · thin-pointer workaround for virtual json_info</div>
+    </div>
+  </div>
+  <div class="warning-box">
+    <strong>⚠ Bean-callout traps</strong> — Server-side callouts fire AFTER 200 OK. Writers respect: (1) chuboe_offer_line CPC dedup collapse — use per-CPC anchor or offer_line_mpn sub-rows; (2) Chuboe_CPC non-updateable after POST; (3) stale mfr-cache missing isSystem causes MPN 500s. See shared/data-model.md.
+  </div>
+</div>
+
+<!-- SYSTEM -->
+<div class="section system">
+  <div class="section-label">System — iDempiere (OT) · PostgreSQL Logical Replica (read-only)</div>
+  <div style="display:flex; gap:15px; flex-wrap:wrap; font-size:0.8em;">
+    <span style="padding:6px 12px; background:rgba(255,255,255,0.05); border-radius:5px;">RFQs</span>
+    <span style="color:#556;">→</span>
+    <span style="padding:6px 12px; background:rgba(255,255,255,0.05); border-radius:5px;">VQs</span>
+    <span style="color:#556;">→</span>
+    <span style="padding:6px 12px; background:rgba(255,255,255,0.05); border-radius:5px;">CQs</span>
+    <span style="color:#556;">→</span>
+    <span style="padding:6px 12px; background:rgba(255,255,255,0.05); border-radius:5px;">Sales Orders</span>
+    <span style="color:#556; margin-left:15px;">|</span>
+    <span style="padding:6px 12px; background:rgba(255,255,255,0.05); border-radius:5px;">Market Offers</span>
+    <span style="padding:6px 12px; background:rgba(255,255,255,0.05); border-radius:5px;">Inventory</span>
+    <span style="padding:6px 12px; background:rgba(255,255,255,0.05); border-radius:5px;">Partners</span>
+    <span style="padding:6px 12px; background:rgba(255,255,255,0.05); border-radius:5px;">MFRs</span>
+    <span style="padding:6px 12px; background:rgba(255,255,255,0.05); border-radius:5px;">Pricing API Results</span>
+  </div>
+  <div style="font-size:0.7em; color:#8899a6; margin-top:10px;">
+    Schemas: <code>adempiere</code> (read-only replica) · <code>intermediate</code> · <code>mart</code> · <code>mart_dev</code> ·
+    All queries filter <code>isactive = 'Y'</code>. Schema reference: <code>shared/data-model.md</code>.
+  </div>
+</div>
+
+<div class="flow-section">
+  <span class="flow-arrow">▼</span>
+  <span class="flow-label">Data flows OUT for analysis</span>
+  <span class="flow-arrow">▼</span>
+</div>
+
+<!-- MARKET INTELLIGENCE -->
+<div class="section intelligence">
+  <div class="section-label">Market Intelligence — Same Data, Different Lens</div>
+  <div class="workflow-row">
+    <div class="workflow wf-green">
+      <span class="wf-status status-active">Active</span>
+      <h3>Suggested Resale</h3>
+      <div class="wf-desc"><strong>Broker-to-broker.</strong> ~20-30% of franchise. Older DC, untraceable stock.</div>
+    </div>
+    <div class="workflow wf-green">
+      <span class="wf-status status-active">Active</span>
+      <h3>Quick Quote</h3>
+      <div class="wf-desc"><strong>Direct customer.</strong> Margin/GP-based. 6-tier resale hierarchy · VQ window 30d · DC 2022+.</div>
+    </div>
+    <div class="workflow wf-green">
+      <span class="wf-status status-active">Active</span>
+      <h3>Vortex Matches</h3>
+      <div class="wf-desc">Inbox-driven: vortex@orangetsunami → RFQs × VQs × Offers → opportunities (email-only output)</div>
+    </div>
+    <div class="workflow wf-green">
+      <span class="wf-status status-active">Active</span>
+      <h3>Market Offer Matching (RFQs)</h3>
+      <div class="wf-desc">New RFQs × existing offers · MFR equivalence · unique-MPN reporting</div>
+    </div>
+    <div class="workflow wf-green">
+      <span class="wf-status status-active">Active</span>
+      <h3>Market Offer Analysis</h3>
+      <div class="wf-desc">Enrich offers via 7 franchise APIs · unconditional (no skip-if-predicted-zero)</div>
+    </div>
+    <div class="workflow wf-green">
+      <span class="wf-status status-active">Active</span>
+      <h3>Seller Quoting Activity</h3>
+      <div class="wf-desc">VQ→CQ→SO funnel by seller · snapshot + 6-mo trend</div>
+    </div>
+  </div>
+</div>
+
+<!-- SCREENING / SOURCING -->
+<div class="section sourcing">
+  <div class="section-label">Screening & Sourcing</div>
+  <div class="workflow-row">
+    <div class="workflow wf-orange">
+      <span class="wf-status status-active">Active</span>
+      <h3>Franchise Screening</h3>
+      <div class="wf-desc">FindChips + 7 APIs → filter low-value parts before broker</div>
+    </div>
+    <div class="workflow wf-orange">
+      <span class="wf-status status-active">Active</span>
+      <h3>RFQ Sourcing (NetComponents)</h3>
+      <div class="wf-desc">Submit RFQs to broker suppliers</div>
+    </div>
+    <div class="workflow wf-orange">
+      <span class="wf-status status-active">Active</span>
+      <h3>RFQ API Enrichment</h3>
+      <div class="wf-desc">Run 7 franchise APIs on every RFQ line · capture as VQ · MFR match flag</div>
+    </div>
+    <div class="workflow wf-orange">
+      <span class="wf-status status-active">Active</span>
+      <h3>HTS / ECCN Backfill</h3>
+      <div class="wf-desc">RFQ-scoped backfill onto chuboe_vq_line via DigiKey + Mouser APIs</div>
+    </div>
+  </div>
+</div>
+
+<!-- REPORTING / OTHER -->
+<div class="section reporting">
+  <div class="section-label">Reporting & Operations</div>
+  <div class="workflow-row">
+    <div class="workflow wf-purple">
+      <span class="wf-status status-cron">Cron</span>
+      <h3>Inventory Cleanup</h3>
+      <div class="wf-desc">Weekly Mon 6am EST · Infor AST → OT offers (11 warehouse groups) + Netcomponents CSV</div>
+    </div>
+    <div class="workflow wf-purple">
+      <span class="wf-status status-cron">Cron</span>
+      <h3>LAM Kitting Reorder</h3>
+      <div class="wf-desc">Weekly reorder alerts + franchise-only sourcing for LAM warehouses</div>
+    </div>
+    <div class="workflow wf-purple">
+      <span class="wf-status status-cron">Cron</span>
+      <h3>API Queue Worker</h3>
+      <div class="wf-desc">Every 30min · retries rate-limited franchise API calls · cascades on success · emails operator on exhaustion</div>
+    </div>
+    <div class="workflow wf-purple">
+      <span class="wf-status status-active">Active</span>
+      <h3>Order / Shipment Tracking</h3>
+      <div class="wf-desc">COV/SO/MPN/PO/salesperson lookups</div>
+    </div>
+    <div class="workflow wf-purple">
+      <span class="wf-status status-active">Active</span>
+      <h3>BOM Monitoring</h3>
+      <div class="wf-desc">Risk, commodity, excess matches</div>
+    </div>
+    <div class="workflow wf-purple">
+      <span class="wf-status status-planned">Planned</span>
+      <h3>Heilind EDI (832/846)</h3>
+      <div class="wf-desc">Scraping ruled out (Imperva WAF). Pursuing EDI feed.</div>
+    </div>
+    <div class="workflow wf-purple">
+      <span class="wf-status status-planned">Planned</span>
+      <h3>Purchase Optimizer</h3>
+      <div class="wf-desc">Split purchases across vendors for blended cost savings</div>
+    </div>
+  </div>
+</div>
+
+<!-- SHARED COGS -->
+<div class="cogs-section">
+  <div class="cogs-label">Write-back Cogs (shared/ · iDempiere REST API)</div>
+  <div class="cog-grid">
+    <div class="cog cog-writeback"><div class="cog-name">api-client.js</div><div class="cog-desc">apiPost / apiPatch / apiGet · HTTPS self-signed cert via Undici dispatcher · credentials from ~/workspace/.env</div></div>
+    <div class="cog cog-writeback"><div class="cog-name">rfq-writer.js</div><div class="cog-desc">chuboe_rfq + lines + line_mpn</div></div>
+    <div class="cog cog-writeback"><div class="cog-name">offer-writeback.js</div><div class="cog-desc">chuboe_offer + per-CPC anchor pattern</div></div>
+    <div class="cog cog-writeback"><div class="cog-name">vq-writer.js</div><div class="cog-desc">chuboe_vq_line · exact → fuzzy MPN match</div></div>
+    <div class="cog cog-writeback"><div class="cog-name">cq-writer.js</div><div class="cog-desc">chuboe_cq_line (flat)</div></div>
+    <div class="cog cog-writeback"><div class="cog-name">record-updater.js</div><div class="cog-desc">PATCH / patchBatch · idempotent backfills</div></div>
+    <div class="cog cog-writeback"><div class="cog-name">api-result-writer.js</div><div class="cog-desc">chuboe_pricing_api_result · thin-pointer for virtual column</div></div>
+  </div>
+  <div class="cogs-label" style="margin-top:14px;">Resolution / Matching Cogs</div>
+  <div class="cog-grid">
+    <div class="cog cog-exists"><div class="cog-name">mfr-equivalence.js</div><div class="cog-desc">canonicalMfr + computeMfrMatch · prenormalize → aliases → acquisitions</div></div>
+    <div class="cog cog-exists"><div class="cog-name">mfr-lookup.js / mfr-resolver.js</div><div class="cog-desc">MFR text → ID · 5-tier (alias → cache → DB → fuzzy → passthrough)</div></div>
+    <div class="cog cog-exists"><div class="cog-name">partner-lookup.js</div><div class="cog-desc">Email/name/domain → iDempiere BP (4-tier)</div></div>
+    <div class="cog cog-exists"><div class="cog-name">mpn-match.js</div><div class="cog-desc">Exact + variant tiers · MIN_LEN=5 · optional MFR veto · used by all parsers (no recommendation fallback)</div></div>
+  </div>
+  <div class="cogs-label" style="margin-top:14px;">Data / API Cogs</div>
+  <div class="cog-grid">
+    <div class="cog cog-exists"><div class="cog-name">franchise-api.js</div><div class="cog-desc">7 distributor APIs → searchAllDistributors(mpn, qty) → VQ capture</div></div>
+    <div class="cog cog-exists"><div class="cog-name">market-data.js</div><div class="cog-desc">VQ history · broker sales · offers · RFQ demand · MPN cleaning</div></div>
+    <div class="cog cog-exists"><div class="cog-name">email-fetcher.js</div><div class="cog-desc">IMAP · shared WORKMAIL creds from .env</div></div>
+    <div class="cog cog-exists"><div class="cog-name">notifier.js</div><div class="cog-desc">SMTP · nodemailer · in-memory attachments (no disk persistence)</div></div>
+    <div class="cog cog-exists"><div class="cog-name">csv-utils.js</div><div class="cog-desc">readCSVFile · proper quoted-comma parsing</div></div>
+    <div class="cog cog-exists"><div class="cog-name">data-model.md</div><div class="cog-desc">Schema source of truth · join patterns · valid values · bean-callout traps</div></div>
+  </div>
+</div>
+
+<!-- TABS -->
+<div class="tabs">
+  <div class="tab active" onclick="switchTab(event,'matrix')">Operation × Workflow Matrix</div>
+  <div class="tab" onclick="switchTab(event,'apis')">Franchise APIs (7)</div>
+  <div class="tab" onclick="switchTab(event,'data')">Data Sources</div>
+  <div class="tab" onclick="switchTab(event,'changelog')">What's New (v1 → v2)</div>
+</div>
+
+<div class="tab-content active" id="tab-matrix">
+  <div class="matrix">
+    <table>
+      <thead>
+        <tr>
+          <th>Operation</th>
+          <th>Cog</th>
+          <th style="text-align:center">VQ Load</th>
+          <th style="text-align:center">Mkt Offer</th>
+          <th style="text-align:center">Stock RFQ</th>
+          <th style="text-align:center">RFQ AI</th>
+          <th style="text-align:center">Resale</th>
+          <th style="text-align:center">Quick Qt</th>
+          <th style="text-align:center">Vortex</th>
+          <th style="text-align:center">Offer Anl</th>
+          <th style="text-align:center">Fr. Screen</th>
+          <th style="text-align:center">HTS/ECCN</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr><td class="op-name">Email fetch</td><td class="cog-col">email-fetcher</td><td class="check">✓</td><td class="check">✓</td><td class="check">✓</td><td class="check">✓</td><td></td><td></td><td class="check">✓</td><td></td><td></td><td></td></tr>
+        <tr><td class="op-name">AI extract line items</td><td class="cog-col">Claude/LLM</td><td class="check">✓</td><td class="check">✓</td><td class="check">✓</td><td class="check">✓</td><td></td><td></td><td></td><td></td><td></td><td></td></tr>
+        <tr><td class="op-name">Partner match</td><td class="cog-col">partner-lookup</td><td class="check">✓</td><td class="check">✓</td><td class="check">✓</td><td class="check">✓</td><td></td><td></td><td></td><td></td><td></td><td></td></tr>
+        <tr><td class="op-name">MFR resolve (text→ID)</td><td class="cog-col">mfr-resolver</td><td class="check">✓</td><td class="check">✓</td><td class="check">✓</td><td class="check">✓</td><td></td><td></td><td></td><td></td><td></td><td></td></tr>
+        <tr><td class="op-name">MFR equivalence</td><td class="cog-col">mfr-equivalence</td><td></td><td class="check">✓</td><td></td><td></td><td></td><td class="check">✓</td><td class="check">✓</td><td class="check">✓</td><td></td><td></td></tr>
+        <tr><td class="op-name">MPN match</td><td class="cog-col">mpn-match</td><td class="check">✓</td><td class="check">✓</td><td class="check">✓</td><td class="check">✓</td><td class="check">✓</td><td class="check">✓</td><td class="check">✓</td><td class="check">✓</td><td class="check">✓</td><td class="check">✓</td></tr>
+        <tr><td class="op-name">Franchise API check</td><td class="cog-col">franchise-api</td><td></td><td></td><td class="check">✓</td><td></td><td class="check">✓</td><td class="planned">◐</td><td></td><td class="check">✓</td><td class="check">✓</td><td class="check">✓</td></tr>
+        <tr><td class="op-name">VQ history</td><td class="cog-col">market-data</td><td></td><td></td><td></td><td></td><td class="check">✓</td><td class="check">✓</td><td class="check">✓</td><td></td><td></td><td></td></tr>
+        <tr><td class="op-name">Broker sales history</td><td class="cog-col">market-data</td><td></td><td></td><td></td><td></td><td class="check">✓</td><td class="check">✓</td><td></td><td></td><td></td><td></td></tr>
+        <tr><td class="op-name">Market offers</td><td class="cog-col">market-data</td><td></td><td></td><td></td><td></td><td class="check">✓</td><td></td><td class="check">✓</td><td class="check">✓</td><td></td><td></td></tr>
+        <tr><td class="op-name">RFQ demand</td><td class="cog-col">market-data</td><td></td><td></td><td></td><td></td><td class="check">✓</td><td></td><td class="check">✓</td><td class="check">✓</td><td></td><td></td></tr>
+        <tr><td class="op-name">Write RFQ</td><td class="cog-col">rfq-writer</td><td></td><td></td><td class="check">✓</td><td class="check">✓</td><td></td><td></td><td></td><td></td><td></td><td></td></tr>
+        <tr><td class="op-name">Write VQ</td><td class="cog-col">vq-writer</td><td class="check">✓</td><td></td><td></td><td></td><td class="check">✓</td><td></td><td></td><td></td><td class="check">✓</td><td></td></tr>
+        <tr><td class="op-name">Write Offer</td><td class="cog-col">offer-writeback</td><td></td><td class="check">✓</td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>
+        <tr><td class="op-name">Write CQ</td><td class="cog-col">cq-writer</td><td></td><td></td><td></td><td></td><td class="planned">◐</td><td class="planned">◐</td><td></td><td></td><td></td><td></td></tr>
+        <tr><td class="op-name">PATCH / backfill</td><td class="cog-col">record-updater</td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td class="check">✓</td></tr>
+        <tr><td class="op-name">CSV / Excel output</td><td class="cog-col">csv-utils</td><td></td><td></td><td></td><td></td><td class="check">✓</td><td class="check">✓</td><td class="check">✓</td><td class="check">✓</td><td class="check">✓</td><td></td></tr>
+        <tr><td class="op-name">Email notification</td><td class="cog-col">notifier</td><td class="check">✓</td><td class="check">✓</td><td class="check">✓</td><td class="check">✓</td><td></td><td></td><td class="check">✓</td><td class="check">✓</td><td></td><td></td></tr>
+      </tbody>
+    </table>
+    <div style="font-size:0.65em; color:#8899a6; margin-top:8px;">
+      ✓ = uses operation &nbsp; ◐ = planned &nbsp; <span style="color:#17bf63;">green</span> = shared cog exists &nbsp; <span style="color:#ffad1f;">yellow</span> = write-back (REST API)
+    </div>
+  </div>
+</div>
+
+<div class="tab-content" id="tab-apis">
+  <div style="display:grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap:10px;">
+    <div style="background:rgba(23,191,99,0.1); border:1px solid rgba(23,191,99,0.2); border-radius:8px; padding:12px;">
+      <div style="font-weight:600; color:#17bf63; font-size:0.85em;">DigiKey</div>
+      <div style="font-size:0.7em; color:#8899a6;">OAuth2 REST · BP 1002331</div>
+      <div style="font-size:0.65em; color:#556; margin-top:4px;">Broadest catalog · HTS/ECCN source</div>
+    </div>
+    <div style="background:rgba(23,191,99,0.1); border:1px solid rgba(23,191,99,0.2); border-radius:8px; padding:12px;">
+      <div style="font-weight:600; color:#17bf63; font-size:0.85em;">Arrow</div>
+      <div style="font-size:0.7em; color:#8899a6;">REST · BP 1002390</div>
+      <div style="font-size:0.65em; color:#556; margin-top:4px;">Filters out Verical</div>
+    </div>
+    <div style="background:rgba(23,191,99,0.1); border:1px solid rgba(23,191,99,0.2); border-radius:8px; padding:12px;">
+      <div style="font-weight:600; color:#17bf63; font-size:0.85em;">Rutronik</div>
+      <div style="font-size:0.7em; color:#8899a6;">REST · BP 1004668</div>
+      <div style="font-size:0.65em; color:#556; margin-top:4px;">European focus</div>
+    </div>
+    <div style="background:rgba(23,191,99,0.1); border:1px solid rgba(23,191,99,0.2); border-radius:8px; padding:12px;">
+      <div style="font-weight:600; color:#17bf63; font-size:0.85em;">Future Electronics</div>
+      <div style="font-size:0.7em; color:#8899a6;">Orbweaver · BP 1002332</div>
+      <div style="font-size:0.65em; color:#556; margin-top:4px;">Batch capable</div>
+    </div>
+    <div style="background:rgba(23,191,99,0.1); border:1px solid rgba(23,191,99,0.2); border-radius:8px; padding:12px;">
+      <div style="font-weight:600; color:#17bf63; font-size:0.85em;">Newark / Farnell</div>
+      <div style="font-size:0.7em; color:#8899a6;">element14 · BP 1002394</div>
+      <div style="font-size:0.65em; color:#556; margin-top:4px;">US + UK</div>
+    </div>
+    <div style="background:rgba(23,191,99,0.1); border:1px solid rgba(23,191,99,0.2); border-radius:8px; padding:12px;">
+      <div style="font-weight:600; color:#17bf63; font-size:0.85em;">TTI</div>
+      <div style="font-size:0.7em; color:#8899a6;">Azure APIM · BP 1002330</div>
+      <div style="font-size:0.65em; color:#556; margin-top:4px;">Passives + connectors · HTS extract</div>
+    </div>
+    <div style="background:rgba(23,191,99,0.1); border:1px solid rgba(23,191,99,0.2); border-radius:8px; padding:12px;">
+      <div style="font-weight:600; color:#17bf63; font-size:0.85em;">Master Electronics</div>
+      <div style="font-size:0.7em; color:#8899a6;">REST v2 · BP 1002409</div>
+      <div style="font-size:0.65em; color:#556; margin-top:4px;">Added 2026-03-17</div>
+    </div>
+    <div style="background:rgba(23,191,99,0.1); border:1px solid rgba(23,191,99,0.2); border-radius:8px; padding:12px;">
+      <div style="font-weight:600; color:#17bf63; font-size:0.85em;">Mouser</div>
+      <div style="font-size:0.7em; color:#8899a6;">REST · HTS/ECCN source</div>
+      <div style="font-size:0.65em; color:#556; margin-top:4px;">Paired with DigiKey for HTS/ECCN backfill</div>
+    </div>
+  </div>
+  <div style="margin-top:12px; font-size:0.75em; color:#8899a6;">
+    All called via <code style="color:#17bf63;">shared/franchise-api.js</code> → <code>searchAllDistributors(mpn, qty)</code>.
+    API data = confirmed pricing → captured as VQ via <code>vq-writer</code>.
+    <br><strong>Parser rule:</strong> never fall back to <code>products[0]</code> — use <code>mpn-match</code> tiers; return <code>found=false</code> on miss (fixes "recommendation" leakage from pre-2026-04-14 parsers).
+    <br><strong>Rate limits:</strong> exhausted calls queue into <code>.deferred-api-queue.json</code>; worker retries every 30min via cron.
+  </div>
+</div>
+
+<div class="tab-content" id="tab-data">
+  <div style="display:grid; grid-template-columns: 1fr 1fr; gap:15px;">
+    <div>
+      <h4 style="font-size:0.8em; color:#17bf63; margin-bottom:8px;">Confirmed (API) → Captured as VQ</h4>
+      <ul style="list-style:none; font-size:0.8em;">
+        <li style="padding:4px 0; border-bottom:1px solid rgba(255,255,255,0.05);">DigiKey · Arrow · Rutronik</li>
+        <li style="padding:4px 0; border-bottom:1px solid rgba(255,255,255,0.05);">Future · Newark/Farnell · TTI</li>
+        <li style="padding:4px 0;">Master Electronics · Mouser</li>
+      </ul>
+    </div>
+    <div>
+      <h4 style="font-size:0.8em; color:#ffad1f; margin-bottom:8px;">Reference Only (availability, not pricing)</h4>
+      <ul style="list-style:none; font-size:0.8em;">
+        <li style="padding:4px 0; border-bottom:1px solid rgba(255,255,255,0.05);">FindChips (screening only)</li>
+        <li style="padding:4px 0; border-bottom:1px solid rgba(255,255,255,0.05);">Customer targets (loose guidance)</li>
+        <li style="padding:4px 0;">Customer sale prices (relationship factors)</li>
+      </ul>
+    </div>
+    <div>
+      <h4 style="font-size:0.8em; color:#1da1f2; margin-bottom:8px;">System Data (DB queries)</h4>
+      <ul style="list-style:none; font-size:0.8em;">
+        <li style="padding:4px 0; border-bottom:1px solid rgba(255,255,255,0.05);">VQ history · secondary market costs</li>
+        <li style="padding:4px 0; border-bottom:1px solid rgba(255,255,255,0.05);">Broker sales · strongest pricing signal</li>
+        <li style="padding:4px 0; border-bottom:1px solid rgba(255,255,255,0.05);">Market offers · supply signals</li>
+        <li style="padding:4px 0;">RFQ demand · demand signals</li>
+      </ul>
+    </div>
+    <div>
+      <h4 style="font-size:0.8em; color:#f45d22; margin-bottom:8px;">Pricing Models (two distinct, do not conflate)</h4>
+      <div style="font-size:0.78em; line-height:1.55;">
+        <strong style="color:#ffad1f;">Broker-to-broker (Stock RFQ, Suggested Resale):</strong><br>
+        ~20-30% of franchise best price. &lt;$1→20% · $1-10→25% · $10+→30%. Broker sales override if market clears differently.
+        <br><br>
+        <strong style="color:#ffad1f;">Direct customer (Quick Quote):</strong><br>
+        Margin/GP-based. 15% min margin, $250 min GP/line. 6-tier suggested resale hierarchy (same-cust PPV/shortage/losing CQ → other-cust → target → 30% fallback).
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="tab-content" id="tab-changelog">
+  <div style="font-size:0.8em; line-height:1.7;">
+    <h4 style="color:#ffad1f; margin-bottom:10px;">Major changes since v1 (March 2026)</h4>
+    <ul style="list-style:none; padding:0;">
+      <li style="padding:8px 10px; border-left:3px solid #ffad1f; background:rgba(255,173,31,0.06); margin-bottom:6px;">
+        <strong>iDempiere REST API write-back is live in PRODUCTION</strong> (172.31.7.239). Tsunami User role 1000004. Six writers ship: rfq-writer, offer-writeback, vq-writer, cq-writer, record-updater, api-result-writer. FDW write-back approach superseded.
+      </li>
+      <li style="padding:8px 10px; border-left:3px solid #17bf63; background:rgba(23,191,99,0.06); margin-bottom:6px;">
+        <strong>RFQ Loading via AI</strong> ships — AI extraction from customer emails/attachments, load-first/enrich-later architecture. 9,003-line Honeywell PPV loaded at ~20 lines/s.
+      </li>
+      <li style="padding:8px 10px; border-left:3px solid #17bf63; background:rgba(23,191,99,0.06); margin-bottom:6px;">
+        <strong>HTS / ECCN Backfill</strong> workflow added — RFQ-scoped PATCH of chuboe_vq_line via DigiKey + Mouser.
+      </li>
+      <li style="padding:8px 10px; border-left:3px solid #17bf63; background:rgba(23,191,99,0.06); margin-bottom:6px;">
+        <strong>mfr-equivalence.js</strong> now standard for all "same company?" checks. 200+ aliases + acquisitions chain (Linear→ADI, Atmel→Microchip, Fairchild→Onsemi, etc.).
+      </li>
+      <li style="padding:8px 10px; border-left:3px solid #17bf63; background:rgba(23,191,99,0.06); margin-bottom:6px;">
+        <strong>mpn-match.js</strong> fixes the "recommendation fallback" bug — all 10 distributor parsers pre-2026-04-14 silently surfaced products[0] as the searched part on miss. Now: exact + variant tiers, optional MFR veto, return found=false on miss.
+      </li>
+      <li style="padding:8px 10px; border-left:3px solid #f45d22; background:rgba(244,93,34,0.06); margin-bottom:6px;">
+        <strong>Bean-callout traps documented</strong> — chuboe_offer_line CPC dedup silently merges MPNs; Chuboe_CPC non-updateable after POST; workarounds shipped (per-CPC anchor + offer_line_mpn sub-rows).
+      </li>
+      <li style="padding:8px 10px; border-left:3px solid #1da1f2; background:rgba(29,161,242,0.06); margin-bottom:6px;">
+        <strong>Cron jobs</strong> — Inventory Cleanup (Mon 6am) · LAM Kitting Reorder · API Queue Worker (*/30). Operator emailed on exhaustion.
+      </li>
+      <li style="padding:8px 10px; border-left:3px solid #9966ff; background:rgba(153,102,255,0.06); margin-bottom:6px;">
+        <strong>Heilind scraping ruled out</strong> (Imperva WAF tarpits headless Chromium). Pursuing EDI 832/846 as durable path.
+      </li>
+      <li style="padding:8px 10px; border-left:3px solid #8899a6; background:rgba(255,255,255,0.03);">
+        <strong>Vortex Matches = email-only</strong> (vortex@orangetsunami → analysis → email back). No disk persistence. Sister principle: outputs emailed, not pushed to GitHub.
+      </li>
+    </ul>
+  </div>
+</div>
+
+</div>
+
+<div class="timestamp">Generated 2026-04-14 · Astute Analytics Architecture v2</div>
+
+<script>
+function switchTab(ev, name) {
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+  ev.target.classList.add('active');
+  document.getElementById('tab-' + name).classList.add('active');
+}
+</script>
+
+</body>
+</html>

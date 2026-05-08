@@ -1,0 +1,172 @@
+[
+  {
+    "cpc": "630-047972-001",
+    "mpn": "EPM1270T144C4N",
+    "mfr": "Altera",
+    "bpSK": "1006857",
+    "qty": 10,
+    "cost": 74.5,
+    "dc": "25+",
+    "notes": "Listed as INTEL manufacturer; STOCK",
+    "vqLineId": 2004762
+  },
+  {
+    "cpc": "630-048308-001",
+    "mpn": "EPM240T100C4N",
+    "mfr": "Altera",
+    "bpSK": "1006857",
+    "qty": 20,
+    "cost": 22.39,
+    "dc": "19+",
+    "notes": "STOCK (booked at LAM target; rebalanced from $27)",
+    "vqLineId": 2004763
+  },
+  {
+    "cpc": "630-337161-001",
+    "mpn": "5M1270ZT144C5N",
+    "mfr": "Altera",
+    "bpSK": "1006247",
+    "qty": 10,
+    "cost": 6.18,
+    "dc": "22+",
+    "notes": "STOCK",
+    "vqLineId": 2004764
+  },
+  {
+    "cpc": "630-337692-003",
+    "mpn": "XCZU4CG-1SFVC784E",
+    "mfr": "Xilinx",
+    "bpSK": "1006857",
+    "qty": 5,
+    "cost": 342,
+    "dc": "22+",
+    "coo": 316,
+    "notes": "Stock; ECCN 5A002.A.4 — compliance review pending",
+    "restricted": true,
+    "vqLineId": 2004765
+  },
+  {
+    "cpc": "631-123367-001",
+    "mpn": "XC6SLX100-3FGG484C",
+    "mfr": "Xilinx",
+    "bpSK": "1006857",
+    "qty": 10,
+    "cost": 53.4463,
+    "dc": "22+",
+    "notes": "STOCK (absorbs rebalance from EPM240+LTC4231; real Smartel $41.00)",
+    "vqLineId": 2004766
+  },
+  {
+    "cpc": "630-052043-001",
+    "mpn": "LT1499CS#PBF",
+    "mfr": "ADI",
+    "bpSK": "1012507",
+    "qty": 50,
+    "cost": 12.062,
+    "dc": "23+",
+    "coo": 238,
+    "notes": "",
+    "vqLineId": 2004767
+  },
+  {
+    "cpc": "630-B70151-001",
+    "mpn": "ADA4891-2ARZ",
+    "mfr": "ADI",
+    "bpSK": "1005255",
+    "qty": 120,
+    "cost": 1.04,
+    "dc": "21+",
+    "coo": 278,
+    "notes": "Quoted MPN: ADA4891-2ARZ-R7",
+    "vqLineId": 2004768
+  },
+  {
+    "cpc": "630-311294-001",
+    "mpn": "LT8645SEV#PBF",
+    "mfr": "ADI",
+    "bpSK": "1006247",
+    "qty": 25,
+    "cost": 4.63,
+    "dc": "22+",
+    "notes": "STOCK",
+    "vqLineId": 2004769
+  },
+  {
+    "cpc": "630-198438-001",
+    "mpn": "AD5696RBRUZ",
+    "mfr": "ADI",
+    "bpSK": "1006857",
+    "qty": 15,
+    "cost": 15.25,
+    "dc": "22+",
+    "notes": "Quoted MPN: AD5696RBRUZ-RL7; COO exclusion: not China",
+    "vqLineId": 2004770
+  },
+  {
+    "cpc": "630-017794-002",
+    "mpn": "LT1376HVIS#PBF",
+    "mfr": "ADI",
+    "bpSK": "1006857",
+    "qty": 20,
+    "cost": 9.6,
+    "dc": "22+",
+    "notes": "STOCK",
+    "vqLineId": 2004771
+  },
+  {
+    "cpc": "630-900073-001",
+    "mpn": "AD586KRZ",
+    "mfr": "ADI",
+    "bpSK": "1006857",
+    "qty": 25,
+    "cost": 8.31,
+    "dc": "25+",
+    "notes": "Quoted MPN: AD586KRZ-REEL7; STOCK",
+    "vqLineId": 2004772
+  },
+  {
+    "cpc": "630-099973-001",
+    "mpn": "ADG431BRZ",
+    "mfr": "ADI",
+    "bpSK": "1006247",
+    "qty": 35,
+    "cost": 6.18,
+    "dc": "22+",
+    "notes": "Quoted MPN: ADG431BRZ-REEL7; STOCK",
+    "vqLineId": 2004773
+  },
+  {
+    "cpc": "630-341691-001",
+    "mpn": "LTC4231HMS-1#PBF",
+    "mfr": "ADI",
+    "bpSK": "1006857",
+    "qty": 35,
+    "cost": 7.3282,
+    "dc": "21+",
+    "notes": "STOCK (booked at LAM target; rebalanced from $8.25)",
+    "vqLineId": 2004774
+  },
+  {
+    "cpc": "630-343681-001",
+    "mpn": "AD5292BRUZ-20",
+    "mfr": "ADI",
+    "bpSK": "1012507",
+    "qty": 40,
+    "cost": 5.778,
+    "dc": "23+",
+    "coo": 238,
+    "notes": "Quoted MPN: AD5292BRUZ-20-RL7; OWN STK",
+    "vqLineId": 2004775
+  },
+  {
+    "cpc": "630-204173-001",
+    "mpn": "524MILF",
+    "mfr": "IDT",
+    "bpSK": "1006857",
+    "qty": 80,
+    "cost": 2.45,
+    "dc": "22+",
+    "notes": "Quoted MPN: 524MILFT; STOCK",
+    "vqLineId": 2004777
+  }
+]

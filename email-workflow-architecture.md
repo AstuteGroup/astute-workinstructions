@@ -135,12 +135,20 @@ If the workflow involves "read an email and decide what to do with it," it belon
 | Workflow | Inbox | Pattern | Status |
 |---|---|---|---|
 | RFQ Loading (general) | rfqloading@ | Agent (`/schedule`) | Live, working |
-| Stock RFQ Loading | stockRFQ@ | Static daemon | **Migration target** |
-| Customer Excess | excess@ | Static cron | **Migration target** |
+| Customer Excess | excess@ | Agent module built | **Phase 1 done 2026-05-08** — `shared/workflow-actions/excess.js` + agent operating instructions in workflow .md. Awaiting `/schedule` cutover + static-pipeline deletion. |
+| Stock RFQ Loading | stockRFQ@ | Agent module built | **Phase 1 done 2026-05-08** — `shared/workflow-actions/stockrfq.js` + agent operating instructions in workflow .md. Awaiting `/schedule` cutover + static-daemon deletion. |
 | VQ Loading | vq@ | Static cron | **Migration target** |
-| Vortex Matches | vortex@ | Static cron | Inbox-driven request/response — review whether agent pattern is appropriate |
+| Vortex Matches | vortex@ | Static cron | **Stays static — exception documented below** |
 
 After migration is complete, the static-cron versions of email-driven workflows are **deleted**, not deprecated. The only path that remains is the agent pattern.
+
+### Documented exception: Vortex Matches
+
+Vortex stays on a static poller. **Why:** Vortex is inbox-driven *request/response* — operator forwards an RFQ to `vortex@`, expects an enriched matches reply within a minute. `/schedule` minimum cadence (every 5–30 min) makes the worst-case round-trip 30 min, which fails the operational expectation. The static poller's near-instant turnaround is load-bearing for how it's used.
+
+**Revisit triggers:** if `/schedule` gains sub-minute or event-driven cadence, OR if Vortex's parsing logic gets hit by the same novel-format failures that took out customer-excess on 2026-05-07, migrate.
+
+The exception is itself in the workflow's .md so anyone touching Vortex sees it; it's not buried here.
 
 ## What NOT to do
 

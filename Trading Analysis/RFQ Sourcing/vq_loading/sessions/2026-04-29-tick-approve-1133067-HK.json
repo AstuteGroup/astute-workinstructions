@@ -1,0 +1,68 @@
+{
+  "rfqSearchKey": "1133067",
+  "runAt": "2026-04-29T19:13:57.746Z",
+  "supersedes": [
+    "1158559",
+    "1158560",
+    "1158561"
+  ],
+  "shipTo": "HONG KONG",
+  "promiseDate": "2026-05-09",
+  "results": [
+    {
+      "vqId": 2140913,
+      "line": 60,
+      "mpn": "LTM8074EY#PBF",
+      "mfr": "Analog Devices",
+      "vendor": "Hong Kong Duan Que Electronics Co., Limited",
+      "vendorShort": "DQ",
+      "cost": 5.88,
+      "qty": 80,
+      "dc": "24+",
+      "leadTime": "STOCK - 1 WEEK",
+      "packagingName": "F-REEL",
+      "lamResale": 9.71975487804878,
+      "lamMoq": 80,
+      "margin": 0.395,
+      "rRequestId": 1160664,
+      "rRequestDocNo": "1158566"
+    },
+    {
+      "vqId": 2140922,
+      "line": 70,
+      "mpn": "MAX16029TG+",
+      "mfr": "Maxim Integrated",
+      "vendor": "SMARTEL ELECTRONICS (ASIA) CO LTD",
+      "vendorShort": "Smartel",
+      "cost": 6.4,
+      "qty": 75,
+      "dc": "24+",
+      "leadTime": "STOCK",
+      "packagingName": "F-REEL",
+      "lamResale": 8.925226829268293,
+      "lamMoq": 75,
+      "margin": 0.283,
+      "altMpn": "MAX16029TG+T",
+      "rRequestId": 1160665,
+      "rRequestDocNo": "1158567"
+    },
+    {
+      "vqId": 2140932,
+      "line": 130,
+      "mpn": "AD9467BCPZ-250",
+      "mfr": "Analog Devices",
+      "vendor": "Xin Jun Hong (HK) Industry Co., Ltd",
+      "vendorShort": "XJH",
+      "cost": 113.95,
+      "qty": 100,
+      "dc": "25+",
+      "leadTime": "STOCK",
+      "packagingName": "OTHER",
+      "lamResale": 263.99063414634145,
+      "lamMoq": 100,
+      "margin": 0.568,
+      "rRequestId": 1160666,
+      "rRequestDocNo": "1158568"
+    }
+  ]
+}

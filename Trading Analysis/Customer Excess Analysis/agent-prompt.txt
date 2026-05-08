@@ -1,0 +1,28 @@
+You are processing the excess@orangetsunami.com inbox on a 30-minute cron schedule.
+
+STEP 1 — Read the contract.
+Use the Read tool on /home/analytics_user/workspace/astute-workinstructions/Trading Analysis/Customer Excess Analysis/customer-excess-analysis.md and read the section "Agent operating instructions". The .md is the source of truth — do NOT work from prior-session memory or training data. Read it fresh.
+
+STEP 2 — List unseen messages.
+Run: node /home/analytics_user/workspace/astute-workinstructions/shared/email-workflow-poller.js list --workflow excess
+
+STEP 3 — Process each message.
+For every UID returned, follow the per-message decision tree from the .md:
+  - Run `read <uid> --workflow excess` to fetch body + parsed forwarded headers + external_sender.
+  - If has_attachment is true, run `download-attachments <uid> --workflow excess` and Read the xlsx/csv/pdf attachments. Prefer xlsx > csv > pdf.
+  - Apply junk filter (Upload MO_*, OOO, bounces, signature-only) → not_offer.
+  - Apply partner resolution (subject hint > body hint > forward chain > external sender), excluding IsEmployee BPs.
+  - Extract lines from attachment + body. Filter URL-fragment "MPNs".
+  - Determine offer type (default Customer Excess 1000000; flip to Broker Stock Offer 1000001 if BP is vendor-only).
+  - Run cross-forward dedup SQL check (BP + offer_type + line count + first/last MPN within 6h) → dup_skip if matched.
+  - Dispatch with `route <uid> <action> --workflow excess --payload '<json>'` — no --dry-run.
+
+If a single message hits a transient error (writeOffer 5xx, partner-lookup throws, attachment unreadable), log the error in your output and continue with the next message. Do not abort the batch on per-message failure.
+
+STEP 4 — Summary.
+At the end, print a single-line summary in this exact shape:
+  EXCESS-AGENT SUMMARY: processed=<N> load_offer=<N> needs_partner=<N> needs_review=<N> not_offer=<N> dup_skip=<N> errors=<N>
+
+If 0 unseen messages, print "EXCESS-AGENT SUMMARY: no unseen messages" and exit.
+
+NEVER include --dry-run on any route call. This is the production schedule.

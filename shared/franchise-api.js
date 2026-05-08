@@ -320,6 +320,18 @@ async function searchPart(distributor, mpn, qty, opts = {}) {
 
   try {
     const mod = require(config.script);
+
+    // Per-disty throttle — blocks until a token is available so we never
+    // exceed the supplier's per-minute window. Distys without a configured
+    // limit pass through unchanged. See shared/api-throttle.js.
+    try {
+      await require('./api-throttle').acquire(distributor);
+    } catch (throttleErr) {
+      // Throttle gave up after max wait — treat as a rate-limit so the
+      // wrapper's catch enqueues for retry instead of just dropping the call.
+      throw throttleErr;
+    }
+
     // opts.mfr — searched MFR — enables the MPN-match MFR veto (rejects
     // candidates whose MFR is MISMATCH per shared/mfr-equivalence). Optional;
     // existing call sites that don't pass it get the old behavior (no veto).
@@ -445,6 +457,63 @@ async function searchPart(distributor, mpn, qty, opts = {}) {
         .alertIfAuthFailure({ distributor, error: err, mpn })
         .catch(() => {});
     } catch { /* module optional */ }
+
+    // Centralized retry policy — classify the error and enqueue if retry-able.
+    // Replaces per-cog enqueue logic that used to live in mouser.js / digikey.js.
+    // All 10 active cogs now get retry coverage automatically; cogs only need
+    // to throw descriptive Errors. See shared/api-retry-policy.js for the rules.
+    //
+    // Also logs every failure to ~/workspace/.api-failures.ndjson so when a
+    // supplier exhibits weird behavior we have evidence on hand instead of
+    // having to add a logger and wait for the next failure. Cogs that need
+    // richer per-call HTTP context (status code, headers, response body) keep
+    // their own loggers — Mouser uses ~/workspace/.mouser-failures.ndjson —
+    // and we correlate by timestamp.
+    //
+    // Skipped when API_RETRY_IN_FLIGHT=1 — prevents the queue worker from
+    // re-enqueueing a call it's currently retrying (which would create
+    // duplicate queue items on every failed attempt).
+    let _verdict = null;
+    try {
+      const { classify } = require('./api-retry-policy');
+      _verdict = classify(err);
+    } catch { /* policy module load failure → fall through with null verdict */ }
+
+    if (process.env.API_RETRY_IN_FLIGHT !== '1') {
+      try {
+        if (_verdict?.retry) {
+          const { enqueueRetry } = require('./api-queue');
+          const argsB64 = Buffer.from(JSON.stringify({ distributor, mpn, qty })).toString('base64');
+          const runnerPath = path.resolve(__dirname, '../scripts/api-retry-runner.js');
+          enqueueRetry({
+            id: `${distributor}-${mpn}-${Date.now()}`,
+            kind: `api-retry-${distributor}`,
+            command: `API_RETRY_IN_FLIGHT=1 API_RETRY_ARGS_B64=${argsB64} node ${JSON.stringify(runnerPath)}`,
+            blocked_until_hours: _verdict.blockedHours,
+            reason: `${distributor} ${_verdict.category}: ${_verdict.reason} on ${mpn} (${err.message.slice(0, 100)})`,
+          });
+        }
+      } catch { /* enqueue is best-effort; never block the result path */ }
+    }
+
+    // Diagnostic log — append every failure (including in-flight retries)
+    // so the digest can show a rolling 24h health summary per disty.
+    try {
+      const fs = require('fs');
+      const home = process.env.HOME || '/home/analytics_user';
+      const line = JSON.stringify({
+        ts: new Date().toISOString(),
+        distributor,
+        mpn,
+        qty,
+        errorMessage: (err.message || String(err)).slice(0, 500),
+        category: _verdict?.category || 'UNCLASSIFIED',
+        retry: _verdict?.retry ?? null,
+        blockedHours: _verdict?.blockedHours ?? null,
+        inFlightRetry: process.env.API_RETRY_IN_FLIGHT === '1',
+      }) + '\n';
+      fs.appendFileSync(path.join(home, 'workspace/.api-failures.ndjson'), line);
+    } catch { /* logging is best-effort; never block the result path */ }
 
     return {
       distributor,

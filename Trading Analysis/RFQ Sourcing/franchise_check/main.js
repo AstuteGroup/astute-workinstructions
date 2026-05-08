@@ -36,7 +36,7 @@ const fs = require('fs');
 const { Client } = require('pg');
 const config = require('./config');
 const { searchPart: findChipsSearch } = require('./search');
-const { searchAllDistributors, getActiveDistributors } = require('../../../shared/franchise-api');
+const { searchAllDistributors, getActiveDistributors, extractStockAndLtRows } = require('../../../shared/franchise-api');
 const { writePricingResult } = require('../../../shared/api-result-writer');
 
 // =============================================================================
@@ -477,18 +477,26 @@ Options:
             }
           }
 
-          // Build VQ lines from API results
+          // Build VQ lines from API results via the centralized extractor.
+          // Per architectural guidance 2026-04-09: don't roll your own
+          // d.vqPrice/d.vqMpn field access — use extractStockAndLtRows so
+          // qty-break tier pricing and stock-vs-LT splits are handled the
+          // same way across all consumers (vq-writer, sweep, enrichment, etc).
           for (const d of apiResults.found) {
-            if (d.vqPrice && d.vqPrice > 0) {
+            const rows = extractStockAndLtRows(d, part.mpn, part.qty || 1) || [];
+            for (const row of rows) {
+              if (!row.cost || row.cost <= 0) continue;
               evaluated.vq_lines.push({
-                bpValue: d.bpValue,
-                vendorName: d.bpName,
-                mpn: d.vqMpn || part.mpn,
-                manufacturer: d.vqManufacturer || '',
-                description: d.vqDescription || '',
-                price: d.vqPrice,
-                vendorNotes: d.vqVendorNotes || '',
-                source: d.name,
+                bpValue: row.vendorBP || d.bpValue,
+                vendorName: row.vendorName || d.bpName,
+                mpn: row.mpn || part.mpn,
+                manufacturer: row.manufacturer || d.vqManufacturer || '',
+                description: row.description || d.vqDescription || '',
+                price: row.cost,
+                qty: row.qty,
+                leadTime: row.leadTime || null,
+                vendorNotes: row.vendorNotes || d.vqVendorNotes || '',
+                source: row.channel || d.name,
               });
             }
           }

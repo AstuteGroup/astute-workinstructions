@@ -170,20 +170,30 @@ function buildSection3DrillDown(crumbs) {
 //
 // Per operator directive 2026-05-05: items must carry forward across digests
 // until they're actually resolved, not just until the next digest window opens.
-async function buildSection4OpenQueue(crumbs, { account = 'excess' } = {}) {
-  const fetcher = createFetcher(account);
+//
+// As of 2026-05-08 the queue spans BOTH the excess and stockrfq inboxes —
+// pass `accounts: ['excess', 'stockrfq']` to scan both.
+async function buildSection4OpenQueue(crumbs, { accounts = ['excess', 'stockrfq'] } = {}) {
   let needsReview = [];
   let needsPartner = [];
   let folderError = null;
-  try {
-    needsReview = await fetcher.listEnvelopes('NeedsReview', 500);
-  } catch (err) {
-    folderError = `NeedsReview: ${err.message}`;
-  }
-  try {
-    needsPartner = await fetcher.listEnvelopes('NeedsPartner', 500);
-  } catch (err) {
-    folderError = (folderError ? folderError + '; ' : '') + `NeedsPartner: ${err.message}`;
+  for (const account of accounts) {
+    const fetcher = createFetcher(account);
+    try {
+      const envs = await fetcher.listEnvelopes('NeedsReview', 500);
+      needsReview.push(...envs.map(e => ({ ...e, _account: account })));
+    } catch (err) {
+      folderError = (folderError ? folderError + '; ' : '') + `${account}/NeedsReview: ${err.message}`;
+    }
+    try {
+      const envs = await fetcher.listEnvelopes('NeedsPartner', 500);
+      needsPartner.push(...envs.map(e => ({ ...e, _account: account })));
+    } catch (err) {
+      // NeedsPartner only exists for excess; stockrfq's miss here is expected
+      if (account !== 'stockrfq') {
+        folderError = (folderError ? folderError + '; ' : '') + `${account}/NeedsPartner: ${err.message}`;
+      }
+    }
   }
 
   const windowEvents = crumbs.filter(c =>
@@ -208,6 +218,7 @@ async function buildSection4OpenQueue(crumbs, { account = 'excess' } = {}) {
     rows.push(`
       <tr>
         <td style="white-space:nowrap">${escapeHtml(fmtTime(env.date))}</td>
+        <td>${escapeHtml(env._account || '')}</td>
         <td><b>UID ${escapeHtml(String(id))}</b></td>
         <td><b>needs-review</b></td>
         <td>NeedsReview</td>
@@ -226,6 +237,7 @@ async function buildSection4OpenQueue(crumbs, { account = 'excess' } = {}) {
     rows.push(`
       <tr>
         <td style="white-space:nowrap">${escapeHtml(fmtTime(env.date))}</td>
+        <td>${escapeHtml(env._account || '')}</td>
         <td><b>UID ${escapeHtml(String(id))}</b></td>
         <td><b>needs-partner</b></td>
         <td>NeedsPartner</td>
@@ -237,6 +249,7 @@ async function buildSection4OpenQueue(crumbs, { account = 'excess' } = {}) {
 
   // (c) Window-scoped non-folder events
   for (const c of windowEvents) {
+    const _accountForRow = c.cog === 'reply-parser' ? 'excess' : 'excess';
     let action = '';
     if (c.event === 'write-failed')          action = `Investigate writeOffer error; manual replay possible after fix`;
     else if (c.event === 'partial-write')    action = `Offer ${c.searchKey || ''} loaded with ${c.errorCount || ''} line errors; review NeedsReview`;
@@ -263,6 +276,7 @@ async function buildSection4OpenQueue(crumbs, { account = 'excess' } = {}) {
     rows.push(`
       <tr>
         <td style="white-space:nowrap">${escapeHtml(fmtTime(c.ts))}</td>
+        <td>${escapeHtml(_accountForRow)}</td>
         <td>${idCell}</td>
         <td><b>${escapeHtml(c.event)}</b></td>
         <td>${escapeHtml(folder)}</td>
@@ -284,6 +298,7 @@ async function buildSection4OpenQueue(crumbs, { account = 'excess' } = {}) {
     html: `${healthNote}<table ${TABLE_STYLE}>
       <tr>
         <th ${TH_STYLE}>When (email date)</th>
+        <th ${TH_STYLE}>Inbox</th>
         <th ${TH_STYLE}>Reference</th>
         <th ${TH_STYLE}>Event</th>
         <th ${TH_STYLE}>Folder</th>
@@ -303,6 +318,113 @@ async function buildSection4OpenQueue(crumbs, { account = 'excess' } = {}) {
   };
 }
 
+// Section 5 = Stock RFQ activity in window (loaded via stockrfq-agent).
+function buildSection5StockRFQ(crumbs) {
+  const loaded = crumbs.filter(c => c.cog === 'stockrfq-agent' && c.event === 'loaded');
+  const needsReview = crumbs.filter(c => c.cog === 'stockrfq-agent' && c.event === 'needs-review');
+  const notRfq = crumbs.filter(c => c.cog === 'stockrfq-agent' && c.event === 'not-rfq');
+
+  const total = loaded.length + needsReview.length + notRfq.length;
+  if (total === 0) {
+    return { html: `<p style="color:#666">No stockRFQ@ activity in this window.</p>`, count: 0 };
+  }
+
+  const summary = `<p>
+    <b>${loaded.length}</b> RFQ${loaded.length === 1 ? '' : 's'} loaded ·
+    <b>${needsReview.length}</b> needs-review ·
+    <b>${notRfq.length}</b> not-rfq
+  </p>`;
+
+  if (loaded.length === 0) return { html: summary, count: total };
+
+  const rows = loaded.map(c => `
+    <tr>
+      <td>${escapeHtml(fmtTime(c.ts))}</td>
+      <td><b>${escapeHtml(c.searchKey || '')}</b></td>
+      <td>BP ${escapeHtml(String(c.bpartnerId || ''))}</td>
+      <td>${escapeHtml(c.type || 'Stock')}</td>
+      <td style="text-align:right">${fmtQty(c.linesWritten)}</td>
+      <td style="text-align:right;color:${c.errorCount ? '#c0392b' : '#27ae60'}">${fmtQty(c.errorCount || 0)}</td>
+    </tr>`).join('');
+
+  return {
+    html: `${summary}
+      <table ${TABLE_STYLE}>
+        <tr><th ${TH_STYLE}>Loaded At</th><th ${TH_STYLE}>Search Key</th><th ${TH_STYLE}>BP</th><th ${TH_STYLE}>Type</th><th ${TH_STYLE}>Lines Written</th><th ${TH_STYLE}>Errors</th></tr>
+        ${rows}
+      </table>`,
+    count: total,
+  };
+}
+
+// Section 6 = Cron job health in window (every job, success/failure/skip).
+function buildSection6CronHealth(crumbs) {
+  const events = crumbs.filter(c => c.cog === 'cron-runner');
+  if (events.length === 0) {
+    return {
+      html: `<p style="color:#666">No cron events recorded yet (the cron-runner started writing breadcrumbs as of 2026-05-08; the first window after that change may be sparse).</p>`,
+      count: 0,
+    };
+  }
+
+  // Group by job name; for each, record success count, failure count, last event
+  const byJob = new Map();
+  for (const e of events) {
+    const name = e.job || '(unknown)';
+    if (!byJob.has(name)) byJob.set(name, { name, success: 0, failure: 0, skipNotDue: 0, skipOtDown: 0, last: null, lastFailure: null });
+    const j = byJob.get(name);
+    if (e.event === 'job-success') j.success++;
+    else if (e.event === 'job-failure') { j.failure++; j.lastFailure = e; }
+    else if (e.event === 'job-skip-not-due') j.skipNotDue++;
+    else if (e.event === 'job-skip-ot-down') j.skipOtDown++;
+    if (!j.last || new Date(e.ts) > new Date(j.last.ts)) j.last = e;
+  }
+
+  const jobs = [...byJob.values()].sort((a, b) => {
+    // Failed jobs first, then by name
+    if ((b.failure > 0) !== (a.failure > 0)) return (b.failure > 0) ? 1 : -1;
+    return a.name.localeCompare(b.name);
+  });
+
+  const failureCount = jobs.filter(j => j.failure > 0).length;
+  const skipOtCount = jobs.filter(j => j.skipOtDown > 0).length;
+
+  const summary = failureCount > 0
+    ? `<p style="color:#c0392b"><b>${failureCount}</b> job${failureCount === 1 ? '' : 's'} reported failure${failureCount === 1 ? '' : 's'} in this window. ${skipOtCount > 0 ? `<b>${skipOtCount}</b> skipped due to OT downtime.` : ''}</p>`
+    : `<p style="color:#27ae60">All cron jobs healthy in this window. ${skipOtCount > 0 ? `(<b>${skipOtCount}</b> skipped due to OT downtime — informational, not a failure.)` : ''}</p>`;
+
+  const rows = jobs.map(j => {
+    const status = j.failure > 0
+      ? `<span style="color:#c0392b">⚠ ${j.failure} failure${j.failure === 1 ? '' : 's'}</span>`
+      : `<span style="color:#27ae60">OK</span>`;
+    const errCell = j.lastFailure
+      ? `<code style="font-size:11px;color:#c0392b">${escapeHtml(j.lastFailure.reason || `exit ${j.lastFailure.exitCode}`)}</code>`
+      : '';
+    return `
+      <tr>
+        <td><b>${escapeHtml(j.name)}</b></td>
+        <td>${status}</td>
+        <td style="text-align:right">${j.success}</td>
+        <td style="text-align:right">${j.failure}</td>
+        <td style="text-align:right">${j.skipNotDue}</td>
+        <td style="text-align:right">${j.skipOtDown}</td>
+        <td style="white-space:nowrap">${j.last ? escapeHtml(fmtTime(j.last.ts)) : ''}</td>
+        <td>${errCell}</td>
+      </tr>`;
+  }).join('');
+
+  return {
+    html: `${summary}
+      <table ${TABLE_STYLE}>
+        <tr><th ${TH_STYLE}>Job</th><th ${TH_STYLE}>Status</th><th ${TH_STYLE}>Success</th><th ${TH_STYLE}>Failure</th><th ${TH_STYLE}>Skip (not due)</th><th ${TH_STYLE}>Skip (OT down)</th><th ${TH_STYLE}>Last Event</th><th ${TH_STYLE}>Last Failure Reason</th></tr>
+        ${rows}
+      </table>
+      <p style="color:#666;font-size:11px;margin-top:6px">Skip counts for sub-hourly jobs are normal — only the cadence-due tick actually executes; the others skip with reason "not due."</p>`,
+    count: events.length,
+    failureCount,
+  };
+}
+
 // ── Main ──────────────────────────────────────────────────────────────────
 
 async function buildDigestEmail({ since, until, crumbs }) {
@@ -310,45 +432,69 @@ async function buildDigestEmail({ since, until, crumbs }) {
   const s2 = buildSection2Routing(crumbs);
   const s3 = buildSection3DrillDown(crumbs);
   const s4 = await buildSection4OpenQueue(crumbs);
+  const s5 = buildSection5StockRFQ(crumbs);
+  const s6 = buildSection6CronHealth(crumbs);
 
-  // Activity is window-scoped (sections 1-3); the open queue is current state, not activity.
-  const windowActivity = s1.count + s2.count + s3.count;
+  // Activity is window-scoped (sections 1-3, 5, 6); the open queue is current state.
+  const windowActivity = s1.count + s2.count + s3.count + s5.count;
   const openQueue = s4.count;
-  const summaryLine = windowActivity === 0 && openQueue === 0
-    ? `<p style="color:#666"><i>No pipeline activity in window and the action queue is clear.</i></p>`
-    : windowActivity === 0
-      ? `<p style="color:#666"><i>No new pipeline activity in this window — but you have <b>${openQueue}</b> open queue item${openQueue === 1 ? '' : 's'} waiting (see Section 4).</i></p>`
-      : `<p>Window: <b>${fmtTime(since)}</b> → <b>${fmtTime(until)}</b><br/>
-         <b>${s1.count}</b> loaded · <b>${s2.count}</b> routed · <b>${s3.count}</b> downstream · <b>${openQueue}</b> open queue item${openQueue === 1 ? '' : 's'}</p>`;
+  const cronFailures = s6.failureCount || 0;
+
+  const headlines = [];
+  if (cronFailures > 0) headlines.push(`<span style="color:#c0392b"><b>⚠ ${cronFailures} cron failure${cronFailures === 1 ? '' : 's'}</b></span>`);
+  if (s1.count > 0) headlines.push(`<b>${s1.count}</b> excess loaded`);
+  if (s5.count > 0) {
+    const loaded = (crumbs.filter(c => c.cog === 'stockrfq-agent' && c.event === 'loaded')).length;
+    headlines.push(`<b>${loaded}</b> stock RFQ loaded`);
+  }
+  if (openQueue > 0) headlines.push(`<b>${openQueue}</b> open queue item${openQueue === 1 ? '' : 's'}`);
+
+  const summaryLine = headlines.length === 0
+    ? `<p style="color:#27ae60"><i>No activity in window, no failures, queue clear.</i></p>`
+    : `<p>Window: <b>${fmtTime(since)}</b> → <b>${fmtTime(until)}</b><br/>${headlines.join(' · ')}</p>`;
 
   const html = `<!DOCTYPE html><html><body style="font-family:Arial,sans-serif;font-size:13px;color:#222">
-    <h2 style="margin:0 0 6px 0">Customer Excess Pipeline — Digest</h2>
+    <h2 style="margin:0 0 6px 0">Operations Digest</h2>
     ${summaryLine}
 
-    <h3 ${SECTION_HEADER}>1. What got written (offers loaded into OT)</h3>
+    <h3 ${SECTION_HEADER}>1. Cron job health (this window)</h3>
+    ${s6.html}
+
+    <h3 ${SECTION_HEADER}>2. Customer Excess — offers loaded</h3>
     ${s1.html}
 
-    <h3 ${SECTION_HEADER}>2. Which path + why (type-router decisions)</h3>
+    <h3 ${SECTION_HEADER}>3. Customer Excess — type-router decisions</h3>
     ${s2.html}
 
-    <h3 ${SECTION_HEADER}>3. Drill-down candidates</h3>
+    <h3 ${SECTION_HEADER}>4. Stock RFQ — RFQs loaded</h3>
+    ${s5.html}
+
+    <h3 ${SECTION_HEADER}>5. Drill-down candidates (Customer Excess Analysis)</h3>
     ${s3.html}
 
-    <h3 ${SECTION_HEADER}>4. Open Action Queue (carries forward across digests)</h3>
+    <h3 ${SECTION_HEADER}>6. Open Action Queue (carries forward across digests)</h3>
     ${s4.html}
 
     <p style="color:#888;font-size:11px;margin-top:24px">
-      Auto-generated by <code>Customer Excess Analysis/digest-builder.js</code>.
-      Reply to this email with structured commands (e.g., <code>PARTNER: 12345 = GE Aerospace</code>, <code>SKIP: 1024645</code>) to feed back into the pipeline — handled by the reply-parser cog on next run.
+      Auto-generated by <code>Customer Excess Analysis/digest-builder.js</code> at 11/16/20 UTC.
+      Reply with structured commands (e.g., <code>PARTNER: 12345 = GE Aerospace</code>, <code>SKIP: 1024645</code>) to feed back into the excess pipeline — handled by the reply-parser cog on next run.
     </p>
   </body></html>`;
 
-  const subject = windowActivity === 0 && openQueue === 0
-    ? `Customer Excess Digest — no activity, queue clear (${fmtTime(until)})`
-    : windowActivity === 0
-      ? `Customer Excess Digest — no new activity, ${openQueue} open (${fmtTime(until)})`
-      : `Customer Excess Digest — ${s1.count} loaded, ${openQueue} open (${fmtTime(until)})`;
-  return { subject, html, totalActivity: windowActivity + openQueue };
+  const subjBits = [];
+  if (cronFailures > 0) subjBits.push(`⚠ ${cronFailures} cron failure${cronFailures === 1 ? '' : 's'}`);
+  if (s1.count > 0) subjBits.push(`${s1.count} excess loaded`);
+  if (s5.count > 0) {
+    const loaded = (crumbs.filter(c => c.cog === 'stockrfq-agent' && c.event === 'loaded')).length;
+    if (loaded > 0) subjBits.push(`${loaded} stock RFQ loaded`);
+  }
+  if (openQueue > 0) subjBits.push(`${openQueue} open`);
+
+  const subject = subjBits.length === 0
+    ? `Ops Digest — quiet window (${fmtTime(until)})`
+    : `Ops Digest — ${subjBits.join(', ')} (${fmtTime(until)})`;
+
+  return { subject, html, totalActivity: windowActivity + openQueue + cronFailures };
 }
 
 async function main() {

@@ -17,7 +17,7 @@
 
 const path = require('path');
 const fs = require('fs');
-const { execSync } = require('child_process');
+const { execSync, execFileSync } = require('child_process');
 
 // Shared cogs
 const { createFetcher } = require('../../shared/email-fetcher');
@@ -65,6 +65,8 @@ const args = process.argv.slice(2);
 const DRY_RUN = args.includes('--dry-run');
 const VERBOSE = args.includes('--verbose');
 if (VERBOSE) process.env.VERBOSE = '1';
+const limitIdx = args.indexOf('--limit');
+const LIMIT = limitIdx !== -1 ? parseInt(args[limitIdx + 1], 10) : null;
 
 // ============================================
 // LLM Extraction (Two-Agent Pattern)
@@ -148,7 +150,7 @@ async function extractWithSDK(client, emailBody, subject) {
   // Agent 1: Extract
   log.info('  Agent 1 (Extractor): Running...');
   const extractResponse = await client.messages.create({
-    model: 'claude-sonnet-4-20250514',
+    model: 'claude-sonnet-4-6',
     max_tokens: 4096,
     messages: [{ role: 'user', content: EXTRACTION_PROMPT + fullText }]
   });
@@ -180,7 +182,7 @@ async function extractWithSDK(client, emailBody, subject) {
     .replace('EXTRACTED_JSON', JSON.stringify(extracted, null, 2));
 
   const verifyResponse = await client.messages.create({
-    model: 'claude-sonnet-4-20250514',
+    model: 'claude-sonnet-4-6',
     max_tokens: 4096,
     messages: [{ role: 'user', content: verifyPrompt }]
   });
@@ -211,29 +213,42 @@ async function extractWithCLI(emailBody, subject) {
   const fullText = `Subject: ${subject}\n\n${emailBody}`;
   const prompt = EXTRACTION_PROMPT + fullText;
 
-  // Write prompt to temp file to avoid shell escaping issues
-  const tmpFile = path.join(DATA_DIR, 'tmp-prompt.txt');
-  fs.writeFileSync(tmpFile, prompt, 'utf-8');
+  // execFileSync avoids the /bin/sh shell mediation that caused EPIPE
+  // in the prior stdin-pipe approach. Prompt goes via argv (Linux
+  // MAX_ARG_STRLEN is 128KB; RFQ emails are almost always well under).
+  // --model pins to Haiku to keep per-email cost in the sub-cent range.
+  const MAX_ATTEMPTS = 2;
+  for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+    try {
+      log.info(`  Extracting via Claude CLI${attempt > 1 ? ` (retry ${attempt})` : ''}...`);
+      const raw = execFileSync('claude', [
+        '-p', prompt,
+        '--output-format', 'json',
+        '--model', 'claude-haiku-4-5-20251001',
+      ], {
+        encoding: 'utf-8',
+        timeout: 300_000,
+        maxBuffer: 10 * 1024 * 1024,
+        stdio: ['ignore', 'pipe', 'pipe'],
+      });
 
-  try {
-    log.info('  Extracting via Claude CLI...');
-    const promptContent = fs.readFileSync(tmpFile, 'utf-8');
-    const result = execSync(
-      `claude -p --output-format json`,
-      { input: promptContent, encoding: 'utf-8', timeout: 120000, maxBuffer: 5 * 1024 * 1024, stdio: ['pipe', 'pipe', 'ignore'] }
-    );
-
-    // Parse Claude CLI JSON output
-    const parsed = JSON.parse(result);
-    const text = parsed.result || parsed.content || result;
-    const arrayMatch = String(text).match(/\[[\s\S]*\]/);
-    if (arrayMatch) {
-      return JSON.parse(arrayMatch[0]);
+      const parsed = JSON.parse(raw);
+      if (parsed.is_error) {
+        log.warn(`  CLI returned error flag: ${parsed.result || 'unknown'}`);
+        if (attempt < MAX_ATTEMPTS) continue;
+        return [];
+      }
+      const text = parsed.result || raw;
+      const arrayMatch = String(text).match(/\[[\s\S]*\]/);
+      if (arrayMatch) {
+        return JSON.parse(arrayMatch[0]);
+      }
+      log.warn('  CLI response did not contain JSON array');
+      return [];
+    } catch (e) {
+      log.error(`  CLI extraction failed (attempt ${attempt}): ${e.message}`);
+      if (attempt >= MAX_ATTEMPTS) break;
     }
-  } catch (e) {
-    log.error('  CLI extraction failed:', e.message);
-  } finally {
-    try { fs.unlinkSync(tmpFile); } catch (_) {}
   }
   return [];
 }
@@ -253,7 +268,7 @@ function extractOriginalSender(body) {
   // Find a forwarded `From:` line. It may or may not be preceded by a separator
   // (`____`, `--- Forwarded`) — some Outlook clients (mobile, web rules) strip
   // the separator and just leave the sig block followed by the forward header.
-  // Heuristic: look for any `From:` line followed within 5 lines by `Sent:` or
+  // Heuristic: look for any `From:` line followed within 3 lines by `Sent:` or
   // `To:` or `Subject:` — that's the forwarded header block.
   const lines = body.split('\n');
 
@@ -263,11 +278,13 @@ function extractOriginalSender(body) {
     const emailMatch = trimmed.match(/[\w.\-+]+@[\w.\-]+\.\w+/);
     if (!emailMatch) continue;
 
+    // Confirm this is a forward header by looking for Sent:/To:/Subject: nearby
     const lookahead = lines.slice(i + 1, i + 6).join('\n');
     const isForwardHeader =
       /^\s*Sent:/im.test(lookahead) ||
       /^\s*To:/im.test(lookahead) ||
       /^\s*Subject:/im.test(lookahead);
+
     if (!isForwardHeader) continue;
 
     // Skip Astute internal addresses — we never want to bucket the RFQ to ourselves
@@ -275,6 +292,7 @@ function extractOriginalSender(body) {
 
     // For NetComponents: real sender is in the `[real@addr]` brackets, not the
     // outer messagesend@netcomponents.com envelope address.
+    // Example: "From: Xi Juan Jiang [jxj@ztjsa.com.cn] <messagesend@netcomponents.com>"
     let email = emailMatch[0];
     const ncMatch = trimmed.match(/\[([\w.\-+]+@[\w.\-]+\.\w+)\]/);
     if (ncMatch && /netcomponents\.com$/i.test(email)) {
@@ -282,7 +300,10 @@ function extractOriginalSender(body) {
     }
 
     const nameMatch = trimmed.match(/From:\s*(.+?)\s*[<\[]/i) || trimmed.match(/From:\s*(.+?)$/i);
-    return { email, name: nameMatch ? nameMatch[1].trim() : '' };
+    return {
+      email,
+      name: nameMatch ? nameMatch[1].trim() : ''
+    };
   }
 
   return null;
@@ -392,8 +413,13 @@ async function run() {
   }
 
   // Filter already processed
-  const unprocessed = envelopes.filter(e => !tracker.isProcessed(e.id));
+  let unprocessed = envelopes.filter(e => !tracker.isProcessed(e.id));
   log.info(`${unprocessed.length} unprocessed emails (${envelopes.length - unprocessed.length} already tracked)`);
+
+  if (LIMIT && unprocessed.length > LIMIT) {
+    log.info(`--limit ${LIMIT} applied (taking first ${LIMIT})`);
+    unprocessed = unprocessed.slice(0, LIMIT);
+  }
 
   if (unprocessed.length === 0) {
     log.info('All emails already processed. Done.');
@@ -404,7 +430,8 @@ async function run() {
   const processedIds = [];
   const notRfqIds = [];
   const needsReviewIds = [];
-  const summary = { processed: 0, notRfq: 0, needsReview: 0, totalLines: 0, errors: 0, rfqsWritten: 0, writebackErrors: 0 };
+  const writebackFailedIds = []; // transient DB/API failures — leave in INBOX for next-run retry
+  const summary = { processed: 0, notRfq: 0, needsReview: 0, totalLines: 0, errors: 0, rfqsWritten: 0, writebackErrors: 0, writebackRetries: 0 };
 
   for (const envelope of unprocessed) {
     log.info(`--- Processing email ${envelope.id}: "${envelope.subject}" from ${envelope.from?.addr || 'unknown'}`);
@@ -465,7 +492,11 @@ async function run() {
         partner = resolvePartner({
           email: senderEmail,
           companyName: senderName,
-          partnerType: 'any'
+          // 'customer' (not 'any') — Stock RFQ senders are customers/brokers,
+          // never vendors. Tightening this also prevents stray vendor-only BPs
+          // from matching a customer email by accident. Pairs with the
+          // IsEmployee filter in partner-lookup.js (committed 2026-05-07).
+          partnerType: 'customer'
         });
 
         if (partner.matched) {
@@ -524,6 +555,10 @@ async function run() {
       summary.totalLines += items.length;
 
       // Step 5b: Write RFQ to ai_writeback (parallel to CSV)
+      // Transient failures (rfqId=null or thrown error) leave the email in
+      // INBOX for the next run to retry — otherwise a flaky network burst
+      // silently strands extracted lines with no DB record.
+      let headerWritten = DRY_RUN; // DRY_RUN treats every email as "processed"
       if (!DRY_RUN) {
         try {
           const bpId = partner.matched ? parseInt(partner.c_bpartner_id, 10) : UNQUALIFIED_BROKER_ID;
@@ -535,25 +570,38 @@ async function run() {
             bpartnerId: bpId,
             type: 'Stock',
             description: rfqDesc,
+            salesrepId: 1000004,  // Jake Harris — default for Stock RFQs
+            userId: 1000004,     // Jake Harris — contact fallback for broker senders without ad_user
             lines: rfqWriterLines,
           });
 
-          if (writeResult.errors.length === 0) {
-            log.info(`  DB writeback: rfqId=${writeResult.rfqId}, ${writeResult.linesWritten} lines`);
+          if (writeResult.rfqId) {
+            headerWritten = true;
+            if (writeResult.errors.length === 0) {
+              log.info(`  DB writeback: rfqId=${writeResult.rfqId}, ${writeResult.linesWritten} lines`);
+            } else {
+              log.warn(`  DB writeback partial: rfqId=${writeResult.rfqId}, line errors: ${writeResult.errors.join('; ')}`);
+              summary.writebackErrors += writeResult.errors.length;
+            }
             summary.rfqsWritten++;
           } else {
-            log.warn(`  DB writeback partial: rfqId=${writeResult.rfqId}, errors: ${writeResult.errors.join('; ')}`);
-            summary.rfqsWritten++;
+            // Header POST failed entirely — no RFQ created. Retry next run.
+            log.warn(`  DB writeback header FAILED — leaving email in INBOX for retry. errors: ${writeResult.errors.join('; ')}`);
             summary.writebackErrors += writeResult.errors.length;
           }
         } catch (writeErr) {
-          log.error(`  DB writeback failed: ${writeErr.message}`);
+          log.error(`  DB writeback threw: ${writeErr.message} — leaving email in INBOX for retry`);
           summary.writebackErrors++;
         }
       }
 
-      processedIds.push(envelope.id);
-      summary.processed++;
+      if (headerWritten) {
+        processedIds.push(envelope.id);
+        summary.processed++;
+      } else {
+        writebackFailedIds.push(envelope.id);
+        summary.writebackRetries++;
+      }
 
     } catch (err) {
       log.error(`  Error processing email ${envelope.id}:`, err.message);
@@ -572,25 +620,29 @@ async function run() {
     log.info(`Generated ${outputFile} with ${allRows.length} lines`);
 
     if (!DRY_RUN) {
-      // Step 7: Move emails
+      // Step 7: Mark tracker FIRST, then move. If IMAP drops mid-loop, at
+      // worst we re-run with emails in the wrong folder — but we won't
+      // re-extract and re-write duplicate RFQs. Move failures go to the
+      // retry queue so a later run can retry the move only.
       for (const id of processedIds) {
+        tracker.markProcessed(id, { status: 'processed', lines: allRows.length });
         const moved = await fetcher.moveMessage(id, 'Processed');
-        if (moved) {
-          tracker.markProcessed(id, { status: 'processed', lines: allRows.length });
-        } else {
-          log.warn(`  Failed to move email ${id}, adding to retry queue`);
+        if (!moved) {
+          log.warn(`  Failed to move email ${id} to Processed, adding to retry queue`);
           tracker.addToRetryQueue(id, 'move-failed');
         }
       }
 
       for (const id of notRfqIds) {
+        tracker.markProcessed(id, { status: 'not-rfq' });
         const moved = await fetcher.moveMessage(id, 'NotRFQ');
-        if (moved) tracker.markProcessed(id, { status: 'not-rfq' });
+        if (!moved) tracker.addToRetryQueue(id, 'move-failed');
       }
 
       for (const id of needsReviewIds) {
+        tracker.markProcessed(id, { status: 'needs-review' });
         const moved = await fetcher.moveMessage(id, 'NeedsReview');
-        if (moved) tracker.markProcessed(id, { status: 'needs-review' });
+        if (!moved) tracker.addToRetryQueue(id, 'move-failed');
       }
 
       // Step 8: Email notification
@@ -601,6 +653,7 @@ async function run() {
         `Emails processed: ${summary.processed}`,
         `Not RFQ (moved): ${summary.notRfq}`,
         `Needs review: ${summary.needsReview}`,
+        `Writeback-retry (left in INBOX): ${summary.writebackRetries}`,
         `Errors: ${summary.errors}`,
         '',
         `Total RFQ lines extracted: ${summary.totalLines}`,
@@ -659,7 +712,7 @@ async function run() {
     recordsGenerated: summary.totalLines
   });
 
-  log.info(`=== Stock RFQ Runner complete: ${summary.processed} emails → ${summary.totalLines} lines, ${summary.rfqsWritten} RFQs written to DB ===`);
+  log.info(`=== Stock RFQ Runner complete: ${summary.processed} emails → ${summary.totalLines} lines, ${summary.rfqsWritten} RFQs written to DB, ${summary.writebackRetries} left in INBOX for retry ===`);
 }
 
 // Run

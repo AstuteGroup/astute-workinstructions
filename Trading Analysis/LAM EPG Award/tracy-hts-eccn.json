@@ -1,0 +1,237 @@
+[
+  {
+    "mpn": "EPM1270T144C4N",
+    "hts": [
+      "8542.31.0055",
+      "8542310055"
+    ],
+    "eccn": [
+      "3A991D",
+      "EAR99"
+    ],
+    "sources": [
+      "DigiKey:HTS",
+      "DigiKey:ECCN",
+      "Mouser:HTS",
+      "Mouser:ECCN"
+    ]
+  },
+  {
+    "mpn": "EPM240T100C4N",
+    "hts": [
+      "8542.31.0055",
+      "8542310055"
+    ],
+    "eccn": [
+      "EAR99",
+      "3A991.d.2"
+    ],
+    "sources": [
+      "DigiKey:HTS",
+      "DigiKey:ECCN",
+      "Newark/Farnell:ECCN",
+      "Mouser:HTS",
+      "Mouser:ECCN"
+    ]
+  },
+  {
+    "mpn": "5M1270ZT144C5N",
+    "hts": [
+      "8542.31.0055",
+      "8542310055"
+    ],
+    "eccn": [
+      "3A991D",
+      "EAR99",
+      "3A991.d"
+    ],
+    "sources": [
+      "DigiKey:HTS",
+      "DigiKey:ECCN",
+      "Newark/Farnell:ECCN",
+      "Mouser:HTS",
+      "Mouser:ECCN"
+    ]
+  },
+  {
+    "mpn": "XCZU4CG-1SFVC784E",
+    "hts": [
+      "8542310070"
+    ],
+    "eccn": [
+      "5A002.A.4"
+    ],
+    "sources": [
+      "Mouser:HTS",
+      "Mouser:ECCN"
+    ]
+  },
+  {
+    "mpn": "XC6SLX100-3FGG484C",
+    "hts": [
+      "8542310060"
+    ],
+    "eccn": [
+      "3A991.d"
+    ],
+    "sources": [
+      "Mouser:HTS",
+      "Mouser:ECCN"
+    ]
+  },
+  {
+    "mpn": "LT1499CS#PBF",
+    "hts": [
+      "8542330001"
+    ],
+    "eccn": [
+      "EAR99"
+    ],
+    "sources": [
+      "Newark/Farnell:ECCN",
+      "Mouser:HTS",
+      "Mouser:ECCN"
+    ]
+  },
+  {
+    "mpn": "ADA4891-2ARZ",
+    "hts": [
+      "8542330001"
+    ],
+    "eccn": [
+      "EAR99"
+    ],
+    "sources": [
+      "Newark/Farnell:ECCN",
+      "Mouser:HTS",
+      "Mouser:ECCN"
+    ]
+  },
+  {
+    "mpn": "LT8645SEV#PBF",
+    "hts": [
+      "8542390090"
+    ],
+    "eccn": [
+      "EAR99"
+    ],
+    "sources": [
+      "Newark/Farnell:ECCN",
+      "Mouser:HTS",
+      "Mouser:ECCN"
+    ]
+  },
+  {
+    "mpn": "AD5696RBRUZ",
+    "hts": [
+      "8542.39.0040",
+      "8542390040"
+    ],
+    "eccn": [
+      "EAR99"
+    ],
+    "sources": [
+      "DigiKey:HTS",
+      "DigiKey:ECCN",
+      "Newark/Farnell:ECCN",
+      "Mouser:HTS",
+      "Mouser:ECCN"
+    ]
+  },
+  {
+    "mpn": "LT1376HVIS#PBF",
+    "hts": [
+      "8542390070"
+    ],
+    "eccn": [
+      "EAR99"
+    ],
+    "sources": [
+      "Mouser:HTS",
+      "Mouser:ECCN"
+    ]
+  },
+  {
+    "mpn": "AD586KRZ",
+    "hts": [
+      "8542.39.0090",
+      "8542390090"
+    ],
+    "eccn": [
+      "EAR99"
+    ],
+    "sources": [
+      "DigiKey:HTS",
+      "DigiKey:ECCN",
+      "Newark/Farnell:ECCN",
+      "Mouser:HTS",
+      "Mouser:ECCN"
+    ]
+  },
+  {
+    "mpn": "ADG431BRZ",
+    "hts": [
+      "8542.39.0070",
+      "8542390090"
+    ],
+    "eccn": [
+      "EAR99"
+    ],
+    "sources": [
+      "DigiKey:HTS",
+      "DigiKey:ECCN",
+      "Newark/Farnell:ECCN",
+      "Mouser:HTS",
+      "Mouser:ECCN"
+    ]
+  },
+  {
+    "mpn": "LTC4231HMS-1#PBF",
+    "hts": [
+      "8542390090"
+    ],
+    "eccn": [
+      "EAR99"
+    ],
+    "sources": [
+      "Newark/Farnell:ECCN",
+      "Mouser:HTS",
+      "Mouser:ECCN"
+    ]
+  },
+  {
+    "mpn": "AD5292BRUZ-20",
+    "hts": [
+      "8542.39.0070",
+      "8542390070"
+    ],
+    "eccn": [
+      "EAR99"
+    ],
+    "sources": [
+      "DigiKey:HTS",
+      "DigiKey:ECCN",
+      "Newark/Farnell:ECCN",
+      "Mouser:HTS",
+      "Mouser:ECCN"
+    ]
+  },
+  {
+    "mpn": "524MILF",
+    "hts": [
+      "8542.39.0090",
+      "8542390090"
+    ],
+    "eccn": [
+      "EAR99",
+      "Unknown"
+    ],
+    "sources": [
+      "DigiKey:HTS",
+      "DigiKey:ECCN",
+      "Newark/Farnell:ECCN",
+      "Mouser:HTS",
+      "Mouser:ECCN"
+    ]
+  }
+]

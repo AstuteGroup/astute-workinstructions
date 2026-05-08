@@ -86,7 +86,7 @@ module.exports = [
     cwd: ASTUTE,
     needsOT: true,
     logFile: '/tmp/rfq-loader-daemon.log',
-    description: 'Every 5m — poll stockRFQ@ inbox, write incoming RFQs via OT API',
+    description: 'Every 5m — drain rfq-load-queue (general RFQ Loading workflow); does NOT poll stockRFQ@ — that job belongs to stockrfq-agent',
   },
   {
     name: 'mfr-reconciler',
@@ -108,20 +108,125 @@ module.exports = [
     logFile: '/tmp/vq-enrichment-roi.log',
     description: 'Mon 7 UTC — report on VQ enrichment ROI (read-only, replica DB)',
   },
+
+  // ── Customer Excess pipeline (universal offer parser + writeback + analysis) ──
+  // Architecture: cog 1 (poller) → cog 2 (writeback) → cog 3 (router) → cog 4
+  // (analysis stub) / data-capture cogs → cog 7 (digest) ← cog 8 (reply parser)
+  // Breadcrumbs at every step, single JSONL at ~/workspace/.offer-pipeline/.
+  // Reports go to operator only in V1; distribution expands once tuned.
+
+  // Email-workflow agents (claude -p invocations following the agent pattern in
+  // email-workflow-architecture.md). Each tick reads the workflow .md, lists
+  // unseen messages, applies the per-message decision tree, and dispatches via
+  // shared/email-workflow-poller.js. Replaces the 5/7-buggy static
+  // offer-poller-excess (which is now retired).
+  //
+  // --max-turns 80 is the cost circuit-breaker. --permission-mode bypassPermissions
+  // is required for headless tool use (no operator to approve).
+  {
+    name: 'excess-agent',
+    cadence: 'every 30m',
+    cadenceCron: '*/30 * * * *',
+    command: `/home/analytics_user/.local/bin/claude -p --permission-mode bypassPermissions --max-turns 80 < "${ASTUTE}/Trading Analysis/Customer Excess Analysis/agent-prompt.txt"`,
+    cwd: ASTUTE,
+    needsOT: true,
+    logFile: '/tmp/excess-agent.log',
+    description: 'Every 30m — agent reads excess@ per customer-excess-analysis.md, writes offers via OT API',
+  },
+
+  {
+    name: 'stockrfq-agent',
+    cadence: 'every 30m',
+    cadenceCron: '*/30 * * * *',
+    command: `/home/analytics_user/.local/bin/claude -p --permission-mode bypassPermissions --max-turns 80 < "${ASTUTE}/Trading Analysis/Stock RFQ Loading/agent-prompt.txt"`,
+    cwd: ASTUTE,
+    needsOT: true,
+    logFile: '/tmp/stockrfq-agent.log',
+    description: 'Every 30m — agent reads stockRFQ@ per stock-rfq-loading.md, writes RFQs via OT API',
+  },
+
+  // PLACEHOLDER for second inbox (broker / franchise) — disabled until the
+  // operator supplies the real inbox name. To enable:
+  //   1. Add the email to ACCOUNT_TO_EMAIL in shared/offer-poller.js
+  //   2. Uncomment this entry and re-run scripts/install-crons.js --apply
+  //
+  // {
+  //   name: 'offer-poller-broker',
+  //   cadence: 'every 30m',
+  //   cadenceCron: '*/30 * * * *',
+  //   command: `node "${ASTUTE}/Trading Analysis/Market Offer Loading/run-poller.js" --account broker`,
+  //   cwd: ASTUTE,
+  //   needsOT: true,
+  //   logFile: '/tmp/offer-poller-broker.log',
+  //   description: 'Every 30m — poll broker@ inbox, parse offers, writeOffer to OT, dispatch to type router',
+  // },
+
+  {
+    name: 'offer-reply-parser',
+    cadence: 'every 30m',
+    // Offset by 5 min from poller so we're not fighting for the inbox lock
+    cadenceCron: '5,35 * * * *',
+    command: `node "${ASTUTE}/Trading Analysis/Customer Excess Analysis/reply-parser.js" --account excess`,
+    cwd: ASTUTE,
+    needsOT: false,
+    logFile: '/tmp/offer-reply-parser.log',
+    description: 'Every 30m (offset +5) — parse operator replies, apply PARTNER/INTENT/SKIP overrides',
+  },
+
+  // 7am / 12pm / 4pm EDT = 11 / 16 / 20 UTC (during DST). EST (winter) = 12 / 17 / 21 UTC.
+  // DST flips twice/year; re-check around Mar (spring forward) and Nov (fall back) and bump
+  // the cron expressions one hour later if needed. Single combined entry below; the digest
+  // builder is idempotent (state-tracked window) so all three fires produce non-overlapping
+  // digests.
+  {
+    name: 'offer-digest',
+    cadence: 'fixed',
+    // :25 past so sub-hourly agents (excess-agent, stockrfq-agent) that fire at :00
+    // have ~25 min of runway to write their breadcrumbs before the digest reads.
+    // Was '0 11,16,20 * * *' until 2026-05-08 — caused empty-window digests.
+    cadenceCron: '25 11,16,20 * * *',
+    command: `node "${ASTUTE}/Trading Analysis/Customer Excess Analysis/digest-builder.js"`,
+    cwd: ASTUTE,
+    needsOT: false,
+    logFile: '/tmp/offer-digest.log',
+    description: '11:25/16:25/20:25 UTC — Operations Digest 3×/day (cron + email-workflow agents + open queue)',
+  },
+
+  {
+    name: 'offer-breadcrumbs-prune',
+    cadence: 'weekly',
+    // Sunday 02:00 UTC — quiet window
+    cadenceCron: '0 2 * * 0',
+    command: `node -e "require('${ASTUTE}/shared/breadcrumbs').prune()"`,
+    cwd: ASTUTE,
+    needsOT: false,
+    logFile: '/tmp/offer-breadcrumbs-prune.log',
+    description: 'Sunday 02 UTC — drop offer-pipeline breadcrumbs older than 7 days',
+  },
 ];
 
 // Helper: convert cadence string to milliseconds (used by sentinel + runner).
 module.exports.cadenceToMs = function cadenceToMs(cadence) {
   if (cadence === 'weekly') return 7 * 24 * 60 * 60 * 1000;
   if (cadence === 'daily') return 24 * 60 * 60 * 1000;
+  if (cadence === 'fixed') return 60 * 1000; // placeholder; sentinel never gates 'fixed'
   const m = /^every (\d+)m$/.exec(cadence);
   if (m) return parseInt(m[1], 10) * 60 * 1000;
   throw new Error(`Unrecognized cadence: ${cadence}`);
 };
 
 // Helper: which cron expression to actually install for this job.
-// For sub-hourly cadences, the cadence cron is sufficient (job self-heals on tick).
-// For weekly/daily, we install hourly checks so a missed window catches up promptly.
+//
+// Cadence semantics:
+//   'weekly'     — install hourly catch-up; sentinel gates so a missed window
+//                  fires at the next hourly tick after the cadence elapses.
+//   'daily'      — same catch-up pattern, daily cadence.
+//   'every Nm'   — sub-hourly; cron schedule directly drives the runs. No
+//                  sentinel gating (job self-heals each tick).
+//   'fixed'      — fire at EXACTLY the times in cadenceCron (e.g., '0 11,16,20 * * *').
+//                  Sentinel does not gate; if the cron fires, the job runs.
+//                  Use this for time-of-day reports / digests where catch-up
+//                  semantics would land at the wrong clock hour.
 module.exports.installCron = function installCron(job) {
   if (job.cadence === 'weekly' || job.cadence === 'daily') {
     return '0 * * * *'; // hourly check; sentinel decides whether to actually run

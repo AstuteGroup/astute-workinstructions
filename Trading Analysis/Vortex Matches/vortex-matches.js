@@ -243,6 +243,7 @@ async function fetchMarketOffers(cleanMpns) {
         AND ol.isactive = 'Y'
       WHERE mol.market_offer_line_mpn_clean = ANY($1)
         AND mol.market_offer_active = 'Y'
+        AND mol.offer_type_name <> 'LAM Kitting Inventory'  -- one-off report type, LAM consigned stock
         AND (
           mol.offer_type_name LIKE 'Stock -%'  -- Astute stock: no time filter
           OR mol.market_offer_created >= CURRENT_DATE - INTERVAL '90 days'  -- Others: 90-day window
@@ -277,8 +278,20 @@ async function fetchMarketOffers(cleanMpns) {
  * being IsActive=N in chuboe_vq_line. The inner join below eliminates
  * those stale rows.
  */
-async function fetchVendorQuotes(cleanMpns) {
+async function fetchVendorQuotes(cleanMpns, { vqRfqId = null, excludeVqRfqId = null } = {}) {
   if (cleanMpns.length === 0) return [];
+
+  // vqRfqId: scope VQs to a specific RFQ (franchise-only shadow analysis)
+  // excludeVqRfqId: exclude VQs from a specific RFQ (normal run minus shadow)
+  let rfqFilter;
+  if (vqRfqId) {
+    rfqFilter = `AND vq.chuboe_rfq_id = ${parseInt(vqRfqId, 10)}`;
+  } else if (excludeVqRfqId) {
+    rfqFilter = `AND vq.chuboe_rfq_id != ${parseInt(excludeVqRfqId, 10)}
+      AND vql.vendor_quote_created >= CURRENT_DATE - INTERVAL '90 days'`;
+  } else {
+    rfqFilter = `AND vql.vendor_quote_created >= CURRENT_DATE - INTERVAL '90 days'`;
+  }
 
   const query = `
     SELECT
@@ -301,7 +314,7 @@ async function fetchVendorQuotes(cleanMpns) {
     LEFT JOIN adempiere.c_currency cur
       ON cur.c_currency_id = vq.c_currency_id
     WHERE vql.vendor_quote_mpn_clean = ANY($1)
-      AND vql.vendor_quote_created >= CURRENT_DATE - INTERVAL '90 days'
+      ${rfqFilter}
     ORDER BY vql.vendor_quote_created DESC
   `;
 
@@ -707,15 +720,27 @@ async function createWorkbook(data, columns, fileType) {
   const supplierMfrColIndex = columns.indexOf('Supplier MFR');
   if (supplierMfrColIndex >= 0) {
     const colNum = supplierMfrColIndex + 1;
+    let mfrLookupErrors = 0;
     for (let i = 0; i < data.length; i++) {
       const row = data[i];
-      const flag = computeMfrMatch(row['RFQ MFR'], row['Supplier MFR']);
+      let flag;
+      try {
+        flag = computeMfrMatch(row['RFQ MFR'], row['Supplier MFR']);
+      } catch (e) {
+        // MFR equivalence is a decoration, not load-bearing for Vortex. If
+        // the DB-backed lookup throws (e.g., cron psql auth hiccup), skip
+        // the flag on this row rather than killing the whole report.
+        mfrLookupErrors++;
+        continue;
+      }
       if (flag === 'MISMATCH') {
-        // Worksheet row index = i + 2 (header is row 1, data starts at row 2)
         const cell = worksheet.getCell(i + 2, colNum);
         cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFCC0000' } };
         cell.font = { bold: true, color: { argb: 'FFFFFFFF' } };
       }
+    }
+    if (mfrLookupErrors > 0) {
+      console.warn(`      WARN: ${mfrLookupErrors} MFR equivalence lookups failed — mismatch flags may be incomplete`);
     }
   }
 
@@ -761,8 +786,8 @@ async function workbookToBuffer(workbook) {
  *
  * Throws if RFQ not found.
  */
-async function runVortexForRFQ(rfqNumber, { log = () => {} } = {}) {
-  log(`Vortex: processing RFQ ${rfqNumber}`);
+async function runVortexForRFQ(rfqNumber, { log = () => {}, vqRfqId = null, excludeVqRfqId = null } = {}) {
+  log(`Vortex: processing RFQ ${rfqNumber}${vqRfqId ? ` (VQs scoped to RFQ ID ${vqRfqId})` : ''}${excludeVqRfqId ? ` (excluding VQs from RFQ ID ${excludeVqRfqId})` : ''}`);
 
   const rfqRows = await fetchRfqDetails(rfqNumber);
   if (rfqRows.length === 0) {
@@ -787,11 +812,15 @@ async function runVortexForRFQ(rfqNumber, { log = () => {} } = {}) {
     log(`  ${selfRfqMpns.size} MPNs cached by THIS RFQ — skipped from API CACHE surfacing`);
   }
 
-  const [marketOffers, vendorQuotes, cachedEnvelopes] = await Promise.all([
-    fetchMarketOffers(cleanMpns),
-    fetchVendorQuotes(cleanMpns),
-    fetchCachedEnvelopes(cleanMpns, selfRfqMpns)
-  ]);
+  // When vqRfqId is set, skip market offers and cached envelopes — only
+  // VQs from the specified RFQ (e.g., franchise-only shadow/mirror analysis).
+  const [marketOffers, vendorQuotes, cachedEnvelopes] = vqRfqId
+    ? [[], await fetchVendorQuotes(cleanMpns, { vqRfqId }), []]
+    : await Promise.all([
+        fetchMarketOffers(cleanMpns),
+        fetchVendorQuotes(cleanMpns, { excludeVqRfqId }),
+        fetchCachedEnvelopes(cleanMpns, selfRfqMpns)
+      ]);
 
   // Cached envelope rows are additional supply data — alternate price tiers
   // and distributors that didn't land in chuboe_vq_line as actionable VQs.
@@ -920,19 +949,51 @@ function escapeHtml(s) {
 async function cliMain() {
   const rfqNumber = process.argv[2];
   if (!rfqNumber) {
-    console.error('Usage: node vortex-matches.js <rfq_number>');
+    console.error('Usage: node vortex-matches.js <rfq_number> [--vq-rfq-id <id>] [--email]');
     console.error('  Runs in-memory and prints a summary. No files written.');
+    console.error('  --vq-rfq-id <id>  Scope VQs to a specific RFQ ID (skip MOs + cache)');
     console.error('  For email-driven automation, use vortex-poller.js.');
     process.exit(1);
   }
 
+  // Parse --vq-rfq-id flag
+  const vqRfqIdx = process.argv.indexOf('--vq-rfq-id');
+  const vqRfqId = vqRfqIdx !== -1 && process.argv[vqRfqIdx + 1]
+    ? parseInt(process.argv[vqRfqIdx + 1], 10)
+    : null;
+
+  // Parse --exclude-vq-rfq-id flag
+  const exclIdx = process.argv.indexOf('--exclude-vq-rfq-id');
+  const excludeVqRfqId = exclIdx !== -1 && process.argv[exclIdx + 1]
+    ? parseInt(process.argv[exclIdx + 1], 10)
+    : null;
+
   try {
-    const result = await runVortexForRFQ(rfqNumber, { log: msg => console.log(msg) });
+    const result = await runVortexForRFQ(rfqNumber, { log: msg => console.log(msg), vqRfqId, excludeVqRfqId });
     console.log('\nSummary:');
     console.log(JSON.stringify(result.summary, null, 2));
     console.log(`\nAttachments built: ${result.attachments.length}`);
     for (const a of result.attachments) {
       console.log(`  - ${a.filename}  (${a.content.length} bytes)`);
+    }
+
+    // --email: send the result to Jake
+    if (process.argv.includes('--email') && result.attachments.length > 0) {
+      require('dotenv').config({ path: path.resolve(__dirname, '../../.env') });
+      const { createNotifier } = require('../../shared/notifier');
+      const notifier = createNotifier({ fromEmail: 'vortex@orangetsunami.com', fromName: 'Vortex Matches' });
+      const html = buildSummaryHtml(result);
+      const nodeMailerAttachments = result.attachments.map(a => ({
+        filename: a.filename, content: a.content,
+      }));
+      await notifier.sendWithAttachment(
+        'jake.harris@astutegroup.com',
+        `Vortex Matches — RFQ ${rfqNumber} (${result.customer})`,
+        html,
+        nodeMailerAttachments,
+        { html: true }
+      );
+      console.log('\nEmail sent to jake.harris@astutegroup.com');
     }
   } catch (err) {
     console.error('Error:', err.message);

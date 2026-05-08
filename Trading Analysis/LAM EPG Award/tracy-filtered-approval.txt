@@ -1,0 +1,601 @@
+RFQ
+  Customer: Lam Research
+  Total Revenue:
+  Total Cost: 216.30
+  Gross Profit:
+  Profit Margin: 0%
+
+RFQ
+  Customer: Lam Research
+  Total Revenue:
+  Total Cost: 603.10
+  Gross Profit:
+  Profit Margin: 0%
+
+RFQ
+  Customer: Lam Research
+  Total Revenue:
+  Total Cost: 196.00
+  Gross Profit:
+  Profit Margin: 0%
+
+RFQ
+  Customer: Lam Research
+  Total Revenue:
+  Total Cost: 534.46
+  Gross Profit:
+  Profit Margin: 0%
+
+RFQ
+  Customer: Lam Research
+  Total Revenue:
+  Total Cost: 447.80
+  Gross Profit:
+  Profit Margin: 0%
+
+RFQ
+  Customer: Lam Research
+  Total Revenue:
+  Total Cost: 124.80
+  Gross Profit:
+  Profit Margin: 0%
+
+RFQ
+  Customer: Lam Research
+  Total Revenue:
+  Total Cost: 745.00
+  Gross Profit:
+  Profit Margin: 0%
+
+RFQ
+  Customer: Lam Research
+  Total Revenue:
+  Total Cost: 61.80
+  Gross Profit:
+  Profit Margin: 0%
+
+RFQ
+  Customer: Lam Research
+  Total Revenue:
+  Total Cost: 256.49
+  Gross Profit:
+  Profit Margin: 0%
+
+RFQ
+  Customer: Lam Research
+  Total Revenue:
+  Total Cost: 228.75
+  Gross Profit:
+  Profit Margin: 0%
+
+RFQ
+  Customer: Lam Research
+  Total Revenue:
+  Total Cost: 192.00
+  Gross Profit:
+  Profit Margin: 0%
+
+RFQ
+  Customer: Lam Research
+  Total Revenue:
+  Total Cost: 231.12
+  Gross Profit:
+  Profit Margin: 0%
+
+RFQ
+  Customer: Lam Research
+  Total Revenue:
+  Total Cost: 115.75
+  Gross Profit:
+  Profit Margin: 0%
+
+RFQ
+  Customer: Lam Research
+  Total Revenue:
+  Total Cost: 207.75
+  Gross Profit:
+  Profit Margin: 0%
+
+RFQ Line
+  RFQ Line #: 150
+  Purchase Qty: 10
+  Sold Qty:
+  Total Revenue:
+  Total Cost: 534.46
+  Gross Profit:
+  Profit Margin: 0%
+  Sales Rep: Josh Syre
+  Public Customer Notes:
+  Private Customer Notes:
+
+Vendor Quote
+  Vendor: SMARTEL ELECTRONICS (ASIA) CO LTD
+  Vendor Type: Global Sourcing
+  Traceability: Non-Traceable
+  Contact:
+  Contact Email:
+  Contact Phone:
+  MPN: XC6SLX100-3FGG484C
+  Ship-To Warehouse: HONG KONG
+  Inventory Group Identifier: ALLOCATED/PRESOLD
+  Cost: 53.4463 USD
+  Quantity: 10
+  Date Code: 22+
+  COO: PENDING
+  Lead Time: stock
+  Packaging: OTHER
+  Shipper: FedEx International Economy (2-5 day)
+  RoHS: Y
+  Public Vendor Order Notes: STOCK (absorbs rebalance from EPM240+LTC4231; real Smartel $41.00)
+  Private Vendor Order Notes:
+  Inco Term: The seller makes the goods available at its location, so the buyer can take over all the transportation costs and also bears the risks of bringing the goods to their final destination.
+  MFR: Xilinx Inc
+  Buyer: Tracy Xie
+
+RFQ Line
+  RFQ Line #: 430
+  Purchase Qty: 10
+  Sold Qty:
+  Total Revenue:
+  Total Cost: 745.00
+  Gross Profit:
+  Profit Margin: 0%
+  Sales Rep: Josh Syre
+  Public Customer Notes:
+  Private Customer Notes:
+
+Vendor Quote
+  Vendor: SMARTEL ELECTRONICS (ASIA) CO LTD
+  Vendor Type: Global Sourcing
+  Traceability: Non-Traceable
+  Contact:
+  Contact Email:
+  Contact Phone:
+  MPN: EPM1270T144C4N
+  Ship-To Warehouse: HONG KONG
+  Inventory Group Identifier: ALLOCATED/PRESOLD
+  Cost: 74.5 USD
+  Quantity: 10
+  Date Code: 25+
+  COO: PENDING
+  Lead Time: stock
+  Packaging: OTHER
+  Shipper: FedEx International Economy (2-5 day)
+  RoHS: Y
+  Public Vendor Order Notes: Listed as INTEL manufacturer; STOCK
+  Private Vendor Order Notes:
+  Inco Term: The seller makes the goods available at its location, so the buyer can take over all the transportation costs and also bears the risks of bringing the goods to their final destination.
+  MFR: Altera
+  Buyer: Tracy Xie
+
+RFQ Line
+  RFQ Line #: 480
+  Purchase Qty: 50
+  Sold Qty:
+  Total Revenue:
+  Total Cost: 603.10
+  Gross Profit:
+  Profit Margin: 0%
+  Sales Rep: Josh Syre
+  Public Customer Notes:
+  Private Customer Notes:
+
+Vendor Quote
+  Vendor: CHIP ENERGY INTERNATIONAL CO.,LIMITED
+  Vendor Type: Global Sourcing
+  Traceability: Non-Traceable
+  Contact:
+  Contact Email:
+  Contact Phone:
+  MPN: LT1499CS#PBF
+  Ship-To Warehouse: HONG KONG
+  Inventory Group Identifier: ALLOCATED/PRESOLD
+  Cost: 12.062 USD
+  Quantity: 50
+  Date Code: 23+
+  COO: Malaysia
+  Lead Time: stock
+  Packaging: OTHER
+  Shipper: FedEx International Economy (2-5 day)
+  RoHS: Y
+  Public Vendor Order Notes:
+  Private Vendor Order Notes:
+  Inco Term: The seller makes the goods available at its location, so the buyer can take over all the transportation costs and also bears the risks of bringing the goods to their final destination.
+  MFR: Analog Devices Inc
+  Buyer: Tracy Xie
+
+RFQ Line
+  RFQ Line #: 660
+  Purchase Qty: 20
+  Sold Qty:
+  Total Revenue:
+  Total Cost: 447.80
+  Gross Profit:
+  Profit Margin: 0%
+  Sales Rep: Josh Syre
+  Public Customer Notes:
+  Private Customer Notes:
+
+Vendor Quote
+  Vendor: SMARTEL ELECTRONICS (ASIA) CO LTD
+  Vendor Type: Global Sourcing
+  Traceability: Non-Traceable
+  Contact:
+  Contact Email:
+  Contact Phone:
+  MPN: EPM240T100C4N
+  Ship-To Warehouse: HONG KONG
+  Inventory Group Identifier: ALLOCATED/PRESOLD
+  Cost: 22.39 USD
+  Quantity: 20
+  Date Code: 19+
+  COO: PENDING
+  Lead Time: stock
+  Packaging: OTHER
+  Shipper: FedEx International Economy (2-5 day)
+  RoHS: Y
+  Public Vendor Order Notes: STOCK (booked at LAM target; rebalanced from $27)
+  Private Vendor Order Notes:
+  Inco Term: The seller makes the goods available at its location, so the buyer can take over all the transportation costs and also bears the risks of bringing the goods to their final destination.
+  MFR: Altera
+  Buyer: Tracy Xie
+
+RFQ Line
+  RFQ Line #: 770
+  Purchase Qty: 10
+  Sold Qty:
+  Total Revenue:
+  Total Cost: 61.80
+  Gross Profit:
+  Profit Margin: 0%
+  Sales Rep: Josh Syre
+  Public Customer Notes:
+  Private Customer Notes:
+
+Vendor Quote
+  Vendor: Dragon Core Electronics (HK) Co., Limited
+  Vendor Type: Suspended
+  Traceability: Non-Traceable
+  Contact:
+  Contact Email:
+  Contact Phone:
+  MPN: 5M1270ZT144C5N
+  Ship-To Warehouse: HONG KONG
+  Inventory Group Identifier: ALLOCATED/PRESOLD
+  Cost: 6.18 USD
+  Quantity: 10
+  Date Code: 22+
+  COO: PENDING
+  Lead Time: stock
+  Packaging: OTHER
+  Shipper: FedEx International Economy (2-5 day)
+  RoHS: Y
+  Public Vendor Order Notes: STOCK
+  Private Vendor Order Notes:
+  Inco Term: The seller makes the goods available at its location, so the buyer can take over all the transportation costs and also bears the risks of bringing the goods to their final destination.
+  MFR: Altera
+  Buyer: Tracy Xie
+
+RFQ Line
+  RFQ Line #: 920
+  Purchase Qty: 120
+  Sold Qty:
+  Total Revenue:
+  Total Cost: 124.80
+  Gross Profit:
+  Profit Margin: 0%
+  Sales Rep: Josh Syre
+  Public Customer Notes:
+  Private Customer Notes:
+
+Vendor Quote
+  Vendor: HK Firsttop Technology Ltd
+  Vendor Type: Global Sourcing
+  Traceability: Non-Traceable
+  Contact:
+  Contact Email:
+  Contact Phone:
+  MPN: ADA4891-2ARZ
+  Ship-To Warehouse: HONG KONG
+  Inventory Group Identifier: ALLOCATED/PRESOLD
+  Cost: 1.04 USD
+  Quantity: 120
+  Date Code: 21+
+  COO: Philippines
+  Lead Time: stock
+  Packaging: OTHER
+  Shipper: FedEx International Economy (2-5 day)
+  RoHS: Y
+  Public Vendor Order Notes: Quoted MPN: ADA4891-2ARZ-R7
+  Private Vendor Order Notes:
+  Inco Term: The seller makes the goods available at its location, so the buyer can take over all the transportation costs and also bears the risks of bringing the goods to their final destination.
+  MFR: Analog Devices Inc
+  Buyer: Tracy Xie
+
+RFQ Line
+  RFQ Line #: 960
+  Purchase Qty: 25
+  Sold Qty:
+  Total Revenue:
+  Total Cost: 115.75
+  Gross Profit:
+  Profit Margin: 0%
+  Sales Rep: Josh Syre
+  Public Customer Notes:
+  Private Customer Notes:
+
+Vendor Quote
+  Vendor: Dragon Core Electronics (HK) Co., Limited
+  Vendor Type: Suspended
+  Traceability: Non-Traceable
+  Contact:
+  Contact Email:
+  Contact Phone:
+  MPN: LT8645SEV#PBF
+  Ship-To Warehouse: HONG KONG
+  Inventory Group Identifier: ALLOCATED/PRESOLD
+  Cost: 4.63 USD
+  Quantity: 25
+  Date Code: 22+
+  COO: PENDING
+  Lead Time: stock
+  Packaging: OTHER
+  Shipper: FedEx International Economy (2-5 day)
+  RoHS: Y
+  Public Vendor Order Notes: STOCK
+  Private Vendor Order Notes:
+  Inco Term: The seller makes the goods available at its location, so the buyer can take over all the transportation costs and also bears the risks of bringing the goods to their final destination.
+  MFR: Analog Devices Inc
+  Buyer: Tracy Xie
+
+RFQ Line
+  RFQ Line #: 1000
+  Purchase Qty: 15
+  Sold Qty:
+  Total Revenue:
+  Total Cost: 228.75
+  Gross Profit:
+  Profit Margin: 0%
+  Sales Rep: Josh Syre
+  Public Customer Notes:
+  Private Customer Notes:
+
+Vendor Quote
+  Vendor: SMARTEL ELECTRONICS (ASIA) CO LTD
+  Vendor Type: Global Sourcing
+  Traceability: Non-Traceable
+  Contact:
+  Contact Email:
+  Contact Phone:
+  MPN: AD5696RBRUZ
+  Ship-To Warehouse: HONG KONG
+  Inventory Group Identifier: ALLOCATED/PRESOLD
+  Cost: 15.25 USD
+  Quantity: 15
+  Date Code: 22+
+  COO: PENDING
+  Lead Time: stock
+  Packaging: OTHER
+  Shipper: FedEx International Economy (2-5 day)
+  RoHS: Y
+  Public Vendor Order Notes: Quoted MPN: AD5696RBRUZ-RL7; COO exclusion: not China
+  Private Vendor Order Notes:
+  Inco Term: The seller makes the goods available at its location, so the buyer can take over all the transportation costs and also bears the risks of bringing the goods to their final destination.
+  MFR: Analog Devices Inc
+  Buyer: Tracy Xie
+
+RFQ Line
+  RFQ Line #: 1100
+  Purchase Qty: 20
+  Sold Qty:
+  Total Revenue:
+  Total Cost: 192.00
+  Gross Profit:
+  Profit Margin: 0%
+  Sales Rep: Josh Syre
+  Public Customer Notes:
+  Private Customer Notes:
+
+Vendor Quote
+  Vendor: SMARTEL ELECTRONICS (ASIA) CO LTD
+  Vendor Type: Global Sourcing
+  Traceability: Non-Traceable
+  Contact:
+  Contact Email:
+  Contact Phone:
+  MPN: LT1376HVIS#PBF
+  Ship-To Warehouse: HONG KONG
+  Inventory Group Identifier: ALLOCATED/PRESOLD
+  Cost: 9.6 USD
+  Quantity: 20
+  Date Code: 22+
+  COO: PENDING
+  Lead Time: stock
+  Packaging: OTHER
+  Shipper: FedEx International Economy (2-5 day)
+  RoHS: Y
+  Public Vendor Order Notes: STOCK
+  Private Vendor Order Notes:
+  Inco Term: The seller makes the goods available at its location, so the buyer can take over all the transportation costs and also bears the risks of bringing the goods to their final destination.
+  MFR: Analog Devices Inc
+  Buyer: Tracy Xie
+
+RFQ Line
+  RFQ Line #: 1110
+  Purchase Qty: 25
+  Sold Qty:
+  Total Revenue:
+  Total Cost: 207.75
+  Gross Profit:
+  Profit Margin: 0%
+  Sales Rep: Josh Syre
+  Public Customer Notes:
+  Private Customer Notes:
+
+Vendor Quote
+  Vendor: SMARTEL ELECTRONICS (ASIA) CO LTD
+  Vendor Type: Global Sourcing
+  Traceability: Non-Traceable
+  Contact:
+  Contact Email:
+  Contact Phone:
+  MPN: AD586KRZ
+  Ship-To Warehouse: HONG KONG
+  Inventory Group Identifier: ALLOCATED/PRESOLD
+  Cost: 8.31 USD
+  Quantity: 25
+  Date Code: 25+
+  COO: PENDING
+  Lead Time: stock
+  Packaging: OTHER
+  Shipper: FedEx International Economy (2-5 day)
+  RoHS: Y
+  Public Vendor Order Notes: Quoted MPN: AD586KRZ-REEL7; STOCK
+  Private Vendor Order Notes:
+  Inco Term: The seller makes the goods available at its location, so the buyer can take over all the transportation costs and also bears the risks of bringing the goods to their final destination.
+  MFR: Analog Devices Inc
+  Buyer: Tracy Xie
+
+RFQ Line
+  RFQ Line #: 1430
+  Purchase Qty: 80
+  Sold Qty:
+  Total Revenue:
+  Total Cost: 196.00
+  Gross Profit:
+  Profit Margin: 0%
+  Sales Rep: Josh Syre
+  Public Customer Notes:
+  Private Customer Notes:
+
+Vendor Quote
+  Vendor: SMARTEL ELECTRONICS (ASIA) CO LTD
+  Vendor Type: Global Sourcing
+  Traceability: Non-Traceable
+  Contact:
+  Contact Email:
+  Contact Phone:
+  MPN: 524MILF
+  Ship-To Warehouse: HONG KONG
+  Inventory Group Identifier: ALLOCATED/PRESOLD
+  Cost: 2.45 USD
+  Quantity: 80
+  Date Code: 22+
+  COO: PENDING
+  Lead Time: stock
+  Packaging: OTHER
+  Shipper: FedEx International Economy (2-5 day)
+  RoHS: Y
+  Public Vendor Order Notes: Quoted MPN: 524MILFT; STOCK
+  Private Vendor Order Notes:
+  Inco Term: The seller makes the goods available at its location, so the buyer can take over all the transportation costs and also bears the risks of bringing the goods to their final destination.
+  MFR: Idt
+  Buyer: Tracy Xie
+
+RFQ Line
+  RFQ Line #: 1530
+  Purchase Qty: 35
+  Sold Qty:
+  Total Revenue:
+  Total Cost: 216.30
+  Gross Profit:
+  Profit Margin: 0%
+  Sales Rep: Josh Syre
+  Public Customer Notes:
+  Private Customer Notes:
+
+Vendor Quote
+  Vendor: Dragon Core Electronics (HK) Co., Limited
+  Vendor Type: Suspended
+  Traceability: Non-Traceable
+  Contact:
+  Contact Email:
+  Contact Phone:
+  MPN: ADG431BRZ
+  Ship-To Warehouse: HONG KONG
+  Inventory Group Identifier: ALLOCATED/PRESOLD
+  Cost: 6.18 USD
+  Quantity: 35
+  Date Code: 22+
+  COO: PENDING
+  Lead Time: stock
+  Packaging: OTHER
+  Shipper: FedEx International Economy (2-5 day)
+  RoHS: Y
+  Public Vendor Order Notes: Quoted MPN: ADG431BRZ-REEL7; STOCK
+  Private Vendor Order Notes:
+  Inco Term: The seller makes the goods available at its location, so the buyer can take over all the transportation costs and also bears the risks of bringing the goods to their final destination.
+  MFR: Analog Devices Inc
+  Buyer: Tracy Xie
+
+RFQ Line
+  RFQ Line #: 1700
+  Purchase Qty: 35
+  Sold Qty:
+  Total Revenue:
+  Total Cost: 256.49
+  Gross Profit:
+  Profit Margin: 0%
+  Sales Rep: Josh Syre
+  Public Customer Notes:
+  Private Customer Notes:
+
+Vendor Quote
+  Vendor: SMARTEL ELECTRONICS (ASIA) CO LTD
+  Vendor Type: Global Sourcing
+  Traceability: Non-Traceable
+  Contact:
+  Contact Email:
+  Contact Phone:
+  MPN: LTC4231HMS-1#PBF
+  Ship-To Warehouse: HONG KONG
+  Inventory Group Identifier: ALLOCATED/PRESOLD
+  Cost: 7.3282 USD
+  Quantity: 35
+  Date Code: 21+
+  COO: PENDING
+  Lead Time: stock
+  Packaging: OTHER
+  Shipper: FedEx International Economy (2-5 day)
+  RoHS: Y
+  Public Vendor Order Notes: STOCK (booked at LAM target; rebalanced from $8.25)
+  Private Vendor Order Notes:
+  Inco Term: The seller makes the goods available at its location, so the buyer can take over all the transportation costs and also bears the risks of bringing the goods to their final destination.
+  MFR: Analog Devices Inc
+  Buyer: Tracy Xie
+
+RFQ Line
+  RFQ Line #: 1730
+  Purchase Qty: 40
+  Sold Qty:
+  Total Revenue:
+  Total Cost: 231.12
+  Gross Profit:
+  Profit Margin: 0%
+  Sales Rep: Josh Syre
+  Public Customer Notes:
+  Private Customer Notes:
+
+Vendor Quote
+  Vendor: CHIP ENERGY INTERNATIONAL CO.,LIMITED
+  Vendor Type: Global Sourcing
+  Traceability: Non-Traceable
+  Contact:
+  Contact Email:
+  Contact Phone:
+  MPN: AD5292BRUZ-20
+  Ship-To Warehouse: HONG KONG
+  Inventory Group Identifier: ALLOCATED/PRESOLD
+  Cost: 5.778 USD
+  Quantity: 40
+  Date Code: 23+
+  COO: Malaysia
+  Lead Time: stock
+  Packaging: OTHER
+  Shipper: FedEx International Economy (2-5 day)
+  RoHS: Y
+  Public Vendor Order Notes: Quoted MPN: AD5292BRUZ-20-RL7; OWN STK
+  Private Vendor Order Notes:
+  Inco Term: The seller makes the goods available at its location, so the buyer can take over all the transportation costs and also bears the risks of bringing the goods to their final destination.
+  MFR: Analog Devices Inc
+  Buyer: Tracy Xie

@@ -1,0 +1,466 @@
+[
+  {
+    "cpc": "630-337692-004",
+    "mpn": "XCZU5CG-1SFVC784E",
+    "mfr": "XILINX",
+    "target": 1532.595,
+    "resale": 1869.018292682927,
+    "mpnToBuy": ""
+  },
+  {
+    "cpc": "668-096776-009",
+    "mpn": "K85X-ED-9S-CBR",
+    "mfr": "KYCON, INC",
+    "target": 3.545,
+    "resale": 4.323170731707317,
+    "mpnToBuy": ""
+  },
+  {
+    "cpc": "630-262333-001",
+    "mpn": "LTC2986CLX#PBF",
+    "mfr": "LINEAR TECHNOLOGY",
+    "target": 29.6962,
+    "resale": 36.21487804878049,
+    "mpnToBuy": ""
+  },
+  {
+    "cpc": "668-096776-015",
+    "mpn": "K85X-AD-15S-CBR",
+    "mfr": "KYCON, INC",
+    "target": 2.825,
+    "resale": 3.445121951219513,
+    "mpnToBuy": ""
+  },
+  {
+    "cpc": "630-A59915-001",
+    "mpn": "MAX14915AFM+",
+    "mfr": "MAXIM INTEGRATED",
+    "target": 8.884,
+    "resale": 10.834146341463416,
+    "mpnToBuy": ""
+  },
+  {
+    "cpc": "630-A92150-002",
+    "mpn": "MTFC64GBCAQTC-WT",
+    "mfr": "MICRON TECHNOLOGY, INC.",
+    "target": 65.38,
+    "resale": 79.73170731707317,
+    "mpnToBuy": ""
+  },
+  {
+    "cpc": "630-257348-001",
+    "mpn": "LTC2312HTS8-14#TRMPBF",
+    "mfr": "ANALOG DEVICES",
+    "target": 18.4892,
+    "resale": 22.547804878048783,
+    "mpnToBuy": ""
+  },
+  {
+    "cpc": "723-097621-068",
+    "mpn": "18130B-S-0632-28",
+    "mfr": "AMATOM ELECTRONIC HARDWARE",
+    "target": 17.5,
+    "resale": 21.34146341463415,
+    "mpnToBuy": "1828"
+  },
+  {
+    "cpc": "723-008848-003",
+    "mpn": "9724-SS-7",
+    "mfr": "AMATOM ELECTRONIC HARDWARE",
+    "target": 34.8,
+    "resale": 42.4390243902439,
+    "mpnToBuy": ""
+  },
+  {
+    "cpc": "668-096777-009",
+    "mpn": "K85X-ED-9P-CBR",
+    "mfr": "KYCON, INC",
+    "target": 5.62,
+    "resale": 6.853658536585367,
+    "mpnToBuy": ""
+  },
+  {
+    "cpc": "723-097621-043",
+    "mpn": "18126B-S-0632-28",
+    "mfr": "AMATOM ELECTRONIC HARDWARE",
+    "target": 19.75,
+    "resale": 24.085365853658537,
+    "mpnToBuy": "18126B-S-0632-28"
+  },
+  {
+    "cpc": "668-014495-026",
+    "mpn": "K86X-AD-26S-CBR",
+    "mfr": "KYCON, INC",
+    "target": 8,
+    "resale": 9.75609756097561,
+    "mpnToBuy": ""
+  },
+  {
+    "cpc": "630-114967-001",
+    "mpn": "LCMXO2280C-3FTN256C",
+    "mfr": "LATTICE SEMI",
+    "target": 37.92,
+    "resale": 46.243902439024396,
+    "mpnToBuy": ""
+  },
+  {
+    "cpc": "668-096776-025",
+    "mpn": "DLS3XS4AA35X",
+    "mfr": "AMPHENOL CONEC",
+    "target": 1.7897,
+    "resale": 2.182560975609756,
+    "mpnToBuy": ""
+  },
+  {
+    "cpc": "630-323468-001",
+    "mpn": "MAX5903NNETT+T",
+    "mfr": "MAXIM INTEGRATED",
+    "target": 4.761,
+    "resale": 5.80609756097561,
+    "mpnToBuy": ""
+  },
+  {
+    "cpc": "668-096776-037",
+    "mpn": "DLS4XS4AA35X",
+    "mfr": "AMPHENOL CONEC",
+    "target": 2.1,
+    "resale": 2.5609756097560976,
+    "mpnToBuy": ""
+  },
+  {
+    "cpc": "669-121789-001",
+    "mpn": "172-978-100-201",
+    "mfr": "ODU",
+    "target": 13.87,
+    "resale": 16.914634146341463,
+    "mpnToBuy": ""
+  },
+  {
+    "cpc": "648-004248-471",
+    "mpn": "100E471GW2500X",
+    "mfr": "AMERICAN TECHNICAL CERAMIC",
+    "target": 47.51,
+    "resale": 57.9390243902439,
+    "mpnToBuy": ""
+  },
+  {
+    "cpc": "630-232484-001",
+    "mpn": "LM5069MM-2/NOPB",
+    "mfr": "TEXAS INSTRUMENTS",
+    "target": 3.015,
+    "resale": 3.6768292682926833,
+    "mpnToBuy": ""
+  },
+  {
+    "cpc": "671-096377-010",
+    "mpn": "TP-105-01-00",
+    "mfr": "COMPONENTS CORPORATION",
+    "target": 0.15,
+    "resale": 0.18292682926829268,
+    "mpnToBuy": ""
+  },
+  {
+    "cpc": "615-122309-200",
+    "mpn": "RNCF0805TTT20K0",
+    "mfr": "STACKPOLE ELECTRONICS",
+    "target": 0.814,
+    "resale": 0.9926829268292683,
+    "mpnToBuy": ""
+  },
+  {
+    "cpc": "668-099029-026",
+    "mpn": "K86X-AD-26P-BR",
+    "mfr": "KYCON, INC",
+    "target": 4.33595,
+    "resale": 5.287743902439026,
+    "mpnToBuy": ""
+  },
+  {
+    "cpc": "630-223433-001",
+    "mpn": "MAX7325ATG+",
+    "mfr": "MAXIM INTEGRATED",
+    "target": 2.38,
+    "resale": 2.902439024390244,
+    "mpnToBuy": ""
+  },
+  {
+    "cpc": "615-049171-124",
+    "mpn": "RG2012P-1242-B-T5",
+    "mfr": "SUSUMU",
+    "target": 0.1607,
+    "resale": 0.1959756097560976,
+    "mpnToBuy": ""
+  },
+  {
+    "cpc": "630-260287-001",
+    "mpn": "LTC2313CTS8-12#TRMPBF",
+    "mfr": "ANALOG DEVICES INC.",
+    "target": 10.67,
+    "resale": 13.01219512195122,
+    "mpnToBuy": ""
+  },
+  {
+    "cpc": "668-096777-025",
+    "mpn": "K85X-BD-25P-CBR",
+    "mfr": "KYCON, INC",
+    "target": 5.62,
+    "resale": 6.853658536585367,
+    "mpnToBuy": ""
+  },
+  {
+    "cpc": "668-A01540-026",
+    "mpn": "163A16959X",
+    "mfr": "CONEC ELEKTRONISCHE BAUELEMENTE GMBH",
+    "target": 12.0986,
+    "resale": 14.754390243902439,
+    "mpnToBuy": ""
+  },
+  {
+    "cpc": "668-A51618-026",
+    "mpn": "163A17059X",
+    "mfr": "CONEC ELEKTRONISCHE BAUELEMENTE GMBH",
+    "target": 11.83,
+    "resale": 14.426829268292684,
+    "mpnToBuy": ""
+  },
+  {
+    "cpc": "630-120971-001",
+    "mpn": "MT47H128M16RT-25E:C TR",
+    "mfr": "MICRON TECHNOLOGY, INC.",
+    "target": 14.7792,
+    "resale": 18.02341463414634,
+    "mpnToBuy": ""
+  },
+  {
+    "cpc": "669-C00309-007",
+    "mpn": "203263-0066",
+    "mfr": "MOLEX, LLC",
+    "target": 3.8,
+    "resale": 4.634146341463414,
+    "mpnToBuy": ""
+  },
+  {
+    "cpc": "615-122309-612",
+    "mpn": "RNCF0805TTT61K2",
+    "mfr": "STACKPOLE ELECTRONICS",
+    "target": 0.814,
+    "resale": 0.9926829268292683,
+    "mpnToBuy": ""
+  },
+  {
+    "cpc": "630-268428-001",
+    "mpn": "FT234XD-R",
+    "mfr": "FUTURE TECHNOLOGY DEVICES INTERNATIONAL (FTDI) LTD.",
+    "target": 2.2502,
+    "resale": 2.7441463414634146,
+    "mpnToBuy": ""
+  },
+  {
+    "cpc": "668-096777-037",
+    "mpn": "K85X-CD-37P-CBR",
+    "mfr": "KYCON, INC",
+    "target": 5.62,
+    "resale": 6.853658536585367,
+    "mpnToBuy": ""
+  },
+  {
+    "cpc": "630-248896-001",
+    "mpn": "IS25LP128-JBLE",
+    "mfr": "INTEGRATED SILICON SOLUTION",
+    "target": 2.1596,
+    "resale": 2.6336585365853664,
+    "mpnToBuy": ""
+  },
+  {
+    "cpc": "630-087790-001",
+    "mpn": "ET1100",
+    "mfr": "BECKHOFF AUTOMATION LLC",
+    "target": 0.1598,
+    "resale": 0.1948780487804878,
+    "mpnToBuy": ""
+  },
+  {
+    "cpc": "630-228108-001",
+    "mpn": "MAX13035EETE+",
+    "mfr": "MAXIM INTEGRATED",
+    "target": 9.2415,
+    "resale": 11.270121951219513,
+    "mpnToBuy": ""
+  },
+  {
+    "cpc": "779-002694-001",
+    "mpn": "QII-0.006-00-61",
+    "mfr": "HENKEL",
+    "target": 0.55,
+    "resale": 0.6707317073170732,
+    "mpnToBuy": ""
+  },
+  {
+    "cpc": "630-026177-001",
+    "mpn": "MAX5917AESE+",
+    "mfr": "MAXIM INTEGRATED",
+    "target": 6.8188,
+    "resale": 8.315609756097562,
+    "mpnToBuy": ""
+  },
+  {
+    "cpc": "648-051878-333",
+    "mpn": "C0603T333K5RACTU",
+    "mfr": "KEMET",
+    "target": 0.4942,
+    "resale": 0.6026829268292683,
+    "mpnToBuy": ""
+  },
+  {
+    "cpc": "631-099701-003",
+    "mpn": "HFBR-1531ETZ",
+    "mfr": "BROADCOM INC.",
+    "target": 17.7206,
+    "resale": 21.61048780487805,
+    "mpnToBuy": ""
+  },
+  {
+    "cpc": "639-A21747-001",
+    "mpn": "X-1569",
+    "mfr": "PULSER LLC.",
+    "target": 13.2582,
+    "resale": 16.168536585365857,
+    "mpnToBuy": ""
+  },
+  {
+    "cpc": "615-041833-203",
+    "mpn": "ERJ-12SF2002U",
+    "mfr": "PANASONIC",
+    "target": 0.3286,
+    "resale": 0.4007317073170732,
+    "mpnToBuy": ""
+  },
+  {
+    "cpc": "644-059699-005",
+    "mpn": "500-231",
+    "mfr": "COMPUTER COMPONENTS,INC",
+    "target": 0.35,
+    "resale": 0.4268292682926829,
+    "mpnToBuy": ""
+  },
+  {
+    "cpc": "667-B77583-001",
+    "mpn": "K202XHT-E9S-N",
+    "mfr": "KYCON INC.",
+    "target": 3.0828,
+    "resale": 3.759512195121952,
+    "mpnToBuy": ""
+  },
+  {
+    "cpc": "648-051878-224",
+    "mpn": "NMC0603X7R224K50TRPF",
+    "mfr": "NIC COMPONENTS",
+    "target": 0.0199,
+    "resale": 0.024268292682926833,
+    "mpnToBuy": ""
+  },
+  {
+    "cpc": "630-173321-001",
+    "mpn": "AS7C34098A-10TCN",
+    "mfr": "ALLIANCE MEMORY",
+    "target": 6.45,
+    "resale": 7.865853658536586,
+    "mpnToBuy": ""
+  },
+  {
+    "cpc": "615-080145-047",
+    "mpn": "TNPW1206174KBETA",
+    "mfr": "VISHAY",
+    "target": 0.286,
+    "resale": 0.348780487804878,
+    "mpnToBuy": ""
+  },
+  {
+    "cpc": "670-A39955-001",
+    "mpn": "1A1119-10-R",
+    "mfr": "EATON",
+    "target": 0.3024,
+    "resale": 0.3687804878048781,
+    "mpnToBuy": "BK/1A1119-10-R"
+  },
+  {
+    "cpc": "630-259131-001",
+    "mpn": "REF3012AIDBZR",
+    "mfr": "TEXAS INSTRUMENTS",
+    "target": 0.6395,
+    "resale": 0.7798780487804878,
+    "mpnToBuy": ""
+  },
+  {
+    "cpc": "615-080142-198",
+    "mpn": "TNPW1206198RBEEA",
+    "mfr": "VISHAY",
+    "target": 0.93,
+    "resale": 1.1341463414634148,
+    "mpnToBuy": ""
+  },
+  {
+    "cpc": "615-122309-100",
+    "mpn": "RNCF0805TTT10K0",
+    "mfr": "STACKPOLE ELECTRONICS",
+    "target": 0.823,
+    "resale": 1.0036585365853659,
+    "mpnToBuy": ""
+  },
+  {
+    "cpc": "639-004556-390",
+    "mpn": "4922R-32L",
+    "mfr": "API DELEVAN",
+    "target": 4.25,
+    "resale": 5.182926829268293,
+    "mpnToBuy": ""
+  },
+  {
+    "cpc": "630-A21745-001",
+    "mpn": "UC2825AQDWREP",
+    "mfr": "TEXAS INSTRUMENTS",
+    "target": 7.2715,
+    "resale": 8.867682926829268,
+    "mpnToBuy": ""
+  },
+  {
+    "cpc": "630-340553-001",
+    "mpn": "551SCMGI",
+    "mfr": "RENESAS",
+    "target": 1.6822,
+    "resale": 2.051463414634146,
+    "mpnToBuy": ""
+  },
+  {
+    "cpc": "630-121394-001",
+    "mpn": "TLK110PTR",
+    "mfr": "TEXAS INSTRUMENTS",
+    "target": 7.1955,
+    "resale": 8.775,
+    "mpnToBuy": ""
+  },
+  {
+    "cpc": "668-277308-002",
+    "mpn": "163A16159X",
+    "mfr": "CONEC ELEKTRONISCHE BAUELEMENTE GMBH",
+    "target": 7.1838,
+    "resale": 8.760731707317074,
+    "mpnToBuy": ""
+  },
+  {
+    "cpc": "639-311328-002",
+    "mpn": "XEL6060-821MEC",
+    "mfr": "COILCRAFT",
+    "target": 2.9476,
+    "resale": 3.5946341463414635,
+    "mpnToBuy": ""
+  },
+  {
+    "cpc": "608-096583-504",
+    "mpn": "TS63Y504KR10",
+    "mfr": "VISHAY",
+    "target": 2.385,
+    "resale": 2.9085365853658534,
+    "mpnToBuy": ""
+  }
+]

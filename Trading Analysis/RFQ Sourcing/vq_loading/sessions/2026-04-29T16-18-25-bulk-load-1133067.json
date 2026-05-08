@@ -1,0 +1,781 @@
+{
+  "rfqSearchKey": "1133067",
+  "buyerId": 1009477,
+  "runAt": "2026-04-29T16:18:25.801Z",
+  "sourceQuotes": "/home/analytics_user/workspace/astute-workinstructions/Trading Analysis/RFQ Sourcing/vq_loading/sessions/2026-04-29-LAM-reorders-1133067.json",
+  "result": {
+    "written": [
+      {
+        "vqLineId": 2140913,
+        "line": 60,
+        "mpn": "LTM8074EY#PBF",
+        "vendor": "Hong Kong Duan Que Electronics Co., Limited",
+        "cost": 5.88,
+        "qty": 80,
+        "fuzzyMatch": false
+      },
+      {
+        "vqLineId": 2140914,
+        "line": 60,
+        "mpn": "LTM8074EY#PBF",
+        "vendor": "Fixchips Global Limited",
+        "cost": 7.72,
+        "qty": 80,
+        "fuzzyMatch": false
+      },
+      {
+        "vqLineId": 2140915,
+        "line": 60,
+        "mpn": "LTM8074EY#PBF",
+        "vendor": "Fixchips Global Limited",
+        "cost": 10.04,
+        "qty": 80,
+        "fuzzyMatch": false
+      },
+      {
+        "vqLineId": 2140916,
+        "line": 60,
+        "mpn": "LTM8074EY#PBF",
+        "vendor": "Skyeast International Group Ltd",
+        "cost": 12.5,
+        "qty": 80,
+        "fuzzyMatch": false
+      },
+      {
+        "vqLineId": 2140917,
+        "line": 60,
+        "mpn": "LTM8074EY#PBF",
+        "vendor": "SMARTEL ELECTRONICS (ASIA) CO LTD",
+        "cost": 7.71,
+        "qty": 80,
+        "fuzzyMatch": false
+      },
+      {
+        "vqLineId": 2140918,
+        "line": 60,
+        "mpn": "LTM8074EY#PBF",
+        "vendor": "Action (HK) Technology Ltd",
+        "cost": 7.83,
+        "qty": 80,
+        "fuzzyMatch": false
+      },
+      {
+        "vqLineId": 2140919,
+        "line": 60,
+        "mpn": "LTM8074EY#PBF",
+        "vendor": "SMARTEL ELECTRONICS (ASIA) CO LTD",
+        "cost": 9.89,
+        "qty": 160,
+        "fuzzyMatch": false
+      },
+      {
+        "vqLineId": 2140920,
+        "line": 70,
+        "mpn": "MAX16029TG+",
+        "vendor": "Fixchips Global Limited",
+        "cost": 6.5,
+        "qty": 75,
+        "fuzzyMatch": false
+      },
+      {
+        "vqLineId": 2140921,
+        "line": 70,
+        "mpn": "MAX16029TG+",
+        "vendor": "Fanco Electronics Ltd",
+        "cost": 7.1,
+        "qty": 75,
+        "fuzzyMatch": false
+      },
+      {
+        "vqLineId": 2140922,
+        "line": 70,
+        "mpn": "MAX16029TG+",
+        "vendor": "SMARTEL ELECTRONICS (ASIA) CO LTD",
+        "cost": 6.4,
+        "qty": 75,
+        "fuzzyMatch": false
+      },
+      {
+        "vqLineId": 2140923,
+        "line": 80,
+        "mpn": "LTM4632EV#PBF",
+        "vendor": "Skyeast International Group Ltd",
+        "cost": 8.5,
+        "qty": 80,
+        "fuzzyMatch": false
+      },
+      {
+        "vqLineId": 2140924,
+        "line": 80,
+        "mpn": "LTM4632EV#PBF",
+        "vendor": "HK Firsttop Technology Ltd",
+        "cost": 8.96,
+        "qty": 80,
+        "fuzzyMatch": false
+      },
+      {
+        "vqLineId": 2140925,
+        "line": 80,
+        "mpn": "LTM4632EV#PBF",
+        "vendor": "Hong Kong Duan Que Electronics Co., Limited",
+        "cost": 9.25,
+        "qty": 80,
+        "fuzzyMatch": false
+      },
+      {
+        "vqLineId": 2140926,
+        "line": 80,
+        "mpn": "LTM4632EV#PBF",
+        "vendor": "Skyeast International Group Ltd",
+        "cost": 9.3,
+        "qty": 80,
+        "fuzzyMatch": false
+      },
+      {
+        "vqLineId": 2140927,
+        "line": 80,
+        "mpn": "LTM4632EV#PBF",
+        "vendor": "Xin Jun Hong (HK) Industry Co., Ltd",
+        "cost": 9.41,
+        "qty": 80,
+        "fuzzyMatch": false
+      },
+      {
+        "vqLineId": 2140928,
+        "line": 80,
+        "mpn": "LTM4632EV#PBF",
+        "vendor": "HongKong NES Group Limited",
+        "cost": 8.701,
+        "qty": 80,
+        "fuzzyMatch": false
+      },
+      {
+        "vqLineId": 2140929,
+        "line": 80,
+        "mpn": "LTM4632EV#PBF",
+        "vendor": "Fanco Electronics Ltd",
+        "cost": 8.5,
+        "qty": 80,
+        "fuzzyMatch": false
+      },
+      {
+        "vqLineId": 2140930,
+        "line": 130,
+        "mpn": "AD9467BCPZ-250",
+        "vendor": "Haoxin Hk Electronic Technology Co., Limited",
+        "cost": 116.7,
+        "qty": 100,
+        "fuzzyMatch": false
+      },
+      {
+        "vqLineId": 2140931,
+        "line": 130,
+        "mpn": "AD9467BCPZ-250",
+        "vendor": "HongKong NES Group Limited",
+        "cost": 123.403,
+        "qty": 100,
+        "fuzzyMatch": false
+      },
+      {
+        "vqLineId": 2140932,
+        "line": 130,
+        "mpn": "AD9467BCPZ-250",
+        "vendor": "Xin Jun Hong (HK) Industry Co., Ltd",
+        "cost": 113.95,
+        "qty": 100,
+        "fuzzyMatch": false
+      },
+      {
+        "vqLineId": 2140933,
+        "line": 130,
+        "mpn": "AD9467BCPZ-250",
+        "vendor": "Skyeast International Group Ltd",
+        "cost": 115,
+        "qty": 100,
+        "fuzzyMatch": false
+      },
+      {
+        "vqLineId": 2140934,
+        "line": 130,
+        "mpn": "AD9467BCPZ-250",
+        "vendor": "Fixchips Global Limited",
+        "cost": 117.4,
+        "qty": 100,
+        "fuzzyMatch": false
+      },
+      {
+        "vqLineId": 2140935,
+        "line": 130,
+        "mpn": "AD9467BCPZ-250",
+        "vendor": "Valley Electronics(HK) Limited",
+        "cost": 120.9,
+        "qty": 100,
+        "fuzzyMatch": false
+      },
+      {
+        "vqLineId": 2140936,
+        "line": 130,
+        "mpn": "AD9467BCPZ-250",
+        "vendor": "LITUOXIN GROUP (HK) CO.,",
+        "cost": 122,
+        "qty": 100,
+        "fuzzyMatch": false
+      },
+      {
+        "vqLineId": 2140937,
+        "line": 130,
+        "mpn": "AD9467BCPZ-250",
+        "vendor": "HK Firsttop Technology Ltd",
+        "cost": 125.38,
+        "qty": 100,
+        "fuzzyMatch": false
+      },
+      {
+        "vqLineId": 2140938,
+        "line": 130,
+        "mpn": "AD9467BCPZ-250",
+        "vendor": "CHIP ENERGY INTERNATIONAL CO.,LIMITED",
+        "cost": 120.977,
+        "qty": 100,
+        "fuzzyMatch": false
+      },
+      {
+        "vqLineId": 2140939,
+        "line": 130,
+        "mpn": "AD9467BCPZ-250",
+        "vendor": "Fanco Electronics Ltd",
+        "cost": 120,
+        "qty": 100,
+        "fuzzyMatch": false
+      },
+      {
+        "vqLineId": 2140940,
+        "line": 130,
+        "mpn": "AD9467BCPZ-250",
+        "vendor": "SMARTEL ELECTRONICS (ASIA) CO LTD",
+        "cost": 120,
+        "qty": 100,
+        "fuzzyMatch": false
+      },
+      {
+        "vqLineId": 2140941,
+        "line": 150,
+        "mpn": "LT1491ACS#PBF",
+        "vendor": "Xin Jun Hong (HK) Industry Co., Ltd",
+        "cost": 12.92,
+        "qty": 60,
+        "fuzzyMatch": false
+      },
+      {
+        "vqLineId": 2140942,
+        "line": 150,
+        "mpn": "LT1491ACS#PBF",
+        "vendor": "Skyeast International Group Ltd",
+        "cost": 13,
+        "qty": 60,
+        "fuzzyMatch": false
+      },
+      {
+        "vqLineId": 2140943,
+        "line": 150,
+        "mpn": "LT1491ACS#PBF",
+        "vendor": "HK Firsttop Technology Ltd",
+        "cost": 13.66,
+        "qty": 60,
+        "fuzzyMatch": false
+      },
+      {
+        "vqLineId": 2140944,
+        "line": 150,
+        "mpn": "LT1491ACS#PBF",
+        "vendor": "HongKong NES Group Limited",
+        "cost": 9.493,
+        "qty": 60,
+        "fuzzyMatch": false
+      },
+      {
+        "vqLineId": 2140945,
+        "line": 150,
+        "mpn": "LT1491ACS#PBF",
+        "vendor": "CHIP ENERGY INTERNATIONAL CO.,LIMITED",
+        "cost": 8.964,
+        "qty": 60,
+        "fuzzyMatch": false
+      },
+      {
+        "vqLineId": 2140946,
+        "line": 150,
+        "mpn": "LT1491ACS#PBF",
+        "vendor": "SMARTEL ELECTRONICS (ASIA) CO LTD",
+        "cost": 13,
+        "qty": 60,
+        "fuzzyMatch": false
+      },
+      {
+        "vqLineId": 2140947,
+        "line": 10,
+        "mpn": "SN74LVC125ARGYR",
+        "vendor": "DelSheng Electronics Co., Ltd",
+        "cost": 0.1,
+        "qty": 200,
+        "fuzzyMatch": false
+      },
+      {
+        "vqLineId": 2140948,
+        "line": 10,
+        "mpn": "SN74LVC125ARGYR",
+        "vendor": "Skyeast International Group Ltd",
+        "cost": 0.13,
+        "qty": 200,
+        "fuzzyMatch": false
+      },
+      {
+        "vqLineId": 2140949,
+        "line": 10,
+        "mpn": "SN74LVC125ARGYR",
+        "vendor": "HK Firsttop Technology Ltd",
+        "cost": 0.16,
+        "qty": 200,
+        "fuzzyMatch": false
+      },
+      {
+        "vqLineId": 2140950,
+        "line": 10,
+        "mpn": "SN74LVC125ARGYR",
+        "vendor": "HongKong NES Group Limited",
+        "cost": 0.116,
+        "qty": 200,
+        "fuzzyMatch": false
+      },
+      {
+        "vqLineId": 2140951,
+        "line": 10,
+        "mpn": "SN74LVC125ARGYR",
+        "vendor": "SMARTEL ELECTRONICS (ASIA) CO LTD",
+        "cost": 0.15,
+        "qty": 200,
+        "fuzzyMatch": false
+      },
+      {
+        "vqLineId": 2140952,
+        "line": 110,
+        "mpn": "ADS8688IDBTR",
+        "vendor": "HK Firsttop Technology Ltd",
+        "cost": 3.7,
+        "qty": 60,
+        "fuzzyMatch": false
+      },
+      {
+        "vqLineId": 2140953,
+        "line": 110,
+        "mpn": "ADS8688IDBTR",
+        "vendor": "Hong Kong Duan Que Electronics Co., Limited",
+        "cost": 4.62,
+        "qty": 60,
+        "fuzzyMatch": false
+      },
+      {
+        "vqLineId": 2140954,
+        "line": 110,
+        "mpn": "ADS8688IDBTR",
+        "vendor": "DelSheng Electronics Co., Ltd",
+        "cost": 5.55,
+        "qty": 60,
+        "fuzzyMatch": false
+      },
+      {
+        "vqLineId": 2140955,
+        "line": 110,
+        "mpn": "ADS8688IDBTR",
+        "vendor": "Skyeast International Group Ltd",
+        "cost": 5.9,
+        "qty": 60,
+        "fuzzyMatch": false
+      },
+      {
+        "vqLineId": 2140956,
+        "line": 110,
+        "mpn": "ADS8688IDBTR",
+        "vendor": "HongKong NES Group Limited",
+        "cost": 7.91,
+        "qty": 60,
+        "fuzzyMatch": false
+      },
+      {
+        "vqLineId": 2140957,
+        "line": 110,
+        "mpn": "ADS8688IDBTR",
+        "vendor": "SMARTEL ELECTRONICS (ASIA) CO LTD",
+        "cost": 4.15,
+        "qty": 60,
+        "fuzzyMatch": false
+      },
+      {
+        "vqLineId": 2140958,
+        "line": 120,
+        "mpn": "LMZ14202TZ-ADJ/NOPB",
+        "vendor": "Keming Electronics Development Co., Ltd",
+        "cost": 10.32,
+        "qty": 250,
+        "fuzzyMatch": false
+      },
+      {
+        "vqLineId": 2140959,
+        "line": 120,
+        "mpn": "LMZ14202TZ-ADJ/NOPB",
+        "vendor": "DelSheng Electronics Co., Ltd",
+        "cost": 10.38,
+        "qty": 250,
+        "fuzzyMatch": false
+      },
+      {
+        "vqLineId": 2140960,
+        "line": 120,
+        "mpn": "LMZ14202TZ-ADJ/NOPB",
+        "vendor": "Guiyu Electronics Group (HK) Ltd",
+        "cost": 10.45,
+        "qty": 250,
+        "fuzzyMatch": false
+      },
+      {
+        "vqLineId": 2140961,
+        "line": 120,
+        "mpn": "LMZ14202TZ-ADJ/NOPB",
+        "vendor": "HongKong NES Group Limited",
+        "cost": 10.837,
+        "qty": 250,
+        "fuzzyMatch": false
+      },
+      {
+        "vqLineId": 2140962,
+        "line": 120,
+        "mpn": "LMZ14202TZ-ADJ/NOPB",
+        "vendor": "Fixchips Global Limited",
+        "cost": 6.82,
+        "qty": 250,
+        "fuzzyMatch": false
+      },
+      {
+        "vqLineId": 2140963,
+        "line": 120,
+        "mpn": "LMZ14202TZ-ADJ/NOPB",
+        "vendor": "Skyeast International Group Ltd",
+        "cost": 6.9,
+        "qty": 250,
+        "fuzzyMatch": false
+      },
+      {
+        "vqLineId": 2140964,
+        "line": 120,
+        "mpn": "LMZ14202TZ-ADJ/NOPB",
+        "vendor": "SMARTEL ELECTRONICS (ASIA) CO LTD",
+        "cost": 6.8,
+        "qty": 250,
+        "fuzzyMatch": false
+      },
+      {
+        "vqLineId": 2140965,
+        "line": 120,
+        "mpn": "LMZ14202TZ-ADJ/NOPB",
+        "vendor": "Action (HK) Technology Ltd",
+        "cost": 6.91,
+        "qty": 250,
+        "fuzzyMatch": false
+      }
+    ],
+    "skipped": [
+      {
+        "vendorName": "DRAGON",
+        "mpn": "LTM8074EY#PBF",
+        "mfr": "Analog Devices",
+        "qty": 80,
+        "cost": 10.04,
+        "leadTime": "stock",
+        "dateCode": "25+",
+        "coo": "Korea, Republic of",
+        "packaging": null,
+        "rohs": null,
+        "vendorNotes": null,
+        "vendorQuotedMpn": null,
+        "reason": "VENDOR_SUSPENDED",
+        "detail": "Dragon Core Electronics (HK) Co., Limited is Suspended (vtype 1000004)"
+      },
+      {
+        "vendorName": "DRAGON",
+        "mpn": "MAX16029TG+",
+        "mfr": "Analog Devices",
+        "qty": 75,
+        "cost": 6.49,
+        "leadTime": "stock",
+        "dateCode": "24+",
+        "coo": "United States",
+        "packaging": null,
+        "rohs": null,
+        "vendorNotes": null,
+        "vendorQuotedMpn": "MAX16029TG+T",
+        "reason": "VENDOR_SUSPENDED",
+        "detail": "Dragon Core Electronics (HK) Co., Limited is Suspended (vtype 1000004)"
+      },
+      {
+        "vendorName": "DRAGON",
+        "mpn": "LTM4632EV#PBF",
+        "mfr": "Analog Devices",
+        "qty": 80,
+        "cost": 9.27,
+        "leadTime": "stock",
+        "dateCode": "22+",
+        "coo": "Malaysia",
+        "packaging": null,
+        "rohs": null,
+        "vendorNotes": null,
+        "vendorQuotedMpn": null,
+        "reason": "VENDOR_SUSPENDED",
+        "detail": "Dragon Core Electronics (HK) Co., Limited is Suspended (vtype 1000004)"
+      },
+      {
+        "vendorName": "DRAGON",
+        "mpn": "AD9467BCPZ-250",
+        "mfr": "Analog Devices",
+        "qty": 100,
+        "cost": 123.53,
+        "leadTime": "stock",
+        "dateCode": "25+",
+        "coo": "Philippines",
+        "packaging": null,
+        "rohs": null,
+        "vendorNotes": null,
+        "vendorQuotedMpn": null,
+        "reason": "VENDOR_SUSPENDED",
+        "detail": "Dragon Core Electronics (HK) Co., Limited is Suspended (vtype 1000004)"
+      },
+      {
+        "vendorName": "DRAGON",
+        "mpn": "LT1491ACS#PBF",
+        "mfr": "Analog Devices",
+        "qty": 60,
+        "cost": 13.13,
+        "leadTime": "stock",
+        "dateCode": "22+",
+        "coo": "Malaysia",
+        "packaging": null,
+        "rohs": null,
+        "vendorNotes": null,
+        "vendorQuotedMpn": null,
+        "reason": "VENDOR_SUSPENDED",
+        "detail": "Dragon Core Electronics (HK) Co., Limited is Suspended (vtype 1000004)"
+      },
+      {
+        "vendorName": "DRAGON",
+        "mpn": "ADS8688IDBTR",
+        "mfr": "Texas Instruments",
+        "qty": 60,
+        "cost": 5.56,
+        "leadTime": "stock",
+        "dateCode": "25+",
+        "coo": "Malaysia",
+        "packaging": null,
+        "rohs": null,
+        "vendorNotes": null,
+        "vendorQuotedMpn": null,
+        "reason": "VENDOR_SUSPENDED",
+        "detail": "Dragon Core Electronics (HK) Co., Limited is Suspended (vtype 1000004)"
+      },
+      {
+        "vendorName": "DRAGON",
+        "mpn": "LMZ14202TZ-ADJ/NOPB",
+        "mfr": "Texas Instruments",
+        "qty": 250,
+        "cost": 6.95,
+        "leadTime": "stock",
+        "dateCode": "26+",
+        "coo": "Malaysia",
+        "packaging": null,
+        "rohs": null,
+        "vendorNotes": null,
+        "vendorQuotedMpn": "LMZ14202TZX-ADJ/NOPB",
+        "reason": "VENDOR_SUSPENDED",
+        "detail": "Dragon Core Electronics (HK) Co., Limited is Suspended (vtype 1000004)"
+      }
+    ],
+    "failed": [
+      {
+        "vendorName": "ECI",
+        "mpn": "LTM4632EV#PBF",
+        "mfr": "Analog Devices",
+        "qty": 80,
+        "cost": 9.085,
+        "leadTime": "stock",
+        "dateCode": "21+",
+        "coo": null,
+        "packaging": null,
+        "rohs": null,
+        "vendorNotes": null,
+        "vendorQuotedMpn": null,
+        "reason": "WRITE_FAILED",
+        "detail": "API_WRITE_ERROR: api-client POST /models/Chuboe_VQ_Line failed (500): {\"title\":\"Server error\",\"status\":500,\"detail\":\"Could not convert value null for Chuboe_VendorType\"}"
+      },
+      {
+        "vendorName": "ECI",
+        "mpn": "AD9467BCPZ-250",
+        "mfr": "Analog Devices",
+        "qty": 100,
+        "cost": 125,
+        "leadTime": "stock",
+        "dateCode": "25+",
+        "coo": null,
+        "packaging": null,
+        "rohs": null,
+        "vendorNotes": null,
+        "vendorQuotedMpn": null,
+        "reason": "WRITE_FAILED",
+        "detail": "API_WRITE_ERROR: api-client POST /models/Chuboe_VQ_Line failed (500): {\"title\":\"Server error\",\"status\":500,\"detail\":\"Could not convert value null for Chuboe_VendorType\"}"
+      }
+    ],
+    "coverage": [
+      {
+        "lineNo": 10,
+        "lineId": 3100474,
+        "rfqQty": 25,
+        "mpns": [
+          "SN74LVC125ARGYR"
+        ],
+        "vqsThisBatch": 5
+      },
+      {
+        "lineNo": 20,
+        "lineId": 3100475,
+        "rfqQty": 25,
+        "mpns": [
+          "101628-000"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 30,
+        "lineId": 3100476,
+        "rfqQty": 25,
+        "mpns": [
+          "CCHD-957X-25-49.152"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 40,
+        "lineId": 3100477,
+        "rfqQty": 25,
+        "mpns": [
+          "MOX93021004FVE"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 50,
+        "lineId": 3100478,
+        "rfqQty": 25,
+        "mpns": [
+          "MT40A512M16TB-062E:R"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 60,
+        "lineId": 3100479,
+        "rfqQty": 25,
+        "mpns": [
+          "LTM8074EY#PBF"
+        ],
+        "vqsThisBatch": 7
+      },
+      {
+        "lineNo": 70,
+        "lineId": 3100480,
+        "rfqQty": 25,
+        "mpns": [
+          "MAX16029TG+"
+        ],
+        "vqsThisBatch": 3
+      },
+      {
+        "lineNo": 80,
+        "lineId": 3100481,
+        "rfqQty": 25,
+        "mpns": [
+          "LTM4632EV#PBF"
+        ],
+        "vqsThisBatch": 7
+      },
+      {
+        "lineNo": 90,
+        "lineId": 3100482,
+        "rfqQty": 25,
+        "mpns": [
+          "PATT0603E2001BGT1"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 100,
+        "lineId": 3100483,
+        "rfqQty": 15,
+        "mpns": [
+          "65100516121"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 110,
+        "lineId": 3100484,
+        "rfqQty": 15,
+        "mpns": [
+          "ADS8688IDBTR"
+        ],
+        "vqsThisBatch": 6
+      },
+      {
+        "lineNo": 120,
+        "lineId": 3100485,
+        "rfqQty": 12,
+        "mpns": [
+          "LMZ14202TZ-ADJ/NOPB"
+        ],
+        "vqsThisBatch": 8
+      },
+      {
+        "lineNo": 130,
+        "lineId": 3100486,
+        "rfqQty": 14,
+        "mpns": [
+          "AD9467BCPZ-250"
+        ],
+        "vqsThisBatch": 11
+      },
+      {
+        "lineNo": 140,
+        "lineId": 3100487,
+        "rfqQty": 8,
+        "mpns": [
+          "1424241"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 150,
+        "lineId": 3100488,
+        "rfqQty": 2,
+        "mpns": [
+          "LT1491ACS#PBF"
+        ],
+        "vqsThisBatch": 6
+      }
+    ],
+    "gaps": [
+      20,
+      30,
+      40,
+      50,
+      90,
+      100,
+      140
+    ]
+  }
+}

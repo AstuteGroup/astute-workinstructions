@@ -1,0 +1,62 @@
+{
+  "rfq": "1133067",
+  "written": [
+    {
+      "mpn": "LTM8074EY#PBF",
+      "vendor": "Dragon Core Electronics (HK) Co., Limited",
+      "vqId": 2140968,
+      "cost": 10.04,
+      "qty": 80,
+      "line": 60
+    },
+    {
+      "mpn": "MAX16029TG+",
+      "vendor": "Dragon Core Electronics (HK) Co., Limited",
+      "vqId": 2140969,
+      "cost": 6.49,
+      "qty": 75,
+      "line": 70
+    },
+    {
+      "mpn": "LTM4632EV#PBF",
+      "vendor": "Dragon Core Electronics (HK) Co., Limited",
+      "vqId": 2140970,
+      "cost": 9.27,
+      "qty": 80,
+      "line": 80
+    },
+    {
+      "mpn": "AD9467BCPZ-250",
+      "vendor": "Dragon Core Electronics (HK) Co., Limited",
+      "vqId": 2140971,
+      "cost": 123.53,
+      "qty": 100,
+      "line": 130
+    },
+    {
+      "mpn": "LT1491ACS#PBF",
+      "vendor": "Dragon Core Electronics (HK) Co., Limited",
+      "vqId": 2140972,
+      "cost": 13.13,
+      "qty": 60,
+      "line": 150
+    },
+    {
+      "mpn": "ADS8688IDBTR",
+      "vendor": "Dragon Core Electronics (HK) Co., Limited",
+      "vqId": 2140973,
+      "cost": 5.56,
+      "qty": 60,
+      "line": 110
+    },
+    {
+      "mpn": "LMZ14202TZ-ADJ/NOPB",
+      "vendor": "Dragon Core Electronics (HK) Co., Limited",
+      "vqId": 2140974,
+      "cost": 6.95,
+      "qty": 250,
+      "line": 120
+    }
+  ],
+  "failed": []
+}

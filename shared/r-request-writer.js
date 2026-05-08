@@ -71,7 +71,8 @@ const AD_TABLE_CHUBOE_RFQ   = 1000002;
  * @throws {Error} if validator fails or required fields are missing
  */
 async function postApproveOrder(opts = {}) {
-  const { vqId, program = null, rfqId, summary, approvalText, message = '', priority = '5' } = opts;
+  const { vqId, program = null, rfqId, summary, approvalText, message = '',
+          priority = '5', allowCompetingTicked = false } = opts;
 
   if (!vqId)          throw new Error('postApproveOrder: vqId is required');
   if (!rfqId)         throw new Error('postApproveOrder: rfqId is required');
@@ -86,7 +87,7 @@ async function postApproveOrder(opts = {}) {
   // Validator gate. VQ must be in a purchasable state AND must be ticked;
   // the validator doesn't check IsPurchased itself since tick order isn't
   // enforced, but if it's not ticked support has nothing to approve.
-  const report = await validateVQForPurchase(vqId, { program });
+  const report = await validateVQForPurchase(vqId, { program, allowCompetingTicked });
   if (!report.ok) {
     const err = new Error(
       `VQ ${vqId} failed validation — aborting R_Request POST. ` +

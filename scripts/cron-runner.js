@@ -27,6 +27,13 @@ const REGISTRY = require('../cron-jobs');
 const { cadenceToMs } = require('../cron-jobs');
 const { shouldRun, markSuccess, markFailure } = require('../shared/cron-sentinel');
 const { probeOT } = require('../shared/ot-health');
+const breadcrumbs = require('../shared/breadcrumbs');
+
+function crumb(jobName, event, detail) {
+  try {
+    breadcrumbs.write({ cog: 'cron-runner', event, job: jobName, ...detail });
+  } catch (e) { /* breadcrumbs are advisory; never fail a run on crumb write */ }
+}
 
 const RUNNER_LOG = '/tmp/cron-runner.log';
 
@@ -71,6 +78,7 @@ async function main() {
     const decision = shouldRun(job.name, job.cadence);
     if (!decision.run) {
       logEvent(job.name, 'skip', { reason: decision.reason });
+      crumb(job.name, 'job-skip-not-due', { reason: decision.reason });
       // Silent exit — no console output for the common skip case so cron logs stay clean.
       process.exit(0);
     }
@@ -82,6 +90,7 @@ async function main() {
     const health = await probeOT();
     if (!health.up) {
       logEvent(job.name, 'skip-ot-down', { statusCode: health.statusCode, reason: health.reason });
+      crumb(job.name, 'job-skip-ot-down', { statusCode: health.statusCode, reason: health.reason });
       // Don't markFailure — this isn't a job-logic failure. nextDue stays put,
       // next hourly tick retries when OT is back.
       console.error(`cron-runner: OT unavailable (${health.reason}) — skipping ${job.name}, will retry next tick`);
@@ -112,6 +121,7 @@ async function main() {
   if (exitCode === 0) {
     markSuccess(job.name, cadenceMs);
     logEvent(job.name, 'success', { durationMs });
+    crumb(job.name, 'job-success', { durationMs });
     process.exit(0);
   } else {
     const reason = result.signal
@@ -119,6 +129,7 @@ async function main() {
       : `exit ${exitCode}`;
     markFailure(job.name, reason, cadenceMs);
     logEvent(job.name, 'failure', { durationMs, exitCode, signal: result.signal });
+    crumb(job.name, 'job-failure', { durationMs, exitCode, signal: result.signal, reason });
     process.exit(exitCode || 1);
   }
 }

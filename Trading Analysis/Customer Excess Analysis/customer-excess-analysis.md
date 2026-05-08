@@ -1,8 +1,138 @@
-# Customer Excess Analysis Workflow
+# Customer Excess Loading + Analysis Workflow
 
 > **Folder rename, 2026-05-04**: this workflow was previously known as "Market Offer Analysis." It was scoped down to **Customer Excess** (and Customer Lead Time Buy) only because broker/franchise offers are handled by a lighter data-capture path inside the same universal pipeline. See section "Pipeline architecture (V1 spine)" below.
 
-**Purpose:** Take a Customer Excess offer that's already persisted in OT and produce actionable output: enriched, scored, and shaped to match the inferred intent (Reactive / Spec Buy / Proactive Customer Offer).
+> **Architecture migration, 2026-05-07**: this workflow is migrating from a static cron-driven pipeline (`shared/offer-poller.js` + 4 cron entries) to the **agent pattern** defined in [`email-workflow-architecture.md`](../../email-workflow-architecture.md). The "Agent operating instructions" section below is the new contract; the pipeline-architecture / V1-spine sections describe the static path still in service until the migration is verified.
+
+**Purpose:** Take customer-excess emails forwarded to `excess@orangetsunami.com`, load each as a `chuboe_offer` in OT, and (downstream) produce actionable analysis output: enriched, scored, and shaped to match the inferred intent (Reactive / Spec Buy / Proactive Customer Offer).
+
+---
+
+## Agent operating instructions (NEW — read first)
+
+### Your goal
+
+Your job is to **load each offer to OT under the correct customer BP**. The decision tree below is the recommended order — it codifies the patterns we've seen most often. But the tree may have gaps; emails arrive in shapes nobody has documented yet.
+
+When the tree's prescribed steps don't fit:
+- **Use judgment.** If a customer is clearly named in the subject, body prose, attachment filename, or forward-chain text — even when not in any `From:` line — try to resolve them by name before escalating.
+- **Don't let an incomplete tree override evidence in the email.** Steps below are descriptive of common cases, not exhaustive.
+- **Escalation is a last resort.** `needs_partner` / `needs_review` exist for genuine ambiguity (the email has zero usable signal), not for "the tree didn't have a step for what I'm seeing."
+
+### Before any escalation, sanity-check yourself
+
+Before you call `route <uid> needs_partner` or `route <uid> needs_review`, re-read the email one more time and ask:
+- Is the customer actually named in the **subject**? (e.g., `FW: Excess <Company>`, `<Company> CONSIGNMENT`, `<Company> RFQ`)
+- Is the customer named in the **body prose** outside the `From:` lines? (e.g., `<Company> is the customer`, `Customer: <Company>`, `for <Company>`, `<Company>'s excess`)
+- Is the customer named in an **attachment filename**? (e.g., `Celestica_Excess_2026-04.xlsx`)
+- Did I dismiss **plain-prose line listings** (qty / mfr / mpn on consecutive lines) because they weren't a table?
+
+If yes to any of these, try the obvious thing — call `resolvePartner({ companyName: '<name>', partnerType: 'customer' })` or extract the prose lines — *before* escalating. The escalation actions exist for cases where you've genuinely exhausted the email; they're not the fallback for "I worked the tree and it didn't match."
+
+### CLI primitives
+
+This is the contract the `/schedule` routine reads each tick. Per [`email-workflow-architecture.md`](../../email-workflow-architecture.md), the agent uses three CLI primitives:
+
+```
+node shared/email-workflow-poller.js list                     --workflow excess
+node shared/email-workflow-poller.js read <uid>               --workflow excess
+node shared/email-workflow-poller.js download-attachments <uid> --workflow excess
+node shared/email-workflow-poller.js route <uid> <action> --workflow excess --payload <json|file>
+```
+
+### Per-message decision tree
+
+For each unseen message, the agent decides **one** routing action. Order of checks:
+
+1. **Junk / automation noise** → `not_offer`
+   - Subject matches `Upload MO_*` (sender confirmation, no offer data)
+   - Subject matches OOO / auto-reply / undeliverable / bounce / read-receipt / newsletter
+   - Body contains SMTP bounce headers (`Reporting-MTA:`, `Final-Recipient:`, `Diagnostic-Code:`)
+   - Effectively empty body AND no parseable attachment
+
+2. **Partner resolution** — try in order, first match wins:
+   - **Subject hint** (highest priority): `MO_<NNNNN>`, `Search Key <NNNNN>`, `Search key#<NNNNN>`, `[#<NNNNN>]` → use that BP search key directly
+   - **Body hint:** `BP: <NNNNN>`, `Partner: <NNNNN>`, `BPartner ID: <NNNNN>`
+   - **Forward chain:** parse all `From:` lines in the body; prefer the deepest sender whose email is NOT `@astutegroup.com`. Resolve via `partner-lookup.js` 4-tier resolver (exact email → email domain → domain hint → name match). All tiers exclude `IsEmployee='Y'` BPs.
+   - **External direct send:** outer From is not `@astutegroup.com` → resolve via partner-lookup directly.
+   - **Company-name fallback (NEW 2026-05-08):** when none of the above resolve (typically because the email is an *internal* forward where Astute employees discuss a customer's parts), scan the subject and body for a clearly-named customer and call `resolvePartner({ companyName: '<name>', partnerType: 'customer' })` — the resolver's name-match tier handles fuzzy lookup. Recognise patterns like:
+       - **Subject patterns:** `FW: Excess <Company>`, `FW: <Company> Excess`, `<Company> CONSIGNMENT`, `<Company> RFQ`, `<Company> Inventory Available`. Strip noise like `FW:`, `RE:`, location modifiers (`Lohja`, `MX`, `EU`, `Asia`), date stamps.
+       - **Body patterns:** explicit assertions like `<Company> is the customer`, `Customer: <Company>`, `customer name: <Company>`, `<Company>'s excess`, `<Company> wants to sell`, `Hi from <Company>`.
+       - When in doubt, try multiple candidate names — the resolver returns `matched: false` if none hit, in which case fall through to `needs_partner`.
+   - If still no match → `needs_partner` with payload `{ subject, outerFrom, hints: "<what was tried, including company-name candidates attempted>" }`
+
+3. **Line extraction** — try in order:
+   - Run `download-attachments` if `has_attachment` is true. Prefer xlsx > csv > pdf attachments.
+   - For xlsx/csv: walk first ~10 header rows looking for an MPN column. Header synonyms: mpn / part number / mfr part / aml / p/n. Other columns: qty, price, mfr, dateCode, description, cpc.
+   - For pdf: use the standard Read tool; extract tabular content if confidence is high enough.
+   - If no attachment yields lines, try the HTML body (Outlook inline tables) and plaintext body (tab/pipe-delimited).
+   - **Plain-prose lists** count too — bodies like `50.000 pcs` / `Broadcom` / `HSMQ-C191` (qty, mfr, mpn on consecutive lines) are valid offers. Use judgment to group consecutive lines into per-part records.
+   - **Filter junk MPNs:** reject lines whose "MPN" cell is a URL fragment (`<HTTPS://...>`, `^WWW.`, anchor-tag fragments). These are footer/signature noise, not real parts.
+   - If 0 valid lines → `needs_review` with payload `{ reason: "no parseable lines", subject, outerFrom, details: "<attachment names + body shape>" }`. **Note:** an email with a clear customer-name subject but empty body (signature/disclaimer only) is still `needs_review` — partner resolution alone doesn't make it loadable. Don't conflate "no partner" with "no lines."
+
+4. **Offer type determination:**
+   - Default for `excess@` = **Customer Excess** (`1000000`)
+   - Body hint `Type: Broker` / `Type: Customer Excess` / `Type: Franchise Offers` / `Type: Customer Lead Time Buy` overrides
+   - **Vendor-only flip:** if resolved partner has `iscustomer='N'` AND `isvendor='Y'`, flip Customer Excess → **Broker Stock Offer** (`1000001`). Catches broker liquidation lists landing in `excess@`.
+
+5. **Cross-forward dedup check** (preempts the write):
+   ```sql
+   SELECT value, chuboe_offer_id FROM adempiere.chuboe_offer
+   WHERE isactive='Y'
+     AND c_bpartner_id = <resolved BP>
+     AND chuboe_offer_type_id = <resolved type>
+     AND created >= NOW() - INTERVAL '6 hours'
+     AND (count active lines on this offer) = <extracted line count>
+     AND EXISTS (line with chuboe_mpn = <sorted first MPN>)
+     AND EXISTS (line with chuboe_mpn = <sorted last MPN>)
+   LIMIT 1
+   ```
+   If matched → `dup_skip` with payload `{ existingSearchKey: <prior offer search key> }`. Don't write a duplicate offer.
+
+6. **Write to OT** → `load_offer` with payload `{ bpartnerId, offerType, lines }`. The handler calls `writeOffer()` which writes the header, lines, and `chuboe_offer_line_mpn` AVL sub-rows. Description auto-generated unless provided.
+
+### Routing actions (full payload reference)
+
+| Action | Required payload | Folder | Side effect |
+|---|---|---|---|
+| `load_offer` | `{ bpartnerId, offerType, lines[] }` (also `description, sourceUid`) | `Processed` | `writeOffer()` to OT + `loaded` breadcrumb |
+| `needs_partner` | `{ subject, outerFrom }` (also `hints`) | `NeedsPartner` | Email Jake with `PARTNER:` reply prompt + `needs-partner` breadcrumb |
+| `needs_review` | `{ reason, subject, outerFrom }` (also `details`) | `NeedsReview` | Email Jake diagnostics + `needs-review` breadcrumb |
+| `not_offer` | `{ reason }` | `NotOffer` | Silent move + `not-offer` breadcrumb |
+| `dup_skip` | `{ existingSearchKey }` | `Processed` | Silent move + `dup-skipped` breadcrumb |
+
+### Schedule
+
+The expected pattern is a **`/schedule` routine** that runs every 30 minutes. Recommended prompt for the routine:
+
+```
+Process all unseen messages in the excess@orangetsunami.com inbox.
+
+1. Read Trading Analysis/Customer Excess Analysis/customer-excess-analysis.md
+   section "Agent operating instructions" before starting (the .md is the
+   source of truth — do not work from prior-session memory).
+2. Run `node shared/email-workflow-poller.js list --workflow excess` to
+   see unseen envelopes.
+3. For each envelope, follow the per-message decision tree in section
+   "Per-message decision tree" and dispatch via `route` with the right
+   action + payload.
+4. If any single message hits a transient error (writeOffer 5xx, partner
+   lookup throws), log it and continue with the next message. Do not abort
+   the batch. Email Jake a one-line summary at the end if any errored.
+5. If the inbox has 0 unseen messages, exit silently.
+```
+
+On-demand invocation (operator asks "process excess inbox") works identically — the agent should follow the same per-message decision tree.
+
+### Key shared modules (tools the agent calls in-session)
+
+- `shared/partner-lookup.js` — `resolvePartner({email, companyName, partnerType})` for tier-1.5 + domain matching. All tiers exclude IsEmployee='Y'.
+- `shared/data-model.md` — schema reference for `chuboe_offer` chain. Read before constructing the `lines[]` payload.
+- `shared/api-writeback.md` — REST payload structure for `writeOffer` (the action handler does this; the agent supplies the line shape).
+
+---
+
+## Pipeline architecture (V1 spine — STATIC, being replaced by agent pattern)
 
 ---
 

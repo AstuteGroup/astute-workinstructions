@@ -344,6 +344,100 @@ Broker :Poplar : MICRON, MT47H128M16RT-25E:C 1000 pcs. 25+ 14usd cut tape, copy 
 
 ---
 
+## Direct API Load — Bulk Summaries (Type 2)
+
+**For Type 2 bulk-summary emails, write VQs directly to OT via the iDempiere REST API. This is the canonical path; the CSV mass-upload below is legacy.**
+
+The dual-phase Extractor + Verifier still applies — but their job is now to produce a structured JSON file, not a CSV. The JSON is then handed to a CLI that resolves vendors / matches MPNs against the RFQ's accepted alternates / writes VQs / reports per-line coverage.
+
+### Workflow
+
+1. **Identify the RFQ search key + buyer.** Buyer = AD_User_ID of the Astute employee who DID the sourcing (e.g. Elaine Liang = `1006326`), NOT the forwarder.
+2. **Run Phase 1 + Phase 2 extraction** (see Dual-Phase section above) — output is a JSON array of quote objects, one per line item.
+3. **Dry run** to verify vendor resolution, MPN matching, and skip categorization:
+   ```bash
+   node "Trading Analysis/RFQ Sourcing/vq_loading/load-bulk-summary-cli.js" \
+     quotes.json --rfq 1132932 --buyer 1006326 --dry-run
+   ```
+4. **Review the report.** Anything `VENDOR_NOT_FOUND` or `NO_MPN_MATCH` is a vendor/data issue to fix before commit. `[fuzzy]` flags on writes mean the MPN matched via whitespace/punctuation normalization — verify those are intentional.
+5. **Commit** with the same command + `--commit` (mutually exclusive with `--dry-run`):
+   ```bash
+   node "Trading Analysis/RFQ Sourcing/vq_loading/load-bulk-summary-cli.js" \
+     quotes.json --rfq 1132932 --buyer 1006326 --commit
+   ```
+   Tracker JSON is written to `vq_loading/sessions/YYYY-MM-DDTHH-MM-SS-bulk-load-<RFQ>.json`.
+
+### Quotes JSON format
+
+```json
+[
+  {
+    "vendorName": "Howeher Co.，Limited",
+    "mpn": "DH82029PCH S LKM8",
+    "mfr": "Intel",
+    "qty": 330,
+    "cost": 62.21,
+    "leadTime": "3-4 days",
+    "dateCode": "18+",
+    "coo": "Malaysia",
+    "packaging": null,
+    "rohs": null,
+    "vendorNotes": "reconfirm COO after PO",
+    "vendorQuotedMpn": null
+  }
+]
+```
+
+| Field | Required | Notes |
+|-------|----------|-------|
+| `vendorName` OR `vendorSearchKey` | Yes | At least one. Search key is faster + more precise; name fallback handles APAC vendors with Chinese punctuation in DB. |
+| `mpn` | Yes | Must match an accepted MPN on a line in the RFQ (incl. AVL alternates from `chuboe_rfq_line_mpn`). Whitespace/punctuation differences are tolerated via fuzzy match. |
+| `mfr` | Yes | MFR resolution happens server-side via bean callout from text. |
+| `qty`, `cost` | Yes | Quoted qty + unit cost. |
+| `leadTime` | No | Defaults to `'stock'` if blank. |
+| `dateCode` | No | Brokers should provide this; no auto-default for non-franchise vendors. |
+| `coo` | No | Country name (e.g. "Malaysia", "China", "Taiwan"). Unknown → PENDING (1000001). Mapping in `shared/load-bulk-summary.js::COO_MAP`. |
+| `packaging` | No | "REEL", "TRAY", etc. or null. |
+| `rohs` | No | "Y" / "N" / null. |
+| `vendorNotes` | No | Free text → `Chuboe_Note_User` (buyer-internal). |
+| `vendorQuotedMpn` | No | If vendor wrote a different MPN than `mpn`, populates "Quoted MPN: X" prefix in notes. |
+
+### Skip categorization
+
+The CLI categorizes failures into three buckets — none are silent:
+
+| Reason | What happened | Action |
+|--------|---------------|--------|
+| `NO_MPN_MATCH` | Quoted MPN doesn't match any accepted MPN on any RFQ line | Verify the MPN against the RFQ; may be a vendor typo or a missing AVL alt |
+| `VENDOR_NOT_FOUND` | BP not in iDempiere by search key or name | Add the vendor to OT, then re-run |
+| `VENDOR_SUSPENDED` | BP exists but vendor type = 1000004 (Suspended) | Skip this quote; do not buy from this vendor |
+| `WRITE_FAILED` / `WRITE_ERROR` | API returned a flag or threw | Inspect the detail; usually MFR resolution or COO mapping |
+
+### Per-line coverage
+
+Output prints every RFQ line with a ✓ marker on hit, the line's accepted MPNs, and a `Gaps:` summary at the end. Use the gap list as the next-action signal — those lines need a different sourcing strategy (different broker pool, franchise check, etc.).
+
+### Why this replaces CSV for Type 2
+
+- **No mass-upload step in OT** — VQs land in `chuboe_vq_line` immediately
+- **Same writer infrastructure** as franchise enrichment, LAM EPG, TI Store loads (`shared/vq-writer.js::writeVQFromAPI`)
+- **AVL-aware MPN matching** uses `chuboe_rfq_line_mpn` directly; vendor's quoted MPN goes in notes, RFQ's canonical MPN goes in the VQ field
+- **Pre-flight Suspended check** prevents writes against vendors that can't be PO'd
+- **Per-line gap report** surfaces uncovered lines for the next sourcing pass
+
+### What this does NOT replace
+
+- Type 1 single-vendor quotes still flow through `node vq-parser/src/index.js fetch` (template engine + regex extractor). Migrating Type 1 to direct-API write is the next step on the roadmap.
+- Manual extraction in Claude sessions is still required to produce the JSON. The cron-driven LLM extractor is on the roadmap (`sourcing-roadmap.md`).
+
+### Reference implementation
+
+- Library: `shared/load-bulk-summary.js`
+- CLI: `Trading Analysis/RFQ Sourcing/vq_loading/load-bulk-summary-cli.js`
+- Validated: RFQ 1132932 (Mercury Systems APAC bulk summary, 2026-04-27, 73 VQs written, 0 failures)
+
+---
+
 ## End-to-End Workflow (REQUIRED STEPS)
 
 **Every step must be completed in order. Do not skip steps.**

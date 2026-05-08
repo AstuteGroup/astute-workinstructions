@@ -20,6 +20,8 @@ shared/data/mpn-prefixes-candidates.json
 shared/data/negative-cache.sqlite
 shared/data/negative-cache.sqlite-*
 shared/data/auth-failure-state.json
+shared/data/api-throttle-state.json
+shared/data/hts-cache.json
 shared/data/linecards/*.json
 !shared/data/linecards/.gitkeep
 

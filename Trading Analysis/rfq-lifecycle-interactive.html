@@ -1,0 +1,479 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>RFQ Lifecycle — Interactive Workflow</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background:#0f1419; color:#e1e8ed; padding:20px; min-height:100vh; }
+  h1 { text-align:center; font-size:1.5em; color:#fff; }
+  .subtitle { text-align:center; font-size:0.8em; color:#8899a6; margin-bottom:15px; }
+  .controls { display:flex; justify-content:center; gap:10px; margin-bottom:20px; }
+  .btn { padding:8px 18px; background:rgba(29,161,242,0.2); border:1px solid rgba(29,161,242,0.4); color:#1da1f2; border-radius:6px; cursor:pointer; font-size:0.8em; font-weight:600; transition:all 0.15s; }
+  .btn:hover { background:rgba(29,161,242,0.3); }
+  .btn.playing { background:rgba(23,191,99,0.25); border-color:rgba(23,191,99,0.5); color:#17bf63; }
+  .btn-reset { background:rgba(120,120,120,0.15); border-color:rgba(255,255,255,0.15); color:#8899a6; }
+
+  .canvas { max-width:1400px; margin:0 auto; display:grid; grid-template-columns: 1fr 360px; gap:20px; }
+  @media (max-width: 1100px) { .canvas { grid-template-columns:1fr; } }
+
+  .flow { background:rgba(255,255,255,0.02); border:1px solid rgba(255,255,255,0.08); border-radius:12px; padding:20px; position:relative; overflow-x:auto; }
+
+  .stage-row { display:flex; align-items:center; gap:0; margin-bottom:30px; flex-wrap:nowrap; min-width:max-content; }
+  .stage { min-width:150px; padding:14px 12px; border-radius:8px; border:1px solid; cursor:pointer; transition:all 0.3s; position:relative; background:rgba(255,255,255,0.03); border-color:rgba(255,255,255,0.1); }
+  .stage:hover { transform:translateY(-2px); }
+  .stage.active { outline:2px solid #fff; outline-offset:3px; }
+  .stage.lit { animation:pulse 1.2s ease-out; }
+  .stage.lit-stay { box-shadow: 0 0 20px currentColor; filter: brightness(1.2); }
+  @keyframes pulse {
+    0% { transform:scale(1); box-shadow: 0 0 0 currentColor; }
+    50% { transform:scale(1.08); box-shadow: 0 0 30px currentColor; }
+    100% { transform:scale(1); }
+  }
+  .stage .num { position:absolute; top:-10px; left:-10px; width:24px; height:24px; border-radius:50%; background:#0f1419; border:2px solid currentColor; display:flex; align-items:center; justify-content:center; font-size:0.7em; font-weight:700; }
+  .stage h3 { font-size:0.82em; margin-bottom:4px; }
+  .stage .st-desc { font-size:0.65em; color:#8899a6; line-height:1.3; }
+  .stage .st-writer { font-size:0.6em; color:#ffad1f; margin-top:4px; font-family:monospace; }
+
+  .arrow { font-size:1.4em; color:#556; padding:0 8px; flex-shrink:0; transition:color 0.3s; }
+  .arrow.lit { color:#17bf63; }
+
+  .s-inbound { color:#1da1f2; border-color:rgba(29,161,242,0.4); background:rgba(29,161,242,0.08); }
+  .s-resolve { color:#5ba0d0; border-color:rgba(91,160,208,0.4); background:rgba(91,160,208,0.08); }
+  .s-screen { color:#f45d22; border-color:rgba(244,93,34,0.4); background:rgba(244,93,34,0.08); }
+  .s-source { color:#f45d22; border-color:rgba(244,93,34,0.4); background:rgba(244,93,34,0.08); }
+  .s-capture { color:#ffad1f; border-color:rgba(255,173,31,0.4); background:rgba(255,173,31,0.08); }
+  .s-analyze { color:#17bf63; border-color:rgba(23,191,99,0.4); background:rgba(23,191,99,0.08); }
+  .s-quote { color:#17bf63; border-color:rgba(23,191,99,0.4); background:rgba(23,191,99,0.08); }
+  .s-cq { color:#9966ff; border-color:rgba(153,102,255,0.4); background:rgba(153,102,255,0.08); }
+  .s-so { color:#9966ff; border-color:rgba(153,102,255,0.4); background:rgba(153,102,255,0.08); }
+  .s-branch { color:#8899a6; border-color:rgba(136,153,166,0.3); background:rgba(136,153,166,0.05); }
+
+  .branch-row { margin-left:40px; padding-left:20px; border-left:2px dashed rgba(255,255,255,0.1); margin-bottom:20px; }
+  .branch-label { font-size:0.65em; color:#8899a6; text-transform:uppercase; letter-spacing:1.2px; margin-bottom:8px; font-weight:600; }
+  .branch-stages { display:flex; gap:10px; flex-wrap:wrap; }
+  .branch-stages .stage { min-width:130px; padding:10px; }
+  .branch-stages .stage h3 { font-size:0.75em; }
+  .branch-stages .stage .st-desc { font-size:0.6em; }
+
+  .section-label { font-size:0.7em; font-weight:700; letter-spacing:1.5px; text-transform:uppercase; color:#8899a6; margin: 15px 0 12px; padding-left:4px; }
+
+  /* Detail panel */
+  .panel { background:rgba(255,255,255,0.02); border:1px solid rgba(255,255,255,0.08); border-radius:12px; padding:20px; height:fit-content; position:sticky; top:20px; }
+  .panel h2 { font-size:1em; margin-bottom:4px; color:#fff; }
+  .panel .ph-stage { font-size:0.7em; color:#8899a6; text-transform:uppercase; letter-spacing:1.5px; margin-bottom:12px; }
+  .panel .ph-badge { display:inline-block; padding:2px 8px; border-radius:4px; font-size:0.7em; font-weight:600; margin-left:6px; }
+  .panel h4 { font-size:0.7em; text-transform:uppercase; letter-spacing:1.2px; color:#8899a6; margin:14px 0 6px; }
+  .panel ul { list-style:none; padding:0; }
+  .panel li { font-size:0.78em; padding:4px 0; color:#c4cbd4; line-height:1.4; }
+  .panel li::before { content:'• '; color:#556; }
+  .panel code { font-family: ui-monospace, Menlo, monospace; font-size:0.88em; color:#ffad1f; background:rgba(255,173,31,0.08); padding:1px 5px; border-radius:3px; }
+  .panel .ph-desc { font-size:0.8em; line-height:1.5; color:#c4cbd4; margin-bottom:10px; }
+  .panel .ph-outcome { background:rgba(23,191,99,0.08); border-left:3px solid #17bf63; padding:8px 10px; font-size:0.78em; margin-top:12px; border-radius:0 4px 4px 0; }
+  .panel .empty { font-size:0.8em; color:#556; text-align:center; padding:40px 10px; }
+
+  .progress-bar { height:4px; background:rgba(255,255,255,0.05); border-radius:2px; margin-bottom:15px; overflow:hidden; }
+  .progress-fill { height:100%; background:linear-gradient(90deg, #1da1f2, #17bf63); width:0%; transition:width 0.4s ease; }
+
+  .legend { display:flex; justify-content:center; gap:14px; margin-bottom:12px; flex-wrap:wrap; font-size:0.7em; color:#8899a6; }
+  .legend-item { display:flex; align-items:center; gap:5px; }
+  .legend-dot { width:10px; height:10px; border-radius:3px; }
+
+  .flow-title { font-size:0.75em; color:#8899a6; text-transform:uppercase; letter-spacing:1.5px; margin-bottom:10px; font-weight:700; }
+</style>
+</head>
+<body>
+
+<h1>RFQ Lifecycle — Interactive Workflow</h1>
+<p class="subtitle">Click any stage for details · Press Play to animate · Side branches = parallel paths</p>
+
+<div class="legend">
+  <div class="legend-item"><div class="legend-dot" style="background:#1da1f2"></div> Inbound</div>
+  <div class="legend-item"><div class="legend-dot" style="background:#f45d22"></div> Source</div>
+  <div class="legend-item"><div class="legend-dot" style="background:#ffad1f"></div> Capture (VQ)</div>
+  <div class="legend-item"><div class="legend-dot" style="background:#17bf63"></div> Analyze / Quote</div>
+  <div class="legend-item"><div class="legend-dot" style="background:#9966ff"></div> Sale</div>
+  <div class="legend-item"><div class="legend-dot" style="background:#8899a6"></div> Parallel branch</div>
+</div>
+
+<div class="controls">
+  <button class="btn" id="playBtn" onclick="playFlow()">▶ Play animation</button>
+  <button class="btn btn-reset" onclick="resetFlow()">Reset</button>
+</div>
+
+<div class="progress-bar"><div class="progress-fill" id="progress"></div></div>
+
+<div class="canvas">
+
+<div class="flow">
+
+  <div class="flow-title">▶ Main path: RFQ → Sales Order</div>
+  <div class="stage-row" id="main-row">
+    <div class="stage s-inbound" data-id="load"><div class="num">1</div><h3>RFQ Loaded</h3><div class="st-desc">Email → chuboe_rfq</div><div class="st-writer">rfq-writer</div></div>
+    <span class="arrow">→</span>
+    <div class="stage s-resolve" data-id="resolve"><div class="num">2</div><h3>Resolve</h3><div class="st-desc">Partner + MFR + MPN</div><div class="st-writer">partner-lookup · mfr-resolver</div></div>
+    <span class="arrow">→</span>
+    <div class="stage s-screen" data-id="screen"><div class="num">3</div><h3>Franchise Screen</h3><div class="st-desc">FindChips + 7 APIs</div><div class="st-writer">franchise-api</div></div>
+    <span class="arrow">→</span>
+    <div class="stage s-source" data-id="enrich"><div class="num">4</div><h3>API Enrichment</h3><div class="st-desc">Capture confirmed prices as VQs</div><div class="st-writer">vq-writer</div></div>
+    <span class="arrow">→</span>
+    <div class="stage s-source" data-id="broker"><div class="num">5</div><h3>Broker Sourcing</h3><div class="st-desc">NetComponents RFQ email</div><div class="st-writer">rfq-sourcing</div></div>
+    <span class="arrow">→</span>
+    <div class="stage s-capture" data-id="vqload"><div class="num">6</div><h3>VQ Loading</h3><div class="st-desc">Supplier quote emails</div><div class="st-writer">vq-writer</div></div>
+    <span class="arrow">→</span>
+    <div class="stage s-analyze" data-id="analyze"><div class="num">7</div><h3>Analyze</h3><div class="st-desc">Vortex · Offer Matching</div><div class="st-writer">market-data</div></div>
+    <span class="arrow">→</span>
+    <div class="stage s-quote" data-id="quote"><div class="num">8</div><h3>Quote</h3><div class="st-desc">Quick Quote or Resale</div><div class="st-writer">pricing logic</div></div>
+    <span class="arrow">→</span>
+    <div class="stage s-cq" data-id="cq"><div class="num">9</div><h3>CQ Written</h3><div class="st-desc">chuboe_cq_line</div><div class="st-writer">cq-writer</div></div>
+    <span class="arrow">→</span>
+    <div class="stage s-so" data-id="so"><div class="num">10</div><h3>Sales Order</h3><div class="st-desc">OT converts CQ → SO</div><div class="st-writer">iDempiere</div></div>
+  </div>
+
+  <div class="section-label">Parallel / Branching Workflows</div>
+
+  <div class="branch-row">
+    <div class="branch-label">⤷ Branch A — At Load time (any RFQ source)</div>
+    <div class="branch-stages">
+      <div class="stage s-inbound s-branch" data-id="rfq-ai"><h3>RFQ Loading (AI)</h3><div class="st-desc">Customer PDF/email extraction</div></div>
+      <div class="stage s-inbound s-branch" data-id="stock-rfq"><h3>Stock RFQ Loading</h3><div class="st-desc">Broker RFQ · always-process</div></div>
+      <div class="stage s-inbound s-branch" data-id="manual"><h3>Manual Entry</h3><div class="st-desc">Seller types into OT</div></div>
+    </div>
+  </div>
+
+  <div class="branch-row">
+    <div class="branch-label">⤷ Branch B — After Resolve (demand-side matching)</div>
+    <div class="branch-stages">
+      <div class="stage s-analyze s-branch" data-id="offer-match"><h3>Market Offer Matching</h3><div class="st-desc">New RFQ × existing offers</div></div>
+      <div class="stage s-analyze s-branch" data-id="bom-mon"><h3>BOM Monitoring</h3><div class="st-desc">Risk, commodity, excess matches</div></div>
+    </div>
+  </div>
+
+  <div class="branch-row">
+    <div class="branch-label">⤷ Branch C — Post-VQ backfill (async enrichment)</div>
+    <div class="branch-stages">
+      <div class="stage s-capture s-branch" data-id="hts"><h3>HTS / ECCN Backfill</h3><div class="st-desc">DigiKey + Mouser PATCH</div></div>
+      <div class="stage s-capture s-branch" data-id="mpn-match"><h3>MPN Clean / Match</h3><div class="st-desc">mpn-match tiers · MFR veto</div></div>
+    </div>
+  </div>
+
+  <div class="branch-row">
+    <div class="branch-label">⤷ Branch D — Supply-side feeds that populate the pool</div>
+    <div class="branch-stages">
+      <div class="stage s-capture s-branch" data-id="mkt-offer"><h3>Market Offer Loading</h3><div class="st-desc">Excess emails → offers</div></div>
+      <div class="stage s-capture s-branch" data-id="inv-clean"><h3>Inventory Cleanup</h3><div class="st-desc">Weekly Infor → OT offers (cron)</div></div>
+      <div class="stage s-capture s-branch" data-id="lam"><h3>LAM Kitting Reorder</h3><div class="st-desc">Weekly alerts (cron)</div></div>
+    </div>
+  </div>
+
+  <div class="branch-row">
+    <div class="branch-label">⤷ Branch E — Analysis lenses (read, not write)</div>
+    <div class="branch-stages">
+      <div class="stage s-analyze s-branch" data-id="vortex"><h3>Vortex Matches</h3><div class="st-desc">Inbox-driven · email output</div></div>
+      <div class="stage s-analyze s-branch" data-id="moa"><h3>Market Offer Analysis</h3><div class="st-desc">Enrich + score opportunities</div></div>
+      <div class="stage s-analyze s-branch" data-id="qq"><h3>Quick Quote</h3><div class="st-desc">Direct customer · margin/GP</div></div>
+      <div class="stage s-analyze s-branch" data-id="resale"><h3>Suggested Resale</h3><div class="st-desc">Broker-to-broker · ~20-30% franchise</div></div>
+      <div class="stage s-analyze s-branch" data-id="seller"><h3>Seller Activity</h3><div class="st-desc">VQ→CQ→SO funnel</div></div>
+      <div class="stage s-analyze s-branch" data-id="track"><h3>Order Tracking</h3><div class="st-desc">COV/SO/MPN/PO lookup</div></div>
+    </div>
+  </div>
+
+</div>
+
+<div class="panel" id="panel">
+  <div class="empty">Click any stage on the left to see details — what it does, which cogs it uses, what it writes, and where in the codebase to find it.</div>
+</div>
+
+</div>
+
+<script>
+const DETAILS = {
+  load: {
+    stage: 'Stage 1 · Inbound', badge: 'Active', badgeColor:'#1da1f2',
+    title: 'RFQ Loaded',
+    desc: 'An RFQ enters the system. Three entry paths feed the same table (chuboe_rfq): AI-extracted customer emails, Stock RFQ broker emails, or manual seller entry.',
+    inputs: ['Customer email + attachments (Stock RFQ Loading)', 'Customer PDF / complex email (RFQ Loading AI)', 'Seller manual entry in OT UI'],
+    cogs: ['email-fetcher', 'rfq-writer', 'partner-lookup', 'mfr-resolver'],
+    writes: ['chuboe_rfq', 'chuboe_rfq_line', 'chuboe_rfq_line_mpn'],
+    outcome: 'RFQ exists in OT with a search_key (Value) that the seller/analyst can reference. Load-first/enrich-later — never blocked on MFR or API.'
+  },
+  resolve: {
+    stage: 'Stage 2 · Resolve', badge: 'Shared', badgeColor:'#5ba0d0',
+    title: 'Partner + MFR + MPN Resolution',
+    desc: 'Inbound data arrives messy. Before anything downstream can use it, we canonicalize: email/domain → BP, MFR text → MFR ID, raw part string → clean MPN.',
+    inputs: ['Sender email / domain', 'MFR text as typed by customer', 'MPN string (may have annotations)'],
+    cogs: ['partner-lookup (4-tier: exact → domain → name → fuzzy)', 'mfr-resolver (5-tier: alias → cache → DB → fuzzy → passthrough)', 'mfr-equivalence (prenormalize → aliases → acquisitions)', 'mpn-match (exact + variant tiers, MIN_LEN=5)'],
+    writes: ['Updates mfr-cache · flags unresolved MFRs for aliases file'],
+    outcome: 'Every downstream workflow compares apples-to-apples: TI ≡ Texas Instruments, Linear → ADI (acquired), EM/ES/SCRN annotations stripped into notes.'
+  },
+  screen: {
+    stage: 'Stage 3 · Screen', badge: 'Active', badgeColor:'#f45d22',
+    title: 'Franchise Screening',
+    desc: 'Before spending broker effort, check if the part is openly available at franchise distributors. If it is, we are competing against retail pricing — often not worth the cycle.',
+    inputs: ['Clean MPN', 'Target quantity'],
+    cogs: ['franchise-api.js (searchAllDistributors)', 'FindChips scrape for availability signal'],
+    writes: ['No DB writes — screening is read-only'],
+    outcome: 'Lines flagged PROCEED (no franchise stock) or SKIP (readily available). Screening ≠ purchasing — same APIs used, different context.'
+  },
+  enrich: {
+    stage: 'Stage 4 · Enrich', badge: 'Unconditional', badgeColor:'#ffad1f',
+    title: 'RFQ API Enrichment',
+    desc: 'Run all 8 franchise APIs (DigiKey, Arrow, Rutronik, Future, Newark, TTI, Master, Mouser) on every RFQ line. Confirmed pricing is captured as a VQ — because an API quote IS a confirmed supplier price.',
+    inputs: ['RFQ lines (with resolved MPN + MFR)'],
+    cogs: ['franchise-api', 'vq-writer (two-pass exact → fuzzy)', 'mfr-equivalence (for MFR match flag)', 'api-result-writer'],
+    writes: ['chuboe_vq_line (one per franchise hit)', 'chuboe_pricing_api_result (audit trail)'],
+    outcome: 'The RFQ now has VQ coverage before a single broker email goes out. Low hit-rate itself is leverage — "no franchise stock" is a signal to push back on the customer.'
+  },
+  broker: {
+    stage: 'Stage 5 · Source', badge: 'Active', badgeColor:'#f45d22',
+    title: 'RFQ Sourcing (NetComponents)',
+    desc: 'For lines that franchise cannot cover, send the RFQ out to the broker network via NetComponents.',
+    inputs: ['RFQ lines flagged PROCEED'],
+    cogs: ['rfq-sourcing-netcomponents', 'notifier'],
+    writes: ['Outbound broker emails · logs replies expected back at VQ Loading'],
+    outcome: 'RFQ is live in the broker market. Suppliers reply over hours → days with quote emails that feed Stage 6.'
+  },
+  vqload: {
+    stage: 'Stage 6 · Capture', badge: 'Active', badgeColor:'#ffad1f',
+    title: 'VQ Loading',
+    desc: 'Supplier quote emails arrive. Two-agent validation (Extractor + Verifier) pulls line items, matches vendor by domain, and posts VQs via the REST API.',
+    inputs: ['Supplier quote emails (inbox polling)'],
+    cogs: ['email-fetcher', 'two-agent validator', 'partner-lookup', 'mfr-resolver', 'vq-writer'],
+    writes: ['chuboe_vq_line'],
+    outcome: 'Every legitimate supplier reply becomes a VQ. The RFQ now has a full VQ pool — franchise-confirmed + broker offers — for the seller to analyze.'
+  },
+  analyze: {
+    stage: 'Stage 7 · Analyze', badge: 'Active', badgeColor:'#17bf63',
+    title: 'Analyze / Match',
+    desc: 'Pull the RFQ into analytical lenses: matched existing offers, market intelligence, VQ history, broker sales history, targets, losing CQs.',
+    inputs: ['chuboe_rfq_line_mpn × chuboe_offer × chuboe_vq_line × sales history'],
+    cogs: ['market-data', 'mfr-equivalence', 'mpn-match'],
+    writes: ['Analysis outputs emailed (not persisted to disk — per feedback_outputs_emailed_not_persisted)'],
+    outcome: 'Seller sees the full picture: what is available, at what price, from whom, and what similar parts have sold for. Ready to price.'
+  },
+  quote: {
+    stage: 'Stage 8 · Quote', badge: 'Two models', badgeColor:'#17bf63',
+    title: 'Pricing — Quick Quote vs Suggested Resale',
+    desc: 'The pricing model depends on WHO the customer is. Do not conflate these two.',
+    inputs: ['VQ pool', 'Customer target', 'Sales history'],
+    cogs: ['Quick Quote SQL (quick-quote.md)', 'Suggested Resale (stock-rfq logic)'],
+    writes: ['Candidate prices attached to the quote · not yet in CQ table'],
+    outcome: 'Quick Quote (direct customer): 15% min margin, $250 min GP/line, 6-tier hierarchy. Suggested Resale (broker-to-broker): ~20-30% of franchise best price, older DC.'
+  },
+  cq: {
+    stage: 'Stage 9 · CQ', badge: 'REST API', badgeColor:'#9966ff',
+    title: 'Customer Quote Written',
+    desc: 'Seller confirms the price. CQ line(s) are POSTed to iDempiere via the REST API.',
+    inputs: ['Confirmed resale price · qty · cost'],
+    cogs: ['cq-writer (flat, no header)'],
+    writes: ['chuboe_cq_line'],
+    outcome: 'CQ is live in OT. Replicates to this DB. Visible in Seller Quoting Activity funnel.'
+  },
+  so: {
+    stage: 'Stage 10 · Sale', badge: 'iDempiere', badgeColor:'#9966ff',
+    title: 'Sales Order',
+    desc: 'Customer accepts the quote. OT converts the CQ into a Sales Order. Procurement fires PO against the winning VQ supplier.',
+    inputs: ['Customer acceptance'],
+    cogs: ['iDempiere SO workflow (not automated here)'],
+    writes: ['c_order · c_orderline · PO chain'],
+    outcome: 'Revenue booked. Line shows up in Order Tracking and Seller Activity reports.'
+  },
+
+  'rfq-ai': {
+    stage: 'Branch A · Load variant', badge: 'Active', badgeColor:'#1da1f2',
+    title: 'RFQ Loading (AI)',
+    desc: 'For complex customer RFQs (multi-sheet Excel, PDF attachments, inline HTML tables), AI extraction pulls line items. Load-first/enrich-later: raw RFQ is created before MFR resolution completes.',
+    cogs: ['email-fetcher', 'Claude/LLM extractor', 'rfq-writer'],
+    writes: ['chuboe_rfq + lines + line_mpn'],
+    outcome: '9,003-line Honeywell PPV loaded at ~20 lines/s. Fast loader: 10 workers, no blocking on MFR.'
+  },
+  'stock-rfq': {
+    stage: 'Branch A · Load variant', badge: 'Active', badgeColor:'#1da1f2',
+    title: 'Stock RFQ Loading',
+    desc: 'Broker-to-broker RFQs. Always processed (no junking) — broker RFQs are demand signals. Unknown senders default to BP 1008499.',
+    cogs: ['email-fetcher', 'partner-lookup', 'rfq-writer'],
+    writes: ['chuboe_rfq + Suggested Resale output'],
+    outcome: 'Entry into the market-intelligence lens, not the direct-customer quoting lens.'
+  },
+  manual: {
+    stage: 'Branch A · Load variant', badge: 'Active', badgeColor:'#1da1f2',
+    title: 'Manual Entry (OT UI)',
+    desc: 'Seller types the RFQ directly into OT. Bypasses automation but still produces the same chuboe_rfq row that downstream workflows consume.',
+    cogs: ['(human)'],
+    writes: ['chuboe_rfq (via OT UI)'],
+    outcome: 'All downstream branches work identically regardless of how the RFQ was loaded.'
+  },
+
+  'offer-match': {
+    stage: 'Branch B · Analyze', badge: 'Active', badgeColor:'#17bf63',
+    title: 'Market Offer Matching for RFQs',
+    desc: 'Match new RFQs against the pool of already-loaded excess offers. MFR equivalence and MPN-match tiers included. Reports in unique-MPN units.',
+    cogs: ['market-data', 'mfr-equivalence', 'mpn-match'],
+    writes: ['CSV opportunity report (emailed)'],
+    outcome: 'Sellers see which lines can be covered from existing excess inventory — usually the highest-margin wins.'
+  },
+  'bom-mon': {
+    stage: 'Branch B · Analyze', badge: 'Active', badgeColor:'#17bf63',
+    title: 'BOM Monitoring',
+    desc: 'Tracks BOM risk, commodity analysis, and excess matches for customer BOMs.',
+    cogs: ['market-data', 'BOM-specific queries'],
+    writes: ['BOM risk reports'],
+    outcome: 'Proactive insight into supply risk before the customer asks.'
+  },
+
+  hts: {
+    stage: 'Branch C · Backfill', badge: 'Active', badgeColor:'#ffad1f',
+    title: 'HTS / ECCN Backfill',
+    desc: 'RFQ-scoped backfill of HTS and ECCN codes onto chuboe_vq_line via DigiKey and Mouser APIs. Runs after VQs are captured — idempotent PATCH.',
+    cogs: ['franchise-api (DigiKey + Mouser)', 'record-updater (patchBatch)'],
+    writes: ['PATCH chuboe_vq_line'],
+    outcome: 'Export compliance fields populated without blocking the main flow.'
+  },
+  'mpn-match': {
+    stage: 'Branch C · Backfill', badge: 'Shared', badgeColor:'#ffad1f',
+    title: 'MPN Clean / Match',
+    desc: 'Standardized MPN matching used by every parser. Exact + variant tiers with MIN_LEN=5 and optional MFR veto. Returns found=false on miss — never falls back to products[0].',
+    cogs: ['mpn-match.js'],
+    writes: ['N/A — pure matching utility'],
+    outcome: 'Fixes the pre-2026-04-14 bug where all 10 parsers silently surfaced "you might also like" recommendations as if they were the searched part.'
+  },
+
+  'mkt-offer': {
+    stage: 'Branch D · Supply feed', badge: 'Active', badgeColor:'#ffad1f',
+    title: 'Market Offer Loading',
+    desc: 'Excess inventory emails from brokers/customers → chuboe_offer. Same email pipeline pattern as VQ/RFQ but populates the supply side of the pool.',
+    cogs: ['email-fetcher', 'offer-writeback', 'partner-lookup', 'mfr-resolver'],
+    writes: ['chuboe_offer + line + line_mpn'],
+    outcome: 'Growing pool of excess inventory available for matching against RFQs (Branch B).'
+  },
+  'inv-clean': {
+    stage: 'Branch D · Supply feed', badge: 'Cron Mon 6am', badgeColor:'#1da1f2',
+    title: 'Inventory Cleanup (weekly)',
+    desc: 'Weekly Infor AST Item Lots Report → deactivate prior-week offers, post current inventory as OT offers, emit Netcomponents portal CSV.',
+    cogs: ['offer-writeback', 'csv-utils', 'notifier'],
+    writes: ['11 warehouse-group chuboe_offer records'],
+    outcome: 'OT reflects current inventory without manual intervention. Portal feeds stay fresh.'
+  },
+  lam: {
+    stage: 'Branch D · Supply feed', badge: 'Cron weekly', badgeColor:'#1da1f2',
+    title: 'LAM Kitting Reorder',
+    desc: 'Weekly reorder alerts + franchise-only sourcing for LAM kitting warehouses. LAM buys franchise-only — "no API coverage" = manual franchise sourcing, never broker.',
+    cogs: ['market-data', 'franchise-api', 'notifier'],
+    writes: ['Alert emails with reorder suggestions'],
+    outcome: 'LAM procurement cycle stays ahead of stock-outs.'
+  },
+
+  vortex: {
+    stage: 'Branch E · Analysis lens', badge: 'Inbox-driven', badgeColor:'#17bf63',
+    title: 'Vortex Matches',
+    desc: 'Forward a customer email to vortex@orangetsunami.com → poller picks it up → analysis runs → email comes back with VQ/offer matches under customer targets. No file output, no disk persistence.',
+    cogs: ['vortex-poller', 'market-data', 'mfr-equivalence', 'notifier'],
+    writes: ['Reply email only'],
+    outcome: 'Zero-friction surface for sellers: just forward the email.'
+  },
+  moa: {
+    stage: 'Branch E · Analysis lens', badge: 'Active', badgeColor:'#17bf63',
+    title: 'Market Offer Analysis',
+    desc: 'Load excess offers, enrich with franchise API intelligence on EVERY line (no skip-if-predicted-zero), score by intent: reactive RFQ match, spec buy, or consignment.',
+    cogs: ['franchise-api', 'market-data', 'mfr-equivalence'],
+    writes: ['Excel/CSV analysis emailed'],
+    outcome: 'Buyer gets a ranked opportunity list, not a raw dump.'
+  },
+  qq: {
+    stage: 'Branch E · Pricing lens', badge: 'Direct customer', badgeColor:'#17bf63',
+    title: 'Quick Quote',
+    desc: 'CPC-level baseline quotes from recent VQs (0-30 days). 6-tier suggested-resale hierarchy: same-cust PPV → same-cust shortage → same-cust losing CQ → other-cust → target → 30% fallback.',
+    cogs: ['quick-quote SQL', 'csv-utils'],
+    writes: ['CSV for seller review (not CQs directly)'],
+    outcome: 'Seller has a defensible starting price per line. 15% min margin, $250 min GP/line.'
+  },
+  resale: {
+    stage: 'Branch E · Pricing lens', badge: 'Broker-to-broker', badgeColor:'#17bf63',
+    title: 'Suggested Resale',
+    desc: 'For Stock RFQ (broker-to-broker), price ≈ 20-30% of franchise best. <$1→20%, $1-10→25%, $10+→30%. Broker sales can override.',
+    cogs: ['franchise-api', 'market-data'],
+    writes: ['Suggested price attached to Stock RFQ output'],
+    outcome: 'Do not conflate with Quick Quote — buyer is a broker, not an OEM. Completely different pricing model.'
+  },
+  seller: {
+    stage: 'Branch E · Reporting', badge: 'Active', badgeColor:'#17bf63',
+    title: 'Seller Quoting Activity',
+    desc: 'VQ→CQ→SO funnel analysis by seller. Snapshot + 6-month trend.',
+    cogs: ['market-data'],
+    writes: ['Report emailed/exported'],
+    outcome: 'Management view of pipeline conversion by individual.'
+  },
+  track: {
+    stage: 'Branch E · Reporting', badge: 'Active', badgeColor:'#17bf63',
+    title: 'Order / Shipment Tracking',
+    desc: 'Look up tracking by COV, SO, MPN, customer PO, or salesperson.',
+    cogs: ['direct DB queries (saved-queries/order-shipment-tracking.md)'],
+    writes: ['Query result'],
+    outcome: 'Ad-hoc operational lookups without touching OT UI.'
+  }
+};
+
+const MAIN_FLOW = ['load','resolve','screen','enrich','broker','vqload','analyze','quote','cq','so'];
+
+function showDetail(id) {
+  const d = DETAILS[id];
+  if (!d) return;
+  document.querySelectorAll('.stage').forEach(s => s.classList.remove('active'));
+  const el = document.querySelector(`.stage[data-id="${id}"]`);
+  if (el) el.classList.add('active');
+
+  const panel = document.getElementById('panel');
+  let html = `<h2>${d.title}<span class="ph-badge" style="background:${d.badgeColor}33;color:${d.badgeColor}">${d.badge}</span></h2>`;
+  html += `<div class="ph-stage">${d.stage}</div>`;
+  html += `<div class="ph-desc">${d.desc}</div>`;
+  if (d.inputs) { html += `<h4>Inputs</h4><ul>${d.inputs.map(x=>`<li>${x}</li>`).join('')}</ul>`; }
+  if (d.cogs) { html += `<h4>Cogs used</h4><ul>${d.cogs.map(x=>`<li><code>${x}</code></li>`).join('')}</ul>`; }
+  if (d.writes) { html += `<h4>Writes</h4><ul>${d.writes.map(x=>`<li><code>${x}</code></li>`).join('')}</ul>`; }
+  if (d.outcome) { html += `<div class="ph-outcome"><strong>Outcome:</strong> ${d.outcome}</div>`; }
+  panel.innerHTML = html;
+}
+
+document.querySelectorAll('.stage').forEach(s => {
+  s.addEventListener('click', () => showDetail(s.dataset.id));
+});
+
+let playing = false;
+async function playFlow() {
+  if (playing) return;
+  playing = true;
+  const btn = document.getElementById('playBtn');
+  btn.classList.add('playing');
+  btn.textContent = '● Playing…';
+  resetFlow(true);
+
+  const fill = document.getElementById('progress');
+  const arrows = document.querySelectorAll('.stage-row .arrow');
+
+  for (let i=0; i<MAIN_FLOW.length; i++) {
+    const id = MAIN_FLOW[i];
+    const el = document.querySelector(`.stage[data-id="${id}"]`);
+    el.classList.add('lit','lit-stay');
+    showDetail(id);
+    fill.style.width = `${((i+1)/MAIN_FLOW.length)*100}%`;
+    if (arrows[i]) arrows[i].classList.add('lit');
+    await new Promise(r => setTimeout(r, 1400));
+  }
+
+  btn.classList.remove('playing');
+  btn.textContent = '▶ Replay animation';
+  playing = false;
+}
+
+function resetFlow(keepProgress) {
+  document.querySelectorAll('.stage').forEach(s => s.classList.remove('lit','lit-stay','active'));
+  document.querySelectorAll('.arrow').forEach(a => a.classList.remove('lit'));
+  if (!keepProgress) {
+    document.getElementById('progress').style.width = '0%';
+    document.getElementById('panel').innerHTML = '<div class="empty">Click any stage on the left to see details — what it does, which cogs it uses, what it writes, and where in the codebase to find it.</div>';
+  }
+}
+</script>
+
+</body>
+</html>

@@ -237,6 +237,41 @@ async function cmdRead(uid) {
   console.log(JSON.stringify(result, null, 2));
 }
 
+// ─── COMMAND: download-attachments ───────────────────────────────────────────
+
+/**
+ * Save all non-image attachments for a given UID to a tmp directory.
+ * Prints the directory path + filename list as JSON. The agent then uses
+ * the Read tool on individual files to inspect xlsx/csv/pdf content.
+ *
+ * Inline images are skipped (Outlook signature noise — not real attachments).
+ */
+async function cmdDownloadAttachments(uid) {
+  const os = require('os');
+  const result = await withInbox(async (client) => {
+    const msg = await client.fetchOne(String(uid), { source: true }, { uid: true });
+    if (!msg || !msg.source) return null;
+    const parsed = await simpleParser(msg.source);
+    const outDir = fs.mkdtempSync(path.join(os.tmpdir(), `wf-${WORKFLOW_NAME}-${uid}-`));
+    const files = [];
+    for (const att of (parsed.attachments || [])) {
+      if (!att.filename) continue;
+      if (/^image\//i.test(att.contentType || '')) continue;
+      const outPath = path.join(outDir, att.filename);
+      fs.writeFileSync(outPath, att.content);
+      files.push({
+        filename: att.filename,
+        path: outPath,
+        size: att.size || att.content.length,
+        contentType: att.contentType,
+      });
+    }
+    return { dir: outDir, files };
+  });
+  if (!result) { console.error(`UID ${uid} not found`); process.exit(2); }
+  console.log(JSON.stringify(result, null, 2));
+}
+
 // ─── COMMAND: route ──────────────────────────────────────────────────────────
 
 async function cmdRoute(uid, actionName, payload) {
@@ -307,6 +342,7 @@ async function cmdRoute(uid, actionName, payload) {
   try {
     if (cmd === 'list') return await cmdList();
     if (cmd === 'read') return await cmdRead(parseInt(argv[1], 10));
+    if (cmd === 'download-attachments') return await cmdDownloadAttachments(parseInt(argv[1], 10));
     if (cmd === 'route') {
       const uid = parseInt(argv[1], 10);
       const actionName = argv[2];
@@ -319,7 +355,7 @@ async function cmdRoute(uid, actionName, payload) {
       }
       return await cmdRoute(uid, actionName, payload);
     }
-    console.error('Usage: email-workflow-poller.js (list | read <uid> | route <uid> <action> --payload <json|file>) --workflow <name> [--dry-run]');
+    console.error('Usage: email-workflow-poller.js (list | read <uid> | download-attachments <uid> | route <uid> <action> --payload <json|file>) --workflow <name> [--dry-run]');
     console.error('Architecture: ~/workspace/astute-workinstructions/email-workflow-architecture.md');
     process.exit(2);
   } catch (err) {

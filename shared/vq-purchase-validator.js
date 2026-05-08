@@ -70,11 +70,14 @@ const INTERNAL_MARKERS = [
 /**
  * Validate a VQ line for purchase readiness.
  * @param {number} vqId  chuboe_vq_line_id
- * @param {object} opts  { program: 'LAM_KITTING' | 'LAM_EPG' | null }
+ * @param {object} opts  { program: 'LAM_KITTING' | 'LAM_EPG' | null,
+ *                         allowCompetingTicked: false (set true for legitimate
+ *                           split-POV cases where multiple vendors share the
+ *                           RFQ line qty, each ticked for their own POV) }
  * @returns {object} { ok: boolean, violations: string[], vq: <row> }
  */
 async function validateVQForPurchase(vqId, opts = {}) {
-  const { program = null } = opts;
+  const { program = null, allowCompetingTicked = false } = opts;
 
   const { rows } = await pool.query(`
     SELECT vl.chuboe_vq_line_id, vl.chuboe_mpn, vl.chuboe_rfq_line_id,
@@ -153,7 +156,11 @@ async function validateVQForPurchase(vqId, opts = {}) {
   }
 
   // Competing VQ check — any other ticked VQ on the same RFQ line?
-  if (vq.chuboe_rfq_line_id) {
+  // Skipped when the caller explicitly opts in via allowCompetingTicked=true
+  // (legitimate split-POV case: line qty split across multiple vendors, each
+  // ticked separately for its own POV. Validator can't distinguish this from
+  // the "accidentally ticked two" error without caller context.)
+  if (vq.chuboe_rfq_line_id && !allowCompetingTicked) {
     const { rows: competing } = await pool.query(`
       SELECT chuboe_vq_line_id, c_bpartner_id
       FROM adempiere.chuboe_vq_line
@@ -166,7 +173,8 @@ async function validateVQForPurchase(vqId, opts = {}) {
       const ids = competing.map(r => r.chuboe_vq_line_id).join(', ');
       violations.push(
         `Competing VQ(s) on the same RFQ line already ticked IsPurchased=Y: ${ids}. ` +
-        `Untick them before proceeding (one winner per line).`
+        `Untick them before proceeding (one winner per line). ` +
+        `If this is a legitimate split-POV case, pass allowCompetingTicked=true.`
       );
     }
   }

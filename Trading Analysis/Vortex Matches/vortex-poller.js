@@ -31,11 +31,12 @@ require('dotenv').config({ path: path.resolve(__dirname, '../../../.env') });
 
 const { ImapFlow } = require('imapflow');
 const { simpleParser } = require('mailparser');
-const nodemailer = require('nodemailer');
 
 const { runVortexForRFQ, buildSummaryHtml } = require('./vortex-matches');
+const { sendWithFallback } = require('../../shared/verified-send');
 
 const VORTEX_EMAIL = 'vortex@orangetsunami.com';
+const FALLBACK_EMAIL = process.env.VORTEX_FALLBACK_SENDER || 'excess@orangetsunami.com';
 const JAKE_EMAIL = 'jake.harris@astutegroup.com';
 
 const IMAP_HOST = process.env.IMAP_HOST || 'imap.mail.us-east-1.awsapps.com';
@@ -54,13 +55,7 @@ const UID_ARG = (() => {
   return i >= 0 ? parseInt(argv[i + 1], 10) : null;
 })();
 
-// Single shared SMTP transporter (HTML + multiple recipients + Cc support)
-const transporter = nodemailer.createTransport({
-  host: process.env.SMTP_HOST || 'smtp.mail.us-east-1.awsapps.com',
-  port: parseInt(process.env.SMTP_PORT || '465', 10),
-  secure: true,
-  auth: { user: VORTEX_EMAIL, pass: WORKMAIL_PASS }
-});
+// SMTP transport is owned by shared/verified-send.js (sendWithFallback).
 
 function log(...args) {
   console.log(new Date().toISOString(), '-', ...args);
@@ -175,11 +170,11 @@ async function sendErrorEmail(subject, errorMsg, sourceMeta) {
     return;
   }
   try {
-    await transporter.sendMail({
-      from: `"Vortex Matches" <${VORTEX_EMAIL}>`,
-      to: JAKE_EMAIL,
-      subject,
-      html
+    await sendWithFallback({
+      primary:  { from: VORTEX_EMAIL,   pass: WORKMAIL_PASS, displayName: 'Vortex Matches' },
+      fallback: { from: FALLBACK_EMAIL, pass: WORKMAIL_PASS, displayName: 'Vortex Matches' },
+      mail: { to: JAKE_EMAIL, subject, html },
+      log
     });
   } catch (e) {
     log('error-email failed:', e.message);
@@ -258,29 +253,33 @@ async function processMessage(client, uid) {
     return { uid, status: 'dry-run', rfqNumber };
   }
 
-  // Send. Note: notifier currently sends plain text; we pass HTML as the body
-  // and rely on most mail clients rendering it. If we need true HTML/text
-  // multipart we'll extend notifier.js — for now this is the smallest patch.
-  await sendVortexResult({
+  // Send via primary (vortex@), fall back to excess@ if primary bounces.
+  const sendResult = await sendVortexResult({
     to, cc, subject: emailSubject, html, attachments: result.attachments
   });
 
   await client.messageFlagsAdd(String(uid), ['\\Seen'], { uid: true });
-  log(`  UID ${uid}: sent and marked Seen`);
-  return { uid, status: 'sent', rfqNumber, attachments: result.attachments.length };
+  log(`  UID ${uid}: sent via ${sendResult.delivered} sender and marked Seen` +
+      (sendResult.bounceDetected ? ' (primary bounced, fallback used)' : ''));
+  return { uid, status: 'sent', rfqNumber, attachments: result.attachments.length, delivered: sendResult.delivered };
 }
 
 /**
- * Send the result email (HTML body + xlsx attachments + Cc).
+ * Send the result email via primary sender with bounce-verified fallback.
+ * See shared/verified-send.js for the pattern and why it exists.
  */
 async function sendVortexResult({ to, cc, subject, html, attachments }) {
-  await transporter.sendMail({
-    from: `"Vortex Matches" <${VORTEX_EMAIL}>`,
-    to: to.join(', '),
-    cc: cc.length ? cc.join(', ') : undefined,
-    subject,
-    html,
-    attachments: attachments.map(a => ({ filename: a.filename, content: a.content }))
+  return sendWithFallback({
+    primary:  { from: VORTEX_EMAIL,   pass: WORKMAIL_PASS, displayName: 'Vortex Matches' },
+    fallback: { from: FALLBACK_EMAIL, pass: WORKMAIL_PASS, displayName: 'Vortex Matches' },
+    mail: {
+      to: to.join(', '),
+      cc: cc.length ? cc.join(', ') : undefined,
+      subject,
+      html,
+      attachments: attachments.map(a => ({ filename: a.filename, content: a.content }))
+    },
+    log
   });
 }
 
