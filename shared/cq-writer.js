@@ -33,6 +33,13 @@
  *   - Stock RFQ pipeline "Propose Quote" step (future)
  *   - Manual CQ entry from email quotes
  *
+ * SOLD-MARKING (IsSold='Y'):
+ *   This writer creates CQ lines in the Open state. To mark a CQ sold, use
+ *   `shared/cq-patcher.js` (`markCQSold()`). That wrapper enforces the
+ *   sold-state checklist and mirrors operational fields from the winning VQ.
+ *   DO NOT `patchRecord('chuboe_cq_line', id, { IsSold: 'Y' })` directly —
+ *   same anti-pattern as bypassing `vq-patcher.js` on the buy side.
+ *
  * RESOLUTION STRATEGY:
  *   1. RFQ search key → chuboe_rfq_id (header)
  *   2. Customer pulled from RFQ header (c_bpartner_id) unless overridden
@@ -43,7 +50,7 @@
 const logger = require('./logger').createLogger('CQWriter');
 const { apiPost, apiGet, resolveMFR } = require('./api-client');
 const { cleanMpn } = require('./db-helpers');
-const { lookupMfr } = require('./mfr-lookup');
+const { lookupMfr, sanitizeMfrText } = require('./mfr-lookup');
 const { resolveMfrForRow } = require('./mfr-resolver');
 const { normalizePackaging } = require('./packaging-lookup');
 
@@ -95,6 +102,17 @@ const OPTIONAL_FIELD_MAP = {
   leadTimeText: 'Chuboe_LeadTime_Text',
   packagingDesc:'Chuboe_Package_Desc',
   shippingAcct: 'Chuboe_ShippingAcct',
+  // Customer-PO-derived fields — populate at RFQ/CQ write time when customer
+  // sends a PO (rather than backfilling at sold-mark time). See the PO-derived
+  // field list in shared/cq-patcher.js header.
+  datePromised:       'DatePromised',
+  dockDate:           'DateNextAction',           // "Dock Date" in OT UI
+  bpartnerLocationId: 'C_BPartner_Location_ID',
+  shipperId:          'M_Shipper_ID',
+  incoTermId:         'Chuboe_Inco_Term_ID',
+  productCodeId:      'Chuboe_Product_Code_ID',
+  leadTimeId:         'Chuboe_LeadTime_ID',
+  uomId:              'C_UOM_ID',
 };
 
 // ─── RFQ RESOLUTION ──────────────────────────────────────────────────────────
@@ -227,7 +245,7 @@ async function resolveMfrForCQ(mfrText, mpn) {
     return { id: null, canonical: mfrResult.canonical, flagReason: FLAG.MFR_LOW_CONFIDENCE, path: mfrResult.path };
   }
 
-  const canonical = mfrResult.canonical || mfrText;
+  const canonical = mfrResult.canonical || sanitizeMfrText(mfrText);
   // Re-resolve via api-client.resolveMFR to ensure target system has the record
   // (mfr-resolver's lookupMfr step uses the local cache; resolveMFR confirms
   // against the live API and respects isSystem).

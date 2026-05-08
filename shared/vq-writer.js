@@ -24,7 +24,7 @@
 
 const { apiGet, apiPost, resolveBP, resolveBPBatch, resolveMFR, buildNaturalKeyFilter } = require('./api-client');
 const { extractStockAndLtRows } = require('./franchise-api');
-const { lookupMfr } = require('./mfr-lookup');
+const { lookupMfr, sanitizeMfrText } = require('./mfr-lookup');
 const { resolveMfrForRow } = require('./mfr-resolver');
 const { normalizePackaging, PACKAGING_MAP } = require('./packaging-lookup');
 const { isValidEccn } = require('./validators');
@@ -566,7 +566,13 @@ async function writeVQFromAPI(rfqSearchKey, cpc, franchiseResults, opts = {}) {
     // rfq-writer.js (proven on RFQ 1132040, 2026-04-06). The text field is the
     // load-bearing one.
     const mfrResult = resolveMfrForRow({ mfrText, mpn });
-    const mfrCanonical = mfrResult.canonical || mfrText || '';
+    // Sanitize the raw-text fallback — sanitizeMfrText drops U+FFFD
+    // mojibake AND infrastructure-noise strings (psql password prompts,
+    // fe_sendauth, etc.) so they cannot land in Chuboe_MFR_Text. Without
+    // this, a bad mfrText ("Password for user analytics_user:") slipped
+    // past the resolver and the writer fell back to the raw value —
+    // 459 leak rows between 2026-04-09 and 2026-05-08.
+    const mfrCanonical = mfrResult.canonical || sanitizeMfrText(mfrText) || '';
     if (mfrResult.acquisitionApplied) {
       logger.info(`MFR inferred from MPN '${mpn}' via prefix '${mfrResult.prefix}' → ${mfrCanonical} (acquisition: ${mfrResult.originalMfr} → ${mfrCanonical})`);
     }

@@ -90,6 +90,52 @@ function saveCache() {
 }
 
 /**
+ * Strip upstream-decoding garbage before resolution.
+ *
+ * U+FFFD (REPLACEMENT CHARACTER, hex EF BF BD) is what every UTF-8 decoder
+ * emits when it hits bytes it can't decode under the assumed encoding.
+ * Email/PDF extraction commonly produces it from non-breaking space (U+00A0,
+ * Latin-1 byte 0xA0) and other extended-Latin punctuation. The mangled text
+ * shows up here as MFR data and defeats every match tier ("MICRON�"
+ * doesn't equal "MICRON", "Micron�Technology�Inc" doesn't fuzzy-match
+ * "Micron Technology" because the separator was eaten).
+ *
+ * Replace with a space rather than strip: in the "Micron�Technology"
+ * case the original character was a separator, so a space restores the word
+ * boundary; in the "MICRON�" trailing-junk case the trailing space is
+ * absorbed by the trim() that callers already do.
+ *
+ * Sized 2026-05-08: ~11,700 active rows across rfq_line_mpn / vq_line / cq_line
+ * have U+FFFD in their MFR text and a NULL FK — this single transform unblocks
+ * most of them on the next reconciler tick.
+ */
+function sanitizeMfrText(s) {
+  if (!s) return '';
+  if (isInfrastructureNoise(s)) return '';
+  return s
+    .replace(/�/g, ' ')   // replacement char → space (was likely separator)
+    .replace(/ /g, ' ')   // raw non-breaking space → space (same root cause, undecoded)
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+/**
+ * Sentinel reject — any text matching infrastructure leak signatures (psql
+ * password prompt, fe_sendauth, "FATAL:", etc.) is rejected as input. The
+ * 4/14 incident wrote "Password for user analytics_user:" into 1,500+ VQ
+ * rows when a single-column auth-prompt line slipped past the row parser.
+ * The fix in queryDB closed that channel for the success path; this is a
+ * belt-and-suspenders so even if a future regression or upstream caller
+ * passes such a string in, we refuse to cache or write it. Verified
+ * 2026-05-08: 459 leak rows still landed between 4/9 and 5/8 from some
+ * residual path, so a top-level guard is warranted.
+ */
+function isInfrastructureNoise(s) {
+  if (!s) return false;
+  return /^password for user|fe_sendauth|^psql:|^FATAL:|^ERROR:/i.test(s.trim());
+}
+
+/**
  * Normalize a name for fuzzy comparison: strip punctuation, suffixes, lowercase.
  * "MOLEX, LLC" → "molex", "COTO TECHNOLOGY, INC." → "coto technology"
  */
@@ -135,10 +181,23 @@ function queryDBFuzzy(mfrName) {
       const words = norm.split(' ').filter(w => w.length >= 3);
       if (words.length === 0) return null;
 
-      // Build ILIKE conditions for each significant word
+      // Plural-tolerant exact-word regex (POSIX `~*`, \m and \M are
+      // start/end of word boundaries). The `s?` before \M lets a singular
+      // input match a plural DB row (input "device" → "Devices Inc"),
+      // while the closing \M anchors prevent substring matches that the
+      // old ILIKE produced — "aos" hit "lanbAOSi", "micron" hit
+      // "Micronel"/"Micronics"/"Micronnect", "ti" hit "Artic". Required
+      // before re-running the reconciler with --since over the U+FFFD
+      // backlog, since most fuzzy lookups would have routed to the wrong
+      // canonical otherwise.
+      //
+      // Regex-escape user-supplied tokens — fuzzyNorm strips `,./()` but
+      // leaves `?+*[]\` and other POSIX-ERE metacharacters that would make
+      // Postgres reject the pattern with "quantifier operand invalid".
+      const escapeRegex = (s) => s.replace(/[\\^$.|?*+(){}\[\]]/g, '\\$&');
       const conditions = words.map(w => {
-        const esc = w.replace(/'/g, "''");
-        return `name ILIKE '%${esc}%'`;
+        const esc = escapeRegex(w).replace(/'/g, "''");
+        return `name ~* '\\m${esc}s?\\M'`;
       }).join(' AND ');
 
       const sql = `SELECT chuboe_mfr_id, name, ad_client_id FROM adempiere.chuboe_mfr WHERE isactive='Y' AND ${conditions} ORDER BY LENGTH(name) ASC LIMIT 5`;
@@ -155,7 +214,7 @@ function queryDBFuzzy(mfrName) {
       });
       const lines = result.split('\n').filter(l => {
         const t = l.trim();
-        return t && !t.includes('rbash') && !t.includes('/dev/null') && !t.includes('restricted:') && !t.includes('/tmp/claude') && !t.includes('ERROR:');
+        return t && !t.includes('rbash') && !t.includes('bashrc') && !t.includes('/dev/null') && !t.includes('restricted:') && !t.includes('/tmp/claude') && !t.includes('ERROR:') && !t.startsWith('Password for') && !t.includes('fe_sendauth') && !t.includes('psql:');
       });
 
       if (lines.length > 0) {
@@ -205,7 +264,19 @@ function queryDBFuzzy(mfrName) {
 function queryDB(mfrName) {
   try {
     const escaped = mfrName.replace(/'/g, "''");
-    const sql = `SELECT chuboe_mfr_id, name, ad_client_id FROM adempiere.chuboe_mfr WHERE isactive='Y' AND (UPPER(name) = UPPER('${escaped}') OR name ILIKE '${escaped} %' OR name ILIKE '% ${escaped}' OR name ILIKE '${escaped},%' OR '${escaped}' ILIKE name || ' %') ORDER BY CASE WHEN UPPER(name) = UPPER('${escaped}') THEN 0 WHEN name ILIKE '${escaped}%' THEN 1 ELSE 2 END, LENGTH(name) ASC LIMIT 1`;
+    // Strict matcher — exact, or DB name starts/ends/comma-extends the input.
+    //
+    // Removed 2026-05-08: the reverse-prefix pattern `'INPUT' ILIKE name || ' %'`
+    // (i.e., input starts with DB name + space). Intent was to catch input
+    // "ARROW ELECTRONICS NORTH AMERICA" → DB row "Arrow", but in practice it
+    // hijacked legitimate plural cases: input "ANALOG DEVICE" matched the
+    // client-level "Analog" (id 1019813, length 6) and short-circuited before
+    // queryDBFuzzy could correctly resolve to system "Analog Devices Inc"
+    // (id 1000006). Triage 2026-05-08 found 29+12 rows queued for the wrong
+    // FK PATCH from this. Aliases cover the legitimate descriptive-suffix
+    // cases (TI INC, etc.); fuzzy AND-word search handles the rest more
+    // safely.
+    const sql = `SELECT chuboe_mfr_id, name, ad_client_id FROM adempiere.chuboe_mfr WHERE isactive='Y' AND (UPPER(name) = UPPER('${escaped}') OR name ILIKE '${escaped} %' OR name ILIKE '% ${escaped}' OR name ILIKE '${escaped},%') ORDER BY CASE WHEN UPPER(name) = UPPER('${escaped}') THEN 0 WHEN name ILIKE '${escaped}%' THEN 1 ELSE 2 END, LENGTH(name) ASC LIMIT 1`;
 
     // -U analytics_user is required under cron (cron doesn't pass $USER)
     const result = execSync(`psql -U analytics_user -t -A -F '|' -c "${sql.replace(/"/g, '\\"')}"`, {
@@ -240,7 +311,7 @@ function queryDB(mfrName) {
     const combined = ((e.stdout || '') + '\n' + (e.stderr || '')).trim();
     const lines = combined.split('\n').filter(l => {
       const t = l.trim();
-      return t && !t.includes('rbash') && !t.includes('bashrc') && !t.includes('/dev/null') && !t.includes('restricted:') && !t.includes('/tmp/claude') && !t.includes('ERROR:');
+      return t && !t.includes('rbash') && !t.includes('bashrc') && !t.includes('/dev/null') && !t.includes('restricted:') && !t.includes('/tmp/claude') && !t.includes('ERROR:') && !t.startsWith('Password for') && !t.includes('fe_sendauth') && !t.includes('psql:');
     });
     if (lines.length > 0) {
       const parts = lines[0].trim().split('|');
@@ -248,7 +319,9 @@ function queryDB(mfrName) {
         const clientId = parts.length >= 3 ? parseInt(parts[2], 10) : null;
         return { id: parseInt(parts[0], 10), name: parts[1], isSystem: clientId === 0 };
       }
-      return { id: null, name: parts[0], isSystem: false };
+      // No single-column fallback — same rationale as the success path above.
+      // Mirror parity prevents the auth-prompt leak from re-entering through
+      // the catch path when execSync throws on a non-infra error.
     }
   }
   return null;
@@ -281,8 +354,9 @@ function cacheGet(c, upper) {
  */
 function normalizeMfr(mfrText) {
   if (!mfrText) return '';
+  if (isInfrastructureNoise(mfrText)) return '';
 
-  const trimmed = mfrText.trim();
+  const trimmed = sanitizeMfrText(mfrText);
   if (!trimmed) return '';
 
   const upper = trimmed.toUpperCase();
@@ -330,8 +404,10 @@ function normalizeMfr(mfrText) {
  */
 function lookupMfr(mfrText) {
   if (!mfrText) return { canonical: '', id: null, isSystem: false, source: 'empty', matched: false };
+  if (isInfrastructureNoise(mfrText)) return { canonical: '', id: null, isSystem: false, source: 'rejected:infra-noise', matched: false };
 
-  const trimmed = mfrText.trim();
+  const trimmed = sanitizeMfrText(mfrText);
+  if (!trimmed) return { canonical: '', id: null, isSystem: false, source: 'empty', matched: false };
   const upper = trimmed.toUpperCase();
 
   // 1. Alias — need to resolve the ID via DB/cache since alias file only has names
@@ -412,5 +488,6 @@ function clearCache() {
 module.exports = {
   normalizeMfr,
   lookupMfr,
+  sanitizeMfrText,
   clearCache,
 };
