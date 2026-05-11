@@ -990,6 +990,21 @@ function getActiveDistributors() {
 }
 
 /**
+ * BP IDs Claude has API coverage for — includes actively queried distributors
+ * AND surfaced-via-another-API distributors (Verical via Arrow, Farnell via
+ * Newark). Used by the ROI tracker to distinguish "Claude calls this vendor
+ * but missed the part" from "Claude doesn't call this distributor at all."
+ *
+ * Source of truth is the DISTRIBUTORS map above. Add/remove entries there;
+ * this helper recomputes from that.
+ */
+function getApiCoverageBps() {
+  return Object.values(DISTRIBUTORS)
+    .filter(d => d.bpId)
+    .map(d => d.bpId);
+}
+
+/**
  * Write VQ capture file from search results
  */
 function writeVQCapture(filePath, vqLines) {
@@ -1070,6 +1085,7 @@ module.exports = {
   searchAllDistributors,
   aggregateBatchHealth,
   getActiveDistributors,
+  getApiCoverageBps,
   writeVQCapture,
   DISTRIBUTORS,
   // Centralized parsing primitives — use these instead of rolling your own
