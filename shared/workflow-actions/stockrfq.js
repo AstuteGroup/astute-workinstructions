@@ -37,11 +37,15 @@ const JAKE_USER_ID = 1000004;
  *   lines[]      [{ mpn, mfrText?, mfrId?, qty, targetPrice?, dateCode?, cpc? }, ...]
  *
  * Optional:
- *   description    (defaults to email subject sanitized)
+ *   description    (override; otherwise built as `<customerName> — Stock RFQ`)
  *   salesrepId     (default: 1000004 — Jake)
  *   userId         (default: 1000004 — Jake; serves as contact fallback when sender's ad_user is unknown)
  *   sourceUid      (for breadcrumb traceability)
- *   customerName   (for description suffix when bpartnerId is the Unqualified Broker)
+ *   customerName   (the agent should ALWAYS pass this — for matched BPs use the
+ *                   resolver's `result.name`; for the Unqualified Broker fallback
+ *                   use the parsed customer name from the email. The handler uses
+ *                   it for the header description, the BPName field, and for
+ *                   prepending to per-line descriptions on the Unqualified path.)
  */
 async function action_load_rfq(payload, ctx) {
   const {
@@ -64,6 +68,8 @@ async function action_load_rfq(payload, ctx) {
 
   // If Unqualified Broker, prepend customer name to each line's description
   // (matches static daemon behavior; keeps the broker name discoverable in OT).
+  // Matched-BP RFQs skip the line-level prepend — the BP FK already identifies
+  // the customer and prepending bloats every line description.
   let normalizedLines = lines;
   if (bpartnerId === UNQUALIFIED_BROKER_ID && customerName) {
     normalizedLines = lines.map(l => ({
@@ -74,10 +80,17 @@ async function action_load_rfq(payload, ctx) {
     }));
   }
 
+  // Header description: prefer explicit `description` in payload; otherwise build
+  // from customerName. Buyers see this in OT — uniform agent-stamp strings hide
+  // who the email came from, especially on the Unqualified Broker fallback path.
+  const headerDescription = description
+    || (customerName ? `${customerName} — Stock RFQ` : 'Stock RFQ');
+
   const result = await writeRFQ({
     bpartnerId,
     type: type || 'Stock',
-    description: description || `excessAgent stock RFQ ${new Date().toISOString().slice(0, 10)}`,
+    description: headerDescription,
+    bpName: customerName || undefined,
     salesrepId: salesrepId || JAKE_USER_ID,
     userId: userId || JAKE_USER_ID,
     lines: normalizedLines,

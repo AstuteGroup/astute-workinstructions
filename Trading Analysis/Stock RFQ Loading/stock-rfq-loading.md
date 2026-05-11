@@ -53,8 +53,13 @@ For each unseen message, the agent picks **one** routing action. Order of checks
 2. **Customer resolution** — try in order, first match wins. Use `shared/partner-lookup.js` `resolvePartner({email, companyName, partnerType: 'customer'})` (the `'customer'` filter + the IsEmployee filter inside the resolver are the fix for the 2026-05-07 wrong-BP incident — do not weaken).
    - **Direct send:** outer From is not `@astutegroup.com` → use that address as the lookup key.
    - **Forwarded send (`FW:` / `Fwd:`):** parse `From:` lines in the body. Walk all of them and pick the first **non-`@astutegroup.com`** sender (skip employees who forwarded the email to us). For NetComponents-style envelopes (`From: Real Sender [real@addr] <messagesend@netcomponents.com>`), use the bracketed address.
-   - **Match found** → use `result.c_bpartner_id` (integer) as `bpartnerId`. Record `result.name` for the description if helpful.
-   - **No match** → fall back to **Unqualified Broker** (`bpartnerId: 1006505`, search key `1008499`). Capture the customer name + email and pass them as `customerName` in the payload — the handler prepends them to each line's description so the broker is discoverable in OT. **This is the default behavior, not an error.** Every RFQ with a part number is signal worth capturing.
+   - **Match found** → `bpartnerId = result.c_bpartner_id`; also pass `customerName = result.name` in the payload so the header description and `BPName` are populated for at-a-glance recognition in OT.
+   - **No match** → fall back to **Unqualified Broker** (`bpartnerId: 1006505`, search key `1008499`). Pass `customerName` set to your best-effort customer string parsed from the email — preference order:
+     1. Company name in the subject (e.g. `FW: Shenzhen Yudexin RFQ` → `Shenzhen Yudexin`)
+     2. Company name in body prose (`From:` display name, signature block, `Quoting for <Company>`)
+     3. The sender's domain stem (e.g. `daisy@igzrc.cn` → `igzrc.cn`)
+     4. `Unknown sender` only when nothing above is parseable
+   - **`customerName` is required on every `load_rfq` call** (matched and unmatched). The handler uses it for the RFQ header `Description` (`<customerName> — Stock RFQ`) and the header `BPName`. On the Unqualified Broker path it ALSO prepends `customerName` to each line description (matched-BP path skips the line-level prepend — the FK already identifies the customer). The Unqualified Broker fallback is **the default behavior, not an error** — every RFQ with a part number is signal worth capturing.
 
 3. **Line extraction:**
    - Run `download-attachments` if `has_attachment` is true. xlsx > csv > pdf preferred.
@@ -66,7 +71,7 @@ For each unseen message, the agent picks **one** routing action. Order of checks
 
 4. **MFR resolution (per line):** Use `shared/mfr-lookup.js` `lookupMfr(mfrText)` to get canonical name + chuboe_mfr_id. If unresolved, leave both blank — the server will accept and the MFR Reconciler cron will fill the FK overnight.
 
-5. **Write to OT** → `load_rfq` with payload `{ bpartnerId, type: 'Stock', lines, customerName? }`. The handler calls `writeRFQ()` which writes the header, lines, and `chuboe_rfq_line_mpn` AVL sub-rows.
+5. **Write to OT** → `load_rfq` with payload `{ bpartnerId, type: 'Stock', lines, customerName }`. `customerName` is required on every call — see Step 2 for how to source it. The handler calls `writeRFQ()` which writes the header (with `Description = "<customerName> — Stock RFQ"` and `BPName = customerName`), lines, and `chuboe_rfq_line_mpn` AVL sub-rows. To override the header description, pass an explicit `description` field; otherwise the customer-name format is built automatically.
 
 ### Routing actions (full payload reference)
 

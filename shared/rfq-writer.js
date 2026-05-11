@@ -97,6 +97,12 @@ function lookupMpnDescription(mpnClean) {
  * @param {number} opts.bpartnerId       - c_bpartner_id (required)
  * @param {string} opts.type             - RFQ type name: 'Stock', 'Shortage', etc. (required)
  * @param {string} [opts.description]    - Customer reference / description
+ * @param {string} [opts.bpName]         - Free-text BPName on chuboe_rfq.bpname.
+ *                                         Surface the parsed customer name on the
+ *                                         header so buyers can identify who an
+ *                                         Unqualified Broker email came from, or
+ *                                         to mirror the matched BP name for at-a-
+ *                                         glance lookup.
  * @param {number} [opts.salesrepId]     - Salesrep ID (default: Jake Harris 1000004)
  * @param {number} [opts.userId]         - Chuboe_User_ID (contact person on RFQ header)
  * @param {number} [opts.statusId]       - r_status_id (default: 1000022 New)
@@ -120,6 +126,7 @@ async function writeRFQ(opts) {
     bpartnerId,
     type,
     description = null,
+    bpName = null,
     salesrepId = DEFAULT_SALESREP_ID,
     userId = null,
     statusId = DEFAULT_STATUS_ID,
@@ -152,6 +159,7 @@ async function writeRFQ(opts) {
     R_Status_ID: statusId,
   };
   if (description) rfqPayload.Description = description;
+  if (bpName) rfqPayload.BPName = bpName;
   if (userId) rfqPayload.Chuboe_User_ID = userId;
 
   let rfqId;
