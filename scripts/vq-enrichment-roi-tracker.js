@@ -155,7 +155,8 @@ async function queryEnrichedLines(windowDays, apiCoverageBps) {
              COUNT(*) AS cq_count,
              SUM(CASE WHEN issold = 'Y' THEN 1 ELSE 0 END) AS cq_sold,
              SUM(CASE WHEN issold = 'Y' THEN COALESCE(priceentered,0) * COALESCE(qty,0) ELSE 0 END) AS cq_sold_net,
-             MIN(created) AS first_cq_created
+             MIN(created) AS first_cq_created,
+             MIN(created) FILTER (WHERE issold = 'Y') AS first_sold_cq_created
       FROM adempiere.chuboe_cq_line
       WHERE isactive = 'Y'
         AND chuboe_rfq_line_id IN (SELECT chuboe_rfq_line_id FROM api_lines)
@@ -278,6 +279,8 @@ async function queryEnrichedLines(windowDays, apiCoverageBps) {
            r.chuboe_rfq_type_id AS rfq_type_id,
            rt.name AS rfq_type,
            bp.name AS customer,
+           r.salesrep_id AS salesrep_id,
+           sru.name AS salesrep_name,
            r.created AS rfq_created,
            lm.chuboe_mpn AS mpn,
            lm.chuboe_mfr_text AS mfr,
@@ -299,6 +302,7 @@ async function queryEnrichedLines(windowDays, apiCoverageBps) {
            COALESCE(cq.cq_sold, 0)         AS cq_sold,
            COALESCE(cq.cq_sold_net, 0)     AS cq_sold_net,
            cq.first_cq_created             AS first_cq_created,
+           cq.first_sold_cq_created        AS first_sold_cq_created,
            COALESCE(sc.so_lines, 0)        AS so_lines,
            COALESCE(sc.so_net, 0)          AS so_net,
            COALESCE(dw.direct_so_lines, 0) AS direct_so_lines,
@@ -318,6 +322,7 @@ async function queryEnrichedLines(windowDays, apiCoverageBps) {
     JOIN adempiere.chuboe_rfq r ON r.chuboe_rfq_id = rl.chuboe_rfq_id
     LEFT JOIN adempiere.chuboe_rfq_type rt ON rt.chuboe_rfq_type_id = r.chuboe_rfq_type_id
     LEFT JOIN adempiere.c_bpartner bp ON bp.c_bpartner_id = r.c_bpartner_id
+    LEFT JOIN adempiere.ad_user sru ON sru.ad_user_id = r.salesrep_id
     LEFT JOIN line_mpn lm ON lm.chuboe_rfq_line_id = al.chuboe_rfq_line_id
     LEFT JOIN po_agg po   ON po.chuboe_rfq_line_id = al.chuboe_rfq_line_id
     LEFT JOIN cq_agg cq   ON cq.chuboe_rfq_line_id = al.chuboe_rfq_line_id
@@ -444,9 +449,20 @@ function aggregate(rows) {
     altWonBroker: 0,
     altWonBrokerNet: 0,
     // Headline rollup: revenue Claude generated (human took over OR copied Claude's VQ)
-    // = winBotSoleAdoptedHandoff + winMirrorClaudeFirst (Adoption segment only)
+    // = winBotSoleAdoptedHandoff + winMirrorClaudeFirst (Adoption segment + Real Sourcing window only)
     revenueClaudeGeneratedLines: 0,
     revenueClaudeGeneratedNet: 0,
+    // Sourcing-window classification for Adoption sold lines.
+    // Customer sourcing decisions take hours-to-days, NOT minutes. Anything
+    // sold within 60 min of RFQ creation = RFQ created to process an order
+    // (salesperson workflow, not a Claude-competitive event). 1-24 hr needs
+    // operator review. 24+ hr is real sourcing where bot attribution applies.
+    processOrderLines: 0,     // <60 min — RFQ created to process an order
+    processOrderNet: 0,
+    needsReviewLines: 0,      // 1-24 hr — operator review window
+    needsReviewNet: 0,
+    realSourcingLines: 0,     // 24+ hr — real sourcing event
+    realSourcingNet: 0,
     // Procurement-side buyer field rollup (across all Claude-purchased lines)
     purchasedBuyerSelfLines: 0,
     purchasedBuyerSelfNet: 0,
@@ -484,6 +500,8 @@ function aggregate(rows) {
     botSoleAdoptedHandoff: [],   // Bucket 1b: Claude's VQ won AND buyer reassigned to human (revenue Claude generated)
     botSoleAdoptedCompetingVq: [], // Adopted residual: human wrote competing VQ but Claude's row got the tick (no buyer handoff)
     botSoleSolo: [],      // Claude won with no human involvement (internal/autonomous)
+    processOrderLines: [], // <60 min window — RFQ created to process an order; seller attribution
+    needsReviewLines: [],  // 1-24 hr window — operator review for true classification
     botSoleStock: [],     // Claude won on a Stock RFQ — broker-to-broker, separate from adoption
     splitDetail: [],      // Sold lines with multiple winners — show what was bought
     missedFranchise: [],  // Lines where buyer found a franchise Claude didn't quote — superseded by coverageGap + noApi below
@@ -564,6 +582,42 @@ function aggregate(rows) {
       const mirrorWonFranchise   = r.mirror_won_franchise === true || r.mirror_won_franchise === 't';
       const altWonApiCovered     = r.alternate_won_api_covered === true || r.alternate_won_api_covered === 't';
       const altWonFranchise      = r.alternate_won_franchise === true || r.alternate_won_franchise === 't';
+      // Sourcing-window classification — see CLAUDE.md memory feedback_check_window_before_miss_narrative.
+      // Adoption sold lines fall into three buckets by RFQ→first-sold-CQ delta:
+      //   <60 min  → RFQ created to process an order (salesperson workflow, NOT a bot-competitive event)
+      //   1-24 hr  → needs review (operator-curated; could be real or paperwork)
+      //   24+ hr   → real sourcing event (where Claude attribution actually applies)
+      const rfqTs = r.rfq_created ? new Date(r.rfq_created).getTime() : null;
+      // Use first SOLD CQ, not first CQ — the sourcing window closes when the
+      // sale lands, not when a quote is drafted. OnCore RFQ 1132927 was the
+      // bug case: first CQ written quickly, sold 167 hr later.
+      const soldCqTs = r.first_sold_cq_created ? new Date(r.first_sold_cq_created).getTime() : null;
+      const rfqToSoldMin = (rfqTs && soldCqTs) ? (soldCqTs - rfqTs) / 60_000 : null;
+      const isProcessOrder = isAdoption && rfqToSoldMin !== null && rfqToSoldMin < 60;
+      // Needs Review is restricted to ACTIONABLE 1-24hr lines — the winning vendor
+      // is in Claude's API-coverage set (so Claude could have surfaced it) OR a
+      // franchise vendor where Claude was late. Fast broker buys in this window
+      // aren't worth review since Claude never had a path to compete.
+      const inNeedsReviewWindow = isAdoption && rfqToSoldMin !== null && rfqToSoldMin >= 60 && rfqToSoldMin < 1440;
+      const isNeedsReview = inNeedsReviewWindow && (
+        altWonApiCovered ||
+        (mirrorWon && mirrorWonFranchise && humanFirst)
+      );
+      const isRealSourcing = isAdoption && rfqToSoldMin !== null && rfqToSoldMin >= 1440;
+      if (isAdoption) {
+        if (isProcessOrder) {
+          totals.processOrderLines++;
+          totals.processOrderNet += cqSoldNetHere;
+          flagLists.processOrderLines.push(r);
+        } else if (isNeedsReview) {
+          totals.needsReviewLines++;
+          totals.needsReviewNet += cqSoldNetHere;
+          flagLists.needsReviewLines.push(r);
+        } else if (isRealSourcing) {
+          totals.realSourcingLines++;
+          totals.realSourcingNet += cqSoldNetHere;
+        }
+      }
       // If line is in soldButPoVoided state (sold + bot's PO got voided + no
       // live PO), don't count as a win — supplier-side cancellation, not a
       // genuine fulfillment. Already surfaced in the soldButPoVoided flag.
@@ -593,8 +647,12 @@ function aggregate(rows) {
           totals.winBotSoleByStock++;
           totals.winBotSoleByStockNet += cqSoldNetHere;
           flagLists.botSoleStock.push(r);
-        } else {
-          // Adoption segment: split into handoff (Bucket 1b) / competing-VQ / solo.
+        } else if (isAdoption) {
+          // Adoption segment: split into handoff / competing-VQ / solo. These all
+          // count as revenue Claude generated regardless of window — even if the
+          // RFQ was created to process an order, the buyer used Claude's VQ to
+          // do it. Window classification (processOrder/needsReview/realSourcing)
+          // is informational context, not a gate on attribution.
           const humanCompeted = Number(r.human_vq_count) > 0;
           if (humanTookBuyer) {
             // Bucket 1b: human took over Claude's VQ for processing (buyer reassigned).
@@ -609,28 +667,38 @@ function aggregate(rows) {
             flagLists.botSoleAdoptedHandoff.push(r);
           } else if (humanCompeted) {
             // Adopted residual: human wrote a competing VQ but Claude's row was ticked,
-            // Claude stayed as buyer. Soft signal — not pure revenue Claude generated.
+            // Claude stayed as buyer. Still revenue Claude generated — Claude's VQ won
+            // the sourcing decision; human just shadowed.
             totals.winBotSoleAdopted++;
             totals.winBotSoleAdoptedNet += cqSoldNetHere;
             totals.winBotSoleAdoptedCompetingVq++;
             totals.winBotSoleAdoptedCompetingVqNet += cqSoldNetHere;
+            totals.revenueClaudeGeneratedLines++;
+            totals.revenueClaudeGeneratedNet += cqSoldNetHere;
             flagLists.botSoleAdopted.push(r);
             flagLists.botSoleAdoptedCompetingVq.push(r);
           } else {
+            // Solo: Claude's VQ won outright with no human involvement on the line.
+            // In Real Sourcing window this is a clean Claude-generated revenue event
+            // (vs Adoption inside <24hr which gets reclassified as process-order).
             totals.winBotSoleSolo++;
             totals.winBotSoleSoloNet += cqSoldNetHere;
+            totals.revenueClaudeGeneratedLines++;
+            totals.revenueClaudeGeneratedNet += cqSoldNetHere;
             flagLists.botSoleSolo.push(r);
           }
         }
+        // (else: LAM/Stock — counted in winBotSole parent above, reported under Efficiency.)
       } else if (mirrorWon) {
         // Human's mirror VQ on Claude's vendor was ticked.
         totals.winMirrorSole++;
         totals.winMirrorSoleNet += cqSoldNetHere;
-        // Win/miss sub-bucketing is gated to Adoption — LAM/Stock mirror-wins
-        // are autonomous-flow mechanics, not competitive wins/losses.
+        // Win sub-bucketing: Adoption + mirror won → either Claude wrote first (1a, revenue
+        // Claude generated) or human wrote first on franchise vendor (Bucket 2 — Claude was late).
+        // Bucket 2 is gated to Real Sourcing only because "Claude was late" only makes sense
+        // when there was a real sourcing competition. Bucket 1a fires in any window.
         if (!isAdoption) {
-          // No-op: counted in winMirrorSole parent; LAM/Stock activity is
-          // surfaced under the Efficiency section, not framed as winning.
+          // No-op: LAM/Stock — counted in parent, reported under Efficiency.
         } else if (!mirrorWonFranchise) {
           // Mirror won on a broker/private vendor — informational only.
           totals.winMirrorBroker++;
@@ -643,9 +711,11 @@ function aggregate(rows) {
           totals.revenueClaudeGeneratedLines++;
           totals.revenueClaudeGeneratedNet += cqSoldNetHere;
           flagLists.mirrorClaudeFirst.push(r);
-        } else if (humanFirst) {
+        } else if (humanFirst && isRealSourcing) {
           // Bucket 2: Claude wrote a mirror AFTER human, on a franchise vendor.
-          // Claude was late — human had already written the winning VQ.
+          // "Claude was late" only makes sense in a Real Sourcing window — if the
+          // line was processOrder/needsReview, the customer had already decided
+          // and being earlier wouldn't have changed anything.
           totals.winMirrorClaudeLate++;
           totals.winMirrorClaudeLateNet += cqSoldNetHere;
           flagLists.mirrorClaudeLate.push(r);
@@ -658,8 +728,10 @@ function aggregate(rows) {
         // Human's VQ on a vendor Claude didn't quote was ticked.
         totals.winAlternateSole++;
         totals.winAlternateSoleNet += cqSoldNetHere;
-        // Sub-bucketing gated to Adoption — LAM/Stock alt-wins aren't misses.
-        if (!isAdoption) {
+        // Miss sub-bucketing gated to Adoption + Real Sourcing — you can't "miss"
+        // a competitive sourcing opportunity that never existed (processOrder /
+        // needsReview windows = customer already decided pre-RFQ).
+        if (!isRealSourcing) {
           // No-op: counted in winAlternateSole parent.
         } else if (altWonApiCovered) {
           // Bucket 3a: Claude has an API for this distributor but didn't surface the part.
@@ -893,8 +965,23 @@ function renderEmail({ totals, flagLists, byCustomer, byType, rfqRollup }, windo
 
 <h3 style="background:#dfd;padding:10px;border-left:6px solid #27ae60;margin-top:24px">🏆 Winning business — Adoption segment</h3>
 <p style="color:#666;font-size:12px">
-  Non-LAM, non-Stock RFQs — seller sourcing for a real customer ask. Claude's quote is one of several competing for the buy.
+  Non-LAM, non-Stock RFQs — seller sourcing for a real customer ask. Customer decision cycles for sourcing run hours to days, so we split Adoption sold lines by the RFQ→sold-CQ window:
 </p>
+<table border="1" cellpadding="6" cellspacing="0" style="border-collapse:collapse">
+<tr style="background:#f0f0f0"><th>Sourcing window</th><th>Lines</th><th>Revenue</th><th>Read</th></tr>
+<tr style="background:#fee"><td><b>📋 &lt; 60 min — RFQ created to process an order</b></td>
+    <td style="text-align:right">${fmtInt(totals.processOrderLines)}</td>
+    <td style="text-align:right">${fmtUsd(totals.processOrderNet)}</td>
+    <td style="font-size:12px">Salesperson workflow: RFQ landed in OT only to document a buy that was already committed. No real sourcing event — Claude attribution doesn't apply.</td></tr>
+<tr style="background:#fff3cd"><td><b>⚠️ 1–24 hr — Needs review</b></td>
+    <td style="text-align:right">${fmtInt(totals.needsReviewLines)}</td>
+    <td style="text-align:right">${fmtUsd(totals.needsReviewNet)}</td>
+    <td style="font-size:12px">Borderline — could be tight legitimate sourcing or paperwork. Operator review to classify properly.</td></tr>
+<tr style="background:#dfd"><td><b>🏆 24+ hr — Real sourcing event</b></td>
+    <td style="text-align:right">${fmtInt(totals.realSourcingLines)}</td>
+    <td style="text-align:right">${fmtUsd(totals.realSourcingNet)}</td>
+    <td style="font-size:12px">Real competitive window where Claude's quote was one of several competing for the buy. Win attribution applies below.</td></tr>
+</table>
 
 <h4>Procurement (Adoption — direct attribution: buyer ticked Claude Harris's VQ)</h4>
 <table border="1" cellpadding="6" cellspacing="0" style="border-collapse:collapse">
@@ -955,9 +1042,56 @@ function renderEmail({ totals, flagLists, byCustomer, byType, rfqRollup }, windo
     <td style="font-size:12px">Claude wrote VQ first. Buyer re-keyed the same vendor onto a second VQ and ticked that one.</td></tr>
 </table>
 
-<h4>Sold lines — win attribution (Adoption segment only)</h4>
+${totals.processOrderLines > 0 ? `
+<h4 style="background:#fee;padding:8px;border-left:4px solid #c0392b">📋 RFQ created to process an order — by salesperson</h4>
 <p style="color:#666;font-size:12px">
-  Of the ${fmtInt(totals.adoption.linesWithSoldCq)} Adoption-segment lines that resulted in a sold CQ, classification by which VQ on the line was ticked <code>IsPurchased</code> (the actual procurement winner). LAM/Stock wins are reported in the Process Efficiency section below.
+  Adoption sold lines where the entire RFQ→sold-CQ flow completed in under 60 minutes. These aren't sourcing events — the customer had already committed to the buy before the RFQ existed in OT. Surfaced by salesperson so the workflow pattern (RFQ-as-order-documentation) is visible.
+</p>
+${(() => {
+  const bySeller = new Map();
+  for (const r of flagLists.processOrderLines) {
+    const seller = r.salesrep_name || '(unassigned)';
+    if (!bySeller.has(seller)) bySeller.set(seller, { lines: 0, revenue: 0, minWindow: Infinity, maxWindow: 0 });
+    const s = bySeller.get(seller);
+    const win = (new Date(r.first_sold_cq_created).getTime() - new Date(r.rfq_created).getTime()) / 60000;
+    s.lines++;
+    s.revenue += Number(r.cq_sold_net) || 0;
+    s.minWindow = Math.min(s.minWindow, win);
+    s.maxWindow = Math.max(s.maxWindow, win);
+  }
+  const sorted = Array.from(bySeller.entries()).sort((a, b) => b[1].revenue - a[1].revenue);
+  let html = `<table border="1" cellpadding="6" cellspacing="0" style="border-collapse:collapse;font-size:12px">
+<tr style="background:#f0f0f0"><th>Salesperson</th><th>Lines</th><th>Revenue</th><th>Window range</th></tr>`;
+  for (const [seller, s] of sorted) {
+    html += `<tr><td>${esc(seller)}</td><td style="text-align:right">${fmtInt(s.lines)}</td><td style="text-align:right">${fmtUsd(s.revenue)}</td><td style="text-align:right;font-size:11px">${Math.round(s.minWindow)}–${Math.round(s.maxWindow)} min</td></tr>`;
+  }
+  html += `</table>`;
+  return html;
+})()}
+` : ''}
+
+${totals.needsReviewLines > 0 ? `
+<h4 style="background:#fff3cd;padding:8px;border-left:4px solid #d4a017">⚠️ Needs review — 1 to 24-hour windows</h4>
+<p style="color:#666;font-size:12px">
+  Adoption sold lines with a 1–24 hour RFQ→sold-CQ window. Could be tight legitimate sourcing or order-documentation depending on customer behavior. Operator review needed to classify properly.
+</p>
+${flagTable(flagLists.needsReviewLines, [
+  { label: 'RFQ',          value: r => r.rfq_value },
+  { label: 'Customer',     value: r => r.customer || '—' },
+  { label: 'Salesperson',  value: r => r.salesrep_name || '—' },
+  { label: 'MPN',          value: r => r.mpn || '—' },
+  { label: 'Sold $',       value: r => fmtUsd(r.cq_sold_net), align: 'right', raw: true },
+  { label: 'Window (hr)',  value: r => {
+      const mins = (new Date(r.first_sold_cq_created).getTime() - new Date(r.rfq_created).getTime()) / 60000;
+      return (mins / 60).toFixed(1);
+    }, align: 'right' },
+  { label: 'RFQ created',  value: r => fmtTimestamp(r.rfq_created) },
+])}
+` : ''}
+
+<h4 style="background:#dfd;padding:8px;border-left:4px solid #27ae60">🏆 Sold-line win attribution (all Adoption sold lines, regardless of window)</h4>
+<p style="color:#666;font-size:12px">
+  Win attribution applies across both Process-Order and Real-Sourcing windows — if a buyer used Claude's VQ to process an order, that's still Claude-attributable revenue. The Process-Order header above shows the wider 22-line totality for context; this table shows who actually won what (in line counts that match the revenue-Claude-generated headline). "Misses" sub-buckets fire only in Real Sourcing (you can't miss what was already decided).
 </p>
 <table border="1" cellpadding="6" cellspacing="0" style="border-collapse:collapse">
 <tr style="background:#f0f0f0"><th>Win attribution</th><th>Lines</th><th>Revenue</th><th>Note</th></tr>
@@ -1352,14 +1486,13 @@ async function main() {
   const { totals } = agg;
   log(
     `RFQs=${totals.rfqs.size} lines=${totals.lines} cqSold=${totals.cqSold}/${totals.cqSoldNet.toFixed(2)} ` +
+    `window(processOrder=${totals.processOrderLines}/${totals.processOrderNet.toFixed(2)} ` +
+    `needsReview=${totals.needsReviewLines}/${totals.needsReviewNet.toFixed(2)} ` +
+    `realSourcing=${totals.realSourcingLines}/${totals.realSourcingNet.toFixed(2)}) ` +
     `revenue-Claude-generated=${totals.revenueClaudeGeneratedLines}/${totals.revenueClaudeGeneratedNet.toFixed(2)} ` +
-    `(handoff=${totals.winBotSoleAdoptedHandoff}/${totals.winBotSoleAdoptedHandoffNet.toFixed(2)} ` +
-    `copied=${totals.winMirrorClaudeFirst}/${totals.winMirrorClaudeFirstNet.toFixed(2)}) ` +
     `misses(claudeLate=${totals.winMirrorClaudeLate}/${totals.winMirrorClaudeLateNet.toFixed(2)} ` +
     `coverageGap=${totals.missCoverageGap}/${totals.missCoverageGapNet.toFixed(2)} ` +
     `noApi=${totals.missNoApi}/${totals.missNoApiNet.toFixed(2)}) ` +
-    `info(broker-alt=${totals.altWonBroker}/${totals.altWonBrokerNet.toFixed(2)} ` +
-    `mirror-broker=${totals.winMirrorBroker}/${totals.winMirrorBrokerNet.toFixed(2)}) ` +
     `proc(LAM=${totals.lam.poCount}/${totals.lam.poNet.toFixed(2)} ` +
     `Stock=${totals.stock.poCount}/${totals.stock.poNet.toFixed(2)} ` +
     `Adoption=${totals.adoption.poCount}/${totals.adoption.poNet.toFixed(2)})`
@@ -1373,8 +1506,10 @@ async function main() {
     const missTotalNet = totals.winMirrorClaudeLateNet + totals.missCoverageGapNet + totals.missNoApiNet;
     const efficiencyNet = totals.lam.poNet + totals.stock.poNet;
     const subject =
-      `Claude Harris ROI — 🏆 ${fmtUsd(totals.revenueClaudeGeneratedNet)} won (Adoption) · ` +
+      `Claude Harris ROI — 🏆 ${fmtUsd(totals.revenueClaudeGeneratedNet)} Claude-driven (${totals.revenueClaudeGeneratedLines} lines) · ` +
+      `📋 ${totals.processOrderLines} order-docs (${fmtUsd(totals.processOrderNet)}) · ` +
       `⚙️ ${fmtUsd(efficiencyNet)} efficiency (LAM+Stock)` +
+      (totals.needsReviewLines > 0 ? ` · ⚠️ ${totals.needsReviewLines} needs review` : '') +
       (missTotal > 0 ? ` · ⚠️ ${missTotal} misses (${fmtUsd(missTotalNet)})` : '') +
       (totals.soldButPoVoided > 0 ? ` · 🔴 ${totals.soldButPoVoided} PO-voided` : '');
     const html = renderEmail(agg, windowDays);
