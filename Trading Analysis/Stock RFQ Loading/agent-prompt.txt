@@ -19,7 +19,7 @@ If a single message hits a transient error (writeRFQ 5xx, partner-lookup throws,
 
 STEP 4 — Summary.
 At the end, print a single-line summary in this exact shape:
-  STOCKRFQ-AGENT SUMMARY: processed=<N> load_rfq=<N> needs_review=<N> not_rfq=<N> errors=<N>
+  STOCKRFQ-AGENT SUMMARY: processed=<N> load_rfq=<N> outbound_pending=<N> needs_review=<N> not_rfq=<N> errors=<N>
 
 If 0 unseen messages, print "STOCKRFQ-AGENT SUMMARY: no unseen messages" and exit.
 

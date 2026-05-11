@@ -43,6 +43,16 @@ node shared/email-workflow-poller.js route <uid> <action> --workflow stockrfq --
 
 For each unseen message, the agent picks **one** routing action. Order of checks:
 
+0. **Outbound reply (operator-to-broker)** → `outbound_pending` *(hard rule, before everything else)*
+   - **Why this rule exists:** every message reaching `stockRFQ@` arrived via the `rfq@astutegroup.com` auto-forward. That same rule forwards both broker-sent RFQs **and** operator replies (when an operator CC's `rfq@`). Without this hard check, the agent has historically loaded operator replies as new phantom RFQs (e.g., 2026-05-11 UID 1725 → phantom RFQ 1134116 alongside the correctly-loaded 1134018).
+   - **Detection (hard rule, not judgment):** parse the **first `From:` line in the body** (Outlook quoted-reply block, after the `________________________________` separator). If the address matches `*@astutegroup.com`, this message is an outbound reply — regardless of subject, downstream `To:` addresses, or whether the body contains MPN/qty/price content.
+   - **Action:** call `outbound_pending` with `reason` = the parsed inner-From address + a one-clause hint (e.g., `"edgar.santana@astutegroup.com — operator reply on PIC18F14K22T-I/SS thread"`).
+   - **Folder:** `OutboundPending` (separate from `NotRFQ`, which is for true junk).
+   - **Downstream consumer:** the future `add_cq` agent (deferred-work entry 2026-05-11) reads from this folder, parses MPN/qty/price/LT, thread-matches back to the source RFQ in OT via `In-Reply-To` headers + body breadcrumbs, and writes a `chuboe_cq_line` via `shared/cq-writer.js`. CQ idempotency key: `(chuboe_rfq_id, chuboe_mpn_clean, priceentered, qty)` — same thread, multiple replies = one CQ row.
+   - **Edge cases:**
+     - Inner From is missing or the body has no quoted block → fall through to Step 1, treat as normal inbound.
+     - Inner From is `@astutegroup.com` AND the body otherwise contains an **inline NEW RFQ from an operator** (rare — e.g., Jake forwarding an Avnet shortage list he prepared himself): the strict rule still routes to `OutboundPending` and add_cq will surface it for manual triage. Operator-originated RFQs of this shape are uncommon enough that the strict rule is the right tradeoff vs. continued phantom-load risk.
+
 1. **Not an RFQ** → `not_rfq`
    - Subject is a PO / order confirmation / shipping notification (`PO 12345`, `COV12345`, `SO12345`, `tracking`, `shipped`, `invoice`, `payment`, `remittance`)
    - Subject is a follow-up (`following up`, `checking in`)
@@ -80,6 +90,7 @@ For each unseen message, the agent picks **one** routing action. Order of checks
 | `load_rfq` | `{ bpartnerId, lines[] }` (also `type, description, salesrepId, userId, sourceUid, customerName`) | `Processed` | `writeRFQ()` to OT + `loaded` breadcrumb |
 | `needs_review` | `{ reason }` (also `subject, outerFrom, details`) | `NeedsReview` | Email Jake diagnostics + `needs-review` breadcrumb |
 | `not_rfq` | `{ reason }` | `NotRFQ` | Silent move + `not-rfq` breadcrumb |
+| `outbound_pending` | `{ reason }` (typically `<innerFromAddr> — <one-clause hint>`) | `OutboundPending` | Silent move + `outbound-pending` breadcrumb; future `add_cq` agent consumes from here |
 
 ### Line shape for `load_rfq.lines[]`
 
@@ -151,7 +162,8 @@ The only true skip is emails with zero extractable part data (orders, shipping n
 
 | Condition | Action |
 |---|---|
-| Any email with MPN + quantity | **`load_rfq`** — even broker blasts. Use `bpartnerId: 1006505` (Unqualified Broker) if customer not in DB |
+| Inner body `From:` is `@astutegroup.com` (operator reply via the rfq@ auto-forward) | **`outbound_pending`** — hard rule, checked first. Future `add_cq` agent consumes the folder. |
+| Any email with MPN + quantity (and inner From is NOT Astute) | **`load_rfq`** — even broker blasts. Use `bpartnerId: 1006505` (Unqualified Broker) if customer not in DB |
 | Order / shipping / follow-up / newsletter / OOO | **`not_rfq`** |
 | MPNs present but ambiguous (no qty, signature-only, write-back failed) | **`needs_review`** |
 

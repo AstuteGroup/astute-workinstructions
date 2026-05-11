@@ -180,6 +180,31 @@ async function action_not_rfq(payload, ctx) {
   return { reason: payload.reason || 'unspecified' };
 }
 
+/**
+ * Move outbound-reply messages (operator quoted back / asked follow-up
+ * questions) to `OutboundPending` for the future add_cq agent to consume.
+ *
+ * These are NOT new RFQs — the originating broker RFQ is already in OT (or
+ * will be loaded separately via the inbound path). Routing them away from
+ * load_rfq prevents phantom-RFQ duplication.
+ *
+ * Required payload: { reason } — short string for the breadcrumb
+ *   (typically the inner From: address + a hint, e.g.,
+ *    "edgar.santana@astutegroup.com — operator reply on PIC18F14K22T-I/SS thread")
+ */
+async function action_outbound_pending(payload, ctx) {
+  if (ctx.dryRun) {
+    return { dry_run: true, reason: payload.reason || 'outbound reply' };
+  }
+  breadcrumbs.write({
+    cog: 'stockrfq-agent',
+    event: 'outbound-pending',
+    uid: ctx.uid,
+    reason: payload.reason || 'outbound reply',
+  });
+  return { reason: payload.reason || 'outbound reply' };
+}
+
 // ─── HELPERS ─────────────────────────────────────────────────────────────────
 
 function esc(s) {
@@ -209,6 +234,11 @@ module.exports = {
       folder: 'NotRFQ',
       requires: ['reason'],
       handler: action_not_rfq,
+    },
+    outbound_pending: {
+      folder: 'OutboundPending',
+      requires: ['reason'],
+      handler: action_outbound_pending,
     },
   },
   // Constants exposed so the agent / .md can reference them
