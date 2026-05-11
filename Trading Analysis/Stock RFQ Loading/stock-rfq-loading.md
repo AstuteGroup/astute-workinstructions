@@ -81,6 +81,16 @@ For each unseen message, the agent picks **one** routing action. Order of checks
 
 4. **MFR resolution (per line):** Use `shared/mfr-lookup.js` `lookupMfr(mfrText)` to get canonical name + chuboe_mfr_id. If unresolved, leave both blank — the server will accept and the MFR Reconciler cron will fill the FK overnight.
 
+4.5. **Price-fishing detection (per line, single-MPN RFQs only):** Before dispatching `load_rfq`, run the heuristic:
+   ```bash
+   node shared/price-check-heuristic.js --mpn <MPN> --qty <broker-qty> --sender <broker-email>
+   ```
+   The CLI returns JSON `{ isPriceCheck, region, ourStockQty, otherBrokerStockQty, reason }`.
+   - If `isPriceCheck` is `true` → include `priceCheck: true` and `priceCheckReason: "<reason>"` in the `load_rfq` payload. The handler stamps `[PRICE CHECK?]` on both the header description and every line description so the trader sees the flag in OT, and the breadcrumb records the diagnosis.
+   - If `isPriceCheck` is `false` → no flag; proceed as normal.
+   - **The heuristic only flags:** APAC broker (.cn/.hk/.tw/.jp/.kr/.sg/.vn/.th/.id/.my/.ph) + exact stock match (within 5% of our Astute inventory qty) + non-Astute broker stock visible in the market within 180 days. US/EMEA senders and dry markets are never flagged.
+   - Skip for multi-line RFQs (signal is per-MPN); v1 only handles single-MPN messages.
+
 5. **Write to OT** → `load_rfq` with payload `{ bpartnerId, type: 'Stock', lines, customerName, messageId }`. `customerName` is required on every call — see Step 2 for how to source it. `messageId` is the email's RFC822 Message-ID from the `read` command's `message_id` field — always pass it through so the outbound CQ agent can later thread-match `In-Reply-To` headers back to this RFQ. The handler calls `writeRFQ()` which writes the header (with `Description = "<customerName> — Stock RFQ"` and `BPName = customerName`), lines, and `chuboe_rfq_line_mpn` AVL sub-rows. To override the header description, pass an explicit `description` field; otherwise the customer-name format is built automatically.
 
 ### Routing actions (full payload reference)

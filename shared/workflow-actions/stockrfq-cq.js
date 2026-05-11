@@ -58,13 +58,24 @@ async function action_add_cq(payload, ctx) {
     sourceUid,
     sourceMessageId,
     matchPath,
+    priceCheck,           // inherited from the matched RFQ's description tag
   } = payload;
 
   // cq-writer's MANDATORY_FIELDS use `resale` (not `price`). Map.
-  const writerLines = lines.map(l => ({
-    ...l,
-    resale: l.resale != null ? l.resale : l.price,
-  }));
+  // Also: when the matched RFQ is tagged as a price-fishing thread, prepend
+  // a one-line notePrivate so the trader sees the context on the CQ row.
+  const writerLines = lines.map(l => {
+    const baseNote = l.notePrivate || '';
+    const priceCheckNote = priceCheck === true
+      ? 'Inherited PRICE CHECK? flag from RFQ — APAC broker fishing pattern. Deprioritize quoting effort.'
+      : '';
+    const combinedNote = [priceCheckNote, baseNote].filter(Boolean).join(' | ');
+    return {
+      ...l,
+      resale: l.resale != null ? l.resale : l.price,
+      notePrivate: combinedNote || undefined,
+    };
+  });
 
   if (ctx.dryRun) {
     return {
@@ -88,6 +99,7 @@ async function action_add_cq(payload, ctx) {
     cqsWritten: result.written.length,
     cqsFlagged: result.flagged.length,
     cqsFailed: result.failed.length,
+    priceCheck: priceCheck === true,
   });
 
   return {

@@ -67,8 +67,10 @@ For each unseen message in `OutboundPending`, the agent picks **one** routing ac
    - **(c) MPN + qty + customer-domain fuzzy.** Last resort: pull the original sender's email domain (from the deepest quoted `From:` line, the broker's address), resolve to a `c_bpartner_id`, and find recent RFQs (`created >= now() - 30 days`) with matching MPN + qty under that BP.
    - **(d) MPN + qty + recent window.** If no customer can be resolved, find recent active RFQs with matching MPN + qty across all customers; if exactly one, use it. If multiple, → `needs_review`.
 
-4. **Dispatch action based on match result:**
-   - **Match found** → `add_cq` with `{ rfqSearchKey, lines[] }`.
+4. **Price-fishing flag inheritance (match-found case only).** Query the matched RFQ's description for the `[PRICE CHECK?]` tag (set at inbound load time by `shared/price-check-heuristic.js`). If present, set `priceCheck: true` on the `add_cq` payload — the handler prepends a one-line `notePrivate` to each CQ row so the trader sees the inherited context. **The CQ agent does NOT re-run the heuristic** — the flag is computed once at RFQ creation; the CQ side is read-only on this.
+
+5. **Dispatch action based on match result:**
+   - **Match found** → `add_cq` with `{ rfqSearchKey, lines[], priceCheck? }`.
    - **No match AND quote has full content (mpn+qty+price+LT)** → `add_cq_with_rfq` with `{ bpartnerId (resolved or Unqualified Broker), lines[], originalSenderEmail, originalCompanyName }`. Writes the RFQ via `writeRFQ()` first (so the demand signal isn't lost — this captures the case where the inbound RFQ never came through), then the CQ via `writeCQ()` against the just-written RFQ.
    - **Match ambiguous (2+ candidate RFQs)** → `needs_review` with the candidate list.
    - **Match found BUT existing CQ already covers (mpn, qty, price)** → `skip` with reason `already-written: cq <id>`.

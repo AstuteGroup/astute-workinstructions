@@ -50,6 +50,12 @@ const JAKE_USER_ID = 1000004;
  *                   use the parsed customer name from the email. The handler uses
  *                   it for the header description, the BPName field, and for
  *                   prepending to per-line descriptions on the Unqualified path.)
+ *   priceCheck     (bool; set by the agent when shared/price-check-heuristic.js
+ *                   classifies the RFQ as a likely price-fishing pattern — APAC
+ *                   broker + exact stock match + non-dry broker market. When true,
+ *                   the handler prepends `[PRICE CHECK?]` to both header and line
+ *                   descriptions so the trader sees the flag in OT.)
+ *   priceCheckReason  (string; the heuristic's reason — written into breadcrumb only.)
  */
 async function action_load_rfq(payload, ctx) {
   const {
@@ -62,6 +68,8 @@ async function action_load_rfq(payload, ctx) {
     sourceUid,
     messageId,
     customerName,
+    priceCheck,
+    priceCheckReason,
   } = payload;
 
   if (ctx.dryRun) {
@@ -88,8 +96,18 @@ async function action_load_rfq(payload, ctx) {
   // Header description: prefer explicit `description` in payload; otherwise build
   // from customerName. Buyers see this in OT — uniform agent-stamp strings hide
   // who the email came from, especially on the Unqualified Broker fallback path.
-  const headerDescription = description
+  let headerDescription = description
     || (customerName ? `${customerName} — Stock RFQ` : 'Stock RFQ');
+
+  // Price-check tag: APAC broker + exact stock match + non-dry market.
+  // Stamps both header AND per-line descriptions so the trader sees it in OT.
+  if (priceCheck === true) {
+    headerDescription = `[PRICE CHECK?] ${headerDescription}`;
+    normalizedLines = normalizedLines.map(l => ({
+      ...l,
+      description: l.description ? `[PRICE CHECK?] ${l.description}` : '[PRICE CHECK?]',
+    }));
+  }
 
   const result = await writeRFQ({
     bpartnerId,
@@ -113,6 +131,8 @@ async function action_load_rfq(payload, ctx) {
     searchKey: result.searchKey,
     linesWritten: result.linesWritten,
     errorCount: result.errors.length,
+    priceCheck: priceCheck === true,
+    priceCheckReason: priceCheck === true ? (priceCheckReason || null) : undefined,
   });
 
   return {

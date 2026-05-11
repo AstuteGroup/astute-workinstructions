@@ -67,11 +67,16 @@ For every UID returned, follow the per-message decision tree from the .md:
         - If matching row exists at a DIFFERENT price → route `needs_review` with reason "existing cq <id> has different price (<old> vs <new>); operator may have revised the quote — do not auto-supersede".
         - If no matching row → continue to 3.7.
 
-  3.7 — Route `add_cq` with payload:
+  3.7 — Check inherited price-fishing flag: query the matched RFQ's description for `[PRICE CHECK?]`:
+        psql -P pager=off -A -F$'\t' -t -c "SELECT CASE WHEN description LIKE '[PRICE CHECK?]%' THEN 'Y' ELSE 'N' END FROM adempiere.chuboe_rfq WHERE value = '<rfqSearchKey>';"
+        If the result is 'Y' → include `priceCheck: true` in the add_cq payload below; the handler will prepend a one-line notePrivate to each CQ row so the trader sees the context.
+
+  3.8 — Route `add_cq` with payload:
           {
             "rfqSearchKey": "<value>",
             "matchPath": "header|subject|mpn-fuzzy",
             "sourceMessageId": "<this message's message_id>",
+            "priceCheck": <true if inherited from RFQ; omit otherwise>,
             "lines": [{ "mpn": "...", "qty": N, "price": <number>, "mfrText": "...", "leadTime": "STOCK" or "...", "dateCode": "...", ... }]
           }
         Note: cq-writer requires `mfrText` and `leadTime` as mandatory. If the operator didn't state lead time, default to "STOCK" only when the body explicitly says "we have N pcs in <warehouse>" (implies stock). Otherwise → `needs_review` for missing leadTime.
