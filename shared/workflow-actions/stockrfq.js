@@ -41,6 +41,10 @@ const JAKE_USER_ID = 1000004;
  *   salesrepId     (default: 1000004 — Jake)
  *   userId         (default: 1000004 — Jake; serves as contact fallback when sender's ad_user is unknown)
  *   sourceUid      (for breadcrumb traceability)
+ *   messageId      (the source email's RFC822 Message-ID. The agent should pass
+ *                   it (from `read`'s `message_id` field) so the outbound CQ
+ *                   agent can later match `In-Reply-To` headers back to this
+ *                   RFQ via the breadcrumb log without a full IMAP scan.)
  *   customerName   (the agent should ALWAYS pass this — for matched BPs use the
  *                   resolver's `result.name`; for the Unqualified Broker fallback
  *                   use the parsed customer name from the email. The handler uses
@@ -56,6 +60,7 @@ async function action_load_rfq(payload, ctx) {
     salesrepId,
     userId,
     sourceUid,
+    messageId,
     customerName,
   } = payload;
 
@@ -101,6 +106,7 @@ async function action_load_rfq(payload, ctx) {
     event: 'loaded',
     uid: ctx.uid,
     sourceUid: sourceUid || ctx.uid,
+    messageId: messageId || null,
     bpartnerId,
     type: type || 'Stock',
     rfqId: result.rfqId,

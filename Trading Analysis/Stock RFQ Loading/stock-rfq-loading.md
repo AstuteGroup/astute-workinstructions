@@ -81,7 +81,7 @@ For each unseen message, the agent picks **one** routing action. Order of checks
 
 4. **MFR resolution (per line):** Use `shared/mfr-lookup.js` `lookupMfr(mfrText)` to get canonical name + chuboe_mfr_id. If unresolved, leave both blank — the server will accept and the MFR Reconciler cron will fill the FK overnight.
 
-5. **Write to OT** → `load_rfq` with payload `{ bpartnerId, type: 'Stock', lines, customerName }`. `customerName` is required on every call — see Step 2 for how to source it. The handler calls `writeRFQ()` which writes the header (with `Description = "<customerName> — Stock RFQ"` and `BPName = customerName`), lines, and `chuboe_rfq_line_mpn` AVL sub-rows. To override the header description, pass an explicit `description` field; otherwise the customer-name format is built automatically.
+5. **Write to OT** → `load_rfq` with payload `{ bpartnerId, type: 'Stock', lines, customerName, messageId }`. `customerName` is required on every call — see Step 2 for how to source it. `messageId` is the email's RFC822 Message-ID from the `read` command's `message_id` field — always pass it through so the outbound CQ agent can later thread-match `In-Reply-To` headers back to this RFQ. The handler calls `writeRFQ()` which writes the header (with `Description = "<customerName> — Stock RFQ"` and `BPName = customerName`), lines, and `chuboe_rfq_line_mpn` AVL sub-rows. To override the header description, pass an explicit `description` field; otherwise the customer-name format is built automatically.
 
 ### Routing actions (full payload reference)
 

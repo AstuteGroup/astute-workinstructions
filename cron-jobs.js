@@ -145,6 +145,17 @@ module.exports = [
     description: 'Every 30m — agent reads stockRFQ@ per stock-rfq-loading.md, writes RFQs via OT API',
   },
 
+  {
+    name: 'stockrfq-cq-agent',
+    cadence: 'every 30m',
+    cadenceCron: '15,45 * * * *',  // offset :15/:45 from inbound stockrfq-agent (:00/:30)
+    command: `/home/analytics_user/.local/bin/claude -p --permission-mode bypassPermissions --max-turns 120 < "${ASTUTE}/Trading Analysis/Stock RFQ Loading/cq-agent-prompt.txt"`,
+    cwd: ASTUTE,
+    needsOT: true,
+    logFile: '/tmp/stockrfq-cq-agent.log',
+    description: 'Every 30m (offset from inbound) — agent reads OutboundPending folder of stockRFQ@ per stock-rfq-cq-loading.md, writes CQ rows via OT API. Idempotency via pre-write chuboe_cq_line lookup.',
+  },
+
   // PLACEHOLDER for second inbox (broker / franchise) — disabled until the
   // operator supplies the real inbox name. To enable:
   //   1. Add the email to ACCOUNT_TO_EMAIL in shared/offer-poller.js

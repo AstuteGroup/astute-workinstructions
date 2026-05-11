@@ -28,6 +28,7 @@
  * WORKFLOW MODULE CONTRACT (shared/workflow-actions/<name>.js):
  *   module.exports = {
  *     inbox:           'someinbox@orangetsunami.com',
+ *     sourceFolder:    'OutboundPending',         // optional; defaults to 'INBOX'
  *     notifierConfig:  { fromEmail, fromName, smtpUser?, smtpPass? },
  *     actions: {
  *       <name>: {
@@ -88,6 +89,10 @@ if (!workflow.actions || typeof workflow.actions !== 'object') {
 }
 
 const INBOX = workflow.inbox;
+// Source folder the poller reads/moves FROM. Default INBOX — most inbound
+// workflows scan unseen mail there. Outbound / staging workflows (e.g.,
+// stockrfq-cq consuming OutboundPending) declare a different folder.
+const SOURCE_FOLDER = workflow.sourceFolder || 'INBOX';
 const JAKE_EMAIL = process.env.OPERATOR_EMAIL || 'jake.harris@astutegroup.com';
 const IMAP_HOST = process.env.IMAP_HOST || 'imap.mail.us-east-1.awsapps.com';
 const IMAP_PORT = parseInt(process.env.IMAP_PORT || '993', 10);
@@ -120,7 +125,7 @@ async function withInbox(fn) {
   const client = newClient();
   await client.connect();
   try {
-    const lock = await client.getMailboxLock('INBOX');
+    const lock = await client.getMailboxLock(SOURCE_FOLDER);
     try {
       return await fn(client);
     } finally {
@@ -219,8 +224,16 @@ async function cmdRead(uid) {
     const senderAddr = (parsed.from && parsed.from.value && parsed.from.value[0] && parsed.from.value[0].address) || '';
     const fwd = parseForwardedHeaders(bodyText);
     const externalSender = isInternalAddress(senderAddr) ? fwd.originalFrom : senderAddr;
+    // References header may be a string or an array depending on the parser.
+    const refsRaw = parsed.references || (parsed.headers && parsed.headers.get('references')) || null;
+    const references = Array.isArray(refsRaw)
+      ? refsRaw
+      : (typeof refsRaw === 'string' ? refsRaw.split(/\s+/).filter(Boolean) : []);
     return {
       uid,
+      message_id: parsed.messageId || '',
+      in_reply_to: parsed.inReplyTo || '',
+      references,
       subject: parsed.subject || '',
       from: senderAddr,
       to: (parsed.to && parsed.to.text) || '',

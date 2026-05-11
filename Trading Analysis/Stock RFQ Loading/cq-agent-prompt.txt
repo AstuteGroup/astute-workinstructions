@@ -1,0 +1,85 @@
+You are processing the OutboundPending folder of stockRFQ@orangetsunami.com on a 30-minute cron schedule. These are operator outbound quote replies that the inbound stockrfq-agent routed here via its Step 0 hard-rule.
+
+STEP 1 — Read the contract.
+Use the Read tool on /home/analytics_user/workspace/astute-workinstructions/Trading Analysis/Stock RFQ Loading/stock-rfq-cq-loading.md and read the "Agent operating instructions" section. The .md is the source of truth — do NOT work from prior-session memory or training data. Read it fresh.
+
+STEP 2 — List unseen messages.
+Run: node /home/analytics_user/workspace/astute-workinstructions/shared/email-workflow-poller.js list --workflow stockrfq-cq
+
+If 0 unseen messages, print "STOCKRFQ-CQ-AGENT SUMMARY: no unseen messages" and exit.
+
+STEP 3 — Process each message.
+For every UID returned, follow the per-message decision tree from the .md:
+
+  3.1 — Run `read <uid> --workflow stockrfq-cq` to fetch body + headers (message_id, in_reply_to, references) + parsed forwarded headers + external_sender.
+
+  3.2 — Parse quote content from the operator's reply (the inner-most "From: <operator>" quoted block in the body). Extract per line:
+        { mpn, qty, price, mfrText, leadTime, dateCode?, packaging? }
+        Quantity normalization: strip "pcs"/"ea", expand "5k" → "5000".
+
+  3.3 — If no parseable quote content (inquiry-only, "what's your target", no $/USD/price, signature-only) → route `skip` with reason describing why. Done with this UID.
+
+  3.4 — Thread-match to source RFQ. Try in this order, first match wins:
+
+        (a) Header-based: if `in_reply_to` is present, grep the breadcrumb log for that Message-ID:
+              grep "<message-id-here>" /home/analytics_user/workspace/.offer-pipeline/breadcrumbs.jsonl
+            If a stockrfq-agent `loaded` event matches → use its rfqId/searchKey. Walk `references` array as fallback (the chain may include the original broker's Message-ID even if In-Reply-To points at an intermediate Astute reply).
+
+        (b) Quoted-subject match: scan the body's deepest quoted block for a `Subject:` line (the original broker's RFQ subject, e.g., "Subject: PMV450ENEAR 50505 pcs"). Query OT:
+              psql -P pager=off -A -F$'\t' -c "
+                SELECT r.value, r.chuboe_rfq_id, bp.name, r.description
+                FROM adempiere.chuboe_rfq r
+                JOIN adempiere.c_bpartner bp ON bp.c_bpartner_id = r.c_bpartner_id
+                WHERE r.isactive='Y'
+                  AND r.created >= now() - interval '14 days'
+                  AND r.description ILIKE '%<subject-keyword>%';"
+            If exactly one match → use it. If multiple → fall through to (c) to narrow. If none → fall through to (c).
+
+        (c) MPN + qty + recent + customer-domain fuzzy:
+              psql -P pager=off -A -F$'\t' -c "
+                SELECT r.value, r.chuboe_rfq_id, bp.name, rl.qty
+                FROM adempiere.chuboe_rfq r
+                JOIN adempiere.chuboe_rfq_line rl ON rl.chuboe_rfq_id=r.chuboe_rfq_id AND rl.isactive='Y'
+                JOIN adempiere.chuboe_rfq_line_mpn rlm ON rlm.chuboe_rfq_line_id=rl.chuboe_rfq_line_id AND rlm.isactive='Y'
+                JOIN adempiere.c_bpartner bp ON bp.c_bpartner_id=r.c_bpartner_id
+                WHERE r.isactive='Y'
+                  AND r.created >= now() - interval '30 days'
+                  AND rlm.chuboe_mpn = '<MPN>'
+                  AND rl.qty = <qty>;"
+            If exactly one match → use it. If multiple, narrow by parsing the original broker's email domain from the deepest quoted `From:` line and matching against bp.name or bp.searchkey. If still multiple → route `needs_review` with candidates list. If zero → continue to step 3.5.
+
+  3.5 — No source RFQ found via any path. Determine bpartnerId:
+        - Parse the deepest quoted `From:` line for the broker's email and company.
+        - Try shared/partner-lookup.js resolvePartner({email, companyName, partnerType:'customer'}). If matched → use its c_bpartner_id.
+        - Otherwise → bpartnerId: 1006505 (Unqualified Broker).
+        Route `add_cq_with_rfq` with payload { bpartnerId, customerName, lines, originalSenderEmail, originalCompanyName, sourceMessageId }.
+
+  3.6 — Source RFQ found. Run the IDEMPOTENCY pre-check before writing:
+        For each line in the quote, query:
+          psql -P pager=off -A -F$'\t' -c "
+            SELECT cq.chuboe_cq_line_id, cq.qty, cq.priceentered
+            FROM adempiere.chuboe_cq_line cq
+            WHERE cq.chuboe_rfq_id = <rfqId>
+              AND cq.chuboe_mpn_clean = '<mpn-clean>'
+              AND cq.qty = <qty>
+              AND cq.isactive='Y';"
+        - If matching row exists at the SAME price → route `skip` with reason "already-written: cq <id> covers (mpn, qty, price) on rfq <searchKey>".
+        - If matching row exists at a DIFFERENT price → route `needs_review` with reason "existing cq <id> has different price (<old> vs <new>); operator may have revised the quote — do not auto-supersede".
+        - If no matching row → continue to 3.7.
+
+  3.7 — Route `add_cq` with payload:
+          {
+            "rfqSearchKey": "<value>",
+            "matchPath": "header|subject|mpn-fuzzy",
+            "sourceMessageId": "<this message's message_id>",
+            "lines": [{ "mpn": "...", "qty": N, "price": <number>, "mfrText": "...", "leadTime": "STOCK" or "...", "dateCode": "...", ... }]
+          }
+        Note: cq-writer requires `mfrText` and `leadTime` as mandatory. If the operator didn't state lead time, default to "STOCK" only when the body explicitly says "we have N pcs in <warehouse>" (implies stock). Otherwise → `needs_review` for missing leadTime.
+
+If a single message hits a transient error (writeCQBatch 5xx, partner-lookup throws, attachment unreadable), log the error and continue with the next message. Do not abort the batch on per-message failure.
+
+STEP 4 — Summary.
+At the end, print a single-line summary in this exact shape:
+  STOCKRFQ-CQ-AGENT SUMMARY: processed=<N> add_cq=<N> add_cq_with_rfq=<N> skip=<N> needs_review=<N> errors=<N>
+
+NEVER include --dry-run on any route call. This is the production schedule.
