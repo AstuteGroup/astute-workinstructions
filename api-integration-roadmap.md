@@ -904,7 +904,48 @@ node master.js LM317 100 --in-stock   # in-stock only
 
 **Fallback if EDI unavailable:** measure how many Heilind-only MPNs (not covered by TTI/Mouser/DigiKey/Newark/Arrow/Avnet/Master) actually appear in monthly RFQ flow. If <50/mo, manual lookups beat any automated solution. If hundreds, revisit stealth-plus-proxy scraping with eyes open to maintenance cost.
 
-**Status:** Scraping ruled out. Pursuing EDI 832/846 — pending colleague check on existing setup.
+**Volume measurement (2026-05-11):** Pulled all RFQ line MPNs in Heilind-bucket MFRs (TE/Tyco, Molex, Amphenol, Samtec, Phoenix Contact, Wurth, Omron, Hirose, JST, 3M, Harting, Weidmuller) over the prior 90 days:
+
+| Bucket | Line MPNs | Distinct MPNs |
+|---|---:|---:|
+| TE/Tyco | 1,626 | 1,059 |
+| Molex | 946 | 670 |
+| Samtec | 631 | 422 |
+| Phoenix Contact | 596 | 160 |
+| Amphenol | 554 | 456 |
+| Wurth | 302 | 175 |
+| Omron + Hirose + JST + 3M + Harting + Weidmuller | ~430 | ~370 |
+| **Total** | **~5,166** | **~3,300** |
+
+Of those 5,166 line-MPNs, **3,074 (60%) got zero VQ from any source** — approximately **1,025 unsourced lines/month** in Heilind's wheelhouse. Volume sits ~20× over the "<50/mo skip automation" threshold. Caveat: zero-VQ ≠ "Heilind would have closed it" — many were never pursued, customer-cancelled, or broker-only buys. Actual Heilind-rescue subset is unknown until tested.
+
+**CalcuQuote-as-proxy (ruled out 2026-05-11):** CalcuQuote lists Heilind as a Supplier Partner. Their rep confirmed CQ does not expose API services, so it cannot be used as a programmatic proxy.
+
+**Stealth-automation options under discussion (2026-05-11):**
+
+Brainstormed the option space with first-party constraint (no new third-party SaaS — rules out Browserbase, residential-proxy services, anti-detect commercial browsers). All three viable options converge on the same OT-write pipeline (scraper → email to workflow inbox → `email-workflow-poller` → new `workflow-actions/heilind-loading.js` → `vq-writer`), so the differentiation is purely on the scraper side.
+
+| Option | Where it runs | Setup | Profile | Risks |
+|---|---|---|---|---|
+| **A. Browser extension** | Manifest V3 in Jake's existing Chrome. Confirmed corporate policy allows dev-mode unpacked load (no Blocklist/Allowlist/AllowedTypes restrictions; only `ExtensionInstallForcelist` is set, which adds, doesn't block). | ~1 day. | Opportunistic — captures only pages Jake actually browses. | Volume-limited. Human-in-the-loop on every capture. |
+| **B. Jake's laptop overnight** *(recommended)* | Playwright on Jake's work laptop, separate Chrome profile (`--user-data-dir`), Windows Task Scheduler ~2am. | ~1 day script + 2 hours workflow action. No new hardware, no new IT conversation. | Hands-free, bulk-capable, overnight only. Calibrated start 20/night, ramp gradually. | Laptop must stay on (corporate auto-shutdown could kill it). VPN drop = wrong IP. Endpoint security may flag 2am Chrome activity. |
+| **C. Dedicated office box** | Spare laptop / NUC physically on corporate WAN. Same Playwright (or Claude computer-use) stack. | ~3-5 days incl. IT conversation. | 24/7 capacity. Cleanest stealth signature (consistent office IP, always-on). | IT politics around unmanaged hardware on LAN. Hardware ownership / lifecycle. |
+
+**Stealth signature:** Heilind's office-IP requirement (Imperva fingerprints datacenter IP ranges) is why a cloud Windows VM in Azure or AWS, even on a first-party account, isn't viable without VPN-egress-through-office (its own networking project) — Options B and C bypass that by running on hardware that already has the office IP.
+
+**Recommendation:** Option B as v1, with graduation to Option C if Jake's laptop proves operationally fragile (auto-shutdown, VPN drop, IT flags). Option B has the lowest setup cost AND produces empirical operational data to justify Option C if/when it's needed.
+
+**Open questions for developer discussion (2026-05-12):**
+
+1. Heilind session lifetime — does anyone know empirically how long an estore login persists?
+2. Corporate VPN keep-alive — does it drop after inactivity?
+3. IT auto-shutdown policy — does Group Policy force laptop shutdown at end of day? (If yes, Option B is blocked.)
+4. Endpoint security (CrowdStrike/SentinelOne) behavior when scheduled task spawns Chrome at 2am.
+5. Heilind ToU — explicit anti-automation clause?
+6. UI selector stability — pilot Claude computer-use as driver instead of fragile CSS selectors?
+7. MPN queue scoping — all unsourced Heilind-bucket lines, or value-threshold filter?
+
+**Status:** Three viable options drafted (A/B/C). Dev review scheduled 2026-05-12. EDI 832/846 path remains the long-term answer; stealth automation is the bridge until EDI is wired up.
 
 ---
 
