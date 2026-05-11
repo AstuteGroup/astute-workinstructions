@@ -36,11 +36,15 @@ const { isRestrictedMfr } = require('../../shared/restricted-mfrs');
 // ─── TTL TABLE ───────────────────────────────────────────────────────────────
 // Source of truth: api-integration-roadmap.md § API Response Caching.
 // Mirror here so lookups are explicit and self-documenting.
+// Stock = 14d (2026-05-11): catches tightening within ~2 broker quotes while
+// avoiding the 7d quota burn on parts that haven't moved in deep distribution.
+// Hot parts refresh naturally via inbound activity, so the TTL is really only
+// the upper bound for quiet MPNs. Tighten later if a part-class shows volatility.
 const TTL_BY_RFQ_TYPE = {
   'PPV': 30,
   'Astute Franchised': 30,
   'Shortage': 7,
-  'Stock': 7,
+  'Stock': 14,
   'EOL/LTB': 7,
   '3PL/VMI': 7,
   'Hot Parts': 7,

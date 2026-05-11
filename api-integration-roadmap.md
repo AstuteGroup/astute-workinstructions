@@ -1309,7 +1309,7 @@ Locked 2026-04-08 — used by `RFQ API Enrichment` workflow (cron-driven, every-
 | PPV | 30 days | Stable customer PPV parts — infrequent pricing churn |
 | Astute Franchised | 30 days | Franchise-sourced, stable supply chain |
 | Shortage | 7 days | Volatile inventory, needs fresher reads |
-| Stock | 7 days | Broker-to-broker, demand signal, current availability matters |
+| Stock | 14 days | Broker-to-broker quoting; hot parts refresh via inbound activity, 14d is upper bound for quiet MPNs. Catches tightening within ~2 broker quotes vs 30d (too stale on tightening) and 7d (wastes quota in deep channels). Updated 2026-05-11. |
 | EOL/LTB | 7 days | Declining stock, but inventory levels shift fast |
 | 3PL/VMI | 7 days | Kitting pulls, qty-driven freshness |
 | Hot Parts | 7 days | High-urgency by definition |
