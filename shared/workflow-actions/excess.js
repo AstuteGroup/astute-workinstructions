@@ -17,6 +17,7 @@
 'use strict';
 
 const { writeOffer } = require('../offer-writeback');
+const offerRouter = require('../offer-router');
 const breadcrumbs = require('../breadcrumbs');
 
 // ─── HANDLERS ────────────────────────────────────────────────────────────────
@@ -32,7 +33,7 @@ const breadcrumbs = require('../breadcrumbs');
  *   sourceUid (for breadcrumb traceability)
  */
 async function action_load_offer(payload, ctx) {
-  const { bpartnerId, offerType, lines, description, sourceUid } = payload;
+  const { bpartnerId, offerType, lines, description, sourceUid, partnerName } = payload;
 
   if (ctx.dryRun) {
     return {
@@ -61,6 +62,33 @@ async function action_load_offer(payload, ctx) {
     linesWritten: result.linesWritten,
     errorCount: result.errors.length,
   });
+
+  // Dispatch to offer-router so the downstream cog (customer-excess-analysis
+  // for type 1000000/1000003, broker-data-capture for 1000001, franchise-
+  // data-capture for 1000002) fires. The router writes its own breadcrumb
+  // and invokes the analyzer. Wrap in try/catch: the offer is already in OT
+  // by this point, so a downstream failure shouldn't fail the load action —
+  // it's separately retryable. Errors are also breadcrumbed by the router
+  // itself (`event: 'downstream-failed'`) so the digest surfaces them.
+  //
+  // Why this is needed: the legacy static offer-poller (pre-2026-05-08)
+  // chained writeOffer → router inline in the same process. The new agentic
+  // loader only writes the offer and stops — leaving the analysis pipeline
+  // starved (verified 5/12: 12 offers / 2,383 lines un-analyzed since 5/8).
+  try {
+    await offerRouter.dispatch({
+      offerId: result.offerId,
+      searchKey: result.searchKey,
+      offerType,
+      partner: { id: bpartnerId, name: partnerName },
+      lineCount: result.linesWritten,
+      source: 'excess-agent',
+    });
+  } catch (e) {
+    // Router-internal failures are already breadcrumbed via 'downstream-failed';
+    // log to stderr for cron visibility but don't surface to the agent.
+    console.error(`[excess.load_offer] offer-router.dispatch failed for offer ${result.offerId}: ${e.message}`);
+  }
 
   return {
     offerId: result.offerId,
