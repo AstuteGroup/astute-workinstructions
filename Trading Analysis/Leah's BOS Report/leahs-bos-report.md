@@ -14,6 +14,8 @@ Weekly open-order report for Leah Griffin (Business Operations Support Superviso
 |---|---|---|
 | Open-order export xlsx | Infor "AST Open Orders" canned report | Columns: Name, Order, Customer Order, Customer Order Recorded Date, Internal Salesperson, Line, Item, Due Date, Promise Date, Qty Ordered, Invoiced, CO Buyer, Comments, Customer CSE |
 | ISE → region mapping | `ise-regions.json` | Regions: APAC, US, MX, EMEA. Edit & rerun to correct. |
+| BOS ↔ ISE matrix | `BOS_ISE_Assignments.xlsx` | Leah's source of truth for which BOS owns which ISE. Re-drop the latest xlsx whenever she sends one; no parsing needed (bos-report reads it directly). |
+| Display-name → login overrides | `ise-login-overrides.json` | Map of matrix display names ("Renald Ng", "Silvia Moreno") to Infor logins ("rayng", "silvmuno") when auto-derivation (first4+last4) doesn't match. Empty-string value means "matrix lists this person but they have no OOB login yet — skip without erroring." |
 
 ---
 
@@ -36,6 +38,25 @@ Weekly open-order report for Leah Griffin (Business Operations Support Superviso
 ## Regions
 
 Set in `ise-regions.json`. Current values: `APAC`, `US`, `MX`, `EMEA`, `(Unmapped)` (fallback). Add entries to `regions` object keyed by Infor ISE login (`first[:4] + last[:4]` pattern).
+
+---
+
+## Matrix Alignment Check
+
+Every run cross-references each flagged line's `Customer CSE` against the BOS↔ISE matrix in `BOS_ISE_Assignments.xlsx`. Three failure modes are surfaced (email body + xlsx `Unaligned` tab + Signals row):
+
+| Issue | Meaning | Severity |
+|---|---|---|
+| **Mismatch** | Line's CSE doesn't match the BOS the matrix assigns to that ISE | `ALERT` |
+| **No CSE** | CSE is blank / "." / "Astute" but matrix names an expected BOS | `WATCH` |
+| **Orphan ISE** | Line's ISE login isn't in the matrix at all (or in `ise-login-overrides.json`) | `INFO` |
+
+**How the matrix maps display names to OOB logins:**
+1. Auto-derive: lowercase(first4 of first name + first4 of last name). Works for ~70% of names.
+2. If `ise-login-overrides.json` has an explicit mapping, use that instead.
+3. If neither produces a login present in the OOB, the matrix entry is tagged "unmapped" — no error, just informational.
+
+**Maintenance:** when Leah sends a new matrix, drop it in this folder replacing `BOS_ISE_Assignments.xlsx`. If new ISE names don't follow the first4+last4 convention, add overrides to `ise-login-overrides.json`. The matrix file is committed to git so changes are auditable.
 
 ---
 
@@ -174,7 +195,10 @@ Leah's second ask: a monthly email showing what hasn't been resolved within the 
 | File | Purpose |
 |---|---|
 | `bos-report.js` | Main script — reads xlsx, buckets, renders email + xlsx, sends |
+| `bos-ise-matrix.js` | Helper module — parses `BOS_ISE_Assignments.xlsx` + `ise-login-overrides.json` into the lookup map bos-report uses to classify lines |
 | `backfill-snapshot.js` | Standalone helper: re-derives a snapshot from any OOB xlsx at any as-of date (`node backfill-snapshot.js <oob.xlsx> <YYYY-MM-DD>`). Use after schema changes to restore the composition view without waiting two weekly cycles. |
+| `BOS_ISE_Assignments.xlsx` | Leah's BOS↔ISE assignment matrix — drop a fresh copy whenever she sends one |
+| `ise-login-overrides.json` | Matrix display-name → OOB Infor-login overrides (for cases where first4+last4 derivation fails) |
 | `ise-regions.json` | ISE login → region mapping (source of truth) |
 | `snapshots/YYYY-MM-DD.json` | Per-run snapshot (bucket × region × BOS × aging counts + pastDueKeys/allKeys for line-level diffs) — drives week-over-week deltas. Committed to git. |
 | `leahs-bos-report.md` | This doc |

@@ -22,6 +22,7 @@ const fs = require('fs');
 const XLSX = require('xlsx');
 const ExcelJS = require('exceljs');
 const { createNotifier } = require('../../shared/notifier');
+const { loadMatrix, classifyLine } = require('./bos-ise-matrix');
 
 const DEFAULT_RECIPIENT = 'leah.griffin@astutegroup.com';
 const DEFAULT_CC = 'jake.harris@astutegroup.com';
@@ -95,10 +96,11 @@ function agingBand(daysPast) {
   return AGING_BANDS[0].label;
 }
 
-function bucketize(rows) {
+function bucketize(rows, matrix) {
   const b = { query: [], placeholder: [], pastDue: [] };
   for (const r of rows) {
     r._region = regionFor(r['Internal Salesperson']);
+    if (matrix) r._alignment = classifyLine(r, matrix);
     const prom = r['Promise Date'];
     const qty = Number(r['Qty Ordered'] || 0);
     const inv = Number(r['Invoiced'] || 0);
@@ -114,6 +116,25 @@ function bucketize(rows) {
     }
   }
   return b;
+}
+
+function collectAlignmentIssues(buckets) {
+  const issues = { mismatch: [], unassigned: [], orphan: [] };
+  const seen = new Set();
+  for (const bkt of ['query', 'placeholder', 'pastDue']) {
+    for (const r of buckets[bkt]) {
+      const key = `${r['Order']||''}|${r['Line']||''}|${r['Item']||''}|${bkt}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      const a = r._alignment;
+      if (!a || a.status === 'aligned' || a.status === 'no-matrix') continue;
+      const entry = { row: r, bucket: bkt };
+      if (a.status === 'mismatch') issues.mismatch.push(entry);
+      else if (a.status === 'unassigned-cse') issues.unassigned.push(entry);
+      else if (a.status === 'orphan-ise') issues.orphan.push(entry);
+    }
+  }
+  return issues;
 }
 
 function byKey(rows, col) {
@@ -613,11 +634,47 @@ function detectSignals(buckets) {
     });
   }
 
+  // --- 5a. Matrix alignment ---
+  const alignmentIssues = buckets._alignmentIssues;
+  if (alignmentIssues) {
+    const mis = alignmentIssues.mismatch.length;
+    const unas = alignmentIssues.unassigned.length;
+    const orph = alignmentIssues.orphan.length;
+    if (mis > 0) {
+      const byBosPair = new Map();
+      for (const e of alignmentIssues.mismatch) {
+        const k = `${e.row['Customer CSE']||'(blank)'} → ${e.row._alignment.expected}`;
+        byBosPair.set(k, (byBosPair.get(k)||0) + 1);
+      }
+      const topPairs = [...byBosPair.entries()].sort((a,b)=>b[1]-a[1]).slice(0,3).map(([k,c])=>`${k} (${c})`).join('; ');
+      signals.push({
+        severity: 'alert',
+        title: `${mis} flagged line${mis===1?'':'s'} routed to wrong BOS per matrix`,
+        detail: `Customer CSE doesn't match the latest BOS↔ISE assignment matrix. Top mismatches: ${topPairs}. Detail in Matrix alignment section + Unaligned xlsx tab.`
+      });
+    }
+    if (unas > 0) {
+      signals.push({
+        severity: 'warn',
+        title: `${unas} flagged line${unas===1?'':'s'} have no CSE assigned`,
+        detail: `Customer CSE is blank / "." / "Astute" but matrix names an expected BOS. These lines need a CSE before BOS can act on them.`
+      });
+    }
+    if (orph > 0) {
+      const orphIses = new Set(alignmentIssues.orphan.map(e => e.row['Internal Salesperson']));
+      signals.push({
+        severity: 'info',
+        title: `${orphIses.size} ISE login${orphIses.size===1?'':'s'} not in BOS↔ISE matrix`,
+        detail: `Affects ${orph} flagged line${orph===1?'':'s'}. ISEs: ${[...orphIses].sort().join(', ')}. Add to matrix or to <code>ise-login-overrides.json</code> if they're an alias.`
+      });
+    }
+  }
+
   // --- 5. Unmapped ISEs (data hygiene) ---
   const unmappedCount = { q: 0, p: 0, pd: 0 };
   const unmappedIses = new Set();
-  for (const [bkt, rows] of Object.entries(buckets)) {
-    for (const r of rows) {
+  for (const bkt of ['query', 'placeholder', 'pastDue']) {
+    for (const r of buckets[bkt]) {
       if (r._region === '(Unmapped)') {
         unmappedCount[bkt === 'query' ? 'q' : bkt === 'placeholder' ? 'p' : 'pd']++;
         unmappedIses.add((r['Internal Salesperson'] || '').toString().trim());
@@ -634,6 +691,87 @@ function detectSignals(buckets) {
   }
 
   return signals;
+}
+
+function renderAlignmentHtml(issues, matrix) {
+  const tot = issues.mismatch.length + issues.unassigned.length + issues.orphan.length;
+  if (!matrix.available) {
+    return `
+    <div style="background:#fdf6e3;border:1px solid #e0d082;padding:12px 16px;margin:0 0 22px 0;border-radius:4px">
+      <h3 style="margin:0 0 4px 0;color:#a67c00">Matrix alignment — not configured</h3>
+      <p style="margin:0;font-size:13px;color:#444">No <code>BOS_ISE_Assignments.xlsx</code> found in this workflow's folder. Drop the latest matrix file there to enable alignment checking.</p>
+    </div>`;
+  }
+  if (tot === 0) {
+    return `
+    <div style="background:#eaf7ea;border:1px solid #b7dfb9;padding:12px 16px;margin:0 0 22px 0;border-radius:4px">
+      <h3 style="margin:0 0 4px 0;color:#1e7e34">Matrix alignment — all clean</h3>
+      <p style="margin:0;font-size:13px;color:#444">Every flagged line's Customer CSE matches the BOS ↔ ISE matrix.</p>
+    </div>`;
+  }
+
+  function tableFor(label, entries, columns) {
+    if (!entries.length) return '';
+    const head = columns.map(c => `<th style="padding:4px 8px;border:1px solid #ddd;text-align:left;background:#fff8e1">${c.label}</th>`).join('');
+    const body = entries.slice(0, 50).map(e => {
+      const r = e.row;
+      return `<tr>${columns.map(c => `<td style="padding:3px 8px;border:1px solid #eed">${c.val(e, r)}</td>`).join('')}</tr>`;
+    }).join('');
+    const more = entries.length > 50 ? `<p style="margin:4px 0 0 0;font-size:12px;color:#666">… and ${entries.length - 50} more (see Unaligned tab in xlsx)</p>` : '';
+    return `<h4 style="margin:14px 0 4px 0">${label} <span style="color:#888;font-weight:normal">(${entries.length})</span></h4>
+      <table style="border-collapse:collapse;font-size:12px">${`<tr>${head}</tr>` + body}</table>${more}`;
+  }
+
+  const mismatchTable = tableFor('Mismatched CSE — line\'s Customer CSE doesn\'t match the matrix', issues.mismatch, [
+    { label: 'Bucket',   val: (e) => bucketLabel(e.bucket) },
+    { label: 'COV',      val: (_e, r) => r['Order'] || '' },
+    { label: 'Customer', val: (_e, r) => r['Name'] || '' },
+    { label: 'ISE',      val: (_e, r) => r['Internal Salesperson'] || '' },
+    { label: 'CSE in OOB', val: (e) => `<span style="color:#c0392b">${e.row['Customer CSE'] || '(blank)'}</span>` },
+    { label: 'Expected BOS', val: (e) => `<span style="color:#1e7e34">${e.row._alignment.expected}</span>` },
+    { label: 'Item',     val: (_e, r) => r['Item'] || '' },
+  ]);
+
+  const unassignedTable = tableFor('Unassigned CSE — line has no BOS in Customer CSE, matrix expects one', issues.unassigned, [
+    { label: 'Bucket',   val: (e) => bucketLabel(e.bucket) },
+    { label: 'COV',      val: (_e, r) => r['Order'] || '' },
+    { label: 'Customer', val: (_e, r) => r['Name'] || '' },
+    { label: 'ISE',      val: (_e, r) => r['Internal Salesperson'] || '' },
+    { label: 'CSE in OOB', val: (e) => `<i>${e.row['Customer CSE'] === '' ? '(blank)' : e.row['Customer CSE']}</i>` },
+    { label: 'Expected BOS', val: (e) => `<span style="color:#1e7e34">${e.row._alignment.expected}</span>` },
+    { label: 'Item',     val: (_e, r) => r['Item'] || '' },
+  ]);
+
+  const orphanByIse = {};
+  for (const e of issues.orphan) {
+    const k = e.row['Internal Salesperson'] || '(blank)';
+    if (!orphanByIse[k]) orphanByIse[k] = { ise: k, count: 0, cseSeen: new Set() };
+    orphanByIse[k].count++;
+    orphanByIse[k].cseSeen.add(e.row['Customer CSE'] || '(blank)');
+  }
+  const orphanRows = Object.values(orphanByIse).sort((a, b) => b.count - a.count).map(o =>
+    `<tr><td style="padding:3px 8px;border:1px solid #eed">${o.ise}</td><td style="padding:3px 8px;border:1px solid #eed;text-align:right">${o.count}</td><td style="padding:3px 8px;border:1px solid #eed">${[...o.cseSeen].join(', ')}</td></tr>`
+  ).join('');
+  const orphanTable = issues.orphan.length === 0 ? '' : `
+    <h4 style="margin:14px 0 4px 0">Orphan ISEs — line's ISE login is not in the matrix at all <span style="color:#888;font-weight:normal">(${issues.orphan.length} line${issues.orphan.length===1?'':'s'} across ${Object.keys(orphanByIse).length} ISE${Object.keys(orphanByIse).length===1?'':'s'})</span></h4>
+    <table style="border-collapse:collapse;font-size:12px">
+      <tr><th style="padding:4px 8px;border:1px solid #ddd;text-align:left;background:#fff8e1">ISE login</th><th style="padding:4px 8px;border:1px solid #ddd;text-align:right;background:#fff8e1">Lines</th><th style="padding:4px 8px;border:1px solid #ddd;text-align:left;background:#fff8e1">CSEs currently on these lines</th></tr>
+      ${orphanRows}
+    </table>
+    <p style="margin:4px 0 0 0;font-size:12px;color:#666">Add these ISEs to the matrix (or to <code>ise-login-overrides.json</code> if they're an alias of an existing matrix entry).</p>`;
+
+  return `
+  <div style="background:#fdecea;border:1px solid #e0bab5;padding:12px 16px;margin:0 0 22px 0;border-radius:4px">
+    <h3 style="margin:0 0 4px 0;color:#c0392b">Matrix alignment — ${tot} flagged line${tot===1?'':'s'} off the matrix</h3>
+    <p style="margin:0 0 6px 0;font-size:12px;color:#666">Compared against <code>BOS_ISE_Assignments.xlsx</code>. Mismatched lines are routed to the wrong BOS based on the latest matrix; unassigned lines need a CSE; orphan ISEs aren't in the matrix.</p>
+    ${mismatchTable}
+    ${unassignedTable}
+    ${orphanTable}
+  </div>`;
+}
+
+function bucketLabel(b) {
+  return b === 'query' ? 'Query (7/7)' : b === 'placeholder' ? 'Placeholder (8/8)' : 'Past Due';
 }
 
 function renderSignalsHtml(signals) {
@@ -842,6 +980,7 @@ async function buildHtml(buckets, fileName, attachments, deltas) {
     </tbody>
   </table>
   ${renderTrendsHtml(deltas)}
+  ${renderAlignmentHtml(buckets._alignmentIssues || { mismatch:[], unassigned:[], orphan:[] }, buckets._matrix || { available: false })}
   <h2 style="margin:18px 0 4px 0">Region overview</h2>
   ${regionTableHtml}
   <div style="margin:6px 0 20px 0"><img src="cid:bos-region-overview" alt="region overview" style="max-width:100%;border:1px solid #eee"/></div>
@@ -1319,6 +1458,48 @@ async function buildXlsxBuffer(buckets, deltas) {
   addPivot('Past Due', buckets.pastDue, true);
   pivot.autoFilter = { from: { row: 1, column: 1 }, to: { row: 1, column: 6 } };
 
+  // --- Unaligned tab (matrix mismatches) ---
+  const ai = buckets._alignmentIssues;
+  if (ai && (ai.mismatch.length + ai.unassigned.length + ai.orphan.length) > 0) {
+    const una = wb.addWorksheet('Unaligned');
+    una.columns = [
+      { header: 'Issue', key: 'issue', width: 18 },
+      { header: 'Bucket', key: 'bucket', width: 16 },
+      { header: 'COV', key: 'cov', width: 14 },
+      { header: 'Customer', key: 'name', width: 28 },
+      { header: 'ISE', key: 'ise', width: 12 },
+      { header: 'CSE in OOB', key: 'actual', width: 14 },
+      { header: 'Expected BOS', key: 'expected', width: 14 },
+      { header: 'Region', key: 'region', width: 10 },
+      { header: 'Item', key: 'item', width: 22 },
+      { header: 'Qty', key: 'qty', width: 10 },
+      { header: 'Promise Date', key: 'promise', width: 14 },
+    ];
+    una.getRow(1).font = { bold: true };
+    una.getRow(1).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFDECEA' } };
+    const addEntry = (issue, e) => {
+      const r = e.row;
+      const expected = r._alignment.expected || '';
+      una.addRow({
+        issue,
+        bucket: bucketLabel(e.bucket),
+        cov: r['Order'] || '',
+        name: r['Name'] || '',
+        ise: r['Internal Salesperson'] || '',
+        actual: r['Customer CSE'] || '',
+        expected,
+        region: r._region || '',
+        item: r['Item'] || '',
+        qty: Number(r['Qty Ordered'] || 0),
+        promise: r['Promise Date'] || ''
+      });
+    };
+    for (const e of ai.mismatch) addEntry('Mismatch', e);
+    for (const e of ai.unassigned) addEntry('No CSE', e);
+    for (const e of ai.orphan) addEntry('Orphan ISE', e);
+    una.autoFilter = { from: { row: 1, column: 1 }, to: { row: 1, column: una.columns.length } };
+  }
+
   return await wb.xlsx.writeBuffer();
 }
 
@@ -1346,8 +1527,20 @@ async function main() {
   const rows = XLSX.utils.sheet_to_json(ws, { defval: '', raw: false });
   console.log(`Loaded ${rows.length} rows`);
 
-  const buckets = bucketize(rows);
+  const matrix = loadMatrix();
+  if (matrix.available) {
+    console.log(`Matrix loaded: ${matrix.loginToBos.size} ISE→BOS mappings, ${matrix.unmappedDisplays.length} unmapped display names.`);
+  } else {
+    console.log('Matrix not found (BOS_ISE_Assignments.xlsx) — alignment check disabled.');
+  }
+  const buckets = bucketize(rows, matrix);
+  buckets._matrix = matrix;
+  buckets._alignmentIssues = collectAlignmentIssues(buckets);
   console.log(`Buckets: query=${buckets.query.length}, placeholder=${buckets.placeholder.length}, pastDue=${buckets.pastDue.length}`);
+  if (matrix.available) {
+    const a = buckets._alignmentIssues;
+    console.log(`Alignment: ${a.mismatch.length} mismatched · ${a.unassigned.length} no-CSE · ${a.orphan.length} orphan-ISE`);
+  }
 
   const runDate = isoDate(TODAY_UTC);
   const currentSnapshot = buildSnapshot(buckets, runDate, rows);

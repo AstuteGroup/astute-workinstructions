@@ -1,0 +1,16 @@
+{
+  "_comment": "Matrix display-name -> OOB Internal Salesperson login overrides. Auto-derivation = lowercase(first4 of first name + first4 of last name); list entries here only when that fails. Empty string means 'matrix entry has no OOB login (ISE never appears in OOB) — track as unmapped, don't error'.",
+  "_lastReviewed": "2026-05-12",
+  "Renald Ng": "rayng",
+  "Manikandan": "manika",
+  "Silvia Moreno": "silvmuno",
+  "Carolina": "carohine",
+  "Rotsarin": "rotsphro",
+  "Edyna": "edynlee",
+  "Wing": "wingzhan",
+  "Laurel": "laurekee",
+  "Julie White": "julicard",
+  "Nandhini": "",
+  "Spring": "",
+  "Joel Marquez": ""
+}
