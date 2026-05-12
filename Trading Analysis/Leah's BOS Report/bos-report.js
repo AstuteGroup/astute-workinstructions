@@ -302,7 +302,14 @@ function tallyBy(rows, accessor) {
   return m;
 }
 
-function buildSnapshot(buckets, runDate) {
+function lineKey(r) {
+  const cov = String(r['Order'] || r['Customer Order'] || '').trim();
+  const ln  = String(r['Line'] || '').trim();
+  const it  = String(r['Item'] || '').trim();
+  return `${cov}|${ln}|${it}`;
+}
+
+function buildSnapshot(buckets, runDate, allRows) {
   const byCse = (r) => (r['Customer CSE'] || '(blank)').toString().trim() || '(blank)';
   const byRegion = (r) => r._region;
   return {
@@ -326,7 +333,9 @@ function buildSnapshot(buckets, runDate) {
       fresh:   buckets.pastDue.filter(r => r._agingBand === AGING_BANDS[0].label).length,
       stale:   buckets.pastDue.filter(r => r._agingBand === AGING_BANDS[1].label).length,
       chronic: buckets.pastDue.filter(r => r._agingBand === AGING_BANDS[2].label).length,
-    }
+    },
+    pastDueKeys: buckets.pastDue.map(lineKey),
+    allKeys: (allRows || []).map(lineKey)
   };
 }
 
@@ -368,12 +377,45 @@ function diffMaps(curMap, priorMap) {
 function computeDeltas(current, prior) {
   if (!prior) return null;
   const d = (a, b) => (a || 0) - (b || 0);
+
+  let composition = null;
+  let daysBetween = null;
+  if (Array.isArray(prior.pastDueKeys) && Array.isArray(prior.allKeys) && Array.isArray(current.pastDueKeys)) {
+    const priorPD = new Set(prior.pastDueKeys);
+    const priorAll = new Set(prior.allKeys);
+    const curPD = new Set(current.pastDueKeys);
+    let persisted = 0, rolledForward = 0, newEntry = 0;
+    for (const k of curPD) {
+      if (priorPD.has(k)) persisted++;
+      else if (priorAll.has(k)) rolledForward++;
+      else newEntry++;
+    }
+    let resolved = 0;
+    for (const k of priorPD) if (!curPD.has(k)) resolved++;
+    composition = { persisted, resolved, rolledForward, newEntry };
+    const a = Date.parse(prior.runDate);
+    const b = Date.parse(current.runDate);
+    if (!isNaN(a) && !isNaN(b)) daysBetween = Math.max(1, Math.round((b - a) / 86400000));
+  }
+
   return {
     priorDate: prior.runDate,
+    daysBetween,
+    composition,
     totals: {
       query:       d(current.totals.query,       prior.totals?.query),
       placeholder: d(current.totals.placeholder, prior.totals?.placeholder),
       pastDue:     d(current.totals.pastDue,     prior.totals?.pastDue),
+    },
+    priorTotals: {
+      query:       prior.totals?.query || 0,
+      placeholder: prior.totals?.placeholder || 0,
+      pastDue:     prior.totals?.pastDue || 0,
+    },
+    currentTotals: {
+      query:       current.totals.query,
+      placeholder: current.totals.placeholder,
+      pastDue:     current.totals.pastDue,
     },
     byRegion: {
       query:       diffMaps(current.byRegion.query,       prior.byRegion?.query),
@@ -416,6 +458,31 @@ function topMoversHtml(label, mapping, limit = 5) {
   return `<li><b>${label}:</b> ${arr.map(e => `${e.k} ${fmtDeltaHtml(e.delta)}`).join(' &nbsp;·&nbsp; ')}</li>`;
 }
 
+function renderPastDueMovementHtml(deltas) {
+  const c = deltas.composition;
+  const days = deltas.daysBetween || 7;
+  const priorPD = deltas.priorTotals?.pastDue || 0;
+  const curPD = deltas.currentTotals?.pastDue || 0;
+  const net = deltas.totals.pastDue;
+  const headline = `${priorPD} → ${curPD} &nbsp;(net ${fmtDeltaHtml(net)} over ${days} day${days === 1 ? '' : 's'})`;
+
+  if (!c) {
+    return `<li><b>Past Due:</b> ${headline} &nbsp;<span style="color:#888;font-size:11px">(line-level composition unavailable — prior snapshot is count-only; next run will show persisted/resolved/rolled-forward/new-entry split)</span></li>`;
+  }
+  const resolvedRate = priorPD > 0 ? Math.round(100 * c.resolved / priorPD) : 0;
+  const persistedRate = priorPD > 0 ? Math.round(100 * c.persisted / priorPD) : 0;
+  const dailyRolled = Math.round(c.rolledForward / days);
+  return `
+    <li><b>Past Due:</b> ${headline}
+      <ul style="margin:4px 0 0 0;padding-left:18px;font-size:12px;color:#444;line-height:1.6">
+        <li><b style="color:#c0392b">Persisted</b> ${c.persisted} &nbsp;(${persistedRate}% of last week's ${priorPD} still overdue — the real problem set)</li>
+        <li><b style="color:#27ae60">Resolved</b> ${c.resolved} &nbsp;(${resolvedRate}% of last week's past-due cleared)</li>
+        <li><b style="color:#7f8c8d">Rolled forward</b> ${c.rolledForward} &nbsp;(was future-promise last week, naturally crossed in ${days} day${days===1?'':'s'} — ~${dailyRolled}/day)</li>
+        <li><b style="color:#e67e22">New entry past-due</b> ${c.newEntry} &nbsp;(line wasn't in last week's file at all)</li>
+      </ul>
+    </li>`;
+}
+
 function renderTrendsHtml(deltas) {
   if (!deltas) {
     return `
@@ -426,12 +493,15 @@ function renderTrendsHtml(deltas) {
   }
   const t = deltas.totals;
   const a = deltas.aging;
+  const days = deltas.daysBetween;
+  const intervalNote = days != null ? ` (${days} day${days===1?'':'s'} since last run)` : '';
   return `
   <div style="background:#eef5fb;border:1px solid #c8dff0;padding:12px 16px;margin:6px 0 22px 0;border-radius:4px">
-    <h3 style="margin:0 0 6px 0;color:#2874a6">Movement vs ${deltas.priorDate}</h3>
-    <p style="margin:0 0 6px 0;font-size:12px;color:#666">Up arrow (red) = more flagged lines this week. Down arrow (green) = fewer.</p>
+    <h3 style="margin:0 0 6px 0;color:#2874a6">Movement vs ${deltas.priorDate}${intervalNote}</h3>
+    <p style="margin:0 0 6px 0;font-size:12px;color:#666">Up arrow (red) = more flagged lines this week. Down arrow (green) = fewer. Past-due breakdown separates real persistence from the natural ticking of promise dates.</p>
     <ul style="margin:0;padding-left:22px;font-size:13px;line-height:1.8">
-      <li><b>Bucket totals:</b> Query ${fmtDeltaHtml(t.query)} &nbsp;·&nbsp; Placeholder ${fmtDeltaHtml(t.placeholder)} &nbsp;·&nbsp; Past Due ${fmtDeltaHtml(t.pastDue)}</li>
+      <li><b>Query / Placeholder totals:</b> Query ${fmtDeltaHtml(t.query)} &nbsp;·&nbsp; Placeholder ${fmtDeltaHtml(t.placeholder)}</li>
+      ${renderPastDueMovementHtml(deltas)}
       <li><b>Past-due aging shift:</b> Fresh ${fmtDeltaHtml(a.fresh)} &nbsp;·&nbsp; Stale ${fmtDeltaHtml(a.stale)} &nbsp;·&nbsp; Chronic ${fmtDeltaHtml(a.chronic)}</li>
       ${topMoversHtml('Region past-due movers', deltas.byRegion.pastDue)}
       ${topMoversHtml('BOS past-due movers',    deltas.byBos.pastDue)}
@@ -1280,7 +1350,7 @@ async function main() {
   console.log(`Buckets: query=${buckets.query.length}, placeholder=${buckets.placeholder.length}, pastDue=${buckets.pastDue.length}`);
 
   const runDate = isoDate(TODAY_UTC);
-  const currentSnapshot = buildSnapshot(buckets, runDate);
+  const currentSnapshot = buildSnapshot(buckets, runDate, rows);
   const priorSnapshot = loadPriorSnapshot(runDate);
   const deltas = computeDeltas(currentSnapshot, priorSnapshot);
   if (priorSnapshot) {

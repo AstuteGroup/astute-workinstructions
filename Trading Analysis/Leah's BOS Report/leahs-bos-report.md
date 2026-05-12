@@ -84,9 +84,18 @@ Thresholds live in `bos-report.js :: detectSignals()` — adjust there.
 
 ## Week-over-Week Trends
 
-After every run, the script writes a snapshot to `snapshots/YYYY-MM-DD.json` capturing bucket totals, by-region counts, by-BOS counts, and past-due aging counts. On the next run it loads the most recent prior snapshot (any date < today) and renders deltas:
+After every run, the script writes a snapshot to `snapshots/YYYY-MM-DD.json` capturing bucket totals, by-region counts, by-BOS counts, past-due aging counts, AND the line keys (`Order|Line|Item`) for every past-due line plus every line in the source file. The keys drive a four-way decomposition of the past-due Δ:
 
-- **Email body** — a "Movement vs {priorDate}" panel just above the Signals block, showing bucket totals ▲▼, aging shift, top region past-due movers, top BOS past-due movers, and top region placeholder movers. Up arrow (red) = more flagged lines = bad. Down arrow (green) = fewer = good.
+| Category | Meaning |
+|---|---|
+| **Persisted** | line was past-due last week AND is past-due this week — the real problem set |
+| **Resolved** | line was past-due last week, no longer past-due (shipped, cancelled, or rolled off the file) |
+| **Rolled forward** | line was a future-promise in last week's file; the calendar crossed its promise date — noise, not a new problem |
+| **New entry past-due** | line wasn't in last week's file at all; arrived already overdue |
+
+This matters because **bare counts mislead when runs aren't evenly spaced**. A 6-day gap typically produces ~50 rolled-forward lines/day. Without the decomposition, a normal week looks catastrophic; with it, you see how much of the Δ is actual operational drift vs. the clock.
+
+- **Email body** — a "Movement vs {priorDate} (N days since last run)" panel just above the Signals block. Shows the past-due composition above, query/placeholder totals ▲▼, aging shift, top region past-due movers, top BOS past-due movers, and top region placeholder movers. Up arrow (red) = more flagged lines = bad. Down arrow (green) = fewer = good. If the prior snapshot pre-dates the line-key schema, the panel falls back to the legacy count-only view.
 - **xlsx `All BOS` tab** — extra `Δ vs {priorDate}` column with red/green cell shading. BOS that fully cleared since last week (prior > 0, current = 0) appear in italics with a green Δ for visibility.
 - **xlsx `By Region` tab** — same `Δ vs {priorDate}` column.
 - **First run / no prior snapshot** — renders a "Baseline week" block instead of deltas; today's snapshot becomes the baseline for next week.
@@ -165,8 +174,9 @@ Leah's second ask: a monthly email showing what hasn't been resolved within the 
 | File | Purpose |
 |---|---|
 | `bos-report.js` | Main script — reads xlsx, buckets, renders email + xlsx, sends |
+| `backfill-snapshot.js` | Standalone helper: re-derives a snapshot from any OOB xlsx at any as-of date (`node backfill-snapshot.js <oob.xlsx> <YYYY-MM-DD>`). Use after schema changes to restore the composition view without waiting two weekly cycles. |
 | `ise-regions.json` | ISE login → region mapping (source of truth) |
-| `snapshots/YYYY-MM-DD.json` | Per-run snapshot (bucket × region × BOS × aging counts) — drives week-over-week deltas. Committed to git. |
+| `snapshots/YYYY-MM-DD.json` | Per-run snapshot (bucket × region × BOS × aging counts + pastDueKeys/allKeys for line-level diffs) — drives week-over-week deltas. Committed to git. |
 | `leahs-bos-report.md` | This doc |
 
 ## Dependencies
