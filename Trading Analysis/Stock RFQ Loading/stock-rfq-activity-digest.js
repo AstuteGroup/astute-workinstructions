@@ -196,12 +196,12 @@ async function queryWindowStats(fromTs, toTs = now) {
       COUNT(DISTINCT r.chuboe_rfq_id)               AS rfq_count,
       COUNT(DISTINCT mpn.chuboe_mpn_clean)          AS unique_mpns,
       COUNT(DISTINCT r.c_bpartner_id)               AS unique_bps,
-      COUNT(*) FILTER (
+      COUNT(DISTINCT r.chuboe_rfq_id) FILTER (
         WHERE r.c_bpartner_id = $3
-      )                                              AS unqualified_lines,
-      COUNT(*) FILTER (
+      )                                              AS unqualified_rfqs,
+      COUNT(DISTINCT r.chuboe_rfq_id) FILTER (
         WHERE r.c_bpartner_id <> $3
-      )                                              AS matched_lines
+      )                                              AS matched_rfqs
     FROM adempiere.chuboe_rfq r
     JOIN adempiere.chuboe_rfq_line rl       ON rl.chuboe_rfq_id = r.chuboe_rfq_id
     JOIN adempiere.chuboe_rfq_line_mpn mpn  ON mpn.chuboe_rfq_line_id = rl.chuboe_rfq_line_id
@@ -217,14 +217,20 @@ async function queryWindowStats(fromTs, toTs = now) {
 
 // Top MPNs over [fromTs, toTs).
 //
+// All counts are at the RFQ level — `COUNT(DISTINCT chuboe_rfq_id)`, never
+// COUNT(*) over the line-mpn join. Counting line-mpn rows inflated the headline
+// "Lines" number whenever an RFQ carried alternates or re-listed the same MPN,
+// and it diverged from the 30d-Repeat RFQ count for no operationally useful
+// reason. One MPN appearing on one broker email = one count.
+//
 // `tickStart` is an OPTIONAL inner window inside [fromTs, toTs). When set,
-// each row also returns `tick_lines` (lines in the inner window) so the 30d
-// table can show "what's hot RIGHT NOW within the 30d signal" inline. Pass
+// each row also returns `tick_rfqs` (distinct RFQs in the inner window) so the
+// 30d table can show "what's hot RIGHT NOW within the 30d signal" inline. Pass
 // `tickStart` = lastTickStart for the 30d-primary table; pass null for the
 // today-only table to skip the extra FILTER.
 //
 // `todayStart` is similarly OPTIONAL — when set, each row returns
-// `today_lines` (lines since 00 ET) for inline delta visibility.
+// `today_rfqs` (distinct RFQs since 00 ET) for inline delta visibility.
 //
 // Asked-by column: dedupes customer names with `(xN)` suffix when a customer
 // has more than one distinct RFQ in the window. CTE-based to keep the count-
@@ -278,28 +284,28 @@ async function queryTopMpns(fromTs, toTs = now, opts = {}) {
     ),
     mpn_summary AS (
       SELECT
-        l.chuboe_mpn                                          AS mpn,
-        MAX(l.chuboe_mfr_text)                                AS mfr,
-        l.chuboe_mpn_clean                                    AS mpn_clean,
-        COUNT(*)                                              AS line_count,
-        MAX(COALESCE(l.qty, 0))                               AS max_qty,
-        COUNT(DISTINCT l.c_bpartner_id)                       AS distinct_bps,
-        COUNT(*) FILTER (WHERE l.c_bpartner_id <> $3)         AS matched_lines,
-        COUNT(*) FILTER (WHERE l.c_bpartner_id = $3)          AS unqualified_lines,
-        MAX(NULLIF(l.priceentered, 0))                        AS max_target_price,
-        COUNT(*) FILTER (
+        l.chuboe_mpn                                                       AS mpn,
+        MAX(l.chuboe_mfr_text)                                             AS mfr,
+        l.chuboe_mpn_clean                                                 AS mpn_clean,
+        COUNT(DISTINCT l.chuboe_rfq_id)                                    AS rfq_count,
+        MAX(COALESCE(l.qty, 0))                                            AS max_qty,
+        COUNT(DISTINCT l.c_bpartner_id)                                    AS distinct_bps,
+        COUNT(DISTINCT l.chuboe_rfq_id) FILTER (WHERE l.c_bpartner_id <> $3) AS matched_rfqs,
+        COUNT(DISTINCT l.chuboe_rfq_id) FILTER (WHERE l.c_bpartner_id = $3)  AS unqualified_rfqs,
+        MAX(NULLIF(l.priceentered, 0))                                     AS max_target_price,
+        COUNT(DISTINCT l.chuboe_rfq_id) FILTER (
           WHERE $6::timestamp IS NOT NULL AND l.created_ct >= $6::timestamp
-        )                                                     AS tick_lines,
-        COUNT(*) FILTER (
+        )                                                                  AS tick_rfqs,
+        COUNT(DISTINCT l.chuboe_rfq_id) FILTER (
           WHERE $7::timestamp IS NOT NULL AND l.created_ct >= $7::timestamp
-        )                                                     AS today_lines
+        )                                                                  AS today_rfqs
       FROM lines l
       GROUP BY l.chuboe_mpn, l.chuboe_mpn_clean
     )
     SELECT s.*, c.customer_names
     FROM mpn_summary s
     LEFT JOIN customer_agg c ON c.chuboe_mpn_clean = s.mpn_clean
-    ORDER BY s.line_count DESC, s.max_qty DESC
+    ORDER BY s.rfq_count DESC, s.max_qty DESC
     LIMIT $5
   `, [
     fromTs, toTs, UNQUALIFIED_BROKER_ID, STOCK_RFQ_TYPE_ID, limit,
@@ -382,7 +388,7 @@ async function fetchOemsecretsForOosHotMpns(topMpns, franchiseMap, repeatMap) {
       const repeat = repeatMap.get(r.mpn_clean);
       return Number(r.distinct_bps) >= 3 || (repeat && Number(repeat.historical_bps) >= 3);
     })
-    .sort((a, b) => Number(b.line_count) - Number(a.line_count));
+    .sort((a, b) => Number(b.rfq_count) - Number(a.rfq_count));
 
   for (const r of candidates) {
     const cached = cache[r.mpn_clean];
@@ -644,13 +650,13 @@ function classifyMpn(row, repeatMap) {
   const mpnClean = row.mpn_clean;
   const repeat = repeatMap.get(mpnClean);
   const distinctBps = Number(row.distinct_bps);
-  const matchedLines = Number(row.matched_lines);
-  const totalLines = Number(row.line_count);
+  const matchedRfqs = Number(row.matched_rfqs);
+  const totalRfqs = Number(row.rfq_count);
   const hist = repeat ? Number(repeat.historical_bps) : 0;
 
   if (distinctBps >= 3 || hist >= 3) return { tag: 'HOT', note: '≥3 distinct customers (today or 30d)' };
-  if (matchedLines >= 1 && matchedLines >= totalLines / 2) return { tag: 'REAL', note: 'mostly from matched BPs' };
-  if (matchedLines === 0) return { tag: 'BOGUS-LEAN', note: 'all from Unqualified' };
+  if (matchedRfqs >= 1 && matchedRfqs >= totalRfqs / 2) return { tag: 'REAL', note: 'mostly from matched BPs' };
+  if (matchedRfqs === 0) return { tag: 'BOGUS-LEAN', note: 'all from Unqualified' };
   return { tag: 'MIXED', note: 'matched + unqualified mix' };
 }
 
@@ -756,20 +762,20 @@ function renderMpnRow(r, i, ctx) {
     ? `${fmtInt(repeat.historical_bps)} BPs / ${fmtInt(repeat.historical_rfqs)} RFQs`
     : '<span class="small">no recent</span>';
   const tickCell = includeTickCol
-    ? `<td>${Number(r.tick_lines) > 0 ? `<b>${fmtInt(r.tick_lines)}</b>` : '<span class="small">0</span>'}</td>`
+    ? `<td>${Number(r.tick_rfqs) > 0 ? `<b>${fmtInt(r.tick_rfqs)}</b>` : '<span class="small">0</span>'}</td>`
     : '';
   const todayCell = includeTodayCol
-    ? `<td>${Number(r.today_lines) > 0 ? `<b>${fmtInt(r.today_lines)}</b>` : '<span class="small">0</span>'}</td>`
+    ? `<td>${Number(r.today_rfqs) > 0 ? `<b>${fmtInt(r.today_rfqs)}</b>` : '<span class="small">0</span>'}</td>`
     : '';
   return `<tr>
     <td>${i + 1}</td>
     <td><b>${escHtml(r.mpn)}</b></td>
     <td>${escHtml(r.mfr || '')}</td>
     <td>${tagBadge(klass.tag)}<br/><span class="small">${escHtml(klass.note)}</span></td>
-    <td>${fmtInt(r.line_count)}</td>
+    <td>${fmtInt(r.rfq_count)}</td>
     ${tickCell}${todayCell}
     <td>${fmtInt(r.max_qty)}</td>
-    <td>${fmtInt(r.distinct_bps)} <span class="small">(${fmtInt(r.matched_lines)} matched / ${fmtInt(r.unqualified_lines)} unq)</span></td>
+    <td>${fmtInt(r.distinct_bps)} <span class="small">(${fmtInt(r.matched_rfqs)} matched / ${fmtInt(r.unqualified_rfqs)} unq)</span></td>
     <td>${repeatTxt}</td>
     <td>${renderStockCell(stockMap.get(r.mpn_clean))}</td>
     <td>${renderExcessCell(excessMap.get(r.mpn_clean), isHot)}</td>
@@ -785,7 +791,7 @@ function renderMpnTable(rows, ctx, headerLabel, emptyMsg) {
   const tickHeader  = ctx.includeTickCol  ? '<th>Last 4h</th>'  : '';
   const todayHeader = ctx.includeTodayCol ? '<th>Today</th>' : '';
   html += `<table><tr><th>#</th><th>MPN</th><th>Mfr</th><th>Tag</th>`
-       + `<th>Lines</th>${tickHeader}${todayHeader}<th>Max Qty</th>`
+       + `<th>RFQs</th>${tickHeader}${todayHeader}<th>Max Qty</th>`
        + `<th>Distinct Customers</th><th>30d Repeat</th>`
        + `<th>Stock</th><th>Excess Match (90d)</th>`
        + `<th>Best Franchise (14d)</th>`
@@ -800,8 +806,8 @@ function renderStatBand(label, stats) {
        + `<div class="stat"><b>${fmtInt(stats.rfq_count)}</b>RFQs</div>`
        + `<div class="stat"><b>${fmtInt(stats.unique_mpns)}</b>Unique MPNs</div>`
        + `<div class="stat"><b>${fmtInt(stats.unique_bps)}</b>Customers</div>`
-       + `<div class="stat"><b>${fmtInt(stats.matched_lines)}</b>Matched lines</div>`
-       + `<div class="stat"><b>${fmtInt(stats.unqualified_lines)}</b>Unqualified lines</div>`;
+       + `<div class="stat"><b>${fmtInt(stats.matched_rfqs)}</b>Matched RFQs</div>`
+       + `<div class="stat"><b>${fmtInt(stats.unqualified_rfqs)}</b>Unqualified RFQs</div>`;
 }
 
 function renderHtml(model) {
@@ -838,7 +844,7 @@ function renderHtml(model) {
   html += renderMpnTable(
     topMpns30d, ctx30d,
     `Top ${TOP_N} MPNs — Last 30 Days`,
-    'No stock RFQ lines in the last 30 days.',
+    'No stock RFQs in the last 30 days.',
   );
 
   // Secondary: Top MPNs since 00 ET (today's slice — what's fresh).
@@ -849,7 +855,7 @@ function renderHtml(model) {
   html += renderMpnTable(
     topMpnsToday, ctxToday,
     `Top ${TOP_N} MPNs — Today (since 00 ET)`,
-    'No stock RFQ lines since 00 ET.',
+    'No stock RFQs since 00 ET.',
   );
 
   // Top Customers (30d only — customer demand is slower-moving than MPN heat)
