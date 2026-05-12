@@ -533,13 +533,43 @@ Some inventory lives outside the weekly Infor export but still needs to be marke
 
 **MFR comparison during reconciliation** uses `shared/mfr-equivalence.js` (alias + acquisition aware), but Infor warehouse-tag MFR is known unreliable across the consignment warehouses, so a MFR mismatch alone never blocks retirement — it only annotates the overlap CSV.
 
+**Carryover lifecycle CLI (canonical entry point):** `manage-carryover.js` — one tool for bootstrap, add, retire, and list across any label. CSV-driven for bulk operations, label-agnostic, audit-logged.
+
+```bash
+# Bootstrap a brand-new carryover (replaces per-label bootstrap_*.js scripts)
+node manage-carryover.js bootstrap --label "GE Consignment" \
+     --csv ge-bootstrap.csv --bp 1003001 --offer-type 1000004 \
+     --paired W103 --portal "Astute Electronics Inc. - GE (Carryover)" \
+     [--dry-run]
+
+# Extend an existing carryover with new lines (idempotent on MPN+DateCode)
+node manage-carryover.js add --label "Eaton Consignment" --csv additions.csv [--dry-run]
+
+# Retire one or more MPNs (defense-in-depth: also retires on bootstrap offer if registry has the label)
+node manage-carryover.js retire --label "Eaton Consignment" \
+     --mpns PMV450ENEAR,XYZ123 --reason "physical in Austin" [--dry-run]
+
+# Inspect current state
+node manage-carryover.js list --label "Eaton Consignment"
+```
+
+CSV schema (bootstrap & add, headers case-insensitive): required `MPN, MFR, Qty`; optional `DateCode, PackageDesc, Price, MOQ, SPQ, LineDescription`.
+
+Audit log: every bootstrap/add/retire appends to `carryover-audit.csv` (this folder). Git-tracked record of what changed when, by whom, and why.
+
 **Adding a carryover entry:**
 
-1. Bootstrap the offer manually (one-off apiPost or use `bootstrap_*.js` pattern in `Trading Analysis/Inventory File Cleanup/`).
-2. Capture the new `chuboe_offer_id` and add an entry to `STATIC_CARRYOVER_OFFERS` with `label`, `bootstrapId`, `portalWarehouseName`, and (if applicable) `pairedWarehouses`.
-3. Run `node inventory_cleanup.js <fresh_export>.xlsx --writeback --dry-run` to verify the entry resolves correctly before next Monday's cron.
+1. Drop a CSV with the initial lines.
+2. Run `manage-carryover.js bootstrap --label … --csv … --bp … --offer-type … [--paired W103,W117] --dry-run` to preview.
+3. Re-run without `--dry-run` to commit. The CLI prints the resulting `bootstrapId` and a copy-pasteable registry block.
+4. Paste the block into `STATIC_CARRYOVER_OFFERS` in `inventory_cleanup.js`.
+5. Run `node inventory_cleanup.js <fresh_export>.xlsx --writeback --dry-run` to verify it resolves before next Monday's cron.
 
-**Removing a carryover entry:** delete the entry from `STATIC_CARRYOVER_OFFERS`. The existing OT offer stays active but stops being refreshed — manually deactivate via the OT UI when ready. (Removing only stops the auto-refresh; it does NOT deactivate the current offer.)
+**Retiring a single MPN (today's pattern for stale lines):** `manage-carryover.js retire --label "…" --mpns MPN1,MPN2 --reason "…"`. Deactivates the matching lines on the current `[Carryover]` offer (and on the registry's `bootstrapId` offer as defense-in-depth). Next weekly refresh's `IsActive eq true` filter then skips them — permanent removal.
+
+**Removing an entire carryover label:** delete the entry from `STATIC_CARRYOVER_OFFERS`. The existing OT offer stays active but stops being refreshed — manually deactivate via the OT UI when ready. (Removing only stops the auto-refresh; it does NOT deactivate the current offer.)
+
+**Historical one-off scripts** (`bootstrap_gm_carryover.js`, `lam_static_bootstrap.js`, `eaton_carryover_patch.js`, `philippines_carryover_patch.js`, `retire-pmv450enear-carryover.js`) are superseded by `manage-carryover.js` but left in place for git history. Do not extend them — add to the CLI instead.
 
 **Historical:** `Incoming Lot bid from Marvell` (bootstrap 1024030, 2025-07-17) was removed 2026-05-07. The slot was placeholder-only — never seeded with any lines, so 10 months of weekly refresh ran as no-ops on an empty source. Open business question (see `deferred-work.md`): should won-lot bids be tracked as static carryovers at all, or as something else?
 

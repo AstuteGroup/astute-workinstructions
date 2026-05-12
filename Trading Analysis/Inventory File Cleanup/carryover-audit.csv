@@ -1,0 +1,2 @@
+timestamp,action,label,offerId,mpn,qty,reason,operator
+2026-05-12T13:02:03Z,retire,Eaton Consignment,1026216,PMV450ENEAR,28034,physical stock in Austin (transferred from Philippines); pre-CLI one-off via retire-pmv450enear-carryover.js,Jake/Claude
