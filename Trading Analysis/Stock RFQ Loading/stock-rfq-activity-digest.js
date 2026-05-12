@@ -2,15 +2,36 @@
  * Stock RFQ Activity Digest
  * =========================
  *
- * Cumulative-growing log of stock RFQ inbound activity, emailed every 4h.
+ * Rolling 30-day activity log of stock RFQ inbound demand, emailed every 4h.
  *
  * Cadence: 00/04/08/12/16/20 UTC (6 ticks/day), anchored at 00 UTC.
  *
  * Each tick shows:
- *   - Last 4h: N RFQs, M MPNs, P customers
- *   - Cumulative since 00 ET
- *   - Top 10 concentrated MPNs (with real/bogus hints per customer mix)
- *   - Top 10 concentrated customers (matched vs Unqualified, real/bogus heuristic)
+ *   - Stat band: Last 4h / Today (since 00 ET) / Last 30d
+ *   - Top 10 MPNs over the LAST 30 DAYS (durable demand signal) with Last-4h
+ *     and Today deltas inline. Drives the heat tag.
+ *   - Top 10 MPNs TODAY (since 00 ET) — what's fresh this slice, separate ranking
+ *   - Top 10 customers over the last 30 days
+ *
+ * Asked-by column dedupes customer names with `(xN)` counts when a customer
+ * has filed multiple distinct RFQs for the MPN in the window.
+ *
+ * Two distinct supply-side enrichment columns:
+ *
+ *   Stock column (Astute-owned inventory — what we currently post on
+ *   inventory reports / static reports):
+ *     - Free Stock        — Astute Electronics Inc (BP 1000332)
+ *     - Franchise Stock   — Astute - Franchise Stock (BP 1000325)
+ *     - Consignment       — Astute-{customer} Excess BPs (GE/Taxan/Spartronics/Eaton/LAM)
+ *     - LAM Dead          — BP 1000332 + "LAM_Dead_Inventory" description suffix
+ *
+ *   Excess Match (90d) column (3rd-party Customer Excess via the offer-poller
+ *   pipeline from excess@orangetsunami.com — NOT on currently-posted inventory
+ *   reports; provided here as a heads-up for HOT-tagged MPNs only):
+ *     - Customer Excess   — offer types 1000000/1000003, last 90 days
+ *
+ * Excludes offer type 1000025 (LAM Kitting Inventory — one-off LAM consigned-
+ * stock report, never on the supply side).
  *
  * Designed to surface "concentrated activity and by whom (real vs bogus)" so
  * the operator can see where to focus broker quoting effort vs ignore junk.
@@ -85,6 +106,30 @@ const pool = new Pool({
   user: process.env.PGUSER || process.env.USER || 'analytics_user',
 });
 
+// ─── INVENTORY BUCKETING (stock-match column) ────────────────────────────────
+//
+// Per `Trading Analysis/Inventory File Cleanup/inventory_cleanup.js`
+// WAREHOUSE_WRITEBACK map: a single (BP, OfferType, description-suffix) tuple
+// identifies each warehouse group. We bucket by BP because BPs are stable
+// and warehouse/location is derivable from offer_type + description.
+const ASTUTE_ELECTRONICS_BP   = 1000332;  // Free Stock + LAM Dead
+const ASTUTE_FRANCHISE_BP     = 1000325;  // Franchise Stock
+const CONSIGNMENT_BPS = {
+  1003236: 'GE',
+  1003621: 'Taxan',
+  1005225: 'Spartronics',
+  1010966: 'Eaton',
+  1011267: 'LAM',
+};
+const FREE_STOCK_LOCATIONS_BY_TYPE = {
+  1000006: 'Stevenage',
+  1000008: 'Austin',
+  1000009: 'Hong Kong',
+  1000014: 'Philippines',
+};
+const LAM_KITTING_INVENTORY_TYPE = 1000025;  // excluded — one-off LAM report
+const CUSTOMER_EXCESS_TYPES = [1000000, 1000003];  // Customer Excess + Lead Time Buy
+
 // ─── TIME WINDOWS ────────────────────────────────────────────────────────────
 //
 // CRITICAL TZ NOTE (2026-05-11): adempiere.chuboe_rfq.created is a
@@ -136,8 +181,12 @@ function fmtEtTimeOnly(d) {
 }
 
 const now = new Date();
-const cumSince = sinceOverride ? new Date(sinceOverride) : etMidnight(now);
-const lastTickStart = nMinutesAgo(now, 240); // 4h
+const todayStart    = sinceOverride ? new Date(sinceOverride) : etMidnight(now);
+const lastTickStart = nMinutesAgo(now, 240);                          // 4h
+const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60_000); // 30d rolling
+// `cumSince` is kept as a legacy alias for the today-since-00-ET anchor used
+// by the second MPN table and stat-band "Today" column.
+const cumSince = todayStart;
 
 // ─── QUERIES ─────────────────────────────────────────────────────────────────
 
@@ -166,36 +215,96 @@ async function queryWindowStats(fromTs, toTs = now) {
   return r.rows[0];
 }
 
-async function queryTopMpns(fromTs, toTs = now, limit = TOP_N) {
+// Top MPNs over [fromTs, toTs).
+//
+// `tickStart` is an OPTIONAL inner window inside [fromTs, toTs). When set,
+// each row also returns `tick_lines` (lines in the inner window) so the 30d
+// table can show "what's hot RIGHT NOW within the 30d signal" inline. Pass
+// `tickStart` = lastTickStart for the 30d-primary table; pass null for the
+// today-only table to skip the extra FILTER.
+//
+// `todayStart` is similarly OPTIONAL — when set, each row returns
+// `today_lines` (lines since 00 ET) for inline delta visibility.
+//
+// Asked-by column: dedupes customer names with `(xN)` suffix when a customer
+// has more than one distinct RFQ in the window. CTE-based to keep the count-
+// per-customer aggregation independent of the headline GROUP BY.
+async function queryTopMpns(fromTs, toTs = now, opts = {}) {
+  const limit = opts.limit || TOP_N;
+  const tickStart = opts.tickStart || null;
+  const todayStartTs = opts.todayStart || null;
+
   const r = await pool.query(`
-    SELECT
-      mpn.chuboe_mpn                                      AS mpn,
-      MAX(mpn.chuboe_mfr_text)                            AS mfr,
-      mpn.chuboe_mpn_clean                                AS mpn_clean,
-      COUNT(*)                                            AS line_count,
-      MAX(COALESCE(rl.qty, 0))                            AS max_qty,
-      COUNT(DISTINCT r.c_bpartner_id)                     AS distinct_bps,
-      COUNT(*) FILTER (WHERE r.c_bpartner_id <> $3)       AS matched_lines,
-      COUNT(*) FILTER (WHERE r.c_bpartner_id = $3)        AS unqualified_lines,
-      MAX(NULLIF(mpn.priceentered, 0))                    AS max_target_price,
-      STRING_AGG(DISTINCT
-        COALESCE(NULLIF(r.bpname, ''), bp.name),
-        ', ' ORDER BY COALESCE(NULLIF(r.bpname, ''), bp.name)
-      )                                                   AS customer_names
-    FROM adempiere.chuboe_rfq r
-    JOIN adempiere.chuboe_rfq_line rl       ON rl.chuboe_rfq_id = r.chuboe_rfq_id
-    JOIN adempiere.chuboe_rfq_line_mpn mpn  ON mpn.chuboe_rfq_line_id = rl.chuboe_rfq_line_id
-    LEFT JOIN adempiere.c_bpartner bp       ON bp.c_bpartner_id = r.c_bpartner_id
-    WHERE r.chuboe_rfq_type_id = $4
-      AND r.created AT TIME ZONE 'America/Chicago' >= $1
-      AND r.created AT TIME ZONE 'America/Chicago' < $2
-      AND r.isactive = 'Y'
-      AND rl.isactive = 'Y'
-      AND mpn.isactive = 'Y'
-    GROUP BY mpn.chuboe_mpn, mpn.chuboe_mpn_clean
-    ORDER BY line_count DESC, max_qty DESC
+    WITH lines AS (
+      SELECT
+        mpn.chuboe_mpn,
+        mpn.chuboe_mpn_clean,
+        mpn.chuboe_mfr_text,
+        mpn.priceentered,
+        r.chuboe_rfq_id,
+        r.c_bpartner_id,
+        rl.qty,
+        COALESCE(NULLIF(r.bpname, ''), bp.name) AS customer_name,
+        (r.created AT TIME ZONE 'America/Chicago') AS created_ct
+      FROM adempiere.chuboe_rfq r
+      JOIN adempiere.chuboe_rfq_line rl       ON rl.chuboe_rfq_id = r.chuboe_rfq_id
+      JOIN adempiere.chuboe_rfq_line_mpn mpn  ON mpn.chuboe_rfq_line_id = rl.chuboe_rfq_line_id
+      LEFT JOIN adempiere.c_bpartner bp       ON bp.c_bpartner_id = r.c_bpartner_id
+      WHERE r.chuboe_rfq_type_id = $4
+        AND r.created AT TIME ZONE 'America/Chicago' >= $1
+        AND r.created AT TIME ZONE 'America/Chicago' < $2
+        AND r.isactive = 'Y'
+        AND rl.isactive = 'Y'
+        AND mpn.isactive = 'Y'
+    ),
+    per_mpn_customer AS (
+      SELECT
+        chuboe_mpn_clean,
+        customer_name,
+        COUNT(DISTINCT chuboe_rfq_id) AS rfq_count
+      FROM lines
+      WHERE customer_name IS NOT NULL AND customer_name <> ''
+      GROUP BY chuboe_mpn_clean, customer_name
+    ),
+    customer_agg AS (
+      SELECT
+        chuboe_mpn_clean,
+        STRING_AGG(
+          customer_name || CASE WHEN rfq_count > 1 THEN ' (x' || rfq_count || ')' ELSE '' END,
+          ', ' ORDER BY rfq_count DESC, customer_name
+        ) AS customer_names
+      FROM per_mpn_customer
+      GROUP BY chuboe_mpn_clean
+    ),
+    mpn_summary AS (
+      SELECT
+        l.chuboe_mpn                                          AS mpn,
+        MAX(l.chuboe_mfr_text)                                AS mfr,
+        l.chuboe_mpn_clean                                    AS mpn_clean,
+        COUNT(*)                                              AS line_count,
+        MAX(COALESCE(l.qty, 0))                               AS max_qty,
+        COUNT(DISTINCT l.c_bpartner_id)                       AS distinct_bps,
+        COUNT(*) FILTER (WHERE l.c_bpartner_id <> $3)         AS matched_lines,
+        COUNT(*) FILTER (WHERE l.c_bpartner_id = $3)          AS unqualified_lines,
+        MAX(NULLIF(l.priceentered, 0))                        AS max_target_price,
+        COUNT(*) FILTER (
+          WHERE $6::timestamp IS NOT NULL AND l.created_ct >= $6::timestamp
+        )                                                     AS tick_lines,
+        COUNT(*) FILTER (
+          WHERE $7::timestamp IS NOT NULL AND l.created_ct >= $7::timestamp
+        )                                                     AS today_lines
+      FROM lines l
+      GROUP BY l.chuboe_mpn, l.chuboe_mpn_clean
+    )
+    SELECT s.*, c.customer_names
+    FROM mpn_summary s
+    LEFT JOIN customer_agg c ON c.chuboe_mpn_clean = s.mpn_clean
+    ORDER BY s.line_count DESC, s.max_qty DESC
     LIMIT $5
-  `, [fromTs, toTs, UNQUALIFIED_BROKER_ID, STOCK_RFQ_TYPE_ID, limit]);
+  `, [
+    fromTs, toTs, UNQUALIFIED_BROKER_ID, STOCK_RFQ_TYPE_ID, limit,
+    tickStart, todayStartTs,
+  ]);
   return r.rows;
 }
 
@@ -302,6 +411,159 @@ async function fetchOemsecretsForOosHotMpns(topMpns, franchiseMap, repeatMap) {
   }
   writeOemsecretsCache(cache);
   return { resultMap: result, budgetUsed, candidates: candidates.length };
+}
+
+// Astute-owned inventory matches for each top MPN. Buckets:
+//   - 'Free Stock'      — BP 1000332, excluding "LAM_Dead_Inventory" desc suffix
+//   - 'LAM Dead'        — BP 1000332 with "LAM_Dead_Inventory" desc suffix
+//   - 'Franchise Stock' — BP 1000325
+//   - 'Consignment'     — BPs 1003236 / 1003621 / 1005225 / 1010966 / 1011267
+// Customer Excess (offer types 1000000/1000003) is handled separately in
+// `queryExcessMatches` because it's a different data product (3rd-party
+// excess via the offer-poller pipeline) with different freshness semantics.
+// Excludes offer type 1000025 (LAM Kitting Inventory). Up to TOP_MATCHES_PER_MPN
+// matches per MPN, ordered by qty desc.
+const TOP_MATCHES_PER_MPN = 3;
+async function queryAstuteStock(mpnCleans) {
+  if (!mpnCleans.length) return new Map();
+  const astuteOwnedBps = [
+    ASTUTE_ELECTRONICS_BP,
+    ASTUTE_FRANCHISE_BP,
+    ...Object.keys(CONSIGNMENT_BPS).map(Number),
+  ];
+  const r = await pool.query(`
+    WITH matches AS (
+      SELECT
+        ol.chuboe_mpn_clean,
+        o.c_bpartner_id,
+        bp.name         AS bp_name,
+        ol.qty,
+        ol.priceentered,
+        CASE
+          WHEN o.c_bpartner_id = $2 AND COALESCE(o.description,'') LIKE '%LAM_Dead_Inventory%'
+            THEN 'LAM Dead'
+          WHEN o.c_bpartner_id = $2  THEN 'Free Stock'
+          WHEN o.c_bpartner_id = $3  THEN 'Franchise Stock'
+          WHEN o.c_bpartner_id = ANY($4::int[]) THEN 'Consignment'
+          ELSE NULL
+        END AS bucket,
+        CASE
+          WHEN o.c_bpartner_id = $2 AND COALESCE(o.description,'') LIKE '%LAM_Dead_Inventory%'
+            THEN 'Austin (Dead)'
+          WHEN o.c_bpartner_id = $2 THEN COALESCE(
+            (CASE o.chuboe_offer_type_id
+               WHEN 1000006 THEN 'Stevenage'
+               WHEN 1000008 THEN 'Austin'
+               WHEN 1000009 THEN 'Hong Kong'
+               WHEN 1000014 THEN 'Philippines'
+            END), 'Astute Electronics')
+          WHEN o.c_bpartner_id = $3 THEN 'Franchise (Austin)'
+          WHEN o.c_bpartner_id = 1003236 THEN 'GE (Austin)'
+          WHEN o.c_bpartner_id = 1003621 THEN 'Taxan (Austin)'
+          WHEN o.c_bpartner_id = 1005225 THEN 'Spartronics (Austin)'
+          WHEN o.c_bpartner_id = 1010966 THEN 'Eaton (PH)'
+          WHEN o.c_bpartner_id = 1011267 THEN 'LAM (PH)'
+          ELSE bp.name
+        END AS location_label
+      FROM adempiere.chuboe_offer o
+      JOIN adempiere.chuboe_offer_line ol ON ol.chuboe_offer_id = o.chuboe_offer_id
+      LEFT JOIN adempiere.c_bpartner bp   ON bp.c_bpartner_id = o.c_bpartner_id
+      WHERE o.isactive = 'Y' AND ol.isactive = 'Y'
+        AND o.chuboe_offer_type_id <> ${LAM_KITTING_INVENTORY_TYPE}
+        AND o.c_bpartner_id = ANY($4::int[])
+        AND ol.chuboe_mpn_clean = ANY($1::text[])
+        AND COALESCE(ol.qty, 0) > 0
+    ),
+    aggregated AS (
+      SELECT
+        chuboe_mpn_clean, bucket, location_label, bp_name, c_bpartner_id,
+        SUM(qty)                       AS total_qty,
+        COUNT(*)                       AS lot_count,
+        MIN(NULLIF(priceentered, 0))   AS min_price
+      FROM matches
+      WHERE bucket IS NOT NULL
+      GROUP BY chuboe_mpn_clean, bucket, location_label, bp_name, c_bpartner_id
+    ),
+    ranked AS (
+      SELECT a.*,
+        ROW_NUMBER() OVER (
+          PARTITION BY chuboe_mpn_clean
+          ORDER BY total_qty DESC NULLS LAST, bucket
+        ) AS rn
+      FROM aggregated a
+    )
+    SELECT chuboe_mpn_clean, bucket, location_label, bp_name, c_bpartner_id,
+           total_qty AS qty, lot_count, min_price
+    FROM ranked
+    WHERE rn <= ${TOP_MATCHES_PER_MPN}
+    ORDER BY chuboe_mpn_clean, qty DESC NULLS LAST
+  `, [
+    mpnCleans,
+    ASTUTE_ELECTRONICS_BP,
+    ASTUTE_FRANCHISE_BP,
+    astuteOwnedBps,
+  ]);
+  const map = new Map();
+  for (const row of r.rows) {
+    if (!map.has(row.chuboe_mpn_clean)) map.set(row.chuboe_mpn_clean, []);
+    map.get(row.chuboe_mpn_clean).push(row);
+  }
+  return map;
+}
+
+// Customer Excess matches in the last 90 days. Restricted to HOT MPNs (the
+// caller filters mpnCleans before calling) so we don't dilute the digest with
+// excess data on lukewarm parts. 90-day window because the offer-poller
+// pipeline runs continuously — old excess offers go stale and shouldn't
+// suggest false supply paths.
+async function queryExcessMatches(mpnCleans) {
+  if (!mpnCleans.length) return new Map();
+  const r = await pool.query(`
+    WITH matches AS (
+      SELECT
+        ol.chuboe_mpn_clean,
+        o.c_bpartner_id,
+        bp.name AS bp_name,
+        ol.qty,
+        ol.priceentered
+      FROM adempiere.chuboe_offer o
+      JOIN adempiere.chuboe_offer_line ol ON ol.chuboe_offer_id = o.chuboe_offer_id
+      LEFT JOIN adempiere.c_bpartner bp   ON bp.c_bpartner_id = o.c_bpartner_id
+      WHERE o.isactive = 'Y' AND ol.isactive = 'Y'
+        AND o.chuboe_offer_type_id = ANY($2::int[])
+        AND ol.chuboe_mpn_clean = ANY($1::text[])
+        AND COALESCE(ol.qty, 0) > 0
+        AND o.created AT TIME ZONE 'America/Chicago' >= NOW() - INTERVAL '90 days'
+    ),
+    aggregated AS (
+      SELECT
+        chuboe_mpn_clean, bp_name, c_bpartner_id,
+        SUM(qty)                       AS total_qty,
+        COUNT(*)                       AS lot_count,
+        MIN(NULLIF(priceentered, 0))   AS min_price
+      FROM matches
+      GROUP BY chuboe_mpn_clean, bp_name, c_bpartner_id
+    ),
+    ranked AS (
+      SELECT a.*,
+        ROW_NUMBER() OVER (
+          PARTITION BY chuboe_mpn_clean
+          ORDER BY total_qty DESC NULLS LAST
+        ) AS rn
+      FROM aggregated a
+    )
+    SELECT chuboe_mpn_clean, bp_name, c_bpartner_id,
+           total_qty AS qty, lot_count, min_price
+    FROM ranked
+    WHERE rn <= ${TOP_MATCHES_PER_MPN}
+    ORDER BY chuboe_mpn_clean, qty DESC NULLS LAST
+  `, [mpnCleans, CUSTOMER_EXCESS_TYPES]);
+  const map = new Map();
+  for (const row of r.rows) {
+    if (!map.has(row.chuboe_mpn_clean)) map.set(row.chuboe_mpn_clean, []);
+    map.get(row.chuboe_mpn_clean).push(row);
+  }
+  return map;
 }
 
 async function queryFranchiseContext(mpnCleans) {
@@ -430,6 +692,46 @@ function renderFranchiseCell(row) {
   return parts.join('<br/>');
 }
 
+function bucketColor(bucket) {
+  return {
+    'Free Stock':      '#0a6',
+    'Franchise Stock': '#069',
+    'Consignment':     '#960',
+    'Customer Excess': '#609',
+    'LAM Dead':        '#888',
+  }[bucket] || '#444';
+}
+
+function renderStockCell(matches) {
+  if (!matches || matches.length === 0) {
+    return '<span class="small" style="color:#888">—</span>';
+  }
+  return matches.map(m => {
+    const color = bucketColor(m.bucket);
+    const lots = Number(m.lot_count) > 1 ? ` <span class="small">(${m.lot_count} lots)</span>` : '';
+    return `<span style="color:${color};font-weight:bold">${escHtml(m.bucket)}</span> · `
+         + `${escHtml(m.location_label)} · ${fmtInt(m.qty)}${lots}`;
+  }).join('<br/>');
+}
+
+// Customer Excess (90d) cell — only populated for HOT MPNs. For non-HOT rows
+// the caller passes `null` and we render the dash. Different visual treatment
+// than Stock — purple-tinted "Excess" label since these are 3rd-party offers
+// from the offer-poller / customer-excess-analysis pipeline, not Astute-owned.
+function renderExcessCell(matches, isHot) {
+  if (!isHot) {
+    return '<span class="small" style="color:#bbb">— (non-HOT)</span>';
+  }
+  if (!matches || matches.length === 0) {
+    return '<span class="small" style="color:#888">none (90d)</span>';
+  }
+  return matches.map(m => {
+    const lots = Number(m.lot_count) > 1 ? ` <span class="small">(${m.lot_count} lots)</span>` : '';
+    return `<span style="color:#609;font-weight:bold">Excess</span> · `
+         + `${escHtml(m.bp_name || '(unknown bp)')} · ${fmtInt(m.qty)}${lots}`;
+  }).join('<br/>');
+}
+
 function renderOemsecretsCell(entry) {
   if (!entry) return '<span class="small" style="color:#888">—</span>';
   if (entry.error && entry.exhausted) return '<span class="small" style="color:#a00">quota exhausted</span>';
@@ -444,8 +746,71 @@ function renderOemsecretsCell(entry) {
   return parts.join('<br/>');
 }
 
+function renderMpnRow(r, i, ctx) {
+  const { repeatMap, franchiseMap, oemsecretsMap, stockMap, excessMap,
+          includeTickCol, includeTodayCol } = ctx;
+  const klass = classifyMpn(r, repeatMap);
+  const isHot = klass.tag === 'HOT';
+  const repeat = repeatMap.get(r.mpn_clean);
+  const repeatTxt = repeat
+    ? `${fmtInt(repeat.historical_bps)} BPs / ${fmtInt(repeat.historical_rfqs)} RFQs`
+    : '<span class="small">no recent</span>';
+  const tickCell = includeTickCol
+    ? `<td>${Number(r.tick_lines) > 0 ? `<b>${fmtInt(r.tick_lines)}</b>` : '<span class="small">0</span>'}</td>`
+    : '';
+  const todayCell = includeTodayCol
+    ? `<td>${Number(r.today_lines) > 0 ? `<b>${fmtInt(r.today_lines)}</b>` : '<span class="small">0</span>'}</td>`
+    : '';
+  return `<tr>
+    <td>${i + 1}</td>
+    <td><b>${escHtml(r.mpn)}</b></td>
+    <td>${escHtml(r.mfr || '')}</td>
+    <td>${tagBadge(klass.tag)}<br/><span class="small">${escHtml(klass.note)}</span></td>
+    <td>${fmtInt(r.line_count)}</td>
+    ${tickCell}${todayCell}
+    <td>${fmtInt(r.max_qty)}</td>
+    <td>${fmtInt(r.distinct_bps)} <span class="small">(${fmtInt(r.matched_lines)} matched / ${fmtInt(r.unqualified_lines)} unq)</span></td>
+    <td>${repeatTxt}</td>
+    <td>${renderStockCell(stockMap.get(r.mpn_clean))}</td>
+    <td>${renderExcessCell(excessMap.get(r.mpn_clean), isHot)}</td>
+    <td>${renderFranchiseCell(franchiseMap.get(r.mpn_clean))}</td>
+    <td>${renderOemsecretsCell(oemsecretsMap.get(r.mpn_clean))}</td>
+    <td class="small">${escHtml((r.customer_names || '').slice(0, 200))}</td>
+  </tr>`;
+}
+
+function renderMpnTable(rows, ctx, headerLabel, emptyMsg) {
+  let html = `<h2>${escHtml(headerLabel)}</h2>`;
+  if (!rows.length) return html + `<p class="small">${escHtml(emptyMsg)}</p>`;
+  const tickHeader  = ctx.includeTickCol  ? '<th>Last 4h</th>'  : '';
+  const todayHeader = ctx.includeTodayCol ? '<th>Today</th>' : '';
+  html += `<table><tr><th>#</th><th>MPN</th><th>Mfr</th><th>Tag</th>`
+       + `<th>Lines</th>${tickHeader}${todayHeader}<th>Max Qty</th>`
+       + `<th>Distinct Customers</th><th>30d Repeat</th>`
+       + `<th>Stock</th><th>Excess Match (90d)</th>`
+       + `<th>Best Franchise (14d)</th>`
+       + `<th>Aggregator (OEMSecrets, 14d)</th><th>Asked by</th></tr>`;
+  rows.forEach((r, i) => { html += renderMpnRow(r, i, ctx); });
+  html += `</table>`;
+  return html;
+}
+
+function renderStatBand(label, stats) {
+  return `<h3>${escHtml(label)}</h3>`
+       + `<div class="stat"><b>${fmtInt(stats.rfq_count)}</b>RFQs</div>`
+       + `<div class="stat"><b>${fmtInt(stats.unique_mpns)}</b>Unique MPNs</div>`
+       + `<div class="stat"><b>${fmtInt(stats.unique_bps)}</b>Customers</div>`
+       + `<div class="stat"><b>${fmtInt(stats.matched_lines)}</b>Matched lines</div>`
+       + `<div class="stat"><b>${fmtInt(stats.unqualified_lines)}</b>Unqualified lines</div>`;
+}
+
 function renderHtml(model) {
-  const { tickStats, cumStats, topMpns, topCustomers, repeatMap, franchiseMap, oemsecretsMap, windowLabel } = model;
+  const {
+    tickStats, todayStats, thirtyStats,
+    topMpns30d, topMpnsToday, topCustomers,
+    repeatMap, franchiseMap, oemsecretsMap, stockMap, excessMap,
+    windowLabel,
+  } = model;
   const css = `body{font-family:Arial,sans-serif;font-size:13px;color:#222}
     h2{color:#234;margin:18px 0 6px;border-bottom:1px solid #ddd;padding-bottom:4px}
     h3{color:#456;margin:12px 0 4px;font-size:14px}
@@ -459,54 +824,38 @@ function renderHtml(model) {
   let html = `<html><head><style>${css}</style></head><body>`;
   html += `<h2>Stock RFQ Activity Digest — ${escHtml(windowLabel)}</h2>`;
 
-  // Section 1: stats
-  html += `<h3>Last 4h</h3>`;
-  html += `<div class="stat"><b>${fmtInt(tickStats.rfq_count)}</b>RFQs</div>`;
-  html += `<div class="stat"><b>${fmtInt(tickStats.unique_mpns)}</b>Unique MPNs</div>`;
-  html += `<div class="stat"><b>${fmtInt(tickStats.unique_bps)}</b>Customers</div>`;
-  html += `<div class="stat"><b>${fmtInt(tickStats.matched_lines)}</b>Matched lines</div>`;
-  html += `<div class="stat"><b>${fmtInt(tickStats.unqualified_lines)}</b>Unqualified lines</div>`;
+  // Stat band — three windows
+  html += renderStatBand('Last 4h',                tickStats);
+  html += renderStatBand('Today (since 00 ET)',    todayStats);
+  html += renderStatBand('Last 30 days',           thirtyStats);
 
-  html += `<h3>Cumulative since 00 ET</h3>`;
-  html += `<div class="stat"><b>${fmtInt(cumStats.rfq_count)}</b>RFQs</div>`;
-  html += `<div class="stat"><b>${fmtInt(cumStats.unique_mpns)}</b>Unique MPNs</div>`;
-  html += `<div class="stat"><b>${fmtInt(cumStats.unique_bps)}</b>Customers</div>`;
-  html += `<div class="stat"><b>${fmtInt(cumStats.matched_lines)}</b>Matched lines</div>`;
-  html += `<div class="stat"><b>${fmtInt(cumStats.unqualified_lines)}</b>Unqualified lines</div>`;
+  // Primary: Top MPNs over 30d (durable demand signal). Inline Last-4h and
+  // Today columns so a 30d-hot MPN that's also moving today stands out.
+  const ctx30d = {
+    repeatMap, franchiseMap, oemsecretsMap, stockMap, excessMap,
+    includeTickCol: true, includeTodayCol: true,
+  };
+  html += renderMpnTable(
+    topMpns30d, ctx30d,
+    `Top ${TOP_N} MPNs — Last 30 Days`,
+    'No stock RFQ lines in the last 30 days.',
+  );
 
-  // Section 2: Top MPNs (cumulative)
-  html += `<h2>Top ${TOP_N} Concentrated MPNs (cumulative since 00 ET)</h2>`;
-  if (topMpns.length === 0) {
-    html += `<p class="small">No stock RFQ lines since 00 ET.</p>`;
-  } else {
-    html += `<table><tr><th>#</th><th>MPN</th><th>Mfr</th><th>Tag</th><th>Lines</th><th>Max Qty</th><th>Distinct Customers</th><th>30d Repeat</th><th>Best Franchise (14d)</th><th>Aggregator (OEMSecrets, 14d)</th><th>Asked by</th></tr>`;
-    topMpns.forEach((r, i) => {
-      const klass = classifyMpn(r, repeatMap);
-      const repeat = repeatMap.get(r.mpn_clean);
-      const repeatTxt = repeat
-        ? `${fmtInt(repeat.historical_bps)} BPs / ${fmtInt(repeat.historical_rfqs)} RFQs`
-        : '<span class="small">no recent</span>';
-      html += `<tr>
-        <td>${i + 1}</td>
-        <td><b>${escHtml(r.mpn)}</b></td>
-        <td>${escHtml(r.mfr || '')}</td>
-        <td>${tagBadge(klass.tag)}<br/><span class="small">${escHtml(klass.note)}</span></td>
-        <td>${fmtInt(r.line_count)}</td>
-        <td>${fmtInt(r.max_qty)}</td>
-        <td>${fmtInt(r.distinct_bps)} <span class="small">(${fmtInt(r.matched_lines)} matched / ${fmtInt(r.unqualified_lines)} unq)</span></td>
-        <td>${repeatTxt}</td>
-        <td>${renderFranchiseCell(franchiseMap.get(r.mpn_clean))}</td>
-        <td>${renderOemsecretsCell(oemsecretsMap.get(r.mpn_clean))}</td>
-        <td class="small">${escHtml((r.customer_names || '').slice(0, 200))}</td>
-      </tr>`;
-    });
-    html += `</table>`;
-  }
+  // Secondary: Top MPNs since 00 ET (today's slice — what's fresh).
+  const ctxToday = {
+    repeatMap, franchiseMap, oemsecretsMap, stockMap, excessMap,
+    includeTickCol: true, includeTodayCol: false,
+  };
+  html += renderMpnTable(
+    topMpnsToday, ctxToday,
+    `Top ${TOP_N} MPNs — Today (since 00 ET)`,
+    'No stock RFQ lines since 00 ET.',
+  );
 
-  // Section 3: Top customers
-  html += `<h2>Top ${TOP_N} Customers by Volume (cumulative since 00 ET)</h2>`;
+  // Top Customers (30d only — customer demand is slower-moving than MPN heat)
+  html += `<h2>Top ${TOP_N} Customers by Volume (Last 30 Days)</h2>`;
   if (topCustomers.length === 0) {
-    html += `<p class="small">No stock RFQ lines since 00 ET.</p>`;
+    html += `<p class="small">No stock RFQ lines in the last 30 days.</p>`;
   } else {
     html += `<table><tr><th>#</th><th>BP</th><th>Parsed Name(s)</th><th>Tag</th><th>RFQs</th><th>Lines</th><th>w/ Target</th></tr>`;
     topCustomers.forEach((r, i) => {
@@ -527,7 +876,9 @@ function renderHtml(model) {
     html += `</table>`;
   }
 
-  html += `<p class="small">Cumulative window: ${fmtEt(cumSince)} → ${fmtEt(now)}. Last-4h window: ${fmtEt(lastTickStart)} → ${fmtEt(now)}.</p>`;
+  html += `<p class="small">Windows — Last 4h: ${fmtEt(lastTickStart)} → ${fmtEt(now)}. `
+       + `Today: ${fmtEt(todayStart)} → ${fmtEt(now)}. `
+       + `Last 30d: ${fmtEt(thirtyDaysAgo)} → ${fmtEt(now)}.</p>`;
   html += `</body></html>`;
   return html;
 }
@@ -536,33 +887,67 @@ function renderHtml(model) {
 
 (async () => {
   try {
-    const [tickStats, cumStats, topMpns, topCustomers] = await Promise.all([
+    const [tickStats, todayStats, thirtyStats, topMpns30d, topMpnsToday, topCustomers] = await Promise.all([
       queryWindowStats(lastTickStart),
-      queryWindowStats(cumSince),
-      queryTopMpns(cumSince),
-      queryTopCustomers(cumSince),
+      queryWindowStats(todayStart),
+      queryWindowStats(thirtyDaysAgo),
+      queryTopMpns(thirtyDaysAgo, now, { tickStart: lastTickStart, todayStart }),
+      queryTopMpns(todayStart,    now, { tickStart: lastTickStart }),
+      queryTopCustomers(thirtyDaysAgo),
     ]);
 
-    const mpnCleans = topMpns.map(r => r.mpn_clean);
-    const [repeatMap, franchiseMap] = await Promise.all([
-      queryRepeatDemand(mpnCleans),
+    // Union of MPNs from both tables — supporting queries (repeat / franchise /
+    // OEMSecrets / stock-match) run against the combined set so the today
+    // table doesn't lose enrichment for MPNs not in the 30d top-10.
+    const mpnCleans = Array.from(new Set([
+      ...topMpns30d.map(r => r.mpn_clean),
+      ...topMpnsToday.map(r => r.mpn_clean),
+    ]));
+    // Repeat-demand map first — needed both for HOT classification (filtering
+    // the excess-match query) and for the OEMSecrets candidate gate.
+    const repeatMap = await queryRepeatDemand(mpnCleans);
+
+    // HOT MPNs (per classifyMpn — ≥3 distinct customers in window OR ≥3 in
+    // 30d historical). Excess matches only run against this subset; not worth
+    // pulling 90d excess data for lukewarm one-off MPNs.
+    const allTopRows = [...topMpns30d, ...topMpnsToday];
+    const hotMpnCleans = Array.from(new Set(
+      allTopRows
+        .filter(r => classifyMpn(r, repeatMap).tag === 'HOT')
+        .map(r => r.mpn_clean)
+    ));
+
+    const [franchiseMap, stockMap, excessMap] = await Promise.all([
       queryFranchiseContext(mpnCleans),
+      queryAstuteStock(mpnCleans),
+      queryExcessMatches(hotMpnCleans),
     ]);
-    const oem = await fetchOemsecretsForOosHotMpns(topMpns, franchiseMap, repeatMap);
+    // OEMSecrets fallback driven by the 30d signal — durable HOT-OOS candidates.
+    const oem = await fetchOemsecretsForOosHotMpns(topMpns30d, franchiseMap, repeatMap);
     const oemsecretsMap = oem.resultMap;
     console.log(`OEMSecrets: ${oem.budgetUsed} fresh call(s), ${oem.candidates} OOS+HOT candidate(s) considered`);
+    console.log(`HOT MPNs: ${hotMpnCleans.length}, Excess matches: ${excessMap.size} HOT MPNs with 90d excess`);
 
-    const cumDateEt = new Intl.DateTimeFormat('en-CA', { timeZone: REPORT_TZ, year: 'numeric', month: '2-digit', day: '2-digit' }).format(cumSince);
-    const windowLabel = `${fmtEtTimeOnly(now)} tick (cum since ${cumDateEt} 00 ET)`;
-    const html = renderHtml({ tickStats, cumStats, topMpns, topCustomers, repeatMap, franchiseMap, oemsecretsMap, windowLabel });
+    const cumDateEt = new Intl.DateTimeFormat('en-CA', { timeZone: REPORT_TZ, year: 'numeric', month: '2-digit', day: '2-digit' }).format(todayStart);
+    const windowLabel = `${fmtEtTimeOnly(now)} tick (30d rolling, today ${cumDateEt})`;
+    const html = renderHtml({
+      tickStats, todayStats, thirtyStats,
+      topMpns30d, topMpnsToday, topCustomers,
+      repeatMap, franchiseMap, oemsecretsMap, stockMap, excessMap,
+      windowLabel,
+    });
 
     if (dryRun) {
       console.log(html);
       console.log('\n--- DRY RUN — no email sent ---');
-      console.log(`Tick stats:  ${JSON.stringify(tickStats)}`);
-      console.log(`Cum stats:   ${JSON.stringify(cumStats)}`);
-      console.log(`Top MPNs:    ${topMpns.length} rows`);
-      console.log(`Top Custs:   ${topCustomers.length} rows`);
+      console.log(`Tick stats:    ${JSON.stringify(tickStats)}`);
+      console.log(`Today stats:   ${JSON.stringify(todayStats)}`);
+      console.log(`30d stats:     ${JSON.stringify(thirtyStats)}`);
+      console.log(`Top MPNs 30d:  ${topMpns30d.length} rows`);
+      console.log(`Top MPNs tdy:  ${topMpnsToday.length} rows`);
+      console.log(`Top Custs:     ${topCustomers.length} rows`);
+      console.log(`Stock matches: ${stockMap.size} MPNs with Astute-owned stock`);
+      console.log(`Excess matches: ${excessMap.size} HOT MPNs with 90d Customer Excess`);
     } else {
       const subject = `Stock RFQ Activity — ${windowLabel}`;
       const notifier = createNotifier({
