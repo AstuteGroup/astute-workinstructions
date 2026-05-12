@@ -126,6 +126,7 @@ async function action_load_rfq(payload, ctx) {
     sourceUid: sourceUid || ctx.uid,
     messageId: messageId || null,
     bpartnerId,
+    customerName: customerName || null,
     type: type || 'Stock',
     rfqId: result.rfqId,
     searchKey: result.searchKey,

@@ -30,6 +30,7 @@ const fs = require('fs');
 const breadcrumbs = require('../../shared/breadcrumbs');
 const { sendWithFallback } = require('../../shared/verified-send');
 const { createFetcher } = require('../../shared/email-fetcher');
+const { psqlQuery } = require('../../shared/db-helpers');
 
 const STATE_DIR = path.join(process.env.HOME || '/home/analytics_user', 'workspace', '.offer-pipeline');
 const STATE_FILE = path.join(STATE_DIR, 'last-digest.json');
@@ -74,6 +75,100 @@ function fmtQty(n) {
   return Number(n).toLocaleString('en-US');
 }
 
+// ── Breadcrumb enrichment (BP names + offer-type labels) ──────────────────
+//
+// Two breadcrumb writers emit `cog: 'offer-poller', event: 'loaded'`:
+//   - shared/offer-poller.js (static poller, verbose format with partner.name,
+//     account, subject, source, offerType-label, lineCount)
+//   - shared/workflow-actions/excess.js (excess agent, compact format —
+//     bpartnerId + offerType-id + linesWritten, no partner.name or labels)
+//
+// The renderer can't tell them apart by event-type, so we enrich any crumb
+// that's missing partner.name / offerType-label via a single SQL lookup.
+// Mutates crumbs in place; safe to call multiple times (no-op when enriched).
+
+async function enrichLoadedCrumbs(crumbs) {
+  // Backfill partner.name on any crumb that has a bpartnerId/partner.id but
+  // no partner.name. Covers offer-poller (Section 1), stockrfq-agent
+  // (Section 4), and offer-router (Section 3) — all render a partner column.
+  const needsLookup = crumbs.filter(c => {
+    if (c.partner && c.partner.name) return false;
+    const id = c.bpartnerId || (c.partner && c.partner.id);
+    return id && (
+      (c.cog === 'offer-poller'   && c.event === 'loaded') ||
+      (c.cog === 'stockrfq-agent' && c.event === 'loaded') ||
+      (c.cog === 'offer-router')
+    );
+  });
+  const bpIds = [...new Set(needsLookup.map(c => Number(c.bpartnerId || (c.partner && c.partner.id))).filter(Boolean))];
+
+  const typeIdsNeeded = [...new Set(
+    crumbs
+      .filter(c => c.cog === 'offer-poller' && c.event === 'loaded')
+      .map(c => Number(c.offerType))
+      .filter(n => Number.isFinite(n))   // compact form stores numeric type-id
+  )];
+
+  let bpMap = new Map();
+  if (bpIds.length > 0) {
+    try {
+      const out = psqlQuery(
+        `SELECT c_bpartner_id, name FROM adempiere.c_bpartner WHERE c_bpartner_id IN (${bpIds.join(',')})`
+      );
+      for (const line of out.split('\n').filter(Boolean)) {
+        const [id, name] = line.split('|');
+        bpMap.set(Number(id), name);
+      }
+    } catch (e) {
+      console.error('enrichLoadedCrumbs: BP lookup failed:', e.message);
+    }
+  }
+
+  let typeMap = new Map();
+  if (typeIdsNeeded.length > 0) {
+    try {
+      const out = psqlQuery(
+        `SELECT chuboe_offer_type_id, name FROM adempiere.chuboe_offer_type WHERE chuboe_offer_type_id IN (${typeIdsNeeded.join(',')})`
+      );
+      for (const line of out.split('\n').filter(Boolean)) {
+        const [id, name] = line.split('|');
+        typeMap.set(Number(id), name);
+      }
+    } catch (e) {
+      console.error('enrichLoadedCrumbs: offer-type lookup failed:', e.message);
+    }
+  }
+
+  for (const c of crumbs) {
+    const isOfferLoaded  = c.cog === 'offer-poller' && c.event === 'loaded';
+    const isStockLoaded  = c.cog === 'stockrfq-agent' && c.event === 'loaded';
+    const isOfferRouter  = c.cog === 'offer-router';
+    if (!isOfferLoaded && !isStockLoaded && !isOfferRouter) continue;
+    // Backfill partner.name from bpartnerId (DB lookup) OR customerName
+    // (agent-parsed string preserved on the crumb — used for Unqualified
+    // Broker fallback where the DB name is generic but the agent knew the
+    // real broker, e.g. "JSD Electronics" vs "Unqualified Broker").
+    const partnerId = c.bpartnerId || (c.partner && c.partner.id);
+    if (!(c.partner && c.partner.name) && partnerId) {
+      const dbName = bpMap.get(Number(partnerId));
+      const UNQUALIFIED_BROKER_ID = 1006505;
+      const preferAgentParsed = Number(partnerId) === UNQUALIFIED_BROKER_ID && c.customerName;
+      const name = preferAgentParsed ? c.customerName : (dbName || c.customerName || '');
+      c.partner = c.partner || {};
+      c.partner.id = c.partner.id || partnerId;
+      c.partner.name = name;
+    }
+    // Backfill offerTypeLabel when offerType is a numeric id
+    if (Number.isFinite(Number(c.offerType))) {
+      c.offerTypeLabel = typeMap.get(Number(c.offerType)) || `Type ${c.offerType}`;
+    } else if (typeof c.offerType === 'string' && c.offerType.length > 0) {
+      c.offerTypeLabel = c.offerType;
+    }
+    // Compact form uses linesWritten; verbose form uses lineCount. Unify.
+    if (c.lineCount == null && c.linesWritten != null) c.lineCount = c.linesWritten;
+  }
+}
+
 // ── Section builders ──────────────────────────────────────────────────────
 
 const SECTION_HEADER = `style="background:#2c3e50;color:#fff;padding:10px 14px;margin:24px 0 0 0;font-size:14px;font-weight:bold"`;
@@ -85,19 +180,28 @@ function buildSection1Loaded(crumbs) {
   if (loaded.length === 0) {
     return { html: `<p style="color:#666">No new offers written in this window.</p>`, count: 0 };
   }
-  const rows = loaded.map(c => `
+  const rows = loaded.map(c => {
+    const partnerName = (c.partner && c.partner.name) || '';
+    const partnerId   = (c.partner && c.partner.id) || c.bpartnerId || '';
+    const partnerCell = partnerName
+      ? `${escapeHtml(partnerName)} <span style="color:#888;font-size:11px">(BP ${escapeHtml(partnerId)})</span>`
+      : `<span style="color:#c0392b">(unresolved)</span> <span style="color:#888;font-size:11px">BP ${escapeHtml(partnerId)}</span>`;
+    const typeLabel   = c.offerTypeLabel || c.offerType || '';
+    const account     = c.account || (c.uid != null ? 'excess' : ''); // compact crumbs from excess.js have uid; account field absent
+    return `
     <tr>
       <td>${escapeHtml(fmtTime(c.ts))}</td>
-      <td>${escapeHtml(c.account || '')}</td>
+      <td>${escapeHtml(account)}</td>
       <td><b>${escapeHtml(c.searchKey || '')}</b></td>
-      <td>${escapeHtml(c.partner && c.partner.name || '')} <span style="color:#888;font-size:11px">(BP ${escapeHtml(c.partner && c.partner.id || '')})</span></td>
-      <td>${escapeHtml(c.offerType || '')}</td>
+      <td>${partnerCell}</td>
+      <td>${escapeHtml(typeLabel)}</td>
       <td style="text-align:right">${fmtQty(c.lineCount)}</td>
-      <td>${escapeHtml(c.source || '')}</td>
-    </tr>`).join('');
+      <td>${escapeHtml(c.source || c.subject || '')}</td>
+    </tr>`;
+  }).join('');
   return {
     html: `<table ${TABLE_STYLE}>
-      <tr><th ${TH_STYLE}>Loaded At</th><th ${TH_STYLE}>Inbox</th><th ${TH_STYLE}>Search Key</th><th ${TH_STYLE}>Partner</th><th ${TH_STYLE}>Type</th><th ${TH_STYLE}>Lines</th><th ${TH_STYLE}>Extracted From</th></tr>
+      <tr><th ${TH_STYLE}>Loaded At</th><th ${TH_STYLE}>Inbox</th><th ${TH_STYLE}>Search Key</th><th ${TH_STYLE}>Partner</th><th ${TH_STYLE}>Type</th><th ${TH_STYLE}>Lines</th><th ${TH_STYLE}>Extracted From / Subject</th></tr>
       ${rows}
     </table>`,
     count: loaded.length,
@@ -109,17 +213,27 @@ function buildSection2Routing(crumbs) {
   if (routed.length === 0) {
     return { html: `<p style="color:#666">No routing decisions in this window.</p>`, count: 0 };
   }
-  const rows = routed.map(c => `
+  const rows = routed.map(c => {
+    const partnerName = (c.partner && c.partner.name) || '';
+    const partnerId   = (c.partner && c.partner.id) || '';
+    const partnerCell = partnerName
+      ? `${escapeHtml(partnerName)} <span style="color:#888;font-size:11px">(BP ${escapeHtml(partnerId)})</span>`
+      : (partnerId
+          ? `<span style="color:#c0392b">(unresolved)</span> <span style="color:#888;font-size:11px">BP ${escapeHtml(partnerId)}</span>`
+          : `<span style="color:#888">—</span>`);
+    return `
     <tr>
       <td>${escapeHtml(fmtTime(c.ts))}</td>
       <td><b>${escapeHtml(c.searchKey || '')}</b></td>
+      <td>${partnerCell}</td>
       <td>${escapeHtml(c.offerType || '')}</td>
       <td>${c.event === 'unrouted' ? '<span style="color:#c0392b">UNROUTED</span>' : escapeHtml(c.route || '')}</td>
       <td>${escapeHtml(c.rule || c.reason || '')}</td>
-    </tr>`).join('');
+    </tr>`;
+  }).join('');
   return {
     html: `<table ${TABLE_STYLE}>
-      <tr><th ${TH_STYLE}>Decided At</th><th ${TH_STYLE}>Search Key</th><th ${TH_STYLE}>Type</th><th ${TH_STYLE}>Route</th><th ${TH_STYLE}>Rule / Reason</th></tr>
+      <tr><th ${TH_STYLE}>Decided At</th><th ${TH_STYLE}>Search Key</th><th ${TH_STYLE}>Partner</th><th ${TH_STYLE}>Type</th><th ${TH_STYLE}>Route</th><th ${TH_STYLE}>Rule / Reason</th></tr>
       ${rows}
     </table>`,
     count: routed.length,
@@ -337,20 +451,27 @@ function buildSection5StockRFQ(crumbs) {
 
   if (loaded.length === 0) return { html: summary, count: total };
 
-  const rows = loaded.map(c => `
+  const rows = loaded.map(c => {
+    const partnerName = (c.partner && c.partner.name) || '';
+    const partnerId   = (c.partner && c.partner.id) || c.bpartnerId || '';
+    const customerCell = partnerName
+      ? `${escapeHtml(partnerName)} <span style="color:#888;font-size:11px">(BP ${escapeHtml(partnerId)})</span>`
+      : `<span style="color:#c0392b">(unresolved)</span> <span style="color:#888;font-size:11px">BP ${escapeHtml(partnerId)}</span>`;
+    return `
     <tr>
       <td>${escapeHtml(fmtTime(c.ts))}</td>
       <td><b>${escapeHtml(c.searchKey || '')}</b></td>
-      <td>BP ${escapeHtml(String(c.bpartnerId || ''))}</td>
+      <td>${customerCell}</td>
       <td>${escapeHtml(c.type || 'Stock')}</td>
       <td style="text-align:right">${fmtQty(c.linesWritten)}</td>
       <td style="text-align:right;color:${c.errorCount ? '#c0392b' : '#27ae60'}">${fmtQty(c.errorCount || 0)}</td>
-    </tr>`).join('');
+    </tr>`;
+  }).join('');
 
   return {
     html: `${summary}
       <table ${TABLE_STYLE}>
-        <tr><th ${TH_STYLE}>Loaded At</th><th ${TH_STYLE}>Search Key</th><th ${TH_STYLE}>BP</th><th ${TH_STYLE}>Type</th><th ${TH_STYLE}>Lines Written</th><th ${TH_STYLE}>Errors</th></tr>
+        <tr><th ${TH_STYLE}>Loaded At</th><th ${TH_STYLE}>Search Key</th><th ${TH_STYLE}>Customer</th><th ${TH_STYLE}>Type</th><th ${TH_STYLE}>Lines Written</th><th ${TH_STYLE}>Errors</th></tr>
         ${rows}
       </table>`,
     count: total,
@@ -428,6 +549,7 @@ function buildSection6CronHealth(crumbs) {
 // ── Main ──────────────────────────────────────────────────────────────────
 
 async function buildDigestEmail({ since, until, crumbs }) {
+  await enrichLoadedCrumbs(crumbs);
   const s1 = buildSection1Loaded(crumbs);
   const s2 = buildSection2Routing(crumbs);
   const s3 = buildSection3DrillDown(crumbs);
