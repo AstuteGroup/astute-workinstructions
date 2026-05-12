@@ -1,6 +1,11 @@
 # Leah's BOS Report
 
-Weekly open-order report for Leah Griffin (Business Operations Support Supervisor) and the BOS team. Processes an Infor "AST Open Orders" export into an HTML email + xlsx drill-down covering three operational buckets, aged into three bands, broken out by region / BOS / ISE, with auto-detected signals surfaced at the top.
+Weekly open-order report for Leah Griffin (Business Operations Support Supervisor) and the BOS team. Processes an Infor "AST Open Orders" export into an HTML email + xlsx drill-down covering:
+
+- **Three operational buckets** (Query 7/7, Placeholder 8/8, Past Due) × **three aging bands** × region / BOS / ISE
+- **Week-over-week movement** — past-due Δ decomposed into Persisted / Resolved / Rolled forward / New entry, normalized to a daily rate so uneven run intervals don't mislead
+- **Matrix alignment check** — every flagged line cross-referenced against Leah's BOS↔ISE assignment matrix; mismatched / no-CSE / orphan-ISE lines surfaced as ALERT/WATCH/INFO signals + dedicated email section + `Unaligned` xlsx tab
+- **Auto-detected signals** — region bucket-mix skew, BOS aging outliers, BOS concentration within a bucket, chronic past-due, unmapped ISEs
 
 **Owner:** Leah Griffin (BOS Supervisor) — consumer. Jake Harris — reviewer.
 **Cadence:** weekly (and monthly carryover — future).
@@ -139,7 +144,15 @@ Open `ise-regions.json`. If the export contains any new ISE logins (not in the `
 
 **Do not skip** if adding a new region (e.g., first EMEA hire) — the mapping file must include it or the ISE will fall into `(Unmapped)`.
 
-### Step 3: Run the report
+### Step 3: Verify BOS↔ISE matrix is current
+
+Look in `rfqloading@orangetsunami.com` for any recent message subject `BOS ISE Assignments*.xlsx` (Leah re-issues whenever assignments change). If newer than the file in this folder, replace `BOS_ISE_Assignments.xlsx` with the new copy.
+
+After replacing, run the report once with `--no-send` and confirm the matrix-alignment Signals look reasonable. If the run flags new orphan ISEs (`X ISE login not in BOS↔ISE matrix`), add an entry to `ise-login-overrides.json` mapping the matrix display name to the Infor login (only when auto-derivation `first4 + last4 lowercased` fails — most names auto-resolve).
+
+**Do not skip** — Leah's primary ask for this report is now alignment verification, not just bucket counts. A stale matrix produces false-positive mismatches and erodes trust.
+
+### Step 4: Run the report
 
 ```bash
 node "astute-workinstructions/Trading Analysis/Leah's BOS Report/bos-report.js" \
@@ -147,21 +160,25 @@ node "astute-workinstructions/Trading Analysis/Leah's BOS Report/bos-report.js" 
   [--to someone@astutegroup.com]
 ```
 
-Defaults to Jake. On success, prints bucket counts, chart fetch count, xlsx size, and `Sent to <email>`.
+Defaults to Leah with Jake on CC. On success, prints bucket counts, alignment counts (mismatched / no-CSE / orphan-ISE), chart fetch count, xlsx size, and `Sent to <email>`.
 
-### Step 4: Review the output
+### Step 5: Review the output
 
-Open the email body. The Signals block at the top summarizes anomalies — read these first. Open the xlsx, scan "All BOS" + "By Region" for the week's shape, drill into per-CSE tabs for anyone flagged.
+Open the email body. Read in this order:
+1. **Movement vs prior** — past-due composition (persisted / resolved / rolled forward / new entry) tells you what's real-world bad vs. calendar drift.
+2. **Matrix alignment** — mismatches + no-CSE lines need ownership corrected in Infor; orphan ISEs need matrix update.
+3. **Signals worth watching** — region/BOS anomalies, chronic past-due, data hygiene.
+4. **Per-bucket sections + xlsx tabs** — drill into specific buckets and per-BOS detail.
 
-### Step 5: Correct the mapping if anything is wrong
+### Step 6: Correct the mapping if anything is wrong
 
-If an ISE is tagged to the wrong region, edit `ise-regions.json` and rerun Step 3. The mapping file is the single source of truth — do not hardcode region strings in the .js.
+If an ISE is tagged to the wrong region, edit `ise-regions.json` and rerun. If a matrix entry routes to the wrong login, edit `ise-login-overrides.json` and rerun. Both files are the single source of truth — do not hardcode in the .js.
 
-### Step 6 (weekly): Email goes to Leah
+### Step 7 (weekly): Email goes to Leah
 
-Default recipient is now `leah.griffin@astutegroup.com` (flipped 2026-04-28) with `jake.harris@astutegroup.com` CC'd by default (added 2026-05-06). Plain `node bos-report.js <file.xlsx>` sends to her with Jake on CC. To redirect to Jake (or anyone else) for ad-hoc tests, pass `--to jake.harris@astutegroup.com`. Pass `--cc ''` to suppress the CC. Use `--no-send` to render to `debug/` without emailing anyone.
+Default recipient is `leah.griffin@astutegroup.com` (flipped 2026-04-28) with `jake.harris@astutegroup.com` CC'd by default (added 2026-05-06). Plain `node bos-report.js <file.xlsx>` sends to her with Jake on CC. To redirect to Jake (or anyone else) for ad-hoc tests, pass `--to jake.harris@astutegroup.com`. Pass `--cc ''` to suppress the CC. Use `--no-send` to render to `debug/` without emailing anyone.
 
-### Step 7 (future): Monthly carryover
+### Step 8 (future): Monthly carryover
 
 Leah's second ask: a monthly email showing what hasn't been resolved within the month. This requires snapshot persistence (save each weekly run to `snapshots/YYYY-WW.json`, then diff against the 4-week-old snapshot). Not yet wired.
 
