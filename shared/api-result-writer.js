@@ -242,11 +242,16 @@ function readCache(mpn, maxAgeDays = 30) {
  *
  * @param {string} mpn - MPN to check
  * @param {number} ttlDays - Max age in days to consider "fresh"
+ * Envelopes containing any PricingResponseStatus='Failed' entry are always
+ * treated as stale and refreshed — the per-distributor retry runner doesn't
+ * heal the cache, so a partial-failure envelope would block recovered API
+ * results from reaching downstream consumers for the full TTL window.
+ *
  * @param {object} [options]
  * @param {function} [options.bypassIf] - Optional predicate (envelope) => bool.
  *   If returns true, force a refresh even when the cached envelope is fresh.
  *   Used by the "PPV + cached price < customer target" force-refresh rule.
- * @returns {{fresh: boolean, ageDays: number|null, envelope: object|null}}
+ * @returns {{fresh: boolean, ageDays: number|null, envelope: object|null, reason?: string, failedDistys?: string[]}}
  */
 function getFreshness(mpn, ttlDays, options = {}) {
   if (!mpn || !ttlDays) {
@@ -266,11 +271,25 @@ function getFreshness(mpn, ttlDays, options = {}) {
     ageDays = Math.floor(ageMs / (1000 * 60 * 60 * 24));
   }
 
+  // Failed-entry gate: refuse to serve envelopes that captured upstream API
+  // failures. The retry runner (scripts/api-retry-runner.js) confirms recovery
+  // but never re-pulls the envelope, so a Failed-tainted envelope sticks for
+  // the full TTL even after the underlying API is healthy again. Forcing a
+  // live re-call overwrites the bad envelope same-day and unblocks downstream
+  // VQ writes. Cost: one extra full pull per tainted MPN per TTL window.
+  const statusEntries = envelope.data?.Status || [];
+  const failedDistys = statusEntries
+    .filter(s => s.PricingResponseStatus === 'Failed')
+    .map(s => s.APIName);
+  if (failedDistys.length > 0) {
+    return { fresh: false, ageDays, envelope, reason: 'failed_entries', failedDistys };
+  }
+
   // Apply optional bypass predicate (e.g., PPV-under-target force refresh)
   if (options.bypassIf && typeof options.bypassIf === 'function') {
     try {
       if (options.bypassIf(envelope)) {
-        return { fresh: false, ageDays, envelope };
+        return { fresh: false, ageDays, envelope, reason: 'bypassIf' };
       }
     } catch (err) {
       logger.error(`bypassIf predicate failed for ${mpn}: ${err.message}`);

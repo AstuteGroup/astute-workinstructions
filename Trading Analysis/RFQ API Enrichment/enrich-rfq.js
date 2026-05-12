@@ -231,6 +231,14 @@ async function enrichRFQ(rfqDocNumber, opts = {}) {
     flagReasonCounts: {},  // { NO_RFQ_LINE: 12, MPN_CROSS_REF: 40, ... }
     flagSamples: [],        // first 5 flag {reason, detail, mpn}
     failSamples: [],        // first 5 failed writes {reason, detail, mpn}
+    // Silent-skip diagnostic: lines where the franchise envelope showed stock-
+    // carrying distributors but writeVQFromAPI produced zero written rows. The
+    // root cause is usually a writer-side gate (Verical BP missing, restricted
+    // MFR canonicalization, missing-MFR-text RFQ, qty=0). We can't pre-classify
+    // without re-running the writer, so we capture the symptom + first few
+    // examples for the digest to surface.
+    silentSkips: 0,
+    silentSkipSamples: [],  // first 8 {mpn, mfr, distys: [...with-stock distys], flagged, skipped, failed}
     apiResultRowsWritten: 0,
     qtyMatches: 0,
     partialCoverage: 0,
@@ -399,6 +407,29 @@ async function enrichRFQ(rfqDocNumber, opts = {}) {
         for (const f of failed) {
           if (counters.failSamples.length < 5) {
             counters.failSamples.push({ mpn: f.mpn || mpn, reason: f.reason, detail: f.detail, vendor: f.vendor });
+          }
+        }
+
+        // Silent-skip detection: envelope had stock-carrying distributors but
+        // writer produced zero written rows AND zero restricted skips. Captures
+        // the writer-side gate misses (Verical BP missing, MFR canonicalization
+        // edges, missing-MFR-text RFQs, zero-qty lines). Restricted-MFR cases
+        // are excluded — those are by-design.
+        const distysWithStock = (result.distributors || [])
+          .filter(d => d.found && (d.franchiseQty || 0) > 0)
+          .map(d => d.name || d.distributor);
+        if (distysWithStock.length > 0 && written.length === 0 && skipped.length === 0) {
+          counters.silentSkips++;
+          if (counters.silentSkipSamples.length < 8) {
+            counters.silentSkipSamples.push({
+              mpn,
+              mfr: line.mfr || '',
+              distys: distysWithStock,
+              flagged: flagged.length,
+              skipped: skipped.length,
+              failed: failed.length,
+              fromCache,
+            });
           }
         }
       } catch (err) {

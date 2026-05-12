@@ -195,8 +195,27 @@ function renderSummaryHtml(batchResults, sinceIso, untilIso, backlog, quotaState
   const totalVqs = batchResults.reduce((s, r) => s + (r.vqsWritten || 0), 0);
   const totalFlagged = batchResults.reduce((s, r) => s + (r.vqsFlagged || 0), 0);
   const totalErrors = batchResults.reduce((s, r) => s + (r.errors?.length || 0), 0);
+  const totalSilentSkips = batchResults.reduce((s, r) => s + (r.silentSkips || 0), 0);
   const totalDurationSec = batchResults.reduce((s, r) => s + ((r.durationMs || 0) / 1000), 0);
   const cacheHitPct = totalLines > 0 ? Math.round(100 * totalCacheHits / totalLines) : 0;
+
+  // Per-RFQ-type rollup. PPV has 30d TTL vs Stock's 14d vs everything-else's
+  // 7d, so the headline cache-hit % conflates very different stability
+  // profiles. Buyer-relevant: are we caching PPV (high-volume, stable
+  // franchise parts) effectively, vs caching Stock (mostly broker MPNs that
+  // franchise doesn't carry) effectively. Counts > percentages — a 70% rate
+  // on 20 lines is a different story than 70% on 200.
+  const byType = {};
+  for (const r of batchResults) {
+    const t = r.rfqType || '?';
+    if (!byType[t]) byType[t] = { lines: 0, apiCalls: 0, cacheHits: 0, vqs: 0, silentSkips: 0, rfqs: 0 };
+    byType[t].rfqs++;
+    byType[t].lines += r.lines || 0;
+    byType[t].apiCalls += r.apiCalls || 0;
+    byType[t].cacheHits += r.cacheHits || 0;
+    byType[t].vqs += r.vqsWritten || 0;
+    byType[t].silentSkips += r.silentSkips || 0;
+  }
 
   // Priority breakdown
   const priorityCounts = { P1: 0, P2: 0, P3: 0, P3B: 0 };
@@ -304,11 +323,31 @@ function renderSummaryHtml(batchResults, sinceIso, untilIso, backlog, quotaState
       <tr><td>api_result rows written</td><td style="text-align:right">${totalRows.toLocaleString()}</td></tr>
       <tr><td>VQs written</td><td style="text-align:right">${totalVqs.toLocaleString()}</td></tr>
       <tr><td>VQs flagged</td><td style="text-align:right">${totalFlagged.toLocaleString()}</td></tr>
+      <tr><td>Silent writer skips</td><td style="text-align:right">${totalSilentSkips.toLocaleString()}${totalSilentSkips > 0 ? ' <span style="color:#a60">(stock available, no VQ written — see breakdown below)</span>' : ''}</td></tr>
       <tr><td>Errors</td><td style="text-align:right">${totalErrors}</td></tr>
       <tr><td>Duration</td><td style="text-align:right">${totalDurationSec.toFixed(1)}s</td></tr>
       <tr><td>DigiKey quota</td><td style="text-align:right">${quotaRemaining} remaining (as of ${quotaUpdated} UTC)</td></tr>
       <tr><td>Tier 4 backlog</td><td style="text-align:right">${backlog.pending} pending (${backlog.totalLineMpns} MPNs, oldest ${backlog.oldestAgeHours}h)</td></tr>
     </table>
+    <br/>
+    <h4>By RFQ Type (counts)</h4>
+    <table border="1" cellpadding="4" cellspacing="0" style="border-collapse:collapse;font-size:12px">
+      <tr style="background:#f0f0f0">
+        <th>RFQ Type</th><th>RFQs</th><th>Line-MPNs</th><th>API calls</th><th>Cache hits</th><th>VQs</th><th>Silent skips</th>
+      </tr>
+      ${Object.entries(byType).sort((a, b) => b[1].lines - a[1].lines).map(([t, s]) => `
+        <tr>
+          <td><b>${t}</b></td>
+          <td style="text-align:right">${s.rfqs}</td>
+          <td style="text-align:right">${s.lines.toLocaleString()}</td>
+          <td style="text-align:right">${s.apiCalls.toLocaleString()}</td>
+          <td style="text-align:right">${s.cacheHits.toLocaleString()}</td>
+          <td style="text-align:right">${s.vqs.toLocaleString()}</td>
+          <td style="text-align:right">${s.silentSkips > 0 ? `<span style="color:#a60">${s.silentSkips}</span>` : '0'}</td>
+        </tr>
+      `).join('')}
+    </table>
+    ${totalSilentSkips > 0 ? renderSilentSkipSamples(batchResults) : ''}
     <br/>
     <h4>Per RFQ</h4>
     <table border="1" cellpadding="4" cellspacing="0" style="border-collapse:collapse;font-size:12px">
@@ -322,6 +361,50 @@ function renderSummaryHtml(batchResults, sinceIso, untilIso, backlog, quotaState
     ${distHealthSection}
     ${apiHealthSection}
     </body></html>
+  `;
+}
+
+/**
+ * Render the "Silent writer skips" section. Surfaces line-MPNs where the
+ * franchise envelope had distributors with stock but writeVQFromAPI produced
+ * zero written rows AND zero restricted skips. These are writer-side gate
+ * misses (Verical BP mapping, MFR canonicalization, missing-MFR-text RFQs,
+ * zero-qty lines) that previously failed silently. Up to 12 samples shown
+ * per digest — drill in to identify common root causes.
+ */
+function renderSilentSkipSamples(batchResults) {
+  const samples = [];
+  for (const r of batchResults) {
+    if (!Array.isArray(r.silentSkipSamples)) continue;
+    for (const s of r.silentSkipSamples) {
+      samples.push({ ...s, rfq: r.rfq, rfqType: r.rfqType, customer: r.customer });
+      if (samples.length >= 12) break;
+    }
+    if (samples.length >= 12) break;
+  }
+  if (samples.length === 0) return '';
+  const rows = samples.map(s => `
+    <tr>
+      <td>${s.rfq}</td>
+      <td>${s.rfqType || '?'}</td>
+      <td>${(s.customer || '?').slice(0, 28)}</td>
+      <td><code>${s.mpn}</code></td>
+      <td>${s.mfr || '<i>(blank)</i>'}</td>
+      <td>${s.distys.join(', ')}</td>
+      <td style="text-align:right">${s.flagged}/${s.failed}</td>
+      <td>${s.fromCache ? 'cache' : 'live'}</td>
+    </tr>
+  `).join('');
+  return `
+    <br/>
+    <h4 style="color:#a60">Silent writer skips (sample)</h4>
+    <p style="font-size:12px;margin:0 0 6px 0">Envelope returned stock, writer wrote nothing. Not restricted-MFR (which is by-design). Look for: Verical BP missing, MFR canonicalization edges, missing-MFR-text RFQs, zero-qty RFQ lines.</p>
+    <table border="1" cellpadding="4" cellspacing="0" style="border-collapse:collapse;font-size:12px">
+      <tr style="background:#fdf5e8">
+        <th>RFQ</th><th>Type</th><th>Customer</th><th>MPN</th><th>RFQ MFR</th><th>Distys with stock</th><th>Flagged/Failed</th><th>Source</th>
+      </tr>
+      ${rows}
+    </table>
   `;
 }
 
