@@ -98,6 +98,86 @@ const OFFER_TYPES = {
   'Manufacturer Cross Reference':   1000027,
 };
 
+// ─── Consignment-BP guard ────────────────────────────────────────────────────
+//
+// Consignment offers represent customer-owned stock Astute holds physically.
+// Two business rules apply *unconditionally* regardless of which pipeline is
+// writing:
+//
+//   1. NO PRICING. Consignment lines must never carry priceentered — pricing
+//      is negotiated per-PO at the time the customer wants to consume.
+//   2. Type is "Stock - <warehouse>", not "Customer Excess". Wrong-pipeline
+//      ingestion (e.g. someone forwards consignment data to excess@orange
+//      tsunami.com so the offer-poller writes type=1000000) gets coerced back
+//      to the BP's paired stock type.
+//
+// This guard runs inside `writeOffer` so every caller — Inventory File Cleanup
+// (weekly + carryover refresh), the customer-excess offer-poller, any future
+// pipeline — is protected. Without it, the weekly flow's group-name-based
+// blanking only covers the weekly path, and other pipelines silently write
+// priced/wrong-typed consignment offers (verified live as of 2026-05-12 on
+// offers 1026111 carryover and 1026118 excessPoller for LAM Consignment).
+const CONSIGNMENT_BP_STOCK_TYPE = {
+  1003236: 1000008, // Astute - GE Aviation Excess    → Stock - Austin
+  1003621: 1000008, // Astute - Taxan Excess          → Stock - Austin
+  1005225: 1000008, // Astute - Spartronics Excess    → Stock - Austin
+  1010966: 1000014, // Astute Inc - Eaton Consignment → Stock - Philippines
+  1011267: 1000014, // Astute - LAM Consignment       → Stock - Philippines
+};
+const CONSIGNMENT_BPARTNER_IDS = new Set(Object.keys(CONSIGNMENT_BP_STOCK_TYPE).map(Number));
+const CUSTOMER_EXCESS_TYPE_ID = 1000000;
+
+/**
+ * Apply the consignment-BP guard. Pure function — returns a new opts object
+ * with corrected price=null + corrected offerTypeId when applicable. Logs a
+ * warning when a coercion fires so the operator sees that a wrong-pipeline
+ * submission was caught. No-op for non-consignment BPs.
+ *
+ * @param {object} opts - the writeOffer opts argument
+ * @returns {object} possibly-modified opts (caller should use the return value)
+ */
+function applyConsignmentGuard(opts) {
+  const bpId = Number(opts.bpartnerId);
+  if (!CONSIGNMENT_BPARTNER_IDS.has(bpId)) return opts;
+
+  const corrections = [];
+  const nextOpts = { ...opts };
+
+  // Resolve string offerTypeId via OFFER_TYPES so we can compare numerics.
+  let currentTypeId;
+  if (typeof opts.offerTypeId === 'string' && isNaN(Number(opts.offerTypeId))) {
+    currentTypeId = OFFER_TYPES[opts.offerTypeId];
+  } else {
+    currentTypeId = Number(opts.offerTypeId);
+  }
+  if (currentTypeId === CUSTOMER_EXCESS_TYPE_ID) {
+    const pairedType = CONSIGNMENT_BP_STOCK_TYPE[bpId];
+    corrections.push(`offerTypeId ${CUSTOMER_EXCESS_TYPE_ID} (Customer Excess) → ${pairedType} (paired stock type for BP ${bpId})`);
+    nextOpts.offerTypeId = pairedType;
+  }
+
+  // Always null prices on consignment BPs.
+  let priceLinesBlanked = 0;
+  if (Array.isArray(opts.lines)) {
+    nextOpts.lines = opts.lines.map(l => {
+      if (l == null) return l;
+      if (l.price != null) {
+        priceLinesBlanked++;
+        return { ...l, price: null };
+      }
+      return l;
+    });
+  }
+  if (priceLinesBlanked > 0) {
+    corrections.push(`PriceEntered blanked on ${priceLinesBlanked}/${opts.lines.length} lines`);
+  }
+
+  if (corrections.length > 0) {
+    logger.warn(`Consignment-BP guard fired for BP ${bpId}: ${corrections.join('; ')}`);
+  }
+  return nextOpts;
+}
+
 // ─── MAIN WRITER ─────────────────────────────────────────────────────────────
 
 /**
@@ -132,6 +212,10 @@ const OFFER_TYPES = {
  * @returns {object} { offerId, searchKey, linesWritten, mpnsWritten, errors }
  */
 async function writeOffer(opts) {
+  // Consignment-BP guard runs before destructuring so every downstream code
+  // path (validation, type resolution, line POSTs) sees the corrected opts.
+  opts = applyConsignmentGuard(opts);
+
   const {
     bpartnerId,
     offerTypeId: rawOfferType,
@@ -493,6 +577,9 @@ function lookupMfrId(mfrName) {
 module.exports = {
   writeOffer,
   writeOffers,
+  applyConsignmentGuard,
+  CONSIGNMENT_BP_STOCK_TYPE,
+  CONSIGNMENT_BPARTNER_IDS,
   deactivatePriorOffers,
   deactivateOfferById,
   lookupMfrId,
