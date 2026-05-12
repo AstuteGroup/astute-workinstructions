@@ -184,8 +184,10 @@ Diagnostic run on the reproducer surfaced six concrete bugs in `arrow.js`:
 - "Lots that exist but are unreachable at this rfqQty" (e.g., the 120pc/$2.069 lot) are silently dropped. Could surface them as `unreachableOpportunities[]` so a buyer asking for 100 can see "you could get \$2.069 if you bumped to 120."
 - Cache invalidation: any cached arrow envelopes captured before today still have the legacy single-row shape. They'll naturally roll over within 7d (non-PPV TTL); no manual purge.
 
-#### TODO — Verical channel surfacing gap (open 2026-05-07)
-Found while investigating ROI-tracker missed-franchise hits: Arrow's API returns `not_carried` for parts that Verical actually stocks. Concrete case: `Q6004D3RP` — buyer purchased 2,500 from Verical at \$0.7608 (Sanmina, RFQ 1132985), but Arrow's API search returned no hits, cached as `not_carried` with 2 confirms.
+#### TODO — Verical channel surfacing gap (open 2026-05-07, second case 2026-05-11)
+Found while investigating ROI-tracker missed-franchise hits: Arrow's API returns `not_carried` for parts that Verical actually stocks. Concrete cases:
+- `Q6004D3RP` — buyer purchased 2,500 from Verical at \$0.7608 (Sanmina, RFQ 1132985), Arrow API returned no hits (2026-05-07).
+- `Q6004D3RP` re-confirmed via live probe 2026-05-11 (East West Mfg RFQ 1132985) — Arrow API still returns `found=false` for the same MPN.
 
 **Hypothesis:** Verical inventory is partially exposed via Arrow's standard product API. Some MPNs surface (the rewrite on 4/09 confirmed this works for parts that DO surface) but not all. May require a different endpoint, query parameter, or marketplace-specific call.
 
@@ -196,6 +198,8 @@ Found while investigating ROI-tracker missed-franchise hits: Arrow's API returns
 4. If Arrow truly has no API surface for Verical's full catalog, evaluate if Verical has its own API or web scrape pathway.
 
 **Why it matters:** ROI tracker flags these as "missed franchise" — but if Verical's surface is structurally limited via Arrow, these aren't bugs we can fix on our side. Worth knowing the bound. Already excluded from the DigiKey miss fix (commit `c6ae2e5`) since it's an Arrow-side gap, not DigiKey.
+
+**Priority context (2026-05-11):** All confirmed Verical wins in the 30d ROI window turned out to be transactional RFQs (customer already committed pre-RFQ — see commit `39b543c` and memory `feedback_check_window_before_miss_narrative.md`). The surfacing gap is still real but lower priority than originally framed — wait for a non-transactional Verical-sourced win before sinking time into the Arrow-API investigation. Cross-listed in `~/workspace/deferred-work.md` § Investigations as a parked pointer entry.
 
 ### Rutronik API (Active)
 
@@ -1471,6 +1475,76 @@ The thin-pointer workaround is good enough for current consumer patterns:
 - Adding it later is a one-line change to writeDb() once the column is writable — no consumer churn
 
 The unblock has real value (especially as we accumulate more snapshots and build trend analysis), but it's not on the critical path for any current workflow.
+
+---
+
+## ROI Tracker Follow-ups
+
+Cross-cutting items surfaced by the ROI tracker rollout (2026-05-11, commits `71c11c7` + `39b543c`). These are bot-performance / API-surface concerns that span multiple distributors; each is also tracked in `~/workspace/deferred-work.md` for active-backlog visibility.
+
+### LT-VQ suppression check in `synthesizeStockLtVqLines`
+
+**Status:** Open — to verify | **Priority:** Medium (affects every API that returns LT pricing) | **Surfaced:** 2026-05-11
+
+Live probe via `~/workspace/oneoffs/probe-coverage-gaps.js` showed several DigiKey responses returning `found=true stockQty=0 cost=$X` (LT pricing valid even with no stock). If `synthesizeStockLtVqLines` in `shared/franchise-api.js` gates VQ row emission on `stockQty > 0`, we are silently suppressing those LT-flavor VQ rows across the entire enrichment pipeline (RFQ enrichment, Quick Quote, Vortex Matches, Hurricane).
+
+**Probe evidence:**
+- `FOD8314` qty=205 → DK returned `found=true stockQty=0 cost=$1.12`
+- `PRM48AF480T400A00` qty=90 → DK returned `found=true stockQty=0 cost=$111.71`
+
+In both cases human buyers eventually purchased the parts from DK at or near those quoted prices — so the LT pricing was legitimate and actionable.
+
+**To investigate:** Read `synthesizeStockLtVqLines` (≈ line 190 of `shared/franchise-api.js`). Trace whether a non-zero `cost` with `stockQty=0` produces an LT-tagged row in the output array. If suppressed, fix to emit one LT row when `cost` is present, with `qty=rfqQty` and `leadTime` populated.
+
+**Cross-listed:** `~/workspace/deferred-work.md` § Investigations — 🟢 ready.
+
+### Diagnostic envelope retention (lighter cousin of OT-native storage)
+
+**Status:** Considered — not started | **Priority:** Low | **Surfaced:** 2026-05-11
+
+The 2026-05-11 coverage-gap investigation required live-reprobing DK + Arrow APIs because the thin-pointer rows in `chuboe_pricing_api_result` (per § "Pricing Envelope OT-Native Storage" above) carry no response body. We had to query the APIs in real time to find out what they returned at the moment Claude enriched — and the answer may have changed since.
+
+**Lighter scope than the full Pricing Envelope unblock:** capture a compact per-call summary (`ts, distributor, mpn, qty, found, stockQty, vqPrice, error_msg, latency_ms, http_status`) in NDJSON files under `~/workspace/.api-pricing-cache/diagnostics/{YYYY-MM-DD}/`. No iDempiere dependency. Append-only, rotate weekly, auto-delete after 90 days.
+
+**Distinct from § "Pricing Envelope OT-Native Storage"** which is about full OT-queryable envelopes (blocked on iDempiere admin un-virtualizing a column). This is local-disk retention for retrospective diagnosis only. Both can ship independently.
+
+**Cross-listed:** `~/workspace/deferred-work.md` § Decisions — 🅿️ parked.
+
+### Bucket 3b distributor prioritization signal
+
+**Status:** Self-populating — review quarterly | **Surfaced:** 2026-05-11
+
+The ROI tracker's "Bucket 3b: No API for this distributor" classifies Adoption Real-Sourcing lines where the winning vendor is a franchise/catalog/authorized type but the BP isn't in Claude's API-coverage set. Over time this accumulates a ranked list of distributors worth integrating — Heilind, RS Components, Symmetry, Allied are likely candidates per the existing "To investigate" entries elsewhere in this roadmap.
+
+**Today (30d window, 2026-05-12):** 2 lines / \$2.04 — not actionable yet.
+
+**Review cadence:** Quarterly. First scheduled review ~2026-08-12 (90 days after `39b543c` shipped). When a distributor surfaces with material revenue (\$5K+ in a 90d window, or repeated appearance across multiple windows), promote it from "To investigate" to "In Progress" status in § Franchise Distributor APIs above.
+
+**How to read:** `node scripts/vq-enrichment-roi-tracker.js --window 90 --dry-run` → log line shows `noApi=N/$X`. Drill into source lines via the rendered email under § "Bucket 3b — No API for this distributor".
+
+**Cross-listed:** `~/workspace/deferred-work.md` § Time-conditional reminders — 🟡 future-dated.
+
+### `shared/business-segments.js` rollout to other reports
+
+**Status:** Built (`71c11c7`), adoption pending | **Surfaced:** 2026-05-11
+
+The canonical Adoption / LAM Kitting / Stock RFQ segment classifier lives at `astute-workinstructions/shared/business-segments.js`. Only the ROI tracker uses it today. BOM Monitoring, seller-activity reports, and any future bot-activity scorecard that mixes those segments should adopt the shared module to keep the "winning vs efficiency" framing consistent (Adoption = competitive wins; LAM/Stock = autonomous-flow efficiency).
+
+**Memory reference:** `feedback_roi_framing_winning_vs_efficiency.md`. Pull-when-touched is fine — no urgent driver.
+
+**Cross-listed:** `~/workspace/deferred-work.md` § Decisions — 🅿️ parked.
+
+### Transactional-window shared utility
+
+**Status:** Inlined in one consumer, candidate for extraction | **Surfaced:** 2026-05-11
+
+The `<60min` RFQ→first-sold-CQ check (= "RFQ created to process an order, no real sourcing competition") and the 1-24hr "needs review" gate live inlined in `scripts/vq-enrichment-roi-tracker.js`. Any future alert / dashboard / scorecard that talks about "Claude misses" must run this filter first — otherwise it conflates salesperson order-documentation workflow with actual competitive losses.
+
+**Extract when:** A second consumer wants the classification. Move to `shared/sourcing-window.js` with `classifyWindow(rfqCreated, firstSoldCqCreated) → 'processOrder' | 'needsReview' | 'realSourcing'`.
+
+**Memory reference:** `feedback_check_window_before_miss_narrative.md` (the rule: any "miss" report must run the window filter first).
+
+**Cross-listed:** `~/workspace/deferred-work.md` § Decisions — 🅿️ parked.
 
 ---
 
