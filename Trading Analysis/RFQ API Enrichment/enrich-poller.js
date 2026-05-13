@@ -634,7 +634,7 @@ async function main() {
   for (const r of immediate) {
     log(`Enriching ${r.rfq_number} (${r.rfq_type} ${r.priority}, ${r.line_mpns} MPNs)...`);
     try {
-      const result = await enrichRFQ(String(r.rfq_number));
+      const result = await enrichRFQ(String(r.rfq_number), { priority: r.priority });
       result._priority = r.priority;
       batchResults.push(result);
       log(`  done: ${result.apiCalls} API, ${result.cacheHits} cache, ${result.vqsWritten} VQs, ${result.errors?.length || 0} err`);
@@ -674,7 +674,7 @@ async function main() {
   for (const item of candidates) {
     log(`  Backlog: enriching ${item.rfq_number} (${item.customer}, ${item.line_mpns} MPNs, queued ${item.queuedAt})...`);
     try {
-      const result = await enrichRFQ(String(item.rfq_number));
+      const result = await enrichRFQ(String(item.rfq_number), { priority: 'P3' });
       result._priority = 'P3';
       result._fromBacklog = true;
       batchResults.push(result);

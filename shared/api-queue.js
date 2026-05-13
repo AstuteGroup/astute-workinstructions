@@ -144,6 +144,10 @@ const QUEUE_PATH = path.resolve(process.env.HOME || '/home/analytics_user', 'wor
  * @param {number} [opts.blocked_until_hours] - Convenience: hours from now (alternative to blocked_until)
  * @param {string} [opts.reason] - Human-readable why-blocked
  * @param {number} [opts.max_attempts=5] - Max retry attempts before exhaustion
+ * @param {string} [opts.priority='P2'] - 'P1' | 'P2' | 'P3' — dispatch priority
+ *   captured at enqueue. P1 = small RFQ / user-waiting express, P2 = main
+ *   immediate, P3 = backlog drain. process-api-queue.js sorts ready items
+ *   P1 → P2 → P3 each tick. Default P2 keeps legacy callers in the middle tier.
  * @returns {boolean} true if added, false if already exists or write failed
  */
 function enqueueRetry(opts) {
@@ -191,6 +195,7 @@ function enqueueRetry(opts) {
     attempts: 0,
     max_attempts: opts.max_attempts || 5,
     status: 'pending',
+    priority: opts.priority || 'P2',
     last_attempt: null,
     last_error: null,
   });

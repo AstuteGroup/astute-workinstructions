@@ -491,6 +491,7 @@ async function searchPart(distributor, mpn, qty, opts = {}) {
             command: `API_RETRY_IN_FLIGHT=1 API_RETRY_ARGS_B64=${argsB64} node ${JSON.stringify(runnerPath)}`,
             blocked_until_hours: _verdict.blockedHours,
             reason: `${distributor} ${_verdict.category}: ${_verdict.reason} on ${mpn} (${err.message.slice(0, 100)})`,
+            priority: opts.priority || 'P2',
           });
         }
       } catch { /* enqueue is best-effort; never block the result path */ }
@@ -723,13 +724,22 @@ async function searchAllDistributors(mpn, qty, options = {}) {
   const {
     parallel = true, exclude = [], onResult = null,
     cacheTTL = null, cacheBypassIf = null, mfr = null,
+    priority = null,
     perDistributorTimeoutMs = DEFAULT_PER_DISTRIBUTOR_TIMEOUT_MS,
   } = options;
   // `mfr` — the searched MFR (typically the RFQ's MFR text). When provided,
   // each distributor's parser applies the MFR veto via shared/mpn-match.js,
   // rejecting candidates whose MFR resolves to MISMATCH. Opt-in — existing
   // callers that don't pass mfr get the old behavior (MPN match only, no veto).
-  const perCallOpts = mfr ? { mfr } : {};
+  //
+  // `priority` — 'P1' | 'P2' | 'P3' from rfq-priority.assignPriority(). Threaded
+  // through to searchPart's opts so that on retry-enqueue, the queue item is
+  // tagged with the originating RFQ's dispatch priority. process-api-queue.js
+  // then sorts retries P1 → P2 → P3 so small RFQs / user-waiting work doesn't
+  // queue behind P3 backlog drain.
+  const perCallOpts = {};
+  if (mfr) perCallOpts.mfr = mfr;
+  if (priority) perCallOpts.priority = priority;
 
   // ── Cache gate ───────────────────────────────────────────────────────────
   // If caller supplied a cacheTTL, consult getFreshness() first. On a hit we

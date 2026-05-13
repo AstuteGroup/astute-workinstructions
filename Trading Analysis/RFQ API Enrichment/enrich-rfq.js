@@ -104,6 +104,12 @@ async function fetchRFQLines(rfqDocNumber) {
  * @param {boolean} [opts.force=false]  - If true, bypass cache (force API calls)
  * @param {number}  [opts.maxLines]     - Cap number of lines processed (smoke testing)
  * @param {function} [opts.onProgress]  - Callback (line, idx, total) for progress
+ * @param {string}  [opts.priority]     - 'P1' | 'P2' | 'P3' from rfq-priority.
+ *   Threaded into searchAllDistributors options so any retry items enqueued by
+ *   the franchise API wrapper carry the RFQ's dispatch priority. The retry
+ *   queue worker uses this to sort retries — P1 small/express ahead of P3
+ *   backlog. Pass-through is the only thing enrich-rfq does with it; it does
+ *   not influence enrichment behavior here.
  * @returns {Promise<object>} summary
  */
 async function enrichRFQ(rfqDocNumber, opts = {}) {
@@ -121,7 +127,7 @@ async function enrichRFQ(rfqDocNumber, opts = {}) {
     );
   }
 
-  const { dryRun = false, force = false, maxLines = null, onProgress = null, ignorePause = false } = opts;
+  const { dryRun = false, force = false, maxLines = null, onProgress = null, ignorePause = false, priority = null } = opts;
   const startedAt = new Date();
 
   const rawRows = await fetchRFQLines(rfqDocNumber);
@@ -273,7 +279,7 @@ async function enrichRFQ(rfqDocNumber, opts = {}) {
     warnings: [],
   };
 
-  // Yield to foreground workflows (LAM Kitting Reorder, Stock RFQ pricing, etc.)
+  // Yield to foreground workflows (LAM 3PL, Stock RFQ pricing, etc.)
   // Check at every MPN boundary — cheap; sleep 30s if a pause is active.
   const apiPause = require('../../shared/api-pause');
 
@@ -307,6 +313,7 @@ async function enrichRFQ(rfqDocNumber, opts = {}) {
       result = await searchAllDistributors(mpn, Number(qty) || 1, {
         cacheTTL: ttlDays,
         cacheBypassIf,
+        priority,
       });
     } catch (err) {
       counters.errors.push({ mpn, cpc, stage: 'search', message: err.message });
