@@ -27,7 +27,14 @@ const REGISTRY = require('../cron-jobs');
 const { cadenceToMs } = require('../cron-jobs');
 const { shouldRun, markSuccess, markFailure } = require('../shared/cron-sentinel');
 const { probeOT } = require('../shared/ot-health');
+const { acquireLock, releaseLock } = require('../shared/lockfile');
 const breadcrumbs = require('../shared/breadcrumbs');
+
+// Single-instance lock stale timeout. 24h means a legitimately slow run is
+// never force-taken on age alone — lockfile.js's alive-PID check is what
+// actually defends against stuck holders (dead PIDs are reclaimed immediately
+// regardless of age).
+const LOCK_STALE_MS = 24 * 60 * 60 * 1000;
 
 function crumb(jobName, event, detail) {
   try {
@@ -104,6 +111,30 @@ async function main() {
     console.log(`[dry-run] would exec: cd "${job.cwd}" && ${job.command}`);
     process.exit(0);
   }
+
+  // ─── Single-instance lock ──────────────────────────────────────────────
+  // Each job (by registry name) acquires a per-name lock so cron can't stack
+  // overlapping runs of the same job when a tick runs longer than the cadence.
+  // Different jobs run concurrently — only same-name re-fires are blocked.
+  //
+  // --force still ACQUIRES the lock (so subsequent cron ticks see lock-held
+  // and skip), but with staleAfterMs=0 — meaning an existing lock is treated
+  // as stale and force-taken. This gives operator-initiated runs guaranteed
+  // single-instance protection: --force never refuses, but it also never
+  // runs concurrently with another instance.
+  const lock = acquireLock(job.name, {
+    staleAfterMs: args.force ? 0 : LOCK_STALE_MS,
+  });
+  if (!lock.acquired) {
+    // Only reachable in non-force mode — force always force-takes.
+    logEvent(job.name, 'skip-lock-held', { heldSince: lock.heldSince, pid: lock.pid, ageMs: lock.ageMs });
+    crumb(job.name, 'job-skip-lock-held', { heldSince: lock.heldSince, pid: lock.pid, ageMs: lock.ageMs });
+    console.error(`cron-runner: '${job.name}' already running (pid=${lock.pid}, held ${Math.round((lock.ageMs || 0) / 1000)}s) — skipping this tick`);
+    process.exit(0);
+  }
+  // Release on any exit path (natural, process.exit, uncaught). Won't fire
+  // on SIGKILL — but lockfile.js's alive-PID check reclaims dead-PID locks.
+  process.on('exit', () => releaseLock(job.name));
 
   // ─── Execute the job ───────────────────────────────────────────────────
   const startedAt = Date.now();

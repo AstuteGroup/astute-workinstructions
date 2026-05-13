@@ -47,6 +47,33 @@
  * appropriate category as cogs surface new error shapes.
  */
 
+/**
+ * Hours until next midnight America/Chicago (Mouser's quota reset boundary).
+ *
+ * Confirmed 2026-05-13 from ~/workspace/.mouser-failures.ndjson: MaxCallPerDay
+ * failures flat-line ~1,500/hour, with a sharp dip at 05:00 UTC = midnight CDT.
+ * The dip is the brief window where real calls succeed before the fresh daily
+ * quota is exhausted again. So that's the reset boundary, not midnight UTC.
+ *
+ * Using America/Chicago handles DST automatically (CDT=UTC-5, CST=UTC-6).
+ * Adds a 15-minute safety margin past midnight to avoid retrying inside any
+ * quota-handover edge case.
+ */
+function hoursUntilNextChicagoMidnight() {
+  const now = new Date();
+  const tzString = now.toLocaleString('en-US', { timeZone: 'America/Chicago', hour12: true });
+  const m = tzString.match(/(\d+):(\d+):(\d+)\s+(AM|PM)/);
+  if (!m) return 6; // fallback if locale format ever changes
+  let h = Number(m[1]);
+  const min = Number(m[2]);
+  const s = Number(m[3]);
+  const ampm = m[4];
+  if (ampm === 'PM' && h !== 12) h += 12;
+  if (ampm === 'AM' && h === 12) h = 0;
+  const hoursLeft = (24 - h) - (min / 60) - (s / 3600);
+  return Math.max(0.5, hoursLeft + 0.25); // 15min safety past midnight, 30min floor
+}
+
 const RULES = [
   // PERMANENT — env / config issues that retrying won't fix
   { pattern: /API[\s_-]?key\s+(not\s+configured|missing|empty|unset|required)/i, category: 'PERMANENT', retry: false, blockedHours: 0, reason: 'API key not configured' },
@@ -59,7 +86,10 @@ const RULES = [
   // Our own client-side throttle in shared/api-throttle.js can also throw "max wait exceeded" — same backoff.
   { pattern: /throttle: max wait/i,                                              category: 'RATE_LIMIT', retry: true, blockedHours: 2/60, reason: 'Client-side throttle exhausted (await window)' },
   { pattern: /MaxCallPerMinute|per-minute rate limit/i,                          category: 'RATE_LIMIT', retry: true, blockedHours: 2/60, reason: 'Per-minute rate limit (~60s reset)' },
-  { pattern: /MaxCallPerDay|daily quota/i,                                       category: 'RATE_LIMIT', retry: true, blockedHours: 6, reason: 'Daily quota exhausted (resets ~midnight UTC)' },
+  // MaxCallPerDay: backoff lands at next midnight America/Chicago (Mouser's
+  // confirmed reset boundary). Dynamic via blockedHoursFn — classify() invokes
+  // it at call time so the wait shrinks as we approach reset.
+  { pattern: /MaxCallPerDay|daily quota/i,                                       category: 'RATE_LIMIT', retry: true, blockedHoursFn: hoursUntilNextChicagoMidnight, reason: 'Daily quota exhausted (resets midnight America/Chicago)' },
   { pattern: /\b429\b|Rate limit|too many requests/i,                            category: 'RATE_LIMIT', retry: true, blockedHours: 1, reason: 'Rate limit (429)' },
   { pattern: /\bquota\b|call limit exceeded/i,                                   category: 'RATE_LIMIT', retry: true, blockedHours: 1, reason: 'Quota exhausted' },
   { pattern: /\b403\b|HTTP 403|Forbidden/i,                                      category: 'RATE_LIMIT', retry: true, blockedHours: 1, reason: '403 Forbidden (generic — could be quota or perms)' },
@@ -96,7 +126,9 @@ function classify(error) {
       return {
         category: rule.category,
         retry: rule.retry,
-        blockedHours: rule.blockedHours,
+        // blockedHoursFn (if present) is called at classify-time so dynamic
+        // backoffs (e.g., "until next Chicago midnight") reflect current clock.
+        blockedHours: typeof rule.blockedHoursFn === 'function' ? rule.blockedHoursFn() : rule.blockedHours,
         reason: rule.reason,
         matchedPattern: rule.pattern.toString(),
       };
@@ -105,4 +137,4 @@ function classify(error) {
   return { ...FALLBACK, matchedPattern: null };
 }
 
-module.exports = { classify, _RULES: RULES, _FALLBACK: FALLBACK };
+module.exports = { classify, hoursUntilNextChicagoMidnight, _RULES: RULES, _FALLBACK: FALLBACK };
