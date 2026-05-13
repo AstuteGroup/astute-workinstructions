@@ -791,7 +791,7 @@ function renderMpnTable(rows, ctx, headerLabel, emptyMsg) {
   const tickHeader  = ctx.includeTickCol  ? '<th>Last 4h</th>'  : '';
   const todayHeader = ctx.includeTodayCol ? '<th>Today</th>' : '';
   html += `<table><tr><th>#</th><th>MPN</th><th>Mfr</th><th>Tag</th>`
-       + `<th>RFQs</th>${tickHeader}${todayHeader}<th>Max Qty</th>`
+       + `<th>RFQs</th>${tickHeader}${todayHeader}<th>Highest RFQ Qty</th>`
        + `<th>Distinct Customers</th><th>30d Repeat</th>`
        + `<th>Stock</th><th>Excess Match (90d)</th>`
        + `<th>Best Franchise (14d)</th>`
