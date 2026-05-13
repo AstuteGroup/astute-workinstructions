@@ -112,9 +112,17 @@ const CONSIGNMENT_GROUPS = [
 // Roadmap B4 (open-PO inventory) is the long-term replacement for this
 // workaround — once the loader can pull from Infor's open-PO data the
 // static carryover list should empty out.
+// Unified-offer model (2026-05-12 refactor): entries with `mergeIntoGroup`
+// no longer write their own `[Carryover] {label}` offer. Instead the seed
+// lives in `carryover-registry/{slug}.json` and is merged into the matching
+// `WAREHOUSE_WRITEBACK` group's weekly write (Infor-row wins on MPN clash).
+// Standalone `[Carryover]` offers in OT are deactivated as a one-time cleanup
+// on the first cron run after this change. The `bootstrapId` field is kept
+// for historical reference (the original OT offer used during initial seed).
 const STATIC_CARRYOVER_OFFERS = [
     {
         label: 'Eaton Consignment',
+        registrySlug: 'eaton-consignment',
         bootstrapId: 1024798,
         portalWarehouseName: 'Astute Electronics Inc. - Eaton (Carryover)',
         // Eaton consignment stock lands in Infor W117 once received — pair for
@@ -123,29 +131,34 @@ const STATIC_CARRYOVER_OFFERS = [
         // treats MFR mismatches as informational (Infor's W117 MFR tag is
         // unreliable — see project_chuboe_warehouse_group_unreliable.md).
         pairedWarehouses: ['W117'],
+        mergeIntoGroup: 'Eaton_Consignment',
     },
     {
         label: 'Free Stock - Philippines',
+        registrySlug: 'free-stock-philippines',
         bootstrapId: 1025258,
         portalWarehouseName: 'Astute Electronics Inc. - Philippines (Carryover)',
         // Philippines (W109/W114) currently has no live Infor data — both
         // warehouses have been empty for at least 2 weeks (verified 5/07,
-        // master CSV has 0 rows in W109 and 0 in W114). Carryover holds the
+        // master CSV has 0 rows in W109 and 0 in W114). Registry holds the
         // 195 active lines as a manual-add. When stock physically moves in
         // and Infor starts reporting W109/W114 again, reconcileCarryover
         // will auto-retire matching MPNs at the 95% qty threshold, same
         // pattern as Eaton (W117) and LAM (W118). Until then the loop
         // finds 0 paired-warehouse rows for every MPN and keeps everything.
         pairedWarehouses: ['W109', 'W114'],
+        mergeIntoGroup: 'Free_Stock_Philippines',
     },
     {
         label: 'LAM Consignment',
+        registrySlug: 'lam-consignment',
         bootstrapId: 1026158,
         portalWarehouseName: 'Astute Electronics Inc. - LAM (Carryover)',
         // LAM consignment stock lands in Infor W118 once received — pair for
         // auto-retire as lines are received (same pattern as Eaton). Seeded
         // 2026-04-22 from master static file (POV0071878, 103 MPNs, $2.14M).
         pairedWarehouses: ['W118'],
+        mergeIntoGroup: 'LAM_Consignment',
     },
     // 'Incoming Lot bid from Marvell' was removed 2026-05-07 — bootstrap
     // 1024030 was created 2025-07-17 but NEVER seeded with any lines (0
@@ -156,6 +169,7 @@ const STATIC_CARRYOVER_OFFERS = [
     // — should we be tracking incoming lot bids at all?"
     {
         label: 'GM Stock',
+        registrySlug: 'gm-stock',
         bootstrapId: 1026173,
         portalWarehouseName: 'Astute Electronics Inc. - GM Stock',
         // Bootstrapped 2026-04-28 from Josh Pucci's "GM Inventory" email
@@ -163,7 +177,8 @@ const STATIC_CARRYOVER_OFFERS = [
         // "1120 Price Update"). 19 MPNs / 2,628,000 pcs (Nexperia + Onsemi).
         // Posted under Astute Electronics Inc → Stock - Austin Warehouse.
         // No paired Infor warehouse — this stock lives outside the weekly
-        // export and propagates forward as-is until retired.
+        // export and propagates forward as-is until retired. NO mergeIntoGroup
+        // — this carryover remains a standalone `[Carryover]` offer in OT.
     },
 ];
 
@@ -171,6 +186,28 @@ const STATIC_CARRYOVER_OFFERS = [
 // of the carryover qty, the line is considered fully received and is retired
 // from next week's carryover. 0.95 accounts for minor lot/count drift.
 const RECONCILE_QTY_THRESHOLD = 0.95;
+
+// File-backed registry path for static carryover seeds (unified-offer model).
+// Each STATIC_CARRYOVER_OFFERS entry with `registrySlug` reads from
+// `carryover-registry/{slug}.json`. See carryover-registry/README — schema
+// is { label, lineCount, lines: [{mpn, mfr, qty, dateCode, packageDesc,
+// description, moq, spq}] }. The manage-carryover.js CLI reads/writes
+// against these files; this script reads them at cron time to build the
+// supplement set merged into each paired warehouse group's weekly write.
+const CARRYOVER_REGISTRY_DIR = path.join(__dirname, 'carryover-registry');
+
+function loadCarryoverRegistry(slug) {
+    const filePath = path.join(CARRYOVER_REGISTRY_DIR, `${slug}.json`);
+    if (!fs.existsSync(filePath)) {
+        throw new Error(`carryover registry not found: ${filePath}`);
+    }
+    const raw = fs.readFileSync(filePath, 'utf8');
+    const obj = JSON.parse(raw);
+    if (!Array.isArray(obj.lines)) {
+        throw new Error(`carryover registry malformed (no lines array): ${filePath}`);
+    }
+    return obj;
+}
 
 // Warehouse Group → OT write-back mapping
 // Each entry produces one chuboe_offer (header) per weekly run, with the
@@ -192,6 +229,19 @@ const WAREHOUSE_WRITEBACK = {
     'LAM_Consignment':         { bpartnerId: 1011267, offerTypeId: 1000014 }, // Astute - LAM Consignment → Philippines
     'LAM_Dead_Inventory':      { bpartnerId: 1000332, offerTypeId: 1000008 }, // Astute Electronics Inc → Austin (separate offer)
 };
+
+// Sanity check: every STATIC_CARRYOVER_OFFERS entry with `mergeIntoGroup`
+// must name a real WAREHOUSE_WRITEBACK key. Catches typos / drift between
+// the carryover registry and the writeback map at module load (fails fast).
+for (const cfg of STATIC_CARRYOVER_OFFERS) {
+    if (cfg.mergeIntoGroup && !WAREHOUSE_WRITEBACK[cfg.mergeIntoGroup]) {
+        throw new Error(
+            `STATIC_CARRYOVER_OFFERS misconfigured: label "${cfg.label}" has ` +
+            `mergeIntoGroup="${cfg.mergeIntoGroup}" which is not a key in ` +
+            `WAREHOUSE_WRITEBACK. Add the group to WAREHOUSE_WRITEBACK or fix the name.`
+        );
+    }
+}
 
 // Groups intentionally excluded from BOTH OT write-back AND the NetComponents
 // portal CSVs. Internal-only — MAIN allocation, W105 HK allocated, W111 LAM
@@ -464,7 +514,8 @@ function arrayToCSV(rows, headers) {
  * @param {'fetch'|'manual'} args.mode    - which entrypoint is calling
  * @returns {object} reconciliation totals + soft-warn data for the email
  */
-function assertRoutingInvariants({ result, writebackResults, carryoverResults = [], mode }) {
+function assertRoutingInvariants({ result, writebackResults, carryoverResults = [], supplementsByGroup = {}, mode }) {
+    const { cleanMpn } = require('../../shared/db-helpers');
     const otGroupNames = new Set(Object.keys(WAREHOUSE_WRITEBACK));
     const errors = [];
 
@@ -496,9 +547,26 @@ function assertRoutingInvariants({ result, writebackResults, carryoverResults = 
         // Mirror the writer's `.filter(l => l.mpn)` so the count compares
         // what each side actually attempts (rows w/ no Item value get
         // dropped on the OT side at line ~498).
-        const inputCount = (result.groups[groupName] || []).filter(
+        const inforInputCount = (result.groups[groupName] || []).filter(
             r => String(r['Item'] || '').trim()
         ).length;
+
+        // Unified-offer supplements: paired carryovers contribute lines on
+        // both sides. They land in the OT offer via writeInventoryToOT and
+        // in the portal CSV via Step 5d (post-merge dedupe — Infor wins on
+        // MPN clash). Count them on the portal side to keep the per-group
+        // check balanced.
+        const supplements = supplementsByGroup[groupName] || [];
+        const inforMpnCleanSet = new Set(
+            (result.groups[groupName] || [])
+                .map(r => cleanMpn(String(r['Item'] || '').trim()))
+                .filter(Boolean)
+        );
+        const supplementCountAfterDedupe = supplements.filter(s => {
+            const c = cleanMpn(s.mpn);
+            return c && !inforMpnCleanSet.has(c);
+        }).length;
+        const inputCount = inforInputCount + supplementCountAfterDedupe;
 
         const wb = writebackResults.find(r => r.groupName === groupName);
         let otAttempted = 0;
@@ -602,9 +670,10 @@ function assertRoutingInvariants({ result, writebackResults, carryoverResults = 
     };
 }
 
-async function writeInventoryToOT(groupedRows, dateStr, dryRun = false) {
+async function writeInventoryToOT(groupedRows, dateStr, dryRun = false, supplementsByGroup = {}) {
     const { writeOffer, deactivatePriorOffers } = require('../../shared/offer-writeback');
     const { apiGet } = require('../../shared/api-client');
+    const { cleanMpn } = require('../../shared/db-helpers');
 
     console.log('\n' + '='.repeat(60));
     console.log(dryRun ? 'OT WRITE-BACK (DRY RUN)' : 'OT WRITE-BACK');
@@ -651,9 +720,10 @@ async function writeInventoryToOT(groupedRows, dateStr, dryRun = false) {
     for (const [groupName, mapping] of Object.entries(WAREHOUSE_WRITEBACK)) {
         const rows = groupedRows[groupName] || [];
         const isConsignment = CONSIGNMENT_GROUPS.includes(groupName);
+        const supplements = supplementsByGroup[groupName] || [];
 
-        if (rows.length === 0) {
-            console.log(`  ${groupName}: 0 rows — skipping`);
+        if (rows.length === 0 && supplements.length === 0) {
+            console.log(`  ${groupName}: 0 rows (Infor + supplement) — skipping`);
             results.push({ groupName, status: 'skipped', reason: 'no rows', ...mapping });
             continue;
         }
@@ -663,7 +733,7 @@ async function writeInventoryToOT(groupedRows, dateStr, dryRun = false) {
         // null so OT records don't carry junk MFR text — the MFR resolver
         // would otherwise fail to canonicalize them and write the raw string.
         const MFR_PLACEHOLDER_RE = /^(not known( yet)?)$/i;
-        const lines = rows.map(row => {
+        const inforLines = rows.map(row => {
             const lot = String(row['Lot'] || '').trim();
             const loc = String(row['Location'] || '').trim();
             const packageDesc = [lot, loc].filter(Boolean).join(';');
@@ -681,6 +751,28 @@ async function writeInventoryToOT(groupedRows, dateStr, dryRun = false) {
                 description: String(row['ItemDescription'] || '').trim() || null,
             };
         }).filter(l => l.mpn);
+
+        // Merge static-seed supplements (Infor-row wins on MPN clash). Build
+        // an Infor MPN-clean set, then keep only the supplement lines whose
+        // cleaned MPN isn't already covered by Infor. Same semantics as the
+        // pre-refactor auto-retire — once a line lands in Infor, the
+        // static-seed entry stops being interesting.
+        const inforMpnCleanSet = new Set(inforLines.map(l => cleanMpn(l.mpn)).filter(Boolean));
+        const supplementSkipped = [];
+        const supplementMerged = [];
+        for (const sup of supplements) {
+            const supClean = cleanMpn(sup.mpn);
+            if (supClean && inforMpnCleanSet.has(supClean)) {
+                supplementSkipped.push(sup.mpn);
+            } else {
+                supplementMerged.push(sup);
+            }
+        }
+        if (supplements.length > 0) {
+            console.log(`  ${groupName}: merge ${supplementMerged.length}/${supplements.length} static-seed line(s) (${supplementSkipped.length} skipped — already in Infor)`);
+        }
+
+        const lines = [...inforLines, ...supplementMerged];
 
         // Pre-query priorOffers in BOTH dry-run and live mode so the email
         // summary can show "OLD → NEW" mapping. In dry-run these are the
@@ -889,6 +981,132 @@ function reconcileCarryover(allLines, pairedWarehouses, pendingMpnDetails) {
 }
 
 /**
+ * Build supplement lines for each WAREHOUSE_WRITEBACK group that has a
+ * merged static carryover. Reads the carryover-registry JSONs, runs
+ * reconcileCarryover against this week's Infor paired-warehouse rows, and
+ * returns the post-reconciliation kept lines mapped to writeOffer line shape.
+ *
+ * Returns:
+ *   {
+ *     supplementsByGroup: { GroupName: [{ mpn, mfrText, qty, dateCode, ... }] },
+ *     results: [{ label, mergeIntoGroup, status, sourceLines, retired, flagged, overlapMpns, overlapDetails }]
+ *   }
+ *
+ * `results` is the same shape downstream code expects from
+ * refreshStaticCarryoverOffers — Step 5d (portal CSV append) and audit-summary
+ * code can consume it uniformly. `sourceLines` is OT-line shape (Chuboe_MPN,
+ * Chuboe_MFR_Text, Qty, ...) for parity with the standalone-carryover path.
+ *
+ * Only entries with `mergeIntoGroup` are processed here — un-paired carryovers
+ * (GM Stock) continue through refreshStaticCarryoverOffers unchanged.
+ *
+ * @param {Array} carryovers       - STATIC_CARRYOVER_OFFERS
+ * @param {Map<string, Array>} pendingMpnDetails - same map refreshStaticCarryoverOffers uses
+ */
+function prepareCarryoverSupplements(carryovers, pendingMpnDetails) {
+    const supplementsByGroup = {};
+    const results = [];
+
+    for (const cfg of carryovers) {
+        if (!cfg.mergeIntoGroup) continue;  // standalone carryover — handled later
+
+        let registry;
+        try {
+            registry = loadCarryoverRegistry(cfg.registrySlug);
+        } catch (e) {
+            results.push({
+                label: cfg.label,
+                mergeIntoGroup: cfg.mergeIntoGroup,
+                portalWarehouseName: cfg.portalWarehouseName,
+                status: 'failed',
+                error: e.message,
+                sourceLines: [],
+            });
+            console.error(`  ${cfg.label}: FAILED — registry load: ${e.message}`);
+            continue;
+        }
+
+        // Convert registry entries to the OT-line shape reconcileCarryover expects.
+        // Keep both shapes: `otShape` for reconcile + downstream Step 5d (portal CSV),
+        // and a transformed writeOffer shape attached to supplementsByGroup below.
+        const otShapeLines = registry.lines.map(l => ({
+            Chuboe_MPN:         l.mpn,
+            Chuboe_MFR_Text:    l.mfr || '',
+            Qty:                l.qty,
+            Chuboe_Date_Code:   l.dateCode || '',
+            Chuboe_Package_Desc: l.packageDesc || '',
+            Description:        l.description || '',
+            Chuboe_MOQ:         l.moq || '',
+            Chuboe_SPQ:         l.spq || '',
+        }));
+
+        const { keptLines, retired, flagged } = reconcileCarryover(
+            otShapeLines, cfg.pairedWarehouses, pendingMpnDetails
+        );
+
+        // Overlap detail (mirrors refreshStaticCarryoverOffers' overlap CSV)
+        const overlapMpnSet = new Set();
+        const overlapDetails = [];
+        for (const line of otShapeLines) {
+            const mpn = String(line.Chuboe_MPN || '').trim();
+            if (!mpn) continue;
+            const matches = pendingMpnDetails.get(mpn);
+            if (!matches || matches.length === 0) continue;
+            overlapMpnSet.add(mpn);
+            overlapDetails.push({
+                mpn,
+                carryoverMfr:        line.Chuboe_MFR_Text || '',
+                carryoverQty:        line.Qty || 0,
+                carryoverDateCode:   line.Chuboe_Date_Code || '',
+                carryoverPackageDesc: line.Chuboe_Package_Desc || '',
+                thisWeekMatches:     matches,
+            });
+        }
+
+        // Convert keptLines back to writeOffer line shape for supplementsByGroup.
+        // Prefix `[static-seed]` on description for provenance — every line on
+        // the merged offer is identifiable as Infor-live vs static-seed by this marker.
+        const writeOfferShapeLines = keptLines.map(l => {
+            const origDesc = String(l.Description || '').trim();
+            const taggedDesc = origDesc ? `[static-seed] ${origDesc}` : '[static-seed]';
+            return {
+                mpn:         l.Chuboe_MPN,
+                mfrText:     l.Chuboe_MFR_Text || null,
+                qty:         l.Qty,
+                price:       null,  // static seed has no price — consignment guard would blank anyway
+                dateCode:    l.Chuboe_Date_Code || null,
+                packageDesc: l.Chuboe_Package_Desc || null,
+                description: taggedDesc,
+                moq:         l.Chuboe_MOQ || null,
+                spq:         l.Chuboe_SPQ || null,
+            };
+        });
+
+        supplementsByGroup[cfg.mergeIntoGroup] = writeOfferShapeLines;
+
+        const retiredQty = retired.reduce((s, r) => s + r.carryoverQty, 0);
+        const mfrDiff = retired.filter(r => !r.mfrMatch).length;
+        console.log(`  ${cfg.label} → ${cfg.mergeIntoGroup}: reconcile vs ${cfg.pairedWarehouses.join(',')} → retire ${retired.length} MPN(s)/${retiredQty.toLocaleString()} pc${mfrDiff ? ` (${mfrDiff} w/ MFR diff)` : ''}, flag ${flagged.length} MPN(s), supplement ${keptLines.length}/${otShapeLines.length} line(s)`);
+
+        results.push({
+            label: cfg.label,
+            mergeIntoGroup: cfg.mergeIntoGroup,
+            portalWarehouseName: cfg.portalWarehouseName,
+            status: 'merged-supplement',
+            sourceLines: keptLines,  // OT shape — Step 5d uses this for portal CSV
+            retired,
+            flagged,
+            overlapMpns: [...overlapMpnSet],
+            overlapDetails,
+            linesAttempted: keptLines.length,
+            linesOriginal: otShapeLines.length,
+        });
+    }
+
+    return { supplementsByGroup, results };
+}
+
+/**
  * Refresh static carryover offers — read each, deactivate it, write a fresh
  * copy with a new Created timestamp. Also cross-reference the carryover
  * MPNs against this week's pending Infor inventory so the user gets flagged
@@ -914,6 +1132,82 @@ async function refreshStaticCarryoverOffers(carryovers, dateStr, dryRun, pending
 
     for (const cfg of carryovers) {
         const labelEsc = cfg.label.replace(/'/g, "''");
+
+        // Unified-offer model: entries with mergeIntoGroup are written into
+        // the WAREHOUSE_WRITEBACK group's Weekly inventory offer in Step 5
+        // (see prepareCarryoverSupplements). Here we only perform a one-time
+        // cleanup of any orphan [Carryover] {label} offer left over from the
+        // pre-refactor pipeline. Once the orphan is gone, this branch becomes
+        // a no-op on subsequent runs.
+        if (cfg.mergeIntoGroup) {
+            let orphanOfferId = null;
+            let orphanHeader = null;
+            try {
+                const lookup = await apiGet('chuboe_offer', {
+                    filter: `IsActive eq true and startswith(Description,'[Carryover] ${labelEsc}')`,
+                    select: 'Value,Description',
+                    orderby: 'Created desc',
+                });
+                const found = lookup.records || [];
+                if (found.length > 0) {
+                    orphanOfferId = found[0].id;
+                    orphanHeader = found[0];
+                }
+            } catch (e) {
+                console.warn(`  ! ${cfg.label}: orphan lookup failed (${e.message}) — skipping cleanup`);
+            }
+
+            if (!orphanOfferId) {
+                console.log(`  ${cfg.label}: merged into ${cfg.mergeIntoGroup} (no orphan to clean up)`);
+                results.push({
+                    label: cfg.label,
+                    mergeIntoGroup: cfg.mergeIntoGroup,
+                    portalWarehouseName: cfg.portalWarehouseName,
+                    status: 'merged-no-orphan',
+                });
+                continue;
+            }
+
+            if (dryRun) {
+                console.log(`  [DRY RUN] ${cfg.label}: merged into ${cfg.mergeIntoGroup} — would deactivate orphan [Carryover] offer ${orphanOfferId} (value ${orphanHeader.Value || '?'})`);
+                results.push({
+                    label: cfg.label,
+                    mergeIntoGroup: cfg.mergeIntoGroup,
+                    portalWarehouseName: cfg.portalWarehouseName,
+                    status: 'dry-run-cleanup',
+                    orphanOfferId,
+                    orphanValue: orphanHeader.Value || null,
+                });
+                continue;
+            }
+
+            try {
+                const deactResult = await deactivateOfferById(orphanOfferId);
+                if (!deactResult.success) throw new Error(deactResult.error || 'deactivate returned non-success');
+                console.log(`  ${cfg.label}: merged into ${cfg.mergeIntoGroup} — deactivated orphan [Carryover] offer ${orphanOfferId} (${deactResult.linesDeactivated} lines)`);
+                results.push({
+                    label: cfg.label,
+                    mergeIntoGroup: cfg.mergeIntoGroup,
+                    portalWarehouseName: cfg.portalWarehouseName,
+                    status: 'merged-orphan-cleaned',
+                    orphanOfferId,
+                    orphanValue: orphanHeader.Value || null,
+                    deactivatedLines: deactResult.linesDeactivated,
+                });
+            } catch (e) {
+                console.error(`  ${cfg.label}: FAILED orphan cleanup — ${e.message}`);
+                results.push({
+                    label: cfg.label,
+                    mergeIntoGroup: cfg.mergeIntoGroup,
+                    portalWarehouseName: cfg.portalWarehouseName,
+                    status: 'failed-cleanup',
+                    error: e.message,
+                    orphanOfferId,
+                });
+            }
+            continue;
+        }
+
         let currentOfferId = null;
         let currentHeader = null;
 
@@ -1881,15 +2175,9 @@ async function fetchAndProcess(opts = {}) {
 
         const dateStr = new Date().toISOString().split('T')[0];
 
-        // Step 5: Write inventory to OT via API (replaces zipped CSV upload path)
-        console.log(`\nStep 5: Writing inventory to OT (${dryRun ? 'DRY RUN' : 'LIVE'})...`);
-        const writebackResults = await writeInventoryToOT(result.groups, dateStr, dryRun);
-
-        // Step 5b: Refresh static carryover offers (Eaton/PH/Marvell — manually
-        // loaded inventory living outside the Infor export). Build a rich
-        // mpn → [{warehouse, qty, lot}] map from the FULL processed inventory
-        // (every warehouse, not just write-back groups) so the carryover
-        // overlap CSV can show exactly where each matching part now lives.
+        // Step 4.5: Build per-MPN pendingMpnDetails BEFORE writeback so the
+        // unified-offer supplement builder can reconcile carryover registry
+        // entries against this week's Infor paired-warehouse rows.
         const pendingMpnDetails = new Map();
         for (const groupName in result.groups) {
             for (const row of result.groups[groupName]) {
@@ -1907,8 +2195,37 @@ async function fetchAndProcess(opts = {}) {
                 pendingMpnDetails.get(mpn).push(detail);
             }
         }
-        console.log(`\nStep 5b: Refreshing static carryover offers (${dryRun ? 'DRY RUN' : 'LIVE'}) — comparing against ${pendingMpnDetails.size} unique MPNs from this week's Infor data...`);
-        const carryoverResults = await refreshStaticCarryoverOffers(STATIC_CARRYOVER_OFFERS, dateStr, dryRun, pendingMpnDetails);
+
+        // Step 4.6: Build carryover supplements for paired-warehouse entries.
+        // The unified-offer model (2026-05-12 refactor) merges static-seed
+        // lines into the matching WAREHOUSE_WRITEBACK group's weekly write
+        // instead of creating a separate [Carryover] offer. Reads
+        // carryover-registry/*.json + reconciles vs paired Infor warehouses.
+        console.log(`\nStep 4.6: Building carryover supplements (paired-warehouse entries) — ${pendingMpnDetails.size} unique MPNs from this week's Infor data...`);
+        const { supplementsByGroup, results: supplementResults } = prepareCarryoverSupplements(
+            STATIC_CARRYOVER_OFFERS, pendingMpnDetails
+        );
+
+        // Step 5: Write inventory to OT via API. Supplements (post-reconciliation
+        // static-seed lines from merged carryovers) are merged into the matching
+        // group's writeOffer call here — Infor-row wins on MPN clash.
+        console.log(`\nStep 5: Writing inventory to OT (${dryRun ? 'DRY RUN' : 'LIVE'})...`);
+        const writebackResults = await writeInventoryToOT(result.groups, dateStr, dryRun, supplementsByGroup);
+
+        // Step 5b: Refresh static carryover offers for entries WITHOUT
+        // mergeIntoGroup (un-paired carryovers, e.g. GM Stock). For entries
+        // WITH mergeIntoGroup, refreshStaticCarryoverOffers performs a
+        // one-time cleanup: deactivates any orphan [Carryover] {label} offer
+        // left over from the pre-refactor pipeline. The lines have already
+        // been written to OT inside the matching group's Weekly inventory
+        // offer in Step 5.
+        console.log(`\nStep 5b: Refreshing static carryover offers (${dryRun ? 'DRY RUN' : 'LIVE'}) — un-paired entries + one-time orphan cleanup for merged entries...`);
+        const standaloneCarryoverResults = await refreshStaticCarryoverOffers(STATIC_CARRYOVER_OFFERS, dateStr, dryRun, pendingMpnDetails);
+
+        // Unified carryoverResults: supplement results (merged entries) +
+        // standalone results (un-paired entries / orphan cleanup). Downstream
+        // (Step 5c audit, Step 5d portal append) reads this combined list.
+        const carryoverResults = [...supplementResults, ...standaloneCarryoverResults];
 
         // Step 5c: Cross-BP audit (runs after both writeback and carryover so
         // it sees the full picture and doesn't false-positive on offers we
@@ -1973,6 +2290,7 @@ async function fetchAndProcess(opts = {}) {
             result,
             writebackResults,
             carryoverResults,
+            supplementsByGroup,
             mode: 'fetch',
         });
         const reconLine = `  portal=${routingInvariants.portalMainTotal + routingInvariants.carryoverPortalTotal}, ot-attempted=${routingInvariants.otMainAttempted + routingInvariants.carryoverOtAttempted}, ot-written=${routingInvariants.otMainWritten + routingInvariants.carryoverOtWritten}`;

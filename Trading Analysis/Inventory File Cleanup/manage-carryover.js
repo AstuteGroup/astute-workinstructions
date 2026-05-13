@@ -81,6 +81,15 @@ function findRegistryEntry(label) {
     return STATIC_CARRYOVER_OFFERS.find(e => e.label === label) || null;
 }
 
+// Returns the registry slug for a label IF the carryover is merged into a
+// WAREHOUSE_WRITEBACK group (i.e. file-backed). Returns null for un-paired
+// carryovers (e.g. GM Stock) which remain OT-backed via [Carryover] offer.
+function resolveFileBackedSlug(label) {
+    const entry = findRegistryEntry(label);
+    if (!entry || !entry.mergeIntoGroup) return null;
+    return entry.registrySlug || null;
+}
+
 function usageAndExit(msg) {
     if (msg) console.error(`\nError: ${msg}\n`);
     console.error('Usage:');
@@ -102,8 +111,37 @@ async function main() {
     const label = f.label;
 
     if (sub === 'bootstrap') {
-        if (!label || !f.csv || !f.bp || !f['offer-type']) {
-            usageAndExit('bootstrap requires --label, --csv, --bp, --offer-type');
+        if (!label || !f.csv) usageAndExit('bootstrap requires --label, --csv');
+
+        // File-backed bootstrap: --slug (or registry entry already in
+        // STATIC_CARRYOVER_OFFERS with mergeIntoGroup) → write to JSON.
+        const fileSlug = resolveFileBackedSlug(label) || (f.slug || null);
+        if (f['merge-into-group'] || fileSlug) {
+            if (!fileSlug) usageAndExit('bootstrap --merge-into-group requires --slug');
+            await ops.bootstrapFile({
+                label,
+                slug: fileSlug,
+                csvPath: path.resolve(f.csv),
+                dryRun,
+                operator,
+            });
+            if (!resolveFileBackedSlug(label)) {
+                console.log(`\nNext: add to STATIC_CARRYOVER_OFFERS in inventory_cleanup.js:`);
+                console.log(`\n    {`);
+                console.log(`        label: '${label}',`);
+                console.log(`        registrySlug: '${fileSlug}',`);
+                console.log(`        bootstrapId: null,  // file-backed — no OT bootstrap offer`);
+                if (f.portal) console.log(`        portalWarehouseName: '${f.portal}',`);
+                if (f.paired) console.log(`        pairedWarehouses: [${String(f.paired).split(',').map(s => `'${s.trim()}'`).join(', ')}],`);
+                if (f['merge-into-group']) console.log(`        mergeIntoGroup: '${f['merge-into-group']}',`);
+                console.log(`    },\n`);
+            }
+            return;
+        }
+
+        // OT-backed bootstrap (un-paired carryovers, e.g. GM Stock)
+        if (!f.bp || !f['offer-type']) {
+            usageAndExit('OT-backed bootstrap requires --bp, --offer-type (or pass --merge-into-group + --slug for file-backed)');
         }
         const paired = f.paired ? String(f.paired).split(',').map(s => s.trim()).filter(Boolean) : undefined;
         await ops.bootstrap({
@@ -121,6 +159,17 @@ async function main() {
 
     if (sub === 'add') {
         if (!label || !f.csv) usageAndExit('add requires --label, --csv');
+        const fileSlug = resolveFileBackedSlug(label);
+        if (fileSlug) {
+            await ops.addFile({
+                label,
+                slug: fileSlug,
+                csvPath: path.resolve(f.csv),
+                dryRun,
+                operator,
+            });
+            return;
+        }
         await ops.add({
             label,
             csvPath: path.resolve(f.csv),
@@ -133,6 +182,18 @@ async function main() {
     if (sub === 'retire') {
         if (!label || !f.mpns || !f.reason) usageAndExit('retire requires --label, --mpns, --reason');
         const mpns = String(f.mpns).split(',').map(s => s.trim()).filter(Boolean);
+        const fileSlug = resolveFileBackedSlug(label);
+        if (fileSlug) {
+            await ops.retireFile({
+                label,
+                slug: fileSlug,
+                mpns,
+                reason: f.reason,
+                dryRun,
+                operator,
+            });
+            return;
+        }
         const registryEntry = findRegistryEntry(label);
         if (!registryEntry) {
             console.warn(`Note: '${label}' not in STATIC_CARRYOVER_OFFERS — skipping bootstrap defense-in-depth.`);
@@ -150,6 +211,11 @@ async function main() {
 
     if (sub === 'list') {
         if (!label) usageAndExit('list requires --label');
+        const fileSlug = resolveFileBackedSlug(label);
+        if (fileSlug) {
+            await ops.listFile({ label, slug: fileSlug });
+            return;
+        }
         await ops.list({ label });
         return;
     }

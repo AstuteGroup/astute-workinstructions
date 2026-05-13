@@ -490,6 +490,219 @@ async function list(opts) {
     return { offerId: offer.offerId, lines };
 }
 
+// ─── FILE-BACKED OPERATIONS (registry JSON) ──────────────────────────────────
+//
+// For carryovers that are merged into a WAREHOUSE_WRITEBACK group's weekly
+// write (paired-warehouse pattern), the seed lives in
+// carryover-registry/{slug}.json instead of in an OT [Carryover] offer.
+// These functions mirror bootstrap/add/retire/list but operate on the JSON
+// file. The OT-backed functions above remain in service for un-paired
+// carryovers (e.g., GM Stock) where the [Carryover] offer is the source.
+
+const REGISTRY_DIR = path.join(__dirname, '..', 'carryover-registry');
+
+function _registryPath(slug) {
+    return path.join(REGISTRY_DIR, `${slug}.json`);
+}
+
+function loadFileRegistry(slug) {
+    const p = _registryPath(slug);
+    if (!fs.existsSync(p)) {
+        throw new Error(`carryover registry file not found: ${p}`);
+    }
+    const obj = JSON.parse(fs.readFileSync(p, 'utf-8'));
+    if (!Array.isArray(obj.lines)) {
+        throw new Error(`carryover registry malformed (no lines array): ${p}`);
+    }
+    return { path: p, data: obj };
+}
+
+function saveFileRegistry(slug, data) {
+    const p = _registryPath(slug);
+    fs.writeFileSync(p, JSON.stringify(data, null, 2) + '\n', 'utf-8');
+}
+
+async function bootstrapFile(opts) {
+    const { label, slug, csvPath, dryRun, operator = process.env.USER || 'unknown' } = opts;
+    if (!label || !slug || !csvPath) throw new Error('bootstrapFile requires: label, slug, csvPath');
+
+    const p = _registryPath(slug);
+    if (fs.existsSync(p)) {
+        throw new Error(`bootstrapFile: registry already exists at ${p}. Use 'add' to extend it, or delete the file first.`);
+    }
+
+    const incoming = parseCarryoverCsv(csvPath);
+    const lines = incoming.map(l => ({
+        mpn:         l.mpn,
+        mfr:         l.mfrText || null,
+        qty:         l.qty,
+        dateCode:    l.dateCode || null,
+        packageDesc: l.packageDesc || null,
+        description: l.description || null,
+        moq:         l.moq || null,
+        spq:         l.spq || null,
+    }));
+    const totalQty = lines.reduce((s, l) => s + (Number(l.qty) || 0), 0);
+
+    console.log(`\n=== BOOTSTRAP (file-backed): ${label} ===`);
+    console.log(`  registry:    ${p}`);
+    console.log(`  lines:       ${lines.length}`);
+    console.log(`  total qty:   ${totalQty.toLocaleString()}`);
+    console.log(`  csv:         ${csvPath}`);
+
+    if (dryRun) {
+        console.log(`\n[DRY RUN] No writes.`);
+        return { dryRun: true, label, slug, planned: lines.length, totalQty };
+    }
+
+    const registry = {
+        label,
+        sourceOfferIdAtMigration: null,
+        migrationTimestamp: new Date().toISOString(),
+        lineCount: lines.length,
+        lines,
+    };
+    saveFileRegistry(slug, registry);
+
+    appendAudit([{
+        timestamp: new Date().toISOString(),
+        action: 'bootstrap-file',
+        label,
+        offerId: '',
+        mpn: '',
+        qty: totalQty,
+        reason: `bootstrap from ${path.basename(csvPath)} (${lines.length} lines) → ${slug}.json`,
+        operator,
+    }]);
+
+    console.log(`\n✓ Wrote ${lines.length} lines to ${p}`);
+    return { wrote: lines.length, totalQty, registryPath: p };
+}
+
+async function addFile(opts) {
+    const { label, slug, csvPath, dryRun, operator = process.env.USER || 'unknown' } = opts;
+    if (!label || !slug || !csvPath) throw new Error('addFile requires: label, slug, csvPath');
+
+    const { path: regPath, data } = loadFileRegistry(slug);
+    const existingKeys = new Set(data.lines.map(l =>
+        `${(l.mpn || '').trim()}||${(l.dateCode || '').trim()}`
+    ));
+
+    const incoming = parseCarryoverCsv(csvPath);
+    const toAdd = [];
+    const dupes = [];
+    for (const l of incoming) {
+        const key = `${l.mpn.trim()}||${(l.dateCode || '').trim()}`;
+        if (existingKeys.has(key)) dupes.push(l);
+        else toAdd.push(l);
+    }
+
+    console.log(`\n=== ADD (file-backed): ${label} ===`);
+    console.log(`  registry:         ${regPath}`);
+    console.log(`  current lines:    ${data.lines.length}`);
+    console.log(`  incoming rows:    ${incoming.length}`);
+    console.log(`  to add (new):     ${toAdd.length}`);
+    console.log(`  to skip (dupes):  ${dupes.length}`);
+
+    if (dryRun) {
+        console.log(`\n[DRY RUN] No writes.`);
+        return { dryRun: true, toAdd: toAdd.length, dupes: dupes.length };
+    }
+    if (toAdd.length === 0) {
+        return { added: 0, skipped: dupes.length };
+    }
+
+    const newLines = toAdd.map(l => ({
+        mpn:         l.mpn,
+        mfr:         l.mfrText || null,
+        qty:         l.qty,
+        dateCode:    l.dateCode || null,
+        packageDesc: l.packageDesc || null,
+        description: l.description || null,
+        moq:         l.moq || null,
+        spq:         l.spq || null,
+    }));
+    data.lines = [...data.lines, ...newLines];
+    data.lineCount = data.lines.length;
+    saveFileRegistry(slug, data);
+
+    appendAudit(toAdd.map(l => ({
+        timestamp: new Date().toISOString(),
+        action: 'add-file',
+        label,
+        offerId: '',
+        mpn: l.mpn,
+        qty: l.qty,
+        reason: `add from ${path.basename(csvPath)} → ${slug}.json`,
+        operator,
+    })));
+
+    console.log(`\n✓ Appended ${toAdd.length} lines (${dupes.length} skipped as dupes). Registry now has ${data.lines.length} lines.`);
+    return { added: toAdd.length, skipped: dupes.length };
+}
+
+async function retireFile(opts) {
+    const { label, slug, mpns, reason, dryRun, operator = process.env.USER || 'unknown' } = opts;
+    if (!label || !slug || !mpns || mpns.length === 0) throw new Error('retireFile requires: label, slug, mpns[]');
+    if (!reason) throw new Error('retireFile requires: reason (audit-log mandatory)');
+
+    const { path: regPath, data } = loadFileRegistry(slug);
+    const wanted = new Set(mpns.map(m => m.trim()));
+    const targets = data.lines.filter(l => wanted.has((l.mpn || '').trim()));
+    const found = new Set(targets.map(l => l.mpn.trim()));
+    const notFound = [...wanted].filter(m => !found.has(m));
+
+    console.log(`\n=== RETIRE (file-backed): ${label} ===`);
+    console.log(`  registry:       ${regPath}`);
+    console.log(`  reason:         ${reason}`);
+    console.log(`  requested MPNs: ${mpns.length}`);
+    console.log(`  matched lines:  ${targets.length} (across ${found.size} MPNs)`);
+    if (notFound.length) console.log(`  not found:      ${notFound.join(', ')}`);
+    for (const t of targets) {
+        console.log(`    - ${(t.mpn || '').padEnd(25)} qty=${String(t.qty).padStart(9)} dc=${t.dateCode || ''}`);
+    }
+
+    if (dryRun) {
+        console.log(`\n[DRY RUN] No writes.`);
+        return { dryRun: true, targets: targets.length, notFound };
+    }
+    if (targets.length === 0) return { retired: 0, notFound };
+
+    data.lines = data.lines.filter(l => !wanted.has((l.mpn || '').trim()));
+    data.lineCount = data.lines.length;
+    saveFileRegistry(slug, data);
+
+    appendAudit(targets.map(t => ({
+        timestamp: new Date().toISOString(),
+        action: 'retire-file',
+        label,
+        offerId: '',
+        mpn: t.mpn,
+        qty: t.qty,
+        reason,
+        operator,
+    })));
+
+    console.log(`\n✓ Retired ${targets.length} line(s) from registry. Registry now has ${data.lines.length} lines.`);
+    return { retired: targets.length, notFound };
+}
+
+async function listFile(opts) {
+    const { label, slug } = opts;
+    if (!label || !slug) throw new Error('listFile requires: label, slug');
+    const { path: regPath, data } = loadFileRegistry(slug);
+    const totalQty = data.lines.reduce((s, l) => s + (Number(l.qty) || 0), 0);
+    console.log(`\n=== ${label} (file-backed registry) ===`);
+    console.log(`  ${regPath}`);
+    console.log(`  ${data.lines.length} active line(s), total qty ${totalQty.toLocaleString()}\n`);
+    console.log(`  ${'MPN'.padEnd(28)} ${'MFR'.padEnd(15)} ${'Qty'.padStart(10)}  DateCode`);
+    console.log(`  ${'-'.repeat(28)} ${'-'.repeat(15)} ${'-'.repeat(10)}  --------`);
+    for (const l of data.lines) {
+        console.log(`  ${(l.mpn || '').padEnd(28)} ${(l.mfr || '').padEnd(15)} ${String(l.qty || 0).padStart(10)}  ${l.dateCode || ''}`);
+    }
+    return { registryPath: regPath, lines: data.lines };
+}
+
 module.exports = {
     parseCarryoverCsv,
     findCarryoverOffer,
@@ -498,6 +711,10 @@ module.exports = {
     add,
     retire,
     list,
+    bootstrapFile,
+    addFile,
+    retireFile,
+    listFile,
     appendAudit,
     AUDIT_PATH,
 };

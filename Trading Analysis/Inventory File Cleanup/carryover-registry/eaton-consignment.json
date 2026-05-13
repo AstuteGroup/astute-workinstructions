@@ -1,0 +1,2438 @@
+{
+  "label": "Eaton Consignment",
+  "sourceOfferIdAtMigration": 1026216,
+  "migrationTimestamp": "2026-05-13T01:41:00.584Z",
+  "lineCount": 243,
+  "lines": [
+    {
+      "mpn": "RC0402FR-07287RL",
+      "mfr": "Yageo Corp",
+      "qty": 11858,
+      "dateCode": null,
+      "packageDesc": null,
+      "description": "Res Thick Film 0402 287",
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "RC-02W47R0FT",
+      "mfr": null,
+      "qty": 5138,
+      "dateCode": null,
+      "packageDesc": null,
+      "description": "Res Thick Film 0402 47 O",
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "LQH2MPN6R8MGRL",
+      "mfr": "Murata",
+      "qty": 28448,
+      "dateCode": null,
+      "packageDesc": null,
+      "description": "Inductor Power Chip Shie",
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "VY1102M31Y5UC63V0",
+      "mfr": "Vishay Intertechnology Inc",
+      "qty": 40677,
+      "dateCode": null,
+      "packageDesc": null,
+      "description": "Cap Ceramic Single SUPPRESSION",
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "GA355QR7GB103KW01L",
+      "mfr": "Murata",
+      "qty": 5611,
+      "dateCode": null,
+      "packageDesc": null,
+      "description": "Cap Ceramic Suppression AC 0.01uF 250VAC X7R 10% Pad",
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "2N7002DW",
+      "mfr": "On Semiconductor",
+      "qty": 107526,
+      "dateCode": null,
+      "packageDesc": null,
+      "description": "Trans MOSFET N-CH 60V 0.",
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "RC0402FR-0710KP",
+      "mfr": "Yageo Corp",
+      "qty": 7663,
+      "dateCode": null,
+      "packageDesc": null,
+      "description": "RES 10K0 1% 0402 1/16W",
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "TLP291(GB-TP,SE",
+      "mfr": "Toshiba",
+      "qty": 29142,
+      "dateCode": null,
+      "packageDesc": null,
+      "description": "OPTOISOLATOR TRANS",
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "XZRNI56W-1",
+      "mfr": "SunLED Corporation",
+      "qty": 21057,
+      "dateCode": null,
+      "packageDesc": null,
+      "description": "Phototransistor 2-Pin SM",
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "SMAJ5.0A",
+      "mfr": "Littelfuse UK Ltd",
+      "qty": 24122,
+      "dateCode": null,
+      "packageDesc": null,
+      "description": "DIODE",
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "NCP500SN33T1G",
+      "mfr": "On Semiconductor",
+      "qty": 57198,
+      "dateCode": null,
+      "packageDesc": null,
+      "description": "18V 200mA 100kHz 8-Pin",
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "RC0402FR-07324RL",
+      "mfr": "Yageo Corp",
+      "qty": 85511,
+      "dateCode": null,
+      "packageDesc": null,
+      "description": "Res CHIP",
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "RC0402FR-07267RL",
+      "mfr": "Yageo Corp",
+      "qty": 65936,
+      "dateCode": null,
+      "packageDesc": null,
+      "description": "Res Thick Film 0402 267",
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "CV300K10B",
+      "mfr": "Sei Electronics",
+      "qty": 25493,
+      "dateCode": null,
+      "packageDesc": null,
+      "description": "MOV TVS 300V 2500A 10MM",
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "TLV1805DBVR",
+      "mfr": "Texas Instruments",
+      "qty": 13048,
+      "dateCode": null,
+      "packageDesc": null,
+      "description": "Comparator Single R-R I/V",
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "ES3G-E3/57T",
+      "mfr": "Vishay Intertechnology Inc",
+      "qty": 21348,
+      "dateCode": null,
+      "packageDesc": null,
+      "description": "Diode Switching 400V 1A",
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "B72540T0500K062",
+      "mfr": "TDK Corp",
+      "qty": 24366,
+      "dateCode": null,
+      "packageDesc": null,
+      "description": "VRBLE RESTRS OTR",
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "AT24C128C-SSHM-T",
+      "mfr": "Microchip Technology Inc",
+      "qty": 20393,
+      "dateCode": null,
+      "packageDesc": null,
+      "description": "EEPROM Serial-2Wire 128K",
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "RC-02W5600FT",
+      "mfr": "Fenghua (HK) Electronics Ltd",
+      "qty": 20649,
+      "dateCode": null,
+      "packageDesc": null,
+      "description": "LED Uni-Color Green/Red 460nm/515nm/630nm 4-Pin",
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "RS-06K1004FT",
+      "mfr": "Fenghua (HK) Electronics Ltd",
+      "qty": 19342,
+      "dateCode": null,
+      "packageDesc": null,
+      "description": "Res Thick Film 1206 1M O",
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "RC0603FR-0720KL",
+      "mfr": null,
+      "qty": 4304,
+      "dateCode": null,
+      "packageDesc": null,
+      "description": "Res Thick Film 0603 20K",
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "RC0402BR-07100KL",
+      "mfr": "Yageo Corp",
+      "qty": 7830,
+      "dateCode": null,
+      "packageDesc": null,
+      "description": "Res Thick Film 0402 100k Ohm 0.1% 1/16W �100ppm/�C",
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "GRM155R61C105KA12D",
+      "mfr": "Murata",
+      "qty": 49947,
+      "dateCode": null,
+      "packageDesc": null,
+      "description": "Cap Ceramic 1uF 16V X5R",
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "RC1206FR-071KL",
+      "mfr": "Yageo Corp",
+      "qty": 28469,
+      "dateCode": null,
+      "packageDesc": null,
+      "description": "Res Thick Film 0402 470",
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "RC-02W1200FT",
+      "mfr": "Fenghua (HK) Electronics Ltd",
+      "qty": 20994,
+      "dateCode": null,
+      "packageDesc": null,
+      "description": "Res Thick Film 0402 250 ohms �1% 0.063W (1/16W)",
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "RC0402FR-07150KL",
+      "mfr": null,
+      "qty": 6597,
+      "dateCode": null,
+      "packageDesc": null,
+      "description": "Res CHIP",
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "SSM3J35AMFV,L3F",
+      "mfr": "Toshiba",
+      "qty": 16000,
+      "dateCode": null,
+      "packageDesc": null,
+      "description": "Trans MOSFET P-CH Si 20V",
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "ERJPB6B6653V",
+      "mfr": "Panasonic",
+      "qty": 8078,
+      "dateCode": null,
+      "packageDesc": null,
+      "description": "Res Thick Film 0402 56.0K Ohm �0.1% 0.25W(1/4W) �50ppm/C",
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "RC0402FR-07100KL",
+      "mfr": "Yageo Corp",
+      "qty": 30379,
+      "dateCode": null,
+      "packageDesc": null,
+      "description": "Res Thick Film 0402 100",
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "MCP6L92T-E/SN",
+      "mfr": "Microchip Technology Inc",
+      "qty": 4139,
+      "dateCode": null,
+      "packageDesc": null,
+      "description": "Op Amp Dual GP R-R I/O 6",
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "155124RV73200",
+      "mfr": "Wurth Elektronik GmBH & Co KG",
+      "qty": 26661,
+      "dateCode": null,
+      "packageDesc": null,
+      "description": "LED Bi-Color Green/Red 5",
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "334317",
+      "mfr": "Hernon Manufacturing Inc",
+      "qty": 2556,
+      "dateCode": null,
+      "packageDesc": null,
+      "description": "Silicone Rubber Adhesive 343",
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "500P687H02 REV 02",
+      "mfr": "Mnr",
+      "qty": 2371,
+      "dateCode": null,
+      "packageDesc": null,
+      "description": "BARE PRINTED CIRCUIT BOARD",
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "BAT54CDW-7-F",
+      "mfr": "Diodes Incorporated",
+      "qty": 50208,
+      "dateCode": null,
+      "packageDesc": null,
+      "description": "Diode Schottky 30V 0.2A",
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "1N4148W-7-F",
+      "mfr": "Diodes Incorporated",
+      "qty": 20859,
+      "dateCode": null,
+      "packageDesc": null,
+      "description": "Diode Small Signal Switc",
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "3220-16-0100-00",
+      "mfr": "CnC Tech",
+      "qty": 23768,
+      "dateCode": null,
+      "packageDesc": null,
+      "description": "Conn Shrouded Header HDR",
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "74275043",
+      "mfr": "Wurth Elektronik GmBH & Co KG",
+      "qty": 23400,
+      "dateCode": null,
+      "packageDesc": null,
+      "description": "6-HOLE FERRITE BEAD WE-U",
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "0402B182K250NT",
+      "mfr": "Fenghua (HK) Electronics Ltd",
+      "qty": 14434,
+      "dateCode": null,
+      "packageDesc": null,
+      "description": "Cap Ceramic 0.0018uF 25V X7R 10% Pad SMD",
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "STD5N52U",
+      "mfr": "STMicroelectronics",
+      "qty": 83378,
+      "dateCode": null,
+      "packageDesc": null,
+      "description": "Trans MOSFET N-CH 25V 5. 3-Pin(2+Tab) DPAK T/R",
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "STM32G030K6T6TR",
+      "mfr": "STMicroelectronics",
+      "qty": 7169,
+      "dateCode": null,
+      "packageDesc": null,
+      "description": "MICROELECTRONICS",
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "RC0402FR-072K61L",
+      "mfr": "Yageo Corp",
+      "qty": 3234,
+      "dateCode": null,
+      "packageDesc": null,
+      "description": "Res Thick Film 0402 27.4",
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "RC0603FR-074K87L",
+      "mfr": null,
+      "qty": 4325,
+      "dateCode": null,
+      "packageDesc": null,
+      "description": "RES SMD 4.87K OHM 1% 1/1",
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "0603B102K201NT",
+      "mfr": "Fenghua (HK) Electronics Ltd",
+      "qty": 10546,
+      "dateCode": null,
+      "packageDesc": null,
+      "description": "Cap Ceramic 0.001uF 200V",
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "TMP102AIDRLR",
+      "mfr": "Texas Instruments",
+      "qty": 14707,
+      "dateCode": null,
+      "packageDesc": null,
+      "description": "Temp Sensor Digital Serial 2-Wire, I2C, SMBUS) 6-Pin SOT-",
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "500P687H02 REV 03",
+      "mfr": "Mnr",
+      "qty": 16048,
+      "dateCode": null,
+      "packageDesc": null,
+      "description": "EV-EMCB CONN BOARD PCB",
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "0402B273K250NT",
+      "mfr": "Fenghua (HK) Electronics Ltd",
+      "qty": 69045,
+      "dateCode": null,
+      "packageDesc": null,
+      "description": "Cap Ceramic 0.027uF 25V",
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "OPA1678IDR",
+      "mfr": "Texas Instruments",
+      "qty": 14663,
+      "dateCode": null,
+      "packageDesc": null,
+      "description": "Audio Amp Speaker 2-CH S",
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "GCM21BR71C335KA73L",
+      "mfr": "Murata",
+      "qty": 37649,
+      "dateCode": null,
+      "packageDesc": null,
+      "description": "Cap Ceramic 3.3uF 16V X7R",
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "593D227X9010D2TE3",
+      "mfr": "Vishay Intertechnology Inc",
+      "qty": 34290,
+      "dateCode": null,
+      "packageDesc": null,
+      "description": "Cap Tant Solid 220uF 10V",
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "RC-02W1002FT",
+      "mfr": "Fenghua (HK) Electronics Ltd",
+      "qty": 39633,
+      "dateCode": null,
+      "packageDesc": null,
+      "description": "Res Thick Film 0402 32.5K �0.5% 0.063W (1/16W)",
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "BH1680FVC-TR",
+      "mfr": "Rohm Co Ltd",
+      "qty": 15000,
+      "dateCode": null,
+      "packageDesc": null,
+      "description": "IC Ambient Light Sensor WSOF5",
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "RC0402FR-07470RL",
+      "mfr": "Yageo Corp",
+      "qty": 6913,
+      "dateCode": null,
+      "packageDesc": null,
+      "description": "Res CHIP",
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "LMK212AB7106MG-T",
+      "mfr": "Taiyo Yuden Co Ltd",
+      "qty": 255027,
+      "dateCode": null,
+      "packageDesc": null,
+      "description": "Cap Ceramic 220pF 50V X7R",
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "RC-05K56R0FT",
+      "mfr": "Fenghua (HK) Electronics Ltd",
+      "qty": 25757,
+      "dateCode": null,
+      "packageDesc": null,
+      "description": "Thin Film 0805 56 Ohms ?",
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "Q 16,0-JXS32-9-10/15-T1-WA-LF",
+      "mfr": "Jauch",
+      "qty": 48693,
+      "dateCode": null,
+      "packageDesc": null,
+      "description": "Crystal 16MHz ��10ppm (T �25ppm) 15pf CMOS",
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "1206B104K251NT",
+      "mfr": "Fenghua (HK) Electronics Ltd",
+      "qty": 10664,
+      "dateCode": null,
+      "packageDesc": null,
+      "description": "Cap Ceramic 0.1uF 250V X",
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "BAV99LT1G",
+      "mfr": "On Semiconductor",
+      "qty": 31805,
+      "dateCode": null,
+      "packageDesc": null,
+      "description": "TVS DIODE 24V 200 SMA",
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "PEME1-S5-D15-S",
+      "mfr": "CUI Inc",
+      "qty": 15422,
+      "dateCode": null,
+      "packageDesc": null,
+      "description": "Module DC-DC 5VIN 2-OUT",
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "MSP430FR5859IRHAR",
+      "mfr": "Texas Instruments",
+      "qty": 15791,
+      "dateCode": null,
+      "packageDesc": null,
+      "description": "MCU 16-bit MSP430 RISC 6",
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "500P686H02 REV 02",
+      "mfr": "Mnr",
+      "qty": 6366,
+      "dateCode": null,
+      "packageDesc": null,
+      "description": "EV-EMCB CONNECT BOARD PCB",
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "TFM-105-01-L-D-RA",
+      "mfr": "Samtec",
+      "qty": 5449,
+      "dateCode": null,
+      "packageDesc": null,
+      "description": "Conn Shrouded Header (4",
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "OPA2834IDGKR",
+      "mfr": "Texas Instruments",
+      "qty": 10579,
+      "dateCode": null,
+      "packageDesc": null,
+      "description": "Op Amp Dual High Speed Amplifier R-R O/P �2.7V/5.4V",
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "XFL2006-223MEC",
+      "mfr": "Coilcraft Inc",
+      "qty": 6896,
+      "dateCode": null,
+      "packageDesc": null,
+      "description": "Inductor Power Shielded Wirewound 220uH 10%",
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "CS5484-INZR",
+      "mfr": "Cirrus Logic",
+      "qty": 33619,
+      "dateCode": null,
+      "packageDesc": null,
+      "description": "Energy Measurement IC 24-Pin QFN EP",
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "S1M-E3/5AT",
+      "mfr": "Vishay Intertechnology Inc",
+      "qty": 37271,
+      "dateCode": null,
+      "packageDesc": null,
+      "description": "Diode Switching 400V 1A",
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "ERJPB3B2001V",
+      "mfr": "Panasonic",
+      "qty": 31023,
+      "dateCode": null,
+      "packageDesc": null,
+      "description": "SMD Chip Resistor, High",
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "LQM21PN1R5MC0D",
+      "mfr": "Murata",
+      "qty": 8084,
+      "dateCode": null,
+      "packageDesc": null,
+      "description": "Inductor Power Chip Shie",
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "B72214S0351K101",
+      "mfr": "TDK Corp",
+      "qty": 4649,
+      "dateCode": null,
+      "packageDesc": null,
+      "description": "Varistors Varistor S14K350",
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "0402B102K160NT",
+      "mfr": "Fenghua (HK) Electronics Ltd",
+      "qty": 22337,
+      "dateCode": null,
+      "packageDesc": null,
+      "description": "Cap Ceramic 0.001uF 16V",
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "RPG-06MR100FT",
+      "mfr": "Fenghua (HK) Electronics Ltd",
+      "qty": 9677,
+      "dateCode": null,
+      "packageDesc": null,
+      "description": "Thick Film 1206 100 mOhm",
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "RC0402FR-07100KL",
+      "mfr": "Yageo Corp",
+      "qty": 14005,
+      "dateCode": null,
+      "packageDesc": null,
+      "description": "Thick Film 1206 100 mOhm",
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "LQP15MN2N4B02D",
+      "mfr": "Murata",
+      "qty": 4713,
+      "dateCode": null,
+      "packageDesc": null,
+      "description": "Inductor RF Chip Unshiel",
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "RC-02000FT",
+      "mfr": "Fenghua (HK) Electronics Ltd",
+      "qty": 65936,
+      "dateCode": null,
+      "packageDesc": null,
+      "description": "Res Thick Film 0402 0 Oh",
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "RC-02W4702FT",
+      "mfr": "Fenghua (HK) Electronics Ltd",
+      "qty": 7012,
+      "dateCode": null,
+      "packageDesc": null,
+      "description": "Res Thin Film 0402 47K O",
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "BAV99S_R1_00001",
+      "mfr": "Panjit",
+      "qty": 9895,
+      "dateCode": null,
+      "packageDesc": null,
+      "description": "TVS DIODE",
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "TD03G1242BT",
+      "mfr": "Fenghua (HK) Electronics Ltd",
+      "qty": 2656,
+      "dateCode": null,
+      "packageDesc": null,
+      "description": "Thin Film 0603 12.4K Ohm",
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "CC0402KRX7R9BB102",
+      "mfr": "Yageo Corp",
+      "qty": 129372,
+      "dateCode": null,
+      "packageDesc": null,
+      "description": "CAP CER 1000PF 50V X7R 0",
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "STWD100NWWY3F",
+      "mfr": "STMicroelectronics",
+      "qty": 3000,
+      "dateCode": null,
+      "packageDesc": null,
+      "description": "LDO Regulator Pos 12V 0.",
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "TL431ASA-7",
+      "mfr": "Diodes Incorporated",
+      "qty": 48074,
+      "dateCode": null,
+      "packageDesc": null,
+      "description": "V-Ref Adjustable 2.495V",
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "5655B03H56",
+      "mfr": "Chint",
+      "qty": 10230,
+      "dateCode": null,
+      "packageDesc": null,
+      "description": "neutral led cable",
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "MC79L12ABDR2G",
+      "mfr": "On Semiconductor",
+      "qty": 40926,
+      "dateCode": null,
+      "packageDesc": null,
+      "description": "MC79L12ABDR2G",
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "RC0402FR-0710KL",
+      "mfr": "Yageo Corp",
+      "qty": 26663,
+      "dateCode": null,
+      "packageDesc": null,
+      "description": "Thick Film 1206 100 mOhm",
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "APFA3010SEEZGKQBKC",
+      "mfr": "Kingbright Electronic Co Ltd",
+      "qty": 127447,
+      "dateCode": null,
+      "packageDesc": null,
+      "description": "5-Pin TSOP T/R",
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "AC050000B3909J6BCS",
+      "mfr": "Vishay Intertechnology Inc",
+      "qty": 50425,
+      "dateCode": null,
+      "packageDesc": null,
+      "description": "Res Wirewound 39 Ohm 5%",
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "501331-0407",
+      "mfr": "Molex LLC",
+      "qty": 23953,
+      "dateCode": null,
+      "packageDesc": null,
+      "description": "Conn Header HDR ST 4 POS 1MM",
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "IRFML8244TRPBF",
+      "mfr": "Infineon Technologies",
+      "qty": 35475,
+      "dateCode": null,
+      "packageDesc": null,
+      "description": "Trans MOSFET N-CH 25V 5.",
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "MMA02040C4703FB300",
+      "mfr": "Vishay Intertechnology Inc",
+      "qty": 91703,
+      "dateCode": null,
+      "packageDesc": null,
+      "description": "Res Thin Film 0204 470K",
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "GMK107AB7105KAHT",
+      "mfr": "Taiyo Yuden Co Ltd",
+      "qty": 28641,
+      "dateCode": null,
+      "packageDesc": null,
+      "description": "Cap Ceramic 1uF 35V X7R",
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "MP05050",
+      "mfr": "Golledge",
+      "qty": 33497,
+      "dateCode": null,
+      "packageDesc": null,
+      "description": "Surface Wave Resonator",
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "RC-02W1503FT",
+      "mfr": "Fenghua (HK) Electronics Ltd",
+      "qty": 15429,
+      "dateCode": null,
+      "packageDesc": null,
+      "description": "RES 5 150K 1% 1/16W 0402",
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "RC0402FR-071KL",
+      "mfr": "Yageo Corp",
+      "qty": 25432,
+      "dateCode": null,
+      "packageDesc": null,
+      "description": "Thick Film 1206 100 mOhm",
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "RC-02W4701FT",
+      "mfr": "Fenghua (HK) Electronics Ltd",
+      "qty": 96395,
+      "dateCode": null,
+      "packageDesc": null,
+      "description": "RES",
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "PEME1-S5-S5-S",
+      "mfr": "CUI Inc",
+      "qty": 8625,
+      "dateCode": null,
+      "packageDesc": null,
+      "description": "Module DC-DC 5VIN 2-OUT",
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "S25FL064LABNFI043",
+      "mfr": "Cypress Semiconductor Corp",
+      "qty": 17664,
+      "dateCode": null,
+      "packageDesc": null,
+      "description": "NOR Flash Serial (SPI Du",
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "F/UCW03WITHLABELLF",
+      "mfr": "Digisound",
+      "qty": 11600,
+      "dateCode": null,
+      "packageDesc": null,
+      "description": "Audio Buzzer Magnetic 2V",
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "TNPW0603105KBEEA",
+      "mfr": "Vishay Intertechnology Inc",
+      "qty": 52684,
+      "dateCode": null,
+      "packageDesc": null,
+      "description": "RES SMD 105K OHM 0.1% 1/",
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "S3528RGB6P-HT",
+      "mfr": "cor light",
+      "qty": 53674,
+      "dateCode": null,
+      "packageDesc": null,
+      "description": "LED",
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "C1608X5R1A106K080AC",
+      "mfr": "TDK Corp",
+      "qty": 105150,
+      "dateCode": null,
+      "packageDesc": null,
+      "description": "Cap Ceramic 10uF 10V X5R",
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "500P709H02",
+      "mfr": "Joel",
+      "qty": 4740,
+      "dateCode": null,
+      "packageDesc": null,
+      "description": "EMCB PRINTED CIRCUIT",
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "1-1879216-7",
+      "mfr": "TE Connectivity Ltd",
+      "qty": 39825,
+      "dateCode": null,
+      "packageDesc": null,
+      "description": "Res Thin Film 0402 73.2K",
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "KMS221GLFS",
+      "mfr": "C&K Switches",
+      "qty": 47474,
+      "dateCode": null,
+      "packageDesc": null,
+      "description": "Switch Tactile 4.5�3.1 Rectangular Button Gull Wing",
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "68D8064H01",
+      "mfr": "Open@Actility",
+      "qty": 5260,
+      "dateCode": null,
+      "packageDesc": null,
+      "description": "PCB 6 LAYER REV G",
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "AF0805JR-070RL",
+      "mfr": "Yageo Corp",
+      "qty": 19019,
+      "dateCode": null,
+      "packageDesc": null,
+      "description": "Yflat resistor",
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "0402B103K250NT",
+      "mfr": "Fenghua (HK) Electronics Ltd",
+      "qty": 10521,
+      "dateCode": null,
+      "packageDesc": null,
+      "description": "Cap Ceramic 0.01uF 25V X",
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "RC0402FR-073K32L",
+      "mfr": "Yageo Corp",
+      "qty": 26540,
+      "dateCode": null,
+      "packageDesc": null,
+      "description": "Res Thick Film 0402 3.32",
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "PESD5V0V1BLD,315",
+      "mfr": "Nexperia",
+      "qty": 90628,
+      "dateCode": null,
+      "packageDesc": null,
+      "description": "ESD Suppressor DiR 5V Automotive 2-Pin DFN",
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "CC0402KRX7R9BB221",
+      "mfr": "Yageo Corp",
+      "qty": 24210,
+      "dateCode": null,
+      "packageDesc": null,
+      "description": "Cap Ceramic 220pF 50V X7R",
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "RC0402JR-070RL",
+      "mfr": "Yageo Corp",
+      "qty": 35342,
+      "dateCode": null,
+      "packageDesc": null,
+      "description": "Res Thick Film 0402 0 Oh",
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "0402CG120J500NT",
+      "mfr": "Fenghua (HK) Electronics Ltd",
+      "qty": 10347,
+      "dateCode": null,
+      "packageDesc": null,
+      "description": "Cap Ceramic 12pF 50V COG",
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "RC0402FR-074K64L",
+      "mfr": "Yageo Corp",
+      "qty": 13721,
+      "dateCode": null,
+      "packageDesc": null,
+      "description": "Res Thick Film 0402 4.64",
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "TNPW0603180RBEEA",
+      "mfr": "Vishay Intertechnology Inc",
+      "qty": 73484,
+      "dateCode": null,
+      "packageDesc": null,
+      "description": "Res Thick Film 0603 180",
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "BAT54SDWQ-7-F",
+      "mfr": "Diodes Incorporated",
+      "qty": 12896,
+      "dateCode": null,
+      "packageDesc": null,
+      "description": "DIODE",
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "RE0603BRE07200KL",
+      "mfr": "Yageo Corp",
+      "qty": 53483,
+      "dateCode": null,
+      "packageDesc": null,
+      "description": "Res Thick Film 0603 200K",
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "MCP6546T-I/OT",
+      "mfr": "Microchip Technology Inc",
+      "qty": 11074,
+      "dateCode": null,
+      "packageDesc": null,
+      "description": "MICROCHIP",
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "1255AY-100M=P3",
+      "mfr": "Murata",
+      "qty": 9247,
+      "dateCode": null,
+      "packageDesc": null,
+      "description": "IND 1.2MH 150MA 3.8 OHM",
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "VOM452T",
+      "mfr": "Vishay Intertechnology Inc",
+      "qty": 80287,
+      "dateCode": null,
+      "packageDesc": null,
+      "description": "Optocoupler DC-IN 1-CH T",
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "RC0402FR-072K1L",
+      "mfr": "Yageo Corp",
+      "qty": 24034,
+      "dateCode": null,
+      "packageDesc": null,
+      "description": "Res Thick Film 0402 2.1K",
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "MSS1210-224KED",
+      "mfr": "Coilcraft Inc",
+      "qty": 7027,
+      "dateCode": null,
+      "packageDesc": null,
+      "description": "Inductor Power Shielded",
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "RC0402FR-07100RL",
+      "mfr": "Yageo Corp",
+      "qty": 181285,
+      "dateCode": null,
+      "packageDesc": null,
+      "description": "Res Thick Film 0402 470",
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "1586532-2",
+      "mfr": "TE Connectivity Ltd",
+      "qty": 10111,
+      "dateCode": null,
+      "packageDesc": null,
+      "description": "Conn POWER PL 2 POS 5.08mm Solder ST Thru-Hole 3",
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "LBWA1ZV1CD-716",
+      "mfr": "Murata",
+      "qty": 60760,
+      "dateCode": null,
+      "packageDesc": null,
+      "description": "802.11 B/G/N Wifi Module",
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "TLP291(GB-TP,SE",
+      "mfr": "Toshiba",
+      "qty": 66868,
+      "dateCode": null,
+      "packageDesc": null,
+      "description": "IC,SMT,OPTOCOUPLER,PHOTO",
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "SLG4L44926VTR",
+      "mfr": "Dialog Semiconductor",
+      "qty": 32243,
+      "dateCode": null,
+      "packageDesc": null,
+      "description": "Green AXI automotive Mixed-signal Matrix",
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "UCC28C43DR",
+      "mfr": "Texas Instruments",
+      "qty": 12500,
+      "dateCode": null,
+      "packageDesc": null,
+      "description": "Pin(3+Tab) SOT-223 T/R",
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "RC0402FR-071K65L",
+      "mfr": "Yageo Corp",
+      "qty": 57208,
+      "dateCode": null,
+      "packageDesc": null,
+      "description": "Res Thick Film 0402 1.65",
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "500P685H01",
+      "mfr": "Mnr",
+      "qty": 10224,
+      "dateCode": null,
+      "packageDesc": null,
+      "description": "EMCB PRINTED CIRCUIT",
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "UCC28C43DR",
+      "mfr": "Texas Instruments",
+      "qty": 5687,
+      "dateCode": null,
+      "packageDesc": null,
+      "description": "Pin(3+Tab) SOT-223 T/R",
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "87898-0314",
+      "mfr": "Molex LLC",
+      "qty": 22403,
+      "dateCode": null,
+      "packageDesc": null,
+      "description": "2.54 mm Pitch Pin Header",
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "0402CG101J500NT",
+      "mfr": null,
+      "qty": 1550,
+      "dateCode": null,
+      "packageDesc": null,
+      "description": "Cap Ceramic 100pF 50V C0",
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "GRM155R70J105KA12J",
+      "mfr": "Murata",
+      "qty": 70980,
+      "dateCode": null,
+      "packageDesc": null,
+      "description": "Cap Ceramic 1uF 6.3V X7R",
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "RT3215-32.768-6-TR",
+      "mfr": "Raltron Electronics",
+      "qty": 13928,
+      "dateCode": null,
+      "packageDesc": null,
+      "description": "(TOL) �50PPM FUND",
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "RC0402FR-073K9L",
+      "mfr": null,
+      "qty": 7914,
+      "dateCode": null,
+      "packageDesc": null,
+      "description": "Chipwiderstand,",
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "TLV76012DBZR",
+      "mfr": "Texas Instruments",
+      "qty": 13601,
+      "dateCode": null,
+      "packageDesc": null,
+      "description": "LDO Regulator Pos 12V 0.",
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "74LVC1G3157GW,125",
+      "mfr": "Nexperia",
+      "qty": 82051,
+      "dateCode": null,
+      "packageDesc": null,
+      "description": "IC Regulator 12V SOT-223 SOT23 AEC-Q",
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "US1G-E3/5AT",
+      "mfr": "Vishay Intertechnology Inc",
+      "qty": 46114,
+      "dateCode": null,
+      "packageDesc": null,
+      "description": "Diode Switching 400V 1A",
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "MC79L12ABDR2G",
+      "mfr": "On Semiconductor",
+      "qty": 1080,
+      "dateCode": null,
+      "packageDesc": null,
+      "description": "MC79L12ABDR2G",
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "RC0402FR-0749K9L",
+      "mfr": null,
+      "qty": 6983,
+      "dateCode": null,
+      "packageDesc": null,
+      "description": "RES CHIP",
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "0402B103K500NT",
+      "mfr": "Fenghua (HK) Electronics Ltd",
+      "qty": 29104,
+      "dateCode": null,
+      "packageDesc": null,
+      "description": "Cap Ceramic 0.01uF 16V X",
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "STWD100NWWY3F",
+      "mfr": "STMicroelectronics",
+      "qty": 39448,
+      "dateCode": null,
+      "packageDesc": null,
+      "description": "LDO Regulator Pos 12V 0.",
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "53253-0270",
+      "mfr": "Molex LLC",
+      "qty": 46328,
+      "dateCode": null,
+      "packageDesc": null,
+      "description": "Conn Shrouded Header (3",
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "MCP6541T-I/LT",
+      "mfr": "Microchip Technology Inc",
+      "qty": 5975,
+      "dateCode": null,
+      "packageDesc": null,
+      "description": "Comparator Single R-R I/V",
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "53253-0470",
+      "mfr": "Molex LLC",
+      "qty": 22338,
+      "dateCode": null,
+      "packageDesc": null,
+      "description": "Conn Shrouded Header (3",
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "RB511SM-30FHT2R",
+      "mfr": "Rohm Co Ltd",
+      "qty": 29870,
+      "dateCode": null,
+      "packageDesc": null,
+      "description": "DIODE",
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "VO1400AEFTR",
+      "mfr": "Vishay Intertechnology Inc",
+      "qty": 342,
+      "dateCode": null,
+      "packageDesc": null,
+      "description": "Solid State Relay 1-CH DC-IN 0.1A 60V AC/DC",
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "0402CG100J500NT",
+      "mfr": "Fenghua (HK) Electronics Ltd",
+      "qty": 15936,
+      "dateCode": null,
+      "packageDesc": null,
+      "description": "Cap Ceramic 0.01uF 16V X Pad SMD 0402 125�C T/R",
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "RC-02W1203FT",
+      "mfr": "Fenghua (HK) Electronics Ltd",
+      "qty": 15003,
+      "dateCode": null,
+      "packageDesc": null,
+      "description": "Res Thick Film 0402 120K",
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "GRM21BC81E106ME51L",
+      "mfr": "Murata",
+      "qty": 56543,
+      "dateCode": null,
+      "packageDesc": null,
+      "description": "Cap Ceramic 0.1uF 50V X7R",
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "RC-02W3302FT",
+      "mfr": "Fenghua (HK) Electronics Ltd",
+      "qty": 10046,
+      "dateCode": null,
+      "packageDesc": null,
+      "description": "Res Thin Film 0402 32.5K 1% 0.063W (1/16W) Pad SMD",
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "501331-0607",
+      "mfr": "Molex LLC",
+      "qty": 26416,
+      "dateCode": null,
+      "packageDesc": null,
+      "description": "Conn Shrouded Header (4 Sides) HDR 6 POS 1mm Solder",
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "CC0402KRX7R9BB222",
+      "mfr": "Yageo Corp",
+      "qty": 24013,
+      "dateCode": null,
+      "packageDesc": null,
+      "description": "Cap Ceramic 0.0022uF 50V",
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "RC0603FR-0710RL",
+      "mfr": "Yageo Corp",
+      "qty": 24001,
+      "dateCode": null,
+      "packageDesc": null,
+      "description": "Res Thick Film 0603 10 O",
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "RC-02W1203FT",
+      "mfr": null,
+      "qty": 2485,
+      "dateCode": null,
+      "packageDesc": null,
+      "description": "Res Thick Film 0402 100",
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "LMK316AB7226ML-TR",
+      "mfr": "Taiyo Yuden Co Ltd",
+      "qty": 27905,
+      "dateCode": null,
+      "packageDesc": null,
+      "description": "Cap Ceramic 22uF 10V X7R",
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "RC0402FR-07100RL",
+      "mfr": "Yageo Corp",
+      "qty": 47476,
+      "dateCode": null,
+      "packageDesc": null,
+      "description": "Res Thick Film 0402 100",
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "RS-05K1002FT",
+      "mfr": "Fenghua (HK) Electronics Ltd",
+      "qty": 6462,
+      "dateCode": null,
+      "packageDesc": null,
+      "description": "Res Thin Film 0402 73.2K",
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "DMN53D0LW-7",
+      "mfr": "Diodes Incorporated",
+      "qty": 84187,
+      "dateCode": null,
+      "packageDesc": null,
+      "description": "Trans MOSFET P-CH 60V 0.",
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "SMBJ7.0A",
+      "mfr": "Littelfuse UK Ltd",
+      "qty": 6116,
+      "dateCode": null,
+      "packageDesc": null,
+      "description": "TVS DIODE 7VWM 12VC SMB",
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "BH1680FVC-TR",
+      "mfr": "Rohm Co Ltd",
+      "qty": 1234,
+      "dateCode": null,
+      "packageDesc": null,
+      "description": "IC Ambient Light Sensor WSOF5",
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "RC0402FR-07100KL",
+      "mfr": "Yageo Corp",
+      "qty": 57649,
+      "dateCode": null,
+      "packageDesc": null,
+      "description": "Res Thick Film 0402 100K",
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "RC-02W2201FT",
+      "mfr": "Fenghua (HK) Electronics Ltd",
+      "qty": 12092,
+      "dateCode": null,
+      "packageDesc": null,
+      "description": "Res Thick Film 0402 2.2K",
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "15291025",
+      "mfr": "Molex LLC",
+      "qty": 17724,
+      "dateCode": null,
+      "packageDesc": null,
+      "description": "Conn Shrouded Header (3",
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "RG1608P-151-B-T5",
+      "mfr": "Susumu Co Ltd",
+      "qty": 12086,
+      "dateCode": null,
+      "packageDesc": null,
+      "description": "Res 150 Ohm 0.1% 1/5W 0603",
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "04025A101JAT2A",
+      "mfr": "AVX Corporation",
+      "qty": 24741,
+      "dateCode": null,
+      "packageDesc": null,
+      "description": "Cap Ceramic 100pF 50V C0",
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "MMBTA92-7-F",
+      "mfr": "Diodes Incorporated",
+      "qty": 80208,
+      "dateCode": null,
+      "packageDesc": null,
+      "description": "Trans GP BJT PNP 300V 0.",
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "AT24C128C-SSHM-T",
+      "mfr": "Microchip Technology Inc",
+      "qty": 16519,
+      "dateCode": null,
+      "packageDesc": null,
+      "description": "EEPROM Serial-2Wire 128K",
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "TC02H2491BT",
+      "mfr": "Fenghua (HK) Electronics Ltd",
+      "qty": 5271,
+      "dateCode": null,
+      "packageDesc": null,
+      "description": "Res SMD 2.2K 1% 0402",
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "RMCF0402FT536R",
+      "mfr": "Sei Electronics",
+      "qty": 79996,
+      "dateCode": null,
+      "packageDesc": null,
+      "description": "Res CHIP",
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "RC0402FR-07330KL",
+      "mfr": null,
+      "qty": 6945,
+      "dateCode": null,
+      "packageDesc": null,
+      "description": "Res CHIP",
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "2292838-3",
+      "mfr": "TE Connectivity Ltd",
+      "qty": 35000,
+      "dateCode": null,
+      "packageDesc": null,
+      "description": "1.1H Lower Profile Spring Finger",
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "BSS84DW-7-F",
+      "mfr": "Diodes Incorporated",
+      "qty": 23087,
+      "dateCode": null,
+      "packageDesc": null,
+      "description": "Automotive 6-Pin SOT-363 T/R",
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "0402B224K160NT",
+      "mfr": "Fenghua (HK) Electronics Ltd",
+      "qty": 11773,
+      "dateCode": null,
+      "packageDesc": null,
+      "description": "Cap Ceramic 0.1uF 50V X7",
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "NC7WZ17P6X",
+      "mfr": "On Semiconductor",
+      "qty": 11866,
+      "dateCode": null,
+      "packageDesc": null,
+      "description": "Schmitt Trigger Buffer 2",
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "RS-06K1003FT",
+      "mfr": "Fenghua (HK) Electronics Ltd",
+      "qty": 11861,
+      "dateCode": null,
+      "packageDesc": null,
+      "description": "Resistor, 100k ohm, 250m",
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "RC0402FR-07100RL",
+      "mfr": "Yageo Corp",
+      "qty": 45645,
+      "dateCode": null,
+      "packageDesc": null,
+      "description": "Thick Film 1206 100 mOhm",
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "MMBZ18VAL,215",
+      "mfr": "Nexperia",
+      "qty": 94045,
+      "dateCode": null,
+      "packageDesc": null,
+      "description": "DIODE",
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "MIC5504-3.3YM5-TR",
+      "mfr": "Microchip Technology Inc",
+      "qty": 13380,
+      "dateCode": null,
+      "packageDesc": null,
+      "description": "3.3VMS-TR - LDO VOLT REG,",
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "RC0402FR-07470RL",
+      "mfr": "Yageo Corp",
+      "qty": 44071,
+      "dateCode": null,
+      "packageDesc": null,
+      "description": "Res Thick Film 0402 470",
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "MCP9700AT-E/TT",
+      "mfr": "Microchip Technology Inc",
+      "qty": 5720,
+      "dateCode": null,
+      "packageDesc": null,
+      "description": "Microchip MCP9700AT-E/TT",
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "RC-02W6202FT",
+      "mfr": "Fenghua (HK) Electronics Ltd",
+      "qty": 11298,
+      "dateCode": null,
+      "packageDesc": null,
+      "description": "Res Thick Film 0402 62K",
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "MSP430FR5859IRHAR",
+      "mfr": "Texas Instruments",
+      "qty": 44,
+      "dateCode": null,
+      "packageDesc": null,
+      "description": "MCU 16-bit MSP430 RISC 6",
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "RC-02W1001FT",
+      "mfr": "Fenghua (HK) Electronics Ltd",
+      "qty": 98029,
+      "dateCode": null,
+      "packageDesc": null,
+      "description": "Res Thick Film 0402 1 kO",
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "RC0402FR-072K94L",
+      "mfr": "Yageo Corp",
+      "qty": 46008,
+      "dateCode": null,
+      "packageDesc": null,
+      "description": "RES,CHIP,2.94K,1%,0402",
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "890334023023CS",
+      "mfr": "Wurth Elektronik GmBH & Co KG",
+      "qty": 13448,
+      "dateCode": null,
+      "packageDesc": null,
+      "description": "W CAP Ceramic Capacitor 100nF 310Vac",
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "CC0402KRX7R9BB101",
+      "mfr": "Yageo Corp",
+      "qty": 95306,
+      "dateCode": null,
+      "packageDesc": null,
+      "description": "Cap Ceramic 220pF 50V X7R",
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "NC7WZ04P6X",
+      "mfr": "On Semiconductor",
+      "qty": 28225,
+      "dateCode": null,
+      "packageDesc": null,
+      "description": "Inverter 2-Element CMOS",
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "250X14W223MV4T",
+      "mfr": "Johanson",
+      "qty": 18993,
+      "dateCode": null,
+      "packageDesc": null,
+      "description": "Cap Feed Through 0.022uF",
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "UFM14PL-TP",
+      "mfr": "Micro Commercial Components",
+      "qty": 9686,
+      "dateCode": null,
+      "packageDesc": null,
+      "description": "Diode Switching 400V 1A",
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "BAT54T1G",
+      "mfr": "On Semiconductor",
+      "qty": 7134,
+      "dateCode": null,
+      "packageDesc": null,
+      "description": "Diode Schottky 30V 0.2A",
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "CC0402KRX7R7BB104",
+      "mfr": "Yageo Corp",
+      "qty": 179815,
+      "dateCode": null,
+      "packageDesc": null,
+      "description": "Cap Ceramic 0.1uF 16V X7",
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "GRM155R71H104ME14D",
+      "mfr": "Murata",
+      "qty": 173618,
+      "dateCode": null,
+      "packageDesc": null,
+      "description": "Cap Ceramic 0.1uF 50V X7R",
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "CC0402JRNPO9BN271",
+      "mfr": "Yageo Corp",
+      "qty": 61034,
+      "dateCode": null,
+      "packageDesc": null,
+      "description": "Ceramic Capacitor,",
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "RC-02W5601FT",
+      "mfr": "Fenghua (HK) Electronics Ltd",
+      "qty": 42532,
+      "dateCode": null,
+      "packageDesc": null,
+      "description": "RES",
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "MKS4G031002E00KSSD",
+      "mfr": "Wima",
+      "qty": 28315,
+      "dateCode": null,
+      "packageDesc": null,
+      "description": "Cap Film 0.01uF 250V PET (10.3 X 5 X 10.5mm) Radial",
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "VO1400AEFTR",
+      "mfr": "Vishay Intertechnology Inc",
+      "qty": 3898,
+      "dateCode": null,
+      "packageDesc": null,
+      "description": "Solid State Relay 1-CH DC-IN 0.1A 60V AC/DC",
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "DF5A6.2CJE,LM",
+      "mfr": "Toshiba",
+      "qty": 43883,
+      "dateCode": null,
+      "packageDesc": null,
+      "description": "TVS DIODE",
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "RC0402FR-07301KL",
+      "mfr": "Yageo Corp",
+      "qty": 13964,
+      "dateCode": null,
+      "packageDesc": null,
+      "description": "Res Thick Film 0402 301K",
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "PESD3V3L5UY,115",
+      "mfr": "Nexperia",
+      "qty": 12927,
+      "dateCode": null,
+      "packageDesc": null,
+      "description": "TVS DIODE 15V 24.4V SMA",
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "RC1206FR-072K43L",
+      "mfr": "Yageo Corp",
+      "qty": 28189,
+      "dateCode": null,
+      "packageDesc": null,
+      "description": "RES SMD 2.43K OHM 1% 1/4",
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "RN732ATTD2002B25",
+      "mfr": "KOA Speer Electronics Inc",
+      "qty": 24424,
+      "dateCode": null,
+      "packageDesc": null,
+      "description": "Res Thin Film 0805 20 kO",
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "MIC5353-3.3YMT-TR",
+      "mfr": "Microchip Technology Inc",
+      "qty": 4019,
+      "dateCode": null,
+      "packageDesc": null,
+      "description": "Inverter 2-Element CMOS",
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "0603B334K250NT",
+      "mfr": "Fenghua (HK) Electronics Ltd",
+      "qty": 6169,
+      "dateCode": null,
+      "packageDesc": null,
+      "description": "Cap Ceramic 0.33uF 25V X",
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "SMAJ15CA-13-F",
+      "mfr": "Diodes Incorporated",
+      "qty": 18386,
+      "dateCode": null,
+      "packageDesc": null,
+      "description": "DIODE",
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "SPMWH1228FD5WARUVG",
+      "mfr": "Samsung",
+      "qty": 26910,
+      "dateCode": null,
+      "packageDesc": null,
+      "description": "3V 80 Cri Full Distribution Cct",
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "VJ0402Y102JXXCW1BC",
+      "mfr": "Vishay Intertechnology Inc",
+      "qty": 42872,
+      "dateCode": null,
+      "packageDesc": null,
+      "description": "Cap Ceramic 0.01uF 25V X Pad SMD 0402 125�C T/R",
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "ERJ-PB3B6652V",
+      "mfr": "Panasonic",
+      "qty": 4108,
+      "dateCode": null,
+      "packageDesc": null,
+      "description": "Res Thick Film 0603 66.5",
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "BAS40X-TP",
+      "mfr": "Micro Commercial Components",
+      "qty": 55789,
+      "dateCode": null,
+      "packageDesc": null,
+      "description": "SINGLE SIGNAL SWITCHING DIODE",
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "BSS314PEH6327XTSA1",
+      "mfr": "Infineon Technologies",
+      "qty": 17424,
+      "dateCode": null,
+      "packageDesc": null,
+      "description": "Trans MOSFET P-CH 60V 0.",
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "RLB1014-122KL",
+      "mfr": "Bourns Inc",
+      "qty": 8526,
+      "dateCode": null,
+      "packageDesc": null,
+      "description": "IND 1.2MH 150MA 4.7 OHM",
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "SN74AHC1G04DRLR",
+      "mfr": "Texas Instruments",
+      "qty": 18450,
+      "dateCode": null,
+      "packageDesc": null,
+      "description": "Inverter 1-Element CMOS",
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "0603B105K250NT",
+      "mfr": "Fenghua (HK) Electronics Ltd",
+      "qty": 36561,
+      "dateCode": null,
+      "packageDesc": null,
+      "description": "Cap Ceramic 1uF 25V X7R",
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "2246092-2",
+      "mfr": "TE Connectivity Ltd",
+      "qty": 1339,
+      "dateCode": null,
+      "packageDesc": null,
+      "description": "Conn Power PL 2 POS 2mm",
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "GRM155R60J475ME47D",
+      "mfr": "Murata",
+      "qty": 36218,
+      "dateCode": null,
+      "packageDesc": null,
+      "description": "Cap Ceramic 0.1uF �10% 20% Pad SMD 0402 85�C T/R",
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "RC0402FR-071KL",
+      "mfr": "Yageo Corp",
+      "qty": 46409,
+      "dateCode": null,
+      "packageDesc": null,
+      "description": "Res Thick Film 0402 1K O",
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "RC0402FR-072K61L",
+      "mfr": "Yageo Corp",
+      "qty": 7815,
+      "dateCode": null,
+      "packageDesc": null,
+      "description": "RES SMD 22 OHM 1% 1/16W 0402",
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "RC1206FR-071K65L",
+      "mfr": "Yageo Corp",
+      "qty": 4007,
+      "dateCode": null,
+      "packageDesc": null,
+      "description": "Res Thick Film 0603 100K",
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "LM2665M6/NOPB",
+      "mfr": "Texas Instruments",
+      "qty": 6124,
+      "dateCode": null,
+      "packageDesc": null,
+      "description": "Charge Pump 5TUPP 5V to",
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "RSTA1-AMMO",
+      "mfr": "BEL Composite Iberica S.L.",
+      "qty": 8393,
+      "dateCode": null,
+      "packageDesc": null,
+      "description": "FUSE BOND WIRE 2.5OHM RADIAL",
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "GRM155R60J106ME15D",
+      "mfr": "Murata",
+      "qty": 35212,
+      "dateCode": null,
+      "packageDesc": null,
+      "description": "CERAMIC CAPACITOR",
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "B72207S2141K101",
+      "mfr": "TDK Corp",
+      "qty": 11313,
+      "dateCode": null,
+      "packageDesc": null,
+      "description": "Var MOV 1750A 220V Radial Bulk",
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "0ZCG0010FF2C",
+      "mfr": "Bel Fuse",
+      "qty": 22874,
+      "dateCode": null,
+      "packageDesc": null,
+      "description": "PTC RESET FUSE 60V 100MA",
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "0ZCJ0010FF2E",
+      "mfr": "Belfuse",
+      "qty": 20859,
+      "dateCode": null,
+      "packageDesc": null,
+      "description": "PTC RESET FUSE 60V 100MA 1206",
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "0ZCG0010FF2C",
+      "mfr": "Bel Fuse",
+      "qty": 18000,
+      "dateCode": null,
+      "packageDesc": null,
+      "description": "PTC RESET FUSE 60V 100MA",
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "BLM15PD121SN1D",
+      "mfr": "Murata",
+      "qty": 48371,
+      "dateCode": null,
+      "packageDesc": null,
+      "description": "Ferrite Beads Multi-Laye",
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "BC857CWT1G",
+      "mfr": "On Semiconductor",
+      "qty": 46459,
+      "dateCode": null,
+      "packageDesc": null,
+      "description": "Trans BJT PNP 45V 0.1A 3",
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "RC0402FR-0710KL",
+      "mfr": "Yageo Corp",
+      "qty": 265224,
+      "dateCode": null,
+      "packageDesc": null,
+      "description": "Res Thick Film 0402 10K",
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "RC0402FR-0727K4L",
+      "mfr": "Yageo Corp",
+      "qty": 47774,
+      "dateCode": null,
+      "packageDesc": null,
+      "description": "Res Thick Film 0402 27.4",
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "RC-02W18R0FT",
+      "mfr": "Fenghua (HK) Electronics Ltd",
+      "qty": 20702,
+      "dateCode": null,
+      "packageDesc": null,
+      "description": "Thick Film 0402 18 Ohms",
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "0402CG0R3B500NT",
+      "mfr": "Fenghua (HK) Electronics Ltd",
+      "qty": 18810,
+      "dateCode": null,
+      "packageDesc": null,
+      "description": "Cap Ceramic 0.3pF 50V C0",
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "ROX3SJ12R",
+      "mfr": "TE Connectivity Ltd",
+      "qty": 5251,
+      "dateCode": null,
+      "packageDesc": null,
+      "description": "RE CONDUCTIVITY 1KOHM ROXS312R Through Hole",
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "BLANK",
+      "mfr": "BLANC AERO",
+      "qty": 3625,
+      "dateCode": null,
+      "packageDesc": null,
+      "description": "CAP CERAMIC SINGLE SUPRESION",
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "TD03G1002BT",
+      "mfr": "Fenghua (HK) Electronics Ltd",
+      "qty": 6592,
+      "dateCode": null,
+      "packageDesc": null,
+      "description": "Res Thin Film 0603 10K O",
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "TC02G5621BT",
+      "mfr": "Fenghua (HK) Electronics Ltd",
+      "qty": 4708,
+      "dateCode": null,
+      "packageDesc": null,
+      "description": "Res Thin Film 0402 32.5K �0.1% 0.063W (1/16W)",
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "RC-02W7502FT",
+      "mfr": "Fenghua (HK) Electronics Ltd",
+      "qty": 7589,
+      "dateCode": null,
+      "packageDesc": null,
+      "description": "Res Thick Film 0402 100K 0.063W (1/16W)",
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "PESD3V3L5UY,115",
+      "mfr": "Nexperia",
+      "qty": 11136,
+      "dateCode": null,
+      "packageDesc": null,
+      "description": "TVS DIODE",
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "TF06G6803BT",
+      "mfr": "Fenghua (HK) Electronics Ltd",
+      "qty": 6555,
+      "dateCode": null,
+      "packageDesc": null,
+      "description": "Res Thin Film 1206 680K",
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "RC0402FR-072KL",
+      "mfr": "Yageo Corp",
+      "qty": 52955,
+      "dateCode": null,
+      "packageDesc": null,
+      "description": "Res Thick Film 0402 20 K O",
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "TD03G1001BT",
+      "mfr": "Fenghua (HK) Electronics Ltd",
+      "qty": 13148,
+      "dateCode": null,
+      "packageDesc": null,
+      "description": "Res Thin Film 0603 1K Oh",
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "RC0402FR-0747K5L",
+      "mfr": "Yageo Corp",
+      "qty": 20274,
+      "dateCode": null,
+      "packageDesc": null,
+      "description": "Res Thick Film 0402 3.32",
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "ERJPB3B2050V",
+      "mfr": "Panasonic",
+      "qty": 7892,
+      "dateCode": null,
+      "packageDesc": null,
+      "description": "Res SMD 0603 0.1% 47k 0603",
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "0402B153K160NT",
+      "mfr": "Fenghua (HK) Electronics Ltd",
+      "qty": 9298,
+      "dateCode": null,
+      "packageDesc": null,
+      "description": "CERAMIC TRAINER",
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "RC0402FR-07200RL",
+      "mfr": "Yageo Corp",
+      "qty": 14850,
+      "dateCode": null,
+      "packageDesc": null,
+      "description": "Res Thick Film 0402 200",
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "RC0402FR-0710RL",
+      "mfr": null,
+      "qty": 4069,
+      "dateCode": null,
+      "packageDesc": null,
+      "description": "Res Thick Film 0402 10 O",
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "RC0402FR-07470KL",
+      "mfr": "Yageo Corp",
+      "qty": 11141,
+      "dateCode": null,
+      "packageDesc": null,
+      "description": "RES",
+      "moq": null,
+      "spq": null
+    }
+  ]
+}

@@ -1,0 +1,1958 @@
+{
+  "label": "Free Stock - Philippines",
+  "sourceOfferIdAtMigration": 1026217,
+  "migrationTimestamp": "2026-05-13T01:41:01.463Z",
+  "lineCount": 195,
+  "lines": [
+    {
+      "mpn": "NMC1206X5R107M6.3TRPLPF",
+      "mfr": "NIPPON GT CORP",
+      "qty": 625,
+      "dateCode": "9D2145",
+      "packageDesc": "REEL",
+      "description": null,
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "FDS6982AS",
+      "mfr": "On Semiconductor",
+      "qty": 5000,
+      "dateCode": "1717",
+      "packageDesc": "TRAY",
+      "description": null,
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "CEJMK107BJ106MA-T",
+      "mfr": "Taiyo Yuden Co Ltd",
+      "qty": 1410,
+      "dateCode": "20181029",
+      "packageDesc": "TRAY",
+      "description": null,
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "2250448-1",
+      "mfr": "Trp Connector",
+      "qty": 2400,
+      "dateCode": "22144",
+      "packageDesc": "REEL",
+      "description": null,
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "XZ53W-9QC54",
+      "mfr": "SunLED Corporation",
+      "qty": 18598,
+      "dateCode": "9D2121",
+      "packageDesc": "REEL",
+      "description": null,
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "2250448-1",
+      "mfr": "Trp Connector",
+      "qty": 4320,
+      "dateCode": "22333",
+      "packageDesc": "REEL",
+      "description": null,
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "ISL88550AIRZ-T",
+      "mfr": "Renesas Electronics Corp",
+      "qty": 14752,
+      "dateCode": "D2218",
+      "packageDesc": "TRAY",
+      "description": null,
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "CSD16322Q5",
+      "mfr": "Texas Instruments",
+      "qty": 11693,
+      "dateCode": "D2129",
+      "packageDesc": "TRAY",
+      "description": null,
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "EMC1444-A-AIA-TR",
+      "mfr": "Microchip Technology Inc",
+      "qty": 7999,
+      "dateCode": "2003",
+      "packageDesc": "REEL",
+      "description": null,
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "LM1117LD-ADJ/NOPB",
+      "mfr": "Texas Instruments",
+      "qty": 2000,
+      "dateCode": "D2148",
+      "packageDesc": "REEL",
+      "description": null,
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "NP00402HTTP150J",
+      "mfr": "Sas",
+      "qty": 25,
+      "dateCode": "250920",
+      "packageDesc": "TRAY",
+      "description": null,
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "XSFP-A-PSLB-0401-QL5",
+      "mfr": "KINNEXA",
+      "qty": 750,
+      "dateCode": "150921",
+      "packageDesc": "REEL",
+      "description": null,
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "U90-C161-100A",
+      "mfr": "Amphenol Ltd",
+      "qty": 4543,
+      "dateCode": "9D1813",
+      "packageDesc": "TRAY",
+      "description": null,
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "FS1-M38-2000-00",
+      "mfr": "Amphenol Ltd",
+      "qty": 1354,
+      "dateCode": "9D1812",
+      "packageDesc": "REEL",
+      "description": null,
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "1P61083-123502LF",
+      "mfr": "Fci",
+      "qty": 450,
+      "dateCode": "1D29MAR22",
+      "packageDesc": "REEL",
+      "description": null,
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "PRT0402BRE072K32L",
+      "mfr": "Yageo Corp",
+      "qty": 181,
+      "dateCode": "9D2045",
+      "packageDesc": null,
+      "description": null,
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "RK73H1ETTP2432F",
+      "mfr": "Venkel",
+      "qty": 462,
+      "dateCode": "2130",
+      "packageDesc": null,
+      "description": null,
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "2250448-1",
+      "mfr": "Trp Connector",
+      "qty": 619,
+      "dateCode": "22283",
+      "packageDesc": "REEL",
+      "description": null,
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "GRM155R71E333KA88D",
+      "mfr": "Murata",
+      "qty": 33443,
+      "dateCode": "20181221",
+      "packageDesc": "REEL",
+      "description": null,
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "LM1117LD-ADJ/NOPB",
+      "mfr": "Texas Instruments",
+      "qty": 2000,
+      "dateCode": "D2148",
+      "packageDesc": "REEL",
+      "description": null,
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "DMC1018UPD-13",
+      "mfr": "Diodes Incorporated",
+      "qty": 5000,
+      "dateCode": "2301",
+      "packageDesc": "REEL",
+      "description": null,
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "C1005COG1H471JT000F",
+      "mfr": "TDK Corp",
+      "qty": 35,
+      "dateCode": "T1630",
+      "packageDesc": "REEL",
+      "description": null,
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "MSCDRI-3D23NP-4R7Y-RT",
+      "mfr": "MAG LAYERS USA INC",
+      "qty": 7500,
+      "dateCode": "B220S74",
+      "packageDesc": "REEL",
+      "description": null,
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "MAX6730UTSD3+T",
+      "mfr": "Maxim Integrated Products Inc",
+      "qty": 2340,
+      "dateCode": "2205",
+      "packageDesc": "REEL",
+      "description": null,
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "BMCABC0606304R7MQ1",
+      "mfr": "Chilisin",
+      "qty": 16129,
+      "dateCode": "20210924",
+      "packageDesc": "REEL",
+      "description": null,
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "CSB63CA2G2C",
+      "mfr": "Not Known Yet",
+      "qty": 15100,
+      "dateCode": "20210225",
+      "packageDesc": "REEL",
+      "description": null,
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "TAJA226K010RNJ",
+      "mfr": "AVX Corporation",
+      "qty": 2000,
+      "dateCode": "2205",
+      "packageDesc": "REEL",
+      "description": null,
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "GRM1885C1H471JA01D",
+      "mfr": "Murata Manufacturing Co Ltd",
+      "qty": 2411,
+      "dateCode": "20190304",
+      "packageDesc": "REEL",
+      "description": null,
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "UPZ1608U471-1R5TF",
+      "mfr": "SUNLORD",
+      "qty": 43,
+      "dateCode": "44853",
+      "packageDesc": null,
+      "description": null,
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "XSFP-A-PSLB-0401-QL5",
+      "mfr": "KINNEXA",
+      "qty": 750,
+      "dateCode": "110222",
+      "packageDesc": "REEL",
+      "description": null,
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "1PRM TMK105 B7472KV-F",
+      "mfr": "Taiyo Yuden Co Ltd",
+      "qty": 8459,
+      "dateCode": "1709",
+      "packageDesc": null,
+      "description": null,
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "1P74LVC2G06GW,125",
+      "mfr": "Nexperia",
+      "qty": 629,
+      "dateCode": "2431",
+      "packageDesc": null,
+      "description": null,
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "IHLP2525CZER4R7M01",
+      "mfr": "Chilisin",
+      "qty": 73,
+      "dateCode": "1535",
+      "packageDesc": null,
+      "description": null,
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "GRM219R61C475KE15D",
+      "mfr": "Murata",
+      "qty": 338378,
+      "dateCode": "201814",
+      "packageDesc": "TUBE",
+      "description": null,
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "2187605-1",
+      "mfr": "TE Connectivity Ltd",
+      "qty": 378,
+      "dateCode": "23106",
+      "packageDesc": "REEL",
+      "description": null,
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "GRM32EC80J107ME20L",
+      "mfr": "Murata",
+      "qty": 387,
+      "dateCode": "9D2151",
+      "packageDesc": null,
+      "description": null,
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "TPS54622RHLR",
+      "mfr": "Texas Instruments",
+      "qty": 2100,
+      "dateCode": "D2206",
+      "packageDesc": "REEL",
+      "description": null,
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "PRT0402BRE0724K9L",
+      "mfr": "Yageo Corp",
+      "qty": 1399,
+      "dateCode": "9D2143",
+      "packageDesc": null,
+      "description": null,
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "04025C222KAT2A",
+      "mfr": "AVX Corporation",
+      "qty": 3705,
+      "dateCode": "9D1848",
+      "packageDesc": null,
+      "description": null,
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "1P61083-123502LF",
+      "mfr": "Fci",
+      "qty": 450,
+      "dateCode": "1D29MAR22",
+      "packageDesc": "REEL",
+      "description": null,
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "TPS54622RHLR",
+      "mfr": "Texas Instruments",
+      "qty": 165,
+      "dateCode": "2135",
+      "packageDesc": null,
+      "description": null,
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "CL10B224KA8NNNC",
+      "mfr": "Samsung",
+      "qty": 4000,
+      "dateCode": "1748",
+      "packageDesc": null,
+      "description": null,
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "GRM32EC80J107ME20L",
+      "mfr": "Murata",
+      "qty": 159,
+      "dateCode": "20220517",
+      "packageDesc": null,
+      "description": null,
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "PRT0402BRE072K32L",
+      "mfr": "Yageo Corp",
+      "qty": 331,
+      "dateCode": "9D2045",
+      "packageDesc": null,
+      "description": null,
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "UPZ1608U471-1R5TF",
+      "mfr": "SUNLORD",
+      "qty": 700,
+      "dateCode": "2022-10-190",
+      "packageDesc": null,
+      "description": null,
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "GRM1555C1H471JA01D",
+      "mfr": "Murata Manufacturing Co Ltd",
+      "qty": 6278,
+      "dateCode": "20210303",
+      "packageDesc": "REEL",
+      "description": null,
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "TAJA226K010RNJ",
+      "mfr": "AVX Corporation",
+      "qty": 8000,
+      "dateCode": "2228",
+      "packageDesc": "REEL",
+      "description": null,
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "MSCDRI-3D23NP-4R7Y-RT",
+      "mfr": "MAG LAYERS USA INC",
+      "qty": 7500,
+      "dateCode": "B220S74",
+      "packageDesc": "REEL",
+      "description": null,
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "1PXZMG53W-2",
+      "mfr": "Kingbright Electronic Co Ltd",
+      "qty": 1697,
+      "dateCode": "9D2239",
+      "packageDesc": null,
+      "description": null,
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "04025C222KAT2A",
+      "mfr": "AVX Corporation",
+      "qty": 10000,
+      "dateCode": "1848",
+      "packageDesc": null,
+      "description": null,
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "LQW15AN2N7C00D",
+      "mfr": "Murata",
+      "qty": 1097,
+      "dateCode": "20220106",
+      "packageDesc": null,
+      "description": null,
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "IR3897MTRPBF",
+      "mfr": "International Rectifier",
+      "qty": 208,
+      "dateCode": "2143",
+      "packageDesc": "REEL",
+      "description": null,
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "TPS54622RHLR",
+      "mfr": "Texas Instruments",
+      "qty": 424,
+      "dateCode": "D2206",
+      "packageDesc": "REEL",
+      "description": null,
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "1P74LVC2G06GW,125",
+      "mfr": "Nexperia",
+      "qty": 6000,
+      "dateCode": "9D2205",
+      "packageDesc": "REEL",
+      "description": null,
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "CR0402-16W-2432FSNT",
+      "mfr": "Venkel",
+      "qty": 10000,
+      "dateCode": "SH0614778",
+      "packageDesc": null,
+      "description": null,
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "CR0402-16W-2432FSNT",
+      "mfr": "Venkel",
+      "qty": 1345,
+      "dateCode": "2136",
+      "packageDesc": null,
+      "description": null,
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "1PRM TMK105 B7472KV-F",
+      "mfr": "Taiyo Yuden Co Ltd",
+      "qty": 5550,
+      "dateCode": "12D20170914",
+      "packageDesc": null,
+      "description": null,
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "10120260-131-102LF",
+      "mfr": "Amphenol Ltd",
+      "qty": 1838,
+      "dateCode": "180420",
+      "packageDesc": "REEL",
+      "description": null,
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "CC0603JRNPO9BN471",
+      "mfr": "Yageo Corp",
+      "qty": 4774,
+      "dateCode": "9D1752",
+      "packageDesc": "PACKET",
+      "description": null,
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "TAJA226K010RNJ",
+      "mfr": "AVX Corporation",
+      "qty": 1695,
+      "dateCode": "2205",
+      "packageDesc": "REEL",
+      "description": null,
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "PI4MSD5V9540BZEEX",
+      "mfr": "Pericom",
+      "qty": 6000,
+      "dateCode": "2229",
+      "packageDesc": "REEL",
+      "description": null,
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "CEJMK316BJ107ML-T",
+      "mfr": "Taiyo Yuden Co Ltd",
+      "qty": 52000,
+      "dateCode": "20220317",
+      "packageDesc": "REEL",
+      "description": null,
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "LTC4352IDD#TRPBF",
+      "mfr": "Linear Technology Corp",
+      "qty": 1576,
+      "dateCode": "9D2003",
+      "packageDesc": "TRAY",
+      "description": null,
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "MAX8688AHETG+T",
+      "mfr": "Maxim Integrated Products Inc",
+      "qty": 30182,
+      "dateCode": "503995",
+      "packageDesc": "REEL",
+      "description": null,
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "530470410",
+      "mfr": "Molex LLC",
+      "qty": 8325,
+      "dateCode": "902116",
+      "packageDesc": "REEL",
+      "description": null,
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "RK73H1ETTP2432F",
+      "mfr": "Venkel",
+      "qty": 913,
+      "dateCode": "2202",
+      "packageDesc": null,
+      "description": null,
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "HPPC12065-R80M-Q8",
+      "mfr": "Asj Components",
+      "qty": 10840,
+      "dateCode": "20210716",
+      "packageDesc": "REEL",
+      "description": null,
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "C0402X7RI60-104KNE",
+      "mfr": "Venkel",
+      "qty": 30000,
+      "dateCode": "1828",
+      "packageDesc": "TUBE",
+      "description": null,
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "2187605-1",
+      "mfr": "TE Connectivity Ltd",
+      "qty": 630,
+      "dateCode": "23106",
+      "packageDesc": "REEL",
+      "description": null,
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "DMC1018UPD-13",
+      "mfr": "Diodes Incorporated",
+      "qty": 2098,
+      "dateCode": "2500",
+      "packageDesc": "REEL",
+      "description": null,
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "SI4497DY-T1-GE3VIS-HK2500",
+      "mfr": "Vishay Intertechnology Inc",
+      "qty": 1897,
+      "dateCode": "R44Y019.1",
+      "packageDesc": "REEL",
+      "description": null,
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "GRM32EC80J107ME20L",
+      "mfr": "Murata",
+      "qty": 4000,
+      "dateCode": "20220517",
+      "packageDesc": "REEL",
+      "description": null,
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "XSFP-A-PSLB-0401-QL5",
+      "mfr": "KINNEXA",
+      "qty": 750,
+      "dateCode": "110222",
+      "packageDesc": "REEL",
+      "description": null,
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "74LVC1G57GM,132",
+      "mfr": "NXP Semiconductors",
+      "qty": 20000,
+      "dateCode": null,
+      "packageDesc": "REEL",
+      "description": null,
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "BMCABC0606304R7MQ1",
+      "mfr": "Chilisin",
+      "qty": 4000,
+      "dateCode": "44830",
+      "packageDesc": "REEL",
+      "description": null,
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "CDEIR6D31FHF-2R2MC",
+      "mfr": "Sumida",
+      "qty": 3000,
+      "dateCode": "20220605",
+      "packageDesc": "REEL",
+      "description": null,
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "CDEIR6D31FHF-2R2MC",
+      "mfr": "Sumida",
+      "qty": 5462,
+      "dateCode": "20220605",
+      "packageDesc": "TUBE",
+      "description": null,
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "TPS51200DRCR",
+      "mfr": "Texas Instruments",
+      "qty": 2738,
+      "dateCode": "D2129",
+      "packageDesc": "REEL",
+      "description": null,
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "BMCABC0606304R7MQ1",
+      "mfr": "Chilisin",
+      "qty": 1000,
+      "dateCode": "2252",
+      "packageDesc": "REEL",
+      "description": null,
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "BMCABC0606304R7MQ1",
+      "mfr": "Chilisin",
+      "qty": 571,
+      "dateCode": "202206",
+      "packageDesc": "REEL",
+      "description": null,
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "1PNMC0402X7R472K25TRPF",
+      "mfr": "Taiyo Yuden Co Ltd",
+      "qty": 7100,
+      "dateCode": "43655",
+      "packageDesc": null,
+      "description": null,
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "1PRM TMK105 B7472KV-F",
+      "mfr": "Taiyo Yuden Co Ltd",
+      "qty": 2008,
+      "dateCode": "12D20170911",
+      "packageDesc": null,
+      "description": null,
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "XSFP-A-PSLB-0401-QL5",
+      "mfr": "KINNEXA",
+      "qty": 250,
+      "dateCode": "260222",
+      "packageDesc": "REEL",
+      "description": null,
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "LM1117LD-ADJ/NOPB",
+      "mfr": "Texas Instruments",
+      "qty": 700,
+      "dateCode": "1840",
+      "packageDesc": "REEL",
+      "description": null,
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "TAJA226K010RNJ",
+      "mfr": "AVX Corporation",
+      "qty": 158,
+      "dateCode": "d2131",
+      "packageDesc": null,
+      "description": null,
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "MAX6730UTSD3+T",
+      "mfr": "Maxim Integrated Products Inc",
+      "qty": 2500,
+      "dateCode": "2205",
+      "packageDesc": "TRAY",
+      "description": null,
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "DO3316P-103MLD",
+      "mfr": "Coilcraft Inc",
+      "qty": 6712,
+      "dateCode": "121119",
+      "packageDesc": "REEL",
+      "description": null,
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "C1005COG1H150JT000F",
+      "mfr": "TDK Corp",
+      "qty": 470,
+      "dateCode": "T1824",
+      "packageDesc": "TUBE",
+      "description": null,
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "CC0201KRX5R5BB104",
+      "mfr": "Yageo Corp",
+      "qty": 480000,
+      "dateCode": null,
+      "packageDesc": "TRAY",
+      "description": null,
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "LAM-227VOF",
+      "mfr": "KINSWOOD ELECTRONICS CORP",
+      "qty": 2000,
+      "dateCode": "210905/211209",
+      "packageDesc": "REEL",
+      "description": null,
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "LM1117LD-ADJ/NOPB",
+      "mfr": "Texas Instruments",
+      "qty": 995,
+      "dateCode": "D995",
+      "packageDesc": "REEL",
+      "description": null,
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "MSCDRI-3D23NP-4R7Y-RT",
+      "mfr": "MAG LAYERS USA INC",
+      "qty": 2103,
+      "dateCode": "B220S74",
+      "packageDesc": "REEL",
+      "description": null,
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "TPS54622RHLR",
+      "mfr": "Texas Instruments",
+      "qty": 6000,
+      "dateCode": "2206",
+      "packageDesc": "REEL",
+      "description": null,
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "LTC4352IDD#TRPBF",
+      "mfr": "Linear Technology Corp",
+      "qty": 2500,
+      "dateCode": "9D2003",
+      "packageDesc": "PACKET",
+      "description": null,
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "TPS252DBVR-1",
+      "mfr": "Texas Instruments",
+      "qty": 269,
+      "dateCode": "D2144",
+      "packageDesc": null,
+      "description": null,
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "XZMG53W-2",
+      "mfr": "Kingbright Electronic Co Ltd",
+      "qty": 34000,
+      "dateCode": "2252",
+      "packageDesc": "REEL",
+      "description": null,
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "9DBV0231AKILF",
+      "mfr": "Idt",
+      "qty": 188,
+      "dateCode": "2223",
+      "packageDesc": "REEL",
+      "description": null,
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "WP937EB-CR22-2.6",
+      "mfr": "Kingbright Electronic Co Ltd",
+      "qty": 6000,
+      "dateCode": "DEC 24 2021",
+      "packageDesc": "REEL",
+      "description": null,
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "WP937EB-CR22-2.6",
+      "mfr": "Kingbright Electronic Co Ltd",
+      "qty": 10000,
+      "dateCode": "H0225A0183-A015",
+      "packageDesc": "REEL",
+      "description": null,
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "MX25L6406EZNI-12G",
+      "mfr": "Metatech Corp",
+      "qty": 8953,
+      "dateCode": "1740",
+      "packageDesc": "REEL",
+      "description": null,
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "SI7658ADP-T1-GE3",
+      "mfr": "Vishay Intertechnology Inc",
+      "qty": 412,
+      "dateCode": "1834",
+      "packageDesc": "TUBE",
+      "description": null,
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "BLM21PG220SN1D",
+      "mfr": "Murata",
+      "qty": 5000,
+      "dateCode": "20220526",
+      "packageDesc": "TRAY",
+      "description": null,
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "RRT0402BRE072K32L",
+      "mfr": "Yageo Corp",
+      "qty": 9587,
+      "dateCode": "9D2117",
+      "packageDesc": "REEL",
+      "description": null,
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "1PXZMG53W-2",
+      "mfr": "Kingbright Electronic Co Ltd",
+      "qty": 4000,
+      "dateCode": "2239",
+      "packageDesc": "REEL",
+      "description": null,
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "1PBLM18PG471SN1D",
+      "mfr": "SUNLORD",
+      "qty": 823,
+      "dateCode": "20201113",
+      "packageDesc": null,
+      "description": null,
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "HPDL-0130-0001",
+      "mfr": "Stanley",
+      "qty": 4000,
+      "dateCode": "C3821N17590",
+      "packageDesc": "REEL",
+      "description": null,
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "MSCDRI-3D23NP-4R7Y-RT",
+      "mfr": "MAG LAYERS USA INC",
+      "qty": 1587,
+      "dateCode": "44524",
+      "packageDesc": "REEL",
+      "description": null,
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "EMC1444-A-AIA-TR",
+      "mfr": "Microchip Technology Inc",
+      "qty": 2192,
+      "dateCode": "2003",
+      "packageDesc": "REEL",
+      "description": null,
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "2187605-1",
+      "mfr": "TE Connectivity Ltd",
+      "qty": 496,
+      "dateCode": "23106",
+      "packageDesc": "REEL",
+      "description": null,
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "CSD16321Q5",
+      "mfr": "Texas Instruments",
+      "qty": 3982,
+      "dateCode": "1943",
+      "packageDesc": "REEL",
+      "description": null,
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "74AHC1G32GV",
+      "mfr": "Nexperia",
+      "qty": 21960,
+      "dateCode": "9D1942",
+      "packageDesc": "REEL",
+      "description": null,
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "HPDL-0130-0001",
+      "mfr": "Stanley",
+      "qty": 3121,
+      "dateCode": "C3821N17590",
+      "packageDesc": "REEL",
+      "description": null,
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "CL31A476MQHNNNE",
+      "mfr": "Samsung",
+      "qty": 159796,
+      "dateCode": "1837",
+      "packageDesc": "REEL",
+      "description": null,
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "ISL8106IRZ-T",
+      "mfr": "Renesas Electronics Corp",
+      "qty": 23509,
+      "dateCode": "D2126",
+      "packageDesc": "REEL",
+      "description": null,
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "FDS6982AS",
+      "mfr": "On Semiconductor",
+      "qty": 75564,
+      "dateCode": "1717",
+      "packageDesc": "TRAY",
+      "description": null,
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "XG-2102CA156.2500M-LHRN",
+      "mfr": "Seiko Epson",
+      "qty": 3090,
+      "dateCode": "230322",
+      "packageDesc": "TUBE",
+      "description": null,
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "2250448-1",
+      "mfr": "Trp Connector",
+      "qty": 5760,
+      "dateCode": "23155",
+      "packageDesc": "REEL",
+      "description": null,
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "WP937EB-CR22-2.6",
+      "mfr": "Kingbright Electronic Co Ltd",
+      "qty": 10000,
+      "dateCode": "H0223A0098-A034",
+      "packageDesc": "REEL",
+      "description": null,
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "1P61083-123502LF",
+      "mfr": "Fci",
+      "qty": 450,
+      "dateCode": "1D04JAN23",
+      "packageDesc": "REEL",
+      "description": null,
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "GRM32EC80J107ME20L",
+      "mfr": "Murata",
+      "qty": 1000,
+      "dateCode": "20220517",
+      "packageDesc": "REEL",
+      "description": null,
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "LAM-227VOF",
+      "mfr": "KINSWOOD ELECTRONICS CORP",
+      "qty": 6000,
+      "dateCode": "211209/220922",
+      "packageDesc": "REEL",
+      "description": null,
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "1PRC0402FR-07806RL",
+      "mfr": "Yageo Corp",
+      "qty": 6024,
+      "dateCode": "2211",
+      "packageDesc": null,
+      "description": null,
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "1PXZMG53W-2",
+      "mfr": "Kingbright Electronic Co Ltd",
+      "qty": 102,
+      "dateCode": "9D2239",
+      "packageDesc": null,
+      "description": null,
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "1PRM TMK105 B7472KV-F",
+      "mfr": "Taiyo Yuden Co Ltd",
+      "qty": 104,
+      "dateCode": "12D20170914",
+      "packageDesc": null,
+      "description": null,
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "ERA-2AEB5622X",
+      "mfr": "Panasonic",
+      "qty": 5219,
+      "dateCode": "44746",
+      "packageDesc": "REEL",
+      "description": null,
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "SN74LV2G06DCKR",
+      "mfr": "Nexperia",
+      "qty": 2179,
+      "dateCode": "D2128",
+      "packageDesc": "REEL",
+      "description": null,
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "PI4MSD5V9540BZEEX",
+      "mfr": "Pericom",
+      "qty": 33,
+      "dateCode": "1740",
+      "packageDesc": null,
+      "description": null,
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "CR042-16W-2432FSNT",
+      "mfr": "Venkel",
+      "qty": 3368,
+      "dateCode": "2049",
+      "packageDesc": null,
+      "description": null,
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "LQW15AN2N7C00D",
+      "mfr": "Murata",
+      "qty": 4482,
+      "dateCode": "20220816",
+      "packageDesc": null,
+      "description": null,
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "04025C222KAT2A",
+      "mfr": "AVX Corporation",
+      "qty": 10000,
+      "dateCode": "9D1922",
+      "packageDesc": null,
+      "description": null,
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "203341-0002",
+      "mfr": "Molex LLC",
+      "qty": 750,
+      "dateCode": "2147 & 2148",
+      "packageDesc": "TRAY",
+      "description": null,
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "SIR438DP-T1-GE3",
+      "mfr": "Vishay Intertechnology Inc",
+      "qty": 3000,
+      "dateCode": "2201",
+      "packageDesc": "TUBE",
+      "description": null,
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "GCM155R71C104KA55D",
+      "mfr": "Murata Manufacturing Co Ltd",
+      "qty": 34864,
+      "dateCode": "1824",
+      "packageDesc": "TRAY",
+      "description": null,
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "B330A-13-F",
+      "mfr": "Diodes Incorporated",
+      "qty": 5000,
+      "dateCode": "2133",
+      "packageDesc": "REEL",
+      "description": null,
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "2187605-1",
+      "mfr": "TE Connectivity Ltd",
+      "qty": 126,
+      "dateCode": "23154",
+      "packageDesc": "REEL",
+      "description": null,
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "0402YC103KAT2A",
+      "mfr": "AVX Corporation",
+      "qty": 392716,
+      "dateCode": "9D1843",
+      "packageDesc": "REEL",
+      "description": null,
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "74LVC2G06GW",
+      "mfr": "Nexperia",
+      "qty": 394,
+      "dateCode": "9D1944",
+      "packageDesc": null,
+      "description": null,
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "WP937EB-CR22-2.6",
+      "mfr": "Kingbright Electronic Co Ltd",
+      "qty": 1500,
+      "dateCode": "H021CA0235-A007",
+      "packageDesc": "REEL",
+      "description": null,
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "XSFP-A-PSLB-0401-QL5",
+      "mfr": "KINNEXA",
+      "qty": 129,
+      "dateCode": "260222",
+      "packageDesc": "REEL",
+      "description": null,
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "LAM-227VOF",
+      "mfr": "KINSWOOD ELECTRONICS CORP",
+      "qty": 907,
+      "dateCode": "210905/211209",
+      "packageDesc": "REEL",
+      "description": null,
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "LM1117LD-ADJ/NOPB",
+      "mfr": "Texas Instruments",
+      "qty": 995,
+      "dateCode": "1840",
+      "packageDesc": "REEL",
+      "description": null,
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "TPS54622RHLT",
+      "mfr": "Texas Instruments",
+      "qty": 235,
+      "dateCode": "1701",
+      "packageDesc": "REEL",
+      "description": null,
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "PI4MSD5V9540BZEEX",
+      "mfr": "Pericom",
+      "qty": 241,
+      "dateCode": "2017",
+      "packageDesc": "REEL",
+      "description": null,
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "74LC2G06GW",
+      "mfr": "Nexperia",
+      "qty": 2597,
+      "dateCode": "9d2205",
+      "packageDesc": "REEL",
+      "description": null,
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "1PB330LA-E3/5AT",
+      "mfr": "Diodes Incorporated",
+      "qty": 489,
+      "dateCode": "2136",
+      "packageDesc": null,
+      "description": null,
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "2187605-1",
+      "mfr": "TE Connectivity Ltd",
+      "qty": 126,
+      "dateCode": "21404",
+      "packageDesc": "REEL",
+      "description": null,
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "B330A-13-F",
+      "mfr": "Diodes Incorporated",
+      "qty": 20000,
+      "dateCode": "44695",
+      "packageDesc": "REEL",
+      "description": null,
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "C0402C0G500-150JNE",
+      "mfr": "Venkel",
+      "qty": 143400,
+      "dateCode": "1903",
+      "packageDesc": "TRAY",
+      "description": null,
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "WP937EB-CR22-2.6",
+      "mfr": "Kingbright Electronic Co Ltd",
+      "qty": 2216,
+      "dateCode": "L8373111EM8",
+      "packageDesc": "REEL",
+      "description": null,
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "TPS252DBVR-1",
+      "mfr": "Texas Instruments",
+      "qty": 278,
+      "dateCode": "D2224",
+      "packageDesc": null,
+      "description": null,
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "XAL5030-332MEC",
+      "mfr": "Coilcraft Inc",
+      "qty": 4636,
+      "dateCode": "2017",
+      "packageDesc": "PACKET",
+      "description": null,
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "1P74LVC2G06GW,125",
+      "mfr": "Nexperia",
+      "qty": 488,
+      "dateCode": "9D2446",
+      "packageDesc": null,
+      "description": null,
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "TPS54622RHLT",
+      "mfr": "Texas Instruments",
+      "qty": 1250,
+      "dateCode": "2126",
+      "packageDesc": "REEL",
+      "description": null,
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "MSCDRI-3D23NP-4R7Y-RT",
+      "mfr": "MAG LAYERS USA INC",
+      "qty": 4950,
+      "dateCode": "B220S74",
+      "packageDesc": "REEL",
+      "description": null,
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "1P61083-123502LF",
+      "mfr": "Fci",
+      "qty": 450,
+      "dateCode": "1D17JAN23",
+      "packageDesc": "REEL",
+      "description": null,
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "LQW15AN2N7C00D",
+      "mfr": "Murata",
+      "qty": 8639,
+      "dateCode": "20220920",
+      "packageDesc": "REEL",
+      "description": null,
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "04025C222KAT2A",
+      "mfr": "AVX Corporation",
+      "qty": 5977,
+      "dateCode": "9D1848",
+      "packageDesc": null,
+      "description": null,
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "CL10B224KA8NNNC",
+      "mfr": "Samsung",
+      "qty": 2088,
+      "dateCode": "1748",
+      "packageDesc": null,
+      "description": null,
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "IR3897MTRPBF",
+      "mfr": "International Rectifier",
+      "qty": 45,
+      "dateCode": "2145",
+      "packageDesc": null,
+      "description": null,
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "74LVC2G06GW",
+      "mfr": "Nexperia",
+      "qty": 89,
+      "dateCode": "9D1914",
+      "packageDesc": null,
+      "description": null,
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "B330A-13-F",
+      "mfr": "Diodes Incorporated",
+      "qty": 862,
+      "dateCode": "11/29/2021",
+      "packageDesc": null,
+      "description": null,
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "CL10B224KA8NNNC",
+      "mfr": "Samsung",
+      "qty": 184000,
+      "dateCode": "1748",
+      "packageDesc": "REEL",
+      "description": null,
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "1PRM TMK105 B7472KV-F",
+      "mfr": "Taiyo Yuden Co Ltd",
+      "qty": 9850,
+      "dateCode": "12D20170914",
+      "packageDesc": null,
+      "description": null,
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "MBCAB0606304R7MQ1",
+      "mfr": "Chilisin",
+      "qty": 722,
+      "dateCode": "44813",
+      "packageDesc": "REEL",
+      "description": null,
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "CL10A106MQ8NNNC",
+      "mfr": "Samsung",
+      "qty": 4000,
+      "dateCode": "2143",
+      "packageDesc": "REEL",
+      "description": null,
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "LM1117LD-ADJ/NOPB",
+      "mfr": "Texas Instruments",
+      "qty": 3000,
+      "dateCode": "L2233530EM2",
+      "packageDesc": "REEL",
+      "description": null,
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "LQW15AN2N7C00D",
+      "mfr": "Murata",
+      "qty": 5483,
+      "dateCode": "22020920",
+      "packageDesc": null,
+      "description": null,
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "GRM32EC80J107ME20L",
+      "mfr": "Murata",
+      "qty": 196,
+      "dateCode": "20220517",
+      "packageDesc": null,
+      "description": null,
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "APG1608L-DL24",
+      "mfr": "Kingbright Electronic Co Ltd",
+      "qty": 4000,
+      "dateCode": null,
+      "packageDesc": "REEL",
+      "description": null,
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "SI4497DY-T1-GE3",
+      "mfr": "Vishay Intertechnology Inc",
+      "qty": 5000,
+      "dateCode": "2202",
+      "packageDesc": "REEL",
+      "description": null,
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "1PXZMG53W-2",
+      "mfr": "Kingbright Electronic Co Ltd",
+      "qty": 47,
+      "dateCode": "2223",
+      "packageDesc": null,
+      "description": null,
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "GRM033R60J473KE19D",
+      "mfr": "Murata",
+      "qty": 93084,
+      "dateCode": "20170408",
+      "packageDesc": "REEL",
+      "description": null,
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "172708",
+      "mfr": "Alpha Company Ltd",
+      "qty": 29384,
+      "dateCode": "020622",
+      "packageDesc": "TRAY",
+      "description": null,
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "GRM32EC80J107ME20L",
+      "mfr": "Murata",
+      "qty": 5000,
+      "dateCode": "20220614",
+      "packageDesc": "REEL",
+      "description": null,
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "203341-0002",
+      "mfr": "Molex LLC",
+      "qty": 24,
+      "dateCode": "2147",
+      "packageDesc": "REEL",
+      "description": null,
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "UPZ1608U471-1E5TF",
+      "mfr": "SUNLORD",
+      "qty": 32000,
+      "dateCode": "44914",
+      "packageDesc": "REEL",
+      "description": null,
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "1P61083-123502LF",
+      "mfr": "Fci",
+      "qty": 2250,
+      "dateCode": "1D21FEB23",
+      "packageDesc": "REEL",
+      "description": null,
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "04025C222KAT2A",
+      "mfr": "AVX Corporation",
+      "qty": 270000,
+      "dateCode": "9D1848",
+      "packageDesc": "REEL",
+      "description": null,
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "0402YC153KAT2A",
+      "mfr": "AVX Corporation",
+      "qty": 12933,
+      "dateCode": "9D2011",
+      "packageDesc": "REEL",
+      "description": null,
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "74LVCG06GW,125",
+      "mfr": "Nexperia",
+      "qty": 996,
+      "dateCode": "9d2152",
+      "packageDesc": null,
+      "description": null,
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "GRM32EC80J107ME20L",
+      "mfr": "Murata",
+      "qty": 3000,
+      "dateCode": "20220217",
+      "packageDesc": "REEL",
+      "description": null,
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "B330A-13-F",
+      "mfr": "Diodes Incorporated",
+      "qty": 3430,
+      "dateCode": "44807",
+      "packageDesc": "REEL",
+      "description": null,
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "SI4497DY-T1-GE3VIS-HK2500",
+      "mfr": "Vishay Intertechnology Inc",
+      "qty": 2500,
+      "dateCode": "R44Y019.1",
+      "packageDesc": "REEL",
+      "description": null,
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "1PXZMG53W-2",
+      "mfr": "Kingbright Electronic Co Ltd",
+      "qty": 914,
+      "dateCode": "2239",
+      "packageDesc": null,
+      "description": null,
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "LM1117LD-ADJ/NOPB",
+      "mfr": "Texas Instruments",
+      "qty": 650,
+      "dateCode": "D1840",
+      "packageDesc": "REEL",
+      "description": null,
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "V086127DEC2022",
+      "mfr": "Fci",
+      "qty": 391,
+      "dateCode": "1D21JAN22",
+      "packageDesc": "REEL",
+      "description": null,
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "1P04025C222KAT2A",
+      "mfr": "AVX Corporation",
+      "qty": 3482,
+      "dateCode": "10D1822",
+      "packageDesc": null,
+      "description": null,
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "GRM32EC80J107ME20L",
+      "mfr": "Murata",
+      "qty": 19,
+      "dateCode": "20220517",
+      "packageDesc": null,
+      "description": null,
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "GRM32EC80J107ME20L",
+      "mfr": "Murata",
+      "qty": 6000,
+      "dateCode": "20220726",
+      "packageDesc": "REEL",
+      "description": null,
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "1PXZMG53W-2",
+      "mfr": "Kingbright Electronic Co Ltd",
+      "qty": 18,
+      "dateCode": "9D2239",
+      "packageDesc": null,
+      "description": null,
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "GRM32EC80J107ME20L",
+      "mfr": "Murata",
+      "qty": 321,
+      "dateCode": "20220517",
+      "packageDesc": null,
+      "description": null,
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "UPZ1608U471-1R5TF",
+      "mfr": "SUNLORD",
+      "qty": 965,
+      "dateCode": "2022-10-190",
+      "packageDesc": null,
+      "description": null,
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "1PRC0402FR-07806RL",
+      "mfr": "Yageo Corp",
+      "qty": 1210,
+      "dateCode": "2211",
+      "packageDesc": null,
+      "description": null,
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "1PNMC0402X7R472K25TRPF",
+      "mfr": "Taiyo Yuden Co Ltd",
+      "qty": 10000,
+      "dateCode": "1704",
+      "packageDesc": null,
+      "description": null,
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "IRF8910TRPBF",
+      "mfr": "Infineon Technologies",
+      "qty": 1340,
+      "dateCode": "1801",
+      "packageDesc": "REEL",
+      "description": null,
+      "moq": null,
+      "spq": null
+    }
+  ]
+}

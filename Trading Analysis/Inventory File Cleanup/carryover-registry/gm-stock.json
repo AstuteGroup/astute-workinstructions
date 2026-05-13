@@ -1,0 +1,198 @@
+{
+  "label": "GM Stock",
+  "sourceOfferIdAtMigration": 1026219,
+  "migrationTimestamp": "2026-05-13T01:41:01.950Z",
+  "lineCount": 19,
+  "lines": [
+    {
+      "mpn": "74HCT4851PW/S400",
+      "mfr": "Nexperia",
+      "qty": 2500,
+      "dateCode": null,
+      "packageDesc": null,
+      "description": null,
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "BAS321-Q",
+      "mfr": "Nexperia",
+      "qty": 27000,
+      "dateCode": null,
+      "packageDesc": null,
+      "description": null,
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "BAV70,215",
+      "mfr": "Nexperia",
+      "qty": 450000,
+      "dateCode": null,
+      "packageDesc": null,
+      "description": null,
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "BC807-25-QR",
+      "mfr": "Nexperia",
+      "qty": 441000,
+      "dateCode": null,
+      "packageDesc": null,
+      "description": null,
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "BC807-40,215",
+      "mfr": "Nexperia",
+      "qty": 150000,
+      "dateCode": null,
+      "packageDesc": null,
+      "description": null,
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "BC817-40-Q",
+      "mfr": "Nexperia",
+      "qty": 20000,
+      "dateCode": null,
+      "packageDesc": null,
+      "description": null,
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "BSS138P,215",
+      "mfr": "Nexperia",
+      "qty": 9000,
+      "dateCode": null,
+      "packageDesc": null,
+      "description": null,
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "BUK9Y29-40E,115",
+      "mfr": "Nexperia",
+      "qty": 28500,
+      "dateCode": null,
+      "packageDesc": null,
+      "description": null,
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "BZX384-C15-Q",
+      "mfr": "Nexperia",
+      "qty": 120000,
+      "dateCode": null,
+      "packageDesc": null,
+      "description": null,
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "BZX585-C5V1",
+      "mfr": "Nexperia",
+      "qty": 150000,
+      "dateCode": null,
+      "packageDesc": null,
+      "description": null,
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "BZX585-C5V1,115",
+      "mfr": "Nexperia",
+      "qty": 33000,
+      "dateCode": null,
+      "packageDesc": null,
+      "description": null,
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "NLVVHC1G32DFT2G",
+      "mfr": "On Semiconductor",
+      "qty": 108000,
+      "dateCode": null,
+      "packageDesc": null,
+      "description": null,
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "PDZ9.1B,115",
+      "mfr": "Nexperia",
+      "qty": 24000,
+      "dateCode": null,
+      "packageDesc": null,
+      "description": null,
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "PMEG4010ETR",
+      "mfr": "Nexperia",
+      "qty": 63000,
+      "dateCode": null,
+      "packageDesc": null,
+      "description": null,
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "PMEG4010ETR-Q",
+      "mfr": "Nexperia",
+      "qty": 240000,
+      "dateCode": null,
+      "packageDesc": null,
+      "description": null,
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "PTVS20VS1UR,115",
+      "mfr": "Nexperia",
+      "qty": 51000,
+      "dateCode": null,
+      "packageDesc": null,
+      "description": null,
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "SBC846BLT1G",
+      "mfr": "On Semiconductor",
+      "qty": 516000,
+      "dateCode": null,
+      "packageDesc": null,
+      "description": null,
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "SBC846BLT3G",
+      "mfr": "On Semiconductor",
+      "qty": 60000,
+      "dateCode": null,
+      "packageDesc": null,
+      "description": null,
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "SZMMBZ18VALT1G",
+      "mfr": "On Semiconductor",
+      "qty": 135000,
+      "dateCode": null,
+      "packageDesc": null,
+      "description": null,
+      "moq": null,
+      "spq": null
+    }
+  ]
+}

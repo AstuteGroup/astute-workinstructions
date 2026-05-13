@@ -510,52 +510,73 @@ Failures are isolated per group: a single bad line is reported in the email summ
 
 ### Static Carryovers (manual-add inventory)
 
-Some inventory lives outside the weekly Infor export but still needs to be marketed in OT and on NetComponents — open POs awaiting receipt, won lot bids being staged, gifted/consigned stock not tracked in Infor warehouses. The `STATIC_CARRYOVER_OFFERS` constant in `inventory_cleanup.js` is the registry for these. Each weekly run **deactivates the prior carryover offer and writes a fresh copy** so the Created date stays current (consumers like Vortex Matches filter on age).
+Some inventory lives outside the weekly Infor export but still needs to be marketed in OT and on NetComponents — open POs awaiting receipt, won lot bids being staged, gifted/consigned stock not tracked in Infor warehouses. The `STATIC_CARRYOVER_OFFERS` constant in `inventory_cleanup.js` is the registry for these. Two operating models, distinguished by whether the carryover has a paired Infor warehouse:
 
-**Live entries (verified 2026-05-07):**
+#### Unified-offer model (paired-warehouse entries — 2026-05-12)
 
-| Label | Bootstrap ID | Paired Infor Warehouse(s) | Notes |
-|---|---|---|---|
-| `Eaton Consignment` | 1024798 | W117 | Auto-retire as Eaton stock arrives. Infor's W117 MFR tag is unreliable — `reconcileCarryover` treats MFR mismatches as informational, not blocking. See `project_chuboe_warehouse_group_unreliable.md`. |
-| `Free Stock - Philippines` | 1025258 | W109, W114 | W109/W114 currently empty in Infor (verified 2026-05-07). Carryover holds 195 lines as a manual-add. Pairing is in place so when stock physically returns to W109/W114, matching MPNs auto-retire from carryover at the 95% qty threshold. |
-| `LAM Consignment` | 1026158 | W118 | Seeded 2026-04-22 from POV0071878 master static (103 MPNs / $2.14M). Auto-retire as LAM stock arrives in W118. |
-| `GM Stock` | 1026173 | *(none — no Infor pairing)* | Bootstrapped 2026-04-28 from Josh Pucci's `Ready To Ship - GM GP 11.14.25.xlsx` (19 MPNs / 2,628,000 pcs Nexperia + Onsemi). Posted under Astute Electronics Inc → Stock - Austin Warehouse. Propagates forward as-is until manually retired. |
+For carryovers with `mergeIntoGroup`, the static seed lives in `carryover-registry/{slug}.json` (file-backed, gitignored from `node_modules` but tracked in this repo) and is **merged into the matching `WAREHOUSE_WRITEBACK` group's weekly Weekly inventory offer**. Buyers see one offer per group containing both Infor-live stock and not-yet-received static-seed lines. **No separate `[Carryover]` offer exists in OT for these entries.**
 
-**Lifecycle per carryover (Step 5b):**
+Merge semantics: per group, build the line set as Infor rows + (registry lines, post-reconciliation, deduped by `mpn_clean` — **Infor wins** on clash). Each static-seed line carries `description: "[static-seed] ..."` so the origin is visible in OT.
 
-1. **Bootstrap** — first ever load is a manual `apiPost` against `chuboe_offer` + lines, capturing the new `chuboe_offer_id` as `bootstrapId` in the registry. After the first weekly refresh lands, `bootstrapId` becomes irrelevant — subsequent runs find the offer by description prefix `[Carryover] {label}`.
-2. **Weekly refresh** — `refreshStaticCarryoverOffers` reads the prior week's lines, deactivates the offer, posts a fresh `chuboe_offer` with description `[Carryover] {label} — refreshed YYYY-MM-DD` and the same lines (minus any retired in step 3 below).
-3. **Paired-warehouse reconciliation** — for entries with `pairedWarehouses`, `reconcileCarryover` compares each carryover MPN against this week's qty in the paired warehouse(s):
-   - `infoQty ≥ 0.95 × carryoverQty` → MPN **retired** from next week's carryover (assumed received). Threshold absorbs minor lot drift.
-   - `0 < infoQty < 0.95 × carryoverQty` → MPN **flagged** for operator review (partial receipt, surfaced in `carryover_overlap_*.csv`).
-   - `infoQty = 0` or MPN absent from paired warehouse → kept on carryover unchanged.
-4. **Portal append** — Step 5d appends the (post-reconciliation) carryover lines to `Netcomponents 1167233 MM-DD.csv` so the non-authorized portal CSV reflects total marketable stock = OT live offers + carryovers.
+#### Standalone model (un-paired entries)
+
+For carryovers without `mergeIntoGroup`, the seed lives in an OT `[Carryover] {label}` offer and is refreshed weekly by `refreshStaticCarryoverOffers` (deactivate prior, write fresh). Lines also append to the NetComponents portal CSV via Step 5d.
+
+**Live entries:**
+
+| Label | Model | Registry Slug | Paired Infor Warehouse(s) | Notes |
+|---|---|---|---|---|
+| `Eaton Consignment` | unified | `eaton-consignment` | W117 | Auto-retire as Eaton stock arrives. Infor's W117 MFR tag is unreliable — `reconcileCarryover` treats MFR mismatches as informational, not blocking. See `project_chuboe_warehouse_group_unreliable.md`. |
+| `Free Stock - Philippines` | unified | `free-stock-philippines` | W109, W114 | W109/W114 currently empty in Infor (verified 2026-05-07). Registry holds 195 lines. Pairing is in place so when stock physically returns to W109/W114, matching MPNs are deduped out at the 95% qty threshold. |
+| `LAM Consignment` | unified | `lam-consignment` | W118 | Seeded 2026-04-22 from POV0071878 master static (103 MPNs / $2.14M). Deduped out as LAM stock arrives in W118. |
+| `GM Stock` | standalone (OT-backed) | `gm-stock` (extracted, not yet active) | *(none — no Infor pairing)* | Bootstrapped 2026-04-28 from Josh Pucci's `Ready To Ship - GM GP 11.14.25.xlsx` (19 MPNs / 2,628,000 pcs Nexperia + Onsemi). Posted under Astute Electronics Inc → Stock - Austin Warehouse. Stays as standalone `[Carryover]` offer (no paired warehouse). |
+
+**Lifecycle per unified entry:**
+
+1. **Bootstrap** — `manage-carryover.js bootstrap --label … --csv … --merge-into-group <GroupName> --slug <slug>` writes the registry JSON. Add the entry to `STATIC_CARRYOVER_OFFERS` with `mergeIntoGroup` set.
+2. **Weekly merge (Step 4.6 + Step 5)** — `prepareCarryoverSupplements` reads the registry, runs `reconcileCarryover` against this week's paired-warehouse rows, returns supplements per group. `writeInventoryToOT` merges these into the per-group write (Infor wins on MPN clash).
+3. **Step 5b cleanup** — for `mergeIntoGroup` entries, `refreshStaticCarryoverOffers` runs an orphan check + deactivate against any historical `[Carryover] {label}` offer (one-time migration cleanup; subsequent runs are no-ops for these).
+4. **Reconciliation** — Infor `qty ≥ 0.95 × registry qty` removes the line from the merge; under threshold flags it as partial. MFR mismatch is informational only.
+
+**Lifecycle per standalone entry (GM Stock):**
+
+1. **Bootstrap** — `manage-carryover.js bootstrap --label … --csv … --bp … --offer-type …` writes the `[Carryover]` offer in OT.
+2. **Weekly refresh** — `refreshStaticCarryoverOffers` reads the prior `[Carryover]` offer's lines, deactivates it, posts a fresh one with description `[Carryover] {label} — refreshed YYYY-MM-DD`.
+3. **Portal append** — Step 5d appends the lines to `Netcomponents 1167233 MM-DD.csv`.
 
 **MFR comparison during reconciliation** uses `shared/mfr-equivalence.js` (alias + acquisition aware), but Infor warehouse-tag MFR is known unreliable across the consignment warehouses, so a MFR mismatch alone never blocks retirement — it only annotates the overlap CSV.
 
-**Carryover lifecycle CLI (canonical entry point):** `manage-carryover.js` — one tool for bootstrap, add, retire, and list across any label. CSV-driven for bulk operations, label-agnostic, audit-logged.
+**Carryover lifecycle CLI (canonical entry point):** `manage-carryover.js` — one tool for bootstrap, add, retire, and list across any label. CSV-driven for bulk operations, label-agnostic, audit-logged. **The CLI dispatches automatically**: labels registered with `mergeIntoGroup` operate against the JSON registry; labels without it operate against the OT `[Carryover]` offer.
 
 ```bash
-# Bootstrap a brand-new carryover (replaces per-label bootstrap_*.js scripts)
+# Unified entry (paired warehouse) — bootstrap into the JSON registry
 node manage-carryover.js bootstrap --label "GE Consignment" \
-     --csv ge-bootstrap.csv --bp 1003001 --offer-type 1000004 \
+     --csv ge-bootstrap.csv --slug ge-consignment --merge-into-group GE_Consignment \
      --paired W103 --portal "Astute Electronics Inc. - GE (Carryover)" \
      [--dry-run]
 
-# Extend an existing carryover with new lines (idempotent on MPN+DateCode)
+# Standalone entry (un-paired) — bootstrap as OT `[Carryover]` offer
+node manage-carryover.js bootstrap --label "GM Stock" \
+     --csv gm-bootstrap.csv --bp 1000332 --offer-type 1000008 \
+     --portal "Astute Electronics Inc. - GM Stock" \
+     [--dry-run]
+
+# Extend an existing carryover with new lines (idempotent on MPN+DateCode).
+# Auto-routes to JSON or OT based on whether the label has mergeIntoGroup.
 node manage-carryover.js add --label "Eaton Consignment" --csv additions.csv [--dry-run]
 
-# Retire one or more MPNs (defense-in-depth: also retires on bootstrap offer if registry has the label)
-node manage-carryover.js retire --label "Eaton Consignment" \
+# Retire one or more MPNs. For unified entries: filters the JSON registry.
+# For standalone: deactivates lines on the [Carryover] offer (+ bootstrap defense-in-depth).
+node manage-carryover.js retire --label "LAM Consignment" \
      --mpns PMV450ENEAR,XYZ123 --reason "physical in Austin" [--dry-run]
 
-# Inspect current state
-node manage-carryover.js list --label "Eaton Consignment"
+# Inspect current state (reads JSON for unified, OT for standalone)
+node manage-carryover.js list --label "LAM Consignment"
 ```
 
 CSV schema (bootstrap & add, headers case-insensitive): required `MPN, MFR, Qty`; optional `DateCode, PackageDesc, Price, MOQ, SPQ, LineDescription`.
 
-Audit log: every bootstrap/add/retire appends to `carryover-audit.csv` (this folder). Git-tracked record of what changed when, by whom, and why.
+Audit log: every bootstrap/add/retire appends to `carryover-audit.csv` (this folder). Git-tracked record of what changed when, by whom, and why. Actions are tagged `bootstrap-file` / `add-file` / `retire-file` for unified entries; `bootstrap` / `add` / `retire` for standalone.
 
 **Adding a carryover entry:**
 

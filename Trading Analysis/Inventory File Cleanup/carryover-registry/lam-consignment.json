@@ -1,0 +1,1038 @@
+{
+  "label": "LAM Consignment",
+  "sourceOfferIdAtMigration": 1026264,
+  "migrationTimestamp": "2026-05-13T01:40:59.851Z",
+  "lineCount": 103,
+  "lines": [
+    {
+      "mpn": "EP3C120F484I7N",
+      "mfr": "INTEL/ALTERA",
+      "qty": 3467,
+      "dateCode": null,
+      "packageDesc": null,
+      "description": null,
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "EPCS64SI16N",
+      "mfr": "INTEL/ALTERA",
+      "qty": 4337,
+      "dateCode": null,
+      "packageDesc": null,
+      "description": null,
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "C1825C0G501-103JNE",
+      "mfr": "Venkel",
+      "qty": 134000,
+      "dateCode": null,
+      "packageDesc": null,
+      "description": null,
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "5055558-4",
+      "mfr": "TE Connectivity Ltd",
+      "qty": 5135,
+      "dateCode": null,
+      "packageDesc": null,
+      "description": null,
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "V48C12C150BL",
+      "mfr": "Vicor Corp",
+      "qty": 253,
+      "dateCode": null,
+      "packageDesc": null,
+      "description": null,
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "V48C12C75BL",
+      "mfr": "Vicor Corp",
+      "qty": 152,
+      "dateCode": null,
+      "packageDesc": null,
+      "description": null,
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "V72C12C150BL",
+      "mfr": "Vicor Corp",
+      "qty": 151,
+      "dateCode": null,
+      "packageDesc": null,
+      "description": null,
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "S36SE12002PRFZ",
+      "mfr": "Delta Electronics",
+      "qty": 1384,
+      "dateCode": null,
+      "packageDesc": null,
+      "description": null,
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "FAN73611MX",
+      "mfr": "On Semiconductor",
+      "qty": 33000,
+      "dateCode": null,
+      "packageDesc": null,
+      "description": null,
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "KUHP-11D17-24",
+      "mfr": "TE Connectivity Ltd",
+      "qty": 458,
+      "dateCode": null,
+      "packageDesc": null,
+      "description": null,
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "ACS756KCB-050B-PFF-T",
+      "mfr": "Allegro Microsystems LLC",
+      "qty": 4079,
+      "dateCode": null,
+      "packageDesc": null,
+      "description": null,
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "MOX93021004FVE",
+      "mfr": "Ohmite",
+      "qty": 756,
+      "dateCode": null,
+      "packageDesc": null,
+      "description": null,
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "1410-L110-L1F1-S01-4A",
+      "mfr": "E-T-A Engineering Technology",
+      "qty": 523,
+      "dateCode": null,
+      "packageDesc": null,
+      "description": null,
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "PTMA402050A1AZ",
+      "mfr": "Texas Instruments",
+      "qty": 736,
+      "dateCode": null,
+      "packageDesc": null,
+      "description": null,
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "350711-4",
+      "mfr": "TE Connectivity Ltd",
+      "qty": 6944,
+      "dateCode": null,
+      "packageDesc": null,
+      "description": null,
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "BIFILAR1.16E-3MH",
+      "mfr": "TBD",
+      "qty": 104,
+      "dateCode": null,
+      "packageDesc": null,
+      "description": null,
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "100E680JMN3600XT",
+      "mfr": "American Technical Ceramics Corp",
+      "qty": 273,
+      "dateCode": null,
+      "packageDesc": null,
+      "description": null,
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "CBD7W2F37S600X",
+      "mfr": "Amphenol Corp",
+      "qty": 944,
+      "dateCode": null,
+      "packageDesc": null,
+      "description": null,
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "RT0805BRD072K37L",
+      "mfr": "Yageo Corp",
+      "qty": 9918,
+      "dateCode": null,
+      "packageDesc": null,
+      "description": null,
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "PTMA403033A1AZ",
+      "mfr": "Texas Instruments",
+      "qty": 382,
+      "dateCode": null,
+      "packageDesc": null,
+      "description": null,
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "DIN-096CSC-S3L-HM",
+      "mfr": "3M",
+      "qty": 1065,
+      "dateCode": null,
+      "packageDesc": null,
+      "description": null,
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "66461-9",
+      "mfr": "TE Connectivity Ltd",
+      "qty": 7590,
+      "dateCode": null,
+      "packageDesc": null,
+      "description": null,
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "747842-4",
+      "mfr": "TE Connectivity Ltd",
+      "qty": 740,
+      "dateCode": null,
+      "packageDesc": null,
+      "description": null,
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "AGN20024",
+      "mfr": "Panasonic",
+      "qty": 4786,
+      "dateCode": null,
+      "packageDesc": null,
+      "description": null,
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "UV-035DQ",
+      "mfr": "Advanced Photonix Inc",
+      "qty": 101,
+      "dateCode": null,
+      "packageDesc": null,
+      "description": null,
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "39-28-1163",
+      "mfr": "Molex LLC",
+      "qty": 5876,
+      "dateCode": null,
+      "packageDesc": null,
+      "description": null,
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "IRFB4321PBF",
+      "mfr": "Infineon Technologies",
+      "qty": 3522,
+      "dateCode": null,
+      "packageDesc": null,
+      "description": null,
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "OPA830IDR",
+      "mfr": "Texas Instruments",
+      "qty": 3224,
+      "dateCode": null,
+      "packageDesc": null,
+      "description": null,
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "350428-4",
+      "mfr": "TE Connectivity Ltd",
+      "qty": 3597,
+      "dateCode": null,
+      "packageDesc": null,
+      "description": null,
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "2056-440-N",
+      "mfr": "Raf Electronics Hardware",
+      "qty": 2288,
+      "dateCode": null,
+      "packageDesc": null,
+      "description": null,
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "PTMA402050P2AS",
+      "mfr": "Texas Instruments",
+      "qty": 147,
+      "dateCode": null,
+      "packageDesc": null,
+      "description": null,
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "104M06QC22",
+      "mfr": "CORNELL DUBILIER / KNOWLES",
+      "qty": 748,
+      "dateCode": null,
+      "packageDesc": null,
+      "description": null,
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "561R10TCCT12",
+      "mfr": "Vishay Intertechnology Inc",
+      "qty": 4887,
+      "dateCode": null,
+      "packageDesc": null,
+      "description": null,
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "RT0805BRD072K55L",
+      "mfr": "Yageo Corp",
+      "qty": 5007,
+      "dateCode": null,
+      "packageDesc": null,
+      "description": null,
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "PCF0J221MCL1GS",
+      "mfr": "Nichicon Corp",
+      "qty": 5032,
+      "dateCode": null,
+      "packageDesc": null,
+      "description": null,
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "208721-1",
+      "mfr": "TE Connectivity Ltd",
+      "qty": 109,
+      "dateCode": null,
+      "packageDesc": null,
+      "description": null,
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "10EOP",
+      "mfr": "TE Connectivity Ltd",
+      "qty": 205,
+      "dateCode": null,
+      "packageDesc": null,
+      "description": null,
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "SR307C104KARTR1",
+      "mfr": "AVX Corporation",
+      "qty": 2144,
+      "dateCode": null,
+      "packageDesc": null,
+      "description": null,
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "PF480D25",
+      "mfr": "Sensata",
+      "qty": 87,
+      "dateCode": null,
+      "packageDesc": null,
+      "description": null,
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "50348563",
+      "mfr": "Molex LLC",
+      "qty": 2946,
+      "dateCode": null,
+      "packageDesc": null,
+      "description": null,
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "TPS3802K33DCKR",
+      "mfr": "Texas Instruments",
+      "qty": 4132,
+      "dateCode": null,
+      "packageDesc": null,
+      "description": null,
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "3005W5PXX49E40X",
+      "mfr": "CONEC Elektronische Bauelemente GmbH",
+      "qty": 222,
+      "dateCode": null,
+      "packageDesc": null,
+      "description": null,
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "RC0805FR-0720RL",
+      "mfr": "Yageo Corp",
+      "qty": 10000,
+      "dateCode": null,
+      "packageDesc": null,
+      "description": null,
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "RT0805BRD071K87L",
+      "mfr": "Yageo Corp",
+      "qty": 10071,
+      "dateCode": null,
+      "packageDesc": null,
+      "description": null,
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "0452001.NRL",
+      "mfr": "Littelfuse Inc",
+      "qty": 4795,
+      "dateCode": null,
+      "packageDesc": null,
+      "description": null,
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "RG2012P-2101-B-T5",
+      "mfr": "Susumu Co Ltd",
+      "qty": 16067,
+      "dateCode": null,
+      "packageDesc": null,
+      "description": null,
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "747840-4",
+      "mfr": "TE Connectivity Ltd",
+      "qty": 750,
+      "dateCode": null,
+      "packageDesc": null,
+      "description": null,
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "HSTTK06-48-Q",
+      "mfr": "Panduit",
+      "qty": 1153,
+      "dateCode": null,
+      "packageDesc": null,
+      "description": null,
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "FP-301 3/4IN CR 200",
+      "mfr": "3M",
+      "qty": 4268,
+      "dateCode": null,
+      "packageDesc": null,
+      "description": null,
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "B32933A3105M000",
+      "mfr": "TDK Corp",
+      "qty": 4323,
+      "dateCode": null,
+      "packageDesc": null,
+      "description": null,
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "KE15L",
+      "mfr": "Murata",
+      "qty": 19520,
+      "dateCode": null,
+      "packageDesc": null,
+      "description": null,
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "1001224",
+      "mfr": "SCS",
+      "qty": 2174,
+      "dateCode": null,
+      "packageDesc": null,
+      "description": null,
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "5747845-4",
+      "mfr": "TE Connectivity Ltd",
+      "qty": 520,
+      "dateCode": null,
+      "packageDesc": null,
+      "description": null,
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "34.81.7.024.9024",
+      "mfr": "Finder",
+      "qty": 52,
+      "dateCode": null,
+      "packageDesc": null,
+      "description": null,
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "RN55D4993FRE6",
+      "mfr": "Vishay Intertechnology Inc",
+      "qty": 5000,
+      "dateCode": null,
+      "packageDesc": null,
+      "description": null,
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "BFC237042103",
+      "mfr": "Vishay Intertechnology Inc",
+      "qty": 2000,
+      "dateCode": null,
+      "packageDesc": null,
+      "description": null,
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "MT25QL128ABA8ESF-0AATTR",
+      "mfr": "Micron Technology Inc",
+      "qty": 1000,
+      "dateCode": null,
+      "packageDesc": null,
+      "description": null,
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "2970442",
+      "mfr": "Phoenix Contact",
+      "qty": 786,
+      "dateCode": null,
+      "packageDesc": null,
+      "description": null,
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "3007W2SCR50E20X",
+      "mfr": "CONEC Elektronische Bauelemente GmbH",
+      "qty": 150,
+      "dateCode": null,
+      "packageDesc": null,
+      "description": null,
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "XLH536003.686400I",
+      "mfr": "Renesas Electronics Corp",
+      "qty": 1146,
+      "dateCode": null,
+      "packageDesc": null,
+      "description": null,
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "TP-104-01-00",
+      "mfr": "NIC Components Corp",
+      "qty": 6664,
+      "dateCode": null,
+      "packageDesc": null,
+      "description": null,
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "OD511JE-TR",
+      "mfr": "Ohmite",
+      "qty": 3513,
+      "dateCode": null,
+      "packageDesc": null,
+      "description": null,
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "SSW-117-01-G-D",
+      "mfr": "Samtec",
+      "qty": 627,
+      "dateCode": null,
+      "packageDesc": null,
+      "description": null,
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "N3433-6203RB",
+      "mfr": "3M",
+      "qty": 431,
+      "dateCode": null,
+      "packageDesc": null,
+      "description": null,
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "IRFB4228PBF",
+      "mfr": "Infineon Technologies",
+      "qty": 1000,
+      "dateCode": null,
+      "packageDesc": null,
+      "description": null,
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "208721-1",
+      "mfr": "TE Connectivity Ltd",
+      "qty": 37,
+      "dateCode": null,
+      "packageDesc": null,
+      "description": null,
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "RUEF185",
+      "mfr": "Littelfuse Inc",
+      "qty": 4874,
+      "dateCode": null,
+      "packageDesc": null,
+      "description": null,
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "RC0805FR-072K55L",
+      "mfr": "Yageo Corp",
+      "qty": 5426,
+      "dateCode": null,
+      "packageDesc": null,
+      "description": null,
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "163A16179X",
+      "mfr": "Amphenol Corp",
+      "qty": 164,
+      "dateCode": null,
+      "packageDesc": null,
+      "description": null,
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "SZ-KS16/12N",
+      "mfr": "ABB Ltd",
+      "qty": 255,
+      "dateCode": null,
+      "packageDesc": null,
+      "description": null,
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "-RC",
+      "mfr": "3M",
+      "qty": 3107,
+      "dateCode": null,
+      "packageDesc": null,
+      "description": null,
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "RUEF500",
+      "mfr": "Littelfuse Inc",
+      "qty": 3153,
+      "dateCode": null,
+      "packageDesc": null,
+      "description": null,
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "XLH536020.000000I",
+      "mfr": "Renesas Electronics Corp",
+      "qty": 1388,
+      "dateCode": null,
+      "packageDesc": null,
+      "description": null,
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "OD132JE-TR",
+      "mfr": "Ohmite",
+      "qty": 2368,
+      "dateCode": null,
+      "packageDesc": null,
+      "description": null,
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "TXS2SA-4.5V-Z",
+      "mfr": "Panasonic",
+      "qty": 231,
+      "dateCode": null,
+      "packageDesc": null,
+      "description": null,
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "68602-172HLF",
+      "mfr": "Amphenol Corp",
+      "qty": 529,
+      "dateCode": null,
+      "packageDesc": null,
+      "description": null,
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "THN 30-2411",
+      "mfr": null,
+      "qty": 19,
+      "dateCode": null,
+      "packageDesc": null,
+      "description": null,
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "1-788130-1",
+      "mfr": "TE Connectivity Ltd",
+      "qty": 41,
+      "dateCode": null,
+      "packageDesc": null,
+      "description": null,
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "1C10X7R102K100R",
+      "mfr": "Vishay Intertechnology Inc",
+      "qty": 7433,
+      "dateCode": null,
+      "packageDesc": null,
+      "description": null,
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "RT-DSUB-H-SR-78TCL",
+      "mfr": "Raycon Industries",
+      "qty": 31,
+      "dateCode": null,
+      "packageDesc": null,
+      "description": null,
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "26-60-5120",
+      "mfr": "Molex LLC",
+      "qty": 865,
+      "dateCode": null,
+      "packageDesc": null,
+      "description": null,
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "RN152-6-02-3M9",
+      "mfr": "TE Connectivity Ltd",
+      "qty": 274,
+      "dateCode": null,
+      "packageDesc": null,
+      "description": null,
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "PLV1J220MCL1TD",
+      "mfr": "Nichicon Corp",
+      "qty": 887,
+      "dateCode": null,
+      "packageDesc": null,
+      "description": null,
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "RN732BTTD4992B25",
+      "mfr": "KOA Speer Electronics Inc",
+      "qty": 7419,
+      "dateCode": null,
+      "packageDesc": null,
+      "description": null,
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "LM311N/NOPB",
+      "mfr": "Texas Instruments",
+      "qty": 1067,
+      "dateCode": null,
+      "packageDesc": null,
+      "description": null,
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "DFA6U12S5",
+      "mfr": "Bel power solutions",
+      "qty": 8,
+      "dateCode": null,
+      "packageDesc": null,
+      "description": null,
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "350429-1",
+      "mfr": "TE Connectivity Ltd",
+      "qty": 3304,
+      "dateCode": null,
+      "packageDesc": null,
+      "description": null,
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "OF122JE-TR",
+      "mfr": "Ohmite",
+      "qty": 1376,
+      "dateCode": null,
+      "packageDesc": null,
+      "description": null,
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "D5W5P36A6GX08LF",
+      "mfr": "Amphenol Corp",
+      "qty": 40,
+      "dateCode": null,
+      "packageDesc": null,
+      "description": null,
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "IRF4905STRLPBF",
+      "mfr": "Infineon Technologies",
+      "qty": 790,
+      "dateCode": null,
+      "packageDesc": null,
+      "description": null,
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "RT0805BRD071K96L",
+      "mfr": "Yageo Corp",
+      "qty": 9855,
+      "dateCode": null,
+      "packageDesc": null,
+      "description": null,
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "MCRC1/4G105JT-RH",
+      "mfr": "Multicomp",
+      "qty": 650,
+      "dateCode": null,
+      "packageDesc": null,
+      "description": null,
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "38660-8806",
+      "mfr": "Molex LLC",
+      "qty": 137,
+      "dateCode": null,
+      "packageDesc": null,
+      "description": null,
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "163A16169X",
+      "mfr": "Amphenol Corp",
+      "qty": 125,
+      "dateCode": null,
+      "packageDesc": null,
+      "description": null,
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "68602-172HLF",
+      "mfr": "Amphenol Corp",
+      "qty": 354,
+      "dateCode": null,
+      "packageDesc": null,
+      "description": null,
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "TDE1798DP",
+      "mfr": "STMicroelectronics",
+      "qty": 149,
+      "dateCode": null,
+      "packageDesc": null,
+      "description": null,
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "P1-28-00098-00-12B",
+      "mfr": "N/A",
+      "qty": 241,
+      "dateCode": null,
+      "packageDesc": null,
+      "description": null,
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "28-10029-00",
+      "mfr": "Harting Electronics GmBH & Co KG",
+      "qty": 191,
+      "dateCode": null,
+      "packageDesc": null,
+      "description": null,
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "TDE1798DP",
+      "mfr": "STMicroelectronics",
+      "qty": 15,
+      "dateCode": null,
+      "packageDesc": null,
+      "description": null,
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "29-121975-00",
+      "mfr": "N/A",
+      "qty": 139,
+      "dateCode": null,
+      "packageDesc": null,
+      "description": null,
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "3007W2SCR50E20X",
+      "mfr": "CONEC Elektronische Bauelemente GmbH",
+      "qty": 1,
+      "dateCode": null,
+      "packageDesc": null,
+      "description": null,
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "104M06QC22",
+      "mfr": "CORNELL DUBILIER / KNOWLES",
+      "qty": 2,
+      "dateCode": null,
+      "packageDesc": null,
+      "description": null,
+      "moq": null,
+      "spq": null
+    },
+    {
+      "mpn": "RUEF500",
+      "mfr": "Littelfuse Inc",
+      "qty": 16,
+      "dateCode": null,
+      "packageDesc": null,
+      "description": null,
+      "moq": null,
+      "spq": null
+    }
+  ]
+}
