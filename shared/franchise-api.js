@@ -725,6 +725,7 @@ async function searchAllDistributors(mpn, qty, options = {}) {
     parallel = true, exclude = [], onResult = null,
     cacheTTL = null, cacheBypassIf = null, mfr = null,
     priority = null,
+    cacheOnly = false,
     perDistributorTimeoutMs = DEFAULT_PER_DISTRIBUTOR_TIMEOUT_MS,
   } = options;
   // `mfr` — the searched MFR (typically the RFQ's MFR text). When provided,
@@ -757,6 +758,19 @@ async function searchAllDistributors(mpn, qty, options = {}) {
       // eslint-disable-next-line no-console
       console.error(`[franchise-api] freshness lookup failed for ${mpn}: ${err.message}`);
     }
+  }
+
+  // cacheOnly mode — caller (e.g., large-RFQ gate "YES --cache-only" approval)
+  // wants to skip live API calls entirely. If we got past the cache gate
+  // without returning, there's no fresh envelope. Return an empty-coverage
+  // result so the caller's writer skips this line cleanly.
+  if (cacheOnly) {
+    return {
+      mpn, qty,
+      found: [],
+      distributors: [],
+      summary: { coverage: 'NONE', fromCache: false, cacheOnlyMiss: true },
+    };
   }
 
   const activeDistributors = Object.keys(DISTRIBUTORS)

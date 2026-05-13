@@ -104,30 +104,36 @@ ${details ? `<pre style="background:#f5f5f5;padding:8px;white-space:pre-wrap;fon
  * the sentinel JSON is missing; the operator gets the ack regardless.
  */
 async function action_approve_large_rfq(payload, ctx) {
-  const { rfq_number, max_lines, note } = payload;
+  const { rfq_number, max_lines, cache_only, note } = payload;
   if (ctx.dryRun) {
-    return { dry_run: true, would_approve: { rfq_number, max_lines, note } };
+    return { dry_run: true, would_approve: { rfq_number, max_lines, cache_only, note } };
   }
   const maxLines = Number.isFinite(Number(max_lines)) && Number(max_lines) > 0
     ? Number(max_lines) : null;
+  const cacheOnly = cache_only === true || cache_only === 'true';
   largeRfqGate.markApproved(rfq_number, {
     maxLines,
+    cacheOnly,
     approvedBy: ctx.from || ctx.jakeEmail || 'email',
     note,
   });
-  const capLine = maxLines ? ` (capped at ${maxLines.toLocaleString('en-US')} lines)` : '';
+  const tags = [];
+  if (maxLines) tags.push(`capped at ${maxLines.toLocaleString('en-US')} lines`);
+  if (cacheOnly) tags.push('cache-only (no live API calls)');
+  const tagLine = tags.length ? ` (${tags.join('; ')})` : '';
   const ackHtml = `<html><body style="font-family:Arial,sans-serif;font-size:13px">
-<p>Got it — <b>RFQ ${esc(rfq_number)}</b> approved for enrichment${capLine}.</p>
+<p>Got it — <b>RFQ ${esc(rfq_number)}</b> approved for enrichment${tagLine}.</p>
 <p>The next enrich-poller tick (within 15 min) will pick it up. You'll see it in the standard digest.</p>
+${cacheOnly ? '<p style="color:#666;font-size:12px">Cache-only mode: lines without a recent envelope will be skipped silently — no API spend.</p>' : ''}
 <p style="color:#888;font-size:11px">Sentinel: <code>~/workspace/.large-rfq-pending/${esc(rfq_number)}.cleared</code></p>
 </body></html>`;
   await ctx.notifier.sendEmail(
     ctx.jakeEmail,
-    `[CONFIRMED] Large RFQ ${rfq_number} approved${capLine}`,
+    `[CONFIRMED] Large RFQ ${rfq_number} approved${tagLine}`,
     ackHtml,
     { html: true }
   );
-  return { approved: rfq_number, maxLines };
+  return { approved: rfq_number, maxLines, cacheOnly };
 }
 
 /**

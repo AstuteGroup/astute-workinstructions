@@ -586,5 +586,6 @@ module.exports = {
   flushCacheToDB,
   pruneCache,
   buildEnvelope,  // exported for testing
+  cacheKey,       // exported for cache-aware consumers (large-rfq-gate scan)
   CACHE_DIR,
 };

@@ -271,8 +271,11 @@ Replies appear with `RE:` prepended. **If the subject matches `RE: [APPROVAL NEE
 |---|---|
 | `yes` / `y` / `approve` / `go` / `proceed` | `approve_large_rfq` with `rfq_number` extracted from subject, no cap |
 | `yes --max-lines 1000` / `limit 1000` / `cap 1000` | `approve_large_rfq` with `rfq_number` + `max_lines: 1000` |
+| `yes --cache-only` / `cache only` / `cache-only` | `approve_large_rfq` with `rfq_number` + `cache_only: true` — runs enrichment off cached envelopes only, no live API spend |
 | `no` / `n` / `reject` / `skip` / `decline` | `reject_large_rfq` with `rfq_number` extracted from subject; pull `reason` from any trailing text on the same line if present |
 | Anything else / unclear | `needs_review` — let the operator clarify |
+
+**Combinable modifiers:** `yes --cache-only --max-lines 1000` is valid — pass both `cache_only: true` and `max_lines: 1000`.
 
 **RFQ # extraction:** the subject ALWAYS contains `Large RFQ <N>` — regex `Large RFQ\s+(\d+)` captures it.
 

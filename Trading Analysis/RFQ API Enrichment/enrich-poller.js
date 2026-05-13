@@ -627,6 +627,17 @@ async function main() {
     }
     try {
       const ctx = await largeRfqGate.fetchRFQContext(pool, r.chuboe_rfq_id);
+      // Cache coverage scan — local I/O only, no API calls. Lets the operator
+      // see how much of the spend is unnecessary (cache hits) before they
+      // approve. Adds the YES --cache-only path. Coverage failure must not
+      // block the email send — proceed without the section if it errors.
+      let coverage = null;
+      try {
+        coverage = await largeRfqGate.scanCacheCoverage(pool, r.chuboe_rfq_id);
+        log(`Large-RFQ gate: cache coverage for ${r.rfq_number}: ${coverage.withCache}/${coverage.totalLines} hit (${Math.round(100 * coverage.cacheHitPct)}%), ${coverage.withStock} with stock`);
+      } catch (cerr) {
+        log(`Large-RFQ gate: cache coverage scan failed for ${r.rfq_number}: ${cerr.message}. Sending email without coverage section.`);
+      }
       const sentinel = largeRfqGate.writeSentinel({
         rfq_number: r.rfq_number,
         chuboe_rfq_id: r.chuboe_rfq_id,
@@ -638,7 +649,7 @@ async function main() {
         sample_mpns: ctx.sample_mpns,
         top_mfrs: ctx.top_mfrs,
       });
-      const html = largeRfqGate.renderApprovalEmailHtml(sentinel, ctx, gateThreshold);
+      const html = largeRfqGate.renderApprovalEmailHtml(sentinel, ctx, gateThreshold, coverage);
       const subject = `[APPROVAL NEEDED] Large RFQ ${r.rfq_number} from ${r.customer || '?'} — ${lineMpns.toLocaleString('en-US')} lines`;
       // Send from rfqloading@ so replies land in the inbox polled by the
       // rfq-loading workflow agent (approve_large_rfq / reject_large_rfq
@@ -731,6 +742,10 @@ async function main() {
       if (Number.isFinite(maxLines) && maxLines > 0) {
         enrichOpts.maxLines = maxLines;
         log(`  applying --max-lines cap from approval: ${maxLines}`);
+      }
+      if (r._approval?.cacheOnly === true) {
+        enrichOpts.cacheOnly = true;
+        log(`  applying --cache-only from approval: skipping live API calls, using cached envelopes only`);
       }
       const result = await enrichRFQ(String(r.rfq_number), enrichOpts);
       result._priority = r.priority;

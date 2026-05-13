@@ -127,7 +127,7 @@ async function enrichRFQ(rfqDocNumber, opts = {}) {
     );
   }
 
-  const { dryRun = false, force = false, maxLines = null, onProgress = null, ignorePause = false, priority = null } = opts;
+  const { dryRun = false, force = false, maxLines = null, onProgress = null, ignorePause = false, priority = null, cacheOnly = false } = opts;
   const startedAt = new Date();
 
   const rawRows = await fetchRFQLines(rfqDocNumber);
@@ -314,6 +314,7 @@ async function enrichRFQ(rfqDocNumber, opts = {}) {
         cacheTTL: ttlDays,
         cacheBypassIf,
         priority,
+        cacheOnly,  // when true, skip live API calls; cache miss → no VQ writes for this line
       });
     } catch (err) {
       counters.errors.push({ mpn, cpc, stage: 'search', message: err.message });
@@ -321,6 +322,15 @@ async function enrichRFQ(rfqDocNumber, opts = {}) {
     }
 
     const fromCache = result?.summary?.fromCache === true;
+    const cacheOnlyMiss = result?.summary?.cacheOnlyMiss === true;
+    if (cacheOnlyMiss) {
+      // cacheOnly mode + no fresh envelope → no API call was made, no VQ
+      // will be written. Track separately so the digest can show "X lines
+      // skipped due to cache-only mode, no fresh cache available".
+      counters.cacheOnlyMisses = (counters.cacheOnlyMisses || 0) + 1;
+      counters.noCoverage++;
+      continue;
+    }
     if (fromCache) counters.cacheHits++;
     else counters.apiCalls++;
 

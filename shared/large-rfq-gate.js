@@ -100,6 +100,7 @@ function markApproved(rfqNumber, opts = {}) {
   fs.writeFileSync(clearedPath(rfqNumber), JSON.stringify({
     approved: true,
     maxLines: opts.maxLines || null,
+    cacheOnly: opts.cacheOnly === true,
     approvedAt: new Date().toISOString(),
     approvedBy: opts.approvedBy || null,
     note: opts.note || null,
@@ -206,6 +207,125 @@ async function fetchRFQContext(pool, chuboeRfqId) {
   return ctx;
 }
 
+// ─── CACHE COVERAGE SCAN ─────────────────────────────────────────────────────
+
+/**
+ * Walk the local envelope cache for every line in an RFQ. Pure local I/O —
+ * no franchise API calls. Returns coverage stats + top-N high-value cached
+ * lines so the operator can decide whether to approve the API spend, cap
+ * lines, or run cache-only (skip live calls, just process what's already in
+ * the cache).
+ *
+ * Tradeoff: this reads up to N cache files (one per RFQ MPN that hits the
+ * index). On a 25k-line RFQ with ~30% cache hit rate ≈ 7,500 file reads;
+ * sequential takes 30-60s. Done before the approval email goes out, so the
+ * operator waits for the email — but that's still way cheaper than the live
+ * API spend the gate is protecting against.
+ *
+ * @param {object} pool — pg pool
+ * @param {number} chuboeRfqId
+ * @param {object} opts
+ * @param {number} [opts.maxAgeDays=30] — older cache entries are ignored
+ * @returns {Promise<{totalLines, withCache, withStock, avgCacheAgeDays,
+ *   estApiCallsIfApproved, digikeyQuotaMultiple, topValued: Array}>}
+ */
+async function scanCacheCoverage(pool, chuboeRfqId, opts = {}) {
+  const maxAgeDays = opts.maxAgeDays || 30;
+  const topN = opts.topN || 10;
+  const { cacheKey, CACHE_DIR } = require('./api-result-writer');
+
+  // Build cache index once: Map<normalized-MPN, {file, dateStr, ageDays}>.
+  const cacheIndex = new Map();
+  if (fs.existsSync(CACHE_DIR)) {
+    const today = new Date(); today.setHours(0, 0, 0, 0);
+    for (const f of fs.readdirSync(CACHE_DIR)) {
+      const m = f.match(/^(.+)_(\d{4}-\d{2}-\d{2})\.json$/);
+      if (!m) continue;
+      const mpn = m[1];
+      const dateStr = m[2];
+      const ageDays = Math.floor((today.getTime() - new Date(dateStr).getTime()) / 86400000);
+      if (ageDays > maxAgeDays) continue;
+      const existing = cacheIndex.get(mpn);
+      if (!existing || dateStr > existing.dateStr) {
+        cacheIndex.set(mpn, { file: path.join(CACHE_DIR, f), dateStr, ageDays });
+      }
+    }
+  }
+
+  const { rows: lines } = await pool.query(
+    `SELECT rl.line, rlm.chuboe_mpn_clean AS mpn, rl.qty
+       FROM adempiere.chuboe_rfq_line rl
+       JOIN adempiere.chuboe_rfq_line_mpn rlm
+         ON rlm.chuboe_rfq_line_id = rl.chuboe_rfq_line_id AND rlm.isactive='Y'
+      WHERE rl.chuboe_rfq_id = $1 AND rl.isactive='Y'
+        AND rlm.chuboe_mpn_clean IS NOT NULL AND rlm.chuboe_mpn_clean <> ''`,
+    [chuboeRfqId]
+  );
+
+  let withCache = 0;
+  let withStock = 0;
+  let totalAgeDays = 0;
+  const valuedHits = [];
+
+  for (const row of lines) {
+    const normalized = cacheKey(row.mpn);
+    const hit = cacheIndex.get(normalized);
+    if (!hit) continue;
+    withCache++;
+    totalAgeDays += hit.ageDays;
+    let envelope;
+    try { envelope = JSON.parse(fs.readFileSync(hit.file, 'utf-8')); }
+    catch { continue; }
+    const pricings = envelope.data?.Pricings || [];
+    const stockEntries = pricings.filter(p => Number(p.CurrentStockQty || 0) > 0);
+    if (stockEntries.length === 0) continue;
+    withStock++;
+
+    // Best price at this qty: for each stock-carrying distributor pick the
+    // highest qty-break ≤ RFQ qty; take the min UnitPrice across distributors.
+    const qty = Number(row.qty || 1);
+    let bestPrice = Infinity;
+    let bestSupplier = null;
+    for (const p of stockEntries) {
+      const breaks = (p.Pricings || []).filter(b => Number(b.QtyBreak) <= qty);
+      if (breaks.length === 0) continue;
+      breaks.sort((a, b) => Number(b.QtyBreak) - Number(a.QtyBreak));
+      const candidate = Number(breaks[0].UnitPrice);
+      if (Number.isFinite(candidate) && candidate > 0 && candidate < bestPrice) {
+        bestPrice = candidate;
+        bestSupplier = p.SupplierName || '?';
+      }
+    }
+    if (!Number.isFinite(bestPrice)) continue;
+    valuedHits.push({
+      line: row.line,
+      mpn: row.mpn,
+      qty,
+      bestPrice,
+      bestSupplier,
+      extended: bestPrice * qty,
+      ageDays: hit.ageDays,
+    });
+  }
+
+  valuedHits.sort((a, b) => b.extended - a.extended);
+  const totalLines = lines.length;
+  const linesWithoutCache = totalLines - withCache;
+  const estApi = linesWithoutCache * 10;
+  return {
+    totalLines,
+    withCache,
+    withStock,
+    avgCacheAgeDays: withCache > 0 ? totalAgeDays / withCache : 0,
+    cacheHitPct: totalLines > 0 ? (withCache / totalLines) : 0,
+    stockHitPct: totalLines > 0 ? (withStock / totalLines) : 0,
+    estApiCallsIfApproved: estApi,
+    digikeyCallsIfApproved: linesWithoutCache,
+    digikeyQuotaMultiple: linesWithoutCache / 1000,
+    topValued: valuedHits.slice(0, topN),
+  };
+}
+
 const esc = s => String(s ?? '').replace(/[&<>"']/g,
   c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const fmt = n => Number(n || 0).toLocaleString('en-US');
@@ -215,7 +335,53 @@ const fmtUsd = v => {
   return n < 0.01 ? `$${n.toFixed(6)}` : `$${n.toFixed(4)}`;
 };
 
-function renderApprovalEmailHtml(meta, ctx, thresholdN) {
+function renderCacheCoverageSection(coverage) {
+  if (!coverage || !coverage.totalLines) return '';
+  const pctOf = (n, d) => d > 0 ? Math.round(100 * n / d) : 0;
+  const hitPct = pctOf(coverage.withCache, coverage.totalLines);
+  const stockPct = pctOf(coverage.withStock, coverage.totalLines);
+  const linesWithoutCache = coverage.totalLines - coverage.withCache;
+  const ageBlurb = coverage.withCache > 0
+    ? `avg ${coverage.avgCacheAgeDays.toFixed(1)}d old`
+    : '—';
+
+  const topRows = (coverage.topValued || []).map(t => `
+    <tr>
+      <td style="padding:3px 14px 3px 0">${esc(t.line)}</td>
+      <td style="padding:3px 14px 3px 0">${esc(t.mpn)}</td>
+      <td style="padding:3px 14px 3px 0">${esc(t.bestSupplier || '?')}</td>
+      <td style="text-align:right;padding:3px 14px 3px 0">${fmt(t.qty)}</td>
+      <td style="text-align:right;padding:3px 14px 3px 0">${fmtUsd(t.bestPrice)}</td>
+      <td style="text-align:right;padding:3px 14px 3px 0">${fmtUsd(t.extended)}</td>
+      <td style="text-align:right">${t.ageDays}d</td>
+    </tr>`).join('') || '<tr><td colspan="7" style="color:#888">No stock-carrying cached lines</td></tr>';
+
+  return `
+<h3 style="margin-bottom:6px;margin-top:18px">Cache Coverage (no APIs called)</h3>
+<table style="border-collapse:collapse;font-size:13px">
+  <tr><td style="color:#666;padding:3px 14px 3px 0">Lines with recent cache data</td><td><b>${fmt(coverage.withCache)}</b> / ${fmt(coverage.totalLines)} (${hitPct}%, ${ageBlurb})</td></tr>
+  <tr><td style="color:#666;padding:3px 14px 3px 0">Lines showing franchise stock (cached)</td><td><b>${fmt(coverage.withStock)}</b> / ${fmt(coverage.totalLines)} (${stockPct}%)</td></tr>
+  <tr><td style="color:#666;padding:3px 14px 3px 0">Lines with NO recent cache</td><td><b>${fmt(linesWithoutCache)}</b> — would need fresh API calls</td></tr>
+  <tr><td style="color:#666;padding:3px 14px 3px 0">Cost if approved (full)</td><td>~${fmt(coverage.estApiCallsIfApproved)} distributor calls; ~${fmt(coverage.digikeyCallsIfApproved)} hit DigiKey (~${coverage.digikeyQuotaMultiple.toFixed(1)}× daily quota)</td></tr>
+  <tr><td style="color:#666;padding:3px 14px 3px 0">Cost if cache-only</td><td><b>$0 API spend</b> — write VQs off the ${fmt(coverage.withCache)} cached envelopes only</td></tr>
+</table>
+
+<h4 style="margin-bottom:6px;margin-top:14px">Top ${coverage.topValued?.length || 0} cached lines by extended value (price × qty)</h4>
+<table style="border-collapse:collapse;font-size:12px">
+  <tr>
+    <th style="text-align:left;border-bottom:1px solid #ccc;padding:4px 14px 4px 0">Line</th>
+    <th style="text-align:left;border-bottom:1px solid #ccc;padding:4px 14px 4px 0">MPN</th>
+    <th style="text-align:left;border-bottom:1px solid #ccc;padding:4px 14px 4px 0">Best supplier</th>
+    <th style="text-align:right;border-bottom:1px solid #ccc;padding:4px 14px 4px 0">Qty</th>
+    <th style="text-align:right;border-bottom:1px solid #ccc;padding:4px 14px 4px 0">Best price</th>
+    <th style="text-align:right;border-bottom:1px solid #ccc;padding:4px 14px 4px 0">Extended</th>
+    <th style="text-align:right;border-bottom:1px solid #ccc">Cache age</th>
+  </tr>
+  ${topRows}
+</table>`;
+}
+
+function renderApprovalEmailHtml(meta, ctx, thresholdN, coverage = null) {
   const t = ctx.targets_summary || {};
   const withTarget = Number(t.with_target || 0);
   const totalLines = Number(t.total_lines || 0);
@@ -273,6 +439,8 @@ Estimated cost if approved: <b>~${fmt(totalApiCalls)} total distributor API call
   ${mfrRows}
 </table>
 
+${renderCacheCoverageSection(coverage)}
+
 <h3 style="margin-bottom:6px;margin-top:18px">Sample Lines (first 20)</h3>
 <table style="border-collapse:collapse;font-size:12px">
   <tr>
@@ -286,10 +454,18 @@ Estimated cost if approved: <b>~${fmt(totalApiCalls)} total distributor API call
 </table>
 
 <h3 style="margin-top:24px">How to respond</h3>
-<p>From the workspace shell, run one of:</p>
+<p><b>Reply by email</b> — the first non-quoted line is parsed by the rfq-loading agent (within ~5–10 min of this email arriving, then every 30m):</p>
+<ul style="font-family:'Courier New',monospace;font-size:12px;background:#f5f5f5;padding:10px 24px;border-radius:4px">
+  <li><b>YES</b> — enrich all lines (full API spend)</li>
+  <li><b>YES --cache-only</b> — write VQs from the ${coverage ? fmt(coverage.withCache) : '<cache hits>'} cached envelopes only; <b>no API spend</b></li>
+  <li><b>LIMIT 1000</b> — enrich the first 1,000 lines only (or any cap)</li>
+  <li><b>NO</b> — reject permanently</li>
+</ul>
+<p style="color:#666;font-size:12px">Or from the workspace shell:</p>
 <pre style="background:#f5f5f5;padding:10px 14px;border-radius:4px;font-size:12px;overflow-x:auto">
 node ~/workspace/astute-workinstructions/shared/large-rfq-gate.js approve ${esc(meta.rfq_number)}
 node ~/workspace/astute-workinstructions/shared/large-rfq-gate.js approve ${esc(meta.rfq_number)} --max-lines 1000
+node ~/workspace/astute-workinstructions/shared/large-rfq-gate.js approve ${esc(meta.rfq_number)} --cache-only
 node ~/workspace/astute-workinstructions/shared/large-rfq-gate.js reject  ${esc(meta.rfq_number)} --reason "duplicate of 1133xxx"</pre>
 
 <p style="color:#888;font-size:11px;margin-top:18px">
@@ -412,12 +588,17 @@ Pending dir:   ${PENDING_DIR}`);
       process.exit(3);
     }
     const maxLines = args.flags['max-lines'] ? Number(args.flags['max-lines']) : null;
+    const cacheOnly = args.flags['cache-only'] === true || args.flags['cache-only'] === 'true';
     markApproved(rfqNumber, {
       maxLines: Number.isFinite(maxLines) ? maxLines : null,
+      cacheOnly,
       approvedBy: args.flags.by || process.env.USER || 'cli',
       note: args.flags.note || null,
     });
-    console.log(`approved ${rfqNumber}${maxLines ? ` (cap ${maxLines} lines)` : ''}`);
+    const extras = [];
+    if (maxLines) extras.push(`cap ${maxLines} lines`);
+    if (cacheOnly) extras.push('cache-only');
+    console.log(`approved ${rfqNumber}${extras.length ? ` (${extras.join(', ')})` : ''}`);
     process.exit(0);
   }
 
@@ -458,6 +639,7 @@ module.exports = {
   markProcessed,
   listClearedUnprocessed,
   fetchRFQContext,
+  scanCacheCoverage,
   renderApprovalEmailHtml,
   sendApprovalEmail,
 };
