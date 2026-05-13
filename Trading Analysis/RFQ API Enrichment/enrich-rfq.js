@@ -418,14 +418,23 @@ async function enrichRFQ(rfqDocNumber, opts = {}) {
         }
 
         // Silent-skip detection: envelope had stock-carrying distributors but
-        // writer produced zero written rows AND zero restricted skips. Captures
-        // the writer-side gate misses (Verical BP missing, MFR canonicalization
-        // edges, missing-MFR-text RFQs, zero-qty lines). Restricted-MFR cases
-        // are excluded — those are by-design.
+        // writer produced zero written rows AND no explained outcome on any
+        // array (skipped/flagged/failed). flagged/failed are NOT silent — they
+        // carry explicit reasons in flagSamples/failSamples (e.g. MPN_CROSS_REF
+        // on Dell/HPE short codes). Including them here was overcounting the
+        // truly-silent path. After this gate, silentSkips measures only the
+        // unexplained drop, currently the cost>0/qty>0 filter in vq-writer
+        // around line 472-473.
         const distysWithStock = (result.distributors || [])
           .filter(d => d.found && (d.franchiseQty || 0) > 0)
           .map(d => d.name || d.distributor);
-        if (distysWithStock.length > 0 && written.length === 0 && skipped.length === 0) {
+        if (
+          distysWithStock.length > 0 &&
+          written.length === 0 &&
+          skipped.length === 0 &&
+          flagged.length === 0 &&
+          failed.length === 0
+        ) {
           counters.silentSkips++;
           if (counters.silentSkipSamples.length < 8) {
             counters.silentSkipSamples.push({
