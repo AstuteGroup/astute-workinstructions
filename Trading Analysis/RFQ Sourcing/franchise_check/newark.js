@@ -282,6 +282,7 @@ function buildPerStoreVqLines(newarkResult, farnellResult, mpn, rfqQty, gbpToUsd
       packaging: newarkResult.vqPackaging || '',
       vendorNotes: `Newark: ${(newarkResult.franchiseQty || 0).toLocaleString()} @ $${newarkResult.vqPrice}`,
       channel: 'STOCK',
+      priceBreaks: newarkResult.priceBreaks || [],
     });
   }
 
@@ -301,6 +302,7 @@ function buildPerStoreVqLines(newarkResult, farnellResult, mpn, rfqQty, gbpToUsd
       packaging: farnellResult.vqPackaging || '',
       vendorNotes: `Farnell UK: ${(farnellResult.franchiseQty || 0).toLocaleString()} @ £${farnellResult.vqPrice}`,
       channel: 'STOCK',
+      priceBreaks: farnellResult.priceBreaks || [],
     });
   }
 

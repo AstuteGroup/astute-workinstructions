@@ -194,6 +194,9 @@ function synthesizeStockLtVqLines(result, mpn, qty, config) {
   const leadTime = result.vqLeadTime || '';
   const hasLeadTime = String(leadTime).trim() !== '';
   const breaks = result.priceBreaks || [];
+  // currencyId may be set on the result by the cache-replay path (Farnell GBP
+  // round-trip). Default null lets vq-writer fall back to USD on its own.
+  const currencyId = result.currencyId || null;
 
   if (stockQty === 0 && !hasLeadTime) return null;  // nothing to quote
 
@@ -216,6 +219,7 @@ function synthesizeStockLtVqLines(result, mpn, qty, config) {
         description: result.vqDescription || '',
         qty: stockQty,           // surface the lot's available stock
         cost: stockPrice,
+        currencyId,
         moq: result.vqMoq || null,
         spq: result.vqSpq || null,
         dateCode: result.vqDateCode || null,
@@ -258,6 +262,7 @@ function synthesizeStockLtVqLines(result, mpn, qty, config) {
         description: result.vqDescription || '',
         qty: ltBuyQty,            // actual commit qty (honors MOQ)
         cost: ltPrice,
+        currencyId,
         moq: result.vqMoq || null,
         spq: result.vqSpq || null,
         dateCode: result.vqDateCode || null,
@@ -556,9 +561,22 @@ function envelopeToResult(envelope, mpn, qty) {
     const bulkPrice = breaks.length > 0 ? breaks[breaks.length - 1].UnitPrice : null;
     const firstPrice = breaks.length > 0 ? breaks[0].UnitPrice : null;
 
-    // Try to map back to a DISTRIBUTORS entry by name for bpId/bpValue
-    const key = Object.keys(DISTRIBUTORS).find(k => DISTRIBUTORS[k].name === p.SupplierName);
+    // Try to map back to a DISTRIBUTORS entry by name for bpId/bpValue.
+    // Per-store cogs (Newark/Farnell, Arrow/Verical) emit SupplierName as the
+    // BP NAME ('Newark in One (Element 14)'), not the parser name ('Newark/Farnell').
+    // Match against either field so cache replay restores bpValue + bpId
+    // — without this, vq-writer falls back to a name search and iDempiere
+    // 500s on names containing parens.
+    const key = Object.keys(DISTRIBUTORS).find(k =>
+      DISTRIBUTORS[k].name === p.SupplierName ||
+      DISTRIBUTORS[k].bpName === p.SupplierName
+    );
     const cfg = key ? DISTRIBUTORS[key] : {};
+
+    // Map cached Currency back to c_currency_id so downstream VQ writes use
+    // the original quote currency (Farnell quotes in GBP — without this it
+    // would silently get stamped USD on replay).
+    const currencyId = p.Currency === 'GBP' ? 114 : 100;
 
     return {
       distributor: key || p.SupplierName,
@@ -572,6 +590,7 @@ function envelopeToResult(envelope, mpn, qty) {
       franchiseBulkPrice: bulkPrice,
       franchiseRfqPrice: vqPrice,
       vqPrice,
+      currencyId,
       vqMpn: p.ManufacturerPartNumber || mpn,
       vqManufacturer: p.ManufacturerName || '',
       vqDescription: p.Description || '',
@@ -674,6 +693,7 @@ function envelopeToResult(envelope, mpn, qty) {
         manufacturer: r.vqManufacturer,
         cost: r.vqPrice,
         qty: r.franchiseQty,
+        currencyId: r.currencyId,
         description: r.vqDescription,
         vendorNotes: r.vqVendorNotes,
         dateCode: r.vqDateCode,

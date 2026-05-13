@@ -80,6 +80,15 @@ function buildEnvelope(searchResult, mpn, qty, source) {
 
     if (Array.isArray(d.vqLines) && d.vqLines.length > 0) {
       for (const sub of d.vqLines) {
+        // Map currencyId → ISO code so cache replay can restore currency.
+        // 100=USD, 114=GBP (extend here as new currencies appear).
+        const currencyCode = sub.currencyId === 114 ? 'GBP' : 'USD';
+        // Fall back to single-tier break when the per-store sub didn't carry
+        // priceBreaks but has a usable cost — otherwise cache replay sees
+        // empty Pricings[] and emits no vqLine even though stock exists.
+        const breaks = (sub.priceBreaks && sub.priceBreaks.length > 0)
+          ? sub.priceBreaks
+          : (sub.cost > 0 ? [{ qty: sub.qty || 1, unitPrice: sub.cost }] : []);
         pricingsArray.push({
           SupplierName: sub.vendorName || (sub.channel === 'Verical' ? 'Verical' : (d.name || d.distributor)),
           ManufacturerName: sub.manufacturer || d.vqManufacturer || '',
@@ -89,7 +98,7 @@ function buildEnvelope(searchResult, mpn, qty, source) {
           MinimumBuy: sub.moq ? parseInt(sub.moq) || 1 : 1,
           Multiplier: sub.spq ? parseInt(sub.spq) || 1 : 1,
           LeadTime: sub.leadTime || null,
-          Currency: 'USD',
+          Currency: currencyCode,
           RoHS: null,
           LifeCycleStatus: null,
           CountryOfOrigin: sub.shipsFrom || null,
@@ -106,7 +115,7 @@ function buildEnvelope(searchResult, mpn, qty, source) {
           // broker even after reconstitution.
           SourceChannel: sub.channel || null,
           SourcePartId: sub.sourcePartId || null,
-          Pricings: (sub.priceBreaks || []).map(pb => ({
+          Pricings: breaks.map(pb => ({
             QtyBreak: pb.qty,
             UnitPrice: pb.unitPrice,
           })),
