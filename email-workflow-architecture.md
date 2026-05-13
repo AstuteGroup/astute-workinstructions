@@ -163,13 +163,50 @@ If a workflow ever has to ask the sender for missing details ("what RFQ type is 
 
 ## How to add a new email-driven workflow
 
-1. **Create `shared/workflow-actions/<name>.js`** — start by copying `_template.js` (TODO: create one). Define inbox, notifier config, and routing actions with handlers.
+1. **Copy `shared/workflow-actions/_template.js`** to `shared/workflow-actions/<name>.js`. Delete what doesn't apply; reply-stitching, large-payload gate, approval actions, and breadcrumb writes are pre-wired — keep only what your workflow needs.
 2. **Create `<area>/<name>/<name>.md`** — describe the workflow. Reference this architecture doc for the CLI contract.
-3. **Set up IMAP folders** in the inbox: `Processed`, plus whatever the workflow needs (`NeedsReview`, `NeedInfo`, `NotRFQ`, etc.).
-4. **Create a `/schedule` routine** pointing at the workflow doc.
-5. **Test on-demand first:** `node shared/email-workflow-poller.js list --workflow <name>` and run a few `route` calls by hand before letting the routine fire.
+3. **Add an entry to `shared/workflow-registry.js`** — declare inbox, cron name, actions, and capabilities. Any capability you set to `false` MUST have a matching `deviations` rationale, OR the parity check will list it as an open gap (intentional — that's the migration backlog).
+4. **Set up IMAP folders** in the inbox: `Processed`, plus whatever the workflow needs (`NeedsReview`, `NeedInfo`, `NotRFQ`, etc.).
+5. **Add a cron entry to `cron-jobs.js`** with the same `name` you declared in the registry. Schedule is up to you — cron cadence is the legitimate-divergence layer; it's not validated cross-workflow.
+6. **Run `node scripts/check-workflow-parity.js`** — verifies handler ↔ registry ↔ cron all align. 0 drift before merging.
+7. **Test on-demand first:** `node shared/email-workflow-poller.js list --workflow <name>` and a few `route` calls by hand before letting the routine fire.
 
-That's the entire flow. No new poller code, no new cron entries, no static scripts.
+That's the entire flow. No new poller code, no new bespoke scripts.
+
+---
+
+## Parity enforcement (registry + drift check)
+
+To prevent the four active workflows from drifting apart over time, every workflow declares its wired capabilities in a central registry. A parity check validates that the registry matches the code, and runs at session start alongside `check-cron-drift.js`.
+
+### Files
+
+- **`shared/workflow-registry.js`** — single source of truth. One entry per workflow declaring inbox, cron name, action list, capability matrix, and declared deviations. See the file header for the schema.
+- **`scripts/check-workflow-parity.js`** — reads the registry + each handler + `cron-jobs.js`, reports two classes of issue:
+  - **DRIFT** (exits 1): registry contradicts code. Example: registry says `replyStitching: true` but the handler doesn't `require('../workflow-pending-state')`. Bug — fix the registry or the code.
+  - **GAP** (exits 0): capability set to `false` without a `deviations` entry. Read as: "this workflow doesn't have feature X yet, and it's not declared as not applicable." That's the migration backlog.
+- **`shared/workflow-actions/_template.js`** — scaffold for new workflows. All shared capabilities pre-wired; delete what doesn't apply.
+
+### Declared deviations — the contract
+
+Every shared-plumbing capability is **default-on** in the sense that the migration target is `true` everywhere. If a workflow has a capability set to `false`:
+
+- **With a `deviations.<capability>` rationale** → intentional NO. Domain reasons: "no external sender to clarify with", "operator already implicitly approved by replying", etc. Doesn't fail the parity check.
+- **Without a `deviations.<capability>` rationale** → open gap. Tracked migration item. Parity check lists it for visibility.
+
+The point of the contract: silent divergence becomes impossible. Either you've explained why this workflow legitimately doesn't need feature X (and that explanation lives forever in the registry, grep-able), or it's on the backlog and the parity check will keep telling you.
+
+### Change protocol when editing shared modules
+
+When you modify anything in:
+
+- `shared/email-workflow-poller.js`
+- `shared/workflow-pending-state.js`
+- `shared/large-rfq-gate.js` (or successor `large-payload-gate.js`)
+- `shared/workflow-actions/_template.js`
+- `shared/workflow-registry.js`
+
+…the commit body should list every workflow whose behavior changes — or state explicitly "no behavior change — plumbing-only." Not enforced by tooling. Enforced by the parity check catching the symptom the next time you forget.
 
 ## What this pattern is NOT
 
