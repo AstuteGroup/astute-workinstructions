@@ -39,6 +39,7 @@ const { enrichRFQ } = require('./enrich-rfq');
 const { assignPriority, isImmediate, PRIORITY } = require('./rfq-priority');
 const { readQuotaState, isQuotaBlocked, hasAdequateQuota } = require('./rfq-quota-state');
 const { addToBacklog, nextBatch, markAttempted, pruneBacklog, backlogStats } = require('./rfq-backlog');
+const largeRfqGate = require('../../shared/large-rfq-gate');
 
 const WATERMARK_FILE = path.resolve(process.env.HOME || '/home/analytics_user', 'workspace/.last-rfq-enrich');
 const ROLLUP_FILE = path.resolve(process.env.HOME || '/home/analytics_user', 'workspace/.enrich-poller-rollup.json');
@@ -589,12 +590,99 @@ async function main() {
     process.exit(1);
   }
 
+  // Phase 0.5: Large-RFQ Approval Gate
+  // RFQs with > threshold line MPNs are paused until an operator explicitly
+  // approves via CLI. Three sub-steps:
+  //   a) Process newly-detected large RFQs: write sentinel + email operator, exclude.
+  //   b) Pick up previously-approved sentinels that haven't been processed yet
+  //      (approval can land after the watermark moved past, so they wouldn't
+  //      be in this tick's findNewRFQs result).
+  //   c) Filter out RFQs that are pending/rejected.
+  const gateThreshold = largeRfqGate.threshold();
+  const filteredNew = [];
+  for (const r of newRFQs) {
+    const lineMpns = Number(r.line_mpns) || 0;
+    if (lineMpns <= gateThreshold) { filteredNew.push(r); continue; }
+    if (largeRfqGate.isRejected(r.rfq_number)) {
+      log(`Large-RFQ gate: ${r.rfq_number} previously rejected — skipping permanently.`);
+      continue;
+    }
+    if (largeRfqGate.isCleared(r.rfq_number)) {
+      // Approved + showed up in this tick's window — include directly.
+      if (largeRfqGate.isProcessed(r.rfq_number)) continue;  // already done
+      const cleared = largeRfqGate.isCleared(r.rfq_number);
+      r._approval = cleared;
+      r._gateApproved = true;
+      filteredNew.push(r);
+      continue;
+    }
+    if (largeRfqGate.isPending(r.rfq_number)) {
+      log(`Large-RFQ gate: ${r.rfq_number} (${lineMpns} lines) still pending operator approval — skipping.`);
+      continue;
+    }
+    // First sight: fire the approval email + write sentinel, exclude this tick.
+    if (DRY_RUN) {
+      log(`Large-RFQ gate: ${r.rfq_number} (${lineMpns} lines) — WOULD send approval email + write sentinel (dry-run, no side effects).`);
+      continue;
+    }
+    try {
+      const ctx = await largeRfqGate.fetchRFQContext(pool, r.chuboe_rfq_id);
+      const sentinel = largeRfqGate.writeSentinel({
+        rfq_number: r.rfq_number,
+        chuboe_rfq_id: r.chuboe_rfq_id,
+        customer: r.customer,
+        rfq_type: r.rfq_type,
+        salesrep: ctx.salesrep,
+        line_mpns: lineMpns,
+        targets_summary: ctx.targets_summary,
+        sample_mpns: ctx.sample_mpns,
+        top_mfrs: ctx.top_mfrs,
+      });
+      const html = largeRfqGate.renderApprovalEmailHtml(sentinel, ctx, gateThreshold);
+      const subject = `[APPROVAL NEEDED] Large RFQ ${r.rfq_number} from ${r.customer || '?'} — ${lineMpns.toLocaleString('en-US')} lines`;
+      await sendEmail(subject, html);
+      log(`Large-RFQ gate: ${r.rfq_number} (${lineMpns} lines) — sentinel written, approval email sent. Excluding from this tick.`);
+    } catch (err) {
+      log(`Large-RFQ gate: ERROR firing for ${r.rfq_number}: ${err.message}. Excluding from this tick (will retry next tick).`);
+      // Roll back sentinel so the next tick will try again — better to re-fire
+      // than to silently leave the RFQ pending without notification.
+      try { fs.unlinkSync(largeRfqGate.sentinelPath(r.rfq_number)); } catch {}
+    }
+    // Excluded from filteredNew regardless of email success.
+  }
+  newRFQs = filteredNew;
+
+  // Pick up any previously-approved sentinels that didn't fall into this
+  // tick's findNewRFQs window. Re-shape them into the same row format.
+  const clearedSentinels = largeRfqGate.listClearedUnprocessed();
+  if (clearedSentinels.length > 0) {
+    log(`Large-RFQ gate: ${clearedSentinels.length} approved sentinel(s) waiting for processing.`);
+    for (const s of clearedSentinels) {
+      newRFQs.push({
+        rfq_number: s.rfq_number,
+        chuboe_rfq_id: s.chuboe_rfq_id,
+        customer: s.customer,
+        rfq_type: s.rfq_type,
+        line_mpns: s.line_mpns,
+        created: s.queued_at,
+        line_mpn_created: s.queued_at,
+        _approval: s._approval,
+        _gateApproved: true,
+      });
+    }
+  }
+
   // Phase 1: Assign priority (P1 Express / P2 Main / P3 Backlog) based on
   // size + type. Region is no longer a signal — Astute operates 24/7 across
   // Mexico, Texas, China, India, Singapore, South Korea so there are no true
   // "off hours" to defer to. See Section J8 of trading-analysis-roadmap.md.
   for (const r of newRFQs) {
     r.priority = assignPriority(r.rfq_type, r.line_mpns);
+    // Force-immediate any gate-approved RFQ regardless of size — the operator
+    // explicitly opted in.
+    if (r._gateApproved && r.priority === PRIORITY.BACKLOG) {
+      r.priority = PRIORITY.MAIN;
+    }
   }
 
   // Sort immediate work so P1 (express) runs before P2 (main), FIFO within tier
@@ -632,10 +720,20 @@ async function main() {
   // Phase 3: Process Tier 1-3 immediately
   const batchResults = [];
   for (const r of immediate) {
-    log(`Enriching ${r.rfq_number} (${r.rfq_type} ${r.priority}, ${r.line_mpns} MPNs)...`);
+    log(`Enriching ${r.rfq_number} (${r.rfq_type} ${r.priority}, ${r.line_mpns} MPNs)${r._gateApproved ? ' [gate-approved]' : ''}...`);
     try {
-      const result = await enrichRFQ(String(r.rfq_number), { priority: r.priority });
+      const enrichOpts = { priority: r.priority };
+      const maxLines = r._approval?.maxLines;
+      if (Number.isFinite(maxLines) && maxLines > 0) {
+        enrichOpts.maxLines = maxLines;
+        log(`  applying --max-lines cap from approval: ${maxLines}`);
+      }
+      const result = await enrichRFQ(String(r.rfq_number), enrichOpts);
       result._priority = r.priority;
+      if (r._gateApproved) {
+        result._gateApproved = true;
+        largeRfqGate.markProcessed(r.rfq_number);
+      }
       batchResults.push(result);
       log(`  done: ${result.apiCalls} API, ${result.cacheHits} cache, ${result.vqsWritten} VQs, ${result.errors?.length || 0} err`);
     } catch (err) {
