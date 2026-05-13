@@ -460,6 +460,11 @@ async function writeVQFromAPI(rfqSearchKey, cpc, franchiseResults, opts = {}) {
     : (rfq.lineIdToQty?.get(rfqLineId) || 1);
 
   const distributors = franchiseResults.distributors || [];
+  // Track a global row index across all distributors for stable cross-ref
+  // candidate IDs (see shared/crossref-queue.makeCandidateId). Same envelope
+  // re-enriched later will produce the same supplierIdx → same candidate ID
+  // → idempotent staging.
+  let globalRowIdx = 0;
   for (const d of distributors) {
     if (!d.found) continue;
 
@@ -485,6 +490,7 @@ async function writeVQFromAPI(rfqSearchKey, cpc, franchiseResults, opts = {}) {
         dateCode: sub.dateCode || null,
         channel: sub.channel || null,
         currencyId: sub.currencyId || null,
+        supplierIdx: globalRowIdx++,
       }));
 
     for (const row of rowsToWrite) {
@@ -526,20 +532,59 @@ async function writeVQFromAPI(rfqSearchKey, cpc, franchiseResults, opts = {}) {
       const vendorDisplay = row.vendorName || d.name;
 
     // Cross-reference check: is the API-returned MPN the same part?
-    // Packaging variants → write with note. Genuine mismatches → flag with full payload for user review.
+    // Packaging variants → write with note. Genuine mismatches → flag (or
+    // route through opts.crossRefClassifier if provided).
     let packagingNote = '';
     if (opts.searchedMpn && mpn) {
       const crossRef = checkMpnCrossRef(opts.searchedMpn, mpn);
       if (crossRef.mismatch) {
-        // Don't write — hold for user confirmation. Include full payload so it can be written later.
-        flagged.push({
-          mpn, searchedMpn: opts.searchedMpn, vendor: vendorDisplay, bpSearchKey,
-          price, qty, mfrText, leadTime, moq, spq,
-          cpc, rfqId: rfq.id, rfqLineId,
-          reason: FLAG.MPN_CROSS_REF,
-          detail: `Searched '${opts.searchedMpn}' but API quoted '${mpn}'. Confirm to proceed.`
-        });
-        continue;
+        // Caller can intercept genuine mismatches with a classifier callback.
+        // The callback returns a decision controlling whether to write, flag,
+        // or silently drop. Side-effects (e.g. writing to a review queue) are
+        // the caller's responsibility — the writer just applies the decision.
+        // See shared/crossref-classifier.js + shared/crossref-queue.js for
+        // the standard implementation used by enrich-rfq.js.
+        let decision = null;
+        if (typeof opts.crossRefClassifier === 'function') {
+          try {
+            decision = await opts.crossRefClassifier({
+              searchedMpn: opts.searchedMpn, returnedMpn: mpn,
+              rfqMfrText: opts.rfqMfrText || '', supplierMfrText: mfrText,
+              rfqValue: rfqSearchKey, rfqId: rfq.id, rfqLineId,
+              rfqLineMpnId: opts.rfqLineMpnId || null,
+              supplierIdx: row.supplierIdx,
+              qty, price, leadTime, moq, spq,
+              dateCode: row.dateCode, channel: row.channel,
+              vendorNotes: row.vendorNotes, vendorName: vendorDisplay,
+              bpSearchKey,
+            });
+          } catch (err) {
+            // Classifier failure must not block the writer — fall through
+            // to the default flag behavior.
+            decision = null;
+          }
+        }
+        const action = decision?.action || 'flag';
+        if (action === 'auto-approve') {
+          // Note becomes the audit trail on Chuboe_Note_User.
+          packagingNote = decision.note ||
+            `Cross-ref auto-approved: ${opts.searchedMpn} → ${mpn}`;
+          // fall through to write
+        } else if (action === 'auto-reject' || action === 'drop' || action === 'pending') {
+          // Silent — classifier already counted it and (for 'pending')
+          // wrote to the review queue. No flag, no failure.
+          continue;
+        } else {
+          // 'flag' or unknown — preserve existing behavior.
+          flagged.push({
+            mpn, searchedMpn: opts.searchedMpn, vendor: vendorDisplay, bpSearchKey,
+            price, qty, mfrText, leadTime, moq, spq,
+            cpc, rfqId: rfq.id, rfqLineId,
+            reason: FLAG.MPN_CROSS_REF,
+            detail: `Searched '${opts.searchedMpn}' but API quoted '${mpn}'. Confirm to proceed.`
+          });
+          continue;
+        }
       }
       if (crossRef.suffix) {
         packagingNote = `Quoted MPN: ${mpn} (${crossRef.suffix})`;

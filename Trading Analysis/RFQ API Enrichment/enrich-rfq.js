@@ -32,6 +32,8 @@ const { writePricingResult } = require('../../shared/api-result-writer');
 const { writeVQFromAPI } = require('../../shared/vq-writer');
 const { computeMfrMatch } = require('../../shared/mfr-equivalence');
 const { isRestrictedMfr } = require('../../shared/restricted-mfrs');
+const { classifyCrossRef } = require('../../shared/crossref-classifier');
+const { addCandidate: addCrossRefCandidate } = require('../../shared/crossref-queue');
 
 // ─── TTL TABLE ───────────────────────────────────────────────────────────────
 // Source of truth: api-integration-roadmap.md § API Response Caching.
@@ -258,6 +260,14 @@ async function enrichRFQ(rfqDocNumber, opts = {}) {
     mfrMismatch: 0,
     mfrUnknown: 0,
     mfrMismatchSamples: [],  // first 5 {mpn, rfqMfr, supplierMfr, distributor}
+    // Cross-ref classifier outcomes (shared/crossref-classifier.js). Counted
+    // when the writer's MPN_CROSS_REF flag would have fired but the classifier
+    // intervened. See shared/crossref-queue.js for the staging file consumers
+    // (digest, Vortex tab, reply parser).
+    crossRefAutoApproved: 0,  // MFR match + RFQ MPN is prefix of returned → VQ written with audit note
+    crossRefAutoRejected: 0,  // RFQ MFR set + supplier MFR set + computeMfrMatch MISMATCH → silent skip
+    crossRefPending: 0,       // MFR match + stem differs → staged to ~/workspace/.crossref-queue/{rfq}.json
+    crossRefDropped: 0,       // RFQ MFR blank → no inference base, silent skip
     // Per-distributor health aggregated across all lines in this RFQ.
     // distinguishes "we tried 7 APIs, got nothing" from "we skipped".
     // Schema: { name: { calls, found, errors, withStock } }
@@ -400,6 +410,49 @@ async function enrichRFQ(rfqDocNumber, opts = {}) {
     // the exact line ID we loaded the MPN from.
     if (!dryRun && (result.found?.length || 0) > 0) {
       try {
+        // Cross-ref classifier callback — invoked by vq-writer when
+        // checkMpnCrossRef returns mismatch=true. Decides per-row whether to
+        // auto-approve (write with audit note), auto-reject (silent skip),
+        // stage to the review queue (pending), or drop (blank RFQ MFR).
+        const crossRefClassifier = async (ctx) => {
+          const decision = classifyCrossRef({
+            searchedMpn: ctx.searchedMpn,
+            returnedMpn: ctx.returnedMpn,
+            rfqMfrText: ctx.rfqMfrText,
+            supplierMfrText: ctx.supplierMfrText,
+          });
+          if (decision.decision === 'auto-approve') counters.crossRefAutoApproved++;
+          else if (decision.decision === 'auto-reject') counters.crossRefAutoRejected++;
+          else if (decision.decision === 'pending') counters.crossRefPending++;
+          else if (decision.decision === 'drop') counters.crossRefDropped++;
+          if (decision.decision === 'pending') {
+            try {
+              addCrossRefCandidate({
+                rfqValue: ctx.rfqValue,
+                rfqLineId: ctx.rfqLineId,
+                rfqLineMpnId: ctx.rfqLineMpnId,
+                supplierIdx: ctx.supplierIdx,
+                searchedMpn: ctx.searchedMpn,
+                returnedMpn: ctx.returnedMpn,
+                rfqMfrText: ctx.rfqMfrText,
+                supplierMfrText: ctx.supplierMfrText,
+                qty: ctx.qty,
+                unitPrice: ctx.price,
+                supplierName: ctx.vendorName,
+                bpSearchKey: ctx.bpSearchKey,
+                leadTime: ctx.leadTime, moq: ctx.moq, spq: ctx.spq,
+                dateCode: ctx.dateCode, channel: ctx.channel, vendorNotes: ctx.vendorNotes,
+                decision: 'pending', status: 'pending', statusReason: decision.reason,
+              });
+            } catch (qErr) {
+              // Queue write failure shouldn't break enrichment — log to errors
+              // counter so it surfaces in the digest but don't throw.
+              counters.errors.push({ stage: 'crossref-queue', message: qErr.message, mpn: ctx.searchedMpn });
+            }
+          }
+          return { action: decision.decision, note: decision.note };
+        };
+
         const { written = [], flagged = [], failed = [], skipped = [] } = await writeVQFromAPI(
           rfqDocNumber,
           cpc || '',
@@ -408,6 +461,9 @@ async function enrichRFQ(rfqDocNumber, opts = {}) {
             searchedMpn: mpn,
             _rfqLineIdOverride: Number(line.chuboe_rfq_line_id),
             applyRestrictedMfrGate: true,
+            rfqMfrText: line.mfr || '',
+            rfqLineMpnId: line.chuboe_rfq_line_mpn_id,
+            crossRefClassifier,
           }
         );
         counters.vqsWritten += written.length;
