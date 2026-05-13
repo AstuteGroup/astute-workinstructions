@@ -156,6 +156,23 @@ module.exports = [
     description: 'Every 30m (offset from inbound) — agent reads OutboundPending folder of stockRFQ@ per stock-rfq-cq-loading.md, writes CQ rows via OT API. Idempotency via pre-write chuboe_cq_line lookup.',
   },
 
+  {
+    name: 'rfqloading-agent',
+    // Cron fires every 5m. The gate script exits 1 (skip) unless either
+    // (a) a large-RFQ sentinel was queued within the last 10m (BURST —
+    // operator might be replying right now), or (b) the current minute
+    // is on the 30-min steady boundary (0 or 30). Net effect: every-5m
+    // polling for ~10m after an approval email goes out, then drops to
+    // every-30m. Tunable via RFQLOADING_BURST_WINDOW_MIN env.
+    cadence: 'every 5m',
+    cadenceCron: '*/5 * * * *',
+    command: `node "${ASTUTE}/scripts/should-run-rfqloading-agent.js" && /home/analytics_user/.local/bin/claude -p --permission-mode bypassPermissions --max-turns 80 < "${ASTUTE}/Trading Analysis/RFQ Loading/agent-prompt.txt"`,
+    cwd: ASTUTE,
+    needsOT: true,
+    logFile: '/tmp/rfqloading-agent.log',
+    description: 'Tiered (5m burst / 30m steady) — agent reads rfqloading@ per rfq-loading.md, routes customer RFQs (enqueue / need_info / needs_review / not_rfq) AND large-RFQ approval replies (approve_large_rfq / reject_large_rfq). Burst window triggered by recently-queued large-RFQ sentinels for fast approval pickup.',
+  },
+
   // PLACEHOLDER for second inbox (broker / franchise) — disabled until the
   // operator supplies the real inbox name. To enable:
   //   1. Add the email to ACCOUNT_TO_EMAIL in shared/offer-poller.js
