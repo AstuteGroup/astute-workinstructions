@@ -251,6 +251,12 @@ async function enrichRFQ(rfqDocNumber, opts = {}) {
     qtyMatches: 0,
     partialCoverage: 0,
     noCoverage: 0,
+    // "Coverage said supply, but search returned 0 vqLines." Smoking gun for
+    // a cache-shape or synthesizer bug — the upstream layer thinks supply
+    // exists (totalStock > 0) but couldn't produce a quotable row.
+    // Distinguishes from "vqLines emitted but writer didn't land any" (which
+    // points at MFR/BP/packaging resolution).
+    supplyButNoVqLines: 0,
     // MFR comparison via shared/mfr-equivalence — informational only, no
     // behavior change. Counts how many distributor responses come back with
     // a manufacturer that doesn't match what the customer asked for.
@@ -348,6 +354,12 @@ async function enrichRFQ(rfqDocNumber, opts = {}) {
     if (result.summary.coverage === 'FULL') counters.qtyMatches++;
     else if (result.summary.coverage === 'PARTIAL') counters.partialCoverage++;
     else counters.noCoverage++;
+
+    // Smoking gun: coverage said supply exists but search emitted 0 vqLines.
+    // Differentiates cache-shape / synth-path bugs from writer-path bugs.
+    const coverageHasSupply = result.summary.coverage === 'FULL' || result.summary.coverage === 'PARTIAL';
+    const noVqLines = !Array.isArray(result.vqLines) || result.vqLines.length === 0;
+    if (coverageHasSupply && noVqLines) counters.supplyButNoVqLines++;
 
     // Per-distributor stats — only count live API calls, not cache hits
     // (cache hits don't tell us anything about current distributor health).
@@ -572,10 +584,21 @@ async function enrichRFQ(rfqDocNumber, opts = {}) {
     counters.errors.length === 0 &&
     !dryRun
   ) {
+    // Branch on supplyButNoVqLines: differentiates the cache-shape / synth
+    // path (coverage said supply, but search emitted no quotable rows) from
+    // the writer path (rows emitted, but MFR/BP/packaging resolution silently
+    // dropped them). Both are bugs; investigation targets differ.
+    const allLinesEmptyVqLines = counters.supplyButNoVqLines === linesWithSupply;
+    const baseStats = `${counters.lines} lines, ${counters.apiCalls} API calls + ${counters.cacheHits} cache hits, ${linesWithSupply} lines had supply (FULL/PARTIAL coverage), 0 VQs written, 0 errors, 0 flagged, 0 restricted-skipped`;
+    const detail = allLinesEmptyVqLines
+      ? `${baseStats}. Coverage shows stock but search returned 0 vqLines on every line — points at the cache-shape / synthesizer path (api-result-writer.js + envelopeToResult / synthesizeStockLtVqLines), not the writer.`
+      : counters.supplyButNoVqLines > 0
+        ? `${baseStats}. ${counters.supplyButNoVqLines}/${linesWithSupply} lines had supply but emitted 0 vqLines (cache-shape / synth path), the rest had rows but the writer landed nothing (MFR/BP/packaging path). Mixed signal — check both.`
+        : `${baseStats}. Search emitted vqLines but writer landed 0 — investigate MFR/BP/packaging resolution path for silent failures.`;
     counters.warnings.push({
       severity: 'HIGH',
       pattern: 'SILENT_NO_VQS',
-      detail: `${counters.lines} lines, ${counters.apiCalls} API calls + ${counters.cacheHits} cache hits, ${linesWithSupply} lines had supply (FULL/PARTIAL coverage), 0 VQs written, 0 errors, 0 flagged, 0 restricted-skipped. Structurally impossible if the writer is healthy — investigate the MFR/BP/packaging resolution path for silent failures.`,
+      detail,
     });
   }
 
@@ -676,6 +699,9 @@ async function main() {
       if (apiPause.shouldPause(sizeProbe)) {
         apiPause.claimPause('enrich-rfq-cli', sizeProbe);
         pauseClaimed = true;
+        // Don't yield to a pause WE own — otherwise the CLI deadlocks itself
+        // (waitIfPaused blocks forever while pauseRefreshTimer keeps refreshing).
+        opts.ignorePause = true;
         pauseRefreshTimer = setInterval(() => apiPause.refreshPause(), 5 * 60 * 1000);
         console.log(`[pause] claimed (${sizeProbe} MPNs < 100, TTL 10m) — background enricher will yield`);
       } else {
