@@ -253,6 +253,37 @@ Read each email body (and attachments if needed). Categorize:
 - **NotRFQ** — no parts data
 - **Duplicate** — same customer + parts already processed
 - **NeedInfo** *(General RFQ only)* — has parts but missing required fields
+- **LargeRFQApproval** *(General RFQ only)* — see Step 3a below
+
+### Step 3a: Large-RFQ Approval Replies (DO NOT SKIP — quick scan before normal triage)
+
+Before applying the rest of Steps 3–10, check the subject line. The large-RFQ approval gate (`shared/large-rfq-gate.js`) sends emails from `rfqloading@` with subject pattern:
+
+```
+[APPROVAL NEEDED] Large RFQ <RFQ#> from <customer> — <N> lines
+```
+
+Replies appear with `RE:` prepended. **If the subject matches `RE: [APPROVAL NEEDED] Large RFQ <RFQ#>`**, treat this as an approval reply, NOT a customer RFQ. Steps 4–9 do NOT apply.
+
+**Extract directive from the first non-empty line of the reply body** (above any quoted-original or signature):
+
+| Reply directive (case-insensitive, first non-quoted line) | Action |
+|---|---|
+| `yes` / `y` / `approve` / `go` / `proceed` | `approve_large_rfq` with `rfq_number` extracted from subject, no cap |
+| `yes --max-lines 1000` / `limit 1000` / `cap 1000` | `approve_large_rfq` with `rfq_number` + `max_lines: 1000` |
+| `no` / `n` / `reject` / `skip` / `decline` | `reject_large_rfq` with `rfq_number` extracted from subject; pull `reason` from any trailing text on the same line if present |
+| Anything else / unclear | `needs_review` — let the operator clarify |
+
+**RFQ # extraction:** the subject ALWAYS contains `Large RFQ <N>` — regex `Large RFQ\s+(\d+)` captures it.
+
+**Body parsing notes:**
+- Ignore everything below a quoted-original marker (`From: ...`, `On <date>, <name> wrote:`, `>` prefix lines, `-----Original Message-----`).
+- Ignore signature blocks below the first line (typical pattern: corporate footer like "Trading Manager … Astute Electronics Inc.").
+- Read just the first non-empty, non-quoted line. A reply containing only "No" plus a sig block is a reject — that's the canonical case from the 2026-05-13 preview test.
+
+**Move processed approval messages to `LargeRFQApprovals/` folder.** Acknowledgment email back to operator is sent automatically by the action handler.
+
+**No new BP, contact, or RFQ-line extraction is needed for approval replies** — the action just calls `largeRfqGate.markApproved` / `markRejected`. Skip the entire customer-resolution stack for these.
 
 ### Step 4: Triage Missing Info (General Customer RFQ Only — DO NOT SKIP)
 

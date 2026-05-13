@@ -640,8 +640,12 @@ async function main() {
       });
       const html = largeRfqGate.renderApprovalEmailHtml(sentinel, ctx, gateThreshold);
       const subject = `[APPROVAL NEEDED] Large RFQ ${r.rfq_number} from ${r.customer || '?'} — ${lineMpns.toLocaleString('en-US')} lines`;
-      await sendEmail(subject, html);
-      log(`Large-RFQ gate: ${r.rfq_number} (${lineMpns} lines) — sentinel written, approval email sent. Excluding from this tick.`);
+      // Send from rfqloading@ so replies land in the inbox polled by the
+      // rfq-loading workflow agent (approve_large_rfq / reject_large_rfq
+      // actions wire YES/NO back to the gate). Override with
+      // LARGE_RFQ_GATE_FROM env var if needed.
+      await largeRfqGate.sendApprovalEmail({ subject, html, log });
+      log(`Large-RFQ gate: ${r.rfq_number} (${lineMpns} lines) — sentinel written, approval email sent from rfqloading@. Excluding from this tick.`);
     } catch (err) {
       log(`Large-RFQ gate: ERROR firing for ${r.rfq_number}: ${err.message}. Excluding from this tick (will retry next tick).`);
       // Roll back sentinel so the next tick will try again — better to re-fire

@@ -298,6 +298,38 @@ Gate threshold: ${fmt(thresholdN)} line MPNs. Override per-run with <code>LARGE_
 </body></html>`;
 }
 
+// ─── EMAIL SEND ──────────────────────────────────────────────────────────────
+
+/**
+ * Send the approval email from rfqloading@orangetsunami.com (the inbox
+ * polled by the rfq-loading workflow agent). Replies land there and get
+ * routed to approve_large_rfq / reject_large_rfq actions automatically.
+ *
+ * Falls back to excess@ on bounce — same pattern as enrich-poller's main
+ * digest email path.
+ *
+ * @param {object} opts
+ * @param {string} opts.subject
+ * @param {string} opts.html
+ * @param {function} opts.log
+ * @param {string} [opts.to=jake.harris@Astutegroup.com]
+ * @returns {Promise<{delivered: 'primary'|'fallback', bounceDetected: boolean}>}
+ */
+async function sendApprovalEmail({ subject, html, log, to }) {
+  const { sendWithFallback } = require('./verified-send');
+  const pass = process.env.WORKMAIL_PASS;
+  if (!pass) {
+    if (log) log('WARN: WORKMAIL_PASS not set — skipping approval email');
+    return { delivered: 'none', bounceDetected: false };
+  }
+  return sendWithFallback({
+    primary:  { from: process.env.LARGE_RFQ_GATE_FROM || 'rfqloading@orangetsunami.com', pass, displayName: 'RFQ Loading' },
+    fallback: { from: process.env.LARGE_RFQ_GATE_FALLBACK || 'excess@orangetsunami.com',  pass, displayName: 'RFQ Loading' },
+    mail: { to: to || 'jake.harris@Astutegroup.com', subject, html },
+    log: log || (() => {}),
+  });
+}
+
 // ─── CLI ─────────────────────────────────────────────────────────────────────
 
 function parseArgs(argv) {
@@ -427,4 +459,5 @@ module.exports = {
   listClearedUnprocessed,
   fetchRFQContext,
   renderApprovalEmailHtml,
+  sendApprovalEmail,
 };
