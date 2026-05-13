@@ -9,7 +9,15 @@ Run: node /home/analytics_user/workspace/astute-workinstructions/shared/email-wo
 STEP 3 — Process each message.
 For every UID returned, follow the per-message decision tree from the .md:
   - Run `read <uid> --workflow rfq-loading` to fetch body + parsed forwarded headers.
-  - **Check subject line FIRST.** If subject matches `RE: [APPROVAL NEEDED] Large RFQ <RFQ#>`:
+  - **Check for `pending_state` FIRST.** If the `read` JSON includes a `pending_state` object, this message is a reply to a prior `need_info` ask. Treat it as a thread continuation:
+      * The customer's reply body usually only supplies the missing fields (qty, RFQ type, contact, etc.); it does NOT re-quote the original parts list. The parts list lives in `pending_state.extracted` from when we first parsed the original.
+      * Build the merged extraction by combining `pending_state.extracted` with whatever new fields the current reply body answers (the items in `pending_state.missing`).
+      * Decide routing:
+          - If merging produces a complete, loadable RFQ → `enqueue` with the FULL merged payload (lines from pending_state, plus the qty/type/etc. from this reply). ALSO pass `original_message_id: pending_state.original_message_id` so the poller can clean up the sidecar.
+          - If still incomplete AND `pending_state.retry_count < 2` → another `need_info` with the updated `extracted` (whatever fields you now have) + the still-`missing` list + `original_message_id: pending_state.original_message_id`. The sidecar is keyed on the anchor and retry_count auto-bumps.
+          - If still incomplete AND `pending_state.retry_count >= 2` → `needs_review` (do NOT loop a third time). Pass `original_message_id: pending_state.original_message_id` so the sidecar is cleared.
+      * Approval/rejection reply messages (`RE: [APPROVAL NEEDED] Large RFQ <N>`) take precedence over this — see the next bullet — even if `pending_state` is somehow present.
+  - **Check subject line.** If subject matches `RE: [APPROVAL NEEDED] Large RFQ <RFQ#>`:
       * Extract `<RFQ#>` from the subject (regex: `Large RFQ\s+(\d+)`).
       * Read the first non-empty, non-quoted line of the body. Ignore quoted-original markers, signature blocks, legal disclaimers.
       * Classify the directive:
@@ -20,7 +28,8 @@ For every UID returned, follow the per-message decision tree from the .md:
           - `no` / `n` / `reject` / `skip` / `decline` → `reject_large_rfq` with `{rfq_number: <N>, reason: <any trailing text>}`.
           - Unclear / ambiguous → `needs_review` with `{reason: "approval reply directive unclear: <body excerpt>"}`.
       * Dispatch with `route <uid> <action> --workflow rfq-loading --payload '<json>'`. Approval/rejection emails do NOT need customer/contact/MFR resolution.
-  - Otherwise (subject is NOT an approval reply): apply the normal customer-RFQ flow per the .md (Steps 4-9), routing to enqueue / need_info / needs_review / not_rfq.
+  - Otherwise (no `pending_state`, subject is NOT an approval reply): apply the normal customer-RFQ flow per the .md (Steps 4-9), routing to enqueue / need_info / needs_review / not_rfq.
+      * When routing to `need_info` on an INITIAL message (first round, no prior sidecar), include `extracted: {...}` in the payload containing whatever fields you DID parse from this email (lines, bpartnerId-guess, etc.). The poller writes the sidecar; the reply will be stitched against it automatically on the next tick.
 
 If a single message hits a transient error, log the error in your output and continue with the next message. Do not abort the batch on per-message failure.
 

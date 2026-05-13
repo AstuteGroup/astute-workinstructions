@@ -32,15 +32,29 @@
  *     notifierConfig:  { fromEmail, fromName, smtpUser?, smtpPass? },
  *     actions: {
  *       <name>: {
- *         folder:    'TargetFolder',           // post-handler move destination
- *         requires:  ['fieldA', 'fieldB'],     // payload field validation
- *         handler:   async (payload, ctx) => { ... }    // null = move-only
+ *         folder:        'TargetFolder',           // post-handler move destination
+ *         requires:      ['fieldA', 'fieldB'],     // payload field validation
+ *         keepsPending:  true,                     // optional; skip sidecar auto-clear for need_info-style actions
+ *         handler:       async (payload, ctx) => { ... }    // null = move-only
  *       },
  *     },
  *   };
  *
- *   Handler ctx: { uid, parsedMessage, dryRun, jakeEmail, notifier, log, workflow }
+ *   Handler ctx: {
+ *     uid, dryRun, jakeEmail, notifier, log, workflow, inbox,
+ *     anchorMessageId,     // Message-ID of the thread anchor (for sidecar keys)
+ *     currentMessageId,    // Message-ID of the message being routed
+ *     currentReferences,   // References+In-Reply-To array
+ *     pendingSidecar       // The matched sidecar (or null) — already-extracted state
+ *   }
  *   Handler returns: any object — merged into the route output JSON.
+ *
+ * REPLY-STITCHING (automatic for any workflow):
+ *   - `cmdRead` attaches `pending_state` to message JSON when a sidecar matches
+ *     the message's References/In-Reply-To chain. Agent merges with current body.
+ *   - `cmdRoute` clears the sidecar on terminal actions; need_info-style actions
+ *     that should PERSIST state must declare `keepsPending: true`.
+ *   - Helper: shared/workflow-pending-state.js (write/read/findByReferences/clear).
  */
 
 'use strict';
@@ -53,6 +67,7 @@ const { ImapFlow } = require('imapflow');
 const { simpleParser } = require('mailparser');
 
 const { createNotifier } = require('./notifier');
+const pending = require('./workflow-pending-state');
 
 // ─── ARGS ────────────────────────────────────────────────────────────────────
 
@@ -247,6 +262,17 @@ async function cmdRead(uid) {
     };
   });
   if (!result) { console.error(`UID ${uid} not found`); process.exit(2); }
+
+  // Reply-stitching: hydrate pending_state if any sidecar matches this thread.
+  // The sidecar is keyed on the thread anchor Message-ID; a reply's References
+  // chain contains that anchor. See shared/workflow-pending-state.js.
+  const stitchRefs = [
+    ...(Array.isArray(result.references) ? result.references : []),
+    ...(result.in_reply_to ? [result.in_reply_to] : []),
+  ];
+  const sidecar = pending.findByReferences(WORKFLOW_NAME, stitchRefs);
+  if (sidecar) result.pending_state = sidecar;
+
   console.log(JSON.stringify(result, null, 2));
 }
 
@@ -307,6 +333,39 @@ async function cmdRoute(uid, actionName, payload) {
   const folder = action.folder;
   const result = { uid, workflow: WORKFLOW_NAME, action: actionName, folder };
 
+  // Fetch the current message's Message-ID + references so we can determine
+  // the thread anchor for reply-stitching state management.
+  let currentMessageId = null;
+  let currentReferences = [];
+  try {
+    await withInbox(async (client) => {
+      const msg = await client.fetchOne(String(uid), { source: true }, { uid: true });
+      if (msg && msg.source) {
+        const parsed = await simpleParser(msg.source);
+        currentMessageId = parsed.messageId || null;
+        const refsRaw = parsed.references
+          || (parsed.headers && parsed.headers.get && parsed.headers.get('references'))
+          || null;
+        currentReferences = Array.isArray(refsRaw)
+          ? refsRaw
+          : (typeof refsRaw === 'string' ? refsRaw.split(/\s+/).filter(Boolean) : []);
+        if (parsed.inReplyTo) currentReferences.push(parsed.inReplyTo);
+      }
+    });
+  } catch (e) {
+    // Non-fatal — sidecar management just won't have an anchor.
+    console.error(`[poller] could not fetch current message for sidecar anchor: ${e.message}`);
+  }
+
+  // Thread-anchor resolution priority:
+  //   1. payload.original_message_id (agent passed it explicitly — continuation)
+  //   2. existing sidecar matched by this message's references chain
+  //   3. this message's own Message-ID (initial routing, no prior state)
+  const existingSidecar = pending.findByReferences(WORKFLOW_NAME, currentReferences);
+  const anchorMessageId = payload.original_message_id
+    || (existingSidecar && existingSidecar.original_message_id)
+    || currentMessageId;
+
   // Build context for the handler
   const ctx = {
     uid,
@@ -316,6 +375,10 @@ async function cmdRoute(uid, actionName, payload) {
     workflow: WORKFLOW_NAME,
     log: (...args) => console.error('[poller]', ...args),
     inbox: INBOX,
+    anchorMessageId,
+    currentMessageId,
+    currentReferences,
+    pendingSidecar: existingSidecar,
   };
 
   // Run handler (if any)
@@ -344,6 +407,13 @@ async function cmdRoute(uid, actionName, payload) {
       });
       result.moved_to = folder;
     }
+  }
+
+  // Reply-stitching cleanup: clear the sidecar unless this action declares
+  // keepsPending (i.e., need_info-style actions that PERSIST state intentionally).
+  if (!DRY_RUN && anchorMessageId && !action.keepsPending) {
+    const cleared = pending.clearSidecar(WORKFLOW_NAME, anchorMessageId);
+    if (cleared) result.cleared_pending_state = anchorMessageId;
   }
 
   console.log(JSON.stringify(result, null, 2));

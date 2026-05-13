@@ -12,6 +12,7 @@
 
 const { enqueue } = require('../rfq-load-queue');
 const largeRfqGate = require('../large-rfq-gate');
+const pending = require('../workflow-pending-state');
 
 // ─── HANDLERS ────────────────────────────────────────────────────────────────
 
@@ -39,28 +40,51 @@ async function action_enqueue(payload, ctx) {
 }
 
 /**
- * Auto-reply to the customer requesting missing fields. Jake on CC + Reply-To.
+ * Auto-reply to the customer requesting missing fields. Replies route back to
+ * the loader inbox (rfqloading@) so the next-tick agent can pick up the reply
+ * and stitch it with the partial extraction stored in the sidecar.
  *
  * Required payload: { recipient, missing[] }
- * Optional: { subject }
+ * Optional: { subject, extracted } — `extracted` is whatever the agent already
+ *           parsed from the original (lines, bpartnerId, type, etc.). It is
+ *           persisted to the sidecar so the next round merges with the reply.
  */
 async function action_need_info(payload, ctx) {
-  const { recipient, missing, subject } = payload;
+  const { recipient, missing, subject, extracted } = payload;
   const body = buildNeedInfoReply(missing);
+
+  // Persist partial state so the reply (which typically won't re-quote the
+  // original parts list) can be merged with what we already know.
+  let sidecarRecord = null;
+  if (!ctx.dryRun && ctx.anchorMessageId) {
+    sidecarRecord = pending.writeSidecar(ctx.workflow, ctx.anchorMessageId, {
+      original_uid: ctx.uid,
+      original_subject: subject || null,
+      original_recipient: recipient || null,
+      extracted: extracted || (ctx.pendingSidecar && ctx.pendingSidecar.extracted) || {},
+      missing: Array.isArray(missing) ? missing : [],
+    });
+  }
+
   if (ctx.dryRun) {
     return {
       dry_run: true,
-      would_reply: { to: recipient, cc: ctx.jakeEmail, missing },
+      would_reply: { to: recipient, cc: ctx.jakeEmail, replyTo: ctx.inbox, missing },
       draft: body,
+      would_write_sidecar: { anchor: ctx.anchorMessageId, extracted, missing },
     };
   }
   await ctx.notifier.sendEmail(
     recipient,
     `RE: ${subject || 'Your RFQ'} — details needed`,
     body,
-    { cc: ctx.jakeEmail, replyTo: ctx.jakeEmail },
+    { cc: ctx.jakeEmail, replyTo: ctx.inbox },
   );
-  return { replied_to: recipient };
+  return {
+    replied_to: recipient,
+    sidecar_anchor: ctx.anchorMessageId,
+    retry_count: sidecarRecord ? sidecarRecord.retry_count : null,
+  };
 }
 
 /**
@@ -205,6 +229,7 @@ module.exports = {
     need_info: {
       folder: 'NeedInfo',
       requires: ['recipient', 'missing'],
+      keepsPending: true,
       handler: action_need_info,
     },
     needs_review: {

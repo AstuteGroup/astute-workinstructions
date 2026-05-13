@@ -72,6 +72,7 @@ module.exports = {
       folder: 'TargetFolder',                      // where to move the email after handler runs
       handler: async (payload, ctx) => { ... },    // null if move-only with no side effects
       requires: ['fieldA', 'fieldB'],              // payload validation; throws if missing
+      keepsPending: false,                         // optional: true for need_info-style actions (see Reply stitching below)
     },
     // ... more actions
   },
@@ -82,7 +83,13 @@ module.exports = {
 ```javascript
 async function handler(payload, ctx) {
   // payload: parsed JSON from --payload flag
-  // ctx: { uid, parsedMessage, dryRun, jakeEmail, notifier, log }
+  // ctx: {
+  //   uid, dryRun, jakeEmail, notifier, log, workflow, inbox,
+  //   anchorMessageId,    // Message-ID of thread anchor — use as sidecar key
+  //   currentMessageId,   // Message-ID of the message being routed
+  //   currentReferences,  // References + In-Reply-To array
+  //   pendingSidecar      // sidecar record if one matched this thread, else null
+  // }
   // returns: { result: <anything>, ... }   — merged into the route command's JSON output
 }
 ```
@@ -111,6 +118,48 @@ Trading Analysis/RFQ Loading/rfq-loading.md.
 ```
 
 The routine prompt should be terse — reference the .md, not duplicate it.
+
+## Reply stitching (automatic)
+
+If a workflow ever has to ask the sender for missing details ("what RFQ type is this?", "what's the quantity?"), the customer's reply almost never re-quotes the original parts list — they just answer the question. Without stitching, the agent reading the reply sees the answer but no parts to attach it to, and dead-ends in `needs_review`.
+
+**The poller solves this by default.** Any workflow gets reply-stitching for free.
+
+### How it works
+
+1. **First touch (initial routing).** Agent reads an email, partially extracts but is missing required fields. It routes `need_info` with payload that includes `extracted: { ...whatever_was_parsed }` + `missing: [...]`. The poller writes a sidecar at `~/workspace/.<workflow>-pending/<sanitized-anchor-msg-id>.json` containing the partial extraction + the missing-fields list + `retry_count: 0`. The auto-reply's `Reply-To` is the workflow inbox, so the customer's reply lands back in this inbox.
+2. **Customer reply lands.** Next tick, `cmdRead` parses the new message, sees `In-Reply-To` / `References` matching a sidecar, and attaches the sidecar to the returned JSON as `pending_state`.
+3. **Agent sees both.** Agent reads the message JSON, finds `pending_state`. Treats `pending_state.extracted` as already-known. Merges with the current reply body. Routes to `enqueue` (or another action) with the FULL merged payload, including `original_message_id: pending_state.original_message_id`.
+4. **Auto-cleanup.** Poller clears the sidecar on any terminal action (anything except actions declared `keepsPending: true`).
+
+### What workflows need to do
+
+- **Declare `keepsPending: true`** on the action(s) that exist to ask the sender for more info (the only actions that should keep state alive across ticks).
+- **In the `need_info`-style handler**, write the sidecar via `shared/workflow-pending-state.js`:
+  ```javascript
+  const pending = require('../workflow-pending-state');
+  pending.writeSidecar(ctx.workflow, ctx.anchorMessageId, {
+    original_uid: ctx.uid,
+    original_subject: subject,
+    original_recipient: recipient,
+    extracted: payload.extracted || {},
+    missing: payload.missing || [],
+  });
+  ```
+- **In the agent prompt**, instruct: if `pending_state` is present on a read, merge `pending_state.extracted` with the current body before extracting; cap retries at `pending_state.retry_count >= 2` (escalate to `needs_review` instead of looping); pass `original_message_id: pending_state.original_message_id` on continuations.
+
+### What workflows do NOT need to do
+
+- Lookup, hydration, or cleanup of sidecars — the poller handles all of it transparently.
+- Thread-anchor calculation — the poller resolves it via payload → existing sidecar → current Message-ID.
+- Workflows without a need_info-style action: nothing changes; sidecar lookup is a no-op (nothing to find).
+
+### Reference
+
+- Helper: `shared/workflow-pending-state.js` (write / read / findByReferences / clear / listSidecars)
+- Reference implementation: `shared/workflow-actions/rfq-loading.js` `action_need_info` + the stitch-merge block in `Trading Analysis/RFQ Loading/agent-prompt.txt`
+
+---
 
 ## How to add a new email-driven workflow
 
