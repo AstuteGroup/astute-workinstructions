@@ -42,10 +42,10 @@ module.exports = [
     name: 'lam-kitting-runner',
     cadence: 'weekly',
     cadenceCron: '0 12 * * 1',
-    command: `node "${ASTUTE}/Trading Analysis/LAM Kitting Reorder/lam-kitting-runner.js"`,
+    command: `node "${ASTUTE}/Trading Analysis/LAM 3PL/lam-kitting-runner.js"`,
     cwd: ASTUTE,
     needsOT: true,
-    logFile: `${ASTUTE}/Trading Analysis/LAM Kitting Reorder/data/cron.log`,
+    logFile: `${ASTUTE}/Trading Analysis/LAM 3PL/data/cron.log`,
     description: 'Mon 12 UTC — LAM Kitting reorder alerts + franchise sourcing + RFQ writes',
   },
   {

@@ -142,7 +142,7 @@ async function main() {
   console.log(`  Querying at MAX(MOQ, Shortfall) for accurate pricing`);
   console.log('');
 
-  // J5 pause — LAM Kitting Reorder is a foreground workflow; claim the pause
+  // J5 pause — LAM 3PL Reorder is a foreground workflow; claim the pause
   // for small batches so the background enricher yields. Large batches run
   // alongside (cache hits dedupe; deferring would break the Monday SLA).
   const apiPause = require('../../shared/api-pause');

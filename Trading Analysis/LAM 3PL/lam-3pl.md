@@ -1,6 +1,30 @@
-# LAM Kitting Reorder Workflow
+# LAM 3PL Workflow
 
-Monitor LAM kitting warehouse inventory levels to trigger reorders and source replenishment.
+Operational home for Astute's LAM 3PL program: W111 (LAM 3PL) + W115 (LAM Dead Inventory) warehouse monitoring, weekly reorder + franchise sourcing, RFQ writes, customer-facing offer refresh, and contract-pricing reference.
+
+**Previously named:** "LAM Kitting Reorder." Renamed 2026-05-13 to reflect that the workflow covers more than just the reorder step (it also owns customer offer refresh, escalations, and the canonical contract-pricing landing page).
+
+---
+
+## Contract Purchase Price — Where to Look
+
+**RULE:** Any time someone asks "what is our contract purchase price for LAM on `<MPN>`?", the answer lives in one of these three files. Check them in order; the *first one that has the MPN* is authoritative (newer files supersede older for that MPN).
+
+| # | Source | Path | Where the price lives | Scope |
+|---|--------|------|------------------------|-------|
+| 1 | **LAM Kitting DB** | `Trading Analysis/LAM 3PL/Lam_Kitting_DB_*.xlsx` (latest dated file) | Sheet `INVENTORY` → column `Base Unit Price` | Steady-state kitting roster (~964 parts) — the ongoing reorder program. Companion column `Resale Price` is the LAM contract resale. |
+| 2 | **EPG SIPOC (Phase 1)** | `Trading Analysis/LAM EPG Award/Lam_EPG_SIPOC.xlsx` | Sheet1 → column `Base Unit Price` | Initial EPG award (~208 parts). Watch for "averaged split pricing" — when SIPOC shows blended cost across vendors, the per-vendor `*_PO_Upload.xlsx` files in the same folder have the real per-POV unit cost. |
+| 3 | **Phase 2 Adds** | `Trading Analysis/LAM 3PL/Astute_New Part ADDS_ Working Copy - *.xlsx` (latest dated file) | Latest `Astute action list <date>` tab → column `Base Unit Price` | New parts being added to Astute's scope of supply post-EPG. Emailed bi-weekly to `rfqloading@orangetsunami.com`, subject "FW: Astute x Lam Bi-Weekly Updates." Replace the file on each new email — keep the most recent. |
+
+**Procedure:**
+1. Open the latest of file #1 (Kitting DB). Search the `INVENTORY` tab for the MPN. If found → `Base Unit Price` column is the contract buy.
+2. If not in #1 → open file #2 (EPG SIPOC). Search Sheet1.
+3. If not in #2 → open file #3 (Phase 2 Adds). Search the most recent `Astute action list <date>` tab.
+4. If not in any of the three → **no contract buy price exists** for that part under LAM. Don't guess. Report "not under contract" and offer to pull recent VQ/CQ history as a directional reference instead.
+
+**Column semantics (locked):** The `Resale Price` column on the Kitting DB INVENTORY tab is explicitly called the "LAM contract resale" elsewhere in this doc. By direct symmetry, the paired `Base Unit Price` column is the contract buy. Same column name carries the same semantic on files #2 and #3.
+
+**When a new Phase 2 Adds file arrives** (bi-weekly to `rfqloading@`): download the attachment into `Trading Analysis/LAM 3PL/`, keep prior versions for audit (don't delete), and update the "latest dated file" pointer above mentally.
 
 ---
 

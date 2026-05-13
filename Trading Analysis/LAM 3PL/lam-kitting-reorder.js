@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * LAM Kitting Reorder Script
+ * LAM 3PL Reorder Script
  *
  * Compares W111 + W115 inventory levels against MIN QTY thresholds
  * to generate reorder alerts with historical purchase data.
@@ -26,7 +26,7 @@ const EMAIL_ACCOUNT = 'excess';
 const NOTIFY_EMAIL = process.env.NOTIFY_EMAIL || 'jake.harris@astutegroup.com';
 const notifier = createNotifier({
   fromEmail: `${EMAIL_ACCOUNT}@orangetsunami.com`,
-  fromName: 'LAM Kitting Reorder'
+  fromName: 'LAM 3PL'
 });
 
 // -----------------------------------------------------------------------------
@@ -80,8 +80,8 @@ async function main() {
   }
   const outputFile = args[2] || path.join(outputDir, `LAM_Reorder_Alerts_${getDateStamp()}.csv`);
 
-  console.log('LAM Kitting Reorder');
-  console.log('===================');
+  console.log('LAM 3PL Reorder');
+  console.log('===============');
   console.log(`Inventory folder: ${inventoryFolder}`);
   console.log(`Excel file: ${excelFile}`);
   console.log(`Output file: ${outputFile}`);
@@ -206,7 +206,7 @@ async function main() {
     const pendingOrderCount = reorderAlerts.filter(r => r.Priority === 'PENDING ORDER PLACEMENT').length;
     const pendingReceiptCount = reorderAlerts.filter(r => r.Priority === 'PENDING RECEIPT').length;
 
-    const emailBody = `LAM Kitting Reorder Alerts generated ${getDateStamp()}.
+    const emailBody = `LAM 3PL Reorder Alerts generated ${getDateStamp()}.
 
 ${reorderAlerts.length} items below threshold:
 - CRITICAL (zero stock, no recent PO): ${critCount}
@@ -220,7 +220,7 @@ Inventory source: ${path.basename(inventoryFolder)}`;
 
     const sent = await sendEmail(
       NOTIFY_EMAIL,
-      `LAM Kitting Reorder Alerts - ${getDateStamp()}`,
+      `LAM 3PL Reorder Alerts - ${getDateStamp()}`,
       emailBody,
       [outputFile]
     );

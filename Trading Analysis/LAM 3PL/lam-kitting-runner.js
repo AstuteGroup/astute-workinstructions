@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * LAM Kitting Reorder Runner (Cron)
+ * LAM 3PL Reorder Runner (Cron)
  *
  * Chains: Inventory Cleanup → Reorder Alerts → Franchise Sourcing → RFQ+VQ Write → Email
  * Scheduled: Mondays at 12:00 PM (after Inventory Cleanup at 11:00 AM)
@@ -26,7 +26,7 @@ const EMAIL_ACCOUNT = 'excess';
 const NOTIFY_EMAIL = process.env.NOTIFY_EMAIL || 'jake.harris@astutegroup.com';
 const notifier = createNotifier({
   fromEmail: `${EMAIL_ACCOUNT}@orangetsunami.com`,
-  fromName: 'LAM Kitting Reorder'
+  fromName: 'LAM 3PL'
 });
 
 function getDateStamp() {
@@ -780,10 +780,10 @@ async function main() {
   } catch (_) { /* non-fatal */ }
 
   const emailSubject = rfqWriteFailed
-    ? `❌ LAM Kitting Reorder - RFQ WRITE FAILED ${dateStr}`
+    ? `❌ LAM 3PL Reorder - RFQ WRITE FAILED ${dateStr}`
     : isPartial
-    ? `⚠️ LAM Kitting Reorder - PARTIAL Sourced ${dateStr}`
-    : `LAM Kitting Reorder - Sourced ${dateStr}`;
+    ? `⚠️ LAM 3PL Reorder - PARTIAL Sourced ${dateStr}`
+    : `LAM 3PL Reorder - Sourced ${dateStr}`;
   const rfqFailWarning = rfqWriteFailed
     ? `\n❌ RFQ WRITE FAILED — no RFQs/VQs created in OT this run.\n   Cause: ${rfqWriteError}\n   The cron-runner will retry on the next hourly tick once OT is healthy.\n`
     : '';
@@ -817,7 +817,7 @@ async function main() {
     customerOfferSection = `\n──────────────────────────────────────────────\n${headline}\n──────────────────────────────────────────────\n${typeLine}\nNew offer search key: ${r.searchKey}\nLines written:        ${r.linesWritten} / ${r.lineCount}${r.errorCount ? ` (${r.errorCount} line errors — review sidecar JSON)` : ''}\nIn-stock parts:       ${(r.lineCount || 0) - (s.zeroStock || 0)}\nZero-stock parts:     ${s.zeroStock || 0}  (visible on dashboard with qty=0)\nLead-time refreshes:  ${s.refreshed || 0}  (from this week's franchise sourcing)\nManual codes kept:    ${s.preservedManual || 0}  (LTB / Obsolete / EOL / etc.)\nDeactivated prior:    ${r.deactivatedPriorOffers || 0} offer(s) — search keys: ${deactList}\nDescription:          "${r.description}"\n──────────────────────────────────────────────\n`;
   }
 
-  const emailBody = `LAM Kitting Reorder - Sourced Report ${dateStr}
+  const emailBody = `LAM 3PL Reorder - Sourced Report ${dateStr}
 ${rfqFailWarning}${partialWarning}${rfqSection}${escalationSection}${restrictedSection}${customerOfferSection}
 ${totalAlerts} items below threshold:
 - CRITICAL (zero stock, no recent PO): ${critCount}

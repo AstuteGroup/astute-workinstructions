@@ -13,7 +13,7 @@ Consolidated roadmap for Trading Analysis workflows.
 | **Live Opportunities (RFQ → Offers)** | `Market Offer Matching for RFQs/` | Operational |
 | **Proactive Opportunities (Offers → Historical)** | `Market Offer Matching for RFQs/` | Partial |
 | Inventory File Cleanup | `Inventory File Cleanup/` | Operational |
-| LAM Kitting Reorder | `LAM Kitting Reorder/` | Operational |
+| LAM 3PL | `LAM 3PL/` | Operational |
 | LAM EPG Award | `LAM EPG Award/` | In Progress |
 | Stock Market Analysis | — | Planned |
 | CQ Writeback | `shared/cq-writer.js` | Operational (writer); QQ integration Planned |
@@ -335,11 +335,11 @@ VQ-side fields involved:
 
 ---
 
-# Section C: LAM Kitting Reorder
+# Section C: LAM 3PL
 
 | # | Feature | Priority | Status |
 |---|---------|----------|--------|
-| C1 | LAM Kitting Reorder Workflow | Complete | Operational |
+| C1 | LAM 3PL Workflow | Complete | Operational |
 | C2 | Purchase Optimizer | **Next** | Planned |
 
 ---
@@ -360,7 +360,7 @@ VQ-side fields involved:
 
 ---
 
-## C1. LAM Kitting Reorder Workflow
+## C1. LAM 3PL Workflow
 
 **Status:** Operational | **Priority:** Complete
 
@@ -531,7 +531,7 @@ Always set `Chuboe_MFR_Text`. Only set `Chuboe_MFR_ID` when the resolved record 
 
 **Affected workflows:**
 - LAM EPG Award sourcing (`epg-full-api-run.js`, `epg-remaining.js`)
-- LAM Kitting Reorder sourcing (`lam-kitting-source.js`)
+- LAM 3PL sourcing (`lam-kitting-source.js`)
 - Any future franchise API sourcing reports
 
 ---
@@ -1158,10 +1158,10 @@ The forward-only J4 cron prevents new debt but doesn't address the historical ga
 | Foreground >= 100 MPNs | **Don't pause** — run alongside, accept quota competition |
 | Background (enricher) | Check pause file at every MPN boundary, sleep 30s if active |
 
-**Why size threshold:** Small foreground = user is actively waiting (e.g., Stock RFQ pricing for a quote). Large foreground (LAM Kitting Reorder = hundreds of MPNs) shouldn't kick the enricher's can down the street indefinitely — better to share quota and let cache hits dedupe.
+**Why size threshold:** Small foreground = user is actively waiting (e.g., Stock RFQ pricing for a quote). Large foreground (LAM 3PL = hundreds of MPNs) shouldn't kick the enricher's can down the street indefinitely — better to share quota and let cache hits dedupe.
 
 **Workflows that write the pause file (foreground, when small):**
-- LAM Kitting Reorder (Monday cron)
+- LAM 3PL (Monday cron)
 - Stock RFQ Loading suggested-resale
 - HTS/ECCN Backfill
 - enrich-rfq.js manual CLI invocation

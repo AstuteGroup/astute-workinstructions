@@ -158,7 +158,7 @@ async function main() {
   const rfqResult = await writeRFQ({
     bpartnerId: LAM_BPARTNER_ID,
     type: RFQ_TYPE,
-    description: `LAM Kitting Reorder ${dateStr} — auto-generated`,
+    description: `LAM 3PL Reorder ${dateStr} — auto-generated`,
     salesrepId: SALESREP_ID,
     userId: LAM_CONTACT_ID,
     lines: rfqLines,

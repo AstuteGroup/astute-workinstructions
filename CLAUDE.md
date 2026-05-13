@@ -67,6 +67,7 @@ At the start of every new conversation, before addressing anything else, always 
 > 17. **Leah's BOS Report** - Weekly open-order report for Leah Griffin / BOS team. Processes Infor xlsx export into 3-bucket × 3-aging × region breakdown with: (a) week-over-week past-due Δ decomposition (Persisted / Resolved / Rolled forward / New entry — normalized to daily rate), (b) BOS↔ISE matrix alignment check (mismatches + no-CSE + orphan-ISE flagged as Signals + Unaligned xlsx tab), (c) auto-detected anomaly signals. Emailed from stockRFQ@ (see `Trading Analysis/Leah's BOS Report/leahs-bos-report.md`)
 > 18. **AMAT RFQ Management** - Pull RFQ data from Applied Materials' Supplier Collaboration Vault 2.0 (https://myapp.amat.com) so RFQs can flow into OT without manual portal click-through. **PAUSED** pending IT confirmation of credentials + ToU + 2FA channel (see `Trading Analysis/AMAT RFQ Management/amat-rfq-management.md`)
 > 19. **Price Intelligence Dashboard** - Per-MPN price-trend dashboard overlaying VQ quotes, market offers, and customer targets. Trigger phrases: "price intelligence on \<MPN\>", "price trend for \<MPN\>", "part trend analysis on \<MPN\>" (see `Trading Analysis/Price Intelligence Dashboard/price-intelligence.md`)
+> 20. **LAM 3PL** - W111/W115 LAM 3PL operations: weekly reorder alerts + franchise sourcing + customer offer refresh. Canonical home for LAM contract purchase pricing lookups across the Kitting DB, EPG SIPOC, and Phase 2 Adds tracker (see `Trading Analysis/LAM 3PL/lam-3pl.md`)
 
 3. **Review Roadmaps** (planned work):
 
