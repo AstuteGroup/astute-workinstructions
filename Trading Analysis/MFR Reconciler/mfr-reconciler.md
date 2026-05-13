@@ -61,7 +61,7 @@ Daily 6 AM UTC (= midnight Central). Runs after enricher backlog drain finishes 
 ## Lifecycle behaviors
 
 - **Single-instance guard:** PID file at `~/workspace/.mfr-reconciler.pid`. If a live PID owns it, the new run exits 0 cleanly. Same pattern as `enrich-poller` and `rfq-loader-daemon`.
-- **Pause-file aware:** Respects `~/workspace/.api-pause` (J5 mechanism). Any foreground workflow (LAM Kitting Reorder, Stock RFQ pricing, etc.) can yield the reconciler. Use `--ignore-pause` to override.
+- **Pause-file aware:** Respects `~/workspace/.api-pause` (J5 mechanism). Any foreground workflow (LAM 3PL, Stock RFQ pricing, etc.) can yield the reconciler. Use `--ignore-pause` to override.
 - **Signal handlers:** SIGINT/SIGTERM release PID and exit cleanly.
 - **Watermark only advances on success.** Fatal errors leave watermark untouched so the next run picks up the same window.
 
