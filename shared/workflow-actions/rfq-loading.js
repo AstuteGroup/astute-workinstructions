@@ -13,6 +13,17 @@
 const { enqueue } = require('../rfq-load-queue');
 const largeRfqGate = require('../large-rfq-gate');
 const pending = require('../workflow-pending-state');
+const { makeApprovalActions } = require('./_approval');
+
+const { action_approve: action_approve_large_rfq, action_reject: action_reject_large_rfq } =
+  makeApprovalActions(largeRfqGate, {
+    workflow: 'rfq-loading',
+    payloadKey: 'rfq_number',
+    recordLabel: 'Large RFQ',
+    downstreamLabel: 'enrich-poller',
+    downstreamLeadTime: 'within 15 min',
+    supportsCacheOnly: true,
+  });
 
 // ─── HANDLERS ────────────────────────────────────────────────────────────────
 
@@ -114,81 +125,11 @@ ${details ? `<pre style="background:#f5f5f5;padding:8px;white-space:pre-wrap;fon
   return { notified: ctx.jakeEmail };
 }
 
-/**
- * Approve a large-RFQ enrichment request (from a reply to an
- * `[APPROVAL NEEDED] Large RFQ N` email — the gate sends these from
- * rfqloading@, so replies land in this inbox).
- *
- * Required payload: { rfq_number }
- * Optional: { max_lines, note }
- *
- * The gate handles missing sentinels gracefully — markApproved just writes
- * the .cleared file. If no sentinel exists (e.g., race condition or stale
- * reply), enrich-poller's `listClearedUnprocessed` won't pick it up because
- * the sentinel JSON is missing; the operator gets the ack regardless.
- */
-async function action_approve_large_rfq(payload, ctx) {
-  const { rfq_number, max_lines, cache_only, note } = payload;
-  if (ctx.dryRun) {
-    return { dry_run: true, would_approve: { rfq_number, max_lines, cache_only, note } };
-  }
-  const maxLines = Number.isFinite(Number(max_lines)) && Number(max_lines) > 0
-    ? Number(max_lines) : null;
-  const cacheOnly = cache_only === true || cache_only === 'true';
-  largeRfqGate.markApproved(rfq_number, {
-    maxLines,
-    cacheOnly,
-    approvedBy: ctx.from || ctx.jakeEmail || 'email',
-    note,
-  });
-  const tags = [];
-  if (maxLines) tags.push(`capped at ${maxLines.toLocaleString('en-US')} lines`);
-  if (cacheOnly) tags.push('cache-only (no live API calls)');
-  const tagLine = tags.length ? ` (${tags.join('; ')})` : '';
-  const ackHtml = `<html><body style="font-family:Arial,sans-serif;font-size:13px">
-<p>Got it — <b>RFQ ${esc(rfq_number)}</b> approved for enrichment${tagLine}.</p>
-<p>The next enrich-poller tick (within 15 min) will pick it up. You'll see it in the standard digest.</p>
-${cacheOnly ? '<p style="color:#666;font-size:12px">Cache-only mode: lines without a recent envelope will be skipped silently — no API spend.</p>' : ''}
-<p style="color:#888;font-size:11px">Sentinel: <code>~/workspace/.large-rfq-pending/${esc(rfq_number)}.cleared</code></p>
-</body></html>`;
-  await ctx.notifier.sendEmail(
-    ctx.jakeEmail,
-    `[CONFIRMED] Large RFQ ${rfq_number} approved${tagLine}`,
-    ackHtml,
-    { html: true }
-  );
-  return { approved: rfq_number, maxLines, cacheOnly };
-}
-
-/**
- * Reject a large-RFQ enrichment request.
- *
- * Required payload: { rfq_number }
- * Optional: { reason }
- */
-async function action_reject_large_rfq(payload, ctx) {
-  const { rfq_number, reason } = payload;
-  if (ctx.dryRun) {
-    return { dry_run: true, would_reject: { rfq_number, reason } };
-  }
-  largeRfqGate.markRejected(rfq_number, {
-    reason,
-    rejectedBy: ctx.from || ctx.jakeEmail || 'email',
-  });
-  const reasonLine = reason ? `<p>Reason: ${esc(reason)}</p>` : '';
-  const ackHtml = `<html><body style="font-family:Arial,sans-serif;font-size:13px">
-<p>Got it — <b>RFQ ${esc(rfq_number)}</b> rejected. The enrich-poller will skip this RFQ permanently.</p>
-${reasonLine}
-<p style="color:#888;font-size:11px">Sentinel: <code>~/workspace/.large-rfq-pending/${esc(rfq_number)}.rejected</code> — delete this file to un-reject if needed.</p>
-</body></html>`;
-  await ctx.notifier.sendEmail(
-    ctx.jakeEmail,
-    `[CONFIRMED] Large RFQ ${rfq_number} rejected`,
-    ackHtml,
-    { html: true }
-  );
-  return { rejected: rfq_number };
-}
+// action_approve_large_rfq + action_reject_large_rfq are produced by
+// makeApprovalActions(largeRfqGate, ...) at the top of this file. Generic
+// payload coercion, sentinel write, and operator ack live in
+// shared/workflow-actions/_approval.js so excess/VQ/Stock RFQ get the same
+// behavior the moment they add their own gate.
 
 // ─── HELPERS ─────────────────────────────────────────────────────────────────
 
