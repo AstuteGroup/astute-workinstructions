@@ -19,6 +19,7 @@ const ExcelJS = require('exceljs');
 const fs = require('fs');
 const path = require('path');
 const { getRate } = require('../../shared/fx-rates');
+const { getCandidatesForRfq: getCrossRefCandidatesForRfq } = require('../../shared/crossref-queue');
 
 // Database connection (uses Unix socket peer authentication).
 // `user` must be set explicitly because cron-launched processes don't
@@ -648,6 +649,110 @@ function sortByPartAndSupply(rows) {
 }
 
 /**
+ * Build a Cross-Ref Candidates workbook for an RFQ.
+ *
+ * Source: ~/workspace/.crossref-queue/{rfq_value}.json — pending and
+ * already-written entries surfaced together so the buyer can see both
+ * what awaits review and what the classifier auto-approved.
+ *
+ * Returns the workbook (caller writes the buffer + attaches). Returns
+ * null if there are no candidates to surface.
+ */
+async function createCrossRefWorkbook(rfqValue, customer) {
+  let cands;
+  try {
+    cands = getCrossRefCandidatesForRfq(rfqValue);
+  } catch {
+    return null;
+  }
+  // Show pending + already-written (auto-approved + operator-approved
+  // both have status 'written'). Skip rejected / expired / auto-rejected /
+  // auto-dropped — those are by-design negatives, no buyer action.
+  const visible = (cands || []).filter(c => c.status === 'pending' || c.status === 'written');
+  if (visible.length === 0) return null;
+
+  visible.sort((a, b) => {
+    // Pending first, then written. Within each group, by total value desc.
+    if (a.status !== b.status) return a.status === 'pending' ? -1 : 1;
+    return (b.totalValue || 0) - (a.totalValue || 0);
+  });
+
+  const wb = new ExcelJS.Workbook();
+  wb.creator = 'Vortex Matches — Cross-Ref Review';
+  wb.created = new Date();
+  const ws = wb.addWorksheet('Cross-Ref Candidates');
+
+  ws.columns = [
+    { header: 'Status',         key: 'status',         width: 18 },
+    { header: 'ID',             key: 'id',             width: 38 },
+    { header: 'Searched MPN',   key: 'searched',       width: 22 },
+    { header: 'Returned MPN',   key: 'returned',       width: 26 },
+    { header: 'RFQ MFR',        key: 'rfqMfr',         width: 18 },
+    { header: 'Supplier MFR',   key: 'supMfr',         width: 18 },
+    { header: 'Supplier',       key: 'supplier',       width: 22 },
+    { header: 'Qty',            key: 'qty',            width: 10 },
+    { header: 'Unit Price',     key: 'unitPrice',      width: 12 },
+    { header: 'Total Value',    key: 'totalValue',     width: 14 },
+    { header: 'Lead Time',      key: 'leadTime',       width: 14 },
+    { header: 'Date Code',      key: 'dateCode',       width: 10 },
+    { header: 'Reason',         key: 'reason',         width: 22 },
+    { header: 'Decided',        key: 'decided',        width: 20 },
+  ];
+
+  const statusLabel = (s) => {
+    if (s === 'pending') return 'Pending review';
+    if (s === 'written') return 'Auto-approved';
+    return s;
+  };
+
+  for (const c of visible) {
+    ws.addRow({
+      status:     statusLabel(c.status),
+      id:         c.id,
+      searched:   c.searchedMpn,
+      returned:   c.returnedMpn,
+      rfqMfr:     c.rfqMfrText,
+      supMfr:     c.supplierMfrText,
+      supplier:   c.supplierName,
+      qty:        Number(c.qty || 0),
+      unitPrice:  Number(c.unitPrice || 0),
+      totalValue: Number(c.totalValue || 0),
+      leadTime:   c.leadTime || '',
+      dateCode:   c.dateCode || '',
+      reason:     c.statusReason || '',
+      decided:    c.decided_at ? c.decided_at.slice(0, 16).replace('T', ' ') : '',
+    });
+  }
+
+  // Header row styling
+  const hdr = ws.getRow(1);
+  hdr.font = { bold: true };
+  hdr.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE6F0FF' } };
+
+  // Format currency + qty columns
+  ws.getColumn('qty').numFmt = '#,##0';
+  ws.getColumn('unitPrice').numFmt = '$#,##0.0000';
+  ws.getColumn('totalValue').numFmt = '$#,##0.00';
+
+  // Conditional fill: pending rows in pale blue, written in pale green
+  for (let i = 2; i <= ws.rowCount; i++) {
+    const r = ws.getRow(i);
+    const stCell = r.getCell('status');
+    if (stCell.value === 'Pending review') {
+      r.eachCell({ includeEmpty: false }, (cell) => {
+        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF0F7FF' } };
+      });
+    } else if (stCell.value === 'Auto-approved') {
+      r.eachCell({ includeEmpty: false }, (cell) => {
+        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF0FFF0' } };
+      });
+    }
+  }
+
+  return { wb, pending: visible.filter(c => c.status === 'pending').length, written: visible.filter(c => c.status === 'written').length };
+}
+
+/**
  * Create formatted Excel workbook using ExcelJS
  */
 async function createWorkbook(data, columns, fileType) {
@@ -910,17 +1015,44 @@ async function runVortexForRFQ(rfqNumber, { log = () => {}, vqRfqId = null, excl
   }
   await pushFile(noPrices, 'No Prices', 'No Prices');
 
-  return { rfqNumber, customer, hasTargets, summary, attachments };
+  // Cross-ref candidates surface (Phase 2c) — buyer-facing tab listing
+  // MPN_CROSS_REF candidates the classifier couldn't auto-decide, plus the
+  // already-auto-approved ones for the trust-build phase. Buyer replies to
+  // the vortex email with `approve cross-ref: <ID>` to write a pending row;
+  // reply handler is shared/workflow-actions/crossref-review.js.
+  let crossRefSummary = null;
+  try {
+    const xr = await createCrossRefWorkbook(rfqNumber, customer);
+    if (xr) {
+      const buf = await workbookToBuffer(xr.wb);
+      attachments.push({ filename: `${rfqNumber}_CrossRef.xlsx`, content: buf });
+      crossRefSummary = { pending: xr.pending, written: xr.written };
+    }
+  } catch (err) {
+    // Cross-ref tab is enhancement, not core — never fail the run on this.
+    console.error(`[vortex] Cross-ref tab build failed for ${rfqNumber}: ${err.message}`);
+  }
+
+  return { rfqNumber, customer, hasTargets, summary, attachments, crossRefSummary };
 }
 
 /**
  * Build an HTML email body summarizing a vortex run.
  */
 function buildSummaryHtml(result) {
-  const { rfqNumber, customer, hasTargets, summary } = result;
+  const { rfqNumber, customer, hasTargets, summary, crossRefSummary } = result;
   const priceLine = hasTargets
     ? `<tr><td>Good Prices (≤20% above target)</td><td style="text-align:right"><b>${summary.goodPrices}</b></td></tr>`
     : `<tr><td>All Prices (no customer targets)</td><td style="text-align:right"><b>${summary.allPrices}</b></td></tr>`;
+
+  const crossRefBlock = (!crossRefSummary || (crossRefSummary.pending + crossRefSummary.written === 0))
+    ? ''
+    : `<p style="margin:14px 0 4px 0;font-size:13px">
+       <b style="color:#06c">Cross-Ref Candidates</b> (see <code>${rfqNumber}_CrossRef.xlsx</code>):
+       ${crossRefSummary.written} already auto-approved (VQs written) ·
+       <b>${crossRefSummary.pending}</b> pending review.
+       ${crossRefSummary.pending > 0 ? `<br/><span style="color:#555">To write any pending row as a VQ, reply with: <code>approve cross-ref: &lt;ID&gt;</code> (or list multiple IDs).</span>` : ''}
+       </p>`;
 
   return `<html><body style="font-family:Arial,sans-serif;font-size:13px;color:#222">
 <h2 style="margin:0 0 8px 0">Vortex Matches — RFQ ${rfqNumber}</h2>
@@ -933,6 +1065,7 @@ function buildSummaryHtml(result) {
   <tr><td>No Prices (supply leads)</td><td style="text-align:right"><b>${summary.noPrices}</b></td></tr>
   <tr style="background:#fafafa"><td><b>Total matches</b></td><td style="text-align:right"><b>${summary.totalMatches}</b></td></tr>
 </table>
+${crossRefBlock}
 <p style="margin:14px 0 4px 0;color:#666;font-size:11px">Generated by Vortex Matches automation. Attached workbooks contain the full row-level detail.</p>
 </body></html>`;
 }

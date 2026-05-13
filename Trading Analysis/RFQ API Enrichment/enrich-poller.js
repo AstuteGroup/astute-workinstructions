@@ -40,6 +40,7 @@ const { assignPriority, isImmediate, PRIORITY } = require('./rfq-priority');
 const { readQuotaState, isQuotaBlocked, hasAdequateQuota } = require('./rfq-quota-state');
 const { addToBacklog, nextBatch, markAttempted, pruneBacklog, backlogStats } = require('./rfq-backlog');
 const largeRfqGate = require('../../shared/large-rfq-gate');
+const { getCandidatesForRfq: getCrossRefCandidatesForRfq } = require('../../shared/crossref-queue');
 
 const WATERMARK_FILE = path.resolve(process.env.HOME || '/home/analytics_user', 'workspace/.last-rfq-enrich');
 const ROLLUP_FILE = path.resolve(process.env.HOME || '/home/analytics_user', 'workspace/.enrich-poller-rollup.json');
@@ -197,6 +198,11 @@ function renderSummaryHtml(batchResults, sinceIso, untilIso, backlog, quotaState
   const totalFlagged = batchResults.reduce((s, r) => s + (r.vqsFlagged || 0), 0);
   const totalErrors = batchResults.reduce((s, r) => s + (r.errors?.length || 0), 0);
   const totalSilentSkips = batchResults.reduce((s, r) => s + (r.silentSkips || 0), 0);
+  const totalCrossRefAutoApproved = batchResults.reduce((s, r) => s + (r.crossRefAutoApproved || 0), 0);
+  const totalCrossRefAutoRejected = batchResults.reduce((s, r) => s + (r.crossRefAutoRejected || 0), 0);
+  const totalCrossRefPending = batchResults.reduce((s, r) => s + (r.crossRefPending || 0), 0);
+  const totalCrossRefDropped = batchResults.reduce((s, r) => s + (r.crossRefDropped || 0), 0);
+  const totalCrossRefDecisions = totalCrossRefAutoApproved + totalCrossRefAutoRejected + totalCrossRefPending + totalCrossRefDropped;
   const totalDurationSec = batchResults.reduce((s, r) => s + ((r.durationMs || 0) / 1000), 0);
   const cacheHitPct = totalLines > 0 ? Math.round(100 * totalCacheHits / totalLines) : 0;
 
@@ -325,6 +331,7 @@ function renderSummaryHtml(batchResults, sinceIso, untilIso, backlog, quotaState
       <tr><td>VQs written</td><td style="text-align:right">${totalVqs.toLocaleString()}</td></tr>
       <tr><td>VQs flagged</td><td style="text-align:right">${totalFlagged.toLocaleString()}</td></tr>
       <tr><td>Silent writer skips</td><td style="text-align:right">${totalSilentSkips.toLocaleString()}${totalSilentSkips > 0 ? ' <span style="color:#a60">(stock available, no VQ written — see breakdown below)</span>' : ''}</td></tr>
+      <tr><td>Cross-ref decisions</td><td style="text-align:right">${totalCrossRefDecisions === 0 ? '0' : `<b>${totalCrossRefAutoApproved}</b> auto-approved (VQs written) · <b>${totalCrossRefAutoRejected}</b> auto-rejected (MFR mismatch) · <b>${totalCrossRefPending}</b> pending review · ${totalCrossRefDropped} dropped (blank MFR)`}</td></tr>
       <tr><td>Errors</td><td style="text-align:right">${totalErrors}</td></tr>
       <tr><td>Duration</td><td style="text-align:right">${totalDurationSec.toFixed(1)}s</td></tr>
       <tr><td>DigiKey quota</td><td style="text-align:right">${quotaRemaining} remaining (as of ${quotaUpdated} UTC)</td></tr>
@@ -349,6 +356,7 @@ function renderSummaryHtml(batchResults, sinceIso, untilIso, backlog, quotaState
       `).join('')}
     </table>
     ${totalSilentSkips > 0 ? renderSilentSkipSamples(batchResults) : ''}
+    ${totalCrossRefPending > 0 ? renderCrossRefPendingSection(batchResults) : ''}
     <br/>
     <h4>Per RFQ</h4>
     <table border="1" cellpadding="4" cellspacing="0" style="border-collapse:collapse;font-size:12px">
@@ -407,6 +415,135 @@ function renderSilentSkipSamples(batchResults) {
       ${rows}
     </table>
   `;
+}
+
+/**
+ * Render cross-ref pending review section. For RFQs in this digest window
+ * that had pending classifier outcomes, pull the staged candidates from
+ * ~/workspace/.crossref-queue/{rfq}.json and surface up to 12 samples
+ * sorted by total value (qty × unit price) descending. Operator reviews
+ * full list via the CSV attachment. Approval flows through the reply
+ * parser (shared/workflow-actions/crossref-review.js): "approve cross-ref:
+ * <ID1>, <ID2>".
+ */
+function renderCrossRefPendingSection(batchResults) {
+  const rfqValues = [...new Set(
+    batchResults.filter(r => (r.crossRefPending || 0) > 0).map(r => r.rfq)
+  )];
+  if (rfqValues.length === 0) return '';
+
+  // Map RFQ → customer for the rendered table
+  const rfqToCustomer = {};
+  for (const r of batchResults) rfqToCustomer[r.rfq] = r.customer || '?';
+
+  const all = [];
+  for (const rfqValue of rfqValues) {
+    try {
+      const cands = getCrossRefCandidatesForRfq(rfqValue, { status: 'pending' });
+      for (const c of cands) all.push(c);
+    } catch (err) {
+      // Per-RFQ queue file read failure shouldn't break the digest.
+    }
+  }
+  if (all.length === 0) return '';
+
+  all.sort((a, b) => (b.totalValue || 0) - (a.totalValue || 0));
+  const top = all.slice(0, 12);
+
+  const fmtCurrency = (n) => `$${Number(n || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 4 })}`;
+  const rows = top.map(c => `
+    <tr>
+      <td><code style="font-size:11px">${c.id}</code></td>
+      <td>${c.rfqValue}</td>
+      <td>${(rfqToCustomer[c.rfqValue] || '?').slice(0, 24)}</td>
+      <td><code>${c.searchedMpn}</code></td>
+      <td><code>${c.returnedMpn}</code></td>
+      <td>${c.rfqMfrText || '<i>(blank)</i>'}</td>
+      <td>${c.supplierMfrText || '<i>(blank)</i>'}</td>
+      <td>${(c.supplierName || '?').slice(0, 22)}</td>
+      <td style="text-align:right">${Number(c.qty || 0).toLocaleString()}</td>
+      <td style="text-align:right">${fmtCurrency(c.unitPrice)}</td>
+      <td style="text-align:right">${fmtCurrency(c.totalValue)}</td>
+      <td><i>${c.statusReason || ''}</i></td>
+    </tr>
+  `).join('');
+
+  const moreNote = all.length > top.length
+    ? `<p style="font-size:11px;margin:6px 0 0 0;color:#666">Showing top ${top.length} of ${all.length} pending — full list in attached CSV.</p>`
+    : '';
+
+  return `
+    <br/>
+    <h4 style="color:#06c">Cross-ref candidates pending review (${all.length})</h4>
+    <p style="font-size:12px;margin:0 0 6px 0">MFR matches but MPN stem differs — neither auto-approve (clean prefix variant) nor auto-reject (MFR mismatch). Reply to this email with <code>approve cross-ref: &lt;ID1&gt;, &lt;ID2&gt;</code> to write the selected lines as VQs (or <code>reject cross-ref: &lt;ID&gt;</code> to mark rejected). Full per-row data in the attached CSV.</p>
+    <table border="1" cellpadding="4" cellspacing="0" style="border-collapse:collapse;font-size:11px">
+      <tr style="background:#e6f0ff">
+        <th>ID</th><th>RFQ</th><th>Customer</th><th>Searched</th><th>Returned</th>
+        <th>RFQ MFR</th><th>Supplier MFR</th><th>Supplier</th>
+        <th>Qty</th><th>Unit</th><th>Total</th><th>Reason</th>
+      </tr>
+      ${rows}
+    </table>
+    ${moreNote}
+  `;
+}
+
+/**
+ * Build a CSV of all cross-ref pending candidates for the given RFQ list.
+ * Returns null if zero pending candidates. Returns {filename, content} ready
+ * to drop into a nodemailer attachments array.
+ */
+function buildCrossRefPendingCsv(batchResults) {
+  const rfqValues = [...new Set(
+    batchResults.filter(r => (r.crossRefPending || 0) > 0).map(r => r.rfq)
+  )];
+  if (rfqValues.length === 0) return null;
+
+  const rfqToCustomer = {};
+  const rfqToType = {};
+  for (const r of batchResults) {
+    rfqToCustomer[r.rfq] = r.customer || '';
+    rfqToType[r.rfq] = r.rfqType || '';
+  }
+
+  const cells = [];
+  for (const rfqValue of rfqValues) {
+    let cands;
+    try {
+      cands = getCrossRefCandidatesForRfq(rfqValue, { status: 'pending' });
+    } catch {
+      continue;
+    }
+    for (const c of cands) cells.push({ ...c, customer: rfqToCustomer[rfqValue], rfqType: rfqToType[rfqValue] });
+  }
+  if (cells.length === 0) return null;
+
+  cells.sort((a, b) => (b.totalValue || 0) - (a.totalValue || 0));
+
+  const escape = (v) => {
+    if (v == null) return '';
+    const s = String(v);
+    if (/[",\r\n]/.test(s)) return `"${s.replace(/"/g, '""')}"`;
+    return s;
+  };
+  const header = [
+    'ID', 'RFQ', 'Customer', 'RFQ Type', 'Searched MPN', 'Returned MPN',
+    'RFQ MFR', 'Supplier MFR', 'Supplier', 'BP Search Key',
+    'Qty', 'Unit Price', 'Total Value',
+    'Lead Time', 'MOQ', 'SPQ', 'Date Code', 'Channel',
+    'Status Reason', 'Decided At', 'Vendor Notes',
+  ];
+  const rows = cells.map(c => [
+    c.id, c.rfqValue, c.customer, c.rfqType,
+    c.searchedMpn, c.returnedMpn,
+    c.rfqMfrText, c.supplierMfrText, c.supplierName, c.bpSearchKey,
+    c.qty, c.unitPrice, c.totalValue,
+    c.leadTime, c.moq, c.spq, c.dateCode, c.channel,
+    c.statusReason, c.decided_at, c.vendorNotes,
+  ].map(escape).join(','));
+  const content = [header.join(','), ...rows].join('\n') + '\n';
+  const date = new Date().toISOString().slice(0, 10);
+  return { filename: `crossref-pending-${date}.csv`, content };
 }
 
 /**
@@ -503,16 +640,18 @@ function renderApiHealthSection() {
   }
 }
 
-async function sendEmail(subject, html) {
+async function sendEmail(subject, html, attachments = null) {
   const pass = process.env.WORKMAIL_PASS;
   if (!pass) {
     log('WARN: WORKMAIL_PASS not set — skipping email');
     return;
   }
+  const mail = { to: JAKE_EMAIL, subject, html };
+  if (attachments && attachments.length) mail.attachments = attachments;
   const result = await sendWithFallback({
     primary:  { from: FROM_EMAIL,     pass, displayName: 'RFQ API Enrichment' },
     fallback: { from: FALLBACK_EMAIL, pass, displayName: 'RFQ API Enrichment' },
-    mail: { to: JAKE_EMAIL, subject, html },
+    mail,
     log,
   });
   log(`sendEmail: delivered via ${result.delivered}` +
@@ -881,8 +1020,11 @@ async function main() {
         if (bl.pending > 0) subject += ` [backlog: ${bl.pending}]`;
         const quotaState = readQuotaState();
         const html = renderSummaryHtml(digestResults, digestWindowSince, digestWindowUntil, bl, quotaState);
-        await sendEmail(subject, html);
-        log(`Digest email sent (UTC slot ${utcHour}h, ${digestResults.length} RFQs covered)`);
+        const crossRefCsv = buildCrossRefPendingCsv(digestResults);
+        const attachments = crossRefCsv ? [crossRefCsv] : null;
+        await sendEmail(subject, html, attachments);
+        log(`Digest email sent (UTC slot ${utcHour}h, ${digestResults.length} RFQs covered)` +
+            (crossRefCsv ? ` [+ crossref CSV: ${crossRefCsv.filename}]` : ''));
       } catch (err) {
         log('WARN: digest email send failed (slot still marked):', err.message);
       }
