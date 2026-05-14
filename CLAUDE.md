@@ -377,11 +377,32 @@ The `adempiere` schema is a read-only logical replica streaming directly from pr
 
 ### ✅ HOW TO WRITE DATA: iDempiere REST API
 
-When you generate new data (like RFQs, Orders, or Business Partners) that needs to go back to the ERP, write it via the **iDempiere REST API** using `shared/api-client.js`.
+**FIRST — which user are you running as?** Run `whoami`.
 
-**Full documentation:** See **`shared/api-writeback.md`** for authentication, credential management, payload structures for all 12 tables, and examples.
+- **`analytics_user`** — you hold the iDempiere credentials in `~/workspace/.env`. Use the writers directly as documented below. Nothing in this section has changed for you.
+- **anything else** (e.g. `josh.syre`, `melissa.bojar`) — you do **not** have iDempiere credentials and you cannot read analytics_user's. Direct calls to `apiPost` / `apiPut` / `api-client.js` **will fail at auth.** Route writebacks through the proxy:
 
-#### Quick Reference
+  ```javascript
+  // Drop-in replacement — same function names, same signatures as the originals.
+  const { writeRFQ, writeOffer, writeCQ, writeCQBatch, writeVQBatch,
+          tickVQForPurchase, postApproveOrder, markCQSold,
+          validateVQForPurchase, validateCQForSold } =
+    require('../shared/writeback-proxy-client');
+
+  const result = await writeRFQ({ bpartnerId: 1000190, type: 'Stock', ... });
+  ```
+
+  Under the hood the shim spawns `sudo -n -u analytics_user /opt/writeback/cli <subcommand>` with a JSON payload on stdin. Every call is audited to `/opt/writeback/audit/`. See **`shared/writeback-proxy.md`** for the full design, the allowlist of exposed writers, and which writers are intentionally NOT reachable through the proxy (`record-updater.patchRecord`, `deactivatePriorOffers`, etc.).
+
+  If a task seems to need an unguarded writer (direct `apiPost`, generic PATCH, mass deactivation), STOP and discuss with the user — do not work around the proxy.
+
+---
+
+When you generate new data (like RFQs, Orders, or Business Partners) that needs to go back to the ERP, write it via the **iDempiere REST API** using `shared/api-client.js` (or the proxy shim if you're not analytics_user).
+
+**Full documentation:** See **`shared/api-writeback.md`** for authentication, credential management, payload structures for all 12 tables, and examples. See **`shared/writeback-proxy.md`** for the proxy path.
+
+#### Quick Reference (analytics_user — direct path)
 
 ```javascript
 const { apiPost } = require('../shared/api-client');
@@ -407,21 +428,26 @@ See [iDempiere REST API docs](https://bxservice.github.io/idempiere-rest-docs/do
 
 IDs are **assigned server-side** by iDempiere — do NOT include PK fields in POST payloads. For parent-child records, POST the parent first, extract the ID from the response, then POST children with the parent's ID.
 
-#### Consumer Modules (Identical Interfaces)
+#### Consumer Modules
 
-| Module | Function | What It Writes |
-|--------|----------|----------------|
-| `shared/rfq-writer.js` | `writeRFQ(opts)` | chuboe_rfq + lines + line_mpn |
-| `shared/offer-writeback.js` | `writeOffer(opts)` | chuboe_offer + lines + line_mpn |
-| `shared/api-result-writer.js` | `writePricingResult(opts)` | chuboe_pricing_api_result |
-| `shared/vq-writer.js` | `writeVQBatch(rfq, items)` | chuboe_vq_line (two-pass: exact → fuzzy) |
-| `shared/cq-writer.js` | `writeCQ(rfq, line)` / `writeCQBatch(rfq, lines)` | chuboe_cq_line (flat, no header) |
-| `shared/record-updater.js` | `patchRecord(table, id, payload, opts)` / `patchBatch(table, updates, opts)` | **Updates** existing rows on any chuboe_* table — idempotent backfills, enrichment passes, corrections (HTS/ECCN, alt-MPN linkage, etc.). See `api-writeback.md` § PATCH / Update Pattern. |
-| `shared/vq-patcher.js` | `tickVQForPurchase(vqId, {program, extra})` | **PATCH IsPurchased='Y'** on a VQ — enforced path. Runs `vq-purchase-validator.js` first, aborts on failure, auto-unticks competing VQs. **DO NOT `patchRecord('chuboe_vq_line', id, {IsPurchased: 'Y'})` directly.** |
-| `shared/r-request-writer.js` | `postApproveOrder({vqId, program, rfqId, summary, approvalText})` | **POST approve-order R_Request** — enforced path. Validates linked VQ first, forces Jake routing + Submitted status + Approve Order type. **DO NOT `apiPost('r_request', ...)` directly for approvals.** |
-| `shared/vq-purchase-validator.js` | `validateVQForPurchase(vqId, {program})` | Pre-flight checker (called internally by the two wrappers above). Returns `{ok, violations, vq}`. Useful on its own for dry-run diagnostics. |
-| `shared/cq-patcher.js` | `markCQSold(cqId, {poReference, extra})` | **PATCH IsSold='Y' + R_Status_ID=Closed** on a CQ — enforced path. Mirrors operational fields (DatePromised, Chuboe_Lead_Time, Chuboe_Date_Code, Chuboe_Packaging_ID, Chuboe_RoHS, C_Country_ID) from the winning VQ on the same RFQ line, then validates. **DO NOT `patchRecord('chuboe_cq_line', id, {IsSold: 'Y'})` directly.** |
-| `shared/cq-sold-validator.js` | `validateCQForSold(cqId)` | Pre-flight checker (called internally by `markCQSold`). Flags missing `POReference` / `DatePromised` / `Chuboe_Lead_Time`, missing-or-mismatched winning-VQ link, competing sold CQs. |
+For non-`analytics_user` sessions: import from `shared/writeback-proxy-client.js` instead of the individual writer modules below. The function names and signatures are identical; the shim detects your user and routes accordingly. Modules marked **proxy-exposed** below are reachable through the shim. Modules NOT marked are direct-only (analytics_user) — see `shared/writeback-proxy.md` for why.
+
+| Module | Function | Proxy-exposed? | What It Writes |
+|--------|----------|---|----------------|
+| `shared/rfq-writer.js` | `writeRFQ(opts)` | ✅ `rfq` | chuboe_rfq + lines + line_mpn |
+| `shared/offer-writeback.js` | `writeOffer(opts)` / `writeOffers(offers)` | ✅ `offer` / `offer-batch` | chuboe_offer + lines + line_mpn |
+| `shared/offer-writeback.js` | `deactivatePriorOffers` / `deactivateOfferById` | ❌ direct-only | Mass deactivation — too easy to over-scope |
+| `shared/api-result-writer.js` | `writePricingResult(opts)` | ✅ `pricing` | chuboe_pricing_api_result |
+| `shared/api-result-writer.js` | `flushCacheToDB()` | ❌ direct-only | Bulk flush of local cache |
+| `shared/vq-writer.js` | `writeVQBatch(rfq, items)` / `writeReviewedItems(...)` | ✅ `vq-batch` / `vq-reviewed` | chuboe_vq_line (two-pass: exact → fuzzy) |
+| `shared/cq-writer.js` | `writeCQ(rfq, line)` / `writeCQBatch(rfq, lines)` | ✅ `cq` / `cq-batch` | chuboe_cq_line (flat, no header) |
+| `shared/record-updater.js` | `patchRecord(table, id, payload, opts)` / `patchBatch(...)` | ❌ direct-only | **Updates** existing rows on any chuboe_* table — wide blast radius; analytics_user only. Idempotent backfills, enrichment passes, corrections (HTS/ECCN, alt-MPN linkage). See `api-writeback.md` § PATCH / Update Pattern. |
+| `shared/rfq-fast-loader.js` | `loadRFQ(opts)` | ❌ direct-only | Alternate RFQ path |
+| `shared/vq-patcher.js` | `tickVQForPurchase(vqId, {program, extra})` | ✅ `tick-vq` | **PATCH IsPurchased='Y'** on a VQ — enforced path. Runs `vq-purchase-validator.js` first, aborts on failure, auto-unticks competing VQs. **DO NOT `patchRecord('chuboe_vq_line', id, {IsPurchased: 'Y'})` directly.** |
+| `shared/r-request-writer.js` | `postApproveOrder({vqId, program, rfqId, summary, approvalText})` | ✅ `approve-order` | **POST approve-order R_Request** — enforced path. Validates linked VQ first, forces Jake routing + Submitted status + Approve Order type. **DO NOT `apiPost('r_request', ...)` directly for approvals.** |
+| `shared/vq-purchase-validator.js` | `validateVQForPurchase(vqId, {program})` | ✅ `validate-vq-purchase` | Pre-flight checker (called internally by the two wrappers above). Returns `{ok, violations, vq}`. Useful on its own for dry-run diagnostics. |
+| `shared/cq-patcher.js` | `markCQSold(cqId, {poReference, extra})` | ✅ `mark-cq-sold` | **PATCH IsSold='Y' + R_Status_ID=Closed** on a CQ — enforced path. Mirrors operational fields (DatePromised, Chuboe_Lead_Time, Chuboe_Date_Code, Chuboe_Packaging_ID, Chuboe_RoHS, C_Country_ID) from the winning VQ on the same RFQ line, then validates. **DO NOT `patchRecord('chuboe_cq_line', id, {IsSold: 'Y'})` directly.** |
+| `shared/cq-sold-validator.js` | `validateCQForSold(cqId)` | ✅ `validate-cq-sold` | Pre-flight checker (called internally by `markCQSold`). Flags missing `POReference` / `DatePromised` / `Chuboe_Lead_Time`, missing-or-mismatched winning-VQ link, competing sold CQs. |
 
 ### R_Requests (Approve Order + related)
 
@@ -433,7 +459,8 @@ IDs are **assigned server-side** by iDempiere — do NOT include PK fields in PO
 
 #### Credentials
 
-Stored in `~/workspace/.env` (gitignored). Template at `shared/.env.example`. Required vars: `IDEMPIERE_BASE_URL`, `IDEMPIERE_USERNAME`, `IDEMPIERE_PASSWORD`.
+- **Running as `analytics_user`** — credentials are stored at `~/workspace/.env` (gitignored, mode 600, inside a 700 home dir). Template at `shared/.env.example`. Required vars: `IDEMPIERE_BASE_URL`, `IDEMPIERE_USERNAME`, `IDEMPIERE_PASSWORD`.
+- **Running as any other user** — you do not have iDempiere credentials and do not need them. The proxy at `/opt/writeback/cli` runs as `analytics_user` and loads them from the path above. Use `shared/writeback-proxy-client.js` (see `shared/writeback-proxy.md`); you'll never touch a token directly. Do not attempt to create your own `.env` — there's no valid token to put in it.
 
 **Note:** Connected to PRODUCTION (https://172.31.7.239/api/v1). User: Claude Harris (ID: 1049524), Role: Tsunami User (1000004). Data written via the API will appear in production and replicate to this database.
 
