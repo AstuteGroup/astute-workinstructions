@@ -179,7 +179,7 @@ module.exports = {
     cron: { name: 'stockrfq-agent' },
     actions: [
       'load_rfq', 'needs_review', 'not_rfq', 'outbound_pending',
-      'clarify_partner',
+      'clarify_partner', 'dup_skip',
       'approve_large_stock_rfq', 'reject_large_stock_rfq',
     ],
     capabilities: {
@@ -187,7 +187,7 @@ module.exports = {
       needInfoClarifications: true,
       largePayloadGate: true,
       approvalReplyAction: true,
-      preWriteIdempotency: false,
+      preWriteIdempotency: true,
       writeQueue: false,
       breadcrumbWrites: true,
       operatorDigest: false,
@@ -199,7 +199,7 @@ module.exports = {
       operatorDigest: 'broker stock-RFQs are transactional; activityDigest (stock-rfq-activity-digest 6×/day) covers visibility',
       writeQueue: 'direct write; broker emails carry small batches',
     },
-    // Open gaps remaining: preWriteIdempotency, replyParserGrammar, tieredCron
+    // Open gaps remaining: replyParserGrammar, tieredCron
   },
 
   // ─── STOCK RFQ CQ (operator outbound quote replies → CQ rows) ───────────────

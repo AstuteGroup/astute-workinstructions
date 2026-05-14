@@ -38,6 +38,12 @@ For every UID returned, follow the per-message decision tree:
           - Partner does NOT resolve AND `external_sender` is identifiable (real person, broker-domain email, not bounce / automated / multi-hop forward) AND no prior `pending_state` exists → route `clarify_partner` with `{recipient: <external_sender_email>, subject: <original_subject>, extracted: {lines, senderEmail, senderDomain, brokerMessageId, customerName-guess, ...everything_else_parsed}, hints: "<short description: what BP-lookup tried, why it didn't match>"}`. The sidecar persists the extraction; the broker's reply round-trips to this inbox.
           - Partner does NOT resolve AND sender is non-clarifiable (internal forward / bounce / ambiguous) → fall back to Unqualified Broker (bpartnerId 1006505) with customerName captured, continue to MPN extraction normally.
       * Extract MPN+qty (+optional MFR/CPC/target price).
+      * **Cross-resend dedup check.** Before routing load_rfq, run a psql check for any active chuboe_rfq from the same bpartner with matching shape within the last 6 hours:
+          - Match: c_bpartner_id, chuboe_rfq_type_id (Stock), active line_count, AND first+last `chuboe_mpn_clean` (ordered by chuboe_rfq_line.line ASC).
+          - Time window: `created >= NOW() AT TIME ZONE 'America/Chicago' - INTERVAL '6 hours'` (the `created` column stores CDT digits, see shared/data-model.md).
+          - If a candidate matches → route `dup_skip` with `{existingSearchKey: "<existing chuboe_rfq.value>"}`. Don't writeRFQ — the existing record covers this demand. Move to Processed.
+          - If no match → continue to load_rfq.
+          - Skip the dedup check on the Unqualified Broker fallback path (bpartnerId 1006505) — many distinct brokers share that BP, so shape-match would cause false-positive collapses.
       * Resolve MFR via shared/mfr-lookup.js if a manufacturer string is present.
       * **Extract source-identification fields for the load_rfq payload (used by the outbound CQ agent to disambiguate same-MPN/qty quotes from different brokers — see `stock-rfq-cq-loading.md`):**
           - `messageId`: the read response's `message_id` field (Outlook-server-generated MID at auto-forward time).
@@ -51,7 +57,7 @@ If a single message hits a transient error (writeRFQ 5xx, partner-lookup throws,
 
 STEP 4 — Summary.
 At the end, print a single-line summary in this exact shape:
-  STOCKRFQ-AGENT SUMMARY: processed=<N> load_rfq=<N> clarify_partner=<N> approve_large_stock_rfq=<N> reject_large_stock_rfq=<N> outbound_pending=<N> needs_review=<N> not_rfq=<N> errors=<N>
+  STOCKRFQ-AGENT SUMMARY: processed=<N> load_rfq=<N> dup_skip=<N> clarify_partner=<N> approve_large_stock_rfq=<N> reject_large_stock_rfq=<N> outbound_pending=<N> needs_review=<N> not_rfq=<N> errors=<N>
 
 If 0 unseen messages, print "STOCKRFQ-AGENT SUMMARY: no unseen messages" and exit.
 

@@ -418,6 +418,30 @@ async function action_not_rfq(payload, ctx) {
 }
 
 /**
+ * Cross-resend duplicate detected. Same broker just sent the same RFQ (matching
+ * bpartnerId + type + line_count + first/last MPN within 6h). Move to Processed
+ * (terminal) but skip writeRFQ — the existing chuboe_rfq covers this demand.
+ *
+ * Mirrors excess's action_dup_skip. The agent does the SQL check before
+ * routing; this handler just breadcrumbs the decision so the digest can show
+ * how often resends fire.
+ *
+ * Required payload: { existingSearchKey } — the prior RFQ's search key
+ */
+async function action_dup_skip(payload, ctx) {
+  if (ctx.dryRun) {
+    return { dry_run: true, existingSearchKey: payload.existingSearchKey };
+  }
+  breadcrumbs.write({
+    cog: 'stockrfq-agent',
+    event: 'dup-skipped',
+    uid: ctx.uid,
+    existingSearchKey: payload.existingSearchKey,
+  });
+  return { existingSearchKey: payload.existingSearchKey };
+}
+
+/**
  * Move outbound-reply messages (operator quoted back / asked follow-up
  * questions) to `OutboundPending` for the future add_cq agent to consume.
  *
@@ -624,6 +648,11 @@ module.exports = {
       folder: 'OutboundPending',
       requires: ['reason'],
       handler: action_outbound_pending,
+    },
+    dup_skip: {
+      folder: 'Processed',
+      requires: ['existingSearchKey'],
+      handler: action_dup_skip,
     },
     approve_large_stock_rfq: {
       folder: 'LargeStockRFQApprovals',
