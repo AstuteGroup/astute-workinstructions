@@ -69,6 +69,22 @@ module.exports = [
     description: 'Every 30m — retry deferred franchise API calls (Mouser/DigiKey rate-limit queue)',
   },
   {
+    // Watermark-based sweep: every hour, find chuboe_rfq rows newly-flipped
+    // to isactive='N' since last sweep, write a cancel manifest per RFQ, and
+    // purge matching items from the api retry queue. Catches the OT-direct
+    // inactivation case the gate-rejection hook misses (gate hook covers
+    // approve/reject replies; this covers any other path that marks an RFQ
+    // inactive — manual DB flip, automated cleanup, etc.).
+    name: 'cancel-inactive-rfq-retries',
+    cadence: 'every 60m',
+    cadenceCron: '15 * * * *',  // :15 past — out of the way of the :00 process-api-queue tick
+    command: `node "${ASTUTE}/scripts/cancel-inactive-rfq-retries.js"`,
+    cwd: ASTUTE,
+    needsOT: false,
+    logFile: '/tmp/cancel-inactive-rfq-retries.log',
+    description: 'Every 60m :15 — sweep newly-inactivated RFQs, write cancel manifests, purge their in-flight retries from the api queue',
+  },
+  {
     name: 'enrich-poller',
     cadence: 'every 15m',
     cadenceCron: '*/15 * * * *',
@@ -200,35 +216,16 @@ module.exports = [
   //   description: 'Every 30m — poll broker@ inbox, parse offers, writeOffer to OT, dispatch to type router',
   // },
 
-  // PLACEHOLDER for vq-loading agent — vq@ inbox is provisioned and active
-  // (vq-parser CLI polls it today). The agent migration is scaffolded but
-  // INTENTIONALLY DISABLED: the workflow handler (shared/workflow-actions/
-  // vq-loading.js) hasn't been built yet, and the operator wants to validate
-  // extraction quality against a reference example (vq@/Processed UID 8372,
-  // "FW: 1132932") before activating.
-  //
-  // To enable (next-day work — see workflow-registry.js 'vq-loading' entry):
-  //   1. Build shared/workflow-actions/vq-loading.js (handler with load_vqs /
-  //      clarify_vendor / no_bid / dup_skip / needs_review actions; mirrors
-  //      stockrfq.js pattern; uses vq-parser's existing llm-extractor +
-  //      template engine for extraction quality).
-  //   2. Build Trading Analysis/RFQ Sourcing/vq_loading/agent-prompt.txt
-  //      (encodes Two-Agent Validation per vq-loading.md; uses Claude vision
-  //      for image-embedded supplier quotes — see the 1132932 example).
-  //   3. Flip status: 'planned' → 'active' in shared/workflow-registry.js,
-  //      add the action set, capabilities, and deviations.
-  //   4. Uncomment this entry and re-run scripts/install-crons.js --apply.
-  //
-  // {
-  //   name: 'vq-loading-agent',
-  //   cadence: 'every 5m',
-  //   cadenceCron: '*/5 * * * *',
-  //   command: `node "${ASTUTE}/scripts/should-run-vq-loading-agent.js" && /home/analytics_user/.local/bin/claude -p --permission-mode bypassPermissions --max-turns 120 < "${ASTUTE}/Trading Analysis/RFQ Sourcing/vq_loading/agent-prompt.txt"`,
-  //   cwd: ASTUTE,
-  //   needsOT: true,
-  //   logFile: '/tmp/vq-loading-agent.log',
-  //   description: 'Tiered (5m burst / 15m steady) — agent reads vq@ per vq-loading.md, writes VQs via OT API. Burst window triggered by clarify_vendor sidecar.',
-  // },
+  {
+    name: 'vq-loading-agent',
+    cadence: 'every 5m',
+    cadenceCron: '*/5 * * * *',
+    command: `node "${ASTUTE}/scripts/should-run-vq-loading-agent.js" && /home/analytics_user/.local/bin/claude -p --permission-mode bypassPermissions --max-turns 120 < "${ASTUTE}/Trading Analysis/RFQ Sourcing/vq_loading/agent-prompt.txt"`,
+    cwd: ASTUTE,
+    needsOT: true,
+    logFile: '/tmp/vq-loading-agent.log',
+    description: 'Tiered (5m burst / 15m steady) — agent reads vq@ per vq-loading.md, runs Two-Agent Validation (extractor → sub-Agent verifier → reconcile), writes VQs via OT API. Burst window triggered by clarify_vendor / need_info_vendor / needs_vendor sidecar fresh in last 10m.',
+  },
 
   {
     name: 'offer-reply-parser',
