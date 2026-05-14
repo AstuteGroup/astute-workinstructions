@@ -315,13 +315,16 @@ async function queryTopMpns(fromTs, toTs = now, opts = {}) {
 }
 
 async function queryTopCustomers(fromTs, toTs = now, limit = TOP_N) {
+  // Ranked by distinct RFQs, not line_mpn rows. Stock RFQs from brokers are
+  // 1-5 lines typical; a single fat misclassified customer RFQ (e.g. a 4k-line
+  // CM RFQ typed as Stock) used to swamp the customer table under line-count
+  // ranking. RFQ count is the durable demand signal.
   const r = await pool.query(`
     SELECT
       r.c_bpartner_id,
       MAX(bp.name)                                  AS bp_name,
       STRING_AGG(DISTINCT NULLIF(r.bpname, ''), ' | ') AS parsed_names,
       COUNT(DISTINCT r.chuboe_rfq_id)               AS rfq_count,
-      COUNT(*)                                      AS line_count,
       COUNT(*) FILTER (WHERE mpn.priceentered > 0)  AS with_target_count
     FROM adempiere.chuboe_rfq r
     JOIN adempiere.chuboe_rfq_line rl       ON rl.chuboe_rfq_id = r.chuboe_rfq_id
@@ -334,7 +337,7 @@ async function queryTopCustomers(fromTs, toTs = now, limit = TOP_N) {
       AND rl.isactive = 'Y'
       AND mpn.isactive = 'Y'
     GROUP BY r.c_bpartner_id
-    ORDER BY line_count DESC
+    ORDER BY rfq_count DESC
     LIMIT $4
   `, [fromTs, toTs, STOCK_RFQ_TYPE_ID, limit]);
   return r.rows;
@@ -863,7 +866,7 @@ function renderHtml(model) {
   if (topCustomers.length === 0) {
     html += `<p class="small">No stock RFQ lines in the last 30 days.</p>`;
   } else {
-    html += `<table><tr><th>#</th><th>BP</th><th>Parsed Name(s)</th><th>Tag</th><th>RFQs</th><th>Lines</th><th>w/ Target</th></tr>`;
+    html += `<table><tr><th>#</th><th>BP</th><th>Parsed Name(s)</th><th>Tag</th><th>RFQs</th><th>w/ Target</th></tr>`;
     topCustomers.forEach((r, i) => {
       const klass = classifyCustomer(r);
       const bpLabel = Number(r.c_bpartner_id) === UNQUALIFIED_BROKER_ID
@@ -875,7 +878,6 @@ function renderHtml(model) {
         <td class="small">${escHtml((r.parsed_names || '').slice(0, 200))}</td>
         <td>${tagBadge(klass.tag)}<br/><span class="small">${escHtml(klass.note)}</span></td>
         <td>${fmtInt(r.rfq_count)}</td>
-        <td>${fmtInt(r.line_count)}</td>
         <td>${fmtInt(r.with_target_count)}</td>
       </tr>`;
     });
