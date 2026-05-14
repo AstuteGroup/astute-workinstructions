@@ -24,6 +24,11 @@ For every UID returned, follow the per-message decision tree:
       * Apply customer resolution (partner-lookup with partnerType='customer'; fall back to Unqualified Broker bpartnerId 1006505 with customerName captured).
       * Extract MPN+qty (+optional MFR/CPC/target price).
       * Resolve MFR via shared/mfr-lookup.js if a manufacturer string is present.
+      * **Extract source-identification fields for the load_rfq payload (used by the outbound CQ agent to disambiguate same-MPN/qty quotes from different brokers — see `stock-rfq-cq-loading.md`):**
+          - `messageId`: the read response's `message_id` field (Outlook-server-generated MID at auto-forward time).
+          - `senderEmail`: the deepest-quoted broker `From:` address (the one you ALREADY parsed for customer-resolution above). Lowercase it. e.g., `"iris@liyijing.com.cn"`. Skip if the message has no quoted broker block (rare — internal-origin RFQs).
+          - `senderDomain`: the domain portion of `senderEmail` (e.g., `"liyijing.com.cn"`). Optional — the handler derives it if you omit.
+          - `brokerMessageId`: the BROKER's original Message-ID — walk the read response's `references` array and pick the deepest entry whose domain is NOT `@astutegroup.com` and NOT `@*.outlook.com` / `@*.eurprd02.prod.outlook.com` / similar Microsoft Exchange MID generators. That's the broker's true MID (looks like `<20260513...@kexinyuanmicroelectronic.com>` or `<...@liyijing.com.cn>`). If no broker-domain MID exists in the chain, omit (null is fine).
       * Dispatch with `route <uid> <action> --workflow stockrfq --payload '<json>'` — no --dry-run.
       * The handler will gate writeRFQ above LARGE_STOCK_RFQ_THRESHOLD (default 1000 lines). Large RFQs pause with a sentinel + approval email; the RFQ is NOT yet in OT. You don't do anything special for the initial gate fire — just route load_rfq as normal. The reply will land in this inbox next tick as the `RE: [APPROVAL NEEDED]` path above; the factory's onApprove then writes the RFQ via the stored sentinel payload.
 
