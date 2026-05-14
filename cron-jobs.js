@@ -146,7 +146,11 @@ module.exports = [
     // :00/:30. Gate short-circuits claude -p when not running.
     cadence: 'every 5m',
     cadenceCron: '*/5 * * * *',
-    command: `node "${ASTUTE}/scripts/should-run-excess-agent.js" && /home/analytics_user/.local/bin/claude -p --permission-mode bypassPermissions --max-turns 80 < "${ASTUTE}/Trading Analysis/Customer Excess Analysis/agent-prompt.txt"`,
+    // `if gate; then agent; fi` — gate's exit 1 = "skip this tick" (NOT a failure).
+    // Plain `&&` would propagate the gate's exit 1 to cron-runner and get counted
+    // as a job failure on every skipped tick (which is most of them). The if-form
+    // returns 0 on gate-skip so only real agent crashes register as failures.
+    command: `if node "${ASTUTE}/scripts/should-run-excess-agent.js"; then /home/analytics_user/.local/bin/claude -p --permission-mode bypassPermissions --max-turns 80 < "${ASTUTE}/Trading Analysis/Customer Excess Analysis/agent-prompt.txt"; fi`,
     cwd: ASTUTE,
     needsOT: true,
     logFile: '/tmp/excess-agent.log',
@@ -161,7 +165,7 @@ module.exports = [
     // is actively involved in both inbound RFQ + outbound CQ chain).
     cadence: 'every 5m',
     cadenceCron: '*/5 * * * *',
-    command: `node "${ASTUTE}/scripts/should-run-stockrfq-agent.js" && /home/analytics_user/.local/bin/claude -p --permission-mode bypassPermissions --max-turns 80 < "${ASTUTE}/Trading Analysis/Stock RFQ Loading/agent-prompt.txt"`,
+    command: `if node "${ASTUTE}/scripts/should-run-stockrfq-agent.js"; then /home/analytics_user/.local/bin/claude -p --permission-mode bypassPermissions --max-turns 80 < "${ASTUTE}/Trading Analysis/Stock RFQ Loading/agent-prompt.txt"; fi`,
     cwd: ASTUTE,
     needsOT: true,
     logFile: '/tmp/stockrfq-agent.log',
@@ -193,7 +197,7 @@ module.exports = [
     // every-30m. Tunable via RFQLOADING_BURST_WINDOW_MIN env.
     cadence: 'every 5m',
     cadenceCron: '*/5 * * * *',
-    command: `node "${ASTUTE}/scripts/should-run-rfqloading-agent.js" && /home/analytics_user/.local/bin/claude -p --permission-mode bypassPermissions --max-turns 80 < "${ASTUTE}/Trading Analysis/RFQ Loading/agent-prompt.txt"`,
+    command: `if node "${ASTUTE}/scripts/should-run-rfqloading-agent.js"; then /home/analytics_user/.local/bin/claude -p --permission-mode bypassPermissions --max-turns 80 < "${ASTUTE}/Trading Analysis/RFQ Loading/agent-prompt.txt"; fi`,
     cwd: ASTUTE,
     needsOT: true,
     logFile: '/tmp/rfqloading-agent.log',
@@ -220,7 +224,7 @@ module.exports = [
     name: 'vq-loading-agent',
     cadence: 'every 5m',
     cadenceCron: '*/5 * * * *',
-    command: `node "${ASTUTE}/scripts/should-run-vq-loading-agent.js" && /home/analytics_user/.local/bin/claude -p --permission-mode bypassPermissions --max-turns 120 < "${ASTUTE}/Trading Analysis/RFQ Sourcing/vq_loading/agent-prompt.txt"`,
+    command: `if node "${ASTUTE}/scripts/should-run-vq-loading-agent.js"; then /home/analytics_user/.local/bin/claude -p --permission-mode bypassPermissions --max-turns 120 < "${ASTUTE}/Trading Analysis/RFQ Sourcing/vq_loading/agent-prompt.txt"; fi`,
     cwd: ASTUTE,
     needsOT: true,
     logFile: '/tmp/vq-loading-agent.log',
