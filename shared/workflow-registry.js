@@ -133,6 +133,9 @@ module.exports = {
       activityDigest: 'transactional flow — per-RFQ visibility via OT, no aggregate sourcing intel needed',
       replyParserGrammar: 'approval replies use a subject-line directive parsed inside action_approve_large_rfq; no key:value grammar needed',
     },
+    // POLICY 2026-05-14: need_info emails Jake, NOT the external customer. Sidecar +
+    // reply-stitching still active — Jake's reply to rfqloading@ with the missing
+    // values round-trips and triggers enqueue on the next agent tick.
   },
 
   // ─── CUSTOMER EXCESS (offers + broker/franchise data capture) ───────────────
@@ -166,6 +169,12 @@ module.exports = {
     },
     // All capabilities now declared. tieredCron wired in scripts/should-run-excess-agent.js
     // (5m burst on pending large-offer sentinel or clarify_partner sidecar; 30m steady).
+    //
+    // POLICY 2026-05-14: clarify_partner emails Jake, NOT the external sender. Sidecar
+    // + reply-stitching still active — Jake's reply to excess@ with the company name
+    // round-trips and triggers load_offer on the next agent tick. Reversed the original
+    // external-sender variant (commit 0a334bc) alongside the stockrfq deviation after
+    // confirming info-requests must never go to unverified third parties.
   },
 
   // ─── STOCK RFQ LOADING (broker stock RFQs — inbound) ────────────────────────
@@ -178,12 +187,12 @@ module.exports = {
     cron: { name: 'stockrfq-agent' },
     actions: [
       'load_rfq', 'needs_review', 'not_rfq', 'outbound_pending',
-      'clarify_partner', 'dup_skip',
+      'dup_skip',
       'approve_large_stock_rfq', 'reject_large_stock_rfq',
     ],
     capabilities: {
-      replyStitching: true,
-      needInfoClarifications: true,
+      replyStitching: false,
+      needInfoClarifications: false,
       largePayloadGate: true,
       approvalReplyAction: true,
       preWriteIdempotency: true,
@@ -195,13 +204,15 @@ module.exports = {
       tieredCron: true,
     },
     deviations: {
+      replyStitching: 'broker-side workflow has no info-request path that needs stitching — unresolved-partner cases route directly to Unqualified Broker (1006505) instead of round-tripping. See needInfoClarifications below.',
+      needInfoClarifications: 'POLICY: stock RFQs from unverified brokers must NOT trigger an outbound info-request to either the broker or the operator. The broker-side default for unknown senders is "load under Unqualified Broker BP 1006505" — the engagement signal is the value; partner ID is operator triage at the OT layer. Reversed 2026-05-14 after the clarify_partner action (commit 513821d) sent 4 outbound confirmation emails to APAC fishing-pattern brokers within 4 hours. Excess (customer-side) keeps its clarify path but redirects to operator; stockrfq is the deviation.',
       operatorDigest: 'broker stock-RFQs are transactional; activityDigest (stock-rfq-activity-digest 6×/day) covers visibility',
       writeQueue: 'direct write; broker emails carry small batches',
       replyParserGrammar: 'activityDigest is informational-only by design — no curation queue, no operator-override loop. Shared grammar in shared/workflow-reply-grammars.js is available if directives are needed later.',
     },
     // All capabilities now declared. tieredCron wired in scripts/should-run-stockrfq-agent.js
-    // (5m burst on pending large-stockrfq sentinel or clarify_partner sidecar; 15m steady —
-    // tighter than rfqloading's 30m because operator works the inbound RFQ + outbound CQ chain).
+    // (5m burst on pending large-stockrfq sentinel; 15m steady — tighter than rfqloading's
+    // 30m because operator works the inbound RFQ + outbound CQ chain).
   },
 
   // ─── STOCK RFQ CQ (operator outbound quote replies → CQ rows) ───────────────

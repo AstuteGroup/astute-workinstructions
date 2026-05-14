@@ -10,15 +10,15 @@ STEP 3 — Process each message.
 For every UID returned, follow the per-message decision tree:
   - Run `read <uid> --workflow excess` to fetch body + parsed forwarded headers + external_sender.
 
-  - **Check for `pending_state` FIRST.** If the `read` JSON includes a `pending_state` object, this message is a reply to a prior `clarify_partner` ask. Treat it as a thread continuation:
-      * `pending_state.extracted` carries the partial extraction from the original offer email (lines, offerType, partnerName guess, etc.). The reply body typically just adds the missing partner info (company name) without re-quoting the parts list.
-      * Build the merged extraction by combining `pending_state.extracted` with the new partner identification parsed from the current reply body. Re-run partner-lookup on the company string the sender provided.
+  - **Check for `pending_state` FIRST.** If the `read` JSON includes a `pending_state` object, this message is a reply to a prior `clarify_partner` ask sent to Jake. Treat it as a thread continuation:
+      * `pending_state.extracted` carries the partial extraction from the original offer email (lines, offerType, partnerName guess, etc.). Jake's reply body supplies the company identification — usually one line of prose ("Customer is Liyijing Electronics") or the structured `PARTNER: <uid> = <BP|name>` directive. The reply does NOT re-quote the parts list.
+      * Build the merged extraction by combining `pending_state.extracted` with the partner identification parsed from Jake's reply body. Re-run partner-lookup on the company string he provided.
       * If partner now resolves AND retry_count < 2:
           - Route `load_offer` with the FULL merged payload (lines from pending_state, bpartnerId from the fresh partner-lookup, offerType from pending_state). The poller auto-clears the sidecar on the terminal action.
       * If partner STILL doesn't resolve AND pending_state.retry_count < 2:
-          - Re-route `clarify_partner` with a refined hints message (you can re-ask, but the retry_count auto-bumps).
+          - Re-route `clarify_partner` with a refined hints message (retry_count auto-bumps). The ask still goes to Jake.
       * If `pending_state.retry_count >= 2`:
-          - Stop the round-trip. Route `needs_partner` with `{subject, outerFrom, hints: "clarify_partner round-tripped 2x; sender's replies haven't resolved the partner — operator triage needed"}` for manual triage.
+          - Stop the round-trip. Route `needs_partner` with `{subject, outerFrom, hints: "clarify_partner round-tripped 2x; operator replies haven't resolved the partner — manual triage needed"}` for manual triage.
       * Approval reply messages (subject `RE: [APPROVAL NEEDED] Large Offer <N>`) take precedence over this — see the next bullet — even if `pending_state` is somehow present.
 
   - **Check subject line.** If subject matches `RE: [APPROVAL NEEDED] Large Offer <searchKey>` (any case):
@@ -37,10 +37,10 @@ For every UID returned, follow the per-message decision tree:
       * Apply partner resolution (subject hint > body hint > forward chain > external sender), excluding IsEmployee BPs.
       * Extract lines from attachment + body. Filter URL-fragment "MPNs".
       * Determine offer type (default Customer Excess 1000000; flip to Broker Stock Offer 1000001 if BP is vendor-only).
-      * **Partner-resolution branching:**
+      * **Partner-resolution branching (info-requests ALWAYS go to Jake — POLICY 2026-05-14):**
           - Partner resolves → continue to dedup check.
-          - Partner does NOT resolve AND `external_sender` looks like a real person (not a bounce / automated) AND lines were extracted AND no `pending_state` exists → route `clarify_partner` with `{recipient: <external_sender_email>, subject: <original_subject>, extracted: {lines, offerType, ...everything_else}, hints: "<short description of what was tried>"}`. The sidecar persists the extraction; the sender's reply round-trips to this inbox.
-          - Partner does NOT resolve AND the sender is internal / ambiguous forward chain / bounce / non-clarifiable → route `needs_partner` (operator triage) per the original flow.
+          - Partner does NOT resolve AND lines were extracted AND no `pending_state` exists → route `clarify_partner` with `{subject: <original_subject>, outerFrom: <external_sender_email>, extracted: {lines, offerType, ...everything_else}, hints: "<short description of what was tried>"}`. The handler emails Jake (NOT the external sender), writes a sidecar, and the reply round-trips when Jake answers.
+          - Partner does NOT resolve AND lines were NOT extracted (signature-only / unparseable body) → route `needs_partner` (operator triage, no stitching).
       * Run cross-forward dedup SQL check (BP + offer_type + line count + first/last MPN within 6h) → dup_skip if matched.
       * Dispatch with `route <uid> <action> --workflow excess --payload '<json>'` — no --dry-run.
       * The handler will gate analysis-dispatch for offers above LARGE_OFFER_THRESHOLD (default 500 lines) on the customer-excess-analysis route. The offer is written to OT regardless; an approval email is sent to the operator from excess@. You don't do anything special — just route to load_offer as normal. The reply will land in this inbox next tick as the `RE: [APPROVAL NEEDED]` path above.

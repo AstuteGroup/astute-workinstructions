@@ -248,82 +248,114 @@ async function action_needs_partner(payload, ctx) {
 }
 
 /**
- * Email the EXTERNAL SENDER asking them to confirm their company so we can
- * resolve the partner BP. Parallel to rfq-loading's action_need_info, but
- * specialized for the "we got an offer but can't tell who you are" case.
+ * Email the OPERATOR (Jake) asking them to identify the unknown partner so
+ * the offer can be loaded. The pending-state sidecar persists the partial
+ * extraction (lines + offerType + everything else parsed); when Jake replies
+ * to excess@ with the company name, the next-tick agent merges his reply
+ * with the sidecar and routes to load_offer.
  *
- * Use this (instead of needs_partner) when:
- *   - The external sender is a real person (not a bounce / automated)
+ * POLICY (2026-05-14): info-requests NEVER go to the external sender,
+ * regardless of how identifiable they look. The original-sender variant was
+ * removed after a fishing-aware broker confirmation leak. The `recipient`
+ * field on the payload is IGNORED and retained only for backward
+ * compatibility with the agent prompt.
+ *
+ * Use this when:
  *   - Lines were successfully extracted from the offer
  *   - Sender domain doesn't match any BP in OT
  *   - We haven't already round-tripped twice on this thread (retry cap = 2)
  *
- * The handler writes a pending-state sidecar with the partial extraction
- * (lines + offerType + everything we DO know) so when the sender replies
- * with their company name, the next-tick agent merges what they said with
- * what we already parsed and routes to load_offer.
+ * Reply-To = excess@ so Jake's reply loops back to this inbox and the
+ * sidecar-stitch path picks it up on the next agent tick.
  *
- * Reply-To = excess@ so replies loop back to this inbox. cc Jake so the
- * operator can see the round-trip happening.
- *
- * Required payload: { recipient, subject, extracted, hints }
- *   recipient   the external sender's email
+ * Required payload: { subject, extracted, hints }
+ * Ignored (but accepted): { recipient } — handler always sends to Jake
  *   subject     the original message's subject line (for the RE:)
  *   extracted   { lines: [...], offerType, ...whatever was parsed }
  *               persisted to the sidecar for the merge on the next round
  *   hints       short string describing what was tried + why partner didn't
  *               resolve (e.g., "subject had no search-key pattern; sender
- *               domain liyijing.com.cn not in BP table") — for breadcrumb
- *               + audit only, not shown in the customer-facing reply
+ *               domain liyijing.com.cn not in BP table")
+ *   outerFrom   (optional) the external sender's email — shown in the
+ *               triage email so Jake can see who sent it
  */
 async function action_clarify_partner(payload, ctx) {
-  const { recipient, subject, extracted, hints } = payload;
-  const body = buildClarifyPartnerReply();
+  const { subject, extracted, hints, outerFrom } = payload;
+  const linesCount = Array.isArray(extracted && extracted.lines) ? extracted.lines.length : 0;
+  const offerType = (extracted && extracted.offerType) || null;
+  const sampleLines = Array.isArray(extracted && extracted.lines)
+    ? extracted.lines.slice(0, 5)
+    : [];
 
   let sidecarRecord = null;
   if (!ctx.dryRun && ctx.anchorMessageId) {
     sidecarRecord = pending.writeSidecar(ctx.workflow, ctx.anchorMessageId, {
       original_uid: ctx.uid,
       original_subject: subject || null,
-      original_recipient: recipient || null,
+      original_recipient: ctx.jakeEmail,
+      external_sender: outerFrom || null,
       extracted: extracted || (ctx.pendingSidecar && ctx.pendingSidecar.extracted) || {},
       missing: ['partner'],
       hints: hints || null,
     });
   }
 
+  const sampleBlock = sampleLines.length
+    ? `<p><b>First ${sampleLines.length} of ${fmt(linesCount)} line(s):</b></p><ul>${sampleLines.map(l =>
+        `<li>${esc(l.mpn || l.MPN || '')}${l.mfr || l.MFR ? ' — ' + esc(l.mfr || l.MFR) : ''}${l.qty ? ' qty ' + fmt(l.qty) : ''}</li>`
+      ).join('')}</ul>`
+    : '';
+
+  const retryCount = sidecarRecord ? sidecarRecord.retry_count : 0;
+  const html = `<html><body style="font-family:Arial,sans-serif;font-size:13px">
+<h2 style="color:#b00">Customer Excess — partner clarification needed</h2>
+<p><b>Subject:</b> ${esc(subject)}<br/>
+   <b>External sender:</b> ${esc(outerFrom || '(unknown)')}<br/>
+   <b>UID:</b> ${ctx.uid}<br/>
+   <b>Inbox:</b> ${esc(ctx.inbox)}<br/>
+   ${retryCount ? `<b>Retry:</b> ${retryCount}/2<br/>` : ''}
+   <b>Offer type:</b> ${esc(offerType || '(default)')}<br/>
+   <b>Line count:</b> ${fmt(linesCount)}</p>
+<p><b>Why partner didn't resolve:</b><br/>${esc(hints || '(no hints provided)')}</p>
+${sampleBlock}
+<p style="background:#f5f5f5;padding:10px;border-left:3px solid #b00">
+   <b>Reply to ${esc(ctx.inbox)} with the company name</b> (one line is fine — e.g., <code>Customer is Liyijing Electronics</code>). The next agent tick will merge your reply with the parsed lines and load the offer. Or use the structured directive: <code>PARTNER: ${ctx.uid} = &lt;BP search key OR company name&gt;</code>
+</p>
+<p style="color:#666;font-size:11px">Message moved to NeedInfo folder. Sidecar: <code>~/workspace/.excess-pending/${esc(ctx.anchorMessageId || '(no anchor)')}.json</code></p>
+</body></html>`;
+
   if (ctx.dryRun) {
     return {
       dry_run: true,
-      would_reply: { to: recipient, cc: ctx.jakeEmail, replyTo: ctx.inbox },
-      draft: body,
+      would_notify_jake: { subject, outerFrom, hints, linesCount },
       would_write_sidecar: { anchor: ctx.anchorMessageId, missing: ['partner'] },
     };
   }
 
-  // Reply-To MUST be the excess inbox — otherwise the sender's reply lands
-  // in Jake's inbox and the agent never sees it, breaking the stitch.
+  // Reply-To MUST be the excess inbox — Jake's reply needs to land here for
+  // the agent to pick up the pending_state on next tick.
   await ctx.notifier.sendEmail(
-    recipient,
-    `RE: ${subject || 'Your message'} — company confirmation needed`,
-    body,
-    { cc: ctx.jakeEmail, replyTo: ctx.inbox },
+    ctx.jakeEmail,
+    `Customer Excess — clarify partner: ${subject || '(no subject)'}`,
+    html,
+    { html: true, replyTo: ctx.inbox },
   );
 
   breadcrumbs.write({
     cog: 'offer-poller',
     event: 'clarify-partner',
     uid: ctx.uid,
-    recipient,
+    notified: ctx.jakeEmail,
+    external_sender: outerFrom || null,
     subject,
     hints: hints || null,
-    retry_count: sidecarRecord ? sidecarRecord.retry_count : null,
+    retry_count: retryCount,
   });
 
   return {
-    replied_to: recipient,
+    notified: ctx.jakeEmail,
     sidecar_anchor: ctx.anchorMessageId,
-    retry_count: sidecarRecord ? sidecarRecord.retry_count : null,
+    retry_count: retryCount,
   };
 }
 
@@ -530,19 +562,6 @@ function esc(s) {
 
 function fmt(n) { return Number(n || 0).toLocaleString('en-US'); }
 
-function buildClarifyPartnerReply() {
-  return [
-    `Hi,`, ``,
-    `Thanks for sending the excess inventory list. To get this loaded into our system, I need to confirm which company account it belongs to — your sender domain isn't currently mapped in our records.`, ``,
-    `Could you reply with:`,
-    `  • Your company name (and any short/legal variations we'd find on a PO or invoice)`,
-    `  • Your role / title (helps us route to the right contact on our side)`, ``,
-    `Once I have that I'll get the list loaded and routed appropriately.`, ``,
-    `Thanks,`,
-    `Astute Group Customer Excess Team`,
-  ].join('\n');
-}
-
 // ─── EXPORTS ─────────────────────────────────────────────────────────────────
 
 module.exports = {
@@ -564,7 +583,7 @@ module.exports = {
     },
     clarify_partner: {
       folder: 'NeedInfo',
-      requires: ['recipient', 'subject', 'extracted'],
+      requires: ['subject', 'extracted'],
       keepsPending: true,
       handler: action_clarify_partner,
     },

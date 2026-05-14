@@ -9,8 +9,8 @@ Run: node /home/analytics_user/workspace/astute-workinstructions/shared/email-wo
 STEP 3 — Process each message.
 For every UID returned, follow the per-message decision tree from the .md:
   - Run `read <uid> --workflow rfq-loading` to fetch body + parsed forwarded headers.
-  - **Check for `pending_state` FIRST.** If the `read` JSON includes a `pending_state` object, this message is a reply to a prior `need_info` ask. Treat it as a thread continuation:
-      * The customer's reply body usually only supplies the missing fields (qty, RFQ type, contact, etc.); it does NOT re-quote the original parts list. The parts list lives in `pending_state.extracted` from when we first parsed the original.
+  - **Check for `pending_state` FIRST.** If the `read` JSON includes a `pending_state` object, this message is a reply to a prior `need_info` ask sent to Jake. Treat it as a thread continuation:
+      * Jake's reply (or a customer reply he forwarded back) supplies the missing fields (qty, RFQ type, contact, etc.); it does NOT re-quote the original parts list. The parts list lives in `pending_state.extracted` from when we first parsed the original.
       * Build the merged extraction by combining `pending_state.extracted` with whatever new fields the current reply body answers (the items in `pending_state.missing`).
       * Decide routing:
           - If merging produces a complete, loadable RFQ → `enqueue` with the FULL merged payload (lines from pending_state, plus the qty/type/etc. from this reply). ALSO pass `original_message_id: pending_state.original_message_id` so the poller can clean up the sidecar.
@@ -29,7 +29,7 @@ For every UID returned, follow the per-message decision tree from the .md:
           - Unclear / ambiguous → `needs_review` with `{reason: "approval reply directive unclear: <body excerpt>"}`.
       * Dispatch with `route <uid> <action> --workflow rfq-loading --payload '<json>'`. Approval/rejection emails do NOT need customer/contact/MFR resolution.
   - Otherwise (no `pending_state`, subject is NOT an approval reply): apply the normal customer-RFQ flow per the .md (Steps 4-9), routing to enqueue / need_info / needs_review / not_rfq.
-      * When routing to `need_info` on an INITIAL message (first round, no prior sidecar), include `extracted: {...}` in the payload containing whatever fields you DID parse from this email (lines, bpartnerId-guess, etc.). The poller writes the sidecar; the reply will be stitched against it automatically on the next tick.
+      * When routing to `need_info` on an INITIAL message (first round, no prior sidecar), include `{missing: [...], subject, outerFrom: <external_sender_email>, extracted: {lines, bpartnerId-guess, ...whatever you parsed}}`. The handler emails Jake (NOT the external customer — POLICY 2026-05-14, info-requests never go to the external sender) and writes the sidecar. Jake's reply round-trips when he answers.
 
 If a single message hits a transient error, log the error in your output and continue with the next message. Do not abort the batch on per-message failure.
 

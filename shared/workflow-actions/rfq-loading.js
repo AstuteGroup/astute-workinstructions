@@ -51,51 +51,90 @@ async function action_enqueue(payload, ctx) {
 }
 
 /**
- * Auto-reply to the customer requesting missing fields. Replies route back to
- * the loader inbox (rfqloading@) so the next-tick agent can pick up the reply
- * and stitch it with the partial extraction stored in the sidecar.
+ * Email the OPERATOR (Jake) requesting the missing fields. The sidecar
+ * persists the partial extraction so Jake's reply (or a forwarded customer
+ * reply with the answer) round-trips and stitches on the next agent tick.
  *
- * Required payload: { recipient, missing[] }
- * Optional: { subject, extracted } — `extracted` is whatever the agent already
- *           parsed from the original (lines, bpartnerId, type, etc.). It is
- *           persisted to the sidecar so the next round merges with the reply.
+ * POLICY (2026-05-14): info-requests NEVER go to the external sender. The
+ * original-sender variant was removed alongside the stockrfq clarify_partner
+ * leak. The `recipient` field on the payload is IGNORED and retained only
+ * for backward compatibility with the agent prompt.
+ *
+ * Reply-To = rfqloading@ so Jake's reply (with the answers) loops back to
+ * this inbox and the sidecar-stitch path picks it up next tick.
+ *
+ * Required payload: { missing[] }
+ * Optional / accepted: { recipient, subject, extracted, outerFrom }
+ *   recipient   IGNORED — handler always sends to Jake
+ *   outerFrom   the external customer's email — shown in the triage email
+ *   subject     the original message's subject line (for the RE:)
+ *   extracted   whatever the agent already parsed (lines, bpartnerId, type)
+ *               persisted to the sidecar for the merge on the next round
  */
 async function action_need_info(payload, ctx) {
-  const { recipient, missing, subject, extracted } = payload;
-  const body = buildNeedInfoReply(missing);
+  const { missing, subject, extracted, outerFrom } = payload;
+  const missingList = Array.isArray(missing) ? missing : [];
+  const linesCount = Array.isArray(extracted && extracted.lines) ? extracted.lines.length : 0;
 
-  // Persist partial state so the reply (which typically won't re-quote the
-  // original parts list) can be merged with what we already know.
   let sidecarRecord = null;
   if (!ctx.dryRun && ctx.anchorMessageId) {
     sidecarRecord = pending.writeSidecar(ctx.workflow, ctx.anchorMessageId, {
       original_uid: ctx.uid,
       original_subject: subject || null,
-      original_recipient: recipient || null,
+      original_recipient: ctx.jakeEmail,
+      external_sender: outerFrom || null,
       extracted: extracted || (ctx.pendingSidecar && ctx.pendingSidecar.extracted) || {},
-      missing: Array.isArray(missing) ? missing : [],
+      missing: missingList,
     });
   }
+
+  const retryCount = sidecarRecord ? sidecarRecord.retry_count : 0;
+  const missingItems = missingList.map(m => `<li>${esc(missingLabel(m))}</li>`).join('');
+  const html = `<html><body style="font-family:Arial,sans-serif;font-size:13px">
+<h2 style="color:#b00">RFQ Loading — info needed</h2>
+<p><b>Subject:</b> ${esc(subject)}<br/>
+   <b>External sender:</b> ${esc(outerFrom || '(unknown)')}<br/>
+   <b>UID:</b> ${ctx.uid}<br/>
+   <b>Inbox:</b> ${esc(ctx.inbox)}<br/>
+   ${retryCount ? `<b>Retry:</b> ${retryCount}/2<br/>` : ''}
+   <b>Lines parsed so far:</b> ${linesCount}</p>
+<p><b>Missing fields:</b></p>
+<ul>${missingItems || '<li>(none specified)</li>'}</ul>
+<p style="background:#f5f5f5;padding:10px;border-left:3px solid #b00">
+   <b>Reply to ${esc(ctx.inbox)} with the missing values</b> — the next agent tick will merge your answers with the parsed lines and enqueue the RFQ. One-line prose answers are fine.
+</p>
+<p style="color:#666;font-size:11px">Message moved to NeedInfo folder. Sidecar: <code>~/workspace/.rfq-loading-pending/${esc(ctx.anchorMessageId || '(no anchor)')}.json</code></p>
+</body></html>`;
 
   if (ctx.dryRun) {
     return {
       dry_run: true,
-      would_reply: { to: recipient, cc: ctx.jakeEmail, replyTo: ctx.inbox, missing },
-      draft: body,
-      would_write_sidecar: { anchor: ctx.anchorMessageId, extracted, missing },
+      would_notify_jake: { subject, outerFrom, missing: missingList, linesCount },
+      would_write_sidecar: { anchor: ctx.anchorMessageId, extracted, missing: missingList },
     };
   }
   await ctx.notifier.sendEmail(
-    recipient,
-    `RE: ${subject || 'Your RFQ'} — details needed`,
-    body,
-    { cc: ctx.jakeEmail, replyTo: ctx.inbox },
+    ctx.jakeEmail,
+    `RFQ Loading — needs info: ${subject || '(no subject)'}`,
+    html,
+    { html: true, replyTo: ctx.inbox },
   );
   return {
-    replied_to: recipient,
+    notified: ctx.jakeEmail,
     sidecar_anchor: ctx.anchorMessageId,
-    retry_count: sidecarRecord ? sidecarRecord.retry_count : null,
+    retry_count: retryCount,
   };
+}
+
+function missingLabel(key) {
+  switch (key) {
+    case 'mpn':      return 'MPN list — couldn\'t extract part numbers';
+    case 'qty':      return 'Quantities — missing for some line items';
+    case 'rfq_type': return 'RFQ type (Shortage / PPV / EOL/LTB / 3PL/VMI / Hot Parts)';
+    case 'contact':  return 'Contact — sender doesn\'t match a contact on file';
+    case 'customer': return 'Company / account to load under';
+    default:         return key;
+  }
 }
 
 /**
@@ -137,22 +176,6 @@ function esc(s) {
   return String(s || '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 }
 
-function buildNeedInfoReply(missing) {
-  const lines = [];
-  if (missing.includes('mpn'))      lines.push('• **MPN list** — I couldn\'t extract part numbers from the message. Could you reply with an MPN + quantity table?');
-  if (missing.includes('qty'))      lines.push('• **Quantities** — quantities weren\'t listed for some line items. Could you confirm the qty for each part?');
-  if (missing.includes('rfq_type')) lines.push('• **RFQ type** — is this a Shortage, PPV, EOL/LTB, or another program? (Options: Shortage, PPV, EOL/LTB, 3PL/VMI, Hot Parts)');
-  if (missing.includes('contact'))  lines.push('• **Contact confirmation** — I couldn\'t match your address to a contact on file. Is this the best email for this RFQ?');
-  if (missing.includes('customer')) lines.push('• **Company** — could you confirm the company name and account I should load this under?');
-  return [
-    `Hi,`, ``,
-    `Thanks for sending this RFQ. Before I can load it into our system, I need a few details:`, ``,
-    ...lines, ``,
-    `Once I have these I'll get the RFQ loaded and routed to the right person here.`, ``,
-    `Thanks,`, `Astute Group RFQ Loading`,
-  ].join('\n');
-}
-
 // ─── EXPORTS ─────────────────────────────────────────────────────────────────
 
 module.exports = {
@@ -169,7 +192,7 @@ module.exports = {
     },
     need_info: {
       folder: 'NeedInfo',
-      requires: ['recipient', 'missing'],
+      requires: ['missing'],
       keepsPending: true,
       handler: action_need_info,
     },
