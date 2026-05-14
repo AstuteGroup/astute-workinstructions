@@ -22,6 +22,7 @@ const path = require('path');
 const { writeOffer } = require('../offer-writeback');
 const offerRouter = require('../offer-router');
 const breadcrumbs = require('../breadcrumbs');
+const pending = require('../workflow-pending-state');
 const { createGate } = require('../large-payload-gate');
 const { makeApprovalActions } = require('./_approval');
 
@@ -247,6 +248,86 @@ async function action_needs_partner(payload, ctx) {
 }
 
 /**
+ * Email the EXTERNAL SENDER asking them to confirm their company so we can
+ * resolve the partner BP. Parallel to rfq-loading's action_need_info, but
+ * specialized for the "we got an offer but can't tell who you are" case.
+ *
+ * Use this (instead of needs_partner) when:
+ *   - The external sender is a real person (not a bounce / automated)
+ *   - Lines were successfully extracted from the offer
+ *   - Sender domain doesn't match any BP in OT
+ *   - We haven't already round-tripped twice on this thread (retry cap = 2)
+ *
+ * The handler writes a pending-state sidecar with the partial extraction
+ * (lines + offerType + everything we DO know) so when the sender replies
+ * with their company name, the next-tick agent merges what they said with
+ * what we already parsed and routes to load_offer.
+ *
+ * Reply-To = excess@ so replies loop back to this inbox. cc Jake so the
+ * operator can see the round-trip happening.
+ *
+ * Required payload: { recipient, subject, extracted, hints }
+ *   recipient   the external sender's email
+ *   subject     the original message's subject line (for the RE:)
+ *   extracted   { lines: [...], offerType, ...whatever was parsed }
+ *               persisted to the sidecar for the merge on the next round
+ *   hints       short string describing what was tried + why partner didn't
+ *               resolve (e.g., "subject had no search-key pattern; sender
+ *               domain liyijing.com.cn not in BP table") — for breadcrumb
+ *               + audit only, not shown in the customer-facing reply
+ */
+async function action_clarify_partner(payload, ctx) {
+  const { recipient, subject, extracted, hints } = payload;
+  const body = buildClarifyPartnerReply();
+
+  let sidecarRecord = null;
+  if (!ctx.dryRun && ctx.anchorMessageId) {
+    sidecarRecord = pending.writeSidecar(ctx.workflow, ctx.anchorMessageId, {
+      original_uid: ctx.uid,
+      original_subject: subject || null,
+      original_recipient: recipient || null,
+      extracted: extracted || (ctx.pendingSidecar && ctx.pendingSidecar.extracted) || {},
+      missing: ['partner'],
+      hints: hints || null,
+    });
+  }
+
+  if (ctx.dryRun) {
+    return {
+      dry_run: true,
+      would_reply: { to: recipient, cc: ctx.jakeEmail, replyTo: ctx.inbox },
+      draft: body,
+      would_write_sidecar: { anchor: ctx.anchorMessageId, missing: ['partner'] },
+    };
+  }
+
+  // Reply-To MUST be the excess inbox — otherwise the sender's reply lands
+  // in Jake's inbox and the agent never sees it, breaking the stitch.
+  await ctx.notifier.sendEmail(
+    recipient,
+    `RE: ${subject || 'Your message'} — company confirmation needed`,
+    body,
+    { cc: ctx.jakeEmail, replyTo: ctx.inbox },
+  );
+
+  breadcrumbs.write({
+    cog: 'offer-poller',
+    event: 'clarify-partner',
+    uid: ctx.uid,
+    recipient,
+    subject,
+    hints: hints || null,
+    retry_count: sidecarRecord ? sidecarRecord.retry_count : null,
+  });
+
+  return {
+    replied_to: recipient,
+    sidecar_anchor: ctx.anchorMessageId,
+    retry_count: sidecarRecord ? sidecarRecord.retry_count : null,
+  };
+}
+
+/**
  * Email an operator diagnostic for manual triage. Used when:
  *   - Lines couldn't be extracted (no parseable attachment, signature-only body)
  *   - writeOffer threw / had errors
@@ -449,6 +530,19 @@ function esc(s) {
 
 function fmt(n) { return Number(n || 0).toLocaleString('en-US'); }
 
+function buildClarifyPartnerReply() {
+  return [
+    `Hi,`, ``,
+    `Thanks for sending the excess inventory list. To get this loaded into our system, I need to confirm which company account it belongs to — your sender domain isn't currently mapped in our records.`, ``,
+    `Could you reply with:`,
+    `  • Your company name (and any short/legal variations we'd find on a PO or invoice)`,
+    `  • Your role / title (helps us route to the right contact on our side)`, ``,
+    `Once I have that I'll get the list loaded and routed appropriately.`, ``,
+    `Thanks,`,
+    `Astute Group Customer Excess Team`,
+  ].join('\n');
+}
+
 // ─── EXPORTS ─────────────────────────────────────────────────────────────────
 
 module.exports = {
@@ -467,6 +561,12 @@ module.exports = {
       folder: 'NeedsPartner',
       requires: ['subject', 'outerFrom'],
       handler: action_needs_partner,
+    },
+    clarify_partner: {
+      folder: 'NeedInfo',
+      requires: ['recipient', 'subject', 'extracted'],
+      keepsPending: true,
+      handler: action_clarify_partner,
     },
     needs_review: {
       folder: 'NeedsReview',

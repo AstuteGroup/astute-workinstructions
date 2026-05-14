@@ -144,12 +144,12 @@ module.exports = {
     sourceFolder: 'INBOX',
     cron: { name: 'excess-agent' },
     actions: [
-      'load_offer', 'needs_partner', 'needs_review', 'not_offer', 'dup_skip',
-      'approve_large_offer', 'reject_large_offer',
+      'load_offer', 'needs_partner', 'clarify_partner', 'needs_review',
+      'not_offer', 'dup_skip', 'approve_large_offer', 'reject_large_offer',
     ],
     capabilities: {
-      replyStitching: false,
-      needInfoClarifications: false,
+      replyStitching: true,
+      needInfoClarifications: true,
       largePayloadGate: true,
       approvalReplyAction: true,
       preWriteIdempotency: true,
@@ -164,9 +164,9 @@ module.exports = {
       writeQueue: 'direct write — one offer per email; fan-out happens downstream via offer-router, not pre-write',
       activityDigest: 'operatorDigest (offer-digest 3×/day) already provides aggregate visibility',
     },
-    // Open gaps (capabilities=false WITHOUT a deviation entry — parity check flags these):
-    //   replyStitching, needInfoClarifications, tieredCron
-    // These are the remaining active migration backlog after step #2.
+    // Open gap remaining: tieredCron.
+    // (Cadence is the legitimate-divergence layer per email-workflow-architecture.md;
+    // step #6 of the convergence-map migration.)
   },
 
   // ─── STOCK RFQ LOADING (broker stock RFQs — inbound) ────────────────────────
