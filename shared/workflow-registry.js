@@ -177,12 +177,15 @@ module.exports = {
     inbox: 'stockRFQ@orangetsunami.com',
     sourceFolder: 'INBOX',
     cron: { name: 'stockrfq-agent' },
-    actions: ['load_rfq', 'needs_review', 'not_rfq', 'outbound_pending'],
+    actions: [
+      'load_rfq', 'needs_review', 'not_rfq', 'outbound_pending',
+      'approve_large_stock_rfq', 'reject_large_stock_rfq',
+    ],
     capabilities: {
       replyStitching: false,
       needInfoClarifications: false,
-      largePayloadGate: false,
-      approvalReplyAction: false,
+      largePayloadGate: true,
+      approvalReplyAction: true,
       preWriteIdempotency: false,
       writeQueue: false,
       breadcrumbWrites: true,
@@ -195,8 +198,8 @@ module.exports = {
       operatorDigest: 'broker stock-RFQs are transactional; activityDigest (stock-rfq-activity-digest 6×/day) covers visibility',
       writeQueue: 'direct write; broker emails carry small batches',
     },
-    // Open gaps: replyStitching, needInfoClarifications, largePayloadGate,
-    //            approvalReplyAction, preWriteIdempotency, replyParserGrammar, tieredCron
+    // Open gaps remaining: replyStitching, needInfoClarifications,
+    //   preWriteIdempotency, replyParserGrammar, tieredCron
   },
 
   // ─── STOCK RFQ CQ (operator outbound quote replies → CQ rows) ───────────────

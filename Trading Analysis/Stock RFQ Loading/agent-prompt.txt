@@ -7,19 +7,31 @@ STEP 2 — List unseen messages.
 Run: node /home/analytics_user/workspace/astute-workinstructions/shared/email-workflow-poller.js list --workflow stockrfq
 
 STEP 3 — Process each message.
-For every UID returned, follow the per-message decision tree from the .md:
+For every UID returned, follow the per-message decision tree:
   - Run `read <uid> --workflow stockrfq` to fetch body + parsed forwarded headers + external_sender.
-  - If has_attachment is true, run `download-attachments <uid> --workflow stockrfq` and Read the relevant xlsx/csv/pdf.
-  - Apply customer resolution (partner-lookup with partnerType='customer'; fall back to Unqualified Broker bpartnerId 1006505 with customerName captured).
-  - Extract MPN+qty (+optional MFR/CPC/target price).
-  - Resolve MFR via shared/mfr-lookup.js if a manufacturer string is present.
-  - Dispatch with `route <uid> <action> --workflow stockrfq --payload '<json>'` — no --dry-run.
+
+  - **Check subject line FIRST.** If subject matches `RE: [APPROVAL NEEDED] Large Stock RFQ <gate_id>` (any case):
+      * Extract `<gate_id>` from the subject (the token right after "Large Stock RFQ ", before the line-count / customer suffix — looks like `m-a3b4c5d6e7` or `h-a3b4c5d6e7`).
+      * Read the first non-quoted line of the body. Match (case-insensitive):
+          - `yes` / `y` / `approve` / `go` / `proceed` → `approve_large_stock_rfq` with `{gate_id: "<gate_id>"}`. The factory's onApprove will read the sentinel and call writeRFQ — operator does NOT need to re-extract or pass lines.
+          - `no` / `n` / `reject` / `skip` → `reject_large_stock_rfq` with `{gate_id: "<gate_id>", reason: <body excerpt or null>}`.
+          - Unclear / ambiguous → `needs_review` with `{reason: "approval reply directive unclear: <body excerpt>"}`.
+      * Dispatch with `route <uid> <action> --workflow stockrfq --payload '<json>'`. Approval/rejection emails do NOT need MPN extraction or partner resolution.
+      * Skip the remaining steps for this UID.
+
+  - Otherwise (normal stock-RFQ flow per the .md):
+      * If has_attachment is true, run `download-attachments <uid> --workflow stockrfq` and Read the relevant xlsx/csv/pdf.
+      * Apply customer resolution (partner-lookup with partnerType='customer'; fall back to Unqualified Broker bpartnerId 1006505 with customerName captured).
+      * Extract MPN+qty (+optional MFR/CPC/target price).
+      * Resolve MFR via shared/mfr-lookup.js if a manufacturer string is present.
+      * Dispatch with `route <uid> <action> --workflow stockrfq --payload '<json>'` — no --dry-run.
+      * The handler will gate writeRFQ above LARGE_STOCK_RFQ_THRESHOLD (default 1000 lines). Large RFQs pause with a sentinel + approval email; the RFQ is NOT yet in OT. You don't do anything special for the initial gate fire — just route load_rfq as normal. The reply will land in this inbox next tick as the `RE: [APPROVAL NEEDED]` path above; the factory's onApprove then writes the RFQ via the stored sentinel payload.
 
 If a single message hits a transient error (writeRFQ 5xx, partner-lookup throws, attachment unreadable), log the error in your output and continue with the next message. Do not abort the batch on per-message failure.
 
 STEP 4 — Summary.
 At the end, print a single-line summary in this exact shape:
-  STOCKRFQ-AGENT SUMMARY: processed=<N> load_rfq=<N> outbound_pending=<N> needs_review=<N> not_rfq=<N> errors=<N>
+  STOCKRFQ-AGENT SUMMARY: processed=<N> load_rfq=<N> approve_large_stock_rfq=<N> reject_large_stock_rfq=<N> outbound_pending=<N> needs_review=<N> not_rfq=<N> errors=<N>
 
 If 0 unseen messages, print "STOCKRFQ-AGENT SUMMARY: no unseen messages" and exit.
 
