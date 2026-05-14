@@ -91,13 +91,19 @@ For each unseen message, the agent picks **one** routing action. Order of checks
    - **The heuristic only flags:** APAC broker (.cn/.hk/.tw/.jp/.kr/.sg/.vn/.th/.id/.my/.ph) + exact stock match (within 5% of our Astute inventory qty) + non-Astute broker stock visible in the market within 180 days. US/EMEA senders and dry markets are never flagged.
    - Skip for multi-line RFQs (signal is per-MPN); v1 only handles single-MPN messages.
 
-5. **Write to OT** → `load_rfq` with payload `{ bpartnerId, type: 'Stock', lines, customerName, messageId }`. `customerName` is required on every call — see Step 2 for how to source it. `messageId` is the email's RFC822 Message-ID from the `read` command's `message_id` field — always pass it through so the outbound CQ agent can later thread-match `In-Reply-To` headers back to this RFQ. The handler calls `writeRFQ()` which writes the header (with `Description = "<customerName> — Stock RFQ"` and `BPName = customerName`), lines, and `chuboe_rfq_line_mpn` AVL sub-rows. To override the header description, pass an explicit `description` field; otherwise the customer-name format is built automatically.
+5. **Write to OT** → `load_rfq` with payload `{ bpartnerId, type: 'Stock', lines, customerName, messageId, senderEmail, senderDomain, brokerMessageId }`.
+   - `customerName` is required on every call — see Step 2 for how to source it. The handler uses it for `Description = "<customerName> — Stock RFQ"` and `BPName`.
+   - `messageId` is the email's RFC822 Message-ID from the `read` command's `message_id` field (the Outlook-server-generated MID assigned at auto-forward time). Always pass it through.
+   - **`senderEmail` (required when known):** the deepest-quoted broker `From:` address (e.g., `iris@liyijing.com.cn`) — you ALREADY parse this for the customer-resolver step. Pass it through so the outbound CQ agent can disambiguate same-MPN/qty candidates from different brokers without re-reading source UIDs in IMAP. The handler stores it (lowercased) on the breadcrumb.
+   - **`senderDomain` (optional):** if you've already extracted just the domain portion, pass it. Otherwise the handler derives it from `senderEmail`.
+   - **`brokerMessageId` (required when known):** the BROKER's original Message-ID — the deepest non-Astute, non-Outlook-server MID in the inbound message's `references` array (or the broker's own `Message-ID:` header if visible in the quoted block). The outbound reply's References chain contains this ID but NOT the Outlook-server-generated `messageId` — so passing `brokerMessageId` is what lets the CQ agent's path-(a) thread-match succeed.
+   - The handler calls `writeRFQ()` which writes the header, lines, and `chuboe_rfq_line_mpn` AVL sub-rows. To override the header description, pass an explicit `description` field.
 
 ### Routing actions (full payload reference)
 
 | Action | Required payload | Folder | Side effect |
 |---|---|---|---|
-| `load_rfq` | `{ bpartnerId, lines[] }` (also `type, description, salesrepId, userId, sourceUid, customerName`) | `Processed` | `writeRFQ()` to OT + `loaded` breadcrumb |
+| `load_rfq` | `{ bpartnerId, lines[] }` (also `type, description, salesrepId, userId, sourceUid, customerName, messageId, senderEmail, senderDomain, brokerMessageId`) | `Processed` | `writeRFQ()` to OT + `loaded` breadcrumb |
 | `needs_review` | `{ reason }` (also `subject, outerFrom, details`) | `NeedsReview` | Email Jake diagnostics + `needs-review` breadcrumb |
 | `not_rfq` | `{ reason }` | `NotRFQ` | Silent move + `not-rfq` breadcrumb |
 | `outbound_pending` | `{ reason }` (typically `<innerFromAddr> — <one-clause hint>`) | `OutboundPending` | Silent move + `outbound-pending` breadcrumb; future `add_cq` agent consumes from here |

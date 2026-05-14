@@ -19,12 +19,56 @@
 
 'use strict';
 
+const fs = require('fs');
+const path = require('path');
+const crypto = require('crypto');
+
 const { writeRFQ } = require('../rfq-writer');
 const breadcrumbs = require('../breadcrumbs');
+const { createGate } = require('../large-payload-gate');
+const { makeApprovalActions } = require('./_approval');
 
 const UNQUALIFIED_BROKER_ID = 1006505;       // c_bpartner_id
 const UNQUALIFIED_BROKER_KEY = '1008499';    // search_key (for human-readable references)
 const JAKE_USER_ID = 1000004;
+
+// ─── LARGE STOCK-RFQ GATE ────────────────────────────────────────────────────
+// Gates writeRFQ itself for broker RFQs above threshold. Unlike excess (where
+// writeOffer is small and only the downstream analysis is gated), writeRFQ
+// scales linearly with line count — a 10k-line broker RFQ would post ~20k+
+// OT rows in a single agent invocation, running for many minutes and
+// potentially polluting OT if the RFQ turns out to be a junk scrape.
+//
+// Default threshold 1000 lines (broker stock RFQs are typically <500; the
+// rare 5k+ scrapes are the ones we want to preview). Override with
+// LARGE_STOCK_RFQ_THRESHOLD env var.
+
+const STOCK_RFQ_GATE_DIR = path.resolve(
+  process.env.HOME || '/home/analytics_user',
+  'workspace/.large-stockrfq-pending'
+);
+
+const stockRfqGate = createGate({
+  kind: 'stockrfq',
+  sentinelDir: STOCK_RFQ_GATE_DIR,
+  defaultThreshold: 1000,
+  envOverride: 'LARGE_STOCK_RFQ_THRESHOLD',
+});
+
+// Stable, short, in-subject-friendly identifier derived from the source
+// Message-ID. UID-based ids reuse across IMAP cycles; messageId is globally
+// unique. Fallback: SHA1 of the lines list (stable across re-runs of the
+// same RFQ even without Message-ID).
+function deriveStockRfqGateId(payload) {
+  const m = payload && payload.messageId;
+  if (m) {
+    return 'm-' + crypto.createHash('sha1').update(String(m)).digest('hex').slice(0, 10);
+  }
+  const lineHash = crypto.createHash('sha1')
+    .update(JSON.stringify((payload.lines || []).map(l => l.mpn).sort()))
+    .digest('hex').slice(0, 10);
+  return 'h-' + lineHash;
+}
 
 // ─── HANDLERS ────────────────────────────────────────────────────────────────
 
@@ -56,28 +100,106 @@ const JAKE_USER_ID = 1000004;
  *                   the handler prepends `[PRICE CHECK?]` to both header and line
  *                   descriptions so the trader sees the flag in OT.)
  *   priceCheckReason  (string; the heuristic's reason — written into breadcrumb only.)
+ *   senderEmail    (the deepest-quoted broker From: address, e.g.,
+ *                   "iris@liyijing.com.cn". The agent ALREADY parses this for the
+ *                   customer-resolver step — passing it through lets the outbound
+ *                   CQ agent disambiguate same-MPN/qty candidates from different
+ *                   brokers without re-reading the source UID in IMAP. Stored on
+ *                   the breadcrumb only.)
+ *   senderDomain   (the email-domain portion of senderEmail, e.g., "liyijing.com.cn".
+ *                   Pre-extracted convenience for the CQ-side breadcrumb grep.)
+ *   brokerMessageId  (the broker's ORIGINAL Message-ID — the deepest non-Astute,
+ *                   non-Outlook-server MID in the inbound message's References /
+ *                   Message-ID chain. Used by the CQ agent's path-(a) thread-match
+ *                   to look up "did we already load an RFQ for this exact broker
+ *                   email?" — the existing `messageId` field stores the Outlook-
+ *                   server-generated MID assigned at auto-forward time, which the
+ *                   outbound reply's References chain does NOT contain.)
  */
 async function action_load_rfq(payload, ctx) {
-  const {
-    bpartnerId,
-    type,
-    lines,
-    description,
-    salesrepId,
-    userId,
-    sourceUid,
-    messageId,
-    customerName,
-    priceCheck,
-    priceCheckReason,
-  } = payload;
+  const { lines } = payload;
 
   if (ctx.dryRun) {
     return {
       dry_run: true,
-      would_write: { bpartnerId, type, lineCount: lines.length, description },
+      would_write: {
+        bpartnerId: payload.bpartnerId, type: payload.type,
+        lineCount: lines.length, description: payload.description,
+      },
     };
   }
+
+  // ── Large stock-RFQ gate ────────────────────────────────────────────────
+  // writeRFQ scales linearly with line count — a 10k-line broker RFQ would
+  // post ~20k+ OT rows in a single agent invocation, running for many
+  // minutes and potentially polluting OT if the RFQ turns out to be a junk
+  // scrape. Gate above threshold pending operator approval; once approved,
+  // the approve_large_stock_rfq factory action's onApprove callback reads
+  // the sentinel and calls doWriteRFQ.
+  const gateId = deriveStockRfqGateId(payload);
+
+  if (stockRfqGate.isRejected(gateId)) {
+    breadcrumbs.write({
+      cog: 'stockrfq-agent', event: 'gate-rejected',
+      uid: ctx.uid, gateId, lineCount: lines.length,
+    });
+    return { gated: 'rejected', gateId };
+  }
+  if (stockRfqGate.isPending(gateId)) {
+    breadcrumbs.write({
+      cog: 'stockrfq-agent', event: 'gate-pending',
+      uid: ctx.uid, gateId, lineCount: lines.length,
+    });
+    return { gated: 'pending', gateId };
+  }
+  if (stockRfqGate.isCleared(gateId) && !stockRfqGate.isProcessed(gateId)) {
+    // Rare: original + approval reply landed in the same tick before
+    // .processed could be written. Run the write inline.
+    const result = await doWriteRFQ(payload, ctx);
+    stockRfqGate.markProcessed(gateId);
+    return { ...result, gated: 'cleared-written', gateId };
+  }
+  if (lines.length > stockRfqGate.threshold() && !stockRfqGate.hasSentinel(gateId)) {
+    stockRfqGate.writeSentinel(gateId, {
+      gateId,
+      payload,             // full payload preserved verbatim for onApprove
+      ctx_uid: ctx.uid,
+      lineCount: lines.length,
+      customer: payload.customerName || null,
+      messageId: payload.messageId || null,
+    });
+    breadcrumbs.write({
+      cog: 'stockrfq-agent', event: 'gate-queued',
+      uid: ctx.uid, gateId,
+      lineCount: lines.length, threshold: stockRfqGate.threshold(),
+      customer: payload.customerName || null,
+    });
+    try {
+      const subject = `[APPROVAL NEEDED] Large Stock RFQ ${gateId} — ${lines.length.toLocaleString('en-US')} lines (${payload.customerName || 'unknown broker'})`;
+      const html = renderStockRfqApprovalEmailHtml(gateId, payload, stockRfqGate.threshold());
+      await sendStockRfqApprovalEmail({ subject, html });
+    } catch (e) {
+      console.error(`[stockrfq.load_rfq] approval-email send failed for gateId ${gateId}: ${e.message}`);
+    }
+    return { gated: 'queued-for-approval', gateId, lineCount: lines.length };
+  }
+
+  // Under threshold — write directly.
+  return doWriteRFQ(payload, ctx);
+}
+
+/**
+ * Core writeRFQ flow shared between the direct path (under threshold) and
+ * the approval path (gate cleared via onApproveStockRfq). Performs line
+ * normalization, description tagging, breadcrumbs. Idempotent given the
+ * same payload.
+ */
+async function doWriteRFQ(payload, ctx) {
+  const {
+    bpartnerId, type, lines, description, salesrepId, userId,
+    sourceUid, messageId, customerName, priceCheck, priceCheckReason,
+    senderEmail, senderDomain, brokerMessageId,
+  } = payload;
 
   // If Unqualified Broker, prepend customer name to each line's description
   // (matches static daemon behavior; keeps the broker name discoverable in OT).
@@ -119,12 +241,21 @@ async function action_load_rfq(payload, ctx) {
     lines: normalizedLines,
   });
 
+  // Derive senderDomain from senderEmail if the agent didn't pre-extract.
+  const derivedDomain = senderDomain
+    || (senderEmail && senderEmail.includes('@')
+        ? senderEmail.split('@')[1].toLowerCase()
+        : null);
+
   breadcrumbs.write({
     cog: 'stockrfq-agent',
     event: 'loaded',
     uid: ctx.uid,
     sourceUid: sourceUid || ctx.uid,
     messageId: messageId || null,
+    brokerMessageId: brokerMessageId || null,
+    senderEmail: senderEmail ? senderEmail.toLowerCase() : null,
+    senderDomain: derivedDomain,
     bpartnerId,
     customerName: customerName || null,
     type: type || 'Stock',
@@ -232,6 +363,136 @@ async function action_outbound_pending(payload, ctx) {
   return { reason: payload.reason || 'outbound reply' };
 }
 
+// ─── LARGE STOCK-RFQ APPROVAL EMAIL ─────────────────────────────────────────
+
+function fmt(n) { return Number(n || 0).toLocaleString('en-US'); }
+
+function renderStockRfqApprovalEmailHtml(gateId, payload, thresholdN) {
+  const lineCount = (payload.lines || []).length;
+  const customer = payload.customerName || '(unknown broker)';
+  const sample = (payload.lines || []).slice(0, 10).map(l =>
+    `<tr><td style="padding:3px 14px 3px 0">${esc(l.mpn || '')}</td>` +
+    `<td style="padding:3px 14px 3px 0">${esc(l.mfrText || '—')}</td>` +
+    `<td style="text-align:right">${fmt(l.qty)}</td></tr>`
+  ).join('') || '<tr><td colspan="3" style="color:#888">—</td></tr>';
+
+  return `<html><body style="font-family:Arial,sans-serif;font-size:13px;max-width:780px">
+<h2 style="color:#b58900;margin-bottom:6px">[APPROVAL NEEDED] Large Stock RFQ ${esc(gateId)}</h2>
+<p style="margin-top:0;color:#666;font-size:12px">From the stockrfq-agent load gate — line count exceeds threshold (${fmt(thresholdN)})</p>
+
+<p>A stock RFQ from <b>${esc(customer)}</b> arrived with <b>${fmt(lineCount)} lines</b>. Loading it would post roughly <b>${fmt(lineCount * 2)} rows</b> to OT (1 header + ${fmt(lineCount)} rfq_line + ${fmt(lineCount)} rfq_line_mpn) over the next several minutes.</p>
+
+<p style="background:#fff3cd;padding:10px 14px;border-left:4px solid #b58900;margin:14px 0">
+<b>The RFQ is NOT yet in OT.</b> The agent paused before writeRFQ because the line count is above the auto-load threshold. Approve to write; reject to discard the RFQ entirely.
+</p>
+
+<h3 style="margin-bottom:6px">RFQ Context</h3>
+<table style="border-collapse:collapse;font-size:13px">
+  <tr><td style="color:#666;padding:3px 14px 3px 0">Gate ID</td><td><code>${esc(gateId)}</code></td></tr>
+  <tr><td style="color:#666;padding:3px 14px 3px 0">Broker / Customer</td><td>${esc(customer)}</td></tr>
+  <tr><td style="color:#666;padding:3px 14px 3px 0">RFQ type</td><td>${esc(payload.type || 'Stock')}</td></tr>
+  <tr><td style="color:#666;padding:3px 14px 3px 0">Line count</td><td>${fmt(lineCount)}</td></tr>
+  <tr><td style="color:#666;padding:3px 14px 3px 0">Source UID</td><td>${esc(payload.sourceUid || '—')}</td></tr>
+</table>
+
+<h3 style="margin-bottom:6px;margin-top:18px">Sample Lines (first 10)</h3>
+<table style="border-collapse:collapse;font-size:12px">
+  <tr>
+    <th style="text-align:left;border-bottom:1px solid #ccc;padding:4px 14px 4px 0">MPN</th>
+    <th style="text-align:left;border-bottom:1px solid #ccc;padding:4px 14px 4px 0">MFR text</th>
+    <th style="text-align:right;border-bottom:1px solid #ccc">Qty</th>
+  </tr>
+  ${sample}
+</table>
+
+<h3 style="margin-top:24px">How to respond</h3>
+<p><b>Reply by email</b> — the stockrfq-agent reads replies on the next tick (every 30m):</p>
+<ul style="font-family:'Courier New',monospace;font-size:12px;background:#f5f5f5;padding:10px 24px;border-radius:4px">
+  <li><b>YES</b> — write the RFQ to OT (all ${fmt(lineCount)} lines)</li>
+  <li><b>NO</b> — reject; the RFQ is discarded permanently</li>
+</ul>
+
+<p style="color:#888;font-size:11px;margin-top:18px">
+Gate threshold: ${fmt(thresholdN)} lines. Override per-run with <code>LARGE_STOCK_RFQ_THRESHOLD=N</code>. Sentinel: <code>~/workspace/.large-stockrfq-pending/${esc(gateId)}.json</code>
+</p>
+</body></html>`;
+}
+
+async function sendStockRfqApprovalEmail({ subject, html, to }) {
+  const { sendWithFallback } = require('../verified-send');
+  const pass = process.env.WORKMAIL_PASS;
+  if (!pass) {
+    console.warn('[stockrfq.gate] WORKMAIL_PASS not set — skipping approval email');
+    return { delivered: 'none', bounceDetected: false };
+  }
+  // From stockRFQ@ so operator replies land back in the stockrfq inbox where
+  // the agent will pick them up and route to approve_large_stock_rfq /
+  // reject_large_stock_rfq.
+  return sendWithFallback({
+    primary:  { from: process.env.LARGE_STOCKRFQ_GATE_FROM || 'stockRFQ@orangetsunami.com', pass, displayName: 'Stock RFQ Loader' },
+    fallback: { from: process.env.LARGE_STOCKRFQ_GATE_FALLBACK || 'rfqloading@orangetsunami.com', pass, displayName: 'Stock RFQ Loader' },
+    mail: { to: to || 'jake.harris@Astutegroup.com', subject, html },
+    log: () => {},
+  });
+}
+
+// ─── APPROVAL ACTIONS (via factory) ──────────────────────────────────────────
+
+/**
+ * Domain-specific work on approval: read the sentinel for the stored RFQ
+ * payload, write it to OT via doWriteRFQ. Idempotent via gate.markProcessed
+ * (the factory's action_approve handler marks the gate cleared, then this
+ * hook fires; we mark processed after the write succeeds).
+ *
+ * Missing sentinel (race / stale reply) → returns {written:false,
+ * reason:'no-sentinel'} without throwing. The cleared file is still on disk
+ * for audit.
+ */
+async function onApproveStockRfq(id /*, ctx, approvalOpts */) {
+  if (stockRfqGate.isProcessed(id)) {
+    return { written: false, reason: 'already-processed' };
+  }
+  const sentinelPath = stockRfqGate.sentinelPath(id);
+  if (!fs.existsSync(sentinelPath)) {
+    return { written: false, reason: 'no-sentinel' };
+  }
+  let sentinel;
+  try {
+    sentinel = JSON.parse(fs.readFileSync(sentinelPath, 'utf-8'));
+  } catch (e) {
+    return { written: false, reason: `sentinel-read-failed: ${e.message}` };
+  }
+  if (!sentinel.payload) {
+    return { written: false, reason: 'sentinel-missing-payload' };
+  }
+  // Synthesize a minimal ctx so doWriteRFQ can breadcrumb (the real ctx from
+  // the approve action has different uid; preserve the original UID from the
+  // sentinel for audit chain).
+  const writeCtx = { uid: sentinel.ctx_uid || null, dryRun: false };
+  try {
+    const result = await doWriteRFQ(sentinel.payload, writeCtx);
+    stockRfqGate.markProcessed(id);
+    return { written: true, rfqId: result.rfqId, searchKey: result.searchKey, linesWritten: result.linesWritten };
+  } catch (e) {
+    breadcrumbs.write({
+      cog: 'stockrfq-agent', event: 'approve-write-failed',
+      gateId: id, error: e.message,
+    });
+    return { written: false, reason: `write-failed: ${e.message}` };
+  }
+}
+
+const { action_approve: action_approve_large_stock_rfq, action_reject: action_reject_large_stock_rfq } =
+  makeApprovalActions(stockRfqGate, {
+    workflow: 'stockrfq',
+    payloadKey: 'gate_id',
+    recordLabel: 'Large Stock RFQ',
+    downstreamLabel: 'stockrfq-agent',
+    downstreamLeadTime: 'on this tick',
+    supportsCacheOnly: false,
+    onApprove: onApproveStockRfq,
+  });
+
 // ─── HELPERS ─────────────────────────────────────────────────────────────────
 
 function esc(s) {
@@ -266,6 +527,16 @@ module.exports = {
       folder: 'OutboundPending',
       requires: ['reason'],
       handler: action_outbound_pending,
+    },
+    approve_large_stock_rfq: {
+      folder: 'LargeStockRFQApprovals',
+      requires: ['gate_id'],
+      handler: action_approve_large_stock_rfq,
+    },
+    reject_large_stock_rfq: {
+      folder: 'LargeStockRFQApprovals',
+      requires: ['gate_id'],
+      handler: action_reject_large_stock_rfq,
     },
   },
   // Constants exposed so the agent / .md can reference them

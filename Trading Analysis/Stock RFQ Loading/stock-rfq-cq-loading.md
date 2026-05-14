@@ -62,19 +62,26 @@ For each unseen message in `OutboundPending`, the agent picks **one** routing ac
    - **Skip the original broker RFQ content** further down in the quoted chain — that's the inbound side's job, not ours.
 
 3. **Thread-match to source RFQ.** Priority order:
-   - **(a) `In-Reply-To` / `References` header → breadcrumb lookup.** If the auto-forward preserves these headers (verify in smoke test), look up the original message UID in `shared/data/breadcrumbs/stockrfq-agent.ndjson` (or `.offer-pipeline/breadcrumbs.jsonl`) → `chuboe_rfq_id`. Fastest, most reliable when it works.
-   - **(b) Quoted-subject text match.** The body's deepest quoted block contains the original RFQ subject (e.g., `Subject: PMV450ENEAR 50505 pcs` from `bruce@aismartho.com`). Search `chuboe_rfq.description` or `chuboe_rfq_line.description` for a match against that subject string, restricted to recent (`created >= now() - 7 days`) and MPN matching.
-   - **(c) MPN + qty + customer-domain fuzzy.** Last resort: pull the original sender's email domain (from the deepest quoted `From:` line, the broker's address), resolve to a `c_bpartner_id`, and find recent RFQs (`created >= now() - 30 days`) with matching MPN + qty under that BP.
-   - **(d) MPN + qty + recent window.** If no customer can be resolved, find recent active RFQs with matching MPN + qty across all customers; if exactly one, use it. If multiple, → `needs_review`.
+   - **(a) `In-Reply-To` / `References` header → breadcrumb lookup.** Walk EVERY ID in `references` + `in_reply_to`. Grep `.offer-pipeline/breadcrumbs.jsonl` for matches against BOTH the breadcrumb's `messageId` field (Outlook-server-generated MID from the auto-forward) AND `brokerMessageId` field (the broker's ORIGINAL outside-domain MID, populated 2026-05-13 onward). Match on either → use the breadcrumb's `rfqId` / `searchKey` as the authoritative source. **If all IDs in the chain were grepped and ZERO matched, this is a strong "no source RFQ ingested yet" signal — proceed through (b)/(c) but if those find only unrelated same-MPN/qty candidates, fall through to `add_cq_with_rfq` rather than bouncing.**
+   - **(b) Quoted-subject text match.** The body's deepest quoted block contains the original RFQ subject (e.g., `Subject: PMV450ENEAR 50505 pcs` from `bruce@aismartho.com`). Search `chuboe_rfq.description` or `chuboe_rfq_line.description` for a match against that subject string, restricted to recent (`created >= now() - 14 days`) and MPN matching.
+   - **(c) MPN + qty + source-email disambiguation.** Find recent active RFQs (`created >= now() - 30 days`) with matching MPN + qty across all customers. If exactly one match → use it. **If multiple, DO NOT bounce.** For each candidate, grep the breadcrumb for its `searchKey` and inspect the `senderEmail` / `senderDomain` fields (populated 2026-05-13 onward). Compare against the outbound's quoted original-From email/domain (parsed from the deepest non-Astute `From:` in the body):
+       - Exactly one breadcrumb match → use that candidate.
+       - Multiple matches (same broker submitted twice) → most recent candidate by `chuboe_rfq.created` (idempotency check at 3.6 will dedup if needed).
+       - Zero matches (no candidate's breadcrumb has a senderEmail tying it to the outbound broker — including the legacy case where all candidate breadcrumbs predate the field) → fall through to `add_cq_with_rfq` in step 4. **Same-MPN/qty candidates from different brokers is the normal APAC price-fishing pattern; the right answer is a new RFQ for each unique broker, not manual triage.**
 
 4. **Price-fishing flag inheritance (match-found case only).** Query the matched RFQ's description for the `[PRICE CHECK?]` tag (set at inbound load time by `shared/price-check-heuristic.js`). If present, set `priceCheck: true` on the `add_cq` payload — the handler prepends a one-line `notePrivate` to each CQ row so the trader sees the inherited context. **The CQ agent does NOT re-run the heuristic** — the flag is computed once at RFQ creation; the CQ side is read-only on this.
 
 5. **Dispatch action based on match result:**
    - **Match found** → `add_cq` with `{ rfqSearchKey, lines[], priceCheck? }`.
    - **No match AND quote has full content (mpn+qty+price+LT)** → `add_cq_with_rfq` with `{ bpartnerId (resolved or Unqualified Broker), lines[], originalSenderEmail, originalCompanyName }`. Writes the RFQ via `writeRFQ()` first (so the demand signal isn't lost — this captures the case where the inbound RFQ never came through), then the CQ via `writeCQ()` against the just-written RFQ.
-   - **Match ambiguous (2+ candidate RFQs)** → `needs_review` with the candidate list.
+   - **Path (c) found same-MPN candidates but source-email disambiguation produced no match** → `add_cq_with_rfq` (NOT `needs_review`). Different APAC brokers shopping the same line is the normal pattern; each should get its own RFQ.
    - **Match found BUT existing CQ already covers (mpn, qty, price)** → `skip` with reason `already-written: cq <id>`.
    - **Match found BUT existing CQ has same (mpn, qty) at a DIFFERENT price** → `needs_review` — operator may have revised the quote; do not auto-supersede.
+
+6. **MFR inference (run BEFORE dispatching `add_cq` / `add_cq_with_rfq`).** `cq-writer` requires `mfrText`. If the operator's quote did not specify a manufacturer:
+   - Call `shared/mfr-resolver.resolveMfrForRow({ mpn })` — synchronous, returns `{ matched, canonical, id, ... }`.
+   - `matched: true` → use `canonical` as `mfrText`. Stamp `notePrivate: 'MFR inferred from MPN prefix via mfr-resolver; operator did not specify'`.
+   - `matched: false` → ONLY then route `needs_review` with a hint that the prefix is missing from `shared/data/mpn-prefixes.json` (gaps should be filed as data-file additions, not recurring manual triage).
 
 ### Routing actions
 

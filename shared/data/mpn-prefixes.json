@@ -73,6 +73,17 @@
     "ERA": { "mfr": "Panasonic", "notes": "Panasonic precision resistors" },
     "ERJ": { "mfr": "Panasonic", "notes": "Panasonic chip resistors" },
     "EEH": { "mfr": "Panasonic", "notes": "Panasonic conductive polymer caps" },
-    "EEU": { "mfr": "Panasonic", "notes": "Panasonic aluminum electrolytic caps" }
+    "EEU": { "mfr": "Panasonic", "notes": "Panasonic aluminum electrolytic caps" },
+    "FDS": { "mfr": "On Semiconductor", "notes": "ON Semi / former Fairchild SO-8 MOSFETs (Fairchild acquired by ON Semi 2016)" },
+    "PC28F": { "mfr": "Micron Technology Inc", "notes": "Micron / former Intel StrataFlash parallel NOR (Intel → Numonyx 2008 → Micron 2010)" },
+    "UCC": { "mfr": "Texas Instruments", "notes": "TI / former Unitrode UCC-series PWM controllers (Unitrode acquired by TI 1999)" },
+    "BUK": { "mfr": "Nexperia", "notes": "Nexperia power MOSFETs (LFPAK family, formerly Philips Semi)" },
+    "PMV": { "mfr": "Nexperia", "notes": "Nexperia small-signal MOSFETs in SOT-23 / DFN packs" },
+    "PMN": { "mfr": "Nexperia", "notes": "Nexperia n-channel MOSFETs" },
+    "PMEG": { "mfr": "Nexperia", "notes": "Nexperia Schottky barrier diodes (PMEG family)" },
+    "W631": { "mfr": "Winbond", "notes": "Winbond DDR / DDR3 SDRAM (W631GG, W631GU, etc.)" },
+    "W632": { "mfr": "Winbond", "notes": "Winbond DDR3 SDRAM higher density" },
+    "W971": { "mfr": "Winbond", "notes": "Winbond DDR2 SDRAM" },
+    "W948": { "mfr": "Winbond", "notes": "Winbond Mobile DDR / LP-DDR" }
   }
 }

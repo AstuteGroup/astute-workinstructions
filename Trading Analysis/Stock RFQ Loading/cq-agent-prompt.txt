@@ -21,9 +21,11 @@ For every UID returned, follow the per-message decision tree from the .md:
 
   3.4 — Thread-match to source RFQ. Try in this order, first match wins:
 
-        (a) Header-based: if `in_reply_to` is present, grep the breadcrumb log for that Message-ID:
+        (a) Header-based: if `in_reply_to` and/or `references` are present, grep the breadcrumb log for EACH ID in the chain:
               grep "<message-id-here>" /home/analytics_user/workspace/.offer-pipeline/breadcrumbs.jsonl
-            If a stockrfq-agent `loaded` event matches → use its rfqId/searchKey. Walk `references` array as fallback (the chain may include the original broker's Message-ID even if In-Reply-To points at an intermediate Astute reply).
+            Both the `messageId` field (Outlook-server-generated MID from the auto-forward) AND the `brokerMessageId` field (the broker's ORIGINAL outside-domain MID, populated 2026-05-13 onward) are valid hit targets — match either. Walk the `references` array fully; the broker's true MID is typically the deepest (outside `@astutegroup.com`/`@outlook.com`) entry.
+            If a stockrfq-agent `loaded` event matches → use its rfqId/searchKey, treat as authoritative match, skip paths (b)/(c), go to 3.6.
+            **If ALL References-chain IDs were grepped and ZERO matched: this is a strong "no source RFQ ingested yet" signal. Do NOT bounce when paths (b)/(c) later find unrelated same-MPN candidates — fall through to 3.5 add_cq_with_rfq.**
 
         (b) Quoted-subject match: scan the body's deepest quoted block for a `Subject:` line (the original broker's RFQ subject, e.g., "Subject: PMV450ENEAR 50505 pcs"). Query OT:
               psql -P pager=off -A -F$'\t' -c "
@@ -35,7 +37,7 @@ For every UID returned, follow the per-message decision tree from the .md:
                   AND r.description ILIKE '%<subject-keyword>%';"
             If exactly one match → use it. If multiple → fall through to (c) to narrow. If none → fall through to (c).
 
-        (c) MPN + qty + recent + customer-domain fuzzy:
+        (c) MPN + qty + recent + source-email disambiguation:
               psql -P pager=off -A -F$'\t' -c "
                 SELECT r.value, r.chuboe_rfq_id, bp.name, rl.qty
                 FROM adempiere.chuboe_rfq r
@@ -46,7 +48,14 @@ For every UID returned, follow the per-message decision tree from the .md:
                   AND r.created >= now() - interval '30 days'
                   AND rlm.chuboe_mpn = '<MPN>'
                   AND rl.qty = <qty>;"
-            If exactly one match → use it. If multiple, narrow by parsing the original broker's email domain from the deepest quoted `From:` line and matching against bp.name or bp.searchkey. If still multiple → route `needs_review` with candidates list. If zero → continue to step 3.5.
+            If exactly one match → use it. If multiple, DO NOT bounce. Run source-email disambiguation:
+              For each candidate searchKey, grep the breadcrumb log for that key's `loaded` event:
+                grep '"searchKey":"<candidate-key>"' /home/analytics_user/workspace/.offer-pipeline/breadcrumbs.jsonl
+              The breadcrumb has `senderEmail` and `senderDomain` fields (populated 2026-05-13 onward). Parse the outbound's quoted original-From email (deepest non-Astute `From:` in the body) and its domain.
+              - Exactly one candidate's senderEmail (or senderDomain) matches the outbound's original-From → use that candidate. Proceed to 3.6.
+              - Multiple candidates match (same broker submitted the same MPN+qty more than once) → use the MOST RECENT one (highest `chuboe_rfq.created`). Proceed to 3.6.
+              - Zero candidates match (or all candidates' breadcrumbs predate 2026-05-13 so they lack senderEmail — and their bp.name doesn't match the outbound's broker name either) → fall through to step 3.5 add_cq_with_rfq. **DO NOT route `needs_review` for same-MPN/qty candidates with no domain match.** Different APAC brokers shopping the same line is the normal pattern; the right answer is a new RFQ for each unique broker, not manual triage.
+            If zero MPN+qty matches → continue to step 3.5.
 
   3.5 — No source RFQ found via any path. Determine bpartnerId:
         - Parse the deepest quoted `From:` line for the broker's email and company.
@@ -71,6 +80,16 @@ For every UID returned, follow the per-message decision tree from the .md:
         psql -P pager=off -A -F$'\t' -t -c "SELECT CASE WHEN description LIKE '[PRICE CHECK?]%' THEN 'Y' ELSE 'N' END FROM adempiere.chuboe_rfq WHERE value = '<rfqSearchKey>';"
         If the result is 'Y' → include `priceCheck: true` in the add_cq payload below; the handler will prepend a one-line notePrivate to each CQ row so the trader sees the context.
 
+  3.7.5 — MFR inference (run BEFORE routing). cq-writer requires `mfrText`. If the operator's quote did NOT specify a manufacturer, run the MPN-prefix resolver:
+
+          node -e "const r=require('/home/analytics_user/workspace/astute-workinstructions/shared/mfr-resolver'); console.log(JSON.stringify(r.resolveMfrForRow({mpn:'<MPN>'})))"
+
+        The resolver is synchronous and returns `{ matched: true|false, canonical, id, path, source, confidence, ... }`. Behavior:
+        - `matched: true` → use `canonical` as mfrText. Stamp `notePrivate: 'MFR inferred from MPN prefix via mfr-resolver; operator did not specify'`. Proceed to 3.8.
+        - `matched: false` → route `needs_review` with reason "operator did not state MFR; MPN-prefix inference returned no match — prefix likely missing from shared/data/mpn-prefixes.json (consider adding)". Suggest the likely MFR in the reason text if obvious from MPN context.
+
+        **Do NOT bounce to `needs_review` for missing MFR without trying the resolver first.** The prefix map covers most common manufacturers; gaps should be filed as prefix-map additions, not as recurring manual triage.
+
   3.8 — Route `add_cq` with payload:
           {
             "rfqSearchKey": "<value>",
@@ -79,7 +98,7 @@ For every UID returned, follow the per-message decision tree from the .md:
             "priceCheck": <true if inherited from RFQ; omit otherwise>,
             "lines": [{ "mpn": "...", "qty": N, "price": <number>, "mfrText": "...", "leadTime": "STOCK" or "...", "dateCode": "...", ... }]
           }
-        Note: cq-writer requires `mfrText` and `leadTime` as mandatory. If the operator didn't state lead time, default to "STOCK" only when the body explicitly says "we have N pcs in <warehouse>" (implies stock). Otherwise → `needs_review` for missing leadTime.
+        Note: cq-writer requires `mfrText` and `leadTime` as mandatory. If the operator didn't state lead time, default to "STOCK" only when the body explicitly says "we have N pcs in <warehouse>" (implies stock). Otherwise → `needs_review` for missing leadTime. For missing mfrText, run step 3.7.5 above first — `needs_review` is the LAST resort, not the first.
 
 If a single message hits a transient error (writeCQBatch 5xx, partner-lookup throws, attachment unreadable), log the error and continue with the next message. Do not abort the batch on per-message failure.
 
