@@ -40,6 +40,13 @@ const overrides = require('../../shared/feedback-overrides');
 const { resolvePartner, lookupById } = require('../../shared/partner-lookup');
 const { sendWithFallback } = require('../../shared/verified-send');
 const { acquireLock, releaseLock } = require('../../shared/lockfile');
+const grammar = require('../../shared/workflow-reply-grammars');
+const {
+  PARTNER_RE, INTENT_RE, SKIP_RE, IGNORE_RE, YES_RE, NO_RE, LINES_RE,
+  JUNK_CHECK_SUBJECT_RE,
+  parseDirectives,
+  looksLikeActionableReply,
+} = grammar;
 
 const ASTUTE_DOMAIN = 'astutegroup.com';
 const JAKE_EMAIL = process.env.OPERATOR_EMAIL || 'jake.harris@astutegroup.com';
@@ -64,96 +71,9 @@ function parseArgs(argv) {
 }
 
 // ── Directive grammar ───────────────────────────────────────────────────────
-
-const PARTNER_RE = /^\s*PARTNER\s*:\s*(\d+)\s*=\s*(.+?)\s*$/im;
-const INTENT_RE  = /^\s*INTENT\s*:\s*(\S+)\s*=\s*(spec[-\s]buy|proactive|reactive)\s*$/im;
-const SKIP_RE    = /^\s*SKIP\s*:\s*(\S+)\s*$/im;
-const IGNORE_RE  = /^\s*(?:IGNORE|JUNK)\s*:\s*(\d+)\s*$/im;
-const YES_RE     = /^\s*YES\s*(?::\s*(\d+))?\s*$/im;
-const NO_RE      = /^\s*NO\s*(?::\s*(\d+))?\s*$/im;
-const LINES_RE   = /^\s*LINES\s*:\s*(\d+)\s*$/im;
-
-// Junk-check questions are sent with subject "Junk check — UID <n>: ...".
-// Operator's reply will have "Re: Junk check — UID <n>: ...".
-const JUNK_CHECK_SUBJECT_RE = /\bJunk\s+check\s*[—-]\s*UID\s+(\d+)\b/i;
-
-/**
- * Parse a reply body into a list of directives. Some directives (LINES, YES,
- * NO) are multi-line or context-dependent — those return as structured objects
- * with the body slice attached so the caller can act on them.
- *
- * @param {object} ctx
- *   text:           reply body (already trimmed of quoted prior message)
- *   subjectUid:     UID extracted from the reply subject (for YES/NO without explicit UID)
- *   parseHeaders:   optional matchHeaders helper (caller passes if LINES is supported)
- */
-function parseDirectives(text, ctx = {}) {
-  if (!text) return { directives: [], unparsed: [] };
-  const directives = [];
-  const unparsedLines = [];
-  const lines = text.split(/\r?\n/);
-  const subjectUid = ctx.subjectUid != null ? Number(ctx.subjectUid) : null;
-
-  let i = 0;
-  while (i < lines.length) {
-    const raw = lines[i];
-    const line = raw.trim();
-    if (!line) { i++; continue; }
-
-    let m;
-    if ((m = PARTNER_RE.exec(line))) {
-      directives.push({ type: 'PARTNER', uid: Number(m[1]), value: m[2].trim() });
-      i++; continue;
-    }
-    if ((m = INTENT_RE.exec(line))) {
-      directives.push({ type: 'INTENT', searchKey: m[1].trim(), intent: m[2].toLowerCase().replace(/\s+/g, '-') });
-      i++; continue;
-    }
-    if ((m = SKIP_RE.exec(line))) {
-      directives.push({ type: 'SKIP', searchKey: m[1].trim() });
-      i++; continue;
-    }
-    if ((m = IGNORE_RE.exec(line))) {
-      directives.push({ type: 'IGNORE', uid: Number(m[1]) });
-      i++; continue;
-    }
-    if ((m = YES_RE.exec(line))) {
-      const uid = m[1] ? Number(m[1]) : subjectUid;
-      if (uid != null) directives.push({ type: 'YES', uid });
-      else unparsedLines.push(`YES with no UID and no subject context: "${line}"`);
-      i++; continue;
-    }
-    if ((m = NO_RE.exec(line))) {
-      const uid = m[1] ? Number(m[1]) : subjectUid;
-      if (uid != null) directives.push({ type: 'NO', uid });
-      else unparsedLines.push(`NO with no UID and no subject context: "${line}"`);
-      i++; continue;
-    }
-    if ((m = LINES_RE.exec(line))) {
-      // LINES: <uid>  →  capture everything until blank line OR another directive.
-      // We don't parse the table here — the caller (processReply) hands the
-      // captured block to the body-table parser shared with the offer-poller.
-      const uid = Number(m[1]);
-      const block = [];
-      i++;
-      while (i < lines.length) {
-        const next = lines[i];
-        if (!next.trim()) break;
-        if (/^\s*(?:PARTNER|INTENT|SKIP|IGNORE|JUNK|YES|NO|LINES)\s*:/i.test(next)) break;
-        block.push(next);
-        i++;
-      }
-      directives.push({ type: 'LINES', uid, block: block.join('\n') });
-      continue;
-    }
-    if (/^\s*(?:PARTNER|INTENT|SKIP|IGNORE|JUNK|YES|NO|LINES)\s*:/i.test(line)) {
-      unparsedLines.push(line);
-    }
-    i++;
-  }
-
-  return { directives, unparsed: unparsedLines };
-}
+// All regex patterns + parseDirectives now live in shared/workflow-reply-grammars.js
+// (imported at top of file). The grammar is workflow-agnostic — what's done
+// with each directive type is excess-specific and stays here in processReply().
 
 // ── Resolving partner from a "BP id or company name" value ─────────────────
 
@@ -249,36 +169,9 @@ function parseLinesBlock(block) {
 }
 
 // ── Substantive-reply detector ──────────────────────────────────────────────
-
-/**
- * Decide whether an operator reply with no recognized directives is still
- * trying to say something actionable. Used to differentiate:
- *
- *   "thanks", "ok", "got it"          → silent skip (no kickback)
- *   "Please update partner to GE"     → kickback ("we may need a directive")
- *   "this should be type X not Y"     → kickback
- *
- * Returns true when the body has enough content + signals to suggest the
- * operator wanted us to take an action we don't yet know how to do.
- */
-function looksLikeActionableReply(text) {
-  if (!text) return false;
-  const trimmed = text.trim();
-  if (trimmed.length < 30) return false;        // one-word ack — silent skip
-
-  // Acknowledgement-only patterns (whole reply is just a polite reply)
-  if (/^\s*(thanks|thank you|ok|got it|noted|sounds good|will do|received|cheers|fyi|nm|nevermind|ignore me)\.?\s*$/i.test(trimmed)) {
-    return false;
-  }
-
-  // Action-indicating signals
-  const hasUidOrKey = /\b(?:UID\s*\d+|\b[1-9]\d{6}\b)/i.test(trimmed);  // UID 97 or a 7-digit search key
-  const hasActionVerb = /\b(?:change|update|fix|correct|set|swap|move|merge|add|remove|delete|cancel|skip|process|reload|reprocess|retry|use|treat|reclassif|need|please)\b/i.test(trimmed);
-  const isSubstantive = trimmed.length >= 60;
-
-  // If they reference a UID/key OR use action verbs OR wrote >60 chars, it's likely actionable
-  return hasUidOrKey || hasActionVerb || isSubstantive;
-}
+// looksLikeActionableReply lives in shared/workflow-reply-grammars.js
+// (imported at top of file). Used to differentiate one-word acks ("thanks")
+// from substantive operator replies that need a kickback.
 
 // ── Email helpers ──────────────────────────────────────────────────────────
 
