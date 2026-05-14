@@ -111,7 +111,7 @@ module.exports = {
     sourceFolder: 'INBOX',
     cron: { name: 'rfqloading-agent' },
     actions: [
-      'enqueue', 'need_info', 'needs_review', 'not_rfq',
+      'enqueue', 'need_info', 'needs_review', 'not_rfq', 'drop_pending',
       'approve_large_rfq', 'reject_large_rfq',
     ],
     capabilities: {
@@ -148,7 +148,8 @@ module.exports = {
     cron: { name: 'excess-agent' },
     actions: [
       'load_offer', 'needs_partner', 'clarify_partner', 'needs_review',
-      'not_offer', 'dup_skip', 'approve_large_offer', 'reject_large_offer',
+      'not_offer', 'dup_skip', 'drop_pending',
+      'approve_large_offer', 'reject_large_offer',
     ],
     capabilities: {
       replyStitching: true,
@@ -287,33 +288,47 @@ module.exports = {
   },
 
   // ─── VQ LOADING (supplier quotes → VQ records) ──────────────────────────────
-  // NOT YET ON THE PATTERN. Listed here so the migration target is discoverable
-  // alongside everything else. Parity check skips capability validation for
-  // status='planned' entries but lists the workflow at the bottom of the report
-  // so the gap stays visible.
   'vq-loading': {
-    status: 'planned',
-    handler: null,
+    status: 'active',
+    handler: 'vq-loading',
     doc: 'Trading Analysis/RFQ Sourcing/vq_loading/vq-loading.md',
-    inbox: null,  // TBD — IT to provision vq@ inbox, or operator picks an existing one
+    inbox: 'vq@orangetsunami.com',
     sourceFolder: 'INBOX',
-    cron: null,
-    actions: [],
+    cron: { name: 'vq-loading-agent' },
+    actions: [
+      'load_vq', 'need_info_vendor', 'clarify_vendor', 'needs_vendor',
+      'needs_review', 'no_bid', 'not_vq', 'dup_skip', 'drop_pending',
+      'outbound_pending',
+    ],
     capabilities: {
-      // Target state — what we want once migrated. Not validated while status='planned'.
       replyStitching: true,
       needInfoClarifications: true,
-      largePayloadGate: true,
-      approvalReplyAction: true,
+      largePayloadGate: false,
+      approvalReplyAction: false,
       preWriteIdempotency: true,
       writeQueue: false,
       breadcrumbWrites: true,
       operatorDigest: false,
       activityDigest: true,
       replyParserGrammar: false,
-      tieredCron: false,
+      tieredCron: true,
     },
-    deviations: {},
-    notes: 'Type 1 (vq-parser fetch) + Type 2 (load-bulk-summary-cli.js) currently manual. Migration plan: see Trading Analysis/RFQ Sourcing/sourcing-roadmap.md. Inherits stitching/gate/clarifications for free once on the pattern.',
+    deviations: {
+      largePayloadGate: 'VQ writes are local to OT — no external API quota at risk. Cost of over-load is bounded (deactivate the lines). The two-agent verifier pass (extractor → independent sub-Agent verifier → reconcile, per agent-prompt.txt step 3.7) is the safety net for "extractor hallucinated N quotes from a small email" failure mode. Decided 2026-05-14.',
+      approvalReplyAction: 'No payload gate → no approval needed. Clarification round-trip uses reply-stitching (needInfoClarifications via need_info_vendor / clarify_vendor / needs_vendor sidecars), not approval.',
+      writeQueue: 'direct write — loadBulkSummary fans out per quote within a single agent invocation; volumes per email are bounded by Two-Agent Validation runtime budget',
+      operatorDigest: 'activityDigest covers visibility; no operator-curation queue (writes are deterministic given valid quotes JSON)',
+      replyParserGrammar: 'reply parsing happens inside the agent prompt (step 3.2 stitch logic for clarify/need_info/needs_vendor replies), not in a shared key:value grammar — replies are operator prose, not directives',
+    },
+    // tieredCron wired in scripts/should-run-vq-loading-agent.js (5m burst on
+    // pending clarify_vendor / need_info_vendor / needs_vendor sidecar; 15m
+    // steady — matches stockrfq cadence).
+    //
+    // Two-Agent Validation lives in agent-prompt.txt (step 3.7): extractor pass
+    // produces structured JSON, sub-Agent verifier (via Agent tool with
+    // subagent_type=general-purpose) independently re-extracts and flags
+    // discrepancies, reconciliation either proceeds or routes needs_review.
+    // The handler is unaware of the validation — it just receives reconciled
+    // quotes.
   },
 };

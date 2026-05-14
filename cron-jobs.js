@@ -228,6 +228,17 @@ module.exports = [
   },
 
   {
+    name: 'vq-watchlist',
+    cadence: 'every 15m',
+    cadenceCron: '7,22,37,52 * * * *',
+    command: `node "${ASTUTE}/scripts/vq-watchlist.js" --notify`,
+    cwd: ASTUTE,
+    needsOT: false,
+    logFile: '/tmp/vq-watchlist.log',
+    description: 'Every 15m (offset +7 from quarter so it does not race vq-loading-agent ticks at :00/:15/:30/:45) — surfaces three shakeout milestones for the cron VQ agent: first fresh complex Type 2 multi-vendor load, first partial_clarify reply stitch, and MFR-resolver overreach detections on recent VQs. Anomaly-immediate email on first firing; state in ~/workspace/.vq-watchlist-state.json keeps it idempotent.',
+  },
+
+  {
     name: 'offer-reply-parser',
     cadence: 'every 30m',
     // Offset by 5 min from poller so we're not fighting for the inbox lock

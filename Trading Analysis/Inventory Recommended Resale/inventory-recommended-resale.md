@@ -76,7 +76,7 @@ At ~5,029 active lines total, full-book refresh ≈ 3.4 weeks if everything cycl
 **Warehouse identifier:** `chuboe_offer.description` is the only signal today since the offer header has no warehouse FK and offer type is "Austin" for almost everything. Either parse the description (`"Weekly inventory YYYY-MM-DD — {Group}"` / `"[Carryover] {Group}"`) or — better — establish a stable enum file in `inventory_cleanup.js` and reference it from both sides.
 
 **LAM Dead progression (in progress — refined 2026-05-05):**
-- **Cost basis:** LAM Kitting DB (`Trading Analysis/LAM Kitting Reorder/Lam_Kitting_DB_03132026.xlsx`), column **Base Unit Price** on the `INVENTORY` sheet. This is operator-confirmed: LAM only approves repurchases above original purchase cost per SIPOC (the LAM Kitting DB *is* the SIPOC, despite the file name).
+- **Cost basis:** LAM Kitting DB (`Trading Analysis/LAM 3PL/Lam_Kitting_DB_*.xlsx` — latest dated file), column **Base Unit Price** on the `INVENTORY` sheet. This is operator-confirmed: LAM only approves repurchases above original purchase cost per SIPOC (the LAM Kitting DB *is* the SIPOC, despite the file name).
 - **Cost-floor floor:** never quote below Base Unit Price (LAM contractual gate). All resale logic snaps to ≥ Base.
 - **Broker markup logic:** see Bucket framework below — broker_validate uses VQ truth, default_markup uses Base × 1.15, underwater uses Base × 1.15 with a "stuck" flag.
 - **Restricted MFR handling:** **bypass the standard masking** for LAM Dead. Restricted gate is a sourcing rule (don't pay broker for ADI/Maxim/LT/TI when franchise has them); when we're the seller, we need open-market price truth on everything (operator confirmed: sold a Linear Tech part at $35 against Mouser's stocked low, "all based on open market").
@@ -206,7 +206,7 @@ Per-line categorization on the cost-spread axis. Franchise stock + qty + DC are 
 
 | Warehouse Group | Cost Source | Field |
 |---|---|---|
-| LAM Dead Inventory (W115) | `Trading Analysis/LAM Kitting Reorder/Lam_Kitting_DB_03132026.xlsx`, sheet `INVENTORY` | `Base Unit Price` |
+| LAM Dead Inventory (W115) | `Trading Analysis/LAM 3PL/Lam_Kitting_DB_*.xlsx` (latest dated file), sheet `INVENTORY` | `Base Unit Price` |
 | GM Stock | Operator emails the cost xlsx to `stockRFQ@orangetsunami.com`; subject "FW: GM Inventory" with `Ready To Ship - GM GP *.xlsx` attached | sheet `Stock and Costs`, column `Astute Cost` |
 | Free Stock (Austin/HK/Stevenage/PH) | TBD — likely OT `priceentered` if inventory_cleanup writes it for these groups, else Infor lot cost | TBD |
 | Consignment groups (GE/Taxan/Spartronics/Eaton/LAM_Consignment) | TBD — special handling per program; consignment owners have different cost-pass-through rules | TBD |
@@ -266,8 +266,8 @@ Standalone "where are we upside down?" report. Pre-cycle, no resale writes, no N
 ## References
 
 - Upstream loader: `Trading Analysis/Inventory File Cleanup/inventory-file-cleanup.md`
-- LAM Kitting DB (LAM Dead cost source): `Trading Analysis/LAM Kitting Reorder/Lam_Kitting_DB_03132026.xlsx`
-- LAM Kitting Reorder workflow (related): `Trading Analysis/LAM Kitting Reorder/lam-kitting-reorder.md`
+- LAM Kitting DB (LAM Dead cost source): `Trading Analysis/LAM 3PL/Lam_Kitting_DB_*.xlsx` (latest dated file)
+- LAM 3PL workflow (related): `Trading Analysis/LAM 3PL/lam-3pl.md`
 - Restricted MFRs: `shared/restricted-mfrs.json`
 - Franchise API: `shared/franchise-api.js`
 - Data model: `shared/data-model.md` (chuboe_offer / chuboe_offer_line / chuboe_rfq)

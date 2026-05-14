@@ -70,6 +70,7 @@ const { apiPost, apiGet, apiPut } = require('./api-client');
 const { psqlQuery, cleanMpn } = require('./db-helpers');
 const { lookupMfr } = require('./mfr-lookup');
 const { resolveMfrForRow } = require('./mfr-resolver');
+const { isDisqualified, disqualificationLabel, disqualificationName } = require('./disqualified-vendor-types');
 
 // Offer type name → chuboe_offer_type_id mapping
 const OFFER_TYPES = {
@@ -231,6 +232,33 @@ async function writeOffer(opts) {
   if (!bpartnerId) throw new Error('offer-writeback: bpartnerId is required');
   if (!rawOfferType) throw new Error('offer-writeback: offerTypeId is required');
   if (!lines || lines.length === 0) throw new Error('offer-writeback: at least one line is required');
+
+  // ── Disqualified-vendor-type check ──
+  // The offer's BP is in the selling role (they're offering inventory). If the
+  // BP is flagged Suspended (1000004) or Prohibited (1000005), skip — we won't
+  // buy from them regardless of how good the offer looks. Default-on; caller
+  // can pass opts.skipDisqualifierCheck=true to override (e.g., audit / catch-up).
+  // See shared/disqualified-vendor-types.js for the canonical set.
+  if (!opts.skipDisqualifierCheck) {
+    try {
+      const bpResp = await apiGet('C_BPartner', { filter: `C_BPartner_ID eq ${bpartnerId}`, top: 1 });
+      const bpRow = bpResp.records?.[0];
+      const vtypeId = bpRow?.Chuboe_VendorType_ID?.id || bpRow?.Chuboe_VendorType_ID || null;
+      if (isDisqualified(vtypeId)) {
+        const name = disqualificationName(vtypeId);
+        const label = disqualificationLabel(vtypeId);
+        logger.warn(`offer-writeback: skipping ${label} BP ${bpartnerId} (${bpRow?.Name || '?'}) — vtype ${vtypeId} (${name})`);
+        return {
+          offerId: null, searchKey: null, linesWritten: 0, mpnsWritten: 0,
+          skipped: true, skipReason: label,
+          errors: [`BP ${bpartnerId} is ${name} (vendor type ${vtypeId}); offer not written. Pass skipDisqualifierCheck:true to override.`],
+        };
+      }
+    } catch (e) {
+      // Don't fail the write on a lookup error — log and proceed.
+      logger.warn(`offer-writeback: disqualifier lookup failed for BP ${bpartnerId}: ${e.message}; proceeding anyway`);
+    }
+  }
 
   // Resolve type: accept either numeric ID or string name
   let offerTypeId;

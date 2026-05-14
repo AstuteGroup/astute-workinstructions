@@ -210,7 +210,7 @@ async function action_load_offer(payload, ctx) {
  *          search-key pattern; body From: chain led to internal Astute employee")
  */
 async function action_needs_partner(payload, ctx) {
-  const { subject, outerFrom, hints } = payload;
+  const { subject, outerFrom, hints, investigation_summary } = payload;
   const html = `<html><body style="font-family:Arial,sans-serif;font-size:13px">
 <h2 style="color:#b00">Customer Excess — partner unresolved</h2>
 <p><b>Subject:</b> ${esc(subject)}<br/>
@@ -238,10 +238,11 @@ async function action_needs_partner(payload, ctx) {
 
   breadcrumbs.write({
     cog: 'offer-poller',
-    event: 'needs-partner',
+    event: 'escalated-needs_partner',
     uid: ctx.uid,
     subject,
     outerFrom,
+    investigation_summary: investigation_summary || null,
   });
 
   return { notified: ctx.jakeEmail };
@@ -280,7 +281,7 @@ async function action_needs_partner(payload, ctx) {
  *               triage email so Jake can see who sent it
  */
 async function action_clarify_partner(payload, ctx) {
-  const { subject, extracted, hints, outerFrom } = payload;
+  const { subject, extracted, hints, outerFrom, investigation_summary } = payload;
   const linesCount = Array.isArray(extracted && extracted.lines) ? extracted.lines.length : 0;
   const offerType = (extracted && extracted.offerType) || null;
   const sampleLines = Array.isArray(extracted && extracted.lines)
@@ -297,6 +298,7 @@ async function action_clarify_partner(payload, ctx) {
       extracted: extracted || (ctx.pendingSidecar && ctx.pendingSidecar.extracted) || {},
       missing: ['partner'],
       hints: hints || null,
+      investigation_summary: investigation_summary || null,
     });
   }
 
@@ -321,6 +323,7 @@ ${sampleBlock}
 <p style="background:#f5f5f5;padding:10px;border-left:3px solid #b00">
    <b>Reply to ${esc(ctx.inbox)} with the company name</b> (one line is fine — e.g., <code>Customer is Liyijing Electronics</code>). The next agent tick will merge your reply with the parsed lines and load the offer. Or use the structured directive: <code>PARTNER: ${ctx.uid} = &lt;BP search key OR company name&gt;</code>
 </p>
+<p style="color:#666;font-size:11px">To discard instead of answering: reply with <code>SKIP</code>, <code>DROP</code>, <code>IGNORE</code>, or <code>DISCARD</code> on the first line. The next tick will move this to NotOffer and clear the pending state.</p>
 <p style="color:#666;font-size:11px">Message moved to NeedInfo folder. Sidecar: <code>~/workspace/.excess-pending/${esc(ctx.anchorMessageId || '(no anchor)')}.json</code></p>
 </body></html>`;
 
@@ -343,13 +346,14 @@ ${sampleBlock}
 
   breadcrumbs.write({
     cog: 'offer-poller',
-    event: 'clarify-partner',
+    event: 'escalated-clarify_partner',
     uid: ctx.uid,
     notified: ctx.jakeEmail,
     external_sender: outerFrom || null,
     subject,
     hints: hints || null,
     retry_count: retryCount,
+    investigation_summary: investigation_summary || null,
   });
 
   return {
@@ -369,7 +373,7 @@ ${sampleBlock}
  * Optional: { details }
  */
 async function action_needs_review(payload, ctx) {
-  const { reason, subject, outerFrom, details } = payload;
+  const { reason, subject, outerFrom, details, investigation_summary } = payload;
   const html = `<html><body style="font-family:Arial,sans-serif;font-size:13px">
 <h2 style="color:#b00">Customer Excess — needs manual review</h2>
 <p><b>Subject:</b> ${esc(subject)}<br/>
@@ -393,11 +397,12 @@ ${details ? `<pre style="background:#f5f5f5;padding:8px;white-space:pre-wrap;fon
 
   breadcrumbs.write({
     cog: 'offer-poller',
-    event: 'needs-review',
+    event: 'escalated-needs_review',
     uid: ctx.uid,
     subject,
     outerFrom,
     reason,
+    investigation_summary: investigation_summary || null,
   });
 
   return { notified: ctx.jakeEmail };
@@ -420,6 +425,34 @@ async function action_not_offer(payload, ctx) {
     reason: payload.reason || 'unspecified',
   });
   return { reason: payload.reason || 'unspecified' };
+}
+
+/**
+ * Operator-initiated discard of a pending escalation. Triggered when Jake
+ * replies to a needs_partner / clarify_partner email with a directive like
+ * SKIP / IGNORE / DROP / DISCARD. The agent parses the directive in the
+ * stitch-logic step via shared/workflow-reply-grammars.parseSidecarReplyDirective
+ * and routes here.
+ *
+ * Side effects:
+ *   - Silent move to NotOffer (signal we considered + declined to load).
+ *   - Breadcrumb 'operator-dropped' so digest can show how often this fires.
+ *   - The poller clears the sidecar automatically (action is NOT keepsPending).
+ *
+ * Required payload: { reason } — usually the directive Jake typed.
+ */
+async function action_drop_pending(payload, ctx) {
+  if (ctx.dryRun) {
+    return { dry_run: true, reason: payload.reason || 'operator-dropped' };
+  }
+  breadcrumbs.write({
+    cog: 'offer-poller',
+    event: 'operator-dropped',
+    uid: ctx.uid,
+    reason: payload.reason || 'operator-dropped',
+    pending_kind: ctx.pendingSidecar && ctx.pendingSidecar.kind || null,
+  });
+  return { reason: payload.reason || 'operator-dropped' };
 }
 
 /**
@@ -601,6 +634,11 @@ module.exports = {
       folder: 'Processed',
       requires: ['existingSearchKey'],
       handler: action_dup_skip,
+    },
+    drop_pending: {
+      folder: 'NotOffer',
+      requires: ['reason'],
+      handler: action_drop_pending,
     },
     approve_large_offer: {
       folder: 'LargeOfferApprovals',

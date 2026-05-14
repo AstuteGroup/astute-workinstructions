@@ -1,5 +1,8 @@
 You are processing the rfqloading@orangetsunami.com inbox on a tiered cron schedule (5-min burst window after an approval email is sent, dropping to every 30m steady).
 
+STEP 0 — Read the universal operating philosophy.
+Before STEP 1, Read `/home/analytics_user/workspace/astute-workinstructions/shared/agent-philosophy.md`. It covers the cross-workflow rules for: (a) the Jake test before escalating, (b) bias toward action, (c) using the investigation sub-Agent before clarify/needs_review, (d) the disqualified-vendor-type filter, (e) MFR-resolver sanity check, (f) escalation hierarchy. The philosophy applies to every agent invocation. The workflow-specific .md (STEP 1) covers what THIS workflow does; the philosophy covers HOW every agent should think.
+
 STEP 1 — Read the contract.
 Use the Read tool on /home/analytics_user/workspace/astute-workinstructions/Trading Analysis/RFQ Loading/rfq-loading.md and read the "End-to-End Workflow" section. The .md is the source of truth — do NOT work from prior-session memory or training data. Pay particular attention to "Step 3a: Large-RFQ Approval Replies" — that path skips the customer-RFQ extraction stack entirely.
 
@@ -10,6 +13,10 @@ STEP 3 — Process each message.
 For every UID returned, follow the per-message decision tree from the .md:
   - Run `read <uid> --workflow rfq-loading` to fetch body + parsed forwarded headers.
   - **Check for `pending_state` FIRST.** If the `read` JSON includes a `pending_state` object, this message is a reply to a prior `need_info` ask sent to Jake. Treat it as a thread continuation:
+      * **Reply-directive check (run before merge).** Call `parseSidecarReplyDirective` on the reply body:
+        `node -e "const g=require('/home/analytics_user/workspace/astute-workinstructions/shared/workflow-reply-grammars'); console.log(JSON.stringify(g.parseSidecarReplyDirective(\`<body text>\`)))"`
+        - `directive: 'DROP'` (operator typed SKIP / DROP / IGNORE / DISCARD on the first non-quoted line) → route `drop_pending` with `{reason: "Operator dropped: <matchedWord>", original_message_id: pending_state.original_message_id}`. The poller clears the sidecar. STOP — do not merge.
+        - `directive: 'MERGE'` → continue with the merge logic below.
       * Jake's reply (or a customer reply he forwarded back) supplies the missing fields (qty, RFQ type, contact, etc.); it does NOT re-quote the original parts list. The parts list lives in `pending_state.extracted` from when we first parsed the original.
       * Build the merged extraction by combining `pending_state.extracted` with whatever new fields the current reply body answers (the items in `pending_state.missing`).
       * Decide routing:

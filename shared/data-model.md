@@ -398,7 +398,7 @@ The `value` column on all chuboe header tables (`chuboe_rfq`, `chuboe_offer`, et
 | 1000010 | Consignment - Spartronics |
 | 1000025 | LAM Kitting Inventory ⚠ |
 
-> ⚠ **Exclude `1000025` (LAM Kitting Inventory) from any excess/stock/availability/market-offer lookup.** It is a one-off report type representing LAM's *consigned* stock — not ours to sell. Standard filter: `AND o.chuboe_offer_type_id <> 1000025`. The exception is the LAM Kitting Reorder workflow itself, which reads this type intentionally. Currently applied in: `shared/market-data.js`, `Trading Analysis/Vortex Matches/vortex-matches.js`, `Trading Analysis/Stock RFQ Loading/suggested-resale.js`, `Trading Analysis/Price Intelligence Dashboard/price-intel.js`. Run `psql -c "SELECT chuboe_offer_type_id, name FROM adempiere.chuboe_offer_type ORDER BY name;"` for the full live list (this table is partial).
+> ⚠ **Exclude `1000025` (LAM Kitting Inventory) from any excess/stock/availability/market-offer lookup.** It is a one-off report type representing LAM's *consigned* stock — not ours to sell. Standard filter: `AND o.chuboe_offer_type_id <> 1000025`. The exception is the LAM 3PL workflow itself, which reads this type intentionally. Currently applied in: `shared/market-data.js`, `Trading Analysis/Vortex Matches/vortex-matches.js`, `Trading Analysis/Stock RFQ Loading/suggested-resale.js`, `Trading Analysis/Price Intelligence Dashboard/price-intel.js`. Run `psql -c "SELECT chuboe_offer_type_id, name FROM adempiere.chuboe_offer_type ORDER BY name;"` for the full live list (this table is partial).
 
 ### Well-Known Partner IDs
 | search_key | Name | Usage |

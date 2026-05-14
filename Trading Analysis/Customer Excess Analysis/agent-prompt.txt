@@ -1,5 +1,8 @@
 You are processing the excess@orangetsunami.com inbox on a 30-minute cron schedule.
 
+STEP 0 — Read the universal operating philosophy.
+Before STEP 1, Read `/home/analytics_user/workspace/astute-workinstructions/shared/agent-philosophy.md`. It covers the cross-workflow rules for: (a) the Jake test before escalating, (b) bias toward action, (c) using the investigation sub-Agent before clarify/needs_review, (d) the disqualified-vendor-type filter, (e) MFR-resolver sanity check, (f) escalation hierarchy. The philosophy applies to every agent invocation. The workflow-specific .md (STEP 1) covers what THIS workflow does; the philosophy covers HOW every agent should think.
+
 STEP 1 — Read the contract.
 Use the Read tool on /home/analytics_user/workspace/astute-workinstructions/Trading Analysis/Customer Excess Analysis/customer-excess-analysis.md and read the section "Agent operating instructions". The .md is the source of truth — do NOT work from prior-session memory or training data. Read it fresh.
 
@@ -10,7 +13,11 @@ STEP 3 — Process each message.
 For every UID returned, follow the per-message decision tree:
   - Run `read <uid> --workflow excess` to fetch body + parsed forwarded headers + external_sender.
 
-  - **Check for `pending_state` FIRST.** If the `read` JSON includes a `pending_state` object, this message is a reply to a prior `clarify_partner` ask sent to Jake. Treat it as a thread continuation:
+  - **Check for `pending_state` FIRST.** If the `read` JSON includes a `pending_state` object, this message is a reply to a prior `clarify_partner` / `needs_partner` ask sent to Jake. Treat it as a thread continuation:
+      * **Reply-directive check (run before merge).** Call `parseSidecarReplyDirective` on the reply body:
+        `node -e "const g=require('/home/analytics_user/workspace/astute-workinstructions/shared/workflow-reply-grammars'); console.log(JSON.stringify(g.parseSidecarReplyDirective(\`<body text>\`)))"`
+        - `directive: 'DROP'` (operator typed SKIP / DROP / IGNORE / DISCARD on the first non-quoted line) → route `drop_pending` with `{reason: "Operator dropped: <matchedWord>", original_message_id: pending_state.original_message_id}`. The poller clears the sidecar. STOP — do not merge.
+        - `directive: 'MERGE'` → continue with the merge logic below.
       * `pending_state.extracted` carries the partial extraction from the original offer email (lines, offerType, partnerName guess, etc.). Jake's reply body supplies the company identification — usually one line of prose ("Customer is Liyijing Electronics") or the structured `PARTNER: <uid> = <BP|name>` directive. The reply does NOT re-quote the parts list.
       * Build the merged extraction by combining `pending_state.extracted` with the partner identification parsed from Jake's reply body. Re-run partner-lookup on the company string he provided.
       * If partner now resolves AND retry_count < 2:

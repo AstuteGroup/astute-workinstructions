@@ -1,5 +1,8 @@
 You are processing the OutboundPending folder of stockRFQ@orangetsunami.com on a 30-minute cron schedule. These are operator outbound quote replies that the inbound stockrfq-agent routed here via its Step 0 hard-rule.
 
+STEP 0 — Read the universal operating philosophy.
+Before STEP 1, Read `/home/analytics_user/workspace/astute-workinstructions/shared/agent-philosophy.md`. It covers the cross-workflow rules for: (a) the Jake test before escalating, (b) bias toward action, (c) using the investigation sub-Agent before clarify/needs_review, (d) the disqualified-vendor-type filter, (e) MFR-resolver sanity check, (f) escalation hierarchy. The philosophy applies to every agent invocation. The workflow-specific .md (STEP 1) covers what THIS workflow does; the philosophy covers HOW every agent should think.
+
 STEP 1 — Read the contract.
 Use the Read tool on /home/analytics_user/workspace/astute-workinstructions/Trading Analysis/Stock RFQ Loading/stock-rfq-cq-loading.md and read the "Agent operating instructions" section. The .md is the source of truth — do NOT work from prior-session memory or training data. Read it fresh.
 
@@ -84,9 +87,25 @@ For every UID returned, follow the per-message decision tree from the .md:
 
           node -e "const r=require('/home/analytics_user/workspace/astute-workinstructions/shared/mfr-resolver'); console.log(JSON.stringify(r.resolveMfrForRow({mpn:'<MPN>'})))"
 
-        The resolver is synchronous and returns `{ matched: true|false, canonical, id, path, source, confidence, ... }`. Behavior:
-        - `matched: true` → use `canonical` as mfrText. Stamp `notePrivate: 'MFR inferred from MPN prefix via mfr-resolver; operator did not specify'`. Proceed to 3.8.
+        The resolver is synchronous and returns `{ matched: true|false, canonical, id, path, source, confidence, ... }`.
+
+        **⚠️ KNOWN RESOLVER OVERREACH (per `project_mfr_resolver_prefix_overreach.md`, 2026-05-14):** the resolver has a ~7% misclassification rate on certain prefixes. Confirmed bad mappings:
+        - `ISO*` → says Issi; often actually TI (ISO7821, ISO5851 isolation/digital)
+        - `ISL*` → says Issi; most are Renesas (Intersil acquired)
+        - `XC*` → says AMD/Xilinx; many are Torex (XC6219, XC9258 LDOs)
+        - `BCM*` → may say Broadcom when actually Nexperia (BCM857 transistors) or others
+        - `LMK*` → can confuse TI vs SiTime
+        Treat resolver output as a HINT, not source-of-truth. Apply this sanity check before using `canonical`:
+        (i) Does the surrounding email context mention a different MFR for this part? If yes, prefer it.
+        (ii) Is the resolved MFR plausible for the part category (e.g., XC6219 is a small LDO — Torex makes those, AMD doesn't)?
+        (iii) Has the operator previously corrected this prefix? Check deferred-work / breadcrumbs.
+
+        Behavior:
+        - `matched: true` AND sanity check passes → use `canonical` as mfrText. Stamp `notePrivate: 'MFR inferred from MPN prefix via mfr-resolver (HINT — verify before purchase); operator did not specify'`. Proceed to 3.8.
+        - `matched: true` BUT sanity check uncertain or fails → write the CQ with `mfrText` BLANK (the MFR Reconciler cron can fill the FK overnight; better than silently wrong). Stamp `notePrivate: 'MFR resolver returned <canonical>; left blank for manual resolution (resolver prefix overreach risk)'`.
         - `matched: false` → route `needs_review` with reason "operator did not state MFR; MPN-prefix inference returned no match — prefix likely missing from shared/data/mpn-prefixes.json (consider adding)". Suggest the likely MFR in the reason text if obvious from MPN context.
+
+        **Principle:** silent wrong MFRs propagate downstream (wrong supplier picks, wrong cross-refs, wrong reconciliation). Blank MFR is recoverable by the reconciler; wrong MFR is a latent data corruption.
 
         **Do NOT bounce to `needs_review` for missing MFR without trying the resolver first.** The prefix map covers most common manufacturers; gaps should be filed as prefix-map additions, not as recurring manual triage.
 

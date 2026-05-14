@@ -107,7 +107,7 @@ async function action_enqueue(payload, ctx) {
  *               persisted to the sidecar for the merge on the next round
  */
 async function action_need_info(payload, ctx) {
-  const { missing, subject, extracted, outerFrom } = payload;
+  const { missing, subject, extracted, outerFrom, investigation_summary } = payload;
   const missingList = Array.isArray(missing) ? missing : [];
   const linesCount = Array.isArray(extracted && extracted.lines) ? extracted.lines.length : 0;
 
@@ -120,6 +120,16 @@ async function action_need_info(payload, ctx) {
       external_sender: outerFrom || null,
       extracted: extracted || (ctx.pendingSidecar && ctx.pendingSidecar.extracted) || {},
       missing: missingList,
+      investigation_summary: investigation_summary || null,
+    });
+  }
+  if (!ctx.dryRun) {
+    breadcrumbs.write({
+      cog: 'rfq-loading-agent',
+      event: 'escalated-need_info',
+      uid: ctx.uid,
+      missing: missingList,
+      investigation_summary: investigation_summary || null,
     });
   }
 
@@ -138,6 +148,7 @@ async function action_need_info(payload, ctx) {
 <p style="background:#f5f5f5;padding:10px;border-left:3px solid #b00">
    <b>Reply to ${esc(ctx.inbox)} with the missing values</b> — the next agent tick will merge your answers with the parsed lines and enqueue the RFQ. One-line prose answers are fine.
 </p>
+<p style="color:#666;font-size:11px">To discard instead of answering: reply with <code>SKIP</code>, <code>DROP</code>, <code>IGNORE</code>, or <code>DISCARD</code> on the first line. The next tick will move this to NotRFQ and clear the pending state.</p>
 <p style="color:#666;font-size:11px">Message moved to NeedInfo folder. Sidecar: <code>~/workspace/.rfq-loading-pending/${esc(ctx.anchorMessageId || '(no anchor)')}.json</code></p>
 </body></html>`;
 
@@ -179,7 +190,7 @@ function missingLabel(key) {
  * Optional: { details, subject, from }
  */
 async function action_needs_review(payload, ctx) {
-  const { reason, details, subject, from } = payload;
+  const { reason, details, subject, from, investigation_summary } = payload;
   const html = `<html><body style="font-family:Arial,sans-serif;font-size:13px">
 <h2 style="color:#b00">RFQ Loading — needs manual review</h2>
 <p><b>Subject:</b> ${esc(subject)}<br/><b>From:</b> ${esc(from)}<br/><b>UID:</b> ${ctx.uid}</p>
@@ -196,6 +207,13 @@ ${details ? `<pre style="background:#f5f5f5;padding:8px;white-space:pre-wrap;fon
     html,
     { html: true },
   );
+  breadcrumbs.write({
+    cog: 'rfq-loading-agent',
+    event: 'escalated-needs_review',
+    uid: ctx.uid,
+    reason,
+    investigation_summary: investigation_summary || null,
+  });
   return { notified: ctx.jakeEmail };
 }
 
@@ -204,6 +222,33 @@ ${details ? `<pre style="background:#f5f5f5;padding:8px;white-space:pre-wrap;fon
 // payload coercion, sentinel write, and operator ack live in
 // shared/workflow-actions/_approval.js so excess/VQ/Stock RFQ get the same
 // behavior the moment they add their own gate.
+
+/**
+ * Operator-initiated discard of a pending escalation. Triggered when Jake
+ * replies to a need_info email with a directive like SKIP / IGNORE / DROP /
+ * DISCARD. The agent parses the directive in the stitch-logic step via
+ * shared/workflow-reply-grammars.parseSidecarReplyDirective and routes here.
+ *
+ * Side effects:
+ *   - Silent move to NotRFQ (signal we considered + declined to load).
+ *   - The poller clears the sidecar automatically (action is NOT keepsPending).
+ *
+ * Required payload: { reason }
+ */
+const breadcrumbs = require('../breadcrumbs');
+async function action_drop_pending(payload, ctx) {
+  if (ctx.dryRun) {
+    return { dry_run: true, reason: payload.reason || 'operator-dropped' };
+  }
+  breadcrumbs.write({
+    cog: 'rfq-loading-agent',
+    event: 'operator-dropped',
+    uid: ctx.uid,
+    reason: payload.reason || 'operator-dropped',
+    pending_kind: ctx.pendingSidecar && ctx.pendingSidecar.kind || null,
+  });
+  return { reason: payload.reason || 'operator-dropped' };
+}
 
 // ─── HELPERS ─────────────────────────────────────────────────────────────────
 
@@ -239,6 +284,11 @@ module.exports = {
     not_rfq: {
       folder: 'NotRFQ',
       handler: null,  // move-only, no side effects
+    },
+    drop_pending: {
+      folder: 'NotRFQ',
+      requires: ['reason'],
+      handler: action_drop_pending,
     },
     approve_large_rfq: {
       folder: 'LargeRFQApprovals',

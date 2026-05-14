@@ -18,6 +18,20 @@ himalaya envelope list --account vq --folder INBOX --page-size 500
 
 ---
 
+## Escalation Routing (Agent Path)
+
+The agent pattern (`/schedule` routine → `email-workflow-poller` → `shared/workflow-actions/vq-loading.js`) is the canonical write path. The legacy Dual-Phase extraction below is the manual fallback / audit path.
+
+**Sender outreach on escalations (VQ-specific override of the operator-only policy).** The four escalation actions — `need_info_vendor`, `clarify_vendor`, `needs_vendor`, `needs_review` — email the broker sender as TO with Jake on CC. Reply-To is `vq@orangetsunami.com` so the reply round-trips through the sidecar-stitch path. When `senderEmail` is missing/unparseable the handler falls back to operator-only.
+
+Why VQ deviates from stockrfq/excess/rfq-loading: VQ replies almost always go to a broker who actually wrote the quote and CAN answer "what's the unit price?", "what's your legal company name?", "could you resend as Excel?" The risk that drove the stockrfq deviation (broker fishing for our quantities) doesn't apply — VQ inbound is already-quoted parts, not unanswered RFQs.
+
+**Partial-load with consolidated clarifications.** Multi-vendor inbound emails go through a partial-load pattern: the agent loads the clean vendors via `load_vq` AND passes a `clarifications[]` array describing per-vendor outstanding asks for the problematic ones. The handler writes the clean quotes, then fires ONE consolidated email to the sender (CC Jake) covering all the loose ends. A sidecar of kind `partial_clarify` persists outstanding state so the next agent tick stitches the reply.
+
+See `agent-prompt.txt` § 3.7.6 + § 3.10 for the full payload schema and the agent's routing rules.
+
+---
+
 ## Dual-Phase Extraction (MANDATORY)
 
 The rigid parser produces too many errors. **Always use dual-phase extraction + verification.**
@@ -397,6 +411,7 @@ The dual-phase Extractor + Verifier still applies — but their job is now to pr
 | `leadTime` | No | Defaults to `'stock'` if blank. |
 | `dateCode` | No | Brokers should provide this; no auto-default for non-franchise vendors. |
 | `coo` | No | Country name (e.g. "Malaysia", "China", "Taiwan"). Unknown → PENDING (1000001). Mapping in `shared/load-bulk-summary.js::COO_MAP`. |
+| `currency` | No | ISO 3-letter code ("EUR", "GBP", "JPY", etc.). Blank or "USD" → defaults to USD (`c_currency_id` 100). Mapping in `shared/load-bulk-summary.js::CURRENCY_MAP` (17 currencies — USD, EUR, GBP, JPY, CAD, AUD, HKD, TWD, SGD, MYR, KRW, CNY, THB, VND, IDR, PHP, INR). Unknown ISO → defaults to USD silently. |
 | `packaging` | No | "REEL", "TRAY", etc. or null. |
 | `rohs` | No | "Y" / "N" / null. |
 | `vendorNotes` | No | Free text → `Chuboe_Note_User` (buyer-internal). |

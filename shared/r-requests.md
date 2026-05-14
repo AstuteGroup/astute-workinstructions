@@ -105,7 +105,7 @@ Defaults to `N` in OT. Should be `Y` when both supplier and ship-to warehouse ar
 - US franchise distributors (Master, TTI, DigiKey, Mouser, Sager, Arrow, Waldom, Future US, Newark) → `Y`
 - APAC brokers (SMARTEL, Chip Energy, HK Firsttop, Dragon Core, etc.) → `N`
 
-The validator doesn't auto-enforce this because the inference is supplier-dependent. Auto-purchase flows that only target franchise stock (e.g., `Trading Analysis/LAM Kitting Reorder/lam-kitting-rfq-writer.js`) set it explicitly.
+The validator doesn't auto-enforce this because the inference is supplier-dependent. Auto-purchase flows that only target franchise stock (e.g., `Trading Analysis/LAM 3PL/lam-kitting-rfq-writer.js`) set it explicitly.
 
 ---
 

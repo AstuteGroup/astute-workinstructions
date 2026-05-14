@@ -205,6 +205,52 @@ function looksLikeActionableReply(text) {
   return hasUidOrKey || hasActionVerb || isSubstantive;
 }
 
+// ─── SIDECAR-REPLY DIRECTIVE (cross-workflow) ────────────────────────────────
+
+/**
+ * Parse the first non-quoted line of an operator reply to a sidecar-anchored
+ * escalation email (need_info / clarify_* / needs_partner / needs_vendor).
+ *
+ * Since the poller has already identified the sidecar via References, the
+ * operator doesn't need to type a UID or search key — just the directive.
+ *
+ * @param {string} body — reply body (caller should pass the full text; this
+ *                        function looks at non-quoted lines only)
+ * @returns {{ directive: 'DROP'|'MERGE', matchedWord: string|null }}
+ *   - 'DROP'  → operator wants to discard the pending thread. Caller should
+ *               route the workflow's `drop_pending` action (or equivalent).
+ *   - 'MERGE' → operator is providing answers / clarifications. Caller should
+ *               proceed with the workflow's existing merge logic (e.g.,
+ *               load_offer / load_vq / enqueue with the merged extraction).
+ *
+ * Matched DROP synonyms (case-insensitive, single word per line):
+ *   skip / drop / ignore / discard / cancel / kill / nope /
+ *   "not a quote" / "not an offer" / "not an rfq"
+ */
+function parseSidecarReplyDirective(body) {
+  if (!body) return { directive: 'MERGE', matchedWord: null };
+
+  // Walk non-quoted lines. A quoted line starts with ">" or is part of an
+  // Outlook quoted block (signature separator or From: line in a forward).
+  const lines = body.split(/\r?\n/);
+  for (const raw of lines) {
+    const line = raw.trim();
+    if (!line) continue;
+    if (line.startsWith('>')) continue;
+    if (/^[-_=]{3,}\s*$/.test(line)) break;             // signature separator
+    if (/^(From|Sent|To|Cc|Subject):\s+/i.test(line)) break;  // start of quoted forward
+    if (/^On\s.+wrote:\s*$/i.test(line)) break;         // "On <date>, X wrote:"
+
+    // First non-quoted, non-empty line.
+    const m = line.match(/^(skip|drop|ignore|discard|cancel|kill|nope|not\s+a(n)?\s+(quote|offer|rfq))\b/i);
+    if (m) {
+      return { directive: 'DROP', matchedWord: m[0].toUpperCase() };
+    }
+    return { directive: 'MERGE', matchedWord: null };
+  }
+  return { directive: 'MERGE', matchedWord: null };
+}
+
 // ─── EXPORTS ─────────────────────────────────────────────────────────────────
 
 module.exports = {
@@ -217,4 +263,6 @@ module.exports = {
   // Parser + probe
   parseDirectives,
   looksLikeActionableReply,
+  // Sidecar-reply directive (cross-workflow)
+  parseSidecarReplyDirective,
 };

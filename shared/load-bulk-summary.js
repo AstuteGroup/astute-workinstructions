@@ -51,7 +51,39 @@
 const { execFileSync } = require('child_process');
 const { writeVQFromAPI } = require('./vq-writer');
 const { resolveBP, apiGet } = require('./api-client');
+const { isDisqualified, disqualificationLabel, disqualificationName } = require('./disqualified-vendor-types');
 const logger = require('./logger').createLogger('LoadBulkSummary');
+
+// Currency ISO code → C_Currency_ID. Verified against c_currency (2026-05-14).
+// Default is USD (100) — only set non-default for explicit non-USD quotes.
+// vq-writer.js (writeVQFromAPI) already accepts currencyId on the stub.
+const CURRENCY_MAP = {
+  USD: 100,
+  EUR: 102,
+  GBP: 114,
+  JPY: 113,
+  CAD: 116,
+  AUD: 120,
+  HKD: 258,
+  TWD: 289,
+  SGD: 307,
+  MYR: 301,
+  KRW: 330,
+  CNY: 332,
+  THB: 206,
+  VND: 234,
+  IDR: 303,
+  PHP: 153,
+  INR: 304,
+};
+const DEFAULT_CURRENCY_ID = CURRENCY_MAP.USD;
+
+function resolveCurrency(isoCode) {
+  if (!isoCode) return DEFAULT_CURRENCY_ID;
+  const upper = String(isoCode).toUpperCase().trim();
+  const id = CURRENCY_MAP[upper];
+  return Number.isFinite(id) ? id : DEFAULT_CURRENCY_ID;
+}
 
 // COO name → C_Country_ID. Verified against c_country (2026-04-27).
 // Add more as bulk summaries surface other origins.
@@ -74,7 +106,8 @@ const COO_MAP = {
 };
 
 const PENDING_COUNTRY_ID = 1000001;
-const SUSPENDED_VTYPE_ID = 1000004;
+// Vendor-type disqualifiers extracted to shared/disqualified-vendor-types.js
+// so other writers (offer-writeback, rfq-writer, etc.) reuse the same set.
 
 // ─── Vendor type cache ─────────────────────────────────────────────────────
 const _vtypeCache = new Map();
@@ -202,15 +235,22 @@ async function loadBulkSummary({ rfqSearchKey, buyerId, quotes, dryRun = false }
       continue;
     }
 
-    // c. Skip Suspended vendor type
+    // c. Skip disqualified vendor types (Suspended, Prohibited — see
+    //    shared/disqualified-vendor-types.js for the canonical set).
     const vtypeId = await getBPVendorType(bp.id);
-    if (vtypeId === SUSPENDED_VTYPE_ID) {
-      skipped.push({ ...q, reason: 'VENDOR_SUSPENDED', detail: `${bp.name} is Suspended (vtype 1000004)` });
+    if (isDisqualified(vtypeId)) {
+      const name = disqualificationName(vtypeId);
+      skipped.push({
+        ...q,
+        reason: disqualificationLabel(vtypeId),
+        detail: `${bp.name} is ${name} (vtype ${vtypeId})`,
+      });
       continue;
     }
 
     // d. Build synthetic distributor stub
     const cooId = resolveCoo(q.coo);
+    const currencyId = resolveCurrency(q.currency);
     const stub = {
       found: true,
       name: q.vendorName || bp.name,
@@ -228,6 +268,7 @@ async function loadBulkSummary({ rfqSearchKey, buyerId, quotes, dryRun = false }
       vqRohs: q.rohs || null,
       vqHts: null,
       vqEccn: null,
+      currencyId,  // c_currency_id — defaults to USD (100) when q.currency is blank
     };
 
     if (dryRun) {
@@ -284,4 +325,4 @@ async function loadBulkSummary({ rfqSearchKey, buyerId, quotes, dryRun = false }
   return { written, skipped, failed, coverage, gaps };
 }
 
-module.exports = { loadBulkSummary, COO_MAP, resolveCoo, matchMpnToLine };
+module.exports = { loadBulkSummary, COO_MAP, resolveCoo, CURRENCY_MAP, resolveCurrency, matchMpnToLine };

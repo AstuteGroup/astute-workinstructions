@@ -91,6 +91,27 @@ For each unseen message, the agent picks **one** routing action. Order of checks
    - **The heuristic only flags:** APAC broker (.cn/.hk/.tw/.jp/.kr/.sg/.vn/.th/.id/.my/.ph) + exact stock match (within 5% of our Astute inventory qty) + non-Astute broker stock visible in the market within 180 days. US/EMEA senders and dry markets are never flagged.
    - Skip for multi-line RFQs (signal is per-MPN); v1 only handles single-MPN messages.
 
+4.7. **Cross-resend dedup check (before writeRFQ).** Brokers commonly re-send the same RFQ — same MPN list, same qty, hours apart. Before routing `load_rfq`, query OT for an active chuboe_rfq from the same bpartner with matching shape within the last 6 hours:
+
+   ```sql
+   SELECT r.value, r.created
+   FROM adempiere.chuboe_rfq r
+   WHERE r.isactive='Y'
+     AND r.c_bpartner_id=<resolved bpartnerId>
+     AND r.chuboe_rfq_type_id=<Stock type id>
+     AND r.created >= NOW() AT TIME ZONE 'America/Chicago' - INTERVAL '6 hours';
+   ```
+
+   For each candidate, compare:
+   - active line_count matches the extracted line count
+   - first AND last `chuboe_mpn_clean` match the extracted MPNs (ordered by `chuboe_rfq_line.line ASC`)
+
+   If a candidate matches → route `dup_skip` with `{existingSearchKey: "<existing chuboe_rfq.value>"}`. Don't writeRFQ — the existing record covers this demand. Move to Processed.
+
+   **Skip the dedup check on the Unqualified Broker fallback path** (bpartnerId 1006505). Many distinct brokers share that BP, so shape-match would cause false-positive collapses.
+
+   Note: time stored in `chuboe_rfq.created` is Chicago time digits even though the PG session is UTC. Cast `AT TIME ZONE 'America/Chicago'` before comparison. See `shared/data-model.md` and memory `project_chuboe_created_cdt_storage.md`.
+
 5. **Write to OT** → `load_rfq` with payload `{ bpartnerId, type: 'Stock', lines, customerName, messageId, senderEmail, senderDomain, brokerMessageId }`.
    - `customerName` is required on every call — see Step 2 for how to source it. The handler uses it for `Description = "<customerName> — Stock RFQ"` and `BPName`.
    - `messageId` is the email's RFC822 Message-ID from the `read` command's `message_id` field (the Outlook-server-generated MID assigned at auto-forward time). Always pass it through.
@@ -103,10 +124,13 @@ For each unseen message, the agent picks **one** routing action. Order of checks
 
 | Action | Required payload | Folder | Side effect |
 |---|---|---|---|
-| `load_rfq` | `{ bpartnerId, lines[] }` (also `type, description, salesrepId, userId, sourceUid, customerName, messageId, senderEmail, senderDomain, brokerMessageId`) | `Processed` | `writeRFQ()` to OT + `loaded` breadcrumb |
+| `load_rfq` | `{ bpartnerId, lines[] }` (also `type, description, salesrepId, userId, sourceUid, customerName, messageId, senderEmail, senderDomain, brokerMessageId, priceCheck, priceCheckReason`) | `Processed` | `writeRFQ()` to OT + `loaded` breadcrumb. **GATED** above `LARGE_STOCK_RFQ_THRESHOLD` (default 1000 lines) — large RFQs pause with an approval email and aren't written until the operator replies YES. |
+| `dup_skip` | `{ existingSearchKey }` | `Processed` | Silent move + `dup-skipped` breadcrumb. Fired by step 4.7's cross-resend dedup. The original chuboe_rfq covers this demand. |
 | `needs_review` | `{ reason }` (also `subject, outerFrom, details`) | `NeedsReview` | Email Jake diagnostics + `needs-review` breadcrumb |
 | `not_rfq` | `{ reason }` | `NotRFQ` | Silent move + `not-rfq` breadcrumb |
-| `outbound_pending` | `{ reason }` (typically `<innerFromAddr> — <one-clause hint>`) | `OutboundPending` | Silent move + `outbound-pending` breadcrumb; future `add_cq` agent consumes from here |
+| `outbound_pending` | `{ reason }` (typically `<innerFromAddr> — <one-clause hint>`) | `OutboundPending` | Silent move + `outbound-pending` breadcrumb; `stockrfq-cq-agent` consumes from here for CQ writes |
+| `approve_large_stock_rfq` | `{ gate_id }` (also `max_lines, note`) | `LargeStockRFQApprovals` | Reads the gate sentinel, runs `writeRFQ()` via the stored payload, sends `[CONFIRMED]` ack. Triggered by an operator reply to the approval email — agent parses the subject (`RE: [APPROVAL NEEDED] Large Stock RFQ <gate_id>`) and the first body line (`yes` / `y` / `approve`). |
+| `reject_large_stock_rfq` | `{ gate_id }` (also `reason`) | `LargeStockRFQApprovals` | Marks the sentinel rejected (the RFQ is discarded permanently), sends `[CONFIRMED]` ack. Operator reply `no` / `n` / `reject`. |
 
 ### Line shape for `load_rfq.lines[]`
 
@@ -129,6 +153,30 @@ For each unseen message, the agent picks **one** routing action. Order of checks
 - **Default RFQ type:** `'Stock'`
 
 These live in `shared/workflow-actions/stockrfq.js` `module.exports.constants` and should not be hardcoded by the agent — pull from the module if scripting around it.
+
+### Large Stock RFQ Gate
+
+Above `LARGE_STOCK_RFQ_THRESHOLD` (default **1000 lines**, env-overridable), the handler pauses `load_rfq` before `writeRFQ()` runs. The RFQ is NOT yet in OT.
+
+**Flow:**
+
+1. Agent extracts the RFQ and routes `load_rfq` normally (no extra agent logic — the gate is enforced in the handler).
+2. Handler computes a stable `gate_id` from the source Message-ID (or a hash of the lines list), writes a sentinel to `~/workspace/.large-stockrfq-pending/<gate_id>.json` with the full payload preserved verbatim, and sends an approval email from `stockRFQ@` to Jake. Email contains: customer/broker name, line count, projected OT row count, gate id, and the first 10 sample MPNs.
+3. Operator replies to the email. The agent reads the next tick, recognizes the subject pattern `RE: [APPROVAL NEEDED] Large Stock RFQ <gate_id>`, parses the first body line as a directive:
+   - `yes` / `y` / `approve` / `go` / `proceed` → `approve_large_stock_rfq` with `{gate_id}`. Handler reads the sentinel, runs `writeRFQ()` from the stored payload, marks `.processed`. Ack sent.
+   - `no` / `n` / `reject` / `skip` → `reject_large_stock_rfq` with `{gate_id}`. Handler marks `.rejected`; RFQ is discarded permanently. Ack sent.
+   - Anything else → `needs_review` with the approval directive in the reason.
+
+**Sentinel states (files in `~/workspace/.large-stockrfq-pending/`):**
+
+| File | Meaning |
+|---|---|
+| `<gate_id>.json` | Pending — original sentinel, awaiting reply |
+| `<gate_id>.cleared` | Approved — `writeRFQ` may run on this or next tick |
+| `<gate_id>.rejected` | Rejected — RFQ discarded permanently |
+| `<gate_id>.processed` | Approved AND written — idempotency marker |
+
+**Override:** `LARGE_STOCK_RFQ_THRESHOLD=N` env var changes the trigger threshold per run. Useful when a known-good broker is sending an unusually large but legitimate batch — operator can raise the threshold for one cron tick before re-enabling.
 
 ### Schedule
 

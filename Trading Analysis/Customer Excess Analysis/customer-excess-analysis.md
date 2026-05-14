@@ -95,11 +95,14 @@ For each unseen message, the agent decides **one** routing action. Order of chec
 
 | Action | Required payload | Folder | Side effect |
 |---|---|---|---|
-| `load_offer` | `{ bpartnerId, offerType, lines[] }` (also `description, sourceUid`) | `Processed` | `writeOffer()` to OT + `loaded` breadcrumb |
+| `load_offer` | `{ bpartnerId, offerType, lines[] }` (also `description, sourceUid`) | `Processed` | `writeOffer()` to OT + `loaded` breadcrumb. **GATED** above `LARGE_OFFER_THRESHOLD` (default 500 lines) — large offers pause with an approval email and aren't written until the operator replies YES. |
 | `needs_partner` | `{ subject, outerFrom }` (also `hints`) | `NeedsPartner` | Email Jake with `PARTNER:` reply prompt + `needs-partner` breadcrumb |
+| `clarify_partner` | `{ recipient, candidates[] }` (also `subject, extracted, outerFrom`) | `NeedInfo` | Email Jake asking which BP to use; **POLICY 2026-05-14: routes to Jake, NEVER the external sender**. `keepsPending: true` — sidecar persists partial extraction; reply stitches on next tick → load_offer. |
 | `needs_review` | `{ reason, subject, outerFrom }` (also `details`) | `NeedsReview` | Email Jake diagnostics + `needs-review` breadcrumb |
 | `not_offer` | `{ reason }` | `NotOffer` | Silent move + `not-offer` breadcrumb |
 | `dup_skip` | `{ existingSearchKey }` | `Processed` | Silent move + `dup-skipped` breadcrumb |
+| `approve_large_offer` | `{ gate_id }` (also `max_lines, note`) | `LargeOfferApprovals` | Reads the gate sentinel, runs `writeOffer()` via the stored payload, dispatches `offerRouter.dispatch()` for downstream intent classification, sends `[CONFIRMED]` ack. Triggered by operator reply `yes` / `y` / `approve` to the approval email. |
+| `reject_large_offer` | `{ gate_id }` (also `reason`) | `LargeOfferApprovals` | Marks the sentinel rejected (offer is discarded permanently), sends `[CONFIRMED]` ack. Operator reply `no` / `n` / `reject`. |
 
 ### Schedule
 
