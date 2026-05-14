@@ -47,6 +47,8 @@ function makeApprovalActions(gate, {
   downstreamLeadTime = 'on the next poll tick',
   downstreamLabel = 'downstream consumer',
   supportsCacheOnly = false,
+  onApprove,
+  onReject,
 } = {}) {
   if (!gate || typeof gate.markApproved !== 'function') {
     throw new Error('_approval: gate must expose markApproved / markRejected / sentinelPath');
@@ -91,6 +93,20 @@ function makeApprovalActions(gate, {
       note,
     });
 
+    // Optional domain-specific work — e.g., excess dispatches the offer-router
+    // here. Runs AFTER markApproved so re-runs (e.g., on retry) see the cleared
+    // sentinel. Errors here are surfaced to the agent but do NOT roll back the
+    // approval — the operator's intent is recorded; failed downstream work is
+    // operator-recoverable. Adds the result to the action return for visibility.
+    let onApproveResult;
+    if (typeof onApprove === 'function') {
+      try {
+        onApproveResult = await onApprove(id, ctx, { maxLines, cacheOnly, note });
+      } catch (e) {
+        onApproveResult = { onApprove_error: e.message };
+      }
+    }
+
     const tags = [];
     if (maxLines) tags.push(`capped at ${maxLines.toLocaleString('en-US')} lines`);
     if (cacheOnly) tags.push('cache-only (no live API calls)');
@@ -113,7 +129,7 @@ ${cacheLine}
       { html: true },
     );
 
-    return { approved: id, maxLines, cacheOnly };
+    return { approved: id, maxLines, cacheOnly, onApprove: onApproveResult };
   }
 
   /**
@@ -136,6 +152,15 @@ ${cacheLine}
       rejectedBy: ctx.from || ctx.jakeEmail || 'email',
     });
 
+    let onRejectResult;
+    if (typeof onReject === 'function') {
+      try {
+        onRejectResult = await onReject(id, ctx, { reason });
+      } catch (e) {
+        onRejectResult = { onReject_error: e.message };
+      }
+    }
+
     const reasonLine = reason ? `<p>Reason: ${esc(reason)}</p>` : '';
     const ackHtml = `<html><body style="font-family:Arial,sans-serif;font-size:13px">
 <p>Got it — <b>${esc(recordLabel)} ${esc(id)}</b> rejected. The ${esc(downstreamLabel)} will skip this record permanently.</p>
@@ -150,7 +175,7 @@ ${reasonLine}
       { html: true },
     );
 
-    return { rejected: id };
+    return { rejected: id, onReject: onRejectResult };
   }
 
   return { action_approve, action_reject };

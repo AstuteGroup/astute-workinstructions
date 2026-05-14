@@ -143,12 +143,15 @@ module.exports = {
     inbox: 'excess@orangetsunami.com',
     sourceFolder: 'INBOX',
     cron: { name: 'excess-agent' },
-    actions: ['load_offer', 'needs_partner', 'needs_review', 'not_offer', 'dup_skip'],
+    actions: [
+      'load_offer', 'needs_partner', 'needs_review', 'not_offer', 'dup_skip',
+      'approve_large_offer', 'reject_large_offer',
+    ],
     capabilities: {
       replyStitching: false,
       needInfoClarifications: false,
-      largePayloadGate: false,
-      approvalReplyAction: false,
+      largePayloadGate: true,
+      approvalReplyAction: true,
       preWriteIdempotency: true,
       writeQueue: false,
       breadcrumbWrites: true,
@@ -162,8 +165,8 @@ module.exports = {
       activityDigest: 'operatorDigest (offer-digest 3×/day) already provides aggregate visibility',
     },
     // Open gaps (capabilities=false WITHOUT a deviation entry — parity check flags these):
-    //   replyStitching, needInfoClarifications, largePayloadGate, approvalReplyAction, tieredCron
-    // These are the active migration backlog. See email-workflow-architecture.md § Convergence map.
+    //   replyStitching, needInfoClarifications, tieredCron
+    // These are the remaining active migration backlog after step #2.
   },
 
   // ─── STOCK RFQ LOADING (broker stock RFQs — inbound) ────────────────────────

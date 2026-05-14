@@ -7,21 +7,34 @@ STEP 2 — List unseen messages.
 Run: node /home/analytics_user/workspace/astute-workinstructions/shared/email-workflow-poller.js list --workflow excess
 
 STEP 3 — Process each message.
-For every UID returned, follow the per-message decision tree from the .md:
+For every UID returned, follow the per-message decision tree:
   - Run `read <uid> --workflow excess` to fetch body + parsed forwarded headers + external_sender.
-  - If has_attachment is true, run `download-attachments <uid> --workflow excess` and Read the xlsx/csv/pdf attachments. Prefer xlsx > csv > pdf.
-  - Apply junk filter (Upload MO_*, OOO, bounces, signature-only) → not_offer.
-  - Apply partner resolution (subject hint > body hint > forward chain > external sender), excluding IsEmployee BPs.
-  - Extract lines from attachment + body. Filter URL-fragment "MPNs".
-  - Determine offer type (default Customer Excess 1000000; flip to Broker Stock Offer 1000001 if BP is vendor-only).
-  - Run cross-forward dedup SQL check (BP + offer_type + line count + first/last MPN within 6h) → dup_skip if matched.
-  - Dispatch with `route <uid> <action> --workflow excess --payload '<json>'` — no --dry-run.
+
+  - **Check subject line FIRST.** If subject matches `RE: [APPROVAL NEEDED] Large Offer <searchKey>` (any case):
+      * Extract `<searchKey>` from the subject (the token right after "Large Offer ").
+      * Read the first non-quoted line of the body. Match (case-insensitive):
+          - `yes` / `y` / `approve` / `go` / `proceed` → `approve_large_offer` with `{offer_search_key: "<searchKey>"}`.
+          - `yes --max-lines 1000` / `limit 1000` / `cap 1000` → `approve_large_offer` with `{offer_search_key: "<searchKey>", max_lines: 1000}`.
+          - `no` / `n` / `reject` / `skip` → `reject_large_offer` with `{offer_search_key: "<searchKey>", reason: <body excerpt or null>}`.
+          - Unclear / ambiguous → `needs_review` with `{reason: "approval reply directive unclear: <body excerpt>"}`.
+      * Dispatch with `route <uid> <action> --workflow excess --payload '<json>'`. Approval/rejection emails do NOT need partner resolution or line extraction.
+      * Skip the remaining steps for this UID.
+
+  - Otherwise (normal offer flow):
+      * If has_attachment is true, run `download-attachments <uid> --workflow excess` and Read the xlsx/csv/pdf attachments. Prefer xlsx > csv > pdf.
+      * Apply junk filter (Upload MO_*, OOO, bounces, signature-only) → not_offer.
+      * Apply partner resolution (subject hint > body hint > forward chain > external sender), excluding IsEmployee BPs.
+      * Extract lines from attachment + body. Filter URL-fragment "MPNs".
+      * Determine offer type (default Customer Excess 1000000; flip to Broker Stock Offer 1000001 if BP is vendor-only).
+      * Run cross-forward dedup SQL check (BP + offer_type + line count + first/last MPN within 6h) → dup_skip if matched.
+      * Dispatch with `route <uid> <action> --workflow excess --payload '<json>'` — no --dry-run.
+      * The handler will gate analysis-dispatch for offers above LARGE_OFFER_THRESHOLD (default 500 lines) on the customer-excess-analysis route. The offer is written to OT regardless; an approval email is sent to the operator from excess@. You don't do anything special — just route to load_offer as normal. The reply will land in this inbox next tick as the `RE: [APPROVAL NEEDED]` path above.
 
 If a single message hits a transient error (writeOffer 5xx, partner-lookup throws, attachment unreadable), log the error in your output and continue with the next message. Do not abort the batch on per-message failure.
 
 STEP 4 — Summary.
 At the end, print a single-line summary in this exact shape:
-  EXCESS-AGENT SUMMARY: processed=<N> load_offer=<N> needs_partner=<N> needs_review=<N> not_offer=<N> dup_skip=<N> errors=<N>
+  EXCESS-AGENT SUMMARY: processed=<N> load_offer=<N> approve_large_offer=<N> reject_large_offer=<N> needs_partner=<N> needs_review=<N> not_offer=<N> dup_skip=<N> errors=<N>
 
 If 0 unseen messages, print "EXCESS-AGENT SUMMARY: no unseen messages" and exit.
 
