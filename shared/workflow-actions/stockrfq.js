@@ -25,6 +25,7 @@ const crypto = require('crypto');
 
 const { writeRFQ } = require('../rfq-writer');
 const breadcrumbs = require('../breadcrumbs');
+const pending = require('../workflow-pending-state');
 const { createGate } = require('../large-payload-gate');
 const { makeApprovalActions } = require('./_approval');
 
@@ -276,6 +277,84 @@ async function doWriteRFQ(payload, ctx) {
 }
 
 /**
+ * Email the EXTERNAL BROKER asking them to confirm their company so we can
+ * resolve a real partner BP instead of falling back to Unqualified Broker
+ * (1006505). Parallel to excess's action_clarify_partner; the same stitching
+ * mechanism merges the broker's reply with the extracted lines on the next tick.
+ *
+ * Use this (instead of Unqualified Broker fallback) when:
+ *   - The external sender is a real person at an identifiable broker domain
+ *     (not a bounce / automated / multi-hop forward)
+ *   - Lines were successfully extracted from the RFQ
+ *   - Sender domain doesn't match any customer BP in OT
+ *   - No `pending_state` retry cap hit (retry_count < 2)
+ *
+ * Falls back to load_rfq with Unqualified Broker fallback if the round-trip
+ * isn't worth attempting (sender ambiguous / retry exhausted).
+ *
+ * Required payload: { recipient, subject, extracted, hints }
+ *   recipient   the external broker's email
+ *   subject     the original message's subject line (for the RE:)
+ *   extracted   { lines, customerName, senderEmail, senderDomain,
+ *                 brokerMessageId, type, ...whatever_was_parsed } —
+ *                 persisted to the sidecar so the merge on the next round
+ *                 picks up the customer info from the broker's reply.
+ *   hints       short string describing what was tried + why partner didn't
+ *               resolve (e.g., "sender domain kexinyuanmicroelectronic.com
+ *               not in BP table, no subject hint")
+ */
+async function action_clarify_partner(payload, ctx) {
+  const { recipient, subject, extracted, hints } = payload;
+  const body = buildClarifyPartnerReply();
+
+  let sidecarRecord = null;
+  if (!ctx.dryRun && ctx.anchorMessageId) {
+    sidecarRecord = pending.writeSidecar(ctx.workflow, ctx.anchorMessageId, {
+      original_uid: ctx.uid,
+      original_subject: subject || null,
+      original_recipient: recipient || null,
+      extracted: extracted || (ctx.pendingSidecar && ctx.pendingSidecar.extracted) || {},
+      missing: ['partner'],
+      hints: hints || null,
+    });
+  }
+
+  if (ctx.dryRun) {
+    return {
+      dry_run: true,
+      would_reply: { to: recipient, cc: ctx.jakeEmail, replyTo: ctx.inbox },
+      draft: body,
+      would_write_sidecar: { anchor: ctx.anchorMessageId, missing: ['partner'] },
+    };
+  }
+
+  // Reply-To MUST be stockRFQ@ — otherwise the broker's reply lands in
+  // Jake's inbox and the agent never sees it, breaking the stitch.
+  await ctx.notifier.sendEmail(
+    recipient,
+    `RE: ${subject || 'Your stock RFQ'} — company confirmation needed`,
+    body,
+    { cc: ctx.jakeEmail, replyTo: ctx.inbox },
+  );
+
+  breadcrumbs.write({
+    cog: 'stockrfq-agent',
+    event: 'clarify-partner',
+    uid: ctx.uid,
+    recipient,
+    subject,
+    hints: hints || null,
+    retry_count: sidecarRecord ? sidecarRecord.retry_count : null,
+  });
+
+  return {
+    replied_to: recipient,
+    sidecar_anchor: ctx.anchorMessageId,
+    retry_count: sidecarRecord ? sidecarRecord.retry_count : null,
+  };
+}
+
+/**
  * Email an operator diagnostic for manual triage. Used when:
  *   - Lines couldn't be extracted (no parseable MPN/qty pairs, signature-only body)
  *   - writeRFQ threw / had errors
@@ -499,6 +578,18 @@ function esc(s) {
   return String(s || '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 }
 
+function buildClarifyPartnerReply() {
+  return [
+    `Hi,`, ``,
+    `Thanks for sending the stock RFQ. To get this loaded under the right account on our side, could you confirm:`, ``,
+    `  • Your company name (and any short/legal variations we'd see on a PO or invoice)`,
+    `  • Your role / title`, ``,
+    `Once I have that I'll get the RFQ loaded and assigned to the right buyer.`, ``,
+    `Thanks,`,
+    `Astute Group Stock RFQ Team`,
+  ].join('\n');
+}
+
 // ─── EXPORTS ─────────────────────────────────────────────────────────────────
 
 module.exports = {
@@ -517,6 +608,12 @@ module.exports = {
       folder: 'NeedsReview',
       requires: ['reason'],
       handler: action_needs_review,
+    },
+    clarify_partner: {
+      folder: 'NeedInfo',
+      requires: ['recipient', 'subject', 'extracted'],
+      keepsPending: true,
+      handler: action_clarify_partner,
     },
     not_rfq: {
       folder: 'NotRFQ',

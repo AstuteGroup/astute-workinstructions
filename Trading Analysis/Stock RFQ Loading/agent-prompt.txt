@@ -10,7 +10,18 @@ STEP 3 — Process each message.
 For every UID returned, follow the per-message decision tree:
   - Run `read <uid> --workflow stockrfq` to fetch body + parsed forwarded headers + external_sender.
 
-  - **Check subject line FIRST.** If subject matches `RE: [APPROVAL NEEDED] Large Stock RFQ <gate_id>` (any case):
+  - **Check for `pending_state` FIRST.** If the `read` JSON includes a `pending_state` object, this message is a reply to a prior `clarify_partner` ask. Treat it as a thread continuation:
+      * `pending_state.extracted` carries the partial extraction from the original broker RFQ (lines, senderEmail, brokerMessageId, customerName-guess, etc.). The reply body typically just supplies the company info without re-quoting the parts list.
+      * Build the merged extraction by combining `pending_state.extracted` with the company / role info parsed from the current reply body. Re-run partner-lookup on the company string the broker provided.
+      * If partner now resolves AND retry_count < 2:
+          - Route `load_rfq` with the FULL merged payload (lines + sender fields from pending_state, bpartnerId from the fresh partner-lookup, customerName from the reply). Pass `original_message_id: pending_state.original_message_id` if available. The poller auto-clears the sidecar on the terminal action.
+      * If partner STILL doesn't resolve AND `pending_state.retry_count < 2`:
+          - Either re-route `clarify_partner` with refined hints (retry_count auto-bumps), OR fall through to `load_rfq` with the Unqualified Broker fallback (1006505) using the merged extraction. Prefer the fallback on retry — don't loop indefinitely.
+      * If `pending_state.retry_count >= 2`:
+          - Route `load_rfq` with Unqualified Broker fallback (1006505). The original demand still needs to land in OT; the partner question is operator triage at this point.
+      * Approval-reply messages (next bullet) take precedence over this — even if `pending_state` is somehow present.
+
+  - **Check subject line.** If subject matches `RE: [APPROVAL NEEDED] Large Stock RFQ <gate_id>` (any case):
       * Extract `<gate_id>` from the subject (the token right after "Large Stock RFQ ", before the line-count / customer suffix — looks like `m-a3b4c5d6e7` or `h-a3b4c5d6e7`).
       * Read the first non-quoted line of the body. Match (case-insensitive):
           - `yes` / `y` / `approve` / `go` / `proceed` → `approve_large_stock_rfq` with `{gate_id: "<gate_id>"}`. The factory's onApprove will read the sentinel and call writeRFQ — operator does NOT need to re-extract or pass lines.
@@ -19,9 +30,13 @@ For every UID returned, follow the per-message decision tree:
       * Dispatch with `route <uid> <action> --workflow stockrfq --payload '<json>'`. Approval/rejection emails do NOT need MPN extraction or partner resolution.
       * Skip the remaining steps for this UID.
 
-  - Otherwise (normal stock-RFQ flow per the .md):
+  - Otherwise (no pending_state, not an approval reply — normal stock-RFQ flow per the .md):
       * If has_attachment is true, run `download-attachments <uid> --workflow stockrfq` and Read the relevant xlsx/csv/pdf.
-      * Apply customer resolution (partner-lookup with partnerType='customer'; fall back to Unqualified Broker bpartnerId 1006505 with customerName captured).
+      * Apply customer resolution (partner-lookup with partnerType='customer').
+      * **Partner-resolution branching:**
+          - Partner resolves to a real BP → continue to MPN extraction.
+          - Partner does NOT resolve AND `external_sender` is identifiable (real person, broker-domain email, not bounce / automated / multi-hop forward) AND no prior `pending_state` exists → route `clarify_partner` with `{recipient: <external_sender_email>, subject: <original_subject>, extracted: {lines, senderEmail, senderDomain, brokerMessageId, customerName-guess, ...everything_else_parsed}, hints: "<short description: what BP-lookup tried, why it didn't match>"}`. The sidecar persists the extraction; the broker's reply round-trips to this inbox.
+          - Partner does NOT resolve AND sender is non-clarifiable (internal forward / bounce / ambiguous) → fall back to Unqualified Broker (bpartnerId 1006505) with customerName captured, continue to MPN extraction normally.
       * Extract MPN+qty (+optional MFR/CPC/target price).
       * Resolve MFR via shared/mfr-lookup.js if a manufacturer string is present.
       * **Extract source-identification fields for the load_rfq payload (used by the outbound CQ agent to disambiguate same-MPN/qty quotes from different brokers — see `stock-rfq-cq-loading.md`):**
@@ -36,7 +51,7 @@ If a single message hits a transient error (writeRFQ 5xx, partner-lookup throws,
 
 STEP 4 — Summary.
 At the end, print a single-line summary in this exact shape:
-  STOCKRFQ-AGENT SUMMARY: processed=<N> load_rfq=<N> approve_large_stock_rfq=<N> reject_large_stock_rfq=<N> outbound_pending=<N> needs_review=<N> not_rfq=<N> errors=<N>
+  STOCKRFQ-AGENT SUMMARY: processed=<N> load_rfq=<N> clarify_partner=<N> approve_large_stock_rfq=<N> reject_large_stock_rfq=<N> outbound_pending=<N> needs_review=<N> not_rfq=<N> errors=<N>
 
 If 0 unseen messages, print "STOCKRFQ-AGENT SUMMARY: no unseen messages" and exit.
 

@@ -22,6 +22,7 @@ const REQUIRED_FOLDERS = [
   'NotRFQ',
   'OutboundPending',
   'LargeStockRFQApprovals',
+  'NeedInfo',
   // stockrfq-cq workflow (reads from OutboundPending):
   'CQ-Processed',
   'CQ-Skipped',

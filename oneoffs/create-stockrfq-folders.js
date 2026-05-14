@@ -23,6 +23,7 @@ const REQUIRED_FOLDERS = [
   'NotRFQ',
   'OutboundPending',
   'LargeStockRFQApprovals',
+  'NeedInfo',
   'CQ-Processed',
   'CQ-Skipped',
   'CQ-NeedsReview',
