@@ -98,7 +98,12 @@ const OEMSECRETS_PER_TICK_BUDGET = 3;
 
 const args = process.argv.slice(2);
 const dryRun = args.includes('--dry-run');
+const publish = args.includes('--publish');
 const sinceOverride = (args.find(a => a.startsWith('--since=')) || '').split('=')[1];
+
+// Site staging dir for --publish; overridable for tests.
+const SITE_DIR = process.env.STOCK_RFQ_SITE_DIR
+  || '/home/analytics_user/workspace/.stock-rfq-digest-site';
 
 const pool = new Pool({
   host: '/var/run/postgresql',
@@ -813,24 +818,27 @@ function renderStatBand(label, stats) {
        + `<div class="stat"><b>${fmtInt(stats.unqualified_rfqs)}</b>Unqualified RFQs</div>`;
 }
 
-function renderHtml(model) {
+const DIGEST_CSS = `body{font-family:Arial,sans-serif;font-size:13px;color:#222}
+  h2{color:#234;margin:18px 0 6px;border-bottom:1px solid #ddd;padding-bottom:4px}
+  h3{color:#456;margin:12px 0 4px;font-size:14px}
+  table{border-collapse:collapse;margin:6px 0 12px}
+  th{background:#eef;text-align:left;padding:4px 8px;border:1px solid #ccd;font-size:12px}
+  td{padding:3px 8px;border:1px solid #eee;font-size:12px;vertical-align:top}
+  .stat{display:inline-block;padding:6px 12px;margin:2px;background:#f6f6f6;border-radius:4px}
+  .stat b{display:block;font-size:18px;color:#234}
+  .small{color:#888;font-size:11px}`;
+
+// Body content (everything between <body> and </body>) — shared between the
+// email wrapper (renderHtml) and the website wrapper (renderSiteHtml).
+function renderBodyInner(model) {
   const {
     tickStats, todayStats, thirtyStats,
     topMpns30d, topMpnsToday, topCustomers,
     repeatMap, franchiseMap, oemsecretsMap, stockMap, excessMap,
     windowLabel,
   } = model;
-  const css = `body{font-family:Arial,sans-serif;font-size:13px;color:#222}
-    h2{color:#234;margin:18px 0 6px;border-bottom:1px solid #ddd;padding-bottom:4px}
-    h3{color:#456;margin:12px 0 4px;font-size:14px}
-    table{border-collapse:collapse;margin:6px 0 12px}
-    th{background:#eef;text-align:left;padding:4px 8px;border:1px solid #ccd;font-size:12px}
-    td{padding:3px 8px;border:1px solid #eee;font-size:12px;vertical-align:top}
-    .stat{display:inline-block;padding:6px 12px;margin:2px;background:#f6f6f6;border-radius:4px}
-    .stat b{display:block;font-size:18px;color:#234}
-    .small{color:#888;font-size:11px}`;
 
-  let html = `<html><head><style>${css}</style></head><body>`;
+  let html = '';
   html += `<h2>Stock RFQ Activity Digest — ${escHtml(windowLabel)}</h2>`;
 
   // Stat band — three windows
@@ -887,8 +895,232 @@ function renderHtml(model) {
   html += `<p class="small">Windows — Last 4h: ${fmtEt(lastTickStart)} → ${fmtEt(now)}. `
        + `Today: ${fmtEt(todayStart)} → ${fmtEt(now)}. `
        + `Last 30d: ${fmtEt(thirtyDaysAgo)} → ${fmtEt(now)}.</p>`;
-  html += `</body></html>`;
   return html;
+}
+
+// Email-style wrapper: self-contained HTML doc for the notifier.
+function renderHtml(model) {
+  return `<html><head><style>${DIGEST_CSS}</style></head><body>${renderBodyInner(model)}</body></html>`;
+}
+
+// ─── SITE RENDERING (--publish path) ─────────────────────────────────────────
+//
+// renderSiteFrame wraps arbitrary body HTML with:
+//   - mobile-friendly viewport + UTF-8
+//   - the Netlify Identity widget (login modal + JWT cookie)
+//   - a top nav (Latest / Archive / Sign out)
+//   - a client-side gate: <main> stays display:none until the widget confirms
+//     a logged-in user.
+//
+// SECURITY NOTE — this is a *client-side* gate. The HTML is still served
+// publicly by URL; a determined party with the URL and curl could download
+// the raw markup. That's acceptable for internal sourcing intel behind an
+// unguessable subdomain, but if we ever need true server-side protection
+// the upgrade path is either Netlify Pro role-based redirects or a
+// Cloudflare Access tunnel in front of the site.
+const SITE_FRAME_CSS = `
+  body{margin:0;padding:0;background:#fafafa}
+  nav.topbar{background:#234;color:#fff;padding:10px 20px;display:flex;
+    justify-content:space-between;align-items:center;font-family:Arial,sans-serif}
+  nav.topbar a{color:#fff;text-decoration:none;margin-right:16px;font-size:13px}
+  nav.topbar a:hover{text-decoration:underline}
+  nav.topbar .title{font-weight:bold;font-size:14px}
+  main{padding:0 20px 40px 20px;max-width:1200px;margin:0 auto;background:#fff}
+  #login-prompt{padding:80px 20px;text-align:center;color:#666;font-family:Arial,sans-serif}
+  #login-prompt button{background:#234;color:#fff;border:none;padding:10px 24px;
+    font-size:14px;cursor:pointer;border-radius:4px;margin-top:12px}
+  .nav-btn{background:none;border:1px solid #fff;color:#fff;padding:4px 10px;
+    font-size:12px;cursor:pointer;border-radius:3px;margin-left:8px}
+  .nav-btn:hover{background:rgba(255,255,255,0.15)}
+  .footer{color:#888;font-size:11px;margin-top:24px;padding:12px 0;
+    border-top:1px solid #eee;text-align:center}`;
+
+function renderSiteFrame(bodyHtml, opts) {
+  opts = opts || {};
+  const showArchiveLink = opts.showArchiveLink !== false;
+  const generatedLabel = opts.generatedLabel || '';
+  const title = opts.title || 'Stock RFQ Activity Digest';
+  const backLink = showArchiveLink
+    ? `<a href="/archive/">Archive</a>`
+    : `<a href="/">&larr; Back to latest</a>`;
+
+  return `<!doctype html>
+<html lang="en"><head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>${escHtml(title)}</title>
+  <style>${DIGEST_CSS}${SITE_FRAME_CSS}</style>
+  <script src="https://identity.netlify.com/v1/netlify-identity-widget.js" defer></script>
+</head>
+<body>
+  <nav class="topbar">
+    <span class="title">${escHtml(title)}</span>
+    <span>
+      <a href="/">Latest</a>
+      ${backLink}
+      <button class="nav-btn" id="logout-btn" style="display:none">Sign out</button>
+    </span>
+  </nav>
+  <main id="content" style="display:none">
+    ${bodyHtml}
+    <div class="footer">Generated ${escHtml(generatedLabel)} &middot; stock-rfq-activity-digest</div>
+  </main>
+  <div id="login-prompt" style="display:none">
+    <p>Sign in to view the Stock RFQ Activity Digest.</p>
+    <button id="login-btn">Sign in</button>
+  </div>
+  <script>
+  (function() {
+    var content = document.getElementById('content');
+    var prompt  = document.getElementById('login-prompt');
+    var logout  = document.getElementById('logout-btn');
+    function gate(user) {
+      if (user) {
+        content.style.display = '';
+        prompt.style.display  = 'none';
+        logout.style.display  = '';
+      } else {
+        content.style.display = 'none';
+        prompt.style.display  = '';
+        logout.style.display  = 'none';
+      }
+    }
+    function wire() {
+      if (!window.netlifyIdentity) { setTimeout(wire, 50); return; }
+      netlifyIdentity.on('init', gate);
+      netlifyIdentity.on('login', function() { netlifyIdentity.close(); location.reload(); });
+      netlifyIdentity.on('logout', function() { location.reload(); });
+      document.getElementById('login-btn').addEventListener('click', function() {
+        netlifyIdentity.open('login');
+      });
+      logout.addEventListener('click', function() { netlifyIdentity.logout(); });
+    }
+    wire();
+  })();
+  </script>
+</body></html>`;
+}
+
+function renderSiteHtml(model, opts) {
+  return renderSiteFrame(renderBodyInner(model), opts);
+}
+
+function renderArchiveListHtml(snapshots, opts) {
+  let body = `<h2>Archive — Last 30 Days</h2>`;
+  if (!snapshots || snapshots.length === 0) {
+    body += `<p class="small">No archived digests yet.</p>`;
+  } else {
+    body += `<table><tr><th>#</th><th>Date</th><th>Time (ET)</th><th>Snapshot</th></tr>`;
+    snapshots.forEach((s, i) => {
+      body += `<tr><td>${i + 1}</td><td>${escHtml(s.dateEt)}</td>`
+           +  `<td>${escHtml(s.timeEt)}</td>`
+           +  `<td><a href="${escHtml(s.href)}">View</a></td></tr>`;
+    });
+    body += `</table>`;
+    body += `<p class="small">Snapshots older than 30 days are pruned automatically. Each tick is captured every 4 hours (00/04/08/12/16/20 UTC).</p>`;
+  }
+  return renderSiteFrame(body, Object.assign({}, opts, {
+    showArchiveLink: false,
+    title: 'Stock RFQ Digest — Archive',
+  }));
+}
+
+// ─── PUBLISH (write site dir + deploy to Netlify) ────────────────────────────
+
+function pad2(n) { return String(n).padStart(2, '0'); }
+
+function makeUtcTsKey(d) {
+  // Format: 2026-05-14T2025Z — UTC date + HHMM. Sortable, file-safe.
+  return `${d.getUTCFullYear()}-${pad2(d.getUTCMonth() + 1)}-${pad2(d.getUTCDate())}`
+       + `T${pad2(d.getUTCHours())}${pad2(d.getUTCMinutes())}Z`;
+}
+
+function parseTsKey(fname) {
+  // archive filename → Date (or null if unparseable)
+  const m = fname.match(/^(\d{4})-(\d{2})-(\d{2})T(\d{2})(\d{2})Z\.html$/);
+  if (!m) return null;
+  return new Date(Date.UTC(+m[1], +m[2] - 1, +m[3], +m[4], +m[5], 0));
+}
+
+async function publishSite(model, nowDate, opts) {
+  opts = opts || {};
+  const fsp = fs.promises;
+  const siteDir = opts.siteDir;
+  const archiveDir = path.join(siteDir, 'archive');
+  await fsp.mkdir(archiveDir, { recursive: true });
+
+  const generatedLabel = fmtEt(nowDate);
+  const tsKey = makeUtcTsKey(nowDate);
+
+  // 1. Render and write the current snapshot to both index.html and archive.
+  const html = renderSiteHtml(model, { generatedLabel, showArchiveLink: true });
+  await fsp.writeFile(path.join(siteDir, 'index.html'), html);
+  await fsp.writeFile(path.join(archiveDir, `${tsKey}.html`), html);
+
+  // 2. Prune archive files older than 30 days.
+  const cutoffMs = nowDate.getTime() - 30 * 24 * 60 * 60 * 1000;
+  const existing = await fsp.readdir(archiveDir);
+  for (const fname of existing) {
+    if (!fname.endsWith('.html') || fname === 'index.html') continue;
+    const ts = parseTsKey(fname);
+    if (!ts) continue;
+    if (ts.getTime() < cutoffMs) {
+      await fsp.unlink(path.join(archiveDir, fname));
+    }
+  }
+
+  // 3. Regenerate archive/index.html — sorted newest first.
+  const archiveFiles = (await fsp.readdir(archiveDir))
+    .filter(f => f.endsWith('.html') && f !== 'index.html' && parseTsKey(f))
+    .sort()
+    .reverse();
+  const snapshots = archiveFiles.map(f => {
+    const d = parseTsKey(f);
+    return {
+      href: `/archive/${f}`,
+      dateEt: new Intl.DateTimeFormat('en-CA', {
+        timeZone: REPORT_TZ, year: 'numeric', month: '2-digit', day: '2-digit',
+      }).format(d),
+      timeEt: new Intl.DateTimeFormat('en-US', {
+        timeZone: REPORT_TZ, hour: '2-digit', minute: '2-digit', hour12: false,
+        timeZoneName: 'short',
+      }).format(d),
+    };
+  });
+  await fsp.writeFile(
+    path.join(archiveDir, 'index.html'),
+    renderArchiveListHtml(snapshots, { generatedLabel }),
+  );
+
+  // 4. 404 page (still gated by Identity).
+  const notFoundBody = `<h2>Not found</h2>
+    <p>That snapshot has either aged out of the 30-day archive or never existed.</p>
+    <p><a href="/">&larr; Back to the latest digest</a></p>`;
+  await fsp.writeFile(
+    path.join(siteDir, '404.html'),
+    renderSiteFrame(notFoundBody, { generatedLabel, showArchiveLink: true }),
+  );
+
+  const fileCount = archiveFiles.length + 3; // index + archive/index + 404
+
+  // 5. Deploy (or skip in dry-run / missing creds).
+  if (opts.dryRun) {
+    console.log(`[publish] dry-run: staged ${fileCount} files at ${siteDir} (skipping Netlify deploy)`);
+    return { dryRun: true, fileCount, siteDir };
+  }
+  if (!opts.siteId || !opts.token) {
+    console.warn(`[publish] NETLIFY_SITE_ID or NETLIFY_AUTH_TOKEN missing — staged ${fileCount} files at ${siteDir} but skipped deploy`);
+    return { skipped: true, fileCount, siteDir };
+  }
+  const { deployDirectory } = require('../../shared/netlify-deploy');
+  const result = await deployDirectory({
+    dir: siteDir,
+    siteId: opts.siteId,
+    token: opts.token,
+    title: `stock-rfq-digest ${tsKey}`,
+  });
+  console.log(`[publish] deployed ${result.uploadedCount}/${result.fileCount} new files → ${result.url}`);
+  return result;
 }
 
 // ─── ENTRY ───────────────────────────────────────────────────────────────────
@@ -938,12 +1170,13 @@ function renderHtml(model) {
 
     const cumDateEt = new Intl.DateTimeFormat('en-CA', { timeZone: REPORT_TZ, year: 'numeric', month: '2-digit', day: '2-digit' }).format(todayStart);
     const windowLabel = `${fmtEtTimeOnly(now)} tick (30d rolling, today ${cumDateEt})`;
-    const html = renderHtml({
+    const model = {
       tickStats, todayStats, thirtyStats,
       topMpns30d, topMpnsToday, topCustomers,
       repeatMap, franchiseMap, oemsecretsMap, stockMap, excessMap,
       windowLabel,
-    });
+    };
+    const html = renderHtml(model);
 
     if (dryRun) {
       console.log(html);
@@ -969,6 +1202,23 @@ function renderHtml(model) {
         { html: true },
       );
       console.log(`Sent digest: "${subject}"`);
+    }
+
+    // --publish: write site dir + deploy to Netlify. Runs independently of
+    // the email path so a notifier failure doesn't skip the deploy and vice
+    // versa. Honors --dry-run (stages files but skips the actual deploy).
+    if (publish) {
+      try {
+        await publishSite(model, now, {
+          siteDir: SITE_DIR,
+          siteId:  process.env.NETLIFY_SITE_ID,
+          token:   process.env.NETLIFY_AUTH_TOKEN,
+          dryRun,
+        });
+      } catch (err) {
+        console.error('[publish] failed:', err.message);
+        process.exitCode = 1;
+      }
     }
   } catch (e) {
     console.error('Stock RFQ digest failed:', e);
