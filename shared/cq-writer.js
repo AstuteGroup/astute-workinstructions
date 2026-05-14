@@ -80,6 +80,11 @@ const FLAG = {
   API_WRITE_ERROR:   'API_WRITE_ERROR',
 };
 
+// Skip reason codes — pre-write conditions that intentionally bypass writing
+const SKIP = {
+  DUP_EXISTING_CQ:   'DUP_EXISTING_CQ',
+};
+
 // Mandatory fields on every CQ line
 const MANDATORY_FIELDS = ['mpn', 'mfrText', 'qty', 'resale', 'leadTime'];
 
@@ -292,6 +297,7 @@ async function writeCQ(rfqSearchKey, line, opts = {}) {
   return {
     written: result.written[0] || null,
     flagged: result.flagged[0] || null,
+    skipped: result.skipped[0] || null,
     error: result.failed[0]?.detail || null,
   };
 }
@@ -309,16 +315,22 @@ async function writeCQ(rfqSearchKey, line, opts = {}) {
  * @param {boolean} [opts.includeInQuote=true] - Include in quote
  * @param {number} [opts.delayMs=50] - Delay between API writes (rate limiting)
  * @param {boolean} [opts.skipUnresolved=false] - If true, skip lines that can't resolve to RFQ line. If false (default), flag them.
- * @returns {{ written: Array, flagged: Array, failed: Array, summary: Object }}
+ * @param {boolean} [opts.skipDedupCheck=false] - If true, bypass the pre-write
+ *   dedup lookup. Default is enforced dedup on (rfq_line_id, mpn_clean, qty,
+ *   resale) — set true only for operator-override scenarios where a duplicate
+ *   row is intentional (e.g., re-quote at a different lead time on same price).
+ * @returns {{ written: Array, flagged: Array, failed: Array, skipped: Array, summary: Object }}
  */
 async function writeCQBatch(rfqSearchKey, lines, opts = {}) {
   const currencyId = opts.currencyId || DEFAULT_CURRENCY_ID;
   const includeInQuote = opts.includeInQuote !== false;
   const delayMs = opts.delayMs || 50;
+  const skipDedupCheck = opts.skipDedupCheck === true;
 
   const written = [];
   const flagged = [];
   const failed = [];
+  const skipped = [];
 
   // ── Resolve RFQ ──
   const rfq = await resolveRFQ(rfqSearchKey);
@@ -331,7 +343,7 @@ async function writeCQBatch(rfqSearchKey, lines, opts = {}) {
         detail: `RFQ '${rfqSearchKey}' not found`,
       });
     }
-    return { written, flagged, failed, summary: buildSummary(lines.length, written, flagged, failed) };
+    return { written, flagged, failed, skipped, summary: buildSummary(lines.length, written, flagged, failed, skipped) };
   }
 
   const bpartnerId = opts.bpartnerId || rfq.bpartnerId;
@@ -369,6 +381,51 @@ async function writeCQBatch(rfqSearchKey, lines, opts = {}) {
         detail: `${cpc ? `CPC '${cpc}'` : `MPN '${mpn}'`} not found in RFQ ${rfqSearchKey} (${rfq.lineCount} lines, ${rfq.mpnCount} MPNs)`,
       });
       continue;
+    }
+
+    // ── Pre-write idempotency check ──
+    // Prevents duplicate CQ rows across separate agent ticks. The naturalKeyFields
+    // option on apiPost below only protects against 5xx retries within a single
+    // call — it does NOT prevent a second tick from re-routing the same operator
+    // outbound message after an interrupted run. This explicit lookup closes that
+    // gap by checking for any active chuboe_cq_line with the same (rfq_line_id,
+    // mpn_clean, qty, resale).
+    //
+    // Match shape mirrors naturalKeyFields exactly so the two enforcement layers
+    // agree on what "duplicate" means.  Description / lead time / packaging /
+    // notes do NOT affect dedup — those are operator-mutable refinements on a
+    // base offer; the (rfq_line, mpn, qty, price) tuple is the natural identity.
+    //
+    // Skipped rows land in result.skipped[] with reason=DUP_EXISTING_CQ and the
+    // existing chuboe_cq_line.id so callers can breadcrumb the de-dup decision.
+    // Pass opts.skipDedupCheck:true to bypass (operator-override path).
+    const mpnClean = mpn ? cleanMpn(mpn).toUpperCase() : null;
+    if (!skipDedupCheck && mpnClean && line.qty != null && resale != null) {
+      try {
+        const filter =
+          `Chuboe_RFQ_Line_ID eq ${rfqLineId}` +
+          ` and Chuboe_MPN_Clean eq '${mpnClean.replace(/'/g, "''")}'` +
+          ` and Qty eq ${Number(line.qty)}` +
+          ` and PriceEntered eq ${Number(resale)}` +
+          ` and IsActive eq 'Y'`;
+        const existing = await apiGet('Chuboe_CQ_Line', { filter, top: 1 });
+        if (existing && Array.isArray(existing.records) && existing.records.length > 0) {
+          const existingId = existing.records[0].id;
+          skipped.push({
+            mpn, cpc, resale, qty: line.qty, lineIndex: i,
+            reason: SKIP.DUP_EXISTING_CQ,
+            detail: `active chuboe_cq_line ${existingId} already covers (rfq_line=${rfqLineId}, mpn=${mpnClean}, qty=${line.qty}, resale=${resale})`,
+            existingCqLineId: existingId,
+            rfqLineId,
+          });
+          continue;
+        }
+      } catch (e) {
+        // Dedup lookup failure should NOT block the write. Log and proceed.
+        // Better to risk one extra duplicate than to silently drop a CQ because
+        // the lookup endpoint hiccupped.
+        logger.warn(`Dedup lookup failed for rfq_line=${rfqLineId} mpn=${mpnClean}: ${e.message}; proceeding with write`);
+      }
     }
 
     // Resolve MFR — text path if provided (Policy D #1), MPN inference fallback
@@ -472,15 +529,15 @@ async function writeCQBatch(rfqSearchKey, lines, opts = {}) {
     }
   }
 
-  const summary = buildSummary(lines.length, written, flagged, failed);
-  logger.info(`CQ write complete for RFQ ${rfqSearchKey}: ${summary.written}/${summary.total} written, ${summary.flagged} flagged, ${summary.failed} failed`);
+  const summary = buildSummary(lines.length, written, flagged, failed, skipped);
+  logger.info(`CQ write complete for RFQ ${rfqSearchKey}: ${summary.written}/${summary.total} written, ${summary.flagged} flagged, ${summary.failed} failed, ${summary.skipped} skipped (dedup)`);
 
-  return { written, flagged, failed, summary };
+  return { written, flagged, failed, skipped, summary };
 }
 
 // ─── HELPERS ─────────────────────────────────────────────────────────────────
 
-function buildSummary(total, written, flagged, failed) {
+function buildSummary(total, written, flagged, failed, skipped = []) {
   const byReason = {};
   for (const f of flagged) {
     byReason[f.reason] = (byReason[f.reason] || 0) + 1;
@@ -488,11 +545,15 @@ function buildSummary(total, written, flagged, failed) {
   for (const f of failed) {
     byReason[f.reason] = (byReason[f.reason] || 0) + 1;
   }
+  for (const s of skipped) {
+    byReason[s.reason] = (byReason[s.reason] || 0) + 1;
+  }
   return {
     total,
     written: written.length,
     flagged: flagged.length,
     failed: failed.length,
+    skipped: skipped.length,
     byReason,
   };
 }
@@ -510,6 +571,7 @@ module.exports = {
   writeCQBatch,
   clearCaches,
   FLAG,
+  SKIP,
   MANDATORY_FIELDS,
   OPTIONAL_FIELD_MAP,
   CQ_RESOLUTIONS,

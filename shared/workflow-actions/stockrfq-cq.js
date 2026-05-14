@@ -31,10 +31,13 @@ const JAKE_USER_ID = 1000004;
 /**
  * Write one or more CQ lines against an EXISTING RFQ.
  *
- * IDEMPOTENCY: the agent is responsible for verifying — before calling this
- * action — that no active chuboe_cq_line already covers (rfq_line, mpn, qty,
- * price). cq-writer's naturalKeyFields option is for 5xx retry-safety only;
- * it does NOT prevent duplicate posts of distinct API calls.
+ * IDEMPOTENCY: cq-writer.writeCQBatch enforces a pre-write lookup on
+ * (rfq_line_id, mpn_clean, qty, resale) — any row already covered by an
+ * active chuboe_cq_line lands in result.skipped[] with reason DUP_EXISTING_CQ
+ * and the existing chuboe_cq_line.id. The agent can call add_cq without its
+ * own dedup check; the writer handles it. To intentionally write a duplicate
+ * (e.g., operator re-quote at the same price but different lead time), pass
+ * opts.skipDedupCheck:true.
  *
  * Required payload:
  *   rfqSearchKey  (string; chuboe_rfq.value, e.g., "1134111")
@@ -99,6 +102,7 @@ async function action_add_cq(payload, ctx) {
     cqsWritten: result.written.length,
     cqsFlagged: result.flagged.length,
     cqsFailed: result.failed.length,
+    cqsSkipped: (result.skipped || []).length,
     priceCheck: priceCheck === true,
   });
 
@@ -107,6 +111,7 @@ async function action_add_cq(payload, ctx) {
     written: result.written,
     flagged: result.flagged,
     failed: result.failed,
+    skipped: result.skipped || [],
     summary: result.summary,
   };
 }
@@ -212,6 +217,7 @@ async function action_add_cq_with_rfq(payload, ctx) {
     cqsWritten: cqResult.written.length,
     cqsFlagged: cqResult.flagged.length,
     cqsFailed: cqResult.failed.length,
+    cqsSkipped: (cqResult.skipped || []).length,
   });
 
   return {
@@ -221,6 +227,7 @@ async function action_add_cq_with_rfq(payload, ctx) {
     cqsWritten: cqResult.written,
     cqsFlagged: cqResult.flagged,
     cqsFailed: cqResult.failed,
+    cqsSkipped: cqResult.skipped || [],
   };
 }
 

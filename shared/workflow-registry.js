@@ -213,7 +213,7 @@ module.exports = {
       needInfoClarifications: false,
       largePayloadGate: false,
       approvalReplyAction: false,
-      preWriteIdempotency: false,
+      preWriteIdempotency: true,
       writeQueue: false,
       breadcrumbWrites: true,
       operatorDigest: false,
@@ -232,10 +232,8 @@ module.exports = {
       replyParserGrammar: 'no operator-override grammar needed — every outbound reply IS the directive',
       tieredCron: 'offset :15/:45 from inbound stockrfq-agent (:00/:30) is the only timing signal needed',
     },
-    // Open gap: preWriteIdempotency
-    //   Handler docstring on action_add_cq says "the agent is responsible for
-    //   verifying" — that's advisory only. Move the (rfq_line, mpn, qty, price)
-    //   check into cq-writer's writeCQBatch so it's enforced, not advisory.
+    // All capabilities now declared. preWriteIdempotency is enforced at the
+    // writer level (shared/cq-writer.js writeCQBatch SELECT before POST).
   },
 
   // ─── CROSS-REF REVIEW (operator approves/rejects ambiguous API cross-refs) ──
