@@ -158,15 +158,14 @@ module.exports = {
       operatorDigest: true,
       activityDigest: false,
       replyParserGrammar: true,
-      tieredCron: false,
+      tieredCron: true,
     },
     deviations: {
       writeQueue: 'direct write — one offer per email; fan-out happens downstream via offer-router, not pre-write',
       activityDigest: 'operatorDigest (offer-digest 3×/day) already provides aggregate visibility',
     },
-    // Open gap remaining: tieredCron.
-    // (Cadence is the legitimate-divergence layer per email-workflow-architecture.md;
-    // step #6 of the convergence-map migration.)
+    // All capabilities now declared. tieredCron wired in scripts/should-run-excess-agent.js
+    // (5m burst on pending large-offer sentinel or clarify_partner sidecar; 30m steady).
   },
 
   // ─── STOCK RFQ LOADING (broker stock RFQs — inbound) ────────────────────────
@@ -193,14 +192,16 @@ module.exports = {
       operatorDigest: false,
       activityDigest: true,
       replyParserGrammar: false,
-      tieredCron: false,
+      tieredCron: true,
     },
     deviations: {
       operatorDigest: 'broker stock-RFQs are transactional; activityDigest (stock-rfq-activity-digest 6×/day) covers visibility',
       writeQueue: 'direct write; broker emails carry small batches',
       replyParserGrammar: 'activityDigest is informational-only by design — no curation queue, no operator-override loop. Shared grammar in shared/workflow-reply-grammars.js is available if directives are needed later.',
     },
-    // Open gap remaining: tieredCron
+    // All capabilities now declared. tieredCron wired in scripts/should-run-stockrfq-agent.js
+    // (5m burst on pending large-stockrfq sentinel or clarify_partner sidecar; 15m steady —
+    // tighter than rfqloading's 30m because operator works the inbound RFQ + outbound CQ chain).
   },
 
   // ─── STOCK RFQ CQ (operator outbound quote replies → CQ rows) ───────────────
@@ -234,7 +235,7 @@ module.exports = {
       operatorDigest: 'parent stockrfq workflow covers visibility',
       activityDigest: 'parent stockrfq workflow covers visibility',
       replyParserGrammar: 'no operator-override grammar needed — every outbound reply IS the directive',
-      tieredCron: 'offset :15/:45 from inbound stockrfq-agent (:00/:30) is the only timing signal needed',
+      tieredCron: 'every 15m at :05/:20/:35/:50 (offset by 5 from inbound stockrfq-agent\'s :00/:15/:30/:45) — no burst gate needed because CQ work is triggered by recent inbound activity, which already bursts on the inbound side',
     },
     // All capabilities now declared. preWriteIdempotency is enforced at the
     // writer level (shared/cq-writer.js writeCQBatch SELECT before POST).

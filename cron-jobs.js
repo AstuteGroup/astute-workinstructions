@@ -125,35 +125,46 @@ module.exports = [
   // is required for headless tool use (no operator to approve).
   {
     name: 'excess-agent',
-    cadence: 'every 30m',
-    cadenceCron: '*/30 * * * *',
-    command: `/home/analytics_user/.local/bin/claude -p --permission-mode bypassPermissions --max-turns 80 < "${ASTUTE}/Trading Analysis/Customer Excess Analysis/agent-prompt.txt"`,
+    // Tiered: 5m burst when any pending large-offer sentinel or
+    // clarify_partner sidecar exists within the last 10m, else steady at
+    // :00/:30. Gate short-circuits claude -p when not running.
+    cadence: 'every 5m',
+    cadenceCron: '*/5 * * * *',
+    command: `node "${ASTUTE}/scripts/should-run-excess-agent.js" && /home/analytics_user/.local/bin/claude -p --permission-mode bypassPermissions --max-turns 80 < "${ASTUTE}/Trading Analysis/Customer Excess Analysis/agent-prompt.txt"`,
     cwd: ASTUTE,
     needsOT: true,
     logFile: '/tmp/excess-agent.log',
-    description: 'Every 30m — agent reads excess@ per customer-excess-analysis.md, writes offers via OT API',
+    description: 'Tiered (5m burst / 30m steady) — agent reads excess@ per customer-excess-analysis.md, writes offers via OT API. Burst window triggered by large-offer sentinel or clarify_partner sidecar.',
   },
 
   {
     name: 'stockrfq-agent',
-    cadence: 'every 30m',
-    cadenceCron: '*/30 * * * *',
-    command: `/home/analytics_user/.local/bin/claude -p --permission-mode bypassPermissions --max-turns 80 < "${ASTUTE}/Trading Analysis/Stock RFQ Loading/agent-prompt.txt"`,
+    // Tiered: 5m burst when any pending large-stockrfq sentinel or
+    // clarify_partner sidecar exists within the last 10m, else steady at
+    // :00/:15/:30/:45 (15m — tighter than rfqloading's 30m because operator
+    // is actively involved in both inbound RFQ + outbound CQ chain).
+    cadence: 'every 5m',
+    cadenceCron: '*/5 * * * *',
+    command: `node "${ASTUTE}/scripts/should-run-stockrfq-agent.js" && /home/analytics_user/.local/bin/claude -p --permission-mode bypassPermissions --max-turns 80 < "${ASTUTE}/Trading Analysis/Stock RFQ Loading/agent-prompt.txt"`,
     cwd: ASTUTE,
     needsOT: true,
     logFile: '/tmp/stockrfq-agent.log',
-    description: 'Every 30m — agent reads stockRFQ@ per stock-rfq-loading.md, writes RFQs via OT API',
+    description: 'Tiered (5m burst / 15m steady) — agent reads stockRFQ@ per stock-rfq-loading.md, writes RFQs via OT API. Burst window triggered by large-stockrfq sentinel or clarify_partner sidecar.',
   },
 
   {
     name: 'stockrfq-cq-agent',
-    cadence: 'every 30m',
-    cadenceCron: '15,45 * * * *',  // offset :15/:45 from inbound stockrfq-agent (:00/:30)
+    // 15m steady offset by 5 from inbound stockrfq-agent's steady boundaries.
+    // No burst gate: CQ work follows recent inbound activity, which already
+    // bursts on the inbound side. Drops from 30m → 15m per operator's
+    // "tighter window on stock rfqs" call.
+    cadence: 'every 15m',
+    cadenceCron: '5,20,35,50 * * * *',
     command: `/home/analytics_user/.local/bin/claude -p --permission-mode bypassPermissions --max-turns 120 < "${ASTUTE}/Trading Analysis/Stock RFQ Loading/cq-agent-prompt.txt"`,
     cwd: ASTUTE,
     needsOT: true,
     logFile: '/tmp/stockrfq-cq-agent.log',
-    description: 'Every 30m (offset from inbound) — agent reads OutboundPending folder of stockRFQ@ per stock-rfq-cq-loading.md, writes CQ rows via OT API. Idempotency via pre-write chuboe_cq_line lookup.',
+    description: 'Every 15m offset (:05/:20/:35/:50) — agent reads OutboundPending folder of stockRFQ@ per stock-rfq-cq-loading.md, writes CQ rows via OT API. Idempotency via pre-write chuboe_cq_line lookup. Burst signal lives on the inbound side; CQ inherits the activity rhythm.',
   },
 
   {
@@ -187,6 +198,36 @@ module.exports = [
   //   needsOT: true,
   //   logFile: '/tmp/offer-poller-broker.log',
   //   description: 'Every 30m — poll broker@ inbox, parse offers, writeOffer to OT, dispatch to type router',
+  // },
+
+  // PLACEHOLDER for vq-loading agent — vq@ inbox is provisioned and active
+  // (vq-parser CLI polls it today). The agent migration is scaffolded but
+  // INTENTIONALLY DISABLED: the workflow handler (shared/workflow-actions/
+  // vq-loading.js) hasn't been built yet, and the operator wants to validate
+  // extraction quality against a reference example (vq@/Processed UID 8372,
+  // "FW: 1132932") before activating.
+  //
+  // To enable (next-day work — see workflow-registry.js 'vq-loading' entry):
+  //   1. Build shared/workflow-actions/vq-loading.js (handler with load_vqs /
+  //      clarify_vendor / no_bid / dup_skip / needs_review actions; mirrors
+  //      stockrfq.js pattern; uses vq-parser's existing llm-extractor +
+  //      template engine for extraction quality).
+  //   2. Build Trading Analysis/RFQ Sourcing/vq_loading/agent-prompt.txt
+  //      (encodes Two-Agent Validation per vq-loading.md; uses Claude vision
+  //      for image-embedded supplier quotes — see the 1132932 example).
+  //   3. Flip status: 'planned' → 'active' in shared/workflow-registry.js,
+  //      add the action set, capabilities, and deviations.
+  //   4. Uncomment this entry and re-run scripts/install-crons.js --apply.
+  //
+  // {
+  //   name: 'vq-loading-agent',
+  //   cadence: 'every 5m',
+  //   cadenceCron: '*/5 * * * *',
+  //   command: `node "${ASTUTE}/scripts/should-run-vq-loading-agent.js" && /home/analytics_user/.local/bin/claude -p --permission-mode bypassPermissions --max-turns 120 < "${ASTUTE}/Trading Analysis/RFQ Sourcing/vq_loading/agent-prompt.txt"`,
+  //   cwd: ASTUTE,
+  //   needsOT: true,
+  //   logFile: '/tmp/vq-loading-agent.log',
+  //   description: 'Tiered (5m burst / 15m steady) — agent reads vq@ per vq-loading.md, writes VQs via OT API. Burst window triggered by clarify_vendor sidecar.',
   // },
 
   {
