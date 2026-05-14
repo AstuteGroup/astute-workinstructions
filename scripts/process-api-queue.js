@@ -55,9 +55,11 @@
  *   pending  → success     (command exited 0)
  *   pending  → pending     (command exited non-zero, attempts < max)
  *   pending  → exhausted   (command exited non-zero, attempts >= max)
+ *   pending  → cancelled   (rejection/inactive manifest covers this MPN —
+ *                           see shared/api-queue.js § CANCELLATION MANIFESTS)
  *
- * Items in success or exhausted state are NEVER re-run. Operator can
- * delete them from the queue file or use --reset to retry.
+ * Items in success, exhausted, or cancelled state are NEVER re-run. Operator
+ * can delete them from the queue file or use --reset to retry.
  *
  * QUEUE FILE FORMAT:
  *
@@ -335,6 +337,41 @@ function main() {
     saveQueue(queue);
     console.log(`Reset ${opts.reset} → pending`);
     return 0;
+  }
+
+  // ─── CANCEL MANIFESTS ──────────────────────────────────────────────────────
+  // Before computing the ready set, honor any cancel manifests written by
+  // rejection / inactive handlers. These exist when an operator rejected an
+  // RFQ (or marked it inactive) and the corresponding retry items must stop
+  // — see shared/api-queue.js § CANCELLATION MANIFESTS for the format.
+  //
+  // This is a safety net. The rejection handler (rfq-loading.js onReject)
+  // also runs the cancel script immediately, so on a normal rejection the
+  // queue is already clean by the time the worker ticks. We re-scan anyway
+  // because:
+  //   - The handler can fail (DB down, queue lock contention) — manifest
+  //     still gets written, worker catches the items next tick.
+  //   - The same manifest covers items enqueued AFTER the rejection if
+  //     anything slipped past the gate.
+  //   - Future inactive-detection cron can just drop a manifest without
+  //     having to also do its own queue surgery.
+  if (queueIO?.loadCancelManifests && queueIO?.applyCancelManifests) {
+    try {
+      const { mpnsToCancel, sources } = queueIO.loadCancelManifests();
+      if (mpnsToCancel.size > 0) {
+        const { cancelled, perReason } = queueIO.applyCancelManifests(queue, mpnsToCancel);
+        if (cancelled > 0) {
+          const reasonsTrail = Array.from(perReason.entries())
+            .map(([r, n]) => `${n}× ${r}`).join('; ');
+          const msg = `Cancel manifests: ${cancelled} pending items cancelled before tick (${sources.length} manifest${sources.length === 1 ? '' : 's'} active) — ${reasonsTrail}`;
+          console.log(msg);
+          appendLog(`CANCEL ${msg}`);
+        }
+      }
+    } catch (e) {
+      console.error(`Cancel manifest scan failed: ${e.message}`);
+      appendLog(`CANCEL-FAIL ${e.message}`);
+    }
   }
 
   const nowMs = Date.now();

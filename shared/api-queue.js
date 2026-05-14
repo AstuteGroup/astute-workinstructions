@@ -345,6 +345,136 @@ function listQueue(opts = {}) {
   }
 }
 
+// ─── CANCELLATION MANIFESTS ─────────────────────────────────────────────────
+//
+// When an RFQ (or any other gated record) is rejected or marked inactive, any
+// items already in the retry queue for that record's MPNs must stop —
+// otherwise they keep grinding through 5 attempts of rate-limited API calls
+// for work the operator already said no to. (Real incident: RFQ 1134261
+// rejected 2026-05-13, 14,783 in-flight items kept retrying through 2026-05-14.)
+//
+// The mechanism: a rejection writes a JSON manifest next to the gate sentinel
+// listing the MPNs that should be cancelled. The worker (process-api-queue.js)
+// reads all manifests at the top of each tick and flips matching pending items
+// to status='cancelled' before processing.
+//
+// Manifest format ({sentinelDir}/{id}.cancel-mpns.json):
+//   {
+//     "id": "1134261",
+//     "kind": "rfq",
+//     "reason": "rejected via large-rfq-gate 5/13",
+//     "written_at": "ISO8601",
+//     "mpns_normalized": ["TKC1350TL40", "GLCBXU60", ...]
+//   }
+//
+// MPNs in the manifest are already normalized (uppercase + alphanumeric only)
+// — same normalization applied to queue MPNs at match time. Caller is
+// responsible for normalization before writing.
+
+const DEFAULT_MANIFEST_DIRS = [
+  path.resolve(process.env.HOME || '/home/analytics_user', 'workspace/.large-rfq-pending'),
+];
+
+/**
+ * Normalize an MPN for cancel-manifest matching. Strict — uppercase + strip
+ * anything that isn't A-Z 0-9. Same form on both manifest write and queue
+ * match so a "BCM857BS,235" in the queue and "BCM857BS235" in the manifest
+ * match cleanly.
+ */
+function normalizeMpnForCancel(s) {
+  return String(s || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
+}
+
+/**
+ * Decode the MPN from a queue item's `command` field. Items are enqueued
+ * with `command = "API_RETRY_IN_FLIGHT=1 API_RETRY_ARGS_B64=<b64-json> node ..."`
+ * where the b64-json carries `{ distributor, mpn, qty }`. Returns null on
+ * decode failure / missing MPN.
+ */
+function decodeItemMpn(item) {
+  if (!item || !item.command) return null;
+  const m = item.command.match(/API_RETRY_ARGS_B64=(\S+)/);
+  if (!m) return null;
+  try {
+    const args = JSON.parse(Buffer.from(m[1], 'base64').toString('utf-8'));
+    return args && args.mpn ? normalizeMpnForCancel(args.mpn) : null;
+  } catch { return null; }
+}
+
+/**
+ * Read every cancel manifest under the configured directories. Returns a
+ * Map<normalizedMpn, reasonLabel> — when two manifests share an MPN the
+ * later-read one wins (we don't try to merge reasons; first-cause is fine).
+ *
+ * Failure modes:
+ *   - Dir missing → skip (no manifests yet)
+ *   - File unparseable → log + skip THAT file, never throw
+ *   - mpns_normalized missing/not-array → skip THAT file
+ *
+ * The worker calls this once per tick and applies the result before
+ * processing.
+ */
+function loadCancelManifests({ dirs } = {}) {
+  const scanDirs = Array.isArray(dirs) && dirs.length ? dirs : DEFAULT_MANIFEST_DIRS;
+  const mpnReasons = new Map();
+  const sources = [];
+  for (const dir of scanDirs) {
+    if (!fs.existsSync(dir)) continue;
+    let files;
+    try { files = fs.readdirSync(dir); } catch { continue; }
+    for (const f of files) {
+      if (!f.endsWith('.cancel-mpns.json')) continue;
+      const filePath = path.join(dir, f);
+      let manifest;
+      try { manifest = JSON.parse(fs.readFileSync(filePath, 'utf-8')); }
+      catch (err) {
+        console.error(`[api-queue] cancel manifest unreadable: ${filePath} — ${err.message}`);
+        continue;
+      }
+      if (!Array.isArray(manifest.mpns_normalized)) continue;
+      const reason = `${manifest.kind || 'gate'} ${manifest.id || f}: ${manifest.reason || 'rejected'}`;
+      sources.push({ file: filePath, id: manifest.id, count: manifest.mpns_normalized.length });
+      for (const mpn of manifest.mpns_normalized) {
+        const n = normalizeMpnForCancel(mpn);
+        if (!n) continue;
+        if (!mpnReasons.has(n)) mpnReasons.set(n, reason);
+      }
+    }
+  }
+  return { mpnsToCancel: mpnReasons, sources };
+}
+
+/**
+ * Walk queue.items and flip status='cancelled' on any pending item whose
+ * decoded MPN appears in mpnsToCancel. Mutates queue.items in place.
+ *
+ * Items in other statuses (success / exhausted / cancelled) are left alone.
+ * Idempotent — re-running with the same manifest is a no-op.
+ *
+ * Returns { cancelled, perReason: Map<reason, count> }.
+ */
+function applyCancelManifests(queue, mpnsToCancel) {
+  if (!queue || !Array.isArray(queue.items) || !mpnsToCancel || mpnsToCancel.size === 0) {
+    return { cancelled: 0, perReason: new Map() };
+  }
+  const perReason = new Map();
+  let cancelled = 0;
+  const nowIso = new Date().toISOString();
+  for (const item of queue.items) {
+    if (item.status !== 'pending') continue;
+    const mpn = decodeItemMpn(item);
+    if (!mpn) continue;
+    const reason = mpnsToCancel.get(mpn);
+    if (!reason) continue;
+    item.status = 'cancelled';
+    item.last_attempt = nowIso;
+    item.last_error = `cancelled: ${reason}`;
+    cancelled++;
+    perReason.set(reason, (perReason.get(reason) || 0) + 1);
+  }
+  return { cancelled, perReason };
+}
+
 module.exports = {
   enqueueRetry,
   listQueue,
@@ -355,4 +485,11 @@ module.exports = {
   withQueueLock,
   readQueueSafe,
   writeQueueAtomic,
+  // Cancellation manifests — for rejection / inactive handlers and the
+  // worker's per-tick cancel pass.
+  normalizeMpnForCancel,
+  decodeItemMpn,
+  loadCancelManifests,
+  applyCancelManifests,
+  DEFAULT_MANIFEST_DIRS,
 };

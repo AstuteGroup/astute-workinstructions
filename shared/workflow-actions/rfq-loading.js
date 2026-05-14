@@ -10,10 +10,44 @@
 
 'use strict';
 
+const { execFileSync } = require('child_process');
+const path = require('path');
+
 const { enqueue } = require('../rfq-load-queue');
 const largeRfqGate = require('../large-rfq-gate');
 const pending = require('../workflow-pending-state');
 const { makeApprovalActions } = require('./_approval');
+
+// On rejection: invoke cancel-rfq-queue-items.js so any items already in the
+// api retry queue for this RFQ's MPNs stop immediately. Without this hook,
+// rejecting only blocks NEW enrichment — items enqueued before the rejection
+// (often thousands, since rate-limit storms enqueue per-MPN) keep grinding
+// through their full attempt budget. Real incident: RFQ 1134261 rejected
+// 2026-05-13, 14,783 in-flight items kept retrying through 2026-05-14.
+//
+// The cancel script writes a {RFQ}.cancel-mpns.json manifest next to the
+// rejection sentinel AND does an immediate queue purge under the queue lock.
+// process-api-queue.js also reads the manifest each tick as a safety net.
+async function cancelRejectedRfqRetries(rfqNumber, ctx, { reason } = {}) {
+  const script = path.resolve(__dirname, '..', '..', 'scripts', 'cancel-rfq-queue-items.js');
+  const args = [script, String(rfqNumber)];
+  if (reason) args.push('--reason', reason);
+  try {
+    const out = execFileSync(process.execPath, args, {
+      encoding: 'utf-8',
+      stdio: ['ignore', 'pipe', 'pipe'],
+      timeout: 5 * 60 * 1000,
+    });
+    const cancelledLine = out.split('\n').find(l => /Cancelled \d+ pending items/.test(l));
+    const match = cancelledLine && cancelledLine.match(/Cancelled (\d+) pending items.*?: (\d+) → (\d+)/);
+    if (match) {
+      return { cancelled: Number(match[1]), pending_before: Number(match[2]), pending_after: Number(match[3]) };
+    }
+    return { ok: true, output_tail: out.slice(-400) };
+  } catch (err) {
+    return { error: err.message };
+  }
+}
 
 const { action_approve: action_approve_large_rfq, action_reject: action_reject_large_rfq } =
   makeApprovalActions(largeRfqGate, {
@@ -23,6 +57,7 @@ const { action_approve: action_approve_large_rfq, action_reject: action_reject_l
     downstreamLabel: 'enrich-poller',
     downstreamLeadTime: 'within 15 min',
     supportsCacheOnly: true,
+    onReject: cancelRejectedRfqRetries,
   });
 
 // ─── HANDLERS ────────────────────────────────────────────────────────────────
