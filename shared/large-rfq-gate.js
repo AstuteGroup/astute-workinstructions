@@ -470,6 +470,7 @@ function main() {
   large-rfq-gate.js list
   large-rfq-gate.js approve <RFQ#> [--max-lines N] [--note "..."] [--cache-only]
   large-rfq-gate.js reject  <RFQ#> [--reason "..."]
+  large-rfq-gate.js veto    <RFQ#> [--reason "..."]   # block enrichment regardless of size, no sentinel required
   large-rfq-gate.js status  <RFQ#>
   large-rfq-gate.js threshold     # print current threshold
 
@@ -535,6 +536,18 @@ Pending dir:   ${PENDING_DIR}`);
       rejectedBy: args.flags.by || process.env.USER || 'cli',
     });
     console.log(`rejected ${rfqNumber}`);
+    process.exit(0);
+  }
+
+  if (cmd === 'veto') {
+    // No sentinel required: this is for RFQs below the gate threshold that the
+    // operator still wants to keep out of enrichment (test stubs, junk loads,
+    // etc.). enrich-poller checks isRejected() unconditionally.
+    gate.markRejected(rfqNumber, {
+      reason: args.flags.reason || 'operator veto',
+      rejectedBy: args.flags.by || process.env.USER || 'cli',
+    });
+    console.log(`vetoed ${rfqNumber} (will be skipped by enrich-poller)`);
     process.exit(0);
   }
 

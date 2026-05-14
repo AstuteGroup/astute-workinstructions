@@ -741,11 +741,15 @@ async function main() {
   const filteredNew = [];
   for (const r of newRFQs) {
     const lineMpns = Number(r.line_mpns) || 0;
-    if (lineMpns <= gateThreshold) { filteredNew.push(r); continue; }
+    // Operator-veto check fires for any size. A `.rejected` file under the
+    // large-rfq-pending dir means "never enrich this RFQ" — equally valid for
+    // a 20-line test stub as for a 25k-line scrape. Without this, small RFQs
+    // had no way to be excluded once loaded (gap surfaced 2026-05-14).
     if (largeRfqGate.isRejected(r.rfq_number)) {
-      log(`Large-RFQ gate: ${r.rfq_number} previously rejected — skipping permanently.`);
+      log(`Enrich-veto: ${r.rfq_number} (${lineMpns} lines) marked rejected — skipping permanently.`);
       continue;
     }
+    if (lineMpns <= gateThreshold) { filteredNew.push(r); continue; }
     if (largeRfqGate.isCleared(r.rfq_number)) {
       // Approved + showed up in this tick's window — include directly.
       if (largeRfqGate.isProcessed(r.rfq_number)) continue;  // already done
