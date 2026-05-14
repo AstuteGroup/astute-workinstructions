@@ -1,0 +1,6 @@
+# Runtime IPC dirs — created by server.js, never committed
+inbox/
+outbox/
+
+# Local notes
+.scratch/

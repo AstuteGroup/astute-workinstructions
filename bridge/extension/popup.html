@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <style>
+    body {
+      width: 280px;
+      padding: 16px;
+      font-family: system-ui, sans-serif;
+      font-size: 13px;
+    }
+    h1 {
+      font-size: 16px;
+      margin: 0 0 12px 0;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .status {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 16px;
+      padding: 8px;
+      background: #f5f5f5;
+      border-radius: 4px;
+    }
+    .dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+    }
+    .dot.connected { background: #4CAF50; }
+    .dot.disconnected { background: #F44336; }
+    button {
+      width: 100%;
+      padding: 10px;
+      margin-bottom: 8px;
+      border: none;
+      border-radius: 4px;
+      background: #2196F3;
+      color: white;
+      cursor: pointer;
+      font-size: 13px;
+    }
+    button:hover { background: #1976D2; }
+    button:active { background: #0D47A1; }
+    .shortcuts {
+      margin-top: 16px;
+      padding-top: 12px;
+      border-top: 1px solid #eee;
+      font-size: 11px;
+      color: #666;
+    }
+    .shortcut {
+      display: flex;
+      justify-content: space-between;
+      margin-bottom: 4px;
+    }
+    kbd {
+      background: #eee;
+      padding: 2px 6px;
+      border-radius: 3px;
+      font-family: monospace;
+    }
+  </style>
+</head>
+<body>
+  <h1>
+    <span>Claude Bridge</span>
+  </h1>
+
+  <div class="status">
+    <div class="dot disconnected" id="statusDot"></div>
+    <span id="statusText">Checking connection...</span>
+  </div>
+
+  <button id="sendPage">Send Page Content</button>
+  <button id="sendSelection">Send Selection</button>
+
+  <div class="shortcuts">
+    <div class="shortcut">
+      <span>Send selection</span>
+      <kbd>Ctrl+Shift+S</kbd>
+    </div>
+    <div class="shortcut">
+      <span>Send page</span>
+      <kbd>Ctrl+Shift+P</kbd>
+    </div>
+  </div>
+
+  <script src="popup.js"></script>
+</body>
+</html>
