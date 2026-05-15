@@ -161,6 +161,31 @@ If a workflow ever has to ask the sender for missing details ("what RFQ type is 
 
 ---
 
+## Standard: recycle NeedsReview after every logic refinement
+
+`needs_review` is a one-way move — once a message lands in the needs-review folder, the agent's next tick won't re-process it (the poller's `list` reads only the source folder). That's correct behavior at first bounce, but stale once the logic that caused the bounce has been fixed.
+
+**Standard process: any time a workflow's prompt, helper, writer contract, or data file (mpn-prefixes.json, mfr-aliases.json, etc.) is refined, recycle the workflow's needs-review folder back to the source folder so the next cron tick gives bounced messages another shot.**
+
+```bash
+# Preview first
+node shared/recycle-needs-review.js --workflow <name> --dry-run
+
+# Move all unresolved needs-review messages back to the source folder + mark unseen
+node shared/recycle-needs-review.js --workflow <name>
+
+# Or scope to specific UIDs
+node shared/recycle-needs-review.js --workflow <name> --uids 2889,2891
+```
+
+The recycler reads the workflow module's `sourceFolder` and `actions.needs_review.folder`; it works for any workflow that follows the standard pattern.
+
+Genuinely-ambiguous cases (operator escalations, qty mismatches, fundamental data gaps) will bounce again — that's correct. Cases the new logic handles will load. The agent's idempotency pre-checks dedup re-processing of already-resolved messages, so it's safe to recycle indiscriminately.
+
+The rationale generalizes the [[feedback_exhaust_signals_pattern_generalizes]] discipline: "try harder before bouncing" applies in-tick; "retry after we've learned more" applies across ticks. Don't let stale bounces stay stuck because the fix was deployed five minutes too late.
+
+---
+
 ## How to add a new email-driven workflow
 
 1. **Copy `shared/workflow-actions/_template.js`** to `shared/workflow-actions/<name>.js`. Delete what doesn't apply; reply-stitching, large-payload gate, approval actions, and breadcrumb writes are pre-wired — keep only what your workflow needs.

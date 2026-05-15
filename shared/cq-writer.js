@@ -85,8 +85,17 @@ const SKIP = {
   DUP_EXISTING_CQ:   'DUP_EXISTING_CQ',
 };
 
-// Mandatory fields on every CQ line
-const MANDATORY_FIELDS = ['mpn', 'mfrText', 'qty', 'resale', 'leadTime'];
+// Mandatory fields on every CQ line.
+//
+// mfrText is INTENTIONALLY NOT mandatory: for stock RFQs in particular, the
+// operator's quote reply often omits MFR ("we have 6,500 pcs in HK at $0.21").
+// Bouncing a quote-back to manual review just because MFR is blank loses an
+// active demand signal for a recoverable problem — the MFR Reconciler cron
+// sweeps text-set FK-null rows nightly, and OT trading history (consulted via
+// resolveMfrForCQ's consultOTHistory path) recovers most MPNs we've traded.
+// What remains blank stays blank and is filled at order-processing time, which
+// is when MFR actually matters for the supplier pick.
+const MANDATORY_FIELDS = ['mpn', 'qty', 'resale', 'leadTime'];
 
 // ─── FIELD MAP ───────────────────────────────────────────────────────────────
 // Maps line input field name → API column name.
@@ -230,7 +239,11 @@ function resolveRFQLine(rfq, cpc, mpn) {
 async function resolveMfrForCQ(mfrText, mpn) {
   if (!mfrText && !mpn) return { id: null, canonical: null, flagReason: null, path: 'none' };
 
-  const mfrResult = resolveMfrForRow({ mfrText, mpn });
+  // consultOTHistory: when the source row has no MFR text, prefer the MFR our
+  // own OT trading history labels this MPN with (operator-vetted: sold CQs +
+  // purchased VQs are money-changed-hands) over a prefix guess that's subject
+  // to known overreach. See shared/mfr-from-ot-history.js.
+  const mfrResult = resolveMfrForRow({ mfrText, mpn, consultOTHistory: true });
 
   if (!mfrResult.matched) {
     return { id: null, canonical: mfrText || null, flagReason: FLAG.MFR_NO_MATCH, path: mfrResult.path };
@@ -356,10 +369,12 @@ async function writeCQBatch(rfqSearchKey, lines, opts = {}) {
     const cpc = line.cpc || '';
     const resale = line.resale;
 
-    // Validate mandatory fields
+    // Validate mandatory fields.
+    // NOTE: mfrText is INTENTIONALLY NOT checked here — see MANDATORY_FIELDS
+    // header comment. Writer infers MFR from OT history / prefix; what can't
+    // be inferred is written blank and reconciled downstream.
     const missing = [];
     if (!mpn) missing.push('mpn');
-    if (!line.mfrText) missing.push('mfrText');
     if (line.qty == null || line.qty <= 0) missing.push('qty');
     if (resale == null || resale <= 0) missing.push('resale');
     if (!line.leadTime) missing.push('leadTime');

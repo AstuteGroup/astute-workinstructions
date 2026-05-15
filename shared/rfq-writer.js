@@ -247,12 +247,20 @@ async function writeRFQ(opts) {
         // Omit button fields — API rejects string 'N' on button columns
       };
       // MFR resolution via the unified resolver: text path (Policy D #1) when
-      // line.mfrText is provided; MPN-prefix inference + acquisition map
-      // (Policy D #3) as fallback when text is empty. Only set Chuboe_MFR_ID
-      // for non-system records (system-level MFRs with AD_Client_ID=0 cause
-      // 500 errors via API).
+      // line.mfrText is provided; OT-history path (consultOTHistory: true)
+      // when we have a >=70% weighted majority MFR across CQ/VQ/offer history
+      // for this MPN — operator-vetted ground truth beats prefix guess for
+      // MPNs we have actually traded, and survives the prefix-resolver's known
+      // overreach (CY7C, ISO*, ISL*, XC*, BCM*); falls back to MPN-prefix +
+      // acquisition map when neither hits. Only set Chuboe_MFR_ID for non-
+      // system records (system-level MFRs with AD_Client_ID=0 cause 500
+      // errors via API).
       if (line.mfrText || mpnRaw) {
-        const mfrResult = resolveMfrForRow({ mfrText: line.mfrText, mpn: mpnRaw });
+        const mfrResult = resolveMfrForRow({
+          mfrText: line.mfrText,
+          mpn: mpnRaw,
+          consultOTHistory: true,
+        });
         if (mfrResult.canonical) {
           mpnPayload.Chuboe_MFR_Text = mfrResult.canonical;
         }

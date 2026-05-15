@@ -128,7 +128,11 @@ function applyAcquisition(mfrName) {
  *   `confidence` when the MPN path was used.
  */
 function resolveMfrForRow(opts = {}) {
-  const { mfrText, mpn, applyAcquisitionMap = true } = opts;
+  const {
+    mfrText, mpn,
+    applyAcquisitionMap = true,
+    consultOTHistory = false,
+  } = opts;
 
   // Path 1: text provided → mfr-lookup wins (Policy D #1: preserve source intent)
   //
@@ -150,6 +154,40 @@ function resolveMfrForRow(opts = {}) {
       confidence: result.matched ? 'high' : 'low',
       acquisitionApplied: false,
     };
+  }
+
+  // Path 1.5 (opt-in): consult OT trading history before prefix inference.
+  // Rationale: prefix-based inference has known overreach (ISO*, ISL*, XC*,
+  // BCM*, CY7C, etc.) and applies acquisitions blindly. OT history is operator-
+  // vetted ground truth for any MPN we have actually traded — sold CQs and
+  // purchased VQs are money-changed-hands signal. When OT consistently labels
+  // an MPN with one MFR (>=70% weighted majority across CQ/VQ/offer rows in
+  // last 2 years), prefer that over a prefix guess. Opt-in via consultOTHistory
+  // so existing callers that can't afford a DB hit per call (Vortex Matches,
+  // Market Offer Matching, etc.) aren't surprised.
+  if (consultOTHistory && mpn && String(mpn).trim()) {
+    let otHit = null;
+    try {
+      const { resolveMfrFromOTHistory } = require('./mfr-from-ot-history');
+      otHit = resolveMfrFromOTHistory(mpn);
+    } catch (e) {
+      if (e && e.code === 'PSQL_INFRA') throw e;
+      // any other failure: fall through to prefix path
+    }
+    if (otHit && otHit.mfr) {
+      const idLookup = lookupMfr(otHit.mfr);
+      return {
+        matched: true,
+        canonical: idLookup.canonical || otHit.mfr,
+        id: idLookup.id || null,
+        isSystem: !!idLookup.isSystem,
+        path: 'ot-history',
+        source: `ot-history-${otHit.confidence}`,
+        confidence: otHit.confidence,
+        otHistory: otHit,
+        acquisitionApplied: false,
+      };
+    }
   }
 
   // Path 2: no text but MPN provided → classify by prefix + optionally remap (Policy D #3)

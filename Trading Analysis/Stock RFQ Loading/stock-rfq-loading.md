@@ -77,7 +77,18 @@ For each unseen message, the agent picks **one** routing action. Order of checks
    - If no attachment yields lines, parse the body. Inline MPN+qty tables, prose lists ("we need 5k of X, 2k of Y"), NetComponents-formatted RFQ blocks all count.
    - Quantity normalization: strip `pcs`/`ea`/`units`; expand `5k` → `5000`. If a line has an MPN but no quantity, set qty = 0 (still load it as demand signal).
    - **Filter junk MPNs:** reject lines whose "MPN" cell is a URL fragment (`<HTTPS://...>`, `^WWW.`, anchor-tag fragments).
-   - If 0 valid lines → `needs_review` with reason `"no parseable lines"`.
+   - If 0 valid lines → **before** routing `needs_review`, run the OT token validator (see step 3.5 below).
+   
+3.5. **Token-validation fallback** (mandatory before `needs_review` for "no parseable lines"). Many forwarded broker emails put the MPN in the subject (Sourceability-style: `FW: 1553019`) — that's a real Phoenix Contact MPN with 1,800 pcs in our Austin stock, not a vendor-internal reference. Validate any ambiguous tokens in the subject + body via OT trading history:
+   ```js
+   const { extractCandidateTokens, validateCandidateMPN } =
+     require('../../shared/validate-mpn-from-ot');
+   const tokens = extractCandidateTokens(subject + ' ' + body);
+   const hits = tokens.map(t => ({ t, v: validateCandidateMPN(t) }))
+                      .filter(x => x.v.isMPN)
+                      .sort((a, b) => b.v.score - a.v.score);
+   ```
+   `confidence: 'high'` (score >=10) → load it as an RFQ line. `medium` (4-9) → load with notePrivate explaining inference. `low` (1-3) → include hits in needs_review payload as confirmation hint; do not auto-use. All 0 → genuinely no MPN; route `needs_review`.
 
 4. **MFR resolution (per line):** Use `shared/mfr-lookup.js` `lookupMfr(mfrText)` to get canonical name + chuboe_mfr_id. If unresolved, leave both blank — the server will accept and the MFR Reconciler cron will fill the FK overnight.
 

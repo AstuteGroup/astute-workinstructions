@@ -20,6 +20,7 @@
 
 const { writeRFQ } = require('../rfq-writer');
 const { writeCQBatch } = require('../cq-writer');
+const { patchRecord } = require('../record-updater');
 const breadcrumbs = require('../breadcrumbs');
 
 const UNQUALIFIED_BROKER_ID = 1006505;
@@ -232,6 +233,67 @@ async function action_add_cq_with_rfq(payload, ctx) {
 }
 
 /**
+ * Update an existing CQ row in place when the operator revises their quote
+ * on the same (RFQ_line, mpn, qty). Replaces the per-revision-needs-review
+ * bounce — the latest operator quote is the truth, OT shows current state.
+ *
+ * Required payload:
+ *   cqLineId       (the existing chuboe_cq_line.chuboe_cq_line_id)
+ *   newPrice       (number; the revised resale)
+ *
+ * Optional (any of these the operator now states differently from the existing row):
+ *   leadTime, dateCode, packaging, rohs, coo, moq, notePublic, mfrText
+ *   priorPrice     (for the audit notePrivate)
+ *   sourceUid, sourceMessageId
+ */
+async function action_update_cq(payload, ctx) {
+  const {
+    cqLineId, newPrice,
+    leadTime, dateCode, packaging, rohs, coo, moq, notePublic, mfrText,
+    priorPrice,
+    sourceUid, sourceMessageId,
+  } = payload;
+
+  const patch = { PriceEntered: newPrice };
+  if (leadTime)  patch.Chuboe_Lead_Time = leadTime;
+  if (dateCode)  patch.Chuboe_Date_Code = dateCode;
+  if (notePublic) patch.Chuboe_Note_Public = notePublic;
+
+  // Always append a revision breadcrumb to notePrivate so the trader sees it
+  const revisionNote = `Revised by stockrfq-cq-agent on ${new Date().toISOString().slice(0, 10)}` +
+    (priorPrice != null ? ` (was $${priorPrice}, now $${newPrice})` : ` (now $${newPrice})`);
+  patch.Chuboe_Note_Private = revisionNote;
+
+  if (ctx.dryRun) {
+    return { dry_run: true, would_patch: { cqLineId, patch } };
+  }
+
+  const result = await patchRecord('chuboe_cq_line', cqLineId, patch, {
+    source: `stockrfq-cq-agent:update_cq:uid=${ctx.uid}`,
+  });
+
+  breadcrumbs.write({
+    cog: 'stockrfq-cq-agent',
+    event: 'cq-updated',
+    uid: ctx.uid,
+    sourceUid: sourceUid || ctx.uid,
+    sourceMessageId: sourceMessageId || null,
+    cqLineId,
+    priorPrice: priorPrice != null ? priorPrice : null,
+    newPrice,
+    fieldsChanged: Object.keys(patch),
+    patchStatus: result.status,
+  });
+
+  return {
+    cqLineId,
+    patchStatus: result.status,
+    patched: result.patched || {},
+    error: result.error || null,
+  };
+}
+
+/**
  * Inquiry-only or no-quote-content reply. Silent move to CQ-Skipped.
  *
  * Required payload: { reason }
@@ -327,6 +389,11 @@ module.exports = {
       folder: 'CQ-Processed',
       requires: ['bpartnerId', 'customerName', 'lines'],
       handler: action_add_cq_with_rfq,
+    },
+    update_cq: {
+      folder: 'CQ-Processed',
+      requires: ['cqLineId', 'newPrice'],
+      handler: action_update_cq,
     },
     skip: {
       folder: 'CQ-Skipped',
