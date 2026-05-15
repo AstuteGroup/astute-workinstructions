@@ -111,8 +111,12 @@ SELECT
   lm.chuboe_mpn       AS asked_mpn,
   COALESCE(lm.chuboe_mpn_clean, lm.chuboe_mpn) AS asked_mpn_clean,
   COALESCE(lm.chuboe_mfr_text,'') AS asked_mfr,
-  COALESCE(lm.qty,0)  AS asked_qty
+  COALESCE(lm.qty,0)  AS asked_qty,
+  rl.chuboe_rfq_line_id AS rfq_line_id,
+  COALESCE(rl.chuboe_cpc,'') AS cpc,
+  COALESCE(rl.qty, 0) AS line_qty
 FROM adempiere.chuboe_rfq_line_mpn lm
+JOIN adempiere.chuboe_rfq_line      rl  ON rl.chuboe_rfq_line_id = lm.chuboe_rfq_line_id
 JOIN adempiere.chuboe_rfq           r   ON r.chuboe_rfq_id = lm.chuboe_rfq_id
 JOIN adempiere.c_bpartner           bp  ON bp.c_bpartner_id = r.c_bpartner_id
 LEFT JOIN adempiere.c_bp_group      grp ON grp.c_bp_group_id = bp.c_bp_group_id
@@ -120,6 +124,7 @@ LEFT JOIN adempiere.ad_user         sr  ON sr.ad_user_id = r.salesrep_id
 LEFT JOIN adempiere.chuboe_rfq_type rt  ON rt.chuboe_rfq_type_id = r.chuboe_rfq_type_id
 WHERE lm.isactive='Y'
   AND r.isactive='Y'
+  AND rl.isactive='Y'
   AND r.created >= NOW() - INTERVAL '12 months'
   AND UPPER(REGEXP_REPLACE(COALESCE(lm.chuboe_mpn_clean, lm.chuboe_mpn), '[\\s\\-_/\\\\.]', '', 'g'))
       IN (SELECT k FROM keys);
@@ -143,6 +148,9 @@ WHERE lm.isactive='Y'
         asked_mpn_clean: c[9],
         asked_mfr: c[10],
         asked_qty: Number(c[11]) || 0,
+        rfq_line_id: Number(c[12]),
+        cpc: c[13] || '',
+        line_qty: Number(c[14]) || 0,
       };
     });
     console.log(`  ${rows.length} hits`);
@@ -166,6 +174,9 @@ WHERE lm.isactive='Y'
     for (const c of cat) {
       hits.push({
         rfq_id: r.chuboe_rfq_id,
+        rfq_line_id: r.rfq_line_id,
+        cpc: r.cpc || '',
+        line_qty: r.line_qty || 0,
         rfq_number: r.rfq_number,
         rfq_date: r.rfq_date,
         customer_bp_id: r.customer_bp_id,
@@ -199,6 +210,9 @@ WHERE lm.isactive='Y'
     for (const c of cat) {
       hits.push({
         rfq_id: r.chuboe_rfq_id,
+        rfq_line_id: r.rfq_line_id,
+        cpc: r.cpc || '',
+        line_qty: r.line_qty || 0,
         rfq_number: r.rfq_number,
         rfq_date: r.rfq_date,
         customer_bp_id: r.customer_bp_id,
@@ -393,7 +407,91 @@ WHERE lm.isactive='Y'
       first_hit: c.first_hit, last_hit: c.last_hit,
     })).sort((a, b) => b.hit_lines - a.hit_lines);
 
-    return { detail, summary, by_competitor_brand, by_brand, by_mpn, rfqDetail, rfq_by_cst };
+    // by_cpc — collapse AVL alternates onto a single customer ask
+    // Bucket per (cpc, rfq_line_id). Each bucket = ONE customer ask. Then aggregate
+    // bucket-level totals (qty taken from rfq_line.qty, deduped per line).
+    const lineBucket = new Map(); // (cpc||rfq_line_id) -> bucket state
+    for (const h of rows) {
+      // CPCs can be empty — fall back to rfq_line_id so a line with no CPC still
+      // gets collapsed (and doesn't double-count across MPN variants).
+      const key = (h.cpc && h.cpc.trim()) ? `CPC:${h.cpc}` : `LINE:${h.rfq_line_id}`;
+      const lineKey = `${key}|${h.rfq_line_id}`;
+      if (!lineBucket.has(lineKey)) {
+        lineBucket.set(lineKey, {
+          cpc: h.cpc || '',
+          rfq_line_id: h.rfq_line_id,
+          rfq_id: h.rfq_id,
+          rfq_number: h.rfq_number,
+          rfq_date: h.rfq_date,
+          customer_name: h.customer_name,
+          seller_name: h.seller_name,
+          rfq_type: h.rfq_type,
+          // qty from the rfq_line (deduped per line — same regardless of MPN variant)
+          line_qty: h.line_qty || h.asked_qty || 0,
+          mpns: new Set(),
+          mfrs: new Set(),
+          competitor_brands: new Set(),
+          htc_mpns: new Set(),
+          match_grades: new Set(),
+        });
+      }
+      const b = lineBucket.get(lineKey);
+      if (h.asked_mpn) b.mpns.add(h.asked_mpn);
+      if (h.asked_mfr) b.mfrs.add(h.asked_mfr);
+      if (h.competitor_brand) b.competitor_brands.add(h.competitor_brand);
+      if (h.xref_htc_mpn) b.htc_mpns.add(h.xref_htc_mpn);
+      if (h.match_grade) b.match_grades.add(h.match_grade);
+    }
+
+    // Now aggregate buckets up to the CPC level
+    const cpcMap = new Map();
+    for (const b of lineBucket.values()) {
+      const key = b.cpc || `(no CPC, line ${b.rfq_line_id})`;
+      if (!cpcMap.has(key)) cpcMap.set(key, {
+        cpc: b.cpc,
+        rfq_line_count: 0,
+        _rfqs: new Set(),
+        _sellers: new Set(),
+        _types: new Set(),
+        _mpns: new Set(),
+        _mfrs: new Set(),
+        _competitor_brands: new Set(),
+        _htc_mpns: new Set(),
+        _match_grades: new Set(),
+        total_qty_asked: 0,
+        first_hit: b.rfq_date, last_hit: b.rfq_date,
+      });
+      const c = cpcMap.get(key);
+      c.rfq_line_count++;
+      c._rfqs.add(b.rfq_id);
+      c._sellers.add(b.seller_name);
+      c._types.add(b.rfq_type);
+      b.mpns.forEach(x => c._mpns.add(x));
+      b.mfrs.forEach(x => c._mfrs.add(x));
+      b.competitor_brands.forEach(x => c._competitor_brands.add(x));
+      b.htc_mpns.forEach(x => c._htc_mpns.add(x));
+      b.match_grades.forEach(x => c._match_grades.add(x));
+      c.total_qty_asked += Number(b.line_qty || 0);
+      if (b.rfq_date && b.rfq_date < c.first_hit) c.first_hit = b.rfq_date;
+      if (b.rfq_date && b.rfq_date > c.last_hit) c.last_hit = b.rfq_date;
+    }
+    const by_cpc = [...cpcMap.values()].map(c => ({
+      cpc: c.cpc || '(no CPC)',
+      rfq_lines: c.rfq_line_count,
+      rfqs: c._rfqs.size,
+      total_qty_asked: c.total_qty_asked,
+      distinct_mpn_variants: c._mpns.size,
+      mpn_variants_seen: [...c._mpns].join(' | '),
+      mfr_seen: [...c._mfrs].filter(Boolean).join(' | '),
+      competitor_brands: [...c._competitor_brands].filter(Boolean).join(' | '),
+      htc_replacements: [...c._htc_mpns].filter(Boolean).join(' | '),
+      match_grades: [...c._match_grades].filter(Boolean).join(' | '),
+      sellers: [...c._sellers].filter(Boolean).join(' | '),
+      rfq_types: [...c._types].filter(Boolean).join(' | '),
+      first_hit: c.first_hit, last_hit: c.last_hit,
+    })).sort((a, b) => b.rfq_lines - a.rfq_lines);
+
+    return { detail, summary, by_competitor_brand, by_brand, by_mpn, rfqDetail, rfq_by_cst, by_cpc };
   }
 
   const full = buildOutputs(hits, 'all');
@@ -425,7 +523,7 @@ WHERE lm.isactive='Y'
     full.rfq_by_cst);
 
   // ─── WRITE XLSX (full + JCI) ────────────────────────────────────────────────
-  function makeWorkbook(set, label) {
+  function makeWorkbook(set, label, opts = {}) {
     const wb = XLSX.utils.book_new();
 
     function addSheet(name, rows, header, formats) {
@@ -462,6 +560,11 @@ WHERE lm.isactive='Y'
     addSheet('Summary', set.summary,
       ['customer_name','bp_group','seller_name','rfq_type','hit_lines','rfqs','distinct_competitor_brands','total_qty_asked','first_hit','last_hit'],
       { total_qty_asked: '#,##0' });
+    if (opts.includeCpc) {
+      addSheet('By CPC', set.by_cpc,
+        ['cpc','rfq_lines','rfqs','total_qty_asked','distinct_mpn_variants','mpn_variants_seen','mfr_seen','competitor_brands','htc_replacements','match_grades','sellers','rfq_types','first_hit','last_hit'],
+        { total_qty_asked: '#,##0' });
+    }
     addSheet('By Competitor Brand', set.by_competitor_brand,
       ['competitor_brand','hit_lines','rfqs','customers','distinct_mpns_asked']);
     addSheet('By HTC Brand', set.by_brand,
@@ -481,7 +584,7 @@ WHERE lm.isactive='Y'
   XLSX.writeFile(fullWb, path.join(ROOT, 'HTC_RFQ_Cross_Reference_12mo.xlsx'));
   console.log(`Wrote HTC_RFQ_Cross_Reference_12mo.xlsx (${full.detail.length} detail rows)`);
 
-  const jciWb = makeWorkbook(jci, 'jci');
+  const jciWb = makeWorkbook(jci, 'jci', { includeCpc: true });
   XLSX.writeFile(jciWb, path.join(ROOT, 'HTC_RFQ_Cross_Reference_12mo_JCI.xlsx'));
   console.log(`Wrote HTC_RFQ_Cross_Reference_12mo_JCI.xlsx (${jci.detail.length} detail rows)`);
 

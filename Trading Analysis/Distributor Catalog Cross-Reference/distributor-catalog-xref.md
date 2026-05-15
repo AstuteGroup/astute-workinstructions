@@ -75,6 +75,10 @@ Outputs (mirroring the ATGBICS shape):
 
 If the operator wants a specific customer in its own file (e.g., "JCI separated" for HTC), filter `hits` by `customer_name.includes('<key>')` and rebuild the same workbook with `_<CUSTNAME>` suffix. Both files share the same aggregation logic so totals match. See `buildOutputs()` in `build-xref.js`.
 
+**The customer-specific workbook gets a `By CPC` tab** (passed via `makeWorkbook(set, label, { includeCpc: true })`). The full cross-customer workbook does NOT — CPCs are per-customer codes so the rollup is only meaningful per customer.
+
+**Why the CPC tab matters:** customers send AVL alternates against a single CPC (e.g., JCI's CPC `0246563` lists 5 different MFR P/Ns — LM317T variants from TI + ON Semi — but it's ONE customer ask). MPN-level rollups multiply that by the AVL count; the CPC tab collapses it back. On HTC/JCI: 508 MPN-level hits → 107 CPC-level asks (~4.7× compression).
+
 ### Step 6 — Email the deliverable
 
 `send-results.js` sends the workbooks to the operator with an HTML body containing the headline brand table and any customer-split summary. Defaults to `jake.harris@astutegroup.com` (per memory: do not send to the harness userEmail). Adapt the inline HTML for each new distributor.
