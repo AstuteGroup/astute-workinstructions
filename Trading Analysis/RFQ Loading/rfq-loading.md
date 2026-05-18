@@ -112,7 +112,14 @@ const result = resolvePartner({
 
 Contact person (`Chuboe_User_ID`) is **required on ALL RFQs** — both Stock and General Customer. It maps to `Chuboe_User_ID` on the RFQ header. The `rfq-writer.js` module enforces this and will throw an error if `userId` is not provided.
 
-### Resolution Order
+There are TWO contacts to resolve, and they're often different people:
+
+| Field | Who | Default | Notes |
+|---|---|---|---|
+| `userId` (`Chuboe_User_ID`) | The **customer contact** — person at the customer BP who owns this RFQ on their side | — (required, no default) | Resolve via the customer-side ladder below |
+| `salesrepId` (`SalesRep_ID`) | The **Astute operator-on-record** — internal owner | 1000004 (Jake) | Resolve via the Astute-side ladder ("Astute Operator Resolution") |
+
+### Customer-side ladder (sets `userId`)
 
 1. **Email sender:** Extract sender email address from the email
 2. **Forwarded email (General RFQ):** Extract the original sender's email from forwarded message headers
@@ -129,6 +136,20 @@ Contact person (`Chuboe_User_ID`) is **required on ALL RFQs** — both Stock and
 6. **No match → PROMPT USER:** Do not proceed without a contact. Present: "Contact [name/email] not found under [Customer]. Please provide the correct contact ID or confirm if we should create a new one." *(Contact creation = future workflow — see Roadmap)*
 
 > **Important:** This applies to Stock RFQs too. If the sender email doesn't resolve to an `ad_user` under the matched BP (or under Unqualified Broker 1008499), prompt the user before writing.
+
+### Astute Operator Resolution (sets `salesrepId`)
+
+Support staff (assistants, ops people) increasingly forward customer RFQs on behalf of the sales rep who owns the account. The outer `From:` is the support person; the real operator is one hop deeper in the quoted chain. Resolve in this order, first match wins:
+
+- **Tier A — Internal forward chain (primary signal).** If the **outer `From:`** is `@astutegroup.com` AND there is a **deeper `@astutegroup.com` `From:`** in the quoted block, the **outer is the forwarder** and the **deeper one is the operator-on-record**. Resolve the deeper email via `resolveAstuteUserByEmail(deeperEmail)` from `shared/partner-lookup.js` and pass the result as `salesrepId`. This is the dead giveaway pattern; it does not require any explicit text hint.
+- **Tier B — Explicit text hint (fallback).** If Tier A doesn't fire, scan the forwarder's note + signature block + subject for explicit owner hints like `on behalf of <Name>`, `for <Name>`, `assigned to <Name>`, `salesrep: <Name>`. If found, call `resolveAstuteUserByName(name)`:
+  - `unambiguous: true` → pass that `userId` as `salesrepId`.
+  - `ambiguous: true` → escalate via `need_info` with the candidate list rather than guessing.
+  - `null` → fall through to Tier C.
+- **Tier C — Outer forwarder.** If the outer `From:` is `@astutegroup.com` and Tier A didn't fire (no deeper internal sender), resolve the outer via `resolveAstuteUserByEmail(outerEmail)`. This is the standard direct-from-rep pattern.
+- **Tier D — Default (last resort).** No internal sender anywhere → omit `salesrepId` from the payload. The handler defaults to Jake (1000004).
+
+**Don't conflate the two ladders.** `userId` is on the CUSTOMER side (their contact); `salesrepId` is on the ASTUTE side (our operator). A typical forwarded RFQ has the customer contact buried in the quoted block AND a separate Astute forward chain on top of it — both need separate resolution.
 
 ---
 

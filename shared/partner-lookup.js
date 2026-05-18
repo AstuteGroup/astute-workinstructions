@@ -455,6 +455,95 @@ function resolvePartner({ email, companyName, partnerType = 'any' } = {}) {
   };
 }
 
+// ─── ASTUTE EMPLOYEE LOOKUP (forwarder-vs-owner resolution) ─────────────────
+
+/**
+ * Resolve an Astute employee's AD_User_ID from an email address.
+ *
+ * Primary use: the "internal-forward-chain" rule in the email-driven loaders.
+ * When a support staffer forwards on behalf of a buyer/seller — e.g.,
+ * Gopal → Stephanie → loader, both @astutegroup.com — the loader resolves the
+ * DEEPER @astutegroup.com sender (the operator on record) into an AD_User_ID
+ * so RFQ.SalesRep_ID / VQ.chuboe_buyer_id can be stamped correctly instead
+ * of defaulting to the outer forwarder or to Jake.
+ *
+ * Filters: active user, active BP, IsEmployee='Y' (defends against the
+ * 2026-05-07 employee-BP misattribution incident the opposite way — here we
+ * REQUIRE employee, since the goal is Astute-internal ownership).
+ *
+ * @param {string} email - e.g. "stephanie.hill@astutegroup.com"
+ * @returns {object|null} { userId, name, email } or null
+ */
+function resolveAstuteUserByEmail(email) {
+  if (!email) return null;
+  const cleanEmail = email.toLowerCase().trim().replace(/'/g, "''");
+
+  const sql = `
+    SELECT u.ad_user_id, u.name, u.email
+    FROM adempiere.ad_user u
+    JOIN adempiere.c_bpartner bp ON u.c_bpartner_id = bp.c_bpartner_id
+    WHERE LOWER(u.email) = '${cleanEmail}'
+      AND u.isactive = 'Y'
+      AND bp.isactive = 'Y'
+      AND bp.isemployee = 'Y'
+    ORDER BY u.created DESC
+    LIMIT 1
+  `;
+  const rows = parseResults(psqlQuery(sql), ['userId', 'name', 'email']);
+  if (rows.length === 0) return null;
+  const r = rows[0];
+  return { userId: Number(r.userId), name: r.name, email: r.email };
+}
+
+/**
+ * Resolve an Astute employee's AD_User_ID from a name string.
+ *
+ * Secondary path for the forwarder-vs-owner pattern: used when the email
+ * chain doesn't reveal the owner internally (e.g., support staff forwards
+ * from a personal account, or the body contains an explicit hint like
+ * "on behalf of Stephanie Hill" / "sourced by Gopal"). Fuzzy-matches on
+ * ad_user.name with the same active+IsEmployee guard as
+ * resolveAstuteUserByEmail.
+ *
+ * Returns null on no match. Returns ALL candidates if ambiguous (caller
+ * decides: the agent should escalate to needs_review rather than pick
+ * one). Returns a single result with `.unambiguous: true` when only one
+ * candidate matches — that's the case the loaders can act on
+ * autonomously.
+ *
+ * @param {string} name - e.g. "Stephanie Hill", "Gopal", "Tracy"
+ * @returns {object|null} { userId, name, email, unambiguous } or
+ *                       { candidates: [...], ambiguous: true } or null
+ */
+function resolveAstuteUserByName(name) {
+  if (!name || typeof name !== 'string') return null;
+  const trimmed = name.trim();
+  if (trimmed.length < 2) return null;
+  const clean = trimmed.replace(/'/g, "''");
+
+  const sql = `
+    SELECT u.ad_user_id, u.name, u.email
+    FROM adempiere.ad_user u
+    JOIN adempiere.c_bpartner bp ON u.c_bpartner_id = bp.c_bpartner_id
+    WHERE u.name ILIKE '%${clean}%'
+      AND u.isactive = 'Y'
+      AND bp.isactive = 'Y'
+      AND bp.isemployee = 'Y'
+    ORDER BY u.created DESC
+    LIMIT 5
+  `;
+  const rows = parseResults(psqlQuery(sql), ['userId', 'name', 'email']);
+  if (rows.length === 0) return null;
+  if (rows.length === 1) {
+    const r = rows[0];
+    return { userId: Number(r.userId), name: r.name, email: r.email, unambiguous: true };
+  }
+  return {
+    ambiguous: true,
+    candidates: rows.map(r => ({ userId: Number(r.userId), name: r.name, email: r.email })),
+  };
+}
+
 // ─── EXPORTS ────────────────────────────────────────────────────────────────
 
 module.exports = {
@@ -467,6 +556,10 @@ module.exports = {
   lookupByDomainHint,
   lookupByName,
   lookupById,
+
+  // Astute-employee resolution (forwarder-vs-owner pattern)
+  resolveAstuteUserByEmail,
+  resolveAstuteUserByName,
 
   // Utilities
   extractDomainHints,

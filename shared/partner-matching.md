@@ -96,7 +96,7 @@ Every tier appends an employee-exclusion clause regardless of `partnerType` (see
 | `'customer'` | `AND bp.iscustomer = 'Y' AND COALESCE(bp.isemployee,'N') != 'Y'` | Stock RFQ Loading, customer-specific lookups |
 | `'any'` | `AND COALESCE(bp.isemployee,'N') != 'Y'` | Market Offer Loading (vendor or customer offers) |
 
-**Stock RFQ Loading uses `'customer'`**, not `'any'` (tightened 2026-05-07) — incoming senders are customers/brokers, never vendors. Using `'any'` allowed stray vendor-only BPs to match customer emails.
+**Stock RFQ Loading uses `'any'`** (broadened 2026-05-18, superseding the 2026-05-07 `'customer'` tightening) — broker counterparties are commonly vendor-only BPs in OT (we've bought from them but they're not promoted customers). Restricting to `IsCustomer='Y'` falsely routed legitimate broker BPs to the Unqualified Broker catch-all; confirmed misroutes 2026-05-11 (Stack Electronics BP 1003267, SUNCODE Electronics BP 1005501). The `IsEmployee='Y'` exclusion (the load-bearing part of the 5/7 fix) stays — that's what defends against the 2026-05-06 employee-BP misattributions. Other inbound loaders (Customer Excess, VQ Loading) keep their own scope choices; this paragraph applies to Stock RFQ specifically.
 
 ---
 
@@ -111,6 +111,39 @@ Every tier appends an employee-exclusion clause regardless of `partnerType` (see
 The fix is in `partnerTypeFilter()` (covers all tiers) plus `lookupById()` (USE-redirect targets).
 
 **Edge case:** if an employee BP genuinely is the right answer for a transaction (employee buys parts through their own BP record), the operator must set the BP explicitly — the automated matcher will never return one. This is by design: silent misattribution is worse than visible "no match → Unqualified Broker" fallback.
+
+---
+
+## Astute Employee Resolution (forwarder vs. operator-on-record)
+
+`resolvePartner` resolves the EXTERNAL counterparty (customer / broker / supplier BP). A separate pair of helpers resolves INTERNAL Astute employees — used by every email-driven loader to figure out whose `AD_User_ID` to stamp on `SalesRep_ID` / `chuboe_buyer_id` / `AD_User_ID` when an email passes through multiple hands before reaching the loader.
+
+```js
+const { resolveAstuteUserByEmail, resolveAstuteUserByName } = require('./partner-lookup');
+
+resolveAstuteUserByEmail('stephanie.hill@astutegroup.com');
+// → { userId: 1009138, name: 'Stephanie Hill', email: 'stephanie.hill@astutegroup.com' } or null
+
+resolveAstuteUserByName('Stephanie');
+// → { userId, name, email, unambiguous: true }  — single match
+// → { ambiguous: true, candidates: [...] }       — multiple matches
+// → null                                          — no match
+```
+
+Both filter to active + `IsEmployee='Y'` on the joined `c_bpartner`. The IsEmployee filter is REQUIRED here (opposite of the external-BP path, where it's an exclusion).
+
+**The forwarder-vs-owner pattern** (codified in every email-driven loader's `.md`):
+
+Support staff (assistants, ops people) increasingly forward broker/customer emails on behalf of the buyer/seller they support. The outer `From:` is the support person; the real operator is one hop deeper in the quoted chain. Resolve in this order, first match wins:
+
+- **Tier A — Internal forward chain (primary).** Outer `From:` is `@astutegroup.com` AND a deeper `@astutegroup.com` `From:` exists in the quoted block → the DEEPER one is the operator. Resolve via `resolveAstuteUserByEmail`. No text hint required.
+- **Tier B — Explicit text hint (fallback).** Forwarder note / signature / subject contains `on behalf of <Name>` / `sourced by <Name>` / `buyer: <Name>`. Resolve via `resolveAstuteUserByName`. Ambiguous matches escalate to needs-review, not a guess.
+- **Tier C — Outer forwarder.** Outer is `@astutegroup.com` with no deeper internal sender → use the outer email.
+- **Tier D — Default.** No internal sender anywhere → omit the field; handler defaults (typically Jake 1000004).
+
+Per-loader sections that implement this pattern: `Trading Analysis/Stock RFQ Loading/stock-rfq-loading.md` § Step 2.5, `Trading Analysis/RFQ Loading/rfq-loading.md` § Astute Operator Resolution, `Trading Analysis/RFQ Sourcing/vq_loading/vq-loading.md` § Buyer Field + `agent-prompt.txt` § 3.5.
+
+**Excess / Market Offer is the exception.** `chuboe_offer` has no internal-owner column today — the field doesn't exist to populate. Adding one is parked in `deferred-work.md` for schema discussion.
 
 ---
 

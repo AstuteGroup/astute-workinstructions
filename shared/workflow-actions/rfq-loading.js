@@ -67,19 +67,28 @@ const { action_approve: action_approve_large_rfq, action_reject: action_reject_l
  * fast-loader daemon within 5 min).
  *
  * Required payload: { bpartnerId, type, userId, lines[] }
- * Optional: { description }
+ * Optional: { description, salesrepId }
+ *
+ * `userId` is the contact on the RFQ header (the operator-on-record for this
+ * RFQ). The agent resolves it per rfq-loading.md Step 7 — including the
+ * internal-forward-chain check that demotes support-staff forwarders in
+ * favor of the deeper Astute sender they're forwarding on behalf of.
+ *
+ * `salesrepId` is optional and defaults to 1000004 (Jake) when omitted —
+ * pass it to override when a support staffer forwards on behalf of the
+ * actual sales rep (see Step 7).
  */
 async function action_enqueue(payload, ctx) {
-  const { bpartnerId, type, userId, description, lines } = payload;
+  const { bpartnerId, type, userId, salesrepId, description, lines } = payload;
   if (ctx.dryRun) {
     return {
       dry_run: true,
-      would_enqueue: { bpartnerId, type, userId, lineCount: lines.length },
+      would_enqueue: { bpartnerId, type, userId, salesrepId: salesrepId || 1000004, lineCount: lines.length },
     };
   }
   const job_id = enqueue({
     bpartnerId, type, userId, description,
-    salesrepId: 1000004,
+    salesrepId: salesrepId || 1000004,
     lines,
   });
   return { job_id };

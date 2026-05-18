@@ -137,21 +137,36 @@ Use the Read tool on:
 3.5 — TYPE CLASSIFICATION + Buyer resolution.
 ────────────────────────────────────────────
 
-Decide Type 1 vs Type 2:
+Decide Type 1 vs Type 2 (affects vendor resolution + line count expectations):
 
   - **Type 1** (Direct broker quote): single vendor's email forwarded once by an Astute employee. Structure: `From: external broker → Astute employee → vq@`. Records: typically 1-3 lines.
-    * Buyer = the Astute employee who forwarded to vq@ (outer From).
     * Vendor = the external sender (the broker).
 
   - **Type 2** (Bulk sourcing summary): an Astute employee consolidated multiple broker quotes into one email, often forwarded internally before reaching vq@. Structure: `From: Feong → Leonard → Jake → vq@` with multiple broker names in the body.
-    * Buyer = the Astute employee who COMPILED the summary (e.g., Feong), NOT the forwarder.
     * Vendors = the broker names inside the body (resolve each via fuzzy name match, not email).
     * Records: 5-20+ per email. 1132932 is the canonical example.
     * Detection signals: multiple vendor names in quick succession, informal notation (`Broker :Poplar :`, `13.8usd`, `25+`, `ex hk`), internal→internal forwarding.
 
-Look up the Buyer's AD_User_ID via psql:
-  SELECT u.ad_user_id, u.name FROM adempiere.ad_user u
-  WHERE LOWER(u.email) = LOWER('<buyer email>') AND u.isactive='Y';
+Buyer resolution (the operator-on-record who DID the sourcing — NOT necessarily the outer forwarder). Run these tiers in order, first match wins:
+
+  - **Tier A — Internal forward chain (primary signal).** If the OUTER From: is `@astutegroup.com` AND there is a DEEPER `@astutegroup.com` From: in the quoted block, the outer is just a forwarder (support staff, intermediary) and the DEEPER one is the buyer. Resolve via:
+        const { resolveAstuteUserByEmail } = require('/home/analytics_user/workspace/astute-workinstructions/shared/partner-lookup');
+        const owner = resolveAstuteUserByEmail(deepestInternalEmail);  // returns {userId, name, email} or null
+    Use `owner.userId` as the buyerId. This catches BOTH the Type 2 chain (Feong → Leonard → Jake → vq@ picks Feong) AND the support-staff-on-behalf-of pattern (broker → Stephanie → Gopal-assistant → vq@ picks Stephanie). It supersedes the Type 1 default.
+
+  - **Tier B — Explicit text hint (fallback).** If Tier A doesn't fire, scan the forwarder's note + signature + subject for hints like `sourced by <Name>`, `on behalf of <Name>`, `buyer: <Name>`. If found:
+        const { resolveAstuteUserByName } = require('.../shared/partner-lookup');
+        const r = resolveAstuteUserByName(name);  // {userId, ..., unambiguous:true} or {ambiguous:true, candidates:[...]} or null
+    - `unambiguous: true` → use `r.userId`.
+    - `ambiguous: true` → route `need_info_vendor` with the candidate list (do NOT guess).
+    - `null` → fall through to Tier C.
+
+  - **Tier C — Type-default fallback.**
+    * **Type 1** → buyer = outer From: (the forwarder is the buyer when there's only one Astute hop).
+    * **Type 2** → buyer = the compiler. On a clean Type 2 chain Tier A would have already picked them, so this branch is rare (the compiler arrived without any intermediate forwarding).
+    Resolve the chosen email via `resolveAstuteUserByEmail` to get the AD_User_ID.
+
+  - **Tier D — Default.** No internal sender anywhere → omit `buyerId` from the payload. The handler defaults to Jake (1000004).
 
 Common buyers (cached for speed but always verify):
   - Jake Harris: 1000004

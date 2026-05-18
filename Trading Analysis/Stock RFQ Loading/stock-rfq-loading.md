@@ -26,7 +26,7 @@ Before you fall back to Unqualified Broker or call `needs_review`, re-read the e
 - Is the customer named in an **attachment filename**? (e.g., `Microsemi_RFQ_2026-04.xlsx`)
 - Did I dismiss **plain-prose line listings** (MPN + qty mentions in narrative) because they weren't a structured table?
 
-If yes to any of these, try the obvious thing — `resolvePartner({ companyName: '<name>', partnerType: 'customer' })` or extract the prose lines — before settling for the fallback.
+If yes to any of these, try the obvious thing — `resolvePartner({ companyName: '<name>', partnerType: 'any' })` or extract the prose lines — before settling for the fallback.
 
 ### CLI primitives
 
@@ -60,7 +60,8 @@ For each unseen message, the agent picks **one** routing action. Order of checks
    - Subject is news/marketing (no MPNs in body, just headlines or promo language)
    - Body has zero extractable MPN+qty pairs
 
-2. **Customer resolution** — try in order, first match wins. Use `shared/partner-lookup.js` `resolvePartner({email, companyName, partnerType: 'customer'})` (the `'customer'` filter + the IsEmployee filter inside the resolver are the fix for the 2026-05-07 wrong-BP incident — do not weaken).
+2. **Customer resolution** — try in order, first match wins. Use `shared/partner-lookup.js` `resolvePartner({email, companyName, partnerType: 'any'})`.
+   - **Scope is `'any'`, not `'customer'`** — Stock RFQ is broker-to-broker. Most counterparties exist in OT as **vendors only** (we've bought from them) and haven't been promoted to customers. Restricting to `IsCustomer='Y'` falsely routes legitimate broker BPs to the Unqualified Broker catch-all. Confirmed misroutes 2026-05-11 (Stack Electronics BP 1003267, SUNCODE Electronics BP 1005501) — both `IsVendor='Y'` only. The resolver still excludes `IsEmployee='Y'` (the load-bearing part of the 2026-05-07 fix) — do not weaken that.
    - **Direct send:** outer From is not `@astutegroup.com` → use that address as the lookup key.
    - **Forwarded send (`FW:` / `Fwd:`):** parse `From:` lines in the body. Walk all of them and pick the first **non-`@astutegroup.com`** sender (skip employees who forwarded the email to us). For NetComponents-style envelopes (`From: Real Sender [real@addr] <messagesend@netcomponents.com>`), use the bracketed address.
    - **Match found** → `bpartnerId = result.c_bpartner_id`; also pass `customerName = result.name` in the payload so the header description and `BPName` are populated for at-a-glance recognition in OT.
@@ -70,6 +71,41 @@ For each unseen message, the agent picks **one** routing action. Order of checks
      3. The sender's domain stem (e.g. `daisy@igzrc.cn` → `igzrc.cn`)
      4. `Unknown sender` only when nothing above is parseable
    - **`customerName` is required on every `load_rfq` call** (matched and unmatched). The handler uses it for the RFQ header `Description` (`<customerName> — Stock RFQ`) and the header `BPName`. On the Unqualified Broker path it ALSO prepends `customerName` to each line description (matched-BP path skips the line-level prepend — the FK already identifies the customer). The Unqualified Broker fallback is **the default behavior, not an error** — every RFQ with a part number is signal worth capturing.
+
+2.5. **Internal Astute owner resolution (forwarder vs. operator-on-record)** — figures out whose `AD_User_ID` to stamp on `SalesRep_ID` + `AD_User_ID`. Defaults to Jake (1000004) when no signal is present.
+
+   Support staff (assistants, ops people) increasingly forward broker emails on behalf of the buyer/seller they support. The outer `From:` is the support person; the real operator is one hop deeper in the quoted chain. Resolve in this order, first match wins:
+
+   - **Tier A — Internal forward chain (primary signal).** If the **outer `From:`** is `@astutegroup.com` AND there is a **deeper `@astutegroup.com` `From:`** in the quoted block, the **outer is the forwarder** and the **deeper one is the operator-on-record**. Resolve the deeper email via `resolveAstuteUserByEmail(deeperEmail)` from `shared/partner-lookup.js` and pass the result as both `salesrepId` and `userId` in the `load_rfq` payload. This is the dead giveaway pattern; it does not require any explicit text hint.
+   - **Tier B — Explicit text hint (fallback).** If Tier A doesn't fire, scan the forwarder's note + signature block + subject for explicit owner hints like `on behalf of <Name>`, `for <Name>`, `sourced by <Name>`, `buyer: <Name>`, `assigned to <Name>`. If found, call `resolveAstuteUserByName(name)`:
+     - `unambiguous: true` → pass that `userId` as both `salesrepId` and `userId`.
+     - `ambiguous: true` → the agent picks the candidate whose email matches a `@astutegroup.com` sender anywhere in the quoted chain; otherwise route `needs_review` with the candidate list rather than guessing.
+     - `null` → fall through to Tier C.
+   - **Tier C — Outer forwarder.** If the outer `From:` is `@astutegroup.com` and Tier A didn't fire (no deeper internal sender), resolve the outer via `resolveAstuteUserByEmail(outerEmail)`. This is the standard direct-from-buyer pattern.
+   - **Tier D — Default (last resort).** No internal sender anywhere → omit `salesrepId` / `userId` from the payload. The handler defaults to Jake (1000004). This is the broker-direct-to-Astute case.
+
+   ```js
+   const { resolveAstuteUserByEmail, resolveAstuteUserByName } = require('../../shared/partner-lookup');
+   // Tier A
+   if (outerFromIsAstute && deeperAstuteEmail) {
+     const owner = resolveAstuteUserByEmail(deeperAstuteEmail);
+     if (owner) payload.salesrepId = payload.userId = owner.userId;
+   }
+   // Tier B (only if Tier A didn't resolve)
+   else if (textHintName) {
+     const r = resolveAstuteUserByName(textHintName);
+     if (r && r.unambiguous) payload.salesrepId = payload.userId = r.userId;
+     // ambiguous → needs_review
+   }
+   // Tier C (only if Tier A + B didn't resolve)
+   else if (outerFromIsAstute) {
+     const owner = resolveAstuteUserByEmail(outerEmail);
+     if (owner) payload.salesrepId = payload.userId = owner.userId;
+   }
+   // Tier D — omit; handler defaults to 1000004
+   ```
+
+   **Don't infer ownership from the customer-side `From:`** — the broker's email is not an Astute employee. Customer resolution (Step 2) and owner resolution (this step) are independent; one is the external counterparty, the other is the internal operator.
 
 3. **Line extraction:**
    - Run `download-attachments` if `has_attachment` is true. xlsx > csv > pdf preferred.
@@ -123,8 +159,9 @@ For each unseen message, the agent picks **one** routing action. Order of checks
 
    Note: time stored in `chuboe_rfq.created` is Chicago time digits even though the PG session is UTC. Cast `AT TIME ZONE 'America/Chicago'` before comparison. See `shared/data-model.md` and memory `project_chuboe_created_cdt_storage.md`.
 
-5. **Write to OT** → `load_rfq` with payload `{ bpartnerId, type: 'Stock', lines, customerName, messageId, senderEmail, senderDomain, brokerMessageId }`.
+5. **Write to OT** → `load_rfq` with payload `{ bpartnerId, type: 'Stock', lines, customerName, salesrepId?, userId?, messageId, senderEmail, senderDomain, brokerMessageId }`.
    - `customerName` is required on every call — see Step 2 for how to source it. The handler uses it for `Description = "<customerName> — Stock RFQ"` and `BPName`.
+   - **`salesrepId` + `userId` (optional but encouraged):** the operator-on-record's `AD_User_ID` — see Step 2.5 for resolution. Omit both to accept the handler default (Jake 1000004); pass to override when a support staffer forwards on behalf of the actual buyer.
    - `messageId` is the email's RFC822 Message-ID from the `read` command's `message_id` field (the Outlook-server-generated MID assigned at auto-forward time). Always pass it through.
    - **`senderEmail` (required when known):** the deepest-quoted broker `From:` address (e.g., `iris@liyijing.com.cn`) — you ALREADY parse this for the customer-resolver step. Pass it through so the outbound CQ agent can disambiguate same-MPN/qty candidates from different brokers without re-reading source UIDs in IMAP. The handler stores it (lowercased) on the breadcrumb.
    - **`senderDomain` (optional):** if you've already extracted just the domain portion, pass it. Otherwise the handler derives it from `senderEmail`.
@@ -218,7 +255,9 @@ On-demand invocation (operator asks "process stockrfq inbox") works identically 
 
 ### Key shared modules (tools the agent calls in-session)
 
-- `shared/partner-lookup.js` — `resolvePartner({email, companyName, partnerType: 'customer'})`. The IsEmployee filter is built in (committed 2026-05-07 — do not bypass).
+- `shared/partner-lookup.js` —
+  - `resolvePartner({email, companyName, partnerType: 'any'})` for **external** customer/vendor BP resolution (Step 2). IsEmployee filter is built in (committed 2026-05-07 — do not bypass). Scope is `'any'`, not `'customer'`, because broker counterparties are often vendor-only.
+  - `resolveAstuteUserByEmail(email)` / `resolveAstuteUserByName(name)` for **internal** owner resolution (Step 2.5 — forwarder vs. operator-on-record).
 - `shared/mfr-lookup.js` — `lookupMfr(mfrText)` returns `{ canonical, id }`.
 - `shared/data-model.md` — schema reference for `chuboe_rfq` chain. Read before constructing the `lines[]` payload.
 - `shared/api-writeback.md` § RFQ — REST payload structure for `writeRFQ` (the handler does this; the agent supplies the line shape).

@@ -115,13 +115,22 @@ Extract ALL available fields from each quote. Required fields must be present; o
 | **Forwarder Email** | `forwarder_email` | Yes | Email of Astute employee who forwarded to vq@ (e.g., jake.harris@astutegroup.com) |
 
 **CRITICAL - Buyer Field:**
-- The Buyer is the **Astute employee who did the sourcing work**, NOT the customer contact from the RFQ
-- **Type 1 (Direct broker quote):** Use the outer `From:` field (who forwarded to vq@)
-- **Type 2 (Bulk sourcing summary):** Use the person who compiled the summary, even if someone else forwarded it
-  - Example: Feong compiled quotes → Leonard forwarded to Jake → Jake forwarded to vq@
-  - Buyer = **Feong** (did the sourcing), not Jake (just forwarded)
-- Do NOT use names from the RFQ record (those are customer contacts)
-- Common buyers: Jake Harris, Ed Harkins, Tracy Xie, Roberto Orozco, Feong Chang
+
+The Buyer is the **Astute employee who did the sourcing work** (the operator-on-record), NOT the customer contact from the RFQ and NOT necessarily whoever forwarded the email. Resolve in this order, first match wins:
+
+- **Tier A — Internal forward chain (primary signal).** If the **outer `From:`** is `@astutegroup.com` AND there is a **deeper `@astutegroup.com` `From:`** in the quoted block, the **outer is the forwarder** and the **deeper one is the buyer**. Resolve the deeper email via `resolveAstuteUserByEmail(deeperEmail)` from `shared/partner-lookup.js`. This is the dead giveaway for support staff forwarding on behalf of someone — it does not require any text hint and supersedes the Type 1 default.
+  - Example (Type 2 + internal chain): `From: Feong → Leonard → Jake → vq@` — Tier A picks Feong (the deepest internal sender), correctly.
+  - Example (Type 1 + support staff): `From: <broker> → Stephanie → vq@` is direct Type 1 (Stephanie is the buyer). But `From: <broker> → Stephanie → Gopal-the-assistant → vq@` is the support-staff case — Tier A picks Stephanie.
+- **Tier B — Explicit text hint (fallback).** If Tier A doesn't fire, scan the forwarder's note + signature + subject for explicit hints like `sourced by <Name>`, `on behalf of <Name>`, `buyer: <Name>`. If found, call `resolveAstuteUserByName(name)`:
+  - `unambiguous: true` → that's the buyer.
+  - `ambiguous: true` → escalate via `need_info_vendor` with the candidate list rather than guessing.
+  - `null` → fall through to Tier C.
+- **Tier C — Type-default fallback.**
+  - **Type 1 (Direct broker quote):** Buyer = the outer `From:` (who forwarded to vq@). Standard direct-sourced-quote shape.
+  - **Type 2 (Bulk sourcing summary):** Buyer = the compiler (e.g., Feong), which on a clean Type 2 chain is the SAME as the deepest-internal sender → Tier A would have caught it. Tier C-as-Type-2 only fires when the compiler arrived directly (no forwards) — rare.
+- **Tier D — Default (last resort).** No internal sender anywhere → defaults to Jake (1000004) in the handler.
+
+Do NOT use names from the RFQ record (those are customer contacts on the customer side). Common buyers: Jake Harris (1000004), Elaine Liang (1006326), Ed Harkins, Tracy Xie, Roberto Orozco, Feong Chang.
 | **Vendor** | `Business Partner Search Key` | Yes | Vendor search_key from domain-based lookup |
 | **Contact** | `Contact` | No | Vendor contact name |
 | **MPN** | `MPN` | Yes | **Customer's requested MPN** (from RFQ, NOT vendor's alternate) |
