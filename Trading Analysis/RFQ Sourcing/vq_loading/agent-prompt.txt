@@ -6,7 +6,7 @@ The quality bar is the terminal Claude session that loaded RFQ 1132932 (vq@/Proc
 STEP 0 — Read the universal operating philosophy.
 ═══════════════════════════════════════════════════════════════════════════════
 
-Before STEP 1, Read `/home/analytics_user/workspace/astute-workinstructions/shared/agent-philosophy.md`. It covers the cross-workflow rules for: (a) the Jake test before escalating, (b) bias toward action, (c) using the investigation sub-Agent before clarify/needs_review, (d) the disqualified-vendor-type filter, (e) MFR-resolver sanity check, (f) escalation hierarchy.
+Before STEP 1, Read `/home/analytics_user/workspace/astute-workinstructions/shared/agent-philosophy.md`. It covers the cross-workflow rules for: (a) the Jake test before escalating, (b) bias toward action, (c) using the investigation sub-Agent before clarify/needs_review, (d) MFR-resolver sanity check, (e) escalation hierarchy, (f) "loading is data capture" — vendor restrictions are an approval-flow concern, not a load-layer concern.
 
 The philosophy applies to every agent invocation. The workflow-specific .md (STEP 1) covers what THIS workflow does; the philosophy covers HOW every agent should think.
 
@@ -408,10 +408,10 @@ For each quote, resolve the vendor BP. **The only role filter is `isactive='Y'`.
       LEFT JOIN adempiere.chuboe_vendortype vt ON bp.chuboe_vendortype_id = vt.chuboe_vendortype_id
       WHERE bp.isactive='Y' AND u.isactive='Y'
         AND LOWER(SUBSTRING(u.email FROM POSITION('@' IN u.email)+1)) = '<vendor domain>'
-        -- Auto-disqualify Suspended (1000004) and Prohibited (1000005) BPs.
-        -- These are operator-flagged "do not buy from" — never auto-pick them,
-        -- never include in clarify_vendor candidates. See shared/disqualified-vendor-types.js.
-        AND COALESCE(bp.chuboe_vendortype_id, 0) NOT IN (1000004, 1000005)
+        -- Note: Suspended (1000004) / Prohibited (1000005) BPs are NOT filtered out
+        -- here. Loading is data capture; the approval flow downstream is the gate
+        -- for buying from a restricted vendor. See shared/agent-philosophy.md
+        -- § "Loading is data capture".
       GROUP BY bp.c_bpartner_id, bp.value, bp.name, bp.isactive, bp.chuboe_vendortype_id, vt.name
       ORDER BY contact_count DESC, bp.created DESC
       LIMIT 5;
@@ -511,7 +511,7 @@ The handler iterates over `[rfqSearchKey, ...secondaryRfqSearchKeys]`, calls `lo
 ────────────────────────────────────────────
 
 Inspect the route response:
-  - `skipped` non-empty → some quotes hit VENDOR_NOT_FOUND / NO_MPN_MATCH / VENDOR_SUSPENDED. If you resolved vendors in 3.8 these should be rare — log per-quote and continue.
+  - `skipped` non-empty → some quotes hit VENDOR_NOT_FOUND / NO_MPN_MATCH. If you resolved vendors in 3.8 these should be rare — log per-quote and continue.
   - `failed` non-empty → writer threw on some quotes. Surface in your summary; don't reroute (the email already moved to Processed).
   - `gaps` non-empty → some RFQ lines have no coverage from this batch. Note in summary — next-action signal for the sourcing team.
   - `written > 0` and no critical failures → success. Email moved to Processed by the handler.

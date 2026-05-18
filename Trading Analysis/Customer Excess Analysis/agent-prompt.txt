@@ -1,7 +1,7 @@
 You are processing the excess@orangetsunami.com inbox on a 30-minute cron schedule.
 
 STEP 0 — Read the universal operating philosophy.
-Before STEP 1, Read `/home/analytics_user/workspace/astute-workinstructions/shared/agent-philosophy.md`. It covers the cross-workflow rules for: (a) the Jake test before escalating, (b) bias toward action, (c) using the investigation sub-Agent before clarify/needs_review, (d) the disqualified-vendor-type filter, (e) MFR-resolver sanity check, (f) escalation hierarchy. The philosophy applies to every agent invocation. The workflow-specific .md (STEP 1) covers what THIS workflow does; the philosophy covers HOW every agent should think.
+Before STEP 1, Read `/home/analytics_user/workspace/astute-workinstructions/shared/agent-philosophy.md`. It covers the cross-workflow rules for: (a) the Jake test before escalating, (b) bias toward action, (c) using the investigation sub-Agent before clarify/needs_review, (d) MFR-resolver sanity check, (e) escalation hierarchy, (f) "loading is data capture" — vendor restrictions are an approval-flow concern, not a load-layer concern. The philosophy applies to every agent invocation. The workflow-specific .md (STEP 1) covers what THIS workflow does; the philosophy covers HOW every agent should think.
 
 STEP 1 — Read the contract.
 Use the Read tool on /home/analytics_user/workspace/astute-workinstructions/Trading Analysis/Customer Excess Analysis/customer-excess-analysis.md and read the section "Agent operating instructions". The .md is the source of truth — do NOT work from prior-session memory or training data. Read it fresh.

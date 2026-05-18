@@ -61,7 +61,6 @@ When tempted to route to an escalation action, FIRST launch an investigation sub
 These show up across multiple workflows. Default to launching a sub-Agent rather than escalating:
 
 1. **Same-domain multi-BP ambiguity.** Multiple active BPs share a domain — which is operational?
-   - Filter: exclude vtype Suspended (1000004) and Prohibited (1000005) → those are automatic disqualifiers.
    - Tiebreak: most recent `chuboe_vq_line` / `chuboe_cq_line` / `chuboe_offer_line` activity in last 90 days.
    - Further tiebreak: highest total active record count.
    - Only after both tiebreakers tie → genuine clarify situation.
@@ -107,8 +106,13 @@ The operator has months of stored corrections in `~/.claude/projects/-home-analy
 ## What this isn't
 
 - **Not permission to be reckless.** "Bias toward action" doesn't mean skip verification or write half-broken data. The Two-Agent Validation / dup checks / write validators all still apply.
-- **Not permission to write to disqualified vendors.** Suspended (1000004) and Prohibited (1000005) are hard skips at the writer layer.
 - **Not permission to ignore real ambiguity.** When the system genuinely has no signal — a vendor that's truly absent, a quote that's genuinely incomprehensible — escalation is the right call. Just make sure you've tried first.
+
+### Loading is data capture
+
+Vendor restrictions are NOT load-layer concerns. Suspended (vtype 1000004) and Prohibited (vtype 1000005) BPs are gated by the **approval flow** when a buyer tries to act on the data, not by the writers when the data lands. Load freely; let the human approver decide downstream.
+
+`shared/disqualified-vendor-types.js` is still in place as a label provider — anyone who wants to *display* vendor status (in an approval body, an alert, an audit view) can use `isDisqualified()` / `disqualificationName()`. It just doesn't decide skips.
 
 ---
 
@@ -123,17 +127,18 @@ psql -P pager=off -A -F$'\t' -c "<SQL>"
 
 ### Vendor / BP
 
-**Is this BP disqualified?** (Suspended / Prohibited — never write to these)
+**Is this BP Suspended or Prohibited?** (informational only — load proceeds regardless; gate is in the approval flow)
 ```sql
 SELECT bp.c_bpartner_id, bp.value, bp.name, bp.isactive,
        bp.chuboe_vendortype_id, vt.name AS vtype_name
 FROM adempiere.c_bpartner bp
 LEFT JOIN adempiere.chuboe_vendortype vt ON bp.chuboe_vendortype_id = vt.chuboe_vendortype_id
 WHERE bp.c_bpartner_id = <id>;
--- vtype_name = 'Suspended' (1000004) or 'Prohibited' (1000005) → DO NOT load to this BP.
+-- vtype_name = 'Suspended' (1000004) or 'Prohibited' (1000005) — surface this to the approver
+-- if useful, but do NOT block the load.
 ```
 
-**All active BPs at a domain.** (Use BEFORE clarify_vendor — filter disqualified, then activity-rank.)
+**All active BPs at a domain.** (Use BEFORE clarify_vendor — activity-rank.)
 ```sql
 SELECT bp.c_bpartner_id, bp.value, bp.name,
        bp.chuboe_vendortype_id, vt.name AS vtype_name,

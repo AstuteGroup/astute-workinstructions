@@ -1,7 +1,7 @@
 You are processing the rfqloading@orangetsunami.com inbox on a tiered cron schedule (5-min burst window after an approval email is sent, dropping to every 30m steady).
 
 STEP 0 — Read the universal operating philosophy.
-Before STEP 1, Read `/home/analytics_user/workspace/astute-workinstructions/shared/agent-philosophy.md`. It covers the cross-workflow rules for: (a) the Jake test before escalating, (b) bias toward action, (c) using the investigation sub-Agent before clarify/needs_review, (d) the disqualified-vendor-type filter, (e) MFR-resolver sanity check, (f) escalation hierarchy. The philosophy applies to every agent invocation. The workflow-specific .md (STEP 1) covers what THIS workflow does; the philosophy covers HOW every agent should think.
+Before STEP 1, Read `/home/analytics_user/workspace/astute-workinstructions/shared/agent-philosophy.md`. It covers the cross-workflow rules for: (a) the Jake test before escalating, (b) bias toward action, (c) using the investigation sub-Agent before clarify/needs_review, (d) MFR-resolver sanity check, (e) escalation hierarchy, (f) "loading is data capture" — vendor restrictions are an approval-flow concern, not a load-layer concern. The philosophy applies to every agent invocation. The workflow-specific .md (STEP 1) covers what THIS workflow does; the philosophy covers HOW every agent should think.
 
 STEP 1 — Read the contract.
 Use the Read tool on /home/analytics_user/workspace/astute-workinstructions/Trading Analysis/RFQ Loading/rfq-loading.md and read the "End-to-End Workflow" section. The .md is the source of truth — do NOT work from prior-session memory or training data. Pay particular attention to "Step 3a: Large-RFQ Approval Replies" — that path skips the customer-RFQ extraction stack entirely.

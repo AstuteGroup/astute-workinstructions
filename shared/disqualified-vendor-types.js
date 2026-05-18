@@ -1,20 +1,21 @@
 /**
  * shared/disqualified-vendor-types.js
  *
- * Single source of truth for "do NOT load a write to this BP regardless of
- * what else looks right." These are operator-flagged vendor types that any
- * writer (vq-writer, offer-writeback, rfq-writer, cq-writer) should skip
- * before posting.
+ * Single source of truth for the vendor-type IDs that mean "restricted —
+ * needs management approval before we buy." Loading is data capture and
+ * these BPs are NOT skipped at the load layer (changed 2026-05-18 — see
+ * `shared/agent-philosophy.md` § "Loading is data capture"). The approval
+ * flow downstream is the gate.
  *
- * The set is OUR opinion on the data, layered ON TOP of OT's bean-callouts
- * (which we don't fully control). Bean callouts may not block writes against
- * Suspended/Prohibited BPs — we have to enforce client-side.
+ * This module is kept as a **label provider** for anyone who wants to
+ * surface vendor status downstream — in an approval R_Request body, an
+ * operator alert, an audit view. The previous "hard skip at writer layer"
+ * role was retired alongside the load-bulk-summary + offer-writeback gates.
  *
- * To add a disqualifier:
- *   1. Confirm with operator that the vendor type means "do not buy from"
- *      (vs. just "low priority" — those are different).
+ * To add a restricted-vendor type label:
+ *   1. Confirm with operator that the vendor type means "needs approval to buy."
  *   2. Add the chuboe_vendortype_id to the set.
- *   3. Add a label mapping for the skip reason.
+ *   3. Add label + name mappings.
  *
  * Vendor type IDs (per psql adempiere.chuboe_vendortype, 2026-05-14):
  *    1000001 Manufacture Direct Component
@@ -36,6 +37,10 @@
 
 'use strict';
 
+// Set name retained for backward compatibility with any downstream consumer
+// that imports it. Semantically these are "restricted, needs approval" — NOT
+// "auto-skip at load." Consumers should use these labels for display/audit,
+// not for blocking writes.
 const DISQUALIFIED_VTYPE_IDS = new Set([
   1000004,  // Suspended
   1000005,  // Prohibited

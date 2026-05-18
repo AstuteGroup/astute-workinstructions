@@ -434,8 +434,9 @@ The CLI categorizes failures into three buckets — none are silent:
 |--------|---------------|--------|
 | `NO_MPN_MATCH` | Quoted MPN doesn't match any accepted MPN on any RFQ line | Verify the MPN against the RFQ; may be a vendor typo or a missing AVL alt |
 | `VENDOR_NOT_FOUND` | BP not in iDempiere by search key or name | Add the vendor to OT, then re-run |
-| `VENDOR_SUSPENDED` | BP exists but vendor type = 1000004 (Suspended) | Skip this quote; do not buy from this vendor |
 | `WRITE_FAILED` / `WRITE_ERROR` | API returned a flag or threw | Inspect the detail; usually MFR resolution or COO mapping |
+
+*(Suspended/Prohibited BPs are NOT skipped at load time — loading is data capture and vendor restrictions are an approval-flow concern. See `shared/agent-philosophy.md` § "Loading is data capture".)*
 
 ### Per-line coverage
 

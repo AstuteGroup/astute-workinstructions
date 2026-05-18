@@ -41,7 +41,7 @@
  * RETURN:
  *   {
  *     written:  [{ vqLineId, line, mpn, vendor, cost, qty }, ...],
- *     skipped:  [{ ...quote, reason }, ...],   // VENDOR_NOT_FOUND, VENDOR_SUSPENDED, NO_MPN_MATCH
+ *     skipped:  [{ ...quote, reason }, ...],   // VENDOR_NOT_FOUND, NO_MPN_MATCH
  *     failed:   [{ ...quote, reason, error }, ...],
  *     coverage: [{ lineNo, lineId, rfqQty, mpns: [...], vqsToday, vqsTotal }, ...],
  *     gaps:     [lineNo, ...],                  // lines with 0 VQs after this batch
@@ -50,8 +50,7 @@
 
 const { execFileSync } = require('child_process');
 const { writeVQFromAPI } = require('./vq-writer');
-const { resolveBP, apiGet } = require('./api-client');
-const { isDisqualified, disqualificationLabel, disqualificationName } = require('./disqualified-vendor-types');
+const { resolveBP } = require('./api-client');
 const logger = require('./logger').createLogger('LoadBulkSummary');
 
 // Currency ISO code → C_Currency_ID. Verified against c_currency (2026-05-14).
@@ -106,19 +105,6 @@ const COO_MAP = {
 };
 
 const PENDING_COUNTRY_ID = 1000001;
-// Vendor-type disqualifiers extracted to shared/disqualified-vendor-types.js
-// so other writers (offer-writeback, rfq-writer, etc.) reuse the same set.
-
-// ─── Vendor type cache ─────────────────────────────────────────────────────
-const _vtypeCache = new Map();
-
-async function getBPVendorType(bpId) {
-  if (_vtypeCache.has(bpId)) return _vtypeCache.get(bpId);
-  const res = await apiGet('C_BPartner', { filter: `C_BPartner_ID eq ${bpId}`, top: 1 });
-  const vt = res.records?.[0]?.Chuboe_VendorType_ID?.id || res.records?.[0]?.Chuboe_VendorType_ID || null;
-  _vtypeCache.set(bpId, vt);
-  return vt;
-}
 
 // ─── RFQ metadata ──────────────────────────────────────────────────────────
 function fetchRfqMeta(rfqSearchKey) {
@@ -235,20 +221,14 @@ async function loadBulkSummary({ rfqSearchKey, buyerId, quotes, dryRun = false }
       continue;
     }
 
-    // c. Skip disqualified vendor types (Suspended, Prohibited — see
-    //    shared/disqualified-vendor-types.js for the canonical set).
-    const vtypeId = await getBPVendorType(bp.id);
-    if (isDisqualified(vtypeId)) {
-      const name = disqualificationName(vtypeId);
-      skipped.push({
-        ...q,
-        reason: disqualificationLabel(vtypeId),
-        detail: `${bp.name} is ${name} (vtype ${vtypeId})`,
-      });
-      continue;
-    }
-
-    // d. Build synthetic distributor stub
+    // c. Build synthetic distributor stub
+    //
+    // Note: Suspended (vtype 1000004) / Prohibited (vtype 1000005) BPs are NOT
+    // gated here. Loading is data capture; the approval flow downstream is the
+    // gate for buying from a restricted vendor. See shared/agent-philosophy.md
+    // § "Loading is data capture" and shared/disqualified-vendor-types.js
+    // (the module is still in place as a label provider for anyone who wants
+    // to display vendor status downstream — it just doesn't decide skips).
     const cooId = resolveCoo(q.coo);
     const currencyId = resolveCurrency(q.currency);
     const stub = {
