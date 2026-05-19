@@ -53,6 +53,15 @@ $SyncSet = @(
     @{ Remote = '/home/analytics_user/workspace/astute-workinstructions/CLAUDE.md';            Local = 'CLAUDE.md' }
     @{ Remote = '/home/analytics_user/workspace/astute-workinstructions/integration-paths.md'; Local = 'integration-paths.md' }
     @{ Remote = '/home/analytics_user/workspace/astute-workinstructions/shared/data-model.md'; Local = 'data-model.md' }
+
+    # Per-source operational notes (server-side empirical observations) — useful
+    # context for the desktop Claude when driving a specific adapter.
+    @{ Remote = '/home/analytics_user/workspace/astute-workinstructions/Trading Analysis/Distributor Scrape Loading/heilind-bom-tool-notes.md';   Local = 'heilind-bom-tool-notes.md' }
+    @{ Remote = '/home/analytics_user/workspace/astute-workinstructions/Trading Analysis/Distributor Scrape Loading/coilcraft-direct-notes.md';   Local = 'coilcraft-direct-notes.md' }
+
+    # Per-site scrape-adapter cheat sheets (selectors, navigation chain, auth nuance).
+    # Subfolder layout matches the contract: %USERPROFILE%\AstuteDocs\scrape-adapters\<slug>.md
+    @{ Remote = '/home/analytics_user/workspace/astute-workinstructions/Trading Analysis/Distributor Scrape Loading/scrape-adapters/coilcraft.md'; Local = 'scrape-adapters\coilcraft.md' }
 )
 
 # ─── BOOTSTRAP ──────────────────────────────────────────────────────────────
@@ -104,6 +113,13 @@ foreach ($item in $SyncSet) {
     $remoteSpec = "$RemoteUser@${RemoteHost}:'" + $item.Remote + "'"
     $localPath  = Join-Path $LocalCacheDir $item.Local
     $tmpPath    = "$localPath.partial"
+
+    # Ensure local parent directory exists — needed for subfolder entries
+    # like `scrape-adapters\coilcraft.md`. scp won't create parent dirs.
+    $parentDir = Split-Path -Parent $localPath
+    if ($parentDir -and -not (Test-Path $parentDir)) {
+        New-Item -ItemType Directory -Path $parentDir -Force | Out-Null
+    }
 
     if (Test-Path $tmpPath) { Remove-Item $tmpPath -Force }
 
