@@ -1,0 +1,1079 @@
+{
+  "rfqSearchKey": "1134421",
+  "buyerId": 1000004,
+  "runAt": "2026-05-13T21:28:25.090Z",
+  "sourceQuotes": "/tmp/mcmaster-quotes-1134421.json",
+  "result": {
+    "written": [
+      {
+        "vqLineId": 2153434,
+        "line": 10,
+        "mpn": "98019A228",
+        "vendor": "McMaster-Carr",
+        "cost": 1.151,
+        "qty": 1,
+        "fuzzyMatch": false
+      },
+      {
+        "vqLineId": 2153435,
+        "line": 20,
+        "mpn": "90145A419",
+        "vendor": "McMaster-Carr",
+        "cost": 0.1158,
+        "qty": 1,
+        "fuzzyMatch": false
+      },
+      {
+        "vqLineId": 2153436,
+        "line": 30,
+        "mpn": "90145A471",
+        "vendor": "McMaster-Carr",
+        "cost": 0.1856,
+        "qty": 1,
+        "fuzzyMatch": false
+      },
+      {
+        "vqLineId": 2153437,
+        "line": 40,
+        "mpn": "90128A246",
+        "vendor": "McMaster-Carr",
+        "cost": 0.3078,
+        "qty": 1,
+        "fuzzyMatch": false
+      },
+      {
+        "vqLineId": 2153438,
+        "line": 50,
+        "mpn": "96445K221",
+        "vendor": "McMaster-Carr",
+        "cost": 0.2367,
+        "qty": 1,
+        "fuzzyMatch": false
+      },
+      {
+        "vqLineId": 2153439,
+        "line": 60,
+        "mpn": "93805A289",
+        "vendor": "McMaster-Carr",
+        "cost": 0.76,
+        "qty": 1,
+        "fuzzyMatch": false
+      },
+      {
+        "vqLineId": 2153440,
+        "line": 70,
+        "mpn": "4711N251",
+        "vendor": "McMaster-Carr",
+        "cost": 8.94,
+        "qty": 1,
+        "fuzzyMatch": false
+      },
+      {
+        "vqLineId": 2153441,
+        "line": 80,
+        "mpn": "2415T31",
+        "vendor": "McMaster-Carr",
+        "cost": 35.45,
+        "qty": 1,
+        "fuzzyMatch": false
+      },
+      {
+        "vqLineId": 2153442,
+        "line": 90,
+        "mpn": "8500K75",
+        "vendor": "McMaster-Carr",
+        "cost": 0.76,
+        "qty": 1,
+        "fuzzyMatch": false
+      },
+      {
+        "vqLineId": 2153443,
+        "line": 130,
+        "mpn": "91273A763",
+        "vendor": "McMaster-Carr",
+        "cost": 11.21,
+        "qty": 1,
+        "fuzzyMatch": false
+      },
+      {
+        "vqLineId": 2153444,
+        "line": 140,
+        "mpn": "90295A455",
+        "vendor": "McMaster-Carr",
+        "cost": 0.131,
+        "qty": 1,
+        "fuzzyMatch": false
+      },
+      {
+        "vqLineId": 2153445,
+        "line": 170,
+        "mpn": "93475A240",
+        "vendor": "McMaster-Carr",
+        "cost": 0.0387,
+        "qty": 1,
+        "fuzzyMatch": false
+      },
+      {
+        "vqLineId": 2153446,
+        "line": 180,
+        "mpn": "92871A030",
+        "vendor": "McMaster-Carr",
+        "cost": 2.36,
+        "qty": 1,
+        "fuzzyMatch": false
+      },
+      {
+        "vqLineId": 2153447,
+        "line": 190,
+        "mpn": "91035A610",
+        "vendor": "McMaster-Carr",
+        "cost": 7.94,
+        "qty": 1,
+        "fuzzyMatch": false
+      },
+      {
+        "vqLineId": 2153448,
+        "line": 200,
+        "mpn": "48805K222",
+        "vendor": "McMaster-Carr",
+        "cost": 11.68,
+        "qty": 1,
+        "fuzzyMatch": false
+      },
+      {
+        "vqLineId": 2153449,
+        "line": 210,
+        "mpn": "6120K75",
+        "vendor": "McMaster-Carr",
+        "cost": 26.51,
+        "qty": 1,
+        "fuzzyMatch": false
+      },
+      {
+        "vqLineId": 2153450,
+        "line": 220,
+        "mpn": "92196A625",
+        "vendor": "McMaster-Carr",
+        "cost": 2.213,
+        "qty": 1,
+        "fuzzyMatch": false
+      },
+      {
+        "vqLineId": 2153451,
+        "line": 230,
+        "mpn": "8875A14",
+        "vendor": "McMaster-Carr",
+        "cost": 94.37,
+        "qty": 1,
+        "fuzzyMatch": false
+      },
+      {
+        "vqLineId": 2153452,
+        "line": 240,
+        "mpn": "3176T84",
+        "vendor": "McMaster-Carr",
+        "cost": 28.96,
+        "qty": 1,
+        "fuzzyMatch": false
+      },
+      {
+        "vqLineId": 2153453,
+        "line": 260,
+        "mpn": "90680A222",
+        "vendor": "McMaster-Carr",
+        "cost": 0.5332,
+        "qty": 1,
+        "fuzzyMatch": false
+      },
+      {
+        "vqLineId": 2153454,
+        "line": 270,
+        "mpn": "92605A111",
+        "vendor": "McMaster-Carr",
+        "cost": 0.146,
+        "qty": 1,
+        "fuzzyMatch": false
+      },
+      {
+        "vqLineId": 2153455,
+        "line": 280,
+        "mpn": "93711A600",
+        "vendor": "McMaster-Carr",
+        "cost": 0.3428,
+        "qty": 1,
+        "fuzzyMatch": false
+      },
+      {
+        "vqLineId": 2153456,
+        "line": 300,
+        "mpn": "92290A019",
+        "vendor": "McMaster-Carr",
+        "cost": 0.1414,
+        "qty": 1,
+        "fuzzyMatch": false
+      },
+      {
+        "vqLineId": 2153457,
+        "line": 320,
+        "mpn": "92196A295",
+        "vendor": "McMaster-Carr",
+        "cost": 1.352,
+        "qty": 1,
+        "fuzzyMatch": false
+      },
+      {
+        "vqLineId": 2153458,
+        "line": 340,
+        "mpn": "92005A218",
+        "vendor": "McMaster-Carr",
+        "cost": 0.058,
+        "qty": 1,
+        "fuzzyMatch": false
+      },
+      {
+        "vqLineId": 2153459,
+        "line": 350,
+        "mpn": "92196A114",
+        "vendor": "McMaster-Carr",
+        "cost": 0.0804,
+        "qty": 1,
+        "fuzzyMatch": false
+      },
+      {
+        "vqLineId": 2153460,
+        "line": 360,
+        "mpn": "92196A220",
+        "vendor": "McMaster-Carr",
+        "cost": 0.2518,
+        "qty": 1,
+        "fuzzyMatch": false
+      },
+      {
+        "vqLineId": 2153461,
+        "line": 370,
+        "mpn": "95198A493",
+        "vendor": "McMaster-Carr",
+        "cost": 4.22,
+        "qty": 1,
+        "fuzzyMatch": false
+      },
+      {
+        "vqLineId": 2153462,
+        "line": 420,
+        "mpn": "92217A470",
+        "vendor": "McMaster-Carr",
+        "cost": 0.661,
+        "qty": 1,
+        "fuzzyMatch": false
+      },
+      {
+        "vqLineId": 2153463,
+        "line": 430,
+        "mpn": "92185A227",
+        "vendor": "McMaster-Carr",
+        "cost": 0.569,
+        "qty": 1,
+        "fuzzyMatch": false
+      },
+      {
+        "vqLineId": 2153464,
+        "line": 440,
+        "mpn": "29495T14",
+        "vendor": "McMaster-Carr",
+        "cost": 108.23,
+        "qty": 1,
+        "fuzzyMatch": false
+      },
+      {
+        "vqLineId": 2153465,
+        "line": 460,
+        "mpn": "93395A254",
+        "vendor": "McMaster-Carr",
+        "cost": 0.1997,
+        "qty": 1,
+        "fuzzyMatch": false
+      },
+      {
+        "vqLineId": 2153466,
+        "line": 470,
+        "mpn": "91287A315",
+        "vendor": "McMaster-Carr",
+        "cost": 1.503,
+        "qty": 1,
+        "fuzzyMatch": false
+      },
+      {
+        "vqLineId": 2153467,
+        "line": 480,
+        "mpn": "93856A281",
+        "vendor": "McMaster-Carr",
+        "cost": 23.35,
+        "qty": 1,
+        "fuzzyMatch": true
+      },
+      {
+        "vqLineId": 2153468,
+        "line": 490,
+        "mpn": "5347A29",
+        "vendor": "McMaster-Carr",
+        "cost": 247.16,
+        "qty": 1,
+        "fuzzyMatch": false
+      },
+      {
+        "vqLineId": 2153469,
+        "line": 500,
+        "mpn": "93615A385",
+        "vendor": "McMaster-Carr",
+        "cost": 0.765,
+        "qty": 1,
+        "fuzzyMatch": false
+      },
+      {
+        "vqLineId": 2153470,
+        "line": 510,
+        "mpn": "97345A476",
+        "vendor": "McMaster-Carr",
+        "cost": 2.95,
+        "qty": 1,
+        "fuzzyMatch": false
+      },
+      {
+        "vqLineId": 2153471,
+        "line": 520,
+        "mpn": "92871A036",
+        "vendor": "McMaster-Carr",
+        "cost": 2.52,
+        "qty": 1,
+        "fuzzyMatch": false
+      },
+      {
+        "vqLineId": 2153472,
+        "line": 560,
+        "mpn": "92745A362",
+        "vendor": "McMaster-Carr",
+        "cost": 0.51,
+        "qty": 1,
+        "fuzzyMatch": false
+      },
+      {
+        "vqLineId": 2153473,
+        "line": 600,
+        "mpn": "6816N16",
+        "vendor": "McMaster-Carr",
+        "cost": 2.573,
+        "qty": 1,
+        "fuzzyMatch": false
+      },
+      {
+        "vqLineId": 2153474,
+        "line": 290,
+        "mpn": "6151K54",
+        "vendor": "McMaster-Carr",
+        "cost": 5.216,
+        "qty": 1,
+        "fuzzyMatch": false
+      },
+      {
+        "vqLineId": 2153475,
+        "line": 310,
+        "mpn": "90344A119",
+        "vendor": "McMaster-Carr",
+        "cost": 6.384,
+        "qty": 1,
+        "fuzzyMatch": false
+      },
+      {
+        "vqLineId": 2153476,
+        "line": 620,
+        "mpn": "90909A522",
+        "vendor": "McMaster-Carr",
+        "cost": 0.7364,
+        "qty": 1,
+        "fuzzyMatch": false
+      },
+      {
+        "vqLineId": 2153477,
+        "line": 660,
+        "mpn": "91075A020",
+        "vendor": "McMaster-Carr",
+        "cost": 3.02,
+        "qty": 1,
+        "fuzzyMatch": false
+      },
+      {
+        "vqLineId": 2153478,
+        "line": 670,
+        "mpn": "90278A303",
+        "vendor": "McMaster-Carr",
+        "cost": 8.11,
+        "qty": 1,
+        "fuzzyMatch": false
+      },
+      {
+        "vqLineId": 2153479,
+        "line": 610,
+        "mpn": "92558A100",
+        "vendor": "McMaster-Carr",
+        "cost": 7.89,
+        "qty": 1,
+        "fuzzyMatch": false
+      }
+    ],
+    "skipped": [],
+    "failed": [
+      {
+        "vendorName": "McMaster-Carr",
+        "vendorSearchKey": "1002922",
+        "mpn": "29695T991",
+        "mfr": "McMaster-Carr",
+        "qty": 0,
+        "cost": 0,
+        "leadTime": null,
+        "vendorNotes": "No-bid - $0.00 returned, treating as no price",
+        "reason": "WRITE_FAILED",
+        "detail": "unknown"
+      },
+      {
+        "vendorName": "McMaster-Carr",
+        "vendorSearchKey": "1002922",
+        "mpn": "9129A111",
+        "mfr": "McMaster-Carr",
+        "qty": 0,
+        "cost": 0,
+        "leadTime": null,
+        "vendorNotes": "No-bid - McMaster returned no price for this MPN",
+        "reason": "WRITE_FAILED",
+        "detail": "unknown"
+      }
+    ],
+    "coverage": [
+      {
+        "lineNo": 10,
+        "lineId": 3121984,
+        "rfqQty": 1,
+        "mpns": [
+          "98019A228"
+        ],
+        "vqsThisBatch": 1
+      },
+      {
+        "lineNo": 20,
+        "lineId": 3121979,
+        "rfqQty": 1,
+        "mpns": [
+          "90145A419"
+        ],
+        "vqsThisBatch": 1
+      },
+      {
+        "lineNo": 30,
+        "lineId": 3121982,
+        "rfqQty": 1,
+        "mpns": [
+          "90145A471"
+        ],
+        "vqsThisBatch": 1
+      },
+      {
+        "lineNo": 40,
+        "lineId": 3121981,
+        "rfqQty": 1,
+        "mpns": [
+          "90128A246"
+        ],
+        "vqsThisBatch": 1
+      },
+      {
+        "lineNo": 50,
+        "lineId": 3121983,
+        "rfqQty": 1,
+        "mpns": [
+          "96445K221"
+        ],
+        "vqsThisBatch": 1
+      },
+      {
+        "lineNo": 60,
+        "lineId": 3121986,
+        "rfqQty": 1,
+        "mpns": [
+          "93805A289"
+        ],
+        "vqsThisBatch": 1
+      },
+      {
+        "lineNo": 70,
+        "lineId": 3121985,
+        "rfqQty": 1,
+        "mpns": [
+          "4711N251"
+        ],
+        "vqsThisBatch": 1
+      },
+      {
+        "lineNo": 80,
+        "lineId": 3121987,
+        "rfqQty": 1,
+        "mpns": [
+          "2415T31"
+        ],
+        "vqsThisBatch": 1
+      },
+      {
+        "lineNo": 90,
+        "lineId": 3121980,
+        "rfqQty": 1,
+        "mpns": [
+          "8500K75"
+        ],
+        "vqsThisBatch": 1
+      },
+      {
+        "lineNo": 100,
+        "lineId": 3121988,
+        "rfqQty": 1,
+        "mpns": [
+          "90145A419"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 110,
+        "lineId": 3121990,
+        "rfqQty": 1,
+        "mpns": [
+          "90145A471"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 120,
+        "lineId": 3121992,
+        "rfqQty": 1,
+        "mpns": [
+          "96445K221"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 130,
+        "lineId": 3121989,
+        "rfqQty": 1,
+        "mpns": [
+          "91273A763"
+        ],
+        "vqsThisBatch": 1
+      },
+      {
+        "lineNo": 140,
+        "lineId": 3121994,
+        "rfqQty": 1,
+        "mpns": [
+          "90295A455"
+        ],
+        "vqsThisBatch": 1
+      },
+      {
+        "lineNo": 150,
+        "lineId": 3121993,
+        "rfqQty": 1,
+        "mpns": [
+          "98019A228"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 160,
+        "lineId": 3121991,
+        "rfqQty": 1,
+        "mpns": [
+          "93805A289"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 170,
+        "lineId": 3121996,
+        "rfqQty": 1,
+        "mpns": [
+          "93475A240"
+        ],
+        "vqsThisBatch": 1
+      },
+      {
+        "lineNo": 180,
+        "lineId": 3121995,
+        "rfqQty": 1,
+        "mpns": [
+          "92871A030"
+        ],
+        "vqsThisBatch": 1
+      },
+      {
+        "lineNo": 190,
+        "lineId": 3121997,
+        "rfqQty": 1,
+        "mpns": [
+          "91035A610"
+        ],
+        "vqsThisBatch": 1
+      },
+      {
+        "lineNo": 200,
+        "lineId": 3121998,
+        "rfqQty": 1,
+        "mpns": [
+          "48805K222"
+        ],
+        "vqsThisBatch": 1
+      },
+      {
+        "lineNo": 210,
+        "lineId": 3121999,
+        "rfqQty": 1,
+        "mpns": [
+          "6120K75"
+        ],
+        "vqsThisBatch": 1
+      },
+      {
+        "lineNo": 220,
+        "lineId": 3122000,
+        "rfqQty": 1,
+        "mpns": [
+          "92196A625"
+        ],
+        "vqsThisBatch": 1
+      },
+      {
+        "lineNo": 230,
+        "lineId": 3122001,
+        "rfqQty": 1,
+        "mpns": [
+          "8875A14"
+        ],
+        "vqsThisBatch": 1
+      },
+      {
+        "lineNo": 240,
+        "lineId": 3122003,
+        "rfqQty": 1,
+        "mpns": [
+          "3176T84"
+        ],
+        "vqsThisBatch": 1
+      },
+      {
+        "lineNo": 250,
+        "lineId": 3122002,
+        "rfqQty": 1,
+        "mpns": [
+          "6120K75"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 260,
+        "lineId": 3122004,
+        "rfqQty": 1,
+        "mpns": [
+          "90680A222"
+        ],
+        "vqsThisBatch": 1
+      },
+      {
+        "lineNo": 270,
+        "lineId": 3122007,
+        "rfqQty": 1,
+        "mpns": [
+          "92605A111"
+        ],
+        "vqsThisBatch": 1
+      },
+      {
+        "lineNo": 280,
+        "lineId": 3122005,
+        "rfqQty": 1,
+        "mpns": [
+          "93711A600"
+        ],
+        "vqsThisBatch": 1
+      },
+      {
+        "lineNo": 290,
+        "lineId": 3122006,
+        "rfqQty": 1,
+        "mpns": [
+          "6151K54"
+        ],
+        "vqsThisBatch": 1
+      },
+      {
+        "lineNo": 300,
+        "lineId": 3122008,
+        "rfqQty": 1,
+        "mpns": [
+          "92290A019"
+        ],
+        "vqsThisBatch": 1
+      },
+      {
+        "lineNo": 310,
+        "lineId": 3122010,
+        "rfqQty": 1,
+        "mpns": [
+          "90344A119"
+        ],
+        "vqsThisBatch": 1
+      },
+      {
+        "lineNo": 320,
+        "lineId": 3122009,
+        "rfqQty": 1,
+        "mpns": [
+          "92196A295"
+        ],
+        "vqsThisBatch": 1
+      },
+      {
+        "lineNo": 330,
+        "lineId": 3122011,
+        "rfqQty": 1,
+        "mpns": [
+          "93635A211"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 340,
+        "lineId": 3122013,
+        "rfqQty": 1,
+        "mpns": [
+          "92005A218"
+        ],
+        "vqsThisBatch": 1
+      },
+      {
+        "lineNo": 350,
+        "lineId": 3122012,
+        "rfqQty": 1,
+        "mpns": [
+          "92196A114"
+        ],
+        "vqsThisBatch": 1
+      },
+      {
+        "lineNo": 360,
+        "lineId": 3122014,
+        "rfqQty": 1,
+        "mpns": [
+          "92196A220"
+        ],
+        "vqsThisBatch": 1
+      },
+      {
+        "lineNo": 370,
+        "lineId": 3122015,
+        "rfqQty": 1,
+        "mpns": [
+          "95198A493"
+        ],
+        "vqsThisBatch": 1
+      },
+      {
+        "lineNo": 380,
+        "lineId": 3122016,
+        "rfqQty": 1,
+        "mpns": [
+          "6151K54"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 390,
+        "lineId": 3122017,
+        "rfqQty": 1,
+        "mpns": [
+          "92605A111"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 400,
+        "lineId": 3122018,
+        "rfqQty": 1,
+        "mpns": [
+          "90344A119"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 410,
+        "lineId": 3122019,
+        "rfqQty": 1,
+        "mpns": [
+          "93711A600"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 420,
+        "lineId": 3122020,
+        "rfqQty": 1,
+        "mpns": [
+          "92217A470"
+        ],
+        "vqsThisBatch": 1
+      },
+      {
+        "lineNo": 430,
+        "lineId": 3122021,
+        "rfqQty": 1,
+        "mpns": [
+          "92185A227"
+        ],
+        "vqsThisBatch": 1
+      },
+      {
+        "lineNo": 440,
+        "lineId": 3122022,
+        "rfqQty": 1,
+        "mpns": [
+          "29495T14"
+        ],
+        "vqsThisBatch": 1
+      },
+      {
+        "lineNo": 450,
+        "lineId": 3122023,
+        "rfqQty": 1,
+        "mpns": [
+          "29695T991"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 460,
+        "lineId": 3122024,
+        "rfqQty": 1,
+        "mpns": [
+          "93395A254"
+        ],
+        "vqsThisBatch": 1
+      },
+      {
+        "lineNo": 470,
+        "lineId": 3122026,
+        "rfqQty": 1,
+        "mpns": [
+          "91287A315"
+        ],
+        "vqsThisBatch": 1
+      },
+      {
+        "lineNo": 480,
+        "lineId": 3122025,
+        "rfqQty": 1,
+        "mpns": [
+          "93856A281-67"
+        ],
+        "vqsThisBatch": 1
+      },
+      {
+        "lineNo": 490,
+        "lineId": 3122028,
+        "rfqQty": 1,
+        "mpns": [
+          "5347A29"
+        ],
+        "vqsThisBatch": 1
+      },
+      {
+        "lineNo": 500,
+        "lineId": 3122027,
+        "rfqQty": 1,
+        "mpns": [
+          "93615A385"
+        ],
+        "vqsThisBatch": 1
+      },
+      {
+        "lineNo": 510,
+        "lineId": 3122030,
+        "rfqQty": 1,
+        "mpns": [
+          "97345A476"
+        ],
+        "vqsThisBatch": 1
+      },
+      {
+        "lineNo": 520,
+        "lineId": 3122029,
+        "rfqQty": 1,
+        "mpns": [
+          "92871A036"
+        ],
+        "vqsThisBatch": 1
+      },
+      {
+        "lineNo": 530,
+        "lineId": 3122032,
+        "rfqQty": 1,
+        "mpns": [
+          "93395A254"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 540,
+        "lineId": 3122033,
+        "rfqQty": 1,
+        "mpns": [
+          "92605A111"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 550,
+        "lineId": 3122036,
+        "rfqQty": 1,
+        "mpns": [
+          "90344A119"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 560,
+        "lineId": 3122031,
+        "rfqQty": 1,
+        "mpns": [
+          "92745A362"
+        ],
+        "vqsThisBatch": 1
+      },
+      {
+        "lineNo": 570,
+        "lineId": 3122035,
+        "rfqQty": 1,
+        "mpns": [
+          "95783A015"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 580,
+        "lineId": 3122034,
+        "rfqQty": 1,
+        "mpns": [
+          "93711A600"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 590,
+        "lineId": 3122037,
+        "rfqQty": 1,
+        "mpns": [
+          "92217A470"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 600,
+        "lineId": 3122038,
+        "rfqQty": 1,
+        "mpns": [
+          "6816N16"
+        ],
+        "vqsThisBatch": 1
+      },
+      {
+        "lineNo": 610,
+        "lineId": 3122039,
+        "rfqQty": 1,
+        "mpns": [
+          "92558A100"
+        ],
+        "vqsThisBatch": 1
+      },
+      {
+        "lineNo": 620,
+        "lineId": 3122040,
+        "rfqQty": 1,
+        "mpns": [
+          "90909A522"
+        ],
+        "vqsThisBatch": 1
+      },
+      {
+        "lineNo": 630,
+        "lineId": 3122041,
+        "rfqQty": 1,
+        "mpns": [
+          "9129A111"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 640,
+        "lineId": 3122042,
+        "rfqQty": 1,
+        "mpns": [
+          "92558A100"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 650,
+        "lineId": 3122044,
+        "rfqQty": 1,
+        "mpns": [
+          "90909A522"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 660,
+        "lineId": 3122043,
+        "rfqQty": 1,
+        "mpns": [
+          "91075A020"
+        ],
+        "vqsThisBatch": 1
+      },
+      {
+        "lineNo": 670,
+        "lineId": 3122045,
+        "rfqQty": 1,
+        "mpns": [
+          "90278A303"
+        ],
+        "vqsThisBatch": 1
+      }
+    ],
+    "gaps": [
+      100,
+      110,
+      120,
+      150,
+      160,
+      250,
+      330,
+      380,
+      390,
+      400,
+      410,
+      450,
+      530,
+      540,
+      550,
+      570,
+      580,
+      590,
+      630,
+      640,
+      650
+    ]
+  }
+}
