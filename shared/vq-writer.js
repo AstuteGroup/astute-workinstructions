@@ -22,6 +22,7 @@
  *   - LAM Kitting reorder sourcing (future)
  */
 
+const { execFileSync } = require('child_process');
 const { apiGet, apiPost, resolveBP, resolveBPBatch, resolveMFR, buildNaturalKeyFilter } = require('./api-client');
 const { extractStockAndLtRows } = require('./franchise-api');
 const { lookupMfr, sanitizeMfrText } = require('./mfr-lookup');
@@ -30,6 +31,39 @@ const { normalizePackaging, PACKAGING_MAP } = require('./packaging-lookup');
 const { isValidEccn } = require('./validators');
 const { isRestrictedMfrName, isRestrictedMfrId } = require('./restricted-mfrs');
 const logger = require('./logger').createLogger('VQWriter');
+
+// ─── Natural-key existence check via psql ──────────────────────────────────
+// Why psql, not apiGet($filter): the iDempiere REST $filter on chuboe_vq_line
+// (same issue on chuboe_offer_line) silently returns the wrong row when the
+// filter doesn't parse — verified 2026-05-14 (offer_line) and 2026-05-19
+// (vq_line during TTI EU smoke load). A bogus "already exists" cascades into
+// silent dropped writes, which is worse than the duplicate it tries to prevent.
+// psql is read-only, fast, and deterministic — use it for the pre-flight.
+//
+// Returns the existing chuboe_vq_line_id, or null if no active row matches.
+function findExistingVqIdByNaturalKey(payload) {
+  const conditions = [
+    `chuboe_rfq_line_id = ${Number(payload.Chuboe_RFQ_Line_ID)}`,
+    `chuboe_mpn = '${String(payload.Chuboe_MPN || '').replace(/'/g, "''")}'`,
+    `c_bpartner_id = ${Number(payload.C_BPartner_ID)}`,
+    `cost = ${Number(payload.Cost)}`,
+    `c_currency_id = ${Number(payload.C_Currency_ID || 100)}`,
+    `isactive = 'Y'`,
+  ];
+  try {
+    const out = execFileSync(
+      'psql',
+      ['-At', '-c', `SELECT chuboe_vq_line_id FROM adempiere.chuboe_vq_line WHERE ${conditions.join(' AND ')} LIMIT 1;`],
+      { encoding: 'utf8' },
+    );
+    const id = out.split('\n').filter(Boolean).map(l => l.trim()).find(l => /^\d+$/.test(l));
+    return id ? Number(id) : null;
+  } catch (err) {
+    // psql unavailable or query failed — caller's catch will fall through to POST,
+    // accepting duplicate risk over data-loss risk.
+    throw err;
+  }
+}
 
 // Flag reason codes
 const FLAG = {
@@ -775,24 +809,27 @@ async function writeVQFromAPI(rfqSearchKey, cpc, franchiseResults, opts = {}) {
     // exists, skip (don't double-write). Adds one GET per VQ write but is
     // the only defense against concurrent distinct actors writing the same
     // logical row. Costs ~50-100ms per VQ, acceptable for data integrity.
-    const NATURAL_KEY_FIELDS = ['Chuboe_RFQ_Line_ID', 'Chuboe_MPN', 'C_BPartner_ID', 'Cost'];
+    // C_Currency_ID is part of the natural key — passive components priced in
+    // pennies/pence frequently coincide numerically between USD and GBP at
+    // sub-cent values (verified 2026-05-19 during TTI EU smoke load: 7 of 19
+    // GBP rows numerically matched pre-existing USD VQs at the same RFQ line
+    // / MPN / BP_ID). Omitting currency causes silent drops of legitimate
+    // multi-currency writes.
+    const NATURAL_KEY_FIELDS = ['Chuboe_RFQ_Line_ID', 'Chuboe_MPN', 'C_BPartner_ID', 'Cost', 'C_Currency_ID'];
     try {
-      const filter = buildNaturalKeyFilter(NATURAL_KEY_FIELDS, payload);
-      if (filter) {
-        const existing = await apiGet('Chuboe_VQ_Line', { filter, top: 1 });
-        if (existing.records && existing.records.length > 0) {
-          // Already written by another caller — skip without error
-          written.push({
-            vqLineId: existing.records[0].id, mpn, vendor: vendorDisplay, bpId: bp.id,
-            mfrId: resolvedMfrId, mfr: mfrCanonical, price, qty,
-            channel: row.channel || null,
-            _skippedAsDuplicate: true,
-          });
-          continue;
-        }
+      const existingId = findExistingVqIdByNaturalKey(payload);
+      if (existingId) {
+        // Already written by another caller — skip without error
+        written.push({
+          vqLineId: existingId, mpn, vendor: vendorDisplay, bpId: bp.id,
+          mfrId: resolvedMfrId, mfr: mfrCanonical, price, qty,
+          channel: row.channel || null,
+          _skippedAsDuplicate: true,
+        });
+        continue;
       }
     } catch (checkErr) {
-      // If the pre-check GET fails, log and fall through to POST —
+      // If the pre-check fails (psql unavailable, etc.), log and fall through to POST —
       // better to risk a duplicate than to lose a legitimate write.
       // apiPost's naturalKeyFields retry guard is still active below.
     }
