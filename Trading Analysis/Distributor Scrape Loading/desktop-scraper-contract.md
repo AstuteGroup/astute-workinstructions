@@ -37,6 +37,64 @@ You do NOT load VQs directly. You produce a JSON file and ship it. The server is
 
 **Folder location is the routing signal.** A scrape envelope dropped at `~/workspace/inbox/<source>/file.json` on the server is unambiguously a `<source>` envelope. You don't need to encode source identity inside the JSON for routing purposes; you put the file in the right folder.
 
+## Slug convention (source of truth)
+
+`<source>` is a **lowercase, hyphenated-where-the-brand-uses-hyphens, no-TLD short name.** Never `heilind.com`, never `Heilind`, never `heilind_corp`. Just `heilind`.
+
+**Canonical list for franchise distributors:** the slug equals the `disty` field exported by `shared/linecards/<slug>.js`, indexed in `shared/linecards/index.js`. Today: `digikey`, `mouser`, `tti`, `rutronik`, `heilind`. If you're adding a new franchise source, also add the linecard module (even a stub one if there's no public manufacturer endpoint to fetch from yet) so the slug is locked in one place.
+
+**Future non-distributor sources** (customer portals, broker market-intel, etc.) follow the same lowercase-no-TLD style and document the slug in their per-source cheat sheet at `scrape-adapters/<slug>.md`. They don't need a `shared/linecards/` entry because they're not franchise-data sources.
+
+**All four folder pairs use the same slug:**
+- `~/workspace/outbox/<slug>/` — requests going DOWN to desktop
+- `~/workspace/inbox/<slug>/` — results coming UP from desktop
+- `Trading Analysis/Distributor Scrape Loading/mappers/<slug>.js` — server-side raw-export parser (pattern C only)
+- `%USERPROFILE%\AstuteDocs\scrape-adapters\<slug>.md` — per-site cheat sheet on the desktop
+
+If any of these four diverge, the routing breaks. Mismatched slugs are how desktop ends up looking in an empty `heilind.com/` while files sit in `heilind/`.
+
+---
+
+# Customer-Identifying Information — DO NOT SHARE
+
+**Outbound files** — anything the desktop uploads, types, drags, or pastes into a distributor's BOM tool, search box, login form, or any other surface visible to the distributor — MUST contain ONLY the data the tool functionally requires. For a BOM-tool upload that's typically `MPN`, `Manufacturer`, and `Qty`. They MUST NOT contain:
+
+- Customer names, customer codes, or any field that identifies the end-customer
+- RFQ numbers, RFQ search keys, RFQ dates (these reveal demand timing and scale)
+- Buyer / salesperson names, sales region, or internal workflow context
+- COV / SO / PO numbers, prior-quote pricing, or any internal-only identifier
+- Anything that ties a request back to a specific end-customer
+
+**Broker norm:** never tell a franchise distributor *who* the demand is for, even indirectly — they may use it for sales prospecting, competitor intelligence, channel partner introductions, or pricing arbitrage. Even if the tool nominally ignores extra columns, distributors log full uploads.
+
+**Where round-trip context lives instead — sidecar JSON.** All customer / RFQ / date / buyer information lives in a server-side `*.meta.json` sidecar next to the upload file in `~/workspace/outbox/<source>/`. The sidecar never leaves the server. On result return, the server consumer joins the export back to the sidecar by `MPN` (or `MPN+MFR` if same-MPN-different-MFR disambiguation is needed) and re-attaches the demand-side context for VQ writeback.
+
+```
+~/workspace/outbox/heilind/
+├─ 2026-05-18T13-00-48Z.csv          ← MPN, Manufacturer, Qty (sent to Heilind)
+└─ 2026-05-18T13-00-48Z.meta.json    ← RFQ#, Customer, RFQ Date (stays on server)
+```
+
+**Producer responsibility:** every per-source producer (`heilind-rfq-candidates.js` and any future siblings) MUST emit the upload file with distributor-safe columns only, and a sidecar with the bookkeeping. The sidecar is the canonical home for everything else. An internal-only audit CSV with the full context is fine to keep server-side for operator inspection (`~/workspace/heilind-rfq-candidates.csv`), but that file MUST NOT be staged into `outbox/`.
+
+**Desktop responsibility:** if you receive an upload file from `outbox/<source>/` that contains a column that looks like customer / RFQ / date / buyer information, STOP — do not upload it. Tell the operator. The sidecar exists precisely so the upload file shouldn't ever contain those fields; the presence of them in the upload is a producer bug.
+
+---
+
+# Adapter Patterns (A / B / C)
+
+Each per-site adapter declares which of three ingest patterns it uses. The choice is per-site, not global — driven by what the distributor's site supports.
+
+| Pattern | Use when | Desktop work | What lands in `inbox/<source>/` | Server consumer |
+|---|---|---|---|---|
+| **A. Per-MPN → canonical JSON** *(default, universal fallback)* | Site has no BOM tool, or it's unusable. Works on any site with a product-page URL. | Visit each product page in turn, parse pricing/stock/lead, build one canonical entry per MPN. Pacing-budget-heavy (~1 action per MPN). | `scrape-<rfqSearchKey-or-LOOKUP>-<ts>.json` with `type: "distributor_scrape"` and the canonical `franchiseResults` envelope below. | `inbox-watcher.js` validates against the canonical schema and calls `writeVQBatch` directly. No per-source code needed. |
+| **B. Bulk BOM upload → canonical JSON, desktop parses** | Site has a BOM tool **and** its export is a clean, stable shape the adapter can parse confidently. | 1 upload + 1 download + adapter parses the export into the same canonical envelope as Pattern A. | Same file shape as Pattern A — `type: "distributor_scrape"`, canonical envelope. Server can't tell A from B. | Same as A — `writeVQBatch` directly. No per-source code needed. |
+| **C. Bulk BOM upload → raw export, server parses** | Site has a BOM tool but its export is messy/vendor-specific (multi-sheet xlsx, merged cells, custom columns) — desktop parsing would be brittle. | 1 upload + 1 download. Do **not** parse. Ship the raw export file + a meta sidecar; server parses. | Two files in `inbox/<source>/`: the raw export (`scrape-<key>-<ts>.<ext>`) and `scrape-<key>-<ts>.meta.json` with `type: "distributor_scrape_bulk"`, the search key, item-level context (`chuboeRfqLineMpnId`s), and `expectFormat: "<source>-bom-export-<ext>"`. | `inbox-watcher.js` routes by `type` to `mappers/<source>.js` which parses the raw export into canonical shape, then calls `writeVQBatch`. |
+
+**Which pattern Heilind uses, which Newark uses, etc., is the adapter's call** — locked in when the per-site adapter ships (and noted in the per-site `scrape-adapters/<source>.md` cheat sheet). The desktop bootstrap doesn't care; it just runs the adapter the operator named.
+
+**Pattern A's envelope shape is the canonical "found" schema below.** Pattern B emits exactly that. Pattern C ships the raw export + a meta sidecar instead, and the server reconstructs the canonical shape on the consumer side.
+
 ---
 
 # Trigger Phrases
@@ -165,10 +223,45 @@ Both rules apply in both directions — pushing scrape envelopes up AND the dail
 
 ---
 
+# Picking Up Outbox Requests (down direction)
+
+A daily producer (e.g. `heilind-rfq-candidates.js`) stages an upload file in `~/workspace/outbox/<source>/<UTC-ts>.csv` and emails the operator. The desktop pulls that file via `scp -O`, runs the distributor's BOM tool, and ships the result back up to `~/workspace/inbox/<source>/`.
+
+**The act of retrieving IS the delete.** Once a file has been successfully pulled, immediately remove it server-side via ssh. The server keeps no copy of the upload — the audit trail lives in the inbox-side `.result.json` once the load completes.
+
+```powershell
+# 1. Pull the file into the Windows temp dir.
+scp -O analytics_user@44.222.126.129:~/workspace/outbox/heilind/2026-05-19T12-00-00Z.csv `
+    "$env:TEMP\heilind-2026-05-19.csv"
+
+# 2. Verify the local copy exists and is non-empty BEFORE deleting from server.
+if ((Test-Path "$env:TEMP\heilind-2026-05-19.csv") -and `
+    (Get-Item "$env:TEMP\heilind-2026-05-19.csv").Length -gt 0) {
+    ssh analytics_user@44.222.126.129 "rm /home/analytics_user/workspace/outbox/heilind/2026-05-19T12-00-00Z.csv"
+}
+```
+
+**Do NOT delete the paired `.meta.json` sidecar.** That file stays server-side — the watcher uses it to re-attach RFQ context when your scrape result lands in the inbox. The watcher itself deletes the sidecar after a successful load.
+
+If the operator says "pull whatever Heilind has waiting", list the outbox first to see what's there, then pull + delete each, oldest first:
+
+```powershell
+ssh analytics_user@44.222.126.129 "ls -t ~/workspace/outbox/heilind/*.csv"
+```
+
+---
+
 # File Naming + scp Handoff
 
-## Local staging path
-`C:\Users\<you>\Sourcing\<source>\` — one subfolder per distributor adapter (e.g. `C:\Users\jake.harris\Sourcing\mouser\`). Create on first run.
+## Local staging path (ephemeral)
+
+**Do NOT accumulate files in the operator's home directory.** Stage the envelope in the Windows temp dir, scp it, delete the temp file. The server is the system of record — `~/workspace/inbox/done/<YYYY-MM-DD>/<source>/` is the audit archive.
+
+- **Envelope JSON (patterns A and B)**: write to `${env:TEMP}\scrape-<key>-<ts>.json.partial`, scp `-O` to server, ssh-rename to `.json`, then `Remove-Item` the local temp file.
+- **Raw BOM export (pattern C)**: the browser drops the download in `${env:USERPROFILE}\Downloads\` because that's the browser's choice, not ours. As soon as the download completes, scp `-O` it up to `~/workspace/inbox/<source>/scrape-<key>-<ts>.<ext>.partial`, ssh-rename, then `Remove-Item` the `Downloads\` copy. Also emit the `*.meta.json` sidecar (same scp+rename dance).
+- **On scp failure**: keep the temp file until upload succeeds. Windows cleans `%TEMP%` on reboot, so even a permanently-failed upload won't accumulate forever. Do NOT delete the temp file before the upload confirms success.
+
+The `C:\Users\<you>\Sourcing\<source>\` pattern from earlier drafts is **deprecated** — never write there.
 
 ## Atomic-write protocol (CRITICAL)
 The server watcher polls the inbox. To avoid it picking up a half-written file:
@@ -194,14 +287,15 @@ The watcher only picks up `*.json` files (NOT `*.partial`), so you can't deliver
 # From PowerShell on the Windows machine.
 # -O forces the legacy SCP protocol (the server's SFTP subsystem does not start).
 # Remote path is absolute; never use a bare relative path like "workspace/inbox/<source>/".
-scp -O "C:\Users\<you>\Sourcing\<source>\scrape-1131217-20260515T153042Z.json" `
+# Source path is the ephemeral temp file — see "Local staging path (ephemeral)" above.
+scp -O "$env:TEMP\scrape-1131217-20260515T153042Z.json" `
     analytics_user@44.222.126.129:/home/analytics_user/workspace/inbox/<source>/
 ```
 
 A `~/`-prefixed target works equivalently:
 
 ```powershell
-scp -O "C:\Users\<you>\Sourcing\<source>\scrape-1131217-20260515T153042Z.json" `
+scp -O "$env:TEMP\scrape-1131217-20260515T153042Z.json" `
     analytics_user@44.222.126.129:~/workspace/inbox/<source>/
 ```
 
@@ -213,9 +307,10 @@ Use the same SSH key the operator already uses to reach the server. If you don't
 scp writes to the target path directly — partial transfers can expose half-written files. Use a `.partial` suffix on the remote name, then SSH a `mv` to publish:
 
 ```powershell
-scp -O "C:\Users\<you>\Sourcing\<source>\scrape-1131217-...json" `
+scp -O "$env:TEMP\scrape-1131217-...json" `
     analytics_user@44.222.126.129:/home/analytics_user/workspace/inbox/<source>/scrape-1131217-...json.partial
 ssh analytics_user@44.222.126.129 "mv /home/analytics_user/workspace/inbox/<source>/scrape-1131217-...json.partial /home/analytics_user/workspace/inbox/<source>/scrape-1131217-...json"
+Remove-Item "$env:TEMP\scrape-1131217-...json"
 ```
 
 The watcher's "only pick up `*.json`" rule means the SSH rename is the atomic publish step.
@@ -254,7 +349,7 @@ The watcher at `~/workspace/astute-workinstructions/Trading Analysis/Distributor
 2. Validates the envelope schema. Bad files → `~/workspace/inbox/failed/<source>/<name>.json` + `<name>.error.json` with reason.
 3. If `rfqSearchKey` is set: calls `writeVQBatch(rfqSearchKey, items)` from `shared/vq-writer.js`. Two-pass exact→fuzzy MPN resolution. Writes VQ lines directly to iDempiere.
 4. If `rfqSearchKey` is absent: calls `writePricingResult(...)` per distributor result for market-intel capture (no VQs).
-5. Moves the input to `~/workspace/inbox/done/<YYYY-MM-DD>/<source>/<filename>` + writes `<filename>.result.json` with `{ written, flagged, failed, needsReview, summary }`.
+5. Writes `~/workspace/inbox/done/<YYYY-MM-DD>/<source>/<filename>.result.json` with `{ written, flagged, failed, needsReview, summary }`, **deletes the inbox envelope** (the result sidecar is the audit), and **deletes the paired outbox `.meta.json` sidecar** (its job ended with this load).
 6. Emits a notifier email per run summarizing the load (immediate on error, digested at 11/16/20 UTC otherwise).
 
 You won't see the load result. The operator sees it in their inbox. If something looks wrong, the operator will tell you and you re-scrape.
@@ -273,3 +368,5 @@ For the full server-side workflow doc, see the cached copy at `%USERPROFILE%\Ast
 - **Do NOT** use a bare relative remote path (`workspace/inbox/...`). The server auto-`cd`s into `~/workspace/` at login, so it resolves to `~/workspace/workspace/inbox/...` and fails.
 - **Do NOT** edit envelopes after they've been shipped. If you find a bug, write a new envelope with a new timestamp.
 - **Do NOT** include `IsActive`, `AD_Client_ID`, `AD_Org_ID`, or any other server-managed field. The server fills those in.
+- **Do NOT** leave an outbox file on the server after pulling it. The act of retrieval IS the delete — `ssh ... rm` immediately after a successful `scp -O` pull, only after verifying the local copy exists and is non-empty.
+- **Do NOT** delete `*.meta.json` files from `~/workspace/outbox/<source>/`. Those are server-side bookkeeping; the watcher removes them when it processes the matching inbox result.

@@ -70,30 +70,43 @@ Consolidated roadmap for RFQ Sourcing and VQ Processing workflows, organized by 
 
 ---
 
-## A2. Non-API Account Scraping
+## A2. Non-API Account Scraping (franchise data channel #3)
 
-**Status:** Planned | **Priority:** Later
+**Status:** Architecture documented, implementation in progress | **Priority:** Active
 
-**Problem:** Some franchise manufacturers where Astute has direct accounts offer web-based price & availability tools but no programmatic API. Currently these require manual lookups.
+**Problem:** Some franchise distributors where Astute has direct accounts offer web-based price & availability tools but no programmatic API — or rate-limit/WAF-block bot-style traffic from headless scrapers run server-side. Currently these require manual lookups.
 
-**Solution:**
-- Use Playwright to automate web-based P&A tools
-- Submit part numbers + quantities, scrape pricing and availability
-- Feed results into franchise screening and Quick Quote workflows
+**Solution — desktop scraping pipeline.** Operator-attended Claude Code instance runs on Windows next to authenticated Chrome sessions, drives the distributor's quote/BOM tool, and ships results as JSON envelopes to `~/workspace/inbox/<source>/` on the server via scp. Server-side watcher loads them into `chuboe_vq_line` via the REST API — same canonical envelope shape `enrich-poller.js` already feeds, so no special-case writer logic.
 
-**Target Accounts:**
-- **Coilcraft** — `coilcraft.com/en-us/partupload/` (bulk part upload form, returns pricing + availability from US warehouse)
+This is the third franchise-data channel alongside:
+1. **Franchise APIs** — `enrich-poller.js` calling DigiKey / Mouser / Arrow / TTI / Future / Avnet REST endpoints
+2. **NetComponents email sourcing** — `Trading Analysis/RFQ Sourcing/netcomponents/` posts RFQs to NC, parses replies into VQs
 
-**Implementation Approach:**
-1. Build per-manufacturer Playwright scripts in `shared/` or `Trading Analysis/RFQ Sourcing/franchise_check/`
-2. Handle auth/session management per account
-3. Parse response tables into standardized format (MPN, price breaks, stock qty, lead time)
-4. Integrate with `shared/franchise-api.js` as additional data source
+**Architecture docs (read before implementing any new adapter):**
+- `Trading Analysis/Distributor Scrape Loading/desktop-scraper-contract.md` — envelope shapes, three adapter patterns (per-MPN canonical / bulk BOM canonical / bulk BOM raw-export), pacing rules, scp gotchas, atomic publish
+- `Trading Analysis/Distributor Scrape Loading/distributor-scrape-loading.md` — server-side watcher behavior, failure modes, `mappers/<source>.js` convention
+
+**Target accounts (priority order):**
+- **Heilind** — `heilind.com` BOM/Quick-Quote tool (the working sample; first adapter to ship)
+- **Coilcraft** — `coilcraft.com/en-us/partupload/` (bulk part upload, US-warehouse pricing + availability)
+- TBD: assessment per franchise account on whether the site has a usable BOM tool (patterns B/C) or only product-page scraping is viable (pattern A)
+
+**Implementation approach (per new distributor):**
+1. Confirm the site has a BOM tool and try it manually first; capture a sample input CSV + sample export
+2. Decide adapter pattern (A/B/C) per the contract
+3. Add a per-site `scrape-adapters/<source>.md` cheat sheet (selectors, auth nuance, BOM-tool URL)
+4. For pattern C: add `Trading Analysis/Distributor Scrape Loading/mappers/<source>.js` with a fixture-based unit test
+5. Pilot with a small RFQ; verify VQs land correctly server-side; tune pacing if Imperva-style soft-degradation surfaces
+
+**Pacing discipline (load-bearing):**
+- 3–15s randomized inter-lookup delay (pattern A)
+- ≤15 lookups / 30 min / distributor across all sessions (pattern A)
+- Patterns B/C drastically reduce pacing risk by collapsing N page hits into 1 upload + 1 download per batch
+- Hard rule: if a page returns CAPTCHA or 404, STOP that distributor for the rest of the run — never retry through soft-degradation
 
 **Notes:**
-- Fragile by nature — manufacturer site changes can break scrapers
-- Rate-limit requests to avoid account issues
-- Add new manufacturers here as direct accounts are identified
+- Fragile by nature — site DOM changes break adapters. Per-site fixture tests on the mapper layer are the regression guard.
+- Operator-attended is the security posture, not a temporary state. Customer pricing only appears in logged-in sessions; running unattended risks credential lockout.
 
 ---
 

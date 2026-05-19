@@ -67,6 +67,9 @@ const DAY_MS = 24 * 60 * 60 * 1000;
 // requireEnvelope: response must match this shape or miss is ignored
 // requireContext: the calling context must match (e.g. Waldom inStockOnly=false)
 // excludeReasons: don't cache when the miss came from these paths
+// requireRequestedQty: callers MUST pass requestedQty on record() and qty on check();
+//   used by single-tier sources (e.g. Heilind BOM tool) where price is only valid
+//   at one qty point. Default tolerance ±25% on retrieval — see check() docs.
 const DISTY_RULES = {
   digikey:    { ttlDays: 180, confirmCount: 1 },
   arrow:      { ttlDays: 180, confirmCount: 1 },
@@ -78,12 +81,26 @@ const DISTY_RULES = {
   master:     { ttlDays: 180, confirmCount: 1 },
   waldom:     { ttlDays: 180, confirmCount: 1, requireContext: { inStockOnly: false } },
   sager:      { ttlDays: 180, confirmCount: 1, requireEnvelope: { status: 'Success' } },
+  heilind:    { ttlDays: 180, confirmCount: 1, requireRequestedQty: true },
   oemsecrets: null,  // dormant + aggregator semantics — skip
 };
 
 // Carried (hit) TTL is shorter — prices/stock move. We still cache for dedup
 // within a single run plus short-window re-asks. No confirm count needed.
 const CARRIED_TTL_DAYS = 7;
+
+// matched_no_price: a third result state for sources whose catalog hit returns
+// no live pricing (Heilind BOM tool's "DAC PN populated, Price1=0" outcome).
+// Fixed 60d TTL across all RFQ types — this is a property of the catalog /
+// quote engine, not of how urgently we need the price. After 60d we re-probe
+// in case the quote engine's pricing record got fixed.
+const MATCHED_NO_PRICE_TTL_DAYS = 60;
+
+// Default qty tolerance for requireRequestedQty disties on check(). ±25%
+// generally stays within one of Heilind's published tier boundaries (typically
+// 10× apart: 1 / 10 / 100 / 1000 / 10000). Tighter than this re-scrapes too
+// often; looser risks crossing a tier boundary and returning stale pricing.
+const DEFAULT_QTY_TOLERANCE = 0.25;
 
 // ---------------------------------------------------------------------------
 // MPN / MFR normalization
@@ -138,7 +155,7 @@ function getDB() {
       mfr_raw TEXT,
       mfr_normalized TEXT,
       disty TEXT NOT NULL,
-      result TEXT NOT NULL,             -- 'not_carried' | 'carried'
+      result TEXT NOT NULL,             -- 'not_carried' | 'carried' | 'matched_no_price'
       -- Lifecycle
       first_seen_at INTEGER NOT NULL,
       last_seen_at INTEGER NOT NULL,
@@ -225,6 +242,13 @@ function getDB() {
     CREATE INDEX IF NOT EXISTS idx_shadow_time ON shadow_log(logged_at);
   `);
 
+  // Migration: add requested_qty column for single-tier sources (Heilind etc.).
+  // Nullable so existing rows from non-qty-aware paths continue to work.
+  const cols = _db.prepare(`PRAGMA table_info(cache_entries)`).all();
+  if (!cols.some(c => c.name === 'requested_qty')) {
+    _db.exec(`ALTER TABLE cache_entries ADD COLUMN requested_qty INTEGER`);
+  }
+
   return _db;
 }
 
@@ -235,31 +259,53 @@ function getDB() {
 /**
  * Look up whether we have a valid cached outcome for this (mpn, mfr, disty).
  *
+ * For disties with `requireRequestedQty: true` (e.g. heilind), the caller MUST
+ * pass `qty` — otherwise the lookup returns null (we won't serve a single-tier
+ * cached price for a query that didn't tell us what qty it cares about).
+ * Optional `qtyTolerance` overrides the default ±25% window.
+ *
  * @param {object} opts
  * @param {string} opts.mpn
  * @param {string} [opts.mfr]
  * @param {string} opts.disty
- * @returns {null | { result, cached_at, expires_at, source, id }}
+ * @param {number} [opts.qty]              - current query qty; required for single-tier disties
+ * @param {number} [opts.qtyTolerance]     - default 0.25 (±25%)
+ * @returns {null | { result, cached_at, expires_at, requested_qty, source, id }}
  */
-function check({ mpn, mfr, disty }) {
+function check({ mpn, mfr, disty, qty, qtyTolerance = DEFAULT_QTY_TOLERANCE }) {
   if (!DISTY_RULES[disty]) return null;           // unknown or disabled disty
+
+  const rule = DISTY_RULES[disty];
+  if (rule.requireRequestedQty && (qty === undefined || qty === null)) {
+    return null;  // single-tier disty queried without qty — can't serve safely
+  }
 
   const mpnN = normalizeMpn(mpn);
   if (!mpnN) return null;
   const mfrN = canonicalMfr(mfr);
 
   const db = getDB();
-  const row = db.prepare(`
-    SELECT id, result, first_seen_at, last_seen_at, expires_at, confirm_count
+  let sql = `
+    SELECT id, result, first_seen_at, last_seen_at, expires_at, confirm_count, requested_qty
     FROM cache_entries
     WHERE mpn_normalized = ? AND mfr_normalized = ? AND disty = ?
       AND invalidated_at IS NULL
-      AND expires_at > ?
-  `).get(mpnN, mfrN, disty, Date.now());
+      AND expires_at > ?`;
+  const params = [mpnN, mfrN, disty, Date.now()];
 
+  if (qty !== undefined && qty !== null) {
+    // Qty-proximity filter — cached entry is reusable when the query qty
+    // falls within ±tolerance of the entry's requested_qty (entry is the
+    // anchor, not the query). E.g., entry at qty=1000 with ±25% tolerance
+    // covers queries in [750, 1250]. Query at 1300 misses (30% above 1000).
+    sql += ` AND requested_qty IS NOT NULL
+             AND ? BETWEEN requested_qty * ? AND requested_qty * ?`;
+    params.push(qty, 1 - qtyTolerance, 1 + qtyTolerance);
+  }
+
+  const row = db.prepare(sql).get(...params);
   if (!row) return null;
 
-  const rule = DISTY_RULES[disty];
   // For disties requiring confirmation, only serve once confirmed
   if (rule.confirmCount > 1 && row.confirm_count < rule.confirmCount) return null;
 
@@ -268,6 +314,7 @@ function check({ mpn, mfr, disty }) {
     result: row.result,
     cached_at: row.first_seen_at,
     expires_at: row.expires_at,
+    requested_qty: row.requested_qty,
     source: 'neg-cache',
   };
 
@@ -283,19 +330,25 @@ function check({ mpn, mfr, disty }) {
  * mode. For use by shadow-audit loggers that need to compare "what cache
  * had" to "what the live API returned" without actually serving the hit.
  */
-function peek({ mpn, mfr, disty }) {
+function peek({ mpn, mfr, disty, qty, qtyTolerance = DEFAULT_QTY_TOLERANCE }) {
   if (!DISTY_RULES[disty]) return null;
   const mpnN = normalizeMpn(mpn);
   if (!mpnN) return null;
   const mfrN = canonicalMfr(mfr);
   const db = getDB();
-  const row = db.prepare(`
-    SELECT id, result, first_seen_at, expires_at, confirm_count
+  let sql = `
+    SELECT id, result, first_seen_at, expires_at, confirm_count, requested_qty
     FROM cache_entries
     WHERE mpn_normalized = ? AND mfr_normalized = ? AND disty = ?
       AND invalidated_at IS NULL
-      AND expires_at > ?
-  `).get(mpnN, mfrN, disty, Date.now());
+      AND expires_at > ?`;
+  const params = [mpnN, mfrN, disty, Date.now()];
+  if (qty !== undefined && qty !== null) {
+    sql += ` AND requested_qty IS NOT NULL
+             AND ? BETWEEN requested_qty * ? AND requested_qty * ?`;
+    params.push(qty, 1 - qtyTolerance, 1 + qtyTolerance);
+  }
+  const row = db.prepare(sql).get(...params);
   if (!row) return null;
   const rule = DISTY_RULES[disty];
   if (rule.confirmCount > 1 && row.confirm_count < rule.confirmCount) return null;
@@ -304,6 +357,7 @@ function peek({ mpn, mfr, disty }) {
     result: row.result,
     cached_at: row.first_seen_at,
     expires_at: row.expires_at,
+    requested_qty: row.requested_qty,
     source: 'neg-cache-peek',
   };
 }
@@ -315,13 +369,15 @@ function peek({ mpn, mfr, disty }) {
  * @param {string} opts.mpn
  * @param {string} [opts.mfr]
  * @param {string} opts.disty
- * @param {'not_carried' | 'carried'} opts.result
+ * @param {'not_carried' | 'carried' | 'matched_no_price'} opts.result
  * @param {object} [opts.envelope]       - raw response envelope fields for rule gates
  * @param {object} [opts.context]        - calling context (e.g. inStockOnly for Waldom)
  * @param {string} [opts.reason]         - internal branch tag (e.g. 'json_error') for excludeReasons
  * @param {number} [opts.priceBreaksN]
  * @param {number} [opts.stockQty]
  * @param {number} [opts.costUnit]
+ * @param {number} [opts.requestedQty]   - the qty we submitted to the source; REQUIRED for
+ *                                         disties with requireRequestedQty (e.g. heilind)
  * @returns {{ cached: boolean, entry_id?: number, skipped_reason?: string }}
  */
 function record(opts) {
@@ -347,12 +403,19 @@ function record(opts) {
       }
     }
   }
+  if (rule.requireRequestedQty &&
+      (opts.requestedQty === undefined || opts.requestedQty === null)) {
+    return { cached: false, skipped_reason: 'missing_requested_qty' };
+  }
 
   const mpnN = normalizeMpn(mpn);
   if (!mpnN) return { cached: false, skipped_reason: 'invalid_mpn' };
   const mfrN = canonicalMfr(mfr);
   const now = Date.now();
-  const ttlDays = result === 'carried' ? CARRIED_TTL_DAYS : rule.ttlDays;
+  const ttlDays =
+    result === 'carried' ? CARRIED_TTL_DAYS :
+    result === 'matched_no_price' ? MATCHED_NO_PRICE_TTL_DAYS :
+    rule.ttlDays;
   const expires = now + ttlDays * DAY_MS;
 
   const envelopeHash = opts.envelope
@@ -366,6 +429,10 @@ function record(opts) {
     WHERE mpn_normalized = ? AND mfr_normalized = ? AND disty = ?
   `).get(mpnN, mfrN, disty);
 
+  const requestedQty = (opts.requestedQty !== undefined && opts.requestedQty !== null)
+    ? Math.trunc(Number(opts.requestedQty))
+    : null;
+
   if (existing) {
     // Reinforce if the result agrees and the min-gap (if any) is satisfied
     if (existing.result === result) {
@@ -378,11 +445,12 @@ function record(opts) {
             price_breaks_n = COALESCE(?, price_breaks_n),
             stock_qty = COALESCE(?, stock_qty),
             cost_unit = COALESCE(?, cost_unit),
+            requested_qty = COALESCE(?, requested_qty),
             invalidated_at = NULL, invalidation_reason = NULL
         WHERE id = ?
       `).run(now, expires, newConfirm, envelopeHash,
              opts.priceBreaksN ?? null, opts.stockQty ?? null, opts.costUnit ?? null,
-             existing.id);
+             requestedQty, existing.id);
       return { cached: true, entry_id: existing.id };
     }
     // Flip — the last result disagrees. Reset confirm and record the new.
@@ -390,11 +458,12 @@ function record(opts) {
       UPDATE cache_entries
       SET result = ?, last_seen_at = ?, expires_at = ?, confirm_count = 1,
           envelope_hash = ?, price_breaks_n = ?, stock_qty = ?, cost_unit = ?,
+          requested_qty = ?,
           invalidated_at = NULL, invalidation_reason = NULL
       WHERE id = ?
     `).run(result, now, expires, envelopeHash,
            opts.priceBreaksN ?? null, opts.stockQty ?? null, opts.costUnit ?? null,
-           existing.id);
+           requestedQty, existing.id);
     return { cached: true, entry_id: existing.id, flipped: true };
   }
 
@@ -402,11 +471,12 @@ function record(opts) {
     INSERT INTO cache_entries
       (mpn, mpn_normalized, mfr_raw, mfr_normalized, disty, result,
        first_seen_at, last_seen_at, expires_at, confirm_count,
-       envelope_hash, price_breaks_n, stock_qty, cost_unit)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?, ?)
+       envelope_hash, price_breaks_n, stock_qty, cost_unit, requested_qty)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?, ?, ?)
   `).run(mpn, mpnN, mfr || null, mfrN, disty, result,
          now, now, expires,
-         envelopeHash, opts.priceBreaksN ?? null, opts.stockQty ?? null, opts.costUnit ?? null);
+         envelopeHash, opts.priceBreaksN ?? null, opts.stockQty ?? null, opts.costUnit ?? null,
+         requestedQty);
 
   return { cached: true, entry_id: Number(info.lastInsertRowid) };
 }
@@ -473,10 +543,13 @@ function invalidateByAcquisition({ oldMfr, newMfr, reason }) {
  */
 function sampleForProbing({ disty, n = 20, biasHotMfrs = true }) {
   const db = getDB();
+  // Probe both 'not_carried' AND 'matched_no_price' — both represent
+  // negative outcomes worth re-checking. 'carried' entries refresh through
+  // normal demand, not probing.
   const sql = biasHotMfrs
     ? `
         SELECT c.id, c.mpn, c.mpn_normalized, c.mfr_raw, c.mfr_normalized, c.disty,
-               c.first_seen_at, c.last_seen_at
+               c.result, c.requested_qty, c.first_seen_at, c.last_seen_at
         FROM cache_entries c
         LEFT JOIN (
           SELECT mfr_normalized, COUNT(*) AS cnt
@@ -485,7 +558,7 @@ function sampleForProbing({ disty, n = 20, biasHotMfrs = true }) {
           GROUP BY mfr_normalized
         ) h ON h.mfr_normalized = c.mfr_normalized
         WHERE c.disty = ?
-          AND c.result = 'not_carried'
+          AND c.result IN ('not_carried', 'matched_no_price')
           AND c.invalidated_at IS NULL
           AND c.expires_at > ?
         ORDER BY COALESCE(h.cnt, 0) DESC, RANDOM()
@@ -493,9 +566,9 @@ function sampleForProbing({ disty, n = 20, biasHotMfrs = true }) {
       `
     : `
         SELECT id, mpn, mpn_normalized, mfr_raw, mfr_normalized, disty,
-               first_seen_at, last_seen_at
+               result, requested_qty, first_seen_at, last_seen_at
         FROM cache_entries
-        WHERE disty = ? AND result = 'not_carried'
+        WHERE disty = ? AND result IN ('not_carried', 'matched_no_price')
           AND invalidated_at IS NULL AND expires_at > ?
         ORDER BY RANDOM()
         LIMIT ?

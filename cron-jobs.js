@@ -297,6 +297,28 @@ module.exports = [
     logFile: '/tmp/offer-breadcrumbs-prune.log',
     description: 'Sunday 02 UTC — drop offer-pipeline breadcrumbs older than 7 days',
   },
+
+  {
+    name: 'heilind-producer',
+    cadence: 'daily',
+    // 12:00 UTC = 08:00 EDT — matches operator workday start
+    cadenceCron: '0 12 * * *',
+    command: `node ${WORKSPACE}/heilind-rfq-candidates.js`,
+    cwd: WORKSPACE,
+    needsOT: false,
+    logFile: '/tmp/heilind-producer.log',
+    description: 'Daily 12 UTC (08 EDT) — build Heilind BOM tool upload (linecard × 30d demand, cache-filtered ±25% qty), stage to outbox/heilind/, email operator',
+  },
+  {
+    name: 'scrape-inbox-watcher',
+    cadence: 'every 15m',
+    cadenceCron: '*/15 * * * *',
+    command: `node "${ASTUTE}/Trading Analysis/Distributor Scrape Loading/inbox-watcher.js"`,
+    cwd: ASTUTE,
+    needsOT: true,
+    logFile: '/tmp/scrape-inbox-watcher.log',
+    description: 'Every 15m — scan inbox/<source>/, dispatch via mappers/<source>.js, write VQs + pricing cache + negative cache, move to done/. Anomaly email on flagged/errored.',
+  },
 ];
 
 // Helper: convert cadence string to milliseconds (used by sentinel + runner).

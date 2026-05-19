@@ -1,21 +1,39 @@
 /**
  * Distributor Scrape Inbox Watcher
  *
- * Polls ~/workspace/inbox/ for scrape-*.json envelopes produced by the local
- * Windows Claude instance (see ./local-windows-CLAUDE.md). Validates each
- * envelope, then hands items to shared/vq-writer.js#writeVQBatch for VQ
- * loading. Files with no rfqSearchKey are recorded as pricing intel via
- * shared/api-result-writer.js#writePricingResult instead.
+ * Polls ~/workspace/inbox/<source>/ for files the per-source mapper at
+ * `mappers/<source>.js` recognizes as processable, then dispatches each via
+ * the mapper's `processExport()`. Source-agnostic: adding a new disty means
+ * dropping files in `inbox/<slug>/` + creating `mappers/<slug>.js`. No watcher
+ * changes needed.
  *
- * Result sidecars land in ~/workspace/inbox/done/<YYYY-MM-DD>/.
- * Validation/load failures land in ~/workspace/inbox/failed/.
+ * Two supported file patterns (per desktop-scraper-contract.md § Adapter Patterns):
+ *   - Pattern A/B: canonical JSON envelope (scrape-*.json). The generic JSON
+ *     mapper (mappers/json-envelope.js, if/when needed) handles validation +
+ *     writeVQBatch. Not used by any source today.
+ *   - Pattern C:   raw export (xlsx/csv) + meta sidecar in outbox/<source>/.
+ *     Each per-source mapper (mappers/heilind.js, etc.) handles parsing +
+ *     writes via writeVQBatch + writePricingResult + negCache.
  *
- * Cron: every minute, gated via cron-runner.js (single-instance lock).
+ * On success the envelope is DELETED (not archived); the .result.json sidecar
+ * in done/<YYYY-MM-DD>/<source>/<filename>.result.json is the audit record.
+ * The paired outbox .meta.json (if any) is deleted too — its job ended with
+ * this load. On failure the envelope is moved to failed/<source>/ for review.
+ *
+ * Result sidecars: ~/workspace/inbox/done/<YYYY-MM-DD>/<source>/<filename>.result.json
+ * Failures:       ~/workspace/inbox/failed/<source>/<filename>.error.json
+ *
+ * Per-mapper interface (mappers/<source>.js MUST export):
+ *   processExport({exportPath, sidecarPath, dryRun}) → result
+ *   autoPairSidecar(exportPath)                       → string|null
+ *   isProcessableFile(filename)                       → boolean
+ *
+ * Cron: every 15 minutes, gated via cron-runner.js (single-instance lock).
  *
  * Manual:
  *   node inbox-watcher.js                    # process current inbox, exit
- *   node inbox-watcher.js --dry-run          # parse + validate only
- *   node inbox-watcher.js --file=NAME.json   # process one named file
+ *   node inbox-watcher.js --dry-run          # parse/validate only, no writes
+ *   node inbox-watcher.js --source=heilind   # only process one source folder
  */
 
 'use strict';
@@ -23,18 +41,15 @@
 const fs = require('fs');
 const path = require('path');
 
-// Repo-relative resolution — keep this script portable if the work-instructions
-// directory ever moves. shared/ lives two levels up from "Trading Analysis/<wf>/".
+// Repo-relative resolution — keep portable if work-instructions moves.
+// shared/ lives two levels up from "Trading Analysis/<wf>/".
 const REPO_ROOT = path.resolve(__dirname, '..', '..');
 const SHARED = path.join(REPO_ROOT, 'shared');
+const MAPPERS_DIR = path.join(__dirname, 'mappers');
 
-const { writeVQBatch } = require(path.join(SHARED, 'vq-writer'));
-const { writePricingResult } = require(path.join(SHARED, 'api-result-writer'));
 const { createNotifier } = require(path.join(SHARED, 'notifier'));
 const logger = require(path.join(SHARED, 'logger')).createLogger('ScrapeInboxWatcher');
 
-// .env (WORKMAIL_PASS) is loaded by ~/workspace/.env via the cron-runner's
-// dotenv preload (consistent with other shared cogs).
 const WORKMAIL_PASS = process.env.WORKMAIL_PASS;
 const NOTIFIER_FROM = process.env.SCRAPE_NOTIFIER_FROM || 'stockRFQ@orangetsunami.com';
 const notifier = createNotifier({
@@ -49,15 +64,20 @@ const notifier = createNotifier({
 const INBOX = path.join(process.env.HOME, 'workspace', 'inbox');
 const DONE_ROOT = path.join(INBOX, 'done');
 const FAILED = path.join(INBOX, 'failed');
-const PROCESSING_TTL_MS = 5 * 60 * 1000; // stale `.processing` markers expire after 5 min
-
+const PROCESSING_TTL_MS = 5 * 60 * 1000;  // stale `.processing` markers expire after 5 min
 const ROLLUP_PATH = path.join(process.env.HOME, 'workspace', '.scrape-load-rollup.json');
+
+// File suffixes that are NEVER primary files — sidecars, markers, results.
+const SKIP_SUFFIXES = ['.processing', '.partial', '.error.json', '.result.json', '.meta.json'];
+
+// Top-level subdirs under inbox/ that aren't source folders.
+const RESERVED_DIRS = new Set(['done', 'failed']);
 
 // ─── Args ───────────────────────────────────────────────────────────────────
 
 const args = process.argv.slice(2);
 const DRY_RUN = args.includes('--dry-run');
-const SPECIFIC_FILE = (args.find(a => a.startsWith('--file=')) || '').split('=')[1] || null;
+const SOURCE_FILTER = (args.find(a => a.startsWith('--source=')) || '').split('=')[1] || null;
 const OPERATOR_EMAIL = process.env.OPERATOR_EMAIL || 'jake.harris@astutegroup.com';
 
 // ─── Bootstrap dirs ─────────────────────────────────────────────────────────
@@ -68,147 +88,128 @@ function ensureDirs() {
   }
 }
 
-// ─── Schema validation ──────────────────────────────────────────────────────
-
-class ValidationError extends Error {
-  constructor(path, message) {
-    super(`${path}: ${message}`);
-    this.path = path;
-  }
+function todayDate() {
+  return new Date().toISOString().slice(0, 10);
 }
 
-function validateEnvelope(env) {
-  if (env == null || typeof env !== 'object') throw new ValidationError('$', 'envelope is not an object');
-  if (env.version !== 1) throw new ValidationError('$.version', `must be 1, got ${env.version}`);
-  if (env.type !== 'distributor_scrape') throw new ValidationError('$.type', `must be "distributor_scrape", got ${env.type}`);
-  if (typeof env.createdAt !== 'string') throw new ValidationError('$.createdAt', 'must be an ISO-8601 string');
-  if (typeof env.operator !== 'string') throw new ValidationError('$.operator', 'must be a string');
-  if (typeof env.source !== 'string') throw new ValidationError('$.source', 'must be a string');
-  if (env.rfqSearchKey != null && typeof env.rfqSearchKey !== 'string') {
-    throw new ValidationError('$.rfqSearchKey', 'must be a string when present');
-  }
-  if (!Array.isArray(env.items) || env.items.length === 0) {
-    throw new ValidationError('$.items', 'must be a non-empty array');
-  }
+// ─── Mapper loading ─────────────────────────────────────────────────────────
 
-  env.items.forEach((item, i) => {
-    const p = `$.items[${i}]`;
-    if (!item || typeof item !== 'object') throw new ValidationError(p, 'must be an object');
-    if (typeof item.searchedMpn !== 'string' || !item.searchedMpn.trim()) {
-      throw new ValidationError(`${p}.searchedMpn`, 'required, non-empty string');
-    }
-    if (!item.franchiseResults || typeof item.franchiseResults !== 'object') {
-      throw new ValidationError(`${p}.franchiseResults`, 'required object');
-    }
-    const dists = item.franchiseResults.distributors;
-    if (!Array.isArray(dists)) {
-      throw new ValidationError(`${p}.franchiseResults.distributors`, 'must be an array');
-    }
-    dists.forEach((d, j) => {
-      const dp = `${p}.franchiseResults.distributors[${j}]`;
-      if (typeof d.distributor !== 'string') throw new ValidationError(`${dp}.distributor`, 'required string slug');
-      if (typeof d.found !== 'boolean') throw new ValidationError(`${dp}.found`, 'required boolean');
-      if (d.found) {
-        // Loose: bpValue OR bpName must be present so the BP resolver has something to chew on.
-        if (!d.bpValue && !d.bpName) throw new ValidationError(`${dp}`, 'found:true requires bpValue or bpName');
-      }
-    });
-  });
+const _mapperCache = new Map();
+
+function loadMapper(source) {
+  if (_mapperCache.has(source)) return _mapperCache.get(source);
+  const mapperPath = path.join(MAPPERS_DIR, `${source}.js`);
+  if (!fs.existsSync(mapperPath)) {
+    _mapperCache.set(source, { error: `no mapper at mappers/${source}.js` });
+    return _mapperCache.get(source);
+  }
+  try {
+    const m = require(mapperPath);
+    if (typeof m.processExport     !== 'function') return _store(source, { error: 'mapper missing processExport()' });
+    if (typeof m.autoPairSidecar   !== 'function') return _store(source, { error: 'mapper missing autoPairSidecar()' });
+    if (typeof m.isProcessableFile !== 'function') return _store(source, { error: 'mapper missing isProcessableFile()' });
+    return _store(source, { mapper: m });
+  } catch (e) {
+    return _store(source, { error: `mapper load threw: ${e.message}` });
+  }
+}
+function _store(source, val) { _mapperCache.set(source, val); return val; }
+
+// ─── File discovery ─────────────────────────────────────────────────────────
+
+function listSources() {
+  if (!fs.existsSync(INBOX)) return [];
+  return fs.readdirSync(INBOX, { withFileTypes: true })
+    .filter(d => d.isDirectory() && !RESERVED_DIRS.has(d.name))
+    .map(d => d.name)
+    .filter(n => !SOURCE_FILTER || n === SOURCE_FILTER);
 }
 
-// ─── File listing ───────────────────────────────────────────────────────────
-
-// Recursively walks INBOX (excluding done/ and failed/), returns paths RELATIVE
-// to INBOX so per-source subfolders (e.g. "mouser/scrape-1131217-...json") are
-// preserved through claim → move-to-done / move-to-failed.
-function listInboxFiles() {
-  if (SPECIFIC_FILE) {
-    const full = path.join(INBOX, SPECIFIC_FILE);
-    return fs.existsSync(full) ? [SPECIFIC_FILE] : [];
-  }
-  const out = [];
-  const SKIP_TOPLEVEL_DIRS = new Set(['done', 'failed']);
-  const walk = (absDir, relDir) => {
-    for (const ent of fs.readdirSync(absDir, { withFileTypes: true })) {
-      const childRel = relDir ? path.join(relDir, ent.name) : ent.name;
-      const childAbs = path.join(absDir, ent.name);
-      if (ent.isDirectory()) {
-        if (!relDir && SKIP_TOPLEVEL_DIRS.has(ent.name)) continue;
-        walk(childAbs, childRel);
-      } else if (
-        ent.isFile()
-        && ent.name.startsWith('scrape-')
-        && ent.name.endsWith('.json')
-        && !ent.name.endsWith('.partial')
-      ) {
-        out.push(childRel);
-      }
-    }
-  };
-  walk(INBOX, '');
-  return out.sort(); // chronological-ish by filename timestamp, stable across subfolders
+function listFilesForSource(source) {
+  const dir = path.join(INBOX, source);
+  if (!fs.existsSync(dir)) return [];
+  const { mapper, error } = loadMapper(source);
+  if (error) return [];  // no mapper → can't dispatch; surfaced in processSource
+  return fs.readdirSync(dir, { withFileTypes: true })
+    .filter(d => d.isFile())
+    .map(d => d.name)
+    .filter(n => !SKIP_SUFFIXES.some(s => n.endsWith(s)))
+    .filter(n => mapper.isProcessableFile(n))
+    .sort();
 }
 
-// ─── Processing markers ─────────────────────────────────────────────────────
+// ─── Processing markers (claim/release) ─────────────────────────────────────
 
-function processingMarker(filename) { return path.join(INBOX, `${filename}.processing`); }
+function processingMarker(source, filename) {
+  return path.join(INBOX, source, `${filename}.processing`);
+}
 
-function isStaleProcessingMarker(filename) {
-  const m = processingMarker(filename);
+function isStaleProcessingMarker(source, filename) {
+  const m = processingMarker(source, filename);
   if (!fs.existsSync(m)) return false;
-  const age = Date.now() - fs.statSync(m).mtimeMs;
-  return age > PROCESSING_TTL_MS;
+  return (Date.now() - fs.statSync(m).mtimeMs) > PROCESSING_TTL_MS;
 }
 
-function claim(filename) {
-  const m = processingMarker(filename);
-  if (fs.existsSync(m) && !isStaleProcessingMarker(filename)) {
-    logger.info(`${filename}: already being processed (marker fresh) — skipping`);
+function claim(source, filename) {
+  const m = processingMarker(source, filename);
+  if (fs.existsSync(m) && !isStaleProcessingMarker(source, filename)) {
+    logger.info(`${source}/${filename}: already processing — skip`);
     return false;
   }
   fs.writeFileSync(m, String(process.pid));
   return true;
 }
 
-function release(filename) {
-  const m = processingMarker(filename);
+function release(source, filename) {
+  const m = processingMarker(source, filename);
   if (fs.existsSync(m)) fs.unlinkSync(m);
 }
 
 // ─── Move helpers ───────────────────────────────────────────────────────────
 
-// `relPath` is relative to INBOX (e.g. "mouser/scrape-1131217-...json").
-// Preserves the per-source subdir under done/<date>/ and failed/ so audit
-// trails keep the distributor attribution.
-function moveToDone(relPath) {
-  const date = new Date().toISOString().slice(0, 10); // YYYY-MM-DD
-  const dest = path.join(DONE_ROOT, date, relPath);
+function archiveResultAndCleanup({ source, filename, sidecarPath, result }) {
+  // Once a file has been retrieved for actioning and the action succeeded, the
+  // envelope itself isn't worth keeping — the .result.json sidecar is enough
+  // for audit, and the writes are already in OT. We:
+  //   1. Write .result.json into done/<date>/<source>/ (named after the envelope)
+  //   2. Delete the inbox envelope
+  //   3. Delete the paired outbox .meta.json sidecar (its job is done too —
+  //      it existed only to re-attach RFQ context for this load)
+  const doneDir = path.join(DONE_ROOT, todayDate(), source);
+  fs.mkdirSync(doneDir, { recursive: true });
+  const resultAnchorPath = path.join(doneDir, filename);
+  writeResultSidecar(resultAnchorPath, result);
+
+  fs.unlinkSync(path.join(INBOX, source, filename));
+
+  let cleanedOutboxSidecar = false;
+  if (sidecarPath && sidecarPath.includes(`${path.sep}outbox${path.sep}`) && fs.existsSync(sidecarPath)) {
+    fs.unlinkSync(sidecarPath);
+    cleanedOutboxSidecar = true;
+  }
+  return { resultPath: `${resultAnchorPath}.result.json`, cleanedOutboxSidecar };
+}
+
+function moveToFailed(source, filename) {
+  const dest = path.join(FAILED, source, filename);
   fs.mkdirSync(path.dirname(dest), { recursive: true });
-  fs.renameSync(path.join(INBOX, relPath), dest);
+  fs.renameSync(path.join(INBOX, source, filename), dest);
   return dest;
 }
 
-function moveToFailed(relPath) {
-  const dest = path.join(FAILED, relPath);
-  fs.mkdirSync(path.dirname(dest), { recursive: true });
-  fs.renameSync(path.join(INBOX, relPath), dest);
-  return dest;
+function writeResultSidecar(filePath, result) {
+  fs.writeFileSync(`${filePath}.result.json`, JSON.stringify(result, null, 2));
 }
 
-function writeResultSidecar(envelopePath, result) {
-  fs.writeFileSync(`${envelopePath}.result.json`, JSON.stringify(result, null, 2));
-}
-
-function writeErrorSidecar(envelopePath, error) {
-  fs.writeFileSync(`${envelopePath}.error.json`, JSON.stringify({
+function writeErrorSidecar(filePath, error) {
+  fs.writeFileSync(`${filePath}.error.json`, JSON.stringify({
     error: error.message,
-    path: error.path || null,
     stack: error.stack,
     at: new Date().toISOString(),
   }, null, 2));
 }
 
-// ─── Rollup (for 11/16/20 UTC digest) ──────────────────────────────────────
+// ─── Rollup + email (per CLAUDE.md § Reporting cadence) ─────────────────────
 
 function appendRollup(entry) {
   let rollup = [];
@@ -219,135 +220,147 @@ function appendRollup(entry) {
   fs.writeFileSync(ROLLUP_PATH, JSON.stringify(rollup, null, 2));
 }
 
-// ─── Email helpers ─────────────────────────────────────────────────────────
-
-async function emailError(filename, error) {
+async function emailError(source, filename, error) {
   const body = [
-    `Distributor scrape envelope failed to load.`,
+    `Distributor scrape file failed to load.`,
     ``,
-    `File: ${filename}`,
-    `Error: ${error.message}`,
-    error.path ? `Field: ${error.path}` : null,
+    `Source: ${source}`,
+    `File:   ${filename}`,
+    `Error:  ${error.message}`,
     ``,
-    `The file has been moved to ~/workspace/inbox/failed/. The error sidecar`,
-    `is at ${filename}.error.json. Fix the local scraper and re-ship.`,
-  ].filter(Boolean).join('\n');
+    `Moved to ~/workspace/inbox/failed/${source}/. Error sidecar at`,
+    `${filename}.error.json. Fix the source/mapper and re-ship if appropriate.`,
+  ].join('\n');
   await notifier
-    .sendEmail(OPERATOR_EMAIL, `[scrape-inbox] FAILED: ${filename}`, body)
+    .sendEmail(OPERATOR_EMAIL, `[scrape-inbox] FAILED: ${source}/${filename}`, body)
     .catch(e => logger.error('notifier failed', e));
 }
 
-async function emailSuccess(filename, summary) {
-  // Per CLAUDE.md § Reporting cadence — success is rolled into the 11/16/20
-  // digest, not emailed immediately. Anomalies (flagged > 0 or failed > 0
-  // within the success path) still get an immediate notification.
-  const hasAnomaly = (summary.flagged || 0) > 0 || (summary.failed || 0) > 0;
-  if (!hasAnomaly) return;
-  const subject = `[scrape-inbox] ${filename}: ${summary.written} written, ${summary.flagged} flagged, ${summary.failed} failed`;
+async function emailAnomaly(source, filename, result) {
+  // Per-source mappers already email their own success summaries — the
+  // watcher only emails when an anomaly surfaces that the mapper didn't
+  // already raise (e.g., partial flag from writeVQBatch's needs-review).
+  const totalFlagged = (result.writeResults || []).reduce(
+    (s, r) => s + ((r.flagged && r.flagged.length) || 0), 0);
+  const totalErrored = (result.writeResults || []).filter(r => r.error).length;
+  if (totalFlagged === 0 && totalErrored === 0) return;
+  const subject = `[scrape-inbox] ${source}/${filename}: ${totalFlagged} flagged, ${totalErrored} RFQ errors`;
   await notifier
-    .sendEmail(OPERATOR_EMAIL, subject, JSON.stringify(summary, null, 2))
+    .sendEmail(OPERATOR_EMAIL, subject, JSON.stringify({
+      source, filename, priced: result.priced, flagged: totalFlagged, errored: totalErrored,
+    }, null, 2))
     .catch(e => logger.error('notifier failed', e));
 }
 
-// ─── Core: process one envelope ────────────────────────────────────────────
+// ─── Core: process one file ─────────────────────────────────────────────────
 
-async function processOne(filename) {
-  if (!claim(filename)) return;
-  const inboxPath = path.join(INBOX, filename);
-  let envelope;
+async function processOne(source, filename) {
+  if (!claim(source, filename)) return { source, filename, skipped: true };
 
-  // Parse + validate
+  const exportPath = path.join(INBOX, source, filename);
+  const { mapper, error: mapperErr } = loadMapper(source);
+  if (mapperErr) {
+    logger.error(`${source}/${filename}: ${mapperErr}`);
+    release(source, filename);
+    return { source, filename, failed: true, error: mapperErr };
+  }
+
+  // Auto-pair sidecar via the mapper's own logic
+  let sidecarPath;
   try {
-    envelope = JSON.parse(fs.readFileSync(inboxPath, 'utf8'));
-    validateEnvelope(envelope);
-  } catch (err) {
-    logger.error(`${filename}: validation/parse failed — ${err.message}`);
+    sidecarPath = mapper.autoPairSidecar(exportPath);
+  } catch (e) {
+    sidecarPath = null;
+    logger.warn(`${source}/${filename}: autoPairSidecar threw — ${e.message}`);
+  }
+  if (!sidecarPath) {
+    // No sidecar yet — could be that the export landed before the producer's
+    // sidecar; or the file is junk. Hold off; next tick will retry.
+    logger.info(`${source}/${filename}: no sidecar paired — will retry next tick`);
+    release(source, filename);
+    return { source, filename, skipped: true, reason: 'no_sidecar' };
+  }
+
+  logger.info(`${source}/${filename}: paired sidecar ${path.basename(sidecarPath)}${DRY_RUN ? ' (DRY-RUN)' : ''}`);
+
+  let result;
+  try {
+    result = await mapper.processExport({ exportPath, sidecarPath, dryRun: DRY_RUN });
+  } catch (e) {
+    logger.error(`${source}/${filename}: mapper threw — ${e.message}`, e);
     if (!DRY_RUN) {
-      writeErrorSidecar(inboxPath, err);
-      moveToFailed(filename);
-      await emailError(filename, err);
+      writeErrorSidecar(exportPath, e);
+      moveToFailed(source, filename);
+      await emailError(source, filename, e);
     }
-    release(filename);
-    return;
+    release(source, filename);
+    return { source, filename, failed: true, error: e.message };
   }
 
   if (DRY_RUN) {
-    logger.info(`${filename}: DRY-RUN — schema OK, would load ${envelope.items.length} items` +
-      (envelope.rfqSearchKey ? ` to RFQ ${envelope.rfqSearchKey}` : ' as pricing intel'));
-    release(filename);
-    return;
+    logger.info(`${source}/${filename}: DRY-RUN result — ${result.priced} priced, ${result.matched_no_price} no-price, ${result.not_carried} not-carried`);
+    release(source, filename);
+    return { source, filename, dryRun: true, ...result };
   }
 
-  // Load
-  try {
-    let result;
-    if (envelope.rfqSearchKey) {
-      // VQ-load mode
-      result = await writeVQBatch(envelope.rfqSearchKey, envelope.items, {
-        buyerId: envelope.defaults?.buyerId,
-        applyRestrictedMfrGate: envelope.defaults?.applyRestrictedMfrGate || false,
-        pass2Auto: envelope.defaults?.pass2Auto || false,
-      });
-    } else {
-      // Pricing-intel mode — one chuboe_pricing_api_result per (item, distributor)
-      const written = [];
-      const failed = [];
-      for (const item of envelope.items) {
-        for (const d of (item.franchiseResults?.distributors || [])) {
-          if (!d.found) continue;
-          try {
-            const r = await writePricingResult({
-              searchedMpn: item.searchedMpn,
-              distributor: d.distributor,
-              bpValue: d.bpValue,
-              result: d, // the raw distributor envelope; api-result-writer extracts what it needs
-              source: envelope.source,
-            });
-            written.push({ mpn: item.searchedMpn, distributor: d.distributor, id: r?.id });
-          } catch (e) {
-            failed.push({ mpn: item.searchedMpn, distributor: d.distributor, error: e.message });
-          }
-        }
-      }
-      result = {
-        mode: 'pricing-intel',
-        summary: { written: written.length, failed: failed.length },
-        written, failed,
-      };
-    }
-
-    const donePath = moveToDone(filename);
-    writeResultSidecar(donePath, result);
-    appendRollup({
-      filename, rfqSearchKey: envelope.rfqSearchKey || null,
-      mode: envelope.rfqSearchKey ? 'vq-batch' : 'pricing-intel',
-      summary: result.summary || {}, at: new Date().toISOString(),
-    });
-    await emailSuccess(filename, result.summary || {});
-    logger.info(`${filename}: loaded — ${JSON.stringify(result.summary || {})}`);
-  } catch (err) {
-    logger.error(`${filename}: load failed — ${err.message}`, err);
-    writeErrorSidecar(inboxPath, err);
-    moveToFailed(filename);
-    await emailError(filename, err);
-  } finally {
-    release(filename);
+  // Success: write .result.json sidecar to done/<date>/<source>/, delete the
+  // envelope from inbox/<source>/, and delete the paired outbox .meta.json.
+  // The mapper's own email summary fires inside processExport; the watcher
+  // only fires an anomaly email if the result had flagged/errored RFQs.
+  const cleanup = archiveResultAndCleanup({ source, filename, sidecarPath, result });
+  if (cleanup.cleanedOutboxSidecar) {
+    logger.info(`${source}/${filename}: cleaned paired outbox sidecar ${path.basename(sidecarPath)}`);
   }
+  appendRollup({
+    source, filename,
+    priced: result.priced,
+    matched_no_price: result.matched_no_price,
+    not_carried: result.not_carried,
+    rfqsAffected: result.rfqsAffected,
+    at: new Date().toISOString(),
+  });
+  await emailAnomaly(source, filename, result);
+  logger.info(`${source}/${filename}: loaded — ${result.priced} priced / ${result.matched_no_price} no-price / ${result.not_carried} not-carried`);
+  release(source, filename);
+  return { source, filename, processed: true, ...result };
 }
 
 // ─── Main ───────────────────────────────────────────────────────────────────
 
 async function main() {
   ensureDirs();
-  const files = listInboxFiles();
-  if (files.length === 0) {
-    logger.info('no envelopes in inbox');
+  const sources = listSources();
+  if (sources.length === 0) {
+    logger.info(`no source folders in ${INBOX}`);
     return;
   }
-  logger.info(`processing ${files.length} envelope(s)${DRY_RUN ? ' (DRY-RUN)' : ''}`);
-  for (const f of files) {
-    await processOne(f);
+
+  const allFiles = [];
+  for (const source of sources) {
+    const { error } = loadMapper(source);
+    if (error) {
+      logger.warn(`${source}: ${error} — skipping folder`);
+      continue;
+    }
+    for (const filename of listFilesForSource(source)) {
+      allFiles.push({ source, filename });
+    }
   }
+
+  if (allFiles.length === 0) {
+    logger.info(`no processable files across ${sources.length} source folder(s)`);
+    return;
+  }
+
+  logger.info(`processing ${allFiles.length} file(s) across ${sources.length} source(s)${DRY_RUN ? ' (DRY-RUN)' : ''}`);
+  const results = { processed: 0, failed: 0, skipped: 0 };
+  for (const { source, filename } of allFiles) {
+    const r = await processOne(source, filename);
+    if (r.processed) results.processed++;
+    else if (r.failed) results.failed++;
+    else if (r.skipped) results.skipped++;
+  }
+  logger.info(`tick complete: ${results.processed} processed / ${results.failed} failed / ${results.skipped} skipped`);
 }
 
 main().catch(e => {

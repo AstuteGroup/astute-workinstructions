@@ -2,9 +2,16 @@
 
 **Status:** New workflow, draft 2026-05-15.
 
+**What this is:** general-purpose infrastructure for moving structured data from operator-attended browser sessions on Windows into iDempiere via JSON envelopes shipped over scp. The contract is intentionally domain-agnostic — it knows about envelopes, folders, atomic publish, and per-source mappers; it does NOT know about sourcing, RFQs, or VQs specifically.
+
+**Current consumers:**
+- **RFQ Sourcing → franchise-data channel #3.** Desktop scraping of franchise distributors that lack APIs (or rate-limit them harshly) — Heilind, possibly Newark/Future/Avnet for non-API tiers. Envelopes carry an `rfqSearchKey` and the watcher writes VQs against the corresponding RFQ lines. See [sourcing-roadmap.md § A2](../RFQ%20Sourcing/sourcing-roadmap.md) for the sourcing-side framing.
+
+**Future consumers** plug in by adding a new folder under `~/workspace/inbox/<source>/` plus an optional `mappers/<source>.js` for raw-export pass-through (envelope pattern C). Examples we'd plausibly want eventually: market-intel scrapes of broker sites, customer-portal RFQ pulls, datasheet/parameter scraping for spec-buy analysis. The contract stays unchanged for those — they're just additional `<source>` subfolders.
+
 Picks up scrape result JSON envelopes from `~/workspace/inbox/` (dropped via scp by a Claude Code instance running on Windows next to operator's browser sessions), validates them, and loads VQ lines into iDempiere via the REST API.
 
-This is the consumer side of the [Local Windows scraper CLAUDE.md draft](local-windows-CLAUDE.md). Read that doc first for the envelope shape — this workflow validates against it.
+This is the consumer side of the [desktop scraper contract](desktop-scraper-contract.md). Read that doc first for the envelope shape — this workflow validates against it.
 
 ---
 
@@ -27,12 +34,12 @@ This workflow covers the gap where a distributor has no API (or rate-limits it h
 # End-to-End Workflow
 
 ## Step 1 — Operator triggers a scrape on the local Windows Claude instance
-Operator says e.g. `lookup MPNs for RFQ 1131217 using mouser, arrow, future`. The local instance reads its CLAUDE.md, confirms scope, then drives Playwright/Chrome to scrape each MPN against each distributor. **Output:** a JSON envelope shaped per `local-windows-CLAUDE.md`.
+Operator says e.g. `lookup MPNs for RFQ 1131217 using mouser, arrow, future`. The local instance reads its CLAUDE.md, confirms scope, then drives Playwright/Chrome to scrape each MPN against each distributor. **Output:** a JSON envelope shaped per `desktop-scraper-contract.md`.
 
 ## Step 2 — Local instance ships the envelope via scp
 The local instance writes the envelope to `~/workspace/inbox/<source>/scrape-<rfqSearchKey>-<UTC-ts>.json.partial` on this server, then SSH-renames it to `.json` to atomically publish. **Output:** a complete `.json` file in the inbox under the source's subfolder.
 
-Two server-side scp requirements (verified 2026-05-15, see `local-windows-CLAUDE.md` for detail):
+Two server-side scp requirements (verified 2026-05-15, see `desktop-scraper-contract.md` for detail):
 - `scp -O` is required (SFTP subsystem does not start; modern scp defaults to SFTP and fails).
 - Remote paths must be absolute (`/home/analytics_user/workspace/inbox/<source>/`) or `~/`-prefixed (`~/workspace/inbox/<source>/`). The server auto-`cd`s into `~/workspace/` at login, so a bare relative `workspace/...` resolves to `~/workspace/workspace/...`.
 
@@ -62,7 +69,11 @@ The email summarizes:
 
 # Envelope Schema (Authoritative)
 
-See `local-windows-CLAUDE.md` for the operator-facing definition. The watcher enforces:
+See `desktop-scraper-contract.md` for the operator-facing definition. The watcher recognizes two envelope `type`s, corresponding to the adapter patterns documented there.
+
+## Type 1 — `"distributor_scrape"` (patterns A and B: canonical envelope)
+
+Used when the desktop adapter has already parsed the scrape into the canonical `franchiseResults` shape. Pattern A (per-MPN) and Pattern B (bulk BOM with desktop-side parsing) both emit this. The server cannot tell A from B and doesn't need to.
 
 | Field | Type | Required | Notes |
 |---|---|---|---|
@@ -80,11 +91,41 @@ See `local-windows-CLAUDE.md` for the operator-facing definition. The watcher en
 | `items[].rfqQty` | number | no | Defaults to RFQ line qty server-side. |
 | `items[].rfqMfrText` | string | no | Drives MFR cross-ref. |
 | `items[].franchiseResults.distributors[]` | array | yes | Per-distributor scrape result. |
-| `items[].franchiseResults.distributors[].distributor` | string | yes | Slug from the distributor table in `local-windows-CLAUDE.md`. |
+| `items[].franchiseResults.distributors[].distributor` | string | yes | Slug from the distributor table in `desktop-scraper-contract.md`. |
 | `items[].franchiseResults.distributors[].found` | boolean | yes | If `false`, the result is recorded as "not carried" and skipped for VQ writing. |
-| (other distributor fields) | various | conditional | See `local-windows-CLAUDE.md`. The watcher passes them through to `extractStockAndLtRows`. |
+| (other distributor fields) | various | conditional | See `desktop-scraper-contract.md`. The watcher passes them through to `extractStockAndLtRows`. |
 
-Schema violations move the file to `failed/` with a precise reason.
+## Type 2 — `"distributor_scrape_bulk"` (pattern C: raw export + meta sidecar)
+
+Used when the BOM-tool export is messy/vendor-specific and desktop-side parsing would be brittle. The desktop ships the raw export file alongside a meta JSON sidecar. The watcher routes the pair to `mappers/<source>.js` (see Architecture Intent below), which parses the raw export into canonical shape before calling `writeVQBatch`.
+
+**Two files arrive together** in `inbox/<source>/`:
+
+1. `scrape-<key>-<ts>.<ext>` — the raw export, untouched (e.g. `scrape-1131217-20260518T080000Z.xlsx`)
+2. `scrape-<key>-<ts>.meta.json` — the sidecar that tells the watcher what the export is and what context to attach
+
+The watcher picks up the `.meta.json` (the `.<ext>` file is a side payload, not a trigger). Both must be present before the meta is processed; if the meta arrives first, the watcher waits one tick. If the export still isn't there, the meta is moved to `failed/` with `BULK_EXPORT_MISSING`.
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `version` | number | yes | Must be `1`. |
+| `type` | string | yes | Must equal `"distributor_scrape_bulk"`. |
+| `createdAt` | ISO-8601 string | yes | Audit trail. |
+| `operator` | string | yes | Username. |
+| `source` | string | yes | `windows-scraper@<hostname>`. |
+| `rfqSearchKey` | string | no | Same semantics as Type 1. |
+| `defaults` | object | no | Same shape as Type 1. |
+| `exportFile` | string | yes | Filename (not path) of the sibling raw export. Must exist in the same folder. |
+| `expectFormat` | string | yes | `"<source>-bom-export-<ext>"` (e.g. `"heilind-bom-export-xlsx"`) — the mapper key. |
+| `items[]` | array | yes | One entry per MPN that was uploaded to the BOM tool. Carries the demand-side context the mapper needs to re-join after parsing. |
+| `items[].id` | string | yes | Opaque ID echoed by the mapper when matching the export back to the request. |
+| `items[].searchedMpn` | string | yes | What the desktop adapter sent to the BOM tool. |
+| `items[].cpc` | string | no | CPC fallback. |
+| `items[].rfqQty` | number | no | Same as Type 1. |
+| `items[].rfqMfrText` | string | no | Same as Type 1. |
+| `items[].context.chuboeRfqLineMpnId` | number | no | RFQ-line-MPN FK if the producer pinned this scrape to a specific demand row. |
+
+Schema violations (either type) move the file(s) to `failed/` with a precise reason.
 
 ---
 
@@ -145,13 +186,50 @@ Resilience checklist:
 
 ---
 
+# Storage Rule — Everything Goes Back to the Same Place
+
+**Every source — API, scrape, vendor email, EDI feed, anything future — writes results to the SAME standard storage paths.** The infrastructure that's specific to scraping (transport, mappers, pacing) stays in this folder. The data lands in:
+
+| Outcome | Standard storage | Writer |
+|---|---|---|
+| Priced (envelope cache) | `chuboe_pricing_api_result` with `source: 'heilind-scrape'` (or `'<slug>-scrape'`) | `shared/api-result-writer.js#writePricingResult()` |
+| Priced (actionable VQ) | `chuboe_vq_line` | `shared/vq-writer.js#writeVQBatch()` |
+| Negative (not-carried / matched-no-price / etc.) | `shared/data/negative-cache.sqlite` per `DISTY_RULES` | `shared/api-negative-cache.js#record()` |
+
+**Why this rule is load-bearing:** every consumer workflow — `enrich-poller`, Vortex Matches, Market Offer Matching, Quick Quote, Customer Excess Analysis, Price Intelligence Dashboard — reads from these tables. They are source-agnostic. When Heilind data lands in `chuboe_pricing_api_result`, every one of those workflows can use it automatically with zero code changes. The moment a new source decides to "have its own table" or "keep a local JSON cache for speed," every consumer either needs custom integration code OR misses the data.
+
+**Anti-patterns to refuse if a future agent proposes them:**
+- A per-source results table ("`chuboe_heilind_results`")
+- A local JSON / Redis cache for scrape data ("for performance")
+- A source-specific enrichment poller ("for Heilind because it's different")
+- Bypassing `writePricingResult` because the source's envelope shape is "unusual" — fix the mapper, not the writer
+
+**Per-source quirks** (Heilind's single-tier pricing, Sager's envelope-status gate, etc.) belong INSIDE the per-source mapper, BEFORE the standard writers see the data. Downstream consumers should never need to know which source the data came from beyond the `source` field on the cache row.
+
+Memory: [[feedback-standard-storage-for-all-sources]] codifies this rule cross-cutting beyond just scrape sources.
+
+---
+
 # Architecture Intent (forward-looking)
 
 **Folder location is the routing signal.** A file at `~/workspace/inbox/<source>/...` is unambiguously a `<source>` envelope. The watcher derives source identity from the folder path; the JSON envelope does not need to carry source metadata for routing purposes.
 
-Today's structural compromise: the canonical envelope (per `local-windows-CLAUDE.md`) still includes `distributor` / `bpValue` / `bpName` per `franchiseResults.distributors[]` entry, because the watcher currently hands the envelope straight to `shared/vq-writer.js#writeVQBatch` which needs that info. The subfolder structure is locked in on both sides so this redundancy is harmless and the routing signal is already in place for the next evolution.
+**Slug convention** — `<source>` is a lowercase, no-TLD short name (`heilind`, never `heilind.com`). For franchise distributors the slug equals the `disty` field exported by `shared/linecards/<slug>.js` — that module is the source of truth. The same slug appears in all four locations: `~/workspace/outbox/<slug>/`, `~/workspace/inbox/<slug>/`, `mappers/<slug>.js`, and the desktop's `scrape-adapters/<slug>.md`. Mismatched slugs are the most common routing failure — see `desktop-scraper-contract.md` § Slug convention for full rules.
 
-**Next evolution — per-source mappers.** Add `mappers/<source>.js` modules. The watcher reads the file's folder, dispatches the raw envelope to `mappers/<source>`, which transforms whatever shape that distributor's adapter naturally produces into the canonical `writeVQBatch` input (filling in slug, BP key, name from a per-source constant table). At that point, the local CLAUDE.md can simplify: emit site-natural shapes; the server normalizes.
+Today's structural compromise: the canonical envelope (per `desktop-scraper-contract.md`) still includes `distributor` / `bpValue` / `bpName` per `franchiseResults.distributors[]` entry, because the watcher currently hands the envelope straight to `shared/vq-writer.js#writeVQBatch` which needs that info. The subfolder structure is locked in on both sides so this redundancy is harmless and the routing signal is already in place for the next evolution.
+
+**Per-source mappers (`mappers/<source>.js`) — now part of the contract, not just a future plan.**
+
+Two places these matter:
+
+1. **Pattern C ingestion (live as of this revision).** A `"distributor_scrape_bulk"` envelope arrives with a raw export file + meta sidecar. The watcher reads `expectFormat` from the sidecar, dispatches to `Trading Analysis/Distributor Scrape Loading/mappers/<source>.js`, which exports a `parseBulkExport(filePath, items, context) → {items: [...canonical...]}` function. The mapper's job is the inverse of the desktop adapter's job — turn the vendor-specific export back into the canonical envelope shape, re-joining each row to its `items[].id` so demand context is preserved. Output goes straight to `writeVQBatch`.
+
+2. **Pattern A/B normalization (future, optional).** Today's canonical envelope still carries `distributor`/`bpValue`/`bpName` per result, so the desktop has to know each site's BP identity. The next evolution is to let desktop adapters emit site-natural shapes and have `mappers/<source>.js` fill in slug, BP key, and name from a per-source constant table on the server. When that lands, the desktop contract can simplify and the per-site `scrape-adapters/<source>.md` shrinks.
+
+**Mapper file convention:**
+- Path: `Trading Analysis/Distributor Scrape Loading/mappers/<source>.js`
+- Required export: `parseBulkExport(absFilePath, items, context) → Promise<{items: CanonicalItem[]}>` for pattern C; `normalize(rawEnvelope) → CanonicalEnvelope` for pattern A/B normalization (when that evolution ships).
+- Per-mapper unit tests: drop a saved fixture export under `mappers/__fixtures__/<source>/` and a `mappers/<source>.test.js` exercising both happy-path and partial-result cases. Real bulk exports change shape over time; the fixture is the regression guard.
 
 **Bidirectional future.** Eventually the server publishes RFQ MPN lists into the same folder structure (`~/workspace/outbox/<source>/rfq-<key>.json` or similar), the desktop Claude picks them up, scrapes, and drops results back into `~/workspace/inbox/<source>/`. The folder pair becomes the full message bus; no additional source metadata required in either direction.
 
@@ -170,7 +248,7 @@ The desktop Claude Code instance does NOT read this server directly. It reads a 
 - `astute-workinstructions/integration-paths.md`
 - `shared/data-model.md`
 
-To propagate a substantive change to the desktop instance, edit the relevant file here. The next sync (worst case 24h) brings it down. The desktop's bootstrap CLAUDE.md (`local-windows-CLAUDE.md`) is deliberately small — it points at the cache, never duplicates content. Drift between server and desktop is therefore bounded by sync cadence, not by remembered-vs-written content.
+To propagate a substantive change to the desktop instance, edit the relevant file here. The next sync (worst case 24h) brings it down. The desktop's bootstrap CLAUDE.md (`desktop-scraper-contract.md`) is deliberately small — it points at the cache, never duplicates content. Drift between server and desktop is therefore bounded by sync cadence, not by remembered-vs-written content.
 
 ---
 
@@ -179,4 +257,4 @@ To propagate a substantive change to the desktop instance, edit the relevant fil
 1. **Avnet BP**: the `c_bpartner` table has multiple Avnet rows (`Avnet`, `Avnet EM`, `Avnet Silica`, `Avnet Abacus`, `Avnet EMG`). Before Avnet's first scrape load, operator must pick the canonical US Avnet BP. Once chosen, add it to `shared/franchise-api.js` `DISTRIBUTORS` so it shows up in cache reconstitution.
 2. **Cross-ref classifier**: enrich-rfq passes a `crossRefClassifier` callback to `writeVQFromAPI` for MPN-variant ambiguity (TPS3837K33DBVT vs TPS3837K33DBVR). The watcher could plumb the same callback through. Deferred until we see the false-positive rate on real scraped data.
 3. **Concurrency**: a single cron lock currently serializes the watcher. If volume grows, we could shard by `rfqSearchKey` — but the natural-key idempotency guard means parallel-safe-by-default if we ever lift it.
-4. **Pacing oversight**: the local side enforces pacing rules per `local-windows-CLAUDE.md`. The server has no visibility into whether they were honored. Consider stamping the local agent's rough lookup-per-minute rate into the envelope so the server can refuse envelopes that look auto-scraped at unsafe rates.
+4. **Pacing oversight**: the local side enforces pacing rules per `desktop-scraper-contract.md`. The server has no visibility into whether they were honored. Consider stamping the local agent's rough lookup-per-minute rate into the envelope so the server can refuse envelopes that look auto-scraped at unsafe rates.
