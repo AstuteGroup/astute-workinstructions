@@ -52,23 +52,28 @@ const STATE_FILE = path.join(process.env.HOME || '/home/analytics_user',
 const OPERATOR_EMAIL = process.env.OPERATOR_EMAIL || 'jake.harris@astutegroup.com';
 
 // Known overreach prefixes (per project_mfr_resolver_prefix_overreach.md).
-// SQL handles a regex match on chuboe_mpn; resolver writes the wrong canonical
-// in the linked Chuboe_MFR_ID. We surface rows where (raw MPN prefix → wrong canonical).
+// Each entry has EITHER mpnPrefix (SQL LIKE) OR mpnRegex (POSIX ~*) — not both.
 //
 // Tight prefixes only — XC* alone matches Xilinx Zynq (XC7Z*) which IS
 // correctly AMD post-2022 acquisition. The actual overreach cases per the
 // memory + spot-checks are narrower:
 //   - ISO15xx/ISO72xx → TI digital isolators (resolver picks Issi/ISSI)
 //   - ISL → Renesas (was Intersil; resolver picks Issi/ISSI)
-//   - XC6xxx → Torex LDOs (resolver picks AMD)
+//   - XC6 + digit → Torex LDOs (resolver picks AMD); XC6S*/XC6V* are Xilinx
+//     Spartan-6 and correctly canonicalize to AMD post-2022 acquisition,
+//     so the pattern must require a digit after XC6.
 //   - BCM857 → Nexperia (resolver picks Broadcom)
 const OVERREACH_PATTERNS = [
-  { mpnPrefix: 'ISO15', wrongMfr: 'Issi', actualMfr: 'Texas Instruments (ISO15xx digital isolators)' },
-  { mpnPrefix: 'ISO72', wrongMfr: 'Issi', actualMfr: 'Texas Instruments (ISO72xx digital isolators)' },
-  { mpnPrefix: 'ISL',   wrongMfr: 'Issi', actualMfr: 'Renesas (was Intersil)' },
-  { mpnPrefix: 'XC6',   wrongMfr: 'AMD',  actualMfr: 'Torex (XC6xxx LDOs)' },
+  { mpnPrefix: 'ISO15',  wrongMfr: 'Issi', actualMfr: 'Texas Instruments (ISO15xx digital isolators)' },
+  { mpnPrefix: 'ISO72',  wrongMfr: 'Issi', actualMfr: 'Texas Instruments (ISO72xx digital isolators)' },
+  { mpnPrefix: 'ISL',    wrongMfr: 'Issi', actualMfr: 'Renesas (was Intersil)' },
+  { mpnRegex:  '^XC6[0-9]', wrongMfr: 'AMD',  actualMfr: 'Torex (XC6xxx LDOs)' },
   { mpnPrefix: 'BCM857', wrongMfr: 'Broadcom', actualMfr: 'Nexperia' },
 ];
+
+// AD_Table_ID for chuboe_vq_line — used to filter chuboe_pricing_api_result
+// to rows that link back to a VQ (record_id = chuboe_vq_line_id).
+const VQ_LINE_AD_TABLE_ID = 1000008;
 
 // ─── STATE ───────────────────────────────────────────────────────────────────
 
@@ -189,21 +194,43 @@ function findMfrOverreach(state) {
 
   for (const pat of OVERREACH_PATTERNS) {
     // chuboe_mpn is on vq_line, chuboe_mfr_id → chuboe_mfr.name resolves to canonical.
+    // LEFT JOIN to chuboe_rfq via the rfq_line gives us the RFQ search-key
+    // (operator's main navigation key). LEFT JOIN to chuboe_pricing_api_result
+    // by (ad_table_id, record_id) surfaces the source API result row for
+    // API-loaded VQs — null for email-driven loads.
+    const mpnMatch = pat.mpnRegex
+      ? `UPPER(vq.chuboe_mpn) ~* '${pat.mpnRegex}'`
+      : `UPPER(vq.chuboe_mpn) LIKE UPPER('${pat.mpnPrefix}%')`;
     const sql = `
-      SELECT vq.chuboe_vq_line_id, vq.chuboe_mpn, m.name, bp.name AS vendor, vq.created
+      SELECT vq.chuboe_vq_line_id,
+             vq.chuboe_mpn,
+             m.name,
+             bp.name AS vendor,
+             vq.created,
+             rfq.value AS rfq_search_key,
+             par.api_result_id
       FROM adempiere.chuboe_vq_line vq
       LEFT JOIN adempiere.chuboe_mfr m ON vq.chuboe_mfr_id = m.chuboe_mfr_id
       LEFT JOIN adempiere.c_bpartner bp ON vq.c_bpartner_id = bp.c_bpartner_id
+      LEFT JOIN adempiere.chuboe_rfq_line rl ON vq.chuboe_rfq_line_id = rl.chuboe_rfq_line_id
+      LEFT JOIN adempiere.chuboe_rfq rfq ON rl.chuboe_rfq_id = rfq.chuboe_rfq_id
+      LEFT JOIN LATERAL (
+        SELECT MAX(chuboe_pricing_api_result_id) AS api_result_id
+        FROM adempiere.chuboe_pricing_api_result
+        WHERE ad_table_id = ${VQ_LINE_AD_TABLE_ID}
+          AND record_id = vq.chuboe_vq_line_id
+          AND isactive = 'Y'
+      ) par ON true
       WHERE vq.isactive='Y'
         AND vq.created >= NOW() - INTERVAL '48 hours'
-        AND UPPER(vq.chuboe_mpn) LIKE UPPER('${pat.mpnPrefix}%')
+        AND ${mpnMatch}
         AND m.name = '${pat.wrongMfr}'
       ORDER BY vq.created DESC
       LIMIT 50
     `;
     const rows = queryPsql(sql);
     for (const row of rows) {
-      const [vqId, mpn, mfrName, vendor, created] = row;
+      const [vqId, mpn, mfrName, vendor, created, rfqSearchKey, apiResultId] = row;
       if (seenSet.has(Number(vqId))) continue;
       findings.push({
         vqId: Number(vqId),
@@ -212,6 +239,8 @@ function findMfrOverreach(state) {
         actualMfr: pat.actualMfr,
         vendor,
         created,
+        rfqSearchKey: rfqSearchKey || null,
+        apiResultId: apiResultId ? Number(apiResultId) : null,
       });
     }
   }
@@ -254,20 +283,23 @@ function renderStitchEmail(milestone) {
 
 function renderOverreachEmail(findings) {
   const rows = findings.map(f =>
-    `<tr><td>${f.vqId}</td><td><code>${esc(f.mpn)}</code></td>` +
+    `<tr><td>${f.vqId}</td>` +
+    `<td>${esc(f.rfqSearchKey || '—')}</td>` +
+    `<td><code>${esc(f.mpn)}</code></td>` +
     `<td style="color:#b00"><b>${esc(f.wrongMfr)}</b></td>` +
     `<td>${esc(f.actualMfr)}</td>` +
     `<td>${esc(f.vendor || '')}</td>` +
+    `<td>${f.apiResultId || '—'}</td>` +
     `<td>${esc((f.created || '').slice(0, 19))}</td></tr>`
   ).join('');
   return `<html><body style="font-family:Arial,sans-serif;font-size:13px">
 <h2 style="color:#b00">VQ Watchlist — MFR resolver overreach detections</h2>
 <p>${findings.length} VQ row${findings.length === 1 ? '' : 's'} created in the last 48h match a known mis-canonical assignment pattern from <code>shared/mfr-resolver.js</code> prefix inference. Spot-check and PATCH <code>Chuboe_MFR_ID</code> as needed.</p>
 <table style="border-collapse:collapse;font-size:13px;margin:8px 0">
-  <tr style="background:#f5f5f5"><th>VQ ID</th><th>MPN</th><th>Wrong MFR</th><th>Likely Actual</th><th>Vendor</th><th>Created</th></tr>
+  <tr style="background:#f5f5f5"><th>VQ ID</th><th>RFQ</th><th>MPN</th><th>Wrong MFR</th><th>Likely Actual</th><th>Vendor</th><th>API Result ID</th><th>Created</th></tr>
   ${rows}
 </table>
-<p style="color:#666;font-size:11px">Tracking: <code>project_mfr_resolver_prefix_overreach.md</code>. These rows are recorded in <code>~/workspace/.vq-watchlist-state.json</code> so the email won't repeat for the same VQ.</p>
+<p style="color:#666;font-size:11px">RFQ = <code>chuboe_rfq.value</code> (operator nav key). API Result ID is the <code>chuboe_pricing_api_result</code> row that wrote this VQ — populated for API-driven loads (DigiKey/Mouser/TTI/Arrow/Avnet), blank for email-driven Type 1/2 loads. Tracking: <code>project_mfr_resolver_prefix_overreach.md</code>. These rows are recorded in <code>~/workspace/.vq-watchlist-state.json</code> so the email won't repeat for the same VQ.</p>
 </body></html>`;
 }
 
