@@ -584,3 +584,49 @@ Some vendors have multiple BPs in OT. **Always use the correct one:**
 1. **Always filter `isactive = 'Y'`** unless explicitly told otherwise
 2. **Always filter `ad_client_id = 1000000`** when querying shared tables like `chuboe_mfr`
 3. **Never write to `adempiere` schema** — use the REST API via `shared/api-client.js` for all writes
+
+---
+
+## Time-Zone Convention
+
+**All operator-facing outputs (CSV / xlsx / HTML / email / console) display dates in Central Time, labeled "CT".**
+
+We do NOT label `CDT`/`CST` — the label is just `CT` regardless of DST. The operator's mental model is "Central", and ping-ponging labels twice a year creates noise.
+
+### The DB storage gotcha
+
+`chuboe_*.created` (and the rest of the iDempiere audit timestamps) is `timestamp without time zone` storing **CDT-naive digits**. PG session is UTC, but the column values are Chicago-local digits. This means:
+
+- `SELECT r.created` returns a naive timestamp string whose digits are CT — e.g. `'2026-05-19 02:19:11.576'` corresponds to CT 02:19, not UTC 02:19.
+- `r.created AT TIME ZONE 'America/Chicago'` returns `timestamptz` that psql will format as UTC (with `+00` suffix) — **this is the source of most "why is my report showing UTC" bugs**.
+
+### The canonical helpers
+
+**JS side** — use `shared/time-format.js`:
+
+```javascript
+const { fmtCT, fmtCTShort, fmtCTDate, parseDBCreated, ctSqlSelect } =
+  require('../shared/time-format');
+
+fmtCT(new Date())                     // "2026-05-19 09:18:06 CT"
+fmtCTShort(new Date())                // "2026-05-19 09:18 CT"
+fmtCTDate(new Date())                 // "2026-05-19"
+
+// Parse a DB-naive value back to a real Date object:
+parseDBCreated('2026-05-19 02:19:11.576')   // Date for 07:19:11 UTC
+```
+
+**SQL side** — `r.created` already stores CT digits, so use `to_char` directly:
+
+```sql
+to_char(r.created, 'YYYY-MM-DD HH24:MI:SS') AS rfq_dt
+```
+
+Or via the helper: `ctSqlSelect('r.created')` returns the same snippet.
+
+### What NOT to do
+
+- ❌ Do NOT use `r.created AT TIME ZONE 'America/Chicago'` for display — the cast returns timestamptz, which psql formats as UTC.
+- ❌ Do NOT use `new Date().toISOString()` in operator-facing output — that's UTC.
+- ❌ Do NOT roll your own `toLocaleString({timeZone: 'America/Chicago'})` — use the helper so the format is consistent across workflows.
+- ❌ Do NOT use `CDT`/`CST` suffix labels — convention is `CT`.
