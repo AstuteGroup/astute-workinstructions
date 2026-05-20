@@ -544,6 +544,101 @@ function resolveAstuteUserByName(name) {
   };
 }
 
+// ─── USER ROLE REGISTRY ─────────────────────────────────────────────────────
+//
+// Operator-maintained list of confirmed buyers + support. Drives the buyer-
+// resolution ladder for VQ loading (and any downstream consumer that needs
+// the buyer vs sourcer/support distinction). See:
+//   shared/data/user-role-registry.json — source of truth
+//   deferred-work.md — implementation flow + escalation policy
+
+const fs = require('fs');
+const path = require('path');
+
+let _roleRegistryCache = null;
+let _roleRegistryLoadedAt = 0;
+const ROLE_REGISTRY_TTL_MS = 5 * 60 * 1000; // 5 min cache; edits become visible quickly
+
+function loadUserRoleRegistry() {
+  const now = Date.now();
+  if (_roleRegistryCache && (now - _roleRegistryLoadedAt) < ROLE_REGISTRY_TTL_MS) {
+    return _roleRegistryCache;
+  }
+  const file = path.join(__dirname, 'data', 'user-role-registry.json');
+  if (!fs.existsSync(file)) {
+    // Fail open with empty lists rather than crashing — operator gets escalated for everyone
+    _roleRegistryCache = { buyers: [], support: [], _missing: true };
+    _roleRegistryLoadedAt = now;
+    return _roleRegistryCache;
+  }
+  try {
+    const raw = JSON.parse(fs.readFileSync(file, 'utf8'));
+    _roleRegistryCache = {
+      buyers: Array.isArray(raw.buyers) ? raw.buyers : [],
+      support: Array.isArray(raw.support) ? raw.support : [],
+    };
+    _roleRegistryLoadedAt = now;
+    return _roleRegistryCache;
+  } catch (e) {
+    _roleRegistryCache = { buyers: [], support: [], _parseError: e.message };
+    _roleRegistryLoadedAt = now;
+    return _roleRegistryCache;
+  }
+}
+
+function isKnownBuyer(adUserId) {
+  if (adUserId == null) return false;
+  const reg = loadUserRoleRegistry();
+  return reg.buyers.some(b => Number(b.id) === Number(adUserId));
+}
+
+function isKnownSupport(adUserId) {
+  if (adUserId == null) return false;
+  const reg = loadUserRoleRegistry();
+  return reg.support.some(s => Number(s.id) === Number(adUserId));
+}
+
+/**
+ * Apply the registry-based buyer-resolution ladder (v1):
+ *
+ *   1. If `candidateUserId` is in the buyers registry → use it.
+ *   2. Else → escalate to operator (push to Jake).
+ *
+ * NOTE on dropped RFQ-owner fallback: chuboe_rfq.chuboe_user_id is the
+ * CUSTOMER's contact (Haley Neumann at Emerson, etc.), not the Astute-side
+ * buyer — so falling back to it would mis-assign external contacts. A future
+ * v2 could use `most-recent chuboe_buyer_id across existing VQs on the same
+ * RFQ` as a smarter fallback if escalation volume warrants it. For now we
+ * escalate cleanly.
+ *
+ * @param {object} opts
+ * @param {number|null} opts.candidateUserId - Tier-A walk result (forwarder/sender after unwrap)
+ * @param {string|null} opts.citedRfq - RFQ search key from email subject/body (informational only in v1)
+ * @returns {{ buyer: number|null, source: string|null, reason: string, escalate: boolean }}
+ */
+function resolveBuyerFromRegistry({ candidateUserId, citedRfq } = {}) {
+  if (candidateUserId && isKnownBuyer(candidateUserId)) {
+    return {
+      buyer: Number(candidateUserId),
+      source: 'tier_a_known_buyer',
+      reason: 'Tier-A unwrap candidate is in the buyer registry',
+      escalate: false,
+    };
+  }
+
+  // Escalation reason needs to be descriptive so the operator can act
+  let reason;
+  if (!candidateUserId) {
+    reason = `No buyer candidate from chain walk${citedRfq ? ` (cited RFQ: ${citedRfq})` : ''}`;
+  } else if (isKnownSupport(candidateUserId)) {
+    reason = `Tier-A candidate ${candidateUserId} is in support registry, not a buyer${citedRfq ? ` (cited RFQ: ${citedRfq})` : ''}`;
+  } else {
+    reason = `Tier-A candidate ${candidateUserId} not in buyer or support registry${citedRfq ? ` (cited RFQ: ${citedRfq})` : ''}`;
+  }
+
+  return { buyer: null, source: null, reason, escalate: true };
+}
+
 // ─── EXPORTS ────────────────────────────────────────────────────────────────
 
 module.exports = {
@@ -560,6 +655,12 @@ module.exports = {
   // Astute-employee resolution (forwarder-vs-owner pattern)
   resolveAstuteUserByEmail,
   resolveAstuteUserByName,
+
+  // User role registry (buyer/support classification + ladder)
+  loadUserRoleRegistry,
+  isKnownBuyer,
+  isKnownSupport,
+  resolveBuyerFromRegistry,
 
   // Utilities
   extractDomainHints,

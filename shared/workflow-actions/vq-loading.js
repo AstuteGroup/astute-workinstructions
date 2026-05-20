@@ -24,11 +24,33 @@
 
 'use strict';
 
+const fs = require('fs');
+const path = require('path');
 const { loadBulkSummary } = require('../load-bulk-summary');
+const { isKnownBuyer, isKnownSupport, resolveBuyerFromRegistry } = require('../partner-lookup');
 const pending = require('../workflow-pending-state');
 const breadcrumbs = require('../breadcrumbs');
 
 const JAKE_USER_ID = 1000004;
+
+// Per-VQ attribution log. Each successful chuboe_vq_line write appends one
+// JSONL row tying the new vqLineId to the source email's UID + Message-ID.
+// Used by the daily digest for precise per-batch "claimed vs active in OT"
+// reconciliation — replaces the load-time-window heuristic that leaked
+// across batches when multiple loads hit the same RFQ.
+const VQ_ATTRIBUTION_LOG = path.join(
+  process.env.HOME || '/home/analytics_user',
+  'workspace',
+  '.vq-batch-attribution.jsonl',
+);
+
+function appendAttribution(rows) {
+  if (!Array.isArray(rows) || rows.length === 0) return;
+  try {
+    const lines = rows.map(r => JSON.stringify(r)).join('\n') + '\n';
+    fs.appendFileSync(VQ_ATTRIBUTION_LOG, lines);
+  } catch (_) { /* log path is best-effort; never fail the load on a log write */ }
+}
 
 // ─── HANDLERS ────────────────────────────────────────────────────────────────
 
@@ -113,6 +135,7 @@ async function action_load_vq(payload, ctx) {
     rfqSearchKey, secondaryRfqSearchKeys, buyerId, quotes,
     sourceUid, messageId, senderEmail, senderDomain, brokerMessageId,
     emailType, clarifications, subject, outerFrom,
+    bypassRegistryValidation,
   } = payload;
 
   // Build the full target list — primary first, then secondaries. Dedup in
@@ -147,6 +170,62 @@ async function action_load_vq(payload, ctx) {
     };
   }
 
+  // ─── Buyer registry validation ─────────────────────────────────────────────
+  // Source of truth: shared/data/user-role-registry.json. If the agent-proposed
+  // buyerId is not in the buyers list, do NOT write — escalate to operator so
+  // they can either add the user to the registry OR specify the correct buyer.
+  // See deferred-work.md § "VQ buyer-resolution: implement role-registry
+  // fallback ladder" for the full design.
+  const buyerCheck = bypassRegistryValidation
+    ? { buyer: buyerId, source: 'operator_override', reason: 'bypassRegistryValidation flag set (operator reply to clarify_buyer)', escalate: false }
+    : resolveBuyerFromRegistry({
+        candidateUserId: buyerId,
+        citedRfq: rfqSearchKey,
+      });
+  if (buyerCheck.escalate) {
+    breadcrumbs.write({
+      cog: 'vq-loading-agent',
+      event: 'escalated-buyer-unknown',
+      uid: ctx.uid,
+      subject,
+      outerFrom: outerFrom || senderEmail,
+      proposed_buyer_id: buyerId,
+      rfq: rfqSearchKey,
+      secondary_rfqs: secondaryRfqSearchKeys,
+      quote_count: (quotes || []).length,
+      reason: buyerCheck.reason,
+    });
+    const askDetails = [
+      `Agent-proposed buyerId: ${buyerId || '(none)'}`,
+      `Tier-A candidate role: ${isKnownSupport(buyerId) ? 'support (Ivy/Gopal/Lathis pattern)' : (buyerId ? 'unknown (not in buyer or support registry)' : 'no candidate')}`,
+      `Primary RFQ: ${rfqSearchKey}`,
+      secondaryRfqSearchKeys && secondaryRfqSearchKeys.length ? `Secondary RFQs: ${secondaryRfqSearchKeys.join(', ')}` : null,
+      `Quote count: ${(quotes || []).length}`,
+      `Sender (outer): ${outerFrom || senderEmail || '(unknown)'}`,
+      '',
+      'To resolve:',
+      '  1. If the proposed user IS a buyer → add them to shared/data/user-role-registry.json under "buyers" and replay the email.',
+      '  2. If the correct buyer is someone else → reply to this email with the buyer name/email and the agent will re-route.',
+      '  3. If this load should not happen → move the email to NoBid / NeedsReview / Deleted Items.',
+    ].filter(Boolean).join('\n');
+    return await action_clarify_buyer({
+      reason: `Buyer not in registry — ${buyerCheck.reason}`,
+      subject: subject || '(no subject)',
+      outerFrom: outerFrom || senderEmail,
+      senderEmail: null, // operator-routed only
+      proposedBuyerId: buyerId,
+      rfqSearchKey,
+      secondaryRfqSearchKeys,
+      quotes,
+      details: askDetails,
+      investigation_summary: `Buyer-registry check: ${buyerCheck.reason}`,
+    }, ctx);
+  }
+
+  // buyerCheck.buyer is the validated buyer ID. Use it from here on (may
+  // differ from the original payload buyerId in future ladder versions).
+  const validatedBuyerId = buyerCheck.buyer;
+
   const derivedDomain = senderDomain
     || (senderEmail && senderEmail.includes('@')
         ? senderEmail.split('@')[1].toLowerCase()
@@ -160,7 +239,7 @@ async function action_load_vq(payload, ctx) {
     try {
       result = await loadBulkSummary({
         rfqSearchKey: targetKey,
-        buyerId: buyerId || JAKE_USER_ID,
+        buyerId: validatedBuyerId,
         quotes,
       });
     } catch (err) {
@@ -192,7 +271,7 @@ async function action_load_vq(payload, ctx) {
       senderDomain: derivedDomain,
       rfqSearchKey: targetKey,
       isPrimary: targetKey === rfqSearchKey,
-      buyerId: buyerId || JAKE_USER_ID,
+      buyerId: validatedBuyerId,
       emailType: emailType || null,
       quotesSubmitted: (quotes || []).length,
       written: result.written.length,
@@ -214,9 +293,33 @@ async function action_load_vq(payload, ctx) {
       skipped: result.skipped.length,
       failed: result.failed.length,
       gaps: result.gaps,
+      writtenDetails: result.written,    // ← was missing pre-2026-05-20; needed for digest reconciliation
       skippedDetails: result.skipped,
       failedDetails: result.failed,
     });
+
+    // Per-VQ attribution: append a JSONL row for each newly-written VQ tying
+    // its vqLineId back to this batch (sourceUid + messageId). See header for
+    // rationale + digest consumption.
+    if (Array.isArray(result.written) && result.written.length > 0) {
+      const nowIso = new Date().toISOString();
+      const attribRows = result.written
+        .filter(w => w && w.vqLineId)
+        .map(w => ({
+          ts: nowIso,
+          sourceUid: sourceUid || ctx.uid,
+          messageId: messageId || null,
+          vqLineId: w.vqLineId,
+          rfqValue: targetKey,
+          rfqLineNo: w.line || null,
+          vendor: w.vendor || null,
+          mpn: w.mpn || null,
+          cost: w.cost != null ? w.cost : null,
+          qty: w.qty != null ? w.qty : null,
+          buyerId: validatedBuyerId,
+        }));
+      appendAttribution(attribRows);
+    }
     if (result.written.length > 0) totals.rfqsWritten += 1;
     totals.vqsWritten += result.written.length;
     totals.vqsSkipped += result.skipped.length;
@@ -267,6 +370,54 @@ async function action_load_vq(payload, ctx) {
     // sidecar (e.g., a need_info_vendor sidecar that this load resolved).
     // No-op if no sidecar exists.
     pending.clearSidecar(ctx.workflow, ctx.anchorMessageId);
+  }
+
+  // Post-load notice when operator overrode buyer-registry validation with a
+  // user who ISN'T yet in the registry. Per 2026-05-20 policy: the load
+  // proceeds, but operator gets a one-off "consider adding to registry"
+  // ping so they can decide whether the buyer is a one-off or a recurring
+  // colleague worth registering. Fires only when (a) validation was bypassed
+  // AND (b) the resolved buyer is not in the buyers registry. Idempotent —
+  // re-running the same payload re-sends the same notice (harmless).
+  if (!ctx.dryRun && bypassRegistryValidation && validatedBuyerId && !isKnownBuyer(validatedBuyerId)) {
+    try {
+      let buyerName = String(validatedBuyerId);
+      try {
+        const { execSync } = require('child_process');
+        const out = execSync(`psql -t -A -c "SELECT name FROM adempiere.ad_user WHERE ad_user_id = ${Number(validatedBuyerId)}"`, { encoding: 'utf8' });
+        if (out.trim()) buyerName = out.trim();
+      } catch (_) { /* fall back to ID */ }
+      const noticeHtml = `<html><body style="font-family:Arial,sans-serif;font-size:13px">
+<h3 style="color:#2a5">VQ Loading — Loaded with non-registry buyer</h3>
+<p>Per your reply, loaded <b>${totals.vqsWritten}</b> VQs across <b>${totals.rfqsWritten}</b> RFQ${totals.rfqsWritten === 1 ? '' : 's'} with <b>${esc(buyerName)}</b> (id=${esc(String(validatedBuyerId))}) as the buyer.</p>
+<p><b>${esc(buyerName)} is not currently in</b> <code>shared/data/user-role-registry.json</code> under "buyers".</p>
+<p>If they'll be loading or owning RFQs ongoing, add them to the registry so future loads don't re-trigger a clarify. If this was a one-off, no action needed.</p>
+<p style="color:#666;font-size:11px">Subject: ${esc(subject || '(no subject)')}<br/>UID: ${ctx.uid}<br/>Primary RFQ: ${esc(rfqSearchKey || '?')}</p>
+</body></html>`;
+      await ctx.notifier.sendEmail(
+        ctx.jakeEmail,
+        `VQ Loading — Loaded with non-registry buyer: ${buyerName}`,
+        noticeHtml,
+        { html: true },
+      );
+      breadcrumbs.write({
+        cog: 'vq-loading-agent',
+        event: 'non-registry-buyer-notice',
+        uid: ctx.uid,
+        buyer_id: validatedBuyerId,
+        buyer_name: buyerName,
+        rfq: rfqSearchKey,
+        vqs_written: totals.vqsWritten,
+      });
+    } catch (e) {
+      // Notice failure is not load-fatal — log and move on.
+      breadcrumbs.write({
+        cog: 'vq-loading-agent',
+        event: 'non-registry-buyer-notice-failed',
+        uid: ctx.uid,
+        error: e.message,
+      });
+    }
   }
 
   return {
@@ -740,17 +891,48 @@ async function action_needs_vendor(payload, ctx) {
  *              parse cleanly.") If omitted, a generic resend-request is used.
  */
 async function action_needs_review(payload, ctx) {
-  const { reason, subject, outerFrom, senderEmail, details, extracted, askSender, investigation_summary } = payload;
+  const {
+    reason, subject, outerFrom, senderEmail, details, extracted, askSender,
+    investigation_summary, rfqSearchKey, secondaryRfqSearchKeys, buyerId, quotes,
+  } = payload;
   const extractedBlock = extracted && Object.keys(extracted).length > 0
     ? `<pre style="background:#f5f5f5;padding:8px;white-space:pre-wrap;font-size:11px">${esc(JSON.stringify(extracted, null, 2))}</pre>`
     : '';
 
   const envelope = resolveOutreachRecipients(payload, ctx);
 
+  // Write a sidecar so any reply to this bounce (from Ivy/external sender OR
+  // from Jake/operator) re-attaches the original context on the next agent
+  // tick. Without this, today's UID 8508 → 8516 failure mode recurs: the
+  // text-format resend lost Betty's chain because the agent treated it as a
+  // fresh email rather than a re-attempt on a known bounce. See
+  // deferred-work § "needs_review should write a sidecar..." for the design.
+  let sidecarRecord = null;
+  if (!ctx.dryRun && ctx.anchorMessageId) {
+    sidecarRecord = pending.writeSidecar(ctx.workflow, ctx.anchorMessageId, {
+      original_uid: ctx.uid,
+      original_subject: subject || null,
+      original_recipient: ctx.jakeEmail,
+      external_sender: outerFrom || senderEmail || null,
+      internal_forwarder: envelope.senderUsed || null,
+      reason: reason || null,
+      rfq_search_key: rfqSearchKey || null,
+      secondary_rfq_search_keys: Array.isArray(secondaryRfqSearchKeys) ? secondaryRfqSearchKeys : [],
+      proposed_buyer_id: buyerId || null,
+      quote_count_at_bounce: Array.isArray(quotes) ? quotes.length : 0,
+      extracted: extracted || {},
+      investigation_summary: investigation_summary || null,
+      kind: 'needs_review_bounce',
+    });
+  }
+
   const senderAsk = askSender && askSender.trim()
     ? askSender.trim()
     : 'Could you resend the quote in a structured text format (Excel, or a plain table in the email body)? Image-only quotes are harder for us to extract reliably.';
 
+  const operatorFooter = envelope.cc
+    ? `<p style="color:#999;font-size:10px;border-top:1px dashed #ccc;margin-top:16px;padding-top:8px"><i>Operator reference (CC only): UID ${ctx.uid}</i></p>`
+    : '';
   const senderHtml = `<html><body style="font-family:Arial,sans-serif;font-size:13px">
 <p>Hello,</p>
 <p>Thanks for your quote — we hit a snag while trying to log it in our system.</p>
@@ -758,6 +940,7 @@ async function action_needs_review(payload, ctx) {
 <p>Reply to this email and your response will route back to our quote-loading system.</p>
 <p>Thanks,<br/>Astute Electronics — VQ Loading</p>
 <p style="color:#999;font-size:11px;border-top:1px solid #eee;padding-top:8px">Reference: ${esc(subject || '(no subject)')}</p>
+${operatorFooter}
 </body></html>`;
 
   const operatorHtml = `<html><body style="font-family:Arial,sans-serif;font-size:13px">
@@ -802,14 +985,111 @@ ${extractedBlock ? `<p><b>What the extractor produced:</b></p>${extractedBlock}`
 }
 
 /**
+ * Buyer-resolution couldn't pick a known buyer (Tier-A returned support /
+ * unknown / no candidate). Ask the operator (Jake only — internal registry
+ * concern, never the external sender) to specify the buyer. Operator replies
+ * with a name/email; the next agent tick stitches the sidecar, parses the
+ * reply, and dispatches load_vq with `bypassRegistryValidation: true`. If
+ * the resolved buyer ISN'T in the registry, the load still proceeds (per
+ * operator policy 2026-05-20 — registry is a heuristic for fresh loads, not
+ * a blocker), and the handler emits a one-off "loaded with non-registry
+ * buyer" notice so operator can decide whether to add them.
+ *
+ * Required payload: { reason, subject }
+ * Optional: { proposedBuyerId, outerFrom, rfqSearchKey, secondaryRfqSearchKeys,
+ *             quotes, details, investigation_summary }
+ */
+async function action_clarify_buyer(payload, ctx) {
+  const {
+    reason, subject, outerFrom, proposedBuyerId, rfqSearchKey,
+    secondaryRfqSearchKeys, quotes, details, investigation_summary,
+  } = payload;
+
+  // Sidecar — capture everything the reply tick needs to retry the load.
+  let sidecarRecord = null;
+  if (!ctx.dryRun && ctx.anchorMessageId) {
+    sidecarRecord = pending.writeSidecar(ctx.workflow, ctx.anchorMessageId, {
+      original_uid: ctx.uid,
+      original_subject: subject || null,
+      external_sender: outerFrom || null,
+      reason: reason || null,
+      rfq_search_key: rfqSearchKey || null,
+      secondary_rfq_search_keys: Array.isArray(secondaryRfqSearchKeys) ? secondaryRfqSearchKeys : [],
+      proposed_buyer_id: proposedBuyerId || null,
+      // Stash the full quotes array so the reply tick re-dispatches without
+      // re-extracting from the original email body. Avoids extraction drift
+      // between bounce and retry.
+      quotes: Array.isArray(quotes) ? quotes : [],
+      investigation_summary: investigation_summary || null,
+      kind: 'clarify_buyer',
+    });
+  }
+
+  const operatorHtml = `<html><body style="font-family:Arial,sans-serif;font-size:13px">
+<h2 style="color:#b80">VQ Loading — Clarify buyer</h2>
+<p><b>Subject:</b> ${esc(subject)}<br/>
+   <b>From:</b> ${esc(outerFrom || '(unknown)')}<br/>
+   <b>UID:</b> ${ctx.uid}</p>
+<p><b>Reason:</b> ${esc(reason || '')}</p>
+${details ? `<pre style="background:#fff8e0;padding:8px;white-space:pre-wrap;font-size:11px">${esc(details)}</pre>` : ''}
+<p><b>To resolve, reply to this email with the buyer:</b></p>
+<ul>
+<li><code>buyer: Stephanie Hill</code></li>
+<li><code>buyer: stephanie.hill@astutegroup.com</code></li>
+<li>or just the name/email on its own line</li>
+</ul>
+<p style="color:#888;font-size:12px"><i>Policy (2026-05-20): if the buyer you name isn't yet in <code>shared/data/user-role-registry.json</code>, the load still proceeds. You'll get a one-off notice afterward so you can add them at your convenience.</i></p>
+<p style="color:#666;font-size:11px;border-top:1px solid #eee;padding-top:8px;margin-top:16px">Sidecar key: ${esc(ctx.anchorMessageId || '(no anchor)')}<br/>Quotes stashed: ${(quotes || []).length}</p>
+</body></html>`;
+
+  if (ctx.dryRun) {
+    return {
+      dry_run: true,
+      would_email: { to: ctx.jakeEmail, reason },
+      would_write_sidecar: !!ctx.anchorMessageId,
+    };
+  }
+
+  await ctx.notifier.sendEmail(
+    ctx.jakeEmail,
+    `VQ Loading — Clarify buyer: ${subject || '(no subject)'}`,
+    operatorHtml,
+    { html: true, replyTo: ctx.inbox },
+  );
+  breadcrumbs.write({
+    cog: 'vq-loading-agent',
+    event: 'escalated-clarify_buyer',
+    uid: ctx.uid,
+    subject,
+    outerFrom: outerFrom || null,
+    proposed_buyer_id: proposedBuyerId || null,
+    rfq: rfqSearchKey || null,
+    quote_count: Array.isArray(quotes) ? quotes.length : 0,
+    reason: reason || null,
+    investigation_summary: investigation_summary || null,
+  });
+  return {
+    notified: ctx.jakeEmail,
+    sidecar_written: !!sidecarRecord,
+  };
+}
+
+/**
  * Vendor explicitly declined (no-bid). Move to NoBid folder + breadcrumb.
  *
- * KNOWN GAP: ideally writes a 0/0 VQ row to preserve the "we asked, they
- * declined" signal in OT for sellers. shared/vq-writer.js currently filters
- * `cost > 0 && qty > 0` (per silentSkips fix 2026-05-13), so a 0/0 write
- * would be silently dropped. Tracked as a deferred-work item: the writer
- * needs a `noBid: true` opt that bypasses the cost/qty filter. Until then
- * the no-bid signal lives only in the breadcrumb + IMAP folder.
+ * NOTE: As of 2026-05-20, `shared/vq-writer.js` now accepts 0/0 rows
+ * (`cost === 0 && qty === 0`) alongside the standard `cost > 0 && qty > 0`
+ * gate. The PRIMARY path for capturing a "we asked, they declined" signal
+ * in OT is the agent's Pass 1 extraction (see agent-prompt.txt § 3.7.0a):
+ * the agent emits 0/0 quotes inside `load_vq` with `vendorNotes` starting
+ * `NO BID — `, which flow into Chuboe_Note_User on the VQ row.
+ *
+ * This action handler stays in place for edge cases where the email is
+ * exclusively a no-bid notification (no quote rows worth a load_vq call)
+ * AND there's no per-line ambiguity — it bookkeeps via breadcrumb + IMAP
+ * move but does NOT itself write a 0/0 VQ today. If a future need arises
+ * to write a single no-bid VQ from this action's payload, the writer is
+ * now ready.
  *
  * Required payload: { reason }
  * Optional: { vendorBpartnerId, rfqSearchKey, vendorName }
@@ -1023,6 +1303,12 @@ module.exports = {
       folder: 'NeedsReview',
       requires: ['reason'],
       handler: action_needs_review,
+    },
+    clarify_buyer: {
+      folder: 'NeedInfo',
+      requires: ['reason'],
+      keepsPending: true,
+      handler: action_clarify_buyer,
     },
     no_bid: {
       folder: 'NoBid',

@@ -1,0 +1,31 @@
+{
+  "_doc": "Astute employee role registry — drives VQ buyer-resolution fallback. Maintained by operator (Jake Harris). The vq-loading-agent (and any downstream consumer needing the buyer/role distinction) checks an ad_user_id against this registry. If a candidate is in `buyers`, assign as chuboe_buyer_id. If in `support`, do NOT use as buyer — fall through to RFQ-owner (chuboe_rfq.chuboe_user_id) or escalate. Anyone in neither list → escalate to Jake for review.",
+  "_updated": "2026-05-20",
+  "_source": "session with operator 2026-05-20; confirmed via interactive review of last-10-days VQ loaders.",
+  "buyers": [
+    { "id": 1009138, "name": "Stephanie Hill" },
+    { "id": 1011159, "name": "Betty Song" },
+    { "id": 1011012, "name": "Molly Huang" },
+    { "id": 1006326, "name": "Elaine Liang" },
+    { "id": 1017258, "name": "Edgar Santana" },
+    { "id": 1019425, "name": "May Wu" },
+    { "id": 1016652, "name": "Rajeev Ranjan" },
+    { "id": 1034720, "name": "Grace Zheng" },
+    { "id": 1005190, "name": "Feong Chang" },
+    { "id": 1043104, "name": "Juan Botero" },
+    { "id": 1009477, "name": "Tracy Xie" },
+    { "id": 1018538, "name": "Serena Zhang" },
+    { "id": 1049524, "name": "Claude Harris (agent)" },
+    { "id": 1000004, "name": "Jake Harris" }
+  ],
+  "support": [
+    { "id": 1013784, "name": "Ivy Song" },
+    { "id": 1016166, "name": "Gopalakrishnan" },
+    { "id": 1016167, "name": "Lathis" }
+  ],
+  "fallback_policy": {
+    "candidate_in_buyers": "assign as chuboe_buyer_id",
+    "candidate_in_support": "DO NOT use as buyer; fall through to RFQ owner (chuboe_rfq.chuboe_user_id), else escalate clarify_buyer",
+    "candidate_in_neither": "escalate clarify_buyer to operator (Jake Harris) with chain candidates listed"
+  }
+}

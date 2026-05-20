@@ -564,15 +564,91 @@ function resetAvailabilityCache() {
 const _bpCache = new Map(); // searchKey -> { id, name }
 
 /**
+ * Normalise a vendor-name string for fuzzy matching: uppercase, strip
+ * whitespace + punctuation. Lets "Samwooele" match "SAMWOO ELECO CO..LTD"
+ * via prefix comparison: "SAMWOOELE" is a prefix of "SAMWOOELECOCOLTD".
+ * Common suffixes (CO/LTD/INC/LIMITED) are NOT stripped because they
+ * appear after the discriminating tokens.
+ */
+function _normalizeBPName(s) {
+  return String(s || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
+}
+
+/**
+ * Levenshtein distance with early-exit when the running minimum exceeds a
+ * threshold. Used by resolveBP's Phase 2 typo-tolerance tier — keeps the
+ * scoring cheap for the "Did the operator just transpose two letters?" case.
+ *
+ * @param {string} a
+ * @param {string} b
+ * @param {number} [maxDist=3] - early-exit if best possible distance exceeds this
+ * @returns {number} edit distance (or maxDist+1 if early-exited)
+ */
+function _levenshtein(a, b, maxDist = 3) {
+  a = a || '';
+  b = b || '';
+  if (a === b) return 0;
+  if (!a.length) return b.length;
+  if (!b.length) return a.length;
+  if (Math.abs(a.length - b.length) > maxDist) return maxDist + 1;
+
+  let prev = new Array(b.length + 1);
+  let curr = new Array(b.length + 1);
+  for (let j = 0; j <= b.length; j++) prev[j] = j;
+
+  for (let i = 1; i <= a.length; i++) {
+    curr[0] = i;
+    let rowMin = i;
+    for (let j = 1; j <= b.length; j++) {
+      const cost = a[i - 1] === b[j - 1] ? 0 : 1;
+      curr[j] = Math.min(
+        prev[j] + 1,        // deletion
+        curr[j - 1] + 1,    // insertion
+        prev[j - 1] + cost, // substitution
+      );
+      if (curr[j] < rowMin) rowMin = curr[j];
+    }
+    if (rowMin > maxDist) return maxDist + 1; // early exit
+    [prev, curr] = [curr, prev];
+  }
+  return prev[b.length];
+}
+
+/**
  * Resolve a Business Partner. Tries search key first, then name.
  * Cached for the session — one API call per unique lookup.
  *
- * @param {string} [searchKey] - BP search key (Value field)
- * @param {string} [vendorName] - Vendor name for fallback lookup
+ * Name-based fuzzy matching (post-2026-05-20 hardening per the
+ * resolveBP-too-loose defect identified during Betty's batch):
+ *
+ *   1. Require `IsVendor='Y'` AND `Chuboe_VendorType_ID IS NOT NULL` on the
+ *      candidate set. Dormant/non-vendor BPs (e.g., "Echo Navigation") and
+ *      BPs that would 500 at POST (VendorType null) are dropped pre-pick.
+ *
+ *   2. Try exact-name match first, then `startswith` only — NEVER `contains`.
+ *      Substring contamination ("roson" → "Lectrosonics") is the failure
+ *      mode `contains` introduced; stricter matching closes it.
+ *
+ *   3. Normalised prefix match catches typos with extra whitespace/punct
+ *      ("Samwooele" → "SAMWOO ELECO" since normalised "SAMWOOELE" is a
+ *      prefix of "SAMWOOELECO..."). Levenshtein-tolerant matching for
+ *      character-level typos ("Dethchy"→"Detechy") is a Phase 2 follow-up.
+ *
+ *   4. When multiple candidates pass, tie-break by recent activity: pick
+ *      the BP with the most active VQs in the last 90 days. Uses psql
+ *      (lighter than REST $expand). Falls back to shortest-name if no
+ *      activity signal.
+ *
+ *   5. If no candidate passes after filters, return `null` (do NOT silently
+ *      mis-pick). The caller routes to `clarify_vendor` / `needs_review`.
+ *
+ * @param {string} [searchKey] - BP search key (Value field) — preferred path
+ * @param {string} [vendorName] - Vendor name for fuzzy fallback
  * @returns {{ id: number, name: string, searchKey: string } | null}
  */
 async function resolveBP(searchKey, vendorName) {
-  // 1. Try search key (exact match)
+  // 1. Try search key (exact match) — unchanged, preserves the operator-
+  //    overridable explicit-ID path used by recovery scripts.
   if (searchKey) {
     if (_bpCache.has(searchKey)) return _bpCache.get(searchKey);
 
@@ -585,42 +661,176 @@ async function resolveBP(searchKey, vendorName) {
     }
   }
 
-  // 2. Try name (contains match)
+  // 2. Name-based fuzzy with vendor filtering + normalised prefix match
   if (vendorName) {
     const cacheKey = 'name:' + vendorName;
     if (_bpCache.has(cacheKey)) return _bpCache.get(cacheKey);
 
+    const inputUpper = vendorName.toUpperCase();
+    const inputNorm = _normalizeBPName(vendorName);
+    if (inputNorm.length < 2) {
+      // 0 or 1 char of signal — bail.
+      _bpCache.set(cacheKey, null);
+      return null;
+    }
     const escaped = vendorName.replace(/'/g, "''").toUpperCase();
 
-    // Try startswith first (more precise than contains)
-    let result = await apiGet('C_BPartner', { filter: `startswith(toupper(Name),'${escaped}')`, top: 5 });
+    // Pull candidates via the iDempiere REST API.
+    //
+    // Filter choice: `Chuboe_VendorType_ID gt 0` alone (NOT also `IsVendor='Y'`).
+    // Empirically (2026-05-20) ECHO COMPONENTS CO.,LTD has VendorType=Global
+    // Sourcing set but `IsVendor` is not 'Y' — adding the IsVendor filter
+    // dropped the correct match. Chuboe_VendorType_ID is the reliable signal
+    // for "this BP is set up for actual quote loading" because writes 500
+    // with Chuboe_VendorType_ID null at POST time.
+    //
+    // Strategy: cast a wide-enough net server-side (`contains` with VendorType
+    // filter), then apply strict client-side scoring so substring contamination
+    // ("roson" → "Lectrosonics") can't slip through.
+    const baseFilter = `Chuboe_VendorType_ID gt 0`;
+    let result = await apiGet('C_BPartner', {
+      filter: `${baseFilter} and contains(toupper(Name),'${escaped}')`,
+      top: 50,
+    });
+    let candidates = (result.records || []).slice();
 
-    // If no startswith match, fall back to contains
-    if (!result.records || result.records.length === 0) {
-      result = await apiGet('C_BPartner', { filter: `contains(toupper(Name),'${escaped}')`, top: 5 });
+    // If the full-string `contains` missed (e.g., "Samwooele" doesn't substring-
+    // match "SAMWOO ELECO" because of the space), fall back to a broader query
+    // using the input's first 4 alphanumeric chars as the server-side anchor.
+    // Client-side scoring (token-prefix / normalised-prefix) still ensures we
+    // don't pick a wrong candidate from the broader set.
+    if (candidates.length === 0 && inputNorm.length >= 4) {
+      const sig = inputNorm.slice(0, 4);
+      const result2 = await apiGet('C_BPartner', {
+        filter: `${baseFilter} and contains(toupper(Name),'${sig}')`,
+        top: 50,
+      });
+      candidates = (result2.records || []).slice();
     }
 
-    // For short names (< 4 chars), also try with space/hyphen variants
-    if ((!result.records || result.records.length === 0) && vendorName.length <= 6) {
-      // Try with spaces (e.g., "DD" -> "D D", or just accept it won't match)
-      // Short names are inherently ambiguous — flag for manual review
+    // Don't bail yet when candidates is empty — Phase 2 typo-tolerance below
+    // runs its own broader server query (`startswith(first 4)`) which can
+    // find typo'd candidates the earlier contains-based queries missed (e.g.,
+    // "HK Dethchy" → "HK Detechy" where the space breaks the contiguous
+    // contains match but startswith picks it up). Phase 2 still gates by
+    // levenshtein ≤ 2 so false positives stay out.
+
+    // Score in priority order: exact normalised > literal startswith >
+    // token-prefix (input is a prefix of any whitespace-delimited token in
+    // the candidate name) > normalised prefix (handles "Samwooele"→"SAMWOO
+    // ELECO" via _normalizeBPName-stripped prefix match).
+    //
+    // Token-prefix specifically excludes substring contamination: "roson" is
+    // NOT a token-prefix of "Lectrosonics" (its only token is "Lectrosonics"
+    // which doesn't start with "roson"), but IS a token-prefix of "Shenzhen
+    // Troson Technology" (the "Troson" token starts with "Troson"). It also
+    // handles short queries like "HM" that fail the exact/normalised prefix
+    // check against multi-token candidates like "HM Tech Electronic Limited".
+    function tokenizeBP(name) {
+      return String(name || '').toUpperCase().split(/[^A-Z0-9]+/).filter(Boolean);
     }
 
-    if (result.records && result.records.length > 0) {
-      // Prefer: exact name match > startswith > shortest name
-      const upper = vendorName.toUpperCase();
-      const exact = result.records.find(r => r.Name.toUpperCase() === upper);
-      const starts = result.records.find(r => r.Name.toUpperCase().startsWith(upper));
-      const best = exact || starts || result.records.sort((a, b) => a.Name.length - b.Name.length)[0];
-      const bp = { id: best.id, name: best.Name, searchKey: best.Value };
+    const exactNorm = candidates.find(r => _normalizeBPName(r.Name) === inputNorm);
+    if (exactNorm) {
+      const bp = { id: exactNorm.id, name: exactNorm.Name, searchKey: exactNorm.Value };
       _bpCache.set(cacheKey, bp);
-      _bpCache.set(best.Value, bp);
+      _bpCache.set(exactNorm.Value, bp);
       return bp;
     }
-    _bpCache.set(cacheKey, null);
+
+    const literalStart = candidates.filter(r => r.Name.toUpperCase().startsWith(inputUpper));
+    const tokenStart = candidates.filter(r => tokenizeBP(r.Name).some(t => t.startsWith(inputUpper.replace(/[^A-Z0-9]+/g, ''))));
+    const normStart = candidates.filter(r => _normalizeBPName(r.Name).startsWith(inputNorm));
+
+    // Build pool in priority order, dedup by id.
+    const seen = new Set();
+    const pool = [];
+    for (const tier of [literalStart, tokenStart, normStart]) {
+      for (const r of tier) {
+        if (!seen.has(r.id)) { seen.add(r.id); pool.push(r); }
+      }
+    }
+
+    // Phase 2 — typo-tolerant fallback (levenshtein on first-token prefix).
+    // Handles single-character typos that the strict tiers miss:
+    //   • "HK Dethchy" → "HK Detechy CO., LIMITED" (single te→th swap)
+    //   • "Louise yen" → "Louis Yen Singapore Pte., Ltd" (extra 'e' on Louis)
+    // The strict tiers won't catch these because the normalised input is
+    // neither a prefix of the normalised candidate nor a token-prefix.
+    //
+    // Gate by input length (>=5 alphanumeric chars) to avoid false positives
+    // on short inputs where a 2-char edit could swing to any vendor. Server
+    // query is `startswith(first 4 of input)` — broad enough to recover both
+    // "HK D…" and "LOUI…" patterns, narrow enough to bound cost.
+    if (pool.length === 0 && inputNorm.length >= 5) {
+      const prefix = inputUpper.replace(/'/g, "''").slice(0, 4);
+      try {
+        const result3 = await apiGet('C_BPartner', {
+          filter: `${baseFilter} and startswith(toupper(Name),'${prefix}')`,
+          top: 100,
+        });
+        const candidates3 = (result3.records || []).slice();
+        const scored = [];
+        for (const r of candidates3) {
+          const normCand = _normalizeBPName(r.Name);
+          // Compare input against the candidate's normalised name truncated
+          // to input length — typos at the START matter, suffix doesn't.
+          const truncated = normCand.slice(0, inputNorm.length);
+          const d = _levenshtein(inputNorm, truncated, 2);
+          if (d <= 2) scored.push({ record: r, distance: d });
+        }
+        if (scored.length > 0) {
+          scored.sort((a, b) => a.distance - b.distance);
+          const minDist = scored[0].distance;
+          for (const s of scored) {
+            if (s.distance === minDist && !seen.has(s.record.id)) {
+              seen.add(s.record.id);
+              pool.push(s.record);
+            }
+          }
+        }
+      } catch (_) { /* server error → fall through, will return null */ }
+    }
+
+    if (pool.length === 0) {
+      _bpCache.set(cacheKey, null);
+      return null;
+    }
+
+    // Activity tie-break: prefer the BP with most active VQs in last 90d.
+    const best = pool.length === 1 ? pool[0] : _pickByActivity(pool);
+    const bp = { id: best.id, name: best.Name, searchKey: best.Value };
+    _bpCache.set(cacheKey, bp);
+    _bpCache.set(best.Value, bp);
+    return bp;
   }
 
   return null;
+}
+
+// Tie-break candidates by recent VQ activity (last 90d active rows). Falls
+// back to shortest-name when psql is unavailable or no activity signal.
+function _pickByActivity(candidates) {
+  try {
+    const { execSync } = require('child_process');
+    const ids = candidates.map(c => c.id).filter(Boolean);
+    if (ids.length === 0) return candidates[0];
+    const sql =
+      `SELECT c_bpartner_id, COUNT(*) AS vq_count ` +
+      `FROM adempiere.chuboe_vq_line ` +
+      `WHERE c_bpartner_id IN (${ids.join(',')}) ` +
+      `AND created >= (CURRENT_DATE - INTERVAL '90 days') AND isactive='Y' ` +
+      `GROUP BY c_bpartner_id ORDER BY vq_count DESC LIMIT 1;`;
+    const out = execSync(`psql -t -A -F'|' -c "${sql.replace(/"/g, '\\"')}"`, { encoding: 'utf8' });
+    const line = out.trim().split('\n').filter(Boolean)[0];
+    if (line) {
+      const [bestId] = line.split('|');
+      const match = candidates.find(c => Number(c.id) === Number(bestId));
+      if (match) return match;
+    }
+  } catch (_) { /* fall through */ }
+  // No psql / no activity → shortest name (closest to a bare brand)
+  return candidates.slice().sort((a, b) => a.Name.length - b.Name.length)[0];
 }
 
 /**

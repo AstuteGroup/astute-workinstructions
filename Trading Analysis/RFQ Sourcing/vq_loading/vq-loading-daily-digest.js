@@ -1,0 +1,507 @@
+#!/usr/bin/env node
+//
+// VQ Loading — Daily Digest
+//
+// Scheduled daily at 8am EST (~12 UTC during DST, 13 UTC standard — DST drift
+// acceptable per ops convention). Surfaces the previous 24 hours of VQ
+// loading activity to the operator for review.
+//
+// What the digest contains:
+//   1. Activity-by-loader table — mixed counting rule:
+//        • Claude as buyer (createdby=1049524 AND RFQ NOT in email batches):
+//          COUNT(DISTINCT (rfq_line × vendor)) — collapses API stock+LT+qty-
+//          break response variants per (vendor, part).
+//        • Claude as purchasing support (createdby=1049524 AND RFQ IN email
+//          batches), and all human loaders: COUNT(*) — each row is a distinct
+//          broker stock batch.
+//        • NetComponents sourcing — shown only when active.
+//        Claude buckets with 0 activity are hidden automatically (avoids
+//        clutter for paused workflows).
+//   2. Per-batch detail table — one row per email processed by
+//      vq-loading-agent in the window. For each batch:
+//        • VQs written
+//        • On behalf of (outer envelope From — discovered via IMAP cross-ref
+//          on the breadcrumb's messageId)
+//        • For buyer (chuboe_buyer_id assigned)
+//        • RFQs covered
+//        • Outstanding (escalations, silent losses, partial extractions)
+//        • Reference (email subject + date for the operator to find it)
+//
+// Usage:
+//   node vq-loading-daily-digest.js               # preview to stdout (no send)
+//   node vq-loading-daily-digest.js --send        # email operator
+//   node vq-loading-daily-digest.js --since 24    # custom window in hours
+//   node vq-loading-daily-digest.js --since 48    # backfill 2 days
+
+'use strict';
+
+const path = require('path');
+require('dotenv').config({ path: path.resolve(__dirname, '../../../../.env') });
+
+const fs = require('fs');
+const { execSync } = require('child_process');
+const { ImapFlow } = require('imapflow');
+const { simpleParser } = require('mailparser');
+const { createNotifier } = require('../../../shared/notifier');
+const { isKnownBuyer, isKnownSupport } = require('../../../shared/partner-lookup');
+
+const BREADCRUMBS = path.join(process.env.HOME, 'workspace', '.offer-pipeline', 'breadcrumbs.jsonl');
+const ATTRIBUTION_LOG = path.join(process.env.HOME, 'workspace', '.vq-batch-attribution.jsonl');
+const RECIPIENT = 'jake.harris@astutegroup.com';
+const CLAUDE_USER_ID = 1049524;
+
+// Load per-VQ attribution rows from the local JSONL log. Maps each
+// chuboe_vq_line.id back to its source email's UID, so the digest can do
+// precise per-batch "claimed vs active in OT" reconciliation. Written by
+// shared/workflow-actions/vq-loading.js after each successful write.
+function loadAttributionSince(sinceMs) {
+  if (!fs.existsSync(ATTRIBUTION_LOG)) return [];
+  const raw = fs.readFileSync(ATTRIBUTION_LOG, 'utf8');
+  const out = [];
+  for (const line of raw.split('\n')) {
+    if (!line.trim()) continue;
+    try {
+      const obj = JSON.parse(line);
+      const ts = Date.parse(obj.ts);
+      if (ts >= sinceMs) out.push(obj);
+    } catch (_) { /* skip malformed */ }
+  }
+  return out;
+}
+
+const args = process.argv.slice(2);
+const SEND = args.includes('--send');
+const sinceIdx = args.indexOf('--since');
+const SINCE_HOURS = sinceIdx >= 0 ? Number(args[sinceIdx + 1]) : 24;
+
+function psqlPipe(sql) {
+  return execSync(`psql -t -A -F'|' -c "${sql.replace(/"/g, '\\"')}"`, { encoding: 'utf8' });
+}
+
+function esc(s) {
+  if (s == null) return '';
+  return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
+// Convert UTC Date → CT-naive timestamp string (CT clock digits with no TZ
+// suffix; matches chuboe_*.created column storage).
+function utcToCTNaive(d) {
+  // CDT = UTC-5 during May 2026 (DST). Hard-coded for now — DST drift is OK.
+  const ct = new Date(d.getTime() - 5 * 3600 * 1000);
+  const pad = (n) => String(n).padStart(2, '0');
+  return `${ct.getUTCFullYear()}-${pad(ct.getUTCMonth() + 1)}-${pad(ct.getUTCDate())} ${pad(ct.getUTCHours())}:${pad(ct.getUTCMinutes())}:${pad(ct.getUTCSeconds())}`;
+}
+
+function loadBreadcrumbsSince(sinceMs) {
+  if (!fs.existsSync(BREADCRUMBS)) return [];
+  const raw = fs.readFileSync(BREADCRUMBS, 'utf8');
+  const out = [];
+  for (const line of raw.split('\n')) {
+    if (!line.trim()) continue;
+    try {
+      const obj = JSON.parse(line);
+      const ts = Date.parse(obj.ts);
+      if (ts >= sinceMs) out.push(obj);
+    } catch (_) { /* skip malformed */ }
+  }
+  return out;
+}
+
+// ─── IMAP outer-From cross-ref ──────────────────────────────────────────────
+//
+// The agent's breadcrumb captures `senderEmail` = the DEEPEST resolved actor
+// from the chain walk (per shared/partner-lookup.js Tier-A logic). That's
+// useful for buyer attribution but it doesn't tell us "who forwarded the
+// email to vq@?" For the digest's "On behalf of" column we want the actual
+// outer envelope From. Lookup by Message-ID across vq@ folders.
+async function fetchOuterFromForMessageIds(messageIds) {
+  if (!messageIds || messageIds.length === 0) return new Map();
+  const result = new Map();
+  const client = new ImapFlow({
+    host: process.env.IMAP_HOST || 'imap.mail.us-east-1.awsapps.com',
+    port: parseInt(process.env.IMAP_PORT || '993', 10),
+    secure: true,
+    auth: { user: 'vq@orangetsunami.com', pass: process.env.WORKMAIL_PASS || process.env.SMTP_PASS },
+    logger: false,
+  });
+  await client.connect();
+  try {
+    for (const folder of ['Processed', 'INBOX', 'NeedsReview', 'NoBid']) {
+      try {
+        const lock = await client.getMailboxLock(folder);
+        try {
+          for (const mid of messageIds) {
+            if (result.has(mid)) continue;
+            try {
+              const uids = await client.search({ header: { 'message-id': mid } }, { uid: true });
+              if (!uids || uids.length === 0) continue;
+              const msg = await client.fetchOne(String(uids[0]), { envelope: true }, { uid: true });
+              if (!msg) continue;
+              const from = (msg.envelope.from && msg.envelope.from[0] && msg.envelope.from[0].address) || '';
+              const subject = msg.envelope.subject || '';
+              const date = msg.envelope.date;
+              result.set(mid, { outerFrom: from, subject, date, folder });
+            } catch (_) { /* skip per-message errors */ }
+          }
+        } finally { lock.release(); }
+      } catch (_) { /* skip folder not accessible */ }
+    }
+  } finally {
+    await client.logout().catch(() => {});
+  }
+  return result;
+}
+
+// ─── Activity by loader (top section) ───────────────────────────────────────
+function pullActivity(sinceTs, untilTs, emailBatchRfqs) {
+  const inClause = emailBatchRfqs.length
+    ? emailBatchRfqs.map(r => `'${r}'`).join(',')
+    : `''`; // empty list — nothing matches
+  // Mixed counting rule: Claude-as-buyer uses DISTINCT (rfq_line × vendor);
+  // everyone else uses raw COUNT(*). Also surface ad_user_id so we can tag
+  // human loaders with their role registry classification.
+  const sql =
+    `WITH labeled AS ( ` +
+    `SELECT v.chuboe_vq_line_id, v.chuboe_rfq_line_id, v.c_bpartner_id, v.createdby, ` +
+    `CASE ` +
+    `  WHEN v.createdby = ${CLAUDE_USER_ID} AND r.value IN (${inClause}) THEN 'Claude as purchasing support (email loading)' ` +
+    `  WHEN v.createdby = ${CLAUDE_USER_ID} THEN 'Claude as buyer (API + scraping)' ` +
+    `  ELSE COALESCE(u.name, 'unknown') END AS loader ` +
+    `FROM adempiere.chuboe_vq_line v ` +
+    `JOIN adempiere.chuboe_rfq_line rl ON v.chuboe_rfq_line_id = rl.chuboe_rfq_line_id ` +
+    `JOIN adempiere.chuboe_rfq r ON rl.chuboe_rfq_id = r.chuboe_rfq_id ` +
+    `LEFT JOIN adempiere.ad_user u ON u.ad_user_id = v.createdby ` +
+    `WHERE v.created >= '${sinceTs}'::timestamp AND v.created < '${untilTs}'::timestamp AND v.isactive='Y' ` +
+    `) SELECT loader, MIN(createdby) AS user_id, ` +
+    `       CASE WHEN loader = 'Claude as buyer (API + scraping)' ` +
+    `            THEN COUNT(DISTINCT (chuboe_rfq_line_id, c_bpartner_id)) ` +
+    `            ELSE COUNT(*) END AS vqs ` +
+    `FROM labeled GROUP BY loader ORDER BY vqs DESC;`;
+  const out = psqlPipe(sql);
+  return out.trim().split('\n').filter(Boolean).map(line => {
+    const [loader, userId, vqs] = line.split('|');
+    return { loader, userId: Number(userId), vqs: Number(vqs) };
+  });
+}
+
+// Returns 'Buyer' / 'Support' / 'Untagged' / '(Claude)' for the role column.
+function roleFor(loaderName, userId) {
+  if (loaderName.startsWith('Claude')) return '(Claude)';
+  if (isKnownBuyer(userId)) return 'Buyer';
+  if (isKnownSupport(userId)) return 'Support';
+  return 'Untagged';
+}
+
+// ─── Active VQ count per RFQ in window (reconciliation) ─────────────────────
+function pullActiveCountsByRfq(sinceTs, untilTs, rfqs) {
+  if (!rfqs.length) return new Map();
+  const sql =
+    `SELECT r.value, COUNT(*) FROM adempiere.chuboe_vq_line v ` +
+    `JOIN adempiere.chuboe_rfq_line rl ON v.chuboe_rfq_line_id = rl.chuboe_rfq_line_id ` +
+    `JOIN adempiere.chuboe_rfq r ON rl.chuboe_rfq_id = r.chuboe_rfq_id ` +
+    `WHERE r.value IN (${rfqs.map(r => `'${r}'`).join(',')}) ` +
+    `AND v.created >= '${sinceTs}'::timestamp AND v.created < '${untilTs}'::timestamp ` +
+    `AND v.isactive='Y' ` +
+    `GROUP BY r.value;`;
+  const out = psqlPipe(sql);
+  const m = new Map();
+  for (const line of out.trim().split('\n').filter(Boolean)) {
+    const [rfq, cnt] = line.split('|');
+    m.set(rfq, Number(cnt));
+  }
+  return m;
+}
+
+function lookupUserNames(userIds) {
+  if (!userIds.length) return new Map();
+  const out = psqlPipe(`SELECT ad_user_id, name FROM adempiere.ad_user WHERE ad_user_id IN (${userIds.join(',')})`);
+  const m = new Map();
+  for (const line of out.trim().split('\n').filter(Boolean)) {
+    const [id, name] = line.split('|');
+    m.set(Number(id), name);
+  }
+  return m;
+}
+
+(async () => {
+  const now = Date.now();
+  const sinceMs = now - SINCE_HOURS * 3600 * 1000;
+  const sinceTs = utcToCTNaive(new Date(sinceMs));
+  const untilTs = utcToCTNaive(new Date(now));
+
+  // 1. Read breadcrumbs in window for vq-loading-agent
+  const bcs = loadBreadcrumbsSince(sinceMs).filter(b => b.cog === 'vq-loading-agent');
+  const loaded = bcs.filter(b => b.event === 'loaded');
+  const escalated = bcs.filter(b => b.event && b.event.startsWith('escalated'));
+
+  // 2. Group loaded events by sourceUid (= one email per group)
+  const byUid = new Map();
+  for (const e of loaded) {
+    const uid = e.sourceUid || e.uid;
+    if (!byUid.has(uid)) byUid.set(uid, { uid, messageId: e.messageId, firstTs: e.ts, events: [] });
+    byUid.get(uid).events.push(e);
+  }
+
+  // 3. IMAP cross-ref: outer From for each batch's messageId
+  const messageIds = [...new Set([...byUid.values()].map(b => b.messageId).filter(Boolean))];
+  const mid2info = messageIds.length ? await fetchOuterFromForMessageIds(messageIds) : new Map();
+
+  // 4. Build per-batch detail
+  const emailBatchRfqs = new Set();
+  const batches = [];
+  for (const [uid, group] of byUid) {
+    const rfqs = group.events.map(e => ({
+      rfq: e.rfqSearchKey,
+      isPrimary: e.isPrimary,
+      written: e.written || 0,
+      skipped: e.skipped || 0,
+      failed: e.failed || 0,
+      coverageHit: e.coverageHit || 0,
+      coverageTotal: e.coverageTotal || 0,
+    }));
+    rfqs.forEach(r => emailBatchRfqs.add(r.rfq));
+    const claimed = rfqs.reduce((a, r) => a + r.written, 0);
+    const failed = rfqs.reduce((a, r) => a + r.failed, 0);
+    const senderEmail = group.events[0]?.senderEmail || '';
+    const info = mid2info.get(group.messageId);
+    // Breadcrumb's buyerId = what the agent assigned at load time. Captured
+    // for audit but should NOT drive the displayed buyer — operator may have
+    // patched it later (e.g., today's UID 8515 Ivy → Molly correction).
+    const breadcrumbBuyerId = group.events[0]?.buyerId;
+
+    // Per-batch CURRENT buyer attribution from OT: aggregate chuboe_buyer_id
+    // across active VQs that landed within this batch's load-time window on
+    // its RFQs. Reflects any operator patches since the breadcrumb was written.
+    const eventTimes = group.events.map(e => Date.parse(e.ts)).filter(Number.isFinite);
+    let currentBuyerId = breadcrumbBuyerId;
+    let currentActive = 0;
+    if (eventTimes.length && rfqs.length) {
+      const winStart = utcToCTNaive(new Date(Math.min(...eventTimes) - 2 * 60 * 1000)); // -2min slop
+      const winEnd   = utcToCTNaive(new Date(Math.max(...eventTimes) + 5 * 60 * 1000)); // +5min slop
+      const distinctRfqs = [...new Set(rfqs.map(r => r.rfq))];
+      try {
+        const sql =
+          `SELECT v.chuboe_buyer_id, COUNT(*) cnt ` +
+          `FROM adempiere.chuboe_vq_line v ` +
+          `JOIN adempiere.chuboe_rfq_line rl ON v.chuboe_rfq_line_id = rl.chuboe_rfq_line_id ` +
+          `JOIN adempiere.chuboe_rfq r ON rl.chuboe_rfq_id = r.chuboe_rfq_id ` +
+          `WHERE r.value IN (${distinctRfqs.map(r => `'${r}'`).join(',')}) ` +
+          `AND v.created BETWEEN '${winStart}'::timestamp AND '${winEnd}'::timestamp ` +
+          `AND v.isactive='Y' ` +
+          `GROUP BY v.chuboe_buyer_id ORDER BY cnt DESC;`;
+        const out = psqlPipe(sql);
+        const rows = out.trim().split('\n').filter(Boolean).map(l => {
+          const [bid, cnt] = l.split('|');
+          return { buyerId: bid ? Number(bid) : null, count: Number(cnt) };
+        });
+        if (rows.length) {
+          currentBuyerId = rows[0].buyerId;
+          currentActive = rows.reduce((a, x) => a + x.count, 0);
+        } else {
+          // No active VQs landed in this batch's window → either rolled back
+          // or the load failed silently.
+          currentBuyerId = null;
+          currentActive = 0;
+        }
+      } catch (_) {
+        // Fail open: keep the breadcrumb buyer if the OT query errors.
+      }
+    }
+
+    batches.push({
+      uid,
+      messageId: group.messageId,
+      firstTs: group.firstTs,
+      outerFrom: (info && info.outerFrom) || senderEmail || '?',
+      subject: (info && info.subject) || '(subject unavailable)',
+      emailDate: info && info.date ? info.date.toISOString() : null,
+      buyerId: currentBuyerId,             // current OT-derived buyer
+      breadcrumbBuyerId,                    // what the agent assigned at load time
+      rfqs,
+      claimedWritten: claimed,
+      failedCount: failed,
+      currentActive,
+    });
+  }
+  batches.sort((a, b) => a.firstTs.localeCompare(b.firstTs));
+
+  // 5. Per-batch reconciliation via the local attribution log.
+  // shared/workflow-actions/vq-loading.js writes one JSONL row per successful
+  // VQ write tying vqLineId → sourceUid. The digest reads that log, groups
+  // by sourceUid, and queries OT for is_active=Y on the vqLineIds attributed
+  // to each batch. Gives precise "claimed vs active" per batch without an
+  // OT schema change. Window-time-based fallback removed.
+  const allBatchRfqs = [...emailBatchRfqs];
+  const attribRows = loadAttributionSince(sinceMs);
+  const attribByUid = new Map();
+  for (const a of attribRows) {
+    const uid = a.sourceUid;
+    if (!uid) continue;
+    if (!attribByUid.has(uid)) attribByUid.set(uid, []);
+    attribByUid.get(uid).push(a);
+  }
+
+  // Bulk query: for every vqLineId across all batches, which are active?
+  const allVqLineIds = attribRows.map(a => a.vqLineId).filter(Number.isFinite);
+  const activeIds = new Set();
+  if (allVqLineIds.length > 0) {
+    const chunks = [];
+    for (let i = 0; i < allVqLineIds.length; i += 500) chunks.push(allVqLineIds.slice(i, i + 500));
+    for (const chunk of chunks) {
+      const sql = `SELECT chuboe_vq_line_id FROM adempiere.chuboe_vq_line WHERE chuboe_vq_line_id IN (${chunk.join(',')}) AND isactive='Y'`;
+      const out = psqlPipe(sql);
+      for (const line of out.trim().split('\n').filter(Boolean)) {
+        const id = Number(line);
+        if (Number.isFinite(id)) activeIds.add(id);
+      }
+    }
+  }
+
+  for (const b of batches) {
+    const rows = attribByUid.get(b.uid) || [];
+    b.attributedVqIds = rows.map(r => r.vqLineId);
+    b.activeInOt = rows.filter(r => activeIds.has(r.vqLineId)).length;
+    b.attributedTotal = rows.length;
+    b.silentLoss = Math.max(0, b.claimedWritten - b.attributedTotal);
+    b.deactivatedAfterLoad = b.attributedTotal - b.activeInOt;
+  }
+
+  // 6. Look up buyer names + user names. Include both current and breadcrumb
+  // buyer IDs so the digest can render "was X, now Y" diffs.
+  const buyerIds = [
+    ...new Set(batches.flatMap(b => [b.buyerId, b.breadcrumbBuyerId]).filter(Boolean)),
+  ];
+  const buyerMap = lookupUserNames(buyerIds);
+
+  // 7. Activity by loader (mixed counting rule)
+  const activity = pullActivity(sinceTs, untilTs, allBatchRfqs);
+
+  // Apply "hide zero" rule for Claude buckets
+  const claudeBucketNames = new Set([
+    'Claude as buyer (API + scraping)',
+    'Claude as purchasing support (email loading)',
+    'Claude — NetComponents sourcing',
+  ]);
+  const activityShown = activity.filter(a => !claudeBucketNames.has(a.loader) || a.vqs > 0);
+  const totalAll = activityShown.reduce((a, x) => a + x.vqs, 0);
+
+  // ─── Render HTML ─────────────────────────────────────────────────────────
+  const dispWindow = `${sinceTs} CT → ${untilTs} CT (${SINCE_HOURS}h)`;
+  let html = `<html><body style="font-family:Arial,sans-serif;font-size:13px;color:#222">
+<h2 style="color:#2a5;margin-bottom:4px">VQ Loading — Daily Digest</h2>
+<p style="margin-top:0;color:#666">${esc(dispWindow)} · ${totalAll} VQs total · ${batches.length} email batch${batches.length === 1 ? '' : 'es'} processed</p>
+
+<h3 style="margin-bottom:4px">Activity by loader</h3>
+<table border="1" cellpadding="6" cellspacing="0" style="border-collapse:collapse;font-size:12px;min-width:540px">
+<thead style="background:#eef"><tr><th align="left">Loader</th><th align="left">Role</th><th align="right">VQs</th></tr></thead>
+<tbody>
+${activityShown.map(a => {
+  const role = roleFor(a.loader, a.userId);
+  const roleColor = role === 'Support' ? '#888' : role === 'Untagged' ? '#b00' : '#222';
+  const nameDisplay = claudeBucketNames.has(a.loader) ? '<b>' + esc(a.loader) + '</b>' : esc(a.loader);
+  return `<tr><td>${nameDisplay}</td><td style="color:${roleColor}"><i>${esc(role)}</i></td><td style="text-align:right">${a.vqs}</td></tr>`;
+}).join('\n')}
+<tr style="background:#eee"><td colspan="2"><b>Total supply-support</b></td><td style="text-align:right"><b>${totalAll}</b></td></tr>
+</tbody>
+</table>
+<p style="color:#666;font-size:11px;margin-top:4px"><i>Counting rule: <b>Claude as buyer</b> uses COUNT(DISTINCT (rfq_line × vendor)) because API responses fan-out stock + lead-time + qty-break variants per (vendor, part); all other loaders use raw row count because each row is a distinct stock batch from the vendor. Claude buckets with 0 activity are hidden.</i></p>
+`;
+
+  if (batches.length > 0) {
+    html += `<h3 style="margin-bottom:4px">Batches loaded via vq-loading-agent</h3>
+<table border="1" cellpadding="8" cellspacing="0" style="border-collapse:collapse;font-size:12px;width:100%">
+<thead style="background:#eef"><tr><th>#</th><th>VQs (active / written)</th><th>On behalf of</th><th>For buyer</th><th>RFQs</th><th>Reference</th><th>Outstanding</th></tr></thead>
+<tbody>
+${batches.map((b, i) => {
+  // Determine display buyer using CURRENT chuboe_buyer_id (post-patches),
+  // with the breadcrumb's original assignment as audit context.
+  const currentBuyerName = b.buyerId ? (buyerMap.get(b.buyerId) || `id=${b.buyerId}`) : null;
+  const breadcrumbBuyerName = b.breadcrumbBuyerId ? (buyerMap.get(b.breadcrumbBuyerId) || `id=${b.breadcrumbBuyerId}`) : null;
+  const wasPatched = b.breadcrumbBuyerId && b.buyerId && b.buyerId !== b.breadcrumbBuyerId;
+  // Precise rolled-back signal now uses the attribution log: 0 of this
+  // batch's attributed vqLineIds are active in OT.
+  const rolledBack = b.attributedTotal > 0 && b.activeInOt === 0;
+
+  let buyerDisplay;
+  if (rolledBack) {
+    buyerDisplay = `<span style="color:#666"><i>(rolled back — 0 active VQs)</i></span>` +
+      (breadcrumbBuyerName ? `<br/><small style="color:#999">breadcrumb had: ${esc(breadcrumbBuyerName)}</small>` : '');
+  } else if (wasPatched) {
+    buyerDisplay = `<b>${esc(currentBuyerName)}</b><br/><small style="color:#888">patched (was ${esc(breadcrumbBuyerName)})</small>`;
+  } else if (!b.buyerId) {
+    buyerDisplay = '<i style="color:#999">(escalated)</i>';
+  } else if (isKnownSupport(b.buyerId)) {
+    buyerDisplay = `<span style="color:#b00">⚠️ ${esc(currentBuyerName)}</span><br/><small style="color:#b00">support — mis-attributed (needs patch)</small>`;
+  } else if (isKnownBuyer(b.buyerId)) {
+    buyerDisplay = esc(currentBuyerName);
+  } else {
+    buyerDisplay = `<span style="color:#b80">${esc(currentBuyerName)}</span><br/><small style="color:#b80">untagged — add to registry?</small>`;
+  }
+
+  const rfqList = [...new Set(b.rfqs.map(r => r.rfq))].join(', ');
+  const outstanding = [];
+  if (rolledBack) outstanding.push(`Batch was rolled back — 0 active VQs in OT despite ${b.attributedTotal} written from this batch (attribution log)`);
+  if (b.deactivatedAfterLoad > 0 && !rolledBack) outstanding.push(`${b.deactivatedAfterLoad} of ${b.attributedTotal} VQs from this batch later deactivated in OT (post-load patch?)`);
+  if (b.silentLoss > 0) outstanding.push(`Silent loss: agent claimed ${b.claimedWritten} writes but attribution log has only ${b.attributedTotal} (Δ ${b.silentLoss})`);
+  if (!rolledBack && b.buyerId && isKnownSupport(b.buyerId)) outstanding.push(`Buyer is a support user (${esc(currentBuyerName)}) — needs operator patch`);
+  if (b.failedCount > 0) outstanding.push(`${b.failedCount} hard failure(s) (e.g., Chuboe_VendorType null) — see breadcrumbs`);
+  if (outstanding.length === 0) outstanding.push('None');
+  // VQs column: show "active / claimed" when they differ, else just the number.
+  const vqsCell = b.attributedTotal !== b.activeInOt
+    ? `<b>${b.activeInOt}</b> <small style="color:#666">of ${b.attributedTotal} written</small>`
+    : `<b>${b.activeInOt}</b>`;
+  return `<tr>
+<td>${i + 1}</td>
+<td>${vqsCell}</td>
+<td>${esc(b.outerFrom)}</td>
+<td>${buyerDisplay}</td>
+<td>${esc(rfqList)}</td>
+<td>"${esc(b.subject)}"<br/><small>${esc(b.emailDate ? b.emailDate.slice(0, 10) : '')}</small></td>
+<td>${outstanding.join('<br/>')}</td>
+</tr>`;
+}).join('\n')}
+</tbody>
+</table>
+<p style="color:#666;font-size:11px;margin-top:4px"><i>"VQs (active / written)" reconciles against <code>~/workspace/.vq-batch-attribution.jsonl</code>: each successful VQ write tags its vqLineId to the source email's UID, so the digest queries OT for is_active=Y on this batch's specific vqLineIds — precise per-batch reconciliation regardless of other loaders hitting the same RFQs. "Active" can be less than "written" if rows were patched/deactivated post-load.</i></p>`;
+  } else {
+    html += `<p style="color:#999"><i>No vq-loading-agent batches processed in this window.</i></p>`;
+  }
+
+  if (escalated.length > 0) {
+    html += `<h3 style="margin-bottom:4px;color:#b00">Escalations</h3><ul>`;
+    for (const e of escalated) {
+      html += `<li><b>UID ${esc(e.uid)}</b> — ${esc(e.event)}: ${esc(e.reason || '(no reason)')}<br/><small>subject: ${esc(e.subject || '?')}</small></li>`;
+    }
+    html += `</ul>`;
+  }
+
+  html += `<p style="color:#999;font-size:11px;margin-top:16px;border-top:1px solid #eee;padding-top:8px">
+Generated by vq-loading-daily-digest.js · Scheduled daily 8am EST.<br/>
+Window: ${esc(dispWindow)} (CT-naive per chuboe_*.created convention).<br/>
+Top-section "Active in OT (since window)" only counts rows created in this window — pre-existing prior loads excluded.
+</p></body></html>`;
+
+  if (!SEND) {
+    console.log('--- HTML preview ---');
+    console.log(html);
+    console.log('\n--- Summary ---');
+    console.log(`Activity rows: ${activityShown.length} · Total VQs: ${totalAll}`);
+    console.log(`Batches: ${batches.length} · Escalations: ${escalated.length}`);
+    console.log('(Preview only — pass --send to email)');
+    return;
+  }
+
+  const notifier = createNotifier({
+    fromEmail: 'vq@orangetsunami.com',
+    fromName: 'VQ Loading — Daily Digest',
+  });
+  const today = new Date().toISOString().slice(0, 10);
+  await notifier.sendEmail(
+    RECIPIENT,
+    `VQ Loading — Daily Digest (${today})`,
+    html,
+    { html: true },
+  );
+  console.log(`Sent to ${RECIPIENT}`);
+  console.log(`Activity: ${activityShown.map(a => `${a.loader.replace(/Claude as /, 'C-')}=${a.vqs}`).join(' / ')} · ${batches.length} batch(es)`);
+})().catch(err => { console.error('FATAL:', err); process.exit(1); });

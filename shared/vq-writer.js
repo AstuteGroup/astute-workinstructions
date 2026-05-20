@@ -75,6 +75,7 @@ const FLAG = {
   MISSING_MANDATORY: 'MISSING_MANDATORY',
   API_WRITE_ERROR: 'API_WRITE_ERROR',
   RESTRICTED_MFR: 'RESTRICTED_MFR',
+  PRE_EXISTING_DUPLICATE: 'PRE_EXISTING_DUPLICATE',
 };
 
 // ─── Tier 1 Defaults (set at VQ load time) ─────────────────────────────────
@@ -250,7 +251,7 @@ async function resolveRFQ(rfqSearchKey) {
   // for callers that don't pass an explicit rfqQty.
   const lineIdToQty = new Map();
   for (const m of allMpns) {
-    const mpn = (m.Chuboe_MPN || '').toUpperCase();
+    const mpn = (m.Chuboe_MPN || '').trim().toUpperCase();
     const lineId = m.Chuboe_RFQ_Line_ID?.id || m.Chuboe_RFQ_Line_ID;
     if (mpn && lineId) mpnToLine.set(mpn, lineId);
     if (lineId && m.Qty != null) lineIdToQty.set(lineId, Number(m.Qty));
@@ -278,7 +279,7 @@ const VENDOR_PREFIXES = [/^BK[0-9]?[-\/]/, /^#/];
  * 7. Fall back to CPC if provided
  */
 function resolveRFQLine(rfq, mpn, cpc) {
-  const upper = mpn.toUpperCase();
+  const upper = (mpn || '').trim().toUpperCase();
 
   // 1. Exact MPN match
   if (rfq.mpnToLine.has(upper)) return rfq.mpnToLine.get(upper);
@@ -509,7 +510,12 @@ async function writeVQFromAPI(rfqSearchKey, cpc, franchiseResults, opts = {}) {
     if (extractedRows.length === 0) continue;
 
     const rowsToWrite = extractedRows
-      .filter(sub => sub.cost != null && sub.cost > 0 && sub.qty > 0)
+      // Accept (a) standard quotes: cost > 0 AND qty > 0, OR
+      //        (b) no-bid records: cost === 0 AND qty === 0 (vendor was asked,
+      //            declined or has no stock — captures the "we asked, no" signal
+      //            in OT so sellers/buyers see it). Filter null/negative/mixed.
+      .filter(sub => sub.cost != null && sub.qty != null &&
+        ((sub.cost > 0 && sub.qty > 0) || (sub.cost === 0 && sub.qty === 0)))
       .map(sub => ({
         mpn: sub.mpn || opts.searchedMpn || '',
         mfrText: sub.manufacturer || d.vqManufacturer || '',
@@ -819,12 +825,20 @@ async function writeVQFromAPI(rfqSearchKey, cpc, franchiseResults, opts = {}) {
     try {
       const existingId = findExistingVqIdByNaturalKey(payload);
       if (existingId) {
-        // Already written by another caller — skip without error
-        written.push({
+        // Already written by another caller (concurrent enricher, prior cron
+        // tick, manual sourcer-load that happens to share the same natural
+        // key, etc.). Route to `skipped` with a documented reason so caller
+        // count reconciliation reflects what actually POSTed today — NOT
+        // counted as `written`. (Pre-2026-05-20 behavior pushed to `written`
+        // with _skippedAsDuplicate:true, which inflated the "claimed" count
+        // in the digest and made claimed-vs-active reconciliation lie. See
+        // deferred-work § writer accounting bug.)
+        skipped.push({
           vqLineId: existingId, mpn, vendor: vendorDisplay, bpId: bp.id,
           mfrId: resolvedMfrId, mfr: mfrCanonical, price, qty,
           channel: row.channel || null,
-          _skippedAsDuplicate: true,
+          reason: FLAG.PRE_EXISTING_DUPLICATE || 'PRE_EXISTING_DUPLICATE',
+          detail: `Existing chuboe_vq_line ${existingId} matches natural key (rfq_line × MPN × BP × cost × currency) — no new POST.`,
         });
         continue;
       }

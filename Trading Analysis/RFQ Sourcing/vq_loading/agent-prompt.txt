@@ -50,10 +50,13 @@ For every UID returned by `list`, process in order:
 Run:
   node /home/analytics_user/workspace/astute-workinstructions/shared/email-workflow-poller.js read <uid> --workflow vq-loading
 
-Output includes: subject, from, body, forwarded_headers, external_sender, internal_forwarder, references, attachments, and (if a sidecar matches the thread) pending_state.
+Output includes: subject, from, body, body_html, forwarded_headers, external_sender, internal_forwarder, references, attachments, and (if a sidecar matches the thread) pending_state.
+
+  - `body`      — plain-text body. Default field for reading the message.
+  - `body_html` — raw HTML body (may be '' if the email is text-only). **Consult this when the operator's instructions reference visual formatting** — see 3.7.0 below.
 
 ────────────────────────────────────────────
-3.2 — STITCH check — if pending_state is present, this is a reply to an earlier need_info_vendor / clarify_vendor / needs_vendor / partial_clarify sidecar.
+3.2 — STITCH check — if pending_state is present, this is a reply to an earlier need_info_vendor / clarify_vendor / needs_vendor / partial_clarify / needs_review_bounce sidecar.
 ────────────────────────────────────────────
 
   **3.2.0 — Reply-directive check FIRST.** Before attempting to merge, call `parseSidecarReplyDirective` on the reply body:
@@ -98,6 +101,39 @@ Output includes: subject, from, body, forwarded_headers, external_sender, intern
       (5) **Safety net:** pre-write dedup (step 3.9) will route `dup_skip` on any (vendor, MPN, qty, cost, RFQ, 30d) row that's already in OT. If rule (1) or (2) is violated, you don't get double-writes — you get redundant work + a dup_skip breadcrumb. But dedup is the backstop, not the primary protection — get rules (1)+(2) right first.
 
       (6) **Cap retries:** if `pending_state.retry_count >= 2`, route `needs_review` with reason "stitch retry cap reached" — don't loop forever.
+  - On `kind: "clarify_buyer"`: this is a REPLY to a prior clarify-buyer escalation. The sidecar carries:
+        `original_uid`, `original_subject`, `external_sender`, `reason`,
+        `rfq_search_key` + `secondary_rfq_search_keys`,
+        `proposed_buyer_id` (what we proposed at escalation time),
+        `quotes` (the full extracted quotes array — stashed at escalation so we can retry without re-extracting),
+        `investigation_summary`.
+    **Behavior on a clarify-buyer reply:**
+      (1) **Parse the reply body for the operator's buyer specification.** Common patterns:
+          - `buyer: Stephanie Hill` → name
+          - `buyer: stephanie.hill@astutegroup.com` → email
+          - Just the name or email on its own line, no prefix
+          - Operator may also include short context ("she's covering this RFQ this week"); ignore the context, extract the identifier.
+      (2) **Resolve to ad_user_id.** Use `resolveAstuteUserByEmail` for an `@astutegroup.com` address; fall back to `resolveAstuteUserByName` for a name. The lookup result will be `{userId, ...unambiguous:true}` or `{ambiguous:true, candidates}` or `null`. On ambiguous → re-route `clarify_buyer` with the candidates listed; the next reply disambiguates. On null → re-route `clarify_buyer` saying "could not resolve <whatever they typed>; try a different name/email."
+      (3) **Dispatch `load_vq`** with:
+          - `rfqSearchKey: pending_state.rfq_search_key`
+          - `secondaryRfqSearchKeys: pending_state.secondary_rfq_search_keys`
+          - `buyerId: <resolved ad_user_id from step 2>`
+          - `quotes: pending_state.quotes` (re-use the stashed array — DO NOT re-extract from the reply body)
+          - `bypassRegistryValidation: true` ← KEY FLAG. Tells the handler to skip the registry check and trust the operator's specified buyer.
+          - `original_message_id: pending_state.original_message_id` so the poller clears the sidecar after load.
+      (4) **The load proceeds regardless of whether the resolved buyer is in the registry.** If they're not in the registry, the handler emits a one-off "loaded with non-registry buyer" notice email so the operator can decide whether to add them. The load itself is NOT blocked.
+      (5) **Retry cap:** if `pending_state.retry_count >= 2`, route `needs_review` with reason "clarify_buyer retry cap reached — operator must resolve manually". Loop guard.
+  - On `kind: "needs_review_bounce"`: this is a REPLY to a prior bounce we sent (operator OR external sender resending). The sidecar carries:
+        `original_uid`, `original_subject`, `external_sender` (the deeper actor on the original — e.g., Betty Song),
+        `internal_forwarder` (outer forwarder — e.g., Ivy), `reason` (why we bounced),
+        `rfq_search_key` + `secondary_rfq_search_keys`, `proposed_buyer_id` (what we inferred at bounce time),
+        `extracted` (what the extractor produced at bounce time), `investigation_summary`.
+    **Behavior on a bounce-reply:**
+      (1) **Use `pending_state.external_sender` as the senderEmail/Tier-A anchor**, NOT the reply's outer envelope From. The reply may be from Ivy (resender) or Jake (operator) — neither is the actual buyer. The original chain's external_sender is the right buyer-resolution anchor.
+      (2) **Re-extract from the reply body and HTML.** The reply often contains a corrected payload (e.g., resent with a different format, with red rows manually called out, etc.). Treat the reply as the source-of-truth for extraction — DO NOT just replay `pending_state.extracted`.
+      (3) **Cite the same RFQ context** (`rfq_search_key` from the sidecar) unless the reply explicitly redirects. Helps MPN-fan-out resolve consistently.
+      (4) **Apply ALL the standard extraction passes** — §3.7.0 formatting filter, §3.7.0a no-bid, §3.7.0b continuation-row, §3.5.1 buyer-registry validation. The bounce-reply path doesn't bypass any of these; it just gives you better context to feed them.
+      (5) **Cap retries:** if `pending_state.retry_count >= 2`, route `needs_review` again with reason "bounce-reply retry cap reached — operator must resolve manually". The sidecar bump signals "we've tried twice; stop the loop."
   - Pass `original_message_id: pending_state.original_message_id` on the continuation route so the poller can clear the right sidecar.
 
 If pending_state is absent, this is a fresh message — continue to 3.3.
@@ -166,12 +202,67 @@ Buyer resolution (the operator-on-record who DID the sourcing — NOT necessaril
     * **Type 2** → buyer = the compiler. On a clean Type 2 chain Tier A would have already picked them, so this branch is rare (the compiler arrived without any intermediate forwarding).
     Resolve the chosen email via `resolveAstuteUserByEmail` to get the AD_User_ID.
 
-  - **Tier D — Default.** No internal sender anywhere → omit `buyerId` from the payload. The handler defaults to Jake (1000004).
+  - **Tier D — Default.** No internal sender anywhere → omit `buyerId` from the payload. The handler will detect and escalate to operator (Jake) rather than silently mis-attributing.
 
-Common buyers (cached for speed but always verify):
+────────────────────────────────────────────
+3.5.1 — BUYER REGISTRY VALIDATION (handler-side safety net).
+────────────────────────────────────────────
+
+After your Tier A → D walk picks a candidate `buyerId`, the handler
+(`shared/workflow-actions/vq-loading.js` → `action_load_vq`) validates it
+against the operator-maintained registry at:
+
+  `shared/data/user-role-registry.json`
+
+The registry has two lists:
+  - `buyers[]` — confirmed buyers. A buyerId in this list passes and the
+    load proceeds.
+  - `support[]` — known support / sourcer / forwarder roles (Ivy Song, Gopal,
+    Lathis). A buyerId in this list FAILS validation; the load is escalated
+    to operator instead of writing with a wrong buyer.
+
+If your candidate is **not in either list** (e.g., a new Asia buyer who
+hasn't been registered yet), the handler escalates as well. The operator
+either (a) adds the user to the registry and replays, or (b) replies with
+the correct buyer.
+
+**Implications for your extraction:**
+
+  - Prefer the deepest internal actor your chain walk can reach. Don't stop
+    at a support-tagged email if a deeper buyer is visible in the chain.
+  - If Tier A only resolves to Ivy/Gopal/Lathis with no deeper actor, that's
+    OK — the handler will escalate cleanly. Don't try to "force" a buyer.
+  - You don't need to read the registry yourself. The handler does it. Just
+    pass your best Tier A → D candidate as `buyerId` and the handler decides
+    whether to load or escalate.
+  - The handler's escalation breadcrumb is `escalated-buyer-unknown`. Reads
+    "Buyer not in registry — ..." in `~/workspace/.offer-pipeline/breadcrumbs.jsonl`.
+
+**Why the registry exists:** today's pre-registry behavior fell back to the
+sender/forwarder when the chain was broken, silently mis-attributing the
+buyer on text-format resends (Ivy-as-buyer on Molly's batches, etc.). The
+registry pushes those cases to operator review instead.
+
+Common buyers (cached for speed but always verify against the registry file):
   - Jake Harris: 1000004
+  - Stephanie Hill: 1009138
+  - Betty Song: 1011159
+  - Molly Huang: 1011012
   - Elaine Liang: 1006326
-  - Ed Harkins, Tracy Xie, Roberto Orozco, Feong Chang — query as needed
+  - Edgar Santana: 1017258
+  - May Wu: 1019425
+  - Rajeev Ranjan: 1016652
+  - Grace Zheng: 1034720
+  - Feong Chang: 1005190
+  - Juan Botero: 1043104
+  - Tracy Xie: 1009477
+  - Serena Zhang: 1018538
+  - Claude Harris (agent itself): 1049524
+
+Common support (NOT buyers — handler will escalate if you pass these):
+  - Ivy Song: 1013784
+  - Gopalakrishnan: 1016166
+  - Lathis: 1016167
 
 ────────────────────────────────────────────
 3.6 — RFQ search key resolution.
@@ -233,6 +324,114 @@ Validate the RFQ exists and is active:
 
 This is the lift that brings cron-quality up to terminal-quality. Per vq-loading.md Dual-Phase Extraction:
 
+**3.7.0 — FORMATTING-BASED ROW FILTERS** (do this BEFORE Pass 1):
+
+Some operators (notably Betty Song on Type 2 bulk-summary forwards) embed row-level filtering instructions in the email body that reference visual formatting:
+
+  - "Only the items highlighted in red in the table need to be uploaded"
+  - "Skip the strikethrough rows — those are cancelled"
+  - "Load only the yellow-background lines"
+  - "Bold rows are confirmed; ignore the rest"
+  - "Items in red are already loaded — do not re-load"
+
+The plain-text `body` field does NOT preserve formatting, so you cannot identify the filtered subset from `body` alone. You MUST consult `body_html`.
+
+**Procedure:**
+
+  (1) Scan `body` for instructions referencing visual formatting (look for tokens like: `red`, `highlighted`, `yellow`, `bold`, `italic`, `strikethrough`, `crossed out`, `marked`, `colored`, `highlighted in <color>`). The cue is the operator's natural-language directive about a colour or style.
+
+  (2) If such an instruction exists AND `body_html` is non-empty, parse `body_html` to identify the formatted elements. Word-via-Outlook encodes formatting in surprising ways — don't just grep for `red`:
+       - **Text colour:** `style="color:#C82613"` (brick red) or `color:#FF0000` or `<font color="...">`. Betty's "red" in the 2026-05-20 UID 8508 case was `#C82613`, NOT `red` or `#FF0000`.
+       - **Cell background:** `background:yellow`, `bgcolor="#FFFF00"`, `style="background-color:..."`.
+       - **Strikethrough:** `<s>`, `<strike>`, `text-decoration:line-through`.
+       - **Bold:** `<b>`, `<strong>`, `font-weight:bold|700`.
+       - **Italic:** `<i>`, `<em>`, `font-style:italic`.
+     Any non-default colour value on a `<td>` or its inner `<span>` / `<font>` counts as "highlighted" — don't enumerate hex codes.
+
+  (3) ⚠️ **Granularity caveat — formatting can apply BELOW row level.** In a consolidated sourcing-summary table, one `<tr>` often lists multiple vendor sub-quotes concatenated in a single cell (e.g., one MPN row with "Ameya 0.072usd 36k | Echo 6979pcs 0.37usd | Detechy 28047pcs 0.20usd"). The operator's "red" may apply to only ONE of those sub-quotes within the row — not the whole row. Do NOT treat the whole row as "highlighted" just because a single text span inside it has the marker.
+       - Walk each `<tr>` and identify the **specific `<span>` / `<font>` / inline text element** that carries the formatting marker.
+       - Determine which **vendor sub-quote** that element belongs to (which vendor's name/price/qty cluster contains the highlighted text).
+       - Build the filter set at the **vendor-sub-quote level**, not the row level.
+       - If formatting markers cover the entire `<tr>` (every text span within shares the marker), then row-level filtering is correct — but verify, don't assume.
+
+  (3a) ⚠️ **Partial-highlight caveat — the highlighted span may NOT contain the full vendor identifier.** Operators frequently highlight only the *new* or *interesting* portion of a sub-quote. The vendor name (and other fields) may extend before or after the red span and be unhighlighted. Example from Betty's 5/13 email: text in the cell reads `Troson  ACPL-217-56AE  12000  0.145usd` — only `roson` is in `color:#C82613`, the leading `T` is unhighlighted black text. Extracting just the red substring produces vendor name "roson" — which doesn't match any BP. The actual vendor is `Shenzhen Troson Technology Co., Ltd`.
+       - When you identify a red span, do NOT extract only the span's text content.
+       - Instead, extract the **enclosing logical sub-quote** — the contiguous text block (across red AND unhighlighted spans) that represents one vendor's quote.
+       - The vendor name typically appears at the start of the sub-quote text. Capture the full vendor token even if only part of it is red.
+       - Cross-check the extracted vendor name against the BP partner table before dispatching `load_vq`. If `resolveAstuteUserByName` / fuzzy BP search returns nothing, suspect a partial-highlight truncation and re-walk the sub-quote with wider boundaries.
+
+  (4) In Pass 1 below, produce quotes ONLY for the vendor sub-quotes that pass the filter. One Betty-row with 3 vendor sub-quotes where only 1 is red → write 1 VQ, not 3. Stamp `vendorNotes` on each quote with a brief audit trail: `'operator filter: only red-highlighted sub-quotes per body instruction'`.
+
+      **Sanity check before dispatch:** the operator's natural expectation should roughly match your output count. Betty's 5/13 email referenced ~50 VQs to load across all 9 RFQs. If your extracted quote count is >>2× that expectation (say >100), you're probably treating whole rows as red when only sub-elements are. Re-walk the HTML at sub-row granularity before dispatching `load_vq`.
+
+  (5) If the operator's instruction references formatting but `body_html` is empty (text-only email) OR the formatting is genuinely missing from the HTML (e.g., a forwarder stripped styles), route `needs_review` with `reason: "Operator instructs to filter by <formatting> but body_html is empty/strip-formatted"` and `investigation_summary` describing what you tried.
+
+**Why this exists:** Before 2026-05-20, the poller only exposed `body` (plain text). UID 8508 was bounced for "only red rows" with a generic format-resend ask, the operator (Ivy) replied in text-format losing the colour info, and the agent then loaded all 293 rows on the resend against Betty's explicit instruction. The HTML-aware filter prevents that failure mode.
+
+**3.7.0a — NO-BID EXTRACTION** (do this AS PART OF Pass 1):
+
+In consolidated sourcing-summary tables, sourcers commonly list every broker they asked, including ones who declined. Each "we asked them, they said no" is a real signal worth recording in OT so sellers can see "this vendor was approached and had nothing to offer."
+
+**Recognise no-bid patterns** in vendor sub-quote text:
+  - `NO STK`, `no stk`, `NO STOCK`, `out of stock`, `OOS`
+  - `NO BID`, `no bid`, `declined`, `decline`
+  - `N/A`, `n/a`, `nothing`, `nil`, `none`
+  - Bilingual variants — `没货`, `无货`, `沒貨`, `없음` (Chinese / Korean no-stock signals from APAC brokers)
+  - Patterns may appear as full row text (`SMARTEL: NO STK`) or as the only content on the vendor's sub-quote line
+
+**When you identify a no-bid sub-quote, emit a quote with:**
+  - `qty: 0`
+  - `cost: 0`
+  - `vendorName` and `mpn` set to the actual vendor and the RFQ's MPN (so it associates correctly)
+  - `vendorNotes: 'NO BID — <verbatim signal>'` — start with the literal text `NO BID — ` so the operator note is searchable, then quote the source text verbatim (`SMARTEL: NO STK`, `dragon: no stock`, etc.) for audit
+  - All other fields can be null/default — date code, packaging, RoHS, etc. don't apply
+
+**Why this matters:**
+  - The writer (as of 2026-05-20) accepts `cost === 0 && qty === 0` rows when both are zero — they bypass the standard "must have a real price" gate and write with `Chuboe_Note_User` set to `vendorNotes`.
+  - Sellers downstream see "Smartel was asked on 2026-05-19 — NO STK" rather than guessing whether the absence of a Smartel VQ means "we never asked them" or "we asked, they said no." Big difference for re-quoting decisions.
+  - The same RFQ-line natural-key dedup (`rfq_line_id, vendor, MPN, cost, currency`) still applies — a no-bid that's already in OT won't duplicate.
+
+**Filter relationship with §3.7.0:** If the operator's body text has a formatting-based row filter (`only red rows`), the no-bid signal is still a separate concern. A non-red row with NO STK is still NOT loaded (operator excluded it). A red row whose only vendor signal is NO STK IS loaded as a 0/0 no-bid quote (operator wants that signal captured).
+
+**3.7.0b — CONTINUATION-ROW VENDOR INFERENCE.**
+
+Operator-aggregated sourcing summaries frequently list multiple qty/price
+tiers from the same vendor across successive rows, with the **vendor name
+appearing only on the FIRST tier**. Subsequent tiers are written as bare
+quote lines with no vendor token.
+
+**Example from Elaine's 2026-05-19 batch (RFQ 1134681):**
+```
+pgc ESDLIN1524BJ ST 10500 25+ $0.305 3-4d COO CN     ← PGC explicit, tier 1
+ESDLIN1524BJ 30000 ST 25+ $0.305 3-4d COO CN          ← continuation, tier 2
+ESDLIN1524BJ ST 45K 25+ $0.444 3-4d COO CN            ← continuation, tier 3
+fixchip ESDLIN1524BJ ST 25+ SOD323 40500 $0.306 3-4d   ← Fixchips explicit
+```
+
+**Rule:** when a sub-quote row contains a price + qty but no explicit
+vendor name, **the row inherits the vendor of the most recent preceding
+row that DID have an explicit vendor name** (within the same MPN block).
+The inferred row is a distinct quote from that vendor — emit it as a
+separate quote in the `quotes[]` array with `vendorName` set to the
+inherited vendor and `vendorNotes` flagged with `'tier N — vendor inherited
+from preceding row'` for audit.
+
+**Boundaries — when NOT to inherit:**
+- Crossing into a new MPN block (any row that includes a different MPN
+  string than the inherited vendor's tier was attached to) resets the
+  inheritance.
+- An explicit vendor name on a later row resets the inheritance to that
+  new vendor for any continuation rows below it.
+- A clearly-different price structure (e.g., a 10x cost difference with no
+  qty discount pattern) suggests a different vendor's quote got mis-pasted
+  — when in doubt, skip rather than mis-attribute.
+
+**Why this matters:** today's PGC tier-2 ESDLIN1524BJ @ $0.305 × 30,000
+was skipped on the live load because the agent saw no vendor on the row
+and assumed it was a no-vendor row. The operator had to load it manually.
+A single inherited row prevents the recurrence; the explicit `vendorNotes`
+tag keeps it auditable.
+
 **Pass 1 — Extraction** (YOU do this):
 
 Read the body + any image/PDF attachments carefully. Produce a structured JSON quotes array, one entry per line item:
@@ -268,9 +467,12 @@ Use the Agent tool with subagent_type="general-purpose". Prompt the verifier wit
 
   "You are independently verifying a supplier-quote extraction. Re-read the source email body and any attached images/PDFs at the paths below — DO NOT look at the extractor's output. Produce your own structured quotes array, then compare to the extractor's output and flag every discrepancy (MPN, qty, cost, currency, vendor, date code, COO, packaging, RoHS).
 
-   Source email body: <paste the read response's `body` field verbatim>
-   Attachment paths: <list of file paths from download-attachments>
+   Source email body (text):     <paste the read response's `body` field verbatim>
+   Source email body (HTML):     <paste the read response's `body_html` field verbatim — may be empty if text-only>
+   Attachment paths:             <list of file paths from download-attachments>
    Extractor's output (DO NOT READ until you've done your own extraction): <paste extractor JSON>
+
+   IMPORTANT — formatting-based row filters: if the text body contains an operator instruction referencing visual formatting ('only the red rows', 'skip strikethrough', 'highlighted only'), consult body_html to identify which rows match. Per 3.7.0 in the parent prompt: red can be `color:#C82613` (Outlook brick red), `#FF0000`, or any non-default colour value on a `<td>`/`<span>`/`<font>`. Your extraction must apply the same filter. If you produce quotes for rows the operator excluded — or omit rows the operator wanted — flag that as a discrepancy.
 
    Return JSON: { my_extraction: [...], discrepancies: [{ field, line, extractor: X, verifier: Y, source: <quote of source text> }, ...], confidence: 0.0-1.0 }
    Brief — under 500 tokens. List every discrepancy. Confidence 1.0 = perfect agreement, 0.0 = totally different."

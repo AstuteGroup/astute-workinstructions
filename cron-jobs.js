@@ -287,6 +287,20 @@ module.exports = [
   },
 
   {
+    name: 'vq-loading-daily-digest',
+    cadence: 'fixed',
+    // 12:00 UTC = 8am EDT (May–Nov) / 7am EST (Nov–Mar). DST drift acceptable
+    // per ops convention. Runs after :25 stock-rfq-activity-digest so the
+    // 24h window naturally includes overnight loading activity.
+    cadenceCron: '0 12 * * *',
+    command: `node "${ASTUTE}/Trading Analysis/RFQ Sourcing/vq_loading/vq-loading-daily-digest.js" --send`,
+    cwd: ASTUTE,
+    needsOT: false,
+    logFile: '/tmp/vq-loading-daily-digest.log',
+    description: 'Daily 8am EDT (12:00 UTC) — VQ Loading digest to operator (jake.harris@). 24h window. Activity-by-loader (mixed counting: Claude-as-buyer distinct, others raw) + per-batch detail (outer-From via IMAP cross-ref / buyer / RFQs / outstanding / subject reference) + escalations.',
+  },
+
+  {
     name: 'offer-breadcrumbs-prune',
     cadence: 'weekly',
     // Sunday 02:00 UTC — quiet window

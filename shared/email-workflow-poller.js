@@ -13,9 +13,17 @@
  *       List UNSEEN envelopes as JSON: [{uid, subject, from, date, attachment_names, has_attachment}, ...]
  *
  *   read <uid> --workflow <name>
- *       Read full email as JSON: { uid, subject, from, to, cc, date, body,
+ *       Read full email as JSON: { uid, subject, from, to, cc, date, body, body_html,
  *                                   forwarded_headers: {originalFrom, originalCc, originalSubject},
  *                                   external_sender, internal_forwarder, attachments: [...] }
+ *
+ *       body      = plain-text body (parsed.text, falling back to parsed.html if no
+ *                   text/plain part). What agents have always read.
+ *       body_html = raw HTML body (parsed.html) — '' if the message has no HTML
+ *                   part. Use this when formatting matters: cell background colours
+ *                   ("only red-highlighted rows"), bold, italic, strikethrough,
+ *                   font colour. Agents should consult body_html when operator
+ *                   instructions reference formatting; otherwise body suffices.
  *
  *   route <uid> <action> --workflow <name> --payload <json|file>
  *       Execute the routing decision via the workflow's action handler;
@@ -255,6 +263,7 @@ async function cmdRead(uid) {
       cc: (parsed.cc && parsed.cc.text) || '',
       date: parsed.date ? parsed.date.toISOString() : '',
       body: bodyText,
+      body_html: parsed.html || '',
       forwarded_headers: fwd,
       external_sender: externalSender,
       internal_forwarder: isInternalAddress(senderAddr) ? senderAddr : null,
