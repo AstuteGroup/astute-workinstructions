@@ -33,6 +33,10 @@ const { ImapFlow } = require('imapflow');
 const { simpleParser } = require('mailparser');
 
 const { runVortexForRFQ, buildSummaryHtml } = require('./vortex-matches');
+const {
+  runSourcingRecapForRFQ,
+  buildSummaryHtml: buildRecapSummaryHtml
+} = require('../Sourcing Recap/sourcing-recap');
 const { sendWithFallback } = require('../../shared/verified-send');
 
 const VORTEX_EMAIL = 'vortex@orangetsunami.com';
@@ -59,6 +63,24 @@ const UID_ARG = (() => {
 
 function log(...args) {
   console.log(new Date().toISOString(), '-', ...args);
+}
+
+/**
+ * Subject-keyword router: does this message ask for Sourcing Recap?
+ *
+ * Rule (locked with operator 2026-05-20): subject contains "BEST" as a
+ * standalone word (case-insensitive) AND a 7-digit RFQ#. The keyword can
+ * appear anywhere — "BEST 1234567", "Best price for 1234567?", "1234567 BEST",
+ * all route to the recap path. Anything else stays on Vortex Matches.
+ *
+ * "Best regards" alone (no RFQ#) won't trigger this. False-positive risk
+ * exists for subjects like "Best price for 1234567" — that's actually the
+ * intent though, so it's fine.
+ */
+function isSourcingRecapRequest(subject) {
+  if (!subject) return false;
+  // Standalone "best" token (not inside another word), case-insensitive.
+  return /\bbest\b/i.test(subject) && /\b\d{7}\b/.test(subject);
 }
 
 /**
@@ -226,16 +248,26 @@ async function processMessage(client, uid) {
     return { uid, status: 'error', reason: 'no rfq number' };
   }
 
-  log(`  UID ${uid}: RFQ=${rfqNumber}  originalFrom=${originalFrom || '(none)'}  ccCount=${originalCc.length}`);
+  // Subject-keyword router: BEST + RFQ# → Sourcing Recap path; everything
+  // else stays on Vortex Matches. See isSourcingRecapRequest above.
+  const isRecap = isSourcingRecapRequest(subject);
+  const flavor = isRecap ? 'recap' : 'vortex';
 
-  // Run vortex
+  log(`  UID ${uid}: RFQ=${rfqNumber}  flavor=${flavor}  originalFrom=${originalFrom || '(none)'}  ccCount=${originalCc.length}`);
+
+  // Run the chosen analysis. Both share the same { customer, attachments[] }
+  // contract on success — the email path below treats them uniformly.
   let result;
   try {
-    result = await runVortexForRFQ(rfqNumber, { log: m => log('   ', m) });
+    if (isRecap) {
+      result = await runSourcingRecapForRFQ(rfqNumber, { log: m => log('   ', m) });
+    } else {
+      result = await runVortexForRFQ(rfqNumber, { log: m => log('   ', m) });
+    }
   } catch (err) {
-    log(`  UID ${uid}: vortex run failed: ${err.message}`);
+    log(`  UID ${uid}: ${flavor} run failed: ${err.message}`);
     await sendErrorEmail(
-      `Vortex Matches — RFQ ${rfqNumber} failed`,
+      `${isRecap ? 'Sourcing Recap' : 'Vortex Matches'} — RFQ ${rfqNumber} failed`,
       err.message,
       { uid, subject, from: senderAddr }
     );
@@ -243,14 +275,34 @@ async function processMessage(client, uid) {
     return { uid, status: 'error', reason: err.message };
   }
 
-  // Build recipients + body
+  // Sourcing Recap may legitimately return ok:false (Stock RFQ rejection / not
+  // found). Treat as a delivered reply, not an error — the operator asked, we
+  // explain why we can't help. Mark Seen so we don't loop.
+  if (isRecap && result && result.ok === false) {
+    log(`  UID ${uid}: sourcing-recap declined (${result.error}): ${result.message}`);
+    const { to, cc } = buildRecipients(originalFrom, originalCc);
+    const subj = result.error === 'stock_rfq'
+      ? `Sourcing Recap — RFQ ${rfqNumber}: Stock RFQ (use Vortex Matches)`
+      : `Sourcing Recap — RFQ ${rfqNumber}: ${result.error}`;
+    if (!DRY_RUN) {
+      await sendVortexResult({
+        to, cc, subject: subj, html: buildRecapSummaryHtml(result), attachments: []
+      });
+      await client.messageFlagsAdd(String(uid), ['\\Seen'], { uid: true });
+    }
+    return { uid, status: 'declined', rfqNumber, reason: result.error };
+  }
+
+  // Build recipients + body (success path, both flavors)
   const { to, cc } = buildRecipients(originalFrom, originalCc);
-  const html = buildSummaryHtml(result);
-  const emailSubject = `Vortex Matches — RFQ ${rfqNumber} (${result.customer})`;
+  const html = isRecap ? buildRecapSummaryHtml(result) : buildSummaryHtml(result);
+  const emailSubject = isRecap
+    ? `Sourcing Recap — RFQ ${rfqNumber} (${result.customer})`
+    : `Vortex Matches — RFQ ${rfqNumber} (${result.customer})`;
 
   if (DRY_RUN) {
-    log(`  [dry-run] would send to=${to.join(',')} cc=${cc.join(',')} attachments=${result.attachments.length}`);
-    return { uid, status: 'dry-run', rfqNumber };
+    log(`  [dry-run] would send (${flavor}) to=${to.join(',')} cc=${cc.join(',')} attachments=${result.attachments.length}`);
+    return { uid, status: 'dry-run', rfqNumber, flavor };
   }
 
   // Send via primary (vortex@), fall back to excess@ if primary bounces.
@@ -259,9 +311,9 @@ async function processMessage(client, uid) {
   });
 
   await client.messageFlagsAdd(String(uid), ['\\Seen'], { uid: true });
-  log(`  UID ${uid}: sent via ${sendResult.delivered} sender and marked Seen` +
+  log(`  UID ${uid}: sent (${flavor}) via ${sendResult.delivered} sender and marked Seen` +
       (sendResult.bounceDetected ? ' (primary bounced, fallback used)' : ''));
-  return { uid, status: 'sent', rfqNumber, attachments: result.attachments.length, delivered: sendResult.delivered };
+  return { uid, status: 'sent', rfqNumber, flavor, attachments: result.attachments.length, delivered: sendResult.delivered };
 }
 
 /**

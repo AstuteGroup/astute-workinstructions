@@ -9,6 +9,7 @@ Consolidated roadmap for Trading Analysis workflows.
 | Workflow | Location | Status |
 |----------|----------|--------|
 | Vortex Matches | `Vortex Matches/` | Operational |
+| Sourcing Recap | `Sourcing Recap/` | Operational (shipped 2026-05-20) |
 | Quick Quote | `Quick Quote/` | Operational |
 | **Live Opportunities (RFQ → Offers)** | `Market Offer Matching for RFQs/` | Operational |
 | **Proactive Opportunities (Offers → Historical)** | `Market Offer Matching for RFQs/` | Partial |
@@ -29,6 +30,7 @@ Consolidated roadmap for Trading Analysis workflows.
 | A2 | Filter Low % of Demand Matches | **Next** | Planned |
 | A3 | MPN Variant Matching | Later | Planned |
 | A4 | Vortex output redundancy investigation + cleanup | **Next** | Planned |
+| A5 | Migrate vortex@ inbox to the agent pattern (architectural debt) | Later | Planned |
 
 ---
 
@@ -235,6 +237,30 @@ VQ-side fields involved:
 - Add `Match Type` column to output
 
 **Depends on:** `mpn_variants.py` module from RFQ Sourcing
+
+---
+
+## A5. Migrate vortex@ inbox to the agent pattern
+
+**Status:** Planned | **Priority:** Later
+
+**Problem:** `Trading Analysis/Vortex Matches/vortex-poller.js` is a standalone IMAP poller that predates `shared/email-workflow-poller.js` + `shared/workflow-actions/<name>.js` (the documented agent pattern for all email-driven workflows — see workspace `CLAUDE.md` § "Email-Driven Workflows Use the Agent Pattern" and `email-workflow-architecture.md`). When Sourcing Recap shipped (2026-05-20), it was bolted onto the existing poller with a subject-keyword router rather than each workflow getting its own agent file, because doing the migration as part of that PR would have meant rewriting working Vortex code as a side quest.
+
+The pragmatic outcome: vortex-poller.js now hosts two actions (Vortex Matches default + Sourcing Recap on `BEST` keyword) but isn't using the generic poller library, doesn't have a `notifierConfig`, and doesn't appear in the workflow registry / parity check.
+
+**Solution:**
+1. Create `shared/workflow-actions/vortex.js` with two actions: `vortex_matches` (default) and `sourcing_recap` (gated by `BEST` subject keyword).
+2. Hook it into `shared/email-workflow-poller.js` so the cron/`/schedule` routine drives it instead of the standalone poller.
+3. Register both actions in `shared/workflow-registry.js` so `check-workflow-parity.js` covers them.
+4. Retire `Trading Analysis/Vortex Matches/vortex-poller.js` (or leave as a thin CLI wrapper).
+
+**Why this matters:** Today, the parity check + registry-driven invariants don't cover anything in the vortex@ pipeline. Any change to one of the two actions can drift without surfacing in the session greeting. Once Vortex moves under the agent pattern, both flows get the same drift guardrails the rest of the codebase has.
+
+**Files:**
+- `Trading Analysis/Vortex Matches/vortex-poller.js` — current host (to migrate)
+- `Trading Analysis/Sourcing Recap/sourcing-recap.js` — second action (already library-shaped: `runSourcingRecapForRFQ` / `buildSummaryHtml`)
+- `shared/email-workflow-poller.js` — target framework
+- `email-workflow-architecture.md` — pattern reference
 
 ---
 
