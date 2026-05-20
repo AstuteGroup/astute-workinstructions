@@ -1,0 +1,428 @@
+[
+  {
+    "rfq": "1134964",
+    "vendorName": "Louise yen",
+    "mpn": "GSOT05C-E3-08",
+    "mfr": "Vishay",
+    "qty": 3000,
+    "cost": 0.06,
+    "dateCode": "23+",
+    "leadTime": "stock",
+    "packaging": "REEL",
+    "vendorNotes": "STOCK (EOL)"
+  },
+  {
+    "rfq": "1134964",
+    "vendorName": "Sijiajie",
+    "mpn": "SDINBDG4-8G-I1",
+    "mfr": "Western Digital",
+    "qty": 1520,
+    "cost": 46,
+    "dateCode": "25+",
+    "leadTime": "stock"
+  },
+  {
+    "rfq": "1134964",
+    "vendorName": "Haoxin",
+    "mpn": "SDINBDG4-8G-I1",
+    "mfr": "Western Digital",
+    "qty": 1520,
+    "cost": 47,
+    "dateCode": "25+",
+    "leadTime": "stock"
+  },
+  {
+    "rfq": "1134964",
+    "vendorName": "Haoxin",
+    "mpn": "SDINBDG4-8G-I1",
+    "mfr": "Western Digital",
+    "qty": 1520,
+    "cost": 43.8,
+    "dateCode": "18+",
+    "leadTime": "stock"
+  },
+  {
+    "rfq": "1134964",
+    "vendorName": "Ample",
+    "mpn": "SDINBDG4-8G-I2",
+    "mfr": "Western Digital",
+    "qty": 1520,
+    "cost": 27.7,
+    "dateCode": "25+",
+    "leadTime": "3-5days",
+    "vendorNotes": "full label"
+  },
+  {
+    "rfq": "1134964",
+    "vendorName": "Ample",
+    "mpn": "ULQ2003ADR",
+    "mfr": "TI",
+    "qty": 22500,
+    "cost": 0.46,
+    "dateCode": "21+/22+",
+    "leadTime": "2-4days",
+    "vendorNotes": "erased label"
+  },
+  {
+    "rfq": "1134964",
+    "vendorName": "Ample",
+    "mpn": "GD25B512MEYIGR",
+    "mfr": "GigaDevice",
+    "qty": 12000,
+    "cost": 3.6,
+    "dateCode": "25+",
+    "leadTime": "2-4days",
+    "vendorNotes": "erased label"
+  },
+  {
+    "rfq": "1134964",
+    "vendorName": "HK Dethchy",
+    "mpn": "BAT54J,115",
+    "mfr": "Nexperia",
+    "qty": 52000,
+    "cost": 0.31,
+    "dateCode": "25+",
+    "leadTime": "stock"
+  },
+  {
+    "rfq": "1134964",
+    "vendorName": "Hada",
+    "mpn": "BAT54J,115",
+    "mfr": "Nexperia",
+    "qty": 3000,
+    "cost": 0.294,
+    "dateCode": "25+",
+    "leadTime": "stock"
+  },
+  {
+    "rfq": "1134964",
+    "vendorName": "Sehot",
+    "mpn": "BAT54HT1G",
+    "mfr": "Onsemi",
+    "qty": 52000,
+    "cost": 0.0118,
+    "dateCode": "25+",
+    "leadTime": "stock"
+  },
+  {
+    "rfq": "1134964",
+    "vendorName": "SSF",
+    "mpn": "MT41K256M16TW-107:P",
+    "mfr": "Micron",
+    "qty": 20000,
+    "cost": 8,
+    "dateCode": "25+",
+    "leadTime": "stock",
+    "vendorNotes": "reconfirm"
+  },
+  {
+    "rfq": "1134281",
+    "vendorName": "Samwooele",
+    "mpn": "GRM31CR60J476ME19L",
+    "mfr": "Murata",
+    "qty": 40000,
+    "cost": 0.02815,
+    "leadTime": "10-14weeks"
+  },
+  {
+    "rfq": "1134279",
+    "vendorName": "Ample",
+    "mpn": "TLV70018DCKR",
+    "mfr": "TI",
+    "qty": 42000,
+    "cost": 0.08,
+    "dateCode": "22+",
+    "leadTime": "2-4days",
+    "vendorNotes": "erased label"
+  },
+  {
+    "rfq": "1134279",
+    "vendorName": "Qadira",
+    "mpn": "TLV70018DCKR",
+    "mfr": "TI",
+    "qty": 15000,
+    "cost": 0.07,
+    "dateCode": "21+",
+    "leadTime": "stock"
+  },
+  {
+    "rfq": "1134279",
+    "vendorName": "Sogood",
+    "mpn": "AP2151WG-7",
+    "mfr": "DIODES INC",
+    "qty": 10646,
+    "cost": 0.072,
+    "dateCode": "22+",
+    "leadTime": "stock"
+  },
+  {
+    "rfq": "1134279",
+    "vendorName": "roson",
+    "mpn": "ACPL-217-56AE",
+    "mfr": "BROADCOM",
+    "qty": 12000,
+    "cost": 0.145,
+    "dateCode": "25+",
+    "leadTime": "stock"
+  },
+  {
+    "rfq": "1134279",
+    "vendorName": "Multisemi",
+    "mpn": "ACPL-217-56AE",
+    "mfr": "BROADCOM",
+    "qty": 12000,
+    "cost": 0.18,
+    "dateCode": "25+",
+    "leadTime": "1 wks",
+    "packaging": "REEL"
+  },
+  {
+    "rfq": "1134279",
+    "vendorName": "Skyeast",
+    "mpn": "ESDS314DBVR",
+    "mfr": "TI",
+    "qty": 6000,
+    "cost": 0.11,
+    "dateCode": "25+",
+    "leadTime": "stock"
+  },
+  {
+    "rfq": "1134264",
+    "vendorName": "Echo",
+    "mpn": "PMXB43UNEZ",
+    "mfr": "NEXPERIA B V.",
+    "qty": 6979,
+    "cost": 0.37,
+    "dateCode": "25+",
+    "leadTime": "stock"
+  },
+  {
+    "rfq": "1134264",
+    "vendorName": "HK Detechy",
+    "mpn": "PMXB43UNEZ",
+    "mfr": "NEXPERIA B V.",
+    "qty": 28047,
+    "cost": 0.54,
+    "dateCode": "25+",
+    "leadTime": "stock"
+  },
+  {
+    "rfq": "1134264",
+    "vendorName": "Hada",
+    "mpn": "PMXB43UNEZ",
+    "mfr": "NEXPERIA B V.",
+    "qty": 5000,
+    "cost": 0.765,
+    "dateCode": "25+",
+    "leadTime": "stock"
+  },
+  {
+    "rfq": "1134264",
+    "vendorName": "Vadas",
+    "mpn": "BAS16L,315",
+    "mfr": "NEXPERIA B V.",
+    "qty": 15000,
+    "cost": 0.265,
+    "dateCode": "25+",
+    "leadTime": "7-9days"
+  },
+  {
+    "rfq": "1134264",
+    "vendorName": "HK Detechy",
+    "mpn": "BAS16L,315",
+    "mfr": "NEXPERIA B V.",
+    "qty": 20000,
+    "cost": 0.2,
+    "dateCode": "25+",
+    "leadTime": "stock",
+    "vendorNotes": "full-package only; post-2540"
+  },
+  {
+    "rfq": "1134264",
+    "vendorName": "HK Detechy",
+    "mpn": "BAS16L,315",
+    "mfr": "NEXPERIA B V.",
+    "qty": 20000,
+    "cost": 0.28,
+    "dateCode": "23+",
+    "leadTime": "stock",
+    "vendorNotes": "full-package only"
+  },
+  {
+    "rfq": "1134264",
+    "vendorName": "JSD",
+    "mpn": "BAS16L,315",
+    "mfr": "NEXPERIA B V.",
+    "qty": 20000,
+    "cost": 0.35,
+    "dateCode": "23+",
+    "leadTime": "stock"
+  },
+  {
+    "rfq": "1134264",
+    "vendorName": "Oneyac",
+    "mpn": "PMV90ENER",
+    "mfr": "NEXPERIA B V.",
+    "qty": 27000,
+    "cost": 0.1788,
+    "leadTime": "5~7 Working Days"
+  },
+  {
+    "rfq": "1134264",
+    "vendorName": "HK Detechy",
+    "mpn": "PMV90ENER",
+    "mfr": "NEXPERIA B V.",
+    "qty": 27000,
+    "cost": 0.18,
+    "dateCode": "25+",
+    "leadTime": "3-5days"
+  },
+  {
+    "rfq": "1134264",
+    "vendorName": "Hada",
+    "mpn": "PMV90ENER",
+    "mfr": "NEXPERIA B V.",
+    "qty": 3000,
+    "cost": 0.467,
+    "dateCode": "26+",
+    "leadTime": "stock"
+  },
+  {
+    "rfq": "1134264",
+    "vendorName": "Oneyac",
+    "mpn": "RC0603FR-07100KL",
+    "mfr": "YAGEO CORPORATION",
+    "qty": 35000,
+    "cost": 0.00114,
+    "leadTime": "5~7 Working Days"
+  },
+  {
+    "rfq": "1134264",
+    "vendorName": "Oneyac",
+    "mpn": "RC0603FR-0710KL",
+    "mfr": "YAGEO CORPORATION",
+    "qty": 80000,
+    "cost": 0.00114,
+    "leadTime": "5~7 Working Days"
+  },
+  {
+    "rfq": "1134264",
+    "vendorName": "Sehot",
+    "mpn": "BSS84LT1G",
+    "mfr": "ON SEMICONDUCTOR",
+    "qty": 1115,
+    "cost": 0.0255,
+    "dateCode": "25+",
+    "leadTime": "stock"
+  },
+  {
+    "rfq": "1134264",
+    "vendorName": "Oneyac",
+    "mpn": "RC0402FR-0710KL",
+    "mfr": "YAGEO CORPORATION",
+    "qty": 100000,
+    "cost": 0.00053,
+    "leadTime": "5~7 Working Days"
+  },
+  {
+    "rfq": "1134264",
+    "vendorName": "HK Detechy",
+    "mpn": "BZT52H-C15,115",
+    "mfr": "NEXPERIA B V.",
+    "qty": 210000,
+    "cost": 0.039,
+    "dateCode": "25+",
+    "leadTime": "stock"
+  },
+  {
+    "rfq": "1134264",
+    "vendorName": "Hada",
+    "mpn": "BZT52H-C15,115",
+    "mfr": "NEXPERIA B V.",
+    "qty": 60000,
+    "cost": 0.176,
+    "dateCode": "25+",
+    "leadTime": "stock"
+  },
+  {
+    "rfq": "1134264",
+    "vendorName": "Hada",
+    "mpn": "BZT52H-C15,115",
+    "mfr": "NEXPERIA B V.",
+    "qty": 300000,
+    "cost": 0.044,
+    "dateCode": "25+",
+    "leadTime": "stock"
+  },
+  {
+    "rfq": "1134264",
+    "vendorName": "Sehot",
+    "mpn": "2N7002LT1G",
+    "mfr": "ON SEMICONDUCTOR",
+    "qty": 46000,
+    "cost": 0.0146,
+    "dateCode": "25+",
+    "leadTime": "stock"
+  },
+  {
+    "rfq": "1134264",
+    "vendorName": "Sehot",
+    "mpn": "SL05T1G",
+    "mfr": "ON SEMICONDUCTOR",
+    "qty": 15000,
+    "cost": 0.0524,
+    "dateCode": "26+",
+    "leadTime": "stock",
+    "vendorNotes": "limited stock per vendor note"
+  },
+  {
+    "rfq": "1134264",
+    "vendorName": "HM",
+    "mpn": "NTJD4001NT1G",
+    "mfr": "ON SEMICONDUCTOR",
+    "qty": 22000,
+    "cost": 0.06,
+    "dateCode": "21+",
+    "leadTime": "stock"
+  },
+  {
+    "rfq": "1134264",
+    "vendorName": "Welight",
+    "mpn": "BZT52-C15X",
+    "mfr": "NEXPERIA B V.",
+    "qty": 26345,
+    "cost": 0.0282,
+    "dateCode": "24+",
+    "leadTime": "1-2wks"
+  },
+  {
+    "rfq": "1134264",
+    "vendorName": "Wah",
+    "mpn": "NTS4001NT1G",
+    "mfr": "ON SEMICONDUCTOR",
+    "qty": 3000,
+    "cost": 0.027,
+    "dateCode": "22+",
+    "leadTime": "stock"
+  },
+  {
+    "rfq": "1134264",
+    "vendorName": "digi-kom",
+    "mpn": "MMBT2222AWT1G",
+    "mfr": "ON SEMICONDUCTOR",
+    "qty": 15000,
+    "cost": 0.015,
+    "dateCode": "21+",
+    "leadTime": "stock"
+  },
+  {
+    "rfq": "1134264",
+    "vendorName": "Welight",
+    "mpn": "BZX884-C10,315",
+    "mfr": "NEXPERIA B V.",
+    "qty": 46000,
+    "cost": 0.0422,
+    "dateCode": "17+",
+    "leadTime": "1-2wks"
+  }
+]
