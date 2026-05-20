@@ -374,14 +374,25 @@ The `value` column on all chuboe header tables (`chuboe_rfq`, `chuboe_offer`, et
 - Alias file: `Trading Analysis/Market Offer Loading/mfr-aliases.json` (shared across workflows)
 
 ### RFQ Types (`chuboe_rfq_type`)
-| ID | Name |
-|----|------|
-| 1000000 | Stock |
-| 1000001 | Shortage |
-| 1000002 | PPV |
-| 1000003 | EOL/LTB |
-| 1000004 | Hot Parts |
-| 1000006 | Unqualified Spot RFQ |
+
+Verified live 2026-05-20.
+
+| ID | Name | Notes |
+|----|------|-------|
+| 1000000 | Shortage | |
+| 1000001 | PPV | |
+| 1000002 | Astute Franchised | |
+| 1000003 | EOL/LTB | |
+| 1000004 | 3PL/VMI | |
+| 1000005 | Proactive Offer | |
+| 1000006 | Import | |
+| 1000007 | Stock | "Item in Astute warehouse." Has its own Stock RFQ Loading workflow. |
+| 1000012 | Unqualified Spot RFQ | |
+| 1000013 | Hot Parts | |
+
+A prior version of this table listed Stock=1000000 / Shortage=1000001 / PPV=1000002 / EOL/LTB=1000003 / Hot Parts=1000004 / Unqualified Spot=1000006 — those IDs are stale (verified against `adempiere.chuboe_rfq_type` 2026-05-20). Always trust the live table over a memorized mapping. Quick re-verify: `psql -c "SELECT chuboe_rfq_type_id, name FROM adempiere.chuboe_rfq_type WHERE isactive='Y' ORDER BY chuboe_rfq_type_id;"`.
+
+**pg type caveat:** `chuboe_rfq_type_id` comes back from node-postgres as a **string** (numeric column). When comparing in JS, coerce with `Number(typeId)` before set/map lookups or `===` against numeric literals.
 
 ### Offer Types (`chuboe_offer_type`)
 | ID | Name |
