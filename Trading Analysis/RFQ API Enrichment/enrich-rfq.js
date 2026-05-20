@@ -58,6 +58,14 @@ function ttlForRfqType(rfqType) {
   return TTL_BY_RFQ_TYPE[rfqType] ?? DEFAULT_TTL;
 }
 
+// Broker-driven RFQ types where cache-hit enrichments must NOT fan VQs out
+// onto each new RFQ line. Pricing still lands in chuboe_pricing_api_result
+// (gated separately at line ~536) so the data is queryable by MPN — we just
+// stop stamping redundant chuboe_vq_line rows on every repeat broker ask.
+// Customer-driven types (PPV/Shortage/EOL/etc.) keep the current behavior so
+// per-RFQ-line audit trails remain intact for sales workflows.
+const BROKER_RFQ_TYPES_NO_CACHE_VQS = new Set(['Stock', 'Unqualified Spot RFQ']);
+
 // ─── DB POOL ─────────────────────────────────────────────────────────────────
 // Explicit user per feedback_cron_pg_user.md — $USER isn't inherited under cron
 // so peer-auth via unix socket breaks unless we set it explicitly.
@@ -235,6 +243,7 @@ async function enrichRFQ(rfqDocNumber, opts = {}) {
     vqsFlagged: 0,
     vqsFailed: 0,           // server-side write rejections (5xx etc.)
     vqsSkippedRestricted: 0, // restricted-MFR rows: data captured to chuboe_pricing_api_result, VQ write skipped
+    vqsSkippedBrokerCacheHit: 0, // Stock/Unqualified-Spot lines whose VQ write was suppressed because enrichment came from cache (broker-noise reduction)
     restrictedLines: restrictedLines.length,
     flagReasonCounts: {},  // { NO_RFQ_LINE: 12, MPN_CROSS_REF: 40, ... }
     flagSamples: [],        // first 5 flag {reason, detail, mpn}
@@ -420,7 +429,19 @@ async function enrichRFQ(rfqDocNumber, opts = {}) {
     // searchedMpn + cpc and can fail on PPV RFQs where those don't round-trip
     // cleanly). Strictly better than the lookup path — we're handing vq-writer
     // the exact line ID we loaded the MPN from.
-    if (!dryRun && (result.found?.length || 0) > 0) {
+    // Broker-cache-hit gate: for Stock + Unqualified Spot RFQs, skip the VQ
+    // write entirely when the enrichment came from cache. The same MPN cycles
+    // through broker rotation constantly; without this gate, every repeat
+    // broker ask stamps a fresh batch of chuboe_vq_line rows from stale cache.
+    // Pricing still lands in chuboe_pricing_api_result on live calls (gated
+    // below at ~line 536), so the data remains queryable by MPN. Customer
+    // RFQ types are unaffected — they keep the per-line VQ audit trail.
+    const suppressBrokerCacheVq = fromCache && BROKER_RFQ_TYPES_NO_CACHE_VQS.has(rfqType);
+    if (suppressBrokerCacheVq) {
+      counters.vqsSkippedBrokerCacheHit++;
+    }
+
+    if (!dryRun && !suppressBrokerCacheVq && (result.found?.length || 0) > 0) {
       try {
         // Cross-ref classifier callback — invoked by vq-writer when
         // checkMpnCrossRef returns mismatch=true. Decides per-row whether to
@@ -724,6 +745,9 @@ async function main() {
     console.log(`VQs written:  ${summary.vqsWritten}`);
     console.log(`VQs flagged:  ${summary.vqsFlagged}`);
     console.log(`VQs failed:   ${summary.vqsFailed}`);
+    if (summary.vqsSkippedBrokerCacheHit > 0) {
+      console.log(`VQs skipped (broker cache-hit): ${summary.vqsSkippedBrokerCacheHit}`);
+    }
     console.log(`api_result rows: ${summary.apiResultRowsWritten}`);
     console.log(`Coverage:     FULL=${summary.qtyMatches}  PARTIAL=${summary.partialCoverage}  NONE=${summary.noCoverage}`);
     const mfrTotal = summary.mfrMatch + summary.mfrMismatch + summary.mfrUnknown;

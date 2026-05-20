@@ -196,6 +196,7 @@ function renderSummaryHtml(batchResults, sinceIso, untilIso, backlog, quotaState
   const totalRows = batchResults.reduce((s, r) => s + (r.apiResultRowsWritten || 0), 0);
   const totalVqs = batchResults.reduce((s, r) => s + (r.vqsWritten || 0), 0);
   const totalFlagged = batchResults.reduce((s, r) => s + (r.vqsFlagged || 0), 0);
+  const totalVqsSkippedBrokerCacheHit = batchResults.reduce((s, r) => s + (r.vqsSkippedBrokerCacheHit || 0), 0);
   const totalErrors = batchResults.reduce((s, r) => s + (r.errors?.length || 0), 0);
   const totalSilentSkips = batchResults.reduce((s, r) => s + (r.silentSkips || 0), 0);
   const totalCrossRefAutoApproved = batchResults.reduce((s, r) => s + (r.crossRefAutoApproved || 0), 0);
@@ -330,6 +331,7 @@ function renderSummaryHtml(batchResults, sinceIso, untilIso, backlog, quotaState
       <tr><td>api_result rows written</td><td style="text-align:right">${totalRows.toLocaleString()}</td></tr>
       <tr><td>VQs written</td><td style="text-align:right">${totalVqs.toLocaleString()}</td></tr>
       <tr><td>VQs flagged</td><td style="text-align:right">${totalFlagged.toLocaleString()}</td></tr>
+      ${totalVqsSkippedBrokerCacheHit > 0 ? `<tr><td>VQs skipped (broker cache-hit)</td><td style="text-align:right">${totalVqsSkippedBrokerCacheHit.toLocaleString()} <span style="color:#888">(Stock/Unqualified-Spot lines whose enrichment came from cache — pricing still in api_result)</span></td></tr>` : ''}
       <tr><td>Silent writer skips</td><td style="text-align:right">${totalSilentSkips.toLocaleString()}${totalSilentSkips > 0 ? ' <span style="color:#a60">(stock available, no VQ written — see breakdown below)</span>' : ''}</td></tr>
       <tr><td>Cross-ref decisions</td><td style="text-align:right">${totalCrossRefDecisions === 0 ? '0' : `<b>${totalCrossRefAutoApproved}</b> auto-approved (VQs written) · <b>${totalCrossRefAutoRejected}</b> auto-rejected (MFR mismatch) · <b>${totalCrossRefPending}</b> pending review · ${totalCrossRefDropped} dropped (blank MFR)`}</td></tr>
       <tr><td>Errors</td><td style="text-align:right">${totalErrors}</td></tr>
