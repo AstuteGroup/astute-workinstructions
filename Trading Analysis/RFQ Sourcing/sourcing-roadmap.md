@@ -1252,6 +1252,52 @@ Placeholder entry — scope to be refined. Intent: surface quote/VQ text that ne
 
 ---
 
+## D5. Auto-Channel Sourcing Value View
+
+**Status:** Planned | **Priority:** Next
+
+**Problem:** Operator can see counts of VQs written by automated channels (Heilind scrape, DigiKey/Mouser/TTI/Rutronik APIs, future scrape sources) but not whether those VQs are actually *moving the needle* on each RFQ line. Per-source slices (e.g., "Heilind winners today") tell only part of the story. The decision-relevant question is cross-source: "where is our automated sourcing the best or only quote on the line?"
+
+**Classification:** For every VQ written by an automated channel within the lookback window, classify against the rest of the same `chuboe_rfq_line`'s active VQs in the same window:
+
+| Bucket | Rule |
+|--------|------|
+| `WINNER` | Auto-channel VQ ≥5% under cheapest competing VQ |
+| `SOLE QUOTE` | No competing active VQ on the line within the window |
+| `COMPETITIVE` | Within ±5% of cheapest competing VQ |
+| `LOSER` | More than 5% over cheapest competing VQ |
+
+**Source-of-truth filter:** The franchise BP set in `shared/linecards/index.js` plus the scrape-source BPs (today: Heilind 1000351 / 1008995). When new sources land they're added to that filter, not to a per-source view.
+
+**Deliverable:** Single daily HTML email to `jake.harris@astutegroup.com` summarizing the prior 24h. **Not per-RFQ** (per `feedback_prefer_daily_summary_over_per_record.md`). Sections inside the digest:
+1. Bucket totals + day-over-day deltas
+2. Top WINNER lines by GP-swing potential (`(competitor_min − auto_cost) × min(rfq_qty, distro_qty)`)
+3. SOLE-QUOTE coverage by customer (where Claude unlocked a price we had nothing on)
+4. Flagged: WINNERS where the auto-channel cost is still above the customer target price (won vs competitors, but a loss vs target — buyer needs to know)
+
+**Cadence:** Daily, emit overnight (e.g., 06:00 UTC tick after the night's enrichment + previous-day's scrape loads have settled). Anomaly-immediate path NOT applicable here (this is a backward-looking value report, not a real-time alert).
+
+**Reference implementation:** `~/workspace/heilind-winners-sweep.js` (2026-05-20) is the Heilind-only slice of this. Generalize:
+- BP filter: from hard-coded `(1000351, 1008995)` → full auto-channel BP set
+- Window: from `created::date = CURRENT_DATE` → `created >= NOW() - INTERVAL '24 hours'`
+- Output: from console + CSV → HTML email + CSV attachment
+- Schedule: from manual → cron via `cron-jobs.js` registry
+
+**Why operator wants this:** Investment in automated sourcing (API enrichment + scrape) needs a value-add view that's channel-agnostic. Per-source reporting can mask where the real wins are. Operator framing 2026-05-20: "I want to start seeing where our activities are the best options or only options; not just scraping but APIs too." See memory `feedback_auto_channel_value_view.md`.
+
+**Open questions for implementation:**
+- Lookback window: 24h is the daily default. Should the digest also include a 7-day rolling section?
+- "Active VQ" filter: include `isactive='Y'` only, or also untick-but-recent-purchased rows for the competitor baseline?
+- GP-swing definition when `distro_qty < rfq_qty`: cap at distro_qty (current heilind-winners-sweep.js behavior) or extrapolate to full rfq_qty?
+
+**Adjacent / not duplicate:** This is *channel value-add* measurement (which sourcing channels produced the best quote on each line). It is NOT:
+- `feedback_roi_framing_winning_vs_efficiency.md` (which classifies whole workflows as Adoption-revenue vs efficiency)
+- D4's Vendor Performance section (which is about supplier behavior — response time, no-bid rate)
+- Vortex Matches (demand-side: RFQ → inventory matching)
+- Quick Quote (CPC-level baseline quoting from VQs)
+
+---
+
 # Completed Items
 
 ## Section A: Franchise Screening
