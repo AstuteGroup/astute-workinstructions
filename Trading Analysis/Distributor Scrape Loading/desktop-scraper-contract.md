@@ -210,16 +210,18 @@ The server watcher (`Trading Analysis/Distributor Scrape Loading/inbox-watcher.j
 
 ---
 
-# Critical: Server-Side scp Gotchas (verified 2026-05-15)
+# Critical: Server-Side ssh/scp Gotchas
 
-**Both of these are confirmed by end-to-end test. They are not optional.**
+**All of these are confirmed by end-to-end test. None are optional.**
 
-1. **Always use `scp -O`.** The server's SFTP subsystem fails to start. Modern OpenSSH `scp` defaults to the SFTP protocol and dies with `Connection closed` / exit 255. The `-O` flag forces the legacy SCP protocol, which works.
-2. **Remote paths must be absolute (`/home/analytics_user/workspace/...`) or `~/`-prefixed (`~/workspace/...`).** The server's login shell auto-`cd`s into `~/workspace/` on connection, so a bare relative path like `workspace/inbox/...` resolves to `/home/analytics_user/workspace/workspace/inbox/...` and fails with `No such file or directory`.
+1. **Always use `scp -O`.** The server's SFTP subsystem fails to start. Modern OpenSSH `scp` defaults to the SFTP protocol and dies with `Connection closed` / exit 255. The `-O` flag forces the legacy SCP protocol, which works. *(verified 2026-05-15)*
+2. **For pull direction, also use `scp -T`.** Without `-T`, pulls fail with `protocol error: filename does not match request`. The legacy SCP protocol echoes the server-side basename back to the client for cross-check; modern OpenSSH clients reject the response when the client's request used a quoted absolute path. `-T` disables the strict filename round-trip check. Push direction does NOT need `-T` (no server→client filename echo). *(verified 2026-05-21 by desktop Claude during scheduled-pickup smoke test)*
+3. **Remote paths must be absolute (`/home/analytics_user/workspace/...`) or `~/`-prefixed (`~/workspace/...`).** The server's login shell auto-`cd`s into `~/workspace/` on connection, so a bare relative path like `workspace/inbox/...` resolves to `/home/analytics_user/workspace/workspace/inbox/...` and fails with `No such file or directory`. *(verified 2026-05-15)*
+4. **The server account runs `rbash` (restricted bash) — no output redirection in remote commands.** `ssh ... "ls foo 2>/dev/null"` fails with `rbash: /dev/null: restricted: cannot redirect output` before `ls` runs at all. Instead: let stderr flow naturally (use PowerShell `2>&1` on the client to capture both streams) and string-match the error text (e.g., `"No such"`) to detect empty/missing cases. *(verified 2026-05-21 by desktop Claude during scheduled-pickup smoke test)*
 
 Verified end-to-end at ~12:21 server time on 2026-05-15: 12-byte test file transferred Windows → `/home/analytics_user/workspace/test.txt` using `scp -O` with an absolute remote path. Bare `scp` (no `-O`) and bare relative paths both fail.
 
-Both rules apply in both directions — pushing scrape envelopes up AND the daily docs sync coming down. The desktop sync script (`pull-from-astute.ps1`) uses `scp -O` for the same reason.
+Rules 1 + 3 apply in both directions — pushing scrape envelopes up AND the daily docs sync coming down. Rule 2 (`-T`) is pull-only. Rule 4 (no redirection) applies to any `ssh ... "<command>"` invocation against this account. The desktop sync script (`pull-from-astute.ps1`) follows all four.
 
 ---
 
@@ -235,8 +237,8 @@ There are two pickup modes — they coexist:
 **The act of retrieving IS the delete.** Once a file has been successfully pulled, immediately remove it server-side via ssh. The server keeps no copy of the upload — the audit trail lives in the inbox-side `.result.json` once the load completes.
 
 ```powershell
-# 1. Pull the file into the Windows temp dir.
-scp -O analytics_user@44.222.126.129:~/workspace/outbox/heilind/2026-05-19T12-00-00Z.csv `
+# 1. Pull the file into the Windows temp dir. -T required on pull direction (see scp gotchas above).
+scp -O -T analytics_user@44.222.126.129:~/workspace/outbox/heilind/2026-05-19T12-00-00Z.csv `
     "$env:TEMP\heilind-2026-05-19.csv"
 
 # 2. Verify the local copy exists and is non-empty BEFORE deleting from server.

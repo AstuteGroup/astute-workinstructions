@@ -156,8 +156,11 @@ foreach ($item in $SyncSet) {
     if (Test-Path $tmpPath) { Remove-Item $tmpPath -Force }
 
     # scp -O forces the legacy SCP protocol (SFTP subsystem doesn't start on server).
-    # -q suppresses chatter; we capture exit code + any stderr.
-    $scpOut = & scp -O -q $remoteSpec $tmpPath 2>&1
+    # -T disables the modern strict filename round-trip check — without it, pull
+    # direction fails with "protocol error: filename does not match request"
+    # because the server echoes the basename while the client sent a quoted
+    # absolute path. -q suppresses chatter; we capture exit code + any stderr.
+    $scpOut = & scp -O -T -q $remoteSpec $tmpPath 2>&1
     $scpExit = $LASTEXITCODE
 
     if ($scpExit -eq 0 -and (Test-Path $tmpPath) -and ((Get-Item $tmpPath).Length -gt 0)) {
@@ -214,13 +217,19 @@ foreach ($slug in $ScrapeQueueSet) {
 
     # List CSVs in the remote outbox. Empty list is fine — operator may have
     # already pulled today's batch ad-hoc, or producer hasn't fired yet.
-    # `ls -1` gives one filename per line; `2>/dev/null` swallows "No such file"
-    # if the slug's outbox directory doesn't exist yet.
+    # `ls -1` gives one filename per line.
+    #
+    # IMPORTANT: do NOT add `2>/dev/null`. The server account runs `rbash`
+    # (restricted bash), which forbids output redirection and rejects the
+    # entire command before `ls` even runs. We let `ls` write its "No such
+    # file" error to stderr, capture both streams via `2>&1`, and detect the
+    # empty-folder case by string-matching the error rather than suppressing
+    # it. The regex filter below (`\.csv\s*$`) drops the error line naturally.
     $lsArgs = @(
         '-o', "ConnectTimeout=$ConnectTimeoutSec",
         '-o', 'BatchMode=yes',
         "$RemoteUser@$RemoteHost",
-        "ls -1 $slugRemoteDir/*.csv 2>/dev/null"
+        "ls -1 $slugRemoteDir/*.csv"
     )
     $lsOut = & ssh @lsArgs 2>&1
     $lsExit = $LASTEXITCODE
@@ -253,8 +262,10 @@ foreach ($slug in $ScrapeQueueSet) {
         if (Test-Path $tmpPath) { Remove-Item $tmpPath -Force }
 
         # Single-quote the remote path to survive shell expansion on the remote side.
+        # -T disables strict filename round-trip check (see docs-sync block above
+        # for full rationale — required for pull direction).
         $remoteSpec = "$RemoteUser@${RemoteHost}:'" + $remoteCsv + "'"
-        $scpOut  = & scp -O -q $remoteSpec $tmpPath 2>&1
+        $scpOut  = & scp -O -T -q $remoteSpec $tmpPath 2>&1
         $scpExit = $LASTEXITCODE
 
         if ($scpExit -ne 0 -or -not (Test-Path $tmpPath) -or (Get-Item $tmpPath).Length -le 0) {
