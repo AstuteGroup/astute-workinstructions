@@ -1,36 +1,60 @@
 <#
 .SYNOPSIS
-    Pulls authoritative .md workflow docs from the Astute analytics server to a local cache.
+    Pulls authoritative .md workflow docs AND any pending scrape-input CSVs from
+    the Astute analytics server to a local cache + scrape queue.
 
 .DESCRIPTION
-    Runs as a scheduled task (daily 6am local + on user logon) to keep the operator's
-    desktop Claude Code instance reading from a fresh, deterministic copy of the
-    server-side workflow documentation.
+    Runs as a scheduled task (daily 08:30 local + on user logon).
 
-    Uses `scp -O` (legacy SCP protocol). The server's SFTP subsystem does not start;
-    modern OpenSSH `scp` defaults to SFTP and fails with "Connection closed". Same
-    finding applies to the scrape-envelope push direction — see desktop-scraper-contract.md.
+    Daily timing rationale: the server-side `heilind-producer` cron fires at
+    12:00 UTC and writes `<ts>.csv` + `<ts>.meta.json` into `outbox/<slug>/`. The
+    desktop pickup needs to run AFTER that. 08:30 LOCAL aligns with the operator
+    workday start year-round (08:30 EDT = 12:30 UTC in DST; 08:30 EST = 13:30
+    UTC in winter — both well after the 12:00 UTC producer).
+
+    Two responsibilities:
+
+    1. Docs sync (always runs first). Pulls `.md` workflow docs into
+           %USERPROFILE%\AstuteDocs\
+       Existing cache preserved on failure — stale copy beats empty mid-workday.
+
+    2. Scrape-queue pickup (after docs). For each source slug in $ScrapeQueueSet:
+       lists `outbox/<slug>/*.csv` on the server, scp-pulls each, verifies the
+       local copy is non-empty, then ssh-rm's the server copy. Pulled files land
+       at:
+           %USERPROFILE%\AstuteScrapeQueue\<slug>\<basename>.csv
+       The paired `<basename>.meta.json` sidecar STAYS server-side (the watcher
+       re-attaches RFQ context after the scrape result lands in inbox/<slug>/).
+       The act of successful pull IS the delete — see desktop-scraper-contract.md
+       section "Picking Up Outbox Requests".
+
+    Uses `scp -O` (legacy SCP protocol). The server's SFTP subsystem does not
+    start; modern OpenSSH `scp` defaults to SFTP and fails with "Connection
+    closed". Same finding applies to the scrape-envelope push direction.
 
     Cache layout:
         %USERPROFILE%\AstuteDocs\
-            .last-sync.json    Manifest of last sync attempt
-            .sync-log.txt      Rolling log
-            <files>            Synced .md files
-
-    Existing cache is preserved on failure (single-file or whole-sync). A stale copy
-    is always preferable to an empty cache mid-workday.
+            .last-sync.json          Manifest of last sync attempt (docs + queue)
+            .sync-log.txt            Rolling log
+            <files>                  Synced .md files
+        %USERPROFILE%\AstuteScrapeQueue\<slug>\
+            <basename>.csv           Pulled scrape inputs awaiting operator+Claude
 
 .NOTES
-    Server host (analytics_user@44.222.126.129) and the sync set are defined as
-    constants at the top of this script — edit those if either changes.
+    Server host (analytics_user@44.222.126.129), the docs sync set, and the
+    scrape-queue source list are defined as constants at the top of this script —
+    edit those if any change.
 
-    Install the scheduled task once (PowerShell as admin, one-time):
+    Install the scheduled tasks once (PowerShell as admin, one-time):
 
-        schtasks /Create /SC DAILY /ST 06:00 /TN "AstuteDocsSync" `
+        schtasks /Create /SC DAILY /ST 08:30 /TN "AstuteDocsSync" `
                  /TR "powershell.exe -NoProfile -ExecutionPolicy Bypass -File `"$env:USERPROFILE\AstuteDocs\pull-from-astute.ps1`""
 
         schtasks /Create /SC ONLOGON /TN "AstuteDocsSyncOnLogon" `
                  /TR "powershell.exe -NoProfile -ExecutionPolicy Bypass -File `"$env:USERPROFILE\AstuteDocs\pull-from-astute.ps1`""
+
+    To update an existing 06:00 task to 08:30, see the bottom of
+    desktop-scraper-contract.md § "Scheduled Outbox Pickup".
 #>
 
 [CmdletBinding()]
@@ -41,9 +65,17 @@ param()
 $RemoteUser    = 'analytics_user'
 $RemoteHost    = '44.222.126.129'
 $LocalCacheDir = Join-Path $env:USERPROFILE 'AstuteDocs'
+$LocalQueueDir = Join-Path $env:USERPROFILE 'AstuteScrapeQueue'
 $LogFile       = Join-Path $LocalCacheDir '.sync-log.txt'
 $ManifestFile  = Join-Path $LocalCacheDir '.last-sync.json'
 $ConnectTimeoutSec = 10
+
+# Scrape-queue sources to drain. Each slug expects `~/workspace/outbox/<slug>/`
+# on the server to be a flat directory of `<basename>.csv` upload files paired
+# with `<basename>.meta.json` sidecars. CSVs are pulled + server-deleted; meta
+# sidecars stay server-side. To add a new source: add the slug here AND ensure
+# the server-side producer is staging into `outbox/<slug>/`.
+$ScrapeQueueSet = @('heilind')
 
 # Sync set: each entry has Remote (absolute path on server) + Local (filename in cache dir).
 # Server is source of truth — to add/remove files, edit here and redeploy the script.
@@ -159,6 +191,123 @@ foreach ($item in $SyncSet) {
     }
 }
 
+# ─── SCRAPE-QUEUE PICKUP ────────────────────────────────────────────────────
+# Drain each `outbox/<slug>/*.csv` from the server to %USERPROFILE%\AstuteScrapeQueue\<slug>\.
+# Successful pull → ssh-rm the server-side CSV (the meta.json sidecar stays put).
+# Failure → log warn, leave server file alone, continue with other slugs.
+
+$queueResults = @()
+$queuePulled  = 0
+$queueFailed  = 0
+
+if (-not (Test-Path $LocalQueueDir)) {
+    New-Item -ItemType Directory -Path $LocalQueueDir -Force | Out-Null
+}
+
+foreach ($slug in $ScrapeQueueSet) {
+    $slugLocalDir  = Join-Path $LocalQueueDir $slug
+    $slugRemoteDir = "/home/analytics_user/workspace/outbox/$slug"
+
+    if (-not (Test-Path $slugLocalDir)) {
+        New-Item -ItemType Directory -Path $slugLocalDir -Force | Out-Null
+    }
+
+    # List CSVs in the remote outbox. Empty list is fine — operator may have
+    # already pulled today's batch ad-hoc, or producer hasn't fired yet.
+    # `ls -1` gives one filename per line; `2>/dev/null` swallows "No such file"
+    # if the slug's outbox directory doesn't exist yet.
+    $lsArgs = @(
+        '-o', "ConnectTimeout=$ConnectTimeoutSec",
+        '-o', 'BatchMode=yes',
+        "$RemoteUser@$RemoteHost",
+        "ls -1 $slugRemoteDir/*.csv 2>/dev/null"
+    )
+    $lsOut = & ssh @lsArgs 2>&1
+    $lsExit = $LASTEXITCODE
+
+    if ($lsExit -ne 0 -and "$lsOut" -notmatch 'No such') {
+        Write-SyncLog ("  QUEUE FAIL [{0}] list-failed: {1}" -f $slug, "$lsOut".Trim()) 'WARN'
+        $queueResults += [ordered]@{ slug = $slug; status = 'list_failed'; error = "$lsOut".Trim() }
+        $queueFailed++
+        continue
+    }
+
+    $remoteCsvs = @("$lsOut" -split "`n" | Where-Object { $_ -match '\.csv\s*$' } | ForEach-Object { $_.Trim() })
+
+    if ($remoteCsvs.Count -eq 0) {
+        Write-SyncLog ("  QUEUE OK   [{0}] outbox empty — nothing to pull" -f $slug)
+        $queueResults += [ordered]@{ slug = $slug; status = 'empty'; pulled = 0 }
+        continue
+    }
+
+    Write-SyncLog ("  QUEUE      [{0}] {1} CSV(s) to pull" -f $slug, $remoteCsvs.Count)
+
+    $slugPulled = 0
+    $slugFiles  = @()
+
+    foreach ($remoteCsv in $remoteCsvs) {
+        $basename   = Split-Path -Leaf $remoteCsv
+        $localPath  = Join-Path $slugLocalDir $basename
+        $tmpPath    = "$localPath.partial"
+
+        if (Test-Path $tmpPath) { Remove-Item $tmpPath -Force }
+
+        # Single-quote the remote path to survive shell expansion on the remote side.
+        $remoteSpec = "$RemoteUser@${RemoteHost}:'" + $remoteCsv + "'"
+        $scpOut  = & scp -O -q $remoteSpec $tmpPath 2>&1
+        $scpExit = $LASTEXITCODE
+
+        if ($scpExit -ne 0 -or -not (Test-Path $tmpPath) -or (Get-Item $tmpPath).Length -le 0) {
+            if (Test-Path $tmpPath) { Remove-Item $tmpPath -Force }
+            $err = if ("$scpOut") { "$scpOut".Trim() } else { "exit=$scpExit, no stderr captured" }
+            Write-SyncLog ("    FAIL  {0}  ({1}) — server copy retained" -f $basename, $err) 'WARN'
+            $slugFiles += [ordered]@{ file = $basename; status = 'pull_failed'; error = $err }
+            $queueFailed++
+            continue
+        }
+
+        # Atomic local move: tmp → final.
+        Move-Item -Path $tmpPath -Destination $localPath -Force
+        $size = (Get-Item $localPath).Length
+
+        # Delete server-side ONLY after the local file is confirmed in place + non-empty.
+        # Per contract: the act of retrieval IS the delete. The .meta.json sidecar
+        # is NOT deleted — it stays on the server for the watcher to use later.
+        $rmArgs = @(
+            '-o', "ConnectTimeout=$ConnectTimeoutSec",
+            '-o', 'BatchMode=yes',
+            "$RemoteUser@$RemoteHost",
+            "rm '$remoteCsv'"
+        )
+        $rmOut  = & ssh @rmArgs 2>&1
+        $rmExit = $LASTEXITCODE
+
+        if ($rmExit -eq 0) {
+            Write-SyncLog ("    OK    {0}  ({1} bytes; server copy deleted)" -f $basename, $size)
+            $slugFiles += [ordered]@{ file = $basename; status = 'ok'; size = $size }
+            $slugPulled++
+            $queuePulled++
+        }
+        else {
+            # Local pull succeeded; server delete failed. Next run will re-pull
+            # (overwriting the local file — same content) and try delete again.
+            # Not a data-loss path; just noisy.
+            $err = "$rmOut".Trim()
+            Write-SyncLog ("    WARN  {0}  pulled OK but server-side rm failed: {1}" -f $basename, $err) 'WARN'
+            $slugFiles += [ordered]@{ file = $basename; status = 'ok_rm_failed'; size = $size; error = $err }
+            $slugPulled++
+            $queuePulled++
+            $queueFailed++
+        }
+    }
+
+    $queueResults += [ordered]@{ slug = $slug; status = 'processed'; pulled = $slugPulled; files = $slugFiles }
+}
+
+if ($ScrapeQueueSet.Count -gt 0) {
+    Write-SyncLog "Scrape queue: pulled $queuePulled CSV(s) across $($ScrapeQueueSet.Count) source(s); $queueFailed failures."
+}
+
 # ─── MANIFEST ───────────────────────────────────────────────────────────────
 
 $manifest = [ordered]@{
@@ -169,16 +318,23 @@ $manifest = [ordered]@{
     failed_count  = $failedCount
     total         = $SyncSet.Count
     files         = $results
+    scrape_queue  = [ordered]@{
+        pulled       = $queuePulled
+        failed       = $queueFailed
+        sources      = $queueResults
+        local_dir    = $LocalQueueDir
+    }
 }
 $manifest | ConvertTo-Json -Depth 6 | Set-Content -Path $ManifestFile -Encoding UTF8
 
 # ─── EXIT ───────────────────────────────────────────────────────────────────
 
-if ($failedCount -gt 0) {
-    Write-SyncLog "Sync completed with failures: $failedCount failed / $okCount OK / $($SyncSet.Count) total." 'WARN'
+$totalFailed = $failedCount + $queueFailed
+if ($totalFailed -gt 0) {
+    Write-SyncLog "Sync completed with failures: docs $failedCount/$($SyncSet.Count) failed, scrape queue $queueFailed failed (pulled $queuePulled)." 'WARN'
     exit 1
 }
 else {
-    Write-SyncLog "Sync OK. $okCount/$($SyncSet.Count) files refreshed."
+    Write-SyncLog "Sync OK. Docs $okCount/$($SyncSet.Count) refreshed; scrape queue pulled $queuePulled."
     exit 0
 }

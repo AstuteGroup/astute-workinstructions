@@ -27,9 +27,17 @@ If that file does not exist or you've never read it this session, READ IT NOW.
 ├── CLAUDE.md                    Astute project-level CLAUDE.md (terminology, workflow catalog)
 ├── integration-paths.md         Supplier coverage strategy reference
 └── data-model.md                iDempiere field reference (VQ/RFQ/Offer hierarchies)
+
+%USERPROFILE%\AstuteScrapeQueue\
+└── <slug>\<basename>.csv        Day's scrape inputs (Heilind, etc.) pulled from
+                                 server outbox at 08:30 local. Drive these
+                                 through the distributor's BOM tool; scp the
+                                 result xlsx back to ~/workspace/inbox/<slug>/.
 ```
 
-These are pulled from the analytics server by a scheduled Task Scheduler task running `pull-from-astute.ps1` (daily at 6am + on user logon).
+Both directories are populated by a scheduled Task Scheduler task running `pull-from-astute.ps1` (daily at **08:30 local** + on user logon). 08:30 is intentional: the server-side producer for franchise scrape inputs fires at 12:00 UTC, and 08:30 local lines up with operator workday start in both EDT and EST.
+
+When the operator says "start the Heilind scrape" (or similar), check `%USERPROFILE%\AstuteScrapeQueue\heilind\` first — that's where today's CSV should be waiting.
 
 ---
 

@@ -227,6 +227,11 @@ Both rules apply in both directions — pushing scrape envelopes up AND the dail
 
 A daily producer (e.g. `heilind-rfq-candidates.js`) stages an upload file in `~/workspace/outbox/<source>/<UTC-ts>.csv` and emails the operator. The desktop pulls that file via `scp -O`, runs the distributor's BOM tool, and ships the result back up to `~/workspace/inbox/<source>/`.
 
+There are two pickup modes — they coexist:
+
+1. **Scheduled pickup** (default). `pull-from-astute.ps1` runs daily at **08:30 local** (and on logon). It drains every `outbox/<slug>/*.csv` listed in the script's `$ScrapeQueueSet` into `%USERPROFILE%\AstuteScrapeQueue\<slug>\` and ssh-rm's the server copy on success. By the time the operator sits down, the day's CSVs are waiting locally. **Timing:** the producer fires at 12:00 UTC; 08:30 local aligns with operator workday start year-round (08:30 EDT = 12:30 UTC in DST; 08:30 EST = 13:30 UTC in winter — both well after producer).
+2. **Ad-hoc pickup** (operator-initiated). If the operator says "pull whatever Heilind has waiting" (e.g., they want to run a second batch later in the day, or the scheduled pull missed), do the explicit `scp -O` + `ssh ... rm` dance shown below.
+
 **The act of retrieving IS the delete.** Once a file has been successfully pulled, immediately remove it server-side via ssh. The server keeps no copy of the upload — the audit trail lives in the inbox-side `.result.json` once the load completes.
 
 ```powershell
