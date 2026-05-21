@@ -301,6 +301,23 @@ module.exports = [
   },
 
   {
+    name: 'ivy-vq-digest',
+    cadence: 'fixed',
+    // 4 PM Shenzhen local (UTC+8, no DST) = 08:00 UTC. Per-loader VQ digest
+    // for Ivy Song — includes VQs she manually loaded (createdby=1013784)
+    // PLUS VQs the agent loaded from emails she forwarded to vq@ (outerFrom
+    // breadcrumb match with IMAP / date-proximity fallback). State-driven
+    // window: ~/workspace/.ivy-vq-digest-state.json. Sends HTML inline +
+    // xlsx attachment to jake.harris@ + ivy.song@.
+    cadenceCron: '0 8 * * *',
+    command: `node "${ASTUTE}/Trading Analysis/RFQ Sourcing/vq_loading/ivy-vq-digest.js" --send`,
+    cwd: ASTUTE,
+    needsOT: false,
+    logFile: '/tmp/ivy-vq-digest.log',
+    description: 'Daily 08:00 UTC (4 PM Shenzhen, no DST) — Ivy Song per-loader VQ digest. Window driven by .ivy-vq-digest-state.json (since-last-digest). Manual + agent-forwarded scopes both included.',
+  },
+
+  {
     name: 'offer-breadcrumbs-prune',
     cadence: 'weekly',
     // Sunday 02:00 UTC — quiet window
@@ -314,7 +331,15 @@ module.exports = [
 
   {
     name: 'heilind-producer',
-    cadence: 'daily',
+    // 'fixed' — fire at EXACTLY 12:00 UTC daily, no sentinel catch-up. The
+    // previous 'daily' cadence used hourly-tick + sentinel gating, which
+    // introduced ~12s drift per day (sentinel advances from actual run time,
+    // not from cron anchor) and caused the 12:00 UTC tick to skip when it
+    // landed 1-2s before the sentinel's stored nextDue. Job doesn't write
+    // to OT, doesn't need catch-up resilience — it just needs to fire once
+    // a day at a predictable time so the desktop pickup at 12:30 UTC can
+    // rely on it.
+    cadence: 'fixed',
     // 12:00 UTC = 08:00 EDT — matches operator workday start
     cadenceCron: '0 12 * * *',
     command: `node ${WORKSPACE}/heilind-rfq-candidates.js`,
