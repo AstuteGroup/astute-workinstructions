@@ -96,6 +96,34 @@ const CARRIED_TTL_DAYS = 7;
 // in case the quote engine's pricing record got fixed.
 const MATCHED_NO_PRICE_TTL_DAYS = 60;
 
+// quota_exhausted: the disty refused this call with a daily-quota error
+// (Mouser MaxCallPerDay et al.). NOT permanent — TTL is set to expire at the
+// next supplier reset (midnight America/Chicago for Mouser, used universally
+// here as a safe single boundary across all cogs since their quotas all
+// reset daily). Lets us avoid re-firing the same (MPN, disty) for the rest
+// of the day, but releases the lock when the quota window rolls over.
+// Without this, every Stock-RFQ that shares this MPN re-fires Mouser the
+// same day → thousands of MaxCallPerDay failures (2026-05-21 incident).
+const QUOTA_EXHAUSTED_RESULT = 'quota_exhausted';
+
+function quotaExhaustedExpiresMs() {
+  // Hours until next midnight America/Chicago, rounded up to 5 minutes for
+  // safety past the supplier-side reset. Matches the boundary used in
+  // shared/api-retry-policy.js for MaxCallPerDay retry scheduling.
+  const now = new Date();
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'America/Chicago',
+    hour: '2-digit', minute: '2-digit', second: '2-digit',
+    hour12: false,
+  }).formatToParts(now);
+  const get = t => Number(parts.find(p => p.type === t).value);
+  let h = get('hour'); if (h === 24) h = 0;
+  const elapsedSec = h * 3600 + get('minute') * 60 + get('second');
+  // Floor to whole seconds for stability, then add 24h minus elapsed + 5min margin.
+  const todayMidnightMs = Math.floor((now.getTime() - elapsedSec * 1000) / 1000) * 1000;
+  return todayMidnightMs + DAY_MS + 5 * 60 * 1000;
+}
+
 // Default qty tolerance for requireRequestedQty disties on check(). ±25%
 // generally stays within one of Heilind's published tier boundaries (typically
 // 10× apart: 1 / 10 / 100 / 1000 / 10000). Tighter than this re-scrapes too
@@ -412,11 +440,17 @@ function record(opts) {
   if (!mpnN) return { cached: false, skipped_reason: 'invalid_mpn' };
   const mfrN = canonicalMfr(mfr);
   const now = Date.now();
-  const ttlDays =
-    result === 'carried' ? CARRIED_TTL_DAYS :
-    result === 'matched_no_price' ? MATCHED_NO_PRICE_TTL_DAYS :
-    rule.ttlDays;
-  const expires = now + ttlDays * DAY_MS;
+  // quota_exhausted has a special TTL that lands at the next Chicago midnight
+  // (Mouser's confirmed reset boundary, used as the single daily-quota boundary
+  // for every cog here). All other results use the per-result TTL constants.
+  const expires =
+    result === QUOTA_EXHAUSTED_RESULT
+      ? quotaExhaustedExpiresMs()
+      : now + (
+          result === 'carried' ? CARRIED_TTL_DAYS :
+          result === 'matched_no_price' ? MATCHED_NO_PRICE_TTL_DAYS :
+          rule.ttlDays
+        ) * DAY_MS;
 
   const envelopeHash = opts.envelope
     ? crypto.createHash('sha1').update(Object.keys(opts.envelope).sort().join('|')).digest('hex').slice(0, 12)
@@ -624,6 +658,55 @@ function logProbe({ entryId, result, elapsedMs, errorCode }) {
 }
 
 // ---------------------------------------------------------------------------
+// Cross-disty stock lookup (for Stock-RFQ MPN-level satisfaction)
+// ---------------------------------------------------------------------------
+
+/**
+ * Has ANY distributor returned 'carried' with stockQty > 0 for this (mpn, mfr)
+ * within its TTL? Used by the Stock-RFQ MPN-level short-circuit in
+ * franchise-api.js — once we have a stock-positive answer from any franchise,
+ * Stock-RFQs don't need to keep asking the others. The question "is there
+ * franchise stock for this part?" has been answered.
+ *
+ * Per operator policy (2026-05-21): this short-circuit is Stock-RFQ ONLY.
+ * Other RFQ types (PPV, Shortage, EOL, etc.) must keep using per-(MPN, disty)
+ * checks — they care about per-franchise pricing comparison, not just
+ * "is it in stock somewhere."
+ *
+ * @param {object} opts
+ * @param {string} opts.mpn
+ * @param {string} [opts.mfr]
+ * @param {string} [opts.excludeDisty]  - if set, ignore entries from this
+ *   disty (useful when the caller wants to know "has SOMEONE ELSE answered?")
+ * @returns {null | { distributor, stockQty, cached_at, expires_at }}
+ */
+function checkMpnAnyStock({ mpn, mfr, excludeDisty }) {
+  const mpnN = normalizeMpn(mpn);
+  if (!mpnN) return null;
+  const mfrN = canonicalMfr(mfr);
+  const db = getDB();
+  let sql = `
+    SELECT disty, stock_qty, first_seen_at, expires_at
+    FROM cache_entries
+    WHERE mpn_normalized = ? AND mfr_normalized = ?
+      AND result = 'carried'
+      AND invalidated_at IS NULL
+      AND expires_at > ?
+      AND COALESCE(stock_qty, 0) > 0`;
+  const params = [mpnN, mfrN, Date.now()];
+  if (excludeDisty) { sql += ` AND disty <> ?`; params.push(excludeDisty); }
+  sql += ` ORDER BY last_seen_at DESC LIMIT 1`;
+  const row = db.prepare(sql).get(...params);
+  if (!row) return null;
+  return {
+    distributor: row.disty,
+    stockQty: row.stock_qty,
+    cached_at: row.first_seen_at,
+    expires_at: row.expires_at,
+  };
+}
+
+// ---------------------------------------------------------------------------
 // Stats (read-only)
 // ---------------------------------------------------------------------------
 
@@ -652,16 +735,19 @@ module.exports = {
   check,
   peek,
   record,
+  checkMpnAnyStock,
   logShadow,
   invalidateByMfr,
   invalidateByAcquisition,
   sampleForProbing,
   logProbe,
   stats,
+  QUOTA_EXHAUSTED_RESULT,
   // Introspection / testing
   _normalizeMpn: normalizeMpn,
   _canonicalMfr: canonicalMfr,
   _DISTY_RULES: DISTY_RULES,
   _getDB: getDB,
+  _quotaExhaustedExpiresMs: quotaExhaustedExpiresMs,
   SHADOW_MODE,
 };

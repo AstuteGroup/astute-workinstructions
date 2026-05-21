@@ -340,6 +340,8 @@ async function enrichRFQ(rfqDocNumber, opts = {}) {
         cacheBypassIf,
         priority,
         cacheOnly,  // when true, skip live API calls; cache miss → no VQ writes for this line
+        rfqType,    // enables the Stock-RFQ MPN-level cross-disty stock cache short-circuit in franchise-api.js
+        mfr: line.mfr || '',
       });
     } catch (err) {
       counters.errors.push({ mpn, cpc, stage: 'search', message: err.message });

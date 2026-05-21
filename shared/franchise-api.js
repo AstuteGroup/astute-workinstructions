@@ -29,6 +29,14 @@
 
 const path = require('path');
 
+// RFQ types eligible for MPN-level cross-disty stock cache satisfaction
+// (operator policy 2026-05-21). For these types, the caller's intent is "is
+// there franchise stock for this part?" — once ANY franchise returns carried
+// + stockQty > 0 within TTL, additional distys can be skipped. All other RFQ
+// types keep strict per-(MPN, disty) cache semantics so per-franchise pricing
+// comparison still works. Mirrors BROKER_RFQ_TYPES_NO_CACHE_VQS in enrich-rfq.
+const BROKER_MPN_LEVEL_CACHE_TYPES = new Set(['Stock', 'Unqualified Spot RFQ']);
+
 // All active distributor API modules
 const API_DIR = path.resolve(__dirname, '../Trading Analysis/RFQ Sourcing/franchise_check');
 
@@ -286,8 +294,9 @@ async function searchPart(distributor, mpn, qty, opts = {}) {
     return { distributor, name: config?.name || distributor, found: false, error: 'Not configured or inactive' };
   }
 
-  // Negative cache check — serves prior "not carried" results without burning
-  // a live API call. Skipped when opts.skipCache is true (for callers that
+  // Negative cache check — serves prior "not carried" / "quota exhausted" /
+  // (Stock-RFQ only) cross-disty stock-found results without burning a live
+  // API call. Skipped when opts.skipCache is true (for callers that
   // explicitly need fresh data — probes, debugging, intentional refresh).
   // Errors from the cache layer MUST never block the live API call.
   let _negCache = null;
@@ -300,7 +309,13 @@ async function searchPart(distributor, mpn, qty, opts = {}) {
     try {
       _preCallCacheState = _negCache.peek({ mpn, mfr: opts.mfr, disty: distributor });
       const hit = _negCache.check({ mpn, mfr: opts.mfr, disty: distributor });
-      if (hit && hit.result === 'not_carried') {
+      // Two cached outcomes short-circuit the live call (in addition to the
+      // legacy not_carried path):
+      //   - not_carried     → disty confirmed it doesn't carry this part
+      //   - quota_exhausted → disty refused this call due to daily-quota;
+      //                       TTL expires at next Chicago midnight so we
+      //                       retry tomorrow rather than every hour today
+      if (hit && (hit.result === 'not_carried' || hit.result === _negCache.QUOTA_EXHAUSTED_RESULT)) {
         return {
           distributor,
           name: config.name,
@@ -311,6 +326,7 @@ async function searchPart(distributor, mpn, qty, opts = {}) {
           cached: true,
           cachedAt: hit.cached_at,
           cacheExpires: hit.expires_at,
+          cacheResult: hit.result,
           matchType: null,
           franchiseQty: 0,
           franchisePrice: null,
@@ -319,6 +335,43 @@ async function searchPart(distributor, mpn, qty, opts = {}) {
           priceBreaks: [],
           vqLines: null,
         };
+      }
+
+      // Stock-RFQ MPN-level short-circuit (operator policy 2026-05-21):
+      // For Stock + Unqualified Spot RFQs only, if ANY other franchise has
+      // already returned 'carried, stockQty > 0' within its TTL, we don't
+      // need to keep asking the remaining distributors — the question "is
+      // there franchise stock for this part?" has been answered. Per-disty
+      // isolation is preserved for every other RFQ type because they care
+      // about per-franchise pricing comparison, not just availability.
+      if (BROKER_MPN_LEVEL_CACHE_TYPES.has(opts.rfqType)) {
+        const mpnHit = _negCache.checkMpnAnyStock({
+          mpn,
+          mfr: opts.mfr,
+          excludeDisty: distributor,
+        });
+        if (mpnHit) {
+          return {
+            distributor,
+            name: config.name,
+            bpValue: config.bpValue,
+            bpName: config.bpName,
+            bpId: config.bpId,
+            found: false,
+            cached: true,
+            cachedAt: mpnHit.cached_at,
+            cacheExpires: mpnHit.expires_at,
+            cacheResult: 'mpn_level_stock_satisfied',
+            cacheSatisfyingDistributor: mpnHit.distributor,
+            matchType: null,
+            franchiseQty: 0,
+            franchisePrice: null,
+            franchiseBulkPrice: null,
+            franchiseRfqPrice: null,
+            priceBreaks: [],
+            vqLines: null,
+          };
+        }
       }
     } catch { /* swallow cache errors */ }
   }
@@ -507,6 +560,24 @@ async function searchPart(distributor, mpn, qty, opts = {}) {
       const { classify } = require('./api-retry-policy');
       _verdict = classify(err);
     } catch { /* policy module load failure → fall through with null verdict */ }
+
+    // Cache MaxCallPerDay outcomes so we don't re-fire the same (mpn, disty)
+    // for the rest of the day. TTL lands at the next Chicago midnight; the
+    // cache check at the top of searchPart() will short-circuit further
+    // attempts until then. The retry queue still picks it up on schedule
+    // (the cache and the queue both unlock at quota reset). Operator policy
+    // 2026-05-21: this is universal across all RFQ types, not just Stock.
+    if (_negCache && _verdict?.category === 'RATE_LIMIT' && /MaxCallPerDay|daily quota/i.test(err.message || '')) {
+      try {
+        _negCache.record({
+          mpn,
+          mfr: opts.mfr,
+          disty: distributor,
+          result: _negCache.QUOTA_EXHAUSTED_RESULT,
+          reason: 'quota_exhausted',
+        });
+      } catch { /* cache record errors must never break the wrapper */ }
+    }
 
     if (process.env.API_RETRY_IN_FLIGHT !== '1') {
       try {
@@ -769,6 +840,7 @@ async function searchAllDistributors(mpn, qty, options = {}) {
     parallel = true, exclude = [], onResult = null,
     cacheTTL = null, cacheBypassIf = null, mfr = null,
     priority = null,
+    rfqType = null,
     cacheOnly = false,
     perDistributorTimeoutMs = DEFAULT_PER_DISTRIBUTOR_TIMEOUT_MS,
   } = options;
@@ -785,6 +857,7 @@ async function searchAllDistributors(mpn, qty, options = {}) {
   const perCallOpts = {};
   if (mfr) perCallOpts.mfr = mfr;
   if (priority) perCallOpts.priority = priority;
+  if (rfqType) perCallOpts.rfqType = rfqType;
 
   // ── Cache gate ───────────────────────────────────────────────────────────
   // If caller supplied a cacheTTL, consult getFreshness() first. On a hit we
