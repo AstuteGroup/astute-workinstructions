@@ -269,6 +269,12 @@ async function action_load_vq(payload, ctx) {
       brokerMessageId: brokerMessageId || null,
       senderEmail: senderEmail ? senderEmail.toLowerCase() : null,
       senderDomain: derivedDomain,
+      // outerFrom (envelope From of the email that hit vq@) is distinct from
+      // senderEmail (the DEEPER Tier-A actor — e.g., when Ivy forwards Serena's
+      // quotes the outerFrom is Ivy and senderEmail resolves to Serena).
+      // Per-loader digests (ivy-vq-digest.js et al.) join on this. Was missing
+      // pre-2026-05-21; back-compat handled by digest's IMAP fallback.
+      outerFrom: outerFrom ? outerFrom.toLowerCase() : null,
       rfqSearchKey: targetKey,
       isPrimary: targetKey === rfqSearchKey,
       buyerId: validatedBuyerId,
@@ -309,6 +315,7 @@ async function action_load_vq(payload, ctx) {
           ts: nowIso,
           sourceUid: sourceUid || ctx.uid,
           messageId: messageId || null,
+          outerFrom: outerFrom ? outerFrom.toLowerCase() : null,
           vqLineId: w.vqLineId,
           rfqValue: targetKey,
           rfqLineNo: w.line || null,

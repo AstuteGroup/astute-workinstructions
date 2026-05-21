@@ -683,9 +683,9 @@ Build the payload:
     "buyerId": <AD_User_ID per Buyer field rule>,
     "quotes": [<reconciled quote objects from 3.7>],
     "subject": "<email subject — needed for the consolidated-clarify email>",
-    "outerFrom": "<outer From — fallback for sender outreach if senderEmail missing>",
-    "messageId": "<read response message_id>",
-    "senderEmail": "<deepest broker From: address, lowercased>",
+    "outerFrom": "<MANDATORY — copy `from` value from cmdRead response, lowercased. The envelope From of the email that hit vq@ (e.g., the Astute forwarder). NOT the same as senderEmail. Populate on EVERY load.>",
+    "messageId": "<MANDATORY — copy the literal `message_id` value from the cmdRead response (the email's own RFC822 Message-ID header). Independent from senderEmail/outerFrom/brokerMessageId — those are different things. Populate on EVERY load, including forwards. Do NOT leave null because the email is a forward; the outer email still has its own Message-ID and we need it.>",
+    "senderEmail": "<MANDATORY — deepest broker From in the chain (Tier-A walk result), lowercased. Independent from messageId — populate this REGARDLESS of whether you populated messageId. If you can identify a broker From, fill this in; if the email is from an Astute internal user with no broker further down the chain, use the outerFrom value.>",
     "brokerMessageId": "<broker's original MID from References — same rule as stockrfq>",
     "emailType": "type1" | "type2",
     "clarifications": [

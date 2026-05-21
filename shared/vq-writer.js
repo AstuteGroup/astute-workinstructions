@@ -42,12 +42,24 @@ const logger = require('./logger').createLogger('VQWriter');
 //
 // Returns the existing chuboe_vq_line_id, or null if no active row matches.
 function findExistingVqIdByNaturalKey(payload) {
+  // Chuboe_Date_Code is part of the natural key (added 2026-05-21 after the
+  // Ivy-forwards-LFZU incident — Southchip's 23+ DC quote was dropped because
+  // dedup matched the 21+ DC row on (RFQ_Line × MPN × BP × Cost × Currency)).
+  // Different DCs represent distinct inventory lots from the same vendor and
+  // should be preserved as separate VQs. Null/empty DC matches null/empty;
+  // populated DCs must match exactly (case-sensitive — matches DB collation).
+  const dcRaw = payload.Chuboe_Date_Code;
+  const dcStr = (dcRaw == null ? '' : String(dcRaw)).trim();
+  const dcCondition = dcStr === ''
+    ? `(chuboe_date_code IS NULL OR chuboe_date_code = '')`
+    : `chuboe_date_code = '${dcStr.replace(/'/g, "''")}'`;
   const conditions = [
     `chuboe_rfq_line_id = ${Number(payload.Chuboe_RFQ_Line_ID)}`,
     `chuboe_mpn = '${String(payload.Chuboe_MPN || '').replace(/'/g, "''")}'`,
     `c_bpartner_id = ${Number(payload.C_BPartner_ID)}`,
     `cost = ${Number(payload.Cost)}`,
     `c_currency_id = ${Number(payload.C_Currency_ID || 100)}`,
+    dcCondition,
     `isactive = 'Y'`,
   ];
   try {
@@ -821,7 +833,13 @@ async function writeVQFromAPI(rfqSearchKey, cpc, franchiseResults, opts = {}) {
     // GBP rows numerically matched pre-existing USD VQs at the same RFQ line
     // / MPN / BP_ID). Omitting currency causes silent drops of legitimate
     // multi-currency writes.
-    const NATURAL_KEY_FIELDS = ['Chuboe_RFQ_Line_ID', 'Chuboe_MPN', 'C_BPartner_ID', 'Cost', 'C_Currency_ID'];
+    //
+    // Chuboe_Date_Code is part of the natural key — vendors routinely quote
+    // the same MPN/qty/cost across distinct DC lots (e.g., 21+ and 23+). DC
+    // distinguishes the lot. Omitting it silently drops the second lot
+    // (verified 2026-05-21: Southchip's 23+ row was lost on UID 8544 because
+    // a 21+ row at the same cost wrote first).
+    const NATURAL_KEY_FIELDS = ['Chuboe_RFQ_Line_ID', 'Chuboe_MPN', 'C_BPartner_ID', 'Cost', 'C_Currency_ID', 'Chuboe_Date_Code'];
     try {
       const existingId = findExistingVqIdByNaturalKey(payload);
       if (existingId) {
