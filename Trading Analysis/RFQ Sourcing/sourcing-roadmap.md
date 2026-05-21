@@ -47,7 +47,10 @@ Consolidated roadmap for RFQ Sourcing and VQ Processing workflows, organized by 
 | # | Feature | Priority | Status |
 |---|---------|----------|--------|
 | A1 | Franchise Pricing via API | Later | Planned |
-| A2 | Non-API Account Scraping | Later | Planned |
+| A2 | Non-API Account Scraping | **Active** | Architecture documented, implementation in progress |
+| A3 | VQ writer: PATCH attribute fields on natural-key match | **Next** | Planned |
+| A4 | api-result-writer: surface vqHts + vqCooCountryId in Flux converter | **Next** | Planned |
+| A5 | writeCache: differentiate multi-variant cache entries | Later | Planned |
 
 ---
 
@@ -107,6 +110,73 @@ This is the third franchise-data channel alongside:
 **Notes:**
 - Fragile by nature — site DOM changes break adapters. Per-site fixture tests on the mapper layer are the regression guard.
 - Operator-attended is the security posture, not a temporary state. Customer pricing only appears in logged-in sessions; running unattended risks credential lockout.
+
+---
+
+## A3. VQ writer: PATCH attribute fields on natural-key match
+
+**Status:** Planned | **Priority:** Next
+
+**Problem:** `shared/vq-writer.js` deduplicates new VQ writes against existing rows via natural key `(Chuboe_RFQ_Line_ID, Chuboe_MPN, C_BPartner_ID, Cost, C_Currency_ID, Chuboe_Date_Code)`. On a match the writer returns the existing `chuboe_vq_line_id` without applying any non-key fields from the new payload. Discovered 2026-05-21 during the Heilind line-by-line canary load: 6 of the 12 priced writes silently skipped because an earlier same-day BOM-tool xlsx load had created rows at the same `Cost`. The line-by-line envelopes carried richer data (COO ISO-2 code, vendor notes with Heilind PN + tariff + DetailLead + Status) that never made it onto those VQ rows.
+
+**Solution:** When a write hits an existing natural-key match, the writer should PATCH the non-key attribute fields *only if the new value is non-null and differs from the existing value*. Fields covered:
+
+- `Chuboe_HTS`
+- `C_Country_ID` (only update when existing = 1000001 "PENDING" — don't overwrite a real COO with a different real COO; flag for review instead)
+- `Description` / vendor-notes equivalent column
+- `Chuboe_Lead_Time` (preserve longer if it conflicts? Or always overwrite — TBD)
+- `Chuboe_Date_Code` is in the natural key so it can't change post-write
+
+Open design questions before coding:
+- Strict "fill nulls only" vs "overwrite with newer" — different semantics for the operator. Recommend fill-nulls-only for the first iteration; surface diffs that aren't pure null→value as `needsReview`.
+- Should this be a separate writer entry point (`upsertVQ`) or a flag on the existing `writeVQBatch` (`{ patchAttributes: true }`)? Latter is less invasive.
+- Affects downstream consumer expectations — current code assumes "if VQ exists, it's already enriched." A PATCH path means re-runs can mutate VQs; flag clearly in writer logs.
+
+**Why "Next" priority:** Today's workaround is "don't run BOM tool on batches the line-by-line will cover." That's fine when the operator manages cadence, but any path with multiple data sources for the same MPN (line-by-line + API enrichment, line-by-line + email VQ, etc.) will hit the same skip behavior and lose richer data.
+
+**Surfaced 2026-05-21 — Heilind line-by-line CSV canary.**
+
+---
+
+## A4. `api-result-writer`: surface `vqHts` + `vqCooCountryId` in Flux converter
+
+**Status:** Planned | **Priority:** Next
+
+**Problem:** `shared/api-result-writer.js` converts the canonical `franchiseResults` envelope into a Flux-shaped JSON for the pricing cache (`shared/data/api-pricing-cache/<mpn>_<date>.json`). The converter currently emits `HTSCode: null` and `CountryOfOrigin: null` in the Pricings entry, even when the source envelope has populated `vqHts` and `vqCooCountryId`. The VQ row itself gets HTS via the `Chuboe_HTS` column write — only the cache representation loses these fields. Pre-existing; affects every scrape and enrichment source that populates HTS/COO. Surfaced 2026-05-21 spot-checking the Heilind line-by-line cache files.
+
+**Solution:** One-line additions in the Flux converter:
+
+```js
+HTSCode:         d.vqHts || null,
+CountryOfOrigin: d.vqCooCountryId  // numeric ID → ISO-2 lookup OR pass-through; decide on cache contract
+                  ? lookupCountryCode(d.vqCooCountryId)
+                  : null,
+```
+
+**Open design question:** should the cache store the ISO-2 code (`'CN'`, `'PH'`) for human readability or the numeric `c_country_id` (`153`, `278`) for direct write-back? VQ rows store `c_country_id`. The Flux envelope is intended as a write-target / human-readable artifact, so ISO-2 likely correct — add a country-code lookup helper in the writer (cached map at module init).
+
+**Why "Next" priority:** As soon as A3 lands, the writer will actually PATCH `C_Country_ID` onto existing rows — at which point downstream consumers that hydrate from the cache (`enrich-poller` re-runs, Quick Quote pricing context) will surface stale `null` COO unless A4 is fixed in parallel. The two together close the HTS+COO loop end-to-end.
+
+**Surfaced 2026-05-21 — Heilind line-by-line CSV canary.**
+
+---
+
+## A5. `writeCache`: differentiate multi-variant cache entries
+
+**Status:** Planned | **Priority:** Later
+
+**Problem:** `shared/api-result-writer.js#writeCache` writes pricing-cache files at `<mpn>_<date>.json`. When a distributor returns multiple manufacturing variants for one MPN (e.g., Heilind line-by-line returns 1888247-1 in PH origin AND CN origin — different tariff, different lead time, different price), each variant gets its own envelope but the writer overwrites the prior file on disk. Only the last-written variant survives. Discovered 2026-05-21 — Heilind line-by-line CSV has 2 rows for 1888247-1, with COO/Tariff differing; the cache file only retained the second.
+
+**Solution:** Differentiate the cache key. Two options:
+
+- **(a) Append variant index to the filename** — `<mpn>_<date>_<idx>.json` (where idx is 1..N per the order variants land). Simple, but the cache reader needs to enumerate by glob rather than a single direct file read.
+- **(b) Merge variants into one cache file with a `variants: [...]` array** under each distributor's Pricings entry. More compact on disk, but changes the on-disk envelope schema — every reader needs to handle both array and scalar shapes.
+
+Recommend (a) for the first iteration — fewer reader-side breaks. The cache reader can pick the best variant per request (e.g., variant whose `CountryOfOrigin` matches a customer's origin preference, or simply "lowest landed cost given the operator's tariff regime").
+
+**Why "Later" priority:** Multi-variant data is real (Heilind surfaces it; other line-by-line scrapes likely will too), but for now buyers don't actually act on COO at the cache layer — they see it on the VQ row. The cache primarily feeds re-pricing decisions where one variant is "good enough." This becomes urgent only when buyers start asking "which Heilind variant is cheapest landed?" — at which point the single-variant cache is silently wrong.
+
+**Surfaced 2026-05-21 — Heilind line-by-line CSV canary.**
 
 ---
 
