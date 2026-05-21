@@ -662,6 +662,18 @@ The SessionStart greeting reads this file and surfaces all open items, sorted by
   - **How:** Add inference rules in the respective distributor modules. Skip unless something forces it.
   - **Source:** C9a audit, 2026-04-08
 
+- [ ] 🅿️ **LAM reorder: multi-file (Original + EPG + Phase 2) roster with Program column** *(surfaced 2026-05-21)*
+  - **Why blocked:** EPG SIPOC and Phase 2 Adds today are scope-expansion / initial-procurement workbooks — they have `SPQ/MOQ`, `Lam Target Initial PO QTY`, `Approved PO Qty`, `12-month RPM usage` columns but **no reorder threshold / MIN QTY**. Steady-state reorder logic has nothing to trigger on. Operator (2026-05-21) plans to request threshold-bearing files from LAM seller for EPG + Phase 2 parts; without those, "include in reorder cron" doesn't have inputs.
+  - **Schema spot-read 2026-05-21 (so future-me doesn't redo):**
+    - `Lam_Kitting_DB_05082026.xlsx` INVENTORY (964 rows): row 0 = header. Cols Lam P/N|MPN|MFR|Desc|Lead Time|Base Unit Price|Resale Price|**MIN QTY** (H)|**MOQ** (I)|**Buyer** (J)|Notes.
+    - `Lam_EPG_SIPOC.xlsx` Sheet1 (208 SKUs): row 0 = metadata/totals junk, **row 1 = header**. CPC|Description|MPN|MFR|Lead time|SPQ/MOQ|Base Unit Price|Total Cost|Resale Price|18% Markup|TOTAL VALUE|Z2 Lowest Price|CQ Median Price|MPN to Purchase|Manufacturer|Source|Purchase Price|Qty|Qty Remaining to Source|… plus execution columns (RFQ Number, POV, Purchased By, PO Sent, Tracking, Qty Received).
+    - `Astute_New Part ADDS_ Working Copy - 04222026.xlsx` latest tab `Astute action list 4.14.26` (291 SKUs): row 0 = metadata, **row 1 = header**. Part Number|Description|MPN|MFR|Lam Target Initial PO QTY|MFR SPQ|Lead Time (wks)|Base Unit Price|SPQ/MOQ|Franchise QTY|Lifecycle Status|Astute PO Strategy|Approved PO Qty|Extended Cost|Lam Transfer Qty|PO Placed|… plus `12-month RPM usage` analytical cols.
+    - Spot-checked overlap: CPC `644-B57073-024` / MPN `5503-24-1` appears in BOTH EPG SIPOC and Phase 2 Adds, so collisions are real.
+  - **Ready when:** Operator receives LAM-provided files (or LAM-confirmed thresholds) for EPG + Phase 2 parts. Could be a new column in EPG SIPOC / Phase 2 Adds OR a separate threshold sheet.
+  - **How (when unblocked):** (1) `lam-kitting-reorder.js`: read all 3 files at startup, build a unified roster keyed by MPN. (2) Precedence on collisions: Phase 2 > EPG > Kitting DB (newest scope wins for threshold lookup; rule mirrors the existing contract-price ladder at the top of `lam-3pl.md`). (3) Each row in the reorder CSV gets a new `Program` column with value `Original` / `EPG` / `Phase 2`. (4) Apply same Program tagging to `lam-kitting-customer-offer.js` so the BI dashboard roster picks up EPG + Phase 2 parts that haven't graduated into Kitting DB. (5) Update `lam-3pl.md` Inputs table + ALERT_COLUMNS reference + customer-offer roster description.
+  - **Today's behavior (correct):** reorder cron reads Kitting DB only (964 SKUs). EPG (208 SKUs) and Phase 2 (291 SKUs) parts don't get alerts until they're added to Kitting DB INVENTORY tab. Operator confirmed this is the intended hand-off path — parts graduate from EPG/Phase 2 execution into Kitting DB steady-state.
+  - **Source:** 2026-05-21 — operator asked whether reorder is reading all 3 files; investigation confirmed it's reading 1 of 3 and EPG/Phase 2 don't carry thresholds.
+
 ### Backfills / cleanups
 
 - [ ] 🅿️ **LAM EPG packaging backfill (RFQ 1132040)**
