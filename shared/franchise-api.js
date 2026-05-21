@@ -326,6 +326,30 @@ async function searchPart(distributor, mpn, qty, opts = {}) {
   try {
     const mod = require(config.script);
 
+    // Hard local daily-call ceiling — pre-flight check that synthesizes a
+    // MaxCallPerDay error when we've hit the per-cog daily cap (currently
+    // only Mouser enforces by default, 900/day; others opt in via env).
+    // Companion to the jitter in api-retry-policy.js: jitter spreads retries
+    // across the morning, ceiling prevents legitimate fresh traffic from
+    // re-burning the new quota before backlog drains. The thrown error flows
+    // through the wrapper's catch below → classify() → MaxCallPerDay rule →
+    // jittered enqueue, same path as a real supplier-side MaxCallPerDay.
+    // See api-daily-counter.js.
+    if (!opts.skipCeiling) {
+      try {
+        const counter = require('./api-daily-counter');
+        const verdict = counter.checkAndIncrement(distributor);
+        if (!verdict.allowed) {
+          throw new Error(`MaxCallPerDay (local ceiling): ${distributor} ${verdict.count}/${verdict.ceiling} for this Chicago-midnight day — see shared/api-daily-counter.js`);
+        }
+      } catch (e) {
+        // Re-throw real MaxCallPerDay; swallow other counter errors (e.g.
+        // module load failure, corrupt counter file) so a broken counter
+        // never blocks real API calls.
+        if (e.message && e.message.includes('MaxCallPerDay')) throw e;
+      }
+    }
+
     // Per-disty throttle — blocks until a token is available so we never
     // exceed the supplier's per-minute window. Distys without a configured
     // limit pass through unchanged. See shared/api-throttle.js.
