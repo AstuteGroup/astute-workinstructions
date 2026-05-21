@@ -58,8 +58,16 @@
  * Using America/Chicago handles DST automatically (CDT=UTC-5, CST=UTC-6).
  * Adds a 15-minute safety margin past midnight to avoid retrying inside any
  * quota-handover edge case.
+ *
+ * @param {number} jitterHours - If > 0, add a random 0..jitterHours hours past
+ *   the reset boundary. This spreads classify-time retries across the morning
+ *   instead of stacking on the reset minute (the thundering-herd problem
+ *   confirmed 2026-05-21: every queue item waiting on MaxCallPerDay woke
+ *   simultaneously at 05:00 UTC and re-exhausted the new daily quota within
+ *   2-4 hours). Default 0 = no jitter, preserves prior behavior for callers
+ *   that don't opt in (the worker's batch-push applies its own per-item jitter).
  */
-function hoursUntilNextChicagoMidnight() {
+function hoursUntilNextChicagoMidnight(jitterHours = 0) {
   const now = new Date();
   const tzString = now.toLocaleString('en-US', { timeZone: 'America/Chicago', hour12: true });
   const m = tzString.match(/(\d+):(\d+):(\d+)\s+(AM|PM)/);
@@ -71,7 +79,9 @@ function hoursUntilNextChicagoMidnight() {
   if (ampm === 'PM' && h !== 12) h += 12;
   if (ampm === 'AM' && h === 12) h = 0;
   const hoursLeft = (24 - h) - (min / 60) - (s / 3600);
-  return Math.max(0.5, hoursLeft + 0.25); // 15min safety past midnight, 30min floor
+  const base = Math.max(0.5, hoursLeft + 0.25); // 15min safety past midnight, 30min floor
+  if (jitterHours > 0) return base + Math.random() * jitterHours;
+  return base;
 }
 
 const RULES = [
@@ -87,9 +97,12 @@ const RULES = [
   { pattern: /throttle: max wait/i,                                              category: 'RATE_LIMIT', retry: true, blockedHours: 2/60, reason: 'Client-side throttle exhausted (await window)' },
   { pattern: /MaxCallPerMinute|per-minute rate limit/i,                          category: 'RATE_LIMIT', retry: true, blockedHours: 2/60, reason: 'Per-minute rate limit (~60s reset)' },
   // MaxCallPerDay: backoff lands at next midnight America/Chicago (Mouser's
-  // confirmed reset boundary). Dynamic via blockedHoursFn — classify() invokes
-  // it at call time so the wait shrinks as we approach reset.
-  { pattern: /MaxCallPerDay|daily quota/i,                                       category: 'RATE_LIMIT', retry: true, blockedHoursFn: hoursUntilNextChicagoMidnight, reason: 'Daily quota exhausted (resets midnight America/Chicago)' },
+  // confirmed reset boundary) PLUS up to 8 hours of random jitter — without
+  // jitter, every item that hits MaxCallPerDay today wakes simultaneously at
+  // 05:00 UTC tomorrow and re-exhausts the new daily quota within hours
+  // (thundering herd, 2026-05-21). Dynamic via blockedHoursFn — classify()
+  // invokes it at call time so each item gets its own random slot.
+  { pattern: /MaxCallPerDay|daily quota/i,                                       category: 'RATE_LIMIT', retry: true, blockedHoursFn: () => hoursUntilNextChicagoMidnight(8), reason: 'Daily quota exhausted (resets midnight America/Chicago, 0-8h jittered)' },
   { pattern: /\b429\b|Rate limit|too many requests/i,                            category: 'RATE_LIMIT', retry: true, blockedHours: 1, reason: 'Rate limit (429)' },
   { pattern: /\bquota\b|call limit exceeded/i,                                   category: 'RATE_LIMIT', retry: true, blockedHours: 1, reason: 'Quota exhausted' },
   { pattern: /\b403\b|HTTP 403|Forbidden/i,                                      category: 'RATE_LIMIT', retry: true, blockedHours: 1, reason: '403 Forbidden (generic — could be quota or perms)' },

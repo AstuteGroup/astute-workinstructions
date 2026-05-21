@@ -849,7 +849,7 @@ async function main() {
     // Force-immediate any gate-approved RFQ regardless of size — the operator
     // explicitly opted in.
     if (r._gateApproved && r.priority === PRIORITY.BACKLOG) {
-      r.priority = PRIORITY.MAIN;
+      r.priority = PRIORITY.MAIN_IMMEDIATE;
     }
   }
 

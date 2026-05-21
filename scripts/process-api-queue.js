@@ -516,10 +516,20 @@ function main() {
       // (cumulative across the tick), skip remaining same-cog ready items
       // this tick AND push their blocked_until to the reset boundary. Saves
       // the next 30-min cron tick from re-burning the first N calls.
+      //
+      // Per-item jitter (0..JITTER_HOURS) is critical: without it, every
+      // pending item gets the same resetIso and they all wake simultaneously
+      // at reset, re-exhausting the new daily quota within hours
+      // (thundering-herd burn confirmed 2026-05-21 — 467 MaxCallPerDay
+      // failures by 09:00 UTC, 4h after the 05:00 UTC reset). With jitter,
+      // items spread across the morning so the quota drains at a sustainable
+      // rate.
       if (isDailyQuota && cumulativeQuotaErrs[cog] >= QUOTA_BAIL_THRESHOLD && !outForTickCogs.has(cog)) {
         outForTickCogs.add(cog);
+        const JITTER_HOURS = 8;
         const resetHours = hoursUntilNextChicagoMidnight ? hoursUntilNextChicagoMidnight() : 6;
-        const resetIso = new Date(Date.now() + resetHours * 60 * 60 * 1000).toISOString();
+        const resetBaseMs = Date.now() + resetHours * 60 * 60 * 1000;
+        const jitterMs = JITTER_HOURS * 60 * 60 * 1000;
         let pushed = 0;
         for (const other of ready) {
           if (other === item) continue;
@@ -528,11 +538,12 @@ function main() {
           // Only push items whose current blocked_until is already in the past
           // (i.e., would have been processed this tick). Don't shorten a longer wait.
           const cur = new Date(other.blocked_until).getTime();
-          if (Number.isFinite(cur) && cur >= Date.now() + resetHours * 60 * 60 * 1000) continue;
-          other.blocked_until = resetIso;
+          if (Number.isFinite(cur) && cur >= resetBaseMs) continue;
+          other.blocked_until = new Date(resetBaseMs + Math.random() * jitterMs).toISOString();
           pushed++;
         }
-        const msg = `⚠ ${cog}: ${cumulativeQuotaErrs[cog]} daily-quota errors this tick — bailing on this cog; pushed ${pushed} more ${cog} items to ${resetIso}`;
+        const resetWindowEnd = new Date(resetBaseMs + jitterMs).toISOString();
+        const msg = `⚠ ${cog}: ${cumulativeQuotaErrs[cog]} daily-quota errors this tick — bailing on this cog; pushed ${pushed} more ${cog} items into reset window ${new Date(resetBaseMs).toISOString()} → ${resetWindowEnd} (jittered ${JITTER_HOURS}h)`;
         console.log(`  ${msg}`);
         appendLog(`QUOTA-BAIL ${msg}`);
       }
