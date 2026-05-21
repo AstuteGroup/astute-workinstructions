@@ -259,6 +259,9 @@ function renderSummaryHtml(batchResults, sinceIso, untilIso, backlog, quotaState
       : (distErrored > 0
           ? `${distTouched} <span style="color:#c00">(${distErrored} err)</span>`
           : `${distTouched}`);
+    const brkCacheCell = (r.vqsSkippedBrokerCacheHit || 0) > 0
+      ? `<span style="color:#888" title="VQ writes suppressed because enrichment came from cache on a Stock/Unqualified-Spot RFQ (pricing still in api_result)">${r.vqsSkippedBrokerCacheHit}</span>`
+      : '0';
     return `
     <tr>
       <td>${r.rfq}</td>
@@ -269,6 +272,7 @@ function renderSummaryHtml(batchResults, sinceIso, untilIso, backlog, quotaState
       <td style="text-align:right">${r.lines}</td>
       <td style="text-align:right">${r.apiCalls}</td>
       <td style="text-align:right">${r.cacheHits}</td>
+      <td style="text-align:right">${brkCacheCell}</td>
       <td style="text-align:center">${distCell}</td>
       <td style="text-align:right">${r.apiResultRowsWritten}</td>
       <td style="text-align:right">${r.vqsWritten}</td>
@@ -364,7 +368,7 @@ function renderSummaryHtml(batchResults, sinceIso, untilIso, backlog, quotaState
     <table border="1" cellpadding="4" cellspacing="0" style="border-collapse:collapse;font-size:12px">
       <tr style="background:#f0f0f0">
         <th>RFQ</th><th>Customer</th><th>Type</th><th>Tier</th><th>TTL</th>
-        <th>Lines</th><th>API</th><th>Cache</th><th>Dist&nbsp;hit</th><th>Rows</th><th>VQs</th>
+        <th>Lines</th><th>API</th><th>Cache</th><th title="VQ writes suppressed by broker-cache-hit gate (Stock/Unqualified-Spot only)">BrkCache</th><th>Dist&nbsp;hit</th><th>Rows</th><th>VQs</th>
         <th>FULL/PART/NONE</th><th>Err</th>
       </tr>
       ${rows}
@@ -968,6 +972,24 @@ async function main() {
     const totalErrors = batchResults.reduce((s, r) => s + (r.errors?.length || 0), 0);
     const totalWarnings = batchResults.reduce((s, r) => s + (r.warnings?.length || 0), 0);
     const isAnomalous = totalWarnings > 0 || totalErrors > 0;
+
+    // Diagnostic — added 2026-05-21 while investigating phantom anomaly emails
+    // (digest noise that didn't trace to any known SILENT_NO_VQS / LOW_VQ_YIELD
+    // path). When anomalous, dump the per-RFQ warnings + errors arrays to the
+    // log so we can trace which result is pushing what. Remove once root cause
+    // is identified.
+    if (isAnomalous) {
+      log(`Anomaly diagnostic — totalWarnings=${totalWarnings} totalErrors=${totalErrors}`);
+      for (const r of batchResults) {
+        const wn = (r.warnings || []).length;
+        const en = (r.errors || []).length;
+        if (wn > 0 || en > 0) {
+          log(`  RFQ ${r.rfq} (${r.rfqType}): ${wn} warnings, ${en} errors`);
+          for (const w of (r.warnings || [])) log(`    WARN [${w.severity}] ${w.pattern}: ${(w.detail || '').slice(0, 200)}`);
+          for (const e of (r.errors || [])) log(`    ERR  stage=${e.stage} mpn=${e.mpn || '?'}: ${(e.message || '').slice(0, 200)}`);
+        }
+      }
+    }
 
     const rollup = readRollup();
     if (batchResults.length > 0) {

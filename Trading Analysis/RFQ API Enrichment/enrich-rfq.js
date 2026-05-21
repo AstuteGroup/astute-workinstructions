@@ -602,6 +602,7 @@ async function enrichRFQ(rfqDocNumber, opts = {}) {
     counters.vqsFailed === 0 &&
     counters.vqsFlagged === 0 &&
     counters.vqsSkippedRestricted === 0 &&  // ← restricted-MFR is a known, expected outcome (TI/ADI/Maxim/Linear): pricing captured to chuboe_pricing_api_result, VQ write deliberately skipped. NOT a silent failure.
+    counters.vqsSkippedBrokerCacheHit === 0 &&  // ← broker-cache-hit suppression is a known, expected outcome (Stock + Unqualified Spot RFQs hitting cache): pricing already in chuboe_pricing_api_result from the original live call, VQ write deliberately skipped to stop fan-out on broker rotation. NOT a silent failure. Added 2026-05-21 after the 5/20 cache gate (commit 74961f4) tripped this detector on every Stock cache-hit RFQ.
     counters.errors.length === 0 &&
     !dryRun
   ) {
@@ -625,20 +626,25 @@ async function enrichRFQ(rfqDocNumber, opts = {}) {
 
   // Lower-severity warning: yield ratio < 25% with no errors. Same gate —
   // only consider lines that had supply (NONE-coverage lines are
-  // legitimately 0-VQ and shouldn't drag down the ratio).
+  // legitimately 0-VQ and shouldn't drag down the ratio). Also subtract
+  // broker-cache-suppressed lines from the denominator: those lines had
+  // supply, but we deliberately didn't write VQs (the 5/20 cache gate). Their
+  // pricing is already in chuboe_pricing_api_result; counting them as "failed
+  // to convert" would skew the yield metric on mixed Stock RFQs.
+  const effectiveLinesWithSupply = linesWithSupply - counters.vqsSkippedBrokerCacheHit;
   if (
-    linesWithSupply >= 10 &&
+    effectiveLinesWithSupply >= 10 &&
     counters.vqsWritten > 0 &&
     counters.vqsFailed === 0 &&
     counters.errors.length === 0 &&
     !dryRun
   ) {
-    const yieldRatio = counters.vqsWritten / linesWithSupply;
+    const yieldRatio = counters.vqsWritten / effectiveLinesWithSupply;
     if (yieldRatio < 0.25) {
       counters.warnings.push({
         severity: 'MEDIUM',
         pattern: 'LOW_VQ_YIELD',
-        detail: `${counters.vqsWritten} VQs written from ${linesWithSupply} lines with supply (${(yieldRatio * 100).toFixed(0)}% yield). Expected ratio depends on supplier count but <25% with 0 errors suggests silent skips somewhere — verify against api_pricing_cache for the same MPNs.`,
+        detail: `${counters.vqsWritten} VQs written from ${effectiveLinesWithSupply} eligible lines with supply (${(yieldRatio * 100).toFixed(0)}% yield${counters.vqsSkippedBrokerCacheHit > 0 ? `; ${counters.vqsSkippedBrokerCacheHit} broker-cache-suppressed excluded from denominator` : ''}). Expected ratio depends on supplier count but <25% with 0 errors suggests silent skips somewhere — verify against api_pricing_cache for the same MPNs.`,
       });
     }
   }
