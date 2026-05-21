@@ -36,7 +36,7 @@ require('dotenv').config({ path: path.resolve(__dirname, '../../../.env') });
 const { Pool } = require('pg');
 const { sendWithFallback } = require('../../shared/verified-send');
 const { enrichRFQ } = require('./enrich-rfq');
-const { assignPriority, isImmediate, PRIORITY } = require('./rfq-priority');
+const { assignPriority, isImmediate, parentTier, PRIORITY } = require('./rfq-priority');
 const { readQuotaState, isQuotaBlocked, hasAdequateQuota } = require('./rfq-quota-state');
 const { addToBacklog, nextBatch, markAttempted, pruneBacklog, backlogStats } = require('./rfq-backlog');
 const largeRfqGate = require('../../shared/large-rfq-gate');
@@ -225,11 +225,15 @@ function renderSummaryHtml(batchResults, sinceIso, untilIso, backlog, quotaState
     byType[t].silentSkips += r.silentSkips || 0;
   }
 
-  // Priority breakdown
-  const priorityCounts = { P1: 0, P2: 0, P3: 0, P3B: 0 };
+  // Priority breakdown — track P1 subdivisions (P1a urgent / P1b neutral /
+  // P1c PPV) plus rollup, P2, P3 new, and P3 backlog-drain.
+  const priorityCounts = { P1: 0, P1a: 0, P1b: 0, P1c: 0, P2: 0, P3: 0, P3B: 0 };
   for (const r of batchResults) {
-    if (r._fromBacklog) priorityCounts.P3B++;
-    else priorityCounts[r._priority || 'P1']++;
+    if (r._fromBacklog) { priorityCounts.P3B++; continue; }
+    const p = r._priority || 'P1a';
+    if (priorityCounts[p] !== undefined) priorityCounts[p]++;
+    const parent = parentTier(p);
+    if (parent !== p && priorityCounts[parent] !== undefined) priorityCounts[parent]++;
   }
 
   // Anomaly warnings
@@ -328,7 +332,7 @@ function renderSummaryHtml(batchResults, sinceIso, untilIso, backlog, quotaState
     <table border="1" cellpadding="6" cellspacing="0" style="border-collapse:collapse">
       <tr style="background:#f0f0f0"><th colspan="2">Totals</th></tr>
       <tr><td>RFQs processed</td><td style="text-align:right">${totalRfqs}</td></tr>
-      <tr><td>Priorities</td><td style="text-align:right">P1(express):${priorityCounts.P1} P2(main):${priorityCounts.P2} P3(backlog-new):${priorityCounts.P3} P3(backlog-drain):${priorityCounts.P3B}</td></tr>
+      <tr><td>Priorities</td><td style="text-align:right">P1(express):${priorityCounts.P1} [a:${priorityCounts.P1a} b:${priorityCounts.P1b} c:${priorityCounts.P1c}] P2(main):${priorityCounts.P2} P3(backlog-new):${priorityCounts.P3} P3(backlog-drain):${priorityCounts.P3B}</td></tr>
       <tr><td>Line-MPNs</td><td style="text-align:right">${totalLines.toLocaleString()}</td></tr>
       <tr><td>Live API calls</td><td style="text-align:right">${totalApiCalls.toLocaleString()}</td></tr>
       <tr><td>Cache hits</td><td style="text-align:right">${totalCacheHits.toLocaleString()} (${cacheHitPct}%)</td></tr>
@@ -859,8 +863,13 @@ async function main() {
   const backlogNew = newRFQs.filter(r => r.priority === PRIORITY.BACKLOG);
 
   if (newRFQs.length > 0) {
-    const pCounts = newRFQs.reduce((acc, r) => { acc[r.priority] = (acc[r.priority] || 0) + 1; return acc; }, {});
-    log(`Found ${newRFQs.length} new RFQ(s): P1=${pCounts.P1 || 0}, P2=${pCounts.P2 || 0}, P3=${pCounts.P3 || 0}`);
+    const pCounts = newRFQs.reduce((acc, r) => {
+      acc[r.priority] = (acc[r.priority] || 0) + 1;
+      const parent = parentTier(r.priority);
+      if (parent !== r.priority) acc[parent] = (acc[parent] || 0) + 1;
+      return acc;
+    }, {});
+    log(`Found ${newRFQs.length} new RFQ(s): P1=${pCounts.P1 || 0} [a:${pCounts.P1a || 0} b:${pCounts.P1b || 0} c:${pCounts.P1c || 0}], P2=${pCounts.P2 || 0}, P3=${pCounts.P3 || 0}`);
     for (const r of newRFQs) {
       log(`  ${r.rfq_number} — ${r.customer || '?'} (${r.rfq_type}) ${r.priority} — ${r.line_mpns} MPNs`);
     }

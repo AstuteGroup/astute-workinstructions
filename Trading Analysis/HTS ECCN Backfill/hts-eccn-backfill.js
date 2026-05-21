@@ -95,6 +95,45 @@ function resolveRfqId(searchKey) {
   return parseInt(rows[0][0], 10);
 }
 
+/**
+ * Look up HTS/ECCN already known for these MPNs from other chuboe_vq_line rows
+ * (any RFQ, last N days). HTS/ECCN are properties of the part, not the seller,
+ * so a value populated yesterday by enrich-poller is reusable today without
+ * burning another franchise API call.
+ *
+ * Returns Map<mpn_clean, { hts: string|null, eccn: string|null }>. We take the
+ * most-recent non-null value per field — different distributors fill different
+ * fields, and aggregating across all rows for the MPN maximizes cache hits.
+ *
+ * Per-mfr scoping is intentionally omitted: HTS/ECCN keys are MPN-level. Caller
+ * still queries the API for the (mpn, mfr) tuple when cache lacks the field.
+ */
+function loadVqCache(mpnCleanList, lookbackDays = 30) {
+  if (!mpnCleanList || mpnCleanList.length === 0) return new Map();
+  const literals = mpnCleanList
+    .filter(Boolean)
+    .map(m => `'${String(m).replace(/'/g, "''")}'`)
+    .join(',');
+  if (!literals) return new Map();
+  const rows = psql(`
+    SELECT
+      chuboe_mpn_clean,
+      (array_agg(chuboe_hts  ORDER BY created DESC) FILTER (WHERE chuboe_hts  IS NOT NULL AND chuboe_hts  <> ''))[1] AS hts,
+      (array_agg(chuboe_eccn ORDER BY created DESC) FILTER (WHERE chuboe_eccn IS NOT NULL AND chuboe_eccn <> ''))[1] AS eccn
+    FROM adempiere.chuboe_vq_line
+    WHERE chuboe_mpn_clean IN (${literals})
+      AND isactive = 'Y'
+      AND created >= NOW() - INTERVAL '${lookbackDays} days'
+      AND (chuboe_hts IS NOT NULL OR chuboe_eccn IS NOT NULL)
+    GROUP BY chuboe_mpn_clean;
+  `);
+  const map = new Map();
+  for (const r of rows) {
+    map.set(r[0], { hts: r[1] || null, eccn: r[2] || null });
+  }
+  return map;
+}
+
 function loadVQLines(rfqId, limit) {
   const limitClause = limit ? `LIMIT ${limit}` : '';
   const rows = psql(`
@@ -228,7 +267,25 @@ async function main() {
     }
     groups.get(key).lines.push(line);
   }
-  console.log(`Distinct (mpn, mfr) tuples to query: ${groups.size}\n`);
+  console.log(`Distinct (mpn, mfr) tuples to query: ${groups.size}`);
+
+  // Step 3.5: VQ-line cache lookup. HTS/ECCN are part-level properties and
+  // every successful enrich-poller call writes them onto chuboe_vq_line. Any
+  // tuple where the cache already has BOTH values skips the franchise APIs
+  // entirely — cuts Mouser/DigiKey quota burn substantially on RFQs whose
+  // parts have been touched by enrichment in the last 30 days.
+  const allMpnClean = Array.from(new Set(Array.from(groups.values()).map(g => g.mpnClean)));
+  const vqCache = loadVqCache(allMpnClean, 30);
+  const cacheFullHits = Array.from(groups.values()).filter(g => {
+    const c = vqCache.get(g.mpnClean);
+    return c && c.hts && c.eccn;
+  }).length;
+  const cachePartialHits = Array.from(groups.values()).filter(g => {
+    const c = vqCache.get(g.mpnClean);
+    return c && (c.hts || c.eccn) && !(c.hts && c.eccn);
+  }).length;
+  console.log(`VQ-cache full hits (skip API):   ${cacheFullHits} / ${groups.size}`);
+  console.log(`VQ-cache partial hits (still call API): ${cachePartialHits} / ${groups.size}\n`);
 
   // J5 pause — HTS/ECCN Backfill is user-initiated. Claim pause for small
   // batches; large batches run alongside the enricher (cache helps dedupe).
@@ -252,6 +309,30 @@ async function main() {
 
   for (const group of groupArray) {
     i++;
+
+    // VQ-cache short-circuit: if both HTS and ECCN are already known for this
+    // MPN from prior enrichment, reuse without burning an API call. Partial
+    // cache hits fall through to the API path (we still need the missing field).
+    const cached = vqCache.get(group.mpnClean);
+    if (cached && cached.hts && cached.eccn) {
+      process.stdout.write(`\r[${i}/${groupArray.length}] ${group.mpn} (vq-cache)`.padEnd(80));
+      resolutions.push({
+        mpn: group.mpn,
+        mpnClean: group.mpnClean,
+        mfrText: group.mfrText,
+        lineCount: group.lines.length,
+        sources: { vqCache: { hts: cached.hts, eccn: cached.eccn } },
+        resolved: {
+          hts: cached.hts,
+          htsSource: 'vq-cache',
+          eccn: cached.eccn,
+          eccnSource: 'vq-cache',
+        },
+        errors: [],
+      });
+      continue;
+    }
+
     process.stdout.write(`\r[${i}/${groupArray.length}] ${group.mpn}`.padEnd(80));
 
     let dkHts = null, dkEccn = null, msHts = null, msEccn = null;
@@ -289,12 +370,30 @@ async function main() {
     const htsResult = resolveHts({ digikey: dkHts, mouser: msHts });
     const eccnResult = resolveEccn({ digikey: dkEccn, mouser: msEccn });
 
+    // Partial cache fallback: API may have returned nothing for one field
+    // while a prior VQ row already has it. Use the cached value rather than
+    // leaving the line unbackfilled.
+    if (htsResult.value === null && cached?.hts) {
+      htsResult.value = cached.hts;
+      htsResult.source = 'vq-cache';
+      htsResult.disagreement = null;
+    }
+    if (eccnResult.value === null && cached?.eccn) {
+      eccnResult.value = cached.eccn;
+      eccnResult.source = 'vq-cache';
+      eccnResult.disagreement = null;
+    }
+
     const resolution = {
       mpn: group.mpn,
       mpnClean: group.mpnClean,
       mfrText: group.mfrText,
       lineCount: group.lines.length,
-      sources: { digikey: { hts: dkHts, eccn: dkEccn }, mouser: { hts: msHts, eccn: msEccn } },
+      sources: {
+        digikey: { hts: dkHts, eccn: dkEccn },
+        mouser: { hts: msHts, eccn: msEccn },
+        ...(cached ? { vqCache: { hts: cached.hts, eccn: cached.eccn } } : {}),
+      },
       resolved: {
         hts: htsResult.value,
         htsSource: htsResult.source,
@@ -338,10 +437,15 @@ async function main() {
     htsDisagreements: disagreements.filter(d => d.kind === 'hts').length,
     eccnDisagreements: disagreements.filter(d => d.kind === 'eccn').length,
     vqLinesToPatch: updates.length,
+    vqCacheFullHits: cacheFullHits,
+    vqCachePartialHits: cachePartialHits,
+    apiCallsAvoided: cacheFullHits,
   };
 
   console.log('=== Resolution Summary ===');
   console.log(`Distinct tuples queried:     ${stats.totalGroups}`);
+  console.log(`  served fully by VQ cache:  ${stats.vqCacheFullHits} (API calls avoided)`);
+  console.log(`  partial-cache + API:       ${stats.vqCachePartialHits}`);
   console.log(`  with resolved HTS:         ${stats.groupsWithHts}`);
   console.log(`  with resolved ECCN:        ${stats.groupsWithEccn}`);
   console.log(`  no data either side:       ${stats.groupsBothNull}`);
