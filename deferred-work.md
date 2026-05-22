@@ -26,6 +26,25 @@ The SessionStart greeting reads this file and surfaces all open items, sorted by
 
 ### Active workstreams (next session pickup)
 
+- [ ] 🟢 **LAM EPG SIPOC — POV0075254 / PO810397 update** *(opened 2026-05-22, picks up Monday 2026-05-25)*
+  - **Context:** Operator placed Arrow PO810397 today (2026-05-22, 11 lines, all stamped `POV0075254`). Need to backfill the SIPOC tracker at `Trading Analysis/LAM EPG Award/Lam_EPG_SIPOC.xlsx` with PO + Purchased By (Mohan, ad_user_id 1013586) + PO Sent (2026-05-22) + Processed in OT (Y) + OT Order Number. All 11 PO MPNs matched to SIPOC rows.
+  - **SIPOC column map (header on row 2 / index 1):** col 17=Qty (LAM sales commitment), 26=POV, 27=Purchased By, 28=PO Sent (date), 30=Processed in OT, 31=OT Order Number, 33=Notes, 34=Tracking.
+  - **Method:** Surgical zip-level patch + dated backup (`.backup-2026-05-25-pov75254`). Do NOT round-trip through SheetJS — destroys validations / customXml / styles per [[feedback_xlsx_roundtrip_destroys_forms]].
+  - **Three buckets (sales-anchored against SIPOC Qty):**
+    - **CLEAN FIRST PO (6 rows — safe to write):** rows 33 (254124-E qty 126), 39 (0826-1X2T-23-F qty 80), 46 (MOX91022505FTE qty 40), 134 (43160-0306 qty 125), 173 (EEEFK1V222SM qty 125), 202 (TSW-108-17-G-S qty 80). SIPOC Qty == PO qty exactly, no prior POs. Fill all 5 columns.
+    - **PLANNED SPLITS (3 rows — safe to append slash-separated):**
+      - Row 13 LP-CC-30: SIPOC qty 50 = Fuses 30 (PO809583/POV0075524) + Arrow 20 (PO810397/POV0075254). Notes confirm. ⚠️ Flag for operator: $24.03 vs $49.66 same-MFR price disparity worth understanding.
+      - Row 104 3299Z-1-202LF: SIPOC qty 175 = Master 16 shipped (not in OT) + Arrow 159 (PO810397). Notes already say "Arrow (159) still open" — today's PO is that leg finally cut.
+      - Row 106 0216.200MXP: SIPOC qty 250 = Arrow 110 (PO810397) + 140 remaining. POV0075257 reserved but no PO cut yet.
+    - **SOURCE CHANGE + COVERAGE GAP (1 row — safe to append, flag the gap):** Row 6 SHV24-1A85-78D3K: SIPOC qty 1000. DK 281 shipped (PO809612/POV0075252) + Arrow 288 (PO810397/POV0075254). 281+288=569; **431 units still uncovered** (POV0075257 reserved, no PO cut). Notes already say "DK repriced after order cancellation".
+    - **🚨 SUSPECTED DUPLICATE (1 row — DO NOT WRITE until operator verifies):** Row 43 R-7315P. Notes already claim `"Master qty (5) shipped 03/28 on 380029812239; Arrow (15) shipped on 518717946566 — fully shipped"` and Tracking column has `"518717946566 (Arrow x15)"`. SIPOC says the Arrow-15 leg was already done. Yet today's PO810397 cuts a fresh Arrow 15 @ $15.584. Either (a) prior shipment was outside OT — today's PO is a duplicate purchase; or (b) the tracking note was premature — today's PO is the real cut. **Verify before writing.**
+  - **Outstanding operator decisions before write:** (1) multi-POV rows: append slash-separated vs. only-fill-blanks vs. overwrite — operator leaned toward append slash-separated but didn't lock it in. (2) Notes line append per row in the existing dated format `[2026-05-22] Arrow POV0075254 / PO810397 placed — qty <X> @ $<Y>` — yes / no. (3) Row 43 duplicate verdict.
+  - **Additional cleanup candidates surfaced during review (not strictly POV0075254):**
+    - Orphan POV0075257 (planned but no PO cut) — used on rows 6 and 106 as reserved placeholder for remaining coverage
+    - Orphan POV0075267 (planned but no PO cut) — used on rows 43 and 104; Master shipments referenced in notes are NOT in OT under any POV stamp
+  - **Ready when:** Monday 2026-05-25 operator session. Three quick decisions, then surgical zip patch.
+  - **Source:** This session (2026-05-22) — operator placed PO810397 today and said "i need to piock this back up monday".
+
 - [ ] 🟢 **Claude Harris ROI digest — clarity pass** *(opened 2026-05-21)*
   - **Context:** Today added a GP column to `scripts/vq-enrichment-roi-tracker.js` (headline overview row + "Revenue Claude generated" detail box + all 9 row-level drill-in tables next to `Sold $` + the email subject line). New accumulator `revenueClaudeGeneratedPoNet` plumbed at all 4 branches (handoff / competing-VQ / solo / mirrorClaudeFirst). Live 30d window: Revenue $13,397 − PO Cost $4,408.73 = **GP $8,988.27 (~67% GM)**.
   - **What needs clarity tomorrow:** Several aspects of what the digest is actually documenting are murky and the headline numbers may not be saying what they look like they're saying. Things to walk through:
