@@ -277,6 +277,20 @@ async function loadBulkSummary({ rfqSearchKey, buyerId, quotes, dryRun = false }
           fuzzyMatch: !!lineMatch.fuzzy,
         });
         writtenByLine.set(lineMatch.lineNo, (writtenByLine.get(lineMatch.lineNo) || 0) + 1);
+      } else if (result.skipped && result.skipped.length > 0) {
+        // writeVQFromAPI routes pre-existing duplicates (and other intentional
+        // no-writes) to skipped[]. Surface that bucket here — otherwise the
+        // breadcrumb mis-counts duplicates as `failed`, which is exactly what
+        // bit UID 8541 (RFQ 1133479) on 5/21: 58 dups from the 5/20 sister
+        // load came back as `failed: 73, detail: unknown` because this branch
+        // wasn't reading result.skipped[].
+        const s = result.skipped[0];
+        skipped.push({
+          ...q,
+          reason: s.reason || 'WRITER_SKIPPED',
+          detail: s.detail || `Writer skipped: ${s.reason || 'unknown'}`,
+          vqLineId: s.vqLineId || null,
+        });
       } else {
         const flagDetail = result.flagged.concat(result.failed);
         failed.push({
