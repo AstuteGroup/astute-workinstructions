@@ -77,6 +77,45 @@ async function action_load_offer(payload, ctx) {
     };
   }
 
+  // ── Message-ID idempotency guard ─────────────────────────────────────────
+  // chuboe_offer has no row-level natural key — same customer can legitimately
+  // send overlapping excess offers next week. Dedup belongs at the handler
+  // layer, keyed on the source email's Message-ID. See [[feedback_parallel_writer_audit]]
+  // and shared/breadcrumbs.js hasMessageIdAlreadyLoaded().
+  //
+  // Uses ctx.currentMessageId (poller-parsed, deterministic). The agent does
+  // NOT need to pass messageId in the payload — the poller surfaces it on
+  // every handler invocation via the ctx object.
+  const dedupMessageId = ctx.currentMessageId;
+  if (dedupMessageId) {
+    const dupCheck = breadcrumbs.hasMessageIdAlreadyLoaded(dedupMessageId, {
+      cog: 'offer-poller',
+      events: ['loaded'],
+    });
+    if (dupCheck.loaded) {
+      breadcrumbs.write({
+        cog: 'offer-poller',
+        event: 'already-loaded-skip',
+        uid: ctx.uid,
+        messageId: dedupMessageId,
+        prior_uid: dupCheck.breadcrumb.uid,
+        prior_offer_id: dupCheck.breadcrumb.offerId,
+        prior_search_key: dupCheck.breadcrumb.searchKey,
+        prior_ts: dupCheck.breadcrumb.ts,
+      });
+      return {
+        already_processed: true,
+        messageId: dedupMessageId,
+        prior: {
+          offerId: dupCheck.breadcrumb.offerId,
+          searchKey: dupCheck.breadcrumb.searchKey,
+          ts: dupCheck.breadcrumb.ts,
+          uid: dupCheck.breadcrumb.uid,
+        },
+      };
+    }
+  }
+
   const result = await writeOffer({
     bpartnerId,
     offerTypeId: offerType,
@@ -90,6 +129,9 @@ async function action_load_offer(payload, ctx) {
     event: 'loaded',
     uid: ctx.uid,
     sourceUid: sourceUid || ctx.uid,
+    // messageId persisted so the next tick's hasMessageIdAlreadyLoaded() can
+    // detect replays. Was missing pre-2026-05-22.
+    messageId: ctx.currentMessageId || null,
     bpartnerId,
     offerType,
     offerId: result.offerId,

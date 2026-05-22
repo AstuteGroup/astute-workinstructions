@@ -96,11 +96,69 @@ function prune(cutoffMs = Date.now() - 7 * 24 * 60 * 60 * 1000) {
   return { kept, dropped };
 }
 
+/**
+ * Has this Message-ID already been successfully loaded by any handler?
+ *
+ * Used as a cross-workflow idempotency guard: each email-driven workflow
+ * checks this before re-invoking its writer, so manual re-routes / replays
+ * / accidental re-polls do not create duplicate RFQs, offers, etc.
+ *
+ * The breadcrumb log is the source of truth (no active prune as of 2026-05-22,
+ * so the history is durable — if a prune cron is later added, retention must
+ * exceed the longest replay window we want to defend against).
+ *
+ * @param {string} messageId - RFC822 Message-ID to look up (including angle brackets)
+ * @param {object} [opts]
+ * @param {string[]} [opts.events] - Event names that count as "successfully loaded".
+ *   Default: ['loaded', 'cq-loaded', 'cq-loaded-with-rfq', 'offer-loaded',
+ *             'rfq-loaded']. Match is exact, not substring.
+ * @param {string|string[]} [opts.cog] - Optional cog filter (e.g.,
+ *   'vq-loading-agent' or ['stockrfq-agent','rfq-loading-agent']).
+ * @param {string} [opts.field] - Which breadcrumb field to match against.
+ *   Default: 'messageId'. Can be set to 'brokerMessageId' to match the broker's
+ *   original Message-ID instead of Outlook's auto-forward wrapper.
+ * @returns {{loaded: boolean, breadcrumb: object|null}}
+ */
+function hasMessageIdAlreadyLoaded(messageId, opts = {}) {
+  if (!messageId || typeof messageId !== 'string') {
+    return { loaded: false, breadcrumb: null };
+  }
+  const DEFAULT_EVENTS = [
+    'loaded',
+    'cq-loaded',
+    'cq-loaded-with-rfq',
+    'offer-loaded',
+    'rfq-loaded',
+  ];
+  const events = new Set(Array.isArray(opts.events) && opts.events.length ? opts.events : DEFAULT_EVENTS);
+  const cogs = opts.cog
+    ? new Set(Array.isArray(opts.cog) ? opts.cog : [opts.cog])
+    : null;
+  const field = opts.field || 'messageId';
+
+  if (!fs.existsSync(BREADCRUMB_FILE)) return { loaded: false, breadcrumb: null };
+  const raw = fs.readFileSync(BREADCRUMB_FILE, 'utf8');
+  // Reverse scan so the most recent match wins (callers see the latest load).
+  const lines = raw.split('\n');
+  for (let i = lines.length - 1; i >= 0; i--) {
+    const line = lines[i];
+    if (!line.trim()) continue;
+    let obj;
+    try { obj = JSON.parse(line); } catch (e) { continue; }
+    if (!events.has(obj.event)) continue;
+    if (cogs && !cogs.has(obj.cog)) continue;
+    if (obj[field] !== messageId) continue;
+    return { loaded: true, breadcrumb: obj };
+  }
+  return { loaded: false, breadcrumb: null };
+}
+
 module.exports = {
   write,
   readSince,
   readAll,
   prune,
+  hasMessageIdAlreadyLoaded,
   BREADCRUMB_FILE,
   ROOT,
 };
