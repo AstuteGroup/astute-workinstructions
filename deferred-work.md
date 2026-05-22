@@ -26,6 +26,17 @@ The SessionStart greeting reads this file and surfaces all open items, sorted by
 
 ### Active workstreams (next session pickup)
 
+- [ ] 🟢 **Claude Harris ROI digest — clarity pass** *(opened 2026-05-21)*
+  - **Context:** Today added a GP column to `scripts/vq-enrichment-roi-tracker.js` (headline overview row + "Revenue Claude generated" detail box + all 9 row-level drill-in tables next to `Sold $` + the email subject line). New accumulator `revenueClaudeGeneratedPoNet` plumbed at all 4 branches (handoff / competing-VQ / solo / mirrorClaudeFirst). Live 30d window: Revenue $13,397 − PO Cost $4,408.73 = **GP $8,988.27 (~67% GM)**.
+  - **What needs clarity tomorrow:** Several aspects of what the digest is actually documenting are murky and the headline numbers may not be saying what they look like they're saying. Things to walk through:
+    1. The "Revenue Claude generated" box header says "Sum of the two paths below" but the accumulator also fires on the **solo** branch (`winBotSoleSolo`, no human involvement at all) and the **competing-VQ** branch (`winBotSoleAdoptedCompetingVq`, human wrote a competing VQ but Claude's was ticked). So Total != handoff + mirrorClaudeFirst — there are 4 contributors, only 2 are displayed. Either fix the description or add the missing 2 sub-rows.
+    2. Per-bucket GP isn't broken out in that box (em-dash placeholder on the two displayed sub-rows). To do per-bucket GP cleanly, add `winBotSoleAdoptedHandoffPoNet` / `winMirrorClaudeFirstPoNet` accumulators in parallel with the existing `*Net` ones.
+    3. `adoption.poNet` and `revenueClaudeGeneratedPoNet` are nearly equal (4,411.53 vs 4,408.73 in today's window). Worth understanding what the $2.80 gap represents — likely 1-2 adoption-procurement lines that weren't classified as wins.
+    4. The "Process efficiency (LAM + Stock)" row shows PO cost only, no revenue/GP — operator might want LAM/Stock revenue + GP tracked too, even if reported separately (per [[feedback_roi_framing_winning_vs_efficiency]] they're not "wins", but the dollar value still exists).
+    5. The window classification (processOrder <60min / needsReview 1-24h / realSourcing 24h+) — should walk through how a single sourced part can land in different buckets and whether the thresholds are still right.
+  - **Ready when:** Next session with the operator at hand. This is a discussion + iterate pass on `vq-enrichment-roi-tracker.js`, not autonomous work.
+  - **Source:** This session (2026-05-21) — operator said "tomorrow we need to get better clarity on some of what it's documenting" after the GP column landed.
+
 - [ ] ✅ **Continuation-row vendor inference — SHIPPED 2026-05-20** *(opened + delivered same day)*
   - Added § 3.7.0b to `agent-prompt.txt`: when a sub-quote row has price+qty but no explicit vendor name, inherit the vendor from the most recent preceding row that did. Stamps `vendorNotes: 'tier N — vendor inherited from preceding row'` for audit. Includes explicit boundary rules (new MPN block / new explicit vendor / clearly-different pricing all reset the inheritance). Concrete worked example: today's PGC tier-2 ESDLIN1524BJ.
 
