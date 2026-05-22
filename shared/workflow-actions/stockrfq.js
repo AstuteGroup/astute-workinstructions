@@ -25,6 +25,7 @@ const crypto = require('crypto');
 
 const { writeRFQ } = require('../rfq-writer');
 const breadcrumbs = require('../breadcrumbs');
+const writerAttribution = require('../writer-attribution');
 const { createGate } = require('../large-payload-gate');
 const { makeApprovalActions } = require('./_approval');
 
@@ -310,6 +311,15 @@ async function doWriteRFQ(payload, ctx) {
     errorCount: result.errors.length,
     priceCheck: priceCheck === true,
     priceCheckReason: priceCheck === true ? (priceCheckReason || null) : undefined,
+  });
+
+  // Per-row failure attribution. rfq-writer returns errors[] as bare strings
+  // (count-style); persistWriterDetails handles both shapes. Persisted to disk
+  // so an error string isn't lost the moment the handler returns.
+  writerAttribution.persistWriterDetails({
+    workflow: 'stockrfq',
+    ctx,
+    result,
   });
 
   return {

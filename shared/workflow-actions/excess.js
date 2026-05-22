@@ -20,6 +20,7 @@ const fs = require('fs');
 const path = require('path');
 
 const { writeOffer } = require('../offer-writeback');
+const writerAttribution = require('../writer-attribution');
 const offerRouter = require('../offer-router');
 const breadcrumbs = require('../breadcrumbs');
 const pending = require('../workflow-pending-state');
@@ -138,6 +139,14 @@ async function action_load_offer(payload, ctx) {
     searchKey: result.searchKey,
     linesWritten: result.linesWritten,
     errorCount: result.errors.length,
+  });
+
+  // Per-row error attribution. offer-writeback returns errors[] as bare strings;
+  // persistWriterDetails handles both bucket-style and count-style.
+  writerAttribution.persistWriterDetails({
+    workflow: 'excess',
+    ctx,
+    result,
   });
 
   // ── Large-offer gate around offer-router.dispatch ────────────────────────

@@ -30,6 +30,7 @@ const { loadBulkSummary } = require('../load-bulk-summary');
 const { isKnownBuyer, isKnownSupport, resolveBuyerFromRegistry } = require('../partner-lookup');
 const pending = require('../workflow-pending-state');
 const breadcrumbs = require('../breadcrumbs');
+const writerAttribution = require('../writer-attribution');
 
 const JAKE_USER_ID = 1000004;
 
@@ -327,6 +328,18 @@ async function action_load_vq(payload, ctx) {
         }));
       appendAttribution(attribRows);
     }
+
+    // Per-row failure + skip attribution. Companion to the breadcrumb COUNT
+    // summary — captures the writer's per-quote reason+detail to disk so
+    // post-mortems do not need an agent replay. See shared/writer-attribution.js
+    // header; primary trigger was Ivy 5/21 UID 8541 where 73 "failed" carried
+    // detail='unknown' and we could not tell why each fell over.
+    writerAttribution.persistWriterDetails({
+      workflow: 'vq-loading',
+      ctx,
+      result,
+    });
+
     if (result.written.length > 0) totals.rfqsWritten += 1;
     totals.vqsWritten += result.written.length;
     totals.vqsSkipped += result.skipped.length;

@@ -20,6 +20,7 @@
 
 const { writeRFQ } = require('../rfq-writer');
 const { writeCQBatch } = require('../cq-writer');
+const writerAttribution = require('../writer-attribution');
 const { patchRecord } = require('../record-updater');
 const breadcrumbs = require('../breadcrumbs');
 
@@ -105,6 +106,13 @@ async function action_add_cq(payload, ctx) {
     cqsFailed: result.failed.length,
     cqsSkipped: (result.skipped || []).length,
     priceCheck: priceCheck === true,
+  });
+
+  // Per-row failure + skip attribution — see shared/writer-attribution.js
+  writerAttribution.persistWriterDetails({
+    workflow: 'stockrfq-cq',
+    ctx,
+    result,
   });
 
   return {
@@ -219,6 +227,13 @@ async function action_add_cq_with_rfq(payload, ctx) {
     cqsFlagged: cqResult.flagged.length,
     cqsFailed: cqResult.failed.length,
     cqsSkipped: (cqResult.skipped || []).length,
+  });
+
+  // Per-row failure + skip attribution — see shared/writer-attribution.js
+  writerAttribution.persistWriterDetails({
+    workflow: 'stockrfq-cq',
+    ctx,
+    result: cqResult,
   });
 
   return {
