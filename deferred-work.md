@@ -45,16 +45,32 @@ The SessionStart greeting reads this file and surfaces all open items, sorted by
   - **Ready when:** Monday 2026-05-25 operator session. Three quick decisions, then surgical zip patch.
   - **Source:** This session (2026-05-22) — operator placed PO810397 today and said "i need to piock this back up monday".
 
-- [ ] 🟢 **Claude Harris ROI digest — clarity pass** *(opened 2026-05-21)*
-  - **Context:** Today added a GP column to `scripts/vq-enrichment-roi-tracker.js` (headline overview row + "Revenue Claude generated" detail box + all 9 row-level drill-in tables next to `Sold $` + the email subject line). New accumulator `revenueClaudeGeneratedPoNet` plumbed at all 4 branches (handoff / competing-VQ / solo / mirrorClaudeFirst). Live 30d window: Revenue $13,397 − PO Cost $4,408.73 = **GP $8,988.27 (~67% GM)**.
-  - **What needs clarity tomorrow:** Several aspects of what the digest is actually documenting are murky and the headline numbers may not be saying what they look like they're saying. Things to walk through:
-    1. The "Revenue Claude generated" box header says "Sum of the two paths below" but the accumulator also fires on the **solo** branch (`winBotSoleSolo`, no human involvement at all) and the **competing-VQ** branch (`winBotSoleAdoptedCompetingVq`, human wrote a competing VQ but Claude's was ticked). So Total != handoff + mirrorClaudeFirst — there are 4 contributors, only 2 are displayed. Either fix the description or add the missing 2 sub-rows.
-    2. Per-bucket GP isn't broken out in that box (em-dash placeholder on the two displayed sub-rows). To do per-bucket GP cleanly, add `winBotSoleAdoptedHandoffPoNet` / `winMirrorClaudeFirstPoNet` accumulators in parallel with the existing `*Net` ones.
-    3. `adoption.poNet` and `revenueClaudeGeneratedPoNet` are nearly equal (4,411.53 vs 4,408.73 in today's window). Worth understanding what the $2.80 gap represents — likely 1-2 adoption-procurement lines that weren't classified as wins.
-    4. The "Process efficiency (LAM + Stock)" row shows PO cost only, no revenue/GP — operator might want LAM/Stock revenue + GP tracked too, even if reported separately (per [[feedback_roi_framing_winning_vs_efficiency]] they're not "wins", but the dollar value still exists).
-    5. The window classification (processOrder <60min / needsReview 1-24h / realSourcing 24h+) — should walk through how a single sourced part can land in different buckets and whether the thresholds are still right.
-  - **Ready when:** Next session with the operator at hand. This is a discussion + iterate pass on `vq-enrichment-roi-tracker.js`, not autonomous work.
-  - **Source:** This session (2026-05-21) — operator said "tomorrow we need to get better clarity on some of what it's documenting" after the GP column landed.
+- [ ] 🟢 **Claude Harris ROI digest — clarity pass (continuation)** *(opened 2026-05-21, big iteration shipped 2026-05-22)*
+  - **Shipped 2026-05-22 (this session):**
+    1. Removed the vestigial 3-row "Sales (Adoption — correlative)" table + its dead `direct_win` CTE / aggregates. Causal sales attribution now lives only in Revenue-Claude-Generated + Sold-line win attribution.
+    2. **Dual-window view** — every scoped table (Procurement, Revenue Claude generated, Process-order per-seller, Sold-line win attribution) now shows trailing-30d AND since-inception (cumulative) columns side-by-side. Blue banner explains the dual-window convention. Inception date queried at runtime (2026-04-07).
+    3. **Process-order per-seller table moved** directly under the Winning Business (Adoption) window table. Added columns: Non-Claude VQs (with avg/line), 🔎 Claude cheaper applicable lines, 💸 GP lost (= (purchased cost − Claude cost) × RFQ qty across qty-applicable cheaper-VQ lines).
+    4. **Scope filter (1) — email-load echoes:** non-franchise Claude VQs written AFTER a human VQ on the same line are dropped from `api_vq`. These are the VQ-loader agent digitizing inbound broker emails on already-active lines — not sourcing.
+    5. **Scope filter (2) — post-SO backfills:** any Claude VQ written AFTER a sold CQ already exists on the line is dropped. Desktop scrape (Heilind etc.) catching up after the deal closed; can't have influenced sourcing.
+    6. **Title changed** "API Enrichment ROI" → "Sourcing ROI" (matches the broader Claude-as-Buyer scope: API enrichment + NetComp broker agent + LAM Kitting + scrapes).
+    7. **MPN selection fix** — multi-MPN/AVL lines now pick the MPN that matches an actual VQ on the line (IsPurchased VQ preferred, then any VQ, fallback to lowest `chuboe_rfq_line_mpn_id`). Validated on RFQ 1135097 — drill now shows Yageo `RC0100FR-07100KL` (the part actually quoted) instead of the KOA AVL alternate.
+    8. **Workflow-context footnote** on the Process-order section showing org-level Adoption RFQ→sold-CQ <60min count, independent of Claude. Today: 163 lines/30d, Claude active pre-sale on 8. The other 155 are "what-if" — surfaced as a count so the workflow signal is visible but per-seller granularity is reserved for the Claude-active subset where money-on-table is provable.
+  - **Discoveries / framing decisions made (carry forward):**
+    - Distinction nailed: **Claude as Sourcing Buyer** (API enrichment, NetComp agent, LAM Kitting, scrapes) vs **Claude as VQ Support** (email-loader digitization). Tracker is scoped to the former.
+    - Mirror parent revenue dropped $32K → $13K post-filter; remaining $13K (Sanmina + GE Aerospace) is legitimate Claude-first franchise mirror.
+    - Coverage Gap miss revenue went 1/$40K → 0/$0 — Marvell RFQ 1134154 was Heilind post-SO backfill, correctly removed.
+    - Buyer-pre-loaded pattern (first human VQ <Xmin after RFQ creation) is the buy-side analog of seller process-order RFQs. Logged but not wired in.
+    - **Truth-over-helpfulness check:** operator explicitly flagged not wanting to manipulate variables to suit outcome — filters keep signal honest, footnote keeps the workflow signal visible even when it's outside Claude attribution.
+  - **Still open (next session):**
+    1. `winBotSoleSolo` + `winBotSoleAdoptedCompetingVq` still contribute to `revenueClaudeGeneratedNet` but only handoff + mirrorClaudeFirst are displayed in the Revenue Claude generated box. Either fix description or add the missing 2 sub-rows.
+    2. Per-bucket GP isn't broken out in that box (em-dash placeholder). Add `winBotSoleAdoptedHandoffPoNet` / `winMirrorClaudeFirstPoNet` accumulators for per-sub-row GP.
+    3. `adoption.poNet` vs `revenueClaudeGeneratedPoNet` $2.80 gap — likely 1-2 lines not classified as wins.
+    4. LAM/Stock revenue + GP tracking under Process Efficiency (currently PO cost only).
+    5. Window classification (processOrder <60min / needsReview 1-24h / realSourcing 24h+) thresholds review.
+    6. Buyer-pre-loaded pattern — if it shows up frequently, surface as parallel signal.
+    7. Replica-lag / late-toggling investigation: misses that appear in one run and not another due to IsPurchased/IsSold flags being toggled later. Operator asked whether we can audit via `ad_changelog`.
+  - **Ready when:** Next session with operator at hand. Discussion + iterate pass, not autonomous.
+  - **Source:** Sessions 2026-05-21 (GP column landed) and 2026-05-22 (clarity pass main iteration).
 
 - [ ] ✅ **Continuation-row vendor inference — SHIPPED 2026-05-20** *(opened + delivered same day)*
   - Added § 3.7.0b to `agent-prompt.txt`: when a sub-quote row has price+qty but no explicit vendor name, inherit the vendor from the most recent preceding row that did. Stamps `vendorNotes: 'tier N — vendor inherited from preceding row'` for audit. Includes explicit boundary rules (new MPN block / new explicit vendor / clearly-different pricing all reset the inheritance). Concrete worked example: today's PGC tier-2 ESDLIN1524BJ.
