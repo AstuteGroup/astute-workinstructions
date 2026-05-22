@@ -31,6 +31,7 @@ const { isKnownBuyer, isKnownSupport, resolveBuyerFromRegistry } = require('../p
 const pending = require('../workflow-pending-state');
 const breadcrumbs = require('../breadcrumbs');
 const writerAttribution = require('../writer-attribution');
+const { notifyHighFailureRate } = require('../failure-rate-gate');
 
 const JAKE_USER_ID = 1000004;
 
@@ -337,6 +338,19 @@ async function action_load_vq(payload, ctx) {
     writerAttribution.persistWriterDetails({
       workflow: 'vq-loading',
       ctx,
+      result,
+    });
+
+    // Rate-based escalation gate. If the batch came back with an unhealthy
+    // failure rate (writer-side) or non-dup-skip rate (resolver gap),
+    // breadcrumb the signal and ping the operator immediately. See
+    // shared/failure-rate-gate.js header — Ivy UID 8541's silent-fail-for-24h
+    // is exactly the case this defends against.
+    await notifyHighFailureRate({
+      cog: 'vq-loading-agent',
+      workflow: 'VQ Loading',
+      ctx,
+      target: targetKey,
       result,
     });
 

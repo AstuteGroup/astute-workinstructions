@@ -21,6 +21,7 @@
 const { writeRFQ } = require('../rfq-writer');
 const { writeCQBatch } = require('../cq-writer');
 const writerAttribution = require('../writer-attribution');
+const { notifyHighFailureRate } = require('../failure-rate-gate');
 const { patchRecord } = require('../record-updater');
 const breadcrumbs = require('../breadcrumbs');
 
@@ -113,6 +114,11 @@ async function action_add_cq(payload, ctx) {
     workflow: 'stockrfq-cq',
     ctx,
     result,
+  });
+
+  await notifyHighFailureRate({
+    cog: 'stockrfq-cq-agent', workflow: 'Stock RFQ → CQ',
+    ctx, target: rfqSearchKey, result,
   });
 
   return {
@@ -234,6 +240,11 @@ async function action_add_cq_with_rfq(payload, ctx) {
     workflow: 'stockrfq-cq',
     ctx,
     result: cqResult,
+  });
+
+  await notifyHighFailureRate({
+    cog: 'stockrfq-cq-agent', workflow: 'Stock RFQ → CQ',
+    ctx, target: rfqResult.searchKey, result: cqResult,
   });
 
   return {
