@@ -153,12 +153,22 @@ function matchMpnToLine(quotedMpn, lines) {
       if (normalizeMpnForMatch(m.mpn) === target) return { ...ln, matchedMpn: m.mpn };
     }
   }
-  // Partial: target is a prefix of an accepted MPN, or vice versa, with min overlap of 8 chars
+  // Partial: one MPN is a strict prefix of the other (packaging suffix etc.).
+  //
+  // Threshold: the SHORTER side must be ≥ 6 chars. Symmetric ≥8 (the older
+  // gate) over-rejected — RFQ MPNs like FSM17PL (7 chars) couldn't accept
+  // any cross-ref offer because the length check failed before the prefix
+  // check ran (UID 8541, Ivy 5/21 — Wellida FSM17PL-TP rejected upstream of
+  // the writer's cross-ref classifier). Asymmetric ≥6 keeps the false-
+  // positive guard (no 3-4 char prefix collisions) while admitting real
+  // packaging-variant cross-refs. The writer's cross-ref classifier is the
+  // downstream gate that decides auto-approve vs. flag.
   for (const ln of lines) {
     for (const m of ln.mpns) {
       const accepted = normalizeMpnForMatch(m.mpn);
-      if (accepted.length >= 8 && target.length >= 8) {
-        if (accepted.startsWith(target) || target.startsWith(accepted)) {
+      if (accepted.startsWith(target) || target.startsWith(accepted)) {
+        const shorter = Math.min(accepted.length, target.length);
+        if (shorter >= 6) {
           return { ...ln, matchedMpn: m.mpn, fuzzy: true };
         }
       }
