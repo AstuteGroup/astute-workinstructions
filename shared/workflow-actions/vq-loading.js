@@ -1325,7 +1325,13 @@ function esc(s) {
  *   - senderUsed null   → operator-only mode (legacy behavior preserved)
  */
 function resolveOutreachRecipients(payload, ctx) {
-  const candidate = (payload.senderEmail || payload.outerFrom || '').trim();
+  // Prefer the poller's parsed envelope From (ctx.currentFrom) over agent-
+  // supplied outerFrom. The agent's outerFrom drifts under load on complex
+  // forwards (e.g., UID 8598 2026-05-22: agent set outerFrom=betty.song
+  // when the envelope From was actually ivy.song, sending the escalation
+  // email to the wrong person). The poller-parsed value is deterministic.
+  const fromCtx = (ctx && ctx.currentFrom) ? String(ctx.currentFrom).trim() : '';
+  const candidate = fromCtx || (payload.senderEmail || payload.outerFrom || '').trim();
   // Reject the obvious anti-self-send cases. We DO allow Astute-internal
   // forwarders (Gopal compiling a Type 2 summary) — they may be the one
   // who can answer the question.
@@ -1335,9 +1341,28 @@ function resolveOutreachRecipients(payload, ctx) {
   if (ctx.inbox && candidate.toLowerCase() === ctx.inbox.toLowerCase()) {
     return { to: ctx.jakeEmail, cc: null, senderUsed: null };
   }
+  // Build CC: operator (Jake) + any Astute-internal addresses that were
+  // already on the original envelope Cc. Policy (operator-stated 2026-05-22):
+  // "CC the support first and let them address the buyer as needed, unless
+  // they're also directly in CC." So Betty (the buyer behind Betty→Ivy→vq
+  // forwards) gets CC'd ONLY when she was on the outer envelope Cc; otherwise
+  // Ivy (TO) handles the loop-in.
+  const ccSet = new Set();
+  if (ctx.jakeEmail) ccSet.add(ctx.jakeEmail.toLowerCase());
+  if (ctx && ctx.currentCc) {
+    const ADDR_RE = /[A-Za-z0-9._+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}/g;
+    for (const addr of String(ctx.currentCc).match(ADDR_RE) || []) {
+      const lower = addr.toLowerCase();
+      if (lower === candidate.toLowerCase()) continue;
+      if (ctx.inbox && lower === ctx.inbox.toLowerCase()) continue;
+      // Only include @astutegroup.com addresses — don't loop external
+      // brokers into operator-internal escalations.
+      if (lower.endsWith('@astutegroup.com')) ccSet.add(lower);
+    }
+  }
   return {
     to: candidate,
-    cc: ctx.jakeEmail,
+    cc: Array.from(ccSet).join(', '),
     senderUsed: candidate,
   };
 }
