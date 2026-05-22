@@ -662,7 +662,11 @@ async function writeVQFromAPI(rfqSearchKey, cpc, franchiseResults, opts = {}) {
     // bean callout resolve from Chuboe_MFR_Text. This is the same pattern as
     // rfq-writer.js (proven on RFQ 1132040, 2026-04-06). The text field is the
     // load-bearing one.
-    const mfrResult = resolveMfrForRow({ mfrText, mpn });
+    // consultMfrHistory: when lookupMfr (alias/cache/db/fuzzy) can't connect
+    // the raw label to a canonical chuboe_mfr row, fall back to "what id did
+    // we write last time we saw this label?" — see shared/mfr-from-vq-history.js.
+    // Same write-side defensive pattern as resolveBPHistorical for BPs.
+    const mfrResult = resolveMfrForRow({ mfrText, mpn, consultMfrHistory: true });
     // Sanitize the raw-text fallback — sanitizeMfrText drops U+FFFD
     // mojibake AND infrastructure-noise strings (psql password prompts,
     // fe_sendauth, etc.) so they cannot land in Chuboe_MFR_Text. Without

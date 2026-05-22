@@ -132,6 +132,7 @@ function resolveMfrForRow(opts = {}) {
     mfrText, mpn,
     applyAcquisitionMap = true,
     consultOTHistory = false,
+    consultMfrHistory = false,
   } = opts;
 
   // Path 1: text provided → mfr-lookup wins (Policy D #1: preserve source intent)
@@ -144,6 +145,35 @@ function resolveMfrForRow(opts = {}) {
   // results.
   if (mfrText && String(mfrText).trim()) {
     const result = lookupMfr(mfrText);
+
+    // Path 1.4 (opt-in): historical-VQ fallback for raw labels that lookupMfr
+    // couldn't connect to a canonical chuboe_mfr row. Mirrors
+    // partner-lookup.resolveBPHistorical on the MFR axis. When the same raw
+    // label has been previously resolved by another load (often via fuzzy or
+    // operator correction), reuse that id. Filtered to non-system MFRs only —
+    // system IDs (ad_client_id=0) would trip the bean callout on client writes.
+    // Opt-in via consultMfrHistory so non-write callers (Vortex / Quick Quote /
+    // analysis) don't take the DB hit on a miss.
+    if (!result.matched && consultMfrHistory) {
+      let hist = null;
+      try {
+        const { resolveMfrFromVqHistory } = require('./mfr-from-vq-history');
+        hist = resolveMfrFromVqHistory(mfrText);
+      } catch (_) { /* fall through to pass-through below */ }
+      if (hist && hist.id) {
+        return {
+          matched: true,
+          canonical: hist.name,
+          id: hist.id,
+          isSystem: false,
+          path: 'text',
+          source: `historical-vq(${hist.rowCount}/${hist.totalNonNull}, ${hist.ratio})`,
+          confidence: hist.ratio >= 0.90 ? 'high' : 'medium',
+          acquisitionApplied: false,
+        };
+      }
+    }
+
     return {
       matched: !!result.matched,
       canonical: result.canonical || null,

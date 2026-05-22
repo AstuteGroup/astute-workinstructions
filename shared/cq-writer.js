@@ -243,7 +243,7 @@ async function resolveMfrForCQ(mfrText, mpn) {
   // own OT trading history labels this MPN with (operator-vetted: sold CQs +
   // purchased VQs are money-changed-hands) over a prefix guess that's subject
   // to known overreach. See shared/mfr-from-ot-history.js.
-  const mfrResult = resolveMfrForRow({ mfrText, mpn, consultOTHistory: true });
+  const mfrResult = resolveMfrForRow({ mfrText, mpn, consultOTHistory: true, consultMfrHistory: true });
 
   if (!mfrResult.matched) {
     return { id: null, canonical: mfrText || null, flagReason: FLAG.MFR_NO_MATCH, path: mfrResult.path };
