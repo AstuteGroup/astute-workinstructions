@@ -81,6 +81,9 @@ function createNotifier({ fromEmail, fromName, smtpUser, smtpPass } = {}) {
 
     // opts.html=true → send `body` as HTML instead of plain text
     // opts.cc, opts.bcc, opts.replyTo → passthrough to nodemailer
+    // opts.messageId → pre-assign the RFC822 Message-ID header (used by the
+    //   cross-workflow forward+park pattern so the sender knows the M-ID
+    //   the receiving workflow will see, before sendMail returns).
     const mailPayload = {
       from: `"${displayName}" <${fromEmail}>`,
       to: to,
@@ -89,6 +92,7 @@ function createNotifier({ fromEmail, fromName, smtpUser, smtpPass } = {}) {
     if (opts.cc) mailPayload.cc = opts.cc;
     if (opts.bcc) mailPayload.bcc = opts.bcc;
     if (opts.replyTo) mailPayload.replyTo = opts.replyTo;
+    if (opts.messageId) mailPayload.messageId = opts.messageId;
     if (opts.html) {
       mailPayload.html = body;
     } else {

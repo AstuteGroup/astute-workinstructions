@@ -243,6 +243,19 @@ module.exports = [
   },
 
   {
+    name: 'vq-loading-resumer',
+    cadence: 'every 10m',
+    // Offset +4 from the quarter-hour so we don't race vq-loading-agent
+    // (at :00/:05/:10/...) and don't race vq-watchlist (at :07/:22/:37/:52).
+    cadenceCron: '4,14,24,34,44,54 * * * *',
+    command: `node "${ASTUTE}/scripts/vq-loading-resumer.js"`,
+    cwd: ASTUTE,
+    needsOT: true,
+    logFile: '/tmp/vq-loading-resumer.log',
+    description: 'Every 10m — picks up parked VQ loads after rfq-loading creates a new RFQ. Walks ~/workspace/.vq-loading-pending/ for `kind=waiting_for_new_rfq` sidecars, correlates each against rfq-loader-daemon `rfq-loaded` breadcrumbs by Message-ID, and calls loadBulkSummary against the new RFQ\'s searchKey. Closes the cross-workflow vq→rfq forward-and-park loop. Idempotent: load-bulk-summary dedups via PRE_EXISTING_DUPLICATE so accidental double-fires write 0 dups. Sidecars past 7d TTL surface to operator via email.',
+  },
+
+  {
     name: 'offer-reply-parser',
     cadence: 'every 30m',
     // Offset by 5 min from poller so we're not fighting for the inbox lock

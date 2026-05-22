@@ -1299,6 +1299,161 @@ async function action_outbound_pending(payload, ctx) {
   return { reason: payload.reason || 'outbound reply' };
 }
 
+/**
+ * Forward an unprocessable block to the rfq-loading workflow so it can
+ * create the new RFQ(s), then park the pending VQ quotes in a sidecar so
+ * the resumer cron can load them once the new RFQ exists in OT.
+ *
+ * Cross-workflow pattern (vq-loading → rfq-loading → vq-loading-resumer):
+ *   1. vq-loading agent encounters MPN blocks that need new-RFQ creation
+ *      (no existing RFQ matches AND the operator's note specifies customer/
+ *      sales-rep/type, e.g. "Astute Group / Aran / Shortage").
+ *   2. This handler sends a synthesized RFQ-creation request to the
+ *      rfqloading@orangetsunami.com inbox. The email pre-assigns a
+ *      Message-ID we control so the resumer can correlate downstream.
+ *   3. A sidecar `kind='waiting_for_new_rfq'` parks the outstanding quotes
+ *      along with the assigned Message-ID and an expiry timestamp.
+ *   4. The rfq-loading agent processes the forward, enqueues to
+ *      rfq-loader-daemon. When the daemon writes `rfq-loaded`, the
+ *      breadcrumb's messageId matches our assigned MID.
+ *   5. `scripts/vq-loading-resumer.js` (separate cron) walks pending
+ *      sidecars, matches against rfq-loaded breadcrumbs by messageId,
+ *      and calls loadBulkSummary to write the parked quotes against the
+ *      newly-created RFQ's searchKey.
+ *
+ * Required payload:
+ *   customer        e.g., "Astute Group" — the customer name to give the
+ *                    new RFQ. The rfq-loading agent's partner-lookup resolves
+ *                    it; we don't need the BP ID here.
+ *   salesRep        e.g., "Aran" — Astute internal sales rep name. The
+ *                    rfq-loading agent's resolveAstuteUserByName picks it up.
+ *   type            'Stock' | 'Shortage' | 'PPV' | ...
+ *   lines           Array of { mpn, qty, mfr?, cpc?, description? } — what
+ *                    the new RFQ should contain. The rfq-loading agent
+ *                    extracts these from the synthesized body block.
+ *   pendingQuotes   Array of quote objects in load-bulk-summary shape
+ *                    ({ vendorName | vendorSearchKey, mpn, mfr, qty, cost,
+ *                       leadTime?, dateCode?, ...}). These are PARKED in the
+ *                    sidecar; the resumer loads them once the RFQ exists.
+ *
+ * Optional payload:
+ *   subject              For threading + sidecar audit
+ *   originalBodySnippet  Excerpt from the source email (for audit / context
+ *                         in the forwarded body)
+ *   reason               One-liner explaining why this is going to
+ *                         rfq-loading instead of escalating
+ */
+async function action_forward_to_rfq_loading(payload, ctx) {
+  const {
+    customer, salesRep, type, lines, pendingQuotes,
+    subject, originalBodySnippet, reason,
+  } = payload;
+
+  if (ctx.dryRun) {
+    return {
+      dry_run: true,
+      would_forward: {
+        to: 'rfqloading@orangetsunami.com',
+        customer, salesRep, type,
+        lineCount: Array.isArray(lines) ? lines.length : 0,
+        pendingQuoteCount: Array.isArray(pendingQuotes) ? pendingQuotes.length : 0,
+      },
+    };
+  }
+
+  // Pre-assigned Message-ID so the resumer can correlate the future
+  // rfq-loaded breadcrumb. Domain matches the from-address so SMTP doesn't
+  // rewrite the header.
+  const assignedMessageId = `<vq-forward-${ctx.uid}-${Date.now()}@orangetsunami.com>`;
+
+  // Synthesized summary header — the rfq-loading agent reads this first.
+  // Verbatim original body follows below for audit.
+  const linesTable = (lines || []).map(l =>
+    `<tr><td>${esc(l.mpn || '')}</td><td align="right">${esc(String(l.qty || ''))}</td><td>${esc(l.mfr || '')}</td><td>${esc(l.cpc || '')}</td><td>${esc(l.description || '')}</td></tr>`
+  ).join('\n');
+
+  const body = `<html><body style="font-family:Arial,sans-serif;font-size:13px">
+<h3 style="color:#246">RFQ creation request from VQ Loading workflow</h3>
+<p>The VQ loading workflow received an email containing offers for parts that don't have an existing RFQ. Per the operator instruction in that email, please create the RFQ as follows:</p>
+<table border="1" cellpadding="4" cellspacing="0" style="border-collapse:collapse;margin-bottom:12px">
+  <tr><th align="left">Field</th><th align="left">Value</th></tr>
+  <tr><td>Customer</td><td><b>${esc(customer)}</b></td></tr>
+  <tr><td>Sales rep (Astute operator-on-record)</td><td><b>${esc(salesRep)}</b></td></tr>
+  <tr><td>Type</td><td><b>${esc(type)}</b></td></tr>
+</table>
+
+<p><b>Lines to add (${(lines || []).length}):</b></p>
+<table border="1" cellpadding="4" cellspacing="0" style="border-collapse:collapse">
+  <tr><th>MPN</th><th>Qty</th><th>MFR</th><th>CPC</th><th>Description</th></tr>
+  ${linesTable}
+</table>
+
+<p style="color:#666;font-size:11px;margin-top:16px">The VQ loading workflow is parking ${(pendingQuotes || []).length} broker quote(s) on a sidecar. Once you write this RFQ to OT, the <code>vq-loading-resumer</code> cron will match by Message-ID and load those quotes against the new RFQ's search key. <b>No action needed beyond standard RFQ creation.</b></p>
+
+<p style="color:#999;font-size:10px;border-top:1px dashed #ccc;margin-top:16px;padding-top:8px">
+<i>Origin: vq@orangetsunami.com / UID ${ctx.uid}<br/>
+Original subject: ${esc(subject || '(no subject)')}<br/>
+Correlation Message-ID: <code>${esc(assignedMessageId)}</code><br/>
+Reason: ${esc(reason || 'new-RFQ-creation needed for parts without an existing RFQ match')}</i></p>
+
+${originalBodySnippet ? `<hr style="margin-top:16px"/>
+<p style="color:#666;font-size:11px"><i>Original email context for audit:</i></p>
+<pre style="background:#f5f5f5;padding:8px;white-space:pre-wrap;font-size:11px">${esc(originalBodySnippet.slice(0, 4000))}</pre>` : ''}
+</body></html>`;
+
+  await ctx.notifier.sendEmail(
+    'rfqloading@orangetsunami.com',
+    `[VQ→RFQ] New RFQ needed: ${customer} / ${type} / ${(lines || []).length} lines`,
+    body,
+    {
+      html: true,
+      messageId: assignedMessageId,
+    },
+  );
+
+  // Sidecar park. Keyed by ctx.anchorMessageId (original Ivy email's MID)
+  // so any future ticks against the same original email can find the
+  // pending state. The resumer scans by kind='waiting_for_new_rfq'.
+  const sidecarRecord = pending.writeSidecar(ctx.workflow, ctx.anchorMessageId || `vq-forward-${ctx.uid}`, {
+    kind: 'waiting_for_new_rfq',
+    original_uid: ctx.uid,
+    original_subject: subject || null,
+    original_message_id: ctx.anchorMessageId || null,
+    forwarded_to: 'rfqloading@orangetsunami.com',
+    forwarded_message_id: assignedMessageId,
+    forwarded_at: new Date().toISOString(),
+    correlation: { customer, salesRep, type },
+    expected_line_count: Array.isArray(lines) ? lines.length : 0,
+    pending_quotes: Array.isArray(pendingQuotes) ? pendingQuotes : [],
+    // 7-day expiry — if the RFQ hasn't been created by then, surface to
+    // operator. The resumer reads this; sidecars past TTL trigger an alert
+    // instead of silent drop.
+    expires_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
+  });
+
+  breadcrumbs.write({
+    cog: 'vq-loading-agent',
+    event: 'forwarded-to-rfq-loading',
+    uid: ctx.uid,
+    sourceUid: ctx.uid,
+    messageId: ctx.currentMessageId || ctx.anchorMessageId || null,
+    forwarded_message_id: assignedMessageId,
+    customer,
+    salesRep,
+    type,
+    line_count: Array.isArray(lines) ? lines.length : 0,
+    pending_quote_count: Array.isArray(pendingQuotes) ? pendingQuotes.length : 0,
+    sidecar_anchor: sidecarRecord && sidecarRecord.original_message_id,
+  });
+
+  return {
+    forwarded_to: 'rfqloading@orangetsunami.com',
+    forwarded_message_id: assignedMessageId,
+    parked_quote_count: Array.isArray(pendingQuotes) ? pendingQuotes.length : 0,
+    sidecar_kind: 'waiting_for_new_rfq',
+  };
+}
+
 // ─── HELPERS ─────────────────────────────────────────────────────────────────
 
 function esc(s) {
@@ -1456,6 +1611,15 @@ module.exports = {
       folder: 'OutboundPending',
       requires: ['reason'],
       handler: action_outbound_pending,
+    },
+    forward_to_rfq_loading: {
+      // Park the source email in OutboundPending (similar semantic: "we're
+      // waiting for something to come back"). The resumer cron moves it to
+      // Processed once the parked quotes are loaded successfully.
+      folder: 'OutboundPending',
+      requires: ['customer', 'salesRep', 'type', 'lines', 'pendingQuotes'],
+      keepsPending: true, // sidecar holds the parked state
+      handler: action_forward_to_rfq_loading,
     },
   },
   constants: {
