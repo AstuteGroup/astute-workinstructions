@@ -893,3 +893,24 @@ The validator checks date code, lead time, promise date, packaging, traceability
 - [Quick Quote](../Quick%20Quote/)
 - [shared/r-requests.md](../../../shared/r-requests.md) — approve-order canonical reference
 - [shared/vq-purchase-validator.js](../../../shared/vq-purchase-validator.js) — pre-flight gate for ticks
+
+---
+
+## Recent Changes
+
+Maintained as part of the cross-loader changelog discipline — see [`shared/loader-changelog.md`](../../../shared/loader-changelog.md) for the central index across ALL loaders, and `feedback_parallel_writer_audit.md` for why this discipline exists.
+
+**Before editing `shared/workflow-actions/vq-loading.js`, `shared/load-bulk-summary.js`, or this file**, scan the central changelog's last ~4 weeks for sibling-loader changes that may apply here.
+
+| Date | Change | Commit |
+|---|---|---|
+| 2026-05-22 | Cross-workflow forward+park (`forward_to_rfq_loading` action + `vq-loading-resumer` cron). When MPN blocks need a new RFQ AND the operator note specifies customer/sales/type, agent forwards to rfq-loading and parks the broker quotes; resumer picks up after RFQ exists. | `cb1ceb9` |
+| 2026-05-22 | Envelope-From determinism + multi-RFQ partition guidance. Poller now provides `ctx.currentFrom` / `ctx.currentCc`; `resolveOutreachRecipients` trusts these over agent-supplied values. Agent prompt §3.10.0(b'/b'') clarifies when to emit N `load_vq` calls vs `forward_to_rfq_loading`. | `5410587` |
+| 2026-05-22 | Clarify-suppression for vendors the writer already loaded. Filters `clarifications[]` against the agent's original vendor labels preserved on `writtenDetails.originalVendorLabel`. | `0d6f09d` |
+| 2026-05-22 | `matchMpnToLine` asymmetric ≥6 threshold (lets 7-char RFQ MPNs accept cross-ref offers). | `9452120` |
+| 2026-05-22 | Vendor alias tier in `resolveBP` (Tier 0). Curated `vendor-aliases.json` catches acronyms like XJH. Shared with all loaders. | `fefc2cc` |
+| 2026-05-22 | Historical-VQ fallback for raw MFR labels (write-side; opt-in `consultMfrHistory`). Wired into `vq-writer` + `cq-writer`. | `68a6ab3` |
+| 2026-05-22 | Historical-VQ fallback for short broker labels (`resolveBPHistorical`). Wired into `load-bulk-summary`. | `dfd896b` |
+| 2026-05-22 | Failure-rate gate — emails operator on unhealthy bulk-write outcomes. | `106abdb` |
+| 2026-05-22 | Writer-attribution per-row failure/skip log (`~/workspace/.writer-attribution.jsonl`) + self-anchoring regression test for the load-bulk-summary skipped propagation. | `9823ede` |
+| 2026-05-22 | `load-bulk-summary` propagates writer's `skipped[]` correctly (the original UID 8541 bug — duplicate VQs were being misclassified as "failed"). | `80c9c38` |

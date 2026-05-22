@@ -624,3 +624,16 @@ The existing `Trading Analysis/Stock RFQ Loading/stock-rfq-loading.md` workflow 
 - [VQ Loading](../RFQ%20Sourcing/vq_loading/vq-loading.md) — Similar two-agent extraction pattern
 - MFR Aliases: `../Market Offer Loading/mfr-aliases.json` (shared)
 - [Data Model](../../shared/data-model.md) — Schema reference for RFQ tables
+
+---
+
+## Recent Changes
+
+Maintained as part of the cross-loader changelog discipline — see [`shared/loader-changelog.md`](../../shared/loader-changelog.md) for the central index across ALL loaders.
+
+**Before editing `shared/workflow-actions/rfq-loading.js`, `scripts/rfq-loader-daemon.js`, `shared/rfq-writer.js`, or this file**, scan the central changelog's last ~4 weeks for sibling-loader changes that may apply here.
+
+| Date | Change | Commit |
+|---|---|---|
+| 2026-05-22 | Vendor alias tier in `resolveBP` (Tier 0). Shared with all loaders. | `fefc2cc` |
+| 2026-05-22 | Two-layer Message-ID dedup for the queue-backed write path. Handler-level (action_enqueue) checks for prior `rfq-loaded` breadcrumb; queue-level (rfq-load-queue.enqueue) refuses in-flight dups by Message-ID; daemon writes `rfq-loaded` breadcrumb on completion so the loop closes. Cross-workflow: vq-loading-resumer reads these breadcrumbs to resume parked VQ loads. | `b683323` |

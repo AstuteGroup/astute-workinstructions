@@ -195,3 +195,18 @@ Alternative (per the 2026-05-11 deferred-work entry, option a): **single combine
 - [Email-Driven Workflow Architecture](../../email-workflow-architecture.md) — top-level pattern doc
 - [CQ Writer module](../../shared/cq-writer.js) — `writeCQ` / `writeCQBatch` API
 - Deferred-work entry: `~/workspace/deferred-work.md` § "Outbound stock-RFQ quotes → CQs in OT" (2026-05-11)
+
+---
+
+## Recent Changes
+
+Maintained as part of the cross-loader changelog discipline — see [`shared/loader-changelog.md`](../../shared/loader-changelog.md) for the central index across ALL loaders.
+
+**Before editing `shared/workflow-actions/stockrfq-cq.js`, `shared/cq-writer.js`, or this file**, scan the central changelog's last ~4 weeks for sibling-loader changes that may apply here.
+
+| Date | Change | Commit |
+|---|---|---|
+| 2026-05-22 | Vendor alias tier in `resolveBP` (Tier 0). Shared with all loaders. | `fefc2cc` |
+| 2026-05-22 | Historical-VQ fallback for raw MFR labels (opt-in via `consultMfrHistory`). Wired into `resolveMfrForCQ`. | `68a6ab3` |
+| 2026-05-22 | Failure-rate gate (`notifyHighFailureRate`) wired into both `action_add_cq` and `action_add_cq_with_rfq`. | `106abdb` |
+| 2026-05-22 | Writer-attribution per-row failure/skip log wired into both `add_cq` paths. | `9823ede` |

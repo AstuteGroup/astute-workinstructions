@@ -608,3 +608,17 @@ Same columns as Reactive, plus:
 - [`shared/market-data.js`](../../shared/market-data.js) — demand-side enrichment cog
 - [`shared/api-result-writer.js`](../../shared/api-result-writer.js) — franchise result cache + DB
 - [`shared/data-model.md`](../../shared/data-model.md) § Offer Chain — schema reference
+
+---
+
+## Recent Changes
+
+Maintained as part of the cross-loader changelog discipline — see [`shared/loader-changelog.md`](../../shared/loader-changelog.md) for the central index across ALL loaders.
+
+**Before editing `shared/workflow-actions/excess.js`, `shared/offer-writeback.js`, or this file**, scan the central changelog's last ~4 weeks for sibling-loader changes that may apply here.
+
+| Date | Change | Commit |
+|---|---|---|
+| 2026-05-22 | Vendor alias tier in `resolveBP` (Tier 0). Shared with all loaders. | `fefc2cc` |
+| 2026-05-22 | Writer-attribution per-row failure log wired into `action_load_offer`. | `9823ede` |
+| 2026-05-22 | Handler-level Message-ID dedup via `breadcrumbs.hasMessageIdAlreadyLoaded()`. The `loaded` breadcrumb now persists `messageId` (was missing pre-fix) so future ticks can detect replays. Defends against manual IMAP folder-move replays and accidental re-polls. | `2a04ffe` |
