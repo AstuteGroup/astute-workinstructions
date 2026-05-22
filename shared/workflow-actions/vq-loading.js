@@ -365,9 +365,72 @@ async function action_load_vq(payload, ctx) {
 
   // Partial-load consolidated clarification: agent loaded the clean vendors,
   // now fire ONE email asking sender (CC operator) about everything else.
-  const clarifList = Array.isArray(clarifications)
+  let clarifList = Array.isArray(clarifications)
     ? clarifications.filter(c => c && c.vendorLabel && Array.isArray(c.asks) && c.asks.length > 0)
     : [];
+
+  // Suppress clarify sections for vendors the writer already resolved.
+  //
+  // Why: the agent's clarify decision and the writer's resolution decision
+  // run independently. The agent might flag "Savilter" as unknown while the
+  // writer's resolveBP (or the historical-VQ fallback added 2026-05-22)
+  // successfully fuzzy-matches it to "Saviliter Technology Co., Ltd" and
+  // writes the row. Without this filter, the operator gets a clarify email
+  // asking about a vendor that's already in OT — confusing and burns trust.
+  //
+  // Surfaced via UID 8563 (Ivy 5/22 RFQ 1135078): "Savilter" was
+  // simultaneously written as Saviliter AND included in the clarify list.
+  //
+  // Strategy: every quote the agent submitted carries vendorName/
+  // vendorSearchKey — those are the SAME label strings the agent used to
+  // build clarifications[]. The writer preserves the agent's original label
+  // on each written row (originalVendorLabel) and the writer's skipped[]
+  // entries spread `...q` so vendorName survives. We exact-match the
+  // clarify section's vendorLabel against those preserved labels — no
+  // fuzzy comparison needed, no risk of false-positive suppression on
+  // unrelated vendors with similar names.
+  if (clarifList.length > 0) {
+    const norm = s => String(s || '').toLowerCase().trim();
+    const resolvedLabels = new Set();   // exact agent labels that loaded OR pre-existed
+    for (const r of perRfqResults) {
+      for (const w of r.writtenDetails || []) {
+        if (w.originalVendorLabel) resolvedLabels.add(norm(w.originalVendorLabel));
+      }
+      for (const s of r.skippedDetails || []) {
+        if (s.reason !== 'PRE_EXISTING_DUPLICATE') continue;
+        // skipped entries spread the original quote, so vendorName /
+        // vendorSearchKey are the agent's labels verbatim.
+        if (s.vendorName)      resolvedLabels.add(norm(s.vendorName));
+        if (s.vendorSearchKey) resolvedLabels.add(norm(s.vendorSearchKey));
+      }
+    }
+
+    const suppressed = [];
+    const remaining = [];
+    for (const c of clarifList) {
+      const lbl = norm(c.vendorLabel);
+      if (lbl && resolvedLabels.has(lbl)) {
+        suppressed.push({ vendorLabel: c.vendorLabel, askCount: c.asks.length });
+      } else {
+        remaining.push(c);
+      }
+    }
+
+    if (suppressed.length > 0) {
+      breadcrumbs.write({
+        cog: 'vq-loading-agent',
+        event: 'clarify-suppressed-already-loaded',
+        uid: ctx.uid,
+        sourceUid: sourceUid || ctx.uid,
+        messageId: messageId || null,
+        primary_rfq: rfqSearchKey,
+        suppressed_count: suppressed.length,
+        suppressed_sections: suppressed,
+        remaining_count: remaining.length,
+      });
+    }
+    clarifList = remaining;
+  }
   // Derive loaded_vendors from the input quotes: any distinct vendor label
   // that appeared in the quotes[] is one the agent meant to load this tick.
   // Reply-tick agent uses this as the "DO NOT touch these on the reply" set.

@@ -301,6 +301,12 @@ async function loadBulkSummary({ rfqSearchKey, buyerId, quotes, dryRun = false }
           vqLineId: w.vqLineId, line: lineMatch.lineNo, mpn: q.mpn,
           vendor: bp.name, cost: q.cost, qty: q.qty,
           fuzzyMatch: !!lineMatch.fuzzy,
+          // Preserve the agent's original vendor label so handler-level
+          // clarify-suppression can exact-match agent labels (e.g., the
+          // 'Savilter' typo on UID 8563) without depending on canonical-name
+          // substring/fuzzy matching downstream.
+          originalVendorLabel: q.vendorName || q.vendorSearchKey || null,
+          bpId: bp.id,
         });
         writtenByLine.set(lineMatch.lineNo, (writtenByLine.get(lineMatch.lineNo) || 0) + 1);
       } else if (result.skipped && result.skipped.length > 0) {
