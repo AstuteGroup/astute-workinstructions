@@ -25,6 +25,7 @@ require('dotenv').config({ path: path.resolve(__dirname, '../../.env') });
 const { loadRFQ } = require('../shared/rfq-fast-loader');
 const queue = require('../shared/rfq-load-queue');
 const { logout } = require('../shared/api-client');
+const breadcrumbs = require('../shared/breadcrumbs');
 
 // ─── CONSTANTS ───────────────────────────────────────────────────────────────
 
@@ -163,6 +164,28 @@ async function runJob(item) {
     errors: result.errors.slice(0, 20),
     completedAt: new Date().toISOString(),
   });
+
+  // Stamp the breadcrumb that rfq-loading's action_enqueue checks for
+  // future replay detection. Includes messageId from the queue payload (set
+  // when the agent first enqueued) so hasMessageIdAlreadyLoaded() can match.
+  // See shared/workflow-actions/rfq-loading.js — action_enqueue § Message-ID
+  // idempotency guard for the receiving end of this contract.
+  try {
+    breadcrumbs.write({
+      cog: 'rfq-loader-daemon',
+      event: 'rfq-loaded',
+      jobId: item.id,
+      uid: item.payload && item.payload.sourceUid ? item.payload.sourceUid : null,
+      messageId: item.payload && item.payload.messageId ? item.payload.messageId : null,
+      rfqId: result.rfqId,
+      searchKey: result.searchKey,
+      linesWritten: totalWritten,
+      errorCount: result.errors.length,
+      finalStatus,
+    });
+  } catch (_) {
+    // best-effort — never fail the load completion on a breadcrumb write
+  }
 
   log(`Job ${item.id} ${finalStatus}: RFQ ${result.searchKey} (${result.rfqId}), ${totalWritten} lines, ${result.errors.length} errors, ${(result.elapsedMs / 1000).toFixed(1)}s`);
 }
