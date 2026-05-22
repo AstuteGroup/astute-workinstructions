@@ -51,6 +51,7 @@
 const { execFileSync } = require('child_process');
 const { writeVQFromAPI } = require('./vq-writer');
 const { resolveBP } = require('./api-client');
+const { resolveBPHistorical } = require('./partner-lookup');
 const logger = require('./logger').createLogger('LoadBulkSummary');
 
 // Currency ISO code → C_Currency_ID. Verified against c_currency (2026-05-14).
@@ -215,7 +216,22 @@ async function loadBulkSummary({ rfqSearchKey, buyerId, quotes, dryRun = false }
     }
 
     // b. Resolve vendor BP (search key first, name fallback)
-    const bp = await resolveBP(q.vendorSearchKey, q.vendorName);
+    let bp = await resolveBP(q.vendorSearchKey, q.vendorName);
+
+    // b'. Historical fallback for short broker labels that the strict name
+    // resolver can't tokenize ("Yuexunfa" vs "YUE XUN FA INTERNATIONAL
+    // LIMITED"). Queries recent VQ history for a uniquely-matching BP and
+    // reuses it. See shared/partner-lookup.js resolveBPHistorical(). Only
+    // fires when (a) the agent did NOT supply a searchKey and (b) the
+    // primary resolver returned nothing.
+    if (!bp && !q.vendorSearchKey && q.vendorName) {
+      const hist = resolveBPHistorical(q.vendorName);
+      if (hist) {
+        logger.info(`Historical BP fallback: '${q.vendorName}' → ${hist.id} (${hist.name}) [${hist.vqCount} VQs in last ${hist.lookbackDays}d]`);
+        bp = { id: hist.id, name: hist.name, searchKey: hist.searchKey };
+      }
+    }
+
     if (!bp) {
       skipped.push({ ...q, reason: 'VENDOR_NOT_FOUND', detail: `${q.vendorName || q.vendorSearchKey} not in BP table` });
       continue;

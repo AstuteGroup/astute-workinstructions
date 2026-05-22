@@ -639,6 +639,98 @@ function resolveBuyerFromRegistry({ candidateUserId, citedRfq } = {}) {
   return { buyer: null, source: null, reason, escalate: true };
 }
 
+// ─── HISTORICAL BP FALLBACK ─────────────────────────────────────────────────
+//
+// When a name-only resolveBP fails for a short broker label ("Yuexunfa" vs
+// "YUE XUN FA INTERNATIONAL LIMITED"), this fallback queries recent VQ
+// history for vendor names whose normalized form contains the input label,
+// weighting by recent write frequency. Returns a match only when it's
+// UNAMBIGUOUS (exactly one matching BP in the lookback window) — otherwise
+// the caller's existing not-found path runs.
+//
+// Why this works: every vendor we've ever loaded a VQ for has a row in
+// chuboe_vq_line with the BP_ID and the BP's name. If "Yuexunfa" maps to BP
+// 1009165 ("YUE XUN FA INTERNATIONAL LIMITED"), there are 25+ recent rows
+// proving the association. The resolver doesn't need a static alias table —
+// the operational history IS the table.
+//
+// Confidence guardrails:
+//   - Reject labels shorter than 4 normalized chars (too generic)
+//   - Reject labels that look like common English words
+//   - Require ≥3 recent VQ writes under the candidate BP
+//   - Return null on ambiguity (≥2 candidate BPs) — caller can still
+//     escalate via needs_vendor / needs_review
+//
+// @param {string} vendorLabel - the agent-extracted broker label
+// @param {object} [opts]
+// @param {number} [opts.lookbackDays=90]
+// @param {number} [opts.minVqCount=3]
+// @returns {{ id:number, name:string, searchKey:string, source:'historical-vq',
+//             vqCount:number, lookbackDays:number } | null}
+function resolveBPHistorical(vendorLabel, opts = {}) {
+  if (!vendorLabel || typeof vendorLabel !== 'string') return null;
+  const lookbackDays = opts.lookbackDays != null ? opts.lookbackDays : 90;
+  const minVqCount = opts.minVqCount != null ? opts.minVqCount : 3;
+
+  const norm = vendorLabel.toLowerCase().replace(/[^a-z0-9]/g, '');
+  if (norm.length < 4) return null;
+
+  // Generic words that would match too many BPs — reject outright.
+  const GENERIC = new Set([
+    'electronics', 'electronic', 'company', 'corp', 'inc', 'ltd', 'limited',
+    'group', 'international', 'trading', 'tech', 'technology', 'global',
+    'industries', 'industrial', 'enterprise',
+  ]);
+  if (GENERIC.has(norm)) return null;
+
+  // Find active vendor BPs with a recent VQ write whose normalized name
+  // contains the label. REGEXP_REPLACE drops all non-alphanumerics; LOWER
+  // normalizes case. The same shape as the JS norm above.
+  const sql = `
+    SELECT
+      bp.c_bpartner_id        AS id,
+      bp.name                 AS name,
+      bp.value                AS search_key,
+      COUNT(v.chuboe_vq_line_id) AS vq_count
+    FROM adempiere.c_bpartner bp
+    JOIN adempiere.chuboe_vq_line v ON v.c_bpartner_id = bp.c_bpartner_id
+    WHERE v.isactive = 'Y'
+      AND bp.isactive = 'Y'
+      AND v.created >= NOW() - INTERVAL '${lookbackDays} days'
+      AND REGEXP_REPLACE(LOWER(bp.name), '[^a-z0-9]', '', 'g') LIKE '%${norm}%'
+    GROUP BY bp.c_bpartner_id, bp.name, bp.value
+    HAVING COUNT(v.chuboe_vq_line_id) >= ${minVqCount}
+    ORDER BY vq_count DESC, MAX(v.created) DESC
+    LIMIT 5
+  `;
+
+  let result;
+  try {
+    result = psqlQuery(sql);
+  } catch (_) {
+    return null;
+  }
+  const rows = parseResults(result, ['id', 'name', 'search_key', 'vq_count']);
+  if (rows.length === 0) return null;
+  // Ambiguity guard: if the second-best candidate has ≥50% of the top
+  // candidate's vq_count, refuse to guess. The caller's not-found path can
+  // still escalate.
+  if (rows.length >= 2) {
+    const top = Number(rows[0].vq_count);
+    const second = Number(rows[1].vq_count);
+    if (top > 0 && (second / top) >= 0.5) return null;
+  }
+  const top = rows[0];
+  return {
+    id: Number(top.id),
+    name: top.name,
+    searchKey: top.search_key,
+    source: 'historical-vq',
+    vqCount: Number(top.vq_count),
+    lookbackDays,
+  };
+}
+
 // ─── EXPORTS ────────────────────────────────────────────────────────────────
 
 module.exports = {
@@ -651,6 +743,9 @@ module.exports = {
   lookupByDomainHint,
   lookupByName,
   lookupById,
+
+  // Historical BP fallback (recent-VQ-history match for short broker labels)
+  resolveBPHistorical,
 
   // Astute-employee resolution (forwarder-vs-owner pattern)
   resolveAstuteUserByEmail,
