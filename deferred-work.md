@@ -26,6 +26,29 @@ The SessionStart greeting reads this file and surfaces all open items, sorted by
 
 ### Active workstreams (next session pickup)
 
+- [ ] 🟢 **vq-loading → rfq-loading forward delivery — verify SMTP path** *(opened 2026-05-23, surfaced during UID 8630 live test)*
+  - **Context:** First live exercise of the new `forward_to_rfq_loading` action (commit `cb1ceb9`) on UID 8630 fired correctly on the vq-loading side at 2026-05-22T23:56:50Z — sidecar `~/workspace/.vq-loading-pending/vq-forward-8630.json` parked 30 quotes with correlation MID `<vq-forward-8630-1779494210267@orangetsunami.com>`. The `vq-loading-resumer` cron is polling correctly (`waiting=1` every 10m). BUT: the forwarded email does not appear to have landed in `rfqloading@orangetsunami.com` inbox — `himalaya envelope list --account rfqloading` shows no matching subject, and there's no `rfq-loading-agent` breadcrumb activity for our MID.
+  - **Why blocked:** unverified whether the send actually succeeded or failed silently. The notifier's `sendEmail` returns `false` on SMTP failure but the handler doesn't check the return value (just `await ctx.notifier.sendEmail(...)`). Three plausible causes: (a) SMTP delivery failure swallowed by lack of return-value check; (b) email landed in a folder I didn't check (Junk?); (c) delivery delayed beyond the time I looked.
+  - **Ready when:** any future session — cheap to verify (himalaya envelope list across folders + `/tmp/vq-loading-agent.log` grep for SMTP errors around 23:56:50Z).
+  - **How:**
+    1. `himalaya envelope list --account rfqloading --folder INBOX --page-size 200` — look for `[VQ→RFQ] New RFQ needed: Astute Group / Shortage / 17 lines`.
+    2. Also check Junk, Processed, OutboundPending folders on rfqloading@.
+    3. If still absent: `grep "rfqloading\|sendEmail\|smtp" /tmp/vq-loading-agent.log` around 23:56:50.
+    4. If genuine send failure: extend `action_forward_to_rfq_loading` to check `sendEmail`'s return value; on `false`, fail the action loudly (escalate `needs_review`) rather than silently parking the sidecar.
+    5. Also extend `shared/notifier.js` `sendEmail` to throw instead of returning `false` on SMTP failure — silent failures here have caused other delivery issues historically.
+  - **Side effects of leaving as-is:** Sidecar `vq-forward-8630.json` will sit for 7 days then trigger the resumer's `parked-expired` operator email. Not silent — operator will get pinged.
+
+- [ ] 🟢 **spawnSync psql ENOBUFS in load-bulk-summary pre-flight for very large RFQs** *(opened 2026-05-23, surfaced during UID 8630 live test)*
+  - **Context:** Same UID 8630 run. Two `load-failed` events with `error: "spawnSync psql ENOBUFS"` against RFQ 1134261 (Astute Electronics Inc, **17,752 active lines**). Both attempts failed identically. Agent then routed `needs_review` cleanly with the right investigation_summary. Other 10 RFQs in the same email loaded fine — only the giant one tripped the buffer.
+  - **Root cause:** `shared/load-bulk-summary.js` calls `execFileSync('psql', ...)` to fetch RFQ lines + MPNs as part of `loadBulkSummary` setup. Default `maxBuffer` for execFileSync is 1MB. 17,752 lines × MPN-set per line easily exceeds that.
+  - **Why blocked:** real but not urgent — the agent escalates cleanly. Affects only the small handful of very-large RFQs (Astute Electronics Inc-class). Not a regression — this RFQ shape has always been at the limit.
+  - **Ready when:** whenever someone touches `shared/load-bulk-summary.js` or `shared/vq-writer.js` for unrelated reasons (apply the fix in the same touch per the parallel-writer-audit discipline).
+  - **How:**
+    1. Find every `execFileSync('psql', ...)` and `execSync('psql ...')` in `shared/load-bulk-summary.js` + `shared/vq-writer.js` + `shared/mfr-from-vq-history.js` + `shared/mfr-from-ot-history.js` + `shared/partner-lookup.js`.
+    2. Pass `{ encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 }` (64MB — generous; the alternative is paginated fetches which is much more code).
+    3. Add a regression test that exercises the RFQ 1134261-size case via `shared/load-bulk-summary.js loadBulkSummary({ rfqSearchKey: '1134261', ... dryRun: true })` — should not throw ENOBUFS.
+    4. Note in commit message that this is a writer-side fix that applies to all callers per parallel-writer-audit; update `loader-changelog.md`.
+
 - [ ] 🟢 **LAM EPG SIPOC — POV0075254 / PO810397 update** *(opened 2026-05-22, picks up Monday 2026-05-25)*
   - **Context:** Operator placed Arrow PO810397 today (2026-05-22, 11 lines, all stamped `POV0075254`). Need to backfill the SIPOC tracker at `Trading Analysis/LAM EPG Award/Lam_EPG_SIPOC.xlsx` with PO + Purchased By (Mohan, ad_user_id 1013586) + PO Sent (2026-05-22) + Processed in OT (Y) + OT Order Number. All 11 PO MPNs matched to SIPOC rows.
   - **SIPOC column map (header on row 2 / index 1):** col 17=Qty (LAM sales commitment), 26=POV, 27=Purchased By, 28=PO Sent (date), 30=Processed in OT, 31=OT Order Number, 33=Notes, 34=Tracking.
