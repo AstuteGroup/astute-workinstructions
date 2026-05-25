@@ -1,22 +1,48 @@
-# PO Activity Analysis (per-month)
+# PO Activity Analysis (date range)
 
-Comprehensive PO-activity workbook for a calendar month: PO + SO economics, OTIN inspection lifecycle, delivery performance vs promise date, tracking visibility, and 4-stage cycle benchmarks.
+Comprehensive PO-activity workbook + management deck for any date range: PO + SO economics, OTIN inspection lifecycle, delivery performance vs promise date, tracking visibility, 4-stage cycle benchmarks, cumulative MFR breakdown, and per-CPC VQ→PO+SO conversion.
 
-**First built:** 2026-05-13 (January 2026 snapshot). Output sits in `output/` for replay.
+**First built:** 2026-05-13 (January 2026 snapshot). **Expanded 2026-05-25** to accept arbitrary date ranges, add MFR breakdown + conversion analysis + management-meeting PowerPoint deck.
 
-## What it produces
+## Quick start
 
-Excel workbook with 8 tabs (parts only — services / testing / fees / freight excluded via MPN regex + MFR='Charge' filter):
+```bash
+node 'Trading Analysis/PO Activity Analysis/build-po-activity.js' \
+  --start 2026-01-01 --end 2026-05-01 --label 2026-Jan-Apr
+```
 
-1. **Summary** — volume, $-economics, OTIN lifecycle, delivery performance, cycle benchmarks (median / P75 / P90 / max)
-2. **Open Past-Due** — NOT_RECEIVED lines sorted by days-late, ready for buyer follow-up
-3. **Buyer Status Matrix** — OTIN status counts per buyer (VALIDATED / LOT_OPEN / RECEIVED_NO_LOT / NOT_RECEIVED + past-due)
-4. **By Buyer** — spend, revenue, validation %, past-due %, avg-days-late
-5. **By Supplier** — on-time / validation rates by supplier
-6. **By Customer** — GP $, open exposure, revenue-at-risk
-7. **Cycle Benchmarks** — 4-stage cycle table (median / P75 / P90 / max)
-8. **Cycle Times** — per-line breakdown of all 4 stages
-9. **All Lines** — full dataset with 37 columns
+`--end` is **exclusive** — use the first day of the month AFTER the last month you want. For "Jan through Apr 2026", end = `2026-05-01`. For just January, end = `2026-02-01`.
+
+Outputs land in `output/<label>/`:
+- `<label>_POs.csv` — line-level fact table (~35 cols)
+- `<label>_MFR_breakdown.csv` — cumulative top-50 MFR aggregation
+- `<label>_CPC_conversion.csv` — per-CPC VQ→PO+SO conversion detail
+- `<label>_POs_Analysis.xlsx` — 11-tab Excel workbook (the operational deliverable)
+- `<label>_POs_Slides.pptx` — 3-slide management deck (headline + operational + concentration)
+
+## What the Excel produces (11 tabs)
+
+| # | Tab | Purpose |
+|---|---|---|
+| 1 | **Summary** | Headline volume, $-economics, conversion, OTIN, delivery, cycle benchmarks |
+| 2 | **Open Past-Due** | NOT_RECEIVED lines sorted by days-late — buyer follow-up worklist |
+| 3 | **Buyer Status Matrix** | OTIN status counts per buyer (Validated / Lot Open / Received-No-Lot / Not Received / Past-Due) |
+| 4 | **By Buyer** | Spend, revenue, validation %, past-due %, avg-days-late |
+| 5 | **By Supplier** | On-time / validation rates by supplier |
+| 6 | **By Customer** | GP $, open exposure, revenue-at-risk |
+| 7 | **MFR Breakdown** | *(NEW)* Top 50 manufacturers — PO lines, supplier reach, customer reach, spend, attributed revenue, booked GP, margin, validation %, past-due % |
+| 8 | **Conversion** | *(NEW)* Per-CPC VQ→PO+sold-CQ conversion. One row per CPC that had a VQ in the period; flagged for PO Placed / Sold CQ / Converted (both) |
+| 9 | **Cycle Benchmarks** | 4-stage cycle table (median / P75 / P90 / max) |
+| 10 | **Cycle Times** | Per-line breakdown of all 4 stages |
+| 11 | **All Lines** | Full dataset with ~40 columns |
+
+## What the PowerPoint produces (3 slides)
+
+1. **Headline Metrics** — POVs, lines, suppliers, customers, PO spend, attributed revenue, booked margin, VQ→PO+SO conversion %. KPI tile grid.
+2. **Operational Health** — Validation %, past-due %, not-received %, open SO at risk, plus the 4-stage cycle benchmark table.
+3. **Spend Concentration** — Top 10 manufacturers + top 10 suppliers by PO spend (with % of total).
+
+Designed for a 1-3 slide management-meeting view. Detail trends live in the raw xlsx tabs.
 
 ## 4-stage cycle definition
 
@@ -35,57 +61,80 @@ Excel workbook with 8 tabs (parts only — services / testing / fees / freight e
 | `RECEIVED_NO_LOT` | Receipt exists, no `m_attributesetinstance` (OTIN lot) allocated yet |
 | `LOT_OPEN` | Lot exists with lnk records, but no `isvalidate='Y'` flip |
 | `VALIDATED` | At least one `chuboe_insp_lot_lnk.isvalidate='Y'` for the lot |
+| `PROCESSED` | Validated AND `processed='Y'` (final state) |
 
 See memory `project_ot_inspection_data_path.md` for the join chain (chuboe_po_receiving → m_attributeinstance → chuboe_insp_lot_lnk).
 
+## VQ→PO+SO conversion definition
+
+**Universe (denominator):** distinct CPCs (`chuboe_rfq_line.chuboe_cpc`) where at least one `chuboe_vq_line` was created during the period.
+
+**Conversion (numerator):** subset of those CPCs that ALSO have, in the same period:
+- a sold customer quote (`chuboe_cq_line.issold='Y'`), AND
+- a PO placed (`c_orderline` joined via `chuboe_vq_line_id` to a VQ on the same RFQ line, with `chuboe_po_string LIKE 'POV%'`).
+
+**Why this definition:** It's the full cycle — we sourced AND won AND placed the buy. Catches stripped-out cases like "we quoted but never won" or "we won but bought from inventory without a fresh PO".
+
+**Caveat:** A CPC can appear on multiple customers' RFQs over a period. The conversion flag is per-CPC across all of them, not per-(CPC × customer). The CSV `Customer(s)` column shows the comma-separated list. Set memory if a deeper per-customer cut is needed.
+
 ## SO revenue attribution — important gotcha
 
-Multiple Jan POs can feed one customer-side RFQ line. Aggregating SO revenue by `chuboe_rfq_line_id` and assigning the full total to every PO triple-counts. We attribute revenue per-PO as:
+Multiple POs in the period can feed one customer-side RFQ line. Aggregating SO revenue by `chuboe_rfq_line_id` and assigning the full total to every PO triple-counts. We attribute revenue per-PO as:
 
 ```
 attributed_so_revenue = po_qty × so_price_weighted_avg
 ```
 
-This is bounded by what this specific PO supplied. Still over-attributes slightly when the customer order is also fulfilled by non-month POs — exact attribution would require shipment-level matching from `m_inout` to specific sales orderlines (not done here).
+This is bounded by what this specific PO supplied. Still over-attributes slightly when the customer order is also fulfilled by non-period POs — exact attribution would require shipment-level matching from `m_inout` to specific sales orderlines (not done here).
 
-See memory `feedback_so_revenue_per_po_attribution.md`.
+## How to re-run for a different range
 
-## How to re-run for a different month
+```bash
+# Just January 2026
+node build-po-activity.js --start 2026-01-01 --end 2026-02-01 --label 2026-Jan
 
-1. Edit the date range in `po-activity-by-month.sql` (two lines, `tmp_jan_po` filter):
-   ```sql
-   AND o.dateordered >= 'YYYY-MM-01'
-   AND o.dateordered <  'YYYY-MM+1-01'
-   ```
-2. Run the SQL: `psql -o ~/workspace/tmp/run.log -f po-activity-by-month.sql`. It COPYs the CSV to `/home/analytics_user/workspace/January_2026_POs.csv` — rename the output path in the SQL if you don't want to overwrite.
-3. Run the Excel builder: `node build-po-activity-excel.js`. It reads the CSV from the hardcoded path and writes `January_2026_POs_Analysis.xlsx`. Update the file paths in the Node script for the new month.
-4. (Optional) Email: `node send-po-activity-email.js` — sends from `stockRFQ@orangetsunami.com` to Jake with HTML summary + xlsx attachment.
+# Full Q1 2026
+node build-po-activity.js --start 2026-01-01 --end 2026-04-01 --label 2026-Q1
 
-## Caveats baked into this workbook
+# Jan through May (when May closes)
+node build-po-activity.js --start 2026-01-01 --end 2026-06-01 --label 2026-Jan-May
 
-- **Services / testing / fees excluded** at the SQL level via regex + MFR='Charge'. 30 lines dropped from the January raw 570 → 541 parts.
+# Custom out-dir (defaults to ./output/<label>/)
+node build-po-activity.js --start 2026-01-01 --end 2026-05-01 --label 2026-Jan-Apr \
+  --out-dir /home/analytics_user/workspace/po-activity-2026-Q1
+```
+
+The script substitutes the date range + output paths into `po-activity-by-range.sql`, runs psql, then reads the three CSVs to build the Excel + pptx. Roughly 5-10 seconds end-to-end for a 4-month range.
+
+## Caveats baked into this analysis
+
+- **Services / testing / fees / freight excluded** at the SQL level via MPN regex + `MFR='Charge'` filter.
 - **`po_qty` falls back to `qtyentered`** when `qtyordered=0` (draft orders).
-- **Promise date** is the OT field (`c_orderline.datepromised`) set at PO time — it doesn't auto-reflect vendor reschedules.
-- **Inspection-validated timestamp** is `lot_lnk.updated` filtered to `isvalidate='Y'` (not `processedon` — that field is `0` for every January row, legacy). Vulnerable to later edits of the lnk row shifting the timestamp.
+- **Promise date** is the OT field (`c_orderline.datepromised`) set at PO time — does not auto-reflect vendor reschedules.
+- **Inspection-validated timestamp** is `lot_lnk.updated` filtered to `isvalidate='Y'` (not `processedon` — that field is `0` for most rows in this org, legacy). Vulnerable to later edits of the lnk row shifting the timestamp.
 - **Tracking column** is `c_orderline.chuboe_trackingnumbers` — free-text, ~half real carrier numbers, half operator notes (`"sent 1.2/26"`). The standard iDempiere `m_inout.trackingno` is **not used** in this org.
-- **Carrier site tracking lookups don't work from this environment** — both FedEx (Akamai) and UPS block headless browsers. Confirmed via Playwright with multiple stealth approaches on 2026-05-13. See `reference_carrier_sites_block_scraping.md`.
+- **MFR-as-commodity proxy.** This org has no native commodity field on `m_product` (the iDempiere category is just "Standard"). MFR serves as a workable commodity grouping for top-line memory / passives / analog / digital tendencies, but is lossy for broad-line MFRs (TI, ST, ON, NXP). Inferred-commodity heuristics are not in scope of this workflow.
+- **`days_late` is measured from the script-run date**, not the end of the period. Re-running the same period on a later date will inflate the "worst days late" figure.
+- **Carrier site tracking lookups don't work from this environment** — both FedEx (Akamai) and UPS block headless browsers. See `reference_carrier_sites_block_scraping.md`.
 
-## Source data summary (January 2026 baseline)
+## Snapshots in `output/`
 
-- 427 distinct POVs / 570 lines raw → 413 POVs / 541 lines after parts filter
-- 28 buyers, 189 suppliers, 83 customers
-- 73% validated, 24% not received, ~1.5% in inspection, ~1.5% received-no-lot
-- Median PO → first receipt: 11 days (P90 = 59)
-- Median Inspection opened → validated: 5 days (P90 = 38)
-- Median total PO → validated: 32 days (P90 = 81)
-- Booked margin (qty-weighted): 61.9%
-- 48% of lines have tracking on PO line; the other 52% have none
+Each run lands in `output/<label>/`. Past artifacts:
+
+| Label | Range | Notes |
+|---|---|---|
+| `2026-Jan-Apr/` | 2026-01-01 → 2026-05-01 | Spring 2026 management-meeting deck |
+
+Plus the original Jan-only Excel + CSV at the workspace root (`January_2026_POs.csv` and `…_Analysis.xlsx`) — kept as the historical artifact from the 2026-05-13 first build.
 
 ## Files in this folder
 
-- `po-activity-analysis.md` — this doc
-- `po-activity-by-month.sql` — the multi-pass SQL (5 passes + final assembly + summary)
-- `build-po-activity-excel.js` — Node script consuming the CSV → xlsx workbook
-- `send-po-activity-email.js` — Email sender wrapping `shared/notifier.js`
-- `output/January_2026_POs.csv` — flat data for Jan 2026
-- `output/January_2026_POs_Analysis.xlsx` — full Excel workbook for Jan 2026
+| File | Role |
+|---|---|
+| `po-activity-analysis.md` | this doc |
+| `po-activity-by-range.sql` | **template SQL** — driver substitutes `@START_DATE@ / @END_DATE@ / @OUT_*@` placeholders. Do not invoke directly without manual substitution. |
+| `build-po-activity.js` | **driver** — fills the template, runs psql, builds xlsx + pptx. The thing you run. |
+| `send-po-activity-email.js` | Optional: email the workbook to Jake via `shared/notifier.js` |
+| `legacy/po-activity-by-month.sql` | Original hardcoded-Jan SQL (superseded by the range template) |
+| `legacy/build-po-activity-excel.js` | Original Jan-only Excel builder (superseded by the unified driver) |
+| `output/<label>/` | Per-run outputs (CSV + xlsx + pptx) |
