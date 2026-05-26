@@ -597,7 +597,7 @@ ${sections}
    <b>Outstanding vendor sections:</b> ${clarifications.length}</p>
 ${sections}
 <p style="background:#fff3cd;padding:10px;border-left:3px solid #b58900">
-   Sender was asked these questions directly (you're on CC). Reply to ${esc(ctx.inbox)} from either side and the next tick will stitch.
+   ${envelope.senderUsed ? `Sender (${esc(envelope.senderUsed)}) was emailed separately with the per-vendor asks above.` : 'No usable sender — this is an operator-only escalation.'} Reply to ${esc(ctx.inbox)} and the next tick will stitch.
 </p>
 <p style="color:#666;font-size:11px">Sidecar: <code>~/workspace/.vq-loading-pending/${esc(ctx.anchorMessageId || '(no anchor)')}.json</code></p>
 </body></html>`;
@@ -619,12 +619,12 @@ ${sections}
     };
   }
 
-  await ctx.notifier.sendEmail(
-    envelope.to,
-    `VQ Loading — clarifications needed: ${subject || '(no subject)'}`,
-    envelope.senderUsed ? senderHtml : operatorHtml,
-    { html: true, replyTo: ctx.inbox, cc: envelope.cc || undefined },
-  );
+  await sendSplitRecipientEmail(ctx, {
+    envelope,
+    subject: `VQ Loading — clarifications needed: ${subject || '(no subject)'}`,
+    senderHtml,
+    operatorHtml,
+  });
 
   breadcrumbs.write({
     cog: 'vq-loading-agent',
@@ -733,12 +733,12 @@ async function action_need_info_vendor(payload, ctx) {
       would_write_sidecar: { anchor: ctx.anchorMessageId, extracted, missing: missingList },
     };
   }
-  await ctx.notifier.sendEmail(
-    envelope.to,
-    `VQ Loading — needs info: ${subject || '(no subject)'}`,
-    envelope.senderUsed ? senderHtml : operatorHtml,
-    { html: true, replyTo: ctx.inbox, cc: envelope.cc || undefined },
-  );
+  await sendSplitRecipientEmail(ctx, {
+    envelope,
+    subject: `VQ Loading — needs info: ${subject || '(no subject)'}`,
+    senderHtml,
+    operatorHtml,
+  });
   return {
     notified: envelope.to,
     cc: envelope.cc || null,
@@ -861,12 +861,12 @@ async function action_clarify_vendor(payload, ctx) {
       would_write_sidecar: { anchor: ctx.anchorMessageId, vendorName, candidates: candidateList },
     };
   }
-  await ctx.notifier.sendEmail(
-    envelope.to,
-    `VQ Loading — clarify vendor: ${subject || '(no subject)'}`,
-    envelope.senderUsed ? senderHtml : operatorHtml,
-    { html: true, replyTo: ctx.inbox, cc: envelope.cc || undefined },
-  );
+  await sendSplitRecipientEmail(ctx, {
+    envelope,
+    subject: `VQ Loading — clarify vendor: ${subject || '(no subject)'}`,
+    senderHtml,
+    operatorHtml,
+  });
   return {
     notified: envelope.to,
     cc: envelope.cc || null,
@@ -957,12 +957,12 @@ async function action_needs_vendor(payload, ctx) {
       would_write_sidecar: { anchor: ctx.anchorMessageId, vendorName, extracted },
     };
   }
-  await ctx.notifier.sendEmail(
-    envelope.to,
-    `VQ Loading — needs vendor: ${esc(vendorName || vendorEmail || subject || '(no subject)')}`,
-    envelope.senderUsed ? senderHtml : operatorHtml,
-    { html: true, replyTo: ctx.inbox, cc: envelope.cc || undefined },
-  );
+  await sendSplitRecipientEmail(ctx, {
+    envelope,
+    subject: `VQ Loading — needs vendor: ${esc(vendorName || vendorEmail || subject || '(no subject)')}`,
+    senderHtml,
+    operatorHtml,
+  });
   return {
     notified: envelope.to,
     cc: envelope.cc || null,
@@ -1040,6 +1040,16 @@ async function action_needs_review(payload, ctx) {
 ${operatorFooter}
 </body></html>`;
 
+  const investigationBlock = investigation_summary
+    ? `<p><b>Investigation summary:</b></p><pre style="background:#eef6ff;padding:8px;white-space:pre-wrap;font-size:11px">${esc(investigation_summary)}</pre>`
+    : '';
+  const senderNotifiedBlock = envelope.senderUsed
+    ? `<p style="background:#fff3cd;padding:10px;border-left:3px solid #b58900;font-size:12px">
+   <b>Sender notified:</b> ${esc(envelope.senderUsed)}<br/>
+   <b>We asked them:</b> <i>${esc(senderAsk)}</i><br/>
+   <span style="color:#666">If this question doesn't match the reason above, reply to ${esc(ctx.inbox)} to redirect — the next tick will re-route.</span>
+</p>`
+    : '';
   const operatorHtml = `<html><body style="font-family:Arial,sans-serif;font-size:13px">
 <h2 style="color:#b00">VQ Loading — needs manual review</h2>
 <p><b>Subject:</b> ${esc(subject)}<br/>
@@ -1047,7 +1057,9 @@ ${operatorFooter}
    <b>UID:</b> ${ctx.uid}</p>
 <p><b>Reason:</b> ${esc(reason)}</p>
 ${details ? `<pre style="background:#f5f5f5;padding:8px;white-space:pre-wrap;font-size:11px">${esc(details)}</pre>` : ''}
+${investigationBlock}
 ${extractedBlock ? `<p><b>What the extractor produced:</b></p>${extractedBlock}` : ''}
+${senderNotifiedBlock}
 <p style="color:#666;font-size:11px">Message moved to NeedsReview folder.</p>
 </body></html>`;
 
@@ -1057,12 +1069,12 @@ ${extractedBlock ? `<p><b>What the extractor produced:</b></p>${extractedBlock}`
       would_email: { to: envelope.to, cc: envelope.cc, senderUsed: envelope.senderUsed, reason },
     };
   }
-  await ctx.notifier.sendEmail(
-    envelope.to,
-    `VQ Loading — needs review: ${subject || '(no subject)'}`,
-    envelope.senderUsed ? senderHtml : operatorHtml,
-    { html: true, replyTo: ctx.inbox, cc: envelope.cc || undefined },
-  );
+  await sendSplitRecipientEmail(ctx, {
+    envelope,
+    subject: `VQ Loading — needs review: ${subject || '(no subject)'}`,
+    senderHtml,
+    operatorHtml,
+  });
   breadcrumbs.write({
     cog: 'vq-loading-agent',
     event: 'escalated-needs_review',
@@ -1520,6 +1532,46 @@ function resolveOutreachRecipients(payload, ctx) {
     cc: Array.from(ccSet).join(', '),
     senderUsed: candidate,
   };
+}
+
+/**
+ * Send the escalation as TWO separate emails (sender + operator) instead of
+ * one CC'd email with a single template.
+ *
+ * The legacy pattern was:
+ *   sendEmail(senderEmail, subj, senderHtml, { cc: operator })
+ * which gave the operator a CC copy of the sanitized sender-facing body —
+ * the actual diagnostic (`reason`, `investigation_summary`, `extracted`)
+ * lived only on the breadcrumb, never in any email. UID 8667 (Savings
+ * Ribbon, 2026-05-26): the operator received "Could you resend in Excel?"
+ * even though the agent's actual reason was a cited-RFQ mismatch.
+ *
+ * New pattern:
+ *   - senderUsed truthy → two emails:
+ *       (1) TO=sender, body=senderHtml, no CC
+ *       (2) TO=operator, body=operatorHtml (full diagnostic), no CC
+ *   - senderUsed null   → one operator email (legacy operator-only mode)
+ *
+ * Subjects are identical so vq@ inbox threading still works on either
+ * side's reply (both reply-to vq@ for next-tick stitching).
+ */
+async function sendSplitRecipientEmail(ctx, {
+  envelope, subject, senderHtml, operatorHtml,
+}) {
+  const opts = { html: true, replyTo: ctx.inbox };
+  if (envelope.senderUsed) {
+    // Sender copy: sanitized, no operator visibility.
+    await ctx.notifier.sendEmail(envelope.to, subject, senderHtml, opts);
+    // Operator copy: full diagnostic. envelope.cc is a comma-joined string
+    // of @astutegroup.com addresses (jake + any Astute folks already on the
+    // original envelope Cc); nodemailer accepts comma-separated TO.
+    if (envelope.cc) {
+      await ctx.notifier.sendEmail(envelope.cc, subject, operatorHtml, opts);
+    }
+  } else {
+    // Operator-only mode (no usable sender). envelope.to is jakeEmail.
+    await ctx.notifier.sendEmail(envelope.to, subject, operatorHtml, opts);
+  }
 }
 
 /**
