@@ -13,6 +13,7 @@
 --   @OUT_CSV@       absolute path for the line-level fact CSV
 --   @OUT_MFR_CSV@   absolute path for the MFR breakdown CSV
 --   @OUT_CONV_CSV@  absolute path for the per-CPC conversion CSV
+--   @OUT_MIX_CSV@   absolute path for the sales-mix-by-RFQ-type CSV
 --
 -- For "Jan through Apr 2026": @START_DATE@='2026-01-01' @END_DATE@='2026-05-01'.
 -- Direct invocation (without the driver) requires hand-substituting all five placeholders.
@@ -276,7 +277,11 @@ LEFT JOIN adempiere.chuboe_rfq rfq ON rfq.chuboe_rfq_id = rl.chuboe_rfq_id
 LEFT JOIN adempiere.c_bpartner bp  ON bp.c_bpartner_id = rfq.c_bpartner_id
 WHERE v.created >= '@START_DATE@'::date AND v.created < '@END_DATE@'::date
   AND v.isactive='Y' AND rl.isactive='Y'
-  AND COALESCE(rl.chuboe_cpc,'') <> '';
+  AND COALESCE(rl.chuboe_cpc,'') <> ''
+  -- Exclude auto-match VQs (StockCQ + CalcuQuote bpartners) — they're CalcuQuote
+  -- customer-excess auto-matches, not real sourcing work. See memory
+  -- feedback_stockcq_not_real_vq.md.
+  AND v.c_bpartner_id NOT IN (1009435, 1008101);
 CREATE INDEX ON tmp_vq_universe (cpc);
 
 DROP TABLE IF EXISTS tmp_cpc_po;
@@ -288,7 +293,9 @@ JOIN adempiere.chuboe_vq_line v     ON v.chuboe_vq_line_id = ol.chuboe_vq_line_i
 JOIN adempiere.chuboe_rfq_line rl   ON rl.chuboe_rfq_line_id = v.chuboe_rfq_line_id
 WHERE o.issotrx='N' AND o.dateordered >= '@START_DATE@'::date AND o.dateordered < '@END_DATE@'::date
   AND ol.isactive='Y' AND o.isactive='Y' AND ol.chuboe_po_string LIKE 'POV%'
-  AND COALESCE(rl.chuboe_cpc,'') <> '';
+  AND COALESCE(rl.chuboe_cpc,'') <> ''
+  -- Consistent with the VQ universe — exclude auto-match VQ links
+  AND v.c_bpartner_id NOT IN (1009435, 1008101);
 CREATE INDEX ON tmp_cpc_po (cpc);
 
 DROP TABLE IF EXISTS tmp_cpc_soldcq;
@@ -314,6 +321,37 @@ FROM tmp_vq_universe u
 GROUP BY u.cpc;
 
 \copy (SELECT * FROM tmp_conv_detail ORDER BY converted DESC, had_po DESC, had_soldcq DESC, cpc) TO '@OUT_CONV_CSV@' WITH CSV HEADER
+
+-- ============================================================
+-- Sales mix by RFQ type (line count basis — per the project framing
+-- that stock-sales success is measured by lines, not value)
+-- ============================================================
+DROP TABLE IF EXISTS tmp_so_mix;
+CREATE TEMP TABLE tmp_so_mix AS
+WITH so AS (
+  SELECT
+    COALESCE(rt.name, '(no RFQ type / direct)') AS rfq_type,
+    ol.c_orderline_id,
+    o.documentno,
+    o.c_bpartner_id
+  FROM adempiere.c_orderline ol
+  JOIN adempiere.c_order o ON o.c_order_id = ol.c_order_id AND o.isactive='Y'
+  LEFT JOIN adempiere.chuboe_rfq_line rl ON rl.chuboe_rfq_line_id = ol.chuboe_rfq_line_id
+  LEFT JOIN adempiere.chuboe_rfq rfq ON rfq.chuboe_rfq_id = rl.chuboe_rfq_id
+  LEFT JOIN adempiere.chuboe_rfq_type rt ON rt.chuboe_rfq_type_id = rfq.chuboe_rfq_type_id
+  WHERE ol.isactive='Y' AND o.issotrx='Y'
+    AND o.dateordered >= '@START_DATE@'::date AND o.dateordered < '@END_DATE@'::date
+)
+SELECT
+  rfq_type,
+  COUNT(*)                          AS so_lines,
+  COUNT(DISTINCT documentno)        AS sos,
+  COUNT(DISTINCT c_bpartner_id)     AS customers
+FROM so
+GROUP BY rfq_type
+ORDER BY so_lines DESC;
+
+\copy (SELECT * FROM tmp_so_mix ORDER BY so_lines DESC) TO '@OUT_MIX_CSV@' WITH CSV HEADER
 
 -- Console summary
 SELECT

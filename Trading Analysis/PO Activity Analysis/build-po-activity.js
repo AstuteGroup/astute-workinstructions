@@ -59,6 +59,7 @@ fs.mkdirSync(OUT_DIR, { recursive: true });
 const OUT_CSV       = path.join(OUT_DIR, `${LABEL}_POs.csv`);
 const OUT_MFR_CSV   = path.join(OUT_DIR, `${LABEL}_MFR_breakdown.csv`);
 const OUT_CONV_CSV  = path.join(OUT_DIR, `${LABEL}_CPC_conversion.csv`);
+const OUT_MIX_CSV   = path.join(OUT_DIR, `${LABEL}_SO_mix_by_rfq_type.csv`);
 const OUT_XLSX      = path.join(OUT_DIR, `${LABEL}_POs_Analysis.xlsx`);
 const OUT_PPTX      = path.join(OUT_DIR, `${LABEL}_POs_Slides.pptx`);
 
@@ -74,7 +75,8 @@ const filledSql = template
   .replace(/@END_DATE@/g, END)
   .replace(/@OUT_CSV@/g, OUT_CSV)
   .replace(/@OUT_MFR_CSV@/g, OUT_MFR_CSV)
-  .replace(/@OUT_CONV_CSV@/g, OUT_CONV_CSV);
+  .replace(/@OUT_CONV_CSV@/g, OUT_CONV_CSV)
+  .replace(/@OUT_MIX_CSV@/g, OUT_MIX_CSV);
 const tmpSql = path.join(OUT_DIR, `_${LABEL}_run.sql`);
 fs.writeFileSync(tmpSql, filledSql);
 
@@ -191,6 +193,40 @@ const convRows = loadCsv(OUT_CONV_CSV, (r, idx) => ({
   converted:  bool(r[idx.converted]),
 })).rows;
 
+const mixRows = loadCsv(OUT_MIX_CSV, (r, idx) => ({
+  rfq_type:   str(r[idx.rfq_type]),
+  so_lines:   num(r[idx.so_lines]),
+  sos:        num(r[idx.sos]),
+  customers:  num(r[idx.customers]),
+})).rows;
+const totalSoLines = mixRows.reduce((s,r)=>s+(r.so_lines||0), 0);
+mixRows.forEach(r => { r.share = totalSoLines>0 ? r.so_lines/totalSoLines : null; });
+// Tag stock vs broker-on-RFQ vs other for grouping.
+// "Stock" stays its own bucket (per the project framing — stock-sales success
+//  is measured separately). "Astute Franchised" is authorized-distribution
+//  business, also a separate bucket.
+const BROKER_TYPES = new Set(['Shortage','PPV','EOL/LTB','Hot Parts','Proactive Offer','Import']);
+const CONSIGN_3PL_TYPES = new Set(['3PL/VMI']);
+mixRows.forEach(r => {
+  r.bucket = r.rfq_type === 'Stock' ? 'Stock'
+    : r.rfq_type === 'Astute Franchised' ? 'Franchised'
+    : BROKER_TYPES.has(r.rfq_type) ? 'Broker-on-RFQ'
+    : CONSIGN_3PL_TYPES.has(r.rfq_type) ? '3PL / Consignment'
+    : 'Other / Direct';
+});
+const bucketSummary = (() => {
+  const m = new Map();
+  mixRows.forEach(r => {
+    if (!m.has(r.bucket)) m.set(r.bucket, { bucket:r.bucket, so_lines:0, sos:0 });
+    const b = m.get(r.bucket);
+    b.so_lines += r.so_lines||0;
+    b.sos      += r.sos||0;
+  });
+  const arr = [...m.values()];
+  arr.forEach(b => b.share = totalSoLines>0 ? b.so_lines/totalSoLines : null);
+  return arr.sort((a,b)=>b.so_lines-a.so_lines);
+})();
+
 // ---------------------------------------------------------------------------
 // Phase 3: derived calculations
 // ---------------------------------------------------------------------------
@@ -295,6 +331,7 @@ const distinctPovs = new Set(fact.map(r=>r.infor_pov)).size;
 const distinctBuyers = new Set(fact.map(r=>r.buyer).filter(Boolean)).size;
 const distinctSuppliers = new Set(fact.map(r=>r.supplier).filter(Boolean)).size;
 const distinctCustomers = new Set(fact.map(r=>r.customer).filter(Boolean)).size;
+const distinctMfrs = new Set(fact.map(r=>r.mfr).filter(Boolean)).size;
 
 // Conversion headline numbers
 const cpcsWithVq = convRows.length;
@@ -302,6 +339,8 @@ const cpcsToPo   = convRows.filter(r=>r.had_po).length;
 const cpcsToSoldcq = convRows.filter(r=>r.had_soldcq).length;
 const cpcsConverted = convRows.filter(r=>r.converted).length;
 const conversionPct = cpcsWithVq>0 ? cpcsConverted / cpcsWithVq : null;
+// Pure sourcing-execution conversion (VQ → PO, no SO dependence)
+const vqToPoPct = cpcsWithVq>0 ? cpcsToPo / cpcsWithVq : null;
 
 // Friendly period label (e.g. "January through April 2026")
 function formatPeriod(start, endExcl) {
@@ -576,6 +615,17 @@ const mfrCols = [
 ];
 const wsMfr = buildSheet(mfrRows, mfrCols);
 
+// ---------- Sales Mix by RFQ Type ----------
+const mixCols = [
+  {key:'rfq_type', header:'RFQ Type', width:24},
+  {key:'bucket',   header:'Bucket',   width:22},
+  {key:'so_lines', header:'SO Lines', width:10, z:'#,##0'},
+  {key:'sos',      header:'SOs',      width:9,  z:'#,##0'},
+  {key:'customers',header:'Customers',width:11, z:'#,##0'},
+  {key:'share',    header:'% of SO Lines', width:14, z:'0.0%'},
+];
+const wsMix = buildSheet(mixRows, mixCols);
+
 // ---------- Conversion (per-CPC detail) ----------
 // Sort so the converted CPCs lead, then partial conversions, then no conversion.
 const convSorted = convRows.slice().sort((a,b) =>
@@ -600,6 +650,7 @@ XLSX.utils.book_append_sheet(wb, wsSupplier, 'By Supplier');
 XLSX.utils.book_append_sheet(wb, wsCust,     'By Customer');
 XLSX.utils.book_append_sheet(wb, wsMfr,      'MFR Breakdown');
 XLSX.utils.book_append_sheet(wb, wsConv,     'Conversion');
+XLSX.utils.book_append_sheet(wb, wsMix,      'Sales Mix');
 XLSX.utils.book_append_sheet(wb, wsBench,    'Cycle Benchmarks');
 XLSX.utils.book_append_sheet(wb, wsCycle,    'Cycle Times');
 XLSX.utils.book_append_sheet(wb, wsAll,      'All Lines');
@@ -629,19 +680,21 @@ function fmtNum(v)     { return v == null ? '—' : Number(v).toLocaleString('en
 {
   const s = pptx.addSlide();
   s.background = { color: 'FFFFFF' };
-  s.addText('PO Activity — Headline Metrics', { x:0.4, y:0.3, w:12.5, h:0.6, fontSize:28, bold:true, color:ACCENT });
+  s.addText('Purchasing Activity — Headline', { x:0.4, y:0.3, w:12.5, h:0.6, fontSize:28, bold:true, color:ACCENT });
   s.addText(PERIOD, { x:0.4, y:0.9, w:12.5, h:0.4, fontSize:16, color:NEUTRAL, italic:true });
 
-  // KPI grid — 4 cols × 2 rows
+  // KPI grid — 4 cols × 2 rows (purchasing lens)
   const kpis = [
+    // Row 1: scope of buying activity
     { label:'Distinct POVs',          value:fmtNum(distinctPovs) },
     { label:'PO Lines (parts)',       value:fmtNum(fact.length) },
     { label:'Suppliers',              value:fmtNum(distinctSuppliers) },
-    { label:'Customers',              value:fmtNum(distinctCustomers) },
+    { label:'Manufacturers',          value:fmtNum(distinctMfrs) },
+    // Row 2: dollars + customer reach + sourcing effectiveness
     { label:'PO Spend',               value:fmtMoney(totalSpend) },
-    { label:'Attributed Revenue',     value:fmtMoney(totalRevenue) },
-    { label:'Booked Margin',          value:fmtPct(totalRevenue>0 ? (totalRevenue-totalSpend)/totalRevenue : null) },
-    { label:'VQ → PO+SO Conversion',  value:fmtPct(conversionPct) },
+    { label:'Customers Served',       value:fmtNum(distinctCustomers) },
+    { label:'CPCs Sourced (VQ)',      value:fmtNum(cpcsWithVq) },
+    { label:'VQ → PO Conversion',     value:fmtPct(vqToPoPct) },
   ];
   const startX = 0.4, startY = 1.6, kpW = 3.05, kpH = 1.6, gap = 0.15;
   kpis.forEach((k, i) => {
@@ -653,72 +706,21 @@ function fmtNum(v)     { return v == null ? '—' : Number(v).toLocaleString('en
     s.addText(k.label, { x, y:y+1.05, w:kpW, h:0.45, fontSize:13, color:NEUTRAL, align:'center' });
   });
 
-  // Conversion narrative
+  // Sourcing-effectiveness narrative
   s.addText(
-    `Of ${fmtNum(cpcsWithVq)} CPCs we sourced VQs for during ${PERIOD}, ${fmtNum(cpcsConverted)} (${fmtPct(conversionPct)}) ` +
-    `converted to both a placed PO and a sold customer quote. ` +
-    `${fmtNum(cpcsToPo)} CPCs received a PO; ${fmtNum(cpcsToSoldcq)} reached a sold CQ.`,
+    `Sourcing pipeline: ${fmtNum(cpcsWithVq)} unique parts (CPCs) received supplier quotes during ${PERIOD}. ` +
+    `Of those, ${fmtNum(cpcsToPo)} (${fmtPct(vqToPoPct)}) advanced to an actual placed PO — the rest stayed in the quote pipeline ` +
+    `(customer didn't buy, lost to competitor, or sourced from inventory).`,
     { x:0.4, y:5.5, w:12.5, h:0.9, fontSize:13, color:NEUTRAL, italic:true }
   );
   s.addText(`Source: iDempiere replica, parts-only filter. As of ${TODAY}.`,
     { x:0.4, y:7.0, w:12.5, h:0.3, fontSize:10, color:'A0A0A0', align:'right' });
 }
 
-// ---------- Slide 2: Operational health ----------
-{
-  const s = pptx.addSlide();
-  s.background = { color: 'FFFFFF' };
-  s.addText('Operational Health', { x:0.4, y:0.3, w:12.5, h:0.6, fontSize:28, bold:true, color:ACCENT });
-  s.addText(`${PERIOD}  •  validation, delivery performance, cycle benchmarks`,
-    { x:0.4, y:0.9, w:12.5, h:0.4, fontSize:14, color:NEUTRAL, italic:true });
-
-  // Left: status / past-due tiles
-  const validatedPct = fact.length>0 ? validated.length / fact.length : null;
-  const pastDuePct   = fact.length>0 ? pastDue.length    / fact.length : null;
-  const notRecvPct   = fact.length>0 ? notReceived.length / fact.length : null;
-
-  const tiles = [
-    { label:'Lines Validated', value:fmtPct(validatedPct), sub:`${fmtNum(validated.length)} of ${fmtNum(fact.length)}`, color:GREEN },
-    { label:'Past Due',        value:fmtPct(pastDuePct),   sub:`${fmtNum(pastDue.length)} lines  •  ${fmtMoney(pastDue.reduce((s,r)=>s+(r.po_spend||0),0))} exposure`, color:RED },
-    { label:'Not Received',    value:fmtPct(notRecvPct),   sub:`${fmtNum(notReceived.length)} lines  •  ${fmtMoney(openExposure)} open PO $`, color:ACCENT },
-    { label:'Open SO at Risk', value:fmtMoney(openCommitRevenue), sub:'attributed SO revenue tied to NOT_RECEIVED lines', color:ACCENT },
-  ];
-  const tileX = 0.4, tileY = 1.6, tileW = 5.8, tileH = 1.2, gap = 0.18;
-  tiles.forEach((t, i) => {
-    const y = tileY + i * (tileH + gap);
-    s.addShape(pptx.ShapeType.rect, { x:tileX, y, w:tileW, h:tileH, fill:{color:'F8F8F8'}, line:{color:t.color, width:2} });
-    s.addText(t.value, { x:tileX+0.2, y:y+0.1, w:2.5, h:0.9, fontSize:30, bold:true, color:t.color });
-    s.addText(t.label, { x:tileX+2.9, y:y+0.1, w:2.8, h:0.5, fontSize:14, bold:true, color:ACCENT });
-    s.addText(t.sub,   { x:tileX+2.9, y:y+0.55, w:2.8, h:0.6, fontSize:11, color:NEUTRAL });
-  });
-
-  // Right: cycle benchmark table
-  const cycleTbl = [
-    [
-      { text:'Cycle Stage (days)', options:{bold:true, color:'FFFFFF', fill:{color:ACCENT}} },
-      { text:'Median',  options:{bold:true, color:'FFFFFF', fill:{color:ACCENT}, align:'center'} },
-      { text:'P75',     options:{bold:true, color:'FFFFFF', fill:{color:ACCENT}, align:'center'} },
-      { text:'P90',     options:{bold:true, color:'FFFFFF', fill:{color:ACCENT}, align:'center'} },
-      { text:'Max',     options:{bold:true, color:'FFFFFF', fill:{color:ACCENT}, align:'center'} },
-    ],
-    ...cycleBenchmarks.map(b => [
-      { text:b.label, options:{} },
-      { text:String(b.median ?? '—'), options:{align:'center'} },
-      { text:String(b.p75 ?? '—'),    options:{align:'center'} },
-      { text:String(b.p90 ?? '—'),    options:{align:'center'} },
-      { text:String(b.max ?? '—'),    options:{align:'center'} },
-    ]),
-  ];
-  s.addText('Cycle Benchmarks (validated lines only)', { x:6.5, y:1.6, w:6.5, h:0.4, fontSize:14, bold:true, color:ACCENT });
-  s.addTable(cycleTbl, { x:6.5, y:2.05, w:6.5, fontSize:11, border:{type:'solid', color:'D0D0D0', pt:0.5}, colW:[3.1, 0.85, 0.85, 0.85, 0.85] });
-  s.addText(`n = ${validatedOnly.length} validated lines.  Stage 1 = vendor lead + transit. Stage 2 = receipt → inspection bench. Stage 3 = inspection work.`,
-    { x:6.5, y:5.6, w:6.5, h:0.9, fontSize:10, color:NEUTRAL, italic:true });
-
-  s.addText(`Source: iDempiere replica. As of ${TODAY}.`,
-    { x:0.4, y:7.0, w:12.5, h:0.3, fontSize:10, color:'A0A0A0', align:'right' });
-}
-
-// ---------- Slide 3: Concentration ----------
+// ---------- Slide 2: Concentration ----------
+// (Operational-health slide intentionally omitted — management deck stays
+//  focused on headline economics + concentration. Operational metrics
+//  remain in the xlsx tabs.)
 {
   const s = pptx.addSlide();
   s.background = { color: 'FFFFFF' };
@@ -754,18 +756,37 @@ function fmtNum(v)     { return v == null ? '—' : Number(v).toLocaleString('en
   makeTbl('Top 10 Manufacturers', top10Mfr,  'Manufacturer', 0.4, 1.4, 6.2);
   makeTbl('Top 10 Suppliers',     top10Supp, 'Supplier',     6.8, 1.4, 6.2);
 
-  // Concentration narrative
+  // Concentration narrative — includes a Tracy shoutout on the buyer side
   const top10MfrSpend = top10Mfr.reduce((a,b)=>a+(b.spend||0), 0);
   const top10SuppSpend = top10Supp.reduce((a,b)=>a+(b.spend||0), 0);
+  // Pull the single top buyer for the shoutout (computed from byBuyer earlier)
+  const topBuyer = byBuyer && byBuyer.length ? byBuyer[0] : null;
+  const topBuyerShare = (topBuyer && grand>0) ? topBuyer.spend/grand : null;
+  const shoutout = topBuyer
+    ? `Buyer-side note: ${topBuyer.buyer} drove ${fmtPct(topBuyerShare)} (${fmtMoney(topBuyer.spend)}) of the period's purchasing — largely the memory bulk-buy activity behind the concentration above.`
+    : '';
   s.addText(
     `Top 10 MFRs = ${fmtPct(grand>0 ? top10MfrSpend/grand : null)} of spend.  ` +
     `Top 10 suppliers = ${fmtPct(grand>0 ? top10SuppSpend/grand : null)} of spend.  ` +
     `Long tail in raw workbook (MFR Breakdown + By Supplier tabs).`,
-    { x:0.4, y:6.6, w:12.5, h:0.4, fontSize:11, color:NEUTRAL, italic:true }
+    { x:0.4, y:6.4, w:12.5, h:0.4, fontSize:11, color:NEUTRAL, italic:true }
   );
+  if (shoutout) {
+    s.addText(shoutout, { x:0.4, y:6.75, w:12.5, h:0.35, fontSize:11, color:ACCENT, bold:true, italic:true });
+  }
   s.addText(`Source: iDempiere replica. As of ${TODAY}.`,
     { x:0.4, y:7.0, w:12.5, h:0.3, fontSize:10, color:'A0A0A0', align:'right' });
 }
+
+// (By-Buyer slide intentionally omitted — the 42 distinct-buyer count
+//  overstates the real buying team because it includes coverage / one-off
+//  assignments. A Tracy shoutout lives in the slide 2 narrative instead.
+//  Full buyer roster remains in the xlsx 'By Buyer' tab.)
+
+// (Sales-Mix-by-RFQ-Type slide intentionally omitted from the deck — most of
+//  the line volume is broker-on-RFQ sales-side activity that is not the
+//  operator's reporting lane. The Sales Mix tab in the xlsx retains the full
+//  breakdown for reference / other audiences.)
 
 pptx.writeFile({ fileName: OUT_PPTX }).then(() => {
   console.log(`  ✓ ${OUT_PPTX}`);
@@ -775,13 +796,12 @@ pptx.writeFile({ fileName: OUT_PPTX }).then(() => {
   // ---------------------------------------------------------------------------
   console.log(`\n[3/3] Done.`);
   console.log(`  Period:                 ${PERIOD}`);
-  console.log(`  PO lines (parts):       ${fmtNum(fact.length)}`);
   console.log(`  Distinct POVs:          ${fmtNum(distinctPovs)}`);
-  console.log(`  PO spend:               ${fmtMoney2(totalSpend)}`);
-  console.log(`  Attributed revenue:     ${fmtMoney2(totalRevenue)}`);
-  console.log(`  Booked margin:          ${fmtPct(totalRevenue>0 ? (totalRevenue-totalSpend)/totalRevenue : null)}`);
-  console.log(`  Validation rate:        ${fmtPct(fact.length>0 ? validated.length/fact.length : null)}`);
-  console.log(`  Past-due lines:         ${fmtNum(pastDue.length)}  (${fmtMoney(pastDue.reduce((s,r)=>s+(r.po_spend||0),0))} exposure)`);
+  console.log(`  PO lines (parts):       ${fmtNum(fact.length)}`);
+  console.log(`  Suppliers / MFRs:       ${fmtNum(distinctSuppliers)} / ${fmtNum(distinctMfrs)}`);
+  console.log(`  Buyers:                 ${fmtNum(distinctBuyers)}`);
+  console.log(`  Total PO spend:         ${fmtMoney2(totalSpend)}`);
   console.log(`  CPCs with VQ:           ${fmtNum(cpcsWithVq)}`);
-  console.log(`  VQ→PO+SO converted:     ${fmtNum(cpcsConverted)} (${fmtPct(conversionPct)})`);
+  console.log(`  VQ → PO conversion:     ${fmtNum(cpcsToPo)} (${fmtPct(vqToPoPct)})`);
+  console.log(`  (Finance ref) revenue:  ${fmtMoney2(totalRevenue)}  margin: ${fmtPct(totalRevenue>0 ? (totalRevenue-totalSpend)/totalRevenue : null)}`);
 });

@@ -36,13 +36,17 @@ Outputs land in `output/<label>/`:
 | 10 | **Cycle Times** | Per-line breakdown of all 4 stages |
 | 11 | **All Lines** | Full dataset with ~40 columns |
 
-## What the PowerPoint produces (3 slides)
+## What the PowerPoint produces (2 slides — purchasing lens)
 
-1. **Headline Metrics** — POVs, lines, suppliers, customers, PO spend, attributed revenue, booked margin, VQ→PO+SO conversion %. KPI tile grid.
-2. **Operational Health** — Validation %, past-due %, not-received %, open SO at risk, plus the 4-stage cycle benchmark table.
-3. **Spend Concentration** — Top 10 manufacturers + top 10 suppliers by PO spend (with % of total).
+1. **Purchasing Activity — Headline** — POVs, PO lines, suppliers, manufacturers, total PO spend, customers served, CPCs sourced, **VQ→PO conversion** (pure sourcing-execution rate, no SO dependence; auto-match VQs from CalcuQuote/StockCQ bpartners excluded). KPI tile grid.
+2. **Spend Concentration** — Top 10 manufacturers + top 10 suppliers by PO spend (with % of total). Bottom-of-slide narrative includes a one-line shoutout to the top buyer for the period (memory-bulk-buy concentration angle).
 
-Designed for a 1-3 slide management-meeting view. Detail trends live in the raw xlsx tabs.
+**Sales Mix data is computed and dropped into the xlsx 'Sales Mix' tab**, but intentionally NOT on the deck — most of the line volume is sales-side activity (Shortage, PPV, EOL) owned by other reporters, so including it on a purchasing operator's deck creates scope confusion. The Stock segment specifically is ~2% of iDempiere-tracked SO lines, and the iDempiere number undercounts (pure-stock sales handled entirely in Infor aren't captured). For Stock-segment reporting use the dedicated Stock workflows + an Infor extract, not this deck.
+
+**Intentionally excluded from the deck:**
+- **Buyer counts and By-Buyer leaderboard** — the raw `distinct_buyers` figure (e.g., 42 for Jan-Apr) counts every ad_user assigned to any PO line including coverage / one-off assignments, so it overstates the actual buying team. The full buyer roster lives in the `By Buyer` xlsx tab; the deck only acknowledges the single top buyer in the slide 2 narrative.
+- **Finance metrics** — attributed revenue, booked margin, GP, SO at risk. Live in the Summary / By Customer / MFR Breakdown tabs for finance/sales audiences.
+- **Operational health** — validation %, past-due %, cycle benchmarks. Live in Summary / Cycle Benchmarks / Open Past-Due tabs. The commented-out operational-health block in `build-po-activity.js` can be re-enabled for a different audience.
 
 ## 4-stage cycle definition
 
