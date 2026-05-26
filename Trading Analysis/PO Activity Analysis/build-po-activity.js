@@ -8,15 +8,21 @@
  * Usage:
  *   node build-po-activity.js --start 2026-01-01 --end 2026-05-01 --label 2026-Jan-Apr
  *   node build-po-activity.js --start 2026-01-01 --end 2026-02-01 --label 2026-Jan
+ *   node build-po-activity.js --label 2026-Jan-Apr --no-sql   # re-render xlsx+pptx from existing CSVs (no OT query)
  *
  * end-date is EXCLUSIVE (first day of the month AFTER the last month you want).
+ *
+ * --no-sql : skip the psql re-query and rebuild the workbook + deck from the CSVs
+ *            already in <out-dir>/. Use for visual/layout/wording iteration so we
+ *            don't re-hit OT. --start/--end are not required in this mode.
  *
  * Outputs (under <out-dir>/, default ./output/<label>/):
  *   <label>_POs.csv                — line-level fact table
  *   <label>_MFR_breakdown.csv      — cumulative top-50 MFR aggregation
  *   <label>_CPC_conversion.csv     — per-CPC VQ→PO+SO conversion detail
- *   <label>_POs_Analysis.xlsx      — 11-tab Excel workbook
- *   <label>_POs_Slides.pptx        — 3-slide management deck
+ *   <label>_SO_mix_by_rfq_type.csv — SO line-count mix by RFQ type
+ *   <label>_POs_Analysis.xlsx      — 12-tab Excel workbook
+ *   <label>_POs_Slides.pptx        — 2-slide management deck
  */
 
 const fs = require('fs');
@@ -24,6 +30,7 @@ const path = require('path');
 const { execFileSync } = require('child_process');
 const XLSX = require('xlsx');
 const PptxGenJS = require('pptxgenjs');
+const { canonicalMfr, prenormalizeMfr } = require(path.join(__dirname, '..', '..', 'shared', 'mfr-equivalence'));
 
 // ---------------------------------------------------------------------------
 // CLI
@@ -42,13 +49,18 @@ function parseArgs(argv) {
   return out;
 }
 const args = parseArgs(process.argv.slice(2));
-if (!args.start || !args.end || !args.label) {
+const NO_SQL = !!args['no-sql'];
+// --no-sql rebuilds from existing CSVs, so --start/--end aren't needed then.
+if (!args.label || (!NO_SQL && (!args.start || !args.end))) {
   console.error('Usage: node build-po-activity.js --start YYYY-MM-DD --end YYYY-MM-DD --label <label> [--out-dir <dir>]');
   console.error('  end-date is EXCLUSIVE — use 2026-05-01 to include April 2026.');
+  console.error('  --no-sql : rebuild xlsx+pptx from existing CSVs in <out-dir> (only --label required).');
   process.exit(2);
 }
-const START = args.start;
-const END   = args.end;
+// let, not const: under --no-sql these are recovered from the run's _meta.json
+// (or derived from the data) since the operator doesn't re-pass --start/--end.
+let START = args.start;
+let END   = args.end;
 const LABEL = args.label;
 const SCRIPT_DIR = __dirname;
 const OUT_DIR = path.resolve(args['out-dir'] || path.join(SCRIPT_DIR, 'output', LABEL));
@@ -62,36 +74,63 @@ const OUT_CONV_CSV  = path.join(OUT_DIR, `${LABEL}_CPC_conversion.csv`);
 const OUT_MIX_CSV   = path.join(OUT_DIR, `${LABEL}_SO_mix_by_rfq_type.csv`);
 const OUT_XLSX      = path.join(OUT_DIR, `${LABEL}_POs_Analysis.xlsx`);
 const OUT_PPTX      = path.join(OUT_DIR, `${LABEL}_POs_Slides.pptx`);
+const OUT_META      = path.join(OUT_DIR, `${LABEL}_meta.json`);
 
-console.log(`PO Activity Analysis — ${START} → ${END}  (label: ${LABEL})`);
+// Under --no-sql, recover the original date window so the period label on the
+// deck is correct. Prefer the meta file written by a prior real run; fall back
+// to deriving it from the fact CSV's po_date range (covers CSVs built before
+// _meta.json existed). START/END stay undefined here only if both fail — the
+// formatPeriod call later tolerates that and the data-derived path kicks in.
+if (NO_SQL && fs.existsSync(OUT_META)) {
+  try {
+    const meta = JSON.parse(fs.readFileSync(OUT_META, 'utf8'));
+    START = START || meta.start;
+    END   = END   || meta.end;
+  } catch (_) { /* fall through to data-derived period below */ }
+}
+
+console.log(`PO Activity Analysis — ${START || '(from data)'} → ${END || '(from data)'}  (label: ${LABEL})`);
 console.log(`Outputs in: ${OUT_DIR}`);
 
 // ---------------------------------------------------------------------------
-// Phase 1: substitute SQL template + run psql
+// Phase 1: substitute SQL template + run psql  (skipped under --no-sql)
 // ---------------------------------------------------------------------------
-const template = fs.readFileSync(TEMPLATE_SQL, 'utf8');
-const filledSql = template
-  .replace(/@START_DATE@/g, START)
-  .replace(/@END_DATE@/g, END)
-  .replace(/@OUT_CSV@/g, OUT_CSV)
-  .replace(/@OUT_MFR_CSV@/g, OUT_MFR_CSV)
-  .replace(/@OUT_CONV_CSV@/g, OUT_CONV_CSV)
-  .replace(/@OUT_MIX_CSV@/g, OUT_MIX_CSV);
-const tmpSql = path.join(OUT_DIR, `_${LABEL}_run.sql`);
-fs.writeFileSync(tmpSql, filledSql);
+if (NO_SQL) {
+  console.log('\n[1/3] --no-sql: skipping psql, rebuilding from existing CSVs.');
+  const missing = [OUT_CSV, OUT_MFR_CSV, OUT_CONV_CSV, OUT_MIX_CSV].filter(f => !fs.existsSync(f));
+  if (missing.length) {
+    console.error('--no-sql requires the CSVs from a prior run, but these are missing:');
+    missing.forEach(f => console.error(`  ${f}`));
+    console.error('Run once without --no-sql to generate them first.');
+    process.exit(1);
+  }
+} else {
+  const template = fs.readFileSync(TEMPLATE_SQL, 'utf8');
+  const filledSql = template
+    .replace(/@START_DATE@/g, START)
+    .replace(/@END_DATE@/g, END)
+    .replace(/@OUT_CSV@/g, OUT_CSV)
+    .replace(/@OUT_MFR_CSV@/g, OUT_MFR_CSV)
+    .replace(/@OUT_CONV_CSV@/g, OUT_CONV_CSV)
+    .replace(/@OUT_MIX_CSV@/g, OUT_MIX_CSV);
+  const tmpSql = path.join(OUT_DIR, `_${LABEL}_run.sql`);
+  fs.writeFileSync(tmpSql, filledSql);
 
-console.log('\n[1/3] Running psql…');
-let psqlOut;
-try {
-  psqlOut = execFileSync('psql', ['-f', tmpSql], { encoding: 'utf8', stdio: ['ignore','pipe','pipe'] });
-} catch (e) {
-  console.error('psql failed:', e.stderr || e.message);
-  process.exit(1);
+  console.log('\n[1/3] Running psql…');
+  let psqlOut;
+  try {
+    psqlOut = execFileSync('psql', ['-f', tmpSql], { encoding: 'utf8', stdio: ['ignore','pipe','pipe'] });
+  } catch (e) {
+    console.error('psql failed:', e.stderr || e.message);
+    process.exit(1);
+  }
+  // Echo summary tail so the operator sees the conversion % + status breakdown live
+  const tail = psqlOut.split('\n').slice(-40).join('\n');
+  console.log(tail);
+  fs.unlinkSync(tmpSql);
+  // Persist the run window so a later --no-sql rebuild reproduces the period label.
+  fs.writeFileSync(OUT_META, JSON.stringify({ start: START, end: END, label: LABEL, builtAt: new Date().toISOString() }, null, 2));
 }
-// Echo summary tail so the operator sees the conversion % + status breakdown live
-const tail = psqlOut.split('\n').slice(-40).join('\n');
-console.log(tail);
-fs.unlinkSync(tmpSql);
 
 // ---------------------------------------------------------------------------
 // Phase 2: read the three CSVs
@@ -172,18 +211,54 @@ const fact = loadCsv(OUT_CSV, (r, idx) => ({
   receipt_picked_date:  dateOnly(r[idx.receipt_picked_date]),
 })).rows;
 
-const mfrRows = loadCsv(OUT_MFR_CSV, (r, idx) => ({
-  mfr:                str(r[idx.mfr]),
-  po_lines:           num(r[idx.po_lines]),
-  supplier_count:     num(r[idx.supplier_count]),
-  customer_count:     num(r[idx.customer_count]),
-  spend:              num(r[idx.spend]),
-  revenue:            num(r[idx.revenue]),
-  booked_gp:          num(r[idx.booked_gp]),
-  booked_margin_pct:  num(r[idx.booked_margin_pct]),
-  validation_rate:    num(r[idx.validation_rate]),
-  past_due_rate:      num(r[idx.past_due_rate]),
-})).rows;
+// MFR breakdown is re-aggregated here by CANONICAL manufacturer
+// (shared/mfr-equivalence) rather than the raw OT-master names the SQL grouped
+// on. OT keeps acquired brands and formatting variants as separate chuboe_mfr
+// records (Xilinx vs AMD, Altera vs Intel, "Texas Instruments" vs "TI", …), so a
+// raw distinct count overstates true distinct companies. Collapsing them feeds
+// the headline count, slide-2 concentration, and the workbook tab from one
+// consistent source. Every column is re-derived from `fact` (same definitions as
+// tmp_mfr_agg in po-activity-by-range.sql). The SQL still emits OUT_MFR_CSV as a
+// raw-name audit artifact; it is intentionally no longer read here.
+const mfrAgg = new Map(); // canonicalKey -> bucket
+for (const r of fact) {
+  const rawMfr = (r.mfr || '').trim();
+  const key = rawMfr ? (canonicalMfr(rawMfr) || rawMfr.toLowerCase()) : '(unknown)';
+  let b = mfrAgg.get(key);
+  if (!b) { b = { key, po_lines:0, suppliers:new Set(), customers:new Set(), spend:0, revenue:0, validated:0, pastDue:0, nameSpend:new Map() }; mfrAgg.set(key, b); }
+  b.po_lines++;
+  if (r.supplier) b.suppliers.add(r.supplier);
+  if (r.customer) b.customers.add(r.customer);
+  const lineSpend = (r.po_qty || 0) * (r.po_price || 0);
+  b.spend   += lineSpend;
+  b.revenue += (r.so_revenue || 0);
+  if (r.otin_status === 'VALIDATED' || r.otin_status === 'PROCESSED') b.validated++;
+  if (r.delivery_status === 'past_due') b.pastDue++;
+  if (rawMfr) b.nameSpend.set(rawMfr, (b.nameSpend.get(rawMfr) || 0) + lineSpend);
+}
+// Display label per canonical group: prefer a parent-brand member (its
+// prenormalized form equals the canonical key, so it isn't an acquisition alias),
+// tie-broken by spend; else the highest-spend raw name; else the key.
+function displayMfr(b) {
+  if (b.key === '(unknown)') return '(unknown)';
+  const members = [...b.nameSpend.entries()];
+  if (!members.length) return b.key;
+  const isParent = n => (prenormalizeMfr(n) || '').toLowerCase().replace(/\s+/g,' ').trim() === b.key;
+  members.sort((a, c) => (isParent(c[0]) - isParent(a[0])) || (c[1] - a[1]));
+  return members[0][0];
+}
+const mfrRows = [...mfrAgg.values()].map(b => ({
+  mfr:                displayMfr(b),
+  po_lines:           b.po_lines,
+  supplier_count:     b.suppliers.size,
+  customer_count:     b.customers.size,
+  spend:              b.spend,
+  revenue:            b.revenue,
+  booked_gp:          b.revenue - b.spend,
+  booked_margin_pct:  b.revenue > 0 ? (b.revenue - b.spend) / b.revenue : null,
+  validation_rate:    b.po_lines > 0 ? b.validated / b.po_lines : null,
+  past_due_rate:      b.po_lines > 0 ? b.pastDue  / b.po_lines : null,
+})).sort((a, c) => (c.spend || 0) - (a.spend || 0));
 
 const convRows = loadCsv(OUT_CONV_CSV, (r, idx) => ({
   cpc:        str(r[idx.cpc]),
@@ -331,7 +406,9 @@ const distinctPovs = new Set(fact.map(r=>r.infor_pov)).size;
 const distinctBuyers = new Set(fact.map(r=>r.buyer).filter(Boolean)).size;
 const distinctSuppliers = new Set(fact.map(r=>r.supplier).filter(Boolean)).size;
 const distinctCustomers = new Set(fact.map(r=>r.customer).filter(Boolean)).size;
-const distinctMfrs = new Set(fact.map(r=>r.mfr).filter(Boolean)).size;
+// Canonical distinct-company count (acquisitions + variants collapsed), not raw
+// OT-master names — see the mfrRows re-aggregation above.
+const distinctMfrs = mfrRows.filter(r => r.mfr !== '(unknown)').length;
 
 // Conversion headline numbers
 const cpcsWithVq = convRows.length;
@@ -352,6 +429,15 @@ function formatPeriod(start, endExcl) {
   if (sM === eM && sY === eY) return `${sM} ${sY}`;
   if (sY === eY)               return `${sM} through ${eM} ${sY}`;
   return `${sM} ${sY} through ${eM} ${eY}`;
+}
+// Fallback for --no-sql on CSVs predating _meta.json: derive the window from
+// the fact data's po_date range so the period label is never "undefined".
+if (!START || !END) {
+  const dates = fact.map(r => r.po_date).filter(Boolean).sort();
+  if (dates.length) {
+    if (!START) START = dates[0];
+    if (!END) { const e = new Date(dates[dates.length-1]); e.setUTCDate(e.getUTCDate()+1); END = e.toISOString().slice(0,10); }
+  }
 }
 const PERIOD = formatPeriod(START, END);
 

@@ -27,6 +27,12 @@ The "Cross-applies?" column is the load-bearing one — say which sibling loader
 
 ---
 
+## 2026-05-26
+
+| Date | Loader(s) | Change | Cross-applies? | Commit |
+|---|---|---|---|---|
+| 2026-05-26 | vq-loading | **Escalations internal-only.** Retired VQ's broker-outreach override AND the two-email split (`41b6362`). `resolveOutreachRecipients` now builds ONE internal recipient list (operator + internal forwarder + buyer via new `partner-lookup.resolveAstuteUserById(buyerId)` + internal Cc); the external broker is recorded (`externalSender`) but never emailed. `sendSplitRecipientEmail` collapsed to a single internal email; `recipientsFooter`/`externalSenderLabel` show the operator exactly who got it. Breadcrumb fields → `recipients` + `external_sender_not_emailed`. Trigger: UID 8684 — the split sent forwarder Ivy a separate copy the operator couldn't see, reading as "forwarder skipped." | **Operator-scoped to VQ only** (operator: "On VQs it should only be internal… this may apply differently to other loaders"). Do NOT propagate to stockrfq/excess/rfq-loading — several legitimately email external parties. The split-recipient pattern from `41b6362` was never adopted elsewhere. New `resolveAstuteUserById` helper in `partner-lookup.js` is shared/additive and safe for any loader to reuse. | _(uncommitted)_ |
+
 ## 2026-05-22
 
 | Date | Loader(s) | Change | Cross-applies? | Commit |

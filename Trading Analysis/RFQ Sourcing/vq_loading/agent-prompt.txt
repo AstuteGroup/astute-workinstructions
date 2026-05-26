@@ -552,21 +552,20 @@ Apply these recovery steps in order. Each one is a "before you bounce, try this"
 This breadcrumb makes the escalation auditable — was bouncing necessary, or did the agent prematurely surrender? The pattern is the new "show your work" requirement before escalation.
 
 ────────────────────────────────────────────
-3.7.6 — SENDER outreach on escalations (VQ-specific override).
+3.7.6 — Escalation routing is INTERNAL-ONLY (operator directive 2026-05-26).
 ────────────────────────────────────────────
 
-**VQ overrides the standing "info-requests go to operator, never the external sender" policy** (memory feedback_info_requests_go_to_operator_not_origin.md is excess/stockrfq policy; VQ is different).
+**VQ clarifications/escalations go ONLY to internal Astute staff — never the external broker.** This RETIRES the earlier VQ-specific broker-outreach override. Rationale: VQ loading is internal data capture; the buyer/sourcer or the support forwarder is the internal owner who chases the broker, not the loader. (This realigns VQ with the standing operator-policy spirit of feedback_info_requests_go_to_operator_not_origin.md.)
 
-Reason: VQ replies almost always go to a broker who CAN answer "what's the unit price?", "what's your legal company name?", "could you resend as Excel?" — the questions are about their own quote. The operator (Jake) still gets visibility via CC and the answer round-trips through vq@ for next-tick stitching.
+**Routing the handlers apply automatically (`need_info_vendor`, `clarify_vendor`, `needs_vendor`, `needs_review`, partial-load `clarifications[]`):**
+  - ONE email to: operator (Jake) + internal forwarder (envelope From, if @astutegroup.com) + the resolved buyer (from `buyerId`) + any @astutegroup.com address already on the Cc.
+  - The external broker is RECORDED on the email body ("external sender — not emailed") so the operator can loop them in manually, but is NEVER a recipient.
+  - Reply-To = vq@ → an internal reply round-trips and the sidecar-stitch path picks it up next tick.
+  - No usable internal sender → operator-only.
 
-**Routing the handlers apply automatically when `senderEmail` is in the payload:**
-  - `need_info_vendor`, `clarify_vendor`, `needs_vendor`, `needs_review` → TO=senderEmail, CC=Jake
-  - Reply-To = vq@ → reply round-trips, sidecar-stitch path picks it up
-  - When `senderEmail` is missing/unparseable → handler falls back to operator-only (legacy behavior preserved)
+**Your job:** still pass `senderEmail` (external broker) and `buyerId` on escalation payloads when you have them — `buyerId` is what loops the buyer in; `senderEmail` is recorded for the operator's manual loop-in. Do NOT describe the broker as "emailed" in your run narration — they are not.
 
-**Your job:** ALWAYS include `senderEmail` on escalation payloads when you have it. The deepest non-Astute broker From: address — same value you'd pass on `load_vq`. Type 2 bulk summaries: the senderEmail will be the Astute compiler; still useful (Gopal/etc. can answer or forward).
-
-**MULTI-VENDOR partial-load (the calibration target):** when one inbound email has quotes from N vendors and you can confidently load M of them but the remaining (N−M) have issues, DO NOT bounce the whole email. Load what you can via `load_vq` AND include `clarifications[]` in the same payload describing the outstanding asks per problematic vendor. The handler writes the clean VQs, then fires ONE consolidated email to the sender (CC Jake) covering all the loose ends in one go. The sidecar (kind=`partial_clarify`) holds the outstanding state for next-tick reply-stitching.
+**MULTI-VENDOR partial-load (the calibration target):** when one inbound email has quotes from N vendors and you can confidently load M of them but the remaining (N−M) have issues, DO NOT bounce the whole email. Load what you can via `load_vq` AND include `clarifications[]` in the same payload describing the outstanding asks per problematic vendor. The handler writes the clean VQs, then fires ONE consolidated INTERNAL email (operator + forwarder + buyer) covering all the loose ends. The sidecar (kind=`partial_clarify`) holds the outstanding state for next-tick reply-stitching.
 
 `clarifications[]` shape on the `load_vq` payload — each section MUST include `pendingQuotes[]` (the partial quote stubs you already extracted for that vendor, missing only the asks). The sidecar persists these so the reply-tick agent merges answers into structured stubs instead of re-extracting from email body — that's what scopes the merge to the unloaded vendors only and avoids double-writes against the already-loaded ones:
 
@@ -596,7 +595,7 @@ Reason: VQ replies almost always go to a broker who CAN answer "what's the unit 
 
 The handler also derives `loaded_vendors` automatically from the input `quotes[]` and persists it in the sidecar. On reply, the agent reads `pending_state.loaded_vendors` and NEVER includes those vendors in the merge load_vq.
 
-Use `clarifications[]` for the partial-load multi-vendor case ONLY. For single-vendor failures or whole-email failures, use the normal escalation actions (`need_info_vendor` / `clarify_vendor` / `needs_vendor` / `needs_review`) — they also do sender outreach.
+Use `clarifications[]` for the partial-load multi-vendor case ONLY. For single-vendor failures or whole-email failures, use the normal escalation actions (`need_info_vendor` / `clarify_vendor` / `needs_vendor` / `needs_review`) — they route to the internal owners (operator + forwarder + buyer), not the broker.
 
 ────────────────────────────────────────────
 3.8 — VENDOR resolution.
@@ -646,7 +645,7 @@ For each quote, resolve the vendor BP. **The only role filter is `isactive='Y'`.
     - Pass 1 returns 0, Pass 2 returns ≥1 → route `clarify_vendor` with the inactive candidates (each `isactive: false` in the candidate object). The candidates' names often include `USE <N>` pointers — operator decides whether to reactivate, redirect to the pointer, or skip. Same payload shape as the ambiguous case; the email surfaces the inactive flag explicitly.
     - Pass 2 also returns 0 → route `needs_vendor` with `{vendorName, vendorEmail, extracted: <quotes>, subject, outerFrom, senderEmail}`. keepsPending — sidecar waits for Jake to add the vendor; next tick auto-detects and loads.
 
-  **Reminder:** include `senderEmail` on every escalation payload per step 3.7.6 so the handler can outreach to the broker (CC Jake) instead of operator-only.
+  **Reminder:** include `senderEmail` (external broker, recorded for context only) AND `buyerId` (loops the internal buyer in) on every escalation payload per step 3.7.6. Routing is internal-only — the broker is never emailed.
 
 The loadBulkSummary library also handles vendor resolution server-side — passing `vendorName` alone (no `vendorSearchKey`) lets it fall back to name fuzzy match. But the agent should resolve up front when the data is available, so it can route clarify/needs_vendor for ambiguity rather than having the writer drop the quote silently as `VENDOR_NOT_FOUND`.
 
@@ -695,8 +694,8 @@ Build the payload:
     "clarifications": [
       // OPTIONAL — only when this is a partial-load (some vendors clean, others
       // need follow-up). See step 3.7.6 for shape + when to use. Omit when
-      // everything loaded cleanly. Triggers consolidated email to sender (CC Jake)
-      // and a sidecar (kind="partial_clarify") that survives across ticks.
+      // everything loaded cleanly. Triggers ONE consolidated INTERNAL email
+      // (operator + forwarder + buyer) and a sidecar (kind="partial_clarify").
     ]
   }
 

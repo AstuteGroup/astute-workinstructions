@@ -544,6 +544,38 @@ function resolveAstuteUserByName(name) {
   };
 }
 
+/**
+ * Resolve an Astute employee's email + name from their AD_User_ID.
+ *
+ * The reverse of resolveAstuteUserByEmail — used when a workflow already holds
+ * a resolved buyer/owner ad_user_id (e.g. chuboe_buyer_id) and needs the email
+ * to loop that person in. Same active + IsEmployee guard as the email/name
+ * resolvers so it never returns an external contact.
+ *
+ * @param {number|string} userId - ad_user_id
+ * @returns {object|null} { userId, name, email } or null
+ */
+function resolveAstuteUserById(userId) {
+  if (userId == null || userId === '') return null;
+  const id = Number(userId);
+  if (!Number.isFinite(id)) return null;
+
+  const sql = `
+    SELECT u.ad_user_id, u.name, u.email
+    FROM adempiere.ad_user u
+    JOIN adempiere.c_bpartner bp ON u.c_bpartner_id = bp.c_bpartner_id
+    WHERE u.ad_user_id = ${id}
+      AND u.isactive = 'Y'
+      AND bp.isactive = 'Y'
+      AND bp.isemployee = 'Y'
+    LIMIT 1
+  `;
+  const rows = parseResults(psqlQuery(sql), ['userId', 'name', 'email']);
+  if (rows.length === 0) return null;
+  const r = rows[0];
+  return { userId: Number(r.userId), name: r.name, email: r.email };
+}
+
 // ─── USER ROLE REGISTRY ─────────────────────────────────────────────────────
 //
 // Operator-maintained list of confirmed buyers + support. Drives the buyer-
@@ -750,6 +782,7 @@ module.exports = {
   // Astute-employee resolution (forwarder-vs-owner pattern)
   resolveAstuteUserByEmail,
   resolveAstuteUserByName,
+  resolveAstuteUserById,
 
   // User role registry (buyer/support classification + ladder)
   loadUserRoleRegistry,

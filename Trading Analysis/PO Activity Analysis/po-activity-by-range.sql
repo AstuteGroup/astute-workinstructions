@@ -43,6 +43,12 @@ WHERE ol.isactive='Y' AND o.issotrx='N' AND ol.chuboe_po_string LIKE 'POV%'
   AND o.dateordered >= '@START_DATE@'::date AND o.dateordered < '@END_DATE@'::date
   -- Exclude services / testing / fees / freight (parts only)
   AND COALESCE(ol.chuboe_mpn, '') !~* '\m(SERVICE|TESTING|FEE|CHARGE|EXPEDIT|FREIGHT|SHIPPING)\M'
+  -- Exclude test-house vendors (independent QA / inspection labs — not component purchases).
+  -- NB: "Ma Labs" (a component distributor) is intentionally NOT excluded.
+  --   1002731 White Horse Laboratories Ltd
+  --   1000337 GETS Global Electronics Testing LLC   1011454 GETS HK
+  --   1000496 AAA Test Lab, Inc.
+  AND o.c_bpartner_id NOT IN (1002731, 1000337, 1011454, 1000496)
   AND NOT EXISTS (
     SELECT 1 FROM adempiere.chuboe_vq_line v2
     JOIN adempiere.chuboe_mfr m2 ON m2.chuboe_mfr_id = v2.chuboe_mfr_id
