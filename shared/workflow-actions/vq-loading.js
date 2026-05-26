@@ -27,7 +27,7 @@
 const fs = require('fs');
 const path = require('path');
 const { loadBulkSummary } = require('../load-bulk-summary');
-const { isKnownBuyer, isKnownSupport, resolveBuyerFromRegistry } = require('../partner-lookup');
+const { isKnownBuyer, isKnownSupport, resolveBuyerFromRegistry, resolveAstuteUserById } = require('../partner-lookup');
 const pending = require('../workflow-pending-state');
 const breadcrumbs = require('../breadcrumbs');
 const writerAttribution = require('../writer-attribution');
@@ -591,15 +591,16 @@ ${sections}
   const operatorHtml = `<html><body style="font-family:Arial,sans-serif;font-size:13px">
 <h2 style="color:#b58900">VQ Loading — partial load + clarifications</h2>
 <p><b>Subject:</b> ${esc(subject)}<br/>
-   <b>External sender:</b> ${esc(envelope.senderUsed || outerFrom || '(unknown)')}<br/>
+   <b>Original sender:</b> ${esc(externalSenderLabel(envelope, outerFrom))}<br/>
    <b>UID:</b> ${ctx.uid}<br/>
    <b>VQs written (this email):</b> ${vqsWritten || 0}<br/>
    <b>Outstanding vendor sections:</b> ${clarifications.length}</p>
 ${sections}
 <p style="background:#fff3cd;padding:10px;border-left:3px solid #b58900">
-   ${envelope.senderUsed ? `Sender (${esc(envelope.senderUsed)}) was emailed separately with the per-vendor asks above.` : 'No usable sender — this is an operator-only escalation.'} Reply to ${esc(ctx.inbox)} and the next tick will stitch.
+   Reply to ${esc(ctx.inbox)} (or have the buyer/forwarder reply) with the missing details and the next tick will stitch them onto the held quotes.
 </p>
 <p style="color:#666;font-size:11px">Sidecar: <code>~/workspace/.vq-loading-pending/${esc(ctx.anchorMessageId || '(no anchor)')}.json</code></p>
+${recipientsFooter(envelope)}
 </body></html>`;
 
   if (ctx.dryRun) {
@@ -631,8 +632,8 @@ ${sections}
     event: 'escalated-partial_clarify',
     uid: ctx.uid,
     sectionCount: clarifications.length,
-    sender_emailed: envelope.senderUsed || null,
-    cc_operator: !!envelope.cc,
+    recipients: envelope.to,
+    external_sender_not_emailed: envelope.externalSender || null,
   });
 
   return {
@@ -648,17 +649,16 @@ ${sections}
  * Email asking for missing fields (qty, price, MFR, etc.) when the
  * extractor + verifier agreed the quote is intentional but incomplete.
  *
- * ROUTING (VQ-specific override of the operator-only policy in
- * feedback_info_requests_go_to_operator_not_origin.md): TO=broker sender,
- * CC=Jake. The broker is the one who can answer "what's the qty?" — Jake
- * needs visibility on the ask + the answer. Reply-To stays vq@ so the
- * reply round-trips and the sidecar-stitch path picks it up next tick.
- * Falls back to operator-only when senderEmail isn't usable.
+ * ROUTING (internal-only, operator directive 2026-05-26): the ask goes to the
+ * internal owners — operator + internal forwarder + buyer (see
+ * resolveOutreachRecipients). We do NOT email the external broker; the buyer/
+ * forwarder chases them. Reply-To stays vq@ so an internal reply round-trips
+ * and the sidecar-stitch path picks it up next tick.
  *
  * Required payload: { missing[] }
  * Optional / accepted: { subject, extracted, outerFrom, senderEmail, recipient }
- *   senderEmail  preferred outreach target (deepest non-Astute broker)
- *   outerFrom    fallback if senderEmail absent
+ *   senderEmail  external broker address (recorded for context, NOT emailed)
+ *   outerFrom    envelope From (internal forwarder looped in if @astutegroup)
  *   recipient    IGNORED — kept for prompt back-compat with stockrfq pattern
  *   extracted    partial parse (RFQ #, line items so far) — persisted to sidecar
  *                for the merge on the reply
@@ -689,8 +689,8 @@ async function action_need_info_vendor(payload, ctx) {
       uid: ctx.uid,
       missing: missingList,
       investigation_summary: investigation_summary || null,
-      sender_emailed: envelope.senderUsed || null,
-      cc_operator: !!envelope.cc,
+      recipients: envelope.to,
+      external_sender_not_emailed: envelope.externalSender || null,
     });
   }
 
@@ -712,7 +712,7 @@ async function action_need_info_vendor(payload, ctx) {
   const operatorHtml = `<html><body style="font-family:Arial,sans-serif;font-size:13px">
 <h2 style="color:#b00">VQ Loading — info needed</h2>
 <p><b>Subject:</b> ${esc(subject)}<br/>
-   <b>External sender:</b> ${esc(envelope.senderUsed || outerFrom || '(unknown)')}<br/>
+   <b>Original sender:</b> ${esc(externalSenderLabel(envelope, outerFrom))}<br/>
    <b>UID:</b> ${ctx.uid}<br/>
    <b>Inbox:</b> ${esc(ctx.inbox)}<br/>
    ${retryCount ? `<b>Retry:</b> ${retryCount}/2<br/>` : ''}
@@ -720,10 +720,11 @@ async function action_need_info_vendor(payload, ctx) {
 <p><b>Missing fields:</b></p>
 <ul>${missingItemsOperator || '<li>(none specified)</li>'}</ul>
 <p style="background:#f5f5f5;padding:10px;border-left:3px solid #b00">
-   <b>Reply to ${esc(ctx.inbox)} with the missing values</b> — the next agent tick will merge your answers with the parsed quotes and load the VQs.
+   <b>Reply to ${esc(ctx.inbox)} with the missing values</b> (or have the buyer/forwarder reply) — the next agent tick will merge the answers with the parsed quotes and load the VQs.
 </p>
 <p style="color:#666;font-size:11px">To discard instead of answering: reply with <code>SKIP</code>, <code>DROP</code>, <code>IGNORE</code>, or <code>DISCARD</code> on the first line. The next tick will move this to NotOffer and clear the pending state.</p>
 <p style="color:#666;font-size:11px">Message moved to NeedInfo folder. Sidecar: <code>~/workspace/.vq-loading-pending/${esc(ctx.anchorMessageId || '(no anchor)')}.json</code></p>
+${recipientsFooter(envelope)}
 </body></html>`;
 
   if (ctx.dryRun) {
@@ -762,10 +763,10 @@ function missingLabel(key) {
 }
 
 /**
- * Vendor BP is ambiguous. The OPERATOR is the one who picks the BP (the sender
- * can't know which internal BP record to use) — but we still email the sender
- * (CC operator) asking them to confirm their company identity. The operator
- * then picks the BP using both the sender's confirmation and the candidate list.
+ * Vendor BP is ambiguous. The OPERATOR picks the BP. INTERNAL-ONLY routing
+ * (2026-05-26): operator + internal forwarder + buyer get the candidate list;
+ * the external broker is NOT emailed. If the buyer/forwarder needs the broker
+ * to confirm their company identity, they reach out directly.
  *
  * keepsPending: sidecar holds the partial extraction so the operator's pick
  * stitches on the next tick.
@@ -801,8 +802,8 @@ async function action_clarify_vendor(payload, ctx) {
       candidateCount: candidateList.length,
       vendorName: vendorName || null,
       investigation_summary: investigation_summary || null,
-      sender_emailed: envelope.senderUsed || null,
-      cc_operator: !!envelope.cc,
+      recipients: envelope.to,
+      external_sender_not_emailed: envelope.externalSender || null,
     });
   }
 
@@ -838,7 +839,7 @@ async function action_clarify_vendor(payload, ctx) {
 <h2 style="color:#b58900">VQ Loading — ambiguous vendor BP</h2>
 <p><b>Subject:</b> ${esc(subject)}<br/>
    <b>Vendor in email:</b> ${esc(vendorName || '(name not given)')} ${vendorEmail ? `&lt;${esc(vendorEmail)}&gt;` : ''}<br/>
-   <b>External sender:</b> ${esc(envelope.senderUsed || outerFrom || '(unknown)')}<br/>
+   <b>Original sender:</b> ${esc(externalSenderLabel(envelope, outerFrom))}<br/>
    <b>UID:</b> ${ctx.uid}<br/>
    ${retryCount ? `<b>Retry:</b> ${retryCount}/2<br/>` : ''}
 </p>
@@ -852,6 +853,7 @@ async function action_clarify_vendor(payload, ctx) {
 </p>
 <p style="color:#666;font-size:11px">To discard this thread entirely: reply with <code>SKIP</code>, <code>DROP</code>, <code>IGNORE</code>, or <code>DISCARD</code> on the first line.</p>
 <p style="color:#666;font-size:11px">Sidecar: <code>~/workspace/.vq-loading-pending/${esc(ctx.anchorMessageId || '(no anchor)')}.json</code></p>
+${recipientsFooter(envelope)}
 </body></html>`;
 
   if (ctx.dryRun) {
@@ -877,10 +879,11 @@ async function action_clarify_vendor(payload, ctx) {
 }
 
 /**
- * Vendor's domain has no active BP at all. Jake has to add the vendor to OT
- * (the sender can't do that for us), but the sender CAN supply the company
- * details Jake needs to create the record — so we email the sender (CC Jake)
- * asking for legal name / website / relationship.
+ * Vendor's domain has no active BP at all. Jake has to add the vendor to OT.
+ * INTERNAL-ONLY routing (2026-05-26): operator + internal forwarder + buyer are
+ * notified; the external broker is NOT emailed. The buyer/forwarder collects
+ * the company details (legal name / website / relationship) from the broker if
+ * Jake needs them to create the record.
  *
  * keepsPending so the sidecar survives until the agent confirms the BP
  * exists and writes.
@@ -914,8 +917,8 @@ async function action_needs_vendor(payload, ctx) {
       uid: ctx.uid,
       vendorName: vendorName || null,
       investigation_summary: investigation_summary || null,
-      sender_emailed: envelope.senderUsed || null,
-      cc_operator: !!envelope.cc,
+      recipients: envelope.to,
+      external_sender_not_emailed: envelope.externalSender || null,
     });
   }
 
@@ -939,7 +942,7 @@ async function action_needs_vendor(payload, ctx) {
 <h2 style="color:#b00">VQ Loading — vendor not in OT</h2>
 <p><b>Subject:</b> ${esc(subject)}<br/>
    <b>Vendor (from email):</b> ${esc(vendorName || '(name not given)')} ${vendorEmail ? `&lt;${esc(vendorEmail)}&gt;` : ''}<br/>
-   <b>External sender:</b> ${esc(envelope.senderUsed || outerFrom || '(unknown)')}<br/>
+   <b>Original sender:</b> ${esc(externalSenderLabel(envelope, outerFrom))}<br/>
    <b>UID:</b> ${ctx.uid}<br/>
    ${retryCount ? `<b>Retry:</b> ${retryCount}/2<br/>` : ''}
    <b>Quotes parsed (waiting to load):</b> ${quotesParsed}</p>
@@ -948,6 +951,7 @@ async function action_needs_vendor(payload, ctx) {
 </p>
 <p style="color:#888;font-size:11px">If this isn't a real vendor (e.g. broker forwarded from a personal address with no company), reply with <code>SKIP</code>, <code>DROP</code>, <code>IGNORE</code>, or <code>DISCARD</code> on the first line to discard the parsed quotes.</p>
 <p style="color:#666;font-size:11px">Sidecar: <code>~/workspace/.vq-loading-pending/${esc(ctx.anchorMessageId || '(no anchor)')}.json</code></p>
+${recipientsFooter(envelope)}
 </body></html>`;
 
   if (ctx.dryRun) {
@@ -977,9 +981,9 @@ async function action_needs_vendor(payload, ctx) {
  * agent can't safely split, PNG-only quote where vision can't parse, conflict
  * between two passes, etc.
  *
- * Routing: TO=sender (CC operator) when senderEmail provided — the sender
- * may be able to resend in a cleaner format that bypasses the failure mode.
- * Falls back to operator-only.
+ * Routing: INTERNAL-ONLY (2026-05-26) — operator + internal forwarder + buyer.
+ * The external broker is NOT emailed; if a cleaner-format resend is needed, the
+ * buyer/forwarder requests it from the broker.
  *
  * Required payload: { reason, subject, outerFrom }
  * Optional: { details, extracted, senderEmail, askSender }
@@ -1010,8 +1014,10 @@ async function action_needs_review(payload, ctx) {
       original_uid: ctx.uid,
       original_subject: subject || null,
       original_recipient: ctx.jakeEmail,
-      external_sender: outerFrom || senderEmail || null,
-      internal_forwarder: envelope.senderUsed || null,
+      external_sender: envelope.externalSender || outerFrom || senderEmail || null,
+      internal_forwarder: (ctx.currentFrom && String(ctx.currentFrom).toLowerCase().endsWith('@astutegroup.com'))
+        ? String(ctx.currentFrom).toLowerCase()
+        : null,
       reason: reason || null,
       rfq_search_key: rfqSearchKey || null,
       secondary_rfq_search_keys: Array.isArray(secondaryRfqSearchKeys) ? secondaryRfqSearchKeys : [],
@@ -1043,24 +1049,17 @@ ${operatorFooter}
   const investigationBlock = investigation_summary
     ? `<p><b>Investigation summary:</b></p><pre style="background:#eef6ff;padding:8px;white-space:pre-wrap;font-size:11px">${esc(investigation_summary)}</pre>`
     : '';
-  const senderNotifiedBlock = envelope.senderUsed
-    ? `<p style="background:#fff3cd;padding:10px;border-left:3px solid #b58900;font-size:12px">
-   <b>Sender notified:</b> ${esc(envelope.senderUsed)}<br/>
-   <b>We asked them:</b> <i>${esc(senderAsk)}</i><br/>
-   <span style="color:#666">If this question doesn't match the reason above, reply to ${esc(ctx.inbox)} to redirect — the next tick will re-route.</span>
-</p>`
-    : '';
   const operatorHtml = `<html><body style="font-family:Arial,sans-serif;font-size:13px">
 <h2 style="color:#b00">VQ Loading — needs manual review</h2>
 <p><b>Subject:</b> ${esc(subject)}<br/>
-   <b>From:</b> ${esc(envelope.senderUsed || outerFrom)}<br/>
+   <b>Original sender:</b> ${esc(externalSenderLabel(envelope, outerFrom))}<br/>
    <b>UID:</b> ${ctx.uid}</p>
 <p><b>Reason:</b> ${esc(reason)}</p>
 ${details ? `<pre style="background:#f5f5f5;padding:8px;white-space:pre-wrap;font-size:11px">${esc(details)}</pre>` : ''}
 ${investigationBlock}
 ${extractedBlock ? `<p><b>What the extractor produced:</b></p>${extractedBlock}` : ''}
-${senderNotifiedBlock}
-<p style="color:#666;font-size:11px">Message moved to NeedsReview folder.</p>
+<p style="color:#666;font-size:11px">Message moved to NeedsReview folder. Reply to ${esc(ctx.inbox)} to redirect or add detail — the next tick will re-route.</p>
+${recipientsFooter(envelope)}
 </body></html>`;
 
   if (ctx.dryRun) {
@@ -1083,8 +1082,8 @@ ${senderNotifiedBlock}
     outerFrom: envelope.senderUsed || outerFrom,
     reason,
     investigation_summary: investigation_summary || null,
-    sender_emailed: envelope.senderUsed || null,
-    cc_operator: !!envelope.cc,
+    recipients: envelope.to,
+    external_sender_not_emailed: envelope.externalSender || null,
   });
   return {
     notified: envelope.to,
@@ -1474,104 +1473,143 @@ function esc(s) {
 }
 
 /**
- * VQ-specific override of the standing operator-only escalation policy
- * (memory: feedback_info_requests_go_to_operator_not_origin.md).
+ * Operator-facing footer naming exactly who received this clarification (the
+ * internal recipient list) and, when the original message came from an external
+ * broker, a note that we did NOT email them (VQ clarifications are internal-only
+ * per the 2026-05-26 directive). Added after UID 8684, where the split-recipient
+ * design hid the forwarder's copy from the operator and read as "forwarder
+ * skipped." Insert this in every escalation's operator body.
+ */
+function recipientsFooter(envelope) {
+  const ext = envelope.externalSender
+    ? ` External sender <b>${esc(envelope.externalSender)}</b> was <b>not</b> emailed — VQ clarifications stay internal; loop them in manually if a broker reply is needed.`
+    : '';
+  return `<p style="color:#555;font-size:11px;border-top:1px solid #eee;margin-top:14px;padding-top:8px">` +
+    `Emailed (internal): <b>${esc(envelope.to)}</b>.${ext}</p>`;
+}
+
+/**
+ * Display label for the original sender in an operator body. Marks an external
+ * broker as "(external — not emailed)" since under the internal-only policy we
+ * never email them; an internal forwarder is shown plainly (they're a recipient).
+ */
+function externalSenderLabel(envelope, fallback) {
+  if (envelope.externalSender) return `${envelope.externalSender} (external — not emailed)`;
+  return fallback || '(internal forward)';
+}
+
+/**
+ * Resolve the recipients for a VQ clarification / escalation email.
  *
- * VQ replies typically come from brokers who CAN answer "what's the qty?"
- * or "what's your legal company name?" — the questions are about their own
- * quote. So we send TO the broker, CC the operator (so Jake sees the ask
- * and the eventual answer), and route the reply back to vq@ so the
- * sidecar-stitch path picks up the answer next tick.
+ * POLICY (operator directive 2026-05-26): VQ clarifications are INTERNAL-ONLY.
+ * We never email the external broker from VQ loading — the buyer/sourcer or the
+ * support forwarder is the internal owner who chases the broker. So the email
+ * goes to: operator (Jake) + the internal forwarder (the envelope From, IF it's
+ * @astutegroup.com) + any internal addresses on the original Cc + the resolved
+ * buyer. One email, all internal, full diagnostic body (no leak risk because
+ * nobody external is on it).
  *
- * Falls back to operator-only when there's no usable sender (Type 2 bulk
- * summaries that lost the original broker address, or extractor couldn't
- * pull a sender at all).
+ * This RETIRES the earlier VQ-specific broker-outreach override (the "send TO
+ * the broker, CC the operator" path). It also supersedes the split-recipient
+ * design from 41b6362 — there is no external party to protect, so there is no
+ * sanitized sender copy to split off. See UID 8684 (forwarder Ivy was emailed
+ * a separate copy the operator couldn't see, which read as "forwarder skipped").
  *
- * Returns { to, cc, senderUsed }:
- *   - senderUsed truthy → outreach mode: to=sender, cc=operator
- *   - senderUsed null   → operator-only mode (legacy behavior preserved)
+ * Determinism: prefer the poller-parsed envelope From (ctx.currentFrom) over
+ * agent-supplied outerFrom/senderEmail — the agent's value drifts under load
+ * (UID 8598 2026-05-22: agent set outerFrom=betty.song when the envelope From
+ * was ivy.song).
+ *
+ * Returns { to, cc, senderUsed, externalSender, recipientList }:
+ *   - to             comma-joined internal recipient list (always ≥ operator)
+ *   - cc             null (everyone is a primary recipient on one email)
+ *   - senderUsed     null (kept for call-site/back-compat; signals "no external
+ *                    outreach" to sendSplitRecipientEmail's single-email path)
+ *   - externalSender the original broker address when it was NOT internal —
+ *                    recorded for the operator body so Jake can loop them in
+ *                    manually if needed; we did NOT email them
+ *   - recipientList  the deduped array (for breadcrumb logging)
  */
 function resolveOutreachRecipients(payload, ctx) {
-  // Prefer the poller's parsed envelope From (ctx.currentFrom) over agent-
-  // supplied outerFrom. The agent's outerFrom drifts under load on complex
-  // forwards (e.g., UID 8598 2026-05-22: agent set outerFrom=betty.song
-  // when the envelope From was actually ivy.song, sending the escalation
-  // email to the wrong person). The poller-parsed value is deterministic.
+  const ASTUTE = '@astutegroup.com';
+  const seen = new Set();
+  const internal = [];
+  const inbox = (ctx && ctx.inbox) ? ctx.inbox.toLowerCase() : '';
+  const add = (addr) => {
+    const a = String(addr == null ? '' : addr).toLowerCase().trim();
+    if (!a || seen.has(a)) return;
+    if (inbox && a === inbox) return;        // never the vq@ inbox (loop guard)
+    if (!a.endsWith(ASTUTE)) return;          // internal-only
+    seen.add(a);
+    internal.push(a);
+  };
+
+  // 1. Operator (Jake) — always.
+  add(ctx.jakeEmail);
+
+  // 2. Original sender. Internal forwarder (e.g. Ivy) → include. External
+  //    broker → record but DO NOT email. Poller-parsed From is authoritative.
   const fromCtx = (ctx && ctx.currentFrom) ? String(ctx.currentFrom).trim() : '';
-  const candidate = fromCtx || (payload.senderEmail || payload.outerFrom || '').trim();
-  // Reject the obvious anti-self-send cases. We DO allow Astute-internal
-  // forwarders (Gopal compiling a Type 2 summary) — they may be the one
-  // who can answer the question.
-  const looksLikeEmail = /^[^\s<>"]+@[^\s<>"]+\.[^\s<>"]+$/.test(candidate);
-  if (!looksLikeEmail) return { to: ctx.jakeEmail, cc: null, senderUsed: null };
-  // Don't email vq@ inbox itself (that would just trigger a loop).
-  if (ctx.inbox && candidate.toLowerCase() === ctx.inbox.toLowerCase()) {
-    return { to: ctx.jakeEmail, cc: null, senderUsed: null };
-  }
-  // Build CC: operator (Jake) + any Astute-internal addresses that were
-  // already on the original envelope Cc. Policy (operator-stated 2026-05-22):
-  // "CC the support first and let them address the buyer as needed, unless
-  // they're also directly in CC." So Betty (the buyer behind Betty→Ivy→vq
-  // forwards) gets CC'd ONLY when she was on the outer envelope Cc; otherwise
-  // Ivy (TO) handles the loop-in.
-  const ccSet = new Set();
-  if (ctx.jakeEmail) ccSet.add(ctx.jakeEmail.toLowerCase());
-  if (ctx && ctx.currentCc) {
-    const ADDR_RE = /[A-Za-z0-9._+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}/g;
-    for (const addr of String(ctx.currentCc).match(ADDR_RE) || []) {
-      const lower = addr.toLowerCase();
-      if (lower === candidate.toLowerCase()) continue;
-      if (ctx.inbox && lower === ctx.inbox.toLowerCase()) continue;
-      // Only include @astutegroup.com addresses — don't loop external
-      // brokers into operator-internal escalations.
-      if (lower.endsWith('@astutegroup.com')) ccSet.add(lower);
+  const originalSender = (fromCtx || payload.outerFrom || payload.senderEmail || '').trim();
+  let externalSender = null;
+  if (originalSender) {
+    if (originalSender.toLowerCase().endsWith(ASTUTE)) {
+      add(originalSender);
+    } else if (/^[^\s<>"]+@[^\s<>"]+\.[^\s<>"]+$/.test(originalSender)) {
+      externalSender = originalSender.toLowerCase();
     }
   }
+
+  // 3. Internal addresses already on the original Cc — captures the buyer when
+  //    support CC'd them on the forward, plus any other Astute folks looped in.
+  if (ctx && ctx.currentCc) {
+    const ADDR_RE = /[A-Za-z0-9._+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}/g;
+    for (const addr of String(ctx.currentCc).match(ADDR_RE) || []) add(addr);
+  }
+
+  // 4. The resolved buyer ("buyer, if applicable") — resolve buyerId → email.
+  if (payload && payload.buyerId) {
+    try {
+      const u = resolveAstuteUserById(payload.buyerId);
+      if (u && u.email) add(u.email);
+    } catch (_) { /* buyer enrichment is best-effort; never fail the send */ }
+  }
+
   return {
-    to: candidate,
-    cc: Array.from(ccSet).join(', '),
-    senderUsed: candidate,
+    to: internal.join(', '),
+    cc: null,
+    senderUsed: null,
+    externalSender,
+    recipientList: internal,
   };
 }
 
 /**
- * Send the escalation as TWO separate emails (sender + operator) instead of
- * one CC'd email with a single template.
+ * Send a VQ clarification / escalation as ONE internal email.
  *
- * The legacy pattern was:
- *   sendEmail(senderEmail, subj, senderHtml, { cc: operator })
- * which gave the operator a CC copy of the sanitized sender-facing body —
- * the actual diagnostic (`reason`, `investigation_summary`, `extracted`)
- * lived only on the breadcrumb, never in any email. UID 8667 (Savings
- * Ribbon, 2026-05-26): the operator received "Could you resend in Excel?"
- * even though the agent's actual reason was a cited-RFQ mismatch.
+ * POLICY (operator directive 2026-05-26): VQ clarifications are internal-only
+ * (see resolveOutreachRecipients). Every recipient on `envelope.to` is an
+ * Astute employee — operator + internal forwarder + buyer — so there is no
+ * external party to shield and no sanitized/operator split to make. The full
+ * operator-facing diagnostic body is sent to everyone, in a single email.
  *
- * New pattern:
- *   - senderUsed truthy → two emails:
- *       (1) TO=sender, body=senderHtml, no CC
- *       (2) TO=operator, body=operatorHtml (full diagnostic), no CC
- *   - senderUsed null   → one operator email (legacy operator-only mode)
+ * This supersedes the two-email split (41b6362): that split sent the forwarder
+ * a separate copy the operator couldn't see (UID 8684 read as "forwarder
+ * skipped"). With internal-only routing the forwarder is simply a visible
+ * recipient on the one email.
  *
- * Subjects are identical so vq@ inbox threading still works on either
- * side's reply (both reply-to vq@ for next-tick stitching).
+ * `senderHtml` is accepted for call-site/back-compat but intentionally unused —
+ * there is no external-sender copy under the internal-only policy.
+ *
+ * Returns true on success so callers can record actual delivery. (notifier
+ * swallows SMTP errors and returns false — see notifier.js.)
  */
 async function sendSplitRecipientEmail(ctx, {
   envelope, subject, senderHtml, operatorHtml,
 }) {
+  void senderHtml; // internal-only policy: no separate external-sender copy
   const opts = { html: true, replyTo: ctx.inbox };
-  if (envelope.senderUsed) {
-    // Sender copy: sanitized, no operator visibility.
-    await ctx.notifier.sendEmail(envelope.to, subject, senderHtml, opts);
-    // Operator copy: full diagnostic. envelope.cc is a comma-joined string
-    // of @astutegroup.com addresses (jake + any Astute folks already on the
-    // original envelope Cc); nodemailer accepts comma-separated TO.
-    if (envelope.cc) {
-      await ctx.notifier.sendEmail(envelope.cc, subject, operatorHtml, opts);
-    }
-  } else {
-    // Operator-only mode (no usable sender). envelope.to is jakeEmail.
-    await ctx.notifier.sendEmail(envelope.to, subject, operatorHtml, opts);
-  }
+  return ctx.notifier.sendEmail(envelope.to, subject, operatorHtml, opts);
 }
 
 /**
