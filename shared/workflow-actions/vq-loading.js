@@ -352,6 +352,11 @@ async function action_load_vq(payload, ctx) {
       ctx,
       target: targetKey,
       result,
+      // Multi-RFQ load: the SAME quote set is written against every target, so
+      // each RFQ sees the other RFQs' MPNs as NO_MPN_MATCH. Tell the gate to
+      // exclude those from the rate (see shared/failure-rate-gate.js). Single-
+      // target loads pass fanOut=false and keep the original behavior.
+      fanOut: targets.length > 1,
     });
 
     if (result.written.length > 0) totals.rfqsWritten += 1;

@@ -69,6 +69,9 @@ function evaluateFailureRate(opts = {}) {
   const failedThreshold = opts.failedThreshold != null ? opts.failedThreshold : 0.30;
   const skipResolverThreshold = opts.skipResolverThreshold != null ? opts.skipResolverThreshold : 0.50;
   const minSubmitted = opts.minSubmitted != null ? opts.minSubmitted : 10;
+  // fanOut: this result is ONE of several RFQs the same quote set was written
+  // against (primary + secondaries). See NO_MPN_MATCH handling below.
+  const fanOut = !!opts.fanOut;
 
   const written = Array.isArray(result.written) ? result.written.length : 0;
   const skipped = Array.isArray(result.skipped) ? result.skipped : [];
@@ -79,66 +82,78 @@ function evaluateFailureRate(opts = {}) {
     'PRE_EXISTING_DUPLICATE',  // vq-writer
     'DUP_EXISTING_CQ',         // cq-writer
   ]);
-  const RESOLVER_GAP_REASONS = new Set([
-    'VENDOR_NOT_FOUND',
-    'NO_MPN_MATCH',
-  ]);
   let dupSkips = 0;
-  let resolverSkips = 0;
+  let vendorNotFoundSkips = 0;
+  let noMpnMatchSkips = 0;
   for (const s of skipped) {
     if (DUP_REASONS.has(s.reason)) dupSkips++;
-    else if (RESOLVER_GAP_REASONS.has(s.reason)) resolverSkips++;
+    else if (s.reason === 'VENDOR_NOT_FOUND') vendorNotFoundSkips++;
+    else if (s.reason === 'NO_MPN_MATCH') noMpnMatchSkips++;
   }
 
+  // NO_MPN_MATCH means "this quote matches no line on THIS RFQ." In a fan-out
+  // load (the same quote set written against primary + N secondary RFQs), each
+  // RFQ legitimately owns only a subset of the quoted MPNs, so a high
+  // NO_MPN_MATCH rate per-RFQ is EXPECTED — not a resolver gap. Counting it
+  // inflated the skip ratio and fired false "high skip rate" alerts (UID 8655,
+  // 5/25: 11/20 = 55% on RFQs 1135458 + 1133971, each carrying only 1 of the 3
+  // quoted MPNs). When fanOut, drop NO_MPN_MATCH from BOTH the resolver-gap
+  // numerator AND the ratio denominator — those quotes were never "for" this
+  // RFQ. In a single-RFQ load it still counts: there, a wall of NO_MPN_MATCH
+  // can mean the agent extracted wrong MPNs or cited the wrong RFQ, and that
+  // signal is worth keeping.
+  const resolverSkips = vendorNotFoundSkips + (fanOut ? 0 : noMpnMatchSkips);
   const submitted = written + skipped.length + failed;
+  // Denominator for the rate decision. In fan-out we judge health only over
+  // the quotes that actually belonged to this RFQ.
+  const evaluated = fanOut ? (submitted - noMpnMatchSkips) : submitted;
+
+  const baseReturn = () => ({
+    submitted, evaluated, written, skippedTotal: skipped.length,
+    skippedDuplicates: dupSkips, skippedResolverGaps: resolverSkips,
+    skippedNoMpnMatch: noMpnMatchSkips, failed, fanOut,
+  });
 
   // Don't fire on tiny batches — one-quote loads carry their own breadcrumb
-  // and don't benefit from a rate-based meta-alert.
-  if (submitted < minSubmitted) {
-    return { flag: false, severity: 'none', reason: null,
-      submitted, written, skippedTotal: skipped.length, skippedDuplicates: dupSkips,
-      skippedResolverGaps: resolverSkips, failed,
+  // and don't benefit from a rate-based meta-alert. (Use the post-exclusion
+  // count so a fan-out RFQ that only owns a couple of the quoted MPNs doesn't
+  // get judged on a denominator full of other RFQs' parts.)
+  if (evaluated < minSubmitted) {
+    return { flag: false, severity: 'none', reason: null, ...baseReturn(),
       ratios: { failed: 0, resolverSkip: 0, dupSkip: 0 },
     };
   }
 
-  const ratioFailed = failed / submitted;
-  const ratioResolverSkip = resolverSkips / submitted;
-  const ratioDupSkip = dupSkips / submitted;
+  const ratioFailed = failed / evaluated;
+  const ratioResolverSkip = resolverSkips / evaluated;
+  const ratioDupSkip = dupSkips / evaluated;
+  const ratios = { failed: ratioFailed, resolverSkip: ratioResolverSkip, dupSkip: ratioDupSkip };
+  const fanNote = fanOut && noMpnMatchSkips > 0 ? ` (fan-out: ${noMpnMatchSkips} NO_MPN_MATCH excluded)` : '';
 
   // High failure rate wins: writer-side breakage is a strict superset of
   // "operator must investigate now."
   if (ratioFailed >= failedThreshold) {
     return {
       flag: true, severity: 'high',
-      reason: `failed rate ${(ratioFailed*100).toFixed(1)}% >= threshold ${(failedThreshold*100).toFixed(0)}% (${failed}/${submitted})`,
-      submitted, written, skippedTotal: skipped.length, skippedDuplicates: dupSkips,
-      skippedResolverGaps: resolverSkips, failed,
-      ratios: { failed: ratioFailed, resolverSkip: ratioResolverSkip, dupSkip: ratioDupSkip },
+      reason: `failed rate ${(ratioFailed*100).toFixed(1)}% >= threshold ${(failedThreshold*100).toFixed(0)}% (${failed}/${evaluated})${fanNote}`,
+      ...baseReturn(), ratios,
     };
   }
 
-  // Medium: most of the batch skipped due to resolver gaps (vendor/MPN
-  // unmatched). Likely root cause: BP table out of sync, agent extracting
-  // wrong field, RFQ misaligned. Not as urgent as a writer failure but
-  // worth surfacing.
+  // Medium: most of the batch skipped due to resolver gaps (vendor not in BP
+  // table, or — single-RFQ only — MPN unmatched). Likely root cause: BP table
+  // out of sync, agent extracting wrong field, RFQ misaligned. Not as urgent
+  // as a writer failure but worth surfacing.
   if (ratioResolverSkip >= skipResolverThreshold) {
     return {
       flag: true, severity: 'medium',
-      reason: `non-dup skip rate ${(ratioResolverSkip*100).toFixed(1)}% >= threshold ${(skipResolverThreshold*100).toFixed(0)}% (resolver-gap ${resolverSkips}/${submitted})`,
-      submitted, written, skippedTotal: skipped.length, skippedDuplicates: dupSkips,
-      skippedResolverGaps: resolverSkips, failed,
-      ratios: { failed: ratioFailed, resolverSkip: ratioResolverSkip, dupSkip: ratioDupSkip },
+      reason: `non-dup skip rate ${(ratioResolverSkip*100).toFixed(1)}% >= threshold ${(skipResolverThreshold*100).toFixed(0)}% (resolver-gap ${resolverSkips}/${evaluated})${fanNote}`,
+      ...baseReturn(), ratios,
     };
   }
 
-  // Healthy: most quotes either wrote or skipped as legit duplicates.
-  return {
-    flag: false, severity: 'none', reason: null,
-    submitted, written, skippedTotal: skipped.length, skippedDuplicates: dupSkips,
-    skippedResolverGaps: resolverSkips, failed,
-    ratios: { failed: ratioFailed, resolverSkip: ratioResolverSkip, dupSkip: ratioDupSkip },
-  };
+  // Healthy: most quotes either wrote or skipped as legit duplicates / other-RFQ.
+  return { flag: false, severity: 'none', reason: null, ...baseReturn(), ratios };
 }
 
 function escHtml(s) {
@@ -165,8 +180,8 @@ function escHtml(s) {
  */
 async function notifyHighFailureRate(opts) {
   const breadcrumbs = require('./breadcrumbs');
-  const { cog, workflow, ctx, target, result, thresholds } = opts;
-  const gateEval = evaluateFailureRate({ result, ...(thresholds || {}) });
+  const { cog, workflow, ctx, target, result, thresholds, fanOut } = opts;
+  const gateEval = evaluateFailureRate({ result, fanOut, ...(thresholds || {}) });
   if (!gateEval.flag) return gateEval;
 
   try {
@@ -179,10 +194,13 @@ async function notifyHighFailureRate(opts) {
       target,
       reason: gateEval.reason,
       submitted: gateEval.submitted,
+      evaluated: gateEval.evaluated,
+      fanOut: gateEval.fanOut,
       written: gateEval.written,
       skippedTotal: gateEval.skippedTotal,
       skippedDuplicates: gateEval.skippedDuplicates,
       skippedResolverGaps: gateEval.skippedResolverGaps,
+      skippedNoMpnMatch: gateEval.skippedNoMpnMatch,
       failed: gateEval.failed,
     });
   } catch (_) { /* best-effort */ }
@@ -198,8 +216,10 @@ async function notifyHighFailureRate(opts) {
   <tr><td>submitted</td><td align="right">${gateEval.submitted}</td></tr>
   <tr><td>written</td><td align="right">${gateEval.written}</td></tr>
   <tr><td>skipped (duplicates, OK)</td><td align="right">${gateEval.skippedDuplicates}</td></tr>
+  <tr><td>skipped (no MPN match${gateEval.fanOut ? ' — fan-out, excluded from rate' : ''})</td><td align="right">${gateEval.skippedNoMpnMatch}</td></tr>
   <tr><td>skipped (resolver gaps)</td><td align="right">${gateEval.skippedResolverGaps}</td></tr>
   <tr><td><b>failed</b></td><td align="right"><b>${gateEval.failed}</b></td></tr>
+  <tr><td>rate evaluated over</td><td align="right">${gateEval.evaluated}</td></tr>
 </table>
 <p style="margin-top:12px">Target: <code>${escHtml(target)}</code><br/>
 Source UID: ${escHtml(ctx.uid)}<br/>

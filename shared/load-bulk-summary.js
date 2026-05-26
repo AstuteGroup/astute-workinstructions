@@ -277,10 +277,60 @@ async function loadBulkSummary({ rfqSearchKey, buyerId, quotes, dryRun = false }
       currencyId,  // c_currency_id — defaults to USD (100) when q.currency is blank
     };
 
+    // No-bid capture (qty 0 AND cost 0): the vendor was asked and explicitly
+    // declined / has no stock. We WANT this "we asked, no" signal in OT.
+    //
+    // The catch: this path round-trips the stub through writeVQFromAPI ->
+    // extractStockAndLtRows -> synthesizeStockLtVqLines, and synthesize only
+    // emits a row when stockQty>0 OR ltPrice>0. A 0/0 stub therefore produces
+    // ZERO rows, never reaches vq-writer's no-bid filter (cost===0 && qty===0,
+    // added in 1d36cc2), and surfaces as `WRITE_FAILED: unknown` — which then
+    // trips the failure-rate gate. This is exactly what bit UID 8655 (Ivy,
+    // 5/25): 7 "NO STK" ADUM4402CRWZ rows reported as failures, on each of the
+    // two RFQs carrying that MPN (1135455 + 1133119).
+    //
+    // Fix: hand extractStockAndLtRows a pre-built vqLines[] entry (franchise-
+    // api.js:1212 returns it verbatim, bypassing synthesize). The no-bid filter
+    // then accepts it and the writer builds a Cost:0/Qty:0 payload (both pass
+    // Tier-1 validation — the check is `== null || === ''`, not falsiness).
+    // Per vq-loading.md § No-bid records: qty 0, cost 0, lead time BLANK (NOT
+    // "stock"), reason in notes.
+    //
+    // Scoped to this broker-email path on purpose. A 0/0 *franchise* API result
+    // means "distributor doesn't carry it" and belongs in the negative cache,
+    // NOT a VQ — so synthesize's price>0 gate is correct for that caller and is
+    // left untouched. (Sibling-writer note per the parallel-writer discipline:
+    // the only other writeVQFromAPI caller is the franchise enrichment path,
+    // which must NOT start emitting no-bid VQs.)
+    const isNoBid = (Number(q.cost) || 0) === 0 && (Number(q.qty) || 0) === 0;
+    if (isNoBid) {
+      const rawNote = buildNotes(q);
+      const noBidNote = /no[\s-]?bid/i.test(rawNote)
+        ? rawNote
+        : `No-bid${rawNote ? ` - ${rawNote}` : ' - out of stock'}`;
+      stub.vqLeadTime = '';              // blank per doc — NOT "stock"
+      stub.vqVendorNotes = noBidNote;
+      stub.vqLines = [{
+        vendorBP: bp.searchKey,
+        vendorName: q.vendorName || bp.name,
+        channel: q.vendorName || bp.name,
+        mpn: q.mpn,
+        manufacturer: q.mfr,
+        qty: 0,
+        cost: 0,
+        leadTime: null,                  // null -> Chuboe_Lead_Time blank
+        dateCode: q.dateCode || null,
+        moq: null,
+        spq: null,
+        vendorNotes: noBidNote,
+        currencyId,
+      }];
+    }
+
     if (dryRun) {
       written.push({
         dryRun: true, line: lineMatch.lineNo, mpn: q.mpn, vendor: bp.name,
-        cost: q.cost, qty: q.qty, fuzzyMatch: !!lineMatch.fuzzy,
+        cost: q.cost, qty: q.qty, fuzzyMatch: !!lineMatch.fuzzy, noBid: isNoBid,
       });
       writtenByLine.set(lineMatch.lineNo, (writtenByLine.get(lineMatch.lineNo) || 0) + 1);
       continue;
@@ -307,6 +357,7 @@ async function loadBulkSummary({ rfqSearchKey, buyerId, quotes, dryRun = false }
           // substring/fuzzy matching downstream.
           originalVendorLabel: q.vendorName || q.vendorSearchKey || null,
           bpId: bp.id,
+          noBid: isNoBid,
         });
         writtenByLine.set(lineMatch.lineNo, (writtenByLine.get(lineMatch.lineNo) || 0) + 1);
       } else if (result.skipped && result.skipped.length > 0) {
