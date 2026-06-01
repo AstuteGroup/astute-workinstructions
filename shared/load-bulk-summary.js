@@ -36,6 +36,9 @@
  *       },
  *       // ...
  *     ],
+ *     unknownVendorPlaceholderBpId: 1009999,  // optional: when vendor BP doesn't
+ *                                              // exist, use this placeholder BP and
+ *                                              // store vendor name in VQ notes
  *   });
  *
  * RETURN:
@@ -197,7 +200,7 @@ function buildNotes(q) {
 }
 
 // ─── Main ──────────────────────────────────────────────────────────────────
-async function loadBulkSummary({ rfqSearchKey, buyerId, quotes, dryRun = false }) {
+async function loadBulkSummary({ rfqSearchKey, buyerId, quotes, dryRun = false, unknownVendorPlaceholderBpId = null }) {
   if (!rfqSearchKey) throw new Error('rfqSearchKey required');
   if (!Array.isArray(quotes) || quotes.length === 0) {
     throw new Error('quotes[] required and non-empty');
@@ -343,6 +346,7 @@ async function loadBulkSummary({ rfqSearchKey, buyerId, quotes, dryRun = false }
         buyerId,
         rfqQty: lineMatch.rfqQty,
         _rfqLineIdOverride: lineMatch.lineId,
+        unknownVendorPlaceholderBpId,  // allow loading without BP when vendor doesn't exist
       });
 
       if (result.written.length > 0) {

@@ -31,9 +31,32 @@ const { isKnownBuyer, isKnownSupport, resolveBuyerFromRegistry, resolveAstuteUse
 const pending = require('../workflow-pending-state');
 const breadcrumbs = require('../breadcrumbs');
 const writerAttribution = require('../writer-attribution');
-const { notifyHighFailureRate } = require('../failure-rate-gate');
+const { notifyHighFailureRate, notifyOtUnreachable } = require('../failure-rate-gate');
 
 const JAKE_USER_ID = 1000004;
+
+// ─── Unknown Vendor Placeholder BP ──────────────────────────────────────────
+// When operator replies "note vendor in VQ notes" to a needs_vendor escalation,
+// quotes are loaded using this placeholder BP and the actual vendor name is
+// stored in Chuboe_Note_User.
+//
+// SETUP (one-time, operator action):
+// 1. Create a new BP in OT with these properties:
+//    - Name: "Unknown Vendor - Note in VQ"
+//    - Search Key: "UNKNOWN-VENDOR-VQ-NOTE"
+//    - IsVendor: Y
+//    - IsCustomer: N
+//    - Vendor Type: 1000010 (Non-Traceable without Franchised lines)
+//    - IsActive: Y
+// 2. Note the c_bpartner_id from the created record
+// 3. Update UNKNOWN_VENDOR_PLACEHOLDER_BP_ID below to that ID
+//
+// Once set up, when the operator replies to a needs_vendor email with a phrase
+// like "note vendor in VQ notes", "load without BP", or "store as note", the
+// agent will retry the load with unknownVendorPlaceholderBpId set, causing the
+// VQ writer to use this placeholder BP and prepend "Vendor: <actual name>" to
+// the notes field.
+const UNKNOWN_VENDOR_PLACEHOLDER_BP_ID = null;  // TODO: set to actual BP ID after creation
 
 // Per-VQ attribution log. Each successful chuboe_vq_line write appends one
 // JSONL row tying the new vqLineId to the source email's UID + Message-ID.
@@ -235,6 +258,10 @@ async function action_load_vq(payload, ctx) {
 
   const perRfqResults = [];
   let totals = { rfqsWritten: 0, vqsWritten: 0, vqsSkipped: 0, vqsFailed: 0 };
+  // OT-down accumulator: targets where the load failed because OT was
+  // unreachable (not bad data). Each gets a resume sidecar; ONE calm
+  // notification is sent after the loop. See shared/failure-rate-gate.js.
+  const otDown = { targets: [], deferred: 0 };
 
   for (const targetKey of targets) {
     let result;
@@ -243,6 +270,7 @@ async function action_load_vq(payload, ctx) {
         rfqSearchKey: targetKey,
         buyerId: validatedBuyerId,
         quotes,
+        unknownVendorPlaceholderBpId: payload.unknownVendorPlaceholderBpId || UNKNOWN_VENDOR_PLACEHOLDER_BP_ID,
       });
     } catch (err) {
       breadcrumbs.write({
@@ -346,7 +374,7 @@ async function action_load_vq(payload, ctx) {
     // breadcrumb the signal and ping the operator immediately. See
     // shared/failure-rate-gate.js header — Ivy UID 8541's silent-fail-for-24h
     // is exactly the case this defends against.
-    await notifyHighFailureRate({
+    const gateEval = await notifyHighFailureRate({
       cog: 'vq-loading-agent',
       workflow: 'VQ Loading',
       ctx,
@@ -359,10 +387,59 @@ async function action_load_vq(payload, ctx) {
       fanOut: targets.length > 1,
     });
 
+    // OT-down: writes failed because OT was unreachable, not because of bad
+    // data. Park a resume sidecar so the resumer replays this load against
+    // this RFQ once OT recovers — vq-writer's natural-key dedup skips the rows
+    // that DID write, so a full replay is idempotent. The calm operator
+    // notification is sent once, after the loop. See shared/failure-rate-gate.js.
+    if (gateEval && gateEval.otDown) {
+      const deferred = (gateEval.failedNetwork || 0) + (gateEval.skippedResolverGaps || 0);
+      otDown.targets.push(targetKey);
+      otDown.deferred += deferred;
+      try {
+        pending.writeSidecar(ctx.workflow, `vq-otdown-${ctx.uid}-${targetKey}`, {
+          kind: 'ot_unreachable_retry',
+          source_workflow: 'vq-loading',
+          original_uid: ctx.uid,
+          source_message_id: messageId || (ctx && ctx.currentMessageId) || null,
+          rfq_search_key: targetKey,
+          buyer_id: validatedBuyerId,
+          pending_quotes: Array.isArray(quotes) ? quotes : [],
+          sender_email: senderEmail ? senderEmail.toLowerCase() : null,
+          outer_from: outerFrom ? outerFrom.toLowerCase() : null,
+          subject: payload.subject || (ctx && ctx.subject) || null,
+          deferred_count: deferred,
+          created_at: new Date().toISOString(),
+          expires_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
+        });
+      } catch (e) {
+        breadcrumbs.write({
+          cog: 'vq-loading-agent', event: 'ot-resume-sidecar-failed',
+          uid: ctx.uid, rfqSearchKey: targetKey, error: e.message,
+        });
+      }
+    }
+
     if (result.written.length > 0) totals.rfqsWritten += 1;
     totals.vqsWritten += result.written.length;
     totals.vqsSkipped += result.skipped.length;
     totals.vqsFailed += result.failed.length;
+  }
+
+  // One calm "OT unreachable — loading paused, will resume" email per inbound
+  // email (globally throttled to 1/30min). Per-target resume sidecars are
+  // already parked above; this is just the operator heads-up.
+  if (otDown.targets.length > 0) {
+    await notifyOtUnreachable({
+      workflow: 'VQ Loading',
+      ctx,
+      affected: {
+        targets: otDown.targets,
+        senders: [senderEmail, outerFrom].filter(Boolean),
+        totalDeferred: otDown.deferred,
+        subject: payload.subject || (ctx && ctx.subject) || null,
+      },
+    });
   }
 
   const primary = perRfqResults[0] || null;

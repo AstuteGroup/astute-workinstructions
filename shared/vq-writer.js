@@ -77,8 +77,11 @@ function findExistingVqIdByNaturalKey(payload) {
   }
 }
 
+const { classifyWriteError } = require('./ot-error');
+
 // Flag reason codes
 const FLAG = {
+  OT_UNREACHABLE: 'OT_UNREACHABLE',   // network/transport failure (OT down) — retryable, NOT a data problem
   BP_NOT_FOUND: 'BP_NOT_FOUND',
   MFR_NO_MATCH: 'MFR_NO_MATCH',
   MFR_LOW_CONFIDENCE: 'MFR_LOW_CONFIDENCE',
@@ -644,7 +647,20 @@ async function writeVQFromAPI(rfqSearchKey, cpc, franchiseResults, opts = {}) {
     }
 
     // Resolve BP — search key first, name fallback, same path for all vendors
-    const bp = await resolveBP(bpSearchKey, vendorDisplay);
+    let bp = await resolveBP(bpSearchKey, vendorDisplay);
+    let vendorNamePrefix = '';
+
+    // Exception: When BP doesn't exist but caller provided unknownVendorPlaceholderBpId,
+    // use the placeholder BP and store the actual vendor name in notes. This allows
+    // loading quotes from vendors not yet set up in OT without blocking on BP creation.
+    // Operator directive 2026-05-26: when asked "note vendor in VQ notes", this path
+    // fires instead of the needs_vendor escalation.
+    if (!bp && opts.unknownVendorPlaceholderBpId) {
+      bp = { id: opts.unknownVendorPlaceholderBpId };
+      vendorNamePrefix = `Vendor: ${vendorDisplay}`;
+      logger.info(`Using placeholder BP ${opts.unknownVendorPlaceholderBpId} for unknown vendor '${vendorDisplay}' - name stored in notes`);
+    }
+
     if (!bp) {
       flagged.push({
         mpn, vendor: vendorDisplay, bpSearchKey, price, qty,
@@ -696,10 +712,16 @@ async function writeVQFromAPI(rfqSearchKey, cpc, franchiseResults, opts = {}) {
     // Build internal enrichment notes — combine parser-built notes (per-row or
     // top-level) with packaging context. Despite the legacy "vendorNotes" field
     // name, the content is buyer-internal (stock counts, MOQ, MFR tags, packaging
-    // confirmations) — NONE of it is vendor-facing. Goes to Chuboe_Note_Private.
+    // confirmations) — NONE of it is vendor-facing. Goes to Chuboe_Note_User.
     // Anything genuinely vendor-safe should be added via opts.publicNote instead.
+    //
+    // vendorNamePrefix: when BP resolution failed but caller provided
+    // unknownVendorPlaceholderBpId, this contains "Vendor: <actual name>" to
+    // preserve the original vendor identity in the notes (since the BP field
+    // now points to a generic placeholder). Prepended to the notes list so it
+    // always appears first.
     const baseNotes = row.vendorNotes || d.vqVendorNotes || '';
-    const internalNotes = [baseNotes, packagingNote].filter(Boolean).join(' | ');
+    const internalNotes = [vendorNamePrefix, baseNotes, packagingNote].filter(Boolean).join(' | ');
 
     // Resolve vendor type and traceability from BP
     const vendorTypeId = await getBPVendorType(bp.id);
@@ -881,9 +903,11 @@ async function writeVQFromAPI(rfqSearchKey, cpc, franchiseResults, opts = {}) {
         channel: row.channel || null,
       });
     } catch (e) {
+      const { reason, network } = classifyWriteError(e, FLAG.API_WRITE_ERROR);
       failed.push({
         mpn, vendor: vendorDisplay, bpId: bp.id, price, qty,
-        reason: FLAG.API_WRITE_ERROR,
+        reason,
+        network: network || undefined,
         detail: e.message.substring(0, 200)
       });
     }
