@@ -189,6 +189,43 @@ Both data files are also consumed by `shared/mfr-lookup.js` and `shared/mfr-reso
 
 If you're building a new workflow that needs MFR comparison, add yourself to this list when you do.
 
+### MPN Normalization (REQUIRED for all MPN matching)
+
+**NEVER use exact string comparison for MPNs.** MPNs come in many variations — with/without hyphens, spaces, slashes, leading zeros, different cases. Always normalize before comparing.
+
+**Use `shared/mpn-normalization.js`:**
+
+```javascript
+const { normalizeMPN, mpnMatch, findByMPN } = require('../shared/mpn-normalization');
+
+// Clean normalization (strips all special characters, uppercase, strips leading zeros)
+const clean = normalizeMPN('ECP-U1C104MA5');  // -> 'ECPU1C104MA5'
+
+// Direct comparison
+if (mpnMatch('ECP-U1C104MA5', 'ECPU1C104MA5')) { ... }  // -> true
+
+// Array search
+const found = findByMPN(rows, 'ECPU1C104MA5', 'MPN');
+```
+
+**Common MPN variations handled:**
+- Hyphens: `ECP-U1C104MA5` vs `ECPU1C104MA5` ✓
+- Spaces: `MAX 3232` vs `MAX3232` ✓
+- Slashes: `LM358/NOPB` vs `LM358NOPB` ✓
+- Leading zeros: `09552156612741` vs `9552156612741` ✓
+- Case: `max3232` vs `MAX3232` ✓
+
+**This is clean matching (normalize → exact match), NOT fuzzy matching** (Levenshtein, soundex, etc.).
+
+**Replace these anti-patterns:**
+```javascript
+❌ String(mpn).trim().toUpperCase() === searchTerm
+❌ mpn.replace(/^0+/, '') === searchTerm
+❌ rows.find(r => r.MPN === searchMPN)
+✅ mpnMatch(mpn, searchTerm)
+✅ findByMPN(rows, searchMPN, 'MPN')
+```
+
 ---
 
 ## Documentation Standards
