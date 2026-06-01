@@ -202,7 +202,7 @@ module.exports = {
       operatorDigest: false,
       activityDigest: true,
       replyParserGrammar: false,
-      tieredCron: true,
+      tieredCron: false,
     },
     deviations: {
       replyStitching: 'broker-side workflow has no info-request path that needs stitching — unresolved-partner cases route directly to Unqualified Broker (1006505) instead of round-tripping. See needInfoClarifications below.',
@@ -210,10 +210,8 @@ module.exports = {
       operatorDigest: 'broker stock-RFQs are transactional; activityDigest (stock-rfq-activity-digest 6×/day) covers visibility',
       writeQueue: 'direct write; broker emails carry small batches',
       replyParserGrammar: 'activityDigest is informational-only by design — no curation queue, no operator-override loop. Shared grammar in shared/workflow-reply-grammars.js is available if directives are needed later.',
+      tieredCron: 'Removed 2026-05-26 — relaxed from 5m burst / 15m steady to hourly :00 fixed cadence (no gate). Stock RFQs are 1-2 line data-capture loads with no live-decision latency requirement; burst overhead unnecessary.',
     },
-    // All capabilities now declared. tieredCron wired in scripts/should-run-stockrfq-agent.js
-    // (5m burst on pending large-stockrfq sentinel; 15m steady — tighter than rfqloading's
-    // 30m because operator works the inbound RFQ + outbound CQ chain).
   },
 
   // ─── STOCK RFQ CQ (operator outbound quote replies → CQ rows) ───────────────
@@ -224,7 +222,7 @@ module.exports = {
     inbox: 'stockRFQ@orangetsunami.com',
     sourceFolder: 'OutboundPending',
     cron: { name: 'stockrfq-cq-agent' },
-    actions: ['add_cq', 'add_cq_with_rfq', 'skip', 'needs_review'],
+    actions: ['add_cq', 'add_cq_with_rfq', 'update_cq', 'skip', 'needs_review'],
     capabilities: {
       replyStitching: false,
       needInfoClarifications: false,
@@ -297,8 +295,8 @@ module.exports = {
     cron: { name: 'vq-loading-agent' },
     actions: [
       'load_vq', 'need_info_vendor', 'clarify_vendor', 'needs_vendor',
-      'needs_review', 'no_bid', 'not_vq', 'dup_skip', 'drop_pending',
-      'outbound_pending',
+      'needs_review', 'clarify_buyer', 'no_bid', 'not_vq', 'dup_skip', 'drop_pending',
+      'outbound_pending', 'forward_to_rfq_loading',
     ],
     capabilities: {
       replyStitching: true,

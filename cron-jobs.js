@@ -151,7 +151,7 @@ module.exports = [
     tier: 'agent',  // Claude-powered — paused by .cron-agents-paused
     // Tiered: 5m burst when any pending large-offer sentinel or
     // clarify_partner sidecar exists within the last 10m, else steady at
-    // :00/:30. Gate short-circuits claude -p when not running.
+    // :00/:45. Gate short-circuits claude -p when not running.
     cadence: 'every 5m',
     cadenceCron: '*/5 * * * *',
     // `if gate; then agent; fi` — gate's exit 1 = "skip this tick" (NOT a failure).
@@ -162,7 +162,7 @@ module.exports = [
     cwd: AGENT_CWD,
     needsOT: true,
     logFile: '/tmp/excess-agent.log',
-    description: 'Tiered (5m burst / 30m steady) — agent reads excess@ per customer-excess-analysis.md, writes offers via OT API. Burst window triggered by large-offer sentinel or clarify_partner sidecar.',
+    description: 'Tiered (5m burst / 45m steady) — agent reads excess@ per customer-excess-analysis.md, writes offers via OT API. Burst window triggered by large-offer sentinel or clarify_partner sidecar.',
   },
 
   {
