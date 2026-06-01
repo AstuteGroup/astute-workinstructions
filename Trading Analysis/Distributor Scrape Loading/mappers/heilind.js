@@ -34,6 +34,7 @@ const ROOT = '/home/analytics_user/workspace/astute-workinstructions';
 const { writeVQBatch } = require(path.join(ROOT, 'shared/vq-writer'));
 const { writePricingResult } = require(path.join(ROOT, 'shared/api-result-writer'));
 const { readCSVFile } = require(path.join(ROOT, 'shared/csv-utils'));
+const { normalizeMPN } = require(path.join(ROOT, 'shared/mpn-normalization'));
 const negCache = require(path.join(ROOT, 'shared/api-negative-cache'));
 
 // -- Constants -----------------------------------------------------------------
@@ -429,7 +430,7 @@ async function processExport({ exportPath, sidecarPath, dryRun = false }) {
   const classify = shape === 'line-by-line' ? classifyRowLineByLine : classifyRow;
   for (const row of rows) {
     if (!row['MPN']) continue;
-    const mpnKey = String(row['MPN']).toUpperCase().trim();
+    const mpnKey = normalizeMPN(row['MPN']);
     if (!itemsByMpn.has(mpnKey)) {
       orphanRows.push(row);
       continue;
@@ -443,7 +444,7 @@ async function processExport({ exportPath, sidecarPath, dryRun = false }) {
   // -- Group priced rows by rfqSearchKey from sidecar
   const pricedByRfq = new Map();
   for (const row of priced) {
-    const mpnKey = String(row['MPN']).toUpperCase().trim();
+    const mpnKey = normalizeMPN(row['MPN']);
     const sidecarItem = itemsByMpn.get(mpnKey);
     const rfq = sidecarItem.context.rfqSearchKey;
     if (!pricedByRfq.has(rfq)) pricedByRfq.set(rfq, []);
@@ -497,7 +498,7 @@ async function processExport({ exportPath, sidecarPath, dryRun = false }) {
   // -- Record all three classes in negative cache
   const cacheResults = { carried: 0, matched_no_price: 0, not_carried: 0, skipped: 0 };
   const cacheRecord = (row, result) => {
-    const mpnKey = String(row['MPN']).toUpperCase().trim();
+    const mpnKey = normalizeMPN(row['MPN']);
     const sidecarItem = itemsByMpn.get(mpnKey);
     const requestedQty = (shape === 'line-by-line' ? parseCsvNumber(row['Qty']) : Number(row['Qty']))
                        || sidecarItem.qty || 1;
