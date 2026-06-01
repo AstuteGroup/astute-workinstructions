@@ -49,6 +49,7 @@ const path = require('path');
 const XLSX = require('xlsx');
 const { writeOffer, deactivatePriorOffers } = require('../../shared/offer-writeback');
 const { readCSVFile } = require('../../shared/csv-utils');
+const { normalizeMPN } = require('../../shared/mpn-normalization');
 
 const SCRIPT_DIR = __dirname;
 const INVENTORY_CLEANUP_DIR = path.join(SCRIPT_DIR, '../Inventory File Cleanup');
@@ -61,15 +62,10 @@ const CURRENCY_USD = 100;                        // c_currency_id for USD
 
 const KDB_PATTERN = /^Lam_Kitting_DB.*\.xlsx$/;
 
-// Canonical MPN form for cross-source matching — strips leading zeros so
-// variants like "9552156612741" (Kitting DB) and "09552156612741" (Infor /
-// inventory CSV) hash to the same key. Mirrors the helper in
-// lam-kitting-reorder.js — kept local to avoid cross-script coupling.
-function canonicalMpn(mpn) {
-  const t = (mpn || '').trim();
-  if (!t) return '';
-  return t.replace(/^0+/, '') || t;
-}
+// Note: Uses shared/mpn-normalization.js normalizeMPN() for cross-source
+// matching. Strips leading zeros, hyphens, spaces, case differences so
+// variants like "9552156612741" / "09552156612741" and "ECP-U1C104MA5" /
+// "ECPU1C104MA5" normalize to the same key.
 
 // Cast an xlsx cell value to a clean string, preserving full numeric
 // precision. Excel stores 13+ digit MPNs as numbers and `cell.w` (display
@@ -207,7 +203,7 @@ function loadRoster(kdbPath) {
   const deduped = [];
   const dupes = [];
   for (const r of roster) {
-    const key = `${r.cpc} ${canonicalMpn(r.mpn)}`;
+    const key = `${r.cpc} ${normalizeMPN(r.mpn)}`;
     if (seen.has(key)) {
       dupes.push(`${r.cpc} | ${r.mpn}`);
       continue;
@@ -224,7 +220,7 @@ function loadRoster(kdbPath) {
 
 // ─── INVENTORY (W111 + W115 cleaned CSVs) ─────────────────────────────────────
 
-// Returns a map keyed by canonicalMpn(MPN) → summed qty. Inventory CSVs
+// Returns a map keyed by normalizeMPN(MPN) → summed qty. Inventory CSVs
 // sometimes carry leading-zero variants (e.g. "09552156612741") while the
 // Kitting DB has the un-padded form (e.g. "9552156612741"); canonicalizing
 // both sides ensures these match. Mirrors lam-kitting-reorder.js.
@@ -249,7 +245,7 @@ function loadInventoryQty(inventoryFolder) {
     for (const row of csv.rows) {
       const mpnRaw = (row[mpnIdx] || '').trim();
       if (!mpnRaw) continue;
-      const key = canonicalMpn(mpnRaw);
+      const key = normalizeMPN(mpnRaw);
       const qty = parseFloat(row[qtyIdx]) || 0;
       qtyByCanonical[key] = (qtyByCanonical[key] || 0) + qty;
       lots++;
@@ -273,7 +269,7 @@ function loadFreshLeadTimes(sourcedCsvPath) {
   for (const row of csv.rows) {
     const mpnRaw = (row[mpnIdx] || '').trim();
     if (!mpnRaw) continue;
-    const key = canonicalMpn(mpnRaw);
+    const key = normalizeMPN(mpnRaw);
     const ltWeeks = parseFloat(row[ltWeeksIdx]);
     const inStock = inStockQtyIdx >= 0 ? parseFloat(row[inStockQtyIdx]) || 0 : 0;
     if (ltWeeks && ltWeeks > 0) {
@@ -325,10 +321,10 @@ function buildLines(roster, qtyByMpn, freshLts, opts = {}) {
   let cpcAnchorSkips = 0;
 
   for (const r of sorted) {
-    const qty = qtyByMpn[canonicalMpn(r.mpn)] || 0;
+    const qty = qtyByMpn[normalizeMPN(r.mpn)] || 0;
     if (qty === 0) zeroStock++;
 
-    const fresh = opts.freshLts ? freshLts[canonicalMpn(r.mpn)] : null;
+    const fresh = opts.freshLts ? freshLts[normalizeMPN(r.mpn)] : null;
     const finalLt = chooseLeadTime(r.lt, fresh);
     if (fresh && finalLt === fresh && finalLt !== r.lt) refreshed++;
     if (r.lt && finalLt === r.lt && !WEEKS_RE.test(r.lt)) preservedManual++;
