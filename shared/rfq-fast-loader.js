@@ -40,6 +40,7 @@
 const logger = require('./logger').createLogger('FastLoader');
 const { apiPost } = require('./api-client');
 const { cleanMpn } = require('./db-helpers');
+const otBudget = require('./ot-api-budget');
 
 // ─── CONSTANTS ───────────────────────────────────────────────────────────────
 
@@ -82,9 +83,10 @@ const RFQ_TYPES = {
  * @param {number}  [opts.concurrency=10]     - Number of concurrent workers
  * @param {number}  [opts.startFrom=0]        - Resume index (0-based into lines[])
  * @param {number}  [opts.rfqId]              - Existing RFQ ID (skip header POST if resuming)
+ * @param {boolean} [opts.isBackfill=false]   - Backfill mode (coordinates with global budget)
  * @param {Function} [opts.onProgress]        - callback(done, total, linesPerSec, etaSec)
  * @param {AbortSignal} [opts.abortSignal]    - Signal to abort (for daemon preemption)
- * @returns {Promise<{rfqId, searchKey, linesWritten, mpnsWritten, errors, elapsedMs, linesPerSec}>}
+ * @returns {Promise<{rfqId, searchKey, linesWritten, mpnsWritten, errors, elapsedMs, linesPerSec, rateLimited?, rateLimitReason?, rateLimitTier?}>}
  */
 async function loadRFQ(opts) {
   const {
@@ -98,6 +100,7 @@ async function loadRFQ(opts) {
     concurrency = 10,
     startFrom = 0,
     rfqId: existingRfqId = null,
+    isBackfill = false,
     onProgress = null,
     abortSignal = null,
   } = opts;
@@ -110,6 +113,31 @@ async function loadRFQ(opts) {
 
   const typeId = RFQ_TYPES[type];
   if (!typeId) throw new Error(`rfq-fast-loader: unknown RFQ type '${type}'. Valid: ${Object.keys(RFQ_TYPES).join(', ')}`);
+
+  // ── TIER 1: Global budget check ──
+  const estimatedWrites = lines.length * 2; // Each line creates rfq_line + rfq_line_mpn
+  const globalCheck = otBudget.checkBudget({
+    table: 'chuboe_rfq_line',
+    count: estimatedWrites,
+    caller: 'rfq-loading-agent',
+    isBackfill,
+  });
+
+  if (!globalCheck.allowed) {
+    logger.warn(`Global budget exhausted: ${globalCheck.reason}`);
+    return {
+      rfqId: null,
+      searchKey: null,
+      linesWritten: 0,
+      mpnsWritten: 0,
+      errors: [],
+      elapsedMs: 0,
+      linesPerSec: 0,
+      rateLimited: true,
+      rateLimitReason: globalCheck.reason,
+      rateLimitTier: 'global',
+    };
+  }
 
   const errors = [];
   let linesWritten = 0;
@@ -146,6 +174,13 @@ async function loadRFQ(opts) {
     logger.info(`RFQ header created: searchKey=${searchKey}, rfqId=${rfqId}, BP=${bpartnerId}, type=${type}`);
   } else {
     logger.info(`Resuming RFQ rfqId=${rfqId} from line ${startFrom}`);
+  }
+
+  // ── Reserve budget and claim backfill slot ──
+  otBudget.reserve('chuboe_rfq_line', estimatedWrites, 'rfq-loading-agent');
+
+  if (isBackfill) {
+    otBudget.claimBackfillSlot('rfq-loading-agent');
   }
 
   // ── Concurrent Workers ──
@@ -237,6 +272,26 @@ async function loadRFQ(opts) {
 
   const elapsedMs = Date.now() - startTime;
   const linesPerSec = linesWritten / ((elapsedMs / 1000) || 1);
+
+  // ── Record writes and release backfill slot ──
+  const totalWritten = linesWritten + mpnsWritten;
+  if (totalWritten > 0) {
+    otBudget.recordWrites('chuboe_rfq_line', totalWritten, {
+      caller: 'rfq-loading-agent',
+      success: true,
+      durationMs: elapsedMs,
+    });
+  }
+
+  if (errors.length > 0) {
+    for (let i = 0; i < errors.length; i++) {
+      otBudget.recordFailure();
+    }
+  }
+
+  if (isBackfill) {
+    otBudget.releaseBackfillSlot('rfq-loading-agent');
+  }
 
   const aborted = abortSignal?.aborted ? ' (ABORTED — preempted)' : '';
   logger.info(`Load complete${aborted}: searchKey=${searchKey}, rfqId=${rfqId}, ${linesWritten} lines, ${mpnsWritten} MPNs, ${errors.length} errors, ${(elapsedMs / 1000).toFixed(1)}s (${linesPerSec.toFixed(1)}/s)`);
