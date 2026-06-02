@@ -67,9 +67,11 @@
 
 const logger = require('./logger').createLogger('OfferWriter');
 const { apiPost, apiGet, apiPut } = require('./api-client');
+const { isOtUnreachableError } = require('./ot-error');
 const { psqlQuery, cleanMpn } = require('./db-helpers');
 const { lookupMfr } = require('./mfr-lookup');
 const { resolveMfrForRow } = require('./mfr-resolver');
+const otBudget = require('./ot-api-budget');
 
 // Offer type name → chuboe_offer_type_id mapping
 const OFFER_TYPES = {
@@ -191,6 +193,7 @@ function applyConsignmentGuard(opts) {
  * @param {number} [opts.userId]            - chuboe_user_id (optional)
  * @param {number} [opts.buyerId]           - chuboe_buyer_id (optional)
  * @param {boolean} [opts.writeMpnRecords=false] - Also write chuboe_offer_line_mpn records
+ * @param {boolean} [opts.isBackfill=false] - Backfill mode (coordinates with global budget)
  * @param {Array}  opts.lines               - Array of line objects (required, at least 1)
  * @param {string} opts.lines[].mpn         - Part number (required)
  * @param {string} [opts.lines[].mpnClean]  - Cleaned MPN (auto-generated if omitted)
@@ -224,6 +227,7 @@ async function writeOffer(opts) {
     userId = null,
     buyerId = null,
     writeMpnRecords = false,
+    isBackfill = false,
     lines = [],
   } = opts;
 
@@ -248,6 +252,32 @@ async function writeOffer(opts) {
     offerTypeId = Number(rawOfferType);
   }
 
+  // ── TIER 1: Global budget check ──
+  // Estimated writes: lines + optional MPN records
+  const estimatedWrites = lines.length + (writeMpnRecords ? lines.length : 0);
+  const caller = 'offer-writeback'; // Will be 'excess-agent' or 'inventory-cleanup' in practice
+  const globalCheck = otBudget.checkBudget({
+    table: 'chuboe_offer_line',
+    count: estimatedWrites,
+    caller,
+    isBackfill,
+  });
+
+  if (!globalCheck.allowed) {
+    logger.warn(`Global budget exhausted: ${globalCheck.reason}`);
+    return {
+      offerId: null,
+      searchKey: null,
+      linesWritten: 0,
+      mpnsWritten: 0,
+      errors: [],
+      rateLimited: true,
+      rateLimitReason: globalCheck.reason,
+      rateLimitTier: 'global',
+      otUnreachable: false,
+    };
+  }
+
   const errors = [];
   let linesWritten = 0;
   let mpnsWritten = 0;
@@ -265,15 +295,26 @@ async function writeOffer(opts) {
 
   let offerId;
   let searchKey = null;
+  let otUnreachable = false;   // set when any write hit a network/transport failure (OT down) — retryable
   try {
     const headerResponse = await apiPost('chuboe_offer', headerPayload);
     offerId = headerResponse.id;
     searchKey = headerResponse.Value || headerResponse.value || null;
     if (!offerId) throw new Error('No ID returned in response');
   } catch (e) {
-    return { offerId: null, searchKey: null, linesWritten: 0, mpnsWritten: 0, errors: [`Failed to insert offer header: ${e.message}`] };
+    const net = isOtUnreachableError(e);
+    return { offerId: null, searchKey: null, linesWritten: 0, mpnsWritten: 0, errors: [`${net ? '[OT_UNREACHABLE] ' : ''}Failed to insert offer header: ${e.message}`], otUnreachable: net };
   }
   logger.info(`Offer header created: searchKey=${searchKey}, chuboe_offer_id=${offerId}, BP=${bpartnerId}, type=${offerTypeId}`);
+
+  // ── Reserve budget and claim backfill slot ──
+  otBudget.reserve('chuboe_offer_line', estimatedWrites, caller);
+
+  if (isBackfill) {
+    otBudget.claimBackfillSlot(caller);
+  }
+
+  const writeStartTime = Date.now();
 
   // ── Insert Lines ──
   for (let i = 0; i < lines.length; i++) {
@@ -334,7 +375,9 @@ async function writeOffer(opts) {
       lineId = lineResponse.id;
       if (!lineId) throw new Error('No ID returned in response');
     } catch (e) {
-      errors.push(`Failed to insert line ${i + 1} (${mpnRaw}): ${e.message}`);
+      const net = isOtUnreachableError(e);
+      if (net) otUnreachable = true;
+      errors.push(`${net ? '[OT_UNREACHABLE] ' : ''}Failed to insert line ${i + 1} (${mpnRaw}): ${e.message}`);
       continue;
     }
     linesWritten++;
@@ -354,14 +397,37 @@ async function writeOffer(opts) {
         });
         mpnsWritten++;
       } catch (e) {
-        errors.push(`Failed to insert offer_line_mpn ${i + 1} (${mpnRaw}): ${e.message}`);
+        const net = isOtUnreachableError(e);
+        if (net) otUnreachable = true;
+        errors.push(`${net ? '[OT_UNREACHABLE] ' : ''}Failed to insert offer_line_mpn ${i + 1} (${mpnRaw}): ${e.message}`);
       }
     }
   }
 
+  // ── Record writes and release backfill slot ──
+  const writeDuration = Date.now() - writeStartTime;
+  const totalWritten = linesWritten + mpnsWritten;
+  if (totalWritten > 0) {
+    otBudget.recordWrites('chuboe_offer_line', totalWritten, {
+      caller,
+      success: true,
+      durationMs: writeDuration,
+    });
+  }
+
+  if (errors.length > 0) {
+    for (let i = 0; i < errors.length; i++) {
+      otBudget.recordFailure();
+    }
+  }
+
+  if (isBackfill) {
+    otBudget.releaseBackfillSlot(caller);
+  }
+
   logger.info(`Offer write complete: searchKey=${searchKey}, offerId=${offerId}, ${linesWritten} lines${writeMpnRecords ? `, ${mpnsWritten} MPNs` : ''}${errors.length ? `, ${errors.length} errors` : ''}`);
 
-  return { offerId, searchKey, linesWritten, mpnsWritten, errors };
+  return { offerId, searchKey, linesWritten, mpnsWritten, errors, otUnreachable };
 }
 
 // ─── BATCH WRITER ────────────────────────────────────────────────────────────
