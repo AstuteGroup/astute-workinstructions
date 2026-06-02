@@ -78,6 +78,8 @@ function findExistingVqIdByNaturalKey(payload) {
 }
 
 const { classifyWriteError } = require('./ot-error');
+const rateLimiter = require('./rate-limiter');
+const otBudget = require('./ot-api-budget');
 
 // Flag reason codes
 const FLAG = {
@@ -948,8 +950,66 @@ function resolveRFQLineExact(rfq, mpn, cpc) {
  * @returns {{ written: Array, flagged: Array, failed: Array, needsReview: Array, summary: Object }}
  */
 async function writeVQBatch(rfqSearchKey, items, opts = {}) {
-  const delayMs = opts.delayMs || 100;
+  const unseenEmailCount = opts.unseenEmailCount || 0;
+  const estimatedVQs = items.length * 10; // rough estimate: 10 VQs per item on average
+  const isBackfill = unseenEmailCount >= 20;
+
+  // TIER 1: Global budget check (coordinates across ALL agents)
+  const globalCheck = otBudget.checkBudget({
+    table: 'chuboe_vq_line',
+    count: estimatedVQs,
+    caller: 'vq-loading-agent',
+    isBackfill,
+  });
+
+  if (!globalCheck.allowed) {
+    logger.warn(`[vq-writer] Global budget exhausted: ${globalCheck.reason}`);
+    logger.warn(`[vq-writer] Deferring ${items.length} items (est ${estimatedVQs} VQs)`);
+    return {
+      written: [],
+      flagged: [],
+      failed: [],
+      skipped: [],
+      needsReview: [],
+      rateLimited: true,
+      rateLimitReason: globalCheck.reason,
+      rateLimitTier: 'global',
+      summary: {
+        total: items.length,
+        rateLimited: true,
+        message: globalCheck.reason,
+      },
+    };
+  }
+
+  // TIER 2: VQ-specific rate limiting (process-specific intelligence)
+  const rateCheck = rateLimiter.checkVQLimit(estimatedVQs, { unseenEmailCount });
+  if (!rateCheck.allowed) {
+    logger.warn(`[vq-writer] Rate limit reached: ${rateCheck.reason}`);
+    logger.warn(`[vq-writer] Deferring ${items.length} items (est ${estimatedVQs} VQs)`);
+    return {
+      written: [],
+      flagged: [],
+      failed: [],
+      skipped: [],
+      needsReview: [],
+      rateLimited: true,
+      rateLimitReason: rateCheck.reason,
+      summary: {
+        total: items.length,
+        rateLimited: true,
+        message: rateCheck.reason,
+      },
+    };
+  }
+
+  // Use recommended delay based on backfill mode
+  const delayMs = opts.delayMs || rateLimiter.getRecommendedDelay(unseenEmailCount);
   const pass2Auto = opts.pass2Auto || false;
+
+  if (rateCheck.backfillMode) {
+    logger.info(`[vq-writer] BACKFILL MODE: ${unseenEmailCount} unseen emails, using ${delayMs}ms delay`);
+  }
 
   const allWritten = [];
   const allFlagged = [];
@@ -988,6 +1048,16 @@ async function writeVQBatch(rfqSearchKey, items, opts = {}) {
     const lookup = lookupMfr(m);
     await resolveMFR(lookup.canonical || m);
   }
+
+  // Reserve global budget before writing
+  otBudget.reserve('chuboe_vq_line', estimatedVQs, 'vq-loading-agent');
+
+  // Claim backfill slot if in backfill mode
+  if (isBackfill) {
+    otBudget.claimBackfillSlot('vq-loading-agent');
+  }
+
+  const writeStartTime = Date.now();
 
   // ── PASS 1: Exact match ──────────────────────────────────────────────────
   console.log(`[vq-writer] Pass 1: exact match on ${items.length} items...`);
@@ -1080,6 +1150,35 @@ async function writeVQBatch(rfqSearchKey, items, opts = {}) {
 
   const skippedMsg = allSkipped.length > 0 ? `, ${allSkipped.length} skipped (restricted MFR)` : '';
   console.log(`[vq-writer] Done: ${summary.written} written (${pass1Written} pass1), ${summary.needsReview} needs review, ${summary.flagged} flagged, ${summary.failed} failed${skippedMsg}`);
+
+  // Record writes for rate limiting (both tiers)
+  const writeDuration = Date.now() - writeStartTime;
+
+  if (allWritten.length > 0) {
+    // Global budget tracking
+    otBudget.recordWrites('chuboe_vq_line', allWritten.length, {
+      caller: 'vq-loading-agent',
+      success: true,
+      durationMs: writeDuration,
+    });
+
+    // VQ-specific tracking
+    rateLimiter.recordVQWrites(allWritten.length);
+    rateLimiter.recordSuccess();
+    logger.info(`[vq-writer] Rate limiter: recorded ${allWritten.length} writes. Status: ${JSON.stringify(rateLimiter.getStatus())}`);
+  }
+
+  if (allFailed.length > 0) {
+    allFailed.forEach(() => {
+      rateLimiter.recordFailure();
+      otBudget.recordFailure();
+    });
+  }
+
+  // Release backfill slot if we claimed it
+  if (isBackfill) {
+    otBudget.releaseBackfillSlot('vq-loading-agent');
+  }
 
   return { written: allWritten, flagged: allFlagged, failed: allFailed, skipped: allSkipped, needsReview: allNeedsReview, summary };
 }
