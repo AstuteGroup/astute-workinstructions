@@ -42,6 +42,7 @@ const path = require('path');
 const crypto = require('crypto');
 const { apiPost, isApiAvailable } = require('./api-client');
 const logger = require('./logger').createLogger('APIPricing');
+const otBudget = require('./ot-api-budget');
 
 // ─── CONSTANTS ───────────────────────────────────────────────────────────────
 
@@ -436,15 +437,46 @@ async function writePricingResult(opts) {
   // Always write to cache
   const cacheFile = writeCache(mpn, envelope);
 
-  // Write to DB via API if available (non-blocking — failure doesn't affect cache)
-  const dbId = await writeDb(mpn, envelope, rfqId);
+  // ── Global budget check for DB write ──
+  const globalCheck = otBudget.checkBudget({
+    table: 'chuboe_pricing_api_result',
+    count: 1,
+    caller: 'enrich-poller',
+    isBackfill: false,
+  });
+
+  let dbId = null;
+  let rateLimited = false;
+  if (!globalCheck.allowed) {
+    logger.warn(`Global budget exhausted for ${mpn}: ${globalCheck.reason} — cache written, DB skipped`);
+    rateLimited = true;
+  } else {
+    // Reserve budget before write
+    otBudget.reserve('chuboe_pricing_api_result', 1, 'enrich-poller');
+    const writeStartTime = Date.now();
+
+    // Write to DB via API if available (non-blocking — failure doesn't affect cache)
+    dbId = await writeDb(mpn, envelope, rfqId);
+
+    // Record the write
+    const writeDuration = Date.now() - writeStartTime;
+    if (dbId) {
+      otBudget.recordWrites('chuboe_pricing_api_result', 1, {
+        caller: 'enrich-poller',
+        success: true,
+        durationMs: writeDuration,
+      });
+    } else {
+      otBudget.recordFailure();
+    }
+  }
 
   const success = cacheFile !== null;
   if (success) {
-    logger.debug(`Captured ${mpn}: ${envelope.data.Pricings.length} distributors → ${cacheFile}${dbId ? ` + DB#${dbId}` : ''}`);
+    logger.debug(`Captured ${mpn}: ${envelope.data.Pricings.length} distributors → ${cacheFile}${dbId ? ` + DB#${dbId}` : ''}${rateLimited ? ' (DB rate limited)' : ''}`);
   }
 
-  return { cacheFile, dbId, success };
+  return { cacheFile, dbId, success, rateLimited };
 }
 
 // ─── PUBLIC API: READ ───────────────────────────────────────────────────────
@@ -519,10 +551,10 @@ async function flushCacheToDB() {
   const available = await isDbAvailable();
   if (!available) {
     logger.error('Cannot flush: iDempiere API not available');
-    return { imported: 0, errors: 0 };
+    return { imported: 0, errors: 0, rateLimited: false };
   }
 
-  if (!fs.existsSync(CACHE_DIR)) return { imported: 0, errors: 0 };
+  if (!fs.existsSync(CACHE_DIR)) return { imported: 0, errors: 0, rateLimited: false };
 
   const importedDir = path.join(CACHE_DIR, 'imported');
   if (!fs.existsSync(importedDir)) {
@@ -530,6 +562,25 @@ async function flushCacheToDB() {
   }
 
   const files = fs.readdirSync(CACHE_DIR).filter(f => f.endsWith('.json'));
+
+  // ── Global budget check for bulk flush ──
+  const globalCheck = otBudget.checkBudget({
+    table: 'chuboe_pricing_api_result',
+    count: files.length,
+    caller: 'enrich-poller',
+    isBackfill: true,  // Bulk flush is treated as backfill
+  });
+
+  if (!globalCheck.allowed) {
+    logger.warn(`Global budget exhausted for cache flush: ${globalCheck.reason} — ${files.length} files deferred`);
+    return { imported: 0, errors: 0, rateLimited: true, rateLimitReason: globalCheck.reason };
+  }
+
+  // Reserve budget and claim backfill slot
+  otBudget.reserve('chuboe_pricing_api_result', files.length, 'enrich-poller');
+  otBudget.claimBackfillSlot('enrich-poller');
+
+  const flushStartTime = Date.now();
   let imported = 0;
   let errors = 0;
 
@@ -554,8 +605,26 @@ async function flushCacheToDB() {
     }
   }
 
+  // ── Record writes and release backfill slot ──
+  const flushDuration = Date.now() - flushStartTime;
+  if (imported > 0) {
+    otBudget.recordWrites('chuboe_pricing_api_result', imported, {
+      caller: 'enrich-poller',
+      success: true,
+      durationMs: flushDuration,
+    });
+  }
+
+  if (errors > 0) {
+    for (let i = 0; i < errors; i++) {
+      otBudget.recordFailure();
+    }
+  }
+
+  otBudget.releaseBackfillSlot('enrich-poller');
+
   logger.info(`Cache flush: ${imported} imported, ${errors} errors`);
-  return { imported, errors };
+  return { imported, errors, rateLimited: false };
 }
 
 // ─── CACHE CLEANUP ──────────────────────────────────────────────────────────
