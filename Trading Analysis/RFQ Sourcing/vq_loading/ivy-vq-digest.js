@@ -320,7 +320,7 @@ function pullVQs(sinceTs, untilTs, forwardedIds) {
     `  AND v.created >= '${sinceTs}'::timestamp ` +
     `  AND v.created <  '${untilTs}'::timestamp ` +
     `  AND (v.createdby = ${IVY_USER_ID} ${idClause}) ` +
-    `ORDER BY cust.name, r.value, v.created DESC;`;
+    `ORDER BY cust.name, r.value, v.chuboe_mpn, v.cost ASC NULLS LAST, v.created DESC;`;
   const out = psqlPipe(sql);
   return out.trim().split('\n').filter(Boolean).map(line => {
     const [vqId, rfq, customer, vendor, mpn, cost, currency, qty, dateCode, leadTime, noteP, noteX, noteU, buyer, created, createdby] = line.split('|');
@@ -447,62 +447,73 @@ function buildHtml(vqs, windowStr, sourceLabel) {
   if (vqs.length === 0) {
     html += `<p style="color:#999"><i>No VQs in this window.</i></p>`;
   } else {
-    // Group by customer and RFQ
+    // Group by customer → RFQ → MPN (sorted lowest to highest price)
     let lastCustomer = null;
     let lastRfq = null;
+    let lastMpn = null;
 
     html += `<table border="1" cellpadding="6" cellspacing="0" style="border-collapse:collapse;font-size:12px;width:100%">
 <thead style="background:#eef"><tr>
   <th align="left">Customer</th>
   <th align="left">RFQ</th>
-  <th align="left">Created (CT)</th>
-  <th align="left">Source</th>
-  <th align="left">Vendor</th>
   <th align="left">MPN</th>
-  <th align="right">Qty</th>
+  <th align="left">Vendor</th>
   <th align="right">Price</th>
+  <th align="right">Qty</th>
   <th align="left">Date Code</th>
   <th align="left">Lead Time</th>
+  <th align="left">Source</th>
   <th align="left">Buyer</th>
+  <th align="left">Created (CT)</th>
   <th align="left">Notes</th>
 </tr></thead>
 <tbody>
 ${vqs.map((v, idx) => {
   const created = (v.created || '').slice(0, 19);
   const sourceCell = v.source === 'forwarded'
-    ? `<i style="color:#888">forwarded</i>`
-    : `manual`;
+    ? `<i style="color:#888">fwd</i>`
+    : `man`;
 
-  // Visual breaks between customer/RFQ groups
+  // Visual breaks between groups
   const newCustomer = v.customer !== lastCustomer;
   const newRfq = v.rfq !== lastRfq;
-  const groupBreak = (newCustomer || newRfq) && idx > 0;
+  const newMpn = v.mpn !== lastMpn;
+
+  // Heavy break for customer/RFQ change, light break for MPN change
+  let rowStyle = '';
+  if ((newCustomer || newRfq) && idx > 0) {
+    rowStyle = ' style="border-top:3px solid #555"';
+  } else if (newMpn && idx > 0) {
+    rowStyle = ' style="border-top:1px solid #ccc"';
+  }
 
   lastCustomer = v.customer;
   lastRfq = v.rfq;
+  lastMpn = v.mpn;
 
-  const rowStyle = groupBreak ? ' style="border-top:2px solid #999"' : '';
+  // Show customer/RFQ/MPN labels only on first row of each group
   const customerCell = newCustomer || newRfq ? `<b>${esc(v.customer)}</b>` : '';
   const rfqCell = newRfq ? `<b>${esc(v.rfq)}</b>` : '';
+  const mpnCell = newMpn ? `<b>${esc(v.mpn || '')}</b>` : '';
 
   return `<tr${rowStyle}>
   <td>${customerCell}</td>
   <td>${rfqCell}</td>
-  <td>${esc(created)}</td>
-  <td>${sourceCell}</td>
+  <td>${mpnCell}</td>
   <td>${esc(v.vendor)}</td>
-  <td>${esc(v.mpn || '')}</td>
-  <td align="right">${v.qty != null ? v.qty.toLocaleString('en-US') : ''}</td>
   <td align="right">${esc(fmtPrice(v.cost, v.currency))}</td>
+  <td align="right">${v.qty != null ? v.qty.toLocaleString('en-US') : ''}</td>
   <td>${esc(v.dateCode)}</td>
   <td>${esc(v.leadTime)}</td>
-  <td>${esc(v.buyer || '(unassigned)')}</td>
-  <td>${esc(v.notes)}</td>
+  <td>${sourceCell}</td>
+  <td style="font-size:10px">${esc(v.buyer || '?')}</td>
+  <td style="font-size:10px">${esc(created.slice(5))}</td>
+  <td style="font-size:10px">${esc(v.notes)}</td>
 </tr>`;
 }).join('\n')}
 </tbody>
 </table>
-<p style="color:#666;font-size:11px;margin-top:6px"><i>Grouped by Customer → RFQ. Full audit (incl. VQ IDs, all note columns broken out) in the attached xlsx.</i></p>`;
+<p style="color:#666;font-size:11px;margin-top:6px"><i>Grouped by Customer → RFQ → MPN (sorted low→high price within each MPN). Heavy line = new customer/RFQ, light line = new MPN. Full audit in attached xlsx.</i></p>`;
   }
 
   html += `<p style="color:#999;font-size:11px;margin-top:16px;border-top:1px solid #eee;padding-top:8px">
