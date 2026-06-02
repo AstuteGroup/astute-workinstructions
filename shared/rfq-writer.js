@@ -132,6 +132,13 @@ async function writeRFQ(opts) {
     statusId = DEFAULT_STATUS_ID,
     lines = [],
     enrichDescription = null,
+    // Resume/backfill: when set, skip the header POST (the RFQ already exists)
+    // and write only the lines/line_mpns not already present — used by the
+    // resumer to backfill an RFQ that was partially written when OT died
+    // mid-write. The header natural key (BP+type+salesrep) is NOT unique, so a
+    // plain re-run would duplicate the header; this path avoids that.
+    existingRfqId = null,
+    existingSearchKey = null,
   } = opts;
 
   // ── Validation ──
@@ -146,6 +153,8 @@ async function writeRFQ(opts) {
   const errors = [];
   let linesWritten = 0;
   let mpnsWritten = 0;
+  let otUnreachable = false;   // set when any write hit a network/transport failure (OT down) — retryable
+  const { isOtUnreachableError } = require('./ot-error');
 
   // ── Insert RFQ Header via API ──
   // Column names MUST be exact PascalCase from ad_column.columnname
@@ -164,23 +173,68 @@ async function writeRFQ(opts) {
 
   let rfqId;
   let searchKey = null; // Value field — the user-facing RFQ number in OT
-  try {
-    // naturalKeyFields enables apiPost's verify-after-error retry path:
-    // on a transient network/5xx, it GETs back any row created since the
-    // POST started matching (BP, type, salesrep) — if found, returns it
-    // (no dup); if not, retries the POST. Without this, intermittent
-    // network flaps left emails in INBOX with no header written.
-    // Discovered 2026-05-06 during the 50% POST-failure run.
-    const rfqResponse = await apiPost('chuboe_rfq', rfqPayload, {
-      naturalKeyFields: ['C_BPartner_ID', 'Chuboe_RFQ_Type_ID', 'SalesRep_ID'],
-    });
-    rfqId = rfqResponse.id;
-    searchKey = rfqResponse.Value || rfqResponse.value || null;
-    if (!rfqId) throw new Error('No ID returned in response');
-  } catch (e) {
-    return { rfqId: null, searchKey: null, linesWritten: 0, mpnsWritten: 0, errors: [`Failed to insert RFQ header: ${e.message}`] };
+
+  // Backfill mode: the RFQ already exists (partial write during an OT outage).
+  // Skip the header POST — re-POSTing duplicates the header (its
+  // BP+type+salesrep natural key is NOT unique). Pre-fetch what's already in
+  // OT so the line loop writes only the gaps (lines + line_mpns).
+  const existingLines = new Map();        // lineNum -> chuboe_rfq_line_id
+  const existingMpnsByLine = new Map();   // chuboe_rfq_line_id -> Set(MPN_CLEAN, uppercased)
+  if (existingRfqId) {
+    rfqId = existingRfqId;
+    searchKey = existingSearchKey || null;
+    try {
+      const rows = psqlQuery(
+        `SELECT rl.line, rl.chuboe_rfq_line_id, ` +
+        `COALESCE(string_agg(rlm.chuboe_mpn_clean, ',') FILTER (WHERE rlm.isactive='Y'), '') ` +
+        `FROM adempiere.chuboe_rfq_line rl ` +
+        `LEFT JOIN adempiere.chuboe_rfq_line_mpn rlm ON rlm.chuboe_rfq_line_id = rl.chuboe_rfq_line_id ` +
+        `WHERE rl.chuboe_rfq_id = ${parseInt(existingRfqId, 10)} AND rl.isactive='Y' ` +
+        `GROUP BY rl.line, rl.chuboe_rfq_line_id`
+      );
+      for (const row of (rows || '').split('\n')) {
+        if (!row.trim()) continue;
+        const [lineStr, idStr, mpnCsv] = row.split('|');
+        const ln = parseInt(lineStr, 10);
+        const id = parseInt(idStr, 10);
+        if (isNaN(ln) || isNaN(id)) continue;
+        existingLines.set(ln, id);
+        existingMpnsByLine.set(id, new Set(
+          (mpnCsv || '').split(',').map(s => s.trim().toUpperCase()).filter(Boolean)
+        ));
+      }
+      logger.info(`RFQ backfill mode: rfqId=${rfqId}, ${existingLines.size} line(s) already present`);
+    } catch (e) {
+      // Can't read existing state → abort backfill rather than risk duplicates.
+      return { rfqId, searchKey, linesWritten: 0, mpnsWritten: 0,
+        errors: [`Backfill pre-fetch failed for rfqId ${rfqId}: ${e.message}`], otUnreachable: false };
+    }
+  } else {
+    try {
+      // naturalKeyFields enables apiPost's verify-after-error retry path:
+      // on a transient network/5xx, it GETs back any row created since the
+      // POST started matching (BP, type, salesrep) — if found, returns it
+      // (no dup); if not, retries the POST. Without this, intermittent
+      // network flaps left emails in INBOX with no header written.
+      // Discovered 2026-05-06 during the 50% POST-failure run.
+      const rfqResponse = await apiPost('chuboe_rfq', rfqPayload, {
+        naturalKeyFields: ['C_BPartner_ID', 'Chuboe_RFQ_Type_ID', 'SalesRep_ID'],
+      });
+      rfqId = rfqResponse.id;
+      searchKey = rfqResponse.Value || rfqResponse.value || null;
+      if (!rfqId) throw new Error('No ID returned in response');
+    } catch (e) {
+      const net = isOtUnreachableError(e);
+      return {
+        rfqId: null, searchKey: null, linesWritten: 0, mpnsWritten: 0,
+        errors: [`${net ? '[OT_UNREACHABLE] ' : ''}Failed to insert RFQ header: ${e.message}`],
+        otUnreachable: net,
+        // Header never wrote → nothing orphaned in OT. Resume re-runs writeRFQ fresh.
+        pending: net ? { rfqId: null, searchKey: null, stage: 'header' } : undefined,
+      };
+    }
+    logger.info(`RFQ header created: searchKey=${searchKey}, chuboe_rfq_id=${rfqId}, BP=${bpartnerId}, type=${type}`);
   }
-  logger.info(`RFQ header created: searchKey=${searchKey}, chuboe_rfq_id=${rfqId}, BP=${bpartnerId}, type=${type}`);
 
   // ── Insert Lines + Line MPNs ──
   for (let i = 0; i < lines.length; i++) {
@@ -216,26 +270,39 @@ async function writeRFQ(opts) {
 
     // ── Insert chuboe_rfq_line via API ──
     let lineId;
-    try {
-      const linePayload = {
-        Chuboe_RFQ_ID: rfqId,
-        Line: lineNum,
-        Qty: qty,
-        PriceEntered: targetPrice,
-      };
-      if (line.cpc) linePayload.Chuboe_CPC = line.cpc;
-      const lineResponse = await apiPost('chuboe_rfq_line', linePayload, {
-        naturalKeyFields: ['Chuboe_RFQ_ID', 'Line'],
-      });
-      lineId = lineResponse.id;
-      if (!lineId) throw new Error('No ID returned in response');
-    } catch (e) {
-      errors.push(`Failed to insert line ${i + 1} (${mpnRaw}): ${e.message}`);
-      continue;
+    if (existingLines.has(lineNum)) {
+      // Backfill: this line already exists — reuse its id and write only its
+      // missing line_mpn below. Don't re-POST (would duplicate the line).
+      lineId = existingLines.get(lineNum);
+    } else {
+      try {
+        const linePayload = {
+          Chuboe_RFQ_ID: rfqId,
+          Line: lineNum,
+          Qty: qty,
+          PriceEntered: targetPrice,
+        };
+        if (line.cpc) linePayload.Chuboe_CPC = line.cpc;
+        const lineResponse = await apiPost('chuboe_rfq_line', linePayload, {
+          naturalKeyFields: ['Chuboe_RFQ_ID', 'Line'],
+        });
+        lineId = lineResponse.id;
+        if (!lineId) throw new Error('No ID returned in response');
+      } catch (e) {
+        const net = isOtUnreachableError(e);
+        if (net) otUnreachable = true;
+        errors.push(`${net ? '[OT_UNREACHABLE] ' : ''}Failed to insert line ${i + 1} (${mpnRaw}): ${e.message}`);
+        continue;
+      }
+      linesWritten++;
     }
-    linesWritten++;
 
     // ── Insert chuboe_rfq_line_mpn via API ──
+    // Backfill: skip if this line already has this MPN (e.g. 1135619 — line
+    // wrote but its line_mpn POST timed out; only the missing sub-row is added).
+    if (existingMpnsByLine.has(lineId) && existingMpnsByLine.get(lineId).has((mpnCleanVal || '').toUpperCase())) {
+      continue;
+    }
     try {
       const mpnPayload = {
         Chuboe_RFQ_Line_ID: lineId,
@@ -280,7 +347,9 @@ async function writeRFQ(opts) {
         naturalKeyFields: ['Chuboe_RFQ_Line_ID', 'Chuboe_MPN_Clean', 'Chuboe_MFR_ID'],
       });
     } catch (e) {
-      errors.push(`Failed to insert line_mpn ${i + 1} (${mpnRaw}): ${e.message}`);
+      const net = isOtUnreachableError(e);
+      if (net) otUnreachable = true;
+      errors.push(`${net ? '[OT_UNREACHABLE] ' : ''}Failed to insert line_mpn ${i + 1} (${mpnRaw}): ${e.message}`);
       continue;
     }
     mpnsWritten++;
@@ -288,7 +357,14 @@ async function writeRFQ(opts) {
 
   logger.info(`RFQ write complete: searchKey=${searchKey}, rfqId=${rfqId}, ${linesWritten} lines, ${mpnsWritten} MPNs${errors.length ? `, ${errors.length} errors` : ''}`);
 
-  return { rfqId, searchKey, linesWritten, mpnsWritten, errors };
+  return {
+    rfqId, searchKey, linesWritten, mpnsWritten, errors,
+    otUnreachable,
+    // Header wrote but some lines/line_mpns may not have (OT died mid-RFQ).
+    // Resume backfills the gaps against this existing rfqId — never re-POSTs
+    // the header (its natural key BP+type+salesrep is not unique → would dup).
+    pending: otUnreachable ? { rfqId, searchKey, stage: 'lines' } : undefined,
+  };
 }
 
 // ─── UTILITY: Look up MFR ID by canonical name ──────────────────────────────

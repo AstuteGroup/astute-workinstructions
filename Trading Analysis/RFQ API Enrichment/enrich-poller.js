@@ -41,6 +41,7 @@ const { readQuotaState, isQuotaBlocked, hasAdequateQuota } = require('./rfq-quot
 const { addToBacklog, nextBatch, markAttempted, pruneBacklog, backlogStats } = require('./rfq-backlog');
 const largeRfqGate = require('../../shared/large-rfq-gate');
 const { getCandidatesForRfq: getCrossRefCandidatesForRfq } = require('../../shared/crossref-queue');
+const enrichmentRateLimiter = require('../../shared/enrichment-rate-limiter');
 
 const WATERMARK_FILE = path.resolve(process.env.HOME || '/home/analytics_user', 'workspace/.last-rfq-enrich');
 const ROLLUP_FILE = path.resolve(process.env.HOME || '/home/analytics_user', 'workspace/.enrich-poller-rollup.json');
@@ -890,9 +891,43 @@ async function main() {
     return;
   }
 
+  // ─── RATE LIMITING CHECK (added 2026-06-02) ─────────────────────────────────
+  // Reset session counters at start of each tick
+  enrichmentRateLimiter.resetSession();
+
+  // Count total RFQs we want to enrich (immediate + potential backlog)
+  const bl = backlogStats();
+  const maxBacklogToProcess = Math.min(bl.pending, BACKLOG_BATCH_SIZE);
+  const totalToEnrich = immediate.length + maxBacklogToProcess;
+  const totalUnenriched = immediate.length + bl.pending;
+
+  // Check rate limit
+  const rateCheck = enrichmentRateLimiter.checkEnrichmentLimit(totalToEnrich, {
+    unenrichedCount: totalUnenriched,
+  });
+
+  if (!rateCheck.allowed) {
+    log(`RATE LIMIT: ${rateCheck.reason}`);
+    log(`  Deferring enrichment of ${totalToEnrich} RFQs (${totalUnenriched} total unenriched)`);
+    log(`  Status: ${JSON.stringify(enrichmentRateLimiter.getStatus())}`);
+    // Don't update watermark - we'll try again next tick
+    await pool.end();
+    return;
+  }
+
+  if (rateCheck.backfillMode) {
+    log(`BACKFILL MODE: ${totalUnenriched} unenriched RFQs, using slower enrichment rate`);
+  }
+
+  const enrichDelay = enrichmentRateLimiter.getRecommendedDelay(totalUnenriched);
+
+  // Record enrichment attempt
+  enrichmentRateLimiter.recordEnrichmentAttempt(totalToEnrich);
+
   // Phase 3: Process Tier 1-3 immediately
   const batchResults = [];
-  for (const r of immediate) {
+  for (let idx = 0; idx < immediate.length; idx++) {
+    const r = immediate[idx];
     log(`Enriching ${r.rfq_number} (${r.rfq_type} ${r.priority}, ${r.line_mpns} MPNs)${r._gateApproved ? ' [gate-approved]' : ''}...`);
     try {
       const enrichOpts = { priority: r.priority };
@@ -913,6 +948,11 @@ async function main() {
       }
       batchResults.push(result);
       log(`  done: ${result.apiCalls} API, ${result.cacheHits} cache, ${result.vqsWritten} VQs, ${result.errors?.length || 0} err`);
+
+      // Apply rate limit delay if in backfill mode
+      if (enrichDelay > 0 && idx < immediate.length - 1) {
+        await new Promise(resolve => setTimeout(resolve, enrichDelay));
+      }
     } catch (err) {
       log(`  ERROR: ${err.message}`);
       batchResults.push({
@@ -940,13 +980,24 @@ async function main() {
   const dkRemaining = dkQuota?.remainingCalls ?? '?';
 
   const candidates = nextBatch(BACKLOG_BATCH_SIZE);
-  if (candidates.length > 0) {
+
+  // Apply rate limiting to backlog drain too
+  const remainingCapacity = rateCheck.limits.maxEnrichmentsPerRun - enrichmentRateLimiter.getStatus().sessionEnrichments;
+  const candidatesToProcess = candidates.slice(0, Math.max(0, remainingCapacity));
+
+  if (candidatesToProcess.length > 0) {
     const dkNote = dkBlocked
       ? ` (note: DigiKey 429-blocked — other 6 distributors will still run)`
       : ` (DigiKey: ${dkRemaining} remaining)`;
-    log(`Draining Tier 4 backlog: ${candidates.length} candidate(s)${dkNote}`);
+    log(`Draining Tier 4 backlog: ${candidatesToProcess.length} candidate(s)${dkNote}`);
   }
-  for (const item of candidates) {
+
+  if (candidatesToProcess.length < candidates.length) {
+    log(`  Rate limited: processing ${candidatesToProcess.length}/${candidates.length} backlog candidates`);
+  }
+
+  for (let idx = 0; idx < candidatesToProcess.length; idx++) {
+    const item = candidatesToProcess[idx];
     log(`  Backlog: enriching ${item.rfq_number} (${item.customer}, ${item.line_mpns} MPNs, queued ${item.queuedAt})...`);
     try {
       const result = await enrichRFQ(String(item.rfq_number), { priority: 'P3' });
@@ -955,6 +1006,11 @@ async function main() {
       batchResults.push(result);
       markAttempted(item.rfq_number, 'success');
       log(`    done: ${result.apiCalls} API, ${result.cacheHits} cache, ${result.vqsWritten} VQs`);
+
+      // Apply rate limit delay if in backfill mode
+      if (enrichDelay > 0 && idx < candidatesToProcess.length - 1) {
+        await new Promise(resolve => setTimeout(resolve, enrichDelay));
+      }
     } catch (err) {
       log(`    ERROR: ${err.message}`);
       markAttempted(item.rfq_number, 'error');

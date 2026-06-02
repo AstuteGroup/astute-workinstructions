@@ -3,8 +3,8 @@
 // Ivy Song — Daily VQ Loading Digest
 //
 // Sends a per-loader digest of VQs that Ivy Song (ad_user_id 1013784) wrote
-// since the last successful digest. Scheduled daily at 4 PM Shenzhen local
-// (UTC+8, no DST) = 08:00 UTC. Recipients: Ivy + Jake.
+// since the last successful digest. Scheduled daily at 6 PM Shenzhen local
+// (UTC+8, no DST) = 10:00 UTC. Recipients: Ivy + Jake.
 //
 // Window: sentinel-driven ("since last digest"). State stored at
 //   ~/workspace/.ivy-vq-digest-state.json   { lastDigestTs: ISO }
@@ -283,8 +283,9 @@ async function collectForwardedVqIds(sinceMs) {
 function pullVQs(sinceTs, untilTs, forwardedIds) {
   // Source columns:
   //   r.value              → RFQ#
-  //   bp.name              → Seller (vendor)
-  //   v.chuboe_mpn         → MPN (as quoted by seller)
+  //   cust.name            → Customer (RFQ seller - who we're quoting to)
+  //   bp.name              → Vendor (supplier who quoted)
+  //   v.chuboe_mpn         → MPN (as quoted by supplier)
   //   v.cost + c.iso_code  → Price + Currency
   //   v.chuboe_date_code   → Date Code
   //   v.chuboe_lead_time   → Lead Time (added — useful context alongside DC)
@@ -303,13 +304,14 @@ function pullVQs(sinceTs, untilTs, forwardedIds) {
     ? `OR v.chuboe_vq_line_id IN (${[...forwardedIds].join(',')})`
     : '';
   const sql =
-    `SELECT v.chuboe_vq_line_id, r.value, ${scrub('bp.name')}, ${scrub('v.chuboe_mpn')}, ` +
+    `SELECT v.chuboe_vq_line_id, r.value, ${scrub('cust.name')}, ${scrub('bp.name')}, ${scrub('v.chuboe_mpn')}, ` +
     `       v.cost, COALESCE(c.iso_code, ''), v.qty, ${scrub('v.chuboe_date_code')}, ${scrub('v.chuboe_lead_time')}, ` +
     `       ${scrub('v.chuboe_note_public')}, ${scrub('v.chuboe_note_private')}, ` +
     `       ${scrub('v.chuboe_note_user')}, ${scrub('ub.name')}, v.created, v.createdby ` +
     `FROM adempiere.chuboe_vq_line v ` +
     `JOIN adempiere.chuboe_rfq_line rl ON v.chuboe_rfq_line_id = rl.chuboe_rfq_line_id ` +
     `JOIN adempiere.chuboe_rfq r ON rl.chuboe_rfq_id = r.chuboe_rfq_id ` +
+    `JOIN adempiere.c_bpartner cust ON r.c_bpartner_id = cust.c_bpartner_id ` +
     `JOIN adempiere.c_bpartner bp ON v.c_bpartner_id = bp.c_bpartner_id ` +
     `LEFT JOIN adempiere.c_currency c ON c.c_currency_id = v.c_currency_id ` +
     `LEFT JOIN adempiere.ad_user ub ON ub.ad_user_id = v.chuboe_buyer_id ` +
@@ -318,15 +320,15 @@ function pullVQs(sinceTs, untilTs, forwardedIds) {
     `  AND v.created >= '${sinceTs}'::timestamp ` +
     `  AND v.created <  '${untilTs}'::timestamp ` +
     `  AND (v.createdby = ${IVY_USER_ID} ${idClause}) ` +
-    `ORDER BY v.created DESC;`;
+    `ORDER BY cust.name, r.value, v.created DESC;`;
   const out = psqlPipe(sql);
   return out.trim().split('\n').filter(Boolean).map(line => {
-    const [vqId, rfq, seller, mpn, cost, currency, qty, dateCode, leadTime, noteP, noteX, noteU, buyer, created, createdby] = line.split('|');
+    const [vqId, rfq, customer, vendor, mpn, cost, currency, qty, dateCode, leadTime, noteP, noteX, noteU, buyer, created, createdby] = line.split('|');
     const notes = [noteP, noteX, noteU].filter(Boolean).join(' | ').replace(/\r?\n/g, ' ').trim();
     const source = Number(createdby) === IVY_USER_ID ? 'manual' : 'forwarded';
     return {
       vqId: Number(vqId),
-      rfq, seller, mpn,
+      rfq, customer, vendor, mpn,
       cost: cost ? Number(cost) : null,
       currency,
       qty: qty ? Number(qty) : null,
@@ -358,10 +360,11 @@ async function buildXlsx(vqs, windowStr) {
   const ws = wb.addWorksheet('VQs');
 
   const cols = [
+    { header: 'Customer',     key: 'customer',  width: 28 },
+    { header: 'RFQ',          key: 'rfq',       width: 10 },
     { header: 'Created (CT)', key: 'created',   width: 19 },
     { header: 'Source',       key: 'source',    width: 11 },
-    { header: 'RFQ',          key: 'rfq',       width: 10 },
-    { header: 'Vendor',       key: 'seller',    width: 32 },
+    { header: 'Vendor',       key: 'vendor',    width: 32 },
     { header: 'MPN',          key: 'mpn',       width: 24 },
     { header: 'Qty',          key: 'qty',       width: 10 },
     { header: 'Price',        key: 'cost',      width: 12 },
@@ -380,10 +383,11 @@ async function buildXlsx(vqs, windowStr) {
 
   for (const v of vqs) {
     const row = ws.addRow({
+      customer: v.customer,
+      rfq: v.rfq,
       created: v.created || '',
       source: v.source,
-      rfq: v.rfq,
-      seller: v.seller,
+      vendor: v.vendor,
       mpn: v.mpn,
       qty: v.qty,
       cost: v.cost,
@@ -418,20 +422,24 @@ async function buildXlsx(vqs, windowStr) {
 function buildHtml(vqs, windowStr, sourceLabel) {
   const sumByRfq = new Map();
   const sumByVendor = new Map();
+  const sumByCustomer = new Map();
   let manualCount = 0, forwardedCount = 0;
   for (const v of vqs) {
     sumByRfq.set(v.rfq, (sumByRfq.get(v.rfq) || 0) + 1);
-    sumByVendor.set(v.seller, (sumByVendor.get(v.seller) || 0) + 1);
+    sumByVendor.set(v.vendor, (sumByVendor.get(v.vendor) || 0) + 1);
+    sumByCustomer.set(v.customer, (sumByCustomer.get(v.customer) || 0) + 1);
     if (v.source === 'manual') manualCount++; else forwardedCount++;
   }
   const distinctRfqs = sumByRfq.size;
   const distinctVendors = sumByVendor.size;
+  const distinctCustomers = sumByCustomer.size;
 
   let html = `<html><body style="font-family:Arial,sans-serif;font-size:13px;color:#222">
 <h2 style="color:#2a5;margin-bottom:4px">Ivy Song — Daily VQ Digest</h2>
 <p style="margin-top:0;color:#666">${esc(windowStr)} · <i>${esc(sourceLabel)}</i></p>
 <p style="margin:6px 0">
   <b>${vqs.length}</b> VQ${vqs.length === 1 ? '' : 's'} (${manualCount} manual + ${forwardedCount} forwarded) ·
+  <b>${distinctCustomers}</b> customer${distinctCustomers === 1 ? '' : 's'} ·
   <b>${distinctRfqs}</b> RFQ${distinctRfqs === 1 ? '' : 's'} ·
   <b>${distinctVendors}</b> vendor${distinctVendors === 1 ? '' : 's'}
 </p>`;
@@ -439,11 +447,16 @@ function buildHtml(vqs, windowStr, sourceLabel) {
   if (vqs.length === 0) {
     html += `<p style="color:#999"><i>No VQs in this window.</i></p>`;
   } else {
-    html += `<table border="1" cellpadding="6" cellspacing="0" style="border-collapse:collapse;font-size:12px">
+    // Group by customer and RFQ
+    let lastCustomer = null;
+    let lastRfq = null;
+
+    html += `<table border="1" cellpadding="6" cellspacing="0" style="border-collapse:collapse;font-size:12px;width:100%">
 <thead style="background:#eef"><tr>
+  <th align="left">Customer</th>
+  <th align="left">RFQ</th>
   <th align="left">Created (CT)</th>
   <th align="left">Source</th>
-  <th align="left">RFQ</th>
   <th align="left">Vendor</th>
   <th align="left">MPN</th>
   <th align="right">Qty</th>
@@ -454,16 +467,30 @@ function buildHtml(vqs, windowStr, sourceLabel) {
   <th align="left">Notes</th>
 </tr></thead>
 <tbody>
-${vqs.map(v => {
+${vqs.map((v, idx) => {
   const created = (v.created || '').slice(0, 19);
   const sourceCell = v.source === 'forwarded'
     ? `<i style="color:#888">forwarded</i>`
     : `manual`;
-  return `<tr>
+
+  // Visual breaks between customer/RFQ groups
+  const newCustomer = v.customer !== lastCustomer;
+  const newRfq = v.rfq !== lastRfq;
+  const groupBreak = (newCustomer || newRfq) && idx > 0;
+
+  lastCustomer = v.customer;
+  lastRfq = v.rfq;
+
+  const rowStyle = groupBreak ? ' style="border-top:2px solid #999"' : '';
+  const customerCell = newCustomer || newRfq ? `<b>${esc(v.customer)}</b>` : '';
+  const rfqCell = newRfq ? `<b>${esc(v.rfq)}</b>` : '';
+
+  return `<tr${rowStyle}>
+  <td>${customerCell}</td>
+  <td>${rfqCell}</td>
   <td>${esc(created)}</td>
   <td>${sourceCell}</td>
-  <td><b>${esc(v.rfq)}</b></td>
-  <td>${esc(v.seller)}</td>
+  <td>${esc(v.vendor)}</td>
   <td>${esc(v.mpn || '')}</td>
   <td align="right">${v.qty != null ? v.qty.toLocaleString('en-US') : ''}</td>
   <td align="right">${esc(fmtPrice(v.cost, v.currency))}</td>
@@ -475,11 +502,11 @@ ${vqs.map(v => {
 }).join('\n')}
 </tbody>
 </table>
-<p style="color:#666;font-size:11px;margin-top:6px"><i>Full audit (incl. VQ IDs, all note columns broken out) in the attached xlsx.</i></p>`;
+<p style="color:#666;font-size:11px;margin-top:6px"><i>Grouped by Customer → RFQ. Full audit (incl. VQ IDs, all note columns broken out) in the attached xlsx.</i></p>`;
   }
 
   html += `<p style="color:#999;font-size:11px;margin-top:16px;border-top:1px solid #eee;padding-top:8px">
-Generated by ivy-vq-digest.js · Scheduled daily 08:00 UTC = 4 PM Shenzhen (Asia/Shanghai).<br/>
+Generated by ivy-vq-digest.js · Scheduled daily 10:00 UTC = 6 PM Shenzhen (Asia/Shanghai).<br/>
 Loader scope: <code>createdby = ${IVY_USER_ID}</code> (Ivy Song).<br/>
 Window labelled CT (chuboe_*.created storage convention).
 </p></body></html>`;

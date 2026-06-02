@@ -332,18 +332,18 @@ module.exports = [
   {
     name: 'ivy-vq-digest',
     cadence: 'fixed',
-    // 4 PM Shenzhen local (UTC+8, no DST) = 08:00 UTC. Per-loader VQ digest
+    // 6 PM Shenzhen local (UTC+8, no DST) = 10:00 UTC. Per-loader VQ digest
     // for Ivy Song — includes VQs she manually loaded (createdby=1013784)
     // PLUS VQs the agent loaded from emails she forwarded to vq@ (outerFrom
     // breadcrumb match with IMAP / date-proximity fallback). State-driven
     // window: ~/workspace/.ivy-vq-digest-state.json. Sends HTML inline +
     // xlsx attachment to jake.harris@ + ivy.song@.
-    cadenceCron: '0 8 * * *',
+    cadenceCron: '0 10 * * *',
     command: `node "${ASTUTE}/Trading Analysis/RFQ Sourcing/vq_loading/ivy-vq-digest.js" --send`,
     cwd: ASTUTE,
     needsOT: false,
     logFile: '/tmp/ivy-vq-digest.log',
-    description: 'Daily 08:00 UTC (4 PM Shenzhen, no DST) — Ivy Song per-loader VQ digest. Window driven by .ivy-vq-digest-state.json (since-last-digest). Manual + agent-forwarded scopes both included.',
+    description: 'Daily 10:00 UTC (6 PM Shenzhen, no DST) — Ivy Song per-loader VQ digest. Window driven by .ivy-vq-digest-state.json (since-last-digest). Manual + agent-forwarded scopes both included.',
   },
 
   {

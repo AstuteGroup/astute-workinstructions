@@ -81,9 +81,11 @@ async function main() {
   // ─── Pause gate ──────────────────────────────────────────────────────────
   // Global pause: ~/.cron-paused stops ALL jobs.
   // Agent pause: ~/.cron-agents-paused stops only jobs with tier='agent'.
+  // Per-job pause: ~/.{job-name}-paused stops specific job (added 2026-06-02).
   // --force bypasses pause checks (for manual operator runs).
   const PAUSE_FILE = path.join(process.env.HOME, 'workspace/.cron-paused');
   const AGENT_PAUSE_FILE = path.join(process.env.HOME, 'workspace/.cron-agents-paused');
+  const JOB_PAUSE_FILE = path.join(process.env.HOME, `workspace/.${job.name}-paused`);
 
   if (!args.force) {
     if (fs.existsSync(PAUSE_FILE)) {
@@ -93,6 +95,10 @@ async function main() {
     }
     if (job.tier === 'agent' && fs.existsSync(AGENT_PAUSE_FILE)) {
       logEvent(job.name, 'skip-paused', { reason: 'agent-pause' });
+      process.exit(0);
+    }
+    if (fs.existsSync(JOB_PAUSE_FILE)) {
+      logEvent(job.name, 'skip-paused', { reason: 'job-specific-pause' });
       process.exit(0);
     }
   }

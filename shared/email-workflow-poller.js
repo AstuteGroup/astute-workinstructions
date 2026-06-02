@@ -166,8 +166,9 @@ function enumerateAttachments(attachments) {
 }
 
 // ─── FORWARDED-HEADER PARSING ────────────────────────────────────────────────
+// Enhanced 2026-06-02 to handle mobile Outlook forwards
 
-function parseForwardedHeaders(body) {
+function parseForwardedHeaders(body, parsed) {
   if (!body) return { originalFrom: null, originalCc: [], originalSubject: null };
 
   const text = body
@@ -177,20 +178,107 @@ function parseForwardedHeaders(body) {
     .replace(/<\/p>/gi, '\n').replace(/<\/div>/gi, '\n')
     .replace(/<[a-zA-Z\/][^>@]*>/g, ' ');
 
-  const fromMatch = text.match(/^[ \t]*From:[ \t]*(.+)$/im);
-  const ccMatch = text.match(/^[ \t]*Cc:[ \t]*(.+)$/im);
-  const subjMatch = text.match(/^[ \t]*Subject:[ \t]*(.+)$/im);
-
   const extractEmails = (line) => {
     if (!line) return [];
     const re = /[\w.+-]+@[\w-]+(?:\.[\w-]+)+/g;
     return (line.match(re) || []).map(e => e.toLowerCase());
   };
 
+  // ─── PATTERN 1: Desktop forward (original logic) ────────────────────────────
+  const fromMatch = text.match(/^[ \t]*From:[ \t]*(.+)$/im);
+  const ccMatch = text.match(/^[ \t]*Cc:[ \t]*(.+)$/im);
+  const subjMatch = text.match(/^[ \t]*Subject:[ \t]*(.+)$/im);
+
+  if (fromMatch || subjMatch) {
+    // Desktop forward detected
+    return {
+      originalFrom: extractEmails(fromMatch && fromMatch[1])[0] || null,
+      originalCc: extractEmails(ccMatch && ccMatch[1]),
+      originalSubject: (subjMatch && subjMatch[1].trim()) || null,
+      isMobileForward: false,
+    };
+  }
+
+  // ─── PATTERN 2: Mobile Outlook forward ──────────────────────────────────────
+  // Mobile forwards have "Get Outlook for iOS/Android" signature but often lack
+  // inline From:/Subject: headers. Parse the content before the signature.
+
+  const isMobileOutlook = /Get Outlook for (iOS|Android)/i.test(body);
+  if (!isMobileOutlook) {
+    return { originalFrom: null, originalCc: [], originalSubject: null };
+  }
+
+  // Strategy 1: Check for .eml attachment (some mobile clients attach original)
+  if (parsed && parsed.attachments) {
+    const emlAttachment = parsed.attachments.find(a =>
+      a.filename && a.filename.toLowerCase().endsWith('.eml')
+    );
+    if (emlAttachment) {
+      // For Phase 2: parse .eml attachment content
+      return {
+        originalFrom: null,
+        originalCc: [],
+        originalSubject: null,
+        isMobileForward: true,
+        hasEmlAttachment: true,
+        emlFilename: emlAttachment.filename,
+      };
+    }
+  }
+
+  // Strategy 2: Extract emails from content BEFORE "Get Outlook" signature
+  const parts = body.split(/Get Outlook for (iOS|Android)/i);
+  if (parts.length > 1) {
+    const contentBeforeSignature = parts[0];
+    const emailsFound = contentBeforeSignature.match(/[\w.+-]+@[\w-]+(?:\.[\w-]+)+/g);
+
+    if (emailsFound && emailsFound.length > 0) {
+      // Filter out our own domain emails (those are the forwarder, not the original sender)
+      const externalEmails = emailsFound
+        .map(e => e.toLowerCase())
+        .filter(e => !e.endsWith('@astutegroup.com') && !e.endsWith('@orangetsunami.com'));
+
+      if (externalEmails.length > 0) {
+        return {
+          originalFrom: externalEmails[0],
+          originalCc: externalEmails.slice(1),
+          originalSubject: null, // Can't reliably extract from mobile forwards
+          isMobileForward: true,
+          mobileForwardBody: contentBeforeSignature.trim(),
+        };
+      }
+    }
+  }
+
+  // Strategy 3: Look for "---------- Forwarded message ---------" marker
+  const fwdMarkerMatch = text.match(/[-_]{5,}\s*(Forwarded message|Original message)/i);
+  if (fwdMarkerMatch) {
+    const afterMarker = text.substring(text.indexOf(fwdMarkerMatch[0]) + fwdMarkerMatch[0].length);
+    const emailsInForward = afterMarker.match(/[\w.+-]+@[\w-]+(?:\.[\w-]+)+/g);
+
+    if (emailsInForward) {
+      const externalEmails = emailsInForward
+        .map(e => e.toLowerCase())
+        .filter(e => !e.endsWith('@astutegroup.com') && !e.endsWith('@orangetsunami.com'));
+
+      if (externalEmails.length > 0) {
+        return {
+          originalFrom: externalEmails[0],
+          originalCc: externalEmails.slice(1),
+          originalSubject: null,
+          isMobileForward: true,
+        };
+      }
+    }
+  }
+
+  // Mobile forward detected but couldn't extract sender
   return {
-    originalFrom: extractEmails(fromMatch && fromMatch[1])[0] || null,
-    originalCc: extractEmails(ccMatch && ccMatch[1]),
-    originalSubject: (subjMatch && subjMatch[1].trim()) || null,
+    originalFrom: null,
+    originalCc: [],
+    originalSubject: null,
+    isMobileForward: true,
+    parseFailure: 'Mobile forward detected but could not extract sender',
   };
 }
 
@@ -245,7 +333,7 @@ async function cmdRead(uid) {
     const parsed = await simpleParser(msg.source);
     const bodyText = parsed.text || parsed.html || '';
     const senderAddr = (parsed.from && parsed.from.value && parsed.from.value[0] && parsed.from.value[0].address) || '';
-    const fwd = parseForwardedHeaders(bodyText);
+    const fwd = parseForwardedHeaders(bodyText, parsed);
     const externalSender = isInternalAddress(senderAddr) ? fwd.originalFrom : senderAddr;
     // References header may be a string or an array depending on the parser.
     const refsRaw = parsed.references || (parsed.headers && parsed.headers.get('references')) || null;

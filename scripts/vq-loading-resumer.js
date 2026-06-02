@@ -38,11 +38,19 @@ require('dotenv').config({ path: path.resolve(__dirname, '..', '..', '.env') });
 
 const ROOT = process.env.HOME || '/home/analytics_user';
 const SIDECAR_DIR = path.join(ROOT, 'workspace', '.vq-loading-pending');
+const STOCKRFQ_SIDECAR_DIR = path.join(ROOT, 'workspace', '.stockrfq-pending');
 const BREADCRUMBS = path.join(ROOT, 'workspace', '.offer-pipeline', 'breadcrumbs.jsonl');
 
 const { loadBulkSummary } = require('../shared/load-bulk-summary');
 const breadcrumbs = require('../shared/breadcrumbs');
 const { createNotifier } = require('../shared/notifier');
+const { probeOT } = require('../shared/ot-health');
+// Replays a parked stockrfq RFQ (fresh, or backfill via existingRfqId).
+const { doWriteRFQ: stockRfqWrite } = require('../shared/workflow-actions/stockrfq');
+
+function esc(s) {
+  return String(s == null ? '' : s).replace(/[&<>]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]));
+}
 
 const JAKE_EMAIL = 'jake.harris@astutegroup.com';
 const notifier = createNotifier({
