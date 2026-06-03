@@ -90,14 +90,49 @@ async function checkForConfirmation() {
     const envelopes = await fetcher.listEnvelopes('INBOX', 3);
     console.log(`Found ${envelopes.length} emails in last 3 days`);
 
-    // Look for confirmation from Jake
+    // Look for confirmation from Jake ONLY
+    // If someone else (NetComponents, vendors) replies - notify Jake, never reply to them
     for (const env of envelopes) {
       const subject = env.subject || '';
       const from = (env.from || '').toLowerCase();
+      const cc = (env.cc || '').toLowerCase();
 
-      // Check if from Jake and matches trigger
-      if (from.includes('jake') || from.includes(JAKE_EMAIL.toLowerCase())) {
-        if (matchesTrigger(subject)) {
+      // STRICT: Only accept gate triggers from Jake
+      const isFromJake = from.includes('jake.harris') || from.includes(JAKE_EMAIL.toLowerCase());
+      const jakeInCC = cc.includes('jake.harris') || cc.includes(JAKE_EMAIL.toLowerCase());
+
+      if (!isFromJake) {
+        // Not from Jake - check if it's related to inventory/NC and Jake isn't CC'd
+        const isInventoryRelated = (subject.toLowerCase().includes('inventory') ||
+                                    subject.toLowerCase().includes('data upload') ||
+                                    subject.toLowerCase().includes('netcomponents') ||
+                                    from.includes('netcomponents'));
+
+        if (isInventoryRelated && !jakeInCC) {
+          // Someone replied about inventory and Jake isn't CC'd - notify him
+          console.log(`  External reply detected (Jake not in CC): ${env.from}`);
+          try {
+            const notifier = createNotifier({
+              fromEmail: INBOX,
+              fromName: 'Inventory Gate Poller',
+              smtpPass: process.env.WORKMAIL_PASS
+            });
+            await notifier.sendEmail(
+              JAKE_EMAIL,
+              `FYI: Reply to inventory email from ${env.from}`,
+              `An email arrived in stockrfq@ that may need your attention:\n\nFrom: ${env.from}\nSubject: ${subject}\nDate: ${env.date}\n\nYou were not CC'd on this email. No reply has been sent.\n\nPlease check stockrfq@ inbox if action is needed.`
+            );
+            console.log(`  Notified Jake about external reply`);
+          } catch (e) {
+            console.warn(`  Could not notify Jake: ${e.message}`);
+          }
+        }
+        // Never reply to non-Jake senders, skip to next email
+        continue;
+      }
+
+      // From Jake - check if it matches trigger
+      if (matchesTrigger(subject)) {
           console.log('');
           console.log('*** CONFIRMATION FOUND ***');
           console.log(`From: ${env.from}`);
