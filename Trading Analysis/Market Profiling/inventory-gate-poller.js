@@ -32,13 +32,24 @@ const INBOX = 'stockrfq@orangetsunami.com';
 const PROCESSED_FOLDER = 'Processed/Inventory Gate';
 const JAKE_EMAIL = 'jake.harris@astutegroup.com';
 
-// Trigger phrases (case-insensitive)
-const TRIGGER_PHRASES = [
+// Trigger phrases from Jake (case-insensitive)
+const JAKE_TRIGGER_PHRASES = [
   'inventory uploaded',
   'inventory confirmed',
   'inventory ready',
   'inv uploaded',
   'inv confirmed'
+];
+
+// Trigger phrases from NetComponents confirming upload (case-insensitive)
+const NC_TRIGGER_PHRASES = [
+  'upload completed',
+  'upload successful',
+  'data received',
+  'file received',
+  'upload has been completed',
+  'successfully uploaded',
+  'successfully received'
 ];
 
 // State file to track last check and avoid duplicate processing
@@ -57,9 +68,14 @@ function writeState(state) {
   fs.writeFileSync(STATE_FILE, JSON.stringify(state, null, 2));
 }
 
-function matchesTrigger(subject) {
+function matchesJakeTrigger(subject) {
   const lower = (subject || '').toLowerCase();
-  return TRIGGER_PHRASES.some(phrase => lower.includes(phrase));
+  return JAKE_TRIGGER_PHRASES.some(phrase => lower.includes(phrase));
+}
+
+function matchesNCTrigger(subject) {
+  const lower = (subject || '').toLowerCase();
+  return NC_TRIGGER_PHRASES.some(phrase => lower.includes(phrase));
 }
 
 async function checkForConfirmation() {
@@ -90,49 +106,90 @@ async function checkForConfirmation() {
     const envelopes = await fetcher.listEnvelopes('INBOX', 3);
     console.log(`Found ${envelopes.length} emails in last 3 days`);
 
-    // Look for confirmation from Jake ONLY
-    // If someone else (NetComponents, vendors) replies - notify Jake, never reply to them
+    // Process emails - accept triggers from Jake OR NetComponents upload confirmations
+    // RULE: NEVER reply directly to NetComponents or external senders - only notify Jake
     for (const env of envelopes) {
       const subject = env.subject || '';
       const from = (env.from || '').toLowerCase();
       const cc = (env.cc || '').toLowerCase();
 
-      // STRICT: Only accept gate triggers from Jake
       const isFromJake = from.includes('jake.harris') || from.includes(JAKE_EMAIL.toLowerCase());
+      const isFromNC = from.includes('netcomponents');
       const jakeInCC = cc.includes('jake.harris') || cc.includes(JAKE_EMAIL.toLowerCase());
 
-      if (!isFromJake) {
-        // Not from Jake - check if it's related to inventory/NC and Jake isn't CC'd
-        const isInventoryRelated = (subject.toLowerCase().includes('inventory') ||
-                                    subject.toLowerCase().includes('data upload') ||
-                                    subject.toLowerCase().includes('netcomponents') ||
-                                    from.includes('netcomponents'));
+      // Case 1: NetComponents confirms upload completed - process it, notify Jake only
+      if (isFromNC && matchesNCTrigger(subject)) {
+        console.log('');
+        console.log('*** NC UPLOAD CONFIRMATION RECEIVED ***');
+        console.log(`From: ${env.from}`);
+        console.log(`Subject: ${subject}`);
+        console.log('');
 
-        if (isInventoryRelated && !jakeInCC) {
-          // Someone replied about inventory and Jake isn't CC'd - notify him
-          console.log(`  External reply detected (Jake not in CC): ${env.from}`);
-          try {
-            const notifier = createNotifier({
-              fromEmail: INBOX,
-              fromName: 'Inventory Gate Poller',
-              smtpPass: process.env.WORKMAIL_PASS
-            });
-            await notifier.sendEmail(
-              JAKE_EMAIL,
-              `FYI: Reply to inventory email from ${env.from}`,
-              `An email arrived in stockrfq@ that may need your attention:\n\nFrom: ${env.from}\nSubject: ${subject}\nDate: ${env.date}\n\nYou were not CC'd on this email. No reply has been sent.\n\nPlease check stockrfq@ inbox if action is needed.`
-            );
-            console.log(`  Notified Jake about external reply`);
-          } catch (e) {
-            console.warn(`  Could not notify Jake: ${e.message}`);
-          }
+        // Set the gate
+        setInventoryGate();
+
+        // Move email to processed folder
+        try {
+          await fetcher.moveEmail(env.id, PROCESSED_FOLDER, 'INBOX');
+          console.log(`Email moved to ${PROCESSED_FOLDER}`);
+        } catch (e) {
+          console.warn(`Could not move email: ${e.message}`);
         }
-        // Never reply to non-Jake senders, skip to next email
+
+        // Notify Jake ONLY - never reply to NC
+        try {
+          const notifier = createNotifier({
+            fromEmail: INBOX,
+            fromName: 'Active Sourcing',
+            smtpPass: process.env.WORKMAIL_PASS
+          });
+          await notifier.sendEmail(
+            JAKE_EMAIL,
+            'Active Sourcing Gate Opened (NC confirmed upload)',
+            `NetComponents confirmed the inventory upload.\n\nFrom: ${env.from}\nSubject: ${subject}\nDate: ${env.date}\n\nActive Sourcing will proceed on the next scheduled run (Mon/Thu 8:30 AM CT).`
+          );
+          console.log('Notified Jake (no reply sent to NC)');
+        } catch (e) {
+          console.warn(`Could not notify Jake: ${e.message}`);
+        }
+
+        writeState({
+          lastCheck: new Date().toISOString(),
+          lastConfirmation: { date: new Date().toISOString(), subject, from: env.from, source: 'netcomponents' }
+        });
+
+        await fetcher.disconnect();
+        return { found: true, email: env, source: 'netcomponents' };
+      }
+
+      // Case 2: Other NC email (questions, issues) - notify Jake if not CC'd, never reply
+      if (isFromNC && !jakeInCC) {
+        console.log(`  NC email detected (not a confirmation, Jake not CC'd): ${subject}`);
+        try {
+          const notifier = createNotifier({
+            fromEmail: INBOX,
+            fromName: 'Inventory Gate Poller',
+            smtpPass: process.env.WORKMAIL_PASS
+          });
+          await notifier.sendEmail(
+            JAKE_EMAIL,
+            `FYI: NetComponents email needs attention`,
+            `An email from NetComponents arrived that may need your attention:\n\nFrom: ${env.from}\nSubject: ${subject}\nDate: ${env.date}\n\nYou were not CC'd. No reply has been sent to them.\n\nPlease check stockrfq@ inbox.`
+          );
+          console.log(`  Notified Jake about NC email`);
+        } catch (e) {
+          console.warn(`  Could not notify Jake: ${e.message}`);
+        }
         continue;
       }
 
-      // From Jake - check if it matches trigger
-      if (matchesTrigger(subject)) {
+      // Case 3: Not from Jake and not NC - skip silently
+      if (!isFromJake) {
+        continue;
+      }
+
+      // Case 4: From Jake - check if it matches trigger
+      if (matchesJakeTrigger(subject)) {
           console.log('');
           console.log('*** CONFIRMATION FOUND ***');
           console.log(`From: ${env.from}`);
@@ -228,8 +285,13 @@ function showStatus() {
   console.log('');
 
   // Trigger phrases
-  console.log('Trigger phrases (in subject):');
-  TRIGGER_PHRASES.forEach(p => console.log(`  - "${p}"`));
+  console.log('Jake trigger phrases (in subject):');
+  JAKE_TRIGGER_PHRASES.forEach(p => console.log(`  - "${p}"`));
+  console.log('');
+  console.log('NetComponents confirmation phrases:');
+  NC_TRIGGER_PHRASES.forEach(p => console.log(`  - "${p}"`));
+  console.log('');
+  console.log('RULE: Never reply to NetComponents - only notify Jake.');
 }
 
 async function main() {
