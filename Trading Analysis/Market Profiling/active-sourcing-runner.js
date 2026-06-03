@@ -44,6 +44,11 @@ const NOTIFICATION_EMAIL = 'jake.harris@astutegroup.com';
 
 const DEFAULT_LIMIT = 200;
 
+// Gate file: Active Sourcing waits for inventory upload confirmation before running.
+// Jake forwards/replies to inventory upload email → creates this file → cron can proceed.
+// File is consumed (deleted) after successful run.
+const INVENTORY_GATE_FILE = path.join(process.env.HOME, 'workspace/.inventory-upload-confirmed');
+
 // NC Python script location
 const NC_SCRIPT = path.join(__dirname, '../RFQ Sourcing/netcomponents/python/batch_rfqs_from_system.py');
 
@@ -175,6 +180,27 @@ function runNCScraper(rfqNumber, fullMode = true, limit = 0) {
 async function runActiveSourcing(options = {}) {
   const limit = options.limit || DEFAULT_LIMIT;
   const dryRun = options.dryRun !== false;
+  const forceRun = options.force === true;
+
+  // Gate check: require inventory upload confirmation before running (unless --force)
+  if (!dryRun && !forceRun) {
+    if (!fs.existsSync(INVENTORY_GATE_FILE)) {
+      console.log('='.repeat(60));
+      console.log('Active Sourcing Runner — GATED');
+      console.log('='.repeat(60));
+      console.log('');
+      console.log('Waiting for inventory upload confirmation.');
+      console.log('');
+      console.log('To proceed: Forward or reply to the inventory upload confirmation');
+      console.log('email to stockrfq@orangetsunami.com with subject containing');
+      console.log('"inventory uploaded" or "inventory confirmed".');
+      console.log('');
+      console.log('Or run manually with --force to bypass this gate.');
+      console.log('='.repeat(60));
+      return { gated: true, reason: 'Waiting for inventory upload confirmation' };
+    }
+    console.log('Gate passed: Inventory upload confirmation found.');
+  }
 
   // Generate batch ID and determine selection mode based on day of week
   const now = new Date();
@@ -384,6 +410,12 @@ This is an automated notification from the Active Sourcing workflow.`;
   console.log('3. Exclusions will auto-expire for next inventory upload');
   console.log('='.repeat(60));
 
+  // Consume the gate file after successful run
+  if (fs.existsSync(INVENTORY_GATE_FILE)) {
+    fs.unlinkSync(INVENTORY_GATE_FILE);
+    console.log('\nGate file consumed — next run will wait for new confirmation.');
+  }
+
   return {
     selected: selectedMpns.length,
     rfq,
@@ -407,6 +439,7 @@ async function main() {
 
   let limit = DEFAULT_LIMIT;
   let dryRun = true;
+  let force = false;
 
   for (let i = 0; i < args.length; i++) {
     if (args[i] === '--limit' && args[i + 1]) {
@@ -416,6 +449,8 @@ async function main() {
       dryRun = true;
     } else if (args[i] === '--commit') {
       dryRun = false;
+    } else if (args[i] === '--force') {
+      force = true;
     } else if (args[i] === '--help') {
       console.log('Usage: node active-sourcing-runner.js [options]');
       console.log('');
@@ -423,16 +458,21 @@ async function main() {
       console.log('  --limit N     Number of MPNs to source (default: 200)');
       console.log('  --dry-run     Preview without sending RFQs (default)');
       console.log('  --commit      Actually run sourcing (WILL SEND RFQs!)');
+      console.log('  --force       Bypass inventory upload confirmation gate');
       console.log('');
       console.log('This runs in FULL mode - RFQs are sent to vendors.');
       console.log('Selected MPNs are excluded from NetComponents uploads');
       console.log('for 7 days to hide inventory during price-check.');
+      console.log('');
+      console.log('GATE: Requires inventory upload confirmation before running.');
+      console.log('Forward email to stockrfq@ with "inventory uploaded" in subject,');
+      console.log('or use --force to bypass.');
       process.exit(0);
     }
   }
 
   try {
-    await runActiveSourcing({ limit, dryRun });
+    await runActiveSourcing({ limit, dryRun, force });
   } catch (e) {
     console.error(`Error: ${e.message}`);
     console.error(e.stack);
@@ -440,8 +480,37 @@ async function main() {
   }
 }
 
-if (require.main === module) {
-  main();
+// Helper: Set the inventory gate (called when Jake confirms upload)
+function setInventoryGate() {
+  fs.writeFileSync(INVENTORY_GATE_FILE, new Date().toISOString());
+  console.log('Inventory upload gate SET — Active Sourcing can now proceed.');
+  console.log(`Gate file: ${INVENTORY_GATE_FILE}`);
 }
 
-module.exports = { runActiveSourcing };
+// Helper: Check gate status
+function checkGateStatus() {
+  if (fs.existsSync(INVENTORY_GATE_FILE)) {
+    const ts = fs.readFileSync(INVENTORY_GATE_FILE, 'utf8').trim();
+    console.log(`Gate: OPEN (set at ${ts})`);
+    console.log('Active Sourcing will proceed on next run.');
+  } else {
+    console.log('Gate: CLOSED');
+    console.log('Waiting for inventory upload confirmation.');
+    console.log('');
+    console.log('To open: node active-sourcing-runner.js --gate-open');
+    console.log('Or forward confirmation email to stockrfq@ with "inventory uploaded" in subject.');
+  }
+}
+
+if (require.main === module) {
+  const args = process.argv.slice(2);
+  if (args.includes('--gate-open')) {
+    setInventoryGate();
+  } else if (args.includes('--gate-status')) {
+    checkGateStatus();
+  } else {
+    main();
+  }
+}
+
+module.exports = { runActiveSourcing, setInventoryGate, INVENTORY_GATE_FILE };
