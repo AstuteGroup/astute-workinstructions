@@ -448,6 +448,9 @@ async function cmdRoute(uid, actionName, payload) {
   try {
     await withInbox(async (client) => {
       const msg = await client.fetchOne(String(uid), { source: true }, { uid: true });
+      if (msg && !msg.source) {
+        console.error(`[poller] WARNING: UID ${uid} fetched but msg.source is null/undefined — sidecar cannot be created (reply-stitching will fail)`);
+      }
       if (msg && msg.source) {
         const parsed = await simpleParser(msg.source);
         currentMessageId = parsed.messageId || null;

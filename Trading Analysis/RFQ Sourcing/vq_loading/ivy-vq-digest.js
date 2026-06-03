@@ -284,6 +284,7 @@ function pullVQs(sinceTs, untilTs, forwardedIds) {
   // Source columns:
   //   r.value              → RFQ#
   //   cust.name            → Customer (RFQ seller - who we're quoting to)
+  //   rl.chuboe_cpc        → Customer Part Code
   //   bp.name              → Vendor (supplier who quoted)
   //   v.chuboe_mpn         → MPN (as quoted by supplier)
   //   v.cost + c.iso_code  → Price + Currency
@@ -304,7 +305,7 @@ function pullVQs(sinceTs, untilTs, forwardedIds) {
     ? `OR v.chuboe_vq_line_id IN (${[...forwardedIds].join(',')})`
     : '';
   const sql =
-    `SELECT v.chuboe_vq_line_id, r.value, ${scrub('cust.name')}, ${scrub('bp.name')}, ${scrub('v.chuboe_mpn')}, ` +
+    `SELECT v.chuboe_vq_line_id, r.value, ${scrub('cust.name')}, ${scrub('rl.chuboe_cpc')}, ${scrub('bp.name')}, ${scrub('v.chuboe_mpn')}, ` +
     `       v.cost, COALESCE(c.iso_code, ''), v.qty, ${scrub('v.chuboe_date_code')}, ${scrub('v.chuboe_lead_time')}, ` +
     `       ${scrub('v.chuboe_note_public')}, ${scrub('v.chuboe_note_private')}, ` +
     `       ${scrub('v.chuboe_note_user')}, ${scrub('ub.name')}, v.created, v.createdby ` +
@@ -320,15 +321,15 @@ function pullVQs(sinceTs, untilTs, forwardedIds) {
     `  AND v.created >= '${sinceTs}'::timestamp ` +
     `  AND v.created <  '${untilTs}'::timestamp ` +
     `  AND (v.createdby = ${IVY_USER_ID} ${idClause}) ` +
-    `ORDER BY cust.name, r.value, v.chuboe_mpn, v.cost ASC NULLS LAST, v.created DESC;`;
+    `ORDER BY cust.name, r.value, rl.chuboe_cpc, v.cost ASC NULLS LAST, v.created DESC;`;
   const out = psqlPipe(sql);
   return out.trim().split('\n').filter(Boolean).map(line => {
-    const [vqId, rfq, customer, vendor, mpn, cost, currency, qty, dateCode, leadTime, noteP, noteX, noteU, buyer, created, createdby] = line.split('|');
+    const [vqId, rfq, customer, cpc, vendor, mpn, cost, currency, qty, dateCode, leadTime, noteP, noteX, noteU, buyer, created, createdby] = line.split('|');
     const notes = [noteP, noteX, noteU].filter(Boolean).join(' | ').replace(/\r?\n/g, ' ').trim();
     const source = Number(createdby) === IVY_USER_ID ? 'manual' : 'forwarded';
     return {
       vqId: Number(vqId),
-      rfq, customer, vendor, mpn,
+      rfq, customer, cpc, vendor, mpn,
       cost: cost ? Number(cost) : null,
       currency,
       qty: qty ? Number(qty) : null,
@@ -362,6 +363,7 @@ async function buildXlsx(vqs, windowStr) {
   const cols = [
     { header: 'Customer',     key: 'customer',  width: 28 },
     { header: 'RFQ',          key: 'rfq',       width: 10 },
+    { header: 'CPC',          key: 'cpc',       width: 24 },
     { header: 'Created (CT)', key: 'created',   width: 19 },
     { header: 'Source',       key: 'source',    width: 11 },
     { header: 'Vendor',       key: 'vendor',    width: 32 },
@@ -385,6 +387,7 @@ async function buildXlsx(vqs, windowStr) {
     const row = ws.addRow({
       customer: v.customer,
       rfq: v.rfq,
+      cpc: v.cpc,
       created: v.created || '',
       source: v.source,
       vendor: v.vendor,
@@ -447,15 +450,16 @@ function buildHtml(vqs, windowStr, sourceLabel) {
   if (vqs.length === 0) {
     html += `<p style="color:#999"><i>No VQs in this window.</i></p>`;
   } else {
-    // Group by customer → RFQ → MPN (sorted lowest to highest price)
+    // Group by customer → RFQ → CPC (sorted lowest to highest price)
     let lastCustomer = null;
     let lastRfq = null;
-    let lastMpn = null;
+    let lastCpc = null;
 
     html += `<table border="1" cellpadding="6" cellspacing="0" style="border-collapse:collapse;font-size:12px;width:100%">
 <thead style="background:#eef"><tr>
   <th align="left">Customer</th>
   <th align="left">RFQ</th>
+  <th align="left">CPC</th>
   <th align="left">MPN</th>
   <th align="left">Vendor</th>
   <th align="right">Price</th>
@@ -477,29 +481,30 @@ ${vqs.map((v, idx) => {
   // Visual breaks between groups
   const newCustomer = v.customer !== lastCustomer;
   const newRfq = v.rfq !== lastRfq;
-  const newMpn = v.mpn !== lastMpn;
+  const newCpc = v.cpc !== lastCpc;
 
-  // Heavy break for customer/RFQ change, light break for MPN change
+  // Heavy break for customer/RFQ change, light break for CPC change
   let rowStyle = '';
   if ((newCustomer || newRfq) && idx > 0) {
     rowStyle = ' style="border-top:3px solid #555"';
-  } else if (newMpn && idx > 0) {
+  } else if (newCpc && idx > 0) {
     rowStyle = ' style="border-top:1px solid #ccc"';
   }
 
   lastCustomer = v.customer;
   lastRfq = v.rfq;
-  lastMpn = v.mpn;
+  lastCpc = v.cpc;
 
-  // Show customer/RFQ/MPN labels only on first row of each group
+  // Show customer/RFQ/CPC labels only on first row of each group
   const customerCell = newCustomer || newRfq ? `<b>${esc(v.customer)}</b>` : '';
   const rfqCell = newRfq ? `<b>${esc(v.rfq)}</b>` : '';
-  const mpnCell = newMpn ? `<b>${esc(v.mpn || '')}</b>` : '';
+  const cpcCell = newCpc ? `<b>${esc(v.cpc || '')}</b>` : '';
 
   return `<tr${rowStyle}>
   <td>${customerCell}</td>
   <td>${rfqCell}</td>
-  <td>${mpnCell}</td>
+  <td>${cpcCell}</td>
+  <td>${esc(v.mpn)}</td>
   <td>${esc(v.vendor)}</td>
   <td align="right">${esc(fmtPrice(v.cost, v.currency))}</td>
   <td align="right">${v.qty != null ? v.qty.toLocaleString('en-US') : ''}</td>
@@ -513,7 +518,7 @@ ${vqs.map((v, idx) => {
 }).join('\n')}
 </tbody>
 </table>
-<p style="color:#666;font-size:11px;margin-top:6px"><i>Grouped by Customer → RFQ → MPN (sorted low→high price within each MPN). Heavy line = new customer/RFQ, light line = new MPN. Full audit in attached xlsx.</i></p>`;
+<p style="color:#666;font-size:11px;margin-top:6px"><i>Grouped by Customer → RFQ → CPC (sorted low→high price within each CPC). Heavy line = new customer/RFQ, light line = new CPC. Full audit in attached xlsx.</i></p>`;
   }
 
   html += `<p style="color:#999;font-size:11px;margin-top:16px;border-top:1px solid #eee;padding-top:8px">

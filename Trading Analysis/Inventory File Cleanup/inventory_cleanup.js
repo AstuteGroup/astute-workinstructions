@@ -2028,13 +2028,53 @@ function processInventoryFile(inputFile, outputDir) {
     const FRANCHISE_GROUP = 'Franchise_Stock';
     const nonAuthGroupNames = otGroupNames.filter(g => g !== FRANCHISE_GROUP);
 
+    // Load Active Sourcing exclusions — MPNs currently being price-checked
+    // are hidden from NC uploads so competitors don't see our inventory.
+    // See Trading Analysis/Market Profiling/exclusion-manager.js
+    let sourcingExclusions = new Set();
+    let exclusionCount = 0;
+    const exclusionFile = path.join(process.env.HOME, 'workspace/.sourcing-exclusions.json');
+    if (fs.existsSync(exclusionFile)) {
+        try {
+            const exclusionData = JSON.parse(fs.readFileSync(exclusionFile, 'utf8'));
+            const now = new Date();
+            // Only active (non-expired) exclusions
+            const activeExclusions = (exclusionData.entries || [])
+                .filter(e => new Date(e.expiresAt) > now)
+                .map(e => e.mpn.toUpperCase());
+            sourcingExclusions = new Set(activeExclusions);
+            if (sourcingExclusions.size > 0) {
+                console.log(`  - Active Sourcing: ${sourcingExclusions.size} MPNs excluded from NC upload`);
+            }
+        } catch (e) {
+            console.warn(`  - Warning: Could not load sourcing exclusions: ${e.message}`);
+        }
+    }
+
     const collectRows = (groupNames) => {
         const out = [];
         for (const g of groupNames) out.push(...(groupedRows[g] || []));
         return out;
     };
-    const nonAuthSourceRows  = collectRows(nonAuthGroupNames);
-    const franchiseSourceRows = collectRows([FRANCHISE_GROUP]);
+
+    // Filter out excluded MPNs from NC portal rows
+    const filterExcludedMpns = (rows) => {
+        if (sourcingExclusions.size === 0) return rows;
+        const before = rows.length;
+        const filtered = rows.filter(row => {
+            const mpn = String(row['Item'] || '').trim().toUpperCase();
+            return !sourcingExclusions.has(mpn);
+        });
+        exclusionCount = before - filtered.length;
+        return filtered;
+    };
+
+    const nonAuthSourceRows  = filterExcludedMpns(collectRows(nonAuthGroupNames));
+    const franchiseSourceRows = filterExcludedMpns(collectRows([FRANCHISE_GROUP]));
+
+    if (exclusionCount > 0) {
+        console.log(`  - Excluded ${exclusionCount} MPNs from NC CSV (Active Sourcing in progress)`);
+    }
 
     const totalPortalRows = nonAuthSourceRows.length + franchiseSourceRows.length;
     const droppedRowCount = uniqueRows.length - totalPortalRows;

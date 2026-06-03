@@ -387,6 +387,47 @@ module.exports = [
     logFile: '/tmp/scrape-inbox-watcher.log',
     description: 'Every 15m — scan inbox/<source>/, dispatch via mappers/<source>.js, write VQs + pricing cache + negative cache, move to done/. Anomaly email on flagged/errored.',
   },
+
+  // ─── MARKET INTELLIGENCE ───────────────────────────────────────────────────
+  // Two complementary workflows: Market Profiling (scrape-only, continuous)
+  // and Active Sourcing (full RFQ submission, 2×/week).
+  // See Trading Analysis/Market Profiling/market-profiling.md
+
+  {
+    name: 'market-profiler',
+    cadence: 'daily',
+    // 13:00 UTC = 8 AM CT — runs after inventory is fresh on Monday
+    cadenceCron: '0 13 * * 1-5',
+    command: `node "${ASTUTE}/Trading Analysis/Market Profiling/market-profiler.js" --limit 500 --commit`,
+    cwd: ASTUTE,
+    needsOT: true,
+    logFile: '/tmp/market-profiler.log',
+    description: 'Mon-Fri 13 UTC (8am CT) — Market profiling: NC check-only scrape for 500 inventory MPNs, loads $0 availability VQs. Does NOT send RFQ emails.',
+  },
+
+  {
+    name: 'active-sourcing',
+    cadence: 'fixed',
+    // Mon + Thu at 13:30 UTC (8:30 AM CT) — after inventory upload + market profiler
+    cadenceCron: '30 13 * * 1,4',
+    command: `node "${ASTUTE}/Trading Analysis/Market Profiling/active-sourcing-runner.js" --limit 200 --commit`,
+    cwd: ASTUTE,
+    needsOT: true,
+    logFile: '/tmp/active-sourcing.log',
+    description: 'Mon/Thu 13:30 UTC (8:30am CT) — Active Sourcing: select 200 priority MPNs, exclude from NC upload, send real RFQs via NC. Vendor responses come via VQ Loading.',
+  },
+
+  {
+    name: 'exclusion-cleanup',
+    cadence: 'weekly',
+    // Sunday 03:00 UTC — cleanup expired exclusions (should be redundant; TTL handles it)
+    cadenceCron: '0 3 * * 0',
+    command: `node "${ASTUTE}/Trading Analysis/Market Profiling/exclusion-manager.js" cleanup`,
+    cwd: ASTUTE,
+    needsOT: false,
+    logFile: '/tmp/exclusion-cleanup.log',
+    description: 'Sunday 03 UTC — remove expired sourcing exclusions from .sourcing-exclusions.json',
+  },
 ];
 
 // Helper: convert cadence string to milliseconds (used by sentinel + runner).
