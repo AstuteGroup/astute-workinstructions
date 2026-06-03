@@ -109,6 +109,14 @@ Get real pricing on 200 priority parts twice weekly. De-list from NetComponents 
 └─────────────────────────┬──────────────────────────────────────┘
                           │
 ┌─────────────────────────▼──────────────────────────────────────┐
+│  Franchise API Enrichment                                      │
+│  - Query DigiKey, Mouser, Arrow, TTI, Future, etc.             │
+│  - Get baseline pricing BEFORE going to brokers                │
+│  - Write VQs from franchise stock                              │
+│  - Store results in chuboe_pricing_api_result                  │
+└─────────────────────────┬──────────────────────────────────────┘
+                          │
+┌─────────────────────────▼──────────────────────────────────────┐
 │  Submit RFQs via NetComponents (full mode)                     │
 │  - batch_rfqs_from_system.py (full submission mode)            │
 │  - Vendors receive email RFQs                                  │
@@ -250,18 +258,32 @@ Add MPNs to .sourcing-exclusions.json so next inventory upload excludes them.
 Create Stock RFQ with 200 lines.
 **Output:** RFQ search key
 
-### Step 4: Run NC scraper in full mode
+### Step 4: Add lines to RFQ
+POST each selected MPN to `chuboe_rfq_line` + `chuboe_rfq_line_mpn`.
+**Output:** RFQ with 200 line items
+
+### Step 5: Franchise API enrichment
+Query DigiKey, Mouser, Arrow, and other franchise APIs for baseline pricing.
+This gives buyers franchise context BEFORE going to brokers.
+**Output:** Franchise VQs written to chuboe_vq_line, API results to chuboe_pricing_api_result
+
+### Step 6: Run NC scraper in full mode
 ```bash
 python3 batch_rfqs_from_system.py <rfq_number>
 ```
 **Output:** Excel with sent RFQs + scraped availability
 
-### Step 5: Load availability VQs
+### Step 7: Load availability VQs
 Profile data (all vendors) → $0 VQs
 Sent RFQs → await vendor quote emails via standard VQ Loading
 
-### Step 6: Monitor responses
+### Step 8: Monitor responses
 VQ Loading processes quote emails over next 3-4 days.
+
+**Value of Step 5:** Franchise enrichment lets buyers immediately see:
+- Which MPNs have franchise coverage (and at what price)
+- Which MPNs are broker-only (no franchise stock)
+- Price comparison baseline when broker quotes arrive
 
 ---
 
@@ -288,11 +310,17 @@ node "Trading Analysis/Market Profiling/active-sourcing-runner.js" --limit 10 --
 
 ## Roadmap
 
+### Completed Enhancements
+
+| Date | Enhancement | Description |
+|------|-------------|-------------|
+| 2026-06-03 | **Proactive franchise enrichment** | ✅ Active Sourcing Step 5 now enriches selected MPNs with DigiKey/Mouser/Arrow APIs BEFORE sourcing to brokers. Option A implemented (200 selected parts enriched per batch). |
+
 ### Planned Enhancements
 
 | Priority | Enhancement | Description |
 |----------|-------------|-------------|
-| 🔴 | **Proactive franchise enrichment** | Enrich inventory MPNs with DigiKey/Mouser pricing BEFORE sourcing to brokers. Know the franchise baseline before going to market. Options: (A) Enrich 200 selected parts during Active Sourcing, (B) Continuous rotation ~500/day covering full inventory in 10 days. API limits: 1,000/day each. |
 | 🟡 | **Risk-weighted rotation** | Cycle higher-risk parts more frequently than 14 days. Criteria TBD: high-value MFRs, volatile pricing history, customer demand signals, long lead times. |
 | 🟡 | **NC confirmation gate** | Trigger sourcing only after NC confirms listing update (email reply parsing). |
 | 🟡 | **Weekly RFQ container** | Single "Market Intelligence Week of {date}" RFQ per week for all profiling + sourcing VQs. |
+| 🟢 | **Full inventory franchise rotation (Option B)** | Continuous enrichment ~500 MPNs/day covering full inventory in 10 days. Complements Active Sourcing enrichment with broader coverage. API limits: 1,000/day each. |

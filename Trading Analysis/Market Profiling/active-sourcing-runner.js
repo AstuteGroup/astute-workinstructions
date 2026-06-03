@@ -6,9 +6,14 @@
  * 1. Run selection engine to pick priority MPNs
  * 2. Add selected MPNs to exclusion list (hide from NC during sourcing)
  * 3. Create Active Sourcing RFQ in OT
- * 4. Run NC scraper in FULL mode (sends RFQ emails to vendors)
- * 5. Load scraped availability as $0 VQs (market profiling)
- * 6. Real pricing comes via VQ Loading workflow over next few days
+ * 4. Add lines to RFQ
+ * 5. Enrich with franchise APIs (DigiKey, Mouser, Arrow, etc.) — baseline pricing
+ * 6. Run NC scraper in FULL mode (sends RFQ emails to brokers)
+ * 7. Load scraped availability as $0 VQs (market profiling)
+ * 8. Real pricing comes via VQ Loading workflow over next few days
+ *
+ * The franchise enrichment step (5) gives buyers baseline pricing context BEFORE
+ * going to brokers. This helps evaluate broker quotes against franchise alternatives.
  *
  * Scheduling: Mon + Thu at 8 AM CT
  *
@@ -25,6 +30,9 @@ const { execFileSync, spawn } = require('child_process');
 const sharedPath = path.join(__dirname, '../../shared');
 const { apiPost, apiGet } = require(path.join(sharedPath, 'api-client'));
 const logger = require(path.join(sharedPath, 'logger')).createLogger('ActiveSourcing');
+
+// Franchise enrichment (DigiKey, Mouser, etc.)
+const { enrichRFQ } = require('../RFQ API Enrichment/enrich-rfq');
 
 // Local modules (we'll require them dynamically to avoid circular deps)
 
@@ -258,9 +266,36 @@ async function runActiveSourcing(options = {}) {
   const linesAdded = await addRFQLines(rfq.id, selectedMpns);
   console.log(`  Added ${linesAdded} lines`);
 
-  // Step 5: Run NC scraper (full mode)
+  // Step 5: Franchise API enrichment (DigiKey, Mouser, Arrow, etc.)
+  // Get baseline franchise pricing BEFORE going to brokers
   console.log('');
-  console.log('Step 5: Running NetComponents scraper (FULL MODE)...');
+  console.log('Step 5: Enriching with franchise APIs (DigiKey, Mouser, etc.)...');
+  let enrichmentResult = null;
+  try {
+    enrichmentResult = await enrichRFQ(rfq.searchKey, {
+      dryRun: false,
+      force: false,   // Use cache if fresh
+      onProgress: (line, idx, total) => {
+        if ((idx + 1) % 25 === 0 || idx === total - 1) {
+          process.stderr.write(`  [${idx + 1}/${total}] ${line.mpn}\n`);
+        }
+      }
+    });
+    console.log(`  API calls:   ${enrichmentResult.apiCalls}`);
+    console.log(`  Cache hits:  ${enrichmentResult.cacheHits}`);
+    console.log(`  VQs written: ${enrichmentResult.vqsWritten}`);
+    console.log(`  Coverage:    FULL=${enrichmentResult.qtyMatches}  PARTIAL=${enrichmentResult.partialCoverage}  NONE=${enrichmentResult.noCoverage}`);
+    if (enrichmentResult.errors.length > 0) {
+      console.log(`  Errors: ${enrichmentResult.errors.length} (see log for details)`);
+    }
+  } catch (e) {
+    console.warn(`  Franchise enrichment failed (non-fatal): ${e.message}`);
+    console.warn('  Continuing with broker sourcing...');
+  }
+
+  // Step 6: Run NC scraper (full mode)
+  console.log('');
+  console.log('Step 6: Running NetComponents scraper (FULL MODE)...');
   let scraperResult;
   try {
     scraperResult = await runNCScraper(rfq.searchKey, true, limit);
@@ -274,10 +309,10 @@ async function runActiveSourcing(options = {}) {
     };
   }
 
-  // Step 6: Load availability VQs from scraped data
+  // Step 7: Load availability VQs from scraped data
   // The real pricing comes via VQ Loading workflow when vendors respond
   console.log('');
-  console.log('Step 6: Loading availability VQs (from scrape data)...');
+  console.log('Step 7: Loading availability VQs (from scrape data)...');
   if (scraperResult.outputFile) {
     const { processResults } = require('./availability-vq-loader');
     const outputPath = path.join(path.dirname(NC_SCRIPT), scraperResult.outputFile);
@@ -298,18 +333,33 @@ async function runActiveSourcing(options = {}) {
   console.log('='.repeat(60));
   console.log(`RFQ: ${rfq.searchKey}`);
   console.log(`Lines: ${linesAdded}`);
+  if (enrichmentResult) {
+    console.log(`Franchise enrichment: ${enrichmentResult.vqsWritten} VQs (${enrichmentResult.apiCalls} API + ${enrichmentResult.cacheHits} cache)`);
+    const franchiseCoverage = enrichmentResult.qtyMatches + enrichmentResult.partialCoverage;
+    const coveragePct = linesAdded > 0 ? Math.round(franchiseCoverage / linesAdded * 100) : 0;
+    console.log(`Franchise coverage: ${franchiseCoverage}/${linesAdded} (${coveragePct}%) — baseline pricing before broker sourcing`);
+  }
   console.log(`Batch: ${batchId} (exclusions will expire in 7 days)`);
   console.log('');
   console.log('Next steps:');
-  console.log('1. Monitor VQ Loading for vendor quote responses');
-  console.log('2. Exclusions will auto-expire for next inventory upload');
+  console.log('1. Franchise VQs already loaded — compare against broker quotes');
+  console.log('2. Monitor VQ Loading for vendor quote responses');
+  console.log('3. Exclusions will auto-expire for next inventory upload');
   console.log('='.repeat(60));
 
   return {
     selected: selectedMpns.length,
     rfq,
     linesAdded,
-    batchId
+    batchId,
+    enrichment: enrichmentResult ? {
+      apiCalls: enrichmentResult.apiCalls,
+      cacheHits: enrichmentResult.cacheHits,
+      vqsWritten: enrichmentResult.vqsWritten,
+      qtyMatches: enrichmentResult.qtyMatches,
+      partialCoverage: enrichmentResult.partialCoverage,
+      noCoverage: enrichmentResult.noCoverage
+    } : null
   };
 }
 
