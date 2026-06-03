@@ -40,8 +40,8 @@ const EMAIL_CONFIG = {
 // Set NC_UPLOAD_ENABLED=true to send CSVs directly to NetComponents
 const NC_UPLOAD_CONFIG = {
     enabled: process.env.NC_UPLOAD_ENABLED === 'true',
-    nonAuthEmail: process.env.NC_NONAUTH_EMAIL || null,      // e.g., 'upload@netcomponents.com'
-    franchiseEmail: process.env.NC_FRANCHISE_EMAIL || null,  // e.g., 'upload@netcomponents.com'
+    ncEmail: 'datamaster@netcomponents.com',
+    ccEmail: 'jake.harris@astutegroup.com',
     fromEmail: 'stockrfq@orangetsunami.com',
     fromName: 'Astute Electronics'
 };
@@ -2473,25 +2473,23 @@ Date: ${dateStr}`,
                 smtpPass: process.env.WORKMAIL_PASS || process.env.SMTP_PASS
             });
 
-            if (NC_UPLOAD_CONFIG.nonAuthEmail) {
-                console.log(`  Sending non-auth CSV to NetComponents: ${NC_UPLOAD_CONFIG.nonAuthEmail}`);
-                await ncNotifier.sendWithAttachment(
-                    NC_UPLOAD_CONFIG.nonAuthEmail,
-                    'Data Upload - Non-Authorized Account # 1167233',
-                    'Hello,\n\nPlease find attached updated stock inventory.\n\nBest regards,\nAstute Electronics',
-                    [{ filename: path.basename(result.portalFile), path: result.portalFile }]
-                );
-            }
+            console.log(`  Sending non-auth CSV to NetComponents: ${NC_UPLOAD_CONFIG.ncEmail} (CC: ${NC_UPLOAD_CONFIG.ccEmail})`);
+            await ncNotifier.sendWithAttachment(
+                NC_UPLOAD_CONFIG.ncEmail,
+                'Data Upload - Non-Authorized Account # 1167233',
+                'Hello,\n\nPlease find attached updated stock inventory.\n\nBest regards,\nAstute Electronics',
+                [{ filename: path.basename(result.portalFile), path: result.portalFile }],
+                { cc: NC_UPLOAD_CONFIG.ccEmail }
+            );
 
-            if (NC_UPLOAD_CONFIG.franchiseEmail) {
-                console.log(`  Sending franchise CSV to NetComponents: ${NC_UPLOAD_CONFIG.franchiseEmail}`);
-                await ncNotifier.sendWithAttachment(
-                    NC_UPLOAD_CONFIG.franchiseEmail,
-                    'Data upload - Franchised account # 1126121',
-                    'Hello,\n\nPlease find attached updated franchise inventory.\n\nBest regards,\nAstute Electronics',
-                    [{ filename: path.basename(result.franchisePortalFile), path: result.franchisePortalFile }]
-                );
-            }
+            console.log(`  Sending franchise CSV to NetComponents: ${NC_UPLOAD_CONFIG.ncEmail} (CC: ${NC_UPLOAD_CONFIG.ccEmail})`);
+            await ncNotifier.sendWithAttachment(
+                NC_UPLOAD_CONFIG.ncEmail,
+                'Data upload - Franchised account # 1126121',
+                'Hello,\n\nPlease find attached updated franchise inventory.\n\nBest regards,\nAstute Electronics',
+                [{ filename: path.basename(result.franchisePortalFile), path: result.franchisePortalFile }],
+                { cc: NC_UPLOAD_CONFIG.ccEmail }
+            );
         }
 
         // Email 2: OT Write-back Summary (HTML, no attachment)
@@ -2625,25 +2623,23 @@ async function reprocessInventory(xlsxPath, opts = {}) {
                 smtpPass: process.env.WORKMAIL_PASS || process.env.SMTP_PASS
             });
 
-            if (NC_UPLOAD_CONFIG.nonAuthEmail) {
-                console.log(`  Sending non-auth CSV to NetComponents: ${NC_UPLOAD_CONFIG.nonAuthEmail}`);
-                await ncNotifier.sendWithAttachment(
-                    NC_UPLOAD_CONFIG.nonAuthEmail,
-                    'Data Upload - Non-Authorized Account # 1167233',
-                    'Hello,\n\nPlease find attached updated stock inventory.\n\nBest regards,\nAstute Electronics',
-                    [{ filename: path.basename(result.portalFile), path: result.portalFile }]
-                );
-            }
+            console.log(`  Sending non-auth CSV to NetComponents: ${NC_UPLOAD_CONFIG.ncEmail} (CC: ${NC_UPLOAD_CONFIG.ccEmail})`);
+            await ncNotifier.sendWithAttachment(
+                NC_UPLOAD_CONFIG.ncEmail,
+                'Data Upload - Non-Authorized Account # 1167233',
+                'Hello,\n\nPlease find attached updated stock inventory.\n\nBest regards,\nAstute Electronics',
+                [{ filename: path.basename(result.portalFile), path: result.portalFile }],
+                { cc: NC_UPLOAD_CONFIG.ccEmail }
+            );
 
-            if (NC_UPLOAD_CONFIG.franchiseEmail) {
-                console.log(`  Sending franchise CSV to NetComponents: ${NC_UPLOAD_CONFIG.franchiseEmail}`);
-                await ncNotifier.sendWithAttachment(
-                    NC_UPLOAD_CONFIG.franchiseEmail,
-                    'Data upload - Franchised account # 1126121',
-                    'Hello,\n\nPlease find attached updated franchise inventory.\n\nBest regards,\nAstute Electronics',
-                    [{ filename: path.basename(result.franchisePortalFile), path: result.franchisePortalFile }]
-                );
-            }
+            console.log(`  Sending franchise CSV to NetComponents: ${NC_UPLOAD_CONFIG.ncEmail} (CC: ${NC_UPLOAD_CONFIG.ccEmail})`);
+            await ncNotifier.sendWithAttachment(
+                NC_UPLOAD_CONFIG.ncEmail,
+                'Data upload - Franchised account # 1126121',
+                'Hello,\n\nPlease find attached updated franchise inventory.\n\nBest regards,\nAstute Electronics',
+                [{ filename: path.basename(result.franchisePortalFile), path: result.franchisePortalFile }],
+                { cc: NC_UPLOAD_CONFIG.ccEmail }
+            );
         }
 
         console.log('\n' + '='.repeat(60));

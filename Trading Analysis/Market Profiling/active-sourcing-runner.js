@@ -30,9 +30,13 @@ const { execFileSync, spawn } = require('child_process');
 const sharedPath = path.join(__dirname, '../../shared');
 const { apiPost, apiGet } = require(path.join(sharedPath, 'api-client'));
 const logger = require(path.join(sharedPath, 'logger')).createLogger('ActiveSourcing');
+const { createNotifier } = require(path.join(sharedPath, 'notifier'));
 
 // Franchise enrichment (DigiKey, Mouser, etc.)
 const { enrichRFQ } = require('../RFQ API Enrichment/enrich-rfq');
+
+// Email configuration
+const NOTIFICATION_EMAIL = 'jake.harris@astutegroup.com';
 
 // Local modules (we'll require them dynamically to avoid circular deps)
 
@@ -253,6 +257,39 @@ async function runActiveSourcing(options = {}) {
   const mpnsToExclude = selectedMpns.map(m => m.mpn);
   const exclusionResult = exclusionManager.addExclusions(mpnsToExclude, batchId);
   console.log(`  Excluded ${exclusionResult.added} MPNs (${exclusionResult.skipped} already excluded)`);
+
+  // Step 2b: Email delisted parts notification
+  console.log('  Sending delisting notification...');
+  try {
+    const notifier = createNotifier({
+      fromEmail: 'stockrfq@orangetsunami.com',
+      fromName: 'Active Sourcing',
+      smtpPass: process.env.WORKMAIL_PASS || process.env.SMTP_PASS
+    });
+
+    // Build delisting summary
+    const delistLines = selectedMpns.map(m =>
+      `${m.mpn.padEnd(30)} ${String(m.qty).padStart(12)} pcs  [P${m.priority}] ${m.source || ''}`
+    ).join('\n');
+
+    const delistBody = `Active Sourcing Batch: ${batchId}
+
+The following ${selectedMpns.length} parts are being temporarily DELISTED from NetComponents for price-check:
+
+${'MPN'.padEnd(30)} ${'QTY'.padStart(12)}      PRIORITY / SOURCE
+${'─'.repeat(70)}
+${delistLines}
+${'─'.repeat(70)}
+
+These parts will be excluded from NetComponents uploads until the exclusion expires (7 days) or next Monday's inventory upload, whichever comes first.
+
+This is an automated notification from the Active Sourcing workflow.`;
+
+    await notifier.sendEmail(NOTIFICATION_EMAIL, `Active Sourcing Delisting — ${batchId} (${selectedMpns.length} parts)`, delistBody);
+    console.log('  Notification sent to ' + NOTIFICATION_EMAIL);
+  } catch (e) {
+    console.warn(`  Failed to send delisting notification: ${e.message}`);
+  }
 
   // Step 3: Create RFQ
   console.log('');
