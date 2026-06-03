@@ -111,8 +111,19 @@ async function loadRFQ(opts) {
   if (!userId) throw new Error('rfq-fast-loader: userId (contact person) is required');
   if (!lines || lines.length === 0) throw new Error('rfq-fast-loader: at least one line is required');
 
-  const typeId = RFQ_TYPES[type];
-  if (!typeId) throw new Error(`rfq-fast-loader: unknown RFQ type '${type}'. Valid: ${Object.keys(RFQ_TYPES).join(', ')}`);
+  // Accept both string names ("Shortage") and numeric IDs (1000000)
+  let typeId;
+  if (typeof type === 'string') {
+    typeId = RFQ_TYPES[type];
+    if (!typeId) throw new Error(`rfq-fast-loader: unknown RFQ type '${type}'. Valid: ${Object.keys(RFQ_TYPES).join(', ')}`);
+  } else if (typeof type === 'number') {
+    const validIds = Object.values(RFQ_TYPES);
+    if (!validIds.includes(type)) {
+      throw new Error(`rfq-fast-loader: unknown RFQ type ID '${type}'. Valid IDs: ${validIds.join(', ')} or names: ${Object.keys(RFQ_TYPES).join(', ')}`);
+    }
+    typeId = type;
+  } else {
+    throw new Error(`rfq-fast-loader: type must be a string name or numeric ID, got ${typeof type}`);
 
   // ── TIER 1: Global budget check ──
   const estimatedWrites = lines.length * 2; // Each line creates rfq_line + rfq_line_mpn

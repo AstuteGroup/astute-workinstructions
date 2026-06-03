@@ -31,8 +31,14 @@ const { processResults } = require('./availability-vq-loader');
 
 // ─── Configuration ─────────────────────────────────────────────────────────
 
-const DEFAULT_LIMIT = 500;
-const PROFILE_SKIP_DAYS = 14; // Skip MPNs profiled in last N days
+// Self-regulating: process this many MPNs per tick. Small batches spread load
+// and avoid rate limiting. At 50 MPNs per 30-min tick = ~2400/day = full
+// inventory rotation every ~2-3 days.
+const DEFAULT_BATCH_SIZE = 50;
+
+// Skip MPNs profiled within this window - defines the rotation cycle
+const PROFILE_SKIP_DAYS = 14;
+
 const WATERMARK_FILE = path.join(process.env.HOME, 'workspace/.market-profiling-watermark.json');
 
 // NC Python script location
@@ -99,7 +105,7 @@ function psqlQueryRows(sql) {
 /**
  * Get inventory MPNs not profiled recently
  */
-function getUnprofiledMPNs(limit = DEFAULT_LIMIT) {
+function getUnprofiledMPNs(limit = DEFAULT_BATCH_SIZE) {
   const watermark = loadWatermark();
   const skipDate = new Date(Date.now() - PROFILE_SKIP_DAYS * 24 * 60 * 60 * 1000).toISOString();
 
@@ -298,16 +304,16 @@ function runNCScraper(rfqNumber, limit = 0) {
 // ─── Main Orchestrator ─────────────────────────────────────────────────────
 
 async function runMarketProfiling(options = {}) {
-  const limit = options.limit || DEFAULT_LIMIT;
+  const limit = options.limit || DEFAULT_BATCH_SIZE;
   const dryRun = options.dryRun !== false;
   const skipNc = options.skipNc || false;
 
   console.log('='.repeat(60));
-  console.log('Market Profiler');
+  console.log('Market Profiler (Self-Regulating)');
   console.log('='.repeat(60));
   console.log(`Mode: ${dryRun ? 'DRY-RUN' : 'COMMIT'}`);
-  console.log(`Limit: ${limit} MPNs`);
-  console.log(`Skip days: ${PROFILE_SKIP_DAYS}`);
+  console.log(`Batch size: ${limit} MPNs per tick`);
+  console.log(`Rotation window: ${PROFILE_SKIP_DAYS} days`);
   console.log('='.repeat(60));
   console.log('');
 
@@ -403,7 +409,7 @@ async function runMarketProfiling(options = {}) {
 async function main() {
   const args = process.argv.slice(2);
 
-  let limit = DEFAULT_LIMIT;
+  let limit = DEFAULT_BATCH_SIZE;
   let dryRun = true;
   let skipNc = false;
 
@@ -420,8 +426,12 @@ async function main() {
     } else if (args[i] === '--help') {
       console.log('Usage: node market-profiler.js [options]');
       console.log('');
+      console.log('Self-regulating market intelligence scraper. Runs continuously,');
+      console.log('processing small batches each tick. Rotates through inventory');
+      console.log(`every ${PROFILE_SKIP_DAYS} days.`);
+      console.log('');
       console.log('Options:');
-      console.log('  --limit N     Number of MPNs to profile (default: 500)');
+      console.log(`  --limit N     Batch size per tick (default: ${DEFAULT_BATCH_SIZE})`);
       console.log('  --dry-run     Preview what would be done (default)');
       console.log('  --commit      Actually run profiling');
       console.log('  --skip-nc     Skip NC scrape (just add RFQ lines)');

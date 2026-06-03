@@ -4,8 +4,8 @@ Two complementary workflows for market intelligence:
 
 | Workflow | Purpose | Volume | Cadence | De-list? | Vendor Contact? |
 |----------|---------|--------|---------|----------|-----------------|
-| **Market Profiling** | Map broker availability | All inventory | Continuous | No | No (scrape only) |
-| **Active Sourcing** | Price check priority parts | 200/batch | 2×/week | Yes | Yes (RFQ emails) |
+| **Market Profiling** | Map broker availability | 50/tick (~2,400/day) | Every 30min, 24/7 | No | No (scrape only) |
+| **Active Sourcing** | Price check priority parts | 200/batch | Mon + Thu | Yes | Yes (RFQ emails) |
 
 ---
 
@@ -54,18 +54,25 @@ Build a comprehensive database of broker market availability across Americas/EME
 ### Commands
 
 ```bash
-# Run market profiling for N MPNs
-node "Trading Analysis/Market Profiling/market-profiler.js" --limit 500 --dry-run
+# Run market profiling (uses default batch size of 50)
+node "Trading Analysis/Market Profiling/market-profiler.js" --dry-run
+
+# Run with custom batch size
+node "Trading Analysis/Market Profiling/market-profiler.js" --limit 100 --commit
 
 # Check profiling watermark
 cat ~/.market-profiling-watermark.json
 ```
 
-### Scheduling
+### Self-Regulating Operation
 
-- **Cadence**: Daily at 8 AM CT
-- **Volume**: 500 MPNs per day
-- **Rotation**: MPNs not profiled in last 14 days
+The market profiler runs autonomously:
+- **Cadence**: Every 30 minutes, 24/7
+- **Batch size**: 50 MPNs per tick (~2,400/day)
+- **Rotation**: 14-day window - each MPN profiled once per cycle
+- **Full rotation**: ~2-3 days to cover entire inventory
+
+No artificial time restrictions - Astute operates globally with purchasing activity at all hours. The small batch size spreads load and avoids rate limiting.
 
 ---
 

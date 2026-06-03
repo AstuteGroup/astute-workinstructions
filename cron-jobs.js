@@ -395,14 +395,13 @@ module.exports = [
 
   {
     name: 'market-profiler',
-    cadence: 'daily',
-    // 13:00 UTC = 8 AM CT — runs after inventory is fresh on Monday
-    cadenceCron: '0 13 * * 1-5',
-    command: `node "${ASTUTE}/Trading Analysis/Market Profiling/market-profiler.js" --limit 500 --commit`,
+    cadence: 'every 30m',
+    cadenceCron: '*/30 * * * *',
+    command: `node "${ASTUTE}/Trading Analysis/Market Profiling/market-profiler.js" --commit`,
     cwd: ASTUTE,
     needsOT: true,
     logFile: '/tmp/market-profiler.log',
-    description: 'Mon-Fri 13 UTC (8am CT) — Market profiling: NC check-only scrape for 500 inventory MPNs, loads $0 availability VQs. Does NOT send RFQ emails.',
+    description: 'Every 30m — Market profiling: NC check-only scrape for unprofiled inventory MPNs, loads $0 availability VQs. Self-regulating batch size. Does NOT send RFQ emails.',
   },
 
   {
