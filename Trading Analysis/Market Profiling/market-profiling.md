@@ -292,6 +292,7 @@ node "Trading Analysis/Market Profiling/active-sourcing-runner.js" --limit 10 --
 
 | Priority | Enhancement | Description |
 |----------|-------------|-------------|
+| 🔴 | **Proactive franchise enrichment** | Enrich inventory MPNs with DigiKey/Mouser pricing BEFORE sourcing to brokers. Know the franchise baseline before going to market. Options: (A) Enrich 200 selected parts during Active Sourcing, (B) Continuous rotation ~500/day covering full inventory in 10 days. API limits: 1,000/day each. |
 | 🟡 | **Risk-weighted rotation** | Cycle higher-risk parts more frequently than 14 days. Criteria TBD: high-value MFRs, volatile pricing history, customer demand signals, long lead times. |
 | 🟡 | **NC confirmation gate** | Trigger sourcing only after NC confirms listing update (email reply parsing). |
 | 🟡 | **Weekly RFQ container** | Single "Market Intelligence Week of {date}" RFQ per week for all profiling + sourcing VQs. |
