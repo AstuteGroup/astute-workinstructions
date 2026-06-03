@@ -36,6 +36,47 @@ const EMAIL_CONFIG = {
     processedFolder: 'Inventory-Processed'
 };
 
+// NetComponents upload configuration
+// Set NC_UPLOAD_ENABLED=true to send CSVs directly to NetComponents
+const NC_UPLOAD_CONFIG = {
+    enabled: process.env.NC_UPLOAD_ENABLED === 'true',
+    nonAuthEmail: process.env.NC_NONAUTH_EMAIL || null,      // e.g., 'upload@netcomponents.com'
+    franchiseEmail: process.env.NC_FRANCHISE_EMAIL || null,  // e.g., 'upload@netcomponents.com'
+    fromEmail: 'stockrfq@orangetsunami.com',
+    fromName: 'Astute Electronics'
+};
+
+// Persistent storage for inventory xlsx (for Thursday reprocess)
+const INVENTORY_STORAGE_DIR = path.join(process.env.HOME, 'workspace/.inventory-storage');
+if (!fs.existsSync(INVENTORY_STORAGE_DIR)) {
+    fs.mkdirSync(INVENTORY_STORAGE_DIR, { recursive: true });
+}
+
+/**
+ * Get the Monday of the current week as YYYY-MM-DD string.
+ * Used to identify which week's inventory file to use for reprocessing.
+ */
+function getWeekStartDate() {
+    const now = new Date();
+    const day = now.getDay();
+    const diff = now.getDate() - day + (day === 0 ? -6 : 1); // Adjust for Sunday
+    const monday = new Date(now.setDate(diff));
+    return monday.toISOString().split('T')[0];
+}
+
+/**
+ * Get the path to this week's saved inventory file.
+ * Returns null if no file exists for this week.
+ */
+function getThisWeekInventoryFile() {
+    const weekStart = getWeekStartDate();
+    const persistentPath = path.join(INVENTORY_STORAGE_DIR, `inventory_${weekStart}.xlsx`);
+    if (fs.existsSync(persistentPath)) {
+        return persistentPath;
+    }
+    return null;
+}
+
 // Rows to skip at start of file (Infor report header)
 const HEADER_ROWS_TO_SKIP = 7;
 
@@ -2204,6 +2245,12 @@ async function fetchAndProcess(opts = {}) {
         try {
             attachmentPath = await downloadAttachment(matchingEmail.id, 'Inventory Reports');
             console.log(`  Downloaded: ${attachmentPath}`);
+
+            // Save a persistent copy for Thursday reprocess
+            const weekStart = getWeekStartDate();
+            const persistentPath = path.join(INVENTORY_STORAGE_DIR, `inventory_${weekStart}.xlsx`);
+            fs.copyFileSync(attachmentPath, persistentPath);
+            console.log(`  Saved persistent copy: ${persistentPath}`);
         } catch (err) {
             throw new Error(`Failed to download attachment: ${err.message}`);
         }
@@ -2409,7 +2456,7 @@ Date: ${dateStr}`,
         // Email 1b: NetComponents upload — franchised account #1126121
         const sent1b = await sendEmail(
             EMAIL_CONFIG.recipient,
-            'Data Upload - Franchised account #1126121',
+            'Data upload - Franchised account # 1126121',
             `Inventory cleanup completed successfully.
 
 Attached: ${path.basename(result.franchisePortalFile)}
@@ -2417,6 +2464,35 @@ Attached: ${path.basename(result.franchisePortalFile)}
 Date: ${dateStr}`,
             [result.franchisePortalFile]
         );
+
+        // Email 1c/1d: Send directly to NetComponents if enabled
+        if (NC_UPLOAD_CONFIG.enabled) {
+            const ncNotifier = createNotifier({
+                fromEmail: NC_UPLOAD_CONFIG.fromEmail,
+                fromName: NC_UPLOAD_CONFIG.fromName,
+                smtpPass: process.env.WORKMAIL_PASS || process.env.SMTP_PASS
+            });
+
+            if (NC_UPLOAD_CONFIG.nonAuthEmail) {
+                console.log(`  Sending non-auth CSV to NetComponents: ${NC_UPLOAD_CONFIG.nonAuthEmail}`);
+                await ncNotifier.sendWithAttachment(
+                    NC_UPLOAD_CONFIG.nonAuthEmail,
+                    'Data Upload - Non-Authorized Account # 1167233',
+                    'Hello,\n\nPlease find attached updated stock inventory.\n\nBest regards,\nAstute Electronics',
+                    [{ filename: path.basename(result.portalFile), path: result.portalFile }]
+                );
+            }
+
+            if (NC_UPLOAD_CONFIG.franchiseEmail) {
+                console.log(`  Sending franchise CSV to NetComponents: ${NC_UPLOAD_CONFIG.franchiseEmail}`);
+                await ncNotifier.sendWithAttachment(
+                    NC_UPLOAD_CONFIG.franchiseEmail,
+                    'Data upload - Franchised account # 1126121',
+                    'Hello,\n\nPlease find attached updated franchise inventory.\n\nBest regards,\nAstute Electronics',
+                    [{ filename: path.basename(result.franchisePortalFile), path: result.franchisePortalFile }]
+                );
+            }
+        }
 
         // Email 2: OT Write-back Summary (HTML, no attachment)
         const writebackOk    = writebackResults.filter(r => r.status === 'success').length;
@@ -2495,6 +2571,102 @@ Date: ${dateStr}`,
 }
 
 // =============================================================================
+// REPROCESS COMMAND - Thursday mode using saved Monday xlsx
+// =============================================================================
+
+async function reprocessInventory(xlsxPath, opts = {}) {
+    const dryRun = !!opts.dryRun;
+    console.log('='.repeat(60));
+    console.log('INVENTORY CLEANUP - REPROCESS MODE (Thursday)');
+    console.log('='.repeat(60));
+    console.log(`Time: ${new Date().toISOString()}`);
+    console.log(`Source file: ${xlsxPath}`);
+    console.log(`Mode: ${dryRun ? 'DRY-RUN' : 'LIVE'}`);
+    console.log('-'.repeat(60));
+
+    try {
+        // Step 1: Process the saved file
+        console.log('\nStep 1: Processing inventory file...');
+        const result = processInventoryFile(xlsxPath, null);
+        const dateStr = new Date().toISOString().split('T')[0];
+
+        // Step 2: Skip OT write-back (already done Monday)
+        console.log('\nStep 2: Skipping OT write-back (already done on Monday)');
+
+        // Step 3: NC CSVs were regenerated by processInventoryFile
+        // The exclusion check in Step 5 of processInventoryFile handles the 200 MPNs
+        console.log('\nStep 3: NetComponents CSVs regenerated with current exclusions');
+        console.log(`  Non-auth: ${result.portalFile}`);
+        console.log(`  Franchise: ${result.franchisePortalFile}`);
+
+        // Step 4: Send emails
+        console.log('\nStep 4: Sending notification emails...');
+
+        // Email to Jake
+        const sent1 = await sendEmail(
+            EMAIL_CONFIG.recipient,
+            'Data Upload - Non-Authorized Account # 1167233',
+            `Hello,\n\nPlease find attached updated stock inventory.\n\nBest regards,\nAstute Electronics`,
+            [result.portalFile]
+        );
+
+        const sent1b = await sendEmail(
+            EMAIL_CONFIG.recipient,
+            'Data upload - Franchised account # 1126121',
+            `Hello,\n\nPlease find attached updated franchise inventory.\n\nBest regards,\nAstute Electronics`,
+            [result.franchisePortalFile]
+        );
+
+        // Email to NetComponents if enabled
+        if (NC_UPLOAD_CONFIG.enabled) {
+            const ncNotifier = createNotifier({
+                fromEmail: NC_UPLOAD_CONFIG.fromEmail,
+                fromName: NC_UPLOAD_CONFIG.fromName,
+                smtpPass: process.env.WORKMAIL_PASS || process.env.SMTP_PASS
+            });
+
+            if (NC_UPLOAD_CONFIG.nonAuthEmail) {
+                console.log(`  Sending non-auth CSV to NetComponents: ${NC_UPLOAD_CONFIG.nonAuthEmail}`);
+                await ncNotifier.sendWithAttachment(
+                    NC_UPLOAD_CONFIG.nonAuthEmail,
+                    'Data Upload - Non-Authorized Account # 1167233',
+                    'Hello,\n\nPlease find attached updated stock inventory.\n\nBest regards,\nAstute Electronics',
+                    [{ filename: path.basename(result.portalFile), path: result.portalFile }]
+                );
+            }
+
+            if (NC_UPLOAD_CONFIG.franchiseEmail) {
+                console.log(`  Sending franchise CSV to NetComponents: ${NC_UPLOAD_CONFIG.franchiseEmail}`);
+                await ncNotifier.sendWithAttachment(
+                    NC_UPLOAD_CONFIG.franchiseEmail,
+                    'Data upload - Franchised account # 1126121',
+                    'Hello,\n\nPlease find attached updated franchise inventory.\n\nBest regards,\nAstute Electronics',
+                    [{ filename: path.basename(result.franchisePortalFile), path: result.franchisePortalFile }]
+                );
+            }
+        }
+
+        console.log('\n' + '='.repeat(60));
+        console.log('REPROCESS COMPLETE');
+        console.log('='.repeat(60));
+        console.log(`Emails sent: ${sent1 && sent1b ? 'Yes' : 'Partial'}`);
+        console.log(`Output: ${result.outputDir}`);
+
+        return { success: true, result };
+
+    } catch (err) {
+        console.error('\n' + '='.repeat(60));
+        console.error('REPROCESS FAILED');
+        console.error('='.repeat(60));
+        console.error(`Error: ${err.message}`);
+
+        await sendFailureNotice(err.message);
+
+        return { success: false, error: err.message };
+    }
+}
+
+// =============================================================================
 // ENTRY POINT
 // =============================================================================
 
@@ -2508,9 +2680,12 @@ if (require.main === module) {
     if (args.length < 1) {
         console.log('Usage: node inventory_cleanup.js <input_file.xlsx|csv> [output_directory] [--writeback] [--dry-run]');
         console.log('       node inventory_cleanup.js fetch [--dry-run]');
+        console.log('       node inventory_cleanup.js reprocess [--dry-run]');
         console.log('\nCommands:');
         console.log('  fetch                    Fetch from email inbox, process, and write back to OT');
         console.log('  fetch --dry-run          Same, but skip the API write-back (preview only)');
+        console.log('  reprocess                Reprocess this week\'s saved xlsx (for Thursday run)');
+        console.log('  reprocess --dry-run      Same, but skip the API write-back (preview only)');
         console.log('  <file.xlsx>              Process a specific file (CSVs only)');
         console.log('  <file.xlsx> --writeback  Process and also write back to OT');
         console.log('  <file.xlsx> --writeback --dry-run');
@@ -2518,11 +2693,30 @@ if (require.main === module) {
         console.log('\nExamples:');
         console.log('  node inventory_cleanup.js fetch');
         console.log('  node inventory_cleanup.js fetch --dry-run');
+        console.log('  node inventory_cleanup.js reprocess               # Thursday: reuse Monday\'s file');
         console.log('  node inventory_cleanup.js ASTItemLotsReportInputs_USS_4544132.xlsx --writeback --dry-run');
         process.exit(1);
     }
 
-    if (args[0] === 'fetch') {
+    if (args[0] === 'reprocess') {
+        // Thursday mode: reuse this week's saved xlsx file
+        const savedFile = getThisWeekInventoryFile();
+        if (!savedFile) {
+            console.error('ERROR: No saved inventory file found for this week.');
+            console.error(`Expected: ${path.join(INVENTORY_STORAGE_DIR, `inventory_${getWeekStartDate()}.xlsx`)}`);
+            console.error('Run "fetch" first on Monday to save the inventory file.');
+            process.exit(1);
+        }
+        console.log(`Reprocessing saved inventory file: ${savedFile}`);
+        reprocessInventory(savedFile, { dryRun })
+            .then(result => {
+                process.exit(result.success ? 0 : 1);
+            })
+            .catch(err => {
+                console.error('Unexpected error:', err);
+                process.exit(1);
+            });
+    } else if (args[0] === 'fetch') {
         fetchAndProcess({ dryRun })
             .then(result => {
                 process.exit(result.success ? 0 : 1);

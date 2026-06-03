@@ -283,3 +283,15 @@ node "Trading Analysis/Inventory File Cleanup/inventory_cleanup.js" <input.xlsx>
 # Full active sourcing test
 node "Trading Analysis/Market Profiling/active-sourcing-runner.js" --limit 10 --dry-run
 ```
+
+---
+
+## Roadmap
+
+### Planned Enhancements
+
+| Priority | Enhancement | Description |
+|----------|-------------|-------------|
+| 🟡 | **Risk-weighted rotation** | Cycle higher-risk parts more frequently than 14 days. Criteria TBD: high-value MFRs, volatile pricing history, customer demand signals, long lead times. |
+| 🟡 | **NC confirmation gate** | Trigger sourcing only after NC confirms listing update (email reply parsing). |
+| 🟡 | **Weekly RFQ container** | Single "Market Intelligence Week of {date}" RFQ per week for all profiling + sourcing VQs. |
