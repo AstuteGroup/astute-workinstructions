@@ -22,64 +22,45 @@ const fs = require('fs');
 const XLSX = require('xlsx');
 const { execFileSync } = require('child_process');
 
-// Shared utilities
+// Shared utilities - reuse existing VQ loader infrastructure
 const sharedPath = path.join(__dirname, '../../shared');
 const { apiPost, resolveBP } = require(path.join(sharedPath, 'api-client'));
-const { lookupMfr, sanitizeMfrText } = require(path.join(sharedPath, 'mfr-lookup'));
 const { resolveMfrForRow } = require(path.join(sharedPath, 'mfr-resolver'));
 const logger = require(path.join(sharedPath, 'logger')).createLogger('AvailabilityVQ');
 
 // ─── Configuration ─────────────────────────────────────────────────────────
 
-// Placeholder BP ID for unknown vendors
-// This should be a generic "Unknown Broker" BP in OT
-const UNKNOWN_VENDOR_PLACEHOLDER_BP_ID = 1000003; // Update with actual ID
+// Placeholder BP ID for unknown vendors - same as VQ loader uses
+const UNKNOWN_VENDOR_PLACEHOLDER_BP_ID = 1000003;
 
 // How long to consider existing VQs when checking for duplicates
 const DUPLICATE_CHECK_DAYS = 14;
 
 // ─── Vendor BP Resolution ──────────────────────────────────────────────────
 
-// Load vendor mapping from file if available
-let vendorBpMapping = {};
-const mappingPath = path.join(__dirname, 'vendor-bp-mapping.json');
-if (fs.existsSync(mappingPath)) {
-  try {
-    vendorBpMapping = JSON.parse(fs.readFileSync(mappingPath, 'utf8'));
-    logger.info(`Loaded ${Object.keys(vendorBpMapping).length} vendor BP mappings`);
-  } catch (e) {
-    logger.warn(`Failed to load vendor BP mapping: ${e.message}`);
-  }
-}
-
 /**
  * Resolve NC supplier name to OT business partner ID.
  *
- * Strategy:
- * 1. Check local mapping file (vendor-bp-mapping.json)
- * 2. Try API lookup by name
- * 3. Return placeholder BP if unknown (with vendor name in notes)
+ * Uses the SAME resolution logic as VQ loader (shared/api-client.js resolveBP):
+ * 1. Curated vendor aliases (shared/data/vendor-aliases.json)
+ * 2. Exact match by searchKey
+ * 3. Fuzzy name matching
+ * 4. Placeholder BP if unknown (with vendor name in notes)
  */
 async function resolveVendorBP(supplierName) {
   if (!supplierName) return null;
 
-  // 1. Check local mapping
-  const normalizedName = supplierName.trim().toUpperCase();
-  if (vendorBpMapping[normalizedName]) {
-    return { id: vendorBpMapping[normalizedName], source: 'mapping' };
-  }
-
-  // 2. Try API lookup
   try {
+    // Use the same resolveBP as VQ loader - handles aliases, fuzzy matching, caching
     const bp = await resolveBP(null, supplierName);
     if (bp) {
-      return { id: bp.id, source: 'api' };
+      return { id: bp.id, name: bp.name, source: 'resolved' };
     }
   } catch (e) {
-    logger.debug(`BP lookup failed for '${supplierName}': ${e.message}`);
+    logger.debug(`BP resolution failed for '${supplierName}': ${e.message}`);
   }
 
-  // 3. Unknown vendor - use placeholder
+  // Unknown vendor - use placeholder (same pattern as VQ loader)
   return {
     id: UNKNOWN_VENDOR_PLACEHOLDER_BP_ID,
     source: 'placeholder',
@@ -425,7 +406,7 @@ async function main() {
         console.log(`  ... and ${unknownVendors.length - 10} more`);
       }
       console.log('');
-      console.log('Consider adding these to vendor-bp-mapping.json or creating BPs in OT.');
+      console.log('Add these to shared/data/vendor-aliases.json or create BPs in OT.');
     }
 
   } catch (e) {

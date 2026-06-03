@@ -395,13 +395,13 @@ module.exports = [
 
   {
     name: 'market-profiler',
-    cadence: 'every 30m',
-    cadenceCron: '*/30 * * * *',
+    cadence: 'every 60m',
+    cadenceCron: '0 * * * *',
     command: `node "${ASTUTE}/Trading Analysis/Market Profiling/market-profiler.js" --commit`,
     cwd: ASTUTE,
     needsOT: true,
     logFile: '/tmp/market-profiler.log',
-    description: 'Every 30m — Market profiling: NC check-only scrape for unprofiled inventory MPNs, loads $0 availability VQs. Self-regulating batch size. Does NOT send RFQ emails.',
+    description: 'Hourly — Market profiling: NC check-only scrape for unprofiled inventory MPNs (~50/tick), loads $0 availability VQs. Does NOT send RFQ emails.',
   },
 
   {

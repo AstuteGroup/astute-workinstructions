@@ -4,7 +4,7 @@ Two complementary workflows for market intelligence:
 
 | Workflow | Purpose | Volume | Cadence | De-list? | Vendor Contact? |
 |----------|---------|--------|---------|----------|-----------------|
-| **Market Profiling** | Map broker availability | 50/tick (~2,400/day) | Every 30min, 24/7 | No | No (scrape only) |
+| **Market Profiling** | Map broker availability | ~50/hour (~1,200/day) | Hourly, 24/7 | No | No (scrape only) |
 | **Active Sourcing** | Price check priority parts | 200/batch | Mon + Thu | Yes | Yes (RFQ emails) |
 
 ---
@@ -67,12 +67,16 @@ cat ~/.market-profiling-watermark.json
 ### Self-Regulating Operation
 
 The market profiler runs autonomously:
-- **Cadence**: Every 30 minutes, 24/7
-- **Batch size**: 50 MPNs per tick (~2,400/day)
+- **Cadence**: Hourly, 24/7
+- **Batch size**: ~50 MPNs per tick (~1,200/day)
 - **Rotation**: 14-day window - each MPN profiled once per cycle
-- **Full rotation**: ~2-3 days to cover entire inventory
+- **Full rotation**: ~4-5 days to cover entire inventory
 
-No artificial time restrictions - Astute operates globally with purchasing activity at all hours. The small batch size spreads load and avoids rate limiting.
+No artificial time restrictions - Astute operates globally with purchasing activity at all hours. The hourly cadence combined with small batch sizes spreads load and reduces bot detection risk.
+
+**Combined NC load** (with Active Sourcing):
+- Market Profiling: ~1,200 searches/day (check-only, no form submission)
+- Active Sourcing: 200 Mon + 200 Thu (with form submission to select vendors)
 
 ---
 

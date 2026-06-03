@@ -164,15 +164,21 @@ async function runActiveSourcing(options = {}) {
   const limit = options.limit || DEFAULT_LIMIT;
   const dryRun = options.dryRun !== false;
 
-  // Generate batch ID
+  // Generate batch ID and determine selection mode based on day of week
   const now = new Date();
   const batchId = `AS-${now.toISOString().slice(0, 10)}`;
+  const dayOfWeek = now.getDay(); // 0=Sun, 1=Mon, 4=Thu
+
+  // Monday (1): Skip top-requested to preserve hot parts for customer RFQs
+  // Thursday (4): Include top-requested for midweek price-check
+  const selectionMode = dayOfWeek === 1 ? 'monday' : dayOfWeek === 4 ? 'thursday' : 'default';
 
   console.log('='.repeat(60));
   console.log('Active Sourcing Runner');
   console.log('='.repeat(60));
   console.log(`Mode: ${dryRun ? 'DRY-RUN (no RFQs sent)' : 'COMMIT (WILL SEND RFQs)'}`);
   console.log(`Batch: ${batchId}`);
+  console.log(`Selection: ${selectionMode} (${selectionMode === 'monday' ? 'skip hot parts' : 'include hot parts'})`);
   console.log(`Limit: ${limit} MPNs`);
   console.log('='.repeat(60));
 
@@ -188,14 +194,13 @@ async function runActiveSourcing(options = {}) {
 
   // Step 1: Run selection engine
   console.log('Step 1: Running selection engine...');
-  const selectionEngine = require('./selection-engine');
-  // We need to call the selectPriorityMPNs function directly
-  // For now, we'll use a simple implementation that reuses the logic
+  console.log(`  Selection mode: ${selectionMode}`);
 
-  // Load functions from selection-engine.js by running it directly
+  // Run selection engine with day-appropriate mode
   const selectionResult = execFileSync('node', [
     path.join(__dirname, 'selection-engine.js'),
     '--limit', String(limit),
+    '--mode', selectionMode,
     '--output', `/tmp/as-selection-${Date.now()}.json`
   ], { encoding: 'utf8' });
 
