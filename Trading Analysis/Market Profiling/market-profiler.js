@@ -95,7 +95,10 @@ function psqlQuery(sql) {
 
 function psqlQueryRows(sql) {
   try {
-    const out = execFileSync('psql', ['-At', '-F', '|', '-c', sql], { encoding: 'utf8' });
+    const out = execFileSync('psql', ['-At', '-F', '|', '-c', sql], {
+      encoding: 'utf8',
+      maxBuffer: 50 * 1024 * 1024  // 50MB buffer for safety
+    });
     return out.trim().split('\n').filter(Boolean);
   } catch (e) {
     return [];

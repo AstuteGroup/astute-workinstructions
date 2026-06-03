@@ -64,9 +64,15 @@ function psqlQuery(sql) {
 
 function psqlQueryRows(sql) {
   try {
-    const out = execFileSync('psql', ['-At', '-F', '|', '-c', sql], { encoding: 'utf8' });
+    // Increase maxBuffer to handle large result sets (84k+ inventory rows)
+    const out = execFileSync('psql', ['-At', '-F', '|', '-c', sql], {
+      encoding: 'utf8',
+      maxBuffer: 50 * 1024 * 1024  // 50MB buffer
+    });
     return out.trim().split('\n').filter(Boolean);
   } catch (e) {
+    console.error(`  SQL error: ${e.message}`);
+    if (e.stderr) console.error(`  stderr: ${e.stderr.toString().slice(0, 200)}`);
     return [];
   }
 }
@@ -75,21 +81,21 @@ function psqlQueryRows(sql) {
  * Get all inventory MPNs with basic info
  */
 function getInventoryMPNs() {
+  // MFR text lives on chuboe_offer_line, not on the _mpn sub-table
   const sql = `
-    SELECT DISTINCT
+    SELECT
       ol.chuboe_mpn,
-      UPPER(COALESCE(olm.chuboe_mfr_text, ol.chuboe_mfr_text, '')) as mfr,
-      COALESCE(SUM(ol.qty), 0) as total_qty
+      UPPER(COALESCE(ol.chuboe_mfr_text, '')) as mfr,
+      SUM(ol.qty) as total_qty
     FROM adempiere.chuboe_offer o
     JOIN adempiere.chuboe_offer_line ol ON o.chuboe_offer_id = ol.chuboe_offer_id
-    LEFT JOIN adempiere.chuboe_offer_line_mpn olm ON ol.chuboe_offer_line_id = olm.chuboe_offer_line_id
     WHERE o.isactive = 'Y'
       AND ol.isactive = 'Y'
       AND o.created > NOW() - INTERVAL '30 days'
       AND ol.chuboe_mpn IS NOT NULL
-      AND ol.chuboe_mpn != ''
-    GROUP BY ol.chuboe_mpn, UPPER(COALESCE(olm.chuboe_mfr_text, ol.chuboe_mfr_text, ''))
-    HAVING COALESCE(SUM(ol.qty), 0) > 0
+      AND LENGTH(ol.chuboe_mpn) > 0
+    GROUP BY ol.chuboe_mpn, UPPER(COALESCE(ol.chuboe_mfr_text, ''))
+    HAVING SUM(ol.qty) > 0
     ORDER BY total_qty DESC
   `;
   const rows = psqlQueryRows(sql);
@@ -366,12 +372,13 @@ function main() {
   console.log('Active Sourcing Selection Engine');
   console.log('='.repeat(60));
   console.log(`Target: ${limit} MPNs`);
-  console.log(`Mode: ${dryRun ? 'DRY-RUN (preview)' : 'OUTPUT to ' + outputPath}`);
+  console.log(`Selection mode: ${mode}`);
+  console.log(`Output: ${dryRun ? 'DRY-RUN (preview)' : outputPath}`);
   console.log('='.repeat(60));
   console.log('');
 
   // Run selection
-  const selected = selectPriorityMPNs(limit);
+  const selected = selectPriorityMPNs(limit, mode);
 
   console.log('');
   console.log('='.repeat(60));
