@@ -419,14 +419,14 @@ module.exports = [
   {
     name: 'inventory-gate-poller',
     cadence: 'fixed',
-    // Mon/Thu hourly from 12-20 UTC (7am-3pm CT) — check for Jake's inventory confirmation
-    // Starts 1 hour after inventory upload email (Monday 11 UTC), polls until confirmation received
-    cadenceCron: '0 12-20 * * 1,4',
+    // Mon/Thu hourly from 13-20 UTC (8am-3pm EST) — check for Jake's inventory confirmation
+    // Aligned with EST business hours for Jake + support team
+    cadenceCron: '0 13-20 * * 1,4',
     command: `node "${ASTUTE}/Trading Analysis/Market Profiling/inventory-gate-poller.js"`,
     cwd: ASTUTE,
     needsOT: false,
     logFile: '/tmp/inventory-gate-poller.log',
-    description: 'Mon/Thu hourly 12-20 UTC — poll stockrfq@ for Jake\'s inventory confirmation, set gate for Active Sourcing',
+    description: 'Mon/Thu hourly 13-20 UTC (8am-3pm EST) — poll stockrfq@ for Jake\'s inventory confirmation, set gate for Active Sourcing',
   },
 
   {
