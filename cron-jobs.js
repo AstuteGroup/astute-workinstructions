@@ -417,6 +417,19 @@ module.exports = [
   },
 
   {
+    name: 'inventory-gate-poller',
+    cadence: 'fixed',
+    // Mon/Thu hourly from 12-20 UTC (7am-3pm CT) — check for Jake's inventory confirmation
+    // Starts 1 hour after inventory upload email (Monday 11 UTC), polls until confirmation received
+    cadenceCron: '0 12-20 * * 1,4',
+    command: `node "${ASTUTE}/Trading Analysis/Market Profiling/inventory-gate-poller.js"`,
+    cwd: ASTUTE,
+    needsOT: false,
+    logFile: '/tmp/inventory-gate-poller.log',
+    description: 'Mon/Thu hourly 12-20 UTC — poll stockrfq@ for Jake\'s inventory confirmation, set gate for Active Sourcing',
+  },
+
+  {
     name: 'exclusion-cleanup',
     cadence: 'weekly',
     // Sunday 03:00 UTC — cleanup expired exclusions (should be redundant; TTL handles it)
