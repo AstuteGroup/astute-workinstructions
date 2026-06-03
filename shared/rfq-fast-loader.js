@@ -124,6 +124,7 @@ async function loadRFQ(opts) {
     typeId = type;
   } else {
     throw new Error(`rfq-fast-loader: type must be a string name or numeric ID, got ${typeof type}`);
+  }
 
   // ── TIER 1: Global budget check ──
   const estimatedWrites = lines.length * 2; // Each line creates rfq_line + rfq_line_mpn

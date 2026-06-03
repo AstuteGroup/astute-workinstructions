@@ -24,6 +24,17 @@ const { execFileSync } = require('child_process');
 // Default batch size
 const DEFAULT_LIMIT = 200;
 
+// Selection modes based on day of week:
+// - 'monday': Skip top-requested MPNs (don't delist hot parts early in week
+//             when customer RFQ activity is running). Focus on high-value MFRs
+//             and inventory rotation.
+// - 'thursday': Include top-requested MPNs (midweek, safe to price-check hot parts)
+const SELECTION_MODES = {
+  monday: { includeTopRequested: false },
+  thursday: { includeTopRequested: true },
+  default: { includeTopRequested: true }
+};
+
 // High-value MFRs to prioritize
 const HIGH_VALUE_MFRS = [
   'ANALOG DEVICES', 'ADI', 'LINEAR TECHNOLOGY', 'LINEAR TECH', 'MAXIM',
@@ -189,16 +200,29 @@ function isHighValueMfr(mfr) {
 
 /**
  * Select priority MPNs for active sourcing
+ *
+ * @param {number} limit - Max MPNs to select
+ * @param {string} mode - 'monday' | 'thursday' | 'default'
+ *   monday: Skip top-requested (don't delist hot parts early week)
+ *   thursday: Include top-requested (midweek price-check is safe)
  */
-function selectPriorityMPNs(limit = DEFAULT_LIMIT) {
+function selectPriorityMPNs(limit = DEFAULT_LIMIT, mode = 'default') {
+  const modeConfig = SELECTION_MODES[mode] || SELECTION_MODES.default;
+
   console.log('Loading data...');
+  console.log(`  Mode: ${mode} (includeTopRequested: ${modeConfig.includeTopRequested})`);
 
   // Load all data sources
   const inventory = getInventoryMPNs();
   console.log(`  Inventory: ${inventory.length} unique MPNs`);
 
-  const topRequested = getTopRequestedMPNs(Math.ceil(limit * 0.4));
-  console.log(`  Top requested: ${topRequested.length} MPNs with 2+ RFQs`);
+  let topRequested = [];
+  if (modeConfig.includeTopRequested) {
+    topRequested = getTopRequestedMPNs(Math.ceil(limit * 0.4));
+    console.log(`  Top requested: ${topRequested.length} MPNs with 2+ RFQs`);
+  } else {
+    console.log(`  Top requested: SKIPPED (${mode} mode - preserving hot parts for customer RFQs)`);
+  }
 
   const shortage = getShortageMPNs(Math.ceil(limit * 0.2));
   console.log(`  Shortage RFQs: ${shortage.length} MPNs`);
@@ -246,15 +270,19 @@ function selectPriorityMPNs(limit = DEFAULT_LIMIT) {
 
   console.log('\nSelecting priority MPNs...');
 
-  // Priority 1: Top-requested MPNs in inventory
+  // Priority 1: Top-requested MPNs in inventory (Thursday only)
   let added = 0;
-  for (const item of topRequested) {
-    if (selected.length >= limit) break;
-    if (addMPN(item.mpn, 'top_requested', 1, { rfqCount: item.rfqCount })) {
-      added++;
+  if (modeConfig.includeTopRequested) {
+    for (const item of topRequested) {
+      if (selected.length >= limit) break;
+      if (addMPN(item.mpn, 'top_requested', 1, { rfqCount: item.rfqCount })) {
+        added++;
+      }
     }
+    console.log(`  Priority 1 (top requested): ${added} added`);
+  } else {
+    console.log(`  Priority 1 (top requested): SKIPPED`);
   }
-  console.log(`  Priority 1 (top requested): ${added} added`);
 
   // Priority 2: High-value MFRs from inventory
   added = 0;
@@ -301,6 +329,7 @@ function main() {
   let limit = DEFAULT_LIMIT;
   let outputPath = null;
   let dryRun = true;
+  let mode = 'default';
 
   for (let i = 0; i < args.length; i++) {
     if (args[i] === '--limit' && args[i + 1]) {
@@ -310,6 +339,9 @@ function main() {
       outputPath = args[i + 1];
       dryRun = false;
       i++;
+    } else if (args[i] === '--mode' && args[i + 1]) {
+      mode = args[i + 1].toLowerCase();
+      i++;
     } else if (args[i] === '--dry-run') {
       dryRun = true;
     } else if (args[i] === '--help') {
@@ -317,12 +349,15 @@ function main() {
       console.log('');
       console.log('Options:');
       console.log('  --limit N      Number of MPNs to select (default: 200)');
+      console.log('  --mode MODE    Selection mode: monday | thursday | default');
+      console.log('                   monday: Skip hot parts (early week customer RFQs)');
+      console.log('                   thursday: Include hot parts (midweek price-check)');
       console.log('  --output FILE  Write selection to JSON file');
       console.log('  --dry-run      Preview selection without writing (default)');
       console.log('');
       console.log('Examples:');
       console.log('  node selection-engine.js --limit 200 --dry-run');
-      console.log('  node selection-engine.js --limit 200 --output batch.json');
+      console.log('  node selection-engine.js --limit 200 --mode monday --output batch.json');
       process.exit(0);
     }
   }
