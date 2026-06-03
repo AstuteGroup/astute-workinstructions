@@ -5,6 +5,39 @@
 - **OT (Orange Tsunami)** — Internal name for our system built on top of iDempiere
 - **CPC (Customer Part Code)** — Customer's internal part number. Also called Customer Part Number. "LAM CPC" = LAM's part code (redundant but common usage)
 
+## How to Send Emails
+
+**NEVER use the `mail` command directly.** The basic `mail` command sends from `analytics_user@<hostname>` which doesn't work properly for external recipients.
+
+**ALWAYS use the shared notifier system:**
+
+```javascript
+const { createNotifier } = require('./astute-workinstructions/shared/notifier');
+
+const notifier = createNotifier({
+  fromEmail: 'stockrfq@orangetsunami.com',  // or other OT email
+  fromName: 'Descriptive Name'
+});
+
+// Simple email
+await notifier.sendEmail('jake.harris@astutegroup.com', 'Subject', 'Body text');
+
+// With attachment
+await notifier.sendWithAttachment(
+  'jake.harris@astutegroup.com',
+  'Subject',
+  'Body text',
+  [{ filename: 'report.txt', path: '/path/to/file.txt' }]
+);
+```
+
+**Common sender addresses:**
+- `stockrfq@orangetsunami.com` - Stock RFQ operations, reports, general automation
+- `excess@orangetsunami.com` - Customer excess analysis
+- `vortex@orangetsunami.com` - Vortex matches, sourcing recap
+
+The notifier uses AWS WorkMail SMTP with credentials from `~/workspace/.env`. Works from `analytics_user` - other users route through writeback proxy (see `shared/writeback-proxy.md`).
+
 ## Recent Sessions
 
 - **2026-05-26 (VQ Unknown Vendor Exception + Cron Pause/Resume Planning)**: **Built exception for VQ loading when vendor BP doesn't exist in OT.** Instead of blocking on `needs_vendor`, can now load VQs with vendor name stored in `Chuboe_Note_User`. **Implementation:** (1) `vq-writer.js` — added `unknownVendorPlaceholderBpId` option; when BP resolution fails and option is set, use placeholder BP and prepend "Vendor: <name>" to notes. (2) `load-bulk-summary.js` — added parameter, passes through to writer. (3) `vq-loading.js` — added `UNKNOWN_VENDOR_PLACEHOLDER_BP_ID` constant with setup instructions. **Use case (Nordisk, UID 8655/8668):** 2 quotes stuck because Nordisk BP doesn't exist; operator requested "note vendor in VQ notes" instead of creating BP. **Setup required (one-time):** Create placeholder BP in OT (Name: "Unknown Vendor - Note in VQ", Search Key: "UNKNOWN-VENDOR-VQ-NOTE", Vendor Type: 1000010), set constant to BP ID. **Test script:** `oneoffs/test-unknown-vendor-nordisk-2026-05-26.js` shows manual load example. **Deferred:** Automatic reply detection for "note vendor in VQ notes" phrase (tomorrow). **Cron pause:** All background jobs paused at 22:51 UTC due to system overload concerns. **Resume plan documented** in `deferred-work.md`: 5-phase approach (assess backlog → clear old → utilities → agents staged → monitor). Decision points: skip archiving if <100 emails; stage agents or all-at-once; token budget cap. Commits: `599ba3c`, `81eea17`.
