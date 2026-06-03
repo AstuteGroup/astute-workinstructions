@@ -149,7 +149,24 @@ node "Trading Analysis/Market Profiling/exclusion-manager.js" clear --batch "AS-
 
 # Run active sourcing batch
 node "Trading Analysis/Market Profiling/active-sourcing-runner.js" --limit 10 --dry-run
+
+# Gate management (inventory upload confirmation)
+node "Trading Analysis/Market Profiling/active-sourcing-runner.js" --gate-status
+node "Trading Analysis/Market Profiling/active-sourcing-runner.js" --gate-open
+node "Trading Analysis/Market Profiling/active-sourcing-runner.js" --limit 200 --commit --force  # bypass gate
 ```
+
+### Inventory Upload Confirmation Gate
+
+Active Sourcing will NOT run automatically until inventory upload is confirmed:
+
+1. **Cron runs Mon/Thu at 8:30 AM CT** — checks for gate file
+2. **Gate closed (default):** Cron exits with "Waiting for inventory upload confirmation"
+3. **To open gate:** Jake forwards/replies to inventory upload email to stockrfq@ with "inventory uploaded" in subject
+4. **Gate open:** Cron proceeds with sourcing
+5. **After successful run:** Gate file consumed — next run waits for new confirmation
+
+This ensures Active Sourcing doesn't run against stale inventory data.
 
 ### Schedule
 
