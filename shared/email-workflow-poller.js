@@ -289,9 +289,61 @@ function isInternalAddress(addr) {
 }
 
 // ─── COMMAND: list ───────────────────────────────────────────────────────────
+//
+// SELF-HEALING: Before listing UNSEEN emails, this command automatically
+// recovers any "stuck" emails — messages that were read (marked SEEN) but
+// never routed out of the source folder. This happens when an agent crashes,
+// times out, or is paused mid-processing.
+//
+// Recovery window: emails between 60 minutes and 24 hours old get auto-recovered.
+// - Under 60 minutes: might still be in-flight (agent processing)
+// - Over 24 hours: too old, probably intentionally marked as read (spam/test/etc.)
+//   → flagged in Operations Digest for manual review, not auto-recovered.
+
+const STUCK_MIN_AGE_MINS = 60;       // Don't recover if newer than this (might be in-flight)
+const STUCK_MAX_AGE_MINS = 24 * 60;  // Don't auto-recover if older than this (needs manual review)
+
+async function recoverStuckEmailsIfNeeded(client) {
+  const minCutoff = new Date(Date.now() - STUCK_MIN_AGE_MINS * 60 * 1000);  // 60 min ago
+  const maxCutoff = new Date(Date.now() - STUCK_MAX_AGE_MINS * 60 * 1000);  // 24 hours ago
+  const seenUids = (await client.search({ seen: true }, { uid: true })) || [];
+  if (seenUids.length === 0) return 0;
+
+  const stuckUids = [];
+  for await (const msg of client.fetch(seenUids, { envelope: true }, { uid: true })) {
+    const env = msg.envelope || {};
+    const msgDate = env.date ? new Date(env.date) : null;
+    // Only recover emails in the window: older than 60 min but newer than 24 hours
+    if (msgDate && msgDate < minCutoff && msgDate > maxCutoff) {
+      stuckUids.push(msg.uid);
+    }
+  }
+
+  if (stuckUids.length === 0) return 0;
+
+  // Clear SEEN flag on stuck emails so they'll be picked up by the normal list
+  let recovered = 0;
+  for (const uid of stuckUids) {
+    try {
+      await client.messageFlagsRemove(String(uid), ['\\Seen'], { uid: true });
+      recovered++;
+      console.error(`[poller] Recovered stuck email UID ${uid} (cleared SEEN flag)`);
+    } catch (err) {
+      console.error(`[poller] Failed to recover UID ${uid}: ${err.message}`);
+    }
+  }
+
+  return recovered;
+}
 
 async function cmdList() {
   const envelopes = await withInbox(async (client) => {
+    // Self-healing: recover any stuck emails before listing
+    const recovered = await recoverStuckEmailsIfNeeded(client);
+    if (recovered > 0) {
+      console.error(`[poller] Auto-recovered ${recovered} stuck email(s)`);
+    }
+
     const uids = (await client.search({ seen: false }, { uid: true })) || [];
     if (uids.length === 0) return [];
     const out = [];
@@ -542,6 +594,123 @@ async function cmdRoute(uid, actionName, payload) {
   console.log(JSON.stringify(result, null, 2));
 }
 
+// ─── COMMAND: recover-stuck ───────────────────────────────────────────────────
+//
+// Finds SEEN emails still in the source folder that are older than a threshold
+// (default 60 minutes). These are "stuck" — they were read by the agent but
+// never routed (agent crashed, timed out, or was paused mid-processing).
+//
+// Recovery action: clear the SEEN flag so the email shows up in the next `list`
+// call and gets re-processed.
+//
+// Usage: email-workflow-poller.js recover-stuck --workflow <name> [--threshold-mins 60] [--dry-run]
+
+async function cmdRecoverStuck() {
+  const thresholdIdx = argv.indexOf('--threshold-mins');
+  const thresholdMins = thresholdIdx >= 0 ? parseInt(argv[thresholdIdx + 1], 10) : 60;
+  const cutoffTime = new Date(Date.now() - thresholdMins * 60 * 1000);
+
+  const result = await withInbox(async (client) => {
+    // Search for SEEN emails (opposite of our normal UNSEEN search)
+    const seenUids = (await client.search({ seen: true }, { uid: true })) || [];
+    if (seenUids.length === 0) {
+      return { stuck: [], recovered: [], message: 'No SEEN emails in source folder' };
+    }
+
+    // Fetch envelopes to check dates
+    const stuck = [];
+    for await (const msg of client.fetch(seenUids, { envelope: true }, { uid: true })) {
+      const env = msg.envelope || {};
+      const msgDate = env.date ? new Date(env.date) : null;
+      if (msgDate && msgDate < cutoffTime) {
+        stuck.push({
+          uid: msg.uid,
+          subject: env.subject || '',
+          from: env.from && env.from[0] ? `${env.from[0].mailbox || ''}@${env.from[0].host || ''}` : '',
+          date: msgDate.toISOString(),
+          ageMinutes: Math.round((Date.now() - msgDate.getTime()) / 60000),
+        });
+      }
+    }
+
+    if (stuck.length === 0) {
+      return { stuck: [], recovered: [], message: `No SEEN emails older than ${thresholdMins} minutes` };
+    }
+
+    // Clear SEEN flag on stuck emails (unless dry-run)
+    const recovered = [];
+    if (!DRY_RUN) {
+      for (const email of stuck) {
+        try {
+          await client.messageFlagsRemove(String(email.uid), ['\\Seen'], { uid: true });
+          recovered.push(email.uid);
+        } catch (err) {
+          console.error(`[poller] failed to clear SEEN on UID ${email.uid}: ${err.message}`);
+        }
+      }
+    }
+
+    return {
+      stuck,
+      recovered: DRY_RUN ? [] : recovered,
+      wouldRecover: DRY_RUN ? stuck.map(e => e.uid) : [],
+      message: DRY_RUN
+        ? `Would clear SEEN flag on ${stuck.length} stuck email(s)`
+        : `Cleared SEEN flag on ${recovered.length} stuck email(s)`,
+      thresholdMins,
+      dryRun: DRY_RUN,
+    };
+  });
+
+  console.log(JSON.stringify(result, null, 2));
+}
+
+// ─── COMMAND: check-stuck ─────────────────────────────────────────────────────
+//
+// Like recover-stuck but read-only. Returns stuck email info without modifying
+// anything. Useful for monitoring/alerting (e.g., Operations Digest).
+//
+// Usage: email-workflow-poller.js check-stuck --workflow <name> [--threshold-mins 60]
+
+async function cmdCheckStuck() {
+  const thresholdIdx = argv.indexOf('--threshold-mins');
+  const thresholdMins = thresholdIdx >= 0 ? parseInt(argv[thresholdIdx + 1], 10) : 60;
+  const cutoffTime = new Date(Date.now() - thresholdMins * 60 * 1000);
+
+  const result = await withInbox(async (client) => {
+    const seenUids = (await client.search({ seen: true }, { uid: true })) || [];
+    if (seenUids.length === 0) {
+      return { stuck: [], count: 0, workflow: WORKFLOW_NAME, sourceFolder: SOURCE_FOLDER };
+    }
+
+    const stuck = [];
+    for await (const msg of client.fetch(seenUids, { envelope: true }, { uid: true })) {
+      const env = msg.envelope || {};
+      const msgDate = env.date ? new Date(env.date) : null;
+      if (msgDate && msgDate < cutoffTime) {
+        stuck.push({
+          uid: msg.uid,
+          subject: (env.subject || '').slice(0, 60),
+          from: env.from && env.from[0] ? `${env.from[0].mailbox || ''}@${env.from[0].host || ''}` : '',
+          date: msgDate.toISOString(),
+          ageMinutes: Math.round((Date.now() - msgDate.getTime()) / 60000),
+        });
+      }
+    }
+
+    return {
+      stuck,
+      count: stuck.length,
+      workflow: WORKFLOW_NAME,
+      sourceFolder: SOURCE_FOLDER,
+      inbox: INBOX,
+      thresholdMins,
+    };
+  });
+
+  console.log(JSON.stringify(result, null, 2));
+}
+
 // ─── MAIN ────────────────────────────────────────────────────────────────────
 
 (async () => {
@@ -564,7 +733,25 @@ async function cmdRoute(uid, actionName, payload) {
       }
       return await cmdRoute(uid, actionName, payload);
     }
-    console.error('Usage: email-workflow-poller.js (list | read <uid> | download-attachments <uid> [--include-images] | route <uid> <action> --payload <json|file>) --workflow <name> [--dry-run]');
+    if (cmd === 'recover-stuck') return await cmdRecoverStuck();
+    if (cmd === 'check-stuck') return await cmdCheckStuck();
+    console.error('Usage: email-workflow-poller.js <command> --workflow <name> [options]');
+    console.error('');
+    console.error('Commands:');
+    console.error('  list                           List UNSEEN emails as JSON');
+    console.error('  read <uid>                     Read full email as JSON');
+    console.error('  download-attachments <uid>     Save attachments to temp dir');
+    console.error('  route <uid> <action>           Execute routing decision');
+    console.error('  check-stuck                    Check for stuck (SEEN but not routed) emails');
+    console.error('  recover-stuck                  Clear SEEN flag on stuck emails for reprocessing');
+    console.error('');
+    console.error('Options:');
+    console.error('  --workflow <name>              Required; resolves to workflow-actions/<name>.js');
+    console.error('  --dry-run                      Preview without modifying state');
+    console.error('  --threshold-mins <N>           For stuck commands: age threshold (default 60)');
+    console.error('  --include-images               For download-attachments: include image files');
+    console.error('  --payload <json|file>          For route: action payload');
+    console.error('');
     console.error('Architecture: ~/workspace/astute-workinstructions/email-workflow-architecture.md');
     process.exit(2);
   } catch (err) {
