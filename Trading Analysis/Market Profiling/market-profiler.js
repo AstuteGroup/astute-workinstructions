@@ -178,9 +178,9 @@ async function getOrCreateProfilingRFQ() {
   }
 
   // Create new RFQ
-  // Using Astute Electronics Inc (BP ID 1000000) as the profiling customer
+  // Using Astute Electronics Inc (BP ID 1000332) as the profiling customer
   const payload = {
-    C_BPartner_ID: 1000000, // Astute Electronics Inc
+    C_BPartner_ID: 1000332, // Astute Electronics Inc
     Chuboe_RFQ_Type_ID: 1000007, // Stock
     SalesRep_ID: 1000004, // Jake Harris
     R_Status_ID: 1000022, // New
