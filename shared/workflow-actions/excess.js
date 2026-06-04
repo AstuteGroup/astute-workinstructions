@@ -69,7 +69,8 @@ function shouldGateRoute(offerType) {
  *   sourceUid (for breadcrumb traceability)
  */
 async function action_load_offer(payload, ctx) {
-  const { bpartnerId, offerType, lines, description, sourceUid, partnerName } = payload;
+  const { bpartnerId, offerType, lines, description, sourceUid, partnerName,
+          originalSender, originalCc, originalSubject } = payload;
 
   if (ctx.dryRun) {
     return {
@@ -239,6 +240,50 @@ async function action_load_offer(payload, ctx) {
       });
     } catch (e) {
       console.error(`[excess.load_offer] offer-router.dispatch failed for offer ${result.offerId}: ${e.message}`);
+    }
+  }
+
+  // ── Send confirmation email to original sender + CC + Jake ─────────────────
+  // Only if we have an original sender and the offer was successfully written.
+  if (originalSender && result.offerId && !ctx.dryRun) {
+    try {
+      const confirmSubject = originalSubject
+        ? `Re: ${originalSubject}`
+        : `Market Offer ${result.searchKey} loaded`;
+      const confirmBody = `Thank you for submitting the excess offer.
+
+Partner: ${partnerName || '(unknown)'}
+Market Offer #: ${result.searchKey}
+Lines loaded: ${result.linesWritten}
+
+This offer has been loaded into Orange Tsunami and is now available for matching against open RFQs.
+
+— Excess Offer System (automated)`;
+
+      // CC: original CC recipients + Jake
+      const ccList = [];
+      if (Array.isArray(originalCc)) {
+        ccList.push(...originalCc.filter(e => e && !e.includes('excessinc@')));
+      }
+      if (ctx.jakeEmail && !ccList.includes(ctx.jakeEmail)) {
+        ccList.push(ctx.jakeEmail);
+      }
+
+      await ctx.notifier.sendEmail(originalSender, confirmSubject, confirmBody, {
+        cc: ccList.length > 0 ? ccList : undefined,
+      });
+
+      breadcrumbs.write({
+        cog: 'offer-poller',
+        event: 'confirmation-sent',
+        uid: ctx.uid,
+        offerId: result.offerId,
+        searchKey: result.searchKey,
+        to: originalSender,
+        cc: ccList,
+      });
+    } catch (e) {
+      console.error(`[excess.load_offer] confirmation email failed: ${e.message}`);
     }
   }
 
