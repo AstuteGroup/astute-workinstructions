@@ -148,12 +148,9 @@ The SessionStart greeting reads this file and surfaces all open items, sorted by
     3. Verify the row landed and the dup/match LEFT JOIN now shows the MPN.
   - **Created / source:** 2026-05-26 stockrfq cron tick. The header+line carry the demand qty; only the MPN string is missing.
 
-- [ ] 🟢 **vq-loading: agent-prompt rule for "cited RFQ active but zero MPN overlap"** *(opened 2026-05-25, surfaced from UID 8667 Savings Ribbon bounce)*
+- [x] ✅ **vq-loading: agent-prompt rule for "cited RFQ active but zero MPN overlap"** *(opened 2026-05-25, surfaced from UID 8667 Savings Ribbon bounce)* — **DONE 2026-06-04**
   - **Context:** UID 8667 — Ivy forwarded a Savings Ribbon email citing RFQ 1128025 (Plexus/108 ADI lines). Agent verified the cite had ZERO of the email's 13 Sanmina MPNs, MPN-matched to RFQ 1121675 (Sanmina, unique complete match), then bounced because the prompt says "cited wins when both active" (`agent-prompt.txt:319`). Agent was being more cautious than the prompt actually required.
-  - **Why blocked:** non-urgent — Ivy/Jake confirmed 1121675 on reply, work was already loaded via UID 8661. But the next similar case will re-bounce.
-  - **Ready when:** any future session.
-  - **How:** Add a symmetric rule to `agent-prompt.txt` (alongside line 317's inactive-cite fall-through): "If cited RFQ is active but has ZERO MPN overlap with extracted parts AND MPN matching yields a clean unique complete match → trust the MPN match. Stamp `vendorNotes` on each quote: `cited RFQ <X> overruled — zero MPN overlap; MPN-matched to <Y>`. Only the unique-complete-match case auto-resolves; partial overlap still bounces."
-  - **Related:** PR #2 (https://github.com/AstuteGroup/astute-workinstructions/pull/2) fixed the misleading email body. This is the upstream "don't bounce in the first place" fix.
+  - **Resolution:** Added `EXCEPTION — Cited RFQ has ZERO MPN overlap` rule to agent-prompt.txt at line 321. When cited RFQ has zero overlap with extracted MPNs AND MPN matching finds a clean unique match → trust the MPN match, stamp vendorNotes with `'cited RFQ <X> overruled — zero MPN overlap; MPN-matched to <Y>'`. Also added rule (h) for missing qty → default to RFQ line qty. Triggered by UID 8761 (Wetech EPM parts).
 
 - [ ] 🟢 **vq-loading: cross-UID duplicate-email detection for same-content forwards** *(opened 2026-05-25, surfaced from UID 8667 Savings Ribbon)*
   - **Context:** Savings Ribbon was already loaded to RFQ 1121675 via UID 8661 (34 VQs). UID 8667 was a sibling forward of the same email that bounced without realizing UID 8661 had already covered it. The natural-key dedup at the writer level catches duplicate VQ writes, but the agent still spent a tick + emitted a needs_review escalation that wasn't needed.

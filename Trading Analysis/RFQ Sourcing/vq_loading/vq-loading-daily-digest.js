@@ -230,6 +230,50 @@ function pullTopBuyersPerLoader(sinceTs, untilTs, emailBatchRfqs) {
   return m;
 }
 
+// ─── Buyer activity breakdown ────────────────────────────────────────────────
+// For each buyer, shows how many VQs were loaded by Claude vs support vs self.
+// Returns array of { buyerId, buyerName, byClaude, bySupport, bySelf, total }
+function pullBuyerActivityBreakdown(sinceTs, untilTs, emailBatchRfqs) {
+  const inClause = emailBatchRfqs.length
+    ? emailBatchRfqs.map(r => `'${r}'`).join(',')
+    : `''`;
+  // Categorize each VQ by loader type, then pivot by buyer.
+  const sql =
+    `WITH categorized AS ( ` +
+    `SELECT v.chuboe_vq_line_id, v.chuboe_buyer_id, v.createdby, ` +
+    `CASE ` +
+    `  WHEN v.createdby = ${CLAUDE_USER_ID} THEN 'claude' ` +
+    `  WHEN v.createdby = v.chuboe_buyer_id THEN 'self' ` +
+    `  ELSE 'support' END AS loader_type ` +
+    `FROM adempiere.chuboe_vq_line v ` +
+    `JOIN adempiere.chuboe_rfq_line rl ON v.chuboe_rfq_line_id = rl.chuboe_rfq_line_id ` +
+    `JOIN adempiere.chuboe_rfq r ON rl.chuboe_rfq_id = r.chuboe_rfq_id ` +
+    `WHERE v.created >= '${sinceTs}'::timestamp AND v.created < '${untilTs}'::timestamp ` +
+    `AND v.isactive='Y' AND v.chuboe_buyer_id IS NOT NULL ` +
+    `) ` +
+    `SELECT c.chuboe_buyer_id, bu.name AS buyer_name, ` +
+    `SUM(CASE WHEN loader_type = 'claude' THEN 1 ELSE 0 END) AS by_claude, ` +
+    `SUM(CASE WHEN loader_type = 'support' THEN 1 ELSE 0 END) AS by_support, ` +
+    `SUM(CASE WHEN loader_type = 'self' THEN 1 ELSE 0 END) AS by_self, ` +
+    `COUNT(*) AS total ` +
+    `FROM categorized c ` +
+    `LEFT JOIN adempiere.ad_user bu ON bu.ad_user_id = c.chuboe_buyer_id ` +
+    `GROUP BY c.chuboe_buyer_id, bu.name ` +
+    `ORDER BY total DESC;`;
+  const out = psqlPipe(sql);
+  return out.trim().split('\n').filter(Boolean).map(line => {
+    const [buyerId, buyerName, byClaude, bySupport, bySelf, total] = line.split('|');
+    return {
+      buyerId: buyerId ? Number(buyerId) : null,
+      buyerName: buyerName || '(unknown)',
+      byClaude: Number(byClaude) || 0,
+      bySupport: Number(bySupport) || 0,
+      bySelf: Number(bySelf) || 0,
+      total: Number(total) || 0,
+    };
+  });
+}
+
 // Returns 'Buyer' / 'Support' / 'Untagged' / '(Claude)' for the role column.
 function roleFor(loaderName, userId) {
   if (loaderName.startsWith('Claude')) return '(Claude)';
@@ -422,6 +466,7 @@ function lookupUserNames(userIds) {
   // 7. Activity by loader (mixed counting rule) + top buyers per loader
   const activity = pullActivity(sinceTs, untilTs, allBatchRfqs);
   const topBuyers = pullTopBuyersPerLoader(sinceTs, untilTs, allBatchRfqs);
+  const buyerBreakdown = pullBuyerActivityBreakdown(sinceTs, untilTs, allBatchRfqs);
 
   // Apply "hide zero" rule for Claude buckets
   const claudeBucketNames = new Set([
@@ -456,6 +501,31 @@ ${activityShown.map(a => {
 </tbody>
 </table>
 <p style="color:#666;font-size:11px;margin-top:4px"><i>Counting rule: <b>Claude as buyer</b> uses COUNT(DISTINCT (rfq_line × vendor)) because API responses fan-out stock + lead-time + qty-break variants per (vendor, part); all other loaders use raw row count because each row is a distinct stock batch from the vendor. Claude buckets with 0 activity are hidden. <b>Top 3 Buyers</b> = chuboe_buyer_id on the VQs — who each loader is loading on behalf of.</i></p>
+
+<h3 style="margin-bottom:4px">Buyer Activity Breakdown</h3>
+<p style="margin-top:0;color:#666;font-size:11px">For each buyer, how their VQs were loaded: by Claude, by support staff, or by themselves.</p>
+<table border="1" cellpadding="6" cellspacing="0" style="border-collapse:collapse;font-size:12px;min-width:600px">
+<thead style="background:#eef"><tr><th align="left">Buyer</th><th align="right">By Claude</th><th align="right">By Support</th><th align="right">By Self</th><th align="right">Total</th><th align="left">Mix</th></tr></thead>
+<tbody>
+${buyerBreakdown.filter(b => b.total > 0).slice(0, 20).map(b => {
+  const claudePct = b.total > 0 ? Math.round(100 * b.byClaude / b.total) : 0;
+  const supportPct = b.total > 0 ? Math.round(100 * b.bySupport / b.total) : 0;
+  const selfPct = b.total > 0 ? Math.round(100 * b.bySelf / b.total) : 0;
+  // Visual bar showing proportions
+  const barWidth = 100;
+  const claudeW = Math.round(barWidth * b.byClaude / b.total);
+  const supportW = Math.round(barWidth * b.bySupport / b.total);
+  const selfW = barWidth - claudeW - supportW;
+  const bar = `<span style="display:inline-block;width:${barWidth}px;height:12px;background:#eee;border-radius:2px;overflow:hidden">` +
+    (claudeW > 0 ? `<span style="display:inline-block;width:${claudeW}px;height:100%;background:#4a4" title="Claude ${claudePct}%"></span>` : '') +
+    (supportW > 0 ? `<span style="display:inline-block;width:${supportW}px;height:100%;background:#88c" title="Support ${supportPct}%"></span>` : '') +
+    (selfW > 0 ? `<span style="display:inline-block;width:${selfW}px;height:100%;background:#ca4" title="Self ${selfPct}%"></span>` : '') +
+    `</span>`;
+  return `<tr><td>${esc(b.buyerName)}</td><td style="text-align:right;color:#4a4">${b.byClaude || '—'}</td><td style="text-align:right;color:#88c">${b.bySupport || '—'}</td><td style="text-align:right;color:#ca4">${b.bySelf || '—'}</td><td style="text-align:right"><b>${b.total}</b></td><td>${bar}</td></tr>`;
+}).join('\n')}
+</tbody>
+</table>
+<p style="color:#666;font-size:11px;margin-top:4px"><i>Legend: <span style="color:#4a4">■ Claude</span> · <span style="color:#88c">■ Support</span> · <span style="color:#ca4">■ Self</span>. "Self" = buyer loaded their own VQs (createdby = chuboe_buyer_id). Top 20 buyers by volume shown.</i></p>
 `;
 
   if (batches.length > 0) {

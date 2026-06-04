@@ -318,6 +318,15 @@ Validate the RFQ exists and is active:
 
 **If the subject-cited RFQ is active AND MPN matching also finds different active RFQs:** the subject is the authoritative target (operator's explicit reference). Use it as the primary. Apply multi-write fan-out (step 3.6.4) only if MPN matching surfaces ADDITIONAL active RFQs within 30 days — those become secondaries.
 
+**EXCEPTION — Cited RFQ has ZERO MPN overlap:** If the subject-cited or body-cited RFQ is active but NONE of the extracted MPNs appear on that RFQ's lines, AND MPN matching (step 3.6.3) finds a clean unique match to a DIFFERENT active RFQ, **trust the MPN match**. The cite was likely a copy-paste error, a mis-forward, or stale reference. Rules:
+  - "Zero overlap" means: query the cited RFQ's lines for the extracted MPNs, get 0 rows.
+  - "Clean unique match" means: MPN matching returns exactly 1 active RFQ that HAS the extracted MPNs.
+  - When this fires: use the MPN-matched RFQ as the target. Stamp `vendorNotes` on each quote: `'cited RFQ <X> overruled — zero MPN overlap; MPN-matched to <Y>'`.
+  - If MPN matching returns multiple candidates (not unique), still escalate — the zero-overlap cite doesn't resolve the ambiguity.
+  - If MPN matching returns 0 RFQs (none found), still escalate — the cite is wrong and there's no fallback.
+
+**Why this exists:** UID 8761 was assigned to RFQ 1133158 (from subject/body) but the extracted MPNs (EPM3064ATI44-10N, EPM7128STI100-10N) had ZERO overlap with 1133158 — they were actually on RFQ 1135874 lines 40/50/60. Agent correctly identified this but bounced instead of loading to 1135874.
+
 ────────────────────────────────────────────
 3.7 — TWO-AGENT VALIDATION (mandatory — do NOT skip).
 ────────────────────────────────────────────
@@ -541,7 +550,21 @@ Apply these recovery steps in order. Each one is a "before you bounce, try this"
 
   (g) **Vendor ambiguous on Type 2 (name-only) → name-based fuzzy plus context.** When Type 2 body has a short vendor name with multiple BP matches (e.g., "Poplar" → multiple "Poplar" BPs in OT), use any context from the body (geographic hints, prior quotes from the same broker compiled by the same operator) to pick. If still ambiguous, route `clarify_vendor` per step 3.8 — but with all candidate BPs in the payload so the operator's reply directly disambiguates.
 
-**The rule:** if any of (a)-(g) recovers a viable load path, take it. `needs_review` should be reserved for cases where required data is genuinely absent or genuinely ambiguous after all recoveries — not for the routine inconveniences (a)-(g) handle.
+  (h) **Missing qty → default to RFQ line qty.** When a supplier quote includes price but no explicit quantity, the supplier is implicitly quoting the RFQ's requested quantity. This is standard broker behavior — they respond to the RFQ as-is without restating the qty.
+
+     **Procedure:**
+     - If the MPN-match step (3.6.3) resolved a specific RFQ line, that line's `qty` field is the default.
+     - If the quote spans multiple RFQ lines (same MPN on multiple lines), use the qty from the matched line — each line is treated independently.
+     - Stamp `vendorNotes` with `'qty defaulted to RFQ line qty (<N>) — supplier did not specify'` for audit.
+
+     **When NOT to apply:**
+     - Supplier explicitly states a different qty (e.g., "have 500 in stock" when RFQ asks for 1000) — use their stated qty.
+     - Supplier says "stock" or "avail" without a number — that's NOT a qty; still default to RFQ qty and set `leadTime: "stock"`.
+     - No RFQ match at all (step 3.6.3 returned 0 rows) — cannot infer qty, escalate as normal.
+
+     **Why this exists:** UID 8761 bounced because Wetech quoted EPM3064ATI44-10N at $33/$35.95 with date codes but no qty — agent correctly found RFQ 1135874 lines 40/50/60 have these MPNs with known quantities, but bounced for "missing qty" instead of using the RFQ qty. Brokers responding to RFQs rarely restate the qty.
+
+**The rule:** if any of (a)-(h) recovers a viable load path, take it. `needs_review` should be reserved for cases where required data is genuinely absent or genuinely ambiguous after all recoveries — not for the routine inconveniences (a)-(h) handle.
 
 **ALWAYS include `investigation_summary` on escalation payloads.** When routing any escalation action (`need_info_vendor`, `clarify_vendor`, `needs_vendor`, `needs_review`), include a payload field `investigation_summary` with a 1-2 sentence summary of what you tried before bouncing. Examples:
 
