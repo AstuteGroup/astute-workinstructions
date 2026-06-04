@@ -80,6 +80,23 @@ function enqueue(payload) {
   const lineCount = payload.lines.length;
   const id = `rfqload-${Date.now()}-${crypto.randomBytes(4).toString('hex')}`;
 
+  // In-flight Message-ID dedup. If the same source email is already queued
+  // or loading, return the existing job ID rather than creating a duplicate.
+  // Defends against the race where action_enqueue runs twice (manual replay,
+  // sidecar reply re-routing) before the daemon's `rfq-loaded` breadcrumb
+  // exists — at that point the handler-level breadcrumb check can't help.
+  // See shared/workflow-actions/rfq-loading.js for the completed-load path.
+  const data = loadQueue();
+  if (payload.messageId) {
+    const existing = data.items.find(it =>
+      (it.status === 'queued' || it.status === 'loading') &&
+      it.payload && it.payload.messageId === payload.messageId
+    );
+    if (existing) {
+      return existing.id;
+    }
+  }
+
   const item = {
     id,
     status: 'queued',
@@ -99,7 +116,6 @@ function enqueue(payload) {
     payload,
   };
 
-  const data = loadQueue();
   data.items.push(item);
   saveQueue(data);
 

@@ -51,6 +51,7 @@
 const { execFileSync } = require('child_process');
 const { writeVQFromAPI } = require('./vq-writer');
 const { resolveBP } = require('./api-client');
+const { resolveBPHistorical } = require('./partner-lookup');
 const logger = require('./logger').createLogger('LoadBulkSummary');
 
 // Currency ISO code → C_Currency_ID. Verified against c_currency (2026-05-14).
@@ -152,12 +153,22 @@ function matchMpnToLine(quotedMpn, lines) {
       if (normalizeMpnForMatch(m.mpn) === target) return { ...ln, matchedMpn: m.mpn };
     }
   }
-  // Partial: target is a prefix of an accepted MPN, or vice versa, with min overlap of 8 chars
+  // Partial: one MPN is a strict prefix of the other (packaging suffix etc.).
+  //
+  // Threshold: the SHORTER side must be ≥ 6 chars. Symmetric ≥8 (the older
+  // gate) over-rejected — RFQ MPNs like FSM17PL (7 chars) couldn't accept
+  // any cross-ref offer because the length check failed before the prefix
+  // check ran (UID 8541, Ivy 5/21 — Wellida FSM17PL-TP rejected upstream of
+  // the writer's cross-ref classifier). Asymmetric ≥6 keeps the false-
+  // positive guard (no 3-4 char prefix collisions) while admitting real
+  // packaging-variant cross-refs. The writer's cross-ref classifier is the
+  // downstream gate that decides auto-approve vs. flag.
   for (const ln of lines) {
     for (const m of ln.mpns) {
       const accepted = normalizeMpnForMatch(m.mpn);
-      if (accepted.length >= 8 && target.length >= 8) {
-        if (accepted.startsWith(target) || target.startsWith(accepted)) {
+      if (accepted.startsWith(target) || target.startsWith(accepted)) {
+        const shorter = Math.min(accepted.length, target.length);
+        if (shorter >= 6) {
           return { ...ln, matchedMpn: m.mpn, fuzzy: true };
         }
       }
@@ -215,7 +226,22 @@ async function loadBulkSummary({ rfqSearchKey, buyerId, quotes, dryRun = false }
     }
 
     // b. Resolve vendor BP (search key first, name fallback)
-    const bp = await resolveBP(q.vendorSearchKey, q.vendorName);
+    let bp = await resolveBP(q.vendorSearchKey, q.vendorName);
+
+    // b'. Historical fallback for short broker labels that the strict name
+    // resolver can't tokenize ("Yuexunfa" vs "YUE XUN FA INTERNATIONAL
+    // LIMITED"). Queries recent VQ history for a uniquely-matching BP and
+    // reuses it. See shared/partner-lookup.js resolveBPHistorical(). Only
+    // fires when (a) the agent did NOT supply a searchKey and (b) the
+    // primary resolver returned nothing.
+    if (!bp && !q.vendorSearchKey && q.vendorName) {
+      const hist = resolveBPHistorical(q.vendorName);
+      if (hist) {
+        logger.info(`Historical BP fallback: '${q.vendorName}' → ${hist.id} (${hist.name}) [${hist.vqCount} VQs in last ${hist.lookbackDays}d]`);
+        bp = { id: hist.id, name: hist.name, searchKey: hist.searchKey };
+      }
+    }
+
     if (!bp) {
       skipped.push({ ...q, reason: 'VENDOR_NOT_FOUND', detail: `${q.vendorName || q.vendorSearchKey} not in BP table` });
       continue;
@@ -275,8 +301,28 @@ async function loadBulkSummary({ rfqSearchKey, buyerId, quotes, dryRun = false }
           vqLineId: w.vqLineId, line: lineMatch.lineNo, mpn: q.mpn,
           vendor: bp.name, cost: q.cost, qty: q.qty,
           fuzzyMatch: !!lineMatch.fuzzy,
+          // Preserve the agent's original vendor label so handler-level
+          // clarify-suppression can exact-match agent labels (e.g., the
+          // 'Savilter' typo on UID 8563) without depending on canonical-name
+          // substring/fuzzy matching downstream.
+          originalVendorLabel: q.vendorName || q.vendorSearchKey || null,
+          bpId: bp.id,
         });
         writtenByLine.set(lineMatch.lineNo, (writtenByLine.get(lineMatch.lineNo) || 0) + 1);
+      } else if (result.skipped && result.skipped.length > 0) {
+        // writeVQFromAPI routes pre-existing duplicates (and other intentional
+        // no-writes) to skipped[]. Surface that bucket here — otherwise the
+        // breadcrumb mis-counts duplicates as `failed`, which is exactly what
+        // bit UID 8541 (RFQ 1133479) on 5/21: 58 dups from the 5/20 sister
+        // load came back as `failed: 73, detail: unknown` because this branch
+        // wasn't reading result.skipped[].
+        const s = result.skipped[0];
+        skipped.push({
+          ...q,
+          reason: s.reason || 'WRITER_SKIPPED',
+          detail: s.detail || `Writer skipped: ${s.reason || 'unknown'}`,
+          vqLineId: s.vqLineId || null,
+        });
       } else {
         const flagDetail = result.flagged.concat(result.failed);
         failed.push({

@@ -349,10 +349,14 @@ async function cmdRoute(uid, actionName, payload) {
   const folder = action.folder;
   const result = { uid, workflow: WORKFLOW_NAME, action: actionName, folder };
 
-  // Fetch the current message's Message-ID + references so we can determine
-  // the thread anchor for reply-stitching state management.
+  // Fetch the current message's Message-ID + references + envelope From so we
+  // can determine the thread anchor for reply-stitching state management AND
+  // give the handler a deterministic envelope-From for escalation routing
+  // (agent-supplied outerFrom drifts under load — see UID 8598, 2026-05-22).
   let currentMessageId = null;
   let currentReferences = [];
+  let currentFrom = null;
+  let currentCc = '';
   try {
     await withInbox(async (client) => {
       const msg = await client.fetchOne(String(uid), { source: true }, { uid: true });
@@ -366,6 +370,12 @@ async function cmdRoute(uid, actionName, payload) {
           ? refsRaw
           : (typeof refsRaw === 'string' ? refsRaw.split(/\s+/).filter(Boolean) : []);
         if (parsed.inReplyTo) currentReferences.push(parsed.inReplyTo);
+        // Envelope From — single address, lowercased. simpleParser returns
+        // parsed.from.value[0].address for the standard single-sender case.
+        if (parsed.from && parsed.from.value && parsed.from.value[0] && parsed.from.value[0].address) {
+          currentFrom = String(parsed.from.value[0].address).toLowerCase();
+        }
+        currentCc = (parsed.cc && parsed.cc.text) || '';
       }
     });
   } catch (e) {
@@ -394,6 +404,12 @@ async function cmdRoute(uid, actionName, payload) {
     anchorMessageId,
     currentMessageId,
     currentReferences,
+    currentFrom,         // envelope From (lowercased) — authoritative; use
+                         // this for escalation routing, not agent-supplied
+                         // outerFrom which can drift on complex forwards.
+    currentCc,           // envelope Cc header text — handler uses this to
+                         // decide whether the buyer was already on the chain
+                         // and should be included on escalation emails.
     pendingSidecar: existingSidecar,
   };
 

@@ -1,0 +1,6 @@
+{
+  "_comment": "Curated vendor-label aliases for acronyms / initialisms / hard typos that resolveBP's strict + Levenshtein + historical-VQ tiers can't catch. Each entry maps a label to a c_bpartner.value (search_key), NOT a name — the search-key path in resolveBP is exact-match and avoids the iDempiere REST 500s that hit when canonical names contain special chars (parentheses, commas, periods).",
+  "_format": "Keys are uppercased + whitespace-collapsed for case/space-insensitive lookup. Values are objects { searchKey, name } — searchKey is what resolveBP uses to look up the BP; name is human-readable annotation so future maintainers can spot-check.",
+  "_governance": "Add an entry only when (a) operator has confirmed the mapping at least once (e.g., via clarify reply), AND (b) the historical-VQ fallback can't catch it (label doesn't appear as a substring of the canonical name, e.g. acronyms like XJH). Remove if the BP record is renamed.",
+  "XJH": { "searchKey": "1003910", "name": "Xin Jun Hong (HK) Industry Co., Ltd" }
+}

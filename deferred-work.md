@@ -26,6 +26,75 @@ The SessionStart greeting reads this file and surfaces all open items, sorted by
 
 ### Active workstreams (next session pickup)
 
+- [ ] 🟢 **vq-loading → rfq-loading forward delivery — verify SMTP path** *(opened 2026-05-23, surfaced during UID 8630 live test)*
+  - **Context:** First live exercise of the new `forward_to_rfq_loading` action (commit `cb1ceb9`) on UID 8630 fired correctly on the vq-loading side at 2026-05-22T23:56:50Z — sidecar `~/workspace/.vq-loading-pending/vq-forward-8630.json` parked 30 quotes with correlation MID `<vq-forward-8630-1779494210267@orangetsunami.com>`. The `vq-loading-resumer` cron is polling correctly (`waiting=1` every 10m). BUT: the forwarded email does not appear to have landed in `rfqloading@orangetsunami.com` inbox — `himalaya envelope list --account rfqloading` shows no matching subject, and there's no `rfq-loading-agent` breadcrumb activity for our MID.
+  - **Why blocked:** unverified whether the send actually succeeded or failed silently. The notifier's `sendEmail` returns `false` on SMTP failure but the handler doesn't check the return value (just `await ctx.notifier.sendEmail(...)`). Three plausible causes: (a) SMTP delivery failure swallowed by lack of return-value check; (b) email landed in a folder I didn't check (Junk?); (c) delivery delayed beyond the time I looked.
+  - **Ready when:** any future session — cheap to verify (himalaya envelope list across folders + `/tmp/vq-loading-agent.log` grep for SMTP errors around 23:56:50Z).
+  - **How:**
+    1. `himalaya envelope list --account rfqloading --folder INBOX --page-size 200` — look for `[VQ→RFQ] New RFQ needed: Astute Group / Shortage / 17 lines`.
+    2. Also check Junk, Processed, OutboundPending folders on rfqloading@.
+    3. If still absent: `grep "rfqloading\|sendEmail\|smtp" /tmp/vq-loading-agent.log` around 23:56:50.
+    4. If genuine send failure: extend `action_forward_to_rfq_loading` to check `sendEmail`'s return value; on `false`, fail the action loudly (escalate `needs_review`) rather than silently parking the sidecar.
+    5. Also extend `shared/notifier.js` `sendEmail` to throw instead of returning `false` on SMTP failure — silent failures here have caused other delivery issues historically.
+  - **Side effects of leaving as-is:** Sidecar `vq-forward-8630.json` will sit for 7 days then trigger the resumer's `parked-expired` operator email. Not silent — operator will get pinged.
+
+- [ ] 🟢 **spawnSync psql ENOBUFS in load-bulk-summary pre-flight for very large RFQs** *(opened 2026-05-23, surfaced during UID 8630 live test)*
+  - **Context:** Same UID 8630 run. Two `load-failed` events with `error: "spawnSync psql ENOBUFS"` against RFQ 1134261 (Astute Electronics Inc, **17,752 active lines**). Both attempts failed identically. Agent then routed `needs_review` cleanly with the right investigation_summary. Other 10 RFQs in the same email loaded fine — only the giant one tripped the buffer.
+  - **Root cause:** `shared/load-bulk-summary.js` calls `execFileSync('psql', ...)` to fetch RFQ lines + MPNs as part of `loadBulkSummary` setup. Default `maxBuffer` for execFileSync is 1MB. 17,752 lines × MPN-set per line easily exceeds that.
+  - **Why blocked:** real but not urgent — the agent escalates cleanly. Affects only the small handful of very-large RFQs (Astute Electronics Inc-class). Not a regression — this RFQ shape has always been at the limit.
+  - **Ready when:** whenever someone touches `shared/load-bulk-summary.js` or `shared/vq-writer.js` for unrelated reasons (apply the fix in the same touch per the parallel-writer-audit discipline).
+  - **How:**
+    1. Find every `execFileSync('psql', ...)` and `execSync('psql ...')` in `shared/load-bulk-summary.js` + `shared/vq-writer.js` + `shared/mfr-from-vq-history.js` + `shared/mfr-from-ot-history.js` + `shared/partner-lookup.js`.
+    2. Pass `{ encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 }` (64MB — generous; the alternative is paginated fetches which is much more code).
+    3. Add a regression test that exercises the RFQ 1134261-size case via `shared/load-bulk-summary.js loadBulkSummary({ rfqSearchKey: '1134261', ... dryRun: true })` — should not throw ENOBUFS.
+    4. Note in commit message that this is a writer-side fix that applies to all callers per parallel-writer-audit; update `loader-changelog.md`.
+
+- [ ] 🟢 **LAM EPG SIPOC — POV0075254 / PO810397 update** *(opened 2026-05-22, picks up Monday 2026-05-25)*
+  - **Context:** Operator placed Arrow PO810397 today (2026-05-22, 11 lines, all stamped `POV0075254`). Need to backfill the SIPOC tracker at `Trading Analysis/LAM EPG Award/Lam_EPG_SIPOC.xlsx` with PO + Purchased By (Mohan, ad_user_id 1013586) + PO Sent (2026-05-22) + Processed in OT (Y) + OT Order Number. All 11 PO MPNs matched to SIPOC rows.
+  - **SIPOC column map (header on row 2 / index 1):** col 17=Qty (LAM sales commitment), 26=POV, 27=Purchased By, 28=PO Sent (date), 30=Processed in OT, 31=OT Order Number, 33=Notes, 34=Tracking.
+  - **Method:** Surgical zip-level patch + dated backup (`.backup-2026-05-25-pov75254`). Do NOT round-trip through SheetJS — destroys validations / customXml / styles per [[feedback_xlsx_roundtrip_destroys_forms]].
+  - **Three buckets (sales-anchored against SIPOC Qty):**
+    - **CLEAN FIRST PO (6 rows — safe to write):** rows 33 (254124-E qty 126), 39 (0826-1X2T-23-F qty 80), 46 (MOX91022505FTE qty 40), 134 (43160-0306 qty 125), 173 (EEEFK1V222SM qty 125), 202 (TSW-108-17-G-S qty 80). SIPOC Qty == PO qty exactly, no prior POs. Fill all 5 columns.
+    - **PLANNED SPLITS (3 rows — safe to append slash-separated):**
+      - Row 13 LP-CC-30: SIPOC qty 50 = Fuses 30 (PO809583/POV0075524) + Arrow 20 (PO810397/POV0075254). Notes confirm. ⚠️ Flag for operator: $24.03 vs $49.66 same-MFR price disparity worth understanding.
+      - Row 104 3299Z-1-202LF: SIPOC qty 175 = Master 16 shipped (not in OT) + Arrow 159 (PO810397). Notes already say "Arrow (159) still open" — today's PO is that leg finally cut.
+      - Row 106 0216.200MXP: SIPOC qty 250 = Arrow 110 (PO810397) + 140 remaining. POV0075257 reserved but no PO cut yet.
+    - **SOURCE CHANGE + COVERAGE GAP (1 row — safe to append, flag the gap):** Row 6 SHV24-1A85-78D3K: SIPOC qty 1000. DK 281 shipped (PO809612/POV0075252) + Arrow 288 (PO810397/POV0075254). 281+288=569; **431 units still uncovered** (POV0075257 reserved, no PO cut). Notes already say "DK repriced after order cancellation".
+    - **🚨 SUSPECTED DUPLICATE (1 row — DO NOT WRITE until operator verifies):** Row 43 R-7315P. Notes already claim `"Master qty (5) shipped 03/28 on 380029812239; Arrow (15) shipped on 518717946566 — fully shipped"` and Tracking column has `"518717946566 (Arrow x15)"`. SIPOC says the Arrow-15 leg was already done. Yet today's PO810397 cuts a fresh Arrow 15 @ $15.584. Either (a) prior shipment was outside OT — today's PO is a duplicate purchase; or (b) the tracking note was premature — today's PO is the real cut. **Verify before writing.**
+  - **Outstanding operator decisions before write:** (1) multi-POV rows: append slash-separated vs. only-fill-blanks vs. overwrite — operator leaned toward append slash-separated but didn't lock it in. (2) Notes line append per row in the existing dated format `[2026-05-22] Arrow POV0075254 / PO810397 placed — qty <X> @ $<Y>` — yes / no. (3) Row 43 duplicate verdict.
+  - **Additional cleanup candidates surfaced during review (not strictly POV0075254):**
+    - Orphan POV0075257 (planned but no PO cut) — used on rows 6 and 106 as reserved placeholder for remaining coverage
+    - Orphan POV0075267 (planned but no PO cut) — used on rows 43 and 104; Master shipments referenced in notes are NOT in OT under any POV stamp
+  - **Ready when:** Monday 2026-05-25 operator session. Three quick decisions, then surgical zip patch.
+  - **Source:** This session (2026-05-22) — operator placed PO810397 today and said "i need to piock this back up monday".
+
+- [ ] 🟢 **Claude Harris ROI digest — clarity pass (continuation)** *(opened 2026-05-21, big iteration shipped 2026-05-22)*
+  - **Shipped 2026-05-22 (this session):**
+    1. Removed the vestigial 3-row "Sales (Adoption — correlative)" table + its dead `direct_win` CTE / aggregates. Causal sales attribution now lives only in Revenue-Claude-Generated + Sold-line win attribution.
+    2. **Dual-window view** — every scoped table (Procurement, Revenue Claude generated, Process-order per-seller, Sold-line win attribution) now shows trailing-30d AND since-inception (cumulative) columns side-by-side. Blue banner explains the dual-window convention. Inception date queried at runtime (2026-04-07).
+    3. **Process-order per-seller table moved** directly under the Winning Business (Adoption) window table. Added columns: Non-Claude VQs (with avg/line), 🔎 Claude cheaper applicable lines, 💸 GP lost (= (purchased cost − Claude cost) × RFQ qty across qty-applicable cheaper-VQ lines).
+    4. **Scope filter (1) — email-load echoes:** non-franchise Claude VQs written AFTER a human VQ on the same line are dropped from `api_vq`. These are the VQ-loader agent digitizing inbound broker emails on already-active lines — not sourcing.
+    5. **Scope filter (2) — post-SO backfills:** any Claude VQ written AFTER a sold CQ already exists on the line is dropped. Desktop scrape (Heilind etc.) catching up after the deal closed; can't have influenced sourcing.
+    6. **Title changed** "API Enrichment ROI" → "Sourcing ROI" (matches the broader Claude-as-Buyer scope: API enrichment + NetComp broker agent + LAM Kitting + scrapes).
+    7. **MPN selection fix** — multi-MPN/AVL lines now pick the MPN that matches an actual VQ on the line (IsPurchased VQ preferred, then any VQ, fallback to lowest `chuboe_rfq_line_mpn_id`). Validated on RFQ 1135097 — drill now shows Yageo `RC0100FR-07100KL` (the part actually quoted) instead of the KOA AVL alternate.
+    8. **Workflow-context footnote** on the Process-order section showing org-level Adoption RFQ→sold-CQ <60min count, independent of Claude. Today: 163 lines/30d, Claude active pre-sale on 8. The other 155 are "what-if" — surfaced as a count so the workflow signal is visible but per-seller granularity is reserved for the Claude-active subset where money-on-table is provable.
+  - **Discoveries / framing decisions made (carry forward):**
+    - Distinction nailed: **Claude as Sourcing Buyer** (API enrichment, NetComp agent, LAM Kitting, scrapes) vs **Claude as VQ Support** (email-loader digitization). Tracker is scoped to the former.
+    - Mirror parent revenue dropped $32K → $13K post-filter; remaining $13K (Sanmina + GE Aerospace) is legitimate Claude-first franchise mirror.
+    - Coverage Gap miss revenue went 1/$40K → 0/$0 — Marvell RFQ 1134154 was Heilind post-SO backfill, correctly removed.
+    - Buyer-pre-loaded pattern (first human VQ <Xmin after RFQ creation) is the buy-side analog of seller process-order RFQs. Logged but not wired in.
+    - **Truth-over-helpfulness check:** operator explicitly flagged not wanting to manipulate variables to suit outcome — filters keep signal honest, footnote keeps the workflow signal visible even when it's outside Claude attribution.
+  - **Still open (next session):**
+    1. `winBotSoleSolo` + `winBotSoleAdoptedCompetingVq` still contribute to `revenueClaudeGeneratedNet` but only handoff + mirrorClaudeFirst are displayed in the Revenue Claude generated box. Either fix description or add the missing 2 sub-rows.
+    2. Per-bucket GP isn't broken out in that box (em-dash placeholder). Add `winBotSoleAdoptedHandoffPoNet` / `winMirrorClaudeFirstPoNet` accumulators for per-sub-row GP.
+    3. `adoption.poNet` vs `revenueClaudeGeneratedPoNet` $2.80 gap — likely 1-2 lines not classified as wins.
+    4. LAM/Stock revenue + GP tracking under Process Efficiency (currently PO cost only).
+    5. Window classification (processOrder <60min / needsReview 1-24h / realSourcing 24h+) thresholds review.
+    6. Buyer-pre-loaded pattern — if it shows up frequently, surface as parallel signal.
+    7. Replica-lag / late-toggling investigation: misses that appear in one run and not another due to IsPurchased/IsSold flags being toggled later. Operator asked whether we can audit via `ad_changelog`.
+  - **Ready when:** Next session with operator at hand. Discussion + iterate pass, not autonomous.
+  - **Source:** Sessions 2026-05-21 (GP column landed) and 2026-05-22 (clarity pass main iteration).
+
 - [ ] ✅ **Continuation-row vendor inference — SHIPPED 2026-05-20** *(opened + delivered same day)*
   - Added § 3.7.0b to `agent-prompt.txt`: when a sub-quote row has price+qty but no explicit vendor name, inherit the vendor from the most recent preceding row that did. Stamps `vendorNotes: 'tier N — vendor inherited from preceding row'` for audit. Includes explicit boundary rules (new MPN block / new explicit vendor / clearly-different pricing all reset the inheritance). Concrete worked example: today's PGC tier-2 ESDLIN1524BJ.
 

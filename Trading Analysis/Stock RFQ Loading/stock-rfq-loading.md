@@ -300,3 +300,17 @@ The current fall-back-to-Unqualified-Broker behavior is permissive by design. If
 - [Customer Excess Analysis](../Customer%20Excess%20Analysis/customer-excess-analysis.md) — sister workflow on the same agent pattern
 - [Email-Driven Workflow Architecture](../../email-workflow-architecture.md) — top-level pattern doc
 - MFR Aliases: `../Customer Excess Analysis/Market Offer Loading/mfr-aliases.json` (shared)
+
+---
+
+## Recent Changes
+
+Maintained as part of the cross-loader changelog discipline — see [`shared/loader-changelog.md`](../../shared/loader-changelog.md) for the central index across ALL loaders.
+
+**Before editing `shared/workflow-actions/stockrfq.js` or this file**, scan the central changelog's last ~4 weeks for sibling-loader changes that may apply here.
+
+| Date | Change | Commit |
+|---|---|---|
+| 2026-05-22 | Vendor alias tier in `resolveBP` (Tier 0). Shared with all loaders. | `fefc2cc` |
+| 2026-05-22 | Writer-attribution per-row failure log (`~/workspace/.writer-attribution.jsonl`) wired into `action_load_rfq`. | `9823ede` |
+| 2026-05-22 | Handler-level Message-ID dedup via `breadcrumbs.hasMessageIdAlreadyLoaded()` in `action_load_rfq`. Catches manual IMAP folder-move replays and accidental re-polls. | `2a04ffe` |

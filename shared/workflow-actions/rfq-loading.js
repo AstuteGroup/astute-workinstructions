@@ -86,10 +86,58 @@ async function action_enqueue(payload, ctx) {
       would_enqueue: { bpartnerId, type, userId, salesrepId: salesrepId || 1000004, lineCount: lines.length },
     };
   }
+
+  // ── Message-ID idempotency guard ─────────────────────────────────────────
+  // Two layers of defense for rfq-loading specifically:
+  //   (1) HERE — check breadcrumbs for a prior `rfq-loaded` event on this
+  //       Message-ID. Catches replays of a COMPLETED load.
+  //   (2) shared/rfq-load-queue.js enqueue() — refuses a duplicate when an
+  //       item with the same messageId is already queued/loading. Catches
+  //       replays while a load is in flight (race window before the daemon
+  //       can write the breadcrumb).
+  //
+  // Belt-and-suspenders because rfq-loading is queue-backed: the load runs
+  // out-of-band in a daemon, so the time from "agent enqueues" to "daemon
+  // writes rfq-loaded breadcrumb" can be minutes on a large RFQ.
+  const dedupMessageId = ctx.currentMessageId;
+  if (dedupMessageId) {
+    const dupCheck = breadcrumbs.hasMessageIdAlreadyLoaded(dedupMessageId, {
+      cog: 'rfq-loader-daemon',
+      events: ['rfq-loaded'],
+    });
+    if (dupCheck.loaded) {
+      breadcrumbs.write({
+        cog: 'rfq-loading-agent',
+        event: 'already-loaded-skip',
+        uid: ctx.uid,
+        messageId: dedupMessageId,
+        prior_uid: dupCheck.breadcrumb.uid,
+        prior_rfq_id: dupCheck.breadcrumb.rfqId,
+        prior_search_key: dupCheck.breadcrumb.searchKey,
+        prior_ts: dupCheck.breadcrumb.ts,
+      });
+      return {
+        already_processed: true,
+        messageId: dedupMessageId,
+        prior: {
+          rfqId: dupCheck.breadcrumb.rfqId,
+          searchKey: dupCheck.breadcrumb.searchKey,
+          ts: dupCheck.breadcrumb.ts,
+          uid: dupCheck.breadcrumb.uid,
+        },
+      };
+    }
+  }
+
   const job_id = enqueue({
     bpartnerId, type, userId, description,
     salesrepId: salesrepId || 1000004,
     lines,
+    // Propagate to the queue payload so (a) the queue can in-flight-dedup
+    // and (b) the daemon can stamp its `rfq-loaded` breadcrumb with the
+    // same Message-ID, so future replays catch this load via path (1) above.
+    messageId: dedupMessageId || null,
+    sourceUid: ctx.uid,
   });
   return { job_id };
 }

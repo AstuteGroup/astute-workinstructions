@@ -647,6 +647,28 @@ function _levenshtein(a, b, maxDist = 3) {
  * @returns {{ id: number, name: string, searchKey: string } | null}
  */
 async function resolveBP(searchKey, vendorName) {
+  // 0. Curated vendor-alias rewrite — handles acronyms / initialisms that
+  //    neither strict normalize nor Levenshtein nor historical-VQ can catch
+  //    (e.g., "XJH" → BP 1001909 "Xin Jun Hong (HK) Industry Co., Ltd").
+  //    When ONLY a name is supplied (no explicit search-key), check the
+  //    curated alias file first; if matched, promote the alias's searchKey
+  //    so the search-key path below resolves it exactly. We do NOT rewrite
+  //    vendorName to the canonical because canonical names often contain
+  //    special chars (parens / commas / periods) that 500 the iDempiere
+  //    REST `contains(toupper(Name), '...')` filter.
+  //
+  //    Skip when searchKey is provided — the caller's explicit-ID path is
+  //    the operator's hard override and should never be second-guessed.
+  if (!searchKey && vendorName) {
+    try {
+      const { lookupVendorAlias } = require('./vendor-aliases');
+      const alias = lookupVendorAlias(vendorName);
+      if (alias && alias.searchKey) {
+        searchKey = alias.searchKey;
+      }
+    } catch (_) { /* alias file unreadable — fall through to normal path */ }
+  }
+
   // 1. Try search key (exact match) — unchanged, preserves the operator-
   //    overridable explicit-ID path used by recovery scripts.
   if (searchKey) {

@@ -30,6 +30,8 @@ const { loadBulkSummary } = require('../load-bulk-summary');
 const { isKnownBuyer, isKnownSupport, resolveBuyerFromRegistry } = require('../partner-lookup');
 const pending = require('../workflow-pending-state');
 const breadcrumbs = require('../breadcrumbs');
+const writerAttribution = require('../writer-attribution');
+const { notifyHighFailureRate } = require('../failure-rate-gate');
 
 const JAKE_USER_ID = 1000004;
 
@@ -327,6 +329,31 @@ async function action_load_vq(payload, ctx) {
         }));
       appendAttribution(attribRows);
     }
+
+    // Per-row failure + skip attribution. Companion to the breadcrumb COUNT
+    // summary — captures the writer's per-quote reason+detail to disk so
+    // post-mortems do not need an agent replay. See shared/writer-attribution.js
+    // header; primary trigger was Ivy 5/21 UID 8541 where 73 "failed" carried
+    // detail='unknown' and we could not tell why each fell over.
+    writerAttribution.persistWriterDetails({
+      workflow: 'vq-loading',
+      ctx,
+      result,
+    });
+
+    // Rate-based escalation gate. If the batch came back with an unhealthy
+    // failure rate (writer-side) or non-dup-skip rate (resolver gap),
+    // breadcrumb the signal and ping the operator immediately. See
+    // shared/failure-rate-gate.js header — Ivy UID 8541's silent-fail-for-24h
+    // is exactly the case this defends against.
+    await notifyHighFailureRate({
+      cog: 'vq-loading-agent',
+      workflow: 'VQ Loading',
+      ctx,
+      target: targetKey,
+      result,
+    });
+
     if (result.written.length > 0) totals.rfqsWritten += 1;
     totals.vqsWritten += result.written.length;
     totals.vqsSkipped += result.skipped.length;
@@ -338,9 +365,72 @@ async function action_load_vq(payload, ctx) {
 
   // Partial-load consolidated clarification: agent loaded the clean vendors,
   // now fire ONE email asking sender (CC operator) about everything else.
-  const clarifList = Array.isArray(clarifications)
+  let clarifList = Array.isArray(clarifications)
     ? clarifications.filter(c => c && c.vendorLabel && Array.isArray(c.asks) && c.asks.length > 0)
     : [];
+
+  // Suppress clarify sections for vendors the writer already resolved.
+  //
+  // Why: the agent's clarify decision and the writer's resolution decision
+  // run independently. The agent might flag "Savilter" as unknown while the
+  // writer's resolveBP (or the historical-VQ fallback added 2026-05-22)
+  // successfully fuzzy-matches it to "Saviliter Technology Co., Ltd" and
+  // writes the row. Without this filter, the operator gets a clarify email
+  // asking about a vendor that's already in OT — confusing and burns trust.
+  //
+  // Surfaced via UID 8563 (Ivy 5/22 RFQ 1135078): "Savilter" was
+  // simultaneously written as Saviliter AND included in the clarify list.
+  //
+  // Strategy: every quote the agent submitted carries vendorName/
+  // vendorSearchKey — those are the SAME label strings the agent used to
+  // build clarifications[]. The writer preserves the agent's original label
+  // on each written row (originalVendorLabel) and the writer's skipped[]
+  // entries spread `...q` so vendorName survives. We exact-match the
+  // clarify section's vendorLabel against those preserved labels — no
+  // fuzzy comparison needed, no risk of false-positive suppression on
+  // unrelated vendors with similar names.
+  if (clarifList.length > 0) {
+    const norm = s => String(s || '').toLowerCase().trim();
+    const resolvedLabels = new Set();   // exact agent labels that loaded OR pre-existed
+    for (const r of perRfqResults) {
+      for (const w of r.writtenDetails || []) {
+        if (w.originalVendorLabel) resolvedLabels.add(norm(w.originalVendorLabel));
+      }
+      for (const s of r.skippedDetails || []) {
+        if (s.reason !== 'PRE_EXISTING_DUPLICATE') continue;
+        // skipped entries spread the original quote, so vendorName /
+        // vendorSearchKey are the agent's labels verbatim.
+        if (s.vendorName)      resolvedLabels.add(norm(s.vendorName));
+        if (s.vendorSearchKey) resolvedLabels.add(norm(s.vendorSearchKey));
+      }
+    }
+
+    const suppressed = [];
+    const remaining = [];
+    for (const c of clarifList) {
+      const lbl = norm(c.vendorLabel);
+      if (lbl && resolvedLabels.has(lbl)) {
+        suppressed.push({ vendorLabel: c.vendorLabel, askCount: c.asks.length });
+      } else {
+        remaining.push(c);
+      }
+    }
+
+    if (suppressed.length > 0) {
+      breadcrumbs.write({
+        cog: 'vq-loading-agent',
+        event: 'clarify-suppressed-already-loaded',
+        uid: ctx.uid,
+        sourceUid: sourceUid || ctx.uid,
+        messageId: messageId || null,
+        primary_rfq: rfqSearchKey,
+        suppressed_count: suppressed.length,
+        suppressed_sections: suppressed,
+        remaining_count: remaining.length,
+      });
+    }
+    clarifList = remaining;
+  }
   // Derive loaded_vendors from the input quotes: any distinct vendor label
   // that appeared in the quotes[] is one the agent meant to load this tick.
   // Reply-tick agent uses this as the "DO NOT touch these on the reply" set.
@@ -1209,6 +1299,161 @@ async function action_outbound_pending(payload, ctx) {
   return { reason: payload.reason || 'outbound reply' };
 }
 
+/**
+ * Forward an unprocessable block to the rfq-loading workflow so it can
+ * create the new RFQ(s), then park the pending VQ quotes in a sidecar so
+ * the resumer cron can load them once the new RFQ exists in OT.
+ *
+ * Cross-workflow pattern (vq-loading → rfq-loading → vq-loading-resumer):
+ *   1. vq-loading agent encounters MPN blocks that need new-RFQ creation
+ *      (no existing RFQ matches AND the operator's note specifies customer/
+ *      sales-rep/type, e.g. "Astute Group / Aran / Shortage").
+ *   2. This handler sends a synthesized RFQ-creation request to the
+ *      rfqloading@orangetsunami.com inbox. The email pre-assigns a
+ *      Message-ID we control so the resumer can correlate downstream.
+ *   3. A sidecar `kind='waiting_for_new_rfq'` parks the outstanding quotes
+ *      along with the assigned Message-ID and an expiry timestamp.
+ *   4. The rfq-loading agent processes the forward, enqueues to
+ *      rfq-loader-daemon. When the daemon writes `rfq-loaded`, the
+ *      breadcrumb's messageId matches our assigned MID.
+ *   5. `scripts/vq-loading-resumer.js` (separate cron) walks pending
+ *      sidecars, matches against rfq-loaded breadcrumbs by messageId,
+ *      and calls loadBulkSummary to write the parked quotes against the
+ *      newly-created RFQ's searchKey.
+ *
+ * Required payload:
+ *   customer        e.g., "Astute Group" — the customer name to give the
+ *                    new RFQ. The rfq-loading agent's partner-lookup resolves
+ *                    it; we don't need the BP ID here.
+ *   salesRep        e.g., "Aran" — Astute internal sales rep name. The
+ *                    rfq-loading agent's resolveAstuteUserByName picks it up.
+ *   type            'Stock' | 'Shortage' | 'PPV' | ...
+ *   lines           Array of { mpn, qty, mfr?, cpc?, description? } — what
+ *                    the new RFQ should contain. The rfq-loading agent
+ *                    extracts these from the synthesized body block.
+ *   pendingQuotes   Array of quote objects in load-bulk-summary shape
+ *                    ({ vendorName | vendorSearchKey, mpn, mfr, qty, cost,
+ *                       leadTime?, dateCode?, ...}). These are PARKED in the
+ *                    sidecar; the resumer loads them once the RFQ exists.
+ *
+ * Optional payload:
+ *   subject              For threading + sidecar audit
+ *   originalBodySnippet  Excerpt from the source email (for audit / context
+ *                         in the forwarded body)
+ *   reason               One-liner explaining why this is going to
+ *                         rfq-loading instead of escalating
+ */
+async function action_forward_to_rfq_loading(payload, ctx) {
+  const {
+    customer, salesRep, type, lines, pendingQuotes,
+    subject, originalBodySnippet, reason,
+  } = payload;
+
+  if (ctx.dryRun) {
+    return {
+      dry_run: true,
+      would_forward: {
+        to: 'rfqloading@orangetsunami.com',
+        customer, salesRep, type,
+        lineCount: Array.isArray(lines) ? lines.length : 0,
+        pendingQuoteCount: Array.isArray(pendingQuotes) ? pendingQuotes.length : 0,
+      },
+    };
+  }
+
+  // Pre-assigned Message-ID so the resumer can correlate the future
+  // rfq-loaded breadcrumb. Domain matches the from-address so SMTP doesn't
+  // rewrite the header.
+  const assignedMessageId = `<vq-forward-${ctx.uid}-${Date.now()}@orangetsunami.com>`;
+
+  // Synthesized summary header — the rfq-loading agent reads this first.
+  // Verbatim original body follows below for audit.
+  const linesTable = (lines || []).map(l =>
+    `<tr><td>${esc(l.mpn || '')}</td><td align="right">${esc(String(l.qty || ''))}</td><td>${esc(l.mfr || '')}</td><td>${esc(l.cpc || '')}</td><td>${esc(l.description || '')}</td></tr>`
+  ).join('\n');
+
+  const body = `<html><body style="font-family:Arial,sans-serif;font-size:13px">
+<h3 style="color:#246">RFQ creation request from VQ Loading workflow</h3>
+<p>The VQ loading workflow received an email containing offers for parts that don't have an existing RFQ. Per the operator instruction in that email, please create the RFQ as follows:</p>
+<table border="1" cellpadding="4" cellspacing="0" style="border-collapse:collapse;margin-bottom:12px">
+  <tr><th align="left">Field</th><th align="left">Value</th></tr>
+  <tr><td>Customer</td><td><b>${esc(customer)}</b></td></tr>
+  <tr><td>Sales rep (Astute operator-on-record)</td><td><b>${esc(salesRep)}</b></td></tr>
+  <tr><td>Type</td><td><b>${esc(type)}</b></td></tr>
+</table>
+
+<p><b>Lines to add (${(lines || []).length}):</b></p>
+<table border="1" cellpadding="4" cellspacing="0" style="border-collapse:collapse">
+  <tr><th>MPN</th><th>Qty</th><th>MFR</th><th>CPC</th><th>Description</th></tr>
+  ${linesTable}
+</table>
+
+<p style="color:#666;font-size:11px;margin-top:16px">The VQ loading workflow is parking ${(pendingQuotes || []).length} broker quote(s) on a sidecar. Once you write this RFQ to OT, the <code>vq-loading-resumer</code> cron will match by Message-ID and load those quotes against the new RFQ's search key. <b>No action needed beyond standard RFQ creation.</b></p>
+
+<p style="color:#999;font-size:10px;border-top:1px dashed #ccc;margin-top:16px;padding-top:8px">
+<i>Origin: vq@orangetsunami.com / UID ${ctx.uid}<br/>
+Original subject: ${esc(subject || '(no subject)')}<br/>
+Correlation Message-ID: <code>${esc(assignedMessageId)}</code><br/>
+Reason: ${esc(reason || 'new-RFQ-creation needed for parts without an existing RFQ match')}</i></p>
+
+${originalBodySnippet ? `<hr style="margin-top:16px"/>
+<p style="color:#666;font-size:11px"><i>Original email context for audit:</i></p>
+<pre style="background:#f5f5f5;padding:8px;white-space:pre-wrap;font-size:11px">${esc(originalBodySnippet.slice(0, 4000))}</pre>` : ''}
+</body></html>`;
+
+  await ctx.notifier.sendEmail(
+    'rfqloading@orangetsunami.com',
+    `[VQ→RFQ] New RFQ needed: ${customer} / ${type} / ${(lines || []).length} lines`,
+    body,
+    {
+      html: true,
+      messageId: assignedMessageId,
+    },
+  );
+
+  // Sidecar park. Keyed by ctx.anchorMessageId (original Ivy email's MID)
+  // so any future ticks against the same original email can find the
+  // pending state. The resumer scans by kind='waiting_for_new_rfq'.
+  const sidecarRecord = pending.writeSidecar(ctx.workflow, ctx.anchorMessageId || `vq-forward-${ctx.uid}`, {
+    kind: 'waiting_for_new_rfq',
+    original_uid: ctx.uid,
+    original_subject: subject || null,
+    original_message_id: ctx.anchorMessageId || null,
+    forwarded_to: 'rfqloading@orangetsunami.com',
+    forwarded_message_id: assignedMessageId,
+    forwarded_at: new Date().toISOString(),
+    correlation: { customer, salesRep, type },
+    expected_line_count: Array.isArray(lines) ? lines.length : 0,
+    pending_quotes: Array.isArray(pendingQuotes) ? pendingQuotes : [],
+    // 7-day expiry — if the RFQ hasn't been created by then, surface to
+    // operator. The resumer reads this; sidecars past TTL trigger an alert
+    // instead of silent drop.
+    expires_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
+  });
+
+  breadcrumbs.write({
+    cog: 'vq-loading-agent',
+    event: 'forwarded-to-rfq-loading',
+    uid: ctx.uid,
+    sourceUid: ctx.uid,
+    messageId: ctx.currentMessageId || ctx.anchorMessageId || null,
+    forwarded_message_id: assignedMessageId,
+    customer,
+    salesRep,
+    type,
+    line_count: Array.isArray(lines) ? lines.length : 0,
+    pending_quote_count: Array.isArray(pendingQuotes) ? pendingQuotes.length : 0,
+    sidecar_anchor: sidecarRecord && sidecarRecord.original_message_id,
+  });
+
+  return {
+    forwarded_to: 'rfqloading@orangetsunami.com',
+    forwarded_message_id: assignedMessageId,
+    parked_quote_count: Array.isArray(pendingQuotes) ? pendingQuotes.length : 0,
+    sidecar_kind: 'waiting_for_new_rfq',
+  };
+}
+
 // ─── HELPERS ─────────────────────────────────────────────────────────────────
 
 function esc(s) {
@@ -1235,7 +1480,13 @@ function esc(s) {
  *   - senderUsed null   → operator-only mode (legacy behavior preserved)
  */
 function resolveOutreachRecipients(payload, ctx) {
-  const candidate = (payload.senderEmail || payload.outerFrom || '').trim();
+  // Prefer the poller's parsed envelope From (ctx.currentFrom) over agent-
+  // supplied outerFrom. The agent's outerFrom drifts under load on complex
+  // forwards (e.g., UID 8598 2026-05-22: agent set outerFrom=betty.song
+  // when the envelope From was actually ivy.song, sending the escalation
+  // email to the wrong person). The poller-parsed value is deterministic.
+  const fromCtx = (ctx && ctx.currentFrom) ? String(ctx.currentFrom).trim() : '';
+  const candidate = fromCtx || (payload.senderEmail || payload.outerFrom || '').trim();
   // Reject the obvious anti-self-send cases. We DO allow Astute-internal
   // forwarders (Gopal compiling a Type 2 summary) — they may be the one
   // who can answer the question.
@@ -1245,9 +1496,28 @@ function resolveOutreachRecipients(payload, ctx) {
   if (ctx.inbox && candidate.toLowerCase() === ctx.inbox.toLowerCase()) {
     return { to: ctx.jakeEmail, cc: null, senderUsed: null };
   }
+  // Build CC: operator (Jake) + any Astute-internal addresses that were
+  // already on the original envelope Cc. Policy (operator-stated 2026-05-22):
+  // "CC the support first and let them address the buyer as needed, unless
+  // they're also directly in CC." So Betty (the buyer behind Betty→Ivy→vq
+  // forwards) gets CC'd ONLY when she was on the outer envelope Cc; otherwise
+  // Ivy (TO) handles the loop-in.
+  const ccSet = new Set();
+  if (ctx.jakeEmail) ccSet.add(ctx.jakeEmail.toLowerCase());
+  if (ctx && ctx.currentCc) {
+    const ADDR_RE = /[A-Za-z0-9._+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}/g;
+    for (const addr of String(ctx.currentCc).match(ADDR_RE) || []) {
+      const lower = addr.toLowerCase();
+      if (lower === candidate.toLowerCase()) continue;
+      if (ctx.inbox && lower === ctx.inbox.toLowerCase()) continue;
+      // Only include @astutegroup.com addresses — don't loop external
+      // brokers into operator-internal escalations.
+      if (lower.endsWith('@astutegroup.com')) ccSet.add(lower);
+    }
+  }
   return {
     to: candidate,
-    cc: ctx.jakeEmail,
+    cc: Array.from(ccSet).join(', '),
     senderUsed: candidate,
   };
 }
@@ -1341,6 +1611,15 @@ module.exports = {
       folder: 'OutboundPending',
       requires: ['reason'],
       handler: action_outbound_pending,
+    },
+    forward_to_rfq_loading: {
+      // Park the source email in OutboundPending (similar semantic: "we're
+      // waiting for something to come back"). The resumer cron moves it to
+      // Processed once the parked quotes are loaded successfully.
+      folder: 'OutboundPending',
+      requires: ['customer', 'salesRep', 'type', 'lines', 'pendingQuotes'],
+      keepsPending: true, // sidecar holds the parked state
+      handler: action_forward_to_rfq_loading,
     },
   },
   constants: {

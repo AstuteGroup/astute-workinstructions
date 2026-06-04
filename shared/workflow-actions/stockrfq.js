@@ -25,6 +25,7 @@ const crypto = require('crypto');
 
 const { writeRFQ } = require('../rfq-writer');
 const breadcrumbs = require('../breadcrumbs');
+const writerAttribution = require('../writer-attribution');
 const { createGate } = require('../large-payload-gate');
 const { makeApprovalActions } = require('./_approval');
 
@@ -127,6 +128,51 @@ async function action_load_rfq(payload, ctx) {
         lineCount: lines.length, description: payload.description,
       },
     };
+  }
+
+  // ── Message-ID idempotency guard ─────────────────────────────────────────
+  // If this exact email's Message-ID has already produced a successful
+  // `loaded` breadcrumb under this cog, don't re-write. Defends against
+  // manual folder-move replays, accidental re-polls, and the IMAP-UID
+  // reassign trap (UIDs change on folder move; messageId doesn't).
+  //
+  // chuboe_rfq has no row-level natural key that distinguishes "same email
+  // replayed" from "customer asked again next week" — same bpartner can
+  // legitimately repeat MPN sets. So the dedup belongs at the handler layer
+  // keyed on the source email, not at the writer layer keyed on row content.
+  // See shared/breadcrumbs.js hasMessageIdAlreadyLoaded() header.
+  //
+  // Prefer ctx.currentMessageId (parsed by the poller from the email source,
+  // deterministic) over payload.messageId (agent-supplied, can drop under
+  // pressure — see [[feedback_agent_xor_payload_pattern]]).
+  const dedupMessageId = ctx.currentMessageId || payload.messageId;
+  if (dedupMessageId) {
+    const dupCheck = breadcrumbs.hasMessageIdAlreadyLoaded(dedupMessageId, {
+      cog: 'stockrfq-agent',
+      events: ['loaded'],
+    });
+    if (dupCheck.loaded) {
+      breadcrumbs.write({
+        cog: 'stockrfq-agent',
+        event: 'already-loaded-skip',
+        uid: ctx.uid,
+        messageId: dedupMessageId,
+        prior_uid: dupCheck.breadcrumb.uid,
+        prior_rfq_id: dupCheck.breadcrumb.rfqId,
+        prior_search_key: dupCheck.breadcrumb.searchKey,
+        prior_ts: dupCheck.breadcrumb.ts,
+      });
+      return {
+        already_processed: true,
+        messageId: dedupMessageId,
+        prior: {
+          rfqId: dupCheck.breadcrumb.rfqId,
+          searchKey: dupCheck.breadcrumb.searchKey,
+          ts: dupCheck.breadcrumb.ts,
+          uid: dupCheck.breadcrumb.uid,
+        },
+      };
+    }
   }
 
   // ── Large stock-RFQ gate ────────────────────────────────────────────────
@@ -265,6 +311,15 @@ async function doWriteRFQ(payload, ctx) {
     errorCount: result.errors.length,
     priceCheck: priceCheck === true,
     priceCheckReason: priceCheck === true ? (priceCheckReason || null) : undefined,
+  });
+
+  // Per-row failure attribution. rfq-writer returns errors[] as bare strings
+  // (count-style); persistWriterDetails handles both shapes. Persisted to disk
+  // so an error string isn't lost the moment the handler returns.
+  writerAttribution.persistWriterDetails({
+    workflow: 'stockrfq',
+    ctx,
+    result,
   });
 
   return {
