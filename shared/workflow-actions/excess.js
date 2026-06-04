@@ -282,9 +282,15 @@ This offer is now in Orange Tsunami and available for matching against open RFQs
 
 — Excess Offer System (automated)`;
 
-        await ctx.notifier.sendEmail(toEmail, confirmSubject, confirmBody, {
+        // Thread confirmation into the original email chain using Message-ID
+        const threadingOpts = {
           cc: ccList.length > 0 ? ccList : undefined,
-        });
+        };
+        if (ctx.currentMessageId) {
+          threadingOpts.inReplyTo = ctx.currentMessageId;
+          threadingOpts.references = ctx.currentMessageId;
+        }
+        await ctx.notifier.sendEmail(toEmail, confirmSubject, confirmBody, threadingOpts);
 
         breadcrumbs.write({
           cog: 'offer-poller',

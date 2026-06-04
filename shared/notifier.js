@@ -84,6 +84,8 @@ function createNotifier({ fromEmail, fromName, smtpUser, smtpPass } = {}) {
     // opts.messageId → pre-assign the RFC822 Message-ID header (used by the
     //   cross-workflow forward+park pattern so the sender knows the M-ID
     //   the receiving workflow will see, before sendMail returns).
+    // opts.inReplyTo → Message-ID of the email being replied to (for threading)
+    // opts.references → array of Message-IDs in the thread chain (for threading)
     const mailPayload = {
       from: `"${displayName}" <${fromEmail}>`,
       to: to,
@@ -93,6 +95,8 @@ function createNotifier({ fromEmail, fromName, smtpUser, smtpPass } = {}) {
     if (opts.bcc) mailPayload.bcc = opts.bcc;
     if (opts.replyTo) mailPayload.replyTo = opts.replyTo;
     if (opts.messageId) mailPayload.messageId = opts.messageId;
+    if (opts.inReplyTo) mailPayload.inReplyTo = opts.inReplyTo;
+    if (opts.references) mailPayload.references = Array.isArray(opts.references) ? opts.references.join(' ') : opts.references;
     if (opts.html) {
       mailPayload.html = body;
     } else {
