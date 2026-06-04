@@ -184,6 +184,52 @@ function pullActivity(sinceTs, untilTs, emailBatchRfqs) {
   });
 }
 
+// ─── Top 3 buyers per loader ─────────────────────────────────────────────────
+// Returns Map<loaderName, [{buyerName, buyerId, vqs}, ...]> (up to 3 per loader)
+// Shows which buyers each loader is loading VQs on behalf of.
+function pullTopBuyersPerLoader(sinceTs, untilTs, emailBatchRfqs) {
+  const inClause = emailBatchRfqs.length
+    ? emailBatchRfqs.map(r => `'${r}'`).join(',')
+    : `''`;
+  // Use chuboe_buyer_id from the VQ line — that's the buyer who did the sourcing.
+  const sql =
+    `WITH labeled AS ( ` +
+    `SELECT v.chuboe_vq_line_id, v.createdby, v.chuboe_buyer_id, ` +
+    `CASE ` +
+    `  WHEN v.createdby = ${CLAUDE_USER_ID} AND r.value IN (${inClause}) THEN 'Claude as purchasing support (email loading)' ` +
+    `  WHEN v.createdby = ${CLAUDE_USER_ID} THEN 'Claude as buyer (API + scraping)' ` +
+    `  ELSE COALESCE(lu.name, 'unknown') END AS loader ` +
+    `FROM adempiere.chuboe_vq_line v ` +
+    `JOIN adempiere.chuboe_rfq_line rl ON v.chuboe_rfq_line_id = rl.chuboe_rfq_line_id ` +
+    `JOIN adempiere.chuboe_rfq r ON rl.chuboe_rfq_id = r.chuboe_rfq_id ` +
+    `LEFT JOIN adempiere.ad_user lu ON lu.ad_user_id = v.createdby ` +
+    `WHERE v.created >= '${sinceTs}'::timestamp AND v.created < '${untilTs}'::timestamp AND v.isactive='Y' ` +
+    `), ` +
+    `by_buyer AS ( ` +
+    `SELECT l.loader, l.chuboe_buyer_id, bu.name AS buyer_name, COUNT(*) AS vqs ` +
+    `FROM labeled l ` +
+    `LEFT JOIN adempiere.ad_user bu ON bu.ad_user_id = l.chuboe_buyer_id ` +
+    `GROUP BY l.loader, l.chuboe_buyer_id, bu.name ` +
+    `), ` +
+    `ranked AS ( ` +
+    `SELECT *, ROW_NUMBER() OVER (PARTITION BY loader ORDER BY vqs DESC) AS rn ` +
+    `FROM by_buyer ` +
+    `) ` +
+    `SELECT loader, chuboe_buyer_id, buyer_name, vqs FROM ranked WHERE rn <= 3 ORDER BY loader, rn;`;
+  const out = psqlPipe(sql);
+  const m = new Map();
+  for (const line of out.trim().split('\n').filter(Boolean)) {
+    const [loader, buyerId, buyerName, vqs] = line.split('|');
+    if (!m.has(loader)) m.set(loader, []);
+    m.get(loader).push({
+      buyerId: buyerId ? Number(buyerId) : null,
+      buyerName: buyerName || '(no buyer)',
+      vqs: Number(vqs),
+    });
+  }
+  return m;
+}
+
 // Returns 'Buyer' / 'Support' / 'Untagged' / '(Claude)' for the role column.
 function roleFor(loaderName, userId) {
   if (loaderName.startsWith('Claude')) return '(Claude)';
@@ -373,8 +419,9 @@ function lookupUserNames(userIds) {
   ];
   const buyerMap = lookupUserNames(buyerIds);
 
-  // 7. Activity by loader (mixed counting rule)
+  // 7. Activity by loader (mixed counting rule) + top buyers per loader
   const activity = pullActivity(sinceTs, untilTs, allBatchRfqs);
+  const topBuyers = pullTopBuyersPerLoader(sinceTs, untilTs, allBatchRfqs);
 
   // Apply "hide zero" rule for Claude buckets
   const claudeBucketNames = new Set([
@@ -392,19 +439,23 @@ function lookupUserNames(userIds) {
 <p style="margin-top:0;color:#666">${esc(dispWindow)} · ${totalAll} VQs total · ${batches.length} email batch${batches.length === 1 ? '' : 'es'} processed</p>
 
 <h3 style="margin-bottom:4px">Activity by loader</h3>
-<table border="1" cellpadding="6" cellspacing="0" style="border-collapse:collapse;font-size:12px;min-width:540px">
-<thead style="background:#eef"><tr><th align="left">Loader</th><th align="left">Role</th><th align="right">VQs</th></tr></thead>
+<table border="1" cellpadding="6" cellspacing="0" style="border-collapse:collapse;font-size:12px;min-width:700px">
+<thead style="background:#eef"><tr><th align="left">Loader</th><th align="left">Role</th><th align="right">VQs</th><th align="left">Top 3 Buyers</th></tr></thead>
 <tbody>
 ${activityShown.map(a => {
   const role = roleFor(a.loader, a.userId);
   const roleColor = role === 'Support' ? '#888' : role === 'Untagged' ? '#b00' : '#222';
   const nameDisplay = claudeBucketNames.has(a.loader) ? '<b>' + esc(a.loader) + '</b>' : esc(a.loader);
-  return `<tr><td>${nameDisplay}</td><td style="color:${roleColor}"><i>${esc(role)}</i></td><td style="text-align:right">${a.vqs}</td></tr>`;
+  const buyers = topBuyers.get(a.loader) || [];
+  const buyersDisplay = buyers.length > 0
+    ? buyers.map(b => `${esc(b.buyerName)} (${b.vqs})`).join(', ')
+    : '<i style="color:#999">—</i>';
+  return `<tr><td>${nameDisplay}</td><td style="color:${roleColor}"><i>${esc(role)}</i></td><td style="text-align:right">${a.vqs}</td><td style="font-size:11px">${buyersDisplay}</td></tr>`;
 }).join('\n')}
-<tr style="background:#eee"><td colspan="2"><b>Total supply-support</b></td><td style="text-align:right"><b>${totalAll}</b></td></tr>
+<tr style="background:#eee"><td colspan="2"><b>Total supply-support</b></td><td style="text-align:right"><b>${totalAll}</b></td><td></td></tr>
 </tbody>
 </table>
-<p style="color:#666;font-size:11px;margin-top:4px"><i>Counting rule: <b>Claude as buyer</b> uses COUNT(DISTINCT (rfq_line × vendor)) because API responses fan-out stock + lead-time + qty-break variants per (vendor, part); all other loaders use raw row count because each row is a distinct stock batch from the vendor. Claude buckets with 0 activity are hidden.</i></p>
+<p style="color:#666;font-size:11px;margin-top:4px"><i>Counting rule: <b>Claude as buyer</b> uses COUNT(DISTINCT (rfq_line × vendor)) because API responses fan-out stock + lead-time + qty-break variants per (vendor, part); all other loaders use raw row count because each row is a distinct stock batch from the vendor. Claude buckets with 0 activity are hidden. <b>Top 3 Buyers</b> = chuboe_buyer_id on the VQs — who each loader is loading on behalf of.</i></p>
 `;
 
   if (batches.length > 0) {
