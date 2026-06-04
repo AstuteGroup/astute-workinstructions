@@ -3,17 +3,23 @@
  * Inventory File Cleanup Script (Node.js version)
  * Processes Infor ERP inventory exports for Astute Electronics
  *
+ * Schedule: Monday 11 UTC (6 AM CT) — weekly cron
+ *
  * Workflow:
- * 1. Convert Excel to CSV (if needed)
+ * 1. Fetch Infor xlsx from email (Task finished: [success] AST Item Lots Report)
  * 2. Clean raw export (remove header rows 1-7, footer rows)
  * 3. Deduplicate based on composite key
  * 4. Split by warehouse group
- * 5. Export to Chuboe format for iDempiere import
- * 6. Create consolidated file for industry portals
+ * 5. Write inventory offers to OT via REST API (one chuboe_offer per warehouse)
+ * 6. Save xlsx to ~/.inventory-storage/ for nc-listing.js to reuse Thursday
+ *
+ * NOTE: NC portal upload is now handled by nc-listing.js (runs Mon/Thu 12 UTC)
  *
  * Usage:
- *     node inventory_cleanup.js <input_file.xlsx|csv> [output_directory]
- *     node inventory_cleanup.js fetch    # Fetch from email and process automatically
+ *     node inventory_cleanup.js fetch              # Fetch, process, write to OT
+ *     node inventory_cleanup.js fetch --dry-run    # Preview without API writes
+ *     node inventory_cleanup.js <file.xlsx>        # Process specific file (CSVs only)
+ *     node inventory_cleanup.js <file.xlsx> --writeback  # Process and write to OT
  */
 
 const XLSX = require('xlsx');
@@ -36,17 +42,7 @@ const EMAIL_CONFIG = {
     processedFolder: 'Inventory-Processed'
 };
 
-// NetComponents upload configuration
-// Set NC_UPLOAD_ENABLED=true to send CSVs directly to NetComponents
-const NC_UPLOAD_CONFIG = {
-    enabled: process.env.NC_UPLOAD_ENABLED === 'true',
-    ncEmail: 'datamaster@netcomponents.com',
-    ccEmail: 'jake.harris@astutegroup.com',
-    fromEmail: 'stockrfq@orangetsunami.com',
-    fromName: 'Astute Electronics'
-};
-
-// Persistent storage for inventory xlsx (for Thursday reprocess)
+// Persistent storage for inventory xlsx (used by nc-listing.js for Thu runs)
 const INVENTORY_STORAGE_DIR = path.join(process.env.HOME, 'workspace/.inventory-storage');
 if (!fs.existsSync(INVENTORY_STORAGE_DIR)) {
     fs.mkdirSync(INVENTORY_STORAGE_DIR, { recursive: true });
@@ -2437,62 +2433,11 @@ async function fetchAndProcess(opts = {}) {
             console.log(`  Carryover overlap CSV: ${overlapCsvPath} (${csvRows.length} rows across ${totalOverlapCount} unique MPN match(es))`);
         }
 
-        // Step 6: Send emails
-        console.log('\nStep 6: Sending notification emails...');
+        // Step 6: Send OT write-back summary email
+        // NOTE: NC upload emails are now handled by nc-listing.js (runs Mon/Thu 12 UTC)
+        console.log('\nStep 6: Sending OT write-back summary email...');
 
-        // Email 1: NetComponents upload — non-authorized account #1167233
-        const sent1 = await sendEmail(
-            EMAIL_CONFIG.recipient,
-            'Data Upload - Non Authorized Account #1167233',
-            `Inventory cleanup completed successfully.
-
-Attached: ${path.basename(result.portalFile)}
-
-Processed: ${result.uniqueRows.toLocaleString()} unique rows
-Date: ${dateStr}`,
-            [result.portalFile]
-        );
-
-        // Email 1b: NetComponents upload — franchised account #1126121
-        const sent1b = await sendEmail(
-            EMAIL_CONFIG.recipient,
-            'Data upload - Franchised account # 1126121',
-            `Inventory cleanup completed successfully.
-
-Attached: ${path.basename(result.franchisePortalFile)}
-
-Date: ${dateStr}`,
-            [result.franchisePortalFile]
-        );
-
-        // Email 1c/1d: Send directly to NetComponents if enabled
-        if (NC_UPLOAD_CONFIG.enabled) {
-            const ncNotifier = createNotifier({
-                fromEmail: NC_UPLOAD_CONFIG.fromEmail,
-                fromName: NC_UPLOAD_CONFIG.fromName,
-                smtpPass: process.env.WORKMAIL_PASS || process.env.SMTP_PASS
-            });
-
-            console.log(`  Sending non-auth CSV to NetComponents: ${NC_UPLOAD_CONFIG.ncEmail} (CC: ${NC_UPLOAD_CONFIG.ccEmail})`);
-            await ncNotifier.sendWithAttachment(
-                NC_UPLOAD_CONFIG.ncEmail,
-                'Data Upload - Non-Authorized Account # 1167233',
-                'Hello,\n\nPlease find attached updated stock inventory.\n\nBest regards,\nAstute Electronics',
-                [{ filename: path.basename(result.portalFile), path: result.portalFile }],
-                { cc: NC_UPLOAD_CONFIG.ccEmail }
-            );
-
-            console.log(`  Sending franchise CSV to NetComponents: ${NC_UPLOAD_CONFIG.ncEmail} (CC: ${NC_UPLOAD_CONFIG.ccEmail})`);
-            await ncNotifier.sendWithAttachment(
-                NC_UPLOAD_CONFIG.ncEmail,
-                'Data upload - Franchised account # 1126121',
-                'Hello,\n\nPlease find attached updated franchise inventory.\n\nBest regards,\nAstute Electronics',
-                [{ filename: path.basename(result.franchisePortalFile), path: result.franchisePortalFile }],
-                { cc: NC_UPLOAD_CONFIG.ccEmail }
-            );
-        }
-
-        // Email 2: OT Write-back Summary (HTML, no attachment)
+        // OT Write-back Summary (HTML, no attachment)
         const writebackOk    = writebackResults.filter(r => r.status === 'success').length;
         const writebackPart  = writebackResults.filter(r => r.status === 'partial').length;
         const writebackFail  = writebackResults.filter(r => r.status === 'failed').length;
@@ -2548,7 +2493,7 @@ Date: ${dateStr}`,
         console.log('\n' + '='.repeat(60));
         console.log(runOk ? 'FETCH AND PROCESS COMPLETE' : 'FETCH AND PROCESS — INCOMPLETE (will retry)');
         console.log('='.repeat(60));
-        console.log(`Emails sent: ${sent1 && sent1b && sent2 ? 'Yes' : 'Partial'}`);
+        console.log(`OT summary email sent: ${sent2 ? 'Yes' : 'No'}`);
         console.log(`Write-back: ${writebackOk} ok, ${writebackPart} partial, ${writebackFail} failed`);
         console.log(`Carryover failed: ${carryoverFail}`);
         console.log(`Output: ${result.outputDir}`);
@@ -2569,102 +2514,9 @@ Date: ${dateStr}`,
 }
 
 // =============================================================================
-// REPROCESS COMMAND - Thursday mode using saved Monday xlsx
-// =============================================================================
-
-async function reprocessInventory(xlsxPath, opts = {}) {
-    const dryRun = !!opts.dryRun;
-    console.log('='.repeat(60));
-    console.log('INVENTORY CLEANUP - REPROCESS MODE (Thursday)');
-    console.log('='.repeat(60));
-    console.log(`Time: ${new Date().toISOString()}`);
-    console.log(`Source file: ${xlsxPath}`);
-    console.log(`Mode: ${dryRun ? 'DRY-RUN' : 'LIVE'}`);
-    console.log('-'.repeat(60));
-
-    try {
-        // Step 1: Process the saved file
-        console.log('\nStep 1: Processing inventory file...');
-        const result = processInventoryFile(xlsxPath, null);
-        const dateStr = new Date().toISOString().split('T')[0];
-
-        // Step 2: Skip OT write-back (already done Monday)
-        console.log('\nStep 2: Skipping OT write-back (already done on Monday)');
-
-        // Step 3: NC CSVs were regenerated by processInventoryFile
-        // The exclusion check in Step 5 of processInventoryFile handles the 200 MPNs
-        console.log('\nStep 3: NetComponents CSVs regenerated with current exclusions');
-        console.log(`  Non-auth: ${result.portalFile}`);
-        console.log(`  Franchise: ${result.franchisePortalFile}`);
-
-        // Step 4: Send emails
-        console.log('\nStep 4: Sending notification emails...');
-
-        // Email to Jake
-        const sent1 = await sendEmail(
-            EMAIL_CONFIG.recipient,
-            'Data Upload - Non-Authorized Account # 1167233',
-            `Hello,\n\nPlease find attached updated stock inventory.\n\nBest regards,\nAstute Electronics`,
-            [result.portalFile]
-        );
-
-        const sent1b = await sendEmail(
-            EMAIL_CONFIG.recipient,
-            'Data upload - Franchised account # 1126121',
-            `Hello,\n\nPlease find attached updated franchise inventory.\n\nBest regards,\nAstute Electronics`,
-            [result.franchisePortalFile]
-        );
-
-        // Email to NetComponents if enabled
-        if (NC_UPLOAD_CONFIG.enabled) {
-            const ncNotifier = createNotifier({
-                fromEmail: NC_UPLOAD_CONFIG.fromEmail,
-                fromName: NC_UPLOAD_CONFIG.fromName,
-                smtpPass: process.env.WORKMAIL_PASS || process.env.SMTP_PASS
-            });
-
-            console.log(`  Sending non-auth CSV to NetComponents: ${NC_UPLOAD_CONFIG.ncEmail} (CC: ${NC_UPLOAD_CONFIG.ccEmail})`);
-            await ncNotifier.sendWithAttachment(
-                NC_UPLOAD_CONFIG.ncEmail,
-                'Data Upload - Non-Authorized Account # 1167233',
-                'Hello,\n\nPlease find attached updated stock inventory.\n\nBest regards,\nAstute Electronics',
-                [{ filename: path.basename(result.portalFile), path: result.portalFile }],
-                { cc: NC_UPLOAD_CONFIG.ccEmail }
-            );
-
-            console.log(`  Sending franchise CSV to NetComponents: ${NC_UPLOAD_CONFIG.ncEmail} (CC: ${NC_UPLOAD_CONFIG.ccEmail})`);
-            await ncNotifier.sendWithAttachment(
-                NC_UPLOAD_CONFIG.ncEmail,
-                'Data upload - Franchised account # 1126121',
-                'Hello,\n\nPlease find attached updated franchise inventory.\n\nBest regards,\nAstute Electronics',
-                [{ filename: path.basename(result.franchisePortalFile), path: result.franchisePortalFile }],
-                { cc: NC_UPLOAD_CONFIG.ccEmail }
-            );
-        }
-
-        console.log('\n' + '='.repeat(60));
-        console.log('REPROCESS COMPLETE');
-        console.log('='.repeat(60));
-        console.log(`Emails sent: ${sent1 && sent1b ? 'Yes' : 'Partial'}`);
-        console.log(`Output: ${result.outputDir}`);
-
-        return { success: true, result };
-
-    } catch (err) {
-        console.error('\n' + '='.repeat(60));
-        console.error('REPROCESS FAILED');
-        console.error('='.repeat(60));
-        console.error(`Error: ${err.message}`);
-
-        await sendFailureNotice(err.message);
-
-        return { success: false, error: err.message };
-    }
-}
-
-// =============================================================================
 // ENTRY POINT
 // =============================================================================
+// NOTE: Thursday NC upload is now handled by nc-listing.js (separate workflow)
 
 if (require.main === module) {
     const argv     = process.argv.slice(2);
@@ -2676,43 +2528,22 @@ if (require.main === module) {
     if (args.length < 1) {
         console.log('Usage: node inventory_cleanup.js <input_file.xlsx|csv> [output_directory] [--writeback] [--dry-run]');
         console.log('       node inventory_cleanup.js fetch [--dry-run]');
-        console.log('       node inventory_cleanup.js reprocess [--dry-run]');
         console.log('\nCommands:');
         console.log('  fetch                    Fetch from email inbox, process, and write back to OT');
         console.log('  fetch --dry-run          Same, but skip the API write-back (preview only)');
-        console.log('  reprocess                Reprocess this week\'s saved xlsx (for Thursday run)');
-        console.log('  reprocess --dry-run      Same, but skip the API write-back (preview only)');
         console.log('  <file.xlsx>              Process a specific file (CSVs only)');
         console.log('  <file.xlsx> --writeback  Process and also write back to OT');
         console.log('  <file.xlsx> --writeback --dry-run');
         console.log('                           Process and dry-run write-back (preview only)');
+        console.log('\nNote: NC portal upload is now handled by nc-listing.js (runs Mon/Thu 12 UTC)');
         console.log('\nExamples:');
         console.log('  node inventory_cleanup.js fetch');
         console.log('  node inventory_cleanup.js fetch --dry-run');
-        console.log('  node inventory_cleanup.js reprocess               # Thursday: reuse Monday\'s file');
         console.log('  node inventory_cleanup.js ASTItemLotsReportInputs_USS_4544132.xlsx --writeback --dry-run');
         process.exit(1);
     }
 
-    if (args[0] === 'reprocess') {
-        // Thursday mode: reuse this week's saved xlsx file
-        const savedFile = getThisWeekInventoryFile();
-        if (!savedFile) {
-            console.error('ERROR: No saved inventory file found for this week.');
-            console.error(`Expected: ${path.join(INVENTORY_STORAGE_DIR, `inventory_${getWeekStartDate()}.xlsx`)}`);
-            console.error('Run "fetch" first on Monday to save the inventory file.');
-            process.exit(1);
-        }
-        console.log(`Reprocessing saved inventory file: ${savedFile}`);
-        reprocessInventory(savedFile, { dryRun })
-            .then(result => {
-                process.exit(result.success ? 0 : 1);
-            })
-            .catch(err => {
-                console.error('Unexpected error:', err);
-                process.exit(1);
-            });
-    } else if (args[0] === 'fetch') {
+    if (args[0] === 'fetch') {
         fetchAndProcess({ dryRun })
             .then(result => {
                 process.exit(result.success ? 0 : 1);

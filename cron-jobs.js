@@ -46,6 +46,16 @@ module.exports = [
     description: 'Mon 11 UTC — pull Infor xlsx, clean, write offers via OT API',
   },
   {
+    name: 'nc-listing',
+    cadence: 'twice-weekly',
+    cadenceCron: '0 12 * * 1,4',
+    command: `node "${ASTUTE}/Trading Analysis/Inventory File Cleanup/nc-listing.js"`,
+    cwd: ASTUTE,
+    needsOT: false,
+    logFile: '/tmp/nc-listing.log',
+    description: 'Mon/Thu 12 UTC — generate NC portal CSVs with exclusions, send upload emails',
+  },
+  {
     name: 'lam-kitting-runner',
     cadence: 'weekly',
     cadenceCron: '0 12 * * 1',
