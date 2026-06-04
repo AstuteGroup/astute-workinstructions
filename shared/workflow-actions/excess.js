@@ -243,45 +243,59 @@ async function action_load_offer(payload, ctx) {
     }
   }
 
-  // ── Send confirmation email to original sender + CC + Jake ─────────────────
-  // Only if we have an original sender and the offer was successfully written.
-  if (originalSender && result.offerId && !ctx.dryRun) {
+  // ── Send confirmation email to INTERNAL Astute people only ─────────────────
+  // DO NOT send to external customers. Only notify the internal forwarder + CC.
+  if (result.offerId && !ctx.dryRun) {
     try {
-      const confirmSubject = originalSubject
-        ? `Re: ${originalSubject}`
-        : `Market Offer ${result.searchKey} loaded`;
-      const confirmBody = `Thank you for submitting the excess offer.
+      const isInternal = (email) => email && email.toLowerCase().includes('@astutegroup.com');
+
+      // Build recipient list: internal forwarder first, then internal CCs, then Jake
+      const internalRecipients = [];
+      if (isInternal(originalSender)) {
+        internalRecipients.push(originalSender);
+      }
+      if (Array.isArray(originalCc)) {
+        for (const cc of originalCc) {
+          if (isInternal(cc) && !cc.includes('excessinc@') && !internalRecipients.includes(cc.toLowerCase())) {
+            internalRecipients.push(cc);
+          }
+        }
+      }
+      if (ctx.jakeEmail && !internalRecipients.map(e => e.toLowerCase()).includes(ctx.jakeEmail.toLowerCase())) {
+        internalRecipients.push(ctx.jakeEmail);
+      }
+
+      if (internalRecipients.length > 0) {
+        const toEmail = internalRecipients[0];
+        const ccList = internalRecipients.slice(1);
+
+        const confirmSubject = originalSubject
+          ? `Re: ${originalSubject}`
+          : `Market Offer ${result.searchKey} loaded`;
+        const confirmBody = `Excess offer loaded.
 
 Partner: ${partnerName || '(unknown)'}
 Market Offer #: ${result.searchKey}
 Lines loaded: ${result.linesWritten}
 
-This offer has been loaded into Orange Tsunami and is now available for matching against open RFQs.
+This offer is now in Orange Tsunami and available for matching against open RFQs.
 
 — Excess Offer System (automated)`;
 
-      // CC: original CC recipients + Jake
-      const ccList = [];
-      if (Array.isArray(originalCc)) {
-        ccList.push(...originalCc.filter(e => e && !e.includes('excessinc@')));
-      }
-      if (ctx.jakeEmail && !ccList.includes(ctx.jakeEmail)) {
-        ccList.push(ctx.jakeEmail);
-      }
+        await ctx.notifier.sendEmail(toEmail, confirmSubject, confirmBody, {
+          cc: ccList.length > 0 ? ccList : undefined,
+        });
 
-      await ctx.notifier.sendEmail(originalSender, confirmSubject, confirmBody, {
-        cc: ccList.length > 0 ? ccList : undefined,
-      });
-
-      breadcrumbs.write({
-        cog: 'offer-poller',
-        event: 'confirmation-sent',
-        uid: ctx.uid,
-        offerId: result.offerId,
-        searchKey: result.searchKey,
-        to: originalSender,
-        cc: ccList,
-      });
+        breadcrumbs.write({
+          cog: 'offer-poller',
+          event: 'confirmation-sent',
+          uid: ctx.uid,
+          offerId: result.offerId,
+          searchKey: result.searchKey,
+          to: toEmail,
+          cc: ccList,
+        });
+      }
     } catch (e) {
       console.error(`[excess.load_offer] confirmation email failed: ${e.message}`);
     }
