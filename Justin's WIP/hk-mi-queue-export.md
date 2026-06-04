@@ -1,4 +1,4 @@
-# Hong Kong MI Queue Export
+# Hong Kong Inspection Queue with Vendor Information
 
 Export active inspection queue lines for Hong Kong warehouse, filtered to MI Queue shelf with no picked user.
 
