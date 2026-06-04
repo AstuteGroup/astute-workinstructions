@@ -274,6 +274,58 @@ function pullBuyerActivityBreakdown(sinceTs, untilTs, emailBatchRfqs) {
   });
 }
 
+// ─── API enrichment overlap detection ────────────────────────────────────────
+// Finds RFQ lines where Claude did API enrichment AND a buyer also sourced.
+// This is duplicate effort — Claude already has franchise pricing.
+function pullApiEnrichmentOverlap(sinceTs, untilTs) {
+  // Find RFQ lines that have BOTH:
+  // 1. VQs from Claude as buyer (API enrichment) — createdby = Claude AND buyer = Claude
+  // 2. VQs from human buyers (createdby = buyer, buyer is a known buyer)
+  const sql =
+    `WITH api_lines AS ( ` +
+    `  SELECT DISTINCT v.chuboe_rfq_line_id ` +
+    `  FROM adempiere.chuboe_vq_line v ` +
+    `  WHERE v.created >= '${sinceTs}'::timestamp AND v.created < '${untilTs}'::timestamp ` +
+    `  AND v.isactive='Y' ` +
+    `  AND v.createdby = ${CLAUDE_USER_ID} ` +
+    `  AND (v.chuboe_buyer_id = ${CLAUDE_USER_ID} OR v.chuboe_buyer_id IS NULL) ` +
+    `), ` +
+    `buyer_vqs AS ( ` +
+    `  SELECT v.chuboe_rfq_line_id, v.chuboe_buyer_id, bu.name AS buyer_name, ` +
+    `         r.value AS rfq, ` +
+    `         (SELECT lm.chuboe_mpn FROM adempiere.chuboe_rfq_line_mpn lm ` +
+    `          WHERE lm.chuboe_rfq_line_id = rl.chuboe_rfq_line_id LIMIT 1) AS mpn, ` +
+    `         COUNT(*) AS vq_count ` +
+    `  FROM adempiere.chuboe_vq_line v ` +
+    `  JOIN adempiere.chuboe_rfq_line rl ON v.chuboe_rfq_line_id = rl.chuboe_rfq_line_id ` +
+    `  JOIN adempiere.chuboe_rfq r ON rl.chuboe_rfq_id = r.chuboe_rfq_id ` +
+    `  LEFT JOIN adempiere.ad_user bu ON bu.ad_user_id = v.chuboe_buyer_id ` +
+    `  WHERE v.created >= '${sinceTs}'::timestamp AND v.created < '${untilTs}'::timestamp ` +
+    `  AND v.isactive='Y' ` +
+    `  AND v.createdby != ${CLAUDE_USER_ID} ` +
+    `  AND v.chuboe_buyer_id IS NOT NULL ` +
+    `  AND v.createdby = v.chuboe_buyer_id ` +
+    `  GROUP BY v.chuboe_rfq_line_id, v.chuboe_buyer_id, bu.name, r.value, rl.chuboe_rfq_line_id ` +
+    `) ` +
+    `SELECT bv.buyer_name, bv.rfq, bv.mpn, bv.vq_count ` +
+    `FROM buyer_vqs bv ` +
+    `JOIN api_lines al ON bv.chuboe_rfq_line_id = al.chuboe_rfq_line_id ` +
+    `ORDER BY bv.buyer_name, bv.rfq;`;
+  const out = psqlPipe(sql);
+  const rows = out.trim().split('\n').filter(Boolean).map(line => {
+    const [buyerName, rfq, mpn, vqCount] = line.split('|');
+    return { buyerName, rfq, mpn: mpn || '(unknown)', vqCount: Number(vqCount) || 0 };
+  });
+  // Aggregate by buyer
+  const byBuyer = new Map();
+  for (const r of rows) {
+    if (!byBuyer.has(r.buyerName)) byBuyer.set(r.buyerName, { lines: [], totalVqs: 0 });
+    byBuyer.get(r.buyerName).lines.push(r);
+    byBuyer.get(r.buyerName).totalVqs += r.vqCount;
+  }
+  return { rows, byBuyer };
+}
+
 // Returns 'Buyer' / 'Support' / 'Untagged' / '(Claude)' for the role column.
 function roleFor(loaderName, userId) {
   if (loaderName.startsWith('Claude')) return '(Claude)';
@@ -467,6 +519,7 @@ function lookupUserNames(userIds) {
   const activity = pullActivity(sinceTs, untilTs, allBatchRfqs);
   const topBuyers = pullTopBuyersPerLoader(sinceTs, untilTs, allBatchRfqs);
   const buyerBreakdown = pullBuyerActivityBreakdown(sinceTs, untilTs, allBatchRfqs);
+  const apiOverlap = pullApiEnrichmentOverlap(sinceTs, untilTs);
 
   // Apply "hide zero" rule for Claude buckets
   const claudeBucketNames = new Set([
@@ -527,6 +580,29 @@ ${buyerBreakdown.filter(b => b.total > 0).slice(0, 20).map(b => {
 </table>
 <p style="color:#666;font-size:11px;margin-top:4px"><i>Legend: <span style="color:#4a4">■ Claude</span> · <span style="color:#88c">■ Support</span> · <span style="color:#ca4">■ Self</span>. "Self" = buyer loaded their own VQs (createdby = chuboe_buyer_id). Top 20 buyers by volume shown.</i></p>
 `;
+
+  // API Enrichment Overlap section
+  if (apiOverlap.rows.length > 0) {
+    const overlapBuyers = [...apiOverlap.byBuyer.entries()].sort((a, b) => b[1].totalVqs - a[1].totalVqs);
+    html += `
+<h3 style="margin-bottom:4px;color:#b80">⚠️ API Enrichment Overlap</h3>
+<p style="margin-top:0;color:#666;font-size:11px">Parts where Claude already got franchise pricing via API, but a buyer also manually sourced. This is duplicate effort.</p>
+<table border="1" cellpadding="6" cellspacing="0" style="border-collapse:collapse;font-size:12px;min-width:500px">
+<thead style="background:#fff3e0"><tr><th align="left">Buyer</th><th align="right">Overlap VQs</th><th align="right">RFQ Lines</th><th align="left">Sample MPNs</th></tr></thead>
+<tbody>
+${overlapBuyers.map(([buyerName, data]) => {
+  const sampleMpns = [...new Set(data.lines.map(l => l.mpn))].slice(0, 3).join(', ');
+  const lineCount = data.lines.length;
+  return `<tr><td>${esc(buyerName)}</td><td style="text-align:right">${data.totalVqs}</td><td style="text-align:right">${lineCount}</td><td style="font-size:11px">${esc(sampleMpns)}${lineCount > 3 ? ' …' : ''}</td></tr>`;
+}).join('\n')}
+<tr style="background:#fff3e0"><td><b>Total overlap</b></td><td style="text-align:right"><b>${apiOverlap.rows.reduce((a, r) => a + r.vqCount, 0)}</b></td><td style="text-align:right"><b>${apiOverlap.rows.length}</b></td><td></td></tr>
+</tbody>
+</table>
+<p style="color:#666;font-size:11px;margin-top:4px"><i>These are RFQ lines where Claude's API enrichment (DigiKey, Mouser, TTI, etc.) already returned pricing, and then a buyer also loaded VQs for the same line. The buyer's manual effort may have been unnecessary — check if the franchise quotes were sufficient.</i></p>
+`;
+  } else {
+    html += `<p style="color:#4a4;margin-top:16px"><b>✓ No API enrichment overlap</b> — buyers aren't duplicating Claude's franchise sourcing.</p>`;
+  }
 
   if (batches.length > 0) {
     html += `<h3 style="margin-bottom:4px">Batches loaded via vq-loading-agent</h3>
