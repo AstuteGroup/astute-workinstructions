@@ -319,13 +319,14 @@ function pullVQs(sinceTs, untilTs, forwardedIds) {
     ? `OR v.chuboe_vq_line_id IN (${[...forwardedIds].join(',')})`
     : '';
   const sql =
-    `SELECT v.chuboe_vq_line_id, r.value, ${scrub('cust.name')}, ${scrub('rl.chuboe_cpc')}, ${scrub('bp.name')}, ${scrub('v.chuboe_mpn')}, ` +
+    `SELECT v.chuboe_vq_line_id, r.value, ${scrub('rt.name')}, ${scrub('cust.name')}, ${scrub('rl.chuboe_cpc')}, ${scrub('bp.name')}, ${scrub('v.chuboe_mpn')}, ` +
     `       v.cost, COALESCE(c.iso_code, ''), v.qty, ${scrub('v.chuboe_date_code')}, ${scrub('v.chuboe_lead_time')}, ` +
     `       ${scrub('v.chuboe_note_public')}, ${scrub('v.chuboe_note_private')}, ` +
     `       ${scrub('v.chuboe_note_user')}, ${scrub('ub.name')}, ${scrub('us.name')}, v.created, v.createdby ` +
     `FROM adempiere.chuboe_vq_line v ` +
     `JOIN adempiere.chuboe_rfq_line rl ON v.chuboe_rfq_line_id = rl.chuboe_rfq_line_id ` +
     `JOIN adempiere.chuboe_rfq r ON rl.chuboe_rfq_id = r.chuboe_rfq_id ` +
+    `LEFT JOIN adempiere.chuboe_rfq_type rt ON rt.chuboe_rfq_type_id = r.chuboe_rfq_type_id ` +
     `JOIN adempiere.c_bpartner cust ON r.c_bpartner_id = cust.c_bpartner_id ` +
     `JOIN adempiere.c_bpartner bp ON v.c_bpartner_id = bp.c_bpartner_id ` +
     `LEFT JOIN adempiere.c_currency c ON c.c_currency_id = v.c_currency_id ` +
@@ -339,7 +340,7 @@ function pullVQs(sinceTs, untilTs, forwardedIds) {
     `ORDER BY cust.name, r.value, rl.chuboe_cpc, NULLIF(v.cost, 0) ASC NULLS LAST, v.created DESC;`;
   const out = psqlPipe(sql);
   return out.trim().split('\n').filter(Boolean).map(line => {
-    const [vqId, rfq, customer, cpc, vendor, mpn, cost, currency, qty, dateCode, leadTime, noteP, noteX, noteU, buyer, seller, created, createdby] = line.split('|');
+    const [vqId, rfq, rfqType, customer, cpc, vendor, mpn, cost, currency, qty, dateCode, leadTime, noteP, noteX, noteU, buyer, seller, created, createdby] = line.split('|');
     const notes = [noteP, noteX, noteU].filter(Boolean).join(' | ').replace(/\r?\n/g, ' ').trim();
     const createdbyId = Number(createdby);
     // Source: show loader name if APAC team member, otherwise 'forwarded'
@@ -347,7 +348,9 @@ function pullVQs(sinceTs, untilTs, forwardedIds) {
     const source = loaderName || 'forwarded';
     return {
       vqId: Number(vqId),
-      rfq, customer, cpc, vendor, mpn,
+      rfq,
+      rfqType: rfqType || '',
+      customer, cpc, vendor, mpn,
       cost: cost ? Number(cost) : null,
       currency,
       qty: qty ? Number(qty) : null,
@@ -382,6 +385,7 @@ async function buildXlsx(vqs, windowStr) {
   const cols = [
     { header: 'Customer',     key: 'customer',  width: 28 },
     { header: 'RFQ',          key: 'rfq',       width: 10 },
+    { header: 'RFQ Type',     key: 'rfqType',   width: 12 },
     { header: 'CPC',          key: 'cpc',       width: 24 },
     { header: 'Vendor',       key: 'vendor',    width: 32 },
     { header: 'MPN',          key: 'mpn',       width: 24 },
@@ -407,6 +411,7 @@ async function buildXlsx(vqs, windowStr) {
     const row = ws.addRow({
       customer: v.customer,
       rfq: v.rfq,
+      rfqType: v.rfqType,
       cpc: v.cpc,
       created: v.created || '',
       source: v.source,
