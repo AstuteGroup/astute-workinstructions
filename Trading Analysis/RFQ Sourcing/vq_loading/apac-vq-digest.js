@@ -74,7 +74,7 @@ const APAC_BUYER_IDS = APAC_TEAM.buyers.map(b => b.id);
 // Buyer emails for forwarder detection (support don't forward to vq@)
 const APAC_EMAILS = APAC_TEAM.buyers.map(b => b.email.toLowerCase());
 
-// Recipients (for now: Jake + Ivy only while testing)
+// Recipients (Jake + Ivy for now)
 const RECIPIENTS = ['jake.harris@astutegroup.com', 'ivy.song@astutegroup.com'];
 
 const MAX_WINDOW_HOURS = 14 * 24; // safety cap if state file is very stale
@@ -88,6 +88,7 @@ const SYSTEM_VENDOR_IDS = [1009435, 1008101];
 const args = process.argv.slice(2);
 const SEND = args.includes('--send');
 const RESET_STATE = args.includes('--reset-state');
+const TEST_MODE = args.includes('--test');  // Use 24h window ending at scheduled send time (10:00 UTC)
 const sinceIdx = args.indexOf('--since');
 const SINCE_OVERRIDE_HOURS = sinceIdx >= 0 ? Number(args[sinceIdx + 1]) : null;
 
@@ -124,6 +125,17 @@ function writeState(state) {
 
 function determineWindow() {
   const now = Date.now();
+
+  // --test mode: use 24h window ending at scheduled send time (10:00 UTC)
+  if (TEST_MODE) {
+    const today10UTC = new Date();
+    today10UTC.setUTCHours(10, 0, 0, 0);
+    // If it's before 10:00 UTC today, use yesterday's 10:00 UTC as the end
+    const untilMs = today10UTC.getTime() <= now ? today10UTC.getTime() : today10UTC.getTime() - 24 * 3600 * 1000;
+    const sinceMs = untilMs - 24 * 3600 * 1000;
+    return { sinceMs, untilMs, source: '--test (24h ending at scheduled 10:00 UTC)' };
+  }
+
   if (SINCE_OVERRIDE_HOURS != null) {
     return { sinceMs: now - SINCE_OVERRIDE_HOURS * 3600 * 1000, untilMs: now, source: `--since ${SINCE_OVERRIDE_HOURS}h` };
   }
@@ -325,7 +337,8 @@ function pullVQs(sinceTs, untilTs, forwardedIds) {
     `SELECT v.chuboe_vq_line_id, r.value, ${scrub('rt.name')}, ${scrub('cust.name')}, ${scrub('rl.chuboe_cpc')}, ${scrub('bp.name')}, ${scrub('v.chuboe_mpn')}, ` +
     `       v.cost, COALESCE(c.iso_code, ''), v.qty, ${scrub('v.chuboe_date_code')}, ${scrub('v.chuboe_lead_time')}, ` +
     `       ${scrub('v.chuboe_note_public')}, ${scrub('v.chuboe_note_private')}, ` +
-    `       ${scrub('v.chuboe_note_user')}, ${scrub('ub.name')}, ${scrub('us.name')}, v.created, v.createdby ` +
+    `       ${scrub('v.chuboe_note_user')}, ${scrub('ub.name')}, ${scrub('us.name')}, v.created, v.createdby, ` +
+    `       v.chuboe_rfq_line_id, v.c_bpartner_id ` +
     `FROM adempiere.chuboe_vq_line v ` +
     `JOIN adempiere.chuboe_rfq_line rl ON v.chuboe_rfq_line_id = rl.chuboe_rfq_line_id ` +
     `JOIN adempiere.chuboe_rfq r ON rl.chuboe_rfq_id = r.chuboe_rfq_id ` +
@@ -343,12 +356,12 @@ function pullVQs(sinceTs, untilTs, forwardedIds) {
     `ORDER BY cust.name, r.value, rl.chuboe_cpc, NULLIF(v.cost, 0) ASC NULLS LAST, v.created DESC;`;
   const out = psqlPipe(sql);
   return out.trim().split('\n').filter(Boolean).map(line => {
-    const [vqId, rfq, rfqType, customer, cpc, vendor, mpn, cost, currency, qty, dateCode, leadTime, noteP, noteX, noteU, buyer, seller, created, createdby] = line.split('|');
+    const [vqId, rfq, rfqType, customer, cpc, vendor, mpn, cost, currency, qty, dateCode, leadTime, noteP, noteX, noteU, buyer, seller, created, createdby, rfqLineId, vendorId] = line.split('|');
     const notes = [noteP, noteX, noteU].filter(Boolean).join(' | ').replace(/\r?\n/g, ' ').trim();
     const createdbyId = Number(createdby);
-    // Source: show loader name if APAC team member, otherwise 'forwarded'
+    // Source: show loader name if APAC team member, otherwise 'Buyer → Claude' (forwarded to vq@ for Claude to load)
     const loaderName = USER_ID_TO_NAME.get(createdbyId);
-    const source = loaderName || 'forwarded';
+    const source = loaderName || 'Buyer → Claude';
     return {
       vqId: Number(vqId),
       rfq,
@@ -365,8 +378,47 @@ function pullVQs(sinceTs, untilTs, forwardedIds) {
       created,
       source,
       createdbyId,
+      rfqLineId: Number(rfqLineId),
+      vendorId: Number(vendorId),
     };
   });
+}
+
+// Detect duplicate VQs: same RFQ line + vendor + MPN loaded by both Claude and a manual loader
+const CLAUDE_USER_ID = 1049524;
+function detectDuplicates(vqs) {
+  // Group by rfqLineId + vendorId + normalized MPN
+  const groups = new Map();
+  for (const v of vqs) {
+    const key = `${v.rfqLineId}|${v.vendorId}|${(v.mpn || '').toUpperCase().replace(/[-\s]/g, '')}`;
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key).push(v);
+  }
+
+  // Find groups with both Claude-loaded and manually-loaded VQs
+  const duplicates = [];
+  for (const [key, group] of groups) {
+    if (group.length < 2) continue;
+    const hasClaudeLoaded = group.some(v => v.createdbyId === CLAUDE_USER_ID);
+    const hasManualLoaded = group.some(v => v.createdbyId !== CLAUDE_USER_ID);
+    if (hasClaudeLoaded && hasManualLoaded) {
+      // Sort by created timestamp to determine who loaded first
+      const sorted = [...group].sort((a, b) => (a.created || '').localeCompare(b.created || ''));
+      const first = sorted[0];
+      const rest = sorted.slice(1);
+      duplicates.push({
+        key,
+        vqs: group,
+        rfq: group[0].rfq,
+        cpc: group[0].cpc,
+        vendor: group[0].vendor,
+        mpn: group[0].mpn,
+        firstLoader: first.source,
+        duplicatedBy: [...new Set(rest.map(v => v.source))].join(', '),
+      });
+    }
+  }
+  return duplicates;
 }
 
 function fmtPrice(cost, currency) {
@@ -451,35 +503,20 @@ async function buildXlsx(vqs, windowStr) {
   return Buffer.from(await wb.xlsx.writeBuffer());
 }
 
-function buildHtml(vqs, windowStr, sourceLabel) {
-  // Summary stats
-  const sumByRfq = new Map();        // rfq -> { count, customer, rfqType }
-  const sumByVendor = new Map();
-  const sumByCustomer = new Map();
-  const sumByLoader = new Map();
-  const sumByBuyer = new Map();
-  const sumBySeller = new Map();
-  const sumByRfqType = new Map();
+function buildHtml(vqs, windowStr, sourceLabel, duplicates = []) {
+  // Summary stats (buyer + loader activity focus)
+  const sumByRfq = new Set();        // unique RFQs
+  const sumByVendor = new Set();     // unique vendors
+  const sumByCustomer = new Set();   // unique customers
+  const sumByLoader = new Map();     // loader -> count
+  const sumByBuyer = new Map();      // buyer -> count
   for (const v of vqs) {
-    // RFQ with metadata
-    if (!sumByRfq.has(v.rfq)) {
-      sumByRfq.set(v.rfq, { count: 0, customer: v.customer, rfqType: v.rfqType });
-    }
-    sumByRfq.get(v.rfq).count++;
-
-    sumByVendor.set(v.vendor, (sumByVendor.get(v.vendor) || 0) + 1);
-    sumByCustomer.set(v.customer, (sumByCustomer.get(v.customer) || 0) + 1);
+    sumByRfq.add(v.rfq);
+    sumByCustomer.add(v.customer);
+    sumByVendor.add(v.vendor);
     sumByLoader.set(v.source, (sumByLoader.get(v.source) || 0) + 1);
     if (v.buyer) sumByBuyer.set(v.buyer, (sumByBuyer.get(v.buyer) || 0) + 1);
-    if (v.seller) sumBySeller.set(v.seller, (sumBySeller.get(v.seller) || 0) + 1);
-    if (v.rfqType) sumByRfqType.set(v.rfqType, (sumByRfqType.get(v.rfqType) || 0) + 1);
   }
-
-  // Build loader breakdown string
-  const loaderBreakdown = [...sumByLoader.entries()]
-    .sort((a, b) => b[1] - a[1])
-    .map(([name, count]) => `${name}: ${count}`)
-    .join(', ');
 
   let html = `<html><body style="font-family:Arial,sans-serif;font-size:13px;color:#222">
 <h2 style="color:#2a5;margin-bottom:4px">APAC Team — Daily VQ Digest</h2>
@@ -489,109 +526,53 @@ function buildHtml(vqs, windowStr, sourceLabel) {
   <b>${sumByCustomer.size}</b> customer${sumByCustomer.size === 1 ? '' : 's'} ·
   <b>${sumByRfq.size}</b> RFQ${sumByRfq.size === 1 ? '' : 's'} ·
   <b>${sumByVendor.size}</b> vendor${sumByVendor.size === 1 ? '' : 's'}
-</p>
-<p style="margin:4px 0;font-size:12px;color:#555">
-  <b>By loader:</b> ${esc(loaderBreakdown)}
 </p>`;
+
+  // Show duplicate warning if any
+  if (duplicates.length > 0) {
+    html += `
+<div style="background:#fff3cd;border:1px solid #ffc107;border-radius:4px;padding:8px 12px;margin:12px 0">
+  <b style="color:#856404">⚠ ${duplicates.length} potential duplicate${duplicates.length === 1 ? '' : 's'}</b>
+  <span style="color:#856404;font-size:12px"> — same RFQ line + vendor + MPN loaded twice</span>
+  <table border="0" cellpadding="4" cellspacing="0" style="margin-top:8px;font-size:11px;color:#856404">
+    <tr style="font-weight:bold"><td>RFQ</td><td>CPC</td><td>Vendor</td><td>MPN</td><td>First</td><td>Duplicated by</td></tr>
+${duplicates.slice(0, 10).map(d => `    <tr><td>${esc(d.rfq)}</td><td>${esc(d.cpc)}</td><td>${esc(d.vendor)}</td><td>${esc(d.mpn)}</td><td>${esc(d.firstLoader)}</td><td style="color:#c00">${esc(d.duplicatedBy)}</td></tr>`).join('\n')}
+${duplicates.length > 10 ? `    <tr><td colspan="6" style="color:#666"><i>...and ${duplicates.length - 10} more</i></td></tr>` : ''}
+  </table>
+</div>`;
+  }
 
   if (vqs.length === 0) {
     html += `<p style="color:#999"><i>No VQs in this window.</i></p>`;
   } else {
-    // Top 10 customers by VQ count
-    const topCustomers = [...sumByCustomer.entries()]
-      .sort((a, b) => b[1] - a[1])
-      .slice(0, 10);
+    // Buyers sorted by VQ count
+    const buyerRows = [...sumByBuyer.entries()]
+      .sort((a, b) => b[1] - a[1]);
 
-    // Top 10 vendors by VQ count
-    const topVendors = [...sumByVendor.entries()]
-      .sort((a, b) => b[1] - a[1])
-      .slice(0, 10);
-
-    // Top 10 RFQs by VQ count (with customer and type)
-    const topRfqs = [...sumByRfq.entries()]
-      .sort((a, b) => b[1].count - a[1].count)
-      .slice(0, 10);
-
-    // Top buyers by VQ count
-    const topBuyers = [...sumByBuyer.entries()]
-      .sort((a, b) => b[1] - a[1])
-      .slice(0, 10);
-
-    // Top sellers by VQ count
-    const topSellers = [...sumBySeller.entries()]
-      .sort((a, b) => b[1] - a[1])
-      .slice(0, 10);
-
-    // RFQ types breakdown
-    const rfqTypes = [...sumByRfqType.entries()]
+    // Loaders sorted by VQ count
+    const loaderRows = [...sumByLoader.entries()]
       .sort((a, b) => b[1] - a[1]);
 
     html += `
-<h3 style="margin:16px 0 8px 0;color:#333">By RFQ Type</h3>
-<table border="1" cellpadding="6" cellspacing="0" style="border-collapse:collapse;font-size:12px">
-<thead style="background:#eef"><tr>
-  <th align="left">Type</th>
-  <th align="right">VQs</th>
-</tr></thead>
-<tbody>
-${rfqTypes.map(([name, count]) => `<tr><td>${esc(name)}</td><td align="right">${count}</td></tr>`).join('\n')}
-</tbody>
-</table>
-
-<h3 style="margin:16px 0 8px 0;color:#333">Top RFQs</h3>
-<table border="1" cellpadding="6" cellspacing="0" style="border-collapse:collapse;font-size:12px">
-<thead style="background:#eef"><tr>
-  <th align="left">RFQ</th>
-  <th align="left">Type</th>
-  <th align="left">Customer</th>
-  <th align="right">VQs</th>
-</tr></thead>
-<tbody>
-${topRfqs.map(([rfq, data]) => `<tr><td>${esc(rfq)}</td><td>${esc(data.rfqType)}</td><td>${esc(data.customer)}</td><td align="right">${data.count}</td></tr>`).join('\n')}
-</tbody>
-</table>
-
-<h3 style="margin:16px 0 8px 0;color:#333">Top Customers</h3>
-<table border="1" cellpadding="6" cellspacing="0" style="border-collapse:collapse;font-size:12px">
-<thead style="background:#eef"><tr>
-  <th align="left">Customer</th>
-  <th align="right">VQs</th>
-</tr></thead>
-<tbody>
-${topCustomers.map(([name, count]) => `<tr><td>${esc(name)}</td><td align="right">${count}</td></tr>`).join('\n')}
-</tbody>
-</table>
-
-<h3 style="margin:16px 0 8px 0;color:#333">Top Vendors</h3>
-<table border="1" cellpadding="6" cellspacing="0" style="border-collapse:collapse;font-size:12px">
-<thead style="background:#eef"><tr>
-  <th align="left">Vendor</th>
-  <th align="right">VQs</th>
-</tr></thead>
-<tbody>
-${topVendors.map(([name, count]) => `<tr><td>${esc(name)}</td><td align="right">${count}</td></tr>`).join('\n')}
-</tbody>
-</table>
-
-<h3 style="margin:16px 0 8px 0;color:#333">Top Buyers</h3>
+<h3 style="margin:16px 0 8px 0;color:#333">VQs by Buyer</h3>
 <table border="1" cellpadding="6" cellspacing="0" style="border-collapse:collapse;font-size:12px">
 <thead style="background:#eef"><tr>
   <th align="left">Buyer</th>
   <th align="right">VQs</th>
 </tr></thead>
 <tbody>
-${topBuyers.map(([name, count]) => `<tr><td>${esc(name)}</td><td align="right">${count}</td></tr>`).join('\n')}
+${buyerRows.map(([name, count]) => `<tr><td>${esc(name)}</td><td align="right">${count}</td></tr>`).join('\n')}
 </tbody>
 </table>
 
-<h3 style="margin:16px 0 8px 0;color:#333">Top Sellers</h3>
+<h3 style="margin:16px 0 8px 0;color:#333">VQs by Loader</h3>
 <table border="1" cellpadding="6" cellspacing="0" style="border-collapse:collapse;font-size:12px">
 <thead style="background:#eef"><tr>
-  <th align="left">Seller</th>
+  <th align="left">Loader</th>
   <th align="right">VQs</th>
 </tr></thead>
 <tbody>
-${topSellers.map(([name, count]) => `<tr><td>${esc(name)}</td><td align="right">${count}</td></tr>`).join('\n')}
+${loaderRows.map(([name, count]) => `<tr><td>${esc(name)}</td><td align="right">${count}</td></tr>`).join('\n')}
 </tbody>
 </table>
 
@@ -633,7 +614,13 @@ Window labelled CT (chuboe_*.created storage convention).
   const breakdown = [...byLoader.entries()].sort((a, b) => b[1] - a[1]).map(([k, v]) => `${k}:${v}`).join(' ');
   console.log(`VQs in window: ${vqs.length} (${breakdown})`);
 
-  const html = buildHtml(vqs, windowStr, source);
+  // Detect duplicates (same RFQ line + vendor + MPN loaded by both Claude and manual loader)
+  const duplicates = detectDuplicates(vqs);
+  if (duplicates.length > 0) {
+    console.log(`Potential duplicates: ${duplicates.length} (Claude + manual loader on same line/vendor/MPN)`);
+  }
+
+  const html = buildHtml(vqs, windowStr, source, duplicates);
   const xlsxBuf = await buildXlsx(vqs, windowStr);
 
   if (!SEND) {
@@ -668,6 +655,11 @@ Window labelled CT (chuboe_*.created storage convention).
     process.exit(1);
   }
 
-  writeState({ lastDigestTs: new Date(untilMs).toISOString(), lastSentVqCount: vqs.length });
-  console.log(`Sent to ${RECIPIENTS.join(', ')} — state advanced to ${new Date(untilMs).toISOString()}`);
+  // Don't advance state in test mode - allows repeated testing on same window
+  if (TEST_MODE) {
+    console.log(`Sent to ${RECIPIENTS.join(', ')} — state NOT advanced (test mode)`);
+  } else {
+    writeState({ lastDigestTs: new Date(untilMs).toISOString(), lastSentVqCount: vqs.length });
+    console.log(`Sent to ${RECIPIENTS.join(', ')} — state advanced to ${new Date(untilMs).toISOString()}`);
+  }
 })().catch(err => { console.error('FATAL:', err); process.exit(1); });
