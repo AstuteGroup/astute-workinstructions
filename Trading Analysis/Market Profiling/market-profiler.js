@@ -29,6 +29,7 @@ const logger = require(path.join(sharedPath, 'logger')).createLogger('MarketProf
 
 // Local modules
 const { processResults } = require('./availability-vq-loader');
+const XLSX = require('xlsx');
 
 // ─── Configuration ─────────────────────────────────────────────────────────
 
@@ -85,6 +86,44 @@ function updateWatermark(mpns) {
 
   saveWatermark(watermark);
   return watermark;
+}
+
+/**
+ * Extract unique MPNs from a scraper output xlsx file
+ */
+function extractMPNsFromOutput(outputPath) {
+  if (!fs.existsSync(outputPath)) return [];
+  try {
+    const wb = XLSX.readFile(outputPath);
+    const data = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]]);
+    const mpns = new Set();
+    for (const row of data) {
+      const mpn = row['Part Number'] || row.part_number || '';
+      if (mpn) mpns.add(String(mpn).toUpperCase());
+    }
+    return [...mpns];
+  } catch (e) {
+    logger.warn(`Failed to read output file ${outputPath}: ${e.message}`);
+    return [];
+  }
+}
+
+/**
+ * Count total unique MPNs already scraped for an RFQ (from all output files)
+ */
+function countScrapedMPNs(rfqNumber) {
+  const rfqFolder = path.join(path.dirname(NC_SCRIPT), `RFQ_${rfqNumber}`);
+  if (!fs.existsSync(rfqFolder)) return { count: 0, mpns: new Set() };
+
+  const allMpns = new Set();
+  const files = fs.readdirSync(rfqFolder).filter(f => f.endsWith('.xlsx') && f.startsWith('Results_'));
+
+  for (const file of files) {
+    const mpns = extractMPNsFromOutput(path.join(rfqFolder, file));
+    mpns.forEach(m => allMpns.add(m));
+  }
+
+  return { count: allMpns.size, mpns: allMpns };
 }
 
 // ─── Database Queries ──────────────────────────────────────────────────────
@@ -373,8 +412,9 @@ async function addRFQLines(rfqId, mpns) {
 /**
  * Run NC scraper in check-only mode
  */
-function runNCScraper(rfqNumber, limit = 0) {
+function runNCScraper(rfqNumber, limit = 0, offset = 0) {
   const args = ['--check-only'];
+  if (offset > 0) args.push('--offset', String(offset));
   if (limit > 0) args.push('--limit', String(limit));
   args.push(rfqNumber);
 
@@ -472,12 +512,17 @@ async function runMarketProfiling(options = {}) {
     return { mpnsFound: mpns.length, linesAdded: lineResult.added, vqsWritten: 0, rfq };
   }
 
-  // Step 4: Run NC scraper
+  // Step 4: Calculate offset and run NC scraper
   console.log('');
   console.log('Step 4: Running NetComponents scraper (check-only)...');
+
+  // Calculate offset: how many MPNs have already been scraped for this RFQ?
+  const { count: alreadyScraped } = countScrapedMPNs(rfq.searchKey);
+  console.log(`  Already scraped: ${alreadyScraped} MPNs (using as offset)`);
+
   let scraperResult;
   try {
-    scraperResult = await runNCScraper(rfq.searchKey, limit);
+    scraperResult = await runNCScraper(rfq.searchKey, limit, alreadyScraped);
   } catch (e) {
     console.error(`  Scraper failed: ${e.message}`);
     return { mpnsFound: mpns.length, linesAdded: lineResult.added, vqsWritten: 0, error: e.message };
@@ -497,10 +542,12 @@ async function runMarketProfiling(options = {}) {
   console.log(`  Skipped: ${vqResult.skipped} (${vqResult.duplicates} duplicates)`);
   console.log(`  Failed: ${vqResult.failed}`);
 
-  // Step 6: Update watermark
+  // Step 6: Update watermark with ACTUALLY scraped MPNs (from output file)
   console.log('');
   console.log('Step 6: Updating watermark...');
-  const watermark = updateWatermark(mpns.map(m => m.mpn));
+  const scrapedMpns = extractMPNsFromOutput(outputPath);
+  console.log(`  MPNs in output file: ${scrapedMpns.length}`);
+  const watermark = updateWatermark(scrapedMpns);
   console.log(`  Total MPNs tracked: ${Object.keys(watermark.mpnsProfiled).length}`);
   console.log(`  Total runs: ${watermark.totalRuns}`);
 

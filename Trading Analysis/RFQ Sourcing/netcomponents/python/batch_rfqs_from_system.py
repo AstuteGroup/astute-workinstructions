@@ -965,7 +965,8 @@ async def main():
         epilog='Examples:\n'
                '  python batch_rfqs_from_system.py 1008627                    # Full RFQ submission\n'
                '  python batch_rfqs_from_system.py --check-only 1008627       # Market profiling (scrape only)\n'
-               '  python batch_rfqs_from_system.py --check-only --limit 100 1008627',
+               '  python batch_rfqs_from_system.py --check-only --limit 50 1008627           # First 50 parts\n'
+               '  python batch_rfqs_from_system.py --check-only --offset 50 --limit 50 1008627  # Next 50 parts',
         formatter_class=argparse.RawDescriptionHelpFormatter
     )
     parser.add_argument('rfq_number', help='RFQ number to process')
@@ -973,12 +974,15 @@ async def main():
                         help='Market profiling mode: scrape availability without sending RFQs')
     parser.add_argument('--limit', type=int, default=0,
                         help='Limit number of parts to process (0 = all)')
+    parser.add_argument('--offset', type=int, default=0,
+                        help='Skip first N parts (use with --limit to paginate)')
 
     args = parser.parse_args()
 
     rfq_number = args.rfq_number
     CHECK_ONLY_MODE = args.check_only
     parts_limit = args.limit
+    parts_offset = args.offset
 
     # Check for existing lock file (prevent duplicate runs)
     if not check_lock_file(rfq_number):
@@ -997,12 +1001,16 @@ async def main():
             remove_lock_file(rfq_number)
             sys.exit(1)
 
-        # Apply limit if specified
+        # Apply offset and limit if specified
+        total_parts = len(parts)
+        if parts_offset > 0:
+            parts = parts[parts_offset:]
+            print(f'Found {total_parts} line items, skipping first {parts_offset}')
         if parts_limit > 0 and len(parts) > parts_limit:
-            print(f'Found {len(parts)} line items, limiting to {parts_limit}')
+            print(f'Processing {parts_limit} of {len(parts)} remaining parts')
             parts = parts[:parts_limit]
         else:
-            print(f'Found {len(parts)} line items:\n')
+            print(f'Processing {len(parts)} line items:\n')
 
         for p in parts:
             print(f"  Line {p['line_number']}: {p['part_number']} x {p['quantity']:,}")
