@@ -450,15 +450,26 @@ async function buildXlsx(vqs, windowStr) {
 
 function buildHtml(vqs, windowStr, sourceLabel) {
   // Summary stats
-  const sumByRfq = new Map();
+  const sumByRfq = new Map();        // rfq -> { count, customer, rfqType }
   const sumByVendor = new Map();
   const sumByCustomer = new Map();
   const sumByLoader = new Map();
+  const sumByBuyer = new Map();
+  const sumBySeller = new Map();
+  const sumByRfqType = new Map();
   for (const v of vqs) {
-    sumByRfq.set(v.rfq, (sumByRfq.get(v.rfq) || 0) + 1);
+    // RFQ with metadata
+    if (!sumByRfq.has(v.rfq)) {
+      sumByRfq.set(v.rfq, { count: 0, customer: v.customer, rfqType: v.rfqType });
+    }
+    sumByRfq.get(v.rfq).count++;
+
     sumByVendor.set(v.vendor, (sumByVendor.get(v.vendor) || 0) + 1);
     sumByCustomer.set(v.customer, (sumByCustomer.get(v.customer) || 0) + 1);
     sumByLoader.set(v.source, (sumByLoader.get(v.source) || 0) + 1);
+    if (v.buyer) sumByBuyer.set(v.buyer, (sumByBuyer.get(v.buyer) || 0) + 1);
+    if (v.seller) sumBySeller.set(v.seller, (sumBySeller.get(v.seller) || 0) + 1);
+    if (v.rfqType) sumByRfqType.set(v.rfqType, (sumByRfqType.get(v.rfqType) || 0) + 1);
   }
 
   // Build loader breakdown string
@@ -493,7 +504,50 @@ function buildHtml(vqs, windowStr, sourceLabel) {
       .sort((a, b) => b[1] - a[1])
       .slice(0, 10);
 
+    // Top 10 RFQs by VQ count (with customer and type)
+    const topRfqs = [...sumByRfq.entries()]
+      .sort((a, b) => b[1].count - a[1].count)
+      .slice(0, 10);
+
+    // Top buyers by VQ count
+    const topBuyers = [...sumByBuyer.entries()]
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 10);
+
+    // Top sellers by VQ count
+    const topSellers = [...sumBySeller.entries()]
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 10);
+
+    // RFQ types breakdown
+    const rfqTypes = [...sumByRfqType.entries()]
+      .sort((a, b) => b[1] - a[1]);
+
     html += `
+<h3 style="margin:16px 0 8px 0;color:#333">By RFQ Type</h3>
+<table border="1" cellpadding="6" cellspacing="0" style="border-collapse:collapse;font-size:12px">
+<thead style="background:#eef"><tr>
+  <th align="left">Type</th>
+  <th align="right">VQs</th>
+</tr></thead>
+<tbody>
+${rfqTypes.map(([name, count]) => `<tr><td>${esc(name)}</td><td align="right">${count}</td></tr>`).join('\n')}
+</tbody>
+</table>
+
+<h3 style="margin:16px 0 8px 0;color:#333">Top RFQs</h3>
+<table border="1" cellpadding="6" cellspacing="0" style="border-collapse:collapse;font-size:12px">
+<thead style="background:#eef"><tr>
+  <th align="left">RFQ</th>
+  <th align="left">Type</th>
+  <th align="left">Customer</th>
+  <th align="right">VQs</th>
+</tr></thead>
+<tbody>
+${topRfqs.map(([rfq, data]) => `<tr><td>${esc(rfq)}</td><td>${esc(data.rfqType)}</td><td>${esc(data.customer)}</td><td align="right">${data.count}</td></tr>`).join('\n')}
+</tbody>
+</table>
+
 <h3 style="margin:16px 0 8px 0;color:#333">Top Customers</h3>
 <table border="1" cellpadding="6" cellspacing="0" style="border-collapse:collapse;font-size:12px">
 <thead style="background:#eef"><tr>
@@ -513,6 +567,28 @@ ${topCustomers.map(([name, count]) => `<tr><td>${esc(name)}</td><td align="right
 </tr></thead>
 <tbody>
 ${topVendors.map(([name, count]) => `<tr><td>${esc(name)}</td><td align="right">${count}</td></tr>`).join('\n')}
+</tbody>
+</table>
+
+<h3 style="margin:16px 0 8px 0;color:#333">Top Buyers</h3>
+<table border="1" cellpadding="6" cellspacing="0" style="border-collapse:collapse;font-size:12px">
+<thead style="background:#eef"><tr>
+  <th align="left">Buyer</th>
+  <th align="right">VQs</th>
+</tr></thead>
+<tbody>
+${topBuyers.map(([name, count]) => `<tr><td>${esc(name)}</td><td align="right">${count}</td></tr>`).join('\n')}
+</tbody>
+</table>
+
+<h3 style="margin:16px 0 8px 0;color:#333">Top Sellers</h3>
+<table border="1" cellpadding="6" cellspacing="0" style="border-collapse:collapse;font-size:12px">
+<thead style="background:#eef"><tr>
+  <th align="left">Seller</th>
+  <th align="right">VQs</th>
+</tr></thead>
+<tbody>
+${topSellers.map(([name, count]) => `<tr><td>${esc(name)}</td><td align="right">${count}</td></tr>`).join('\n')}
 </tbody>
 </table>
 
