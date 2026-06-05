@@ -321,7 +321,7 @@ function pullVQs(sinceTs, untilTs, forwardedIds) {
     `  AND v.created >= '${sinceTs}'::timestamp ` +
     `  AND v.created <  '${untilTs}'::timestamp ` +
     `  AND (v.createdby = ${IVY_USER_ID} ${idClause}) ` +
-    `ORDER BY cust.name, r.value, rl.chuboe_cpc, v.cost ASC NULLS LAST, v.created DESC;`;
+    `ORDER BY cust.name, r.value, rl.chuboe_cpc, NULLIF(v.cost, 0) ASC NULLS LAST, v.created DESC;`;
   const out = psqlPipe(sql);
   return out.trim().split('\n').filter(Boolean).map(line => {
     const [vqId, rfq, customer, cpc, vendor, mpn, cost, currency, qty, dateCode, leadTime, noteP, noteX, noteU, buyer, created, createdby] = line.split('|');
