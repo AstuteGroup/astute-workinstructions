@@ -26,6 +26,7 @@ const { execFileSync } = require('child_process');
 const sharedPath = path.join(__dirname, '../../shared');
 const { apiPost, resolveBP } = require(path.join(sharedPath, 'api-client'));
 const { resolveMfrForRow } = require(path.join(sharedPath, 'mfr-resolver'));
+const { resolveBPHistorical } = require(path.join(sharedPath, 'partner-lookup'));
 const logger = require(path.join(sharedPath, 'logger')).createLogger('AvailabilityVQ');
 
 // ─── Configuration ─────────────────────────────────────────────────────────
@@ -45,7 +46,8 @@ const DUPLICATE_CHECK_DAYS = 14;
  * 1. Curated vendor aliases (shared/data/vendor-aliases.json)
  * 2. Exact match by searchKey
  * 3. Fuzzy name matching
- * 4. Placeholder BP if unknown (with vendor name in notes)
+ * 4. Historical VQ fallback (resolveBPHistorical) - same as broker VQ loading
+ * 5. Placeholder BP if unknown (with vendor name in notes)
  */
 async function resolveVendorBP(supplierName) {
   if (!supplierName) return null;
@@ -58,6 +60,20 @@ async function resolveVendorBP(supplierName) {
     }
   } catch (e) {
     logger.debug(`BP resolution failed for '${supplierName}': ${e.message}`);
+  }
+
+  // Historical fallback: check recent VQ history for this vendor label
+  // Same pattern as load-bulk-summary.js - matches short broker names like
+  // "Yuexunfa" → "YUE XUN FA INTERNATIONAL LIMITED" by finding BPs that have
+  // received VQs with similar names in the last 90 days.
+  try {
+    const hist = resolveBPHistorical(supplierName);
+    if (hist) {
+      logger.info(`Historical BP fallback: '${supplierName}' → ${hist.id} (${hist.name})`);
+      return { id: hist.id, name: hist.name, source: 'historical' };
+    }
+  } catch (e) {
+    logger.debug(`Historical BP fallback failed for '${supplierName}': ${e.message}`);
   }
 
   // Unknown vendor - use placeholder (same pattern as VQ loader)
