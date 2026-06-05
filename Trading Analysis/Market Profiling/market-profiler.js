@@ -6,11 +6,12 @@
  * Scrapes broker availability WITHOUT sending RFQ emails.
  *
  * Workflow:
- * 1. Get inventory MPNs not profiled in last N days
- * 2. Create or reuse a weekly "Stock Profiling" RFQ in OT
- * 3. Run NC scraper in --check-only mode
- * 4. Load availability as $0 VQs
- * 5. Update profiling watermark
+ * 1. Read inventory MPNs from the weekly Infor export (same source as nc-listing.js)
+ * 2. Filter out MPNs profiled in the last N days (watermark)
+ * 3. Create or reuse a weekly "Stock Profiling" RFQ in OT
+ * 4. Run NC scraper in --check-only mode
+ * 5. Load availability as $0 VQs
+ * 6. Update profiling watermark
  *
  * Usage:
  *   node market-profiler.js --limit 500 --dry-run
@@ -43,6 +44,25 @@ const WATERMARK_FILE = path.join(process.env.HOME, 'workspace/.market-profiling-
 
 // NC Python script location
 const NC_SCRIPT = path.join(__dirname, '../RFQ Sourcing/netcomponents/python/batch_rfqs_from_system.py');
+
+// ─── Inventory File Helpers ─────────────────────────────────────────────────
+
+function getWeekStartDate() {
+  const now = new Date();
+  const day = now.getDay();
+  const diff = now.getDate() - day + (day === 0 ? -6 : 1);
+  const monday = new Date(now.setDate(diff));
+  return monday.toISOString().split('T')[0];
+}
+
+function getThisWeekInventoryFile() {
+  const weekStart = getWeekStartDate();
+  const persistentPath = path.join(INVENTORY_STORAGE_DIR, `inventory_${weekStart}.xlsx`);
+  if (fs.existsSync(persistentPath)) {
+    return persistentPath;
+  }
+  return null;
+}
 
 // ─── Watermark Management ──────────────────────────────────────────────────
 
@@ -105,10 +125,65 @@ function psqlQueryRows(sql) {
   }
 }
 
+// ─── Inventory Reading ─────────────────────────────────────────────────────
+
+// All BPs used for inventory offers (from inventory_cleanup.js WAREHOUSE_WRITEBACK)
+const STOCK_BP_IDS = [
+  1000332, // Astute Electronics Inc (Free Stock Austin/Stevenage/HK/Philippines, LAM Dead)
+  1000325, // Astute - Franchise Stock
+  1003236, // Astute - GE Aviation Excess (consignment)
+  1003621, // Astute - Taxan Excess (consignment)
+  1005225, // Astute - Spartronics Excess (consignment)
+  1010966, // Astute Inc - Eaton Consignment
+  1011267, // Astute - LAM Consignment
+];
+
 /**
- * Get inventory MPNs not profiled recently
+ * Get inventory MPNs not profiled recently.
+ *
+ * Reads from the OT stock offers (all inventory BPs) rather than re-parsing raw files.
+ * This captures static lists, carryovers, consignment inventory, and any other
+ * adjustments that were applied during inventory cleanup.
  */
 function getUnprofiledMPNs(limit = DEFAULT_BATCH_SIZE) {
+  console.log(`  Querying OT stock offers (${STOCK_BP_IDS.length} BPs)...`);
+
+  // Query active stock offers from all inventory BPs
+  // Get distinct MPNs with total qty across all offer lines
+  const bpList = STOCK_BP_IDS.join(', ');
+  const sql = `
+    SELECT
+      olm.chuboe_mpn,
+      COALESCE(SUM(ol.qty), 0) as total_qty
+    FROM adempiere.chuboe_offer o
+    JOIN adempiere.chuboe_offer_line ol ON o.chuboe_offer_id = ol.chuboe_offer_id
+    LEFT JOIN adempiere.chuboe_offer_line_mpn olm ON ol.chuboe_offer_line_id = olm.chuboe_offer_line_id
+    WHERE o.c_bpartner_id IN (${bpList})
+      AND o.isactive = 'Y'
+      AND ol.isactive = 'Y'
+      AND olm.chuboe_mpn IS NOT NULL
+      AND olm.chuboe_mpn <> ''
+    GROUP BY olm.chuboe_mpn
+    HAVING COALESCE(SUM(ol.qty), 0) > 0
+    ORDER BY total_qty DESC
+  `;
+
+  const rows = psqlQueryRows(sql);
+  console.log(`  Total inventory MPNs in OT: ${rows.length}`);
+
+  if (rows.length === 0) {
+    console.error(`  WARNING: No stock offers found for inventory BPs`);
+    console.error('  Run inventory_cleanup.js fetch first to load inventory offers.');
+    return [];
+  }
+
+  // Parse results
+  const allMPNs = rows.map(row => {
+    const [mpn, qty] = row.split('|');
+    return { mpn, qty: parseInt(qty, 10) || 0 };
+  });
+
+  // Load watermark to filter out recently profiled
   const watermark = loadWatermark();
   const skipDate = new Date(Date.now() - PROFILE_SKIP_DAYS * 24 * 60 * 60 * 1000).toISOString();
 
@@ -119,32 +194,14 @@ function getUnprofiledMPNs(limit = DEFAULT_BATCH_SIZE) {
       .map(([mpn]) => mpn)
   );
 
-  // Query inventory
-  const sql = `
-    SELECT DISTINCT
-      ol.chuboe_mpn,
-      COALESCE(SUM(ol.qty), 0) as total_qty
-    FROM adempiere.chuboe_offer o
-    JOIN adempiere.chuboe_offer_line ol ON o.chuboe_offer_id = ol.chuboe_offer_id
-    WHERE o.isactive = 'Y'
-      AND ol.isactive = 'Y'
-      AND o.created > NOW() - INTERVAL '30 days'
-      AND ol.chuboe_mpn IS NOT NULL
-      AND ol.chuboe_mpn != ''
-    GROUP BY ol.chuboe_mpn
-    HAVING COALESCE(SUM(ol.qty), 0) > 0
-    ORDER BY total_qty DESC
-    LIMIT ${limit * 2}
-  `;
+  console.log(`  Recently profiled (skip): ${recentlyProfiled.size}`);
 
-  const rows = psqlQueryRows(sql);
+  // Filter and limit
   const result = [];
-
-  for (const row of rows) {
+  for (const item of allMPNs) {
     if (result.length >= limit) break;
-    const [mpn, qty] = row.split('|');
-    if (!recentlyProfiled.has(mpn.toUpperCase())) {
-      result.push({ mpn, qty: parseInt(qty, 10) });
+    if (!recentlyProfiled.has(item.mpn.toUpperCase())) {
+      result.push(item);
     }
   }
 
@@ -178,7 +235,7 @@ async function getOrCreateProfilingRFQ() {
   }
 
   // Create new RFQ
-  // Using Astute Electronics Inc (BP ID 1000332) as the profiling customer
+  // Using Astute Electronics Inc (BP ID 1049385) as the profiling customer
   const payload = {
     C_BPartner_ID: 1000332, // Astute Electronics Inc
     Chuboe_RFQ_Type_ID: 1000007, // Stock
@@ -312,7 +369,7 @@ async function runMarketProfiling(options = {}) {
   const skipNc = options.skipNc || false;
 
   console.log('='.repeat(60));
-  console.log('Market Profiler (Self-Regulating)');
+  console.log('Market Profiler (Inventory-Based)');
   console.log('='.repeat(60));
   console.log(`Mode: ${dryRun ? 'DRY-RUN' : 'COMMIT'}`);
   console.log(`Batch size: ${limit} MPNs per tick`);
@@ -320,8 +377,8 @@ async function runMarketProfiling(options = {}) {
   console.log('='.repeat(60));
   console.log('');
 
-  // Step 1: Get unprofiled MPNs
-  console.log('Step 1: Getting unprofiled MPNs...');
+  // Step 1: Get unprofiled MPNs from inventory file
+  console.log('Step 1: Getting unprofiled MPNs from inventory file...');
   const mpns = getUnprofiledMPNs(limit);
   console.log(`  Found ${mpns.length} MPNs to profile`);
 
@@ -429,9 +486,9 @@ async function main() {
     } else if (args[i] === '--help') {
       console.log('Usage: node market-profiler.js [options]');
       console.log('');
-      console.log('Self-regulating market intelligence scraper. Runs continuously,');
-      console.log('processing small batches each tick. Rotates through inventory');
-      console.log(`every ${PROFILE_SKIP_DAYS} days.`);
+      console.log('Inventory-based market intelligence scraper. Reads MPNs from the');
+      console.log('weekly Infor inventory export (same source as nc-listing.js),');
+      console.log('scrapes NC for broker availability, and loads $0 VQs.');
       console.log('');
       console.log('Options:');
       console.log(`  --limit N     Batch size per tick (default: ${DEFAULT_BATCH_SIZE})`);
@@ -440,6 +497,9 @@ async function main() {
       console.log('  --skip-nc     Skip NC scrape (just add RFQ lines)');
       console.log('');
       console.log('This runs in check-only mode - no RFQs are sent to vendors.');
+      console.log('');
+      console.log('Inventory file location:');
+      console.log(`  ${INVENTORY_STORAGE_DIR}/inventory_<week-start>.xlsx`);
       process.exit(0);
     }
   }
