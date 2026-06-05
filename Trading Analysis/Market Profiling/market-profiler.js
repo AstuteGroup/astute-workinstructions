@@ -45,24 +45,8 @@ const WATERMARK_FILE = path.join(process.env.HOME, 'workspace/.market-profiling-
 // NC Python script location
 const NC_SCRIPT = path.join(__dirname, '../RFQ Sourcing/netcomponents/python/batch_rfqs_from_system.py');
 
-// ─── Inventory File Helpers ─────────────────────────────────────────────────
-
-function getWeekStartDate() {
-  const now = new Date();
-  const day = now.getDay();
-  const diff = now.getDate() - day + (day === 0 ? -6 : 1);
-  const monday = new Date(now.setDate(diff));
-  return monday.toISOString().split('T')[0];
-}
-
-function getThisWeekInventoryFile() {
-  const weekStart = getWeekStartDate();
-  const persistentPath = path.join(INVENTORY_STORAGE_DIR, `inventory_${weekStart}.xlsx`);
-  if (fs.existsSync(persistentPath)) {
-    return persistentPath;
-  }
-  return null;
-}
+// Carryover registry location (same as nc-listing.js)
+const CARRYOVER_DIR = path.join(__dirname, '../Inventory File Cleanup/carryover-registry');
 
 // ─── Watermark Management ──────────────────────────────────────────────────
 
@@ -139,49 +123,120 @@ const STOCK_BP_IDS = [
 ];
 
 /**
+ * Load carryover MPNs from the carryover registry.
+ * These are static lists that stay on NC even when not in the weekly Infor export.
+ */
+function loadCarryoverMPNs() {
+  if (!fs.existsSync(CARRYOVER_DIR)) {
+    return [];
+  }
+
+  const mpnQtyMap = {};
+  const files = fs.readdirSync(CARRYOVER_DIR).filter(f => f.endsWith('.json'));
+
+  for (const file of files) {
+    try {
+      const data = JSON.parse(fs.readFileSync(path.join(CARRYOVER_DIR, file), 'utf8'));
+      for (const line of (data.lines || [])) {
+        const mpn = String(line.MPN || line.mpn || '').trim();
+        if (!mpn) continue;
+        const qty = parseInt(line.Qty || line.qty || 1, 10);
+        const key = mpn.toUpperCase();
+        if (!mpnQtyMap[key]) {
+          mpnQtyMap[key] = { mpn, qty: 0 };
+        }
+        mpnQtyMap[key].qty += qty;
+      }
+    } catch (e) {
+      console.warn(`  Warning: Could not load carryover file ${file}: ${e.message}`);
+    }
+  }
+
+  return Object.values(mpnQtyMap);
+}
+
+/**
  * Get inventory MPNs not profiled recently.
  *
- * Reads from the OT stock offers (all inventory BPs) rather than re-parsing raw files.
- * This captures static lists, carryovers, consignment inventory, and any other
- * adjustments that were applied during inventory cleanup.
+ * Combines:
+ * 1. OT stock offers (all inventory BPs)
+ * 2. Carryover registry (static lists for NC)
+ *
+ * This captures everything we market on NetComponents.
  */
 function getUnprofiledMPNs(limit = DEFAULT_BATCH_SIZE) {
   console.log(`  Querying OT stock offers (${STOCK_BP_IDS.length} BPs)...`);
 
   // Query active stock offers from all inventory BPs
-  // Get distinct MPNs with total qty across all offer lines
+  // Include both offer_line.chuboe_mpn AND offer_line_mpn.chuboe_mpn
   const bpList = STOCK_BP_IDS.join(', ');
   const sql = `
-    SELECT
-      olm.chuboe_mpn,
-      COALESCE(SUM(ol.qty), 0) as total_qty
-    FROM adempiere.chuboe_offer o
-    JOIN adempiere.chuboe_offer_line ol ON o.chuboe_offer_id = ol.chuboe_offer_id
-    LEFT JOIN adempiere.chuboe_offer_line_mpn olm ON ol.chuboe_offer_line_id = olm.chuboe_offer_line_id
-    WHERE o.c_bpartner_id IN (${bpList})
-      AND o.isactive = 'Y'
-      AND ol.isactive = 'Y'
-      AND olm.chuboe_mpn IS NOT NULL
-      AND olm.chuboe_mpn <> ''
-    GROUP BY olm.chuboe_mpn
-    HAVING COALESCE(SUM(ol.qty), 0) > 0
+    WITH all_mpns AS (
+      -- MPNs from offer_line directly
+      SELECT ol.chuboe_mpn as mpn, ol.qty
+      FROM adempiere.chuboe_offer o
+      JOIN adempiere.chuboe_offer_line ol ON o.chuboe_offer_id = ol.chuboe_offer_id
+      WHERE o.c_bpartner_id IN (${bpList})
+        AND o.isactive = 'Y'
+        AND ol.isactive = 'Y'
+        AND ol.chuboe_mpn IS NOT NULL
+        AND ol.chuboe_mpn <> ''
+      UNION ALL
+      -- MPNs from offer_line_mpn sub-table
+      SELECT olm.chuboe_mpn as mpn, ol.qty
+      FROM adempiere.chuboe_offer o
+      JOIN adempiere.chuboe_offer_line ol ON o.chuboe_offer_id = ol.chuboe_offer_id
+      JOIN adempiere.chuboe_offer_line_mpn olm ON ol.chuboe_offer_line_id = olm.chuboe_offer_line_id
+      WHERE o.c_bpartner_id IN (${bpList})
+        AND o.isactive = 'Y'
+        AND ol.isactive = 'Y'
+        AND olm.chuboe_mpn IS NOT NULL
+        AND olm.chuboe_mpn <> ''
+    )
+    SELECT mpn, SUM(qty) as total_qty
+    FROM all_mpns
+    GROUP BY mpn
+    HAVING SUM(qty) > 0
     ORDER BY total_qty DESC
   `;
 
   const rows = psqlQueryRows(sql);
-  console.log(`  Total inventory MPNs in OT: ${rows.length}`);
+  console.log(`  OT offer MPNs: ${rows.length}`);
 
-  if (rows.length === 0) {
-    console.error(`  WARNING: No stock offers found for inventory BPs`);
+  // Parse OT results into a map for merging
+  const mpnQtyMap = {};
+  for (const row of rows) {
+    const [mpn, qty] = row.split('|');
+    const key = mpn.toUpperCase();
+    mpnQtyMap[key] = { mpn, qty: parseInt(qty, 10) || 0 };
+  }
+
+  // Load and merge carryover MPNs
+  console.log(`  Loading carryover MPNs...`);
+  const carryoverMPNs = loadCarryoverMPNs();
+  console.log(`  Carryover MPNs: ${carryoverMPNs.length}`);
+
+  let carryoverNew = 0;
+  for (const item of carryoverMPNs) {
+    const key = item.mpn.toUpperCase();
+    if (!mpnQtyMap[key]) {
+      mpnQtyMap[key] = item;
+      carryoverNew++;
+    } else {
+      mpnQtyMap[key].qty += item.qty;
+    }
+  }
+  console.log(`  Carryover unique (not in OT): ${carryoverNew}`);
+
+  // Convert to array sorted by qty
+  const allMPNs = Object.values(mpnQtyMap).sort((a, b) => b.qty - a.qty);
+  console.log(`  Total unique MPNs: ${allMPNs.length}`);
+
+  if (allMPNs.length === 0) {
+    console.error(`  WARNING: No inventory found`);
     console.error('  Run inventory_cleanup.js fetch first to load inventory offers.');
     return [];
   }
-
-  // Parse results
-  const allMPNs = rows.map(row => {
-    const [mpn, qty] = row.split('|');
-    return { mpn, qty: parseInt(qty, 10) || 0 };
-  });
 
   // Load watermark to filter out recently profiled
   const watermark = loadWatermark();
