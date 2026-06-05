@@ -308,7 +308,7 @@ function pullVQs(sinceTs, untilTs, forwardedIds) {
     `SELECT v.chuboe_vq_line_id, r.value, ${scrub('cust.name')}, ${scrub('rl.chuboe_cpc')}, ${scrub('bp.name')}, ${scrub('v.chuboe_mpn')}, ` +
     `       v.cost, COALESCE(c.iso_code, ''), v.qty, ${scrub('v.chuboe_date_code')}, ${scrub('v.chuboe_lead_time')}, ` +
     `       ${scrub('v.chuboe_note_public')}, ${scrub('v.chuboe_note_private')}, ` +
-    `       ${scrub('v.chuboe_note_user')}, ${scrub('ub.name')}, v.created, v.createdby ` +
+    `       ${scrub('v.chuboe_note_user')}, ${scrub('ub.name')}, ${scrub('us.name')}, v.created, v.createdby ` +
     `FROM adempiere.chuboe_vq_line v ` +
     `JOIN adempiere.chuboe_rfq_line rl ON v.chuboe_rfq_line_id = rl.chuboe_rfq_line_id ` +
     `JOIN adempiere.chuboe_rfq r ON rl.chuboe_rfq_id = r.chuboe_rfq_id ` +
@@ -316,6 +316,7 @@ function pullVQs(sinceTs, untilTs, forwardedIds) {
     `JOIN adempiere.c_bpartner bp ON v.c_bpartner_id = bp.c_bpartner_id ` +
     `LEFT JOIN adempiere.c_currency c ON c.c_currency_id = v.c_currency_id ` +
     `LEFT JOIN adempiere.ad_user ub ON ub.ad_user_id = v.chuboe_buyer_id ` +
+    `LEFT JOIN adempiere.ad_user us ON us.ad_user_id = r.salesrep_id ` +
     `WHERE v.isactive = 'Y' ` +
     `  AND v.c_bpartner_id NOT IN (${SYSTEM_VENDOR_IDS.join(',')}) ` +
     `  AND v.created >= '${sinceTs}'::timestamp ` +
@@ -324,7 +325,7 @@ function pullVQs(sinceTs, untilTs, forwardedIds) {
     `ORDER BY cust.name, r.value, rl.chuboe_cpc, NULLIF(v.cost, 0) ASC NULLS LAST, v.created DESC;`;
   const out = psqlPipe(sql);
   return out.trim().split('\n').filter(Boolean).map(line => {
-    const [vqId, rfq, customer, cpc, vendor, mpn, cost, currency, qty, dateCode, leadTime, noteP, noteX, noteU, buyer, created, createdby] = line.split('|');
+    const [vqId, rfq, customer, cpc, vendor, mpn, cost, currency, qty, dateCode, leadTime, noteP, noteX, noteU, buyer, seller, created, createdby] = line.split('|');
     const notes = [noteP, noteX, noteU].filter(Boolean).join(' | ').replace(/\r?\n/g, ' ').trim();
     const source = Number(createdby) === IVY_USER_ID ? 'manual' : 'forwarded';
     return {
@@ -337,6 +338,7 @@ function pullVQs(sinceTs, untilTs, forwardedIds) {
       leadTime: leadTime || '',
       notes,
       buyer: buyer || '',
+      seller: seller || '',
       created,
       source,
     };
@@ -374,6 +376,7 @@ async function buildXlsx(vqs, windowStr) {
     { header: 'Date Code',    key: 'dateCode',  width: 12 },
     { header: 'Lead Time',    key: 'leadTime',  width: 14 },
     { header: 'Buyer',        key: 'buyer',     width: 18 },
+    { header: 'Seller',       key: 'seller',    width: 18 },
     { header: 'Notes',        key: 'notes',     width: 50 },
     { header: 'VQ ID',        key: 'vqId',      width: 12 },
   ];
@@ -398,6 +401,7 @@ async function buildXlsx(vqs, windowStr) {
       dateCode: v.dateCode,
       leadTime: v.leadTime,
       buyer: v.buyer,
+      seller: v.seller,
       notes: v.notes,
       vqId: v.vqId,
     });
@@ -468,6 +472,7 @@ function buildHtml(vqs, windowStr, sourceLabel) {
   <th align="left">Lead Time</th>
   <th align="left">Source</th>
   <th align="left">Buyer</th>
+  <th align="left">Seller</th>
   <th align="left">Created (CT)</th>
   <th align="left">Notes</th>
 </tr></thead>
@@ -512,6 +517,7 @@ ${vqs.map((v, idx) => {
   <td>${esc(v.leadTime)}</td>
   <td>${sourceCell}</td>
   <td style="font-size:10px">${esc(v.buyer || '?')}</td>
+  <td style="font-size:10px">${esc(v.seller || '?')}</td>
   <td style="font-size:10px">${esc(created.slice(5))}</td>
   <td style="font-size:10px">${esc(v.notes)}</td>
 </tr>`;
