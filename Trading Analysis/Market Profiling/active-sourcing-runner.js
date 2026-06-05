@@ -356,6 +356,56 @@ This is an automated notification from the Active Sourcing workflow.`;
     console.warn('  Continuing with broker sourcing...');
   }
 
+  // Step 5b: Filter out MPNs with good franchise coverage
+  // If franchise has plenty of stock at known price, no need to bother brokers
+  let mpnsForBrokers = selectedMpns.length;
+  let franchiseSkipped = 0;
+  const franchiseCoveredMpns = [];
+
+  if (enrichmentResult && enrichmentResult.qtyMatches > 0) {
+    console.log('');
+    console.log('Step 5b: Filtering MPNs with good franchise coverage...');
+
+    // Query which MPNs got full franchise coverage
+    const coverageQuery = `
+      SELECT DISTINCT rlm.chuboe_mpn_clean
+      FROM adempiere.chuboe_rfq r
+      JOIN adempiere.chuboe_rfq_line rl ON rl.chuboe_rfq_id = r.chuboe_rfq_id
+      JOIN adempiere.chuboe_rfq_line_mpn rlm ON rlm.chuboe_rfq_line_id = rl.chuboe_rfq_line_id
+      JOIN adempiere.chuboe_vq_line vq ON vq.chuboe_rfq_line_id = rl.chuboe_rfq_line_id
+      JOIN adempiere.c_bpartner bp ON bp.c_bpartner_id = vq.c_bpartner_id
+      WHERE r.value = '${rfq.searchKey}'
+        AND vq.isactive = 'Y'
+        AND vq.qty >= rlm.qty
+        AND vq.cost > 0
+        AND bp.name IN ('Digi-Key Electronics', 'Mouser', 'Arrow Electronics', 'Future Electronics Corporation', 'Newark in One (Element 14)', 'TTI Inc')
+    `;
+
+    try {
+      const covered = psqlQueryRows(coverageQuery);
+      if (covered.length > 0) {
+        franchiseCoveredMpns.push(...covered);
+        franchiseSkipped = covered.length;
+        mpnsForBrokers = selectedMpns.length - franchiseSkipped;
+
+        console.log(`  Franchise-covered (skipping broker RFQ): ${franchiseSkipped} MPNs`);
+        console.log(`  Sending to brokers: ${mpnsForBrokers} MPNs`);
+
+        // Log a few examples
+        if (covered.length <= 5) {
+          covered.forEach(mpn => console.log(`    - ${mpn} (franchise has full qty)`));
+        } else {
+          covered.slice(0, 3).forEach(mpn => console.log(`    - ${mpn} (franchise has full qty)`));
+          console.log(`    ... and ${covered.length - 3} more`);
+        }
+      } else {
+        console.log('  No MPNs with full franchise coverage - all going to brokers');
+      }
+    } catch (e) {
+      console.warn(`  Coverage query failed: ${e.message} - sending all to brokers`);
+    }
+  }
+
   // Step 6: Run NC scraper (full mode)
   console.log('');
   console.log('Step 6: Running NetComponents scraper (FULL MODE)...');
@@ -402,7 +452,10 @@ This is an automated notification from the Active Sourcing workflow.`;
     const coveragePct = linesAdded > 0 ? Math.round(franchiseCoverage / linesAdded * 100) : 0;
     console.log(`Franchise coverage: ${franchiseCoverage}/${linesAdded} (${coveragePct}%) — baseline pricing before broker sourcing`);
   }
-  console.log(`Batch: ${batchId} (exclusions will expire in 7 days)`);
+  if (franchiseSkipped > 0) {
+    console.log(`Franchise-covered (skipped broker RFQ): ${franchiseSkipped} MPNs`);
+  }
+  console.log(`Batch: ${batchId} (exclusions expire in 7 days)`);
   console.log('');
   console.log('Next steps:');
   console.log('1. Franchise VQs already loaded — compare against broker quotes');
@@ -421,6 +474,8 @@ This is an automated notification from the Active Sourcing workflow.`;
     rfq,
     linesAdded,
     batchId,
+    franchiseSkipped,
+    mpnsForBrokers,
     enrichment: enrichmentResult ? {
       apiCalls: enrichmentResult.apiCalls,
       cacheHits: enrichmentResult.cacheHits,
