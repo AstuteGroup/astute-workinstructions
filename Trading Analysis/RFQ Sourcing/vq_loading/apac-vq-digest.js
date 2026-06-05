@@ -383,8 +383,6 @@ async function buildXlsx(vqs, windowStr) {
     { header: 'Customer',     key: 'customer',  width: 28 },
     { header: 'RFQ',          key: 'rfq',       width: 10 },
     { header: 'CPC',          key: 'cpc',       width: 24 },
-    { header: 'Created (CT)', key: 'created',   width: 19 },
-    { header: 'Loader',       key: 'source',    width: 16 },
     { header: 'Vendor',       key: 'vendor',    width: 32 },
     { header: 'MPN',          key: 'mpn',       width: 24 },
     { header: 'Qty',          key: 'qty',       width: 10 },
@@ -395,7 +393,9 @@ async function buildXlsx(vqs, windowStr) {
     { header: 'Buyer',        key: 'buyer',     width: 18 },
     { header: 'Seller',       key: 'seller',    width: 18 },
     { header: 'Notes',        key: 'notes',     width: 50 },
+    { header: 'Loader',       key: 'source',    width: 16 },
     { header: 'VQ ID',        key: 'vqId',      width: 12 },
+    { header: 'Created (CT)', key: 'created',   width: 19 },
   ];
   ws.columns = cols;
 
