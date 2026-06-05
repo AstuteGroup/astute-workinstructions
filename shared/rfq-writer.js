@@ -50,6 +50,7 @@ const { apiPost } = require('./api-client');
 const { psqlQuery, cleanMpn } = require('./db-helpers');
 const { lookupMfr } = require('./mfr-lookup');
 const { resolveMfrForRow } = require('./mfr-resolver');
+const otBudget = require('./ot-api-budget');
 
 // ─── CONSTANTS ───────────────────────────────────────────────────────────────
 
@@ -236,8 +237,51 @@ async function writeRFQ(opts) {
     logger.info(`RFQ header created: searchKey=${searchKey}, chuboe_rfq_id=${rfqId}, BP=${bpartnerId}, type=${type}`);
   }
 
+  // ── CHUNKED MODE for large RFQs (BOMs) ──
+  // Large BOMs would overwhelm the API without pacing. Write in chunks with delays.
+  const LARGE_RFQ_THRESHOLD = 500;  // lines
+  const CHUNK_SIZE = 150;           // lines per chunk
+  const CHUNK_DELAY_MS = 2000;      // 2s between chunks
+  const useChunkedMode = lines.length > LARGE_RFQ_THRESHOLD;
+
+  if (useChunkedMode) {
+    logger.info(`Large RFQ detected (${lines.length} lines) — using chunked mode with ${CHUNK_SIZE}-line chunks and ${CHUNK_DELAY_MS}ms delays`);
+  } else {
+    // Budget check for smaller RFQs (large ones self-pace via chunking)
+    const estimatedWrites = lines.length * 2; // line + line_mpn per input
+    const globalCheck = otBudget.checkBudget({
+      table: 'chuboe_rfq_line',
+      count: estimatedWrites,
+      caller: 'rfq-writer',
+    });
+    if (!globalCheck.allowed) {
+      logger.warn(`Global budget exhausted: ${globalCheck.reason}`);
+      return {
+        rfqId,
+        searchKey,
+        linesWritten: 0,
+        mpnsWritten: 0,
+        errors: [],
+        rateLimited: true,
+        rateLimitReason: globalCheck.reason,
+        otUnreachable: false,
+      };
+    }
+  }
+
+  // Helper for chunked delay
+  const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
+
   // ── Insert Lines + Line MPNs ──
   for (let i = 0; i < lines.length; i++) {
+    // Chunked mode: pause between chunks to stay under rate limits
+    if (useChunkedMode && i > 0 && i % CHUNK_SIZE === 0) {
+      const chunkNum = Math.floor(i / CHUNK_SIZE);
+      const totalChunks = Math.ceil(lines.length / CHUNK_SIZE);
+      logger.info(`Chunk ${chunkNum}/${totalChunks} complete (${linesWritten} lines written). Pausing ${CHUNK_DELAY_MS}ms...`);
+      await sleep(CHUNK_DELAY_MS);
+    }
+
     const line = lines[i];
     const lineNum = (i + 1) * 10; // Line 10, 20, 30...
 
@@ -355,11 +399,12 @@ async function writeRFQ(opts) {
     mpnsWritten++;
   }
 
-  logger.info(`RFQ write complete: searchKey=${searchKey}, rfqId=${rfqId}, ${linesWritten} lines, ${mpnsWritten} MPNs${errors.length ? `, ${errors.length} errors` : ''}`);
+  const chunkedNote = useChunkedMode ? ` [chunked: ${Math.ceil(lines.length / CHUNK_SIZE)} chunks]` : '';
+  logger.info(`RFQ write complete: searchKey=${searchKey}, rfqId=${rfqId}, ${linesWritten} lines, ${mpnsWritten} MPNs${errors.length ? `, ${errors.length} errors` : ''}${chunkedNote}`);
 
   return {
     rfqId, searchKey, linesWritten, mpnsWritten, errors,
-    otUnreachable,
+    otUnreachable, chunkedMode: useChunkedMode,
     // Header wrote but some lines/line_mpns may not have (OT died mid-RFQ).
     // Resume backfills the gaps against this existing rfqId — never re-POSTs
     // the header (its natural key BP+type+salesrep is not unique → would dup).

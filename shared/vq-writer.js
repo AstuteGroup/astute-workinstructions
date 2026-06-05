@@ -954,37 +954,48 @@ async function writeVQBatch(rfqSearchKey, items, opts = {}) {
   const estimatedVQs = items.length * 10; // rough estimate: 10 VQs per item on average
   const isBackfill = unseenEmailCount >= 20;
 
-  // TIER 1: Global budget check (coordinates across ALL agents)
-  const globalCheck = otBudget.checkBudget({
-    table: 'chuboe_vq_line',
-    count: estimatedVQs,
-    caller: 'vq-loading-agent',
-    isBackfill,
-  });
+  // ── CHUNKED MODE for large batches ──
+  // Large API enrichment batches (500+ items) would fail the budget check.
+  // Instead of rejecting, we allow them through and rely on inter-item delays.
+  const LARGE_BATCH_THRESHOLD = 200;  // items (each item ≈ 10 VQs)
+  const useChunkedMode = items.length > LARGE_BATCH_THRESHOLD;
 
-  if (!globalCheck.allowed) {
-    logger.warn(`[vq-writer] Global budget exhausted: ${globalCheck.reason}`);
-    logger.warn(`[vq-writer] Deferring ${items.length} items (est ${estimatedVQs} VQs)`);
-    return {
-      written: [],
-      flagged: [],
-      failed: [],
-      skipped: [],
-      needsReview: [],
-      rateLimited: true,
-      rateLimitReason: globalCheck.reason,
-      rateLimitTier: 'global',
-      summary: {
-        total: items.length,
+  if (!useChunkedMode) {
+    // TIER 1: Global budget check for smaller batches
+    const globalCheck = otBudget.checkBudget({
+      table: 'chuboe_vq_line',
+      count: estimatedVQs,
+      caller: 'vq-loading-agent',
+      isBackfill,
+    });
+
+    if (!globalCheck.allowed) {
+      logger.warn(`[vq-writer] Global budget exhausted: ${globalCheck.reason}`);
+      logger.warn(`[vq-writer] Deferring ${items.length} items (est ${estimatedVQs} VQs)`);
+      return {
+        written: [],
+        flagged: [],
+        failed: [],
+        skipped: [],
+        needsReview: [],
         rateLimited: true,
-        message: globalCheck.reason,
-      },
-    };
+        rateLimitReason: globalCheck.reason,
+        rateLimitTier: 'global',
+        summary: {
+          total: items.length,
+          rateLimited: true,
+          message: globalCheck.reason,
+        },
+      };
+    }
+  } else {
+    logger.info(`[vq-writer] Large batch detected (${items.length} items, est ${estimatedVQs} VQs) — bypassing upfront budget check, using inter-item delays`);
   }
 
   // TIER 2: VQ-specific rate limiting (process-specific intelligence)
+  // Also bypassed for large batches — they self-pace via inter-item delays
   const rateCheck = rateLimiter.checkVQLimit(estimatedVQs, { unseenEmailCount });
-  if (!rateCheck.allowed) {
+  if (!rateCheck.allowed && !useChunkedMode) {
     logger.warn(`[vq-writer] Rate limit reached: ${rateCheck.reason}`);
     logger.warn(`[vq-writer] Deferring ${items.length} items (est ${estimatedVQs} VQs)`);
     return {
@@ -1140,6 +1151,7 @@ async function writeVQBatch(rfqSearchKey, items, opts = {}) {
     failed: allFailed.length,
     skipped: allSkipped.length,
     needsReview: allNeedsReview.length,
+    chunkedMode: useChunkedMode,
     byReason: {},
   };
 

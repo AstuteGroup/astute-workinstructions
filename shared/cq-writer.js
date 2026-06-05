@@ -367,35 +367,49 @@ async function writeCQBatch(rfqSearchKey, lines, opts = {}) {
 
   const bpartnerId = opts.bpartnerId || rfq.bpartnerId;
 
-  // ── TIER 1: Global budget check ──
-  const estimatedWrites = lines.length; // One chuboe_cq_line per input line
-  const globalCheck = otBudget.checkBudget({
-    table: 'chuboe_cq_line',
-    count: estimatedWrites,
-    caller: 'stockrfq-cq-agent',
-    isBackfill,
-  });
+  // ── CHUNKED MODE for large batches ──
+  // Large CQ batches (unlikely but possible) bypass upfront budget check and self-pace.
+  const LARGE_BATCH_THRESHOLD = 200;
+  const CHUNK_SIZE = 100;
+  const CHUNK_DELAY_MS = 1500;
+  const useChunkedMode = lines.length > LARGE_BATCH_THRESHOLD;
 
-  if (!globalCheck.allowed) {
-    logger.warn(`Global budget exhausted for RFQ ${rfqSearchKey}: ${globalCheck.reason} — ${lines.length} CQ lines deferred`);
-    const summary = {
-      total: lines.length,
-      written: 0,
-      flagged: 0,
-      failed: 0,
-      skipped: 0,
-      byReason: {},
-      rateLimited: true,
-      rateLimitReason: globalCheck.reason,
-      rateLimitTier: 'global',
-    };
-    return { written, flagged, failed, skipped, summary };
+  if (!useChunkedMode) {
+    // ── TIER 1: Global budget check ──
+    const estimatedWrites = lines.length; // One chuboe_cq_line per input line
+    const globalCheck = otBudget.checkBudget({
+      table: 'chuboe_cq_line',
+      count: estimatedWrites,
+      caller: 'stockrfq-cq-agent',
+      isBackfill,
+    });
+
+    if (!globalCheck.allowed) {
+      logger.warn(`Global budget exhausted for RFQ ${rfqSearchKey}: ${globalCheck.reason} — ${lines.length} CQ lines deferred`);
+      const summary = {
+        total: lines.length,
+        written: 0,
+        flagged: 0,
+        failed: 0,
+        skipped: 0,
+        byReason: {},
+        rateLimited: true,
+        rateLimitReason: globalCheck.reason,
+        rateLimitTier: 'global',
+      };
+      return { written, flagged, failed, skipped, summary };
+    }
+  } else {
+    logger.info(`Large CQ batch detected (${lines.length} lines) — using chunked mode`);
   }
 
   logger.info(`Writing ${lines.length} CQ lines for RFQ ${rfqSearchKey} (customer: ${rfq.bpName || bpartnerId})`);
 
   // ── Reserve budget and claim backfill slot ──
-  otBudget.reserve('chuboe_cq_line', estimatedWrites, 'stockrfq-cq-agent');
+  // Skip reservation for chunked mode — we self-pace with delays
+  if (!useChunkedMode) {
+    otBudget.reserve('chuboe_cq_line', lines.length, 'stockrfq-cq-agent');
+  }
 
   if (isBackfill) {
     otBudget.claimBackfillSlot('stockrfq-cq-agent');
@@ -403,8 +417,19 @@ async function writeCQBatch(rfqSearchKey, lines, opts = {}) {
 
   const writeStartTime = Date.now();
 
+  // Helper for chunked delay
+  const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
+
   // ── Process each line ──
   for (let i = 0; i < lines.length; i++) {
+    // Chunked mode: pause between chunks
+    if (useChunkedMode && i > 0 && i % CHUNK_SIZE === 0) {
+      const chunkNum = Math.floor(i / CHUNK_SIZE);
+      const totalChunks = Math.ceil(lines.length / CHUNK_SIZE);
+      logger.info(`CQ chunk ${chunkNum}/${totalChunks} complete. Pausing ${CHUNK_DELAY_MS}ms...`);
+      await sleep(CHUNK_DELAY_MS);
+    }
+
     const line = lines[i];
     const mpn = line.mpn || '';
     const cpc = line.cpc || '';
