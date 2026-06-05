@@ -27,6 +27,12 @@ The "Cross-applies?" column is the load-bearing one — say which sibling loader
 
 ---
 
+## 2026-06-05
+
+| Date | Loader(s) | Change | Cross-applies? | Commit |
+|---|---|---|---|---|
+| 2026-06-05 | offer-writeback, rfq-writer, vq-writer, cq-writer | **Chunked mode for large batches.** Large batches were being rejected outright by the upfront budget check (OSIE 2,109-line excess list failed silently with `linesWritten: 0`). Now: batches above threshold bypass the upfront check and write in chunks with delays to self-pace under rate limits. Thresholds: offer/rfq 500 lines (150/chunk, 2s delay), vq 200 items (uses existing inter-item delays), cq 200 lines (100/chunk, 1.5s delay). All writers return `chunkedMode: true` when used. Also fixed: MPN coerced to string in offer-writeback (xlsx parsing returns numbers for numeric-looking MPNs). | **Applied to all four writers.** Pattern is identical across loaders. Future writers should include the same chunked-mode gate. `api-result-writer` skipped — writes single records, not batches. | `505e3a0`, `1577951` |
+
 ## 2026-05-26
 
 | Date | Loader(s) | Change | Cross-applies? | Commit |
