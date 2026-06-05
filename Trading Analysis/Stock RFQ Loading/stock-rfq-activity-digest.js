@@ -188,6 +188,7 @@ function fmtEtTimeOnly(d) {
 const now = new Date();
 const todayStart    = sinceOverride ? new Date(sinceOverride) : etMidnight(now);
 const lastTickStart = nMinutesAgo(now, 240);                          // 4h
+const twentyFourHoursAgo = new Date(now.getTime() - 24 * 60 * 60_000); // 24h rolling
 const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60_000); // 30d rolling
 // `cumSince` is kept as a legacy alias for the today-since-00-ET anchor used
 // by the second MPN table and stat-band "Today" column.
@@ -316,6 +317,99 @@ async function queryTopMpns(fromTs, toTs = now, opts = {}) {
     fromTs, toTs, UNQUALIFIED_BROKER_ID, STOCK_RFQ_TYPE_ID, limit,
     tickStart, todayStartTs,
   ]);
+  return r.rows;
+}
+
+// APAC country codes to exclude from "qualified Western" demand signal.
+const APAC_COUNTRY_CODES = ['CN', 'HK', 'TW', 'JP', 'KR', 'SG', 'VN', 'TH', 'ID', 'MY', 'PH', 'IN'];
+
+// Top MPNs from QUALIFIED NON-APAC customers only.
+// Excludes: Unqualified Broker (1006505) + APAC-based BPs (by country on BP location).
+// Used for the 24h rolling "real Western demand" signal section.
+async function queryTopMpnsQualifiedOnly(fromTs, toTs = now, opts = {}) {
+  const limit = opts.limit || 5;
+  const tickStart = opts.tickStart || null;
+  const todayStartTs = opts.todayStart || null;
+
+  const r = await pool.query(`
+    WITH apac_bps AS (
+      -- BPs with ANY location in an APAC country
+      SELECT DISTINCT bp.c_bpartner_id
+      FROM adempiere.c_bpartner bp
+      JOIN adempiere.c_bpartner_location bpl ON bpl.c_bpartner_id = bp.c_bpartner_id AND bpl.isactive = 'Y'
+      JOIN adempiere.c_location l ON l.c_location_id = bpl.c_location_id
+      JOIN adempiere.c_country c ON c.c_country_id = l.c_country_id
+      WHERE c.countrycode = ANY($8::text[])
+    ),
+    lines AS (
+      SELECT
+        mpn.chuboe_mpn,
+        mpn.chuboe_mpn_clean,
+        mpn.chuboe_mfr_text,
+        mpn.priceentered,
+        r.chuboe_rfq_id,
+        r.c_bpartner_id,
+        rl.qty,
+        COALESCE(NULLIF(r.bpname, ''), bp.name) AS customer_name,
+        (r.created AT TIME ZONE 'America/Chicago') AS created_ct
+      FROM adempiere.chuboe_rfq r
+      JOIN adempiere.chuboe_rfq_line rl       ON rl.chuboe_rfq_id = r.chuboe_rfq_id
+      JOIN adempiere.chuboe_rfq_line_mpn mpn  ON mpn.chuboe_rfq_line_id = rl.chuboe_rfq_line_id
+      LEFT JOIN adempiere.c_bpartner bp       ON bp.c_bpartner_id = r.c_bpartner_id
+      WHERE r.chuboe_rfq_type_id = $4
+        AND r.created AT TIME ZONE 'America/Chicago' >= $1
+        AND r.created AT TIME ZONE 'America/Chicago' < $2
+        AND r.c_bpartner_id <> $3
+        AND r.c_bpartner_id NOT IN (SELECT c_bpartner_id FROM apac_bps)
+        AND r.isactive = 'Y'
+        AND rl.isactive = 'Y'
+        AND mpn.isactive = 'Y'
+    ),
+    per_mpn_customer AS (
+      SELECT
+        chuboe_mpn_clean,
+        customer_name,
+        COUNT(DISTINCT chuboe_rfq_id) AS rfq_count
+      FROM lines
+      WHERE customer_name IS NOT NULL AND customer_name <> ''
+      GROUP BY chuboe_mpn_clean, customer_name
+    ),
+    customer_agg AS (
+      SELECT
+        chuboe_mpn_clean,
+        STRING_AGG(
+          customer_name || CASE WHEN rfq_count > 1 THEN ' (x' || rfq_count || ')' ELSE '' END,
+          ', ' ORDER BY rfq_count DESC, customer_name
+        ) AS customer_names
+      FROM per_mpn_customer
+      GROUP BY chuboe_mpn_clean
+    ),
+    mpn_summary AS (
+      SELECT
+        l.chuboe_mpn                                                       AS mpn,
+        MAX(l.chuboe_mfr_text)                                             AS mfr,
+        l.chuboe_mpn_clean                                                 AS mpn_clean,
+        COUNT(DISTINCT l.chuboe_rfq_id)                                    AS rfq_count,
+        MAX(COALESCE(l.qty, 0))                                            AS max_qty,
+        COUNT(DISTINCT l.c_bpartner_id)                                    AS distinct_bps,
+        COUNT(DISTINCT l.chuboe_rfq_id)                                    AS matched_rfqs,
+        0                                                                  AS unqualified_rfqs,
+        MAX(NULLIF(l.priceentered, 0))                                     AS max_target_price,
+        COUNT(DISTINCT l.chuboe_rfq_id) FILTER (
+          WHERE $6::timestamp IS NOT NULL AND l.created_ct >= $6::timestamp
+        )                                                                  AS tick_rfqs,
+        COUNT(DISTINCT l.chuboe_rfq_id) FILTER (
+          WHERE $7::timestamp IS NOT NULL AND l.created_ct >= $7::timestamp
+        )                                                                  AS today_rfqs
+      FROM lines l
+      GROUP BY l.chuboe_mpn, l.chuboe_mpn_clean
+    )
+    SELECT s.*, c.customer_names
+    FROM mpn_summary s
+    LEFT JOIN customer_agg c ON c.chuboe_mpn_clean = s.mpn_clean
+    ORDER BY s.rfq_count DESC, s.max_qty DESC
+    LIMIT $5
+  `, [fromTs, toTs, UNQUALIFIED_BROKER_ID, STOCK_RFQ_TYPE_ID, limit, tickStart, todayStartTs, APAC_COUNTRY_CODES]);
   return r.rows;
 }
 
@@ -809,6 +903,7 @@ function renderMpnTable(rows, ctx, headerLabel, emptyMsg) {
   return html;
 }
 
+
 function renderStatBand(label, stats) {
   return `<h3>${escHtml(label)}</h3>`
        + `<div class="stat"><b>${fmtInt(stats.rfq_count)}</b>RFQs</div>`
@@ -833,7 +928,7 @@ const DIGEST_CSS = `body{font-family:Arial,sans-serif;font-size:13px;color:#222}
 function renderBodyInner(model) {
   const {
     tickStats, todayStats, thirtyStats,
-    topMpns30d, topMpnsToday, topCustomers,
+    topMpns30d, topMpnsToday, topCustomers, topQualified24h,
     repeatMap, franchiseMap, oemsecretsMap, stockMap, excessMap,
     windowLabel,
   } = model;
@@ -845,6 +940,19 @@ function renderBodyInner(model) {
   html += renderStatBand('Last 4h',                tickStats);
   html += renderStatBand('Today (since 00 ET)',    todayStats);
   html += renderStatBand('Last 30 days',           thirtyStats);
+
+  // Top 5 Qualified Non-APAC (24h rolling) — real Western demand signal.
+  // Excludes: Unqualified Broker (1006505) + APAC-based BPs (CN/HK/TW/JP/KR/SG/VN/TH/ID/MY/PH/IN).
+  // Full enrichment columns (Stock, Excess, Franchise, OEMSecrets) for opportunity ID.
+  const ctxQualified24h = {
+    repeatMap, franchiseMap, oemsecretsMap, stockMap, excessMap,
+    includeTickCol: true, includeTodayCol: true,
+  };
+  html += renderMpnTable(
+    topQualified24h || [], ctxQualified24h,
+    'Top 5 Requested Parts — 24h Rolling (Western Customers Only)',
+    'No Western-customer RFQs in the last 24 hours.',
+  );
 
   // Primary: Top MPNs over 30d (durable demand signal). Inline Last-4h and
   // Today columns so a 30d-hot MPN that's also moving today stands out.
@@ -1127,21 +1235,23 @@ async function publishSite(model, nowDate, opts) {
 
 (async () => {
   try {
-    const [tickStats, todayStats, thirtyStats, topMpns30d, topMpnsToday, topCustomers] = await Promise.all([
+    const [tickStats, todayStats, thirtyStats, topMpns30d, topMpnsToday, topCustomers, topQualified24h] = await Promise.all([
       queryWindowStats(lastTickStart),
       queryWindowStats(todayStart),
       queryWindowStats(thirtyDaysAgo),
       queryTopMpns(thirtyDaysAgo, now, { tickStart: lastTickStart, todayStart }),
       queryTopMpns(todayStart,    now, { tickStart: lastTickStart }),
       queryTopCustomers(thirtyDaysAgo),
+      queryTopMpnsQualifiedOnly(twentyFourHoursAgo, now, { limit: 5, tickStart: lastTickStart, todayStart }),
     ]);
 
-    // Union of MPNs from both tables — supporting queries (repeat / franchise /
-    // OEMSecrets / stock-match) run against the combined set so the today
-    // table doesn't lose enrichment for MPNs not in the 30d top-10.
+    // Union of MPNs from all three tables — supporting queries (repeat / franchise /
+    // OEMSecrets / stock-match) run against the combined set so no table loses
+    // enrichment for MPNs not in the other tables.
     const mpnCleans = Array.from(new Set([
       ...topMpns30d.map(r => r.mpn_clean),
       ...topMpnsToday.map(r => r.mpn_clean),
+      ...topQualified24h.map(r => r.mpn_clean),
     ]));
     // Repeat-demand map first — needed both for HOT classification (filtering
     // the excess-match query) and for the OEMSecrets candidate gate.
@@ -1172,7 +1282,7 @@ async function publishSite(model, nowDate, opts) {
     const windowLabel = `${fmtEtTimeOnly(now)} tick (30d rolling, today ${cumDateEt})`;
     const model = {
       tickStats, todayStats, thirtyStats,
-      topMpns30d, topMpnsToday, topCustomers,
+      topMpns30d, topMpnsToday, topCustomers, topQualified24h,
       repeatMap, franchiseMap, oemsecretsMap, stockMap, excessMap,
       windowLabel,
     };
@@ -1186,6 +1296,7 @@ async function publishSite(model, nowDate, opts) {
       console.log(`30d stats:     ${JSON.stringify(thirtyStats)}`);
       console.log(`Top MPNs 30d:  ${topMpns30d.length} rows`);
       console.log(`Top MPNs tdy:  ${topMpnsToday.length} rows`);
+      console.log(`Qualified 24h: ${topQualified24h.length} rows (no Unqualified Broker)`);
       console.log(`Top Custs:     ${topCustomers.length} rows`);
       console.log(`Stock matches: ${stockMap.size} MPNs with Astute-owned stock`);
       console.log(`Excess matches: ${excessMap.size} HOT MPNs with 90d Customer Excess`);
