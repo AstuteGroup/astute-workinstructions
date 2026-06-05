@@ -2,5 +2,22 @@
   "_comment": "Curated vendor-label aliases for acronyms / initialisms / hard typos that resolveBP's strict + Levenshtein + historical-VQ tiers can't catch. Each entry maps a label to a c_bpartner.value (search_key), NOT a name — the search-key path in resolveBP is exact-match and avoids the iDempiere REST 500s that hit when canonical names contain special chars (parentheses, commas, periods).",
   "_format": "Keys are uppercased + whitespace-collapsed for case/space-insensitive lookup. Values are objects { searchKey, name } — searchKey is what resolveBP uses to look up the BP; name is human-readable annotation so future maintainers can spot-check.",
   "_governance": "Add an entry only when (a) operator has confirmed the mapping at least once (e.g., via clarify reply), AND (b) the historical-VQ fallback can't catch it (label doesn't appear as a substring of the canonical name, e.g. acronyms like XJH). Remove if the BP record is renamed.",
-  "XJH": { "searchKey": "1003910", "name": "Xin Jun Hong (HK) Industry Co., Ltd" }
+  "XJH": { "searchKey": "1003910", "name": "Xin Jun Hong (HK) Industry Co., Ltd" },
+  "PC COMPONENTS (PCC)": { "searchKey": "1002553", "name": "PC Components" },
+  "PC COMPONENTS": { "searchKey": "1002553", "name": "PC Components" },
+  "PCC": { "searchKey": "1002553", "name": "PC Components" },
+  "ARROW ELECTRONICS (UK) LTD.": { "searchKey": "1002344", "name": "Arrow UK" },
+  "ARROW ELECTRONICS (UK) LTD": { "searchKey": "1002344", "name": "Arrow UK" },
+  "ARROW ELECTRONICS UK": { "searchKey": "1002344", "name": "Arrow UK" },
+  "ARROW UK": { "searchKey": "1002344", "name": "Arrow UK" },
+  "REBOUND ELECTRONICS (UK) LTD": { "searchKey": "1002855", "name": "Rebound Electronics (UK) Ltd" },
+  "REBOUND ELECTRONICS UK": { "searchKey": "1002855", "name": "Rebound Electronics (UK) Ltd" },
+  "REBOUND ELECTRONICS": { "searchKey": "1002855", "name": "Rebound Electronics (UK) Ltd" },
+  "REBOUND": { "searchKey": "1002855", "name": "Rebound Electronics (UK) Ltd" },
+  "CYCLOPS GROUP (US)": { "searchKey": "1002495", "name": "Cyclops Electronics" },
+  "CYCLOPS GROUP": { "searchKey": "1002495", "name": "Cyclops Electronics" },
+  "CYCLOPS": { "searchKey": "1002495", "name": "Cyclops Electronics" },
+  "FDH ELECTRONICS (ELECTRO/BJG)": { "searchKey": "1011486", "name": "FDH Electronics" },
+  "FDH ELECTRONICS": { "searchKey": "1011486", "name": "FDH Electronics" },
+  "FDH": { "searchKey": "1011486", "name": "FDH Electronics" }
 }
