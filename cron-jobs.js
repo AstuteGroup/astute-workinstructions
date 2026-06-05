@@ -317,12 +317,13 @@ module.exports = [
     cadence: 'fixed',
     // :25 past so stockrfq-agent (fires at :00 / :30) has runway to write its
     // RFQs before the digest reads.
-    cadenceCron: '25 0,4,8,12,16,20 * * *',
+    // 12:25/18:25/21:25 UTC = 7:25am/1:25pm/4:25pm EST (8:25am/2:25pm/5:25pm EDT)
+    cadenceCron: '25 12,18,21 * * *',
     command: `node "${ASTUTE}/Trading Analysis/Stock RFQ Loading/stock-rfq-activity-digest.js"`,
     cwd: ASTUTE,
     needsOT: false,
     logFile: '/tmp/stock-rfq-activity-digest.log',
-    description: 'Every 4h — Stock RFQ activity digest (top concentrated MPNs + customers, real-vs-bogus heuristic). Cumulative window resets at 00 ET.',
+    description: '3x daily (7am/1pm/4pm EST) — Stock RFQ activity digest (top concentrated MPNs + customers, Western demand signal). Cumulative window resets at 00 ET.',
   },
 
   {
