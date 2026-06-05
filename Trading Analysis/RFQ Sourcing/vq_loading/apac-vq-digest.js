@@ -478,73 +478,40 @@ function buildHtml(vqs, windowStr, sourceLabel) {
   if (vqs.length === 0) {
     html += `<p style="color:#999"><i>No VQs in this window.</i></p>`;
   } else {
-    let lastCustomer = null;
-    let lastRfq = null;
-    let lastCpc = null;
+    // Top 10 customers by VQ count
+    const topCustomers = [...sumByCustomer.entries()]
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 10);
 
-    html += `<table border="1" cellpadding="6" cellspacing="0" style="border-collapse:collapse;font-size:12px;width:100%">
+    // Top 10 vendors by VQ count
+    const topVendors = [...sumByVendor.entries()]
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 10);
+
+    html += `
+<h3 style="margin:16px 0 8px 0;color:#333">Top Customers</h3>
+<table border="1" cellpadding="6" cellspacing="0" style="border-collapse:collapse;font-size:12px">
 <thead style="background:#eef"><tr>
   <th align="left">Customer</th>
-  <th align="left">RFQ</th>
-  <th align="left">CPC</th>
-  <th align="left">MPN</th>
-  <th align="left">Vendor</th>
-  <th align="right">Price</th>
-  <th align="right">Qty</th>
-  <th align="left">Date Code</th>
-  <th align="left">Lead Time</th>
-  <th align="left">Loader</th>
-  <th align="left">Buyer</th>
-  <th align="left">Seller</th>
-  <th align="left">Created (CT)</th>
-  <th align="left">Notes</th>
+  <th align="right">VQs</th>
 </tr></thead>
 <tbody>
-${vqs.map((v, idx) => {
-  const created = (v.created || '').slice(0, 19);
-  const loaderCell = v.source === 'forwarded'
-    ? `<i style="color:#888">fwd</i>`
-    : esc(v.source.split(' ')[0]); // First name only for brevity
-
-  const newCustomer = v.customer !== lastCustomer;
-  const newRfq = v.rfq !== lastRfq;
-  const newCpc = v.cpc !== lastCpc;
-
-  let rowStyle = '';
-  if ((newCustomer || newRfq) && idx > 0) {
-    rowStyle = ' style="border-top:3px solid #555"';
-  } else if (newCpc && idx > 0) {
-    rowStyle = ' style="border-top:1px solid #ccc"';
-  }
-
-  lastCustomer = v.customer;
-  lastRfq = v.rfq;
-  lastCpc = v.cpc;
-
-  const customerCell = newCustomer || newRfq ? `<b>${esc(v.customer)}</b>` : '';
-  const rfqCell = newRfq ? `<b>${esc(v.rfq)}</b>` : '';
-  const cpcCell = newCpc ? `<b>${esc(v.cpc || '')}</b>` : '';
-
-  return `<tr${rowStyle}>
-  <td>${customerCell}</td>
-  <td>${rfqCell}</td>
-  <td>${cpcCell}</td>
-  <td>${esc(v.mpn)}</td>
-  <td>${esc(v.vendor)}</td>
-  <td align="right">${esc(fmtPrice(v.cost, v.currency))}</td>
-  <td align="right">${v.qty != null ? v.qty.toLocaleString('en-US') : ''}</td>
-  <td>${esc(v.dateCode)}</td>
-  <td>${esc(v.leadTime)}</td>
-  <td style="font-size:10px">${loaderCell}</td>
-  <td style="font-size:10px">${esc(v.buyer || '?')}</td>
-  <td style="font-size:10px">${esc(v.seller || '?')}</td>
-  <td style="font-size:10px">${esc(created.slice(5))}</td>
-  <td style="font-size:10px">${esc(v.notes)}</td>
-</tr>`;
-}).join('\n')}
+${topCustomers.map(([name, count]) => `<tr><td>${esc(name)}</td><td align="right">${count}</td></tr>`).join('\n')}
 </tbody>
 </table>
-<p style="color:#666;font-size:11px;margin-top:6px"><i>Grouped by Customer → RFQ → CPC (sorted low→high price within each CPC, $0 no-bids last). Heavy line = new customer/RFQ, light line = new CPC. Full audit in attached xlsx.</i></p>`;
+
+<h3 style="margin:16px 0 8px 0;color:#333">Top Vendors</h3>
+<table border="1" cellpadding="6" cellspacing="0" style="border-collapse:collapse;font-size:12px">
+<thead style="background:#eef"><tr>
+  <th align="left">Vendor</th>
+  <th align="right">VQs</th>
+</tr></thead>
+<tbody>
+${topVendors.map(([name, count]) => `<tr><td>${esc(name)}</td><td align="right">${count}</td></tr>`).join('\n')}
+</tbody>
+</table>
+
+<p style="color:#666;font-size:11px;margin-top:12px"><i>Full detail in attached xlsx (${vqs.length.toLocaleString()} rows).</i></p>`;
   }
 
   const teamList = APAC_TEAM.buyers.map(b => b.name).join(', ');
