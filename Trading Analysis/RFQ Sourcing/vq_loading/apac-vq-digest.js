@@ -62,11 +62,14 @@ const APAC_TEAM = {
   ],
 };
 
-// All user IDs whose createdby VQs should appear in the digest
+// All user IDs whose createdby VQs should appear in the digest (loaders)
 const APAC_USER_IDS = [
   ...APAC_TEAM.buyers.map(b => b.id),
   ...APAC_TEAM.support.map(s => s.id),
 ];
+
+// Buyer IDs for filtering by assigned buyer (chuboe_buyer_id)
+const APAC_BUYER_IDS = APAC_TEAM.buyers.map(b => b.id);
 
 // Buyer emails for forwarder detection (support don't forward to vq@)
 const APAC_EMAILS = APAC_TEAM.buyers.map(b => b.email.toLowerCase());
@@ -336,7 +339,7 @@ function pullVQs(sinceTs, untilTs, forwardedIds) {
     `  AND v.c_bpartner_id NOT IN (${SYSTEM_VENDOR_IDS.join(',')}) ` +
     `  AND v.created >= '${sinceTs}'::timestamp ` +
     `  AND v.created <  '${untilTs}'::timestamp ` +
-    `  AND (v.createdby IN (${APAC_USER_IDS.join(',')}) ${idClause}) ` +
+    `  AND v.chuboe_buyer_id IN (${APAC_BUYER_IDS.join(',')}) ` +
     `ORDER BY cust.name, r.value, rl.chuboe_cpc, NULLIF(v.cost, 0) ASC NULLS LAST, v.created DESC;`;
   const out = psqlPipe(sql);
   return out.trim().split('\n').filter(Boolean).map(line => {
