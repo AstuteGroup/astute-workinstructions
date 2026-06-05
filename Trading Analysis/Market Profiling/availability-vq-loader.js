@@ -110,6 +110,7 @@ function getRFQBySearchKey(searchKey) {
 
 /**
  * Get RFQ line by MPN
+ * Uses same normalization as load-bulk-summary.js - normalize both sides in SQL
  */
 function getRFQLineByMPN(rfqId, mpn) {
   const cleanMpn = (mpn || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
@@ -120,7 +121,7 @@ function getRFQLineByMPN(rfqId, mpn) {
     WHERE rl.chuboe_rfq_id = ${rfqId}
       AND rl.isactive = 'Y'
       AND rlm.isactive = 'Y'
-      AND rlm.chuboe_mpn_clean = '${cleanMpn}'
+      AND UPPER(REGEXP_REPLACE(rlm.chuboe_mpn, '[^A-Za-z0-9]', '', 'g')) = '${cleanMpn}'
     LIMIT 1
   `;
   try {
