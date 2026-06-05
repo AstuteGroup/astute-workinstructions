@@ -140,6 +140,7 @@ async function action_load_offer(payload, ctx) {
     searchKey: result.searchKey,
     linesWritten: result.linesWritten,
     errorCount: result.errors.length,
+    chunkedMode: result.chunkedMode || false,
   });
 
   // Per-row error attribution. offer-writeback returns errors[] as bare strings;
