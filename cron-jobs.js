@@ -340,20 +340,22 @@ module.exports = [
   },
 
   {
-    name: 'ivy-vq-digest',
+    name: 'apac-vq-digest',
     cadence: 'fixed',
-    // 6 PM Shenzhen local (UTC+8, no DST) = 10:00 UTC. Per-loader VQ digest
-    // for Ivy Song — includes VQs she manually loaded (createdby=1013784)
-    // PLUS VQs the agent loaded from emails she forwarded to vq@ (outerFrom
-    // breadcrumb match with IMAP / date-proximity fallback). State-driven
-    // window: ~/workspace/.ivy-vq-digest-state.json. Sends HTML inline +
-    // xlsx attachment to jake.harris@ + ivy.song@.
+    // 6 PM Shenzhen local (UTC+8, no DST) = 10:00 UTC. APAC team VQ digest.
+    // Buyers: Ivy Song, Serena Zhang, Feong Chang, Elaine Liang, May Wu,
+    //         Tracy Xie, Betty Song, Grace Zheng
+    // Support: Gopalakrishnan, Lathis (load VQs on behalf of APAC buyers)
+    // Includes VQs directly loaded by any team member (createdby IN list)
+    // PLUS VQs the agent loaded from emails any buyer forwarded to vq@.
+    // State-driven window: ~/workspace/.apac-vq-digest-state.json.
+    // Sends HTML inline + xlsx attachment to jake.harris@ + ivy.song@.
     cadenceCron: '0 10 * * *',
-    command: `node "${ASTUTE}/Trading Analysis/RFQ Sourcing/vq_loading/ivy-vq-digest.js" --send`,
+    command: `node "${ASTUTE}/Trading Analysis/RFQ Sourcing/vq_loading/apac-vq-digest.js" --send`,
     cwd: ASTUTE,
     needsOT: false,
-    logFile: '/tmp/ivy-vq-digest.log',
-    description: 'Daily 10:00 UTC (6 PM Shenzhen, no DST) — Ivy Song per-loader VQ digest. Window driven by .ivy-vq-digest-state.json (since-last-digest). Manual + agent-forwarded scopes both included.',
+    logFile: '/tmp/apac-vq-digest.log',
+    description: 'Daily 10:00 UTC (6 PM Shenzhen, no DST) — APAC team VQ digest (8 buyers + 2 support). Window driven by .apac-vq-digest-state.json (since-last-digest). Manual + agent-forwarded scopes.',
   },
 
   {

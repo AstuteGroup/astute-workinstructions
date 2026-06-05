@@ -1,31 +1,31 @@
 #!/usr/bin/env node
 //
-// Ivy Song — Daily VQ Loading Digest
+// APAC Team — Daily VQ Loading Digest
 //
-// Sends a per-loader digest of VQs that Ivy Song (ad_user_id 1013784) wrote
-// since the last successful digest. Scheduled daily at 6 PM Shenzhen local
-// (UTC+8, no DST) = 10:00 UTC. Recipients: Ivy + Jake.
+// Sends a daily digest of VQs loaded by the APAC buying team (8 buyers + 2 support).
+// Scheduled daily at 6 PM Shenzhen local (UTC+8, no DST) = 10:00 UTC.
+//
+// Team roster:
+//   Buyers:  Ivy Song, Serena Zhang, Feong Chang, Elaine Liang,
+//            May Wu, Tracy Xie, Betty Song, Grace Zheng
+//   Support: Gopalakrishnan, Lathis (load VQs on behalf of APAC buyers)
 //
 // Window: sentinel-driven ("since last digest"). State stored at
-//   ~/workspace/.ivy-vq-digest-state.json   { lastDigestTs: ISO }
+//   ~/workspace/.apac-vq-digest-state.json   { lastDigestTs: ISO }
 // On first run (no state file), defaults to last 24h. On --send success the
 // state advances to the window end. A successful send with 0 VQs also advances
 // state, so an empty day doesn't roll all the next day's activity into one
 // double-sized digest.
 //
 // Output:
-//   - HTML inline table (skim view, sorted newest first)
+//   - HTML inline table (skim view, grouped by Customer → RFQ → CPC)
 //   - xlsx attachment (full audit, one row per VQ)
 //
-// Columns per the operator's spec: RFQ, Seller, MPN, Price, Date Code, Notes,
-// Buyer. Plus Created (CT) for ordering and Currency next to Price since some
-// of Ivy's VQs are non-USD.
-//
 // Usage:
-//   node ivy-vq-digest.js              # preview to stdout, no email, no state update
-//   node ivy-vq-digest.js --send       # email + advance state
-//   node ivy-vq-digest.js --since 48   # override window to N hours (does NOT advance state)
-//   node ivy-vq-digest.js --reset-state # discard state file (next run = default 24h)
+//   node apac-vq-digest.js              # preview to stdout, no email, no state update
+//   node apac-vq-digest.js --send       # email + advance state
+//   node apac-vq-digest.js --since 48   # override window to N hours (does NOT advance state)
+//   node apac-vq-digest.js --reset-state # discard state file (next run = default 24h)
 
 'use strict';
 
@@ -38,19 +38,48 @@ const ExcelJS = require('exceljs');
 const { ImapFlow } = require('imapflow');
 const { createNotifier } = require('../../../shared/notifier');
 
-const STATE_FILE = path.join(process.env.HOME, 'workspace', '.ivy-vq-digest-state.json');
+const STATE_FILE = path.join(process.env.HOME, 'workspace', '.apac-vq-digest-state.json');
 const BREADCRUMBS = path.join(process.env.HOME, 'workspace', '.offer-pipeline', 'breadcrumbs.jsonl');
 const ATTRIBUTION_LOG = path.join(process.env.HOME, 'workspace', '.vq-batch-attribution.jsonl');
-const IVY_USER_ID = 1013784;
-const IVY_EMAIL = 'ivy.song@astutegroup.com';
+
+// ─── APAC Team Roster ───────────────────────────────────────────────────────
+// Buyers: their VQs appear in the digest; their forwards to vq@ are tracked
+// Support: load VQs on behalf of buyers; their createdby VQs appear in digest
+const APAC_TEAM = {
+  buyers: [
+    { id: 1013784, name: 'Ivy Song',      email: 'ivy.song@astutegroup.com' },
+    { id: 1018538, name: 'Serena Zhang',  email: 'serena.zhang@astutegroup.com' },
+    { id: 1005190, name: 'Feong Chang',   email: 'feong.chang@astutegroup.com' },
+    { id: 1006326, name: 'Elaine Liang',  email: 'elaine.liang@astutegroup.com' },
+    { id: 1019425, name: 'May Wu',        email: 'may.wu@astutegroup.com' },
+    { id: 1009477, name: 'Tracy Xie',     email: 'tracy.xie@astutegroup.com' },
+    { id: 1011159, name: 'Betty Song',    email: 'betty.song@astutegroup.com' },
+    { id: 1034720, name: 'Grace Zheng',   email: 'grace.zheng@astutegroup.com' },
+  ],
+  support: [
+    { id: 1016166, name: 'Gopalakrishnan', email: null },
+    { id: 1016167, name: 'Lathis',         email: null },
+  ],
+};
+
+// All user IDs whose createdby VQs should appear in the digest
+const APAC_USER_IDS = [
+  ...APAC_TEAM.buyers.map(b => b.id),
+  ...APAC_TEAM.support.map(s => s.id),
+];
+
+// Buyer emails for forwarder detection (support don't forward to vq@)
+const APAC_EMAILS = APAC_TEAM.buyers.map(b => b.email.toLowerCase());
+
+// Recipients (for now: Jake + Ivy only while testing)
 const RECIPIENTS = ['jake.harris@astutegroup.com', 'ivy.song@astutegroup.com'];
+
 const MAX_WINDOW_HOURS = 14 * 24; // safety cap if state file is very stale
 
 // System-placeholder vendors that get auto-stamped to RFQ lines but are NOT
-// quotes Ivy actually sourced. Confirmed 2026-05-21:
+// quotes the team actually sourced:
 //   1009435 StockCQ          — Calcuquote Customer Excess auto-match
 //   1008101 CalcuQuote       — CalcuQuote integration parent partner
-// Excluded from the digest so it only shows quotes she actively requested.
 const SYSTEM_VENDOR_IDS = [1009435, 1008101];
 
 const args = process.argv.slice(2);
@@ -74,8 +103,7 @@ function esc(s) {
   return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 }
 
-// UTC Date → CT-naive timestamp string. CDT = UTC-5 during May 2026 (DST).
-// DST drift is acceptable per the existing vq-loading-daily-digest convention.
+// UTC Date → CT-naive timestamp string. CDT = UTC-5 during DST.
 function utcToCTNaive(d) {
   const ct = new Date(d.getTime() - 5 * 3600 * 1000);
   const pad = (n) => String(n).padStart(2, '0');
@@ -106,21 +134,13 @@ function determineWindow() {
   return { sinceMs, untilMs: now, source: sinceMs === oldest ? `state stale — capped at ${MAX_WINDOW_HOURS}h` : 'since last digest' };
 }
 
-// ─── Forwarder-scope: VQs the agent loaded from emails Ivy forwarded to vq@ ──
+// ─── Forwarder-scope: VQs the agent loaded from emails APAC buyers forwarded to vq@ ──
 //
 // The agent stamps `createdby = Claude (1049524)` on these, so the
-// createdby-only filter misses them. The breadcrumb's `senderEmail` is the
-// DEEPER actor (Tier-A chain walk per [[feedback_forwarder_vs_owner_pattern]])
-// — when Ivy forwards Serena's quotes to vq@, the breadcrumb resolves to Serena
-// and the load is attributed to Serena's buyer ID. To capture Ivy-as-forwarder
-// we need the OUTER envelope From, which means an IMAP cross-ref by messageId.
-//
-// Pipeline:
-//   1. Filter breadcrumbs to vq-loading-agent loaded events in window
-//   2. IMAP-fetch outer-From for each unique messageId
-//   3. Keep only breadcrumbs whose outer-From = ivy.song@astutegroup.com
-//   4. From attribution.jsonl, collect vqLineIds for those sourceUids
-//   5. Pull those vqLineIds into the main VQ query
+// createdby-only filter misses them. We detect APAC-forwarded emails via:
+//   1. breadcrumb.outerFrom or senderEmail matches an APAC buyer email
+//   2. IMAP cross-ref by messageId for the outer envelope From
+//   3. Date-proximity fallback for older breadcrumbs without messageId
 
 function loadJsonlSince(filepath, sinceMs) {
   if (!fs.existsSync(filepath)) return [];
@@ -173,11 +193,8 @@ async function fetchOuterFromForMessageIds(messageIds) {
   return result;
 }
 
-// IMAP-search Ivy's outbound to vq@ within the window and return list of
-// {messageId, date, subject}. Used as the source of truth for "did Ivy forward
-// anything", and as the date-proximity fallback for breadcrumbs whose
-// messageId is null (upstream agent path that doesn't populate it).
-async function searchIvyEmailsInWindow(sinceMs) {
+// IMAP-search for emails from any APAC buyer to vq@ within the window
+async function searchApacEmailsInWindow(sinceMs) {
   const since = new Date(sinceMs);
   const result = [];
   const seenMids = new Set();
@@ -194,17 +211,27 @@ async function searchIvyEmailsInWindow(sinceMs) {
       try {
         const lock = await client.getMailboxLock(folder);
         try {
-          const uids = await client.search({ from: 'ivy.song', since }, { uid: true });
+          // Search for emails from any APAC buyer (by domain, then filter)
+          const uids = await client.search({ from: '@astutegroup.com', since }, { uid: true });
           if (!uids || uids.length === 0) continue;
           for (const u of uids) {
             try {
               const m = await client.fetchOne(String(u), { envelope: true }, { uid: true });
               if (!m || !m.envelope) continue;
+              const fromAddr = (m.envelope.from && m.envelope.from[0] && m.envelope.from[0].address) || '';
+              // Only keep if from an APAC buyer
+              if (!APAC_EMAILS.includes(fromAddr.toLowerCase())) continue;
               const mid = m.envelope.messageId || null;
               const date = m.envelope.date;
               if (mid && seenMids.has(mid)) continue;
               if (mid) seenMids.add(mid);
-              result.push({ messageId: mid, date: date ? date.getTime() : null, subject: m.envelope.subject || '', folder });
+              result.push({
+                messageId: mid,
+                date: date ? date.getTime() : null,
+                subject: m.envelope.subject || '',
+                folder,
+                fromEmail: fromAddr.toLowerCase(),
+              });
             } catch (_) { /* skip */ }
           }
         } finally { lock.release(); }
@@ -222,49 +249,45 @@ async function collectForwardedVqIds(sinceMs) {
   if (bcs.length === 0) return { ids: new Set(), uids: new Set(), via: { fastPath: 0, mid: 0, dateProx: 0 } };
 
   // Pass 1 — fast paths (no IMAP):
-  //  (a) breadcrumb.outerFrom = Ivy   (after upstream 2026-05-21 fix lands)
-  //  (b) breadcrumb.senderEmail = Ivy (Tier-A chain resolved to Ivy directly)
-  const ivyUids = new Set();
+  //  (a) breadcrumb.outerFrom = APAC buyer email
+  //  (b) breadcrumb.senderEmail = APAC buyer email
+  const apacUids = new Set();
   let viaFast = 0;
   for (const b of bcs) {
     const outer = (b.outerFrom || '').toLowerCase();
     const sender = (b.senderEmail || '').toLowerCase();
-    if (outer === IVY_EMAIL || sender === IVY_EMAIL) {
-      if (Number.isFinite(b.sourceUid)) { ivyUids.add(b.sourceUid); viaFast++; }
+    if (APAC_EMAILS.includes(outer) || APAC_EMAILS.includes(sender)) {
+      if (Number.isFinite(b.sourceUid)) { apacUids.add(b.sourceUid); viaFast++; }
     }
   }
 
   // Pass 2 — IMAP messageId cross-ref for unresolved breadcrumbs with a known mid.
-  const unresolved = bcs.filter(b => !ivyUids.has(b.sourceUid));
+  const unresolved = bcs.filter(b => !apacUids.has(b.sourceUid));
   const withMid = unresolved.filter(b => b.messageId);
   const lookupMids = [...new Set(withMid.map(b => b.messageId))];
   const mid2info = lookupMids.length ? await fetchOuterFromForMessageIds(lookupMids) : new Map();
   let viaMid = 0;
   for (const b of withMid) {
     const info = mid2info.get(b.messageId);
-    if (info && info.outerFrom === IVY_EMAIL) {
-      if (Number.isFinite(b.sourceUid)) { ivyUids.add(b.sourceUid); viaMid++; }
+    if (info && APAC_EMAILS.includes(info.outerFrom)) {
+      if (Number.isFinite(b.sourceUid)) { apacUids.add(b.sourceUid); viaMid++; }
     }
   }
 
   // Pass 3 — date-proximity backfill for unresolved breadcrumbs whose messageId
-  // is null (older breadcrumbs from before the upstream outerFrom fix). Search
-  // vq@ for Ivy emails in window and match by (envelope.date ≤ breadcrumb.ts ≤
-  // envelope.date + 60min). The agent runs every 5-15 min so loads typically
-  // happen within ~30 min of the email landing. ±60 min is conservative.
-  // Best-effort — won't catch every case but covers the common pattern.
-  const stillUnresolved = bcs.filter(b => !ivyUids.has(b.sourceUid) && !b.messageId);
+  // is null (older breadcrumbs from before the upstream outerFrom fix).
+  const stillUnresolved = bcs.filter(b => !apacUids.has(b.sourceUid) && !b.messageId);
   let viaDate = 0;
   if (stillUnresolved.length > 0) {
-    const ivyEmails = await searchIvyEmailsInWindow(sinceMs);
+    const apacEmails = await searchApacEmailsInWindow(sinceMs);
     const PROX_MS = 60 * 60 * 1000;
     for (const b of stillUnresolved) {
       const bts = Date.parse(b.ts);
       if (!Number.isFinite(bts)) continue;
-      for (const e of ivyEmails) {
+      for (const e of apacEmails) {
         if (!e.date) continue;
         if (bts >= e.date && bts <= e.date + PROX_MS) {
-          if (Number.isFinite(b.sourceUid)) { ivyUids.add(b.sourceUid); viaDate++; }
+          if (Number.isFinite(b.sourceUid)) { apacUids.add(b.sourceUid); viaDate++; }
           break;
         }
       }
@@ -275,32 +298,23 @@ async function collectForwardedVqIds(sinceMs) {
   const attrib = loadJsonlSince(ATTRIBUTION_LOG, sinceMs);
   const ids = new Set();
   for (const a of attrib) {
-    if (ivyUids.has(a.sourceUid) && Number.isFinite(a.vqLineId)) ids.add(a.vqLineId);
+    if (apacUids.has(a.sourceUid) && Number.isFinite(a.vqLineId)) ids.add(a.vqLineId);
   }
-  return { ids, uids: ivyUids, via: { fastPath: viaFast, mid: viaMid, dateProx: viaDate } };
+  return { ids, uids: apacUids, via: { fastPath: viaFast, mid: viaMid, dateProx: viaDate } };
 }
 
+// Map user ID to name for source column display
+const USER_ID_TO_NAME = new Map([
+  ...APAC_TEAM.buyers.map(b => [b.id, b.name]),
+  ...APAC_TEAM.support.map(s => [s.id, s.name]),
+]);
+
 function pullVQs(sinceTs, untilTs, forwardedIds) {
-  // Source columns:
-  //   r.value              → RFQ#
-  //   cust.name            → Customer (RFQ seller - who we're quoting to)
-  //   rl.chuboe_cpc        → Customer Part Code
-  //   bp.name              → Vendor (supplier who quoted)
-  //   v.chuboe_mpn         → MPN (as quoted by supplier)
-  //   v.cost + c.iso_code  → Price + Currency
-  //   v.chuboe_date_code   → Date Code
-  //   v.chuboe_lead_time   → Lead Time (added — useful context alongside DC)
-  //   v.chuboe_note_public / private / user → Notes (concatenated, public first)
-  //   ub.name              → Buyer (chuboe_buyer_id, NOT createdby)
-  //   v.created            → Created (CT)
-  // Strip newlines + collapse pipes in any free-text field — psql's pipe-delimited
-  // output breaks rows on embedded \n and confuses columns on embedded |.
   const scrub = (col) => `REGEXP_REPLACE(REGEXP_REPLACE(COALESCE(${col}, ''), E'[\\\\r\\\\n]+', ' ', 'g'), '\\\\|', '/', 'g')`;
 
   // Union of two scopes:
-  //  (A) Ivy as direct loader  → v.createdby = IVY_USER_ID (excluding system vendors)
-  //  (B) Ivy as forwarder      → v.chuboe_vq_line_id IN forwardedIds (collected
-  //      via IMAP outer-From cross-ref before this function ran)
+  //  (A) APAC team as direct loaders → v.createdby IN (APAC_USER_IDS)
+  //  (B) APAC buyers as forwarders   → v.chuboe_vq_line_id IN forwardedIds
   const idClause = forwardedIds && forwardedIds.size > 0
     ? `OR v.chuboe_vq_line_id IN (${[...forwardedIds].join(',')})`
     : '';
@@ -321,13 +335,16 @@ function pullVQs(sinceTs, untilTs, forwardedIds) {
     `  AND v.c_bpartner_id NOT IN (${SYSTEM_VENDOR_IDS.join(',')}) ` +
     `  AND v.created >= '${sinceTs}'::timestamp ` +
     `  AND v.created <  '${untilTs}'::timestamp ` +
-    `  AND (v.createdby = ${IVY_USER_ID} ${idClause}) ` +
+    `  AND (v.createdby IN (${APAC_USER_IDS.join(',')}) ${idClause}) ` +
     `ORDER BY cust.name, r.value, rl.chuboe_cpc, NULLIF(v.cost, 0) ASC NULLS LAST, v.created DESC;`;
   const out = psqlPipe(sql);
   return out.trim().split('\n').filter(Boolean).map(line => {
     const [vqId, rfq, customer, cpc, vendor, mpn, cost, currency, qty, dateCode, leadTime, noteP, noteX, noteU, buyer, seller, created, createdby] = line.split('|');
     const notes = [noteP, noteX, noteU].filter(Boolean).join(' | ').replace(/\r?\n/g, ' ').trim();
-    const source = Number(createdby) === IVY_USER_ID ? 'manual' : 'forwarded';
+    const createdbyId = Number(createdby);
+    // Source: show loader name if APAC team member, otherwise 'forwarded'
+    const loaderName = USER_ID_TO_NAME.get(createdbyId);
+    const source = loaderName || 'forwarded';
     return {
       vqId: Number(vqId),
       rfq, customer, cpc, vendor, mpn,
@@ -341,13 +358,13 @@ function pullVQs(sinceTs, untilTs, forwardedIds) {
       seller: seller || '',
       created,
       source,
+      createdbyId,
     };
   });
 }
 
 function fmtPrice(cost, currency) {
   if (cost == null || !Number.isFinite(cost)) return '';
-  // 4 decimal places for sub-dollar prices, 2 otherwise — passive prices look ridiculous at $0.05
   const decimals = cost < 1 ? 4 : 2;
   const formatted = cost.toLocaleString('en-US', { minimumFractionDigits: decimals, maximumFractionDigits: decimals });
   const prefix = currency === 'USD' ? '$' : '';
@@ -357,7 +374,7 @@ function fmtPrice(cost, currency) {
 
 async function buildXlsx(vqs, windowStr) {
   const wb = new ExcelJS.Workbook();
-  wb.creator = 'Ivy VQ Digest';
+  wb.creator = 'APAC VQ Digest';
   wb.created = new Date();
 
   const ws = wb.addWorksheet('VQs');
@@ -367,7 +384,7 @@ async function buildXlsx(vqs, windowStr) {
     { header: 'RFQ',          key: 'rfq',       width: 10 },
     { header: 'CPC',          key: 'cpc',       width: 24 },
     { header: 'Created (CT)', key: 'created',   width: 19 },
-    { header: 'Source',       key: 'source',    width: 11 },
+    { header: 'Loader',       key: 'source',    width: 16 },
     { header: 'Vendor',       key: 'vendor',    width: 32 },
     { header: 'MPN',          key: 'mpn',       width: 24 },
     { header: 'Qty',          key: 'qty',       width: 10 },
@@ -405,11 +422,11 @@ async function buildXlsx(vqs, windowStr) {
       notes: v.notes,
       vqId: v.vqId,
     });
+    // Style forwarded rows differently
     if (v.source === 'forwarded') {
       row.getCell('source').font = { italic: true, color: { argb: 'FF888888' } };
     }
     if (v.qty != null) row.getCell('qty').numFmt = '#,##0';
-    // Currency-aware price format
     const priceCell = row.getCell('cost');
     if (v.cost != null) {
       if (v.currency === 'USD' || !v.currency) {
@@ -427,34 +444,40 @@ async function buildXlsx(vqs, windowStr) {
 }
 
 function buildHtml(vqs, windowStr, sourceLabel) {
+  // Summary stats
   const sumByRfq = new Map();
   const sumByVendor = new Map();
   const sumByCustomer = new Map();
-  let manualCount = 0, forwardedCount = 0;
+  const sumByLoader = new Map();
   for (const v of vqs) {
     sumByRfq.set(v.rfq, (sumByRfq.get(v.rfq) || 0) + 1);
     sumByVendor.set(v.vendor, (sumByVendor.get(v.vendor) || 0) + 1);
     sumByCustomer.set(v.customer, (sumByCustomer.get(v.customer) || 0) + 1);
-    if (v.source === 'manual') manualCount++; else forwardedCount++;
+    sumByLoader.set(v.source, (sumByLoader.get(v.source) || 0) + 1);
   }
-  const distinctRfqs = sumByRfq.size;
-  const distinctVendors = sumByVendor.size;
-  const distinctCustomers = sumByCustomer.size;
+
+  // Build loader breakdown string
+  const loaderBreakdown = [...sumByLoader.entries()]
+    .sort((a, b) => b[1] - a[1])
+    .map(([name, count]) => `${name}: ${count}`)
+    .join(', ');
 
   let html = `<html><body style="font-family:Arial,sans-serif;font-size:13px;color:#222">
-<h2 style="color:#2a5;margin-bottom:4px">Ivy Song — Daily VQ Digest</h2>
+<h2 style="color:#2a5;margin-bottom:4px">APAC Team — Daily VQ Digest</h2>
 <p style="margin-top:0;color:#666">${esc(windowStr)} · <i>${esc(sourceLabel)}</i></p>
 <p style="margin:6px 0">
-  <b>${vqs.length}</b> VQ${vqs.length === 1 ? '' : 's'} (${manualCount} manual + ${forwardedCount} forwarded) ·
-  <b>${distinctCustomers}</b> customer${distinctCustomers === 1 ? '' : 's'} ·
-  <b>${distinctRfqs}</b> RFQ${distinctRfqs === 1 ? '' : 's'} ·
-  <b>${distinctVendors}</b> vendor${distinctVendors === 1 ? '' : 's'}
+  <b>${vqs.length}</b> VQ${vqs.length === 1 ? '' : 's'} ·
+  <b>${sumByCustomer.size}</b> customer${sumByCustomer.size === 1 ? '' : 's'} ·
+  <b>${sumByRfq.size}</b> RFQ${sumByRfq.size === 1 ? '' : 's'} ·
+  <b>${sumByVendor.size}</b> vendor${sumByVendor.size === 1 ? '' : 's'}
+</p>
+<p style="margin:4px 0;font-size:12px;color:#555">
+  <b>By loader:</b> ${esc(loaderBreakdown)}
 </p>`;
 
   if (vqs.length === 0) {
     html += `<p style="color:#999"><i>No VQs in this window.</i></p>`;
   } else {
-    // Group by customer → RFQ → CPC (sorted lowest to highest price)
     let lastCustomer = null;
     let lastRfq = null;
     let lastCpc = null;
@@ -470,7 +493,7 @@ function buildHtml(vqs, windowStr, sourceLabel) {
   <th align="right">Qty</th>
   <th align="left">Date Code</th>
   <th align="left">Lead Time</th>
-  <th align="left">Source</th>
+  <th align="left">Loader</th>
   <th align="left">Buyer</th>
   <th align="left">Seller</th>
   <th align="left">Created (CT)</th>
@@ -479,16 +502,14 @@ function buildHtml(vqs, windowStr, sourceLabel) {
 <tbody>
 ${vqs.map((v, idx) => {
   const created = (v.created || '').slice(0, 19);
-  const sourceCell = v.source === 'forwarded'
+  const loaderCell = v.source === 'forwarded'
     ? `<i style="color:#888">fwd</i>`
-    : `man`;
+    : esc(v.source.split(' ')[0]); // First name only for brevity
 
-  // Visual breaks between groups
   const newCustomer = v.customer !== lastCustomer;
   const newRfq = v.rfq !== lastRfq;
   const newCpc = v.cpc !== lastCpc;
 
-  // Heavy break for customer/RFQ change, light break for CPC change
   let rowStyle = '';
   if ((newCustomer || newRfq) && idx > 0) {
     rowStyle = ' style="border-top:3px solid #555"';
@@ -500,7 +521,6 @@ ${vqs.map((v, idx) => {
   lastRfq = v.rfq;
   lastCpc = v.cpc;
 
-  // Show customer/RFQ/CPC labels only on first row of each group
   const customerCell = newCustomer || newRfq ? `<b>${esc(v.customer)}</b>` : '';
   const rfqCell = newRfq ? `<b>${esc(v.rfq)}</b>` : '';
   const cpcCell = newCpc ? `<b>${esc(v.cpc || '')}</b>` : '';
@@ -515,7 +535,7 @@ ${vqs.map((v, idx) => {
   <td align="right">${v.qty != null ? v.qty.toLocaleString('en-US') : ''}</td>
   <td>${esc(v.dateCode)}</td>
   <td>${esc(v.leadTime)}</td>
-  <td>${sourceCell}</td>
+  <td style="font-size:10px">${loaderCell}</td>
   <td style="font-size:10px">${esc(v.buyer || '?')}</td>
   <td style="font-size:10px">${esc(v.seller || '?')}</td>
   <td style="font-size:10px">${esc(created.slice(5))}</td>
@@ -524,12 +544,15 @@ ${vqs.map((v, idx) => {
 }).join('\n')}
 </tbody>
 </table>
-<p style="color:#666;font-size:11px;margin-top:6px"><i>Grouped by Customer → RFQ → CPC (sorted low→high price within each CPC). Heavy line = new customer/RFQ, light line = new CPC. Full audit in attached xlsx.</i></p>`;
+<p style="color:#666;font-size:11px;margin-top:6px"><i>Grouped by Customer → RFQ → CPC (sorted low→high price within each CPC, $0 no-bids last). Heavy line = new customer/RFQ, light line = new CPC. Full audit in attached xlsx.</i></p>`;
   }
 
+  const teamList = APAC_TEAM.buyers.map(b => b.name).join(', ');
+  const supportList = APAC_TEAM.support.map(s => s.name).join(', ');
   html += `<p style="color:#999;font-size:11px;margin-top:16px;border-top:1px solid #eee;padding-top:8px">
-Generated by ivy-vq-digest.js · Scheduled daily 10:00 UTC = 6 PM Shenzhen (Asia/Shanghai).<br/>
-Loader scope: <code>createdby = ${IVY_USER_ID}</code> (Ivy Song).<br/>
+Generated by apac-vq-digest.js · Scheduled daily 10:00 UTC = 6 PM Shenzhen (Asia/Shanghai).<br/>
+<b>Buyers:</b> ${esc(teamList)}<br/>
+<b>Support:</b> ${esc(supportList)}<br/>
 Window labelled CT (chuboe_*.created storage convention).
 </p></body></html>`;
   return html;
@@ -542,42 +565,48 @@ Window labelled CT (chuboe_*.created storage convention).
   const windowStr = `${sinceTs} CT → ${untilTs} CT`;
 
   console.log(`Window: ${windowStr} (${source})`);
+  console.log(`APAC team: ${APAC_TEAM.buyers.length} buyers + ${APAC_TEAM.support.length} support = ${APAC_USER_IDS.length} users`);
 
   const { ids: forwardedIds, uids: forwardedUids, via } = await collectForwardedVqIds(sinceMs);
   if (forwardedIds.size > 0 || forwardedUids.size > 0) {
-    console.log(`Ivy-forwarded UIDs: ${forwardedUids.size} (fast=${via.fastPath} mid=${via.mid} dateProx=${via.dateProx}) · forwarded vqLineIds: ${forwardedIds.size}`);
+    console.log(`APAC-forwarded UIDs: ${forwardedUids.size} (fast=${via.fastPath} mid=${via.mid} dateProx=${via.dateProx}) · forwarded vqLineIds: ${forwardedIds.size}`);
   }
 
   const vqs = pullVQs(sinceTs, untilTs, forwardedIds);
-  const manual = vqs.filter(v => v.source === 'manual').length;
-  const forwarded = vqs.length - manual;
-  console.log(`VQs in window: ${vqs.length} (${manual} manual + ${forwarded} forwarded)`);
+
+  // Count by source type
+  const byLoader = new Map();
+  for (const v of vqs) {
+    byLoader.set(v.source, (byLoader.get(v.source) || 0) + 1);
+  }
+  const breakdown = [...byLoader.entries()].sort((a, b) => b[1] - a[1]).map(([k, v]) => `${k}:${v}`).join(' ');
+  console.log(`VQs in window: ${vqs.length} (${breakdown})`);
 
   const html = buildHtml(vqs, windowStr, source);
   const xlsxBuf = await buildXlsx(vqs, windowStr);
 
   if (!SEND) {
-    const previewPath = path.join(__dirname, 'output', `ivy-vq-digest-preview-${Date.now()}.xlsx`);
+    const previewPath = path.join(__dirname, 'output', `apac-vq-digest-preview-${Date.now()}.xlsx`);
     if (!fs.existsSync(path.dirname(previewPath))) fs.mkdirSync(path.dirname(previewPath), { recursive: true });
     fs.writeFileSync(previewPath, xlsxBuf);
     console.log(`Preview xlsx written: ${previewPath}`);
-    console.log('--- HTML preview (first 2000 chars) ---');
-    console.log(html.slice(0, 2000));
+    console.log('--- HTML preview (first 2500 chars) ---');
+    console.log(html.slice(0, 2500));
     console.log('(Preview only — pass --send to email and advance state)');
     return;
   }
 
   const today = new Date().toISOString().slice(0, 10);
-  const filename = `ivy-vq-digest-${today}.xlsx`;
+  const filename = `apac-vq-digest-${today}.xlsx`;
 
   const notifier = createNotifier({
     fromEmail: 'vq@orangetsunami.com',
-    fromName: 'Ivy VQ Digest',
+    fromName: 'APAC VQ Digest',
   });
 
   const ok = await notifier.sendWithAttachment(
     RECIPIENTS.join(','),
-    `Ivy VQ Digest — ${vqs.length} VQ${vqs.length === 1 ? '' : 's'} (${today})`,
+    `APAC VQ Digest — ${vqs.length} VQ${vqs.length === 1 ? '' : 's'} (${today})`,
     html,
     [{ filename, content: xlsxBuf }],
     { html: true },
@@ -588,9 +617,6 @@ Window labelled CT (chuboe_*.created storage convention).
     process.exit(1);
   }
 
-  // Advance state only on successful send. Use the untilMs from THIS run as
-  // the next run's lower bound — so anything created at-or-after untilMs lands
-  // in the next digest. Empty windows also advance to avoid a runaway window.
   writeState({ lastDigestTs: new Date(untilMs).toISOString(), lastSentVqCount: vqs.length });
   console.log(`Sent to ${RECIPIENTS.join(', ')} — state advanced to ${new Date(untilMs).toISOString()}`);
 })().catch(err => { console.error('FATAL:', err); process.exit(1); });
