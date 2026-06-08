@@ -323,18 +323,26 @@ This offer is now in Orange Tsunami and available for matching against open RFQs
  * into INBOX with a partner override.
  *
  * Required payload: { subject, outerFrom, hints }
+ * Optional: { extracted } — line data to display so operator can identify customer
  *   hints: free-text describing what was tried (e.g., "subject had no
  *          search-key pattern; body From: chain led to internal Astute employee")
  */
 async function action_needs_partner(payload, ctx) {
-  const { subject, outerFrom, hints, investigation_summary } = payload;
+  const { subject, outerFrom, hints, extracted, investigation_summary } = payload;
+  const linesCount = Array.isArray(extracted && extracted.lines) ? extracted.lines.length : 0;
+
+  // Build extracted-lines table so operator can see what data is waiting
+  const extractedLinesHtml = formatExtractedLinesTable(extracted);
+
   const html = `<html><body style="font-family:Arial,sans-serif;font-size:13px">
 <h2 style="color:#b00">Customer Excess — partner unresolved</h2>
 <p><b>Subject:</b> ${esc(subject)}<br/>
    <b>From:</b> ${esc(outerFrom)}<br/>
    <b>UID:</b> ${ctx.uid}<br/>
-   <b>Inbox:</b> ${esc(ctx.inbox)}</p>
+   <b>Inbox:</b> ${esc(ctx.inbox)}<br/>
+   <b>Lines parsed:</b> ${fmt(linesCount)}</p>
 <p><b>What was tried:</b><br/>${esc(hints || '(no hints provided)')}</p>
+${extractedLinesHtml}
 <p style="background:#f5f5f5;padding:10px;border-left:3px solid #b00">
    <b>Reply with:</b><br/>
    <code>PARTNER: ${ctx.uid} = &lt;BP search key 6-8 digits OR company name&gt;</code>
@@ -401,9 +409,9 @@ async function action_clarify_partner(payload, ctx) {
   const { subject, extracted, hints, outerFrom, investigation_summary } = payload;
   const linesCount = Array.isArray(extracted && extracted.lines) ? extracted.lines.length : 0;
   const offerType = (extracted && extracted.offerType) || null;
-  const sampleLines = Array.isArray(extracted && extracted.lines)
-    ? extracted.lines.slice(0, 5)
-    : [];
+
+  // Build extracted-lines table so operator can see what data is waiting
+  const extractedLinesHtml = formatExtractedLinesTable(extracted);
 
   let sidecarRecord = null;
   if (!ctx.dryRun && ctx.anchorMessageId) {
@@ -419,12 +427,6 @@ async function action_clarify_partner(payload, ctx) {
     });
   }
 
-  const sampleBlock = sampleLines.length
-    ? `<p><b>First ${sampleLines.length} of ${fmt(linesCount)} line(s):</b></p><ul>${sampleLines.map(l =>
-        `<li>${esc(l.mpn || l.MPN || '')}${l.mfr || l.MFR ? ' — ' + esc(l.mfr || l.MFR) : ''}${l.qty ? ' qty ' + fmt(l.qty) : ''}</li>`
-      ).join('')}</ul>`
-    : '';
-
   const retryCount = sidecarRecord ? sidecarRecord.retry_count : 0;
   const html = `<html><body style="font-family:Arial,sans-serif;font-size:13px">
 <h2 style="color:#b00">Customer Excess — partner clarification needed</h2>
@@ -436,7 +438,7 @@ async function action_clarify_partner(payload, ctx) {
    <b>Offer type:</b> ${esc(offerType || '(default)')}<br/>
    <b>Line count:</b> ${fmt(linesCount)}</p>
 <p><b>Why partner didn't resolve:</b><br/>${esc(hints || '(no hints provided)')}</p>
-${sampleBlock}
+${extractedLinesHtml}
 <p style="background:#f5f5f5;padding:10px;border-left:3px solid #b00">
    <b>Reply to ${esc(ctx.inbox)} with the company name</b> (one line is fine — e.g., <code>Customer is Liyijing Electronics</code>). The next agent tick will merge your reply with the parsed lines and load the offer. Or use the structured directive: <code>PARTNER: ${ctx.uid} = &lt;BP search key OR company name&gt;</code>
 </p>
@@ -711,6 +713,59 @@ function esc(s) {
 }
 
 function fmt(n) { return Number(n || 0).toLocaleString('en-US'); }
+
+/**
+ * Format extracted offer lines as an HTML table for operator decision-making.
+ * Without this, escalation emails show "Line count: 50" but don't tell the
+ * operator WHAT those lines contain — making it hard to identify the customer.
+ *
+ * Added 2026-06-08 per operator feedback on VQ uid 8937 — same pattern applies here.
+ */
+function formatExtractedLinesTable(extracted) {
+  const lines = Array.isArray(extracted && extracted.lines) ? extracted.lines : [];
+  if (lines.length === 0) {
+    return '<p style="color:#666;font-style:italic">No lines extracted yet.</p>';
+  }
+
+  // Build compact table showing the key fields an operator needs
+  const rows = lines.slice(0, 15).map((ln, i) => {
+    const mpn = ln.mpn || ln.MPN || '?';
+    const mfr = ln.mfr || ln.MFR || '';
+    const qty = ln.qty != null ? fmt(ln.qty) : '?';
+    const price = ln.price != null ? `$${Number(ln.price).toFixed(4)}` : '';
+    const dc = ln.dateCode || ln.dc || '';
+    const coo = ln.coo || '';
+    return `<tr style="background:${i % 2 === 0 ? '#fff' : '#f9f9f9'}">
+      <td style="padding:4px 8px;border:1px solid #ddd;font-family:monospace">${esc(mpn)}</td>
+      <td style="padding:4px 8px;border:1px solid #ddd">${esc(mfr)}</td>
+      <td style="padding:4px 8px;border:1px solid #ddd;text-align:right">${esc(qty)}</td>
+      <td style="padding:4px 8px;border:1px solid #ddd;text-align:right">${esc(price)}</td>
+      <td style="padding:4px 8px;border:1px solid #ddd">${esc(dc)}</td>
+      <td style="padding:4px 8px;border:1px solid #ddd">${esc(coo)}</td>
+    </tr>`;
+  }).join('');
+
+  const truncateNote = lines.length > 15
+    ? `<p style="color:#666;font-size:11px">Showing first 15 of ${fmt(lines.length)} extracted lines.</p>`
+    : '';
+
+  return `
+<p style="margin-top:16px"><b>Extracted line data:</b></p>
+<table style="border-collapse:collapse;font-size:12px;width:100%">
+  <thead>
+    <tr style="background:#e0e0e0">
+      <th style="padding:4px 8px;border:1px solid #ddd;text-align:left">MPN</th>
+      <th style="padding:4px 8px;border:1px solid #ddd;text-align:left">MFR</th>
+      <th style="padding:4px 8px;border:1px solid #ddd;text-align:right">Qty</th>
+      <th style="padding:4px 8px;border:1px solid #ddd;text-align:right">Price</th>
+      <th style="padding:4px 8px;border:1px solid #ddd;text-align:left">DC</th>
+      <th style="padding:4px 8px;border:1px solid #ddd;text-align:left">COO</th>
+    </tr>
+  </thead>
+  <tbody>${rows}</tbody>
+</table>
+${truncateNote}`;
+}
 
 // ─── EXPORTS ─────────────────────────────────────────────────────────────────
 
