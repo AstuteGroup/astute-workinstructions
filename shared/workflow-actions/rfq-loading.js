@@ -192,6 +192,11 @@ async function action_need_info(payload, ctx) {
 
   const retryCount = sidecarRecord ? sidecarRecord.retry_count : 0;
   const missingItems = missingList.map(m => `<li>${esc(missingLabel(m))}</li>`).join('');
+
+  // Build extracted-lines summary so operator can see what data is waiting.
+  // Without this, operator sees "Lines parsed so far: 5" but no idea what MPNs.
+  const extractedLinesHtml = formatExtractedLinesTable(extracted);
+
   const html = `<html><body style="font-family:Arial,sans-serif;font-size:13px">
 <h2 style="color:#b00">RFQ Loading — info needed</h2>
 <p><b>Subject:</b> ${esc(subject)}<br/>
@@ -202,6 +207,7 @@ async function action_need_info(payload, ctx) {
    <b>Lines parsed so far:</b> ${linesCount}</p>
 <p><b>Missing fields:</b></p>
 <ul>${missingItems || '<li>(none specified)</li>'}</ul>
+${extractedLinesHtml}
 <p style="background:#f5f5f5;padding:10px;border-left:3px solid #b00">
    <b>Reply to ${esc(ctx.inbox)} with the missing values</b> — the next agent tick will merge your answers with the parsed lines and enqueue the RFQ. One-line prose answers are fine.
 </p>
@@ -238,6 +244,60 @@ function missingLabel(key) {
     case 'customer': return 'Company / account to load under';
     default:         return key;
   }
+}
+
+/**
+ * Format extracted RFQ lines as an HTML table for operator decision-making.
+ * Without this, escalation emails show "Lines parsed: 5" but don't tell
+ * the operator WHAT those lines contain — making it impossible to determine
+ * customer/type without re-reading the original email.
+ *
+ * Added 2026-06-08 per operator feedback on VQ uid 8937 — same pattern applies here.
+ */
+function formatExtractedLinesTable(extracted) {
+  const lines = Array.isArray(extracted && extracted.lines) ? extracted.lines : [];
+  if (lines.length === 0) {
+    return '<p style="color:#666;font-style:italic">No lines extracted yet.</p>';
+  }
+
+  // Build compact table showing the key fields an operator needs
+  const rows = lines.slice(0, 20).map((ln, i) => {
+    const mpn = ln.mpn || '?';
+    const mfr = ln.mfr || '';
+    const qty = ln.qty != null ? String(ln.qty).replace(/\B(?=(\d{3})+(?!\d))/g, ',') : '?';
+    const cpc = ln.cpc || '';
+    const target = ln.targetPrice != null ? `$${Number(ln.targetPrice).toFixed(4)}` : '';
+    const desc = ln.description ? ln.description.substring(0, 40) : '';
+    return `<tr style="background:${i % 2 === 0 ? '#fff' : '#f9f9f9'}">
+      <td style="padding:4px 8px;border:1px solid #ddd;font-family:monospace">${esc(mpn)}</td>
+      <td style="padding:4px 8px;border:1px solid #ddd">${esc(mfr)}</td>
+      <td style="padding:4px 8px;border:1px solid #ddd;text-align:right">${esc(qty)}</td>
+      <td style="padding:4px 8px;border:1px solid #ddd">${esc(cpc)}</td>
+      <td style="padding:4px 8px;border:1px solid #ddd;text-align:right">${esc(target)}</td>
+      <td style="padding:4px 8px;border:1px solid #ddd;color:#666;font-size:11px">${esc(desc)}</td>
+    </tr>`;
+  }).join('');
+
+  const truncateNote = lines.length > 20
+    ? `<p style="color:#666;font-size:11px">Showing first 20 of ${lines.length} extracted lines.</p>`
+    : '';
+
+  return `
+<p style="margin-top:16px"><b>Extracted line data:</b></p>
+<table style="border-collapse:collapse;font-size:12px;width:100%">
+  <thead>
+    <tr style="background:#e0e0e0">
+      <th style="padding:4px 8px;border:1px solid #ddd;text-align:left">MPN</th>
+      <th style="padding:4px 8px;border:1px solid #ddd;text-align:left">MFR</th>
+      <th style="padding:4px 8px;border:1px solid #ddd;text-align:right">Qty</th>
+      <th style="padding:4px 8px;border:1px solid #ddd;text-align:left">CPC</th>
+      <th style="padding:4px 8px;border:1px solid #ddd;text-align:right">Target</th>
+      <th style="padding:4px 8px;border:1px solid #ddd;text-align:left">Desc</th>
+    </tr>
+  </thead>
+  <tbody>${rows}</tbody>
+</table>
+${truncateNote}`;
 }
 
 /**

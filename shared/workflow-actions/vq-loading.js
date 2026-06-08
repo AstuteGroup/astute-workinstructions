@@ -780,6 +780,11 @@ async function action_need_info_vendor(payload, ctx) {
   const missingItemsSender = missingList.map(m => `<li>${esc(missingLabelForSender(m))}</li>`).join('');
   const missingItemsOperator = missingList.map(m => `<li>${esc(missingLabel(m))}</li>`).join('');
 
+  // Build extracted-quotes summary for operator decision-making.
+  // Without this, operator sees "RFQ# — couldn't resolve" but has no idea what
+  // MPNs/vendors were extracted, making it hard to identify the right RFQ.
+  const extractedQuotesHtml = formatExtractedQuotesTable(extracted);
+
   // Sender-facing (outreach mode) — friendly, no internal jargon, no sidecar paths.
   const senderHtml = `<html><body style="font-family:Arial,sans-serif;font-size:13px">
 <p>Hello,</p>
@@ -801,6 +806,7 @@ async function action_need_info_vendor(payload, ctx) {
    <b>Quotes parsed so far:</b> ${quotesParsed}</p>
 <p><b>Missing fields:</b></p>
 <ul>${missingItemsOperator || '<li>(none specified)</li>'}</ul>
+${extractedQuotesHtml}
 <p style="background:#f5f5f5;padding:10px;border-left:3px solid #b00">
    <b>Reply to ${esc(ctx.inbox)} with the missing values</b> (or have the buyer/forwarder reply) — the next agent tick will merge the answers with the parsed quotes and load the VQs.
 </p>
@@ -842,6 +848,63 @@ function missingLabel(key) {
     case 'date_code':     return 'Date code — vendor quote didn\'t include it';
     default:              return key;
   }
+}
+
+/**
+ * Format extracted quotes as an HTML table for operator decision-making.
+ * Without this, escalation emails show "couldn't resolve RFQ" but don't tell
+ * the operator WHAT was extracted (vendors, MPNs, prices) — making it
+ * impossible to determine the correct RFQ without re-reading the original email.
+ *
+ * Added 2026-06-08 per operator feedback on uid 8937 (RFQ 1136761).
+ */
+function formatExtractedQuotesTable(extracted) {
+  const quotes = Array.isArray(extracted && extracted.quotes) ? extracted.quotes : [];
+  if (quotes.length === 0) {
+    return '<p style="color:#666;font-style:italic">No quotes extracted yet.</p>';
+  }
+
+  // Build compact table showing the key fields an operator needs to identify the RFQ
+  const rows = quotes.slice(0, 20).map((q, i) => {
+    const vendor = q.vendorName || q.vendorSearchKey || '?';
+    const mpn = q.mpn || q.vendorQuotedMpn || '?';
+    const mfr = q.mfr || '';
+    const qty = q.qty != null ? q.qty.toLocaleString() : '?';
+    const cost = q.cost != null ? `$${Number(q.cost).toFixed(4)}` : '?';
+    const dc = q.dateCode || '';
+    const lt = q.leadTime || '';
+    return `<tr style="background:${i % 2 === 0 ? '#fff' : '#f9f9f9'}">
+      <td style="padding:4px 8px;border:1px solid #ddd">${esc(vendor)}</td>
+      <td style="padding:4px 8px;border:1px solid #ddd;font-family:monospace">${esc(mpn)}</td>
+      <td style="padding:4px 8px;border:1px solid #ddd">${esc(mfr)}</td>
+      <td style="padding:4px 8px;border:1px solid #ddd;text-align:right">${esc(qty)}</td>
+      <td style="padding:4px 8px;border:1px solid #ddd;text-align:right">${esc(cost)}</td>
+      <td style="padding:4px 8px;border:1px solid #ddd">${esc(dc)}</td>
+      <td style="padding:4px 8px;border:1px solid #ddd">${esc(lt)}</td>
+    </tr>`;
+  }).join('');
+
+  const truncateNote = quotes.length > 20
+    ? `<p style="color:#666;font-size:11px">Showing first 20 of ${quotes.length} extracted quotes.</p>`
+    : '';
+
+  return `
+<p style="margin-top:16px"><b>Extracted quote data:</b></p>
+<table style="border-collapse:collapse;font-size:12px;width:100%">
+  <thead>
+    <tr style="background:#e0e0e0">
+      <th style="padding:4px 8px;border:1px solid #ddd;text-align:left">Vendor</th>
+      <th style="padding:4px 8px;border:1px solid #ddd;text-align:left">MPN</th>
+      <th style="padding:4px 8px;border:1px solid #ddd;text-align:left">MFR</th>
+      <th style="padding:4px 8px;border:1px solid #ddd;text-align:right">Qty</th>
+      <th style="padding:4px 8px;border:1px solid #ddd;text-align:right">Cost</th>
+      <th style="padding:4px 8px;border:1px solid #ddd;text-align:left">DC</th>
+      <th style="padding:4px 8px;border:1px solid #ddd;text-align:left">Lead</th>
+    </tr>
+  </thead>
+  <tbody>${rows}</tbody>
+</table>
+${truncateNote}`;
 }
 
 /**
@@ -897,6 +960,9 @@ async function action_clarify_vendor(payload, ctx) {
     `<td style="color:#666;font-size:12px">${esc(c.reason || '')}</td></tr>`
   ).join('');
 
+  // Extracted quotes table — helps operator see what data is waiting on this vendor pick
+  const extractedQuotesHtml = formatExtractedQuotesTable(extracted);
+
   // Sender-facing list — names only, no search keys / match reasons.
   const senderCandidateRows = candidateList.map((c, i) =>
     `<li><b>${esc(c.name || '(unnamed)')}</b></li>`
@@ -933,6 +999,7 @@ async function action_clarify_vendor(payload, ctx) {
 <p style="background:#fff3cd;padding:10px;border-left:3px solid #b58900">
    <b>Reply to ${esc(ctx.inbox)}</b> with either the search key (e.g. <code>1009842</code>) or the row number (<code>1</code>). If none of these is right, reply with <code>NEW</code> and add the vendor to OT first.
 </p>
+${extractedQuotesHtml}
 <p style="color:#666;font-size:11px">To discard this thread entirely: reply with <code>SKIP</code>, <code>DROP</code>, <code>IGNORE</code>, or <code>DISCARD</code> on the first line.</p>
 <p style="color:#666;font-size:11px">Sidecar: <code>~/workspace/.vq-loading-pending/${esc(ctx.anchorMessageId || '(no anchor)')}.json</code></p>
 ${recipientsFooter(envelope)}
@@ -1006,6 +1073,9 @@ async function action_needs_vendor(payload, ctx) {
 
   const retryCount = sidecarRecord ? sidecarRecord.retry_count : 0;
 
+  // Extracted quotes table — helps operator see what data is waiting on vendor creation
+  const extractedQuotesHtml = formatExtractedQuotesTable(extracted);
+
   const senderHtml = `<html><body style="font-family:Arial,sans-serif;font-size:13px">
 <p>Hello,</p>
 <p>Thanks for your quote. We don't see your company in our records yet — to add you so we can process this and future quotes, could you reply with:</p>
@@ -1031,6 +1101,7 @@ async function action_needs_vendor(payload, ctx) {
 <p style="background:#f5f5f5;padding:10px;border-left:3px solid #b00">
    <b>Add the vendor to OT</b> (BP table — set IsVendor='Y', IsCustomer='N', vendor type per relationship). The next agent tick will auto-detect the new BP and load the ${quotesParsed} parsed quote${quotesParsed === 1 ? '' : 's'} without further action.
 </p>
+${extractedQuotesHtml}
 <p style="color:#888;font-size:11px">If this isn't a real vendor (e.g. broker forwarded from a personal address with no company), reply with <code>SKIP</code>, <code>DROP</code>, <code>IGNORE</code>, or <code>DISCARD</code> on the first line to discard the parsed quotes.</p>
 <p style="color:#666;font-size:11px">Sidecar: <code>~/workspace/.vq-loading-pending/${esc(ctx.anchorMessageId || '(no anchor)')}.json</code></p>
 ${recipientsFooter(envelope)}
