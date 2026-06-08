@@ -26,10 +26,6 @@
 const path = require('path');
 require('dotenv').config({ path: path.resolve(__dirname, '../../../.env') });
 
-// Weekend gate — skip Sat/Sun EST to reduce noise
-const { exitIfWeekend } = require('../../shared/weekend-gate');
-exitIfWeekend();
-
 const fs = require('fs');
 const breadcrumbs = require('../../shared/breadcrumbs');
 const { sendWithFallback } = require('../../shared/verified-send');
@@ -39,6 +35,10 @@ const { psqlQuery } = require('../../shared/db-helpers');
 const STATE_DIR = path.join(process.env.HOME || '/home/analytics_user', 'workspace', '.offer-pipeline');
 const STATE_FILE = path.join(STATE_DIR, 'last-digest.json');
 const WORKSPACE = path.join(process.env.HOME || '/home/analytics_user', 'workspace');
+
+// Weekend gate — skip Sat/Sun EST, advance state so Monday starts fresh
+const { exitIfWeekend } = require('../../shared/weekend-gate');
+exitIfWeekend({ stateFile: STATE_FILE, stateKey: 'lastSent' });
 
 // Import cron-jobs registry to get job names for per-job pause detection
 const CRON_REGISTRY = require('../../cron-jobs');
