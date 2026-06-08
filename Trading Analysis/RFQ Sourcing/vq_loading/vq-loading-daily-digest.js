@@ -38,6 +38,10 @@
 const path = require('path');
 require('dotenv').config({ path: path.resolve(__dirname, '../../../../.env') });
 
+// Weekend gate — skip Sat/Sun EST to reduce noise
+const { exitIfWeekend } = require('../../../shared/weekend-gate');
+exitIfWeekend();
+
 const fs = require('fs');
 const { execSync } = require('child_process');
 const { ImapFlow } = require('imapflow');

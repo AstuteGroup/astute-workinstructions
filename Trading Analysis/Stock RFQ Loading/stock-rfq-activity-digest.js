@@ -77,6 +77,10 @@
 
 require('dotenv').config({ path: '/home/analytics_user/workspace/.env' });
 
+// Weekend gate — skip Sat/Sun EST to reduce noise
+const { exitIfWeekend } = require('../../shared/weekend-gate');
+exitIfWeekend();
+
 const fs = require('fs');
 const path = require('path');
 const { Pool } = require('pg');
