@@ -46,6 +46,68 @@ const GENERIC_ROLE_NAMES = new Set([
   'hello', 'hi', 'mail', 'email',
 ]);
 
+// Category prefixes that indicate "type of supplier" rather than company name.
+// When vendor resolution fails, strip these and retry. E.g., "Broker-A power"
+// should match "A-Power Electronic Asia Ltd" after stripping "Broker-".
+// Case-insensitive, may have trailing hyphen/space/colon.
+const CATEGORY_PREFIXES = [
+  'broker', 'vendor', 'supplier', 'distributor', 'franchise', 'authorized',
+  'oem', 'cm', 'ems', 'customer', 'partner', 'agent', 'reseller', 'source',
+];
+
+/**
+ * Generate name variations for fuzzy matching. Handles:
+ * 1. Category prefix stripping ("Broker-A power" → "A power")
+ * 2. Hyphen/space normalization ("A power" → "A-power", "A-Power")
+ *
+ * Returns array of variations to try, in priority order.
+ * Priority: hyphenated versions first (more specific), then space versions.
+ */
+function generateNameVariations(name) {
+  if (!name) return [];
+  const variations = [];
+  let working = name.trim();
+
+  // Try stripping category prefixes
+  for (const prefix of CATEGORY_PREFIXES) {
+    const re = new RegExp(`^${prefix}[\\s:\\-]+`, 'i');
+    if (re.test(working)) {
+      working = working.replace(re, '').trim();
+      break; // Only strip one prefix
+    }
+  }
+
+  // Generate hyphen/space variations of the working name
+  // Priority: hyphenated first (more specific match), then original stripped
+  const withHyphen = working.replace(/ /g, '-');
+  const withSpace = working.replace(/-/g, ' ');
+
+  // Add hyphenated version first (more specific, less likely to false-match)
+  if (withHyphen !== name.trim() && !variations.includes(withHyphen)) {
+    variations.push(withHyphen);
+  }
+
+  // Then the stripped version as-is (if different from original)
+  if (working !== name.trim() && !variations.includes(working)) {
+    variations.push(working);
+  }
+
+  // Then space version (if different)
+  if (withSpace !== working && withSpace !== name.trim() && !variations.includes(withSpace)) {
+    variations.push(withSpace);
+  }
+
+  // Also try title case with hyphen
+  const titleCase = working.split(/[\s-]+/).map(w =>
+    w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()
+  ).join('-');
+  if (titleCase !== working && !variations.includes(titleCase)) {
+    variations.push(titleCase);
+  }
+
+  return variations;
+}
+
 /**
  * Execute a psql query and return raw result string.
  * Returns empty string on error.
@@ -309,13 +371,10 @@ function lookupByDomainHint(email, partnerType = 'any') {
 // ─── TIER 3: Name-Based Fuzzy Match ─────────────────────────────────────────
 
 /**
- * Look up partner by company name (from email signature, body, etc.)
- *
- * @param {string} companyName - Company name extracted from email
- * @param {string} partnerType - 'vendor', 'customer', or 'any'
- * @returns {object|null}
+ * Core name lookup — single query against bp.name.
+ * @private
  */
-function lookupByName(companyName, partnerType = 'any') {
+function lookupByNameCore(companyName, partnerType = 'any') {
   if (!companyName || companyName.length < 3) return null;
   // Reject generic role words (sales, info, support, etc.) — these match too
   // many real BPs as substrings and produce false positives.
@@ -340,6 +399,32 @@ function lookupByName(companyName, partnerType = 'any') {
 
   const results = parseResults(psqlQuery(sql), ['c_bpartner_id', 'name', 'search_key', 'iscustomer', 'isvendor']);
   return results[0] || null;
+}
+
+/**
+ * Look up partner by company name (from email signature, body, etc.)
+ *
+ * Tries the original name first, then falls back to variations:
+ * - Stripped category prefix ("Broker-A power" → "A power")
+ * - Hyphen/space normalization ("A power" → "A-power")
+ *
+ * @param {string} companyName - Company name extracted from email
+ * @param {string} partnerType - 'vendor', 'customer', or 'any'
+ * @returns {object|null}
+ */
+function lookupByName(companyName, partnerType = 'any') {
+  // Try original name first
+  const direct = lookupByNameCore(companyName, partnerType);
+  if (direct) return direct;
+
+  // Try variations (prefix-stripped, hyphen/space swapped, etc.)
+  const variations = generateNameVariations(companyName);
+  for (const variation of variations) {
+    const result = lookupByNameCore(variation, partnerType);
+    if (result) return result;
+  }
+
+  return null;
 }
 
 // ─── TIER 1.5: Domain-Based Email Match ─────────────────────────────────────
