@@ -458,6 +458,7 @@ module.exports = [
 // Helper: convert cadence string to milliseconds (used by sentinel + runner).
 module.exports.cadenceToMs = function cadenceToMs(cadence) {
   if (cadence === 'weekly') return 7 * 24 * 60 * 60 * 1000;
+  if (cadence === 'twice-weekly') return 3 * 24 * 60 * 60 * 1000; // Mon→Thu = 3 days; Thu→Mon = 4 days, but 3 is min
   if (cadence === 'daily') return 24 * 60 * 60 * 1000;
   if (cadence === 'fixed') return 60 * 1000; // placeholder; sentinel never gates 'fixed'
   const m = /^every (\d+)m$/.exec(cadence);
