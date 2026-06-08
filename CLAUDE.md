@@ -34,6 +34,42 @@ If you catch yourself thinking "I remember how this works" - STOP and read the f
 
 ---
 
+# North Star: Bug Fix Protocol (Test Before Processing)
+
+**When the operator reports a bug using a specific stuck email/record as the example:**
+
+1. **DO NOT manually process the stuck item first.** The stuck item is your test case.
+2. **Diagnose and fix the underlying bug** in the code/workflow.
+3. **Use the stuck item to verify the fix works** — clear its stuck state (SEEN flag, sentinel, etc.) and let the fixed code reprocess it.
+4. **If multiple items are stuck from the same bug**, fix first, then batch-recover all of them as validation.
+
+**Why this matters:** Manually processing the stuck item before fixing the bug:
+- Destroys your only test case
+- Leaves you unable to verify the fix actually works
+- Means you might deploy a broken fix and not know until the next occurrence
+
+**Anti-pattern (what NOT to do):**
+```
+1. Operator reports: "UID 1517 is stuck"
+2. You manually load UID 1517 to OT        ← WRONG: destroyed test case
+3. You fix the bug
+4. No way to verify fix works              ← now you're guessing
+```
+
+**Correct pattern:**
+```
+1. Operator reports: "UID 1517 is stuck"
+2. Diagnose root cause
+3. Fix the bug in code
+4. Clear SEEN flag / reset state on UID 1517
+5. Let the fixed code reprocess UID 1517   ← verifies fix works
+6. Check for other items stuck by same bug, recover them too
+```
+
+**This applies to all loaders:** excess, vq-loading, rfq-loading, stockrfq, offer-poller, vortex, etc. The stuck item is a gift — it's a reproducible test case. Don't waste it.
+
+---
+
 # Session Greeting
 
 **TRIGGER:** When you see `SessionStart:startup hook success` in a system-reminder, IMMEDIATELY display the greeting below — do not wait for user input. This allows the user to jump straight into their task.
