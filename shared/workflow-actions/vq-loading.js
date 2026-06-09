@@ -29,6 +29,7 @@ const path = require('path');
 const { loadBulkSummary } = require('../load-bulk-summary');
 const { isKnownBuyer, isKnownSupport, resolveBuyerFromRegistry, resolveAstuteUserById } = require('../partner-lookup');
 const pending = require('../workflow-pending-state');
+const { resolveOutreachRecipients: resolveOutreachRecipientsBase } = require('../outreach-recipients');
 const breadcrumbs = require('../breadcrumbs');
 const writerAttribution = require('../writer-attribution');
 const { notifyHighFailureRate, notifyOtUnreachable } = require('../failure-rate-gate');
@@ -1682,59 +1683,13 @@ function externalSenderLabel(envelope, fallback) {
  *                    recorded for the operator body so Jake can loop them in
  *                    manually if needed; we did NOT email them
  *   - recipientList  the deduped array (for breadcrumb logging)
+ *
+ * Uses shared/outreach-recipients.js with VQ-specific buyer enrichment.
  */
 function resolveOutreachRecipients(payload, ctx) {
-  const ASTUTE = '@astutegroup.com';
-  const seen = new Set();
-  const internal = [];
-  const inbox = (ctx && ctx.inbox) ? ctx.inbox.toLowerCase() : '';
-  const add = (addr) => {
-    const a = String(addr == null ? '' : addr).toLowerCase().trim();
-    if (!a || seen.has(a)) return;
-    if (inbox && a === inbox) return;        // never the vq@ inbox (loop guard)
-    if (!a.endsWith(ASTUTE)) return;          // internal-only
-    seen.add(a);
-    internal.push(a);
-  };
-
-  // 1. Operator (Jake) — always.
-  add(ctx.jakeEmail);
-
-  // 2. Original sender. Internal forwarder (e.g. Ivy) → include. External
-  //    broker → record but DO NOT email. Poller-parsed From is authoritative.
-  const fromCtx = (ctx && ctx.currentFrom) ? String(ctx.currentFrom).trim() : '';
-  const originalSender = (fromCtx || payload.outerFrom || payload.senderEmail || '').trim();
-  let externalSender = null;
-  if (originalSender) {
-    if (originalSender.toLowerCase().endsWith(ASTUTE)) {
-      add(originalSender);
-    } else if (/^[^\s<>"]+@[^\s<>"]+\.[^\s<>"]+$/.test(originalSender)) {
-      externalSender = originalSender.toLowerCase();
-    }
-  }
-
-  // 3. Internal addresses already on the original Cc — captures the buyer when
-  //    support CC'd them on the forward, plus any other Astute folks looped in.
-  if (ctx && ctx.currentCc) {
-    const ADDR_RE = /[A-Za-z0-9._+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}/g;
-    for (const addr of String(ctx.currentCc).match(ADDR_RE) || []) add(addr);
-  }
-
-  // 4. The resolved buyer ("buyer, if applicable") — resolve buyerId → email.
-  if (payload && payload.buyerId) {
-    try {
-      const u = resolveAstuteUserById(payload.buyerId);
-      if (u && u.email) add(u.email);
-    } catch (_) { /* buyer enrichment is best-effort; never fail the send */ }
-  }
-
-  return {
-    to: internal.join(', '),
-    cc: null,
-    senderUsed: null,
-    externalSender,
-    recipientList: internal,
-  };
+  return resolveOutreachRecipientsBase(payload, ctx, {
+    resolveUserById: resolveAstuteUserById,
+  });
 }
 
 /**

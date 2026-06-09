@@ -32,6 +32,7 @@ const pending = require('../workflow-pending-state');
 const { probeOT } = require('../ot-health');
 const { notifyOtUnreachable } = require('../failure-rate-gate');
 const otBudget = require('../ot-api-budget');
+const { resolveOutreachRecipients, recipientsFooter, externalSenderLabel } = require('../outreach-recipients');
 
 // Park a resume sidecar for an RFQ that couldn't be written because OT was
 // unreachable. The vq-loading-resumer (extended) replays `ot_unreachable_retry`
@@ -481,22 +482,27 @@ async function doWriteRFQ(payload, ctx) {
  */
 async function action_needs_review(payload, ctx) {
   const { reason, subject, outerFrom, details } = payload;
+
+  // Resolve internal recipients (operator + internal forwarders)
+  const envelope = resolveOutreachRecipients(payload, ctx);
+
   const html = `<html><body style="font-family:Arial,sans-serif;font-size:13px">
 <h2 style="color:#b00">Stock RFQ — needs manual review</h2>
 <p><b>Subject:</b> ${esc(subject)}<br/>
-   <b>From:</b> ${esc(outerFrom)}<br/>
+   <b>From:</b> ${esc(externalSenderLabel(envelope, outerFrom))}<br/>
    <b>UID:</b> ${ctx.uid}</p>
 <p><b>Reason:</b> ${esc(reason)}</p>
 ${details ? `<pre style="background:#f5f5f5;padding:8px;white-space:pre-wrap;font-size:11px">${esc(details)}</pre>` : ''}
 <p style="color:#666;font-size:11px">Message moved to NeedsReview folder.</p>
+${recipientsFooter(envelope)}
 </body></html>`;
 
   if (ctx.dryRun) {
-    return { dry_run: true, would_notify_jake: { reason } };
+    return { dry_run: true, would_notify: { to: envelope.to, reason } };
   }
 
   await ctx.notifier.sendEmail(
-    ctx.jakeEmail,
+    envelope.to,
     `Stock RFQ — needs review: ${subject || '(no subject)'}`,
     html,
     { html: true },
@@ -509,9 +515,15 @@ ${details ? `<pre style="background:#f5f5f5;padding:8px;white-space:pre-wrap;fon
     subject,
     outerFrom,
     reason,
+    recipients: envelope.recipientList,
+    external_sender_not_emailed: envelope.externalSender || null,
   });
 
-  return { notified: ctx.jakeEmail };
+  return {
+    notified: envelope.to,
+    recipients: envelope.recipientList,
+    external_sender_not_emailed: envelope.externalSender || null,
+  };
 }
 
 /**
