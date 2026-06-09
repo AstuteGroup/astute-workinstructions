@@ -91,7 +91,7 @@ At the start of every new conversation, before addressing anything else, always 
 > 5. **Market Offer Analysis for RFQs** - Match new RFQs against customer excess and stock offers (see `Trading Analysis/Market Offer Matching for RFQs/market-offer-matching.md`)
 > 6. **Quick Quote** - Generate baseline quotes from recent VQs (0-30 days) with margin/GP/rebate pricing logic
 > 7. **Seller Quoting Activity** - VQ→CQ→SO funnel analysis by seller (snapshot + 6-month trend)
-> 8. **Order/Shipment Tracking** - Look up tracking by COV, SO, MPN, customer PO, or salesperson (see `saved-queries/order-shipment-tracking.md`)
+> 8. **Order/Shipment Tracking** - Look up tracking by COV, SO, MPN, customer PO, or salesperson (see `Trading Analysis/saved-queries/order-shipment-tracking.md`)
 > 9. **Inventory File Cleanup** - Process Infor inventory exports into Chuboe format for iDempiere import (see `Trading Analysis/Inventory File Cleanup/inventory-file-cleanup.md`)
 > 10. **Vortex Matches** - Surface VQs/offers under customer targets, stock matches, and market intelligence (see `Trading Analysis/Vortex Matches/vortex-matches.md`)
 > 11. **Customer Excess Analysis** - Universal offer pipeline: 30-min inbox poll → writeOffer → type-router → Customer Excess Analysis (intent: Spec Buy / Proactive Customer / Reactive RFQ-match) for types 1000000/1000003, or broker/franchise data-capture for 1000001/1000002. Operator digest 3×/day (7am/12pm/4pm EDT) with reply-parser feedback loop (see `Trading Analysis/Customer Excess Analysis/customer-excess-analysis.md`)
