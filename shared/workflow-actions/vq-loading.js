@@ -552,6 +552,62 @@ async function action_load_vq(payload, ctx) {
     pending.clearSidecar(ctx.workflow, ctx.anchorMessageId);
   }
 
+  // ── Send confirmation email to internal Astute people ─────────────────────
+  // Mirrors the excess.js pattern: reply letting the forwarder know the VQs
+  // loaded successfully. Only when VQs were written AND no partial-clarify
+  // email was sent (clarifyResult means sendPartialClarify already sent one).
+  if (!ctx.dryRun && totals.vqsWritten > 0 && !clarifyResult) {
+    try {
+      const envelope = resolveOutreachRecipients(payload, ctx);
+
+      if (envelope.recipientList.length > 0) {
+        const toEmail = envelope.recipientList[0];
+        const ccList = envelope.recipientList.slice(1);
+
+        const confirmSubject = subject
+          ? `Re: ${subject}`
+          : `VQs loaded for RFQ ${rfqSearchKey}`;
+        const confirmBody = `VQs loaded successfully.
+
+RFQ #: ${rfqSearchKey}${secondaryRfqSearchKeys && secondaryRfqSearchKeys.length ? ` (+ ${secondaryRfqSearchKeys.length} secondary)` : ''}
+VQs loaded: ${totals.vqsWritten}
+Vendors: ${loadedVendorLabels.slice(0, 5).join(', ')}${loadedVendorLabels.length > 5 ? ` (+${loadedVendorLabels.length - 5} more)` : ''}
+
+These quotes are now in Orange Tsunami.
+
+— VQ Loading System (automated)`;
+
+        const threadingOpts = {};
+        if (ccList.length > 0) threadingOpts.cc = ccList;
+        if (ctx.currentMessageId || messageId) {
+          const msgId = ctx.currentMessageId || messageId;
+          threadingOpts.inReplyTo = msgId;
+          threadingOpts.references = msgId;
+        }
+
+        await ctx.notifier.sendEmail(toEmail, confirmSubject, confirmBody, threadingOpts);
+
+        breadcrumbs.write({
+          cog: 'vq-loading-agent',
+          event: 'confirmation-sent',
+          uid: ctx.uid,
+          rfq: rfqSearchKey,
+          vqs_written: totals.vqsWritten,
+          to: toEmail,
+          cc: ccList,
+        });
+      }
+    } catch (e) {
+      // Confirmation failure is not load-fatal — log and move on.
+      breadcrumbs.write({
+        cog: 'vq-loading-agent',
+        event: 'confirmation-failed',
+        uid: ctx.uid,
+        error: e.message,
+      });
+    }
+  }
+
   // Post-load notice when operator overrode buyer-registry validation with a
   // user who ISN'T yet in the registry. Per 2026-05-20 policy: the load
   // proceeds, but operator gets a one-off "consider adding to registry"

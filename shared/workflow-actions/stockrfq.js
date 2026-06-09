@@ -462,6 +462,58 @@ async function doWriteRFQ(payload, ctx) {
     });
   }
 
+  // ── Send confirmation email to internal Astute people ─────────────────────
+  // Mirrors the excess.js pattern: reply with the RFQ # so the forwarder knows
+  // it was loaded successfully. Only on successful writes (not OT-down, not failed).
+  if (result.rfqId && !writeFailed && !ctx.dryRun) {
+    try {
+      const envelope = resolveOutreachRecipients({
+        outerFrom: payload.originalSender || senderEmail,
+        salesrepId: salesrepId,
+      }, ctx);
+
+      if (envelope.recipientList.length > 0) {
+        const toEmail = envelope.recipientList[0];
+        const ccList = envelope.recipientList.slice(1);
+
+        const confirmSubject = payload.subject
+          ? `Re: ${payload.subject}`
+          : `Stock RFQ ${result.searchKey} loaded`;
+        const confirmBody = `Stock RFQ loaded.
+
+Customer: ${customerName || '(unknown)'}
+RFQ #: ${result.searchKey}
+Lines loaded: ${result.linesWritten}
+
+This RFQ is now in Orange Tsunami.
+
+— Stock RFQ System (automated)`;
+
+        const threadingOpts = {};
+        if (ccList.length > 0) threadingOpts.cc = ccList;
+        if (ctx.currentMessageId || messageId) {
+          const msgId = ctx.currentMessageId || messageId;
+          threadingOpts.inReplyTo = msgId;
+          threadingOpts.references = msgId;
+        }
+
+        await ctx.notifier.sendEmail(toEmail, confirmSubject, confirmBody, threadingOpts);
+
+        breadcrumbs.write({
+          cog: 'stockrfq-agent',
+          event: 'confirmation-sent',
+          uid: ctx.uid,
+          rfqId: result.rfqId,
+          searchKey: result.searchKey,
+          to: toEmail,
+          cc: ccList,
+        });
+      }
+    } catch (e) {
+      console.error(`[stockrfq.doWriteRFQ] confirmation email failed: ${e.message}`);
+    }
+  }
+
   return {
     rfqId: result.rfqId,
     searchKey: result.searchKey,

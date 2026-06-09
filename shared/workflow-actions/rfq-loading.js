@@ -80,7 +80,11 @@ const { action_approve: action_approve_large_rfq, action_reject: action_reject_l
  * actual sales rep (see Step 7).
  */
 async function action_enqueue(payload, ctx) {
-  const { bpartnerId, type, userId, salesrepId, description, lines } = payload;
+  const {
+    bpartnerId, type, userId, salesrepId, description, lines,
+    // Email context for confirmation (passed through to daemon)
+    originalSubject, originalSender, originalCc, partnerName,
+  } = payload;
   if (ctx.dryRun) {
     return {
       dry_run: true,
@@ -139,6 +143,11 @@ async function action_enqueue(payload, ctx) {
     // same Message-ID, so future replays catch this load via path (1) above.
     messageId: dedupMessageId || null,
     sourceUid: ctx.uid,
+    // Email context for confirmation email after load completes
+    originalSubject: originalSubject || ctx.currentSubject || null,
+    originalSender: originalSender || ctx.currentFrom || null,
+    originalCc: originalCc || ctx.currentCc || null,
+    partnerName: partnerName || null,
   });
   return { job_id };
 }

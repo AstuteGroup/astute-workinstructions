@@ -26,6 +26,14 @@ const { loadRFQ } = require('../shared/rfq-fast-loader');
 const queue = require('../shared/rfq-load-queue');
 const { logout } = require('../shared/api-client');
 const breadcrumbs = require('../shared/breadcrumbs');
+const { createNotifier } = require('../shared/notifier');
+const { resolveOutreachRecipients } = require('../shared/outreach-recipients');
+
+// Notifier for confirmation emails
+const notifier = createNotifier({
+  fromEmail: 'rfqloading@orangetsunami.com',
+  fromName: 'RFQ Loading',
+});
 
 // ─── CONSTANTS ───────────────────────────────────────────────────────────────
 
@@ -185,6 +193,62 @@ async function runJob(item) {
     });
   } catch (_) {
     // best-effort — never fail the load completion on a breadcrumb write
+  }
+
+  // ── Send confirmation email to internal Astute people ─────────────────────
+  // Mirrors the excess.js pattern: reply with the RFQ # so the forwarder knows
+  // it was loaded successfully.
+  try {
+    const payload = item.payload || {};
+    const envelope = resolveOutreachRecipients({
+      outerFrom: payload.originalSender,
+      salesrepId: payload.salesrepId,
+    }, {
+      jakeEmail: 'jake.harris@astutegroup.com',
+      inbox: 'rfqloading@orangetsunami.com',
+      currentFrom: payload.originalSender,
+      currentCc: payload.originalCc,
+    });
+
+    if (envelope.recipientList.length > 0) {
+      const toEmail = envelope.recipientList[0];
+      const ccList = envelope.recipientList.slice(1);
+
+      const confirmSubject = payload.originalSubject
+        ? `Re: ${payload.originalSubject}`
+        : `RFQ ${result.searchKey} loaded`;
+      const confirmBody = `RFQ loaded.
+
+Customer: ${payload.partnerName || '(unknown)'}
+RFQ #: ${result.searchKey}
+Lines loaded: ${totalWritten}
+
+This RFQ is now in Orange Tsunami.
+
+— RFQ Loading System (automated)`;
+
+      const threadingOpts = {};
+      if (ccList.length > 0) threadingOpts.cc = ccList;
+      if (payload.messageId) {
+        threadingOpts.inReplyTo = payload.messageId;
+        threadingOpts.references = payload.messageId;
+      }
+
+      await notifier.sendEmail(toEmail, confirmSubject, confirmBody, threadingOpts);
+
+      breadcrumbs.write({
+        cog: 'rfq-loader-daemon',
+        event: 'confirmation-sent',
+        jobId: item.id,
+        rfqId: result.rfqId,
+        searchKey: result.searchKey,
+        to: toEmail,
+        cc: ccList,
+      });
+      log(`  Confirmation sent to ${envelope.recipientList.join(', ')}`);
+    }
+  } catch (e) {
+    log(`  Confirmation email failed: ${e.message}`);
   }
 
   log(`Job ${item.id} ${finalStatus}: RFQ ${result.searchKey} (${result.rfqId}), ${totalWritten} lines, ${result.errors.length} errors, ${(result.elapsedMs / 1000).toFixed(1)}s`);
