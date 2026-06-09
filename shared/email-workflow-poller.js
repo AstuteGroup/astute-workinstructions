@@ -159,10 +159,46 @@ async function withInbox(fn) {
   }
 }
 
+/**
+ * Enumerate attachments, separating documents from images.
+ *
+ * Returns { documents: [...], images: [...] }
+ *   - documents: non-image attachments (xlsx, csv, pdf, etc.)
+ *   - images: image attachments with metadata for agent decision-making
+ *
+ * Image classification:
+ *   - size >= 20KB → likely content (screenshot, photo of document)
+ *   - size < 20KB → likely signature logo/icon (can ignore)
+ *   - contentId (cid) present → inline image (signature block)
+ *
+ * The agent should use `download-attachments --include-images` then Read tool
+ * on large images when email body is sparse.
+ */
 function enumerateAttachments(attachments) {
-  return (attachments || [])
-    .filter(a => a.filename && !/^image\//i.test(a.contentType || ''))
-    .map(a => ({ filename: a.filename, contentType: a.contentType, size: a.size }));
+  const docs = [];
+  const images = [];
+
+  for (const a of (attachments || [])) {
+    if (!a.filename) continue;
+    const isImage = /^image\//i.test(a.contentType || '');
+    const size = a.size || (a.content && a.content.length) || 0;
+
+    if (isImage) {
+      // Classify image: large (>= 20KB) likely content, small likely signature
+      const isLikelyContent = size >= 20000 && !a.cid;
+      images.push({
+        filename: a.filename,
+        contentType: a.contentType,
+        size,
+        isLikelyContent,
+        contentId: a.cid || null,
+      });
+    } else {
+      docs.push({ filename: a.filename, contentType: a.contentType, size });
+    }
+  }
+
+  return { documents: docs, images };
 }
 
 // ─── FORWARDED-HEADER PARSING ────────────────────────────────────────────────
@@ -351,14 +387,22 @@ async function cmdList() {
       const env = msg.envelope || {};
       const from = env.from && env.from[0] ? `${env.from[0].mailbox || ''}@${env.from[0].host || ''}` : '';
       const atts = [];
+      let hasLargeImage = false;
       const walk = (node) => {
         if (!node) return;
         if (Array.isArray(node.childNodes)) node.childNodes.forEach(walk);
         const disp = (node.disposition || '').toLowerCase();
         const fname = (node.dispositionParameters && node.dispositionParameters.filename) ||
                       (node.parameters && node.parameters.name) || null;
-        if (disp === 'attachment' && fname && !/^image\//i.test(node.type || '')) {
-          atts.push(fname);
+        const isImage = /^image\//i.test(node.type || '');
+        const size = node.size || 0;
+        if (disp === 'attachment' && fname) {
+          if (isImage) {
+            // Large images (>= 20KB) likely content, not signature
+            if (size >= 20000) hasLargeImage = true;
+          } else {
+            atts.push(fname);
+          }
         }
       };
       walk(msg.bodyStructure);
@@ -369,6 +413,7 @@ async function cmdList() {
         date: env.date ? env.date.toISOString() : '',
         attachment_names: atts,
         has_attachment: atts.length > 0,
+        has_large_image: hasLargeImage,
       });
     }
     return out;
@@ -407,7 +452,7 @@ async function cmdRead(uid) {
       forwarded_headers: fwd,
       external_sender: externalSender,
       internal_forwarder: isInternalAddress(senderAddr) ? senderAddr : null,
-      attachments: enumerateAttachments(parsed.attachments),
+      ...enumerateAttachments(parsed.attachments),
     };
   });
   if (!result) { console.error(`UID ${uid} not found`); process.exit(2); }
