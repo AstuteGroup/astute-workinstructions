@@ -420,27 +420,18 @@ module.exports = [
   {
     name: 'active-sourcing',
     cadence: 'fixed',
-    // Mon + Thu at 13:30 UTC (8:30 AM CT) — after inventory upload + market profiler
-    cadenceCron: '30 13 * * 1,4',
+    // Mon + Thu at 11:30 UTC — BEFORE nc-listing (12:00) so exclusions are applied
+    // Mon: skips hot RFQ parts (preserves for customer RFQs)
+    // Thu: includes hot RFQ parts
+    cadenceCron: '30 11 * * 1,4',
     command: `node "${ASTUTE}/Trading Analysis/Market Profiling/active-sourcing-runner.js" --limit 200 --commit`,
     cwd: ASTUTE,
     needsOT: true,
     logFile: '/tmp/active-sourcing.log',
-    description: 'Mon/Thu 13:30 UTC (8:30am CT) — Active Sourcing: select 200 priority MPNs, exclude from NC upload, send real RFQs via NC. Vendor responses come via VQ Loading.',
+    description: 'Mon/Thu 11:30 UTC (6:30am CT) — Active Sourcing: select 200 priority MPNs, add to exclusions, source via NC. Runs BEFORE nc-listing so exclusions apply.',
   },
 
-  {
-    name: 'inventory-gate-poller',
-    cadence: 'fixed',
-    // Mon/Thu hourly from 13-20 UTC (8am-3pm EST) — check for Jake's inventory confirmation
-    // Aligned with EST business hours for Jake + support team
-    cadenceCron: '0 13-20 * * 1,4',
-    command: `node "${ASTUTE}/Trading Analysis/Market Profiling/inventory-gate-poller.js"`,
-    cwd: ASTUTE,
-    needsOT: false,
-    logFile: '/tmp/inventory-gate-poller.log',
-    description: 'Mon/Thu hourly 13-20 UTC (8am-3pm EST) — poll stockrfq@ for Jake\'s inventory confirmation, set gate for Active Sourcing',
-  },
+  // inventory-gate-poller removed 2026-06-09 — gate logic removed from active-sourcing-runner
 
   {
     name: 'exclusion-cleanup',
@@ -452,6 +443,18 @@ module.exports = [
     needsOT: false,
     logFile: '/tmp/exclusion-cleanup.log',
     description: 'Sunday 03 UTC — remove expired sourcing exclusions from .sourcing-exclusions.json',
+  },
+
+  {
+    name: 'nc-response-monitor',
+    cadence: 'every 4h',
+    // Every 4 hours at :30 — checks stockrfq@ for replies from datamaster@netcomponents.com
+    cadenceCron: '30 */4 * * *',
+    command: `node "${ASTUTE}/scripts/nc-response-monitor.js"`,
+    cwd: ASTUTE,
+    needsOT: false,
+    logFile: '/tmp/nc-response-monitor.log',
+    description: 'Every 4h — monitor for NetComponents datamaster@ replies. Forwards to Jake if he wasn\'t CC\'d. Self-terminates once any response is detected.',
   },
 ];
 

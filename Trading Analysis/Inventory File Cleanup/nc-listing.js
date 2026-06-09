@@ -195,7 +195,8 @@ function processInventoryFile(inputFile) {
     const unmatchedRows = [];
 
     for (const row of uniqueRows) {
-        const warehouseCode = String(row['Warehouse Name'] || '').trim().toUpperCase();
+        // 'Warehouse' has the code (W102, MAIN, etc.), 'Warehouse Name' has company name
+        const warehouseCode = String(row['Warehouse'] || '').trim().toUpperCase();
         let matched = false;
 
         for (const [groupName, codes, filter] of WAREHOUSE_GROUPS) {

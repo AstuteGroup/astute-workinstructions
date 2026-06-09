@@ -182,25 +182,9 @@ async function runActiveSourcing(options = {}) {
   const dryRun = options.dryRun !== false;
   const forceRun = options.force === true;
 
-  // Gate check: require inventory upload confirmation before running (unless --force)
-  if (!dryRun && !forceRun) {
-    if (!fs.existsSync(INVENTORY_GATE_FILE)) {
-      console.log('='.repeat(60));
-      console.log('Active Sourcing Runner — GATED');
-      console.log('='.repeat(60));
-      console.log('');
-      console.log('Waiting for inventory upload confirmation.');
-      console.log('');
-      console.log('To proceed: Forward or reply to the inventory upload confirmation');
-      console.log('email to stockrfq@orangetsunami.com with subject containing');
-      console.log('"inventory uploaded" or "inventory confirmed".');
-      console.log('');
-      console.log('Or run manually with --force to bypass this gate.');
-      console.log('='.repeat(60));
-      return { gated: true, reason: 'Waiting for inventory upload confirmation' };
-    }
-    console.log('Gate passed: Inventory upload confirmation found.');
-  }
+  // Gate removed 2026-06-09: Was blocking iteration during shakeout. If inventory
+  // upload didn't happen, the exclusions just have no effect (parts weren't
+  // listed anyway). No harm in running sourcing even if upload was missed.
 
   // Generate batch ID and determine selection mode based on day of week
   const now = new Date();

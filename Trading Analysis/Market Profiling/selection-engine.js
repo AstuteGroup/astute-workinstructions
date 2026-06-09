@@ -77,11 +77,25 @@ function psqlQueryRows(sql) {
   }
 }
 
+// BPs that represent Astute's actual inventory
+// Must match WAREHOUSE_WRITEBACK from inventory_cleanup.js exactly.
+// BP 1000363 "Astute Group" contains stale 2024 data - do NOT include.
+const STOCK_BP_IDS = [
+  1000332, // Astute Electronics Inc (Free Stock Austin/Stevenage/HK/Philippines, LAM Dead)
+  1000325, // Astute - Franchise Stock
+  1003236, // Astute - GE Aviation Excess (consignment)
+  1003621, // Astute - Taxan Excess (consignment)
+  1005225, // Astute - Spartronics Excess (consignment)
+  1010966, // Astute Inc - Eaton Consignment
+  1011267, // Astute - LAM Consignment
+];
+
 /**
- * Get all inventory MPNs with basic info
+ * Get all inventory MPNs with basic info.
+ * Only pulls from Astute's actual stock offers (~5k MPNs), not all offers (~39k).
  */
 function getInventoryMPNs() {
-  // MFR text lives on chuboe_offer_line, not on the _mpn sub-table
+  const bpList = STOCK_BP_IDS.join(', ');
   const sql = `
     SELECT
       ol.chuboe_mpn,
@@ -89,9 +103,9 @@ function getInventoryMPNs() {
       SUM(ol.qty) as total_qty
     FROM adempiere.chuboe_offer o
     JOIN adempiere.chuboe_offer_line ol ON o.chuboe_offer_id = ol.chuboe_offer_id
-    WHERE o.isactive = 'Y'
+    WHERE o.c_bpartner_id IN (${bpList})
+      AND o.isactive = 'Y'
       AND ol.isactive = 'Y'
-      AND o.created > NOW() - INTERVAL '30 days'
       AND ol.chuboe_mpn IS NOT NULL
       AND LENGTH(ol.chuboe_mpn) > 0
     GROUP BY ol.chuboe_mpn, UPPER(COALESCE(ol.chuboe_mfr_text, ''))
@@ -106,7 +120,9 @@ function getInventoryMPNs() {
 }
 
 /**
- * Get MPNs with most RFQ hits in last N days
+ * Get MPNs with most Stock RFQ hits in last N days.
+ * "Hot parts" = parts customers are actively requesting via stockrfq@ inbox.
+ * Only counts Stock RFQs (type 1000007), not Shortage/PPV/internal RFQs.
  */
 function getTopRequestedMPNs(limit = 100) {
   const sql = `
@@ -120,6 +136,7 @@ function getTopRequestedMPNs(limit = 100) {
     WHERE r.isactive = 'Y'
       AND rl.isactive = 'Y'
       AND rlm.isactive = 'Y'
+      AND r.chuboe_rfq_type_id = 1000007  -- Stock RFQs only
       AND r.created > NOW() - INTERVAL '${RFQ_WINDOW_DAYS} days'
       AND rlm.chuboe_mpn IS NOT NULL
     GROUP BY rlm.chuboe_mpn
