@@ -19,5 +19,7 @@
   "CYCLOPS": { "searchKey": "1002495", "name": "Cyclops Electronics" },
   "FDH ELECTRONICS (ELECTRO/BJG)": { "searchKey": "1011486", "name": "FDH Electronics" },
   "FDH ELECTRONICS": { "searchKey": "1011486", "name": "FDH Electronics" },
-  "FDH": { "searchKey": "1011486", "name": "FDH Electronics" }
+  "FDH": { "searchKey": "1011486", "name": "FDH Electronics" },
+  "DUANQUE": { "searchKey": "1003874", "name": "Hong Kong Duan Que Electronics Co., Limited" },
+  "DUAN QUE": { "searchKey": "1003874", "name": "Hong Kong Duan Que Electronics Co., Limited" }
 }
