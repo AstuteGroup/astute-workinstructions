@@ -1,6 +1,6 @@
 # Broker/Franchise Market Offer Loading Workflow
 
-> **Created:** 2026-06-10. **Status:** PLANNED (awaiting inbox setup)
+> **Created:** 2026-06-10. **Status:** ACTIVE
 
 **Purpose:** Load market offers from external brokers and franchise distributors into OT. These are NOT customer excess — they are offers from external suppliers (brokers, franchises) that we may want to purchase from or use for market intelligence.
 
