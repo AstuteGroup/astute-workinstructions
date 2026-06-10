@@ -329,4 +329,77 @@ module.exports = {
     // The handler is unaware of the validation — it just receives reconciled
     // quotes.
   },
+
+  // ─── BROKER/FRANCHISE MARKET OFFERS ─────────────────────────────────────────
+  'broker-offers': {
+    status: 'planned',  // → 'active' once inbox brokeroffers@orangetsunami.com is created
+    handler: 'broker-offers',
+    doc: 'Trading Analysis/Broker Offers/broker-offers.md',
+    inbox: 'brokeroffers@orangetsunami.com',
+    sourceFolder: 'INBOX',
+    cron: { name: 'broker-offers-agent' },
+    actions: [
+      'load_offer', 'needs_partner', 'clarify_partner', 'needs_review',
+      'not_offer', 'dup_skip', 'drop_pending',
+    ],
+    capabilities: {
+      replyStitching: true,
+      needInfoClarifications: true,
+      largePayloadGate: false,
+      approvalReplyAction: false,
+      preWriteIdempotency: true,
+      writeQueue: false,
+      breadcrumbWrites: true,
+      operatorDigest: false,
+      activityDigest: false,
+      replyParserGrammar: true,
+      tieredCron: false,
+    },
+    deviations: {
+      largePayloadGate: 'No downstream analysis pipeline — offers are data capture only. No per-line cost to gate.',
+      approvalReplyAction: 'No payload gate → no approval action needed. Clarification round-trip uses reply-stitching (clarify_partner sidecars).',
+      writeQueue: 'Direct write; broker/franchise emails are typically bounded batch sizes.',
+      operatorDigest: 'No downstream analysis to curate. Breadcrumbs + confirmation emails provide visibility.',
+      activityDigest: 'Low priority; can add later if visibility needed. Confirmations email internal parties on every load.',
+      tieredCron: 'No approval gate → no burst trigger. Fixed 30m cadence sufficient for data capture.',
+    },
+    // POLICY: All notifications go to Jake + internal CC — NEVER to external brokers/franchises.
+    // clarify_partner emails Jake (Reply-To: brokeroffers@ for sidecar round-trip).
+    // load_offer confirmation emails internal forwarder + internal CCs + Jake; excludes external sender.
+  },
+
+  // ─── TRACKING LOADING (supplier shipping confirmations → PO tracking) ───────
+  'tracking-loading': {
+    status: 'planned',  // → 'active' once inbox is created
+    handler: 'tracking-loading',
+    doc: 'Trading Analysis/Tracking Loading/tracking-loading.md',
+    inbox: 'tracking@orangetsunami.com',
+    sourceFolder: 'INBOX',
+    cron: { name: 'tracking-agent' },
+    actions: ['patch_tracking', 'needs_review', 'not_tracking'],
+    capabilities: {
+      replyStitching: false,
+      needInfoClarifications: false,
+      largePayloadGate: false,
+      approvalReplyAction: false,
+      preWriteIdempotency: true,
+      writeQueue: false,
+      breadcrumbWrites: true,
+      operatorDigest: false,
+      activityDigest: false,
+      replyParserGrammar: false,
+      tieredCron: false,
+    },
+    deviations: {
+      replyStitching: 'tracking updates are one-shot — no clarification round-trip with external parties',
+      needInfoClarifications: 'ambiguous cases route to needs_review for operator manual handling; no external sender to clarify with',
+      largePayloadGate: 'tracking numbers are tiny payloads; no gate needed',
+      approvalReplyAction: 'no payload gate → no approval needed',
+      writeQueue: 'direct PATCH to c_order; single-row updates',
+      operatorDigest: 'low-volume workflow; per-email confirmation is sufficient visibility',
+      activityDigest: 'low-volume workflow; breadcrumbs provide audit trail',
+      replyParserGrammar: 'no operator-override grammar needed — escalations go to needs_review',
+      tieredCron: 'fixed cadence (every 15m); shipping confirmations have no urgency signal',
+    },
+  },
 };
