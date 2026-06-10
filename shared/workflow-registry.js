@@ -332,7 +332,7 @@ module.exports = {
 
   // ─── BROKER/FRANCHISE MARKET OFFERS ─────────────────────────────────────────
   'broker-offers': {
-    status: 'planned',  // → 'active' once inbox brokeroffers@orangetsunami.com is created
+    status: 'active',
     handler: 'broker-offers',
     doc: 'Trading Analysis/Broker Offers/broker-offers.md',
     inbox: 'brokeroffers@orangetsunami.com',
@@ -370,7 +370,7 @@ module.exports = {
 
   // ─── TRACKING LOADING (supplier shipping confirmations → PO tracking) ───────
   'tracking-loading': {
-    status: 'planned',  // → 'active' once inbox is created
+    status: 'active',
     handler: 'tracking-loading',
     doc: 'Trading Analysis/Tracking Loading/tracking-loading.md',
     inbox: 'tracking@orangetsunami.com',

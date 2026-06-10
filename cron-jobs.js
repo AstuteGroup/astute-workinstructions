@@ -282,36 +282,30 @@ module.exports = [
   },
 
   // ─── BROKER/FRANCHISE MARKET OFFERS ─────────────────────────────────────────
-  // PLANNED: Uncomment once brokeroffers@orangetsunami.com inbox is created in WorkMail
-  // and IMAP folders (Processed, NeedsPartner, NeedInfo, NeedsReview, NotOffer) are set up.
-  //
-  // {
-  //   name: 'broker-offers-agent',
-  //   tier: 'agent',  // Claude-powered — paused by .cron-agents-paused
-  //   cadence: 'every 30m',
-  //   cadenceCron: '*/30 * * * *',
-  //   command: `/home/analytics_user/.local/bin/claude -p --model sonnet --permission-mode bypassPermissions --max-turns 80 < "${ASTUTE}/Trading Analysis/Broker Offers/agent-prompt.txt"`,
-  //   cwd: AGENT_CWD,
-  //   needsOT: true,
-  //   logFile: '/tmp/broker-offers-agent.log',
-  //   description: 'Every 30m — agent reads brokeroffers@ per broker-offers.md, writes Broker Stock/Franchise offers via OT API. No analysis gate — data capture only. All notifications go to internal parties.',
-  // },
+  {
+    name: 'broker-offers-agent',
+    tier: 'agent',  // Claude-powered — paused by .cron-agents-paused
+    cadence: 'every 30m',
+    cadenceCron: '*/30 * * * *',
+    command: `/home/analytics_user/.local/bin/claude -p --model sonnet --permission-mode bypassPermissions --max-turns 80 < "${ASTUTE}/Trading Analysis/Broker Offers/agent-prompt.txt"`,
+    cwd: AGENT_CWD,
+    needsOT: true,
+    logFile: '/tmp/broker-offers-agent.log',
+    description: 'Every 30m — agent reads brokeroffers@ per broker-offers.md, writes Broker Stock/Franchise offers via OT API. No analysis gate — data capture only. All notifications go to internal parties.',
+  },
 
   // ─── TRACKING LOADING (supplier shipping confirmations → PO tracking) ───────
-  // PLANNED: Uncomment once tracking@orangetsunami.com inbox is created in WorkMail
-  // and credentials added to .env (TRACKING_USER, TRACKING_PASS, or reuse WORKMAIL_*).
-  //
-  // {
-  //   name: 'tracking-agent',
-  //   tier: 'agent',  // Claude-powered — paused by .cron-agents-paused
-  //   cadence: 'every 15m',
-  //   cadenceCron: '*/15 * * * *',
-  //   command: `/home/analytics_user/.local/bin/claude -p --model sonnet --permission-mode bypassPermissions --max-turns 40 < "${ASTUTE}/Trading Analysis/Tracking Loading/agent-prompt.txt"`,
-  //   cwd: AGENT_CWD,
-  //   needsOT: true,
-  //   logFile: '/tmp/tracking-agent.log',
-  //   description: 'Every 15m — agent reads tracking@ for forwarded shipping confirmations, extracts tracking numbers + PO references, PATCHes c_order.Chuboe_TrackingNumbers via OT API. Low-volume workflow; no gate needed.',
-  // },
+  {
+    name: 'tracking-agent',
+    tier: 'agent',  // Claude-powered — paused by .cron-agents-paused
+    cadence: 'every 15m',
+    cadenceCron: '*/15 * * * *',
+    command: `/home/analytics_user/.local/bin/claude -p --model sonnet --permission-mode bypassPermissions --max-turns 40 < "${ASTUTE}/Trading Analysis/Tracking Loading/agent-prompt.txt"`,
+    cwd: AGENT_CWD,
+    needsOT: true,
+    logFile: '/tmp/tracking-agent.log',
+    description: 'Every 15m — agent reads tracking@ for forwarded shipping confirmations, extracts tracking numbers + PO references, PATCHes c_order.Chuboe_TrackingNumbers via OT API. Low-volume workflow; no gate needed.',
+  },
 
   {
     name: 'offer-reply-parser',

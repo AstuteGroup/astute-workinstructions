@@ -38,7 +38,9 @@ const ACCOUNT_MAP = {
   excess: 'excess@orangetsunami.com',
   stockrfq: 'stockRFQ@orangetsunami.com',
   vortex: 'vortex@orangetsunami.com',
-  rfqloading: 'rfqloading@orangetsunami.com'
+  rfqloading: 'rfqloading@orangetsunami.com',
+  brokeroffers: 'brokeroffers@orangetsunami.com',
+  tracking: 'tracking@orangetsunami.com',
 };
 
 const IMAP_HOST = process.env.IMAP_HOST || 'imap.mail.us-east-1.awsapps.com';
