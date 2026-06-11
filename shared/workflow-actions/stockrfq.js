@@ -28,6 +28,38 @@ const breadcrumbs = require('../breadcrumbs');
 const writerAttribution = require('../writer-attribution');
 const { createGate } = require('../large-payload-gate');
 const { makeApprovalActions } = require('./_approval');
+const pending = require('../workflow-pending-state');
+const { probeOT } = require('../ot-health');
+const { notifyOtUnreachable } = require('../failure-rate-gate');
+const otBudget = require('../ot-api-budget');
+const { resolveOutreachRecipients, recipientsFooter, externalSenderLabel } = require('../outreach-recipients');
+
+// Park a resume sidecar for an RFQ that couldn't be written because OT was
+// unreachable. The vq-loading-resumer (extended) replays `ot_unreachable_retry`
+// sidecars once OT recovers: stockrfq ones re-run writeRFQ — fresh when
+// existing_rfq_id is null (header never wrote → nothing orphaned), or backfill
+// against existing_rfq_id when OT died mid-write (header wrote, lines/mpns
+// didn't). The full payload is preserved verbatim so the replay is exact.
+function parkStockRfqResumeSidecar(ctx, payload, pendingInfo = {}) {
+  try {
+    pending.writeSidecar('stockrfq', `stockrfq-otdown-${(ctx && ctx.uid) || 'na'}`, {
+      kind: 'ot_unreachable_retry',
+      source_workflow: 'stockrfq',
+      original_uid: (ctx && ctx.uid) || null,
+      source_message_id: payload.messageId || (ctx && ctx.currentMessageId) || null,
+      existing_rfq_id: pendingInfo.rfqId || null,
+      existing_search_key: pendingInfo.searchKey || null,
+      payload,                       // full payload — resumer re-runs writeRFQ (fresh or backfill)
+      customer_name: payload.customerName || null,
+      sender_email: payload.senderEmail ? payload.senderEmail.toLowerCase() : null,
+      line_count: (payload.lines || []).length,
+      created_at: new Date().toISOString(),
+      expires_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
+    });
+  } catch (e) {
+    breadcrumbs.write({ cog: 'stockrfq-agent', event: 'ot-resume-sidecar-failed', uid: ctx && ctx.uid, error: e.message });
+  }
+}
 
 const UNQUALIFIED_BROKER_ID = 1006505;       // c_bpartner_id
 const UNQUALIFIED_BROKER_KEY = '1008499';    // search_key (for human-readable references)
@@ -277,6 +309,95 @@ async function doWriteRFQ(payload, ctx) {
     }));
   }
 
+  // Derive senderDomain from senderEmail if the agent didn't pre-extract.
+  const derivedDomain = senderDomain
+    || (senderEmail && senderEmail.includes('@')
+        ? senderEmail.split('@')[1].toLowerCase()
+        : null);
+
+  // ── OT-health pre-flight ─────────────────────────────────────────────────
+  // If OT is unreachable, do NOT attempt the write — that's what orphans a
+  // header+line when the line_mpn POST then times out (RFQ 1135619). Park a
+  // resume sidecar with the full payload and breadcrumb a NON-'loaded' event
+  // so the Message-ID dedup guard never traps the recovery (see deferred-work
+  // "writeRFQ failure during OT outage … false `loaded` breadcrumb"). Probe
+  // failure itself is non-fatal — fall through and let the writer try.
+  try {
+    const health = await probeOT();
+    if (!health.up) {
+      parkStockRfqResumeSidecar(ctx, payload, { rfqId: null, searchKey: null });
+      breadcrumbs.write({
+        cog: 'stockrfq-agent', event: 'load-deferred-ot-down',
+        uid: ctx.uid, sourceUid: sourceUid || ctx.uid, messageId: messageId || null,
+        bpartnerId, customerName: customerName || null,
+        lineCount: normalizedLines.length, reason: health.reason,
+      });
+      await notifyOtUnreachable({
+        workflow: 'Stock RFQ', ctx,
+        affected: { targets: [], senders: [senderEmail].filter(Boolean),
+          totalDeferred: normalizedLines.length, subject: payload.subject || null },
+      });
+      return { rfqId: null, searchKey: null, linesWritten: 0,
+        errors: [`OT unreachable at pre-flight (${health.reason}) — deferred for resume`], deferred: true };
+    }
+  } catch (_) { /* probe error shouldn't block the write attempt */ }
+
+  // ── TIER 1: Global budget check ──
+  // Stock RFQ has lowest priority (P1) — throttled first when budget is tight.
+  // EXCEPTION: Sidecar replays (skipBudgetCheck=true) bypass budget — they're
+  // recovery operations for writes that were already authorized. Blocking them
+  // just makes sidecars pile up forever.
+  const estimatedWrites = normalizedLines.length * 3;
+
+  if (!payload.skipBudgetCheck) {
+    const globalCheck = otBudget.checkBudget({
+      table: 'chuboe_rfq',
+      count: estimatedWrites,
+      caller: 'stockrfq-agent',
+      isBackfill: false,  // Stock RFQ doesn't use backfill coordination
+    });
+
+    if (!globalCheck.allowed) {
+      // REPEAT-DEFERRAL CHECK: If we already have a breadcrumb for this UID from a
+      // prior tick, don't notify again — the agent should exit silently.
+      const priorDeferral = breadcrumbs.findByUid(ctx.uid, {
+        cog: 'stockrfq-agent',
+        events: ['load-deferred-budget'],
+        sinceMs: Date.now() - 24 * 60 * 60 * 1000,
+      });
+      const alreadyDeferred = priorDeferral.found;
+
+      if (!alreadyDeferred) {
+        breadcrumbs.write({
+          cog: 'stockrfq-agent',
+          event: 'load-deferred-budget',
+          uid: ctx.uid,
+          sourceUid: sourceUid || ctx.uid,
+          messageId: messageId || null,
+          bpartnerId,
+          customerName: customerName || null,
+          lineCount: normalizedLines.length,
+          reason: globalCheck.reason,
+        });
+      }
+
+      return {
+        rfqId: null,
+        searchKey: null,
+        linesWritten: 0,
+        errors: [`Global budget exhausted: ${globalCheck.reason} — processing deferred`],
+        rateLimited: true,
+        alreadyDeferred,
+        rateLimitReason: globalCheck.reason,
+        rateLimitTier: 'global',
+      };
+    }
+  }
+
+  // Reserve budget before write
+  otBudget.reserve('chuboe_rfq', estimatedWrites, 'stockrfq-agent');
+  const writeStartTime = Date.now();
+
   const result = await writeRFQ({
     bpartnerId,
     type: type || 'Stock',
@@ -285,17 +406,42 @@ async function doWriteRFQ(payload, ctx) {
     salesrepId: salesrepId || JAKE_USER_ID,
     userId: userId || JAKE_USER_ID,
     lines: normalizedLines,
+    // Backfill on resume: when the resumer replays an RFQ that was partially
+    // written during an OT outage, it passes the existing rfqId so writeRFQ
+    // skips the header and writes only the missing lines/line_mpns.
+    existingRfqId: payload.existingRfqId || undefined,
+    existingSearchKey: payload.existingSearchKey || undefined,
+    // Sidecar replays bypass budget checks — recovery shouldn't compete
+    skipBudgetCheck: payload.skipBudgetCheck || false,
   });
 
-  // Derive senderDomain from senderEmail if the agent didn't pre-extract.
-  const derivedDomain = senderDomain
-    || (senderEmail && senderEmail.includes('@')
-        ? senderEmail.split('@')[1].toLowerCase()
-        : null);
+  // Classify the outcome. otDown = OT died mid-write (header may have written,
+  // lines/mpns may not). writeFailed = any failure (otDown or logical). Only a
+  // clean write earns the 'loaded' event — a false 'loaded' on failure makes
+  // the dedup guard block recovery on re-poll.
+  const otDown = !!result.otUnreachable;
+  const writeFailed = otDown || result.rfqId == null || (result.errors && result.errors.length > 0);
+
+  // ── Record writes to global budget ──
+  const writeDuration = Date.now() - writeStartTime;
+  const actualWritten = (result.linesWritten || 0) * 2;  // lines + line_mpns (header not counted)
+  if (actualWritten > 0) {
+    otBudget.recordWrites('chuboe_rfq', actualWritten, {
+      caller: 'stockrfq-agent',
+      success: !writeFailed,
+      durationMs: writeDuration,
+    });
+  }
+
+  if (result.errors && result.errors.length > 0) {
+    for (let i = 0; i < result.errors.length; i++) {
+      otBudget.recordFailure();
+    }
+  }
 
   breadcrumbs.write({
     cog: 'stockrfq-agent',
-    event: 'loaded',
+    event: otDown ? 'load-failed-ot-down' : (writeFailed ? 'load-failed' : 'loaded'),
     uid: ctx.uid,
     sourceUid: sourceUid || ctx.uid,
     messageId: messageId || null,
@@ -322,11 +468,26 @@ async function doWriteRFQ(payload, ctx) {
     result,
   });
 
+  // OT died mid-write: park a resume sidecar so the resumer backfills the
+  // missing lines/mpns against the (partial) existing rfqId, and send the calm
+  // notification. result.pending carries {rfqId, searchKey} (rfqId null if even
+  // the header didn't write → resumer re-runs fresh).
+  if (otDown) {
+    parkStockRfqResumeSidecar(ctx, payload, result.pending || { rfqId: result.rfqId, searchKey: result.searchKey });
+    await notifyOtUnreachable({
+      workflow: 'Stock RFQ', ctx,
+      affected: { targets: result.searchKey ? [result.searchKey] : [],
+        senders: [senderEmail].filter(Boolean),
+        totalDeferred: normalizedLines.length, subject: payload.subject || null },
+    });
+  }
+
   return {
     rfqId: result.rfqId,
     searchKey: result.searchKey,
     linesWritten: result.linesWritten,
     errors: result.errors,
+    deferred: otDown,
   };
 }
 
@@ -341,22 +502,27 @@ async function doWriteRFQ(payload, ctx) {
  */
 async function action_needs_review(payload, ctx) {
   const { reason, subject, outerFrom, details } = payload;
+
+  // Resolve internal recipients (operator + internal forwarders)
+  const envelope = resolveOutreachRecipients(payload, ctx);
+
   const html = `<html><body style="font-family:Arial,sans-serif;font-size:13px">
 <h2 style="color:#b00">Stock RFQ — needs manual review</h2>
 <p><b>Subject:</b> ${esc(subject)}<br/>
-   <b>From:</b> ${esc(outerFrom)}<br/>
+   <b>From:</b> ${esc(externalSenderLabel(envelope, outerFrom))}<br/>
    <b>UID:</b> ${ctx.uid}</p>
 <p><b>Reason:</b> ${esc(reason)}</p>
 ${details ? `<pre style="background:#f5f5f5;padding:8px;white-space:pre-wrap;font-size:11px">${esc(details)}</pre>` : ''}
 <p style="color:#666;font-size:11px">Message moved to NeedsReview folder.</p>
+${recipientsFooter(envelope)}
 </body></html>`;
 
   if (ctx.dryRun) {
-    return { dry_run: true, would_notify_jake: { reason } };
+    return { dry_run: true, would_notify: { to: envelope.to, reason } };
   }
 
   await ctx.notifier.sendEmail(
-    ctx.jakeEmail,
+    envelope.to,
     `Stock RFQ — needs review: ${subject || '(no subject)'}`,
     html,
     { html: true },
@@ -369,9 +535,15 @@ ${details ? `<pre style="background:#f5f5f5;padding:8px;white-space:pre-wrap;fon
     subject,
     outerFrom,
     reason,
+    recipients: envelope.recipientList,
+    external_sender_not_emailed: envelope.externalSender || null,
   });
 
-  return { notified: ctx.jakeEmail };
+  return {
+    notified: envelope.to,
+    recipients: envelope.recipientList,
+    external_sender_not_emailed: envelope.externalSender || null,
+  };
 }
 
 /**
@@ -629,4 +801,8 @@ module.exports = {
     UNQUALIFIED_BROKER_KEY,
     JAKE_USER_ID,
   },
+  // Exposed for the resumer: replays a parked OT-down RFQ. Pass the stored
+  // payload (optionally with existingRfqId/existingSearchKey for a mid-write
+  // backfill) + a synthetic ctx. Re-probes OT and re-parks if still down.
+  doWriteRFQ,
 };

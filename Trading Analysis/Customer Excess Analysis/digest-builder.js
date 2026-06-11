@@ -34,10 +34,211 @@ const { psqlQuery } = require('../../shared/db-helpers');
 
 const STATE_DIR = path.join(process.env.HOME || '/home/analytics_user', 'workspace', '.offer-pipeline');
 const STATE_FILE = path.join(STATE_DIR, 'last-digest.json');
+const WORKSPACE = path.join(process.env.HOME || '/home/analytics_user', 'workspace');
+
+// Weekend gate — skip Sat/Sun EST, advance state so Monday starts fresh
+const { exitIfWeekend } = require('../../shared/weekend-gate');
+exitIfWeekend({ stateFile: STATE_FILE, stateKey: 'lastSent' });
+
+// Import cron-jobs registry to get job names for per-job pause detection
+const CRON_REGISTRY = require('../../cron-jobs');
 
 const SENDER = 'excess@orangetsunami.com';
 const FALLBACK = process.env.EXCESS_FALLBACK_SENDER || 'stockRFQ@orangetsunami.com';
 const RECIPIENT = process.env.OPERATOR_EMAIL || 'jake.harris@astutegroup.com';
+
+// ── Pause detection (job-specific, agent, global) ──────────────────────────
+//
+// Checks for pause files that stop scheduled jobs from running:
+//   - ~/.cron-paused           → ALL jobs paused
+//   - ~/.cron-agents-paused    → all tier='agent' jobs paused
+//   - ~/.{job-name}-paused     → specific job paused
+//
+// Returns { global, agents, jobs: [...] } where jobs is an array of paused job names.
+// Only included in digest when something IS paused.
+
+function checkPausedJobs() {
+  const globalPause = fs.existsSync(path.join(WORKSPACE, '.cron-paused'));
+  const agentPause = fs.existsSync(path.join(WORKSPACE, '.cron-agents-paused'));
+
+  const pausedJobs = [];
+  for (const job of CRON_REGISTRY) {
+    if (typeof job !== 'object' || !job.name) continue;
+    const pauseFile = path.join(WORKSPACE, `.${job.name}-paused`);
+    if (fs.existsSync(pauseFile)) {
+      // Get file creation time for context
+      try {
+        const stat = fs.statSync(pauseFile);
+        pausedJobs.push({ name: job.name, since: stat.mtime.toISOString(), tier: job.tier });
+      } catch (e) {
+        pausedJobs.push({ name: job.name, since: null, tier: job.tier });
+      }
+    }
+  }
+
+  return { global: globalPause, agents: agentPause, jobs: pausedJobs };
+}
+
+function buildPauseWarningSection(pauseStatus) {
+  const { global, agents, jobs } = pauseStatus;
+
+  // Nothing paused → return empty (no section shown)
+  if (!global && !agents && jobs.length === 0) {
+    return { html: '', count: 0 };
+  }
+
+  let html = '<div style="background:#fff3cd;border:2px solid #ffc107;padding:12px;margin-bottom:16px;border-radius:4px">';
+  html += '<h3 style="margin:0 0 8px 0;color:#856404">⚠ Paused Jobs Detected</h3>';
+
+  if (global) {
+    html += '<p style="margin:4px 0;color:#856404"><b>🛑 ALL JOBS PAUSED</b> — <code>~/.cron-paused</code> exists. Remove to resume.</p>';
+  }
+
+  if (agents) {
+    html += '<p style="margin:4px 0;color:#856404"><b>🤖 ALL AGENTS PAUSED</b> — <code>~/.cron-agents-paused</code> exists. Remove to resume Claude agents.</p>';
+  }
+
+  if (jobs.length > 0) {
+    html += '<p style="margin:8px 0 4px 0;color:#856404"><b>Per-job pauses:</b></p>';
+    html += '<ul style="margin:0;padding-left:20px;color:#856404">';
+    for (const j of jobs) {
+      const sinceStr = j.since ? ` (since ${fmtTime(j.since)})` : '';
+      const tierStr = j.tier === 'agent' ? ' [agent]' : '';
+      html += `<li><code>.${j.name}-paused</code>${tierStr}${sinceStr}</li>`;
+    }
+    html += '</ul>';
+    html += '<p style="margin:8px 0 0 0;font-size:11px;color:#856404">To resume: <code>rm ~/workspace/.{job-name}-paused</code></p>';
+  }
+
+  html += '</div>';
+
+  const count = (global ? 1 : 0) + (agents ? 1 : 0) + jobs.length;
+  return { html, count };
+}
+
+// ── Stuck email detection ──────────────────────────────────────────────────
+//
+// Checks email-driven workflows for "stuck" emails: messages that were read
+// (marked SEEN by IMAP) but never routed to a target folder. This happens when
+// an agent crashes, times out, or is paused mid-processing.
+//
+// Uses the poller's check-stuck command for each workflow. Returns aggregated
+// results for the digest warning section.
+
+const { execSync } = require('child_process');
+const POLLER_PATH = path.join(__dirname, '../../shared/email-workflow-poller.js');
+
+// Workflows to check for stuck emails (must have workflow-actions/<name>.js)
+const STUCK_CHECK_WORKFLOWS = ['vq-loading', 'excess', 'stockrfq', 'rfq-loading'];
+
+function checkStuckEmails() {
+  const results = [];
+
+  for (const workflow of STUCK_CHECK_WORKFLOWS) {
+    try {
+      const out = execSync(
+        `node "${POLLER_PATH}" check-stuck --workflow ${workflow} --threshold-mins 60`,
+        {
+          encoding: 'utf8',
+          timeout: 30000,
+          env: { ...process.env, DOTENV_CONFIG_QUIET: 'true' },
+        }
+      );
+      // Parse only the JSON portion (skip any dotenv debug output)
+      const jsonStart = out.indexOf('{');
+      const jsonEnd = out.lastIndexOf('}');
+      if (jsonStart < 0 || jsonEnd < 0) {
+        console.error(`[stuck-check] ${workflow}: No JSON in output`);
+        continue;
+      }
+      const data = JSON.parse(out.slice(jsonStart, jsonEnd + 1));
+      if (data.count > 0) {
+        results.push({
+          workflow,
+          inbox: data.inbox,
+          stuck: data.stuck,
+          count: data.count,
+        });
+      }
+    } catch (err) {
+      // Workflow check failed — could be IMAP auth issue, network, etc.
+      // Log but don't block the digest
+      console.error(`[stuck-check] ${workflow}: ${err.message}`);
+    }
+  }
+
+  return results;
+}
+
+function buildStuckEmailWarningSection(stuckResults) {
+  if (!stuckResults || stuckResults.length === 0) {
+    return { html: '', count: 0 };
+  }
+
+  // Separate into auto-recoverable (60 min - 24 hours) and manual-review (>24 hours)
+  const AUTO_RECOVER_MAX_MINS = 24 * 60;  // 24 hours
+  let autoRecoverCount = 0;
+  let manualReviewCount = 0;
+  const autoRecoverResults = [];
+  const manualReviewResults = [];
+
+  for (const r of stuckResults) {
+    const autoEmails = r.stuck.filter(e => e.ageMinutes <= AUTO_RECOVER_MAX_MINS);
+    const manualEmails = r.stuck.filter(e => e.ageMinutes > AUTO_RECOVER_MAX_MINS);
+
+    if (autoEmails.length > 0) {
+      autoRecoverResults.push({ ...r, stuck: autoEmails, count: autoEmails.length });
+      autoRecoverCount += autoEmails.length;
+    }
+    if (manualEmails.length > 0) {
+      manualReviewResults.push({ ...r, stuck: manualEmails, count: manualEmails.length });
+      manualReviewCount += manualEmails.length;
+    }
+  }
+
+  const totalStuck = autoRecoverCount + manualReviewCount;
+  if (totalStuck === 0) return { html: '', count: 0 };
+
+  let html = '<div style="background:#f8d7da;border:2px solid #f5c6cb;padding:12px;margin-bottom:16px;border-radius:4px">';
+  html += `<h3 style="margin:0 0 8px 0;color:#721c24">📧 ${totalStuck} Stuck Email${totalStuck === 1 ? '' : 's'} Detected</h3>`;
+
+  // Auto-recoverable section (will be fixed automatically)
+  if (autoRecoverCount > 0) {
+    html += `<p style="margin:0 0 8px 0;color:#721c24;font-size:12px"><b>🔄 Auto-recovering (${autoRecoverCount}):</b> These will be processed on next agent tick.</p>`;
+    for (const r of autoRecoverResults) {
+      html += `<p style="margin:4px 0 2px 0;color:#721c24;font-size:11px"><i>${r.workflow}</i> (${r.inbox}):</p>`;
+      html += '<ul style="margin:0;padding-left:20px;color:#721c24;font-size:11px">';
+      for (const email of r.stuck.slice(0, 3)) {
+        const subj = email.subject || '(no subject)';
+        const ageFmt = email.ageMinutes < 60 ? `${email.ageMinutes}m` : `${Math.round(email.ageMinutes / 60)}h`;
+        html += `<li>UID ${email.uid}: "${subj.slice(0, 35)}..." (${ageFmt})</li>`;
+      }
+      if (r.stuck.length > 3) html += `<li><i>+${r.stuck.length - 3} more</i></li>`;
+      html += '</ul>';
+    }
+  }
+
+  // Manual review section (too old to auto-recover)
+  if (manualReviewCount > 0) {
+    html += `<p style="margin:12px 0 8px 0;color:#721c24;font-size:12px"><b>⚠️ Needs manual review (${manualReviewCount}):</b> These are >24h old — likely spam, test emails, or need investigation.</p>`;
+    for (const r of manualReviewResults) {
+      html += `<p style="margin:4px 0 2px 0;color:#721c24;font-size:11px"><i>${r.workflow}</i> (${r.inbox}):</p>`;
+      html += '<ul style="margin:0;padding-left:20px;color:#721c24;font-size:11px">';
+      for (const email of r.stuck.slice(0, 3)) {
+        const subj = email.subject || '(no subject)';
+        const ageFmt = email.ageMinutes < 1440 ? `${Math.round(email.ageMinutes / 60)}h` : `${Math.round(email.ageMinutes / 1440)}d`;
+        html += `<li>UID ${email.uid}: "${subj.slice(0, 35)}..." (${ageFmt} old)</li>`;
+      }
+      if (r.stuck.length > 3) html += `<li><i>+${r.stuck.length - 3} more</i></li>`;
+      html += '</ul>';
+    }
+    html += '<p style="margin:8px 0 0 0;font-size:10px;color:#721c24">To force-recover old emails: <code>node shared/email-workflow-poller.js recover-stuck --workflow &lt;name&gt; --threshold-mins 999999</code></p>';
+  }
+
+  html += '</div>';
+
+  return { html, count: totalStuck, autoRecoverCount, manualReviewCount };
+}
 
 // ── State tracking (last digest send time) ────────────────────────────────
 
@@ -557,12 +758,35 @@ async function buildDigestEmail({ since, until, crumbs }) {
   const s5 = buildSection5StockRFQ(crumbs);
   const s6 = buildSection6CronHealth(crumbs);
 
+  // Check for paused jobs (global, agent-tier, per-job)
+  const pauseStatus = checkPausedJobs();
+  const pauseWarning = buildPauseWarningSection(pauseStatus);
+  const pausedCount = pauseWarning.count;
+
+  // Check for stuck emails (SEEN but not routed)
+  const stuckResults = checkStuckEmails();
+  const stuckWarning = buildStuckEmailWarningSection(stuckResults);
+  const stuckCount = stuckWarning.count;
+
   // Activity is window-scoped (sections 1-3, 5, 6); the open queue is current state.
   const windowActivity = s1.count + s2.count + s3.count + s5.count;
   const openQueue = s4.count;
   const cronFailures = s6.failureCount || 0;
 
   const headlines = [];
+  // Stuck emails and paused jobs warnings take priority (shown first in red/orange)
+  if (stuckCount > 0) {
+    headlines.push(`<span style="color:#c0392b"><b>📧 ${stuckCount} stuck email${stuckCount === 1 ? '' : 's'}</b></span>`);
+  }
+  if (pausedCount > 0) {
+    if (pauseStatus.global) {
+      headlines.push(`<span style="color:#c0392b"><b>🛑 ALL CRONS PAUSED</b></span>`);
+    } else if (pauseStatus.agents) {
+      headlines.push(`<span style="color:#e67e22"><b>🤖 ${pauseStatus.jobs.length > 0 ? pauseStatus.jobs.length + ' jobs + ' : ''}agents paused</b></span>`);
+    } else {
+      headlines.push(`<span style="color:#e67e22"><b>⏸ ${pausedCount} job${pausedCount === 1 ? '' : 's'} paused</b></span>`);
+    }
+  }
   if (cronFailures > 0) headlines.push(`<span style="color:#c0392b"><b>⚠ ${cronFailures} cron failure${cronFailures === 1 ? '' : 's'}</b></span>`);
   if (s1.count > 0) headlines.push(`<b>${s1.count}</b> excess loaded`);
   if (s5.count > 0) {
@@ -578,6 +802,9 @@ async function buildDigestEmail({ since, until, crumbs }) {
   const html = `<!DOCTYPE html><html><body style="font-family:Arial,sans-serif;font-size:13px;color:#222">
     <h2 style="margin:0 0 6px 0">Operations Digest</h2>
     ${summaryLine}
+
+    ${stuckWarning.html}
+    ${pauseWarning.html}
 
     <h3 ${SECTION_HEADER}>1. Cron job health (this window)</h3>
     ${s6.html}
@@ -604,6 +831,21 @@ async function buildDigestEmail({ since, until, crumbs }) {
   </body></html>`;
 
   const subjBits = [];
+  // Stuck emails and paused jobs warnings take priority in subject line
+  if (stuckCount > 0) {
+    subjBits.push(`📧 ${stuckCount} stuck`);
+  }
+  if (pausedCount > 0) {
+    if (pauseStatus.global) {
+      subjBits.push('🛑 ALL PAUSED');
+    } else if (pauseStatus.agents && pauseStatus.jobs.length > 0) {
+      subjBits.push(`⏸ agents + ${pauseStatus.jobs.length} job${pauseStatus.jobs.length === 1 ? '' : 's'} paused`);
+    } else if (pauseStatus.agents) {
+      subjBits.push('⏸ agents paused');
+    } else {
+      subjBits.push(`⏸ ${pausedCount} paused`);
+    }
+  }
   if (cronFailures > 0) subjBits.push(`⚠ ${cronFailures} cron failure${cronFailures === 1 ? '' : 's'}`);
   if (s1.count > 0) subjBits.push(`${s1.count} excess loaded`);
   if (s5.count > 0) {
@@ -616,7 +858,7 @@ async function buildDigestEmail({ since, until, crumbs }) {
     ? `Ops Digest — quiet window (${fmtTime(until)})`
     : `Ops Digest — ${subjBits.join(', ')} (${fmtTime(until)})`;
 
-  return { subject, html, totalActivity: windowActivity + openQueue + cronFailures };
+  return { subject, html, totalActivity: windowActivity + openQueue + cronFailures + pausedCount + stuckCount };
 }
 
 async function main() {

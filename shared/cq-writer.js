@@ -53,6 +53,7 @@ const { cleanMpn } = require('./db-helpers');
 const { lookupMfr, sanitizeMfrText } = require('./mfr-lookup');
 const { resolveMfrForRow } = require('./mfr-resolver');
 const { normalizePackaging } = require('./packaging-lookup');
+const otBudget = require('./ot-api-budget');
 
 // ─── CONSTANTS ───────────────────────────────────────────────────────────────
 
@@ -70,8 +71,11 @@ const CQ_RESOLUTIONS = {
   'Lost Stock':                  1000005,
 };
 
+const { classifyWriteError } = require('./ot-error');
+
 // Flag reason codes — things that prevent a write
 const FLAG = {
+  OT_UNREACHABLE:    'OT_UNREACHABLE',   // network/transport failure (OT down) — retryable, NOT a data problem
   NO_RFQ:            'NO_RFQ',
   NO_RFQ_LINE:       'NO_RFQ_LINE',
   MFR_NO_MATCH:      'MFR_NO_MATCH',
@@ -326,7 +330,8 @@ async function writeCQ(rfqSearchKey, line, opts = {}) {
  * @param {number} [opts.bpartnerId] - Override customer for all lines
  * @param {number} [opts.currencyId=100] - Currency
  * @param {boolean} [opts.includeInQuote=true] - Include in quote
- * @param {number} [opts.delayMs=50] - Delay between API writes (rate limiting)
+ * @param {number} [opts.delayMs=50] - Delay between API writes (process-specific rate limiting)
+ * @param {boolean} [opts.isBackfill=false] - Backfill mode (coordinates with global budget)
  * @param {boolean} [opts.skipUnresolved=false] - If true, skip lines that can't resolve to RFQ line. If false (default), flag them.
  * @param {boolean} [opts.skipDedupCheck=false] - If true, bypass the pre-write
  *   dedup lookup. Default is enforced dedup on (rfq_line_id, mpn_clean, qty,
@@ -339,6 +344,7 @@ async function writeCQBatch(rfqSearchKey, lines, opts = {}) {
   const includeInQuote = opts.includeInQuote !== false;
   const delayMs = opts.delayMs || 50;
   const skipDedupCheck = opts.skipDedupCheck === true;
+  const isBackfill = opts.isBackfill === true;
 
   const written = [];
   const flagged = [];
@@ -360,10 +366,91 @@ async function writeCQBatch(rfqSearchKey, lines, opts = {}) {
   }
 
   const bpartnerId = opts.bpartnerId || rfq.bpartnerId;
+
+  // ── CHUNKED MODE for large batches ──
+  // Large CQ batches (unlikely but possible) bypass upfront budget check and self-pace.
+  const LARGE_BATCH_THRESHOLD = 200;
+  const CHUNK_SIZE = 100;
+  const CHUNK_DELAY_MS = 1500;
+  const useChunkedMode = lines.length > LARGE_BATCH_THRESHOLD;
+
+  const estimatedWrites = lines.length; // One chuboe_cq_line per input line
+
+  if (!useChunkedMode) {
+    // ── TIER 1: Global budget check ──
+    const globalCheck = otBudget.checkBudget({
+      table: 'chuboe_cq_line',
+      count: estimatedWrites,
+      caller: 'stockrfq-cq-agent',
+      isBackfill,
+    });
+
+    if (!globalCheck.allowed) {
+      logger.warn(`Global budget exhausted for RFQ ${rfqSearchKey}: ${globalCheck.reason} — ${lines.length} CQ lines deferred`);
+      const summary = {
+        total: lines.length,
+        written: 0,
+        flagged: 0,
+        failed: 0,
+        skipped: 0,
+        byReason: {},
+        rateLimited: true,
+        rateLimitReason: globalCheck.reason,
+        rateLimitTier: 'global',
+      };
+      return { written, flagged, failed, skipped, summary };
+    }
+  } else {
+    // Chunked mode: still check daily limit (skip burst checks - we self-pace)
+    // Prevents perfect storm of normal loads + huge batch exceeding daily cap
+    const status = otBudget.getStatus();
+    const dailyUsed = parseInt(status.globalBudget.lastDay.split('/')[0], 10) || 0;
+    const dailyLimit = otBudget.LIMITS.maxWritesPerDay;
+    if (dailyUsed + estimatedWrites > dailyLimit) {
+      logger.warn(`Daily budget would be exceeded for RFQ ${rfqSearchKey}: ${dailyUsed}/${dailyLimit} + ${estimatedWrites} estimated`);
+      const summary = {
+        total: lines.length,
+        written: 0,
+        flagged: 0,
+        failed: 0,
+        skipped: 0,
+        byReason: {},
+        rateLimited: true,
+        rateLimitReason: `Daily limit: ${dailyUsed}/${dailyLimit} used, need ${estimatedWrites} more`,
+        rateLimitTier: 'daily',
+      };
+      return { written, flagged, failed, skipped, summary };
+    }
+    logger.info(`Large CQ batch detected (${lines.length} lines) — using chunked mode`);
+  }
+
   logger.info(`Writing ${lines.length} CQ lines for RFQ ${rfqSearchKey} (customer: ${rfq.bpName || bpartnerId})`);
+
+  // ── Reserve budget and claim backfill slot ──
+  // Skip reservation for chunked mode — we self-pace with delays
+  if (!useChunkedMode) {
+    otBudget.reserve('chuboe_cq_line', lines.length, 'stockrfq-cq-agent');
+  }
+
+  if (isBackfill) {
+    otBudget.claimBackfillSlot('stockrfq-cq-agent');
+  }
+
+  const writeStartTime = Date.now();
+
+  // Helper for chunked delay
+  const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 
   // ── Process each line ──
   for (let i = 0; i < lines.length; i++) {
+    // Chunked mode: pause between chunks
+    if (useChunkedMode && i > 0 && i % CHUNK_SIZE === 0) {
+      const chunkNum = Math.floor(i / CHUNK_SIZE);
+      const totalChunks = Math.ceil(lines.length / CHUNK_SIZE);
+      logger.info(`CQ chunk ${chunkNum}/${totalChunks} complete. Pausing ${CHUNK_DELAY_MS}ms...`);
+      await sleep(CHUNK_DELAY_MS);
+    }
+
     const line = lines[i];
     const mpn = line.mpn || '';
     const cpc = line.cpc || '';
@@ -531,9 +618,11 @@ async function writeCQBatch(rfqSearchKey, lines, opts = {}) {
         lineIndex: i,
       });
     } catch (e) {
+      const { reason, network } = classifyWriteError(e, FLAG.API_WRITE_ERROR);
       failed.push({
         mpn, cpc, resale, lineIndex: i,
-        reason: FLAG.API_WRITE_ERROR,
+        reason,
+        network: network || undefined,
         detail: e.message.substring(0, 300),
       });
     }
@@ -542,6 +631,26 @@ async function writeCQBatch(rfqSearchKey, lines, opts = {}) {
     if (i < lines.length - 1 && delayMs > 0) {
       await new Promise(r => setTimeout(r, delayMs));
     }
+  }
+
+  // ── Record writes and release backfill slot ──
+  const writeDuration = Date.now() - writeStartTime;
+  if (written.length > 0) {
+    otBudget.recordWrites('chuboe_cq_line', written.length, {
+      caller: 'stockrfq-cq-agent',
+      success: true,
+      durationMs: writeDuration,
+    });
+  }
+
+  if (failed.length > 0) {
+    for (let i = 0; i < failed.length; i++) {
+      otBudget.recordFailure();
+    }
+  }
+
+  if (isBackfill) {
+    otBudget.releaseBackfillSlot('stockrfq-cq-agent');
   }
 
   const summary = buildSummary(lines.length, written, flagged, failed, skipped);

@@ -318,6 +318,15 @@ Validate the RFQ exists and is active:
 
 **If the subject-cited RFQ is active AND MPN matching also finds different active RFQs:** the subject is the authoritative target (operator's explicit reference). Use it as the primary. Apply multi-write fan-out (step 3.6.4) only if MPN matching surfaces ADDITIONAL active RFQs within 30 days — those become secondaries.
 
+**EXCEPTION — Cited RFQ has ZERO MPN overlap:** If the subject-cited or body-cited RFQ is active but NONE of the extracted MPNs appear on that RFQ's lines, AND MPN matching (step 3.6.3) finds a clean unique match to a DIFFERENT active RFQ, **trust the MPN match**. The cite was likely a copy-paste error, a mis-forward, or stale reference. Rules:
+  - "Zero overlap" means: query the cited RFQ's lines for the extracted MPNs, get 0 rows.
+  - "Clean unique match" means: MPN matching returns exactly 1 active RFQ that HAS the extracted MPNs.
+  - When this fires: use the MPN-matched RFQ as the target. Stamp `vendorNotes` on each quote: `'cited RFQ <X> overruled — zero MPN overlap; MPN-matched to <Y>'`.
+  - If MPN matching returns multiple candidates (not unique), still escalate — the zero-overlap cite doesn't resolve the ambiguity.
+  - If MPN matching returns 0 RFQs (none found), still escalate — the cite is wrong and there's no fallback.
+
+**Why this exists:** UID 8761 was assigned to RFQ 1133158 (from subject/body) but the extracted MPNs (EPM3064ATI44-10N, EPM7128STI100-10N) had ZERO overlap with 1133158 — they were actually on RFQ 1135874 lines 40/50/60. Agent correctly identified this but bounced instead of loading to 1135874.
+
 ────────────────────────────────────────────
 3.7 — TWO-AGENT VALIDATION (mandatory — do NOT skip).
 ────────────────────────────────────────────
@@ -541,7 +550,21 @@ Apply these recovery steps in order. Each one is a "before you bounce, try this"
 
   (g) **Vendor ambiguous on Type 2 (name-only) → name-based fuzzy plus context.** When Type 2 body has a short vendor name with multiple BP matches (e.g., "Poplar" → multiple "Poplar" BPs in OT), use any context from the body (geographic hints, prior quotes from the same broker compiled by the same operator) to pick. If still ambiguous, route `clarify_vendor` per step 3.8 — but with all candidate BPs in the payload so the operator's reply directly disambiguates.
 
-**The rule:** if any of (a)-(g) recovers a viable load path, take it. `needs_review` should be reserved for cases where required data is genuinely absent or genuinely ambiguous after all recoveries — not for the routine inconveniences (a)-(g) handle.
+  (h) **Missing qty → default to RFQ line qty.** When a supplier quote includes price but no explicit quantity, the supplier is implicitly quoting the RFQ's requested quantity. This is standard broker behavior — they respond to the RFQ as-is without restating the qty.
+
+     **Procedure:**
+     - If the MPN-match step (3.6.3) resolved a specific RFQ line, that line's `qty` field is the default.
+     - If the quote spans multiple RFQ lines (same MPN on multiple lines), use the qty from the matched line — each line is treated independently.
+     - Stamp `vendorNotes` with `'qty defaulted to RFQ line qty (<N>) — supplier did not specify'` for audit.
+
+     **When NOT to apply:**
+     - Supplier explicitly states a different qty (e.g., "have 500 in stock" when RFQ asks for 1000) — use their stated qty.
+     - Supplier says "stock" or "avail" without a number — that's NOT a qty; still default to RFQ qty and set `leadTime: "stock"`.
+     - No RFQ match at all (step 3.6.3 returned 0 rows) — cannot infer qty, escalate as normal.
+
+     **Why this exists:** UID 8761 bounced because Wetech quoted EPM3064ATI44-10N at $33/$35.95 with date codes but no qty — agent correctly found RFQ 1135874 lines 40/50/60 have these MPNs with known quantities, but bounced for "missing qty" instead of using the RFQ qty. Brokers responding to RFQs rarely restate the qty.
+
+**The rule:** if any of (a)-(h) recovers a viable load path, take it. `needs_review` should be reserved for cases where required data is genuinely absent or genuinely ambiguous after all recoveries — not for the routine inconveniences (a)-(h) handle.
 
 **ALWAYS include `investigation_summary` on escalation payloads.** When routing any escalation action (`need_info_vendor`, `clarify_vendor`, `needs_vendor`, `needs_review`), include a payload field `investigation_summary` with a 1-2 sentence summary of what you tried before bouncing. Examples:
 
@@ -552,21 +575,20 @@ Apply these recovery steps in order. Each one is a "before you bounce, try this"
 This breadcrumb makes the escalation auditable — was bouncing necessary, or did the agent prematurely surrender? The pattern is the new "show your work" requirement before escalation.
 
 ────────────────────────────────────────────
-3.7.6 — SENDER outreach on escalations (VQ-specific override).
+3.7.6 — Escalation routing is INTERNAL-ONLY (operator directive 2026-05-26).
 ────────────────────────────────────────────
 
-**VQ overrides the standing "info-requests go to operator, never the external sender" policy** (memory feedback_info_requests_go_to_operator_not_origin.md is excess/stockrfq policy; VQ is different).
+**VQ clarifications/escalations go ONLY to internal Astute staff — never the external broker.** This RETIRES the earlier VQ-specific broker-outreach override. Rationale: VQ loading is internal data capture; the buyer/sourcer or the support forwarder is the internal owner who chases the broker, not the loader. (This realigns VQ with the standing operator-policy spirit of feedback_info_requests_go_to_operator_not_origin.md.)
 
-Reason: VQ replies almost always go to a broker who CAN answer "what's the unit price?", "what's your legal company name?", "could you resend as Excel?" — the questions are about their own quote. The operator (Jake) still gets visibility via CC and the answer round-trips through vq@ for next-tick stitching.
+**Routing the handlers apply automatically (`need_info_vendor`, `clarify_vendor`, `needs_vendor`, `needs_review`, partial-load `clarifications[]`):**
+  - ONE email to: operator (Jake) + internal forwarder (envelope From, if @astutegroup.com) + the resolved buyer (from `buyerId`) + any @astutegroup.com address already on the Cc.
+  - The external broker is RECORDED on the email body ("external sender — not emailed") so the operator can loop them in manually, but is NEVER a recipient.
+  - Reply-To = vq@ → an internal reply round-trips and the sidecar-stitch path picks it up next tick.
+  - No usable internal sender → operator-only.
 
-**Routing the handlers apply automatically when `senderEmail` is in the payload:**
-  - `need_info_vendor`, `clarify_vendor`, `needs_vendor`, `needs_review` → TO=senderEmail, CC=Jake
-  - Reply-To = vq@ → reply round-trips, sidecar-stitch path picks it up
-  - When `senderEmail` is missing/unparseable → handler falls back to operator-only (legacy behavior preserved)
+**Your job:** still pass `senderEmail` (external broker) and `buyerId` on escalation payloads when you have them — `buyerId` is what loops the buyer in; `senderEmail` is recorded for the operator's manual loop-in. Do NOT describe the broker as "emailed" in your run narration — they are not.
 
-**Your job:** ALWAYS include `senderEmail` on escalation payloads when you have it. The deepest non-Astute broker From: address — same value you'd pass on `load_vq`. Type 2 bulk summaries: the senderEmail will be the Astute compiler; still useful (Gopal/etc. can answer or forward).
-
-**MULTI-VENDOR partial-load (the calibration target):** when one inbound email has quotes from N vendors and you can confidently load M of them but the remaining (N−M) have issues, DO NOT bounce the whole email. Load what you can via `load_vq` AND include `clarifications[]` in the same payload describing the outstanding asks per problematic vendor. The handler writes the clean VQs, then fires ONE consolidated email to the sender (CC Jake) covering all the loose ends in one go. The sidecar (kind=`partial_clarify`) holds the outstanding state for next-tick reply-stitching.
+**MULTI-VENDOR partial-load (the calibration target):** when one inbound email has quotes from N vendors and you can confidently load M of them but the remaining (N−M) have issues, DO NOT bounce the whole email. Load what you can via `load_vq` AND include `clarifications[]` in the same payload describing the outstanding asks per problematic vendor. The handler writes the clean VQs, then fires ONE consolidated INTERNAL email (operator + forwarder + buyer) covering all the loose ends. The sidecar (kind=`partial_clarify`) holds the outstanding state for next-tick reply-stitching.
 
 `clarifications[]` shape on the `load_vq` payload — each section MUST include `pendingQuotes[]` (the partial quote stubs you already extracted for that vendor, missing only the asks). The sidecar persists these so the reply-tick agent merges answers into structured stubs instead of re-extracting from email body — that's what scopes the merge to the unloaded vendors only and avoids double-writes against the already-loaded ones:
 
@@ -596,7 +618,7 @@ Reason: VQ replies almost always go to a broker who CAN answer "what's the unit 
 
 The handler also derives `loaded_vendors` automatically from the input `quotes[]` and persists it in the sidecar. On reply, the agent reads `pending_state.loaded_vendors` and NEVER includes those vendors in the merge load_vq.
 
-Use `clarifications[]` for the partial-load multi-vendor case ONLY. For single-vendor failures or whole-email failures, use the normal escalation actions (`need_info_vendor` / `clarify_vendor` / `needs_vendor` / `needs_review`) — they also do sender outreach.
+Use `clarifications[]` for the partial-load multi-vendor case ONLY. For single-vendor failures or whole-email failures, use the normal escalation actions (`need_info_vendor` / `clarify_vendor` / `needs_vendor` / `needs_review`) — they route to the internal owners (operator + forwarder + buyer), not the broker.
 
 ────────────────────────────────────────────
 3.8 — VENDOR resolution.
@@ -646,7 +668,7 @@ For each quote, resolve the vendor BP. **The only role filter is `isactive='Y'`.
     - Pass 1 returns 0, Pass 2 returns ≥1 → route `clarify_vendor` with the inactive candidates (each `isactive: false` in the candidate object). The candidates' names often include `USE <N>` pointers — operator decides whether to reactivate, redirect to the pointer, or skip. Same payload shape as the ambiguous case; the email surfaces the inactive flag explicitly.
     - Pass 2 also returns 0 → route `needs_vendor` with `{vendorName, vendorEmail, extracted: <quotes>, subject, outerFrom, senderEmail}`. keepsPending — sidecar waits for Jake to add the vendor; next tick auto-detects and loads.
 
-  **Reminder:** include `senderEmail` on every escalation payload per step 3.7.6 so the handler can outreach to the broker (CC Jake) instead of operator-only.
+  **Reminder:** include `senderEmail` (external broker, recorded for context only) AND `buyerId` (loops the internal buyer in) on every escalation payload per step 3.7.6. Routing is internal-only — the broker is never emailed.
 
 The loadBulkSummary library also handles vendor resolution server-side — passing `vendorName` alone (no `vendorSearchKey`) lets it fall back to name fuzzy match. But the agent should resolve up front when the data is available, so it can route clarify/needs_vendor for ambiguity rather than having the writer drop the quote silently as `VENDOR_NOT_FOUND`.
 
@@ -695,8 +717,8 @@ Build the payload:
     "clarifications": [
       // OPTIONAL — only when this is a partial-load (some vendors clean, others
       // need follow-up). See step 3.7.6 for shape + when to use. Omit when
-      // everything loaded cleanly. Triggers consolidated email to sender (CC Jake)
-      // and a sidecar (kind="partial_clarify") that survives across ticks.
+      // everything loaded cleanly. Triggers ONE consolidated INTERNAL email
+      // (operator + forwarder + buyer) and a sidecar (kind="partial_clarify").
     ]
   }
 

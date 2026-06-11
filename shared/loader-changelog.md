@@ -27,6 +27,18 @@ The "Cross-applies?" column is the load-bearing one — say which sibling loader
 
 ---
 
+## 2026-06-05
+
+| Date | Loader(s) | Change | Cross-applies? | Commit |
+|---|---|---|---|---|
+| 2026-06-05 | offer-writeback, rfq-writer, vq-writer, cq-writer | **Chunked mode for large batches.** Large batches were being rejected outright by the upfront budget check (OSIE 2,109-line excess list failed silently with `linesWritten: 0`). Now: batches above threshold bypass the upfront check and write in chunks with delays to self-pace under rate limits. Thresholds: offer/rfq 500 lines (150/chunk, 2s delay), vq 200 items (uses existing inter-item delays), cq 200 lines (100/chunk, 1.5s delay). All writers return `chunkedMode: true` when used. Also fixed: MPN coerced to string in offer-writeback (xlsx parsing returns numbers for numeric-looking MPNs). | **Applied to all four writers.** Pattern is identical across loaders. Future writers should include the same chunked-mode gate. `api-result-writer` skipped — writes single records, not batches. | `505e3a0`, `1577951` |
+
+## 2026-05-26
+
+| Date | Loader(s) | Change | Cross-applies? | Commit |
+|---|---|---|---|---|
+| 2026-05-26 | vq-loading | **Escalations internal-only.** Retired VQ's broker-outreach override AND the two-email split (`41b6362`). `resolveOutreachRecipients` now builds ONE internal recipient list (operator + internal forwarder + buyer via new `partner-lookup.resolveAstuteUserById(buyerId)` + internal Cc); the external broker is recorded (`externalSender`) but never emailed. `sendSplitRecipientEmail` collapsed to a single internal email; `recipientsFooter`/`externalSenderLabel` show the operator exactly who got it. Breadcrumb fields → `recipients` + `external_sender_not_emailed`. Trigger: UID 8684 — the split sent forwarder Ivy a separate copy the operator couldn't see, reading as "forwarder skipped." | **Operator-scoped to VQ only** (operator: "On VQs it should only be internal… this may apply differently to other loaders"). Do NOT propagate to stockrfq/excess/rfq-loading — several legitimately email external parties. The split-recipient pattern from `41b6362` was never adopted elsewhere. New `resolveAstuteUserById` helper in `partner-lookup.js` is shared/additive and safe for any loader to reuse. | _(uncommitted)_ |
+
 ## 2026-05-22
 
 | Date | Loader(s) | Change | Cross-applies? | Commit |

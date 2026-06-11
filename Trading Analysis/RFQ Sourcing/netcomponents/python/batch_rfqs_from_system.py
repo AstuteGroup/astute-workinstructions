@@ -10,12 +10,16 @@ Features:
 - Randomized timing jitter to appear natural
 - Date code prioritization
 - Quantity adjustment to encourage supplier quoting
+- --check-only mode for market profiling (scrape availability, no RFQ submission)
 
 Usage:
     python batch_rfqs_from_system.py <rfq_number>
+    python batch_rfqs_from_system.py --check-only <rfq_number>
+    python batch_rfqs_from_system.py --check-only --limit 100 <rfq_number>
 
 Example:
     python batch_rfqs_from_system.py 1008627
+    python batch_rfqs_from_system.py --check-only 1008627
 
 Output file: RFQ_<rfq_number>_Results_YYYY-MM-DD_HHMMSS.xlsx
 """
@@ -26,6 +30,7 @@ import asyncio
 import time
 import re
 import random
+import argparse
 from datetime import datetime
 from pathlib import Path
 from playwright.async_api import async_playwright
@@ -34,6 +39,9 @@ from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
 from openpyxl.utils import get_column_letter
 import config
 import mpn_variants
+
+# Global flag for check-only mode (set by argparse)
+CHECK_ONLY_MODE = False
 
 
 def jitter_sleep(base_seconds):
@@ -183,6 +191,194 @@ def create_output_excel(results, rfq_number, output_path):
 
     wb.save(output_path)
     wb.close()
+
+
+async def scrape_availability_only(page, part_number, quantity, line_number, worker_id, cpc=''):
+    """
+    Scrape supplier availability for market profiling WITHOUT submitting RFQ forms.
+
+    Returns results with status='SCRAPED' instead of 'SENT'.
+    This mode is used for market intelligence gathering without contacting vendors.
+    """
+    results = []
+
+    print(f'  [W{worker_id}] Scraping availability for {part_number}...', flush=True)
+    search_start = time.time()
+
+    # Search box should already be ready (worker navigated here)
+    await page.fill('#PartsSearched_0__PartNumber', part_number)
+    await page.wait_for_selector('#btnSearch', state='visible', timeout=15000)
+    await page.click('#btnSearch')
+    await sleep_with_jitter(7)  # Base 7 sec with jitter
+    print(f'    [W{worker_id}] Search complete ({time.time() - search_start:.1f}s)', flush=True)
+
+    rows = await page.query_selector_all('table#trv_0 tbody tr')
+
+    supplier_data = {}
+    in_stock_section = False
+    current_region = 'Unknown'
+
+    for row in rows:
+        cells = await row.query_selector_all('td')
+        row_text = (await row.inner_text() or '').lower()
+
+        is_header_row = len(cells) < 5
+
+        if is_header_row:
+            if 'americas' in row_text:
+                current_region = 'Americas'
+            elif 'europe' in row_text:
+                current_region = 'Europe'
+            elif 'asia' in row_text or 'other' in row_text:
+                current_region = 'Asia/Other'
+            if 'in stock' in row_text or 'in-stock' in row_text:
+                in_stock_section = True
+            elif 'brokered' in row_text:
+                in_stock_section = False
+            continue
+
+        if len(cells) < 16:
+            continue
+
+        if not in_stock_section or current_region == 'Asia/Other':
+            continue
+
+        supplier_cell = cells[15]
+        link = await supplier_cell.query_selector('a')
+        if not link:
+            continue
+        supplier_name = (await link.inner_text()).strip()
+        if not supplier_name:
+            continue
+
+        # Skip franchised/authorized distributors (marked with 'ncauth' class)
+        # Market profiling focuses on broker availability only — franchise data
+        # comes through the API enrichment pipeline. Added 2026-06-11.
+        auth_icon = await supplier_cell.query_selector('.ncauth')
+        if auth_icon:
+            continue
+
+        # Get offered MPN from column 0
+        offered_mpn = ''
+        try:
+            offered_mpn = (await cells[0].inner_text()).strip()
+        except Exception:
+            pass
+
+        # Get date code from column 4
+        dc_text = ''
+        dc_year = None
+        dc_ambiguous = False
+        try:
+            dc_text = (await cells[4].inner_text()).strip()
+            dc_year, dc_ambiguous = config.parse_date_code(dc_text)
+        except Exception:
+            pass
+
+        qty = 0
+        try:
+            qty_text = (await cells[8].inner_text()).strip()
+            match = re.match(r'^(\d+)', qty_text.replace(',', ''))
+            if match:
+                qty = int(match.group(1))
+        except Exception:
+            pass
+
+        key = f"{supplier_name}|{current_region}"
+        if key not in supplier_data:
+            supplier_data[key] = {
+                'name': supplier_name,
+                'region': current_region,
+                'total_qty': 0,
+                'best_dc_year': None,
+                'best_dc_text': '',
+                'dc_ambiguous': False,
+                'offered_mpn': offered_mpn,
+                'match_type': 'EXACT',
+                'variant_flags': '',
+            }
+        supplier_data[key]['total_qty'] += qty
+
+        if dc_year is not None:
+            if supplier_data[key]['best_dc_year'] is None or dc_year > supplier_data[key]['best_dc_year']:
+                supplier_data[key]['best_dc_year'] = dc_year
+                supplier_data[key]['best_dc_text'] = dc_text
+                supplier_data[key]['dc_ambiguous'] = dc_ambiguous
+
+        if offered_mpn:
+            current_offered = supplier_data[key].get('offered_mpn', '')
+            match_result = mpn_variants.get_match_type(part_number, offered_mpn)
+            current_priority = mpn_variants.match_type_priority(supplier_data[key].get('match_type', 'UNKNOWN'))
+            new_priority = mpn_variants.match_type_priority(match_result.match_type)
+            if new_priority > current_priority or not current_offered:
+                supplier_data[key]['offered_mpn'] = offered_mpn
+                supplier_data[key]['match_type'] = match_result.match_type
+                supplier_data[key]['variant_flags'] = ', '.join(match_result.variant_flags)
+
+    # Determine date code status for each supplier
+    for s in supplier_data.values():
+        s['dc_status'] = config.get_dc_status(s.get('best_dc_year'), s.get('dc_ambiguous', False))
+
+    # Count by region
+    americas_count = len([s for s in supplier_data.values() if s['region'] == 'Americas'])
+    europe_count = len([s for s in supplier_data.values() if s['region'] == 'Europe'])
+    total_count = len(supplier_data)
+    total_qty = sum(s['total_qty'] for s in supplier_data.values())
+
+    if total_count == 0:
+        print(f'    [W{worker_id}] No suppliers found')
+        results.append({
+            'line_number': line_number,
+            'cpc': cpc,
+            'part_number': part_number,
+            'offered_mpn': '',
+            'match_type': '',
+            'variant_flags': '',
+            'qty_requested': quantity,
+            'qty_sent': '',
+            'supplier': '',
+            'region': '',
+            'supplier_qty': '',
+            'qualifying_total': 0,
+            'qualifying_americas': 0,
+            'qualifying_europe': 0,
+            'selected_count': 0,
+            'status': 'NO_SUPPLIERS',
+            'timestamp': datetime.now().isoformat(),
+            'error': 'No suppliers found in search',
+            'worker_id': worker_id
+        })
+        return results
+
+    print(f'    [W{worker_id}] Found {total_count} suppliers ({americas_count} Americas, {europe_count} Europe), total qty {total_qty:,}')
+
+    # Create SCRAPED result for each supplier
+    for supplier in supplier_data.values():
+        results.append({
+            'line_number': line_number,
+            'cpc': cpc,
+            'part_number': part_number,
+            'offered_mpn': supplier.get('offered_mpn', ''),
+            'match_type': supplier.get('match_type', ''),
+            'variant_flags': supplier.get('variant_flags', ''),
+            'qty_requested': quantity,
+            'qty_sent': '',  # No RFQ sent
+            'supplier': supplier['name'],
+            'region': supplier['region'],
+            'supplier_qty': supplier['total_qty'],
+            'date_code': supplier.get('best_dc_text', ''),
+            'dc_status': supplier.get('dc_status', 'unknown'),
+            'qualifying_total': total_count,
+            'qualifying_americas': americas_count,
+            'qualifying_europe': europe_count,
+            'selected_count': 0,  # No selection in check-only mode
+            'status': 'SCRAPED',  # Key difference from process_part
+            'timestamp': datetime.now().isoformat(),
+            'error': '',
+            'worker_id': worker_id
+        })
+
+    return results
 
 
 async def process_part(page, part_number, quantity, line_number, worker_id, cpc='', franchise_data=None):
@@ -652,14 +848,25 @@ async def worker(worker_id, parts_queue, results_list, results_lock):
                     await page.wait_for_selector('#PartsSearched_0__PartNumber', state='visible', timeout=15000)
                     await page.wait_for_selector('#btnSearch', state='visible', timeout=10000)
 
-                    results = await process_part(
-                        page,
-                        part['part_number'],
-                        part['quantity'],
-                        part['line_number'],
-                        worker_id,
-                        part.get('cpc', '')
-                    )
+                    # Use check-only mode if flag is set
+                    if CHECK_ONLY_MODE:
+                        results = await scrape_availability_only(
+                            page,
+                            part['part_number'],
+                            part['quantity'],
+                            part['line_number'],
+                            worker_id,
+                            part.get('cpc', '')
+                        )
+                    else:
+                        results = await process_part(
+                            page,
+                            part['part_number'],
+                            part['quantity'],
+                            part['line_number'],
+                            worker_id,
+                            part.get('cpc', '')
+                        )
 
                     # Thread-safe append to results
                     async with results_lock:
@@ -755,12 +962,31 @@ def remove_lock_file(rfq_number):
 
 
 async def main():
-    if len(sys.argv) < 2:
-        print('Usage: python batch_rfqs_from_system.py <rfq_number>')
-        print('Example: python batch_rfqs_from_system.py 1008627')
-        sys.exit(1)
+    global CHECK_ONLY_MODE
 
-    rfq_number = sys.argv[1]
+    parser = argparse.ArgumentParser(
+        description='Batch RFQ submission to NetComponents suppliers',
+        epilog='Examples:\n'
+               '  python batch_rfqs_from_system.py 1008627                    # Full RFQ submission\n'
+               '  python batch_rfqs_from_system.py --check-only 1008627       # Market profiling (scrape only)\n'
+               '  python batch_rfqs_from_system.py --check-only --limit 50 1008627           # First 50 parts\n'
+               '  python batch_rfqs_from_system.py --check-only --offset 50 --limit 50 1008627  # Next 50 parts',
+        formatter_class=argparse.RawDescriptionHelpFormatter
+    )
+    parser.add_argument('rfq_number', help='RFQ number to process')
+    parser.add_argument('--check-only', action='store_true',
+                        help='Market profiling mode: scrape availability without sending RFQs')
+    parser.add_argument('--limit', type=int, default=0,
+                        help='Limit number of parts to process (0 = all)')
+    parser.add_argument('--offset', type=int, default=0,
+                        help='Skip first N parts (use with --limit to paginate)')
+
+    args = parser.parse_args()
+
+    rfq_number = args.rfq_number
+    CHECK_ONLY_MODE = args.check_only
+    parts_limit = args.limit
+    parts_offset = args.offset
 
     # Check for existing lock file (prevent duplicate runs)
     if not check_lock_file(rfq_number):
@@ -779,7 +1005,17 @@ async def main():
             remove_lock_file(rfq_number)
             sys.exit(1)
 
-        print(f'Found {len(parts)} line items:\n')
+        # Apply offset and limit if specified
+        total_parts = len(parts)
+        if parts_offset > 0:
+            parts = parts[parts_offset:]
+            print(f'Found {total_parts} line items, skipping first {parts_offset}')
+        if parts_limit > 0 and len(parts) > parts_limit:
+            print(f'Processing {parts_limit} of {len(parts)} remaining parts')
+            parts = parts[:parts_limit]
+        else:
+            print(f'Processing {len(parts)} line items:\n')
+
         for p in parts:
             print(f"  Line {p['line_number']}: {p['part_number']} x {p['quantity']:,}")
 
@@ -791,7 +1027,11 @@ async def main():
         output_file = rfq_folder / f'Results_{timestamp}.xlsx'
 
         print('\n' + '=' * 60)
-        print(f'NetComponents Batch RFQ Submission')
+        if CHECK_ONLY_MODE:
+            print(f'NetComponents Market Profiling (CHECK-ONLY MODE)')
+            print(f'>>> NO RFQs WILL BE SENT - scraping availability only <<<')
+        else:
+            print(f'NetComponents Batch RFQ Submission')
         print(f'RFQ: {rfq_number}')
         print(f'Parts to process: {len(parts)}')
         print(f'Parallel workers: {config.NUM_WORKERS}')
@@ -828,14 +1068,16 @@ async def main():
 
         total_time = time.time() - start_time
         sent_count = len([r for r in results_list if r['status'] == 'SENT'])
+        scraped_count = len([r for r in results_list if r['status'] == 'SCRAPED'])
         failed_count = len([r for r in results_list if r['status'] == 'FAILED'])
         no_suppliers = len([r for r in results_list if r['status'] == 'NO_SUPPLIERS'])
         omitted_count = len([r for r in results_list if r['status'] == 'OMITTED'])
 
         # Supplier distribution analysis
         supplier_counts = {}
+        status_key = 'SCRAPED' if CHECK_ONLY_MODE else 'SENT'
         for r in results_list:
-            if r['status'] == 'SENT':
+            if r['status'] == status_key:
                 supplier = r.get('supplier', 'Unknown')
                 supplier_counts[supplier] = supplier_counts.get(supplier, 0) + 1
 
@@ -843,24 +1085,35 @@ async def main():
         top_suppliers = sorted(supplier_counts.items(), key=lambda x: x[1], reverse=True)
 
         print('\n' + '=' * 60)
-        print('BATCH SUMMARY')
+        if CHECK_ONLY_MODE:
+            print('MARKET PROFILING SUMMARY (CHECK-ONLY MODE)')
+        else:
+            print('BATCH SUMMARY')
         print('=' * 60)
         print(f'Total parts processed: {len(parts)}')
-        print(f'RFQs sent: {sent_count}')
+        if CHECK_ONLY_MODE:
+            print(f'Suppliers scraped: {scraped_count}')
+            # Calculate total market availability
+            total_market_qty = sum(r.get('supplier_qty', 0) for r in results_list if r['status'] == 'SCRAPED')
+            print(f'Total market availability: {total_market_qty:,} pcs across {len(supplier_counts)} vendors')
+        else:
+            print(f'RFQs sent: {sent_count}')
         print(f'Failed: {failed_count}')
-        print(f'Omitted (min order filter): {omitted_count}')
+        if not CHECK_ONLY_MODE:
+            print(f'Omitted (min order filter): {omitted_count}')
         print(f'No suppliers found: {no_suppliers}')
         print(f'Total time: {total_time:.1f}s ({total_time/60:.1f} min)')
         print(f'Avg time per part: {total_time/len(parts):.1f}s')
         print(f'Results saved to: {output_file}')
         print('-' * 60)
         print('SUPPLIER DISTRIBUTION')
-        print(f'Unique suppliers used: {len(supplier_counts)}')
+        print(f'Unique suppliers found: {len(supplier_counts)}')
         if top_suppliers:
+            primary_count = scraped_count if CHECK_ONLY_MODE else sent_count
             print('Top 10 suppliers:')
             for supplier, count in top_suppliers[:10]:
-                pct = count / sent_count * 100 if sent_count > 0 else 0
-                print(f'  {supplier}: {count} RFQs ({pct:.1f}%)')
+                pct = count / primary_count * 100 if primary_count > 0 else 0
+                print(f'  {supplier}: {count} {"listings" if CHECK_ONLY_MODE else "RFQs"} ({pct:.1f}%)')
         print('=' * 60)
 
     finally:

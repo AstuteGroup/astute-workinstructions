@@ -3,17 +3,23 @@
  * Inventory File Cleanup Script (Node.js version)
  * Processes Infor ERP inventory exports for Astute Electronics
  *
+ * Schedule: Monday 11 UTC (6 AM CT) — weekly cron
+ *
  * Workflow:
- * 1. Convert Excel to CSV (if needed)
+ * 1. Fetch Infor xlsx from email (Task finished: [success] AST Item Lots Report)
  * 2. Clean raw export (remove header rows 1-7, footer rows)
  * 3. Deduplicate based on composite key
  * 4. Split by warehouse group
- * 5. Export to Chuboe format for iDempiere import
- * 6. Create consolidated file for industry portals
+ * 5. Write inventory offers to OT via REST API (one chuboe_offer per warehouse)
+ * 6. Save xlsx to ~/.inventory-storage/ for nc-listing.js to reuse Thursday
+ *
+ * NOTE: NC portal upload is now handled by nc-listing.js (runs Mon/Thu 12 UTC)
  *
  * Usage:
- *     node inventory_cleanup.js <input_file.xlsx|csv> [output_directory]
- *     node inventory_cleanup.js fetch    # Fetch from email and process automatically
+ *     node inventory_cleanup.js fetch              # Fetch, process, write to OT
+ *     node inventory_cleanup.js fetch --dry-run    # Preview without API writes
+ *     node inventory_cleanup.js <file.xlsx>        # Process specific file (CSVs only)
+ *     node inventory_cleanup.js <file.xlsx> --writeback  # Process and write to OT
  */
 
 const XLSX = require('xlsx');
@@ -35,6 +41,80 @@ const EMAIL_CONFIG = {
     subjectPattern: /Task finished: \[success\] \d+ AST Item Lots Report Inputs/i,
     processedFolder: 'Inventory-Processed'
 };
+
+// Persistent storage for inventory xlsx (used by nc-listing.js for Thu runs)
+const INVENTORY_STORAGE_DIR = path.join(process.env.HOME, 'workspace/.inventory-storage');
+if (!fs.existsSync(INVENTORY_STORAGE_DIR)) {
+    fs.mkdirSync(INVENTORY_STORAGE_DIR, { recursive: true });
+}
+
+// Delisted parts queue — MPNs that left inventory, need API enrichment + NC sourcing
+// Active Sourcing selection engine reads from this instead of current inventory
+const DELISTED_QUEUE_FILE = path.join(process.env.HOME, 'workspace/.delisted-parts-queue.json');
+
+/**
+ * Read the delisted parts queue
+ */
+function readDelistedQueue() {
+    try {
+        if (fs.existsSync(DELISTED_QUEUE_FILE)) {
+            return JSON.parse(fs.readFileSync(DELISTED_QUEUE_FILE, 'utf8'));
+        }
+    } catch (e) { /* ignore */ }
+    return { parts: [], lastUpdated: null };
+}
+
+/**
+ * Write delisted MPNs to the queue (append, dedupe)
+ */
+function appendDelistedQueue(newMpns, dateStr) {
+    const queue = readDelistedQueue();
+    const existingSet = new Set(queue.parts.map(p => p.mpn.toUpperCase()));
+
+    let added = 0;
+    for (const mpn of newMpns) {
+        const key = mpn.toUpperCase();
+        if (!existingSet.has(key)) {
+            queue.parts.push({
+                mpn,
+                delistedDate: dateStr,
+                sourced: false,
+                sourcedDate: null
+            });
+            existingSet.add(key);
+            added++;
+        }
+    }
+
+    queue.lastUpdated = new Date().toISOString();
+    fs.writeFileSync(DELISTED_QUEUE_FILE, JSON.stringify(queue, null, 2));
+    return added;
+}
+
+/**
+ * Get the Monday of the current week as YYYY-MM-DD string.
+ * Used to identify which week's inventory file to use for reprocessing.
+ */
+function getWeekStartDate() {
+    const now = new Date();
+    const day = now.getDay();
+    const diff = now.getDate() - day + (day === 0 ? -6 : 1); // Adjust for Sunday
+    const monday = new Date(now.setDate(diff));
+    return monday.toISOString().split('T')[0];
+}
+
+/**
+ * Get the path to this week's saved inventory file.
+ * Returns null if no file exists for this week.
+ */
+function getThisWeekInventoryFile() {
+    const weekStart = getWeekStartDate();
+    const persistentPath = path.join(INVENTORY_STORAGE_DIR, `inventory_${weekStart}.xlsx`);
+    if (fs.existsSync(persistentPath)) {
+        return persistentPath;
+    }
+    return null;
+}
 
 // Rows to skip at start of file (Infor report header)
 const HEADER_ROWS_TO_SKIP = 7;
@@ -715,7 +795,29 @@ async function writeInventoryToOT(groupedRows, dateStr, dryRun = false, suppleme
         }
     }
 
+    // Helper: fetch all MPNs from a list of offer IDs
+    async function fetchMPNsFromOffers(offerIds) {
+        const mpns = new Set();
+        for (const offerId of offerIds) {
+            try {
+                const lineResult = await apiGet('chuboe_offer_line', {
+                    filter: `chuboe_offer_id eq ${offerId} and IsActive eq true`,
+                    select: 'chuboe_mpn',
+                });
+                for (const line of (lineResult.records || [])) {
+                    const mpn = line.chuboe_mpn || line.Chuboe_MPN;
+                    if (mpn) mpns.add(mpn.toUpperCase().replace(/[^A-Z0-9]/g, ''));
+                }
+            } catch (e) {
+                console.warn(`  ! Failed to fetch lines for offer ${offerId}: ${e.message}`);
+            }
+        }
+        return mpns;
+    }
+
     const results = [];
+    const allPriorMPNs = new Set();  // Track all MPNs from prior week
+    const allCurrentMPNs = new Set(); // Track all MPNs in current week
 
     for (const [groupName, mapping] of Object.entries(WAREHOUSE_WRITEBACK)) {
         const rows = groupedRows[groupName] || [];
@@ -790,6 +892,20 @@ async function writeInventoryToOT(groupedRows, dateStr, dryRun = false, suppleme
         const descriptionSuffix = `— ${groupName}`;
         const priorOffers = await queryActiveOffers(mapping.bpartnerId, mapping.offerTypeId, descriptionSuffix);
 
+        // Collect MPNs for delisted tracking
+        // Prior MPNs: from offers about to be deactivated
+        const priorOfferIds = priorOffers.map(o => o.id);
+        if (priorOfferIds.length > 0) {
+            const priorMpns = await fetchMPNsFromOffers(priorOfferIds);
+            for (const mpn of priorMpns) allPriorMPNs.add(mpn);
+        }
+        // Current MPNs: from lines about to be written
+        for (const line of lines) {
+            if (line.mpn) {
+                allCurrentMPNs.add(line.mpn.toUpperCase().replace(/[^A-Z0-9]/g, ''));
+            }
+        }
+
         if (dryRun) {
             const oldKeys = priorOffers.map(o => o.value || o.id).join(', ') || 'none';
             console.log(`  [DRY RUN] ${groupName}: would deactivate ${priorOffers.length} prior offer(s) [${oldKeys}] and write ${lines.length} new lines (BP ${mapping.bpartnerId}, OfferType ${mapping.offerTypeId})`);
@@ -845,6 +961,27 @@ async function writeInventoryToOT(groupedRows, dateStr, dryRun = false, suppleme
                 linesAttempted: lines.length,
                 ...mapping,
             });
+        }
+    }
+
+    // ─── Delisted Parts Tracking ───────────────────────────────────────────────
+    // Compute MPNs that were in prior week but not in current week = delisted
+    // These need API enrichment + NC sourcing via Active Sourcing
+    if (!dryRun && allPriorMPNs.size > 0) {
+        const delistedMpns = [];
+        for (const mpn of allPriorMPNs) {
+            if (!allCurrentMPNs.has(mpn)) {
+                delistedMpns.push(mpn);
+            }
+        }
+        if (delistedMpns.length > 0) {
+            const added = appendDelistedQueue(delistedMpns, dateStr);
+            console.log(`\nDelisted parts tracking:`);
+            console.log(`  Prior week MPNs: ${allPriorMPNs.size}`);
+            console.log(`  Current week MPNs: ${allCurrentMPNs.size}`);
+            console.log(`  Delisted (left inventory): ${delistedMpns.length}`);
+            console.log(`  Added to queue (new): ${added}`);
+            console.log(`  Queue file: ${DELISTED_QUEUE_FILE}`);
         }
     }
 
@@ -2028,13 +2165,53 @@ function processInventoryFile(inputFile, outputDir) {
     const FRANCHISE_GROUP = 'Franchise_Stock';
     const nonAuthGroupNames = otGroupNames.filter(g => g !== FRANCHISE_GROUP);
 
+    // Load Active Sourcing exclusions — MPNs currently being price-checked
+    // are hidden from NC uploads so competitors don't see our inventory.
+    // See Trading Analysis/Market Profiling/exclusion-manager.js
+    let sourcingExclusions = new Set();
+    let exclusionCount = 0;
+    const exclusionFile = path.join(process.env.HOME, 'workspace/.sourcing-exclusions.json');
+    if (fs.existsSync(exclusionFile)) {
+        try {
+            const exclusionData = JSON.parse(fs.readFileSync(exclusionFile, 'utf8'));
+            const now = new Date();
+            // Only active (non-expired) exclusions
+            const activeExclusions = (exclusionData.entries || [])
+                .filter(e => new Date(e.expiresAt) > now)
+                .map(e => e.mpn.toUpperCase());
+            sourcingExclusions = new Set(activeExclusions);
+            if (sourcingExclusions.size > 0) {
+                console.log(`  - Active Sourcing: ${sourcingExclusions.size} MPNs excluded from NC upload`);
+            }
+        } catch (e) {
+            console.warn(`  - Warning: Could not load sourcing exclusions: ${e.message}`);
+        }
+    }
+
     const collectRows = (groupNames) => {
         const out = [];
         for (const g of groupNames) out.push(...(groupedRows[g] || []));
         return out;
     };
-    const nonAuthSourceRows  = collectRows(nonAuthGroupNames);
-    const franchiseSourceRows = collectRows([FRANCHISE_GROUP]);
+
+    // Filter out excluded MPNs from NC portal rows
+    const filterExcludedMpns = (rows) => {
+        if (sourcingExclusions.size === 0) return rows;
+        const before = rows.length;
+        const filtered = rows.filter(row => {
+            const mpn = String(row['Item'] || '').trim().toUpperCase();
+            return !sourcingExclusions.has(mpn);
+        });
+        exclusionCount = before - filtered.length;
+        return filtered;
+    };
+
+    const nonAuthSourceRows  = filterExcludedMpns(collectRows(nonAuthGroupNames));
+    const franchiseSourceRows = filterExcludedMpns(collectRows([FRANCHISE_GROUP]));
+
+    if (exclusionCount > 0) {
+        console.log(`  - Excluded ${exclusionCount} MPNs from NC CSV (Active Sourcing in progress)`);
+    }
 
     const totalPortalRows = nonAuthSourceRows.length + franchiseSourceRows.length;
     const droppedRowCount = uniqueRows.length - totalPortalRows;
@@ -2164,6 +2341,12 @@ async function fetchAndProcess(opts = {}) {
         try {
             attachmentPath = await downloadAttachment(matchingEmail.id, 'Inventory Reports');
             console.log(`  Downloaded: ${attachmentPath}`);
+
+            // Save a persistent copy for Thursday reprocess
+            const weekStart = getWeekStartDate();
+            const persistentPath = path.join(INVENTORY_STORAGE_DIR, `inventory_${weekStart}.xlsx`);
+            fs.copyFileSync(attachmentPath, persistentPath);
+            console.log(`  Saved persistent copy: ${persistentPath}`);
         } catch (err) {
             throw new Error(`Failed to download attachment: ${err.message}`);
         }
@@ -2350,35 +2533,11 @@ async function fetchAndProcess(opts = {}) {
             console.log(`  Carryover overlap CSV: ${overlapCsvPath} (${csvRows.length} rows across ${totalOverlapCount} unique MPN match(es))`);
         }
 
-        // Step 6: Send emails
-        console.log('\nStep 6: Sending notification emails...');
+        // Step 6: Send OT write-back summary email
+        // NOTE: NC upload emails are now handled by nc-listing.js (runs Mon/Thu 12 UTC)
+        console.log('\nStep 6: Sending OT write-back summary email...');
 
-        // Email 1: NetComponents upload — non-authorized account #1167233
-        const sent1 = await sendEmail(
-            EMAIL_CONFIG.recipient,
-            'Data Upload - Non Authorized Account #1167233',
-            `Inventory cleanup completed successfully.
-
-Attached: ${path.basename(result.portalFile)}
-
-Processed: ${result.uniqueRows.toLocaleString()} unique rows
-Date: ${dateStr}`,
-            [result.portalFile]
-        );
-
-        // Email 1b: NetComponents upload — franchised account #1126121
-        const sent1b = await sendEmail(
-            EMAIL_CONFIG.recipient,
-            'Data Upload - Franchised account #1126121',
-            `Inventory cleanup completed successfully.
-
-Attached: ${path.basename(result.franchisePortalFile)}
-
-Date: ${dateStr}`,
-            [result.franchisePortalFile]
-        );
-
-        // Email 2: OT Write-back Summary (HTML, no attachment)
+        // OT Write-back Summary (HTML, no attachment)
         const writebackOk    = writebackResults.filter(r => r.status === 'success').length;
         const writebackPart  = writebackResults.filter(r => r.status === 'partial').length;
         const writebackFail  = writebackResults.filter(r => r.status === 'failed').length;
@@ -2434,7 +2593,7 @@ Date: ${dateStr}`,
         console.log('\n' + '='.repeat(60));
         console.log(runOk ? 'FETCH AND PROCESS COMPLETE' : 'FETCH AND PROCESS — INCOMPLETE (will retry)');
         console.log('='.repeat(60));
-        console.log(`Emails sent: ${sent1 && sent1b && sent2 ? 'Yes' : 'Partial'}`);
+        console.log(`OT summary email sent: ${sent2 ? 'Yes' : 'No'}`);
         console.log(`Write-back: ${writebackOk} ok, ${writebackPart} partial, ${writebackFail} failed`);
         console.log(`Carryover failed: ${carryoverFail}`);
         console.log(`Output: ${result.outputDir}`);
@@ -2457,6 +2616,7 @@ Date: ${dateStr}`,
 // =============================================================================
 // ENTRY POINT
 // =============================================================================
+// NOTE: Thursday NC upload is now handled by nc-listing.js (separate workflow)
 
 if (require.main === module) {
     const argv     = process.argv.slice(2);
@@ -2475,6 +2635,7 @@ if (require.main === module) {
         console.log('  <file.xlsx> --writeback  Process and also write back to OT');
         console.log('  <file.xlsx> --writeback --dry-run');
         console.log('                           Process and dry-run write-back (preview only)');
+        console.log('\nNote: NC portal upload is now handled by nc-listing.js (runs Mon/Thu 12 UTC)');
         console.log('\nExamples:');
         console.log('  node inventory_cleanup.js fetch');
         console.log('  node inventory_cleanup.js fetch --dry-run');

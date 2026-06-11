@@ -159,15 +159,52 @@ async function withInbox(fn) {
   }
 }
 
+/**
+ * Enumerate attachments, separating documents from images.
+ *
+ * Returns { documents: [...], images: [...] }
+ *   - documents: non-image attachments (xlsx, csv, pdf, etc.)
+ *   - images: image attachments with metadata for agent decision-making
+ *
+ * Image classification:
+ *   - size >= 20KB → likely content (screenshot, photo of document)
+ *   - size < 20KB → likely signature logo/icon (can ignore)
+ *   - contentId (cid) present → inline image (signature block)
+ *
+ * The agent should use `download-attachments --include-images` then Read tool
+ * on large images when email body is sparse.
+ */
 function enumerateAttachments(attachments) {
-  return (attachments || [])
-    .filter(a => a.filename && !/^image\//i.test(a.contentType || ''))
-    .map(a => ({ filename: a.filename, contentType: a.contentType, size: a.size }));
+  const docs = [];
+  const images = [];
+
+  for (const a of (attachments || [])) {
+    if (!a.filename) continue;
+    const isImage = /^image\//i.test(a.contentType || '');
+    const size = a.size || (a.content && a.content.length) || 0;
+
+    if (isImage) {
+      // Classify image: large (>= 20KB) likely content, small likely signature
+      const isLikelyContent = size >= 20000 && !a.cid;
+      images.push({
+        filename: a.filename,
+        contentType: a.contentType,
+        size,
+        isLikelyContent,
+        contentId: a.cid || null,
+      });
+    } else {
+      docs.push({ filename: a.filename, contentType: a.contentType, size });
+    }
+  }
+
+  return { documents: docs, images };
 }
 
 // ─── FORWARDED-HEADER PARSING ────────────────────────────────────────────────
+// Enhanced 2026-06-02 to handle mobile Outlook forwards
 
-function parseForwardedHeaders(body) {
+function parseForwardedHeaders(body, parsed) {
   if (!body) return { originalFrom: null, originalCc: [], originalSubject: null };
 
   const text = body
@@ -177,20 +214,107 @@ function parseForwardedHeaders(body) {
     .replace(/<\/p>/gi, '\n').replace(/<\/div>/gi, '\n')
     .replace(/<[a-zA-Z\/][^>@]*>/g, ' ');
 
-  const fromMatch = text.match(/^[ \t]*From:[ \t]*(.+)$/im);
-  const ccMatch = text.match(/^[ \t]*Cc:[ \t]*(.+)$/im);
-  const subjMatch = text.match(/^[ \t]*Subject:[ \t]*(.+)$/im);
-
   const extractEmails = (line) => {
     if (!line) return [];
     const re = /[\w.+-]+@[\w-]+(?:\.[\w-]+)+/g;
     return (line.match(re) || []).map(e => e.toLowerCase());
   };
 
+  // ─── PATTERN 1: Desktop forward (original logic) ────────────────────────────
+  const fromMatch = text.match(/^[ \t]*From:[ \t]*(.+)$/im);
+  const ccMatch = text.match(/^[ \t]*Cc:[ \t]*(.+)$/im);
+  const subjMatch = text.match(/^[ \t]*Subject:[ \t]*(.+)$/im);
+
+  if (fromMatch || subjMatch) {
+    // Desktop forward detected
+    return {
+      originalFrom: extractEmails(fromMatch && fromMatch[1])[0] || null,
+      originalCc: extractEmails(ccMatch && ccMatch[1]),
+      originalSubject: (subjMatch && subjMatch[1].trim()) || null,
+      isMobileForward: false,
+    };
+  }
+
+  // ─── PATTERN 2: Mobile Outlook forward ──────────────────────────────────────
+  // Mobile forwards have "Get Outlook for iOS/Android" signature but often lack
+  // inline From:/Subject: headers. Parse the content before the signature.
+
+  const isMobileOutlook = /Get Outlook for (iOS|Android)/i.test(body);
+  if (!isMobileOutlook) {
+    return { originalFrom: null, originalCc: [], originalSubject: null };
+  }
+
+  // Strategy 1: Check for .eml attachment (some mobile clients attach original)
+  if (parsed && parsed.attachments) {
+    const emlAttachment = parsed.attachments.find(a =>
+      a.filename && a.filename.toLowerCase().endsWith('.eml')
+    );
+    if (emlAttachment) {
+      // For Phase 2: parse .eml attachment content
+      return {
+        originalFrom: null,
+        originalCc: [],
+        originalSubject: null,
+        isMobileForward: true,
+        hasEmlAttachment: true,
+        emlFilename: emlAttachment.filename,
+      };
+    }
+  }
+
+  // Strategy 2: Extract emails from content BEFORE "Get Outlook" signature
+  const parts = body.split(/Get Outlook for (iOS|Android)/i);
+  if (parts.length > 1) {
+    const contentBeforeSignature = parts[0];
+    const emailsFound = contentBeforeSignature.match(/[\w.+-]+@[\w-]+(?:\.[\w-]+)+/g);
+
+    if (emailsFound && emailsFound.length > 0) {
+      // Filter out our own domain emails (those are the forwarder, not the original sender)
+      const externalEmails = emailsFound
+        .map(e => e.toLowerCase())
+        .filter(e => !e.endsWith('@astutegroup.com') && !e.endsWith('@orangetsunami.com'));
+
+      if (externalEmails.length > 0) {
+        return {
+          originalFrom: externalEmails[0],
+          originalCc: externalEmails.slice(1),
+          originalSubject: null, // Can't reliably extract from mobile forwards
+          isMobileForward: true,
+          mobileForwardBody: contentBeforeSignature.trim(),
+        };
+      }
+    }
+  }
+
+  // Strategy 3: Look for "---------- Forwarded message ---------" marker
+  const fwdMarkerMatch = text.match(/[-_]{5,}\s*(Forwarded message|Original message)/i);
+  if (fwdMarkerMatch) {
+    const afterMarker = text.substring(text.indexOf(fwdMarkerMatch[0]) + fwdMarkerMatch[0].length);
+    const emailsInForward = afterMarker.match(/[\w.+-]+@[\w-]+(?:\.[\w-]+)+/g);
+
+    if (emailsInForward) {
+      const externalEmails = emailsInForward
+        .map(e => e.toLowerCase())
+        .filter(e => !e.endsWith('@astutegroup.com') && !e.endsWith('@orangetsunami.com'));
+
+      if (externalEmails.length > 0) {
+        return {
+          originalFrom: externalEmails[0],
+          originalCc: externalEmails.slice(1),
+          originalSubject: null,
+          isMobileForward: true,
+        };
+      }
+    }
+  }
+
+  // Mobile forward detected but couldn't extract sender
   return {
-    originalFrom: extractEmails(fromMatch && fromMatch[1])[0] || null,
-    originalCc: extractEmails(ccMatch && ccMatch[1]),
-    originalSubject: (subjMatch && subjMatch[1].trim()) || null,
+    originalFrom: null,
+    originalCc: [],
+    originalSubject: null,
+    isMobileForward: true,
+    parseFailure: 'Mobile forward detected but could not extract sender',
   };
 }
 
@@ -201,9 +325,61 @@ function isInternalAddress(addr) {
 }
 
 // ─── COMMAND: list ───────────────────────────────────────────────────────────
+//
+// SELF-HEALING: Before listing UNSEEN emails, this command automatically
+// recovers any "stuck" emails — messages that were read (marked SEEN) but
+// never routed out of the source folder. This happens when an agent crashes,
+// times out, or is paused mid-processing.
+//
+// Recovery window: emails between 60 minutes and 24 hours old get auto-recovered.
+// - Under 60 minutes: might still be in-flight (agent processing)
+// - Over 24 hours: too old, probably intentionally marked as read (spam/test/etc.)
+//   → flagged in Operations Digest for manual review, not auto-recovered.
+
+const STUCK_MIN_AGE_MINS = 60;       // Don't recover if newer than this (might be in-flight)
+const STUCK_MAX_AGE_MINS = 24 * 60;  // Don't auto-recover if older than this (needs manual review)
+
+async function recoverStuckEmailsIfNeeded(client) {
+  const minCutoff = new Date(Date.now() - STUCK_MIN_AGE_MINS * 60 * 1000);  // 60 min ago
+  const maxCutoff = new Date(Date.now() - STUCK_MAX_AGE_MINS * 60 * 1000);  // 24 hours ago
+  const seenUids = (await client.search({ seen: true }, { uid: true })) || [];
+  if (seenUids.length === 0) return 0;
+
+  const stuckUids = [];
+  for await (const msg of client.fetch(seenUids, { envelope: true }, { uid: true })) {
+    const env = msg.envelope || {};
+    const msgDate = env.date ? new Date(env.date) : null;
+    // Only recover emails in the window: older than 60 min but newer than 24 hours
+    if (msgDate && msgDate < minCutoff && msgDate > maxCutoff) {
+      stuckUids.push(msg.uid);
+    }
+  }
+
+  if (stuckUids.length === 0) return 0;
+
+  // Clear SEEN flag on stuck emails so they'll be picked up by the normal list
+  let recovered = 0;
+  for (const uid of stuckUids) {
+    try {
+      await client.messageFlagsRemove(String(uid), ['\\Seen'], { uid: true });
+      recovered++;
+      console.error(`[poller] Recovered stuck email UID ${uid} (cleared SEEN flag)`);
+    } catch (err) {
+      console.error(`[poller] Failed to recover UID ${uid}: ${err.message}`);
+    }
+  }
+
+  return recovered;
+}
 
 async function cmdList() {
   const envelopes = await withInbox(async (client) => {
+    // Self-healing: recover any stuck emails before listing
+    const recovered = await recoverStuckEmailsIfNeeded(client);
+    if (recovered > 0) {
+      console.error(`[poller] Auto-recovered ${recovered} stuck email(s)`);
+    }
+
     const uids = (await client.search({ seen: false }, { uid: true })) || [];
     if (uids.length === 0) return [];
     const out = [];
@@ -211,14 +387,22 @@ async function cmdList() {
       const env = msg.envelope || {};
       const from = env.from && env.from[0] ? `${env.from[0].mailbox || ''}@${env.from[0].host || ''}` : '';
       const atts = [];
+      let hasLargeImage = false;
       const walk = (node) => {
         if (!node) return;
         if (Array.isArray(node.childNodes)) node.childNodes.forEach(walk);
         const disp = (node.disposition || '').toLowerCase();
         const fname = (node.dispositionParameters && node.dispositionParameters.filename) ||
                       (node.parameters && node.parameters.name) || null;
-        if (disp === 'attachment' && fname && !/^image\//i.test(node.type || '')) {
-          atts.push(fname);
+        const isImage = /^image\//i.test(node.type || '');
+        const size = node.size || 0;
+        if (disp === 'attachment' && fname) {
+          if (isImage) {
+            // Large images (>= 20KB) likely content, not signature
+            if (size >= 20000) hasLargeImage = true;
+          } else {
+            atts.push(fname);
+          }
         }
       };
       walk(msg.bodyStructure);
@@ -229,6 +413,7 @@ async function cmdList() {
         date: env.date ? env.date.toISOString() : '',
         attachment_names: atts,
         has_attachment: atts.length > 0,
+        has_large_image: hasLargeImage,
       });
     }
     return out;
@@ -245,7 +430,7 @@ async function cmdRead(uid) {
     const parsed = await simpleParser(msg.source);
     const bodyText = parsed.text || parsed.html || '';
     const senderAddr = (parsed.from && parsed.from.value && parsed.from.value[0] && parsed.from.value[0].address) || '';
-    const fwd = parseForwardedHeaders(bodyText);
+    const fwd = parseForwardedHeaders(bodyText, parsed);
     const externalSender = isInternalAddress(senderAddr) ? fwd.originalFrom : senderAddr;
     // References header may be a string or an array depending on the parser.
     const refsRaw = parsed.references || (parsed.headers && parsed.headers.get('references')) || null;
@@ -267,7 +452,7 @@ async function cmdRead(uid) {
       forwarded_headers: fwd,
       external_sender: externalSender,
       internal_forwarder: isInternalAddress(senderAddr) ? senderAddr : null,
-      attachments: enumerateAttachments(parsed.attachments),
+      ...enumerateAttachments(parsed.attachments),
     };
   });
   if (!result) { console.error(`UID ${uid} not found`); process.exit(2); }
@@ -360,6 +545,9 @@ async function cmdRoute(uid, actionName, payload) {
   try {
     await withInbox(async (client) => {
       const msg = await client.fetchOne(String(uid), { source: true }, { uid: true });
+      if (msg && !msg.source) {
+        console.error(`[poller] WARNING: UID ${uid} fetched but msg.source is null/undefined — sidecar cannot be created (reply-stitching will fail)`);
+      }
       if (msg && msg.source) {
         const parsed = await simpleParser(msg.source);
         currentMessageId = parsed.messageId || null;
@@ -427,6 +615,17 @@ async function cmdRoute(uid, actionName, payload) {
     }
   }
 
+  // ── RATE-LIMIT DEFERRAL ──────────────────────────────────────────────────────
+  // If handler returns rateLimited: true, the write was blocked due to budget
+  // exhaustion. Do NOT move the email — leave it UNSEEN in Inbox so it gets
+  // picked up on the next poll cycle when budget resets. No notification needed.
+  if (result.rateLimited) {
+    result.deferred = true;
+    result.deferred_reason = result.rateLimitReason || 'budget exhausted';
+    console.log(JSON.stringify(result, null, 2));
+    return; // Exit without moving email or clearing sidecar
+  }
+
   // Move email
   if (folder) {
     if (DRY_RUN) {
@@ -447,6 +646,123 @@ async function cmdRoute(uid, actionName, payload) {
     const cleared = pending.clearSidecar(WORKFLOW_NAME, anchorMessageId);
     if (cleared) result.cleared_pending_state = anchorMessageId;
   }
+
+  console.log(JSON.stringify(result, null, 2));
+}
+
+// ─── COMMAND: recover-stuck ───────────────────────────────────────────────────
+//
+// Finds SEEN emails still in the source folder that are older than a threshold
+// (default 60 minutes). These are "stuck" — they were read by the agent but
+// never routed (agent crashed, timed out, or was paused mid-processing).
+//
+// Recovery action: clear the SEEN flag so the email shows up in the next `list`
+// call and gets re-processed.
+//
+// Usage: email-workflow-poller.js recover-stuck --workflow <name> [--threshold-mins 60] [--dry-run]
+
+async function cmdRecoverStuck() {
+  const thresholdIdx = argv.indexOf('--threshold-mins');
+  const thresholdMins = thresholdIdx >= 0 ? parseInt(argv[thresholdIdx + 1], 10) : 60;
+  const cutoffTime = new Date(Date.now() - thresholdMins * 60 * 1000);
+
+  const result = await withInbox(async (client) => {
+    // Search for SEEN emails (opposite of our normal UNSEEN search)
+    const seenUids = (await client.search({ seen: true }, { uid: true })) || [];
+    if (seenUids.length === 0) {
+      return { stuck: [], recovered: [], message: 'No SEEN emails in source folder' };
+    }
+
+    // Fetch envelopes to check dates
+    const stuck = [];
+    for await (const msg of client.fetch(seenUids, { envelope: true }, { uid: true })) {
+      const env = msg.envelope || {};
+      const msgDate = env.date ? new Date(env.date) : null;
+      if (msgDate && msgDate < cutoffTime) {
+        stuck.push({
+          uid: msg.uid,
+          subject: env.subject || '',
+          from: env.from && env.from[0] ? `${env.from[0].mailbox || ''}@${env.from[0].host || ''}` : '',
+          date: msgDate.toISOString(),
+          ageMinutes: Math.round((Date.now() - msgDate.getTime()) / 60000),
+        });
+      }
+    }
+
+    if (stuck.length === 0) {
+      return { stuck: [], recovered: [], message: `No SEEN emails older than ${thresholdMins} minutes` };
+    }
+
+    // Clear SEEN flag on stuck emails (unless dry-run)
+    const recovered = [];
+    if (!DRY_RUN) {
+      for (const email of stuck) {
+        try {
+          await client.messageFlagsRemove(String(email.uid), ['\\Seen'], { uid: true });
+          recovered.push(email.uid);
+        } catch (err) {
+          console.error(`[poller] failed to clear SEEN on UID ${email.uid}: ${err.message}`);
+        }
+      }
+    }
+
+    return {
+      stuck,
+      recovered: DRY_RUN ? [] : recovered,
+      wouldRecover: DRY_RUN ? stuck.map(e => e.uid) : [],
+      message: DRY_RUN
+        ? `Would clear SEEN flag on ${stuck.length} stuck email(s)`
+        : `Cleared SEEN flag on ${recovered.length} stuck email(s)`,
+      thresholdMins,
+      dryRun: DRY_RUN,
+    };
+  });
+
+  console.log(JSON.stringify(result, null, 2));
+}
+
+// ─── COMMAND: check-stuck ─────────────────────────────────────────────────────
+//
+// Like recover-stuck but read-only. Returns stuck email info without modifying
+// anything. Useful for monitoring/alerting (e.g., Operations Digest).
+//
+// Usage: email-workflow-poller.js check-stuck --workflow <name> [--threshold-mins 60]
+
+async function cmdCheckStuck() {
+  const thresholdIdx = argv.indexOf('--threshold-mins');
+  const thresholdMins = thresholdIdx >= 0 ? parseInt(argv[thresholdIdx + 1], 10) : 60;
+  const cutoffTime = new Date(Date.now() - thresholdMins * 60 * 1000);
+
+  const result = await withInbox(async (client) => {
+    const seenUids = (await client.search({ seen: true }, { uid: true })) || [];
+    if (seenUids.length === 0) {
+      return { stuck: [], count: 0, workflow: WORKFLOW_NAME, sourceFolder: SOURCE_FOLDER };
+    }
+
+    const stuck = [];
+    for await (const msg of client.fetch(seenUids, { envelope: true }, { uid: true })) {
+      const env = msg.envelope || {};
+      const msgDate = env.date ? new Date(env.date) : null;
+      if (msgDate && msgDate < cutoffTime) {
+        stuck.push({
+          uid: msg.uid,
+          subject: (env.subject || '').slice(0, 60),
+          from: env.from && env.from[0] ? `${env.from[0].mailbox || ''}@${env.from[0].host || ''}` : '',
+          date: msgDate.toISOString(),
+          ageMinutes: Math.round((Date.now() - msgDate.getTime()) / 60000),
+        });
+      }
+    }
+
+    return {
+      stuck,
+      count: stuck.length,
+      workflow: WORKFLOW_NAME,
+      sourceFolder: SOURCE_FOLDER,
+      inbox: INBOX,
+      thresholdMins,
+    };
+  });
 
   console.log(JSON.stringify(result, null, 2));
 }
@@ -473,7 +789,25 @@ async function cmdRoute(uid, actionName, payload) {
       }
       return await cmdRoute(uid, actionName, payload);
     }
-    console.error('Usage: email-workflow-poller.js (list | read <uid> | download-attachments <uid> [--include-images] | route <uid> <action> --payload <json|file>) --workflow <name> [--dry-run]');
+    if (cmd === 'recover-stuck') return await cmdRecoverStuck();
+    if (cmd === 'check-stuck') return await cmdCheckStuck();
+    console.error('Usage: email-workflow-poller.js <command> --workflow <name> [options]');
+    console.error('');
+    console.error('Commands:');
+    console.error('  list                           List UNSEEN emails as JSON');
+    console.error('  read <uid>                     Read full email as JSON');
+    console.error('  download-attachments <uid>     Save attachments to temp dir');
+    console.error('  route <uid> <action>           Execute routing decision');
+    console.error('  check-stuck                    Check for stuck (SEEN but not routed) emails');
+    console.error('  recover-stuck                  Clear SEEN flag on stuck emails for reprocessing');
+    console.error('');
+    console.error('Options:');
+    console.error('  --workflow <name>              Required; resolves to workflow-actions/<name>.js');
+    console.error('  --dry-run                      Preview without modifying state');
+    console.error('  --threshold-mins <N>           For stuck commands: age threshold (default 60)');
+    console.error('  --include-images               For download-attachments: include image files');
+    console.error('  --payload <json|file>          For route: action payload');
+    console.error('');
     console.error('Architecture: ~/workspace/astute-workinstructions/email-workflow-architecture.md');
     process.exit(2);
   } catch (err) {

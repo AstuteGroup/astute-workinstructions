@@ -30,7 +30,83 @@ const { resolveMfrForRow } = require('./mfr-resolver');
 const { normalizePackaging, PACKAGING_MAP } = require('./packaging-lookup');
 const { isValidEccn } = require('./validators');
 const { isRestrictedMfrName, isRestrictedMfrId } = require('./restricted-mfrs');
+const { patchRecord } = require('./record-updater');
 const logger = require('./logger').createLogger('VQWriter');
+
+// ─── Profile VQ deactivation ────────────────────────────────────────────────
+//
+// When a real priced VQ arrives for an MPN that already has a $0 "profile" VQ
+// (from Market Profiler), deactivate the profile VQ before writing the new one.
+// This keeps the VQ list clean — profile VQs are placeholders for availability,
+// replaced by real quotes when they arrive.
+//
+// Criteria for deactivation:
+//   - Same RFQ line, MPN, and vendor (BP)
+//   - Cost = 0 (profile VQs are always $0)
+//   - Created within last 10 days (stale profiles left alone)
+//   - IsActive = 'Y'
+//
+const PROFILE_VQ_MAX_AGE_DAYS = 10;
+
+/**
+ * Find and deactivate $0 profile VQs for the same RFQ line + MPN + vendor.
+ * Called before writing a priced VQ to replace the placeholder.
+ *
+ * @param {number} rfqLineId - RFQ line ID
+ * @param {string} mpn - MPN (will be uppercased for comparison)
+ * @param {number} bpId - Vendor business partner ID
+ * @returns {Promise<{deactivated: number[], errors: string[]}>}
+ */
+async function deactivateProfileVQs(rfqLineId, mpn, bpId) {
+  const deactivated = [];
+  const errors = [];
+
+  // Find $0 profile VQs within the age window
+  const cutoffDate = new Date(Date.now() - PROFILE_VQ_MAX_AGE_DAYS * 24 * 60 * 60 * 1000)
+    .toISOString().slice(0, 10); // YYYY-MM-DD
+
+  const sql = `
+    SELECT chuboe_vq_line_id
+    FROM adempiere.chuboe_vq_line
+    WHERE chuboe_rfq_line_id = ${Number(rfqLineId)}
+      AND UPPER(chuboe_mpn) = '${String(mpn).toUpperCase().replace(/'/g, "''")}'
+      AND c_bpartner_id = ${Number(bpId)}
+      AND cost = 0
+      AND isactive = 'Y'
+      AND created::date >= '${cutoffDate}'
+  `;
+
+  let profileVqIds = [];
+  try {
+    const out = execFileSync('psql', ['-At', '-c', sql], { encoding: 'utf8' });
+    profileVqIds = out.split('\n').filter(l => /^\d+$/.test(l.trim())).map(l => Number(l.trim()));
+  } catch (err) {
+    // psql failed — log and continue (don't block the write)
+    logger.warn(`Profile VQ lookup failed for RFQ line ${rfqLineId} / ${mpn}: ${err.message}`);
+    return { deactivated, errors: [err.message] };
+  }
+
+  if (profileVqIds.length === 0) {
+    return { deactivated, errors };
+  }
+
+  logger.info(`Deactivating ${profileVqIds.length} profile VQ(s) for ${mpn} (BP ${bpId}): ${profileVqIds.join(', ')}`);
+
+  // Deactivate each profile VQ
+  for (const vqId of profileVqIds) {
+    try {
+      await patchRecord('chuboe_vq_line', vqId, { IsActive: false }, {
+        source: 'vq-writer:profile-deactivation'
+      });
+      deactivated.push(vqId);
+    } catch (err) {
+      logger.warn(`Failed to deactivate profile VQ ${vqId}: ${err.message}`);
+      errors.push(`VQ ${vqId}: ${err.message}`);
+    }
+  }
+
+  return { deactivated, errors };
+}
 
 // ─── Natural-key existence check via psql ──────────────────────────────────
 // Why psql, not apiGet($filter): the iDempiere REST $filter on chuboe_vq_line
@@ -77,8 +153,13 @@ function findExistingVqIdByNaturalKey(payload) {
   }
 }
 
+const { classifyWriteError } = require('./ot-error');
+const rateLimiter = require('./rate-limiter');
+const otBudget = require('./ot-api-budget');
+
 // Flag reason codes
 const FLAG = {
+  OT_UNREACHABLE: 'OT_UNREACHABLE',   // network/transport failure (OT down) — retryable, NOT a data problem
   BP_NOT_FOUND: 'BP_NOT_FOUND',
   MFR_NO_MATCH: 'MFR_NO_MATCH',
   MFR_LOW_CONFIDENCE: 'MFR_LOW_CONFIDENCE',
@@ -644,7 +725,20 @@ async function writeVQFromAPI(rfqSearchKey, cpc, franchiseResults, opts = {}) {
     }
 
     // Resolve BP — search key first, name fallback, same path for all vendors
-    const bp = await resolveBP(bpSearchKey, vendorDisplay);
+    let bp = await resolveBP(bpSearchKey, vendorDisplay);
+    let vendorNamePrefix = '';
+
+    // Exception: When BP doesn't exist but caller provided unknownVendorPlaceholderBpId,
+    // use the placeholder BP and store the actual vendor name in notes. This allows
+    // loading quotes from vendors not yet set up in OT without blocking on BP creation.
+    // Operator directive 2026-05-26: when asked "note vendor in VQ notes", this path
+    // fires instead of the needs_vendor escalation.
+    if (!bp && opts.unknownVendorPlaceholderBpId) {
+      bp = { id: opts.unknownVendorPlaceholderBpId };
+      vendorNamePrefix = `Vendor: ${vendorDisplay}`;
+      logger.info(`Using placeholder BP ${opts.unknownVendorPlaceholderBpId} for unknown vendor '${vendorDisplay}' - name stored in notes`);
+    }
+
     if (!bp) {
       flagged.push({
         mpn, vendor: vendorDisplay, bpSearchKey, price, qty,
@@ -696,10 +790,16 @@ async function writeVQFromAPI(rfqSearchKey, cpc, franchiseResults, opts = {}) {
     // Build internal enrichment notes — combine parser-built notes (per-row or
     // top-level) with packaging context. Despite the legacy "vendorNotes" field
     // name, the content is buyer-internal (stock counts, MOQ, MFR tags, packaging
-    // confirmations) — NONE of it is vendor-facing. Goes to Chuboe_Note_Private.
+    // confirmations) — NONE of it is vendor-facing. Goes to Chuboe_Note_User.
     // Anything genuinely vendor-safe should be added via opts.publicNote instead.
+    //
+    // vendorNamePrefix: when BP resolution failed but caller provided
+    // unknownVendorPlaceholderBpId, this contains "Vendor: <actual name>" to
+    // preserve the original vendor identity in the notes (since the BP field
+    // now points to a generic placeholder). Prepended to the notes list so it
+    // always appears first.
     const baseNotes = row.vendorNotes || d.vqVendorNotes || '';
-    const internalNotes = [baseNotes, packagingNote].filter(Boolean).join(' | ');
+    const internalNotes = [vendorNamePrefix, baseNotes, packagingNote].filter(Boolean).join(' | ');
 
     // Resolve vendor type and traceability from BP
     const vendorTypeId = await getBPVendorType(bp.id);
@@ -843,6 +943,23 @@ async function writeVQFromAPI(rfqSearchKey, cpc, franchiseResults, opts = {}) {
     // distinguishes the lot. Omitting it silently drops the second lot
     // (verified 2026-05-21: Southchip's 23+ row was lost on UID 8544 because
     // a 21+ row at the same cost wrote first).
+    //
+    // Profile VQ deactivation: If this is a priced VQ (cost > 0), check for
+    // existing $0 profile VQs from Market Profiler and deactivate them before
+    // writing. This replaces the availability placeholder with real quote data.
+    // Added 2026-06-11 to keep VQ list clean.
+    if (price > 0 && rfqLineId) {
+      try {
+        const profileResult = await deactivateProfileVQs(rfqLineId, mpn, bp.id);
+        if (profileResult.deactivated.length > 0) {
+          logger.info(`Deactivated ${profileResult.deactivated.length} profile VQ(s) before writing priced VQ for ${mpn}`);
+        }
+      } catch (profileErr) {
+        // Don't block the write if deactivation fails
+        logger.warn(`Profile VQ deactivation failed for ${mpn}: ${profileErr.message}`);
+      }
+    }
+
     const NATURAL_KEY_FIELDS = ['Chuboe_RFQ_Line_ID', 'Chuboe_MPN', 'C_BPartner_ID', 'Cost', 'C_Currency_ID', 'Chuboe_Date_Code'];
     try {
       const existingId = findExistingVqIdByNaturalKey(payload);
@@ -881,9 +998,11 @@ async function writeVQFromAPI(rfqSearchKey, cpc, franchiseResults, opts = {}) {
         channel: row.channel || null,
       });
     } catch (e) {
+      const { reason, network } = classifyWriteError(e, FLAG.API_WRITE_ERROR);
       failed.push({
         mpn, vendor: vendorDisplay, bpId: bp.id, price, qty,
-        reason: FLAG.API_WRITE_ERROR,
+        reason,
+        network: network || undefined,
         detail: e.message.substring(0, 200)
       });
     }
@@ -924,8 +1043,100 @@ function resolveRFQLineExact(rfq, mpn, cpc) {
  * @returns {{ written: Array, flagged: Array, failed: Array, needsReview: Array, summary: Object }}
  */
 async function writeVQBatch(rfqSearchKey, items, opts = {}) {
-  const delayMs = opts.delayMs || 100;
+  const unseenEmailCount = opts.unseenEmailCount || 0;
+  const estimatedVQs = items.length * 10; // rough estimate: 10 VQs per item on average
+  const isBackfill = unseenEmailCount >= 20;
+
+  // ── CHUNKED MODE for large batches ──
+  // Large API enrichment batches (500+ items) would fail the budget check.
+  // Instead of rejecting, we allow them through and rely on inter-item delays.
+  const LARGE_BATCH_THRESHOLD = 200;  // items (each item ≈ 10 VQs)
+  const useChunkedMode = items.length > LARGE_BATCH_THRESHOLD;
+
+  if (!useChunkedMode) {
+    // TIER 1: Global budget check for smaller batches
+    const globalCheck = otBudget.checkBudget({
+      table: 'chuboe_vq_line',
+      count: estimatedVQs,
+      caller: 'vq-loading-agent',
+      isBackfill,
+    });
+
+    if (!globalCheck.allowed) {
+      logger.warn(`[vq-writer] Global budget exhausted: ${globalCheck.reason}`);
+      logger.warn(`[vq-writer] Deferring ${items.length} items (est ${estimatedVQs} VQs)`);
+      return {
+        written: [],
+        flagged: [],
+        failed: [],
+        skipped: [],
+        needsReview: [],
+        rateLimited: true,
+        rateLimitReason: globalCheck.reason,
+        rateLimitTier: 'global',
+        summary: {
+          total: items.length,
+          rateLimited: true,
+          message: globalCheck.reason,
+        },
+      };
+    }
+  } else {
+    // Chunked mode: still check daily limit (skip burst checks - we self-pace)
+    // Prevents perfect storm of normal loads + huge batch exceeding daily cap
+    const status = otBudget.getStatus();
+    const dailyUsed = parseInt(status.globalBudget.lastDay.split('/')[0], 10) || 0;
+    const dailyLimit = otBudget.LIMITS.maxWritesPerDay;
+    if (dailyUsed + estimatedVQs > dailyLimit) {
+      logger.warn(`[vq-writer] Daily budget would be exceeded: ${dailyUsed}/${dailyLimit} + ${estimatedVQs} estimated`);
+      return {
+        written: [],
+        flagged: [],
+        failed: [],
+        skipped: [],
+        needsReview: [],
+        rateLimited: true,
+        rateLimitReason: `Daily limit: ${dailyUsed}/${dailyLimit} used, need ${estimatedVQs} more`,
+        rateLimitTier: 'daily',
+        summary: {
+          total: items.length,
+          rateLimited: true,
+          message: `Daily limit: ${dailyUsed}/${dailyLimit} used, need ${estimatedVQs} more`,
+        },
+      };
+    }
+    logger.info(`[vq-writer] Large batch detected (${items.length} items, est ${estimatedVQs} VQs) — bypassing upfront budget check, using inter-item delays`);
+  }
+
+  // TIER 2: VQ-specific rate limiting (process-specific intelligence)
+  // Also bypassed for large batches — they self-pace via inter-item delays
+  const rateCheck = rateLimiter.checkVQLimit(estimatedVQs, { unseenEmailCount });
+  if (!rateCheck.allowed && !useChunkedMode) {
+    logger.warn(`[vq-writer] Rate limit reached: ${rateCheck.reason}`);
+    logger.warn(`[vq-writer] Deferring ${items.length} items (est ${estimatedVQs} VQs)`);
+    return {
+      written: [],
+      flagged: [],
+      failed: [],
+      skipped: [],
+      needsReview: [],
+      rateLimited: true,
+      rateLimitReason: rateCheck.reason,
+      summary: {
+        total: items.length,
+        rateLimited: true,
+        message: rateCheck.reason,
+      },
+    };
+  }
+
+  // Use recommended delay based on backfill mode
+  const delayMs = opts.delayMs || rateLimiter.getRecommendedDelay(unseenEmailCount);
   const pass2Auto = opts.pass2Auto || false;
+
+  if (rateCheck.backfillMode) {
+    logger.info(`[vq-writer] BACKFILL MODE: ${unseenEmailCount} unseen emails, using ${delayMs}ms delay`);
+  }
 
   const allWritten = [];
   const allFlagged = [];
@@ -964,6 +1175,16 @@ async function writeVQBatch(rfqSearchKey, items, opts = {}) {
     const lookup = lookupMfr(m);
     await resolveMFR(lookup.canonical || m);
   }
+
+  // Reserve global budget before writing
+  otBudget.reserve('chuboe_vq_line', estimatedVQs, 'vq-loading-agent');
+
+  // Claim backfill slot if in backfill mode
+  if (isBackfill) {
+    otBudget.claimBackfillSlot('vq-loading-agent');
+  }
+
+  const writeStartTime = Date.now();
 
   // ── PASS 1: Exact match ──────────────────────────────────────────────────
   console.log(`[vq-writer] Pass 1: exact match on ${items.length} items...`);
@@ -1046,6 +1267,7 @@ async function writeVQBatch(rfqSearchKey, items, opts = {}) {
     failed: allFailed.length,
     skipped: allSkipped.length,
     needsReview: allNeedsReview.length,
+    chunkedMode: useChunkedMode,
     byReason: {},
   };
 
@@ -1056,6 +1278,35 @@ async function writeVQBatch(rfqSearchKey, items, opts = {}) {
 
   const skippedMsg = allSkipped.length > 0 ? `, ${allSkipped.length} skipped (restricted MFR)` : '';
   console.log(`[vq-writer] Done: ${summary.written} written (${pass1Written} pass1), ${summary.needsReview} needs review, ${summary.flagged} flagged, ${summary.failed} failed${skippedMsg}`);
+
+  // Record writes for rate limiting (both tiers)
+  const writeDuration = Date.now() - writeStartTime;
+
+  if (allWritten.length > 0) {
+    // Global budget tracking
+    otBudget.recordWrites('chuboe_vq_line', allWritten.length, {
+      caller: 'vq-loading-agent',
+      success: true,
+      durationMs: writeDuration,
+    });
+
+    // VQ-specific tracking
+    rateLimiter.recordVQWrites(allWritten.length);
+    rateLimiter.recordSuccess();
+    logger.info(`[vq-writer] Rate limiter: recorded ${allWritten.length} writes. Status: ${JSON.stringify(rateLimiter.getStatus())}`);
+  }
+
+  if (allFailed.length > 0) {
+    allFailed.forEach(() => {
+      rateLimiter.recordFailure();
+      otBudget.recordFailure();
+    });
+  }
+
+  // Release backfill slot if we claimed it
+  if (isBackfill) {
+    otBudget.releaseBackfillSlot('vq-loading-agent');
+  }
 
   return { written: allWritten, flagged: allFlagged, failed: allFailed, skipped: allSkipped, needsReview: allNeedsReview, summary };
 }

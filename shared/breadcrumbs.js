@@ -153,12 +153,55 @@ function hasMessageIdAlreadyLoaded(messageId, opts = {}) {
   return { loaded: false, breadcrumb: null };
 }
 
+/**
+ * Find breadcrumbs matching a UID and event filter.
+ *
+ * Used for detecting repeat deferrals — if we already wrote a 'load-deferred-budget'
+ * breadcrumb for this UID, the retry attempt should not re-notify.
+ *
+ * @param {number|string} uid - Email UID to look up
+ * @param {object} [opts]
+ * @param {string|string[]} [opts.events] - Event names to match (exact match)
+ * @param {string|string[]} [opts.cog] - Cog filter
+ * @param {number} [opts.sinceMs] - Only consider breadcrumbs newer than this (default: 24h)
+ * @returns {{found: boolean, breadcrumb: object|null}}
+ */
+function findByUid(uid, opts = {}) {
+  if (uid == null) return { found: false, breadcrumb: null };
+  const uidNum = Number(uid);
+  const events = opts.events
+    ? new Set(Array.isArray(opts.events) ? opts.events : [opts.events])
+    : null;
+  const cogs = opts.cog
+    ? new Set(Array.isArray(opts.cog) ? opts.cog : [opts.cog])
+    : null;
+  const sinceMs = opts.sinceMs ?? (Date.now() - 24 * 60 * 60 * 1000);
+
+  if (!fs.existsSync(BREADCRUMB_FILE)) return { found: false, breadcrumb: null };
+  const raw = fs.readFileSync(BREADCRUMB_FILE, 'utf8');
+  const lines = raw.split('\n');
+  // Reverse scan for most recent match
+  for (let i = lines.length - 1; i >= 0; i--) {
+    const line = lines[i];
+    if (!line.trim()) continue;
+    let obj;
+    try { obj = JSON.parse(line); } catch (e) { continue; }
+    if (obj.uid !== uidNum && obj.uid !== String(uid)) continue;
+    if (events && !events.has(obj.event)) continue;
+    if (cogs && !cogs.has(obj.cog)) continue;
+    if (obj.ts && Date.parse(obj.ts) < sinceMs) continue;
+    return { found: true, breadcrumb: obj };
+  }
+  return { found: false, breadcrumb: null };
+}
+
 module.exports = {
   write,
   readSince,
   readAll,
   prune,
   hasMessageIdAlreadyLoaded,
+  findByUid,
   BREADCRUMB_FILE,
   ROOT,
 };

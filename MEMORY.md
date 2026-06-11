@@ -5,65 +5,48 @@
 - **OT (Orange Tsunami)** — Internal name for our system built on top of iDempiere
 - **CPC (Customer Part Code)** — Customer's internal part number. Also called Customer Part Number. "LAM CPC" = LAM's part code (redundant but common usage)
 
+## How to Send Emails
+
+**NEVER use the `mail` command directly.** The basic `mail` command sends from `analytics_user@<hostname>` which doesn't work properly for external recipients.
+
+**ALWAYS use the shared notifier system:**
+
+```javascript
+const { createNotifier } = require('./astute-workinstructions/shared/notifier');
+
+const notifier = createNotifier({
+  fromEmail: 'stockrfq@orangetsunami.com',  // or other OT email
+  fromName: 'Descriptive Name'
+});
+
+// Simple email
+await notifier.sendEmail('jake.harris@astutegroup.com', 'Subject', 'Body text');
+
+// With attachment
+await notifier.sendWithAttachment(
+  'jake.harris@astutegroup.com',
+  'Subject',
+  'Body text',
+  [{ filename: 'report.txt', path: '/path/to/file.txt' }]
+);
+```
+
+**Common sender addresses:**
+- `stockrfq@orangetsunami.com` - Stock RFQ operations, reports, general automation
+- `excess@orangetsunami.com` - Customer excess analysis
+- `vortex@orangetsunami.com` - Vortex matches, sourcing recap
+
+The notifier uses AWS WorkMail SMTP with credentials from `~/workspace/.env`. Works from `analytics_user` - other users route through writeback proxy (see `shared/writeback-proxy.md`).
+
 ## Recent Sessions
 
-- **2026-05-29 (Sales Pulse Daily - Email Setup READY)**: Completed comprehensive Sales Pulse Daily report with all 6 sections and email delivery setup.
+- **2026-06-11 (Delisted Parts Pipeline)**: **Major overhaul of Active Sourcing to source from DELISTED parts instead of current inventory.** Changes: (1) `inventory_cleanup.js` now tracks delta (prior - current week offers), writes delisted MPNs to `~/.delisted-parts-queue.json`. (2) `selection-engine.js` reads from delisted queue instead of current inventory offers. (3) `active-sourcing-runner.js` marks MPNs as sourced after processing, sends batch digest email with queue progress %. (4) First pass completion notification when all delisted parts sourced. (5) Profile VQ deactivation when real priced VQs arrive (same MPN/vendor within 10 days). (6) Broker VQ consolidation (multiple rows same MPN/vendor → 1 VQ with total qty). (7) NC scraper skips franchised suppliers (ncauth CSS class) — franchise data comes via APIs. (8) Re-enabled inventory gate (waits for NC upload confirmation before sourcing). **Key distinction:** Profiled parts (current inventory) → NC scrape only, no API calls. Delisted parts → full treatment (API enrichment + NC RFQ). **Documentation:** Updated `market-profiling.md` with full pipeline docs. Commits: `614468e`, `898aac3`, `9192d5c`, `7e8a73f`.
 
-  **Report Sections:**
-  1. Global Snapshot (Pipeline Input, Quoting Activity, Wins, System Discipline)
-  2. By Region (USA, MEX, 3 APAC subregions)
-  3. Yesterday's Wins (grouped by region with MPN details)
-  4. Needs Attention (5 alert types: High-value quotes, High-probability customers, New customers, Pricing benchmarks, Sourcing stuck)
-  5. Week-to-Date (Monday-yesterday metrics by region)
-  6. Market Pulse (Top 10 trending manufacturers & parts)
+- **2026-06-11 (Budget Exhaustion Handling Overhaul)**: **Fixed inconsistent budget handling across all loaders after 256k writes in one day triggered budget exhaustion.** Root cause: June 10 inventory cleanup wrote 118k×2 offer lines, hitting 30k daily limit. Loaders handled this inconsistently — some routed to NeedsReview with manual-retry email, others silently moved to Processed with `offerId: null`. **Fixes:** (1) **Raised daily limit** 30k → 300k (256k proven safe; burst limits are real protection). (2) **Chunked mode now respects daily limit** — was bypassing all budget checks; now checks daily before starting. (3) **Poller checks `rateLimited: true`** — if handler returns this, email stays UNSEEN for auto-retry on next cycle (no notification). (4) **All handlers propagate `rateLimited`** — broker-offers.js, excess.js, stockrfq-cq.js now check writer result and return rateLimited to poller. (5) **Recovery script** `scripts/recover-budget-stuck.js` — moves emails from NeedsReview or Processed back to INBOX. Supports `--folder` and `--uids` options. **Recovery performed:** 1 from broker-offers NeedsReview, 4 from stockrfq NeedsReview, 8 from vq-loading NeedsReview, 14 from broker-offers Processed = 27 emails total moved back to INBOX for reprocessing. **Writers updated:** offer-writeback.js, rfq-writer.js, cq-writer.js, vq-writer.js. Commits: `064d133`, `b0aa5ee`, `c6db717`, `765119b`, `663637c`.
 
-  **Key Fixes:**
-  - Sourcing Stuck: Updated to V5 format (3-5 day window, grouped by region with buyer/seller/routed date)
-  - Quote Age: Filtered to auto-close windows (30 days short-cycle, 64 days long-cycle)
-  - Testing Summary: Added yellow-highlighted explanation section (removed in production)
+- **2026-06-08 (NC Listing Fix + Inventory Cleanup Drift)**: **Fixed `nc-listing` cron job that was broken since refactor.** Root cause: job used `cadence: 'twice-weekly'` but `cadenceToMs()` didn't support it — crashed on every tick with `Error: Unrecognized cadence: twice-weekly`. **Fixes:** (1) Added `twice-weekly` = 3 days to `cron-jobs.js`. (2) Ran `inventory-cleanup` manually (4,188 lines to OT). (3) Ran `nc-listing` manually (560 rows to NetComponents). (4) Re-anchored both sentinels to proper schedule times (inventory-cleanup: Mon 11 UTC, nc-listing: Mon/Thu 12 UTC) — they had drifted to ~20 UTC from late runs. **Also refactored `nc-listing` email logic:** Removed duplicate review copies to jake.harris@ — NetComponents emails already CC him, so 4 emails → 2 emails. Commits: `40c8a80`, `1011461`.
 
-  **Email Setup:**
-  - Recipients: melissa.bojar@astutegroup.com, josh.pucci@astutegroup.com
-  - Sender: analytics@orangetsunami.com
-  - Schedule: Business days only (Mon-Fri) at 6:00 AM EST
-  - Delivery: Ready for Jake to test (instructions provided in instructions-for-jake.md)
-
-  **Files Committed (5 essential files):**
-  - `sales-pulse-comprehensive.js` - Main report generator
-  - `send-email.js` - Email sender
-  - `instructions-for-jake.md` - Setup guide for automated daily sends
-  - `README.md` - Workflow documentation
-  - `.gitkeep` - Folder tracking
-
-  **Next Steps:** Jake needs to send test email and optionally set up cron for daily automation.
-
-- **2026-05-28 (MI KPI Dashboard - May 2026 Update - COMPLETE)**: Built MI KPI Performance Dashboard for May 2026 with all 5 planned enhancements.
-
-  **Data Summary (May 1-28):**
-  - Team: 163 OTINs, 443.3 KPI (82.1% of 540 target)
-  - Top performers: Daisy Mendoza (136.0 KPI, 151%), Ofelio Martinez (107.5 KPI, 119%)
-  - Tier distribution: T1=85 (16.5% of KPI), T2=44 (42.4% of KPI), T3=21 (25.7%), T4=13 (15.3%)
-
-  **Enhancements Implemented:**
-  1. **T2+ Mix column** (weekly summary) — Week 3: 28% T2+ = 17.8 KPI/day (red); Week 4: 64% T2+ = 39.0 KPI/day (green)
-  2. **KPI/OTIN column** (inspector table) — Daisy 4.25 (green), Sharanya 1.48 (red - T1-heavy workload)
-  3. **Pace Required banner** — Red warning: 32.2 KPI/day needed to hit 540 target
-  4. **Enhanced tier cards** — Each shows KPI score and % contribution
-  5. **Insight callout** — Yellow box correlating T2+ mix with daily KPI output
-
-  **Key Insight:** T2 drives 42% of team KPI with only 27% of OTINs. Tier mix is the strongest predictor of daily KPI output.
-
-  **Technical Note:** Pencil `get_screenshot` had rendering issues; used `export_nodes` to PNG instead.
-
-  **Files:**
-  - `~/workspace/MI KPIs/MI_KPI_Dashboard_May2026_Enhanced.png` — Final version with all enhancements
-  - `~/workspace/MI KPIs/SESSION_NOTES_2026-05-28.md` — Full session documentation
-
-- **2026-05-21 (ISE/FSE Steward Reassignment Report)**: Built comprehensive report identifying customer locations assigned to inactive ISE/FSE stewards for Sales Leadership and Customer Service to reassign.
-
-  **Key Discovery:** The `chuboe_ise_steward_id` and `chuboe_fse_steward_id` fields reference `ad_user.ad_user_id`, NOT `c_bpartner.c_bpartner_id`. Initial queries joined to the wrong table, causing incorrect results (e.g., showing John Pauls when Thomas Haynes was actually assigned).
-
-  **Final Report (1,343 locations):**
+- **2026-06-04 (Stuck Email Detection + Auto-Recovery + Cleanup)**: **Fixed systemic gap where emails could get stuck in SEEN-but-not-processed state.** Root cause: when agent reads an email (marks SEEN) but crashes/pauses before routing, the email becomes invisible to the next `list` call. **Solution (3 parts):** (1) **Auto-recovery in poller** — `list` command now scans for SEEN emails >60 min old, clears their SEEN flag so they reappear. 24-hour cap prevents recovering ancient spam/test emails. (2) **Operations Digest detection** — new section shows stuck emails across all 4 workflows (vq-loading, excess, stockrfq, rfq-loading), separates auto-recoverable (60min-24h) from manual-review (>24h). (3) **New poller commands** — `check-stuck` (read-only monitoring) and `recover-stuck` (manual recovery with configurable threshold). **Also added:** Pause detection to digest (paused jobs now flagged). **Investigation origin:** Ivy's test emails (UID 8765/8768 to VQ inbox) didn't load AND didn't send failure notification because VQ loading agent was paused via `.vq-loading-agent-paused` file since June 2. **Cleanup (post-recovery):** Archived 37 old stuck emails across vq-loading/stockrfq/rfq-loading via new `scripts/archive-stuck-emails.js`. Excess inbox had 8 stuck from May 8-22 — reviewed individually: archived 8 junk (spam, RFQs-not-offers, partial forwards), recovered 3 legitimate offers (USI Mexico, Benchmark Romania, DFI) by clearing SEEN flag. **Root cause of May 8-22 excess stuck emails:** Agent WAS running (confirmed by offers created with "excessAgent" in description), but specific edge-case emails got stuck because agent read them, determined they weren't actionable, but failed to route them to a folder (NotOffer/NeedsReview). Not crashes — routing gaps. The auto-recovery and archive scripts now handle this. Scripts: `archive-stuck-emails.js`, `move-uids-to-archive.js`. Commit: `64d906e`.
   - ISE Steward: 1,207 locations across 52 inactive stewards
   - FSE Steward: 136 locations
   - Top stewards needing reassignment: Madison Fischl (113), Elena Wilfong (94), JeanPaul Chevrier (78), Erin Lee (77), Edyna Lee (76), Hugo Ogalde (114 total)

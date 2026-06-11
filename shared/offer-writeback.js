@@ -67,9 +67,11 @@
 
 const logger = require('./logger').createLogger('OfferWriter');
 const { apiPost, apiGet, apiPut } = require('./api-client');
+const { isOtUnreachableError } = require('./ot-error');
 const { psqlQuery, cleanMpn } = require('./db-helpers');
 const { lookupMfr } = require('./mfr-lookup');
 const { resolveMfrForRow } = require('./mfr-resolver');
+const otBudget = require('./ot-api-budget');
 
 // Offer type name → chuboe_offer_type_id mapping
 const OFFER_TYPES = {
@@ -191,6 +193,7 @@ function applyConsignmentGuard(opts) {
  * @param {number} [opts.userId]            - chuboe_user_id (optional)
  * @param {number} [opts.buyerId]           - chuboe_buyer_id (optional)
  * @param {boolean} [opts.writeMpnRecords=false] - Also write chuboe_offer_line_mpn records
+ * @param {boolean} [opts.isBackfill=false] - Backfill mode (coordinates with global budget)
  * @param {Array}  opts.lines               - Array of line objects (required, at least 1)
  * @param {string} opts.lines[].mpn         - Part number (required)
  * @param {string} [opts.lines[].mpnClean]  - Cleaned MPN (auto-generated if omitted)
@@ -224,6 +227,7 @@ async function writeOffer(opts) {
     userId = null,
     buyerId = null,
     writeMpnRecords = false,
+    isBackfill = false,
     lines = [],
   } = opts;
 
@@ -248,6 +252,66 @@ async function writeOffer(opts) {
     offerTypeId = Number(rawOfferType);
   }
 
+  // ── TIER 1: Global budget check ──
+  // Estimated writes: lines + optional MPN records
+  const estimatedWrites = lines.length + (writeMpnRecords ? lines.length : 0);
+  const caller = 'offer-writeback'; // Will be 'excess-agent' or 'inventory-cleanup' in practice
+
+  // ── CHUNKED MODE for large offers ──
+  // Offers with many lines would fail the budget check outright. Instead of
+  // rejecting, we write in chunks with delays to stay under rate limits.
+  // This allows legitimate large customer excess lists (1000+ lines) to load.
+  const LARGE_OFFER_THRESHOLD = 500;  // lines
+  const CHUNK_SIZE = 150;             // lines per chunk (300 writes with MPN)
+  const CHUNK_DELAY_MS = 2000;        // 2s between chunks
+  const useChunkedMode = lines.length > LARGE_OFFER_THRESHOLD;
+
+  if (!useChunkedMode) {
+    // Standard budget check for small/medium offers
+    const globalCheck = otBudget.checkBudget({
+      table: 'chuboe_offer_line',
+      count: estimatedWrites,
+      caller,
+      isBackfill,
+    });
+
+    if (!globalCheck.allowed) {
+      logger.warn(`Global budget exhausted: ${globalCheck.reason}`);
+      return {
+        offerId: null,
+        searchKey: null,
+        linesWritten: 0,
+        mpnsWritten: 0,
+        errors: [],
+        rateLimited: true,
+        rateLimitReason: globalCheck.reason,
+        rateLimitTier: 'global',
+        otUnreachable: false,
+      };
+    }
+  } else {
+    // Chunked mode: still check daily limit (skip burst checks - we self-pace)
+    // Prevents perfect storm of normal loads + huge file exceeding daily cap
+    const status = otBudget.getStatus();
+    const dailyUsed = parseInt(status.globalBudget.lastDay.split('/')[0], 10) || 0;
+    const dailyLimit = otBudget.LIMITS.maxWritesPerDay;
+    if (dailyUsed + estimatedWrites > dailyLimit) {
+      logger.warn(`Daily budget would be exceeded: ${dailyUsed}/${dailyLimit} + ${estimatedWrites} estimated`);
+      return {
+        offerId: null,
+        searchKey: null,
+        linesWritten: 0,
+        mpnsWritten: 0,
+        errors: [],
+        rateLimited: true,
+        rateLimitReason: `Daily limit: ${dailyUsed}/${dailyLimit} used, need ${estimatedWrites} more`,
+        rateLimitTier: 'daily',
+        otUnreachable: false,
+      };
+    }
+    logger.info(`Large offer detected (${lines.length} lines) — using chunked mode with ${CHUNK_SIZE}-line chunks and ${CHUNK_DELAY_MS}ms delays`);
+  }
+
   const errors = [];
   let linesWritten = 0;
   let mpnsWritten = 0;
@@ -265,22 +329,48 @@ async function writeOffer(opts) {
 
   let offerId;
   let searchKey = null;
+  let otUnreachable = false;   // set when any write hit a network/transport failure (OT down) — retryable
   try {
     const headerResponse = await apiPost('chuboe_offer', headerPayload);
     offerId = headerResponse.id;
     searchKey = headerResponse.Value || headerResponse.value || null;
     if (!offerId) throw new Error('No ID returned in response');
   } catch (e) {
-    return { offerId: null, searchKey: null, linesWritten: 0, mpnsWritten: 0, errors: [`Failed to insert offer header: ${e.message}`] };
+    const net = isOtUnreachableError(e);
+    return { offerId: null, searchKey: null, linesWritten: 0, mpnsWritten: 0, errors: [`${net ? '[OT_UNREACHABLE] ' : ''}Failed to insert offer header: ${e.message}`], otUnreachable: net };
   }
   logger.info(`Offer header created: searchKey=${searchKey}, chuboe_offer_id=${offerId}, BP=${bpartnerId}, type=${offerTypeId}`);
 
+  // ── Reserve budget and claim backfill slot ──
+  // Skip reservation for chunked mode — we self-pace with delays between chunks
+  if (!useChunkedMode) {
+    otBudget.reserve('chuboe_offer_line', estimatedWrites, caller);
+  }
+
+  if (isBackfill) {
+    otBudget.claimBackfillSlot(caller);
+  }
+
+  const writeStartTime = Date.now();
+
+  // Helper for chunked delay
+  const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
+
   // ── Insert Lines ──
   for (let i = 0; i < lines.length; i++) {
+    // Chunked mode: pause between chunks to stay under rate limits
+    if (useChunkedMode && i > 0 && i % CHUNK_SIZE === 0) {
+      const chunkNum = Math.floor(i / CHUNK_SIZE);
+      const totalChunks = Math.ceil(lines.length / CHUNK_SIZE);
+      logger.info(`Chunk ${chunkNum}/${totalChunks} complete (${linesWritten} lines written). Pausing ${CHUNK_DELAY_MS}ms...`);
+      await sleep(CHUNK_DELAY_MS);
+    }
+
     const line = lines[i];
     const lineNum = (i + 1) * 10; // Line 10, 20, 30...
 
-    const mpnRaw = line.mpn || '';
+    // Coerce MPN to string — xlsx parsing often returns numbers for numeric-looking part numbers
+    const mpnRaw = String(line.mpn || '');
     const mpnCleanVal = line.mpnClean || cleanMpn(mpnRaw);
 
     const linePayload = {
@@ -334,7 +424,9 @@ async function writeOffer(opts) {
       lineId = lineResponse.id;
       if (!lineId) throw new Error('No ID returned in response');
     } catch (e) {
-      errors.push(`Failed to insert line ${i + 1} (${mpnRaw}): ${e.message}`);
+      const net = isOtUnreachableError(e);
+      if (net) otUnreachable = true;
+      errors.push(`${net ? '[OT_UNREACHABLE] ' : ''}Failed to insert line ${i + 1} (${mpnRaw}): ${e.message}`);
       continue;
     }
     linesWritten++;
@@ -354,14 +446,38 @@ async function writeOffer(opts) {
         });
         mpnsWritten++;
       } catch (e) {
-        errors.push(`Failed to insert offer_line_mpn ${i + 1} (${mpnRaw}): ${e.message}`);
+        const net = isOtUnreachableError(e);
+        if (net) otUnreachable = true;
+        errors.push(`${net ? '[OT_UNREACHABLE] ' : ''}Failed to insert offer_line_mpn ${i + 1} (${mpnRaw}): ${e.message}`);
       }
     }
   }
 
-  logger.info(`Offer write complete: searchKey=${searchKey}, offerId=${offerId}, ${linesWritten} lines${writeMpnRecords ? `, ${mpnsWritten} MPNs` : ''}${errors.length ? `, ${errors.length} errors` : ''}`);
+  // ── Record writes and release backfill slot ──
+  const writeDuration = Date.now() - writeStartTime;
+  const totalWritten = linesWritten + mpnsWritten;
+  if (totalWritten > 0) {
+    otBudget.recordWrites('chuboe_offer_line', totalWritten, {
+      caller,
+      success: true,
+      durationMs: writeDuration,
+    });
+  }
 
-  return { offerId, searchKey, linesWritten, mpnsWritten, errors };
+  if (errors.length > 0) {
+    for (let i = 0; i < errors.length; i++) {
+      otBudget.recordFailure();
+    }
+  }
+
+  if (isBackfill) {
+    otBudget.releaseBackfillSlot(caller);
+  }
+
+  const chunkedNote = useChunkedMode ? ` [chunked: ${Math.ceil(lines.length / CHUNK_SIZE)} chunks]` : '';
+  logger.info(`Offer write complete: searchKey=${searchKey}, offerId=${offerId}, ${linesWritten} lines${writeMpnRecords ? `, ${mpnsWritten} MPNs` : ''}${errors.length ? `, ${errors.length} errors` : ''}${chunkedNote}`);
+
+  return { offerId, searchKey, linesWritten, mpnsWritten, errors, otUnreachable, chunkedMode: useChunkedMode };
 }
 
 // ─── BATCH WRITER ────────────────────────────────────────────────────────────

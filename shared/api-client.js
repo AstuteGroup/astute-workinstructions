@@ -699,19 +699,20 @@ async function resolveBP(searchKey, vendorName) {
 
     // Pull candidates via the iDempiere REST API.
     //
-    // Filter choice: `Chuboe_VendorType_ID gt 0` alone (NOT also `IsVendor='Y'`).
-    // Empirically (2026-05-20) ECHO COMPONENTS CO.,LTD has VendorType=Global
-    // Sourcing set but `IsVendor` is not 'Y' — adding the IsVendor filter
-    // dropped the correct match. Chuboe_VendorType_ID is the reliable signal
-    // for "this BP is set up for actual quote loading" because writes 500
-    // with Chuboe_VendorType_ID null at POST time.
+    // Two-pass strategy:
+    //   Pass 1: Prefer BPs with Chuboe_VendorType_ID set (properly configured vendors)
+    //   Pass 2: Fall back to ANY BP if pass 1 misses (VQs can be written against
+    //           BPs without vendor type — empirically confirmed June 2026 with
+    //           Jabil, TI, Lam Research, eBay all receiving VQs despite null type)
     //
-    // Strategy: cast a wide-enough net server-side (`contains` with VendorType
-    // filter), then apply strict client-side scoring so substring contamination
+    // Within each pass, use strict client-side scoring so substring contamination
     // ("roson" → "Lectrosonics") can't slip through.
-    const baseFilter = `Chuboe_VendorType_ID gt 0`;
+    const vendorFilter = `Chuboe_VendorType_ID gt 0`;
+    const anyBpFilter = `IsActive eq 'Y'`;  // fallback: any active BP
+
+    // Pass 1: Try with vendor-type filter (properly configured vendors)
     let result = await apiGet('C_BPartner', {
-      filter: `${baseFilter} and contains(toupper(Name),'${escaped}')`,
+      filter: `${vendorFilter} and contains(toupper(Name),'${escaped}')`,
       top: 50,
     });
     let candidates = (result.records || []).slice();
@@ -724,10 +725,20 @@ async function resolveBP(searchKey, vendorName) {
     if (candidates.length === 0 && inputNorm.length >= 4) {
       const sig = inputNorm.slice(0, 4);
       const result2 = await apiGet('C_BPartner', {
-        filter: `${baseFilter} and contains(toupper(Name),'${sig}')`,
+        filter: `${vendorFilter} and contains(toupper(Name),'${sig}')`,
         top: 50,
       });
       candidates = (result2.records || []).slice();
+    }
+
+    // Pass 2: If vendor-type filter missed entirely, try ANY active BP.
+    // VQs can be written against BPs without vendor type (Jabil, TI, eBay, etc.).
+    if (candidates.length === 0) {
+      const result3 = await apiGet('C_BPartner', {
+        filter: `${anyBpFilter} and contains(toupper(Name),'${escaped}')`,
+        top: 50,
+      });
+      candidates = (result3.records || []).slice();
     }
 
     // Don't bail yet when candidates is empty — Phase 2 typo-tolerance below
@@ -788,7 +799,7 @@ async function resolveBP(searchKey, vendorName) {
       const prefix = inputUpper.replace(/'/g, "''").slice(0, 4);
       try {
         const result3 = await apiGet('C_BPartner', {
-          filter: `${baseFilter} and startswith(toupper(Name),'${prefix}')`,
+          filter: `${anyBpFilter} and startswith(toupper(Name),'${prefix}')`,
           top: 100,
         });
         const candidates3 = (result3.records || []).slice();

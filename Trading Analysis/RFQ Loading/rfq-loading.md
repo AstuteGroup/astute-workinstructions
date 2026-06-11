@@ -183,6 +183,34 @@ If still unclear → **draft reply** requesting the RFQ type (see Missing Info H
 
 ---
 
+## Company-Specific Defaults
+
+Certain customers have established defaults for RFQ type and contact when information is missing from the email. **Apply these defaults automatically** rather than escalating as "need_info".
+
+### Astute Group (Astute Electronics)
+
+**Business Partner:** 1000363 (search_key: 1002367)
+**Default Contact:** Aran Coker (ad_user_id: 1007712, email: aran.coker@astute.global)
+**Default RFQ Type:** Shortage (1000000)
+
+**Why:** Astute Group is Astute Inc's sister company. These RFQs are primarily for **VQ data capture** — capturing market quotes from brokers that Astute Ltd received. The customer and type are less critical than having the MPNs + quantities in the system for trading intelligence.
+
+**When to apply:**
+- **ONLY** when the email sender is `*@astutegroup.com`
+- Sender email domain is the trigger, NOT the customer BP
+- If someone outside Astute Group emails about an Astute Group RFQ → escalate normally (don't apply defaults)
+
+**If sender is @astutegroup.com AND missing info:**
+- Default to RFQ Type: Shortage (1000000)
+- Default to Contact: Aran Coker (1007712)
+- Don't escalate as need_info
+
+**Example:** Email from `ivy.song@astutegroup.com` with subject "转发: upload VQ May 12th" listing MPNs/quantities from various brokers → automatically use Shortage + Aran Coker, don't escalate.
+
+**Counter-example:** External broker emails an RFQ where the customer is Astute Group, but sender is `broker@example.com` → escalate normally for missing contact/type, don't apply defaults.
+
+---
+
 ## Missing Info Handling (General Customer RFQ Only)
 
 When required information is missing, draft a reply for the user to review before sending.

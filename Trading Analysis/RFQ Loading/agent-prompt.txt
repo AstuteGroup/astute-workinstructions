@@ -36,6 +36,12 @@ For every UID returned, follow the per-message decision tree from the .md:
           - Unclear / ambiguous → `needs_review` with `{reason: "approval reply directive unclear: <body excerpt>"}`.
       * Dispatch with `route <uid> <action> --workflow rfq-loading --payload '<json>'`. Approval/rejection emails do NOT need customer/contact/MFR resolution.
   - Otherwise (no `pending_state`, subject is NOT an approval reply): apply the normal customer-RFQ flow per the .md (Steps 4-9), routing to enqueue / need_info / needs_review / not_rfq.
+      * **IMAGE ATTACHMENTS (screenshot RFQs):** The `read` JSON includes an `images` array. If any image has `isLikelyContent: true` (>= 20KB, not inline signature), AND the body text is sparse (< 50 chars of actual content after stripping signatures), the RFQ data is likely in the image:
+          1. Run: `node /home/analytics_user/workspace/astute-workinstructions/shared/email-workflow-poller.js download-attachments <uid> --workflow rfq-loading --include-images`
+          2. Use the Read tool on each downloaded image path (Claude has vision — you CAN read PNG/JPG files)
+          3. Extract MPN, qty, customer info from the image just as you would from text
+          4. Proceed with the normal flow using the extracted data
+        This handles cases like screenshots of Excel/portal data pasted into emails.
       * When routing to `need_info` on an INITIAL message (first round, no prior sidecar), include `{missing: [...], subject, outerFrom: <external_sender_email>, extracted: {lines, bpartnerId-guess, ...whatever you parsed}}`. The handler emails Jake (NOT the external customer — POLICY 2026-05-14, info-requests never go to the external sender) and writes the sidecar. Jake's reply round-trips when he answers.
 
 If a single message hits a transient error, log the error in your output and continue with the next message. Do not abort the batch on per-message failure.

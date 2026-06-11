@@ -13,6 +13,19 @@
  *   node rts-lookup.js 1155861          # by R_Request documentno
  *   node rts-lookup.js SO506724         # by OT Sales Order number
  *   node rts-lookup.js COV0021568       # by Infor COV number
+ *
+ * ═══════════════════════════════════════════════════════════════════════════
+ * COST SOURCING — READ BEFORE USING INVENTORY LOT COST
+ * ═══════════════════════════════════════════════════════════════════════════
+ * W111 (LAM 3PL) and W115 (LAM Dead Stock) use LAM SIPOC contractual pricing,
+ * NOT the inventory file's lot cost. Look up contract price in order:
+ *   1. Lam_Kitting_DB_*.xlsx → INVENTORY → "Base Unit Price"
+ *   2. Lam_EPG_SIPOC.xlsx → Sheet1 → "Base Unit Price"
+ *   3. Astute_New Part ADDS_*.xlsx → latest "Astute action list" tab
+ *
+ * Other warehouses (W104, W102, W108, etc.) use inventory lot cost as normal.
+ * See rts-lookup.md for full cost sourcing rules.
+ * ═══════════════════════════════════════════════════════════════════════════
  */
 
 const { execSync } = require('child_process');

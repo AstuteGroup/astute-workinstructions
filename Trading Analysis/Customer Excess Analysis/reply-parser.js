@@ -260,6 +260,27 @@ async function processReply(client, uid, account, dryRun, log) {
     return { uid, status: 'skipped', reason: 'self' };
   }
 
+  // Skip if this is a NEW FORWARD of a customer email (not a reply to an escalation).
+  // New forwards should be processed by the excess-agent, not reply-parser.
+  //
+  // This fixes a race condition where reply-parser would grab operator forwards,
+  // fail to parse directives, send a kickback, and mark the email SEEN before
+  // the excess-agent could process it. Root cause: operator forwards customer
+  // excess emails with subjects like "FW: Inventory Available..." — no directives,
+  // but looksLikeActionableReply() triggers on the customer content.
+  //
+  // Detection: forward prefix (FW:/Fwd:) WITHOUT an escalation marker in subject.
+  // Escalation markers: "Customer Excess —", "Junk check —", our kickback pattern.
+  const isNewForward = /^(?:FW|Fwd)\s*:/i.test(subject);
+  const isEscalationReply = /Customer Excess\s*[—-]/i.test(subject) ||
+                            /Junk\s+check\s*[—-]/i.test(subject) ||
+                            /I didn't understand/i.test(subject) ||
+                            /clarification needed/i.test(subject);
+  if (isNewForward && !isEscalationReply) {
+    log(`  UID ${uid}: new forward (not a reply to escalation) — leaving for excess-agent`);
+    return { uid, status: 'skipped', reason: 'new-forward' };
+  }
+
   log(`  UID ${uid}: reply from ${fromAddr} subject="${subject}"`);
 
   // Strip any quoted prior-message blocks below "On <date> wrote:" or similar

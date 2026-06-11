@@ -34,6 +34,42 @@ If you catch yourself thinking "I remember how this works" - STOP and read the f
 
 ---
 
+# North Star: Bug Fix Protocol (Test Before Processing)
+
+**When the operator reports a bug using a specific stuck email/record as the example:**
+
+1. **DO NOT manually process the stuck item first.** The stuck item is your test case.
+2. **Diagnose and fix the underlying bug** in the code/workflow.
+3. **Use the stuck item to verify the fix works** — clear its stuck state (SEEN flag, sentinel, etc.) and let the fixed code reprocess it.
+4. **If multiple items are stuck from the same bug**, fix first, then batch-recover all of them as validation.
+
+**Why this matters:** Manually processing the stuck item before fixing the bug:
+- Destroys your only test case
+- Leaves you unable to verify the fix actually works
+- Means you might deploy a broken fix and not know until the next occurrence
+
+**Anti-pattern (what NOT to do):**
+```
+1. Operator reports: "UID 1517 is stuck"
+2. You manually load UID 1517 to OT        ← WRONG: destroyed test case
+3. You fix the bug
+4. No way to verify fix works              ← now you're guessing
+```
+
+**Correct pattern:**
+```
+1. Operator reports: "UID 1517 is stuck"
+2. Diagnose root cause
+3. Fix the bug in code
+4. Clear SEEN flag / reset state on UID 1517
+5. Let the fixed code reprocess UID 1517   ← verifies fix works
+6. Check for other items stuck by same bug, recover them too
+```
+
+**This applies to all loaders:** excess, vq-loading, rfq-loading, stockrfq, offer-poller, vortex, etc. The stuck item is a gift — it's a reproducible test case. Don't waste it.
+
+---
+
 # Session Greeting
 
 **TRIGGER:** When you see `SessionStart:startup hook success` in a system-reminder, IMMEDIATELY display the greeting below — do not wait for user input. This allows the user to jump straight into their task.
@@ -55,7 +91,7 @@ At the start of every new conversation, before addressing anything else, always 
 > 5. **Market Offer Analysis for RFQs** - Match new RFQs against customer excess and stock offers (see `Trading Analysis/Market Offer Matching for RFQs/market-offer-matching.md`)
 > 6. **Quick Quote** - Generate baseline quotes from recent VQs (0-30 days) with margin/GP/rebate pricing logic
 > 7. **Seller Quoting Activity** - VQ→CQ→SO funnel analysis by seller (snapshot + 6-month trend)
-> 8. **Order/Shipment Tracking** - Look up tracking by COV, SO, MPN, customer PO, or salesperson (see `saved-queries/order-shipment-tracking.md`)
+> 8. **Order/Shipment Tracking** - Look up tracking by COV, SO, MPN, customer PO, or salesperson (see `Trading Analysis/saved-queries/order-shipment-tracking.md`)
 > 9. **Inventory File Cleanup** - Process Infor inventory exports into Chuboe format for iDempiere import (see `Trading Analysis/Inventory File Cleanup/inventory-file-cleanup.md`)
 > 10. **Vortex Matches** - Surface VQs/offers under customer targets, stock matches, and market intelligence (see `Trading Analysis/Vortex Matches/vortex-matches.md`)
 > 11. **Customer Excess Analysis** - Universal offer pipeline: 30-min inbox poll → writeOffer → type-router → Customer Excess Analysis (intent: Spec Buy / Proactive Customer / Reactive RFQ-match) for types 1000000/1000003, or broker/franchise data-capture for 1000001/1000002. Operator digest 3×/day (7am/12pm/4pm EDT) with reply-parser feedback loop (see `Trading Analysis/Customer Excess Analysis/customer-excess-analysis.md`)
@@ -71,6 +107,9 @@ At the start of every new conversation, before addressing anything else, always 
 > 21. **CalcuQuote vs Claude API Comparison** - Side-by-side analysis when a CalcuQuote Costed BOM email arrives from the Ltd side for the same RFQ Inc already has API-enrichment on. Read-only (do NOT load VQs). Produces AVL coverage %, apples-to-apples pricing, per-supplier profile, MFR pricing trends with Coverage vs True Pricing split, and explicit Inc-only / Ltd-only channel reach. Trigger: operator forwards a Costed BOM email saying "do not load, compare against system" (see `Trading Analysis/CalcuQuote vs Claude API Comparison/calcuquote-vs-claude-api-comparison.md`)
 > 22. **Distributor Scrape Loading** - General-purpose infrastructure for operator-attended desktop scrapes (Windows Claude + authenticated Chrome) shipping JSON envelopes to `~/workspace/inbox/<source>/` via scp. Server-side watcher validates and loads via `writeVQBatch` or `writePricingResult`. Today's primary consumer: RFQ Sourcing franchise-data channel #3 (Heilind, etc. — distributors lacking APIs or rate-limited). Domain-agnostic contract: future consumers (market-intel scrapes, customer-portal pulls) plug in via additional `<source>` subfolders + `mappers/<source>.js`. See `Trading Analysis/Distributor Scrape Loading/desktop-scraper-contract.md` (envelope shapes + adapter patterns) and `Trading Analysis/Distributor Scrape Loading/distributor-scrape-loading.md` (server-side ingestion). Per-source operational notes (envelope mapping, edge protection, quirks): `heilind-bom-tool-notes.md`, `coilcraft-direct-notes.md`. Per-site desktop cheat sheets (selectors, navigation chain) live under `scrape-adapters/<slug>.md`.
 > 23. **Sourcing Recap** - Per-RFQ best-option sourcing summary. Complements Vortex Matches (savings) — same inbox (vortex@orangetsunami.com), routed by subject keyword: subject contains **"BEST"** + a 7-digit RFQ# → Sourcing Recap; anything else stays on Vortex. Output: single-tab xlsx grouped by CPC, ranked within each group by RFQ-type rule (Shortage/Hot Parts use stock-first; PPV/3PL/EOL/others use cost-first; Stock RFQs rejected with redirect). In-RFQ VQs always shown; out-of-RFQ VQs (same CPC, last 14 days, any other RFQ) surfaced only when they beat at least one in-RFQ row, visually called out in bold + orange tint. CLI: `node "Trading Analysis/Sourcing Recap/sourcing-recap.js" <RFQ#>`. See `Trading Analysis/Sourcing Recap/sourcing-recap.md`.
+> 24. **Market Intelligence** - Two complementary workflows: (1) **Market Profiling** runs hourly 24/7, scrapes NC for broker availability without sending RFQs (~50/tick, ~1,200/day), loads $0 availability VQs. (2) **Active Sourcing** selects 200 priority MPNs Mon/Thu — Monday skips hot parts (preserves for customer RFQs), Thursday includes them. Excludes from NC upload during price-check. See `Trading Analysis/Market Profiling/market-profiling.md`.
+> 25. **Tracking Loading** - Process forwarded supplier shipping confirmations into OT purchase order tracking fields. Forward FedEx/UPS/DHL shipping emails to `tracking@orangetsunami.com`, agent extracts tracking numbers + PO reference, PATCHes `c_order.Chuboe_TrackingNumbers` (see `Trading Analysis/Tracking Loading/tracking-loading.md`)
+> 26. **Broker/Franchise Market Offers** - Load market offers from external brokers and franchise distributors into OT. Agent determines offer type (Broker Stock 1000001, Franchise Offers 1000002, Franchise Stock 1000004) from sender signals. Data capture only — no downstream analysis pipeline. All notifications to internal parties only. Inbox: `brokeroffers@orangetsunami.com` (see `Trading Analysis/Broker Offers/broker-offers.md`)
 
 3. **Review Roadmaps** (planned work):
 
@@ -188,6 +227,43 @@ Both data files are also consumed by `shared/mfr-lookup.js` and `shared/mfr-reso
 - `Trading Analysis/Quick Quote/qq_*.sql` — pulls `rfq_mfr` + `vq_mfr` for the (planned) Node-wrapper to compare
 
 If you're building a new workflow that needs MFR comparison, add yourself to this list when you do.
+
+### MPN Normalization (REQUIRED for all MPN matching)
+
+**NEVER use exact string comparison for MPNs.** MPNs come in many variations — with/without hyphens, spaces, slashes, leading zeros, different cases. Always normalize before comparing.
+
+**Use `shared/mpn-normalization.js`:**
+
+```javascript
+const { normalizeMPN, mpnMatch, findByMPN } = require('../shared/mpn-normalization');
+
+// Clean normalization (strips all special characters, uppercase, strips leading zeros)
+const clean = normalizeMPN('ECP-U1C104MA5');  // -> 'ECPU1C104MA5'
+
+// Direct comparison
+if (mpnMatch('ECP-U1C104MA5', 'ECPU1C104MA5')) { ... }  // -> true
+
+// Array search
+const found = findByMPN(rows, 'ECPU1C104MA5', 'MPN');
+```
+
+**Common MPN variations handled:**
+- Hyphens: `ECP-U1C104MA5` vs `ECPU1C104MA5` ✓
+- Spaces: `MAX 3232` vs `MAX3232` ✓
+- Slashes: `LM358/NOPB` vs `LM358NOPB` ✓
+- Leading zeros: `09552156612741` vs `9552156612741` ✓
+- Case: `max3232` vs `MAX3232` ✓
+
+**This is clean matching (normalize → exact match), NOT fuzzy matching** (Levenshtein, soundex, etc.).
+
+**Replace these anti-patterns:**
+```javascript
+❌ String(mpn).trim().toUpperCase() === searchTerm
+❌ mpn.replace(/^0+/, '') === searchTerm
+❌ rows.find(r => r.MPN === searchMPN)
+✅ mpnMatch(mpn, searchTerm)
+✅ findByMPN(rows, searchMPN, 'MPN')
+```
 
 ---
 

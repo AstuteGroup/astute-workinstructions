@@ -38,6 +38,10 @@
 const path = require('path');
 require('dotenv').config({ path: path.resolve(__dirname, '../../../../.env') });
 
+// Weekend gate — skip Sat/Sun EST to reduce noise
+const { exitIfWeekend } = require('../../../shared/weekend-gate');
+exitIfWeekend();
+
 const fs = require('fs');
 const { execSync } = require('child_process');
 const { ImapFlow } = require('imapflow');
@@ -182,6 +186,148 @@ function pullActivity(sinceTs, untilTs, emailBatchRfqs) {
     const [loader, userId, vqs] = line.split('|');
     return { loader, userId: Number(userId), vqs: Number(vqs) };
   });
+}
+
+// ─── Top 3 buyers per loader ─────────────────────────────────────────────────
+// Returns Map<loaderName, [{buyerName, buyerId, vqs}, ...]> (up to 3 per loader)
+// Shows which buyers each loader is loading VQs on behalf of.
+function pullTopBuyersPerLoader(sinceTs, untilTs, emailBatchRfqs) {
+  const inClause = emailBatchRfqs.length
+    ? emailBatchRfqs.map(r => `'${r}'`).join(',')
+    : `''`;
+  // Use chuboe_buyer_id from the VQ line — that's the buyer who did the sourcing.
+  const sql =
+    `WITH labeled AS ( ` +
+    `SELECT v.chuboe_vq_line_id, v.createdby, v.chuboe_buyer_id, ` +
+    `CASE ` +
+    `  WHEN v.createdby = ${CLAUDE_USER_ID} AND r.value IN (${inClause}) THEN 'Claude as purchasing support (email loading)' ` +
+    `  WHEN v.createdby = ${CLAUDE_USER_ID} THEN 'Claude as buyer (API + scraping)' ` +
+    `  ELSE COALESCE(lu.name, 'unknown') END AS loader ` +
+    `FROM adempiere.chuboe_vq_line v ` +
+    `JOIN adempiere.chuboe_rfq_line rl ON v.chuboe_rfq_line_id = rl.chuboe_rfq_line_id ` +
+    `JOIN adempiere.chuboe_rfq r ON rl.chuboe_rfq_id = r.chuboe_rfq_id ` +
+    `LEFT JOIN adempiere.ad_user lu ON lu.ad_user_id = v.createdby ` +
+    `WHERE v.created >= '${sinceTs}'::timestamp AND v.created < '${untilTs}'::timestamp AND v.isactive='Y' ` +
+    `), ` +
+    `by_buyer AS ( ` +
+    `SELECT l.loader, l.chuboe_buyer_id, bu.name AS buyer_name, COUNT(*) AS vqs ` +
+    `FROM labeled l ` +
+    `LEFT JOIN adempiere.ad_user bu ON bu.ad_user_id = l.chuboe_buyer_id ` +
+    `GROUP BY l.loader, l.chuboe_buyer_id, bu.name ` +
+    `), ` +
+    `ranked AS ( ` +
+    `SELECT *, ROW_NUMBER() OVER (PARTITION BY loader ORDER BY vqs DESC) AS rn ` +
+    `FROM by_buyer ` +
+    `) ` +
+    `SELECT loader, chuboe_buyer_id, buyer_name, vqs FROM ranked WHERE rn <= 3 ORDER BY loader, rn;`;
+  const out = psqlPipe(sql);
+  const m = new Map();
+  for (const line of out.trim().split('\n').filter(Boolean)) {
+    const [loader, buyerId, buyerName, vqs] = line.split('|');
+    if (!m.has(loader)) m.set(loader, []);
+    m.get(loader).push({
+      buyerId: buyerId ? Number(buyerId) : null,
+      buyerName: buyerName || '(no buyer)',
+      vqs: Number(vqs),
+    });
+  }
+  return m;
+}
+
+// ─── Buyer activity breakdown ────────────────────────────────────────────────
+// For each buyer, shows how many VQs were loaded by Claude vs support vs self.
+// Returns array of { buyerId, buyerName, byClaude, bySupport, bySelf, total }
+function pullBuyerActivityBreakdown(sinceTs, untilTs, emailBatchRfqs) {
+  const inClause = emailBatchRfqs.length
+    ? emailBatchRfqs.map(r => `'${r}'`).join(',')
+    : `''`;
+  // Categorize each VQ by loader type, then pivot by buyer.
+  const sql =
+    `WITH categorized AS ( ` +
+    `SELECT v.chuboe_vq_line_id, v.chuboe_buyer_id, v.createdby, ` +
+    `CASE ` +
+    `  WHEN v.createdby = ${CLAUDE_USER_ID} THEN 'claude' ` +
+    `  WHEN v.createdby = v.chuboe_buyer_id THEN 'self' ` +
+    `  ELSE 'support' END AS loader_type ` +
+    `FROM adempiere.chuboe_vq_line v ` +
+    `JOIN adempiere.chuboe_rfq_line rl ON v.chuboe_rfq_line_id = rl.chuboe_rfq_line_id ` +
+    `JOIN adempiere.chuboe_rfq r ON rl.chuboe_rfq_id = r.chuboe_rfq_id ` +
+    `WHERE v.created >= '${sinceTs}'::timestamp AND v.created < '${untilTs}'::timestamp ` +
+    `AND v.isactive='Y' AND v.chuboe_buyer_id IS NOT NULL ` +
+    `) ` +
+    `SELECT c.chuboe_buyer_id, bu.name AS buyer_name, ` +
+    `SUM(CASE WHEN loader_type = 'claude' THEN 1 ELSE 0 END) AS by_claude, ` +
+    `SUM(CASE WHEN loader_type = 'support' THEN 1 ELSE 0 END) AS by_support, ` +
+    `SUM(CASE WHEN loader_type = 'self' THEN 1 ELSE 0 END) AS by_self, ` +
+    `COUNT(*) AS total ` +
+    `FROM categorized c ` +
+    `LEFT JOIN adempiere.ad_user bu ON bu.ad_user_id = c.chuboe_buyer_id ` +
+    `GROUP BY c.chuboe_buyer_id, bu.name ` +
+    `ORDER BY total DESC;`;
+  const out = psqlPipe(sql);
+  return out.trim().split('\n').filter(Boolean).map(line => {
+    const [buyerId, buyerName, byClaude, bySupport, bySelf, total] = line.split('|');
+    return {
+      buyerId: buyerId ? Number(buyerId) : null,
+      buyerName: buyerName || '(unknown)',
+      byClaude: Number(byClaude) || 0,
+      bySupport: Number(bySupport) || 0,
+      bySelf: Number(bySelf) || 0,
+      total: Number(total) || 0,
+    };
+  });
+}
+
+// ─── API enrichment overlap detection ────────────────────────────────────────
+// Finds RFQ lines where Claude did API enrichment AND a buyer also sourced.
+// This is duplicate effort — Claude already has franchise pricing.
+function pullApiEnrichmentOverlap(sinceTs, untilTs) {
+  // Find RFQ lines that have BOTH:
+  // 1. VQs from Claude as buyer (API enrichment) — createdby = Claude AND buyer = Claude
+  // 2. VQs from human buyers (createdby = buyer, buyer is a known buyer)
+  const sql =
+    `WITH api_lines AS ( ` +
+    `  SELECT DISTINCT v.chuboe_rfq_line_id ` +
+    `  FROM adempiere.chuboe_vq_line v ` +
+    `  WHERE v.created >= '${sinceTs}'::timestamp AND v.created < '${untilTs}'::timestamp ` +
+    `  AND v.isactive='Y' ` +
+    `  AND v.createdby = ${CLAUDE_USER_ID} ` +
+    `  AND (v.chuboe_buyer_id = ${CLAUDE_USER_ID} OR v.chuboe_buyer_id IS NULL) ` +
+    `), ` +
+    `buyer_vqs AS ( ` +
+    `  SELECT v.chuboe_rfq_line_id, v.chuboe_buyer_id, bu.name AS buyer_name, ` +
+    `         r.value AS rfq, ` +
+    `         (SELECT lm.chuboe_mpn FROM adempiere.chuboe_rfq_line_mpn lm ` +
+    `          WHERE lm.chuboe_rfq_line_id = rl.chuboe_rfq_line_id LIMIT 1) AS mpn, ` +
+    `         COUNT(*) AS vq_count ` +
+    `  FROM adempiere.chuboe_vq_line v ` +
+    `  JOIN adempiere.chuboe_rfq_line rl ON v.chuboe_rfq_line_id = rl.chuboe_rfq_line_id ` +
+    `  JOIN adempiere.chuboe_rfq r ON rl.chuboe_rfq_id = r.chuboe_rfq_id ` +
+    `  LEFT JOIN adempiere.ad_user bu ON bu.ad_user_id = v.chuboe_buyer_id ` +
+    `  WHERE v.created >= '${sinceTs}'::timestamp AND v.created < '${untilTs}'::timestamp ` +
+    `  AND v.isactive='Y' ` +
+    `  AND v.createdby != ${CLAUDE_USER_ID} ` +
+    `  AND v.chuboe_buyer_id IS NOT NULL ` +
+    `  AND v.createdby = v.chuboe_buyer_id ` +
+    `  GROUP BY v.chuboe_rfq_line_id, v.chuboe_buyer_id, bu.name, r.value, rl.chuboe_rfq_line_id ` +
+    `) ` +
+    `SELECT bv.buyer_name, bv.rfq, bv.mpn, bv.vq_count ` +
+    `FROM buyer_vqs bv ` +
+    `JOIN api_lines al ON bv.chuboe_rfq_line_id = al.chuboe_rfq_line_id ` +
+    `ORDER BY bv.buyer_name, bv.rfq;`;
+  const out = psqlPipe(sql);
+  const rows = out.trim().split('\n').filter(Boolean).map(line => {
+    const [buyerName, rfq, mpn, vqCount] = line.split('|');
+    return { buyerName, rfq, mpn: mpn || '(unknown)', vqCount: Number(vqCount) || 0 };
+  });
+  // Aggregate by buyer
+  const byBuyer = new Map();
+  for (const r of rows) {
+    if (!byBuyer.has(r.buyerName)) byBuyer.set(r.buyerName, { lines: [], totalVqs: 0 });
+    byBuyer.get(r.buyerName).lines.push(r);
+    byBuyer.get(r.buyerName).totalVqs += r.vqCount;
+  }
+  return { rows, byBuyer };
 }
 
 // Returns 'Buyer' / 'Support' / 'Untagged' / '(Claude)' for the role column.
@@ -373,8 +519,11 @@ function lookupUserNames(userIds) {
   ];
   const buyerMap = lookupUserNames(buyerIds);
 
-  // 7. Activity by loader (mixed counting rule)
+  // 7. Activity by loader (mixed counting rule) + top buyers per loader
   const activity = pullActivity(sinceTs, untilTs, allBatchRfqs);
+  const topBuyers = pullTopBuyersPerLoader(sinceTs, untilTs, allBatchRfqs);
+  const buyerBreakdown = pullBuyerActivityBreakdown(sinceTs, untilTs, allBatchRfqs);
+  const apiOverlap = pullApiEnrichmentOverlap(sinceTs, untilTs);
 
   // Apply "hide zero" rule for Claude buckets
   const claudeBucketNames = new Set([
@@ -392,20 +541,72 @@ function lookupUserNames(userIds) {
 <p style="margin-top:0;color:#666">${esc(dispWindow)} · ${totalAll} VQs total · ${batches.length} email batch${batches.length === 1 ? '' : 'es'} processed</p>
 
 <h3 style="margin-bottom:4px">Activity by loader</h3>
-<table border="1" cellpadding="6" cellspacing="0" style="border-collapse:collapse;font-size:12px;min-width:540px">
-<thead style="background:#eef"><tr><th align="left">Loader</th><th align="left">Role</th><th align="right">VQs</th></tr></thead>
+<table border="1" cellpadding="6" cellspacing="0" style="border-collapse:collapse;font-size:12px;min-width:700px">
+<thead style="background:#eef"><tr><th align="left">Loader</th><th align="left">Role</th><th align="right">VQs</th><th align="left">Top 3 Buyers</th></tr></thead>
 <tbody>
 ${activityShown.map(a => {
   const role = roleFor(a.loader, a.userId);
   const roleColor = role === 'Support' ? '#888' : role === 'Untagged' ? '#b00' : '#222';
   const nameDisplay = claudeBucketNames.has(a.loader) ? '<b>' + esc(a.loader) + '</b>' : esc(a.loader);
-  return `<tr><td>${nameDisplay}</td><td style="color:${roleColor}"><i>${esc(role)}</i></td><td style="text-align:right">${a.vqs}</td></tr>`;
+  const buyers = topBuyers.get(a.loader) || [];
+  const buyersDisplay = buyers.length > 0
+    ? buyers.map(b => `${esc(b.buyerName)} (${b.vqs})`).join(', ')
+    : '<i style="color:#999">—</i>';
+  return `<tr><td>${nameDisplay}</td><td style="color:${roleColor}"><i>${esc(role)}</i></td><td style="text-align:right">${a.vqs}</td><td style="font-size:11px">${buyersDisplay}</td></tr>`;
 }).join('\n')}
-<tr style="background:#eee"><td colspan="2"><b>Total supply-support</b></td><td style="text-align:right"><b>${totalAll}</b></td></tr>
+<tr style="background:#eee"><td colspan="2"><b>Total supply-support</b></td><td style="text-align:right"><b>${totalAll}</b></td><td></td></tr>
 </tbody>
 </table>
-<p style="color:#666;font-size:11px;margin-top:4px"><i>Counting rule: <b>Claude as buyer</b> uses COUNT(DISTINCT (rfq_line × vendor)) because API responses fan-out stock + lead-time + qty-break variants per (vendor, part); all other loaders use raw row count because each row is a distinct stock batch from the vendor. Claude buckets with 0 activity are hidden.</i></p>
+<p style="color:#666;font-size:11px;margin-top:4px"><i>Counting rule: <b>Claude as buyer</b> uses COUNT(DISTINCT (rfq_line × vendor)) because API responses fan-out stock + lead-time + qty-break variants per (vendor, part); all other loaders use raw row count because each row is a distinct stock batch from the vendor. Claude buckets with 0 activity are hidden. <b>Top 3 Buyers</b> = chuboe_buyer_id on the VQs — who each loader is loading on behalf of.</i></p>
+
+<h3 style="margin-bottom:4px">Buyer Activity Breakdown</h3>
+<p style="margin-top:0;color:#666;font-size:11px">For each buyer, how their VQs were loaded: by Claude, by support staff, or by themselves.</p>
+<table border="1" cellpadding="6" cellspacing="0" style="border-collapse:collapse;font-size:12px;min-width:600px">
+<thead style="background:#eef"><tr><th align="left">Buyer</th><th align="right">By Claude</th><th align="right">By Support</th><th align="right">By Self</th><th align="right">Total</th><th align="left">Mix</th></tr></thead>
+<tbody>
+${buyerBreakdown.filter(b => b.total > 0).slice(0, 20).map(b => {
+  const claudePct = b.total > 0 ? Math.round(100 * b.byClaude / b.total) : 0;
+  const supportPct = b.total > 0 ? Math.round(100 * b.bySupport / b.total) : 0;
+  const selfPct = b.total > 0 ? Math.round(100 * b.bySelf / b.total) : 0;
+  // Visual bar showing proportions
+  const barWidth = 100;
+  const claudeW = Math.round(barWidth * b.byClaude / b.total);
+  const supportW = Math.round(barWidth * b.bySupport / b.total);
+  const selfW = barWidth - claudeW - supportW;
+  const bar = `<span style="display:inline-block;width:${barWidth}px;height:12px;background:#eee;border-radius:2px;overflow:hidden">` +
+    (claudeW > 0 ? `<span style="display:inline-block;width:${claudeW}px;height:100%;background:#4a4" title="Claude ${claudePct}%"></span>` : '') +
+    (supportW > 0 ? `<span style="display:inline-block;width:${supportW}px;height:100%;background:#88c" title="Support ${supportPct}%"></span>` : '') +
+    (selfW > 0 ? `<span style="display:inline-block;width:${selfW}px;height:100%;background:#ca4" title="Self ${selfPct}%"></span>` : '') +
+    `</span>`;
+  return `<tr><td>${esc(b.buyerName)}</td><td style="text-align:right;color:#4a4">${b.byClaude || '—'}</td><td style="text-align:right;color:#88c">${b.bySupport || '—'}</td><td style="text-align:right;color:#ca4">${b.bySelf || '—'}</td><td style="text-align:right"><b>${b.total}</b></td><td>${bar}</td></tr>`;
+}).join('\n')}
+</tbody>
+</table>
+<p style="color:#666;font-size:11px;margin-top:4px"><i>Legend: <span style="color:#4a4">■ Claude</span> · <span style="color:#88c">■ Support</span> · <span style="color:#ca4">■ Self</span>. "Self" = buyer loaded their own VQs (createdby = chuboe_buyer_id). Top 20 buyers by volume shown.</i></p>
 `;
+
+  // API Enrichment Overlap section
+  if (apiOverlap.rows.length > 0) {
+    const overlapBuyers = [...apiOverlap.byBuyer.entries()].sort((a, b) => b[1].totalVqs - a[1].totalVqs);
+    html += `
+<h3 style="margin-bottom:4px;color:#b80">⚠️ API Enrichment Overlap</h3>
+<p style="margin-top:0;color:#666;font-size:11px">Parts where Claude already got franchise pricing via API, but a buyer also manually sourced. This is duplicate effort.</p>
+<table border="1" cellpadding="6" cellspacing="0" style="border-collapse:collapse;font-size:12px;min-width:500px">
+<thead style="background:#fff3e0"><tr><th align="left">Buyer</th><th align="right">Overlap VQs</th><th align="right">RFQ Lines</th><th align="left">Sample MPNs</th></tr></thead>
+<tbody>
+${overlapBuyers.map(([buyerName, data]) => {
+  const sampleMpns = [...new Set(data.lines.map(l => l.mpn))].slice(0, 3).join(', ');
+  const lineCount = data.lines.length;
+  return `<tr><td>${esc(buyerName)}</td><td style="text-align:right">${data.totalVqs}</td><td style="text-align:right">${lineCount}</td><td style="font-size:11px">${esc(sampleMpns)}${lineCount > 3 ? ' …' : ''}</td></tr>`;
+}).join('\n')}
+<tr style="background:#fff3e0"><td><b>Total overlap</b></td><td style="text-align:right"><b>${apiOverlap.rows.reduce((a, r) => a + r.vqCount, 0)}</b></td><td style="text-align:right"><b>${apiOverlap.rows.length}</b></td><td></td></tr>
+</tbody>
+</table>
+<p style="color:#666;font-size:11px;margin-top:4px"><i>These are RFQ lines where Claude's API enrichment (DigiKey, Mouser, TTI, etc.) already returned pricing, and then a buyer also loaded VQs for the same line. The buyer's manual effort may have been unnecessary — check if the franchise quotes were sufficient.</i></p>
+`;
+  } else {
+    html += `<p style="color:#4a4;margin-top:16px"><b>✓ No API enrichment overlap</b> — buyers aren't duplicating Claude's franchise sourcing.</p>`;
+  }
 
   if (batches.length > 0) {
     html += `<h3 style="margin-bottom:4px">Batches loaded via vq-loading-agent</h3>

@@ -1,0 +1,85 @@
+Process all unseen messages in the brokeroffers@orangetsunami.com inbox.
+
+BEFORE STARTING: Read Trading Analysis/Broker Offers/broker-offers.md section "Agent Operating Instructions". The .md is the source of truth — do not work from prior-session memory.
+
+Step 1: List unseen messages
+Run: node shared/email-workflow-poller.js list --workflow broker-offers
+
+Step 2: For each unseen message, follow the per-message decision tree:
+
+2.1 JUNK CHECK — route to `not_offer` if:
+- Subject matches OOO / auto-reply / undeliverable / bounce / read-receipt / newsletter
+- Body contains SMTP bounce headers (Reporting-MTA:, Final-Recipient:, Diagnostic-Code:)
+- Empty body AND no parseable attachment
+
+2.2 PARTNER RESOLUTION (try in order, first match wins):
+- Subject hint: MO_<NNNNN>, Search Key <NNNNN>, [#<NNNNN>] → use BP search key directly
+- Body hint: BP: <NNNNN>, Partner: <NNNNN>, Vendor: <NNNNN>
+- Forward chain: parse all From: lines in body; prefer deepest non-@astutegroup.com sender. Resolve via shared/partner-lookup.js 4-tier resolver (exact email → email domain → domain hint → name match)
+- External direct send: outer From not @astutegroup.com → resolve via partner-lookup
+- Company-name fallback: scan subject/body for clearly-named company → resolvePartner({ companyName: '<name>', partnerType: 'vendor' })
+- If no match + lines extracted → clarify_partner (sidecar + email Jake)
+- If no match + no lines → needs_partner (email Jake)
+
+2.3 LINE EXTRACTION:
+- Download attachments if has_attachment is true. Prefer xlsx > csv > pdf.
+- For xlsx/csv: look for MPN column (synonyms: mpn, part number, mfr part, aml, p/n). Other columns: qty, price, mfr, dateCode, description, cpc.
+- For pdf: use Read tool, extract tabular content if confident.
+- Try HTML body (inline tables) and plaintext body (tab/pipe-delimited).
+- Plain-prose lists count: qty/mfr/mpn on consecutive lines = valid offer.
+- Filter junk MPNs: reject URL fragments, footer/signature noise.
+- If 0 valid lines → needs_review with reason "no parseable lines"
+
+2.4 OFFER TYPE DETERMINATION (agent decides based on signals):
+| Signal                                                        | → Offer Type              |
+|---------------------------------------------------------------|---------------------------|
+| Body hint "Type: Broker"                                       | 1000001 (Broker Stock)    |
+| Body hint "Type: Franchise" or "Type: Franchise Offers"        | 1000002 (Franchise Offers)|
+| Body hint "Type: Franchise Stock"                              | 1000004 (Franchise Stock) |
+| Sender domain = known franchise (Arrow, Avnet, Digi-Key, etc.) | 1000002 or 1000004        |
+| Subject/body contains "liquidation", "excess", "lot", "closeout"| 1000001 (Broker Stock)    |
+| Subject/body contains "franchise", "authorized", "stock offer"  | 1000004 (Franchise Stock) |
+| Default unknown broker                                         | 1000001 (Broker Stock)    |
+
+2.5 CROSS-FORWARD DEDUP CHECK:
+Query for recent offer from same BP + same type + same line count + first/last MPN match.
+If found → dup_skip with existingSearchKey.
+
+2.6 WRITE TO OT:
+Route to load_offer with payload:
+{
+  bpartnerId: <resolved BP ID>,
+  offerType: <1000001 | 1000002 | 1000004>,
+  lines: [ { mpn, mfr, qty, price, dateCode, coo, cpc } ],
+  partnerName: <resolved partner name>,
+  originalSender: <outer From email>,
+  originalCc: <array of CC emails>,
+  originalSubject: <email subject>
+}
+
+Step 3: REPLY-STITCH HANDLING
+If a message has pending_state (from a prior clarify_partner sidecar):
+- Merge pending_state.extracted with the current reply body
+- Check if Jake provided a company name or BP search key
+- If so, resolve the partner and route to load_offer with full merged payload
+- If Jake replied SKIP/DROP/IGNORE/DISCARD → route to drop_pending
+
+Step 4: ERROR HANDLING
+- If any single message hits a transient error (writeOffer 5xx, partner lookup throws), log it and continue with the next message. Do not abort the batch.
+- Email Jake a one-line summary at the end if any errored.
+
+Step 4.5: RATE-LIMITED DEFERRAL HANDLING
+When `load_offer` returns `{ rateLimited: true, ... }`:
+- If `alreadyDeferred: false` → this is the FIRST deferral. Send ONE notification to Jake explaining the budget exhaustion. The email will stay UNSEEN for automatic retry.
+- If `alreadyDeferred: true` → this is a REPEAT deferral (budget still exhausted). Do NOT send another notification. Just exit silently — the email remains UNSEEN and will retry on the next tick when budget resets.
+
+CRITICAL: Repeat notifications for the same deferred email waste Jake's inbox and provide no new information. The handler tracks deferral state via breadcrumbs.
+
+Step 5: EXIT
+If 0 unseen messages, exit silently.
+
+NOTIFICATION POLICY (CRITICAL):
+- All notifications go to Jake (jake.harris@Astutegroup.com) + internal Astute CC'd parties
+- NEVER send notifications to external brokers/franchises
+- clarify_partner → emails Jake only (Reply-To: brokeroffers@ for sidecar round-trip)
+- load_offer confirmation → internal parties only; excludes external sender

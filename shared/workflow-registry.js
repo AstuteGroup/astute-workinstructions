@@ -202,7 +202,7 @@ module.exports = {
       operatorDigest: false,
       activityDigest: true,
       replyParserGrammar: false,
-      tieredCron: true,
+      tieredCron: false,
     },
     deviations: {
       replyStitching: 'broker-side workflow has no info-request path that needs stitching — unresolved-partner cases route directly to Unqualified Broker (1006505) instead of round-tripping. See needInfoClarifications below.',
@@ -210,10 +210,8 @@ module.exports = {
       operatorDigest: 'broker stock-RFQs are transactional; activityDigest (stock-rfq-activity-digest 6×/day) covers visibility',
       writeQueue: 'direct write; broker emails carry small batches',
       replyParserGrammar: 'activityDigest is informational-only by design — no curation queue, no operator-override loop. Shared grammar in shared/workflow-reply-grammars.js is available if directives are needed later.',
+      tieredCron: 'Removed 2026-05-26 — relaxed from 5m burst / 15m steady to hourly :00 fixed cadence (no gate). Stock RFQs are 1-2 line data-capture loads with no live-decision latency requirement; burst overhead unnecessary.',
     },
-    // All capabilities now declared. tieredCron wired in scripts/should-run-stockrfq-agent.js
-    // (5m burst on pending large-stockrfq sentinel; 15m steady — tighter than rfqloading's
-    // 30m because operator works the inbound RFQ + outbound CQ chain).
   },
 
   // ─── STOCK RFQ CQ (operator outbound quote replies → CQ rows) ───────────────
@@ -224,7 +222,7 @@ module.exports = {
     inbox: 'stockRFQ@orangetsunami.com',
     sourceFolder: 'OutboundPending',
     cron: { name: 'stockrfq-cq-agent' },
-    actions: ['add_cq', 'add_cq_with_rfq', 'skip', 'needs_review'],
+    actions: ['add_cq', 'add_cq_with_rfq', 'update_cq', 'skip', 'needs_review'],
     capabilities: {
       replyStitching: false,
       needInfoClarifications: false,
@@ -297,8 +295,8 @@ module.exports = {
     cron: { name: 'vq-loading-agent' },
     actions: [
       'load_vq', 'need_info_vendor', 'clarify_vendor', 'needs_vendor',
-      'needs_review', 'no_bid', 'not_vq', 'dup_skip', 'drop_pending',
-      'outbound_pending',
+      'needs_review', 'clarify_buyer', 'no_bid', 'not_vq', 'dup_skip', 'drop_pending',
+      'outbound_pending', 'forward_to_rfq_loading',
     ],
     capabilities: {
       replyStitching: true,
@@ -330,5 +328,78 @@ module.exports = {
     // discrepancies, reconciliation either proceeds or routes needs_review.
     // The handler is unaware of the validation — it just receives reconciled
     // quotes.
+  },
+
+  // ─── BROKER/FRANCHISE MARKET OFFERS ─────────────────────────────────────────
+  'broker-offers': {
+    status: 'active',
+    handler: 'broker-offers',
+    doc: 'Trading Analysis/Broker Offers/broker-offers.md',
+    inbox: 'brokeroffers@orangetsunami.com',
+    sourceFolder: 'INBOX',
+    cron: { name: 'broker-offers-agent' },
+    actions: [
+      'load_offer', 'needs_partner', 'clarify_partner', 'needs_review',
+      'not_offer', 'dup_skip', 'drop_pending',
+    ],
+    capabilities: {
+      replyStitching: true,
+      needInfoClarifications: true,
+      largePayloadGate: false,
+      approvalReplyAction: false,
+      preWriteIdempotency: true,
+      writeQueue: false,
+      breadcrumbWrites: true,
+      operatorDigest: false,
+      activityDigest: false,
+      replyParserGrammar: true,
+      tieredCron: false,
+    },
+    deviations: {
+      largePayloadGate: 'No downstream analysis pipeline — offers are data capture only. No per-line cost to gate.',
+      approvalReplyAction: 'No payload gate → no approval action needed. Clarification round-trip uses reply-stitching (clarify_partner sidecars).',
+      writeQueue: 'Direct write; broker/franchise emails are typically bounded batch sizes.',
+      operatorDigest: 'No downstream analysis to curate. Breadcrumbs + confirmation emails provide visibility.',
+      activityDigest: 'Low priority; can add later if visibility needed. Confirmations email internal parties on every load.',
+      tieredCron: 'No approval gate → no burst trigger. Fixed 30m cadence sufficient for data capture.',
+    },
+    // POLICY: All notifications go to Jake + internal CC — NEVER to external brokers/franchises.
+    // clarify_partner emails Jake (Reply-To: brokeroffers@ for sidecar round-trip).
+    // load_offer confirmation emails internal forwarder + internal CCs + Jake; excludes external sender.
+  },
+
+  // ─── TRACKING LOADING (supplier shipping confirmations → PO tracking) ───────
+  'tracking-loading': {
+    status: 'active',
+    handler: 'tracking-loading',
+    doc: 'Trading Analysis/Tracking Loading/tracking-loading.md',
+    inbox: 'tracking@orangetsunami.com',
+    sourceFolder: 'INBOX',
+    cron: { name: 'tracking-agent' },
+    actions: ['patch_tracking', 'needs_review', 'not_tracking'],
+    capabilities: {
+      replyStitching: false,
+      needInfoClarifications: false,
+      largePayloadGate: false,
+      approvalReplyAction: false,
+      preWriteIdempotency: true,
+      writeQueue: false,
+      breadcrumbWrites: true,
+      operatorDigest: false,
+      activityDigest: false,
+      replyParserGrammar: false,
+      tieredCron: false,
+    },
+    deviations: {
+      replyStitching: 'tracking updates are one-shot — no clarification round-trip with external parties',
+      needInfoClarifications: 'ambiguous cases route to needs_review for operator manual handling; no external sender to clarify with',
+      largePayloadGate: 'tracking numbers are tiny payloads; no gate needed',
+      approvalReplyAction: 'no payload gate → no approval needed',
+      writeQueue: 'direct PATCH to c_order; single-row updates',
+      operatorDigest: 'low-volume workflow; per-email confirmation is sufficient visibility',
+      activityDigest: 'low-volume workflow; breadcrumbs provide audit trail',
+      replyParserGrammar: 'no operator-override grammar needed — escalations go to needs_review',
+      tieredCron: 'fixed cadence (every 15m); shipping confirmations have no urgency signal',
+    },
   },
 };

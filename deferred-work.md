@@ -26,6 +26,144 @@ The SessionStart greeting reads this file and surfaces all open items, sorted by
 
 ### Active workstreams (next session pickup)
 
+- [ ] 🟢 **VQ Loading: Add automatic reply detection for "note vendor in VQ notes"** *(opened 2026-05-26 during Nordisk unknown-vendor implementation)*
+  - **Context:** Built the infrastructure to allow VQ loading when vendor BP doesn't exist in OT by storing vendor name in `Chuboe_Note_User` instead (using a placeholder BP). Works when called with `unknownVendorPlaceholderBpId` parameter. **Not yet wired into automatic reply detection** — operator must manually invoke the test script or add the parameter to the payload. Future workflow: when operator replies to a `needs_vendor` escalation with "note vendor in VQ notes" / "load without BP" / "store as note", the agent should auto-detect and retry the load with the placeholder BP flag enabled.
+  - **Why blocked:** operator requested "flag for later (tomorrow)" on 2026-05-26 to focus on cron pause/resume planning.
+  - **Ready when:** tomorrow (2026-05-27) or whenever operator wants to finish the Nordisk case automation.
+  - **How:**
+    1. Read `Trading Analysis/RFQ Sourcing/vq_loading/agent-prompt.txt` reply-stitching section (§ 3.2 or wherever `needs_vendor` sidecar replies are parsed)
+    2. Add pattern matching for phrases: "note vendor in vq notes", "load without bp", "store as note", "note in notes", "vendor in notes"
+    3. When detected, extract the vendor name from the sidecar's `vendor_name` field and re-dispatch `load_vq` with `unknownVendorPlaceholderBpId` set to `UNKNOWN_VENDOR_PLACEHOLDER_BP_ID` constant (defined in `shared/workflow-actions/vq-loading.js`)
+    4. Test with a mock reply to one of the Nordisk sidecar files
+  - **Prerequisite:** Operator must create the placeholder BP in OT first (instructions in `shared/workflow-actions/vq-loading.js` lines 40-64) and set the `UNKNOWN_VENDOR_PLACEHOLDER_BP_ID` constant
+  - **Files changed:** `shared/workflow-actions/vq-loading.js` (implemented), `shared/vq-writer.js` (implemented), `shared/load-bulk-summary.js` (implemented), `Trading Analysis/RFQ Sourcing/vq_loading/agent-prompt.txt` (needs reply detection logic)
+  - **Created / source:** 2026-05-26 session, git commit `599ba3c`
+
+- [ ] 🟢 **Cron resume plan + backfill strategy** *(paused 2026-05-26 22:51 UTC due to system overload concerns)*
+  - **Context:** All crons paused via `~/workspace/.cron-paused` on 2026-05-26 at 22:51 UTC. Operator concerned about overloading the system and wants a plan for resuming + handling backfill when crons turn back on. Key risks when resuming:
+    1. **Email agents** (vq-loading, excess, stockrfq, rfq-loading) will process everything in their inboxes since pause — could be 100+ emails across 4 inboxes if paused multiple days
+    2. **Weekly/daily jobs** (inventory-cleanup, lam-kitting-runner, vq-enrichment-roi-tracker) will catch up via sentinel-based logic — should be fine, but need to verify sentinel state
+    3. **Agent token budget** — 5 Claude agents running concurrently on backfill could burn through daily budget quickly
+    4. **OT API load** — mass VQ/RFQ/CQ writes during backfill could stress OT if not throttled
+  - **Why blocked:** operator wants a planned approach, not ad-hoc "turn it back on and see what happens"
+  - **Ready when:** tomorrow (2026-05-27) or when operator reviews the plan below and approves
+  - **How (phased resume):**
+
+    **Phase 1: Assess backlog (before turning anything on)**
+    1. Check inbox counts across all 4 agent inboxes:
+       ```bash
+       himalaya envelope list --account vq --folder INBOX --page-size 500 | wc -l
+       himalaya envelope list --account excess --folder INBOX --page-size 500 | wc -l
+       himalaya envelope list --account stockrfq --folder INBOX --page-size 500 | wc -l
+       himalaya envelope list --account rfqloading --folder INBOX --page-size 500 | wc -l
+       ```
+    2. Check sentinel state for weekly/daily jobs:
+       ```bash
+       cat ~/workspace/.cron-sentinels/*.json | jq '{name:.name, lastSuccess:.lastSuccess, nextDue:.nextDue}'
+       ```
+    3. Estimate token cost: ~2K tokens/email avg × total inbox count × 5 agents = rough budget needed
+
+    **Phase 2: Clear or archive old backlog (optional)**
+    - If inbox counts are >200 emails total, consider:
+      - Moving emails older than 7 days to an "Archive" folder (manual triage later)
+      - Dropping obvious spam/marketing (not-vq pattern)
+      - This reduces the burst load on resume
+
+    **Phase 3: Resume utilities first (non-agent jobs)**
+    ```bash
+    rm ~/workspace/.cron-paused
+    touch ~/workspace/.cron-agents-paused  # keeps agents off
+    ```
+    - Turns on: inventory-cleanup, lam-kitting-runner, vq-enrichment-roi-tracker, offer-breadcrumbs-prune, mfr-reconciler, vortex-poller (non-agent), etc.
+    - These are cheap/predictable — let them catch up first
+    - Watch logs for sentinel catch-up behavior (weekly jobs should auto-fire if overdue)
+
+    **Phase 4: Resume agents one at a time (staged)**
+    ```bash
+    rm ~/workspace/.cron-agents-paused  # turns on all 5 agents
+    ```
+    - **Alternative (more cautious):** Turn on agents one at a time by temporarily modifying their cron entries or creating agent-specific pause files
+    - Suggested order (least to most token-intensive):
+      1. `stockrfq` — smallest inbox, simplest extraction
+      2. `rfq-loading` — structured RFQ creation, predictable cost
+      3. `vq-loading` — higher volume, dual-phase extraction
+      4. `excess` — customer offer parsing, medium complexity
+      5. `stockrfq-cq` (if exists as separate agent)
+    - **Watch for:**
+      - Token burn rate in `~/workspace/.claude-usage.log` (if exists)
+      - OT API response times (`shared/api-client.js` logs)
+      - Load average on analytics box (`uptime`)
+
+    **Phase 5: Monitor first 24h after full resume**
+    - Check breadcrumb logs for failure rates
+    - Verify VQs/RFQs/CQs writing successfully to OT
+    - Watch for hung `himalaya` processes (see other deferred item above)
+    - Adjust agent cadences if needed (burst windows, steady intervals)
+
+  - **Decision points for operator:**
+    1. **Skip Phase 2?** If inbox backlog is manageable (<100 emails total), resume directly
+    2. **Skip Phase 4 staging?** If confident in system capacity, turn all agents on at once (faster but riskier)
+    3. **Set token budget cap?** Add a daily token counter that pauses agents when threshold hit (future enhancement)
+
+  - **Files to check after resume:**
+    - `~/workspace/.cron-sentinels/` — verify weekly/daily jobs caught up
+    - `~/workspace/.vq-loading-pending/` — any stuck sidecars?
+    - `~/workspace/.excess-pending/` — any hung clarifications?
+    - Breadcrumb logs — look for spike in `load-failed` / `escalated-*` events
+
+  - **Created / source:** 2026-05-26 session, crons paused at 22:51 UTC
+
+### Active workstreams (next session pickup)
+
+- [ ] 🟢 **Hung `himalaya` process accumulation — add a reaper and/or timeout wrapper** *(opened 2026-05-26, surfaced during a live "VQ loader killing OT" incident)*
+  - **Context:** Colleague reported a VQ loader "killing OT." Investigation found OT prod was healthy (API 404 at root in 61ms), but THIS analytics box was at **load average 40.7** sustained 15+ min. Cause: **65 orphaned `himalaya attachment download` processes** across the `vq`, `rfqloading`, and `stockrfq` inboxes — abandoned email-attachment fetches from past Claude sessions that hung mid-download and were never reaped. They held **469% aggregate CPU** (≈4.7 cores). Oldest had been spinning **~82 days**; newest ~17 days. Parent shells were dead `/tmp/claude-*-cwd` interactive shells. Killed all 65 (`ps … | grep "[h]imalaya" | awk '{print $1}' | xargs -r kill -9`) → count→0, CPU freed; load decaying. Because VQ/RFQ/Stock loaders all run *through* himalaya, the symptom looked like "the VQ loader is thrashing." No actual VQ-loader node process was running.
+  - **Why blocked:** operator said "save this for discussion later" (2026-05-26). Incident itself resolved; this is the *prevention*.
+  - **Ready when:** any future session — operator wants to discuss approach before building.
+  - **How (decide with operator):**
+    1. **Cron reaper (leaning toward this — belt-and-suspenders):** small registered cron job that kills any `himalaya` process older than ~10 min. Follow the Resilience Checklist + `cron-jobs.js` flow. Covers all call sites at once, including ad-hoc interactive ones.
+    2. **Timeout wrapper at the call sites:** wrap every himalaya invocation in `timeout 120 himalaya …` (in the shared email-fetch helper) so a stuck fetch self-terminates. Cleaner per-call but only covers code paths that go through the helper — misses ad-hoc/interactive calls (which is exactly what accumulated here).
+    3. Probably do both: wrapper for the common path + reaper as the safety net.
+  - **Created / source:** 2026-05-26 live incident triage.
+
+- [ ] 🟢 **stockrfq/poller: writeRFQ failure during OT outage silently loses the RFQ AND traps it against recovery (false `loaded` breadcrumb)** *(opened 2026-05-26, surfaced during stockrfq cron tick UIDs 5040+5041)*
+  - **Context:** OT REST API flapped again 2026-05-26 ~11:17–11:22 UTC (curl probe http_code=000, ~20s connect timeout, then recovered to 404). Two real RFQs routed `load_rfq` during the dead window: UID 5040 (Zhengxin/qq.com, MCP6001T-I/OT ×350K, Unqualified Broker) and UID 5041 (ElecDif/HoldElec BP 1001212, MAX690AMJA ×25). **Both were recovered and written this tick** → searchKeys `1135625` (rfqId 1145040) and `1135626` (rfqId 1145041), verified in DB. This item is the *systemic fix*, not the recovery.
+  - **The bug (two compounding failures):**
+    1. `rfq-writer.writeRFQ` returns `{rfqId:null, linesWritten:0, errors:['Failed to insert RFQ header: fetch failed']}` **without throwing** when OT is unreachable. `email-workflow-poller.cmdRoute` only escalates on a *thrown* handler error (it does `process.exit(1)` on throw); a returned-errors result is treated as success → the message is **moved to `Processed`** and drops out of the unseen queue. Demand signal lost with no retry.
+    2. `doWriteRFQ` writes a `loaded` breadcrumb **unconditionally** even when `rfqId===null`/`errorCount>0`. `breadcrumbs.hasMessageIdAlreadyLoaded()` matches any `event:'loaded'` regardless of rfqId — so the next time the email is seen, `action_load_rfq`'s Message-ID dedup guard returns `already_processed:true` and `dup_skip`s it. The failed RFQ is now **unrecoverable via normal re-poll.** (Recovery this tick required manually renaming the two false breadcrumbs `loaded`→`load-failed-fetch`, then re-invoking the handler with the captured payloads.)
+  - **Why blocked:** non-urgent now (today's two RFQs are in OT), but this WILL silently drop RFQs on every future OT blip. Same root outage as the UID 5029 item below.
+  - **Ready when:** any future session.
+  - **How (pick the cheap wins first):**
+    1. **Don't write a `loaded` breadcrumb on failure** — in `doWriteRFQ`, if `result.rfqId==null || result.errors.length`, write `event:'load-failed'` (NOT `loaded`) so the dedup guard never suppresses a recovery re-write. One-line fix, highest leverage.
+    2. **Poller should treat returned `errors[]` as a failure** — `cmdRoute` should inspect the handler result for a non-empty `errors`/null id and route to NeedsReview (keep unseen / don't move to Processed) rather than silently succeeding. Or the handler should `throw` on total write failure so the existing exit(1) path fires.
+    3. **Gate the write on OT health** — `action_load_rfq` (and the poller route path for `needsOT` workflows) should probe `/api/v1/` before `writeRFQ`; on 000/5xx, leave the message unseen instead of moving to Processed. Mirrors the cron-runner OT health gate that already exists for scheduled jobs.
+  - **Created / source:** 2026-05-26 stockrfq cron tick (UIDs 5040, 5041). Recovery details in that session transcript.
+
+- [ ] ⏸️ **stockrfq: backfill missing chuboe_rfq_line_mpn on RFQ 1135619 (partial write during OT API outage)** *(opened 2026-05-26, surfaced during stockrfq cron tick UID 5029)*
+  - **Context:** UID 5029 (eric_pldz@163.com / PLDZ Technology, Unqualified Broker fallback) loaded during a live OT REST API outage on 2026-05-26 ~10:02–10:07 UTC. `writeRFQ` created the header + line fine, but the `chuboe_rfq_line_mpn` AVL sub-row POST hung ~5 min and failed with `network error: fetch failed`. The writer logged "not retrying to avoid dup risk" — so there is **no auto-retry queue** for it. DB confirms: RFQ `1135619` / rfqId `1145034` / chuboe_rfq_line_id `3126132` / line 10 / qty 4257 has **0** active line_mpn rows → MPN `EPCS64SI16N` is NOT captured/searchable on this RFQ.
+  - **Why blocked:** OT REST API (https://172.31.7.239/api/v1) was unreachable this tick (curl probe http_code=000, two consecutive 15–20s timeouts). Can't POST the sub-row until it recovers.
+  - **Ready when:** OT API is healthy again (verify: `curl -sk -o /dev/null -w "%{http_code}\n" --max-time 15 https://172.31.7.239/api/v1/` returns 200/401, not 000).
+  - **How:**
+    1. Confirm still missing: `psql -c "SELECT COUNT(*) FROM adempiere.chuboe_rfq_line_mpn WHERE chuboe_rfq_line_id=3126132 AND isactive='Y';"` — if already >0, mark done (a later reprocess or manual fix beat us to it).
+    2. Backfill via the API: `apiPost('chuboe_rfq_line_mpn', { Chuboe_RFQ_Line_ID: 3126132, Chuboe_MPN: 'EPCS64SI16N', Chuboe_MPN_Clean: 'EPCS64SI16N' })`. Leave MFR blank — EPCS64 is Altera/Intel but the MFR Reconciler cron fills the FK overnight; don't guess it here.
+    3. Verify the row landed and the dup/match LEFT JOIN now shows the MPN.
+  - **Created / source:** 2026-05-26 stockrfq cron tick. The header+line carry the demand qty; only the MPN string is missing.
+
+- [x] ✅ **vq-loading: agent-prompt rule for "cited RFQ active but zero MPN overlap"** *(opened 2026-05-25, surfaced from UID 8667 Savings Ribbon bounce)* — **DONE 2026-06-04**
+  - **Context:** UID 8667 — Ivy forwarded a Savings Ribbon email citing RFQ 1128025 (Plexus/108 ADI lines). Agent verified the cite had ZERO of the email's 13 Sanmina MPNs, MPN-matched to RFQ 1121675 (Sanmina, unique complete match), then bounced because the prompt says "cited wins when both active" (`agent-prompt.txt:319`). Agent was being more cautious than the prompt actually required.
+  - **Resolution:** Added `EXCEPTION — Cited RFQ has ZERO MPN overlap` rule to agent-prompt.txt at line 321. When cited RFQ has zero overlap with extracted MPNs AND MPN matching finds a clean unique match → trust the MPN match, stamp vendorNotes with `'cited RFQ <X> overruled — zero MPN overlap; MPN-matched to <Y>'`. Also added rule (h) for missing qty → default to RFQ line qty. Triggered by UID 8761 (Wetech EPM parts).
+
+- [ ] 🟢 **vq-loading: cross-UID duplicate-email detection for same-content forwards** *(opened 2026-05-25, surfaced from UID 8667 Savings Ribbon)*
+  - **Context:** Savings Ribbon was already loaded to RFQ 1121675 via UID 8661 (34 VQs). UID 8667 was a sibling forward of the same email that bounced without realizing UID 8661 had already covered it. The natural-key dedup at the writer level catches duplicate VQ writes, but the agent still spent a tick + emitted a needs_review escalation that wasn't needed.
+  - **Why blocked:** non-urgent — writer-level dedup prevents data corruption; only the escalation noise is the issue.
+  - **Ready when:** any future session.
+  - **How:** Investigate whether the agent should check breadcrumbs for prior `loaded` events with overlapping MPN sets + similar timing before issuing escalations. May want a "this email's content already covered by UID X loaded at T" early-exit branch.
+
+- [ ] ⏸️ **Personal documentation track — paused pending external review** *(opened 2026-05-25)*
+  - **Context:** Solo workstream. Local context only.
+  - **Why blocked:** Event-driven on an external review conversation.
+  - **Ready when:** That conversation has happened and there's feedback to fold in.
+  - **Resume cue:** Operator will reference this with the phrase *"let's pick up the personal docs track"* — Claude pulls the per-user memory file (not in the repo) for the full picture.
+
 - [ ] 🟢 **vq-loading → rfq-loading forward delivery — verify SMTP path** *(opened 2026-05-23, surfaced during UID 8630 live test)*
   - **Context:** First live exercise of the new `forward_to_rfq_loading` action (commit `cb1ceb9`) on UID 8630 fired correctly on the vq-loading side at 2026-05-22T23:56:50Z — sidecar `~/workspace/.vq-loading-pending/vq-forward-8630.json` parked 30 quotes with correlation MID `<vq-forward-8630-1779494210267@orangetsunami.com>`. The `vq-loading-resumer` cron is polling correctly (`waiting=1` every 10m). BUT: the forwarded email does not appear to have landed in `rfqloading@orangetsunami.com` inbox — `himalaya envelope list --account rfqloading` shows no matching subject, and there's no `rfq-loading-agent` breadcrumb activity for our MID.
   - **Why blocked:** unverified whether the send actually succeeded or failed silently. The notifier's `sendEmail` returns `false` on SMTP failure but the handler doesn't check the return value (just `await ctx.notifier.sendEmail(...)`). Three plausible causes: (a) SMTP delivery failure swallowed by lack of return-value check; (b) email landed in a folder I didn't check (Junk?); (c) delivery delayed beyond the time I looked.

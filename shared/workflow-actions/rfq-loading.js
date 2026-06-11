@@ -17,6 +17,7 @@ const { enqueue } = require('../rfq-load-queue');
 const largeRfqGate = require('../large-rfq-gate');
 const pending = require('../workflow-pending-state');
 const { makeApprovalActions } = require('./_approval');
+const { resolveOutreachRecipients, recipientsFooter, externalSenderLabel } = require('../outreach-recipients');
 
 // On rejection: invoke cancel-rfq-queue-items.js so any items already in the
 // api retry queue for this RFQ's MPNs stop immediately. Without this hook,
@@ -79,7 +80,11 @@ const { action_approve: action_approve_large_rfq, action_reject: action_reject_l
  * actual sales rep (see Step 7).
  */
 async function action_enqueue(payload, ctx) {
-  const { bpartnerId, type, userId, salesrepId, description, lines } = payload;
+  const {
+    bpartnerId, type, userId, salesrepId, description, lines,
+    // Email context for confirmation (passed through to daemon)
+    originalSubject, originalSender, originalCc, partnerName,
+  } = payload;
   if (ctx.dryRun) {
     return {
       dry_run: true,
@@ -138,6 +143,11 @@ async function action_enqueue(payload, ctx) {
     // same Message-ID, so future replays catch this load via path (1) above.
     messageId: dedupMessageId || null,
     sourceUid: ctx.uid,
+    // Email context for confirmation email after load completes
+    originalSubject: originalSubject || ctx.currentSubject || null,
+    originalSender: originalSender || ctx.currentFrom || null,
+    originalCc: originalCc || ctx.currentCc || null,
+    partnerName: partnerName || null,
   });
   return { job_id };
 }
@@ -168,13 +178,16 @@ async function action_need_info(payload, ctx) {
   const missingList = Array.isArray(missing) ? missing : [];
   const linesCount = Array.isArray(extracted && extracted.lines) ? extracted.lines.length : 0;
 
+  // Resolve internal recipients (operator + internal forwarders + salesrep)
+  const envelope = resolveOutreachRecipients(payload, ctx);
+
   let sidecarRecord = null;
   if (!ctx.dryRun && ctx.anchorMessageId) {
     sidecarRecord = pending.writeSidecar(ctx.workflow, ctx.anchorMessageId, {
       original_uid: ctx.uid,
       original_subject: subject || null,
-      original_recipient: ctx.jakeEmail,
-      external_sender: outerFrom || null,
+      original_recipient: envelope.to,
+      external_sender: envelope.externalSender || outerFrom || null,
       extracted: extracted || (ctx.pendingSidecar && ctx.pendingSidecar.extracted) || {},
       missing: missingList,
       investigation_summary: investigation_summary || null,
@@ -187,43 +200,54 @@ async function action_need_info(payload, ctx) {
       uid: ctx.uid,
       missing: missingList,
       investigation_summary: investigation_summary || null,
+      recipients: envelope.recipientList,
+      external_sender_not_emailed: envelope.externalSender || null,
     });
   }
 
   const retryCount = sidecarRecord ? sidecarRecord.retry_count : 0;
   const missingItems = missingList.map(m => `<li>${esc(missingLabel(m))}</li>`).join('');
+
+  // Build extracted-lines summary so operator can see what data is waiting.
+  // Without this, operator sees "Lines parsed so far: 5" but no idea what MPNs.
+  const extractedLinesHtml = formatExtractedLinesTable(extracted);
+
   const html = `<html><body style="font-family:Arial,sans-serif;font-size:13px">
 <h2 style="color:#b00">RFQ Loading — info needed</h2>
 <p><b>Subject:</b> ${esc(subject)}<br/>
-   <b>External sender:</b> ${esc(outerFrom || '(unknown)')}<br/>
+   <b>External sender:</b> ${esc(externalSenderLabel(envelope, outerFrom))}<br/>
    <b>UID:</b> ${ctx.uid}<br/>
    <b>Inbox:</b> ${esc(ctx.inbox)}<br/>
    ${retryCount ? `<b>Retry:</b> ${retryCount}/2<br/>` : ''}
    <b>Lines parsed so far:</b> ${linesCount}</p>
 <p><b>Missing fields:</b></p>
 <ul>${missingItems || '<li>(none specified)</li>'}</ul>
+${extractedLinesHtml}
 <p style="background:#f5f5f5;padding:10px;border-left:3px solid #b00">
    <b>Reply to ${esc(ctx.inbox)} with the missing values</b> — the next agent tick will merge your answers with the parsed lines and enqueue the RFQ. One-line prose answers are fine.
 </p>
 <p style="color:#666;font-size:11px">To discard instead of answering: reply with <code>SKIP</code>, <code>DROP</code>, <code>IGNORE</code>, or <code>DISCARD</code> on the first line. The next tick will move this to NotRFQ and clear the pending state.</p>
 <p style="color:#666;font-size:11px">Message moved to NeedInfo folder. Sidecar: <code>~/workspace/.rfq-loading-pending/${esc(ctx.anchorMessageId || '(no anchor)')}.json</code></p>
+${recipientsFooter(envelope)}
 </body></html>`;
 
   if (ctx.dryRun) {
     return {
       dry_run: true,
-      would_notify_jake: { subject, outerFrom, missing: missingList, linesCount },
+      would_notify: { to: envelope.to, subject, outerFrom, missing: missingList, linesCount },
       would_write_sidecar: { anchor: ctx.anchorMessageId, extracted, missing: missingList },
     };
   }
   await ctx.notifier.sendEmail(
-    ctx.jakeEmail,
+    envelope.to,
     `RFQ Loading — needs info: ${subject || '(no subject)'}`,
     html,
     { html: true, replyTo: ctx.inbox },
   );
   return {
-    notified: ctx.jakeEmail,
+    notified: envelope.to,
+    recipients: envelope.recipientList,
+    external_sender_not_emailed: envelope.externalSender || null,
     sidecar_anchor: ctx.anchorMessageId,
     retry_count: retryCount,
   };
@@ -241,25 +265,88 @@ function missingLabel(key) {
 }
 
 /**
- * Email Jake diagnostics for manual triage.
+ * Format extracted RFQ lines as an HTML table for operator decision-making.
+ * Without this, escalation emails show "Lines parsed: 5" but don't tell
+ * the operator WHAT those lines contain — making it impossible to determine
+ * customer/type without re-reading the original email.
+ *
+ * Added 2026-06-08 per operator feedback on VQ uid 8937 — same pattern applies here.
+ */
+function formatExtractedLinesTable(extracted) {
+  const lines = Array.isArray(extracted && extracted.lines) ? extracted.lines : [];
+  if (lines.length === 0) {
+    return '<p style="color:#666;font-style:italic">No lines extracted yet.</p>';
+  }
+
+  // Build compact table showing the key fields an operator needs
+  const rows = lines.slice(0, 20).map((ln, i) => {
+    const mpn = ln.mpn || '?';
+    const mfr = ln.mfr || '';
+    const qty = ln.qty != null ? String(ln.qty).replace(/\B(?=(\d{3})+(?!\d))/g, ',') : '?';
+    const cpc = ln.cpc || '';
+    const target = ln.targetPrice != null ? `$${Number(ln.targetPrice).toFixed(4)}` : '';
+    const desc = ln.description ? ln.description.substring(0, 40) : '';
+    return `<tr style="background:${i % 2 === 0 ? '#fff' : '#f9f9f9'}">
+      <td style="padding:4px 8px;border:1px solid #ddd;font-family:monospace">${esc(mpn)}</td>
+      <td style="padding:4px 8px;border:1px solid #ddd">${esc(mfr)}</td>
+      <td style="padding:4px 8px;border:1px solid #ddd;text-align:right">${esc(qty)}</td>
+      <td style="padding:4px 8px;border:1px solid #ddd">${esc(cpc)}</td>
+      <td style="padding:4px 8px;border:1px solid #ddd;text-align:right">${esc(target)}</td>
+      <td style="padding:4px 8px;border:1px solid #ddd;color:#666;font-size:11px">${esc(desc)}</td>
+    </tr>`;
+  }).join('');
+
+  const truncateNote = lines.length > 20
+    ? `<p style="color:#666;font-size:11px">Showing first 20 of ${lines.length} extracted lines.</p>`
+    : '';
+
+  return `
+<p style="margin-top:16px"><b>Extracted line data:</b></p>
+<table style="border-collapse:collapse;font-size:12px;width:100%">
+  <thead>
+    <tr style="background:#e0e0e0">
+      <th style="padding:4px 8px;border:1px solid #ddd;text-align:left">MPN</th>
+      <th style="padding:4px 8px;border:1px solid #ddd;text-align:left">MFR</th>
+      <th style="padding:4px 8px;border:1px solid #ddd;text-align:right">Qty</th>
+      <th style="padding:4px 8px;border:1px solid #ddd;text-align:left">CPC</th>
+      <th style="padding:4px 8px;border:1px solid #ddd;text-align:right">Target</th>
+      <th style="padding:4px 8px;border:1px solid #ddd;text-align:left">Desc</th>
+    </tr>
+  </thead>
+  <tbody>${rows}</tbody>
+</table>
+${truncateNote}`;
+}
+
+/**
+ * Email diagnostics for manual triage. Sends to all internal recipients
+ * (operator + internal forwarders) so the salesperson who forwarded the
+ * RFQ is aware there's an issue.
  *
  * Required payload: { reason }
  * Optional: { details, subject, from }
  */
 async function action_needs_review(payload, ctx) {
   const { reason, details, subject, from, investigation_summary } = payload;
+
+  // Resolve internal recipients (operator + internal forwarders + salesrep)
+  const envelope = resolveOutreachRecipients(payload, ctx);
+
   const html = `<html><body style="font-family:Arial,sans-serif;font-size:13px">
 <h2 style="color:#b00">RFQ Loading — needs manual review</h2>
-<p><b>Subject:</b> ${esc(subject)}<br/><b>From:</b> ${esc(from)}<br/><b>UID:</b> ${ctx.uid}</p>
+<p><b>Subject:</b> ${esc(subject)}<br/>
+   <b>From:</b> ${esc(externalSenderLabel(envelope, from))}<br/>
+   <b>UID:</b> ${ctx.uid}</p>
 <p><b>Reason:</b> ${esc(reason)}</p>
 ${details ? `<pre style="background:#f5f5f5;padding:8px;white-space:pre-wrap;font-size:11px">${esc(details)}</pre>` : ''}
 <p style="color:#666;font-size:11px">Message moved to NeedsReview in ${ctx.inbox} inbox.</p>
+${recipientsFooter(envelope)}
 </body></html>`;
   if (ctx.dryRun) {
-    return { dry_run: true, would_notify_jake: { reason } };
+    return { dry_run: true, would_notify: { to: envelope.to, reason } };
   }
   await ctx.notifier.sendEmail(
-    ctx.jakeEmail,
+    envelope.to,
     `RFQ Loading — needs review: ${subject || '(no subject)'}`,
     html,
     { html: true },
@@ -270,8 +357,14 @@ ${details ? `<pre style="background:#f5f5f5;padding:8px;white-space:pre-wrap;fon
     uid: ctx.uid,
     reason,
     investigation_summary: investigation_summary || null,
+    recipients: envelope.recipientList,
+    external_sender_not_emailed: envelope.externalSender || null,
   });
-  return { notified: ctx.jakeEmail };
+  return {
+    notified: envelope.to,
+    recipients: envelope.recipientList,
+    external_sender_not_emailed: envelope.externalSender || null,
+  };
 }
 
 // action_approve_large_rfq + action_reject_large_rfq are produced by

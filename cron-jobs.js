@@ -26,6 +26,13 @@
 const HOME = process.env.HOME || '/home/analytics_user';
 const WORKSPACE = `${HOME}/workspace`;
 const ASTUTE = `${WORKSPACE}/astute-workinstructions`;
+// Headless email-workflow agents run from here so they auto-load only the lean
+// ~/agent-runtime/CLAUDE.md (operational invariants) instead of the two full
+// interactive CLAUDE.md files (~76KB / ~19K tokens) that Claude Code would
+// otherwise walk up and ingest from cwd=ASTUTE on every launch. Agent prompts
+// use absolute paths, so cwd does not affect their file access. See the
+// startup/ingestion optimization (2026-05-26).
+const AGENT_CWD = `${HOME}/agent-runtime`;
 
 module.exports = [
   {
@@ -37,6 +44,16 @@ module.exports = [
     needsOT: true,
     logFile: '/tmp/inventory-cleanup.log',
     description: 'Mon 11 UTC — pull Infor xlsx, clean, write offers via OT API',
+  },
+  {
+    name: 'nc-listing',
+    cadence: 'twice-weekly',
+    cadenceCron: '0 12 * * 1,4',
+    command: `node "${ASTUTE}/Trading Analysis/Inventory File Cleanup/nc-listing.js"`,
+    cwd: ASTUTE,
+    needsOT: false,
+    logFile: '/tmp/nc-listing.log',
+    description: 'Mon/Thu 12 UTC — generate NC portal CSVs with exclusions, send upload emails',
   },
   {
     name: 'lam-kitting-runner',
@@ -141,54 +158,62 @@ module.exports = [
   // is required for headless tool use (no operator to approve).
   {
     name: 'excess-agent',
+    tier: 'agent',  // Claude-powered — paused by .cron-agents-paused
     // Tiered: 5m burst when any pending large-offer sentinel or
     // clarify_partner sidecar exists within the last 10m, else steady at
-    // :00/:30. Gate short-circuits claude -p when not running.
+    // :00/:45. Gate short-circuits claude -p when not running.
     cadence: 'every 5m',
     cadenceCron: '*/5 * * * *',
     // `if gate; then agent; fi` — gate's exit 1 = "skip this tick" (NOT a failure).
     // Plain `&&` would propagate the gate's exit 1 to cron-runner and get counted
     // as a job failure on every skipped tick (which is most of them). The if-form
     // returns 0 on gate-skip so only real agent crashes register as failures.
-    command: `if node "${ASTUTE}/scripts/should-run-excess-agent.js"; then /home/analytics_user/.local/bin/claude -p --permission-mode bypassPermissions --max-turns 80 < "${ASTUTE}/Trading Analysis/Customer Excess Analysis/agent-prompt.txt"; fi`,
-    cwd: ASTUTE,
+    command: `if node "${ASTUTE}/scripts/should-run-excess-agent.js"; then /home/analytics_user/.local/bin/claude -p --model sonnet --permission-mode bypassPermissions --max-turns 80 < "${ASTUTE}/Trading Analysis/Customer Excess Analysis/agent-prompt.txt"; fi`,
+    cwd: AGENT_CWD,
     needsOT: true,
     logFile: '/tmp/excess-agent.log',
-    description: 'Tiered (5m burst / 30m steady) — agent reads excess@ per customer-excess-analysis.md, writes offers via OT API. Burst window triggered by large-offer sentinel or clarify_partner sidecar.',
+    description: 'Tiered (5m burst / 45m steady) — agent reads excess@ per customer-excess-analysis.md, writes offers via OT API. Burst window triggered by large-offer sentinel or clarify_partner sidecar.',
   },
 
   {
     name: 'stockrfq-agent',
-    // Tiered: 5m burst when any pending large-stockrfq sentinel or
-    // clarify_partner sidecar exists within the last 10m, else steady at
-    // :00/:15/:30/:45 (15m — tighter than rfqloading's 30m because operator
-    // is actively involved in both inbound RFQ + outbound CQ chain).
-    cadence: 'every 5m',
-    cadenceCron: '*/5 * * * *',
-    command: `if node "${ASTUTE}/scripts/should-run-stockrfq-agent.js"; then /home/analytics_user/.local/bin/claude -p --permission-mode bypassPermissions --max-turns 80 < "${ASTUTE}/Trading Analysis/Stock RFQ Loading/agent-prompt.txt"; fi`,
-    cwd: ASTUTE,
+    tier: 'agent',  // Claude-powered — paused by .cron-agents-paused
+    // Hourly, no burst (2026-05-26). Stock RFQs are 1-2 line data-capture loads
+    // with no live-decision pressure, so the 5m-burst / 15m-steady tiering was
+    // removed: burst's only trigger here was the large-stockrfq approval
+    // sidecar, which tiny stock RFQs almost never trip (it fired 0× in the
+    // token-usage data). Runs claude directly once an hour. should-run-stockrfq-agent.js
+    // is now unused by cron (kept on disk for history / possible reinstatement).
+    // Revisit cadence if inbound latency becomes an issue or the workflow changes.
+    cadence: 'every 1h',
+    cadenceCron: '0 * * * *',
+    command: `/home/analytics_user/.local/bin/claude -p --model sonnet --permission-mode bypassPermissions --max-turns 80 < "${ASTUTE}/Trading Analysis/Stock RFQ Loading/agent-prompt.txt"`,
+    cwd: AGENT_CWD,
     needsOT: true,
     logFile: '/tmp/stockrfq-agent.log',
-    description: 'Tiered (5m burst / 15m steady) — agent reads stockRFQ@ per stock-rfq-loading.md, writes RFQs via OT API. Burst window triggered by large-stockrfq sentinel or clarify_partner sidecar.',
+    description: 'Hourly (:00), no burst — agent reads stockRFQ@ per stock-rfq-loading.md, writes RFQs via OT API. Stock RFQs are small data-capture loads; cadence relaxed from 15m to 1h on 2026-05-26 (burst removed) since there is no live-decision latency requirement.',
   },
 
   {
     name: 'stockrfq-cq-agent',
-    // 15m steady offset by 5 from inbound stockrfq-agent's steady boundaries.
-    // No burst gate: CQ work follows recent inbound activity, which already
-    // bursts on the inbound side. Drops from 30m → 15m per operator's
-    // "tighter window on stock rfqs" call.
-    cadence: 'every 15m',
-    cadenceCron: '5,20,35,50 * * * *',
-    command: `/home/analytics_user/.local/bin/claude -p --permission-mode bypassPermissions --max-turns 120 < "${ASTUTE}/Trading Analysis/Stock RFQ Loading/cq-agent-prompt.txt"`,
-    cwd: ASTUTE,
+    tier: 'agent',  // Claude-powered — paused by .cron-agents-paused
+    // Hourly at :05 (offset by 5 from inbound stockrfq-agent's :00 so the
+    // inbound load lands before CQ reads OutboundPending). Relaxed from 15m to
+    // 1h on 2026-05-26 alongside the inbound agent — CQ is outbound data
+    // capture with no live-decision pressure. Still content-gated, so an empty
+    // OutboundPending hour costs zero LLM launches.
+    cadence: 'every 1h',
+    cadenceCron: '5 * * * *',
+    command: `if node "${ASTUTE}/scripts/should-run-stockrfq-cq-agent.js"; then /home/analytics_user/.local/bin/claude -p --model sonnet --permission-mode bypassPermissions --max-turns 120 < "${ASTUTE}/Trading Analysis/Stock RFQ Loading/cq-agent-prompt.txt"; fi`,
+    cwd: AGENT_CWD,
     needsOT: true,
     logFile: '/tmp/stockrfq-cq-agent.log',
-    description: 'Every 15m offset (:05/:20/:35/:50) — agent reads OutboundPending folder of stockRFQ@ per stock-rfq-cq-loading.md, writes CQ rows via OT API. Idempotency via pre-write chuboe_cq_line lookup. Burst signal lives on the inbound side; CQ inherits the activity rhythm.',
+    description: 'Hourly (:05) — content-gated by should-run-stockrfq-cq-agent.js (peeks OutboundPending via poller list; skips the LLM launch when 0 unseen, fail-open on gate error). Agent reads OutboundPending folder of stockRFQ@ per stock-rfq-cq-loading.md, writes CQ rows via OT API. Idempotency via pre-write chuboe_cq_line lookup. Cadence relaxed from 15m to 1h on 2026-05-26 (no live-decision latency requirement).',
   },
 
   {
     name: 'rfqloading-agent',
+    tier: 'agent',  // Claude-powered — paused by .cron-agents-paused
     // Cron fires every 5m. The gate script exits 1 (skip) unless either
     // (a) a large-RFQ sentinel was queued within the last 10m (BURST —
     // operator might be replying right now), or (b) the current minute
@@ -197,8 +222,8 @@ module.exports = [
     // every-30m. Tunable via RFQLOADING_BURST_WINDOW_MIN env.
     cadence: 'every 5m',
     cadenceCron: '*/5 * * * *',
-    command: `if node "${ASTUTE}/scripts/should-run-rfqloading-agent.js"; then /home/analytics_user/.local/bin/claude -p --permission-mode bypassPermissions --max-turns 80 < "${ASTUTE}/Trading Analysis/RFQ Loading/agent-prompt.txt"; fi`,
-    cwd: ASTUTE,
+    command: `if node "${ASTUTE}/scripts/should-run-rfqloading-agent.js"; then /home/analytics_user/.local/bin/claude -p --model sonnet --permission-mode bypassPermissions --max-turns 80 < "${ASTUTE}/Trading Analysis/RFQ Loading/agent-prompt.txt"; fi`,
+    cwd: AGENT_CWD,
     needsOT: true,
     logFile: '/tmp/rfqloading-agent.log',
     description: 'Tiered (5m burst / 30m steady) — agent reads rfqloading@ per rfq-loading.md, routes customer RFQs (enqueue / need_info / needs_review / not_rfq) AND large-RFQ approval replies (approve_large_rfq / reject_large_rfq). Burst window triggered by recently-queued large-RFQ sentinels for fast approval pickup.',
@@ -222,10 +247,11 @@ module.exports = [
 
   {
     name: 'vq-loading-agent',
+    tier: 'agent',  // Claude-powered — paused by .cron-agents-paused
     cadence: 'every 5m',
     cadenceCron: '*/5 * * * *',
-    command: `if node "${ASTUTE}/scripts/should-run-vq-loading-agent.js"; then /home/analytics_user/.local/bin/claude -p --permission-mode bypassPermissions --max-turns 120 < "${ASTUTE}/Trading Analysis/RFQ Sourcing/vq_loading/agent-prompt.txt"; fi`,
-    cwd: ASTUTE,
+    command: `if node "${ASTUTE}/scripts/should-run-vq-loading-agent.js"; then /home/analytics_user/.local/bin/claude -p --model sonnet --permission-mode bypassPermissions --max-turns 120 < "${ASTUTE}/Trading Analysis/RFQ Sourcing/vq_loading/agent-prompt.txt"; fi`,
+    cwd: AGENT_CWD,
     needsOT: true,
     logFile: '/tmp/vq-loading-agent.log',
     description: 'Tiered (5m burst / 15m steady) — agent reads vq@ per vq-loading.md, runs Two-Agent Validation (extractor → sub-Agent verifier → reconcile), writes VQs via OT API. Burst window triggered by clarify_vendor / need_info_vendor / needs_vendor sidecar fresh in last 10m.',
@@ -253,6 +279,32 @@ module.exports = [
     needsOT: true,
     logFile: '/tmp/vq-loading-resumer.log',
     description: 'Every 10m — picks up parked VQ loads after rfq-loading creates a new RFQ. Walks ~/workspace/.vq-loading-pending/ for `kind=waiting_for_new_rfq` sidecars, correlates each against rfq-loader-daemon `rfq-loaded` breadcrumbs by Message-ID, and calls loadBulkSummary against the new RFQ\'s searchKey. Closes the cross-workflow vq→rfq forward-and-park loop. Idempotent: load-bulk-summary dedups via PRE_EXISTING_DUPLICATE so accidental double-fires write 0 dups. Sidecars past 7d TTL surface to operator via email.',
+  },
+
+  // ─── BROKER/FRANCHISE MARKET OFFERS ─────────────────────────────────────────
+  {
+    name: 'broker-offers-agent',
+    tier: 'agent',  // Claude-powered — paused by .cron-agents-paused
+    cadence: 'every 30m',
+    cadenceCron: '*/30 * * * *',
+    command: `/home/analytics_user/.local/bin/claude -p --model sonnet --permission-mode bypassPermissions --max-turns 80 < "${ASTUTE}/Trading Analysis/Broker Offers/agent-prompt.txt"`,
+    cwd: AGENT_CWD,
+    needsOT: true,
+    logFile: '/tmp/broker-offers-agent.log',
+    description: 'Every 30m — agent reads brokeroffers@ per broker-offers.md, writes Broker Stock/Franchise offers via OT API. No analysis gate — data capture only. All notifications go to internal parties.',
+  },
+
+  // ─── TRACKING LOADING (supplier shipping confirmations → PO tracking) ───────
+  {
+    name: 'tracking-agent',
+    tier: 'agent',  // Claude-powered — paused by .cron-agents-paused
+    cadence: 'every 15m',
+    cadenceCron: '*/15 * * * *',
+    command: `/home/analytics_user/.local/bin/claude -p --model sonnet --permission-mode bypassPermissions --max-turns 40 < "${ASTUTE}/Trading Analysis/Tracking Loading/agent-prompt.txt"`,
+    cwd: AGENT_CWD,
+    needsOT: true,
+    logFile: '/tmp/tracking-agent.log',
+    description: 'Every 15m — agent reads tracking@ for forwarded shipping confirmations, extracts tracking numbers + PO references, PATCHes c_order.Chuboe_TrackingNumbers via OT API. Low-volume workflow; no gate needed.',
   },
 
   {
@@ -291,12 +343,13 @@ module.exports = [
     cadence: 'fixed',
     // :25 past so stockrfq-agent (fires at :00 / :30) has runway to write its
     // RFQs before the digest reads.
-    cadenceCron: '25 0,4,8,12,16,20 * * *',
+    // 12:25/18:25/21:25 UTC = 7:25am/1:25pm/4:25pm EST (8:25am/2:25pm/5:25pm EDT)
+    cadenceCron: '25 12,18,21 * * *',
     command: `node "${ASTUTE}/Trading Analysis/Stock RFQ Loading/stock-rfq-activity-digest.js"`,
     cwd: ASTUTE,
     needsOT: false,
     logFile: '/tmp/stock-rfq-activity-digest.log',
-    description: 'Every 4h — Stock RFQ activity digest (top concentrated MPNs + customers, real-vs-bogus heuristic). Cumulative window resets at 00 ET.',
+    description: '3x daily (7am/1pm/4pm EST) — Stock RFQ activity digest (top concentrated MPNs + customers, Western demand signal). Cumulative window resets at 00 ET.',
   },
 
   {
@@ -314,20 +367,22 @@ module.exports = [
   },
 
   {
-    name: 'ivy-vq-digest',
+    name: 'apac-vq-digest',
     cadence: 'fixed',
-    // 4 PM Shenzhen local (UTC+8, no DST) = 08:00 UTC. Per-loader VQ digest
-    // for Ivy Song — includes VQs she manually loaded (createdby=1013784)
-    // PLUS VQs the agent loaded from emails she forwarded to vq@ (outerFrom
-    // breadcrumb match with IMAP / date-proximity fallback). State-driven
-    // window: ~/workspace/.ivy-vq-digest-state.json. Sends HTML inline +
-    // xlsx attachment to jake.harris@ + ivy.song@.
-    cadenceCron: '0 8 * * *',
-    command: `node "${ASTUTE}/Trading Analysis/RFQ Sourcing/vq_loading/ivy-vq-digest.js" --send`,
+    // 6 PM Shenzhen local (UTC+8, no DST) = 10:00 UTC. APAC team VQ digest.
+    // Buyers: Ivy Song, Serena Zhang, Feong Chang, Elaine Liang, May Wu,
+    //         Tracy Xie, Betty Song, Grace Zheng
+    // Support: Gopalakrishnan, Lathis (load VQs on behalf of APAC buyers)
+    // Includes VQs directly loaded by any team member (createdby IN list)
+    // PLUS VQs the agent loaded from emails any buyer forwarded to vq@.
+    // State-driven window: ~/workspace/.apac-vq-digest-state.json.
+    // Sends HTML inline + xlsx attachment to jake.harris@ + ivy.song@.
+    cadenceCron: '0 10 * * *',
+    command: `node "${ASTUTE}/Trading Analysis/RFQ Sourcing/vq_loading/apac-vq-digest.js" --send`,
     cwd: ASTUTE,
     needsOT: false,
-    logFile: '/tmp/ivy-vq-digest.log',
-    description: 'Daily 08:00 UTC (4 PM Shenzhen, no DST) — Ivy Song per-loader VQ digest. Window driven by .ivy-vq-digest-state.json (since-last-digest). Manual + agent-forwarded scopes both included.',
+    logFile: '/tmp/apac-vq-digest.log',
+    description: 'Daily 10:00 UTC (6 PM Shenzhen, no DST) — APAC team VQ digest (8 buyers + 2 support). Window driven by .apac-vq-digest-state.json (since-last-digest). Manual + agent-forwarded scopes.',
   },
 
   {
@@ -371,15 +426,85 @@ module.exports = [
     logFile: '/tmp/scrape-inbox-watcher.log',
     description: 'Every 15m — scan inbox/<source>/, dispatch via mappers/<source>.js, write VQs + pricing cache + negative cache, move to done/. Anomaly email on flagged/errored.',
   },
+
+  // ─── MARKET INTELLIGENCE ───────────────────────────────────────────────────
+  // Two complementary workflows: Market Profiling (scrape-only, continuous)
+  // and Active Sourcing (full RFQ submission, 2×/week).
+  // See Trading Analysis/Market Profiling/market-profiling.md
+
+  {
+    name: 'market-profiler',
+    cadence: 'every 60m',
+    cadenceCron: '0 * * * *',
+    command: `node "${ASTUTE}/Trading Analysis/Market Profiling/market-profiler.js" --commit`,
+    cwd: ASTUTE,
+    needsOT: true,
+    logFile: '/tmp/market-profiler.log',
+    description: 'Hourly — Market profiling: NC check-only scrape for unprofiled inventory MPNs (~50/tick), loads $0 availability VQs. Does NOT send RFQ emails.',
+  },
+
+  {
+    name: 'active-sourcing',
+    cadence: 'fixed',
+    // Mon + Thu at 11:30 UTC — BEFORE nc-listing (12:00) so exclusions are applied
+    // Mon: skips hot RFQ parts (preserves for customer RFQs)
+    // Thu: includes hot RFQ parts
+    cadenceCron: '30 11 * * 1,4',
+    command: `node "${ASTUTE}/Trading Analysis/Market Profiling/active-sourcing-runner.js" --limit 200 --commit`,
+    cwd: ASTUTE,
+    needsOT: true,
+    logFile: '/tmp/active-sourcing.log',
+    description: 'Mon/Thu 11:30 UTC (6:30am CT) — Active Sourcing: select 200 priority MPNs, add to exclusions, source via NC. Runs BEFORE nc-listing so exclusions apply.',
+  },
+
+  {
+    name: 'inventory-gate-poller',
+    cadence: 'hourly',
+    // Hourly on Mon/Thu — checks stockrfq@ for NC upload confirmation or Jake's forward.
+    // Re-enabled 2026-06-11 after shakeout complete.
+    cadenceCron: '15 * * * 1,4',
+    command: `node "${ASTUTE}/Trading Analysis/Market Profiling/inventory-gate-poller.js"`,
+    cwd: ASTUTE,
+    needsOT: false,
+    logFile: '/tmp/inventory-gate-poller.log',
+    description: 'Hourly Mon/Thu — polls stockrfq@ for NC upload confirmation. Sets gate so Active Sourcing can proceed.',
+  },
+
+  {
+    name: 'exclusion-cleanup',
+    cadence: 'weekly',
+    // Sunday 03:00 UTC — cleanup expired exclusions (should be redundant; TTL handles it)
+    cadenceCron: '0 3 * * 0',
+    command: `node "${ASTUTE}/Trading Analysis/Market Profiling/exclusion-manager.js" cleanup`,
+    cwd: ASTUTE,
+    needsOT: false,
+    logFile: '/tmp/exclusion-cleanup.log',
+    description: 'Sunday 03 UTC — remove expired sourcing exclusions from .sourcing-exclusions.json',
+  },
+
+  {
+    name: 'nc-response-monitor',
+    cadence: 'every 4h',
+    // Every 4 hours at :30 — checks stockrfq@ for replies from datamaster@netcomponents.com
+    cadenceCron: '30 */4 * * *',
+    command: `node "${ASTUTE}/scripts/nc-response-monitor.js"`,
+    cwd: ASTUTE,
+    needsOT: false,
+    logFile: '/tmp/nc-response-monitor.log',
+    description: 'Every 4h — monitor for NetComponents datamaster@ replies. Forwards to Jake if he wasn\'t CC\'d. Self-terminates once any response is detected.',
+  },
 ];
 
 // Helper: convert cadence string to milliseconds (used by sentinel + runner).
 module.exports.cadenceToMs = function cadenceToMs(cadence) {
   if (cadence === 'weekly') return 7 * 24 * 60 * 60 * 1000;
+  if (cadence === 'twice-weekly') return 3 * 24 * 60 * 60 * 1000; // Mon→Thu = 3 days; Thu→Mon = 4 days, but 3 is min
   if (cadence === 'daily') return 24 * 60 * 60 * 1000;
   if (cadence === 'fixed') return 60 * 1000; // placeholder; sentinel never gates 'fixed'
   const m = /^every (\d+)m$/.exec(cadence);
   if (m) return parseInt(m[1], 10) * 60 * 1000;
+  const h = /^every (\d+)h$/.exec(cadence);
+  if (h) return parseInt(h[1], 10) * 60 * 60 * 1000;
   throw new Error(`Unrecognized cadence: ${cadence}`);
 };
 

@@ -69,7 +69,8 @@ function shouldGateRoute(offerType) {
  *   sourceUid (for breadcrumb traceability)
  */
 async function action_load_offer(payload, ctx) {
-  const { bpartnerId, offerType, lines, description, sourceUid, partnerName } = payload;
+  const { bpartnerId, offerType, lines, description, sourceUid, partnerName,
+          originalSender, originalCc, originalSubject } = payload;
 
   if (ctx.dryRun) {
     return {
@@ -125,6 +126,43 @@ async function action_load_offer(payload, ctx) {
     lines,
   });
 
+  // ── Budget exhaustion: defer for retry ──────────────────────────────────────
+  // If offer-writeback returned rateLimited, propagate it so the poller leaves
+  // the email UNSEEN for the next poll cycle.
+  //
+  // REPEAT-DEFERRAL CHECK: If we already have a breadcrumb for this UID from a
+  // prior tick, don't notify again — the agent should exit silently.
+  if (result.rateLimited) {
+    const priorDeferral = breadcrumbs.findByUid(ctx.uid, {
+      cog: 'offer-poller',
+      events: ['load-deferred-budget'],
+      sinceMs: Date.now() - 24 * 60 * 60 * 1000,
+    });
+    const alreadyDeferred = priorDeferral.found;
+
+    if (!alreadyDeferred) {
+      breadcrumbs.write({
+        cog: 'offer-poller',
+        event: 'load-deferred-budget',
+        uid: ctx.uid,
+        sourceUid: sourceUid || ctx.uid,
+        messageId: ctx.currentMessageId || null,
+        bpartnerId,
+        offerType,
+        lineCount: lines.length,
+        reason: result.rateLimitReason,
+      });
+    }
+
+    return {
+      rateLimited: true,
+      alreadyDeferred,
+      rateLimitReason: result.rateLimitReason,
+      rateLimitTier: result.rateLimitTier || 'global',
+      lineCount: lines.length,
+    };
+  }
+
   breadcrumbs.write({
     cog: 'offer-poller',
     event: 'loaded',
@@ -139,6 +177,7 @@ async function action_load_offer(payload, ctx) {
     searchKey: result.searchKey,
     linesWritten: result.linesWritten,
     errorCount: result.errors.length,
+    chunkedMode: result.chunkedMode || false,
   });
 
   // Per-row error attribution. offer-writeback returns errors[] as bare strings;
@@ -242,6 +281,70 @@ async function action_load_offer(payload, ctx) {
     }
   }
 
+  // ── Send confirmation email to INTERNAL Astute people only ─────────────────
+  // DO NOT send to external customers. Only notify the internal forwarder + CC.
+  if (result.offerId && !ctx.dryRun) {
+    try {
+      const isInternal = (email) => email && email.toLowerCase().includes('@astutegroup.com');
+
+      // Build recipient list: internal forwarder first, then internal CCs, then Jake
+      const internalRecipients = [];
+      if (isInternal(originalSender)) {
+        internalRecipients.push(originalSender);
+      }
+      if (Array.isArray(originalCc)) {
+        for (const cc of originalCc) {
+          if (isInternal(cc) && !cc.includes('excessinc@') && !internalRecipients.includes(cc.toLowerCase())) {
+            internalRecipients.push(cc);
+          }
+        }
+      }
+      if (ctx.jakeEmail && !internalRecipients.map(e => e.toLowerCase()).includes(ctx.jakeEmail.toLowerCase())) {
+        internalRecipients.push(ctx.jakeEmail);
+      }
+
+      if (internalRecipients.length > 0) {
+        const toEmail = internalRecipients[0];
+        const ccList = internalRecipients.slice(1);
+
+        const confirmSubject = originalSubject
+          ? `Re: ${originalSubject}`
+          : `Market Offer ${result.searchKey} loaded`;
+        const confirmBody = `Excess offer loaded.
+
+Partner: ${partnerName || '(unknown)'}
+Market Offer #: ${result.searchKey}
+Lines loaded: ${result.linesWritten}
+
+This offer is now in Orange Tsunami and available for matching against open RFQs.
+
+— Excess Offer System (automated)`;
+
+        // Thread confirmation into the original email chain using Message-ID
+        const threadingOpts = {
+          cc: ccList.length > 0 ? ccList : undefined,
+        };
+        if (ctx.currentMessageId) {
+          threadingOpts.inReplyTo = ctx.currentMessageId;
+          threadingOpts.references = ctx.currentMessageId;
+        }
+        await ctx.notifier.sendEmail(toEmail, confirmSubject, confirmBody, threadingOpts);
+
+        breadcrumbs.write({
+          cog: 'offer-poller',
+          event: 'confirmation-sent',
+          uid: ctx.uid,
+          offerId: result.offerId,
+          searchKey: result.searchKey,
+          to: toEmail,
+          cc: ccList,
+        });
+      }
+    } catch (e) {
+      console.error(`[excess.load_offer] confirmation email failed: ${e.message}`);
+    }
+  }
+
   return {
     offerId: result.offerId,
     searchKey: result.searchKey,
@@ -257,18 +360,26 @@ async function action_load_offer(payload, ctx) {
  * into INBOX with a partner override.
  *
  * Required payload: { subject, outerFrom, hints }
+ * Optional: { extracted } — line data to display so operator can identify customer
  *   hints: free-text describing what was tried (e.g., "subject had no
  *          search-key pattern; body From: chain led to internal Astute employee")
  */
 async function action_needs_partner(payload, ctx) {
-  const { subject, outerFrom, hints, investigation_summary } = payload;
+  const { subject, outerFrom, hints, extracted, investigation_summary } = payload;
+  const linesCount = Array.isArray(extracted && extracted.lines) ? extracted.lines.length : 0;
+
+  // Build extracted-lines table so operator can see what data is waiting
+  const extractedLinesHtml = formatExtractedLinesTable(extracted);
+
   const html = `<html><body style="font-family:Arial,sans-serif;font-size:13px">
 <h2 style="color:#b00">Customer Excess — partner unresolved</h2>
 <p><b>Subject:</b> ${esc(subject)}<br/>
    <b>From:</b> ${esc(outerFrom)}<br/>
    <b>UID:</b> ${ctx.uid}<br/>
-   <b>Inbox:</b> ${esc(ctx.inbox)}</p>
+   <b>Inbox:</b> ${esc(ctx.inbox)}<br/>
+   <b>Lines parsed:</b> ${fmt(linesCount)}</p>
 <p><b>What was tried:</b><br/>${esc(hints || '(no hints provided)')}</p>
+${extractedLinesHtml}
 <p style="background:#f5f5f5;padding:10px;border-left:3px solid #b00">
    <b>Reply with:</b><br/>
    <code>PARTNER: ${ctx.uid} = &lt;BP search key 6-8 digits OR company name&gt;</code>
@@ -335,9 +446,9 @@ async function action_clarify_partner(payload, ctx) {
   const { subject, extracted, hints, outerFrom, investigation_summary } = payload;
   const linesCount = Array.isArray(extracted && extracted.lines) ? extracted.lines.length : 0;
   const offerType = (extracted && extracted.offerType) || null;
-  const sampleLines = Array.isArray(extracted && extracted.lines)
-    ? extracted.lines.slice(0, 5)
-    : [];
+
+  // Build extracted-lines table so operator can see what data is waiting
+  const extractedLinesHtml = formatExtractedLinesTable(extracted);
 
   let sidecarRecord = null;
   if (!ctx.dryRun && ctx.anchorMessageId) {
@@ -353,12 +464,6 @@ async function action_clarify_partner(payload, ctx) {
     });
   }
 
-  const sampleBlock = sampleLines.length
-    ? `<p><b>First ${sampleLines.length} of ${fmt(linesCount)} line(s):</b></p><ul>${sampleLines.map(l =>
-        `<li>${esc(l.mpn || l.MPN || '')}${l.mfr || l.MFR ? ' — ' + esc(l.mfr || l.MFR) : ''}${l.qty ? ' qty ' + fmt(l.qty) : ''}</li>`
-      ).join('')}</ul>`
-    : '';
-
   const retryCount = sidecarRecord ? sidecarRecord.retry_count : 0;
   const html = `<html><body style="font-family:Arial,sans-serif;font-size:13px">
 <h2 style="color:#b00">Customer Excess — partner clarification needed</h2>
@@ -370,7 +475,7 @@ async function action_clarify_partner(payload, ctx) {
    <b>Offer type:</b> ${esc(offerType || '(default)')}<br/>
    <b>Line count:</b> ${fmt(linesCount)}</p>
 <p><b>Why partner didn't resolve:</b><br/>${esc(hints || '(no hints provided)')}</p>
-${sampleBlock}
+${extractedLinesHtml}
 <p style="background:#f5f5f5;padding:10px;border-left:3px solid #b00">
    <b>Reply to ${esc(ctx.inbox)} with the company name</b> (one line is fine — e.g., <code>Customer is Liyijing Electronics</code>). The next agent tick will merge your reply with the parsed lines and load the offer. Or use the structured directive: <code>PARTNER: ${ctx.uid} = &lt;BP search key OR company name&gt;</code>
 </p>
@@ -645,6 +750,59 @@ function esc(s) {
 }
 
 function fmt(n) { return Number(n || 0).toLocaleString('en-US'); }
+
+/**
+ * Format extracted offer lines as an HTML table for operator decision-making.
+ * Without this, escalation emails show "Line count: 50" but don't tell the
+ * operator WHAT those lines contain — making it hard to identify the customer.
+ *
+ * Added 2026-06-08 per operator feedback on VQ uid 8937 — same pattern applies here.
+ */
+function formatExtractedLinesTable(extracted) {
+  const lines = Array.isArray(extracted && extracted.lines) ? extracted.lines : [];
+  if (lines.length === 0) {
+    return '<p style="color:#666;font-style:italic">No lines extracted yet.</p>';
+  }
+
+  // Build compact table showing the key fields an operator needs
+  const rows = lines.slice(0, 15).map((ln, i) => {
+    const mpn = ln.mpn || ln.MPN || '?';
+    const mfr = ln.mfr || ln.MFR || '';
+    const qty = ln.qty != null ? fmt(ln.qty) : '?';
+    const price = ln.price != null ? `$${Number(ln.price).toFixed(4)}` : '';
+    const dc = ln.dateCode || ln.dc || '';
+    const coo = ln.coo || '';
+    return `<tr style="background:${i % 2 === 0 ? '#fff' : '#f9f9f9'}">
+      <td style="padding:4px 8px;border:1px solid #ddd;font-family:monospace">${esc(mpn)}</td>
+      <td style="padding:4px 8px;border:1px solid #ddd">${esc(mfr)}</td>
+      <td style="padding:4px 8px;border:1px solid #ddd;text-align:right">${esc(qty)}</td>
+      <td style="padding:4px 8px;border:1px solid #ddd;text-align:right">${esc(price)}</td>
+      <td style="padding:4px 8px;border:1px solid #ddd">${esc(dc)}</td>
+      <td style="padding:4px 8px;border:1px solid #ddd">${esc(coo)}</td>
+    </tr>`;
+  }).join('');
+
+  const truncateNote = lines.length > 15
+    ? `<p style="color:#666;font-size:11px">Showing first 15 of ${fmt(lines.length)} extracted lines.</p>`
+    : '';
+
+  return `
+<p style="margin-top:16px"><b>Extracted line data:</b></p>
+<table style="border-collapse:collapse;font-size:12px;width:100%">
+  <thead>
+    <tr style="background:#e0e0e0">
+      <th style="padding:4px 8px;border:1px solid #ddd;text-align:left">MPN</th>
+      <th style="padding:4px 8px;border:1px solid #ddd;text-align:left">MFR</th>
+      <th style="padding:4px 8px;border:1px solid #ddd;text-align:right">Qty</th>
+      <th style="padding:4px 8px;border:1px solid #ddd;text-align:right">Price</th>
+      <th style="padding:4px 8px;border:1px solid #ddd;text-align:left">DC</th>
+      <th style="padding:4px 8px;border:1px solid #ddd;text-align:left">COO</th>
+    </tr>
+  </thead>
+  <tbody>${rows}</tbody>
+</table>
+${truncateNote}`;
+}
 
 // ─── EXPORTS ─────────────────────────────────────────────────────────────────
 

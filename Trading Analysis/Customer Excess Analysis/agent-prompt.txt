@@ -54,6 +54,10 @@ For every UID returned, follow the per-message decision tree:
 
 If a single message hits a transient error (writeOffer 5xx, partner-lookup throws, attachment unreadable), log the error in your output and continue with the next message. Do not abort the batch on per-message failure.
 
+**Rate-limited deferral handling:** When `load_offer` returns `{ rateLimited: true, ... }`:
+- If `alreadyDeferred: false` → first deferral. Send ONE notification to Jake explaining budget exhaustion. The email stays UNSEEN for auto-retry.
+- If `alreadyDeferred: true` → repeat deferral (budget still exhausted). Do NOT notify again. Exit silently — email remains UNSEEN for retry on next tick when budget resets.
+
 STEP 4 — Summary.
 At the end, print a single-line summary in this exact shape:
   EXCESS-AGENT SUMMARY: processed=<N> load_offer=<N> clarify_partner=<N> approve_large_offer=<N> reject_large_offer=<N> needs_partner=<N> needs_review=<N> not_offer=<N> dup_skip=<N> errors=<N>

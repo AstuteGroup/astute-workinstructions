@@ -1,0 +1,1165 @@
+{
+  "rfqSearchKey": "1135249",
+  "buyerId": 1006326,
+  "runAt": "2026-05-25T01:51:30.586Z",
+  "sourceQuotes": "/tmp/vq_uid8639_recovery.json",
+  "result": {
+    "written": [
+      {
+        "vqLineId": 2165829,
+        "line": 370,
+        "mpn": "PCM1808PWR",
+        "vendor": "Original Chip Source Electronics Co., Limited",
+        "cost": 0.28,
+        "qty": 2000,
+        "fuzzyMatch": false,
+        "originalVendorLabel": "original chip",
+        "bpId": 1009652
+      },
+      {
+        "vqLineId": 2165830,
+        "line": 480,
+        "mpn": "UC3525ADWTR",
+        "vendor": "Original Chip Source Electronics Co., Limited",
+        "cost": 0.84,
+        "qty": 2000,
+        "fuzzyMatch": false,
+        "originalVendorLabel": "original chip",
+        "bpId": 1009652
+      },
+      {
+        "vqLineId": 2165831,
+        "line": 730,
+        "mpn": "5CGXFC4C7F23C8N",
+        "vendor": "Haoxin Hk Electronic Technology Co., Limited",
+        "cost": 290,
+        "qty": 298,
+        "fuzzyMatch": false,
+        "originalVendorLabel": "haoxin",
+        "bpId": 1004036
+      },
+      {
+        "vqLineId": 2165832,
+        "line": 830,
+        "mpn": "10AX016E4F27E3SG",
+        "vendor": "Macroquest",
+        "cost": 294.11,
+        "qty": 81,
+        "fuzzyMatch": false,
+        "originalVendorLabel": "macroquest",
+        "bpId": 1000403
+      },
+      {
+        "vqLineId": 2165833,
+        "line": 870,
+        "mpn": "10CX105YF672I5G",
+        "vendor": "Haoxin Hk Electronic Technology Co., Limited",
+        "cost": 105,
+        "qty": 40,
+        "fuzzyMatch": false,
+        "originalVendorLabel": "haoxin",
+        "bpId": 1004036
+      },
+      {
+        "vqLineId": 2165834,
+        "line": 870,
+        "mpn": "10CX105YF672I5G",
+        "vendor": "VERY CHIP CO., LIMITED",
+        "cost": 164,
+        "qty": 40,
+        "fuzzyMatch": false,
+        "originalVendorLabel": "verychip",
+        "bpId": 1010956
+      },
+      {
+        "vqLineId": 2165835,
+        "line": 890,
+        "mpn": "10AX048H4F34E3SG",
+        "vendor": "VERY CHIP CO., LIMITED",
+        "cost": 445,
+        "qty": 6,
+        "fuzzyMatch": false,
+        "originalVendorLabel": "verychip",
+        "bpId": 1010956
+      },
+      {
+        "vqLineId": 2165836,
+        "line": 890,
+        "mpn": "10AX048H4F34E3SG",
+        "vendor": "Macroquest",
+        "cost": 1060,
+        "qty": 6,
+        "fuzzyMatch": false,
+        "originalVendorLabel": "macroquest",
+        "bpId": 1000403
+      },
+      {
+        "vqLineId": 2165837,
+        "line": 110,
+        "mpn": "AD8628ARTZ-R2",
+        "vendor": "IC Offer Electronics Co., Ltd",
+        "cost": 1.4,
+        "qty": 3000,
+        "fuzzyMatch": true,
+        "originalVendorLabel": "icoffer",
+        "bpId": 1001812
+      },
+      {
+        "vqLineId": 2165838,
+        "line": 110,
+        "mpn": "AD8628ARTZ-R2",
+        "vendor": "Yuguang International (HK) Co., Ltd",
+        "cost": 1.34,
+        "qty": 3000,
+        "fuzzyMatch": true,
+        "originalVendorLabel": "yuguang",
+        "bpId": 1000741
+      },
+      {
+        "vqLineId": 2165839,
+        "line": 280,
+        "mpn": "LT3693EMSE#PBF",
+        "vendor": "IC Offer Electronics Co., Ltd",
+        "cost": 3.4,
+        "qty": 2500,
+        "fuzzyMatch": true,
+        "originalVendorLabel": "icoffer",
+        "bpId": 1001812
+      },
+      {
+        "vqLineId": 2165840,
+        "line": 290,
+        "mpn": "LT3094EMSE#PBF",
+        "vendor": "IC Offer Electronics Co., Ltd",
+        "cost": 3.7,
+        "qty": 2500,
+        "fuzzyMatch": true,
+        "originalVendorLabel": "icoffer",
+        "bpId": 1001812
+      },
+      {
+        "vqLineId": 2165841,
+        "line": 300,
+        "mpn": "LT3014BES5#PBF",
+        "vendor": "IC Offer Electronics Co., Ltd",
+        "cost": 3.9,
+        "qty": 2500,
+        "fuzzyMatch": true,
+        "originalVendorLabel": "icoffer",
+        "bpId": 1001812
+      },
+      {
+        "vqLineId": 2165842,
+        "line": 310,
+        "mpn": "AD8139ARDZ",
+        "vendor": "Fixchips Global Limited",
+        "cost": 5.33,
+        "qty": 3000,
+        "fuzzyMatch": true,
+        "originalVendorLabel": "fixchip",
+        "bpId": 1000387
+      },
+      {
+        "vqLineId": 2165843,
+        "line": 320,
+        "mpn": "SST25VF080B-50-4C-S2AF",
+        "vendor": "Newchip Electronics Limited",
+        "cost": 1.78,
+        "qty": 2100,
+        "fuzzyMatch": true,
+        "originalVendorLabel": "newchip",
+        "bpId": 1005085
+      },
+      {
+        "vqLineId": 2165844,
+        "line": 430,
+        "mpn": "ADA4940-2ACPZ-R2",
+        "vendor": "IC Offer Electronics Co., Ltd",
+        "cost": 5.35,
+        "qty": 1500,
+        "fuzzyMatch": true,
+        "originalVendorLabel": "icoffer",
+        "bpId": 1001812
+      },
+      {
+        "vqLineId": 2165845,
+        "line": 570,
+        "mpn": "AD9528BCPZ",
+        "vendor": "IC Offer Electronics Co., Ltd",
+        "cost": 7,
+        "qty": 800,
+        "fuzzyMatch": true,
+        "originalVendorLabel": "icoffer",
+        "bpId": 1001812
+      },
+      {
+        "vqLineId": 2165846,
+        "line": 620,
+        "mpn": "MCP9804-E/MC",
+        "vendor": "Colorful(China)Co.,Limited",
+        "cost": 0.896,
+        "qty": 600,
+        "fuzzyMatch": true,
+        "originalVendorLabel": "colorful",
+        "bpId": 1011465
+      },
+      {
+        "vqLineId": 2165847,
+        "line": 680,
+        "mpn": "LT3045EMSE#PBF",
+        "vendor": "IC Offer Electronics Co., Ltd",
+        "cost": 4.05,
+        "qty": 444,
+        "fuzzyMatch": true,
+        "originalVendorLabel": "icoffer",
+        "bpId": 1001812
+      },
+      {
+        "vqLineId": 2165848,
+        "line": 700,
+        "mpn": "LT1521IST-5#PBF",
+        "vendor": "PGC-IC Ltd",
+        "cost": 2.44,
+        "qty": 370,
+        "fuzzyMatch": true,
+        "originalVendorLabel": "pgc",
+        "bpId": 1001639
+      },
+      {
+        "vqLineId": 2165849,
+        "line": 700,
+        "mpn": "LT1521IST-5#PBF",
+        "vendor": "PGC-IC Ltd",
+        "cost": 4.23,
+        "qty": 390,
+        "fuzzyMatch": true,
+        "originalVendorLabel": "pgc",
+        "bpId": 1001639
+      }
+    ],
+    "skipped": [],
+    "failed": [
+      {
+        "vendorName": "tychip",
+        "mpn": "SST25VF080B-50-4C-S2AF",
+        "mfr": null,
+        "qty": 2100,
+        "cost": 1.46,
+        "dateCode": "21+",
+        "leadTime": "stock",
+        "packaging": null,
+        "coo": "Thailand",
+        "rohs": "Y",
+        "currency": null,
+        "vendorNotes": "New & Original/PB free; MPN canonicalized to RFQ-first variant; vendor quoted variant: SST25VF080B-50-4C-S2AF-T",
+        "vendorQuotedMpn": "SST25VF080B-50-4C-S2AF-T",
+        "reason": "WRITE_FAILED",
+        "detail": "MISSING_MANDATORY: Missing mandatory fields: Chuboe_MFR_Text"
+      },
+      {
+        "vendorName": "mto",
+        "mpn": "SST25VF080B-50-4C-S2AF",
+        "mfr": null,
+        "qty": 2100,
+        "cost": 1.85,
+        "dateCode": "21+",
+        "leadTime": "3-4 days",
+        "packaging": null,
+        "coo": "Thailand",
+        "rohs": null,
+        "currency": null,
+        "vendorNotes": "MPN canonicalized to RFQ-first variant; vendor quoted variant: SST25VF080B-50-4C-S2AF-T",
+        "vendorQuotedMpn": "SST25VF080B-50-4C-S2AF-T",
+        "reason": "WRITE_FAILED",
+        "detail": "MISSING_MANDATORY: Missing mandatory fields: Chuboe_MFR_Text"
+      }
+    ],
+    "coverage": [
+      {
+        "lineNo": 10,
+        "lineId": 3125128,
+        "rfqQty": 3000,
+        "mpns": [
+          "TPS7A8101DRBR"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 20,
+        "lineId": 3125129,
+        "rfqQty": 3000,
+        "mpns": [
+          "TPS7A5301RPSR"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 30,
+        "lineId": 3125130,
+        "rfqQty": 3000,
+        "mpns": [
+          "TPS74901RGWR"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 40,
+        "lineId": 3125131,
+        "rfqQty": 3000,
+        "mpns": [
+          "TPS62153RGTR"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 50,
+        "lineId": 3125132,
+        "rfqQty": 3000,
+        "mpns": [
+          "TPS60400DBVR"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 60,
+        "lineId": 3125133,
+        "rfqQty": 3000,
+        "mpns": [
+          "TPS560430XDBVR"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 70,
+        "lineId": 3125134,
+        "rfqQty": 3000,
+        "mpns": [
+          "TPS3808G33DBVR"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 80,
+        "lineId": 3125135,
+        "rfqQty": 3000,
+        "mpns": [
+          "TLV333IDCKR"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 90,
+        "lineId": 3125136,
+        "rfqQty": 3000,
+        "mpns": [
+          "LM76002RNPR"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 100,
+        "lineId": 3125137,
+        "rfqQty": 3000,
+        "mpns": [
+          "6EDL04N02PRXUMA1;SP000926072"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 110,
+        "lineId": 3125138,
+        "rfqQty": 3000,
+        "mpns": [
+          "AD8628ARTZ-R2;AD8628ARTZ-REEL7"
+        ],
+        "vqsThisBatch": 2
+      },
+      {
+        "lineNo": 120,
+        "lineId": 3125139,
+        "rfqQty": 2500,
+        "mpns": [
+          "STM32WBA63CIU6TR"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 130,
+        "lineId": 3125140,
+        "rfqQty": 2500,
+        "mpns": [
+          "CC2564CRVMR"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 140,
+        "lineId": 3125141,
+        "rfqQty": 2500,
+        "mpns": [
+          "MAX17662BATE+T"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 150,
+        "lineId": 3125142,
+        "rfqQty": 2500,
+        "mpns": [
+          "CYW89072BRFB5GT"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 160,
+        "lineId": 3125143,
+        "rfqQty": 2500,
+        "mpns": [
+          "STD1NK80Z"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 170,
+        "lineId": 3125144,
+        "rfqQty": 2500,
+        "mpns": [
+          "UCC28C42DR"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 180,
+        "lineId": 3125145,
+        "rfqQty": 2500,
+        "mpns": [
+          "TPS73801DCQR"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 190,
+        "lineId": 3125146,
+        "rfqQty": 2500,
+        "mpns": [
+          "SN65HVD1786DR"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 200,
+        "lineId": 3125147,
+        "rfqQty": 2500,
+        "mpns": [
+          "OPA2810IDGKR"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 210,
+        "lineId": 3125148,
+        "rfqQty": 2500,
+        "mpns": [
+          "ST2378ETTR"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 220,
+        "lineId": 3125149,
+        "rfqQty": 2500,
+        "mpns": [
+          "L6470HTR"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 230,
+        "lineId": 3125150,
+        "rfqQty": 2500,
+        "mpns": [
+          "X9C103SZT1"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 240,
+        "lineId": 3125151,
+        "rfqQty": 2500,
+        "mpns": [
+          "FDD86381-F085"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 250,
+        "lineId": 3125152,
+        "rfqQty": 2500,
+        "mpns": [
+          "PL123E-09SC-R"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 260,
+        "lineId": 3125153,
+        "rfqQty": 2500,
+        "mpns": [
+          "MAX485ESA+T"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 270,
+        "lineId": 3125154,
+        "rfqQty": 2500,
+        "mpns": [
+          "IPD90N04S403ATMA1;SP000671630"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 280,
+        "lineId": 3125155,
+        "rfqQty": 2500,
+        "mpns": [
+          "LT3693EMSE#PBF;LT3693EMSE#TRPBF"
+        ],
+        "vqsThisBatch": 1
+      },
+      {
+        "lineNo": 290,
+        "lineId": 3125156,
+        "rfqQty": 2500,
+        "mpns": [
+          "LT3094EMSE#PBF;LT3094EMSE#TRPBF"
+        ],
+        "vqsThisBatch": 1
+      },
+      {
+        "lineNo": 300,
+        "lineId": 3125157,
+        "rfqQty": 2500,
+        "mpns": [
+          "LT3014BES5#PBF;LT3014BES5#TRMPBF;LT3014BES5#TRPBF"
+        ],
+        "vqsThisBatch": 1
+      },
+      {
+        "lineNo": 310,
+        "lineId": 3125158,
+        "rfqQty": 2500,
+        "mpns": [
+          "AD8139ARDZ;AD8139ARDZ-REEL;AD8139ARDZ-REEL7"
+        ],
+        "vqsThisBatch": 1
+      },
+      {
+        "lineNo": 320,
+        "lineId": 3125159,
+        "rfqQty": 2100,
+        "mpns": [
+          "SST25VF080B-50-4C-S2AF;SST25VF080B-50-4C-S2AF-T"
+        ],
+        "vqsThisBatch": 1
+      },
+      {
+        "lineNo": 330,
+        "lineId": 3125160,
+        "rfqQty": 2000,
+        "mpns": [
+          "LP38692SD-5.0/NOPB"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 340,
+        "lineId": 3125161,
+        "rfqQty": 2000,
+        "mpns": [
+          "AMC7836IPAPR"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 350,
+        "lineId": 3125162,
+        "rfqQty": 2000,
+        "mpns": [
+          "ISO1430DWR"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 360,
+        "lineId": 3125163,
+        "rfqQty": 2000,
+        "mpns": [
+          "TPS40055PWPR"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 370,
+        "lineId": 3125164,
+        "rfqQty": 2000,
+        "mpns": [
+          "PCM1808PWR"
+        ],
+        "vqsThisBatch": 1
+      },
+      {
+        "lineNo": 380,
+        "lineId": 3125165,
+        "rfqQty": 2000,
+        "mpns": [
+          "IPT012N08N5ATMA1;SP001227054"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 390,
+        "lineId": 3125166,
+        "rfqQty": 1600,
+        "mpns": [
+          "PIC16F677-I/SS;PIC16F677T-I/SS"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 400,
+        "lineId": 3125167,
+        "rfqQty": 1500,
+        "mpns": [
+          "NTMFS015N10MCLT1G"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 410,
+        "lineId": 3125168,
+        "rfqQty": 1500,
+        "mpns": [
+          "STM32G071CBT6;STM32G071CBT6TR"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 420,
+        "lineId": 3125169,
+        "rfqQty": 1500,
+        "mpns": [
+          "STM32F103CBT6;STM32F103CBT6TR"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 430,
+        "lineId": 3125170,
+        "rfqQty": 1500,
+        "mpns": [
+          "ADA4940-2ACPZ-R2;ADA4940-2ACPZ-R7;ADA4940-2ACPZ-RL"
+        ],
+        "vqsThisBatch": 1
+      },
+      {
+        "lineNo": 440,
+        "lineId": 3125171,
+        "rfqQty": 1440,
+        "mpns": [
+          "STM32F103ZGT6;STM32F103ZGT6TR"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 450,
+        "lineId": 3125172,
+        "rfqQty": 1350,
+        "mpns": [
+          "FGH60N60SMD"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 460,
+        "lineId": 3125173,
+        "rfqQty": 1280,
+        "mpns": [
+          "SN65HVD74DGK"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 470,
+        "lineId": 3125174,
+        "rfqQty": 1000,
+        "mpns": [
+          "DAC38RF80IAAVR"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 480,
+        "lineId": 3125175,
+        "rfqQty": 1000,
+        "mpns": [
+          "UC3525ADWTR"
+        ],
+        "vqsThisBatch": 1
+      },
+      {
+        "lineNo": 490,
+        "lineId": 3125176,
+        "rfqQty": 1000,
+        "mpns": [
+          "SN65HVD233DR"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 500,
+        "lineId": 3125177,
+        "rfqQty": 1000,
+        "mpns": [
+          "CY14V101QS-SE108XIT"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 510,
+        "lineId": 3125178,
+        "rfqQty": 960,
+        "mpns": [
+          "STM32F205RET7;STM32F205RET7TR"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 520,
+        "lineId": 3125179,
+        "rfqQty": 960,
+        "mpns": [
+          "STM32L431RCT6;STM32L431RCT6TR"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 530,
+        "lineId": 3125180,
+        "rfqQty": 960,
+        "mpns": [
+          "STM32U575RGT6;STM32U575RGT6TR"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 540,
+        "lineId": 3125181,
+        "rfqQty": 900,
+        "mpns": [
+          "NTHL065N65S3F"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 550,
+        "lineId": 3125182,
+        "rfqQty": 800,
+        "mpns": [
+          "ADG823BRMZ;ADG823BRMZ-REEL;ADG823BRMZ-REEL7"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 560,
+        "lineId": 3125183,
+        "rfqQty": 800,
+        "mpns": [
+          "MCP4821-E/SN;MCP4821T-E/SN"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 570,
+        "lineId": 3125184,
+        "rfqQty": 800,
+        "mpns": [
+          "AD9528BCPZ;AD9528BCPZ-REEL7"
+        ],
+        "vqsThisBatch": 1
+      },
+      {
+        "lineNo": 580,
+        "lineId": 3125185,
+        "rfqQty": 768,
+        "mpns": [
+          "EMMC16G-M525-X01U"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 590,
+        "lineId": 3125186,
+        "rfqQty": 750,
+        "mpns": [
+          "REF3133AIDBZT"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 600,
+        "lineId": 3125187,
+        "rfqQty": 720,
+        "mpns": [
+          "TMS320F28377SPZPT"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 610,
+        "lineId": 3125188,
+        "rfqQty": 624,
+        "mpns": [
+          "8S89831AKILF"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 620,
+        "lineId": 3125189,
+        "rfqQty": 600,
+        "mpns": [
+          "MCP9804-E/MC;MCP9804T-E/MC"
+        ],
+        "vqsThisBatch": 1
+      },
+      {
+        "lineNo": 630,
+        "lineId": 3125190,
+        "rfqQty": 600,
+        "mpns": [
+          "MSP430F2132TPWR"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 640,
+        "lineId": 3125191,
+        "rfqQty": 600,
+        "mpns": [
+          "STW10N105K5"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 650,
+        "lineId": 3125192,
+        "rfqQty": 540,
+        "mpns": [
+          "LT8642SIV#PBF;LT8642SIV#TRPBF"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 660,
+        "lineId": 3125193,
+        "rfqQty": 540,
+        "mpns": [
+          "STM32F103VCT6;STM32F103VCT6TR"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 670,
+        "lineId": 3125194,
+        "rfqQty": 480,
+        "mpns": [
+          "PIC18F46K22-I/PT;PIC18F46K22T-I/PT"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 680,
+        "lineId": 3125195,
+        "rfqQty": 444,
+        "mpns": [
+          "LT3045EMSE#PBF;LT3045EMSE#TRPBF"
+        ],
+        "vqsThisBatch": 1
+      },
+      {
+        "lineNo": 690,
+        "lineId": 3125196,
+        "rfqQty": 418,
+        "mpns": [
+          "AD2S1205WSTZ"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 700,
+        "lineId": 3125197,
+        "rfqQty": 390,
+        "mpns": [
+          "LT1521IST-5#PBF;LT1521IST-5#TRPBF"
+        ],
+        "vqsThisBatch": 2
+      },
+      {
+        "lineNo": 710,
+        "lineId": 3125198,
+        "rfqQty": 360,
+        "mpns": [
+          "10M02SCE144I7G"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 720,
+        "lineId": 3125199,
+        "rfqQty": 360,
+        "mpns": [
+          "TMS320F28379DPTPQ"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 730,
+        "lineId": 3125200,
+        "rfqQty": 360,
+        "mpns": [
+          "5CGXFC4C7F23C8N"
+        ],
+        "vqsThisBatch": 1
+      },
+      {
+        "lineNo": 740,
+        "lineId": 3125201,
+        "rfqQty": 357,
+        "mpns": [
+          "TMS320F28062UPNT"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 750,
+        "lineId": 3125202,
+        "rfqQty": 357,
+        "mpns": [
+          "PIC18F8722-I/PT;PIC18F8722T-I/PT"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 760,
+        "lineId": 3125203,
+        "rfqQty": 305,
+        "mpns": [
+          "PIC24FJ64GA002-I/ML;PIC24FJ64GA002T-I/ML"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 770,
+        "lineId": 3125204,
+        "rfqQty": 300,
+        "mpns": [
+          "MT40A512M16TB-062E IT:R"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 780,
+        "lineId": 3125205,
+        "rfqQty": 298,
+        "mpns": [
+          "EP4SGX230FF35C3G"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 790,
+        "lineId": 3125206,
+        "rfqQty": 260,
+        "mpns": [
+          "8T49N287A-047NLGI"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 800,
+        "lineId": 3125207,
+        "rfqQty": 260,
+        "mpns": [
+          "LTM8053EY#PBF"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 810,
+        "lineId": 3125208,
+        "rfqQty": 198,
+        "mpns": [
+          "AD9629BCPZ-20;AD9629BCPZRL7-20"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 820,
+        "lineId": 3125209,
+        "rfqQty": 90,
+        "mpns": [
+          "TMS320F2810PBKA"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 830,
+        "lineId": 3125210,
+        "rfqQty": 81,
+        "mpns": [
+          "10AX016E4F27E3SG"
+        ],
+        "vqsThisBatch": 1
+      },
+      {
+        "lineNo": 840,
+        "lineId": 3125211,
+        "rfqQty": 60,
+        "mpns": [
+          "EP4CE40F23I7N"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 850,
+        "lineId": 3125212,
+        "rfqQty": 50,
+        "mpns": [
+          "AR0830CSSC11SMKA1-CP2"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 860,
+        "lineId": 3125213,
+        "rfqQty": 44,
+        "mpns": [
+          "EP2AGX65DF25C6G"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 870,
+        "lineId": 3125214,
+        "rfqQty": 40,
+        "mpns": [
+          "10CX105YF672I5G"
+        ],
+        "vqsThisBatch": 2
+      },
+      {
+        "lineNo": 880,
+        "lineId": 3125215,
+        "rfqQty": 18,
+        "mpns": [
+          "XC7K70T-2FBG676C"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 890,
+        "lineId": 3125216,
+        "rfqQty": 6,
+        "mpns": [
+          "10AX048H4F34E3SG"
+        ],
+        "vqsThisBatch": 2
+      },
+      {
+        "lineNo": 900,
+        "lineId": 3125217,
+        "rfqQty": 1,
+        "mpns": [
+          "XCKU095-1FFVA1156C"
+        ],
+        "vqsThisBatch": 0
+      }
+    ],
+    "gaps": [
+      10,
+      20,
+      30,
+      40,
+      50,
+      60,
+      70,
+      80,
+      90,
+      100,
+      120,
+      130,
+      140,
+      150,
+      160,
+      170,
+      180,
+      190,
+      200,
+      210,
+      220,
+      230,
+      240,
+      250,
+      260,
+      270,
+      330,
+      340,
+      350,
+      360,
+      380,
+      390,
+      400,
+      410,
+      420,
+      440,
+      450,
+      460,
+      470,
+      490,
+      500,
+      510,
+      520,
+      530,
+      540,
+      550,
+      560,
+      580,
+      590,
+      600,
+      610,
+      630,
+      640,
+      650,
+      660,
+      670,
+      690,
+      710,
+      720,
+      740,
+      750,
+      760,
+      770,
+      780,
+      790,
+      800,
+      810,
+      820,
+      840,
+      850,
+      860,
+      880,
+      900
+    ]
+  }
+}
