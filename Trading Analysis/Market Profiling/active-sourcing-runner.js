@@ -441,6 +441,14 @@ This is an automated notification from the Active Sourcing workflow.`;
   // Cleanup temp file
   fs.unlinkSync(selectionFile);
 
+  // Step 8: Mark selected MPNs as sourced in delisted queue
+  console.log('');
+  console.log('Step 8: Marking MPNs as sourced in delisted queue...');
+  const { markAsSourced } = require('./selection-engine');
+  const sourcedMpns = selectedMpns.map(m => m.mpn);
+  const markedCount = markAsSourced(sourcedMpns);
+  console.log(`  Marked ${markedCount} MPNs as sourced (won't be re-selected)`);
+
   console.log('');
   console.log('='.repeat(60));
   console.log('ACTIVE SOURCING COMPLETE');

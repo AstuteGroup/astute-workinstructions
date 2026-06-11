@@ -48,6 +48,49 @@ if (!fs.existsSync(INVENTORY_STORAGE_DIR)) {
     fs.mkdirSync(INVENTORY_STORAGE_DIR, { recursive: true });
 }
 
+// Delisted parts queue — MPNs that left inventory, need API enrichment + NC sourcing
+// Active Sourcing selection engine reads from this instead of current inventory
+const DELISTED_QUEUE_FILE = path.join(process.env.HOME, 'workspace/.delisted-parts-queue.json');
+
+/**
+ * Read the delisted parts queue
+ */
+function readDelistedQueue() {
+    try {
+        if (fs.existsSync(DELISTED_QUEUE_FILE)) {
+            return JSON.parse(fs.readFileSync(DELISTED_QUEUE_FILE, 'utf8'));
+        }
+    } catch (e) { /* ignore */ }
+    return { parts: [], lastUpdated: null };
+}
+
+/**
+ * Write delisted MPNs to the queue (append, dedupe)
+ */
+function appendDelistedQueue(newMpns, dateStr) {
+    const queue = readDelistedQueue();
+    const existingSet = new Set(queue.parts.map(p => p.mpn.toUpperCase()));
+
+    let added = 0;
+    for (const mpn of newMpns) {
+        const key = mpn.toUpperCase();
+        if (!existingSet.has(key)) {
+            queue.parts.push({
+                mpn,
+                delistedDate: dateStr,
+                sourced: false,
+                sourcedDate: null
+            });
+            existingSet.add(key);
+            added++;
+        }
+    }
+
+    queue.lastUpdated = new Date().toISOString();
+    fs.writeFileSync(DELISTED_QUEUE_FILE, JSON.stringify(queue, null, 2));
+    return added;
+}
+
 /**
  * Get the Monday of the current week as YYYY-MM-DD string.
  * Used to identify which week's inventory file to use for reprocessing.
@@ -752,7 +795,29 @@ async function writeInventoryToOT(groupedRows, dateStr, dryRun = false, suppleme
         }
     }
 
+    // Helper: fetch all MPNs from a list of offer IDs
+    async function fetchMPNsFromOffers(offerIds) {
+        const mpns = new Set();
+        for (const offerId of offerIds) {
+            try {
+                const lineResult = await apiGet('chuboe_offer_line', {
+                    filter: `chuboe_offer_id eq ${offerId} and IsActive eq true`,
+                    select: 'chuboe_mpn',
+                });
+                for (const line of (lineResult.records || [])) {
+                    const mpn = line.chuboe_mpn || line.Chuboe_MPN;
+                    if (mpn) mpns.add(mpn.toUpperCase().replace(/[^A-Z0-9]/g, ''));
+                }
+            } catch (e) {
+                console.warn(`  ! Failed to fetch lines for offer ${offerId}: ${e.message}`);
+            }
+        }
+        return mpns;
+    }
+
     const results = [];
+    const allPriorMPNs = new Set();  // Track all MPNs from prior week
+    const allCurrentMPNs = new Set(); // Track all MPNs in current week
 
     for (const [groupName, mapping] of Object.entries(WAREHOUSE_WRITEBACK)) {
         const rows = groupedRows[groupName] || [];
@@ -827,6 +892,20 @@ async function writeInventoryToOT(groupedRows, dateStr, dryRun = false, suppleme
         const descriptionSuffix = `— ${groupName}`;
         const priorOffers = await queryActiveOffers(mapping.bpartnerId, mapping.offerTypeId, descriptionSuffix);
 
+        // Collect MPNs for delisted tracking
+        // Prior MPNs: from offers about to be deactivated
+        const priorOfferIds = priorOffers.map(o => o.id);
+        if (priorOfferIds.length > 0) {
+            const priorMpns = await fetchMPNsFromOffers(priorOfferIds);
+            for (const mpn of priorMpns) allPriorMPNs.add(mpn);
+        }
+        // Current MPNs: from lines about to be written
+        for (const line of lines) {
+            if (line.mpn) {
+                allCurrentMPNs.add(line.mpn.toUpperCase().replace(/[^A-Z0-9]/g, ''));
+            }
+        }
+
         if (dryRun) {
             const oldKeys = priorOffers.map(o => o.value || o.id).join(', ') || 'none';
             console.log(`  [DRY RUN] ${groupName}: would deactivate ${priorOffers.length} prior offer(s) [${oldKeys}] and write ${lines.length} new lines (BP ${mapping.bpartnerId}, OfferType ${mapping.offerTypeId})`);
@@ -882,6 +961,27 @@ async function writeInventoryToOT(groupedRows, dateStr, dryRun = false, suppleme
                 linesAttempted: lines.length,
                 ...mapping,
             });
+        }
+    }
+
+    // ─── Delisted Parts Tracking ───────────────────────────────────────────────
+    // Compute MPNs that were in prior week but not in current week = delisted
+    // These need API enrichment + NC sourcing via Active Sourcing
+    if (!dryRun && allPriorMPNs.size > 0) {
+        const delistedMpns = [];
+        for (const mpn of allPriorMPNs) {
+            if (!allCurrentMPNs.has(mpn)) {
+                delistedMpns.push(mpn);
+            }
+        }
+        if (delistedMpns.length > 0) {
+            const added = appendDelistedQueue(delistedMpns, dateStr);
+            console.log(`\nDelisted parts tracking:`);
+            console.log(`  Prior week MPNs: ${allPriorMPNs.size}`);
+            console.log(`  Current week MPNs: ${allCurrentMPNs.size}`);
+            console.log(`  Delisted (left inventory): ${delistedMpns.length}`);
+            console.log(`  Added to queue (new): ${added}`);
+            console.log(`  Queue file: ${DELISTED_QUEUE_FILE}`);
         }
     }
 
