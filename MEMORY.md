@@ -40,30 +40,13 @@ The notifier uses AWS WorkMail SMTP with credentials from `~/workspace/.env`. Wo
 
 ## Recent Sessions
 
+- **2026-06-11 (CLAUDE.md Refactor)**: **Refactored CLAUDE.md from 41.8k chars to 9.3k chars (77% reduction) to fix performance warning.** Root cause: CLAUDE.md had drifted into a catch-all, duplicating content from workflow-specific docs (Inventory File Cleanup, Quick Quote) and embedding full procedural docs inline. **Solution:** Created `docs/` folder with extracted content: (1) `docs/session-greeting.md` — full 8-step startup procedure. (2) `docs/workflow-catalog.md` — 26 workflows with descriptions and trigger patterns. (3) `docs/environment.md` — DB access, write-back rules, commands, file system. Both CLAUDE.md files now follow index pattern: behavioral rules inline, everything else via pointers. **Also slimmed in-repo version:** `astute-workinstructions/CLAUDE.md` went from 653 lines (~40k chars) to ~180 lines (7.2k chars) — 83% reduction. Commits: `b1538c8`, `a839c4c`.
+
 - **2026-06-11 (Delisted Parts Pipeline)**: **Major overhaul of Active Sourcing to source from DELISTED parts instead of current inventory.** Changes: (1) `inventory_cleanup.js` now tracks delta (prior - current week offers), writes delisted MPNs to `~/.delisted-parts-queue.json`. (2) `selection-engine.js` reads from delisted queue instead of current inventory offers. (3) `active-sourcing-runner.js` marks MPNs as sourced after processing, sends batch digest email with queue progress %. (4) First pass completion notification when all delisted parts sourced. (5) Profile VQ deactivation when real priced VQs arrive (same MPN/vendor within 10 days). (6) Broker VQ consolidation (multiple rows same MPN/vendor → 1 VQ with total qty). (7) NC scraper skips franchised suppliers (ncauth CSS class) — franchise data comes via APIs. (8) Re-enabled inventory gate (waits for NC upload confirmation before sourcing). **Key distinction:** Profiled parts (current inventory) → NC scrape only, no API calls. Delisted parts → full treatment (API enrichment + NC RFQ). **Documentation:** Updated `market-profiling.md` with full pipeline docs. Commits: `614468e`, `898aac3`, `9192d5c`, `7e8a73f`.
 
 - **2026-06-11 (Budget Exhaustion Handling Overhaul)**: **Fixed inconsistent budget handling across all loaders after 256k writes in one day triggered budget exhaustion.** Root cause: June 10 inventory cleanup wrote 118k×2 offer lines, hitting 30k daily limit. Loaders handled this inconsistently — some routed to NeedsReview with manual-retry email, others silently moved to Processed with `offerId: null`. **Fixes:** (1) **Raised daily limit** 30k → 300k (256k proven safe; burst limits are real protection). (2) **Chunked mode now respects daily limit** — was bypassing all budget checks; now checks daily before starting. (3) **Poller checks `rateLimited: true`** — if handler returns this, email stays UNSEEN for auto-retry on next cycle (no notification). (4) **All handlers propagate `rateLimited`** — broker-offers.js, excess.js, stockrfq-cq.js now check writer result and return rateLimited to poller. (5) **Recovery script** `scripts/recover-budget-stuck.js` — moves emails from NeedsReview or Processed back to INBOX. Supports `--folder` and `--uids` options. **Recovery performed:** 1 from broker-offers NeedsReview, 4 from stockrfq NeedsReview, 8 from vq-loading NeedsReview, 14 from broker-offers Processed = 27 emails total moved back to INBOX for reprocessing. **Writers updated:** offer-writeback.js, rfq-writer.js, cq-writer.js, vq-writer.js. Commits: `064d133`, `b0aa5ee`, `c6db717`, `765119b`, `663637c`.
 
 - **2026-06-08 (NC Listing Fix + Inventory Cleanup Drift)**: **Fixed `nc-listing` cron job that was broken since refactor.** Root cause: job used `cadence: 'twice-weekly'` but `cadenceToMs()` didn't support it — crashed on every tick with `Error: Unrecognized cadence: twice-weekly`. **Fixes:** (1) Added `twice-weekly` = 3 days to `cron-jobs.js`. (2) Ran `inventory-cleanup` manually (4,188 lines to OT). (3) Ran `nc-listing` manually (560 rows to NetComponents). (4) Re-anchored both sentinels to proper schedule times (inventory-cleanup: Mon 11 UTC, nc-listing: Mon/Thu 12 UTC) — they had drifted to ~20 UTC from late runs. **Also refactored `nc-listing` email logic:** Removed duplicate review copies to jake.harris@ — NetComponents emails already CC him, so 4 emails → 2 emails. Commits: `40c8a80`, `1011461`.
-
-- **2026-06-04 (Stuck Email Detection + Auto-Recovery + Cleanup)**: **Fixed systemic gap where emails could get stuck in SEEN-but-not-processed state.** Root cause: when agent reads an email (marks SEEN) but crashes/pauses before routing, the email becomes invisible to the next `list` call. **Solution (3 parts):** (1) **Auto-recovery in poller** — `list` command now scans for SEEN emails >60 min old, clears their SEEN flag so they reappear. 24-hour cap prevents recovering ancient spam/test emails. (2) **Operations Digest detection** — new section shows stuck emails across all 4 workflows (vq-loading, excess, stockrfq, rfq-loading), separates auto-recoverable (60min-24h) from manual-review (>24h). (3) **New poller commands** — `check-stuck` (read-only monitoring) and `recover-stuck` (manual recovery with configurable threshold). Commit: `64d906e`.
-
-  **Completed:**
-  - Built SQL query with all metrics (activities, RFQs by type, CQs, sold values)
-  - Mapped regions (USA/MEX/APAC/OTHER) from country codes
-  - Identified seller assignments (ISE Steward = inside, FSE Steward/salesrep_id = outside)
-  - Discovered activities link via `ad_user.c_bpartner_id` (contacts), not directly to BP
-  - Created account status classification: Neglect, Underperformance, Low ROI, Growing, Defend, Active, Dormant
-  - Generated initial CSV with 4,886 non-broker customers
-
-  **Key Finding:** Neglect + Underperformance = $212.8M lifetime value being under-served
-
-  **Next Session - First Thing:** Revise account status thresholds (see questions in doc)
-
-  **Files:**
-  - `Trading Analysis/Sales Funnel Report/sales-funnel-report.md` — Full documentation with threshold questions
-  - `~/workspace/sales_funnel_report_v2.sql` — Current SQL query
-  - `~/workspace/sales_funnel_results.csv` — Current output (4,886 rows)
 
 - **2026-05-19 (Serena Zhang Buyer Analysis)**: Created comprehensive analysis of buyer Serena Zhang's VQ coverage for Sales-Purchasing Leadership discussion. Justin Goodwin and Aaron Mendoza reported challenges getting VQ responses from Serena.
 
