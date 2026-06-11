@@ -276,16 +276,22 @@ function checkBudget(opts = {}) {
   const counts = getWriteCounts();
 
   // CRITICAL: 5-minute burst check (prevents June 1 crash scenario)
-  // This is a hard limit with no priority override - prevents sustained high write rate
+  // P4 callers (RFQ loading) are EXEMPT - customer-facing RFQs must always get through
+  // Other callers subject to burst limit to prevent sustained high write rate
   const limit5Min = isBackfill ? LIMITS.backfill.maxWritesPer5Min : LIMITS.maxWritesPer5Min;
 
   if (counts.last5Min + count > limit5Min) {
-    return {
-      allowed: false,
-      reason: `Global 5-min burst limit: ${counts.last5Min}/${limit5Min} (prevents sustained overload)${isBackfill ? ' [backfill mode]' : ''}`,
-      limits: LIMITS,
-      priority,
-    };
+    if (priority >= 4) {
+      // P4 exempt but log for monitoring
+      console.warn(`[ot-api-budget] P4 caller ${caller} bypassing 5-min burst limit: ${counts.last5Min + count}/${limit5Min}`);
+    } else {
+      return {
+        allowed: false,
+        reason: `Global 5-min burst limit: ${counts.last5Min}/${limit5Min} (prevents sustained overload, P4 exempt)${isBackfill ? ' [backfill mode]' : ''}`,
+        limits: LIMITS,
+        priority,
+      };
+    }
   }
 
   // Priority-aware 15-min check
@@ -331,11 +337,13 @@ function checkBudget(opts = {}) {
     };
   }
 
-  // Check daily window (no priority reservation - hard cap)
-  if (counts.lastDay + count > LIMITS.maxWritesPerDay) {
+  // Check daily window
+  // P4 callers (RFQ loading) are EXEMPT from daily limit - customer-facing, always allowed
+  // Other callers still subject to hard cap to prevent runaway automation
+  if (priority < 4 && counts.lastDay + count > LIMITS.maxWritesPerDay) {
     return {
       allowed: false,
-      reason: `Global daily limit: ${counts.lastDay}/${LIMITS.maxWritesPerDay} already used`,
+      reason: `Global daily limit: ${counts.lastDay}/${LIMITS.maxWritesPerDay} already used (P4 exempt, you are P${priority})`,
       limits: LIMITS,
       priority,
     };

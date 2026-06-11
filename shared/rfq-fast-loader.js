@@ -142,7 +142,7 @@ async function loadRFQ(opts) {
       searchKey: null,
       linesWritten: 0,
       mpnsWritten: 0,
-      errors: [],
+      errors: [`Rate limited: ${globalCheck.reason}`],
       elapsedMs: 0,
       linesPerSec: 0,
       rateLimited: true,

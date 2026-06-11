@@ -28,6 +28,26 @@ const { logout } = require('../shared/api-client');
 const breadcrumbs = require('../shared/breadcrumbs');
 const { createNotifier } = require('../shared/notifier');
 const { resolveOutreachRecipients } = require('../shared/outreach-recipients');
+const { execSync } = require('child_process');
+
+/**
+ * Look up partner name from bpartnerId if not provided in payload.
+ * Fallback for when agent doesn't pass partnerName.
+ */
+function lookupPartnerName(bpartnerId) {
+  if (!bpartnerId) return null;
+  try {
+    const sql = `SELECT name FROM adempiere.c_bpartner WHERE c_bpartner_id = ${parseInt(bpartnerId, 10)} LIMIT 1`;
+    const result = execSync(`psql -t -A -c "${sql}"`, {
+      encoding: 'utf-8',
+      timeout: 5000,
+      env: { ...process.env, PGUSER: 'analytics_user', PGDATABASE: 'idempiere_replica' },
+    }).trim();
+    return result || null;
+  } catch (e) {
+    return null;
+  }
+}
 
 // Notifier for confirmation emails
 const notifier = createNotifier({
@@ -160,7 +180,12 @@ async function runJob(item) {
 
   // Job completed (or partial with errors)
   const totalWritten = (item.checkpoint || 0) + result.linesWritten;
-  const finalStatus = result.errors.length > 0 ? 'partial' : 'loaded';
+
+  // Determine final status — must have actually created an RFQ and written lines
+  // to be considered "loaded". Rate-limiting returns rfqId=null with errors now,
+  // but defend against any path that returns null without writing.
+  const actuallyLoaded = result.rfqId && totalWritten > 0;
+  const finalStatus = !actuallyLoaded ? 'error' : (result.errors.length > 0 ? 'partial' : 'loaded');
 
   queue.updateItem(item.id, {
     status: finalStatus,
@@ -198,7 +223,14 @@ async function runJob(item) {
   // ── Send confirmation email to internal Astute people ─────────────────────
   // Mirrors the excess.js pattern: reply with the RFQ # so the forwarder knows
   // it was loaded successfully.
-  try {
+  //
+  // IMPORTANT: Only send confirmation if actually loaded. Rate-limiting or
+  // header-POST failures should NOT trigger a "success" email with null values.
+  // Bug fix 2026-06-11: was sending "RFQ loaded, Customer: (unknown), RFQ #: null"
+  // when rate-limited because errors[] was empty and we didn't check rfqId.
+  if (!actuallyLoaded) {
+    log(`  Skipping confirmation email — job ${finalStatus}, rfqId=${result.rfqId}, lines=${totalWritten}`);
+  } else try {
     const payload = item.payload || {};
     const envelope = resolveOutreachRecipients({
       outerFrom: payload.originalSender,
@@ -214,12 +246,15 @@ async function runJob(item) {
       const toEmail = envelope.recipientList[0];
       const ccList = envelope.recipientList.slice(1);
 
+      // Look up partner name if not provided in payload
+      const customerName = payload.partnerName || lookupPartnerName(payload.bpartnerId) || '(unknown)';
+
       const confirmSubject = payload.originalSubject
         ? `Re: ${payload.originalSubject}`
         : `RFQ ${result.searchKey} loaded`;
       const confirmBody = `RFQ loaded.
 
-Customer: ${payload.partnerName || '(unknown)'}
+Customer: ${customerName}
 RFQ #: ${result.searchKey}
 Lines loaded: ${totalWritten}
 
