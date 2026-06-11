@@ -126,6 +126,29 @@ async function action_load_offer(payload, ctx) {
     lines,
   });
 
+  // ── Budget exhaustion: defer for retry ──────────────────────────────────────
+  // If offer-writeback returned rateLimited, propagate it so the poller leaves
+  // the email UNSEEN for the next poll cycle. No notification needed.
+  if (result.rateLimited) {
+    breadcrumbs.write({
+      cog: 'offer-poller',
+      event: 'load-deferred-budget',
+      uid: ctx.uid,
+      sourceUid: sourceUid || ctx.uid,
+      messageId: ctx.currentMessageId || null,
+      bpartnerId,
+      offerType,
+      lineCount: lines.length,
+      reason: result.rateLimitReason,
+    });
+    return {
+      rateLimited: true,
+      rateLimitReason: result.rateLimitReason,
+      rateLimitTier: result.rateLimitTier || 'global',
+      lineCount: lines.length,
+    };
+  }
+
   breadcrumbs.write({
     cog: 'offer-poller',
     event: 'loaded',

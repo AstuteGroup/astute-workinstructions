@@ -94,6 +94,29 @@ async function action_add_cq(payload, ctx) {
     bpartnerId: bpartnerId || undefined,
   });
 
+  // ── Budget exhaustion: defer for retry ──────────────────────────────────────
+  // If cq-writer returned rateLimited, propagate it so the poller leaves
+  // the email UNSEEN for the next poll cycle. No notification needed.
+  if (result.summary && result.summary.rateLimited) {
+    breadcrumbs.write({
+      cog: 'stockrfq-cq-agent',
+      event: 'cq-load-deferred-budget',
+      uid: ctx.uid,
+      sourceUid: sourceUid || ctx.uid,
+      sourceMessageId: sourceMessageId || null,
+      rfqSearchKey,
+      lineCount: writerLines.length,
+      reason: result.summary.rateLimitReason,
+    });
+    return {
+      rateLimited: true,
+      rateLimitReason: result.summary.rateLimitReason,
+      rateLimitTier: result.summary.rateLimitTier || 'global',
+      rfqSearchKey,
+      lineCount: writerLines.length,
+    };
+  }
+
   breadcrumbs.write({
     cog: 'stockrfq-cq-agent',
     event: 'cq-loaded',

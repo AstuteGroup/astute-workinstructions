@@ -615,6 +615,17 @@ async function cmdRoute(uid, actionName, payload) {
     }
   }
 
+  // ── RATE-LIMIT DEFERRAL ──────────────────────────────────────────────────────
+  // If handler returns rateLimited: true, the write was blocked due to budget
+  // exhaustion. Do NOT move the email — leave it UNSEEN in Inbox so it gets
+  // picked up on the next poll cycle when budget resets. No notification needed.
+  if (result.rateLimited) {
+    result.deferred = true;
+    result.deferred_reason = result.rateLimitReason || 'budget exhausted';
+    console.log(JSON.stringify(result, null, 2));
+    return; // Exit without moving email or clearing sidecar
+  }
+
   // Move email
   if (folder) {
     if (DRY_RUN) {

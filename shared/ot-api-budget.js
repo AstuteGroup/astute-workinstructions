@@ -23,13 +23,14 @@ const STATE_FILE = path.join(process.env.HOME, 'workspace', '.ot-api-budget.json
 // ─── GLOBAL LIMITS ───────────────────────────────────────────────────────────
 
 const LIMITS = {
-  // Hard caps across ALL agents/writers (data-driven from 30-day analysis)
+  // Hard caps across ALL agents/writers (data-driven from operational history)
   // Analysis showed: system handles 1,657 VQs/hour and 672/15min routinely
   // June 1 crash: 252 VQs in 5 minutes sustained (50/min rate)
+  // June 10: 256k writes/day worked fine (two 118k inventory offers + normal traffic)
   maxWritesPer5Min: 200,            // CRITICAL - prevents sustained burst (June 1 hit 252 and crashed)
   maxWritesPer15Min: 800,           // 20% buffer above proven 672 peak
   maxWritesPerHour: 2000,           // 20% buffer above proven 1,657 peak
-  maxWritesPerDay: 30000,           // Safety net (current avg ~1,000/day)
+  maxWritesPerDay: 150000,          // Raised from 30k — 256k proven safe; burst limits are real protection
 
   // Priority tiers (higher number = higher priority)
   // When budget is constrained, higher-priority callers get preference
