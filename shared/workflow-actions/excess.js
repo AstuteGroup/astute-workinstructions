@@ -128,21 +128,35 @@ async function action_load_offer(payload, ctx) {
 
   // ── Budget exhaustion: defer for retry ──────────────────────────────────────
   // If offer-writeback returned rateLimited, propagate it so the poller leaves
-  // the email UNSEEN for the next poll cycle. No notification needed.
+  // the email UNSEEN for the next poll cycle.
+  //
+  // REPEAT-DEFERRAL CHECK: If we already have a breadcrumb for this UID from a
+  // prior tick, don't notify again — the agent should exit silently.
   if (result.rateLimited) {
-    breadcrumbs.write({
+    const priorDeferral = breadcrumbs.findByUid(ctx.uid, {
       cog: 'offer-poller',
-      event: 'load-deferred-budget',
-      uid: ctx.uid,
-      sourceUid: sourceUid || ctx.uid,
-      messageId: ctx.currentMessageId || null,
-      bpartnerId,
-      offerType,
-      lineCount: lines.length,
-      reason: result.rateLimitReason,
+      events: ['load-deferred-budget'],
+      sinceMs: Date.now() - 24 * 60 * 60 * 1000,
     });
+    const alreadyDeferred = priorDeferral.found;
+
+    if (!alreadyDeferred) {
+      breadcrumbs.write({
+        cog: 'offer-poller',
+        event: 'load-deferred-budget',
+        uid: ctx.uid,
+        sourceUid: sourceUid || ctx.uid,
+        messageId: ctx.currentMessageId || null,
+        bpartnerId,
+        offerType,
+        lineCount: lines.length,
+        reason: result.rateLimitReason,
+      });
+    }
+
     return {
       rateLimited: true,
+      alreadyDeferred,
       rateLimitReason: result.rateLimitReason,
       rateLimitTier: result.rateLimitTier || 'global',
       lineCount: lines.length,

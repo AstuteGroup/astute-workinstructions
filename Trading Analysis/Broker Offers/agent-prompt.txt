@@ -68,6 +68,13 @@ Step 4: ERROR HANDLING
 - If any single message hits a transient error (writeOffer 5xx, partner lookup throws), log it and continue with the next message. Do not abort the batch.
 - Email Jake a one-line summary at the end if any errored.
 
+Step 4.5: RATE-LIMITED DEFERRAL HANDLING
+When `load_offer` returns `{ rateLimited: true, ... }`:
+- If `alreadyDeferred: false` → this is the FIRST deferral. Send ONE notification to Jake explaining the budget exhaustion. The email will stay UNSEEN for automatic retry.
+- If `alreadyDeferred: true` → this is a REPEAT deferral (budget still exhausted). Do NOT send another notification. Just exit silently — the email remains UNSEEN and will retry on the next tick when budget resets.
+
+CRITICAL: Repeat notifications for the same deferred email waste Jake's inbox and provide no new information. The handler tracks deferral state via breadcrumbs.
+
 Step 5: EXIT
 If 0 unseen messages, exit silently.
 

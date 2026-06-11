@@ -96,20 +96,34 @@ async function action_add_cq(payload, ctx) {
 
   // ── Budget exhaustion: defer for retry ──────────────────────────────────────
   // If cq-writer returned rateLimited, propagate it so the poller leaves
-  // the email UNSEEN for the next poll cycle. No notification needed.
+  // the email UNSEEN for the next poll cycle.
+  //
+  // REPEAT-DEFERRAL CHECK: If we already have a breadcrumb for this UID from a
+  // prior tick, don't notify again — the agent should exit silently.
   if (result.summary && result.summary.rateLimited) {
-    breadcrumbs.write({
+    const priorDeferral = breadcrumbs.findByUid(ctx.uid, {
       cog: 'stockrfq-cq-agent',
-      event: 'cq-load-deferred-budget',
-      uid: ctx.uid,
-      sourceUid: sourceUid || ctx.uid,
-      sourceMessageId: sourceMessageId || null,
-      rfqSearchKey,
-      lineCount: writerLines.length,
-      reason: result.summary.rateLimitReason,
+      events: ['cq-load-deferred-budget'],
+      sinceMs: Date.now() - 24 * 60 * 60 * 1000,
     });
+    const alreadyDeferred = priorDeferral.found;
+
+    if (!alreadyDeferred) {
+      breadcrumbs.write({
+        cog: 'stockrfq-cq-agent',
+        event: 'cq-load-deferred-budget',
+        uid: ctx.uid,
+        sourceUid: sourceUid || ctx.uid,
+        sourceMessageId: sourceMessageId || null,
+        rfqSearchKey,
+        lineCount: writerLines.length,
+        reason: result.summary.rateLimitReason,
+      });
+    }
+
     return {
       rateLimited: true,
+      alreadyDeferred,
       rateLimitReason: result.summary.rateLimitReason,
       rateLimitTier: result.summary.rateLimitTier || 'global',
       rfqSearchKey,

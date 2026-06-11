@@ -344,36 +344,54 @@ async function doWriteRFQ(payload, ctx) {
 
   // ── TIER 1: Global budget check ──
   // Stock RFQ has lowest priority (P1) — throttled first when budget is tight.
-  // Estimated writes: header + lines + line_mpns (~3× line count)
+  // EXCEPTION: Sidecar replays (skipBudgetCheck=true) bypass budget — they're
+  // recovery operations for writes that were already authorized. Blocking them
+  // just makes sidecars pile up forever.
   const estimatedWrites = normalizedLines.length * 3;
-  const globalCheck = otBudget.checkBudget({
-    table: 'chuboe_rfq',
-    count: estimatedWrites,
-    caller: 'stockrfq-agent',
-    isBackfill: false,  // Stock RFQ doesn't use backfill coordination
-  });
 
-  if (!globalCheck.allowed) {
-    breadcrumbs.write({
-      cog: 'stockrfq-agent',
-      event: 'load-deferred-budget',
-      uid: ctx.uid,
-      sourceUid: sourceUid || ctx.uid,
-      messageId: messageId || null,
-      bpartnerId,
-      customerName: customerName || null,
-      lineCount: normalizedLines.length,
-      reason: globalCheck.reason,
+  if (!payload.skipBudgetCheck) {
+    const globalCheck = otBudget.checkBudget({
+      table: 'chuboe_rfq',
+      count: estimatedWrites,
+      caller: 'stockrfq-agent',
+      isBackfill: false,  // Stock RFQ doesn't use backfill coordination
     });
-    return {
-      rfqId: null,
-      searchKey: null,
-      linesWritten: 0,
-      errors: [`Global budget exhausted: ${globalCheck.reason} — processing deferred`],
-      rateLimited: true,
-      rateLimitReason: globalCheck.reason,
-      rateLimitTier: 'global',
-    };
+
+    if (!globalCheck.allowed) {
+      // REPEAT-DEFERRAL CHECK: If we already have a breadcrumb for this UID from a
+      // prior tick, don't notify again — the agent should exit silently.
+      const priorDeferral = breadcrumbs.findByUid(ctx.uid, {
+        cog: 'stockrfq-agent',
+        events: ['load-deferred-budget'],
+        sinceMs: Date.now() - 24 * 60 * 60 * 1000,
+      });
+      const alreadyDeferred = priorDeferral.found;
+
+      if (!alreadyDeferred) {
+        breadcrumbs.write({
+          cog: 'stockrfq-agent',
+          event: 'load-deferred-budget',
+          uid: ctx.uid,
+          sourceUid: sourceUid || ctx.uid,
+          messageId: messageId || null,
+          bpartnerId,
+          customerName: customerName || null,
+          lineCount: normalizedLines.length,
+          reason: globalCheck.reason,
+        });
+      }
+
+      return {
+        rfqId: null,
+        searchKey: null,
+        linesWritten: 0,
+        errors: [`Global budget exhausted: ${globalCheck.reason} — processing deferred`],
+        rateLimited: true,
+        alreadyDeferred,
+        rateLimitReason: globalCheck.reason,
+        rateLimitTier: 'global',
+      };
+    }
   }
 
   // Reserve budget before write
@@ -393,6 +411,8 @@ async function doWriteRFQ(payload, ctx) {
     // skips the header and writes only the missing lines/line_mpns.
     existingRfqId: payload.existingRfqId || undefined,
     existingSearchKey: payload.existingSearchKey || undefined,
+    // Sidecar replays bypass budget checks — recovery shouldn't compete
+    skipBudgetCheck: payload.skipBudgetCheck || false,
   });
 
   // Classify the outcome. otDown = OT died mid-write (header may have written,

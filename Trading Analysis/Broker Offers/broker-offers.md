@@ -151,6 +151,19 @@ Process all unseen messages in the brokeroffers@orangetsunami.com inbox.
 
 ---
 
+## Rate-Limit Deferral Behavior
+
+When the OT API daily budget is exhausted, `load_offer` returns `{ rateLimited: true, alreadyDeferred: bool }`:
+
+| `alreadyDeferred` | Behavior |
+|-------------------|----------|
+| `false` | First deferral — send ONE notification to Jake, write breadcrumb, leave email UNSEEN for retry |
+| `true` | Repeat deferral (prior breadcrumb exists within 24h) — exit silently, no notification, email stays UNSEEN |
+
+This prevents repeat notifications every 30 minutes for the same stuck email. Once budget resets (midnight CT), the retry will succeed and send a normal confirmation.
+
+---
+
 ## Key Shared Modules
 
 - `shared/partner-lookup.js` — `resolvePartner({email, companyName, partnerType})` for vendor matching
