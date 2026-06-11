@@ -176,6 +176,75 @@ function parseScrapeResults(filePath) {
 }
 
 /**
+ * Consolidate rows by (MPN, Supplier) — sum qty, take best date code.
+ *
+ * Broker market rarely has price breaks, so multiple lines for the same
+ * MPN/vendor should consolidate into a single VQ with total availability.
+ * Added 2026-06-11 to keep VQ list clean.
+ *
+ * @param {Array} rows - Parsed scrape result rows
+ * @returns {Array} - Consolidated rows (one per MPN+Supplier)
+ */
+function consolidateRows(rows) {
+  const groups = new Map(); // key: "MPN_NORMALIZED|SUPPLIER_NORMALIZED" → aggregated row
+
+  for (const row of rows) {
+    const mpn = (row['Part Number'] || row.part_number || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
+    const supplier = (row['Supplier'] || row.supplier || '').toUpperCase().trim();
+
+    if (!mpn || !supplier) {
+      // Can't consolidate without MPN or supplier — pass through as-is
+      groups.set(`_PASSTHROUGH_${groups.size}`, row);
+      continue;
+    }
+
+    const key = `${mpn}|${supplier}`;
+    const qty = parseInt(row['Supplier Qty'] || row.supplier_qty || 0, 10);
+    const dc = row['Date Code'] || row.date_code || row['DC'] || '';
+
+    if (groups.has(key)) {
+      const existing = groups.get(key);
+      // Sum qty
+      existing._totalQty = (existing._totalQty || 0) + qty;
+      // Take newest date code (simple heuristic: higher string value = newer for YY+ format)
+      if (dc && (!existing._bestDc || dc > existing._bestDc)) {
+        existing._bestDc = dc;
+      }
+      existing._consolidatedCount = (existing._consolidatedCount || 1) + 1;
+    } else {
+      // First row for this MPN/supplier — clone it
+      const consolidated = { ...row };
+      consolidated._totalQty = qty;
+      consolidated._bestDc = dc || '';
+      consolidated._consolidatedCount = 1;
+      groups.set(key, consolidated);
+    }
+  }
+
+  // Convert back to array, updating qty and dc fields with consolidated values
+  const result = [];
+  for (const row of groups.values()) {
+    if (row._totalQty !== undefined) {
+      // Consolidated row — update fields
+      if (row['Supplier Qty'] !== undefined) row['Supplier Qty'] = row._totalQty;
+      if (row.supplier_qty !== undefined) row.supplier_qty = row._totalQty;
+      if (row._bestDc) {
+        if (row['Date Code'] !== undefined) row['Date Code'] = row._bestDc;
+        if (row.date_code !== undefined) row.date_code = row._bestDc;
+        if (row['DC'] !== undefined) row['DC'] = row._bestDc;
+      }
+      // Clean up internal fields
+      delete row._totalQty;
+      delete row._bestDc;
+      // Keep _consolidatedCount for logging
+    }
+    result.push(row);
+  }
+
+  return result;
+}
+
+/**
  * Build availability note for VQ
  */
 function buildAvailabilityNote(row, vendorName) {
@@ -302,12 +371,20 @@ async function writeAvailabilityVQ(rfq, row, dryRun = false) {
  */
 async function processResults(filePath, rfqSearchKey, dryRun = false) {
   // Parse input file
-  const rows = parseScrapeResults(filePath);
-  logger.info(`Parsed ${rows.length} scraped rows from ${path.basename(filePath)}`);
+  const rawRows = parseScrapeResults(filePath);
+  logger.info(`Parsed ${rawRows.length} scraped rows from ${path.basename(filePath)}`);
 
-  if (rows.length === 0) {
+  if (rawRows.length === 0) {
     logger.warn('No SCRAPED rows found in file');
     return { written: 0, skipped: 0, failed: 0, duplicates: 0, results: [] };
+  }
+
+  // Consolidate broker rows (same MPN+vendor → sum qty, single VQ)
+  // Franchise rows are passed through as-is (they have legitimate separate entries)
+  const rows = consolidateRows(rawRows);
+  const consolidated = rawRows.length - rows.length;
+  if (consolidated > 0) {
+    logger.info(`Consolidated ${rawRows.length} rows → ${rows.length} (${consolidated} merged)`);
   }
 
   // Resolve RFQ

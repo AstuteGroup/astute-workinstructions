@@ -251,8 +251,12 @@ async def scrape_availability_only(page, part_number, quantity, line_number, wor
         if not supplier_name:
             continue
 
-        # Note: Unlike process_part, we include ALL suppliers (including franchised)
-        # for market intelligence purposes. No ncauth filter here.
+        # Skip franchised/authorized distributors (marked with 'ncauth' class)
+        # Market profiling focuses on broker availability only — franchise data
+        # comes through the API enrichment pipeline. Added 2026-06-11.
+        auth_icon = await supplier_cell.query_selector('.ncauth')
+        if auth_icon:
+            continue
 
         # Get offered MPN from column 0
         offered_mpn = ''
