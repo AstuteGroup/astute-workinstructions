@@ -457,7 +457,18 @@ module.exports = [
     description: 'Mon/Thu 11:30 UTC (6:30am CT) — Active Sourcing: select 200 priority MPNs, add to exclusions, source via NC. Runs BEFORE nc-listing so exclusions apply.',
   },
 
-  // inventory-gate-poller removed 2026-06-09 — gate logic removed from active-sourcing-runner
+  {
+    name: 'inventory-gate-poller',
+    cadence: 'hourly',
+    // Hourly on Mon/Thu — checks stockrfq@ for NC upload confirmation or Jake's forward.
+    // Re-enabled 2026-06-11 after shakeout complete.
+    cadenceCron: '15 * * * 1,4',
+    command: `node "${ASTUTE}/Trading Analysis/Market Profiling/inventory-gate-poller.js"`,
+    cwd: ASTUTE,
+    needsOT: false,
+    logFile: '/tmp/inventory-gate-poller.log',
+    description: 'Hourly Mon/Thu — polls stockrfq@ for NC upload confirmation. Sets gate so Active Sourcing can proceed.',
+  },
 
   {
     name: 'exclusion-cleanup',

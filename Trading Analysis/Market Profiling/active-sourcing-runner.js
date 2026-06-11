@@ -182,9 +182,26 @@ async function runActiveSourcing(options = {}) {
   const dryRun = options.dryRun !== false;
   const forceRun = options.force === true;
 
-  // Gate removed 2026-06-09: Was blocking iteration during shakeout. If inventory
-  // upload didn't happen, the exclusions just have no effect (parts weren't
-  // listed anyway). No harm in running sourcing even if upload was missed.
+  // Gate check: Wait for inventory upload confirmation before sourcing.
+  // This ensures we only source parts that are actually listed on NetComponents.
+  // Re-enabled 2026-06-11 after shakeout complete.
+  if (!forceRun && !fs.existsSync(INVENTORY_GATE_FILE)) {
+    console.log('='.repeat(60));
+    console.log('Active Sourcing Runner — GATE CLOSED');
+    console.log('='.repeat(60));
+    console.log('');
+    console.log('Waiting for inventory upload confirmation.');
+    console.log('');
+    console.log('To open the gate:');
+    console.log('  1. NetComponents replies with "upload completed" to stockrfq@');
+    console.log('  2. OR you forward/send email with "inventory uploaded" in subject');
+    console.log('  3. OR run: node active-sourcing-runner.js --gate-open');
+    console.log('  4. OR run with --force to bypass');
+    console.log('');
+    console.log('Gate file: ' + INVENTORY_GATE_FILE);
+    console.log('='.repeat(60));
+    return { skipped: true, reason: 'gate_closed' };
+  }
 
   // Generate batch ID and determine selection mode based on day of week
   const now = new Date();

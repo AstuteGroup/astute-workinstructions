@@ -92,36 +92,31 @@ async function checkForConfirmation() {
     return { found: false, alreadyOpen: true };
   }
 
-  const fetcher = createFetcher({
-    user: INBOX,
-    password: process.env.WORKMAIL_PASS,
-    host: process.env.IMAP_HOST || 'imap.mail.us-east-1.awsapps.com',
-    port: parseInt(process.env.IMAP_PORT || '993', 10)
-  });
+  const fetcher = createFetcher('stockrfq');
 
   try {
-    await fetcher.connect();
-
-    // Check INBOX for recent emails (last 3 days)
-    const envelopes = await fetcher.listEnvelopes('INBOX', 3);
-    console.log(`Found ${envelopes.length} emails in last 3 days`);
+    // Check INBOX for recent emails (last 100)
+    const envelopes = await fetcher.listEnvelopes('INBOX', 100);
+    console.log(`Found ${envelopes.length} emails to check`);
 
     // Process emails - accept triggers from Jake OR NetComponents upload confirmations
     // RULE: NEVER reply directly to NetComponents or external senders - only notify Jake
     for (const env of envelopes) {
       const subject = env.subject || '';
-      const from = (env.from || '').toLowerCase();
-      const cc = (env.cc || '').toLowerCase();
+      // New API: env.from is {name, addr} object
+      const fromAddr = (env.from && env.from.addr ? env.from.addr : '').toLowerCase();
+      const fromDisplay = env.from ? `${env.from.name || ''} <${env.from.addr || ''}>` : '';
+      const cc = ''; // CC not available in new envelope format
 
-      const isFromJake = from.includes('jake.harris') || from.includes(JAKE_EMAIL.toLowerCase());
-      const isFromNC = from.includes('netcomponents');
-      const jakeInCC = cc.includes('jake.harris') || cc.includes(JAKE_EMAIL.toLowerCase());
+      const isFromJake = fromAddr.includes('jake.harris') || fromAddr.includes(JAKE_EMAIL.toLowerCase());
+      const isFromNC = fromAddr.includes('netcomponents');
+      const jakeInCC = false; // CC not available in current envelope format - always notify on NC emails
 
       // Case 1: NetComponents confirms upload completed - process it, notify Jake only
       if (isFromNC && matchesNCTrigger(subject)) {
         console.log('');
         console.log('*** NC UPLOAD CONFIRMATION RECEIVED ***');
-        console.log(`From: ${env.from}`);
+        console.log(`From: ${fromDisplay}`);
         console.log(`Subject: ${subject}`);
         console.log('');
 
@@ -130,7 +125,7 @@ async function checkForConfirmation() {
 
         // Move email to processed folder
         try {
-          await fetcher.moveEmail(env.id, PROCESSED_FOLDER, 'INBOX');
+          await fetcher.moveMessage(env.id, PROCESSED_FOLDER);
           console.log(`Email moved to ${PROCESSED_FOLDER}`);
         } catch (e) {
           console.warn(`Could not move email: ${e.message}`);
@@ -146,7 +141,7 @@ async function checkForConfirmation() {
           await notifier.sendEmail(
             JAKE_EMAIL,
             'Active Sourcing Gate Opened (NC confirmed upload)',
-            `NetComponents confirmed the inventory upload.\n\nFrom: ${env.from}\nSubject: ${subject}\nDate: ${env.date}\n\nActive Sourcing will proceed on the next scheduled run (Mon/Thu 8:30 AM CT).`
+            `NetComponents confirmed the inventory upload.\n\nFrom: ${fromDisplay}\nSubject: ${subject}\nDate: ${env.date}\n\nActive Sourcing will proceed on the next scheduled run (Mon/Thu 8:30 AM CT).`
           );
           console.log('Notified Jake (no reply sent to NC)');
         } catch (e) {
@@ -155,16 +150,15 @@ async function checkForConfirmation() {
 
         writeState({
           lastCheck: new Date().toISOString(),
-          lastConfirmation: { date: new Date().toISOString(), subject, from: env.from, source: 'netcomponents' }
+          lastConfirmation: { date: new Date().toISOString(), subject, from: fromDisplay, source: 'netcomponents' }
         });
 
-        await fetcher.disconnect();
         return { found: true, email: env, source: 'netcomponents' };
       }
 
-      // Case 2: Other NC email (questions, issues) - notify Jake if not CC'd, never reply
-      if (isFromNC && !jakeInCC) {
-        console.log(`  NC email detected (not a confirmation, Jake not CC'd): ${subject}`);
+      // Case 2: Other NC email (questions, issues) - notify Jake, never reply
+      if (isFromNC && !matchesNCTrigger(subject)) {
+        console.log(`  NC email detected (not a confirmation): ${subject}`);
         try {
           const notifier = createNotifier({
             fromEmail: INBOX,
@@ -174,7 +168,7 @@ async function checkForConfirmation() {
           await notifier.sendEmail(
             JAKE_EMAIL,
             `FYI: NetComponents email needs attention`,
-            `An email from NetComponents arrived that may need your attention:\n\nFrom: ${env.from}\nSubject: ${subject}\nDate: ${env.date}\n\nYou were not CC'd. No reply has been sent to them.\n\nPlease check stockrfq@ inbox.`
+            `An email from NetComponents arrived that may need your attention:\n\nFrom: ${fromDisplay}\nSubject: ${subject}\nDate: ${env.date}\n\nNo reply has been sent to them.\n\nPlease check stockrfq@ inbox.`
           );
           console.log(`  Notified Jake about NC email`);
         } catch (e) {
@@ -192,7 +186,7 @@ async function checkForConfirmation() {
       if (matchesJakeTrigger(subject)) {
           console.log('');
           console.log('*** CONFIRMATION FOUND ***');
-          console.log(`From: ${env.from}`);
+          console.log(`From: ${fromDisplay}`);
           console.log(`Subject: ${subject}`);
           console.log(`Date: ${env.date}`);
           console.log('');
@@ -202,7 +196,7 @@ async function checkForConfirmation() {
 
           // Move email to processed folder
           try {
-            await fetcher.moveEmail(env.id, PROCESSED_FOLDER, 'INBOX');
+            await fetcher.moveMessage(env.id, PROCESSED_FOLDER);
             console.log(`Email moved to ${PROCESSED_FOLDER}`);
           } catch (e) {
             console.warn(`Could not move email: ${e.message}`);
@@ -214,7 +208,7 @@ async function checkForConfirmation() {
             lastConfirmation: {
               date: new Date().toISOString(),
               subject: subject,
-              from: env.from
+              from: fromDisplay
             }
           });
 
@@ -235,10 +229,8 @@ async function checkForConfirmation() {
             console.warn(`Could not send acknowledgment: ${e.message}`);
           }
 
-          await fetcher.disconnect();
           return { found: true, email: env };
         }
-      }
     }
 
     console.log('');
@@ -251,12 +243,10 @@ async function checkForConfirmation() {
       lastCheck: new Date().toISOString()
     });
 
-    await fetcher.disconnect();
     return { found: false };
 
   } catch (err) {
     console.error(`Error checking inbox: ${err.message}`);
-    try { await fetcher.disconnect(); } catch (e) { /* ignore */ }
     return { found: false, error: err.message };
   }
 }
