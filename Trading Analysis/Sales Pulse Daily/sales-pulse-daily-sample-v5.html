@@ -1,0 +1,643 @@
+<!DOCTYPE html>
+<html>
+<head>
+<style>
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif;
+    font-size: 13px;
+    line-height: 1.5;
+    color: #333;
+    max-width: 900px;
+    margin: 0 auto;
+    padding: 20px;
+    background: #f5f5f5;
+  }
+  .container {
+    background: white;
+    padding: 24px;
+    border-radius: 8px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+  }
+  h1 {
+    font-size: 20px;
+    font-weight: 600;
+    margin: 0 0 4px 0;
+    color: #1a1a1a;
+  }
+  .subtitle {
+    font-size: 11px;
+    color: #666;
+    margin-bottom: 20px;
+  }
+  .section {
+    margin-bottom: 24px;
+    padding-bottom: 24px;
+    border-bottom: 2px solid #e0e0e0;
+  }
+  .section:last-child {
+    border-bottom: none;
+  }
+  .section-title {
+    font-size: 15px;
+    font-weight: 600;
+    margin-bottom: 12px;
+    color: #1a1a1a;
+  }
+  .subsection {
+    margin-bottom: 16px;
+  }
+  .subsection-title {
+    font-size: 12px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: #666;
+    margin-bottom: 8px;
+    padding-bottom: 4px;
+    border-bottom: 1px solid #e0e0e0;
+  }
+  .metric-row {
+    display: flex;
+    justify-content: space-between;
+    padding: 6px 0;
+    border-bottom: 1px solid #f5f5f5;
+  }
+  .metric-row:last-child {
+    border-bottom: none;
+  }
+  .metric-label {
+    font-size: 13px;
+    color: #333;
+  }
+  .metric-value {
+    font-size: 13px;
+    font-weight: 600;
+    color: #1a1a1a;
+  }
+  .metric-change {
+    font-size: 12px;
+    margin-left: 12px;
+  }
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 12px;
+  }
+  th {
+    text-align: left;
+    padding: 8px 8px;
+    background: #f8f8f8;
+    font-weight: 600;
+    border-bottom: 2px solid #e0e0e0;
+    font-size: 11px;
+  }
+  td {
+    padding: 8px 8px;
+    border-bottom: 1px solid #f0f0f0;
+  }
+  .region-row {
+    font-weight: 600;
+  }
+  .subregion-row {
+    font-weight: normal;
+    color: #666;
+  }
+  .subregion-row td:first-child {
+    padding-left: 24px;
+  }
+  .total-row {
+    border-top: 2px solid #e0e0e0;
+    font-weight: 600;
+    background: #f8f8f8;
+  }
+  .up { color: #16a34a; }
+  .down { color: #dc2626; }
+  .flat { color: #666; }
+  .warning { color: #ea580c; }
+  .alert-box {
+    background: #fef3c7;
+    border-left: 4px solid #f59e0b;
+    padding: 12px 16px;
+    margin-bottom: 12px;
+    border-radius: 4px;
+  }
+  .alert-box.critical {
+    background: #fee2e2;
+    border-left-color: #dc2626;
+  }
+  .alert-box.opportunity {
+    background: #dbeafe;
+    border-left-color: #3b82f6;
+  }
+  .alert-title {
+    font-weight: 600;
+    margin-bottom: 4px;
+  }
+  .alert-detail {
+    font-size: 12px;
+    color: #666;
+    margin-top: 4px;
+  }
+  .alert-item {
+    margin: 4px 0;
+    padding-left: 12px;
+  }
+  .win-item {
+    background: #f0fdf4;
+    border-left: 4px solid #16a34a;
+    padding: 12px 16px;
+    margin-bottom: 12px;
+    border-radius: 4px;
+  }
+  .win-title {
+    font-weight: 600;
+    margin-bottom: 4px;
+  }
+  .insight {
+    font-size: 12px;
+    color: #666;
+    font-style: italic;
+    margin-top: 4px;
+  }
+  .market-pulse-item {
+    background: #f0f9ff;
+    border-left: 4px solid #0ea5e9;
+    padding: 12px 16px;
+    margin-bottom: 12px;
+    border-radius: 4px;
+  }
+  .notes {
+    background: #f8f8f8;
+    padding: 12px 16px;
+    border-radius: 6px;
+    font-size: 12px;
+    color: #666;
+  }
+  .notes ul {
+    margin: 8px 0;
+    padding-left: 20px;
+  }
+  .notes li {
+    margin-bottom: 4px;
+  }
+  .footer {
+    margin-top: 20px;
+    padding-top: 16px;
+    border-top: 1px solid #e0e0e0;
+    font-size: 11px;
+    color: #999;
+    text-align: center;
+  }
+  .status-good { color: #16a34a; font-weight: 600; }
+  .status-warn { color: #ea580c; font-weight: 600; }
+  .footnote {
+    font-size: 11px;
+    color: #999;
+    margin-top: 8px;
+    font-style: italic;
+  }
+  .rfq-type {
+    font-size: 11px;
+    color: #666;
+    font-style: italic;
+  }
+</style>
+</head>
+<body>
+<div class="container">
+
+  <h1>📊 Sales Pulse — Thursday, May 28, 2026</h1>
+  <div class="subtitle">Data as of 6:00am PT | Reflects activity through EOD Wed May 27</div>
+
+  <!-- GLOBAL SNAPSHOT -->
+  <div class="section">
+    <div class="section-title">Global Snapshot — Yesterday vs. 5-Day Rolling Avg</div>
+
+    <!-- PIPELINE INPUT -->
+    <div class="subsection">
+      <div class="subsection-title">Pipeline Input</div>
+      <div class="metric-row">
+        <div class="metric-label">RFQ Lines Entered in OT</div>
+        <div>
+          <span class="metric-value">47 lines (22 customers)</span>
+          <span class="metric-change">5-day avg: 42</span>
+          <span class="metric-change up">↑ +12%</span>
+        </div>
+      </div>
+      <div class="metric-row">
+        <div class="metric-label">RFQ Lines with 1+ Response (VQ or No-Bid)</div>
+        <div>
+          <span class="metric-value">38 lines (81% sourced)</span>
+          <span class="metric-change">5-day avg: 35</span>
+          <span class="metric-change up">↑ +9%</span>
+        </div>
+      </div>
+      <div class="metric-row">
+        <div class="metric-label">Buyer Queue Time (routed → picked)</div>
+        <div>
+          <span class="metric-value">0.6 days avg</span>
+          <span class="metric-change">5-day avg: 0.7d</span>
+          <span class="metric-change up">✅ -14%</span>
+        </div>
+      </div>
+      <div class="metric-row">
+        <div class="metric-label">Buyer Response Time (picked → first response)</div>
+        <div>
+          <span class="metric-value">1.2 days avg</span>
+          <span class="metric-change">5-day avg: 1.3d</span>
+          <span class="metric-change up">✅ -8%</span>
+        </div>
+      </div>
+      <div class="metric-row">
+        <div class="metric-label">Total Response Time (routed → first response)</div>
+        <div>
+          <span class="metric-value">1.8 days avg</span>
+          <span class="metric-change">5-day avg: 2.1d</span>
+          <span class="metric-change up">✅ -14%</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- QUOTING ACTIVITY -->
+    <div class="subsection">
+      <div class="subsection-title">Quoting Activity</div>
+      <div class="metric-row">
+        <div class="metric-label">CQ Lines Entered in OT</div>
+        <div>
+          <span class="metric-value">32 lines (15 customers)</span>
+          <span class="metric-change">5-day avg: 34</span>
+          <span class="metric-change down">↓ -6%</span>
+        </div>
+      </div>
+      <div class="metric-row">
+        <div class="metric-label">CQ Lines Selected as 'Sold'</div>
+        <div>
+          <span class="metric-value">15 lines</span>
+          <span class="metric-change">5-day avg: 12</span>
+          <span class="metric-change up">↑ +25%</span>
+        </div>
+      </div>
+      <div class="metric-row">
+        <div class="metric-label">Avg Quote Age - Short-cycle (Shortage/PPV/Other)</div>
+        <div>
+          <span class="metric-value">6.8 days</span>
+          <span class="metric-change">5-day avg: 6.4d</span>
+          <span class="metric-change warning">⚠️ +6%</span>
+        </div>
+      </div>
+      <div class="metric-row">
+        <div class="metric-label">Avg Quote Age - Long-cycle (Mil-Aero/EOL/Obsolete/LTB)</div>
+        <div>
+          <span class="metric-value">18.3 days</span>
+          <span class="metric-change">5-day avg: 19.8d</span>
+          <span class="metric-change up">✅ -8%</span>
+        </div>
+      </div>
+      <div class="footnote">
+        * Short-cycle: Shortage (10d auto-close), PPV/Cost Saving (15d), Other (30d)<br>
+        * Long-cycle: Mil-Aero/EOL/Obsolete/LTB (64d auto-close)
+      </div>
+    </div>
+
+    <!-- WINS -->
+    <div class="subsection">
+      <div class="subsection-title">Wins</div>
+      <div class="metric-row">
+        <div class="metric-label">SO Lines Booked</div>
+        <div>
+          <span class="metric-value">12 lines</span>
+          <span class="metric-change">5-day avg: 10</span>
+          <span class="metric-change up">↑ +20%</span>
+        </div>
+      </div>
+      <div class="metric-row">
+        <div class="metric-label">$ Booked</div>
+        <div>
+          <span class="metric-value">$67K</span>
+          <span class="metric-change">5-day avg: $58K</span>
+          <span class="metric-change up">↑ +16%</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- SYSTEM DISCIPLINE -->
+    <div class="subsection">
+      <div class="subsection-title">System Discipline</div>
+      <div class="metric-row">
+        <div class="metric-label">CQs entered within 2hrs of marking 'sold'</div>
+        <div>
+          <span class="metric-value">8 of 15 (53%)</span>
+          <span class="metric-change">5-day avg: 62%</span>
+          <span class="metric-change down">↓ -9pts</span>
+        </div>
+      </div>
+      <div class="metric-row">
+        <div class="metric-label">Retroactive CQ entry rate (entered after sold)</div>
+        <div>
+          <span class="metric-value">47%</span>
+          <span class="metric-change">5-day avg: 45%</span>
+          <span class="metric-change warning">⚠️ +2pts</span>
+        </div>
+      </div>
+      <div class="footnote">
+        Note: These numbers reflect OT activity only. Actual pipeline may be higher due to off-system work.
+      </div>
+    </div>
+
+  </div>
+
+  <!-- BY REGION -->
+  <div class="section">
+    <div class="section-title">📍 By Region (Yesterday's Activity)</div>
+    <table>
+      <thead>
+        <tr>
+          <th>Region</th>
+          <th>RFQ Lines<br>Entered</th>
+          <th>RFQ Lines<br>w/ Response</th>
+          <th>Total Resp.<br>Time</th>
+          <th>CQ Lines<br>Entered</th>
+          <th>CQ Lines<br>Sold</th>
+          <th>SO Lines<br>Booked</th>
+          <th>Quote Age<br>(Short)</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr class="region-row">
+          <td><strong>USA</strong> (Jeff, 9 sellers)</td>
+          <td>22 <span class="up">↑</span></td>
+          <td>18 (82%)</td>
+          <td><span class="status-good">1.6d</span></td>
+          <td>18 <span class="flat">→</span></td>
+          <td>8 <span class="up">↑</span></td>
+          <td>7 <span class="up">↑</span></td>
+          <td><span class="status-good">6.1d ✅</span></td>
+        </tr>
+
+        <tr class="region-row">
+          <td><strong>MEX</strong> (Joel, 9 sellers)</td>
+          <td>8 <span class="flat">→</span></td>
+          <td>6 (75%)</td>
+          <td>2.1d</td>
+          <td>5 <span class="down">↓</span></td>
+          <td>3 <span class="flat">→</span></td>
+          <td>2 <span class="flat">→</span></td>
+          <td><span class="status-warn">8.8d ⚠️</span></td>
+        </tr>
+
+        <tr class="region-row">
+          <td><strong>APAC TOTAL</strong> (11 sellers)</td>
+          <td>17 <span class="down">↓</span></td>
+          <td>14 (82%)</td>
+          <td>1.9d</td>
+          <td>9 <span class="down">↓</span></td>
+          <td>4 <span class="up">↑</span></td>
+          <td>3 <span class="up">↑</span></td>
+          <td><span class="status-warn">7.9d ⚠️</span></td>
+        </tr>
+        <tr class="subregion-row">
+          <td>↳ Laurel (SGP, 3 sellers)</td>
+          <td>8</td>
+          <td>7 (88%)</td>
+          <td>1.5d</td>
+          <td>5</td>
+          <td>2</td>
+          <td>2</td>
+          <td>7.2d</td>
+        </tr>
+        <tr class="subregion-row">
+          <td>↳ Kris/Silvia (PHL/China, 5)</td>
+          <td>3</td>
+          <td>2 (67%)</td>
+          <td>2.8d</td>
+          <td>2</td>
+          <td>1</td>
+          <td>0</td>
+          <td>10.3d</td>
+        </tr>
+        <tr class="subregion-row">
+          <td>↳ Lavanya (IND, 3 sellers)</td>
+          <td>5</td>
+          <td>4 (80%)</td>
+          <td>1.7d</td>
+          <td>2</td>
+          <td>1</td>
+          <td>1</td>
+          <td>6.5d</td>
+        </tr>
+
+        <tr class="total-row">
+          <td>GLOBAL (29 sellers)</td>
+          <td>47</td>
+          <td>38 (81%)</td>
+          <td>1.8d</td>
+          <td>32</td>
+          <td>15</td>
+          <td>12</td>
+          <td>6.8d</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- YESTERDAY'S WINS -->
+  <div class="section">
+    <div class="section-title">🎉 Yesterday's Wins (orders booked Wed 5/27)</div>
+
+    <div class="win-item">
+      <div class="win-title">✅ USA: $47K across 7 lines</div>
+      <div>
+        • Premier Electronics — 4 lines, $32K (Dan Reiser)<br>
+        • TechSource — 3 lines, $15K (Jake McAloose)
+      </div>
+      <div class="insight">💡 Premier order came from 3-day-old quote (fast close!)</div>
+    </div>
+
+    <div class="win-item">
+      <div class="win-title">✅ MEX: $8K across 2 lines</div>
+      <div>• Grupo Industrial — 2 lines, $8K (Carlos Moreno)</div>
+    </div>
+
+    <div class="win-item">
+      <div class="win-title">✅ APAC: $12K across 3 lines</div>
+      <div>
+        • Delta Electronics — 2 lines, $9K (Jasper Kee - Laurel's team)<br>
+        • LG Display — 1 line, $3K (Meenakshi Chidambaram - Lavanya's team)
+      </div>
+    </div>
+  </div>
+
+  <!-- NEEDS ATTENTION -->
+  <div class="section">
+    <div class="section-title">🚨 Needs Attention (Quotes/RFQs Created in Last 5 Business Days)</div>
+    <div class="footnote" style="margin-bottom: 12px;">
+      Showing only items created in last 5 business days — keeps focus on fresh, actionable opportunities
+    </div>
+
+    <div class="alert-box critical">
+      <div class="alert-title">🔥 HIGH-VALUE QUOTES (>$10K, created in last 5 days) — Top 5</div>
+      <div class="alert-item">1. Samsung Electronics - <strong>$24K</strong>, created 3 days ago <span class="rfq-type">(Shortage - 10d window, 7d left)</span> (APAC - Jasper Kee)</div>
+      <div class="alert-item">2. Acme Corp - <strong>$18K</strong>, created 5 days ago <span class="rfq-type">(PPV - 15d window, 10d left)</span> (USA - Dan Reiser) <em>← 75% win rate</em></div>
+      <div class="alert-item">3. Foxconn - <strong>$11K</strong>, created 2 days ago <span class="rfq-type">(Shortage - 10d window, 8d left)</span> (APAC - Ray Ng)</div>
+      <div class="alert-item">4. Widget Co - <strong>$10K</strong>, created 4 days ago <span class="rfq-type">(Other - 30d window, 26d left)</span> (USA - Jake McAloose)</div>
+      <div class="alert-item">5. Delta Electronics - <strong>$9K</strong>, created 1 day ago <span class="rfq-type">(EOL - 64d window, 63d left)</span> (APAC - Meenakshi)</div>
+      <div class="alert-detail"><strong>ACTION:</strong> Prioritize Shortage/PPV quotes — shorter windows require faster action — combined <strong>$72K pipeline</strong></div>
+    </div>
+
+    <div class="alert-box opportunity">
+      <div class="alert-title">💎 HIGH-PROBABILITY CUSTOMERS (30-50% win rate, quoted in last 5 days) — Top 5</div>
+      <div class="alert-item">1. Premier Electronics - $9K, quoted 4 days ago <span class="rfq-type">(Shortage)</span> (USA - Jake McAloose) <em>← 45% win rate</em></div>
+      <div class="alert-item">2. Grupo Industrial - $6K, quoted 2 days ago <span class="rfq-type">(PPV)</span> (MEX - Carlos Moreno) <em>← 42% win rate, won last 3</em></div>
+      <div class="alert-item">3. LG Display - $7K, quoted 3 days ago <span class="rfq-type">(Shortage)</span> (APAC - Lavanya team) <em>← 38% win rate</em></div>
+      <div class="alert-item">4. TechSource - $5K, quoted 5 days ago <span class="rfq-type">(Other)</span> (USA - Justin Goodwin) <em>← 35% win rate</em></div>
+      <div class="alert-item">5. Positronic - $4K, quoted 1 day ago <span class="rfq-type">(Shortage)</span> (USA - Thomas Haynes) <em>← 33% win rate</em></div>
+      <div class="alert-detail"><strong>ACTION:</strong> Follow up today — reliable customers, likely to close with nudge (combined $31K)</div>
+    </div>
+
+    <div class="alert-box opportunity">
+      <div class="alert-title">🆕 NEW CUSTOMER OPPORTUNITIES (first-time RFQs in last 5 days, no quotes yet) — Top 5</div>
+      <div class="alert-item">1. TechGlobal Inc - 4 RFQ lines, <strong>entered 5/23</strong> (5 days ago) (USA - Justin Goodwin)</div>
+      <div class="alert-item">2. Delta Systems - 3 RFQ lines, <strong>entered 5/25</strong> (3 days ago) (APAC - Lavanya team)</div>
+      <div class="alert-item">3. Innovatech - 2 RFQ lines, <strong>entered 5/24</strong> (4 days ago) (MEX - Joel team)</div>
+      <div class="alert-item">4. Quantum Electronics - 2 RFQ lines, <strong>entered 5/26</strong> (2 days ago) (USA - Dan Reiser)</div>
+      <div class="alert-item">5. Apex Manufacturing - 1 RFQ line, <strong>entered 5/27</strong> (1 day ago) (APAC - Laurel team)</div>
+      <div class="alert-detail"><strong>ACTION:</strong> Prioritize for fast response — first impression matters, oldest RFQs need quotes today (12 lines total)</div>
+    </div>
+
+    <div class="alert-box">
+      <div class="alert-title">⚠️ PRICING BENCHMARKS (last 30 days: 30+ lines quoted, <10% win rate)</div>
+      <div class="alert-item">• WidgetCorp - 47 lines quoted, 3 won (6% win rate) — price not competitive or wrong fit</div>
+      <div class="alert-item">• GlobalTech - 32 lines quoted, 2 won (6% win rate) — review pricing strategy</div>
+      <div class="alert-detail"><strong>NOTE:</strong> Use for pricing intel / market benchmarking (not pursuit priority). These alerts persist for 5 days after first appearance, then fall off unless pattern continues.</div>
+    </div>
+
+    <div class="alert-box">
+      <div class="alert-title">⚠️ SOURCING STUCK (routed RFQ lines with no response after 3+ days) — 8 lines</div>
+
+      <div style="margin-top: 8px;"><strong>USA (3 lines):</strong></div>
+      <div class="alert-item">1. <strong>TPS54620</strong> (Texas Instruments) | QTY: 500<br>
+        <span style="font-size: 11px;">Customer: Premier Electronics | Seller: Dan Reiser | Buyer: Pool | Routed: 5/24 (4 days ago)</span></div>
+      <div class="alert-item">2. <strong>LM317T</strong> (STMicroelectronics) | QTY: 1,000<br>
+        <span style="font-size: 11px;">Customer: TechSource | Seller: Jake McAloose | Buyer: Pool | Routed: 5/23 (5 days ago)</span></div>
+      <div class="alert-item">3. <strong>MC34063</strong> (ON Semiconductor) | QTY: 250<br>
+        <span style="font-size: 11px;">Customer: Acme Corp | Seller: Justin Goodwin | Buyer: Sarah Chen | Routed: 5/25 (3 days ago)</span></div>
+
+      <div style="margin-top: 8px;"><strong>MEX (1 line):</strong></div>
+      <div class="alert-item">1. <strong>2N3904</strong> (Fairchild) | QTY: 5,000<br>
+        <span style="font-size: 11px;">Customer: Grupo Industrial | Seller: Carlos Moreno | Buyer: Pool | Routed: 5/25 (3 days ago)</span></div>
+
+      <div style="margin-top: 8px;"><strong>APAC (4 lines):</strong></div>
+      <div class="alert-item">1. <strong>ATmega328P</strong> (Microchip) | QTY: 2,000<br>
+        <span style="font-size: 11px;">Customer: Samsung Electronics | Seller: Jasper Kee | Buyer: Li Wei | Routed: 5/23 (5 days ago)</span></div>
+      <div class="alert-item">2. <strong>NE555</strong> (Texas Instruments) | QTY: 3,500<br>
+        <span style="font-size: 11px;">Customer: Foxconn | Seller: Ray Ng | Buyer: Pool | Routed: 5/24 (4 days ago)</span></div>
+      <div class="alert-item">3. <strong>STM32F103</strong> (STMicroelectronics) | QTY: 1,200<br>
+        <span style="font-size: 11px;">Customer: LG Display | Seller: Meenakshi Chidambaram | Buyer: Ravi Kumar | Routed: 5/25 (3 days ago)</span></div>
+      <div class="alert-item">4. <strong>LM358</strong> (Texas Instruments) | QTY: 800<br>
+        <span style="font-size: 11px;">Customer: Delta Electronics | Seller: Jasper Kee | Buyer: Pool | Routed: 5/24 (4 days ago)</span></div>
+
+      <div class="alert-detail"><strong>ACTION:</strong> Escalate to assigned buyers (or pull from pool) or close out. Only includes RFQ lines routed to buyer queue 3+ days ago with no VQ or no-bid/no-stock response yet.</div>
+    </div>
+
+  </div>
+
+  <!-- WEEK-TO-DATE -->
+  <div class="section">
+    <div class="section-title">📈 Week-to-Date (Mon-Thu, 4 of 5 days)</div>
+    <table>
+      <thead>
+        <tr>
+          <th>Region</th>
+          <th>RFQ Lines<br>Entered</th>
+          <th>CQ Lines<br>Entered</th>
+          <th>CQ Lines<br>Sold</th>
+          <th>Weekly<br>Target*</th>
+          <th>Pace</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><strong>USA</strong> (9 sellers)</td>
+          <td>89</td>
+          <td>72</td>
+          <td>32</td>
+          <td>180 / 135 / 41</td>
+          <td><span class="status-good">✅ On track</span></td>
+        </tr>
+        <tr>
+          <td><strong>MEX</strong> (9 sellers)</td>
+          <td>30</td>
+          <td>19</td>
+          <td>11</td>
+          <td>180 / 135 / 41</td>
+          <td><span class="status-warn">⚠️ Below pace</span></td>
+        </tr>
+        <tr>
+          <td><strong>APAC</strong> (11 sellers)</td>
+          <td>65</td>
+          <td>40</td>
+          <td>17</td>
+          <td>220 / 165 / 50</td>
+          <td><span class="status-good">✅ On track</span></td>
+        </tr>
+        <tr class="total-row">
+          <td>GLOBAL (29 sellers)</td>
+          <td>184</td>
+          <td>131</td>
+          <td>60</td>
+          <td>580 / 435 / 132</td>
+          <td><span class="status-good">✅ On track</span></td>
+        </tr>
+      </tbody>
+    </table>
+    <div style="font-size: 11px; color: #666; margin-top: 12px;">
+      <strong>* Weekly Target format:</strong> RFQ Lines / CQ Lines / CQ Sold<br>
+      <strong>Per-seller KPIs:</strong> 20 RFQ lines, 15 CQ lines, 4.5 CQ sold (30% close rate)<br>
+      <strong>Projected week-end:</strong> 230 RFQ lines, 164 CQ lines, 75 CQ sold → <span class="status-good">✅ On pace</span>
+    </div>
+  </div>
+
+  <!-- MARKET PULSE -->
+  <div class="section">
+    <div class="section-title">📊 Market Pulse (5-Day Rolling Trends)</div>
+
+    <div class="market-pulse-item">
+      <div style="font-weight: 600; margin-bottom: 4px;">🔥 HOT: Microchip Technology Parts</div>
+      <div>23 RFQ lines from <strong>10 distinct customers</strong> this week</div>
+      <div style="font-size: 11px; color: #666; margin-top: 2px;">vs 9 lines / 4 customers last week (+156% demand spike)</div>
+    </div>
+
+    <div class="market-pulse-item">
+      <div style="font-weight: 600; margin-bottom: 4px;">📈 TRENDING UP: Parts with Prefix "74LS"</div>
+      <div>Booking <strong>2.3× faster</strong> than 30-day avg (2.1 days to close vs 4.8 days)</div>
+      <div style="font-size: 11px; color: #666; margin-top: 2px;">Hot commodity — prioritize sourcing and quoting for these parts</div>
+    </div>
+
+    <div class="market-pulse-item">
+      <div style="font-weight: 600; margin-bottom: 4px;">📉 TRENDING DOWN: PPV/Cost Saving RFQs</div>
+      <div>Down <strong>12%</strong> vs prior 5-day period</div>
+      <div style="font-size: 11px; color: #666; margin-top: 2px;">Customers less price-sensitive this week or shift to shortage demand?</div>
+    </div>
+
+  </div>
+
+  <!-- NOTES -->
+  <div class="notes">
+    <div style="font-weight: 600; margin-bottom: 8px;">📝 Observations</div>
+    <ul>
+      <li>USA leading on velocity (6.1d avg quote age vs 6.8d global short-cycle)</li>
+      <li>System discipline slipping: only 53% of CQs entered within 2hrs of marking sold (down from 62% 5-day avg)</li>
+      <li>Buyer response time improving (1.8d total vs 2.1d 5-day avg) — good trend</li>
+      <li>MEX below weekly pace — lighter RFQ load or sourcing bottleneck?</li>
+      <li>Watch Microchip parts — 156% demand spike signals market opportunity</li>
+    </ul>
+  </div>
+
+  <div class="footer">
+    Questions? Reply to this email or ping analytics team.<br>
+    Next digest: Tomorrow 6am PT
+  </div>
+
+</div>
+</body>
+</html>
