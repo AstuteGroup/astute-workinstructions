@@ -257,8 +257,46 @@ async function runActiveSourcing(options = {}) {
   console.log(`  Selected ${selectedMpns.length} MPNs`);
 
   if (selectedMpns.length === 0) {
-    console.log('  No MPNs selected. Done.');
-    return { selected: 0, rfqsSent: 0 };
+    // Check if this means first pass is complete
+    const { isFirstPassComplete, getQueueStats } = require('./selection-engine');
+    if (isFirstPassComplete()) {
+      const stats = getQueueStats();
+      console.log('');
+      console.log('='.repeat(60));
+      console.log('🎉 FIRST PASS COMPLETE — ALL DELISTED PARTS SOURCED');
+      console.log('='.repeat(60));
+      console.log(`Total delisted parts: ${stats.total}`);
+      console.log(`All sourced: ${stats.sourced}`);
+      console.log('');
+      console.log('Phase 2 prioritization can now begin with full pricing data.');
+      console.log('='.repeat(60));
+
+      // Send notification email
+      try {
+        const notifier = createNotifier({
+          fromEmail: 'stockrfq@orangetsunami.com',
+          fromName: 'Active Sourcing',
+          smtpPass: process.env.WORKMAIL_PASS
+        });
+        await notifier.sendEmail(
+          NOTIFICATION_EMAIL,
+          'Active Sourcing: First Pass Complete — All Delisted Parts Sourced',
+          `All ${stats.total} delisted parts have been sourced.\n\n` +
+          `The first pass through the delisted inventory queue is complete.\n\n` +
+          `Phase 2 prioritization can now begin with the full pricing data collected.\n\n` +
+          `Queue stats:\n` +
+          `  - Total parts: ${stats.total}\n` +
+          `  - Sourced: ${stats.sourced}\n` +
+          `  - Last updated: ${stats.lastUpdated}\n`
+        );
+        console.log('Notification sent to operator.');
+      } catch (e) {
+        console.warn(`Could not send notification: ${e.message}`);
+      }
+    } else {
+      console.log('  No MPNs selected (queue empty or all recently sourced).');
+    }
+    return { selected: 0, rfqsSent: 0, firstPassComplete: isFirstPassComplete() };
   }
 
   if (dryRun) {

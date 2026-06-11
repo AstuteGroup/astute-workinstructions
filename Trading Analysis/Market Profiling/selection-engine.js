@@ -65,35 +65,13 @@ function markAsSourced(mpns) {
 
 /**
  * Get unsourced delisted MPNs from the queue.
- * If unsourced count is below batch limit, reset oldest sourced parts
- * to keep the cycle going continuously.
+ * Returns only parts not yet sourced. When queue is exhausted,
+ * returns empty array — Active Sourcing will send completion notification.
+ * Phase 2 will use different prioritization after first pass completes.
  */
-function getDelistedMPNs(batchLimit = DEFAULT_LIMIT) {
+function getDelistedMPNs() {
     const queue = readDelistedQueue();
-    let unsourced = queue.parts.filter(p => !p.sourced);
-
-    // If we don't have enough unsourced parts, reset oldest sourced to cycle through again
-    if (unsourced.length < batchLimit && queue.parts.length > 0) {
-        const sourced = queue.parts
-            .filter(p => p.sourced)
-            .sort((a, b) => new Date(a.sourcedDate) - new Date(b.sourcedDate)); // oldest first
-
-        const needToReset = batchLimit - unsourced.length;
-        const toReset = sourced.slice(0, needToReset);
-
-        for (const part of toReset) {
-            part.sourced = false;
-            part.sourcedDate = null;
-        }
-
-        if (toReset.length > 0) {
-            queue.lastUpdated = new Date().toISOString();
-            fs.writeFileSync(DELISTED_QUEUE_FILE, JSON.stringify(queue, null, 2));
-            console.log(`  Recycled ${toReset.length} oldest sourced parts back into queue`);
-        }
-
-        unsourced = queue.parts.filter(p => !p.sourced);
-    }
+    const unsourced = queue.parts.filter(p => !p.sourced);
 
     return unsourced.map(p => ({
         mpn: p.mpn,
@@ -101,6 +79,27 @@ function getDelistedMPNs(batchLimit = DEFAULT_LIMIT) {
         qty: 0,
         delistedDate: p.delistedDate
     }));
+}
+
+/**
+ * Check if all delisted parts have been sourced (first pass complete)
+ */
+function isFirstPassComplete() {
+    const queue = readDelistedQueue();
+    if (queue.parts.length === 0) return false; // No parts to source
+    const unsourced = queue.parts.filter(p => !p.sourced);
+    return unsourced.length === 0;
+}
+
+/**
+ * Get queue stats for notifications
+ */
+function getQueueStats() {
+    const queue = readDelistedQueue();
+    const total = queue.parts.length;
+    const sourced = queue.parts.filter(p => p.sourced).length;
+    const unsourced = total - sourced;
+    return { total, sourced, unsourced, lastUpdated: queue.lastUpdated };
 }
 
 // ─── Configuration ─────────────────────────────────────────────────────────
@@ -540,5 +539,7 @@ module.exports = {
   selectPriorityMPNs,
   markAsSourced,
   readDelistedQueue,
-  getDelistedMPNs
+  getDelistedMPNs,
+  isFirstPassComplete,
+  getQueueStats
 };
