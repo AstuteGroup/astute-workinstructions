@@ -1,10 +1,11 @@
 #!/usr/bin/env node
 /**
- * Recover emails stuck in NeedsReview due to budget exhaustion.
+ * Recover emails stuck due to budget exhaustion.
  * Moves them back to INBOX so the next agent cycle reprocesses them.
  *
  * Usage:
  *   node scripts/recover-budget-stuck.js --workflow broker-offers [--dry-run]
+ *   node scripts/recover-budget-stuck.js --workflow broker-offers --folder Processed --uids 14,17,20
  *   node scripts/recover-budget-stuck.js --workflow excess [--dry-run]
  */
 
@@ -15,6 +16,10 @@ const { ImapFlow } = require('imapflow');
 const argv = process.argv.slice(2);
 const workflowIdx = argv.indexOf('--workflow');
 const WORKFLOW_NAME = workflowIdx >= 0 ? argv[workflowIdx + 1] : null;
+const folderIdx = argv.indexOf('--folder');
+const FOLDER = folderIdx >= 0 ? argv[folderIdx + 1] : 'NeedsReview';
+const uidsIdx = argv.indexOf('--uids');
+const SPECIFIC_UIDS = uidsIdx >= 0 ? argv[uidsIdx + 1].split(',').map(u => u.trim()) : null;
 const DRY_RUN = argv.includes('--dry-run');
 
 if (!WORKFLOW_NAME) {
@@ -43,11 +48,17 @@ async function main() {
   await client.connect();
 
   try {
-    // Open NeedsReview folder
-    const lock = await client.getMailboxLock('NeedsReview');
+    // Open specified folder (default: NeedsReview)
+    const lock = await client.getMailboxLock(FOLDER);
     try {
-      const uids = (await client.search({ all: true }, { uid: true })) || [];
-      console.log(`Found ${uids.length} email(s) in NeedsReview`);
+      let uids;
+      if (SPECIFIC_UIDS) {
+        // Search for specific UIDs
+        uids = (await client.search({ uid: SPECIFIC_UIDS.join(',') }, { uid: true })) || [];
+      } else {
+        uids = (await client.search({ all: true }, { uid: true })) || [];
+      }
+      console.log(`Found ${uids.length} email(s) in ${FOLDER}${SPECIFIC_UIDS ? ` (filtered to UIDs: ${SPECIFIC_UIDS.join(',')})` : ''}`);
 
       if (uids.length === 0) {
         console.log('Nothing to recover');
