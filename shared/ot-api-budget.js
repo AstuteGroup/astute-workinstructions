@@ -30,7 +30,7 @@ const LIMITS = {
   maxWritesPer5Min: 200,            // CRITICAL - prevents sustained burst (June 1 hit 252 and crashed)
   maxWritesPer15Min: 800,           // 20% buffer above proven 672 peak
   maxWritesPerHour: 2000,           // 20% buffer above proven 1,657 peak
-  maxWritesPerDay: 150000,          // Raised from 30k — 256k proven safe; burst limits are real protection
+  maxWritesPerDay: 300000,          // Raised from 30k — 256k proven safe June 10; burst limits are real protection
 
   // Priority tiers (higher number = higher priority)
   // When budget is constrained, higher-priority callers get preference
