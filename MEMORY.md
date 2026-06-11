@@ -46,35 +46,7 @@ The notifier uses AWS WorkMail SMTP with credentials from `~/workspace/.env`. Wo
 
 - **2026-06-08 (NC Listing Fix + Inventory Cleanup Drift)**: **Fixed `nc-listing` cron job that was broken since refactor.** Root cause: job used `cadence: 'twice-weekly'` but `cadenceToMs()` didn't support it — crashed on every tick with `Error: Unrecognized cadence: twice-weekly`. **Fixes:** (1) Added `twice-weekly` = 3 days to `cron-jobs.js`. (2) Ran `inventory-cleanup` manually (4,188 lines to OT). (3) Ran `nc-listing` manually (560 rows to NetComponents). (4) Re-anchored both sentinels to proper schedule times (inventory-cleanup: Mon 11 UTC, nc-listing: Mon/Thu 12 UTC) — they had drifted to ~20 UTC from late runs. **Also refactored `nc-listing` email logic:** Removed duplicate review copies to jake.harris@ — NetComponents emails already CC him, so 4 emails → 2 emails. Commits: `40c8a80`, `1011461`.
 
-- **2026-06-04 (Stuck Email Detection + Auto-Recovery + Cleanup)**: **Fixed systemic gap where emails could get stuck in SEEN-but-not-processed state.** Root cause: when agent reads an email (marks SEEN) but crashes/pauses before routing, the email becomes invisible to the next `list` call. **Solution (3 parts):** (1) **Auto-recovery in poller** — `list` command now scans for SEEN emails >60 min old, clears their SEEN flag so they reappear. 24-hour cap prevents recovering ancient spam/test emails. (2) **Operations Digest detection** — new section shows stuck emails across all 4 workflows (vq-loading, excess, stockrfq, rfq-loading), separates auto-recoverable (60min-24h) from manual-review (>24h). (3) **New poller commands** — `check-stuck` (read-only monitoring) and `recover-stuck` (manual recovery with configurable threshold). **Also added:** Pause detection to digest (paused jobs now flagged). **Investigation origin:** Ivy's test emails (UID 8765/8768 to VQ inbox) didn't load AND didn't send failure notification because VQ loading agent was paused via `.vq-loading-agent-paused` file since June 2. **Cleanup (post-recovery):** Archived 37 old stuck emails across vq-loading/stockrfq/rfq-loading via new `scripts/archive-stuck-emails.js`. Excess inbox had 8 stuck from May 8-22 — reviewed individually: archived 8 junk (spam, RFQs-not-offers, partial forwards), recovered 3 legitimate offers (USI Mexico, Benchmark Romania, DFI) by clearing SEEN flag. **Root cause of May 8-22 excess stuck emails:** Agent WAS running (confirmed by offers created with "excessAgent" in description), but specific edge-case emails got stuck because agent read them, determined they weren't actionable, but failed to route them to a folder (NotOffer/NeedsReview). Not crashes — routing gaps. The auto-recovery and archive scripts now handle this. Scripts: `archive-stuck-emails.js`, `move-uids-to-archive.js`. Commit: `64d906e`.
-  - ISE Steward: 1,207 locations across 52 inactive stewards
-  - FSE Steward: 136 locations
-  - Top stewards needing reassignment: Madison Fischl (113), Elena Wilfong (94), JeanPaul Chevrier (78), Erin Lee (77), Edyna Lee (76), Hugo Ogalde (114 total)
-  - 226 locations have another active rep currently working the account
-
-  **V8 Account Status (location-level):**
-  - DECLINING: 18 ($28.4M lifetime)
-  - AT RISK: 60 ($21.7M lifetime)
-  - LAPSED: 106 ($8.4M lifetime)
-  - TRUE NEGLECT: 6 ($1.2M lifetime)
-  - NEVER ENGAGED: 963 locations
-
-  **Deliverables:**
-  - `~/workspace/Account Reassignment/ISE-FSE-Steward-Reassignment.xlsx` (5 sheets)
-  - `~/workspace/Account Reassignment/ise-fse-steward-reassignment.js` (final script)
-  - Screenshots: `RTX Example OT - Thomas.png`, `Change Log RTX Example.png`
-
-  **Column Order (Sales Leadership sheet):**
-  1. Former ISE/FSE (Inactive), Assignment Type, Termination Date, Last Activity (Former ISE/FSE), Last Steward Change, Changed By
-  2. Account Name, Account Location
-  3. Location-level metrics: CQ Lines YTD, CQ Sold YTD, Sold YTD/2025/Lifetime
-  4. Account-level: RFQ Lines YTD (RFQs don't have location field)
-  5. Last Activity Date/By, Other Rep Working, Action Note
-  6. Account Status, Reassign To, Notes
-
-- **2026-05-19 (Sales Funnel Report - In Progress)**: Building comprehensive sales funnel report by customer showing engagement metrics for OEM/EMS accounts (excluding brokers).
-
-  **Status:** Threshold revision needed before finalizing
+- **2026-06-04 (Stuck Email Detection + Auto-Recovery + Cleanup)**: **Fixed systemic gap where emails could get stuck in SEEN-but-not-processed state.** Root cause: when agent reads an email (marks SEEN) but crashes/pauses before routing, the email becomes invisible to the next `list` call. **Solution (3 parts):** (1) **Auto-recovery in poller** — `list` command now scans for SEEN emails >60 min old, clears their SEEN flag so they reappear. 24-hour cap prevents recovering ancient spam/test emails. (2) **Operations Digest detection** — new section shows stuck emails across all 4 workflows (vq-loading, excess, stockrfq, rfq-loading), separates auto-recoverable (60min-24h) from manual-review (>24h). (3) **New poller commands** — `check-stuck` (read-only monitoring) and `recover-stuck` (manual recovery with configurable threshold). Commit: `64d906e`.
 
   **Completed:**
   - Built SQL query with all metrics (activities, RFQs by type, CQs, sold values)
