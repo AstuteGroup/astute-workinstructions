@@ -482,10 +482,14 @@ This is an automated notification from the Active Sourcing workflow.`;
   // Step 8: Mark selected MPNs as sourced in delisted queue
   console.log('');
   console.log('Step 8: Marking MPNs as sourced in delisted queue...');
-  const { markAsSourced } = require('./selection-engine');
+  const { markAsSourced, getQueueStats } = require('./selection-engine');
   const sourcedMpns = selectedMpns.map(m => m.mpn);
   const markedCount = markAsSourced(sourcedMpns);
   console.log(`  Marked ${markedCount} MPNs as sourced (won't be re-selected)`);
+
+  // Get queue stats for digest
+  const queueStats = getQueueStats();
+  const progressPct = queueStats.total > 0 ? Math.round(queueStats.sourced / queueStats.total * 100) : 0;
 
   console.log('');
   console.log('='.repeat(60));
@@ -504,11 +508,48 @@ This is an automated notification from the Active Sourcing workflow.`;
   }
   console.log(`Batch: ${batchId} (exclusions expire in 7 days)`);
   console.log('');
-  console.log('Next steps:');
-  console.log('1. Franchise VQs already loaded — compare against broker quotes');
-  console.log('2. Monitor VQ Loading for vendor quote responses');
-  console.log('3. Exclusions will auto-expire for next inventory upload');
+  console.log('Queue progress:');
+  console.log(`  Sourced: ${queueStats.sourced} / ${queueStats.total} (${progressPct}%)`);
+  console.log(`  Remaining: ${queueStats.unsourced} parts`);
   console.log('='.repeat(60));
+
+  // Step 9: Send batch digest email
+  console.log('');
+  console.log('Step 9: Sending batch digest...');
+  try {
+    const franchiseCoverage = enrichmentResult ? enrichmentResult.qtyMatches + enrichmentResult.partialCoverage : 0;
+    const franchisePct = linesAdded > 0 ? Math.round(franchiseCoverage / linesAdded * 100) : 0;
+
+    const notifier = createNotifier({
+      fromEmail: 'stockrfq@orangetsunami.com',
+      fromName: 'Active Sourcing',
+      smtpPass: process.env.WORKMAIL_PASS
+    });
+
+    await notifier.sendEmail(
+      NOTIFICATION_EMAIL,
+      `Active Sourcing Batch Complete — ${progressPct}% through delisted queue`,
+      `Active Sourcing batch ${batchId} complete.\n\n` +
+      `THIS BATCH:\n` +
+      `  RFQ: ${rfq.searchKey}\n` +
+      `  Parts sourced: ${linesAdded}\n` +
+      `  Franchise coverage: ${franchiseCoverage}/${linesAdded} (${franchisePct}%)\n` +
+      (enrichmentResult ? `  API calls: ${enrichmentResult.apiCalls} (${enrichmentResult.cacheHits} cache hits)\n` : '') +
+      (franchiseSkipped > 0 ? `  Skipped broker RFQ (full franchise coverage): ${franchiseSkipped}\n` : '') +
+      `\n` +
+      `QUEUE PROGRESS:\n` +
+      `  Total delisted parts: ${queueStats.total}\n` +
+      `  Sourced so far: ${queueStats.sourced} (${progressPct}%)\n` +
+      `  Remaining: ${queueStats.unsourced}\n` +
+      `\n` +
+      (queueStats.unsourced === 0
+        ? `🎉 FIRST PASS COMPLETE — All delisted parts have been sourced!\n`
+        : `Next batch: ${Math.min(200, queueStats.unsourced)} parts on next scheduled run.\n`)
+    );
+    console.log('  Digest sent.');
+  } catch (e) {
+    console.warn(`  Could not send digest: ${e.message}`);
+  }
 
   // Consume the gate file after successful run
   if (fs.existsSync(INVENTORY_GATE_FILE)) {
