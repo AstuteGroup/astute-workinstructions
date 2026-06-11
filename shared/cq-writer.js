@@ -374,9 +374,10 @@ async function writeCQBatch(rfqSearchKey, lines, opts = {}) {
   const CHUNK_DELAY_MS = 1500;
   const useChunkedMode = lines.length > LARGE_BATCH_THRESHOLD;
 
+  const estimatedWrites = lines.length; // One chuboe_cq_line per input line
+
   if (!useChunkedMode) {
     // ── TIER 1: Global budget check ──
-    const estimatedWrites = lines.length; // One chuboe_cq_line per input line
     const globalCheck = otBudget.checkBudget({
       table: 'chuboe_cq_line',
       count: estimatedWrites,
@@ -400,6 +401,26 @@ async function writeCQBatch(rfqSearchKey, lines, opts = {}) {
       return { written, flagged, failed, skipped, summary };
     }
   } else {
+    // Chunked mode: still check daily limit (skip burst checks - we self-pace)
+    // Prevents perfect storm of normal loads + huge batch exceeding daily cap
+    const status = otBudget.getStatus();
+    const dailyUsed = parseInt(status.globalBudget.lastDay.split('/')[0], 10) || 0;
+    const dailyLimit = otBudget.LIMITS.maxWritesPerDay;
+    if (dailyUsed + estimatedWrites > dailyLimit) {
+      logger.warn(`Daily budget would be exceeded for RFQ ${rfqSearchKey}: ${dailyUsed}/${dailyLimit} + ${estimatedWrites} estimated`);
+      const summary = {
+        total: lines.length,
+        written: 0,
+        flagged: 0,
+        failed: 0,
+        skipped: 0,
+        byReason: {},
+        rateLimited: true,
+        rateLimitReason: `Daily limit: ${dailyUsed}/${dailyLimit} used, need ${estimatedWrites} more`,
+        rateLimitTier: 'daily',
+      };
+      return { written, flagged, failed, skipped, summary };
+    }
     logger.info(`Large CQ batch detected (${lines.length} lines) — using chunked mode`);
   }
 

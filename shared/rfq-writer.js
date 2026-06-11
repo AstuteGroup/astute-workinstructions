@@ -140,6 +140,9 @@ async function writeRFQ(opts) {
     // plain re-run would duplicate the header; this path avoids that.
     existingRfqId = null,
     existingSearchKey = null,
+    // Sidecar replays: when true, bypass the global OT write budget check.
+    // Recovery operations should not compete with normal flow for budget.
+    skipBudgetCheck = false,
   } = opts;
 
   // ── Validation ──
@@ -244,11 +247,33 @@ async function writeRFQ(opts) {
   const CHUNK_DELAY_MS = 2000;      // 2s between chunks
   const useChunkedMode = lines.length > LARGE_RFQ_THRESHOLD;
 
+  const estimatedWrites = lines.length * 2; // line + line_mpn per input
+
   if (useChunkedMode) {
+    // Chunked mode: still check daily limit (skip burst checks - we self-pace)
+    // Prevents perfect storm of normal loads + huge file exceeding daily cap
+    if (!skipBudgetCheck) {
+      const status = otBudget.getStatus();
+      const dailyUsed = parseInt(status.globalBudget.lastDay.split('/')[0], 10) || 0;
+      const dailyLimit = otBudget.LIMITS.maxWritesPerDay;
+      if (dailyUsed + estimatedWrites > dailyLimit) {
+        logger.warn(`Daily budget would be exceeded: ${dailyUsed}/${dailyLimit} + ${estimatedWrites} estimated`);
+        return {
+          rfqId,
+          searchKey,
+          linesWritten: 0,
+          mpnsWritten: 0,
+          errors: [],
+          rateLimited: true,
+          rateLimitReason: `Daily limit: ${dailyUsed}/${dailyLimit} used, need ${estimatedWrites} more`,
+          otUnreachable: false,
+        };
+      }
+    }
     logger.info(`Large RFQ detected (${lines.length} lines) — using chunked mode with ${CHUNK_SIZE}-line chunks and ${CHUNK_DELAY_MS}ms delays`);
-  } else {
+  } else if (!skipBudgetCheck) {
     // Budget check for smaller RFQs (large ones self-pace via chunking)
-    const estimatedWrites = lines.length * 2; // line + line_mpn per input
+    // Skipped for sidecar replays (recovery operations bypass budget)
     const globalCheck = otBudget.checkBudget({
       table: 'chuboe_rfq_line',
       count: estimatedWrites,

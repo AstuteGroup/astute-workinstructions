@@ -290,6 +290,25 @@ async function writeOffer(opts) {
       };
     }
   } else {
+    // Chunked mode: still check daily limit (skip burst checks - we self-pace)
+    // Prevents perfect storm of normal loads + huge file exceeding daily cap
+    const status = otBudget.getStatus();
+    const dailyUsed = parseInt(status.globalBudget.lastDay.split('/')[0], 10) || 0;
+    const dailyLimit = otBudget.LIMITS.maxWritesPerDay;
+    if (dailyUsed + estimatedWrites > dailyLimit) {
+      logger.warn(`Daily budget would be exceeded: ${dailyUsed}/${dailyLimit} + ${estimatedWrites} estimated`);
+      return {
+        offerId: null,
+        searchKey: null,
+        linesWritten: 0,
+        mpnsWritten: 0,
+        errors: [],
+        rateLimited: true,
+        rateLimitReason: `Daily limit: ${dailyUsed}/${dailyLimit} used, need ${estimatedWrites} more`,
+        rateLimitTier: 'daily',
+        otUnreachable: false,
+      };
+    }
     logger.info(`Large offer detected (${lines.length} lines) — using chunked mode with ${CHUNK_SIZE}-line chunks and ${CHUNK_DELAY_MS}ms delays`);
   }
 

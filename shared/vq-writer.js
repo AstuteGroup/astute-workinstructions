@@ -989,6 +989,29 @@ async function writeVQBatch(rfqSearchKey, items, opts = {}) {
       };
     }
   } else {
+    // Chunked mode: still check daily limit (skip burst checks - we self-pace)
+    // Prevents perfect storm of normal loads + huge batch exceeding daily cap
+    const status = otBudget.getStatus();
+    const dailyUsed = parseInt(status.globalBudget.lastDay.split('/')[0], 10) || 0;
+    const dailyLimit = otBudget.LIMITS.maxWritesPerDay;
+    if (dailyUsed + estimatedVQs > dailyLimit) {
+      logger.warn(`[vq-writer] Daily budget would be exceeded: ${dailyUsed}/${dailyLimit} + ${estimatedVQs} estimated`);
+      return {
+        written: [],
+        flagged: [],
+        failed: [],
+        skipped: [],
+        needsReview: [],
+        rateLimited: true,
+        rateLimitReason: `Daily limit: ${dailyUsed}/${dailyLimit} used, need ${estimatedVQs} more`,
+        rateLimitTier: 'daily',
+        summary: {
+          total: items.length,
+          rateLimited: true,
+          message: `Daily limit: ${dailyUsed}/${dailyLimit} used, need ${estimatedVQs} more`,
+        },
+      };
+    }
     logger.info(`[vq-writer] Large batch detected (${items.length} items, est ${estimatedVQs} VQs) — bypassing upfront budget check, using inter-item delays`);
   }
 
