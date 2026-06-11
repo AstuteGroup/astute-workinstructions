@@ -2,10 +2,14 @@
 
 Two complementary workflows for market intelligence:
 
-| Workflow | Purpose | Volume | Cadence | De-list? | Vendor Contact? |
-|----------|---------|--------|---------|----------|-----------------|
-| **Market Profiling** | Map broker availability | ~50/hour (~1,200/day) | Hourly, 24/7 | No | No (scrape only) |
-| **Active Sourcing** | Price check priority parts | 200/batch | Mon + Thu | Yes | Yes (RFQ emails) |
+| Workflow | Purpose | Input | Volume | Cadence | API Enrichment? |
+|----------|---------|-------|--------|---------|-----------------|
+| **Market Profiling** | Map broker availability | Current inventory | ~50/hour (~1,200/day) | Hourly, 24/7 | **NO** (NC scrape only) |
+| **Active Sourcing** | Full pricing on delisted parts | Delisted queue | 200/batch | Mon + Thu | **YES** (API + NC RFQ) |
+
+**Key distinction:**
+- **Profiled parts** (current inventory) → NC scrape only, no API calls
+- **Delisted parts** (left inventory) → Full treatment: API enrichment + NC RFQ submission
 
 ---
 
@@ -80,32 +84,45 @@ No artificial time restrictions - Astute operates globally with purchasing activ
 
 ---
 
-## Workflow 2: Active Sourcing (Price Check with De-listing)
+## Workflow 2: Active Sourcing (Delisted Parts Pipeline)
 
 ### Goal
-Get real pricing on 200 priority parts twice weekly. De-list from NetComponents during sourcing so competitors don't see our inventory while we price-check.
+Get full pricing (franchise APIs + broker RFQs) on parts that LEFT inventory. These are parts we no longer stock but want market intelligence on before they disappear from our radar.
+
+**Why delisted parts?**
+- Current inventory gets profiled via Market Profiling (NC scrape, no API cost)
+- Delisted parts need active sourcing because they won't appear in future profiling runs
+- Captures pricing data while the parts are still fresh in supplier inventories
 
 ### Architecture
 
 ```
 ┌────────────────────────────────────────────────────────────────┐
-│  Selection Engine                                              │
-│  Priority: Top-requested → High-end MFRs → Shortage → Rotate   │
-│  Output: 200 MPNs per batch                                    │
+│  Inventory Cleanup (Monday)                                    │
+│  - Compare prior week offers vs current week                   │
+│  - Delta (prior - current) = DELISTED parts                    │
+│  - Write to ~/.delisted-parts-queue.json                       │
 └─────────────────────────┬──────────────────────────────────────┘
                           │
 ┌─────────────────────────▼──────────────────────────────────────┐
-│  DE-LIST from NetComponents                                    │
-│  - Add MPNs to .sourcing-exclusions.json                       │
-│  - inventory_cleanup.js checks this when building NC CSV       │
-│  - OT write-back is NOT affected                               │
+│  Selection Engine                                              │
+│  - Reads from DELISTED QUEUE (not current inventory)           │
+│  - Priority: Top-requested → Shortage → Queue rotation         │
+│  - Output: 200 unsourced MPNs per batch                        │
+└─────────────────────────┬──────────────────────────────────────┘
+                          │
+┌─────────────────────────▼──────────────────────────────────────┐
+│  Inventory Gate (waits for NC confirmation)                    │
+│  - inventory-gate-poller.js polls stockrfq@ hourly             │
+│  - Triggers: NC "upload completed" OR Jake forward             │
+│  - Creates ~/.inventory-upload-confirmed                       │
 └─────────────────────────┬──────────────────────────────────────┘
                           │
 ┌─────────────────────────▼──────────────────────────────────────┐
 │  Create "Active Sourcing" RFQ in OT                            │
 │  - Type: Stock (1000007)                                       │
 │  - Description: "Active Sourcing Batch {date}"                 │
-│  - 200 lines with actual inventory qtys                        │
+│  - 200 lines from delisted queue                               │
 └─────────────────────────┬──────────────────────────────────────┘
                           │
 ┌─────────────────────────▼──────────────────────────────────────┐
@@ -118,23 +135,73 @@ Get real pricing on 200 priority parts twice weekly. De-list from NetComponents 
                           │
 ┌─────────────────────────▼──────────────────────────────────────┐
 │  Submit RFQs via NetComponents (full mode)                     │
-│  - batch_rfqs_from_system.py (full submission mode)            │
+│  - batch_rfqs_from_system.py (BROKERS ONLY - skips ncauth)     │
 │  - Vendors receive email RFQs                                  │
 │  - 3 parallel workers, normal timing                           │
 └─────────────────────────┬──────────────────────────────────────┘
                           │
 ┌─────────────────────────▼──────────────────────────────────────┐
-│  Capture Responses                                             │
-│  - Vendor quote emails → Standard VQ Loading workflow          │
-│  - Scraped availability → $0 VQs (like Market Profiling)       │
+│  Mark Sourced + Send Digest                                    │
+│  - Mark MPNs sourced in queue (won't re-select)                │
+│  - Email digest: batch stats + queue progress %                │
 └─────────────────────────┬──────────────────────────────────────┘
                           │
 ┌─────────────────────────▼──────────────────────────────────────┐
-│  RE-LIST on NetComponents                                      │
-│  - Wait for Monday auto-upload (simplest)                      │
-│  - Exclusion cleared after 7 days automatically                │
+│  First Pass Complete?                                          │
+│  - When all delisted parts sourced → 🎉 notification           │
+│  - Phase 2: New prioritization with full pricing data          │
 └────────────────────────────────────────────────────────────────┘
 ```
+
+### Delisted Parts Queue
+
+**File:** `~/.delisted-parts-queue.json`
+
+```json
+{
+  "parts": [
+    { "mpn": "LM358N", "delistedDate": "2026-06-09", "sourced": false, "sourcedDate": null },
+    { "mpn": "MAX232", "delistedDate": "2026-06-09", "sourced": true, "sourcedDate": "2026-06-09T14:30:00Z" }
+  ],
+  "lastUpdated": "2026-06-11T..."
+}
+```
+
+**Queue lifecycle:**
+1. **Populated by:** `inventory_cleanup.js` (compares prior vs current week)
+2. **Consumed by:** `selection-engine.js` (reads unsourced parts)
+3. **Updated by:** `active-sourcing-runner.js` (marks parts sourced)
+
+### Batch Digest Email
+
+After each run, operator receives:
+```
+Subject: Active Sourcing Batch Complete — 35% through delisted queue
+
+THIS BATCH:
+  RFQ: 1138472
+  Parts sourced: 200
+  Franchise coverage: 45/200 (23%)
+  API calls: 187 (13 cache hits)
+
+QUEUE PROGRESS:
+  Total delisted parts: 1,247
+  Sourced so far: 437 (35%)
+  Remaining: 810
+
+Next batch: 200 parts on next scheduled run.
+```
+
+### First Pass Complete
+
+When queue is exhausted:
+```
+🎉 FIRST PASS COMPLETE — All delisted parts have been sourced!
+
+Phase 2 prioritization can now begin with full pricing data.
+```
+
+Phase 2 will use the collected VQ/API data to prioritize differently (TBD).
 
 ### Commands
 
@@ -173,12 +240,15 @@ This ensures Active Sourcing doesn't run against stale inventory data.
 | Day | Time | Activity |
 |-----|------|----------|
 | Sunday night | — | Fresh inventory file arrives from Infor |
-| Monday | 6 AM | Inventory upload runs (excludes "sourcing in progress" MPNs from NC CSV) |
-| Monday | 8 AM | **Batch 1**: Select 200 → Create RFQ → Profile + Source via NC |
+| Monday | 6 AM | Inventory cleanup: write offers to OT, identify delisted parts → queue |
+| Monday | 6 AM | NC listing upload (excludes sourcing-in-progress MPNs) |
+| Monday | hourly | `inventory-gate-poller` checks for NC confirmation |
+| Monday | after gate | **Batch 1**: 200 from delisted queue → API + NC RFQ → digest email |
 | Monday-Wednesday | — | Vendor responses arrive, VQ Loading processes them |
-| Thursday | 8 AM | **Batch 2**: Select 200 → Create RFQ → Profile + Source via NC |
+| Thursday | hourly | `inventory-gate-poller` checks for NC confirmation |
+| Thursday | after gate | **Batch 2**: 200 from delisted queue → API + NC RFQ → digest email |
 | Thursday-Sunday | — | Vendor responses arrive |
-| Sunday night | — | Exclusions auto-expire (7 day TTL) |
+| Ongoing | — | Queue drains until first pass complete → 🎉 notification |
 
 ---
 
@@ -189,39 +259,56 @@ This ensures Active Sourcing doesn't run against stale inventory data.
 ```
 Trading Analysis/Market Profiling/
 ├── market-profiling.md              # This documentation
-├── selection-engine.js              # Priority-based MPN selection (Active Sourcing)
-├── market-profiler.js               # Continuous availability scraper (Market Profiling)
-├── availability-vq-loader.js        # Convert scrape results → $0 VQs
-├── active-sourcing-runner.js        # Orchestrator for price-check batches
+├── selection-engine.js              # Reads from delisted queue, marks sourced
+├── market-profiler.js               # Continuous availability scraper (current inventory)
+├── availability-vq-loader.js        # Convert scrape results → $0 VQs (brokers only)
+├── active-sourcing-runner.js        # Orchestrator: API + NC + digest emails
+├── inventory-gate-poller.js         # Polls for NC upload confirmation
 ├── exclusion-manager.js             # Track MPNs excluded from NC upload
 ├── vendor-bp-mapping.json           # NC supplier name → OT BP lookup
 └── output/
     ├── profiling/                   # Market Profiling scrape results
     └── sourcing/                    # Active Sourcing batch results
+
+State files (in ~/workspace/):
+├── .delisted-parts-queue.json       # Delisted MPNs queue (populated by inventory_cleanup)
+├── .inventory-upload-confirmed      # Gate file (created by poller, consumed after run)
+├── .inventory-gate-poller-state.json # Poller state (last check, last confirmation)
+└── .sourcing-exclusions.json        # MPNs excluded from NC CSV upload
 ```
 
 ### Coordination Rules
 
-#### Rule 1: Market Profiling checks existing VQs
-Before creating a $0 availability VQ, check:
+#### Rule 1: Market Profiling — brokers only, no APIs
+Market Profiling scrapes NC for availability but:
+- **Skips franchised suppliers** (ncauth CSS class in NC results)
+- **No API calls** — franchise data comes via RFQ API Enrichment
+- Creates $0 profile VQs for broker availability only
+
+#### Rule 2: Profile VQ deactivation
+When real priced VQs arrive (cost > 0), deactivate matching $0 profile VQs:
 ```sql
-SELECT 1 FROM adempiere.chuboe_vq_line v
-WHERE v.chuboe_mpn_clean = $mpn
-  AND v.c_bpartner_id = $vendorBpId
-  AND v.created > NOW() - INTERVAL '14 days'
-  AND v.isactive = 'Y'
-LIMIT 1;
+-- Find $0 profile VQs within 10-day window
+SELECT chuboe_vq_line_id FROM adempiere.chuboe_vq_line
+WHERE chuboe_rfq_line_id = $rfqLineId
+  AND chuboe_mpn_clean = $mpn
+  AND c_bpartner_id = $bpId
+  AND cost = 0 AND isactive = 'Y'
+  AND created > NOW() - INTERVAL '10 days';
+-- PATCH IsActive = false on each
 ```
+This prevents duplicate VQs (profile + real) for same MPN/vendor.
 
-#### Rule 2: Active Sourcing profiles AND sources
-When Active Sourcing searches an MPN:
-- **PROFILE**: Capture ALL availability data from search results
-- **SOURCE**: Send RFQs to SELECT vendors based on NC workflow rules
+#### Rule 3: Broker VQ consolidation
+When a broker has multiple availability rows for same MPN (different date codes, etc.):
+- **Consolidate** into 1 VQ with total qty
+- Use best date code from the group
+- Prevents cluttered VQ lists
 
-#### Rule 3: Real pricing updates availability records
-When Active Sourcing receives real pricing:
-- If a $0 availability VQ exists, update with real pricing (PATCH)
-- Don't create a duplicate VQ
+#### Rule 4: Delisted queue is source of truth
+Active Sourcing pulls ONLY from delisted queue, not current inventory.
+- Current inventory → Market Profiling (NC scrape only)
+- Delisted parts → Active Sourcing (API + NC RFQ)
 
 ### De-listing Clarification
 
@@ -263,44 +350,59 @@ Record which MPNs were profiled and when.
 
 ## End-to-End Workflow: Active Sourcing
 
-### Step 1: Run selection engine
-Query OT for 200 priority MPNs based on request frequency, MFR value, shortage status.
-**Output:** List of 200 MPNs
+### Step 1: Check inventory gate
+Verify NC has confirmed inventory upload. Gate file: `~/.inventory-upload-confirmed`
+**If closed:** Exit, wait for next hourly poll
+**If open:** Proceed
 
-### Step 2: Add to exclusion list
+### Step 2: Run selection engine
+Read 200 unsourced MPNs from delisted queue (`~/.delisted-parts-queue.json`).
+**Output:** List of 200 MPNs (or fewer if queue nearly exhausted)
+
+### Step 3: Add to exclusion list
 Add MPNs to .sourcing-exclusions.json so next inventory upload excludes them.
 **Output:** Updated exclusion file
 
-### Step 3: Create Active Sourcing RFQ
-Create Stock RFQ with 200 lines.
+### Step 4: Create Active Sourcing RFQ
+Create Stock RFQ with lines from delisted queue.
 **Output:** RFQ search key
 
-### Step 4: Add lines to RFQ
+### Step 5: Add lines to RFQ
 POST each selected MPN to `chuboe_rfq_line` + `chuboe_rfq_line_mpn`.
-**Output:** RFQ with 200 line items
+**Output:** RFQ with line items
 
-### Step 5: Franchise API enrichment
-Query DigiKey, Mouser, Arrow, and other franchise APIs for baseline pricing.
-This gives buyers franchise context BEFORE going to brokers.
+### Step 6: Franchise API enrichment
+Query DigiKey, Mouser, Arrow, TTI, Future, etc. for baseline pricing.
 **Output:** Franchise VQs written to chuboe_vq_line, API results to chuboe_pricing_api_result
 
-### Step 6: Run NC scraper in full mode
+### Step 7: Run NC scraper in full mode (BROKERS ONLY)
 ```bash
 python3 batch_rfqs_from_system.py <rfq_number>
 ```
-**Output:** Excel with sent RFQs + scraped availability
+**Note:** Skips franchised suppliers (ncauth CSS class) — franchise data comes from APIs.
+**Output:** Excel with sent RFQs + scraped broker availability
 
-### Step 7: Load availability VQs
-Profile data (all vendors) → $0 VQs
-Sent RFQs → await vendor quote emails via standard VQ Loading
+### Step 8: Load availability VQs
+Broker availability → $0 VQs (consolidated: multiple rows same MPN/vendor → 1 VQ with total qty)
+Deactivates existing $0 profile VQs when real priced VQs arrive.
 
-### Step 8: Monitor responses
-VQ Loading processes quote emails over next 3-4 days.
+### Step 9: Mark sourced in queue
+Update delisted queue: set `sourced: true`, `sourcedDate: now` for processed MPNs.
+**Output:** Queue updated, MPNs won't be re-selected
 
-**Value of Step 5:** Franchise enrichment lets buyers immediately see:
-- Which MPNs have franchise coverage (and at what price)
-- Which MPNs are broker-only (no franchise stock)
-- Price comparison baseline when broker quotes arrive
+### Step 10: Send batch digest email
+Email operator with:
+- Batch stats (RFQ#, parts sourced, franchise coverage %)
+- Queue progress (X/Y sourced, Z% complete, remaining)
+
+### Step 11: Consume gate + check completion
+- Delete gate file (next run waits for new NC confirmation)
+- If queue exhausted → send "First Pass Complete" notification
+
+**Value of franchise enrichment (Step 6):**
+- Baseline pricing BEFORE broker quotes arrive
+- Identify franchise-covered vs broker-only parts
+- Price comparison context for buyer decisions
 
 ---
 
@@ -331,13 +433,20 @@ node "Trading Analysis/Market Profiling/active-sourcing-runner.js" --limit 10 --
 
 | Date | Enhancement | Description |
 |------|-------------|-------------|
-| 2026-06-03 | **Proactive franchise enrichment** | ✅ Active Sourcing Step 5 now enriches selected MPNs with DigiKey/Mouser/Arrow APIs BEFORE sourcing to brokers. Option A implemented (200 selected parts enriched per batch). |
+| 2026-06-03 | **Proactive franchise enrichment** | ✅ Active Sourcing enriches selected MPNs with DigiKey/Mouser/Arrow APIs BEFORE sourcing to brokers. |
+| 2026-06-11 | **Delisted parts pipeline** | ✅ Active Sourcing now sources from DELISTED parts queue instead of current inventory. Inventory cleanup tracks delta (prior - current week), writes to queue. Selection engine reads from queue, marks sourced. |
+| 2026-06-11 | **NC confirmation gate** | ✅ `inventory-gate-poller.js` polls stockrfq@ for NC upload confirmation. Active Sourcing waits for gate before running. |
+| 2026-06-11 | **Batch digest emails** | ✅ After each batch: email with parts sourced, franchise coverage %, queue progress (X/Y sourced). |
+| 2026-06-11 | **First pass notification** | ✅ When all delisted parts sourced → "First Pass Complete" email. Phase 2 prioritization can begin. |
+| 2026-06-11 | **Profile VQ deactivation** | ✅ $0 profile VQs are deactivated when real priced VQs arrive (same MPN/vendor within 10 days). |
+| 2026-06-11 | **Broker VQ consolidation** | ✅ Multiple availability rows for same MPN/vendor → consolidated to 1 VQ with total qty. |
+| 2026-06-11 | **Franchise skip in NC scraper** | ✅ NC scraper skips suppliers with `ncauth` class (franchised) — franchise data comes via APIs. |
 
 ### Planned Enhancements
 
 | Priority | Enhancement | Description |
 |----------|-------------|-------------|
-| 🟡 | **Risk-weighted rotation** | Cycle higher-risk parts more frequently than 14 days. Criteria TBD: high-value MFRs, volatile pricing history, customer demand signals, long lead times. |
-| 🟡 | **NC confirmation gate** | Trigger sourcing only after NC confirms listing update (email reply parsing). |
+| 🔴 | **Phase 2 prioritization** | After first pass complete, use collected VQ/API data to prioritize next rotation differently. TBD: risk-weighted, demand-based, price-volatility signals. |
+| 🟡 | **Risk-weighted rotation** | Cycle higher-risk parts more frequently. Criteria: high-value MFRs, volatile pricing history, customer demand signals, long lead times. |
 | 🟡 | **Weekly RFQ container** | Single "Market Intelligence Week of {date}" RFQ per week for all profiling + sourcing VQs. |
-| 🟢 | **Full inventory franchise rotation (Option B)** | Continuous enrichment ~500 MPNs/day covering full inventory in 10 days. Complements Active Sourcing enrichment with broader coverage. API limits: 1,000/day each. |
+| 🟢 | **Full inventory franchise rotation** | Continuous enrichment ~500 MPNs/day covering full inventory in 10 days. Complements Active Sourcing with broader franchise coverage. |
