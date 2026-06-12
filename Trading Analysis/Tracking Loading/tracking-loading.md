@@ -97,9 +97,10 @@ await patchRecord('c_order', orderId, { Chuboe_TrackingNumbers: merged });
 | Outcome | Folder | Notification |
 |---------|--------|--------------|
 | Success (tracking patched) | `Processed` | Confirmation email |
+| Multi-POV, same vendor | `Processed` | Consolidated confirmation (2026-06 enhancement) |
 | PO not found | `NeedsReview` | Escalation with extracted data |
 | No tracking found | `NotTracking` | Silent move (likely not a shipping email) |
-| Multiple POs matched | `NeedsReview` | Escalation to disambiguate |
+| Multi-POV, different vendors | `NeedsReview` | Escalation — cannot auto-assign tracking |
 
 ## Actions
 
@@ -107,8 +108,9 @@ await patchRecord('c_order', orderId, { Chuboe_TrackingNumbers: merged });
 
 Updates OT with extracted tracking numbers.
 
-**Required payload:** `tracking[]` + at least one of `documentno` or `pov`
+**Required payload:** `tracking[]` + one of `documentno`, `pov`, or `povs[]`
 
+#### Single-PO Mode (original)
 ```json
 {
   "documentno": "PO809588",
@@ -126,9 +128,28 @@ Or with POV only:
 }
 ```
 
+#### Multi-POV Mode (2026-06 enhancement)
+
+When a single tracking number applies to multiple Infor POVs (supplier shipped
+multiple orders together), use `povs[]` array:
+
+```json
+{
+  "povs": ["POV0076596", "POV0076598"],
+  "tracking": ["SF1574132053716"],
+  "carrier": "SF Express"
+}
+```
+
+**Safety check:** All POVs must resolve to the same vendor. If different vendors
+are detected, the handler returns an error and escalates to needs_review.
+
+**Confirmation email:** Single consolidated email listing all POs patched.
+
 **Lookup priority:**
 1. `documentno` (OT PO) via `c_order.documentno`
 2. `pov` (Infor POV) via `c_orderline.chuboe_po_string`
+3. `povs[]` (multiple Infor POVs) — batch lookup, same-vendor verified
 
 **Single-line vs Multi-line:**
 | Order Lines | MPN Required? | Tracking Applied To |

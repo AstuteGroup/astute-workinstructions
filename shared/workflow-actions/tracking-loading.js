@@ -16,7 +16,12 @@ const { patchRecord } = require('../record-updater');
 const breadcrumbs = require('../breadcrumbs');
 
 // DB pool for PO lookups (read-only replica)
-const pool = new Pool({ database: 'idempiere_replica' });
+// Uses Unix socket peer auth — no password needed
+const pool = new Pool({
+  host: '/var/run/postgresql',
+  database: process.env.PGDATABASE || 'idempiere_replica',
+  user: process.env.PGUSER || process.env.USER || 'analytics_user',
+});
 
 // ─── HELPERS ─────────────────────────────────────────────────────────────────
 
@@ -152,27 +157,187 @@ function mergeTracking(existing, newTracking) {
   return [...existingSet].join(', ');
 }
 
+// ─── MULTI-POV HANDLER ────────────────────────────────────────────────────────
+
+/**
+ * Handle multiple POVs in a single email — same tracking for all.
+ * Safety: all POs must be from the same vendor.
+ *
+ * @param {string[]} povs - Array of Infor POV numbers
+ * @param {string[]} tracking - Tracking numbers to apply
+ * @param {string|null} carrier - Carrier name
+ * @param {object} ctx - Handler context
+ * @returns {Promise<object>}
+ */
+async function handleMultiPOV(povs, tracking, carrier, ctx) {
+  // Look up all POs
+  const lookups = await Promise.all(povs.map(async (pov) => {
+    const po = await lookupPOByPOV(pov);
+    return { pov, po };
+  }));
+
+  // Check for missing POs
+  const missing = lookups.filter(l => !l.po).map(l => l.pov);
+  if (missing.length > 0) {
+    return {
+      error: 'Some POVs not found',
+      missing,
+      found: lookups.filter(l => l.po).map(l => ({ pov: l.pov, documentno: l.po.documentno })),
+      tracking,
+    };
+  }
+
+  // Extract POs
+  const pos = lookups.map(l => l.po);
+
+  // Verify all POs are from the same vendor (safety check)
+  const vendorIds = [...new Set(pos.map(p => p.c_bpartner_id))];
+  if (vendorIds.length > 1) {
+    return {
+      error: 'Multi-POV tracking requires same vendor — different vendors found',
+      vendors: pos.map(p => ({ documentno: p.documentno, vendor: p.vendor_name, vendorId: p.c_bpartner_id })),
+      tracking,
+    };
+  }
+
+  const vendorName = pos[0].vendor_name;
+
+  // Check for already-loaded (idempotency via breadcrumbs)
+  if (ctx.currentMessageId) {
+    const dupCheck = breadcrumbs.hasMessageIdAlreadyLoaded(ctx.currentMessageId, {
+      cog: 'tracking-loading-agent',
+      events: ['tracking-loaded-multi'],
+    });
+    if (dupCheck.loaded) {
+      return {
+        already_processed: true,
+        messageId: ctx.currentMessageId,
+        prior: dupCheck.breadcrumb,
+      };
+    }
+  }
+
+  if (ctx.dryRun) {
+    return {
+      dry_run: true,
+      would_patch_multi: {
+        pos: pos.map(p => ({ documentno: p.documentno, pov: lookups.find(l => l.po === p).pov })),
+        vendor: vendorName,
+        tracking,
+        carrier,
+      },
+    };
+  }
+
+  // Patch each PO (order header level — multi-POV implies combined shipment)
+  const results = [];
+  for (const po of pos) {
+    const existing = po.existing_tracking;
+    const merged = mergeTracking(existing, tracking);
+
+    // Check if anything new
+    const existingSet = new Set(
+      (existing || '').split(',').map(s => s.trim()).filter(Boolean)
+    );
+    const newAdded = tracking.filter(t => !existingSet.has(t.trim()));
+
+    if (newAdded.length > 0) {
+      await patchRecord('c_order', po.c_order_id, {
+        Chuboe_TrackingNumbers: merged,
+      });
+      results.push({
+        documentno: po.documentno,
+        pov: lookups.find(l => l.po === po).pov,
+        patched: true,
+        tracking_added: newAdded,
+      });
+    } else {
+      results.push({
+        documentno: po.documentno,
+        pov: lookups.find(l => l.po === po).pov,
+        already_present: true,
+      });
+    }
+  }
+
+  // Write breadcrumb
+  breadcrumbs.write({
+    cog: 'tracking-loading-agent',
+    event: 'tracking-loaded-multi',
+    uid: ctx.uid,
+    messageId: ctx.currentMessageId,
+    pos: results.map(r => ({ documentno: r.documentno, pov: r.pov })),
+    vendor: vendorName,
+    tracking,
+    carrier: carrier || null,
+  });
+
+  // Send consolidated confirmation email
+  const poListHtml = results.map(r => {
+    const status = r.patched ? '✓' : '(already present)';
+    return `<li><b>${esc(r.documentno)}</b> (${esc(r.pov)}) ${status}</li>`;
+  }).join('');
+
+  const trackingListHtml = tracking.map(t =>
+    `<li>${esc(t)}${carrier ? ` (${esc(carrier)})` : ''}</li>`
+  ).join('');
+
+  const html = `<html><body style="font-family:Arial,sans-serif;font-size:13px">
+<h2 style="color:#080">Tracking loaded: ${pos.length} POs</h2>
+<p><b>Vendor:</b> ${esc(vendorName)}</p>
+<p><b>Purchase Orders:</b></p>
+<ul>${poListHtml}</ul>
+<p><b>Tracking numbers:</b></p>
+<ul>${trackingListHtml}</ul>
+<p style="color:#666;font-size:11px">UID: ${ctx.uid} | Multi-POV batch | Same-vendor verified</p>
+</body></html>`;
+
+  await ctx.notifier.sendEmail(
+    'jake.harris@astutegroup.com',
+    `Tracking loaded: ${pos.map(p => p.documentno).join(', ')}`,
+    html,
+    { html: true }
+  );
+
+  return {
+    patched_multi: true,
+    vendor: vendorName,
+    results,
+    tracking,
+  };
+}
+
 // ─── HANDLERS ────────────────────────────────────────────────────────────────
 
 /**
- * Patch tracking numbers onto a purchase order.
+ * Patch tracking numbers onto one or more purchase orders.
  *
- * Required payload: { tracking[] } + one of { documentno } or { pov }
+ * Required payload: { tracking[] } + one of { documentno }, { pov }, or { povs[] }
  * Optional: { carrier, mpn }
  *
- * Lookup priority: documentno (OT PO) first, then pov (Infor POV).
+ * Single-PO mode (existing): documentno or pov
+ * Multi-PO mode (new): povs[] array — all POs must be from the same vendor
+ *
+ * Lookup priority: documentno (OT PO) first, then pov/povs (Infor POV).
  *
  * Line logic:
  * - Single-line order: patch order header (no MPN needed)
  * - Multi-line order: MPN required to identify which line; returns error if missing
  */
 async function action_patch_tracking(payload, ctx) {
-  const { documentno, pov, tracking, carrier, mpn } = payload;
+  const { documentno, pov, povs, tracking, carrier, mpn } = payload;
 
   if (!Array.isArray(tracking) || tracking.length === 0) {
     return { error: 'Missing tracking array' };
   }
 
+  // ─── MULTI-POV MODE ─────────────────────────────────────────────────────────
+  // When povs[] is provided, look up all POs and verify same vendor
+  if (Array.isArray(povs) && povs.length > 0) {
+    return await handleMultiPOV(povs, tracking, carrier, ctx);
+  }
+
+  // ─── SINGLE-PO MODE (original logic) ────────────────────────────────────────
   if (!documentno && !pov) {
     return { error: 'Missing documentno or pov — need at least one PO reference' };
   }
