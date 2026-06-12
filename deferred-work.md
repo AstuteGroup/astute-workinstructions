@@ -26,6 +26,28 @@ The SessionStart greeting reads this file and surfaces all open items, sorted by
 
 ### Active workstreams (next session pickup)
 
+- [ ] 🟢 **VQ Loading: Support .eml/.msg attachments for batch quote loading** *(opened 2026-06-12, operator request)*
+  - **Context:** Operator has many broker quote emails to load as VQs. Current workflow requires forwarding each email individually to `vq@`. Operator asked if they could attach multiple emails (.eml or .msg files) to a single email and have them all processed. Current system does NOT support this — it processes one email = one quote entity, and attachment handling is limited to PDF/Excel/CSV within a single email.
+  - **Why blocked:** Feature doesn't exist. Operator flagged as "priority for next week" (2026-06-12).
+  - **Ready when:** 2026-06-16 (next week) or whenever operator picks this up.
+  - **Scope / How:**
+    1. **Phase 1: .eml parsing** — Add `.eml` to the attachment type detection in `vq-parser/src/attachment/downloader.js`. Use `mailparser` npm package (or similar) to parse .eml files into structured email objects (From, Subject, Body, nested attachments).
+    2. **Phase 2: Multi-email handler** — Modify `processAttachments()` in `vq-parser/src/attachment/index.js` to detect when attachments are .eml files. For each .eml, extract the email body and run the existing quote extraction logic (template matching + LLM extraction).
+    3. **Phase 3: .msg support** — Add `.msg` parsing using `msg-reader` or similar npm package (Outlook MSG format). Same flow as .eml — parse to structured email, extract body, run extraction.
+    4. **Phase 4: Routing adjustments** — Each .eml/.msg attachment becomes a separate extraction result. Routing decisions (Processed/NeedsVendor/NeedsReview) should apply per-attachment, not per-wrapper-email. May need a "batch wrapper" folder routing concept.
+  - **Estimated effort:** 4-6 hours for Phase 1+2 (eml), +2 hours for Phase 3 (msg). Phase 4 depends on operator's preferred UX.
+  - **Dependencies:**
+    - `npm install mailparser` (for .eml)
+    - `npm install @nicktomlin/msg-reader` or similar (for .msg — note: .msg parsing libs are less mature than .eml)
+  - **Alternative considered:** Operator could use IMAP drag-and-drop to move emails directly into vq@ INBOX, bypassing attachment approach. Works but requires IMAP client access.
+  - **Files to modify:**
+    - `vq-parser/src/attachment/downloader.js` — add .eml/.msg type detection
+    - `vq-parser/src/attachment/index.js` — add .eml/.msg parsing handlers
+    - `vq-parser/src/attachment/eml-parser.js` (new file)
+    - `vq-parser/src/attachment/msg-parser.js` (new file)
+    - Possibly `vq-parser/src/index.js` fetch flow if batch routing changes needed
+  - **Created / source:** 2026-06-12 session, operator request for batch loading efficiency.
+
 - [ ] 🟢 **VQ Loading: Add automatic reply detection for "note vendor in VQ notes"** *(opened 2026-05-26 during Nordisk unknown-vendor implementation)*
   - **Context:** Built the infrastructure to allow VQ loading when vendor BP doesn't exist in OT by storing vendor name in `Chuboe_Note_User` instead (using a placeholder BP). Works when called with `unknownVendorPlaceholderBpId` parameter. **Not yet wired into automatic reply detection** — operator must manually invoke the test script or add the parameter to the payload. Future workflow: when operator replies to a `needs_vendor` escalation with "note vendor in VQ notes" / "load without BP" / "store as note", the agent should auto-detect and retry the load with the placeholder BP flag enabled.
   - **Why blocked:** operator requested "flag for later (tomorrow)" on 2026-05-26 to focus on cron pause/resume planning.
