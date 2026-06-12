@@ -24,6 +24,35 @@ const nodemailer = require('nodemailer');
 const fs = require('fs');
 const logger = require('./logger');
 
+// ─── EXTERNAL EMAIL BLOCK ────────────────────────────────────────────────────
+// orangetsunami.com should NEVER send to external addresses.
+// Only @astutegroup.com recipients are allowed.
+const ALLOWED_DOMAINS = ['astutegroup.com', 'orangetsunami.com'];
+
+function isInternalEmail(email) {
+  if (!email) return false;
+  const domain = email.toLowerCase().split('@')[1];
+  return ALLOWED_DOMAINS.some(d => domain === d || domain.endsWith('.' + d));
+}
+
+function filterExternalRecipients(recipients) {
+  if (!recipients) return { allowed: [], blocked: [] };
+  const list = Array.isArray(recipients) ? recipients : [recipients];
+  const allowed = [];
+  const blocked = [];
+  for (const r of list) {
+    // Handle "Name <email>" format
+    const match = r.match(/<([^>]+)>/) || [null, r];
+    const email = match[1] || r;
+    if (isInternalEmail(email.trim())) {
+      allowed.push(r);
+    } else {
+      blocked.push(r);
+    }
+  }
+  return { allowed, blocked };
+}
+
 // AWS WorkMail SMTP settings (shared across all OT email accounts)
 const SMTP_HOST = process.env.SMTP_HOST || 'smtp.mail.us-east-1.awsapps.com';
 const SMTP_PORT = parseInt(process.env.SMTP_PORT || '465', 10);
@@ -79,6 +108,28 @@ function createNotifier({ fromEmail, fromName, smtpUser, smtpPass } = {}) {
       return false;
     }
 
+    // ─── EXTERNAL EMAIL BLOCK ──────────────────────────────────────────────
+    // Strip external recipients - only send to @astutegroup.com / @orangetsunami.com.
+    // External addresses are logged and removed, internal recipients still get the email.
+    const toResult = filterExternalRecipients(to);
+    const ccResult = filterExternalRecipients(opts.cc);
+    const bccResult = filterExternalRecipients(opts.bcc);
+
+    const allBlocked = [...toResult.blocked, ...ccResult.blocked, ...bccResult.blocked];
+    if (allBlocked.length > 0) {
+      logger.warn(`Notifier [${displayName}]: STRIPPED external recipients: ${allBlocked.join(', ')} — only sending to internal addresses`);
+    }
+
+    if (toResult.allowed.length === 0) {
+      logger.warn(`Notifier [${displayName}]: No internal recipients — email not sent. Subject: ${subject}`);
+      return false;
+    }
+
+    // Use filtered internal-only recipients
+    const internalTo = toResult.allowed.join(', ');
+    const internalCc = ccResult.allowed.length > 0 ? ccResult.allowed : null;
+    const internalBcc = bccResult.allowed.length > 0 ? bccResult.allowed : null;
+
     // opts.html=true → send `body` as HTML instead of plain text
     // opts.cc, opts.bcc, opts.replyTo → passthrough to nodemailer
     // opts.messageId → pre-assign the RFC822 Message-ID header (used by the
@@ -88,11 +139,11 @@ function createNotifier({ fromEmail, fromName, smtpUser, smtpPass } = {}) {
     // opts.references → array of Message-IDs in the thread chain (for threading)
     const mailPayload = {
       from: `"${displayName}" <${fromEmail}>`,
-      to: to,
+      to: internalTo,
       subject: subject,
     };
-    if (opts.cc) mailPayload.cc = opts.cc;
-    if (opts.bcc) mailPayload.bcc = opts.bcc;
+    if (internalCc) mailPayload.cc = internalCc;
+    if (internalBcc) mailPayload.bcc = internalBcc;
     if (opts.replyTo) mailPayload.replyTo = opts.replyTo;
     if (opts.messageId) mailPayload.messageId = opts.messageId;
     if (opts.inReplyTo) mailPayload.inReplyTo = opts.inReplyTo;
@@ -123,16 +174,38 @@ function createNotifier({ fromEmail, fromName, smtpUser, smtpPass } = {}) {
       return false;
     }
 
+    // ─── EXTERNAL EMAIL BLOCK ──────────────────────────────────────────────
+    // Strip external recipients - only send to @astutegroup.com / @orangetsunami.com.
+    // External addresses are logged and removed, internal recipients still get the email.
+    const toResult = filterExternalRecipients(to);
+    const ccResult = filterExternalRecipients(opts.cc);
+    const bccResult = filterExternalRecipients(opts.bcc);
+
+    const allBlocked = [...toResult.blocked, ...ccResult.blocked, ...bccResult.blocked];
+    if (allBlocked.length > 0) {
+      logger.warn(`Notifier [${displayName}]: STRIPPED external recipients: ${allBlocked.join(', ')} — only sending to internal addresses`);
+    }
+
+    if (toResult.allowed.length === 0) {
+      logger.warn(`Notifier [${displayName}]: No internal recipients — email not sent. Subject: ${subject}`);
+      return false;
+    }
+
+    // Use filtered internal-only recipients
+    const internalTo = toResult.allowed.join(', ');
+    const internalCc = ccResult.allowed.length > 0 ? ccResult.allowed : null;
+    const internalBcc = bccResult.allowed.length > 0 ? bccResult.allowed : null;
+
     // opts.html=true → send `body` as HTML instead of plain text
     // opts.cc, opts.bcc, opts.replyTo → passthrough to nodemailer
     const mailPayload = {
       from: `"${displayName}" <${fromEmail}>`,
-      to: to,
+      to: internalTo,
       subject: subject,
       attachments: attachments,
     };
-    if (opts.cc) mailPayload.cc = opts.cc;
-    if (opts.bcc) mailPayload.bcc = opts.bcc;
+    if (internalCc) mailPayload.cc = internalCc;
+    if (internalBcc) mailPayload.bcc = internalBcc;
     if (opts.replyTo) mailPayload.replyTo = opts.replyTo;
     if (opts.html) {
       mailPayload.html = body;

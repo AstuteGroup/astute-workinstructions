@@ -2,22 +2,16 @@
 /**
  * Selection Engine for Active Sourcing
  *
- * Selects DELISTED MPNs (parts that left inventory) for:
- *   - API enrichment (franchise pricing from DigiKey, Mouser, etc.)
- *   - NetComponents RFQ submission (broker quotes)
- *
- * The delisted queue is populated by inventory_cleanup.js when parts
- * disappear from the weekly Infor export.
+ * Selects CURRENT INVENTORY MPNs for market price-checking:
+ *   - Delist from NetComponents (hide from competitors)
+ *   - Send RFQ to NC to get market pricing
+ *   - Receive quotes in inbox
  *
  * Priority hierarchy:
- * 1. Top-requested delisted MPNs (most RFQ hits in last 90 days)
- * 2. High-end MFRs from delisted (ADI, TI, Intel, Maxim, etc.)
- * 3. Shortage RFQ MPNs that are delisted
- * 4. Rotation through remaining delisted queue
- *
- * IMPORTANT: This does NOT select from current inventory.
- * Current inventory parts are profiled by market-profiler.js (NC scrape only).
- * Delisted parts get the full treatment (API + NC RFQ).
+ * 1. Top-requested inventory MPNs (most RFQ hits in last 90 days)
+ * 2. High-value MFRs (ADI, TI, Intel, Maxim, etc.)
+ * 3. Shortage RFQ MPNs that we have in stock
+ * 4. Rotation through remaining inventory
  *
  * Usage:
  *   node selection-engine.js --limit 200 --dry-run
@@ -28,78 +22,55 @@ const path = require('path');
 const fs = require('fs');
 const { execFileSync } = require('child_process');
 
-// ─── Delisted Parts Queue ───────────────────────────────────────────────────
-// Populated by inventory_cleanup.js when parts leave inventory
-const DELISTED_QUEUE_FILE = path.join(process.env.HOME, 'workspace/.delisted-parts-queue.json');
+// ─── Sourcing State ─────────────────────────────────────────────────────────
+// Tracks which MPNs have been recently sourced (to avoid re-sourcing too soon)
+const SOURCED_STATE_FILE = path.join(process.env.HOME, 'workspace/.sourcing-state.json');
+const SOURCED_COOLDOWN_DAYS = 14; // Don't re-source same MPN within this window
 
 /**
- * Read the delisted parts queue
+ * Read sourcing state
  */
-function readDelistedQueue() {
+function readSourcingState() {
     try {
-        if (fs.existsSync(DELISTED_QUEUE_FILE)) {
-            return JSON.parse(fs.readFileSync(DELISTED_QUEUE_FILE, 'utf8'));
+        if (fs.existsSync(SOURCED_STATE_FILE)) {
+            return JSON.parse(fs.readFileSync(SOURCED_STATE_FILE, 'utf8'));
         }
     } catch (e) { /* ignore */ }
-    return { parts: [], lastUpdated: null };
+    return { sourced: {}, lastUpdated: null };
 }
 
 /**
- * Mark MPNs as sourced in the queue (so we don't re-source them)
+ * Mark MPNs as sourced (with timestamp)
  */
 function markAsSourced(mpns) {
-    const queue = readDelistedQueue();
-    const mpnSet = new Set(mpns.map(m => m.toUpperCase()));
+    const state = readSourcingState();
+    const now = new Date().toISOString();
     let marked = 0;
-    for (const part of queue.parts) {
-        if (mpnSet.has(part.mpn.toUpperCase()) && !part.sourced) {
-            part.sourced = true;
-            part.sourcedDate = new Date().toISOString();
-            marked++;
-        }
+    for (const mpn of mpns) {
+        const key = mpn.toUpperCase();
+        state.sourced[key] = now;
+        marked++;
     }
-    queue.lastUpdated = new Date().toISOString();
-    fs.writeFileSync(DELISTED_QUEUE_FILE, JSON.stringify(queue, null, 2));
+    state.lastUpdated = now;
+    fs.writeFileSync(SOURCED_STATE_FILE, JSON.stringify(state, null, 2));
     return marked;
 }
 
 /**
- * Get unsourced delisted MPNs from the queue.
- * Returns only parts not yet sourced. When queue is exhausted,
- * returns empty array — Active Sourcing will send completion notification.
- * Phase 2 will use different prioritization after first pass completes.
+ * Get MPNs sourced within cooldown window (to skip)
  */
-function getDelistedMPNs() {
-    const queue = readDelistedQueue();
-    const unsourced = queue.parts.filter(p => !p.sourced);
+function getRecentlySourcedMPNs() {
+    const state = readSourcingState();
+    const cutoff = new Date();
+    cutoff.setDate(cutoff.getDate() - SOURCED_COOLDOWN_DAYS);
 
-    return unsourced.map(p => ({
-        mpn: p.mpn,
-        mfr: '',
-        qty: 0,
-        delistedDate: p.delistedDate
-    }));
-}
-
-/**
- * Check if all delisted parts have been sourced (first pass complete)
- */
-function isFirstPassComplete() {
-    const queue = readDelistedQueue();
-    if (queue.parts.length === 0) return false; // No parts to source
-    const unsourced = queue.parts.filter(p => !p.sourced);
-    return unsourced.length === 0;
-}
-
-/**
- * Get queue stats for notifications
- */
-function getQueueStats() {
-    const queue = readDelistedQueue();
-    const total = queue.parts.length;
-    const sourced = queue.parts.filter(p => p.sourced).length;
-    const unsourced = total - sourced;
-    return { total, sourced, unsourced, lastUpdated: queue.lastUpdated };
+    const recent = new Set();
+    for (const [mpn, dateStr] of Object.entries(state.sourced || {})) {
+        if (new Date(dateStr) > cutoff) {
+            recent.add(mpn);
+        }
+    }
+    return recent;
 }
 
 // ─── Configuration ─────────────────────────────────────────────────────────
@@ -305,7 +276,7 @@ function isHighValueMfr(mfr) {
 }
 
 /**
- * Select priority MPNs for active sourcing
+ * Select priority MPNs for active sourcing from CURRENT INVENTORY
  *
  * @param {number} limit - Max MPNs to select
  * @param {string} mode - 'monday' | 'thursday' | 'default'
@@ -318,22 +289,21 @@ function selectPriorityMPNs(limit = DEFAULT_LIMIT, mode = 'default') {
   console.log('Loading data...');
   console.log(`  Mode: ${mode} (includeTopRequested: ${modeConfig.includeTopRequested})`);
 
-  // Load DELISTED parts (parts that left inventory — need API enrichment + NC sourcing)
-  const delisted = getDelistedMPNs();
-  console.log(`  Delisted queue: ${delisted.length} unsourced MPNs`);
+  // Load CURRENT INVENTORY (parts we have in stock that we want to price-check)
+  const inventory = getInventoryMPNs();
+  console.log(`  Current inventory: ${inventory.length} MPNs with qty > 0`);
 
-  if (delisted.length === 0) {
-    console.log('\n⚠ No delisted parts to source. Queue is empty.');
-    console.log('  Delisted parts are populated by inventory_cleanup.js when parts leave inventory.');
+  if (inventory.length === 0) {
+    console.log('\n⚠ No inventory parts found.');
     return [];
   }
 
-  // Build delisted lookup
-  const delistedMap = new Map();
-  for (const item of delisted) {
+  // Build inventory lookup
+  const inventoryMap = new Map();
+  for (const item of inventory) {
     const key = item.mpn.toUpperCase();
-    if (!delistedMap.has(key)) {
-      delistedMap.set(key, item);
+    if (!inventoryMap.has(key)) {
+      inventoryMap.set(key, item);
     }
   }
 
@@ -351,6 +321,9 @@ function selectPriorityMPNs(limit = DEFAULT_LIMIT, mode = 'default') {
   const recentlyProfiled = getRecentlyProfiledMPNs();
   console.log(`  Recently profiled: ${recentlyProfiled.size} MPNs (skipping)`);
 
+  const recentlySourced = getRecentlySourcedMPNs();
+  console.log(`  Recently sourced: ${recentlySourced.size} MPNs (skipping)`);
+
   const excluded = getCurrentlyExcludedMPNs();
   console.log(`  Currently excluded: ${excluded.size} MPNs`);
 
@@ -362,18 +335,18 @@ function selectPriorityMPNs(limit = DEFAULT_LIMIT, mode = 'default') {
     const key = mpn.toUpperCase();
     if (seen.has(key)) return false;
     if (recentlyProfiled.has(key) || recentlyProfiled.has(mpn)) return false;
+    if (recentlySourced.has(key)) return false;
     if (excluded.has(key) || excluded.has(mpn)) return false;
 
-    // Must be in DELISTED queue (not current inventory)
-    const del = delistedMap.get(key);
-    if (!del) return false;
+    // Must be in CURRENT INVENTORY
+    const inv = inventoryMap.get(key);
+    if (!inv) return false;
 
     seen.add(key);
     selected.push({
-      mpn: del.mpn,
-      mfr: del.mfr || '',
-      qty: 0, // Qty not relevant for delisted parts
-      delistedDate: del.delistedDate,
+      mpn: inv.mpn,
+      mfr: inv.mfr || '',
+      qty: inv.qty,
       source,
       priority,
       ...metadata
@@ -381,9 +354,9 @@ function selectPriorityMPNs(limit = DEFAULT_LIMIT, mode = 'default') {
     return true;
   }
 
-  console.log('\nSelecting priority MPNs from DELISTED queue...');
+  console.log('\nSelecting priority MPNs from CURRENT INVENTORY...');
 
-  // Priority 1: Top-requested delisted MPNs (Thursday only)
+  // Priority 1: Top-requested inventory MPNs (Thursday only)
   let added = 0;
   if (modeConfig.includeTopRequested) {
     for (const item of topRequested) {
@@ -397,14 +370,19 @@ function selectPriorityMPNs(limit = DEFAULT_LIMIT, mode = 'default') {
     console.log(`  Priority 1 (top requested): SKIPPED`);
   }
 
-  // Priority 2: High-value MFRs from delisted queue
-  // Note: MFR may need lookup from historical data since queue doesn't store MFR
+  // Priority 2: High-value MFRs from inventory
   added = 0;
-  // For now, skip MFR filtering since delisted queue doesn't store MFR
-  // Future: could lookup MFR from prior offer lines or RFQ history
-  console.log(`  Priority 2 (high-value MFR): SKIPPED (MFR not in delisted queue)`);
+  for (const item of inventory) {
+    if (selected.length >= limit) break;
+    if (isHighValueMfr(item.mfr)) {
+      if (addMPN(item.mpn, 'high_value_mfr', 2)) {
+        added++;
+      }
+    }
+  }
+  console.log(`  Priority 2 (high-value MFR): ${added} added`);
 
-  // Priority 3: Shortage RFQs that are delisted
+  // Priority 3: Shortage RFQs that we have in stock
   added = 0;
   for (const item of shortage) {
     if (selected.length >= limit) break;
@@ -414,15 +392,15 @@ function selectPriorityMPNs(limit = DEFAULT_LIMIT, mode = 'default') {
   }
   console.log(`  Priority 3 (shortage): ${added} added`);
 
-  // Priority 4: Fill remaining with delisted queue rotation
+  // Priority 4: Fill remaining with inventory rotation (by qty desc)
   added = 0;
-  for (const item of delisted) {
+  for (const item of inventory) {
     if (selected.length >= limit) break;
-    if (addMPN(item.mpn, 'delisted_rotation', 4)) {
+    if (addMPN(item.mpn, 'rotation', 4)) {
       added++;
     }
   }
-  console.log(`  Priority 4 (delisted rotation): ${added} added`);
+  console.log(`  Priority 4 (rotation): ${added} added`);
 
   return selected;
 }
@@ -538,8 +516,6 @@ if (require.main === module) {
 module.exports = {
   selectPriorityMPNs,
   markAsSourced,
-  readDelistedQueue,
-  getDelistedMPNs,
-  isFirstPassComplete,
-  getQueueStats
+  getRecentlySourcedMPNs,
+  getInventoryMPNs
 };
