@@ -121,6 +121,11 @@ async function resumeOne(sidecar) {
 
   // TTL check first — don't waste a DB call if the sidecar is already expired.
   if (expiresAt && Date.now() > expiresAt) {
+    // Only notify once — check if we already sent the expiration email
+    if (data.expired_notified_at) {
+      return { status: 'expired', file };
+    }
+
     breadcrumbs.write({
       cog: 'vq-loading-resumer',
       event: 'parked-expired',
@@ -146,6 +151,9 @@ Sidecar: <code>${path.basename(file)}</code></p>
 </body></html>`,
         { html: true },
       );
+      // Mark as notified so we don't spam on every tick
+      data.expired_notified_at = new Date().toISOString();
+      try { fs.writeFileSync(file, JSON.stringify(data, null, 2)); } catch (_) {}
     } catch (_) { /* best-effort */ }
     return { status: 'expired', file };
   }
@@ -367,7 +375,10 @@ const DRY_RUN = process.argv.includes('--dry-run');
     const isExpired = expiresAt && Date.now() > expiresAt;
 
     if (isExpired && !FORCE_EXPIRED) {
-      expiredSidecars.push(s);
+      // Skip if already notified
+      if (!s.data.expired_notified_at) {
+        expiredSidecars.push(s);
+      }
       expired++;
       continue;
     }
@@ -418,6 +429,11 @@ const DRY_RUN = process.argv.includes('--dry-run');
         { html: true },
       );
       log(`Sent batch expiration notification for ${expiredSidecars.length} sidecars`);
+      // Mark all as notified so we don't spam on every tick
+      for (const s of expiredSidecars) {
+        s.data.expired_notified_at = new Date().toISOString();
+        try { fs.writeFileSync(s.file, JSON.stringify(s.data, null, 2)); } catch (_) {}
+      }
     } catch (e) {
       log(`Failed to send batch expiration notification: ${e.message}`);
     }

@@ -27,10 +27,13 @@ const LIMITS = {
   // Analysis showed: system handles 1,657 VQs/hour and 672/15min routinely
   // June 1 crash: 252 VQs in 5 minutes sustained (50/min rate)
   // June 10: 256k writes/day worked fine (two 118k inventory offers + normal traffic)
-  maxWritesPer5Min: 200,            // CRITICAL - prevents sustained burst (June 1 hit 252 and crashed)
-  maxWritesPer15Min: 800,           // 20% buffer above proven 672 peak
-  maxWritesPerHour: 2000,           // 20% buffer above proven 1,657 peak
-  maxWritesPerDay: 300000,          // Raised from 30k — 256k proven safe June 10; burst limits are real protection
+  // June 12: Rebalanced limits to match 300k daily capacity
+  // Math: 300k/day = 12.5k/hour = 3.1k/15min = 1k/5min
+  // Keep 5-min conservative as burst protection (June 1 crashed at 252 sustained)
+  maxWritesPer5Min: 600,            // Burst protection - below sustained crash threshold
+  maxWritesPer15Min: 4000,          // 12.5k/hour ÷ 4 = 3.1k, rounded up
+  maxWritesPerHour: 15000,          // 300k/day ÷ 24 = 12.5k, with headroom
+  maxWritesPerDay: 300000,          // 256k proven safe June 10
 
   // Priority tiers (higher number = higher priority)
   // When budget is constrained, higher-priority callers get preference
@@ -39,42 +42,44 @@ const LIMITS = {
     'rfq-fast-loader': 4,           // Same tier as rfq-loading
     'vq-loading-agent': 3,          // Second - vendor quotes
     'excess-agent': 2,              // Third - market offers
-    'stockrfq-agent': 1,            // Lowest - broker data capture
+    'stockrfq-agent': 1,            // Broker data capture
     'stockrfq-cq-agent': 1,         // Same as stockrfq
     'enrich-poller': 2,             // Same as excess (market intel - writes chuboe_pricing_api_result)
-    'offer-writeback': 2,           // Same as excess
+    'offer-writeback': 0,           // LOWEST - bulk inventory offers, throttle first (can be 15k+ lines)
     'inventory-cleanup': 2,         // Non-urgent automation
   },
 
   // Reserved budget for high-priority callers
   // Even if lower-priority agents consumed most budget, always keep this much for P4/P3
+  // ~5% of hourly for P4, ~2.5% for P3
   reservedForPriority: {
-    4: 100,   // Always reserve 100 writes for RFQ agents
-    3: 50,    // Always reserve 50 writes for VQ agent
+    4: 750,   // Always reserve 750 writes for RFQ agents
+    3: 400,   // Always reserve 400 writes for VQ agent
   },
 
   // Backfill coordination - only ONE agent in backfill mode at a time
   maxConcurrentBackfills: 1,
 
   // Backfill mode limits (when catching up after cron pause)
+  // June 12: Scaled to match 15k/hour global limit
   backfill: {
-    maxPerAgentRun: 500,            // Can handle large batches (system proven at 672/15min)
-    maxWritesPer5Min: 100,          // Half the normal burst limit during backfill
-    delayBetweenWrites: 100,        // 100ms pacing to prevent API hammering
+    maxPerAgentRun: 2000,           // Large batches OK with higher limits
+    maxWritesPer5Min: 300,          // Half the normal burst limit (600/2)
+    delayBetweenWrites: 50,         // 50ms pacing
   },
 
   // Per-table limits (prevent one table from dominating the budget)
-  // These are MORE generous than before based on actual data
+  // June 12: Scaled to match 15k/hour global limit
   perTable: {
-    chuboe_rfq: { maxPerHour: 400 },              // Doubled from 200
-    chuboe_rfq_line: { maxPerHour: 1000 },        // Doubled from 500
-    chuboe_rfq_line_mpn: { maxPerHour: 1000 },    // Doubled from 500
-    chuboe_vq_line: { maxPerHour: 1800 },         // Tripled from 600 (handles peak 1,657)
-    chuboe_cq_line: { maxPerHour: 800 },          // Doubled from 400
-    chuboe_offer: { maxPerHour: 400 },            // Doubled from 200
-    chuboe_offer_line: { maxPerHour: 1000 },      // Doubled from 500
-    chuboe_offer_line_mpn: { maxPerHour: 1000 },  // Doubled from 500
-    chuboe_pricing_api_result: { maxPerHour: 600 }, // Doubled from 300
+    chuboe_rfq: { maxPerHour: 3000 },
+    chuboe_rfq_line: { maxPerHour: 8000 },
+    chuboe_rfq_line_mpn: { maxPerHour: 8000 },
+    chuboe_vq_line: { maxPerHour: 12000 },
+    chuboe_cq_line: { maxPerHour: 6000 },
+    chuboe_offer: { maxPerHour: 3000 },
+    chuboe_offer_line: { maxPerHour: 15000 },     // Full headroom for bulk inventory
+    chuboe_offer_line_mpn: { maxPerHour: 8000 },
+    chuboe_pricing_api_result: { maxPerHour: 5000 },
   },
 
   // Global circuit breaker (affects ALL agents)
