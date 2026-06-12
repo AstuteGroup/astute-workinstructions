@@ -89,13 +89,13 @@ For each unseen message, the agent decides **one** routing action. Order of chec
    ```
    If matched → `dup_skip` with payload `{ existingSearchKey: <prior offer search key> }`. Don't write a duplicate offer.
 
-6. **Write to OT** → `load_offer` with payload `{ bpartnerId, offerType, lines }`. The handler calls `writeOffer()` which writes the header, lines, and `chuboe_offer_line_mpn` AVL sub-rows. Description auto-generated unless provided.
+6. **Write to OT** → `load_offer` with payload `{ bpartnerId, offerType, lines, partnerName }`. The handler calls `writeOffer()` which writes the header, lines, and `chuboe_offer_line_mpn` AVL sub-rows. Description auto-generated unless provided. **Include `partnerName`** (the resolved customer name) so confirmation emails show the correct partner — the handler has a DB fallback but passing it explicitly is preferred.
 
 ### Routing actions (full payload reference)
 
 | Action | Required payload | Folder | Side effect |
 |---|---|---|---|
-| `load_offer` | `{ bpartnerId, offerType, lines[] }` (also `description, sourceUid`) | `Processed` | `writeOffer()` to OT + `loaded` breadcrumb. **GATED** above `LARGE_OFFER_THRESHOLD` (default 500 lines) — large offers pause with an approval email and aren't written until the operator replies YES. |
+| `load_offer` | `{ bpartnerId, offerType, lines[] }` (also `description, sourceUid, partnerName, originalSender, originalCc, originalSubject`) | `Processed` | `writeOffer()` to OT + `loaded` breadcrumb + confirmation email. **GATED** above `LARGE_OFFER_THRESHOLD` (default 500 lines) — large offers pause with an approval email and aren't written until the operator replies YES. Pass `partnerName` so confirmation emails show the customer name. |
 | `needs_partner` | `{ subject, outerFrom }` (also `hints`) | `NeedsPartner` | Email Jake with `PARTNER:` reply prompt + `needs-partner` breadcrumb |
 | `clarify_partner` | `{ recipient, candidates[] }` (also `subject, extracted, outerFrom`) | `NeedInfo` | Email Jake asking which BP to use; **POLICY 2026-05-14: routes to Jake, NEVER the external sender**. `keepsPending: true` — sidecar persists partial extraction; reply stitches on next tick → load_offer. |
 | `needs_review` | `{ reason, subject, outerFrom }` (also `details`) | `NeedsReview` | Email Jake diagnostics + `needs-review` breadcrumb |

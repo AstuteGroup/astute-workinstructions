@@ -18,6 +18,7 @@
 
 const fs = require('fs');
 const path = require('path');
+const { execSync } = require('child_process');
 
 const { writeOffer } = require('../offer-writeback');
 const writerAttribution = require('../writer-attribution');
@@ -26,6 +27,25 @@ const breadcrumbs = require('../breadcrumbs');
 const pending = require('../workflow-pending-state');
 const { createGate } = require('../large-payload-gate');
 const { makeApprovalActions } = require('./_approval');
+
+// ─── PARTNER NAME LOOKUP ──────────────────────────────────────────────────────
+// Look up partner name from bpartnerId if not provided in payload.
+// Fallback for when agent doesn't pass partnerName. Matches the fix applied to
+// rfq-loader-daemon.js (2026-06-11).
+function lookupPartnerName(bpartnerId) {
+  if (!bpartnerId) return null;
+  try {
+    const sql = `SELECT name FROM adempiere.c_bpartner WHERE c_bpartner_id = ${parseInt(bpartnerId, 10)} LIMIT 1`;
+    const result = execSync(`psql -t -A -c "${sql}"`, {
+      encoding: 'utf-8',
+      timeout: 5000,
+      env: { ...process.env, PGUSER: 'analytics_user', PGDATABASE: 'idempiere_replica' },
+    }).trim();
+    return result || null;
+  } catch (e) {
+    return null;
+  }
+}
 
 // ─── LARGE-OFFER GATE ────────────────────────────────────────────────────────
 // Pauses the customer-excess-analysis dispatch for unusually large offers so
@@ -69,8 +89,12 @@ function shouldGateRoute(offerType) {
  *   sourceUid (for breadcrumb traceability)
  */
 async function action_load_offer(payload, ctx) {
-  const { bpartnerId, offerType, lines, description, sourceUid, partnerName,
+  const { bpartnerId, offerType, lines, description, sourceUid,
           originalSender, originalCc, originalSubject } = payload;
+
+  // Resolve partnerName from payload OR look up from DB (fallback for when
+  // agent doesn't pass partnerName). Matches rfq-loader-daemon.js pattern.
+  const partnerName = payload.partnerName || lookupPartnerName(bpartnerId);
 
   if (ctx.dryRun) {
     return {

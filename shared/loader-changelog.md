@@ -27,6 +27,12 @@ The "Cross-applies?" column is the load-bearing one — say which sibling loader
 
 ---
 
+## 2026-06-12
+
+| Date | Loader(s) | Change | Cross-applies? | Commit |
+|---|---|---|---|---|
+| 2026-06-12 | excess, broker-offers | **Partner name lookup fallback.** Confirmation emails were showing `(unknown)` for partner name when the agent didn't pass `partnerName` in the `load_offer` payload. Added `lookupPartnerName(bpartnerId)` helper that queries the DB to resolve partner name from `bpartnerId`. Pattern matches `rfq-loader-daemon.js` fix from 2026-06-11. | **rfq-loading** already fixed in `rfq-loader-daemon.js`. **vq-loading** + **stockrfq** + **stockrfq-cq** don't send confirmation emails with partner names, so not applicable. | `bdae9cd` |
+
 ## 2026-06-05
 
 | Date | Loader(s) | Change | Cross-applies? | Commit |
