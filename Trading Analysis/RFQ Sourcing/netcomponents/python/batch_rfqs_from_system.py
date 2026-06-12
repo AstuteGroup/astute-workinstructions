@@ -39,6 +39,7 @@ from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
 from openpyxl.utils import get_column_letter
 import config
 import mpn_variants
+import rfq_history
 
 # Global flag for check-only mode (set by argparse)
 CHECK_ONLY_MODE = False
@@ -131,6 +132,7 @@ def create_output_excel(results, rfq_number, output_path):
     success_fill = PatternFill(start_color='C6EFCE', end_color='C6EFCE', fill_type='solid')
     fail_fill = PatternFill(start_color='FFC7CE', end_color='FFC7CE', fill_type='solid')
     omitted_fill = PatternFill(start_color='FFE699', end_color='FFE699', fill_type='solid')  # Yellow for omitted
+    cooldown_fill = PatternFill(start_color='B4C6E7', end_color='B4C6E7', fill_type='solid')  # Light blue for cooldown
 
     # Match type colors
     compliance_fill = PatternFill(start_color='FFCCCB', end_color='FFCCCB', fill_type='solid')  # Light red for compliance
@@ -169,6 +171,8 @@ def create_output_excel(results, rfq_number, output_path):
             status_cell.fill = fail_fill
         elif r.get('status') == 'OMITTED':
             status_cell.fill = omitted_fill
+        elif r.get('status') == 'COOLDOWN':
+            status_cell.fill = cooldown_fill
 
         # Color-code match type column
         match_type_cell = ws.cell(row=row_num, column=5)
@@ -381,11 +385,12 @@ async def scrape_availability_only(page, part_number, quantity, line_number, wor
     return results
 
 
-async def process_part(page, part_number, quantity, line_number, worker_id, cpc='', franchise_data=None):
+async def process_part(page, part_number, quantity, line_number, worker_id, cpc='', franchise_data=None, rfq_number=''):
     """Process a single part number and return results
 
     Args:
         franchise_data: Optional dict with 'franchise_qty', 'franchise_bulk_price' for min order filtering
+        rfq_number: System RFQ number for history tracking
     """
     results = []
     omitted_suppliers = []  # Track suppliers filtered out by min order value
@@ -594,6 +599,34 @@ async def process_part(page, part_number, quantity, line_number, worker_id, cpc=
 
         print(f'    [W{worker_id}] -> {supplier["name"]} qty:{rfq_qty}{qty_note}{match_note}...')
 
+        # Check cooldown - skip if we've RFQ'd this supplier+MPN recently
+        is_blocked, cooldown_record = rfq_history.check_cooldown(supplier['name'], part_number)
+        if is_blocked:
+            cooldown_date = cooldown_record.get('rfqDate', 'unknown')
+            print(f'      [W{worker_id}] COOLDOWN: last RFQ {cooldown_date}')
+            results.append({
+                'line_number': line_number,
+                'cpc': cpc,
+                'part_number': part_number,
+                'offered_mpn': supplier.get('offered_mpn', ''),
+                'match_type': supplier.get('match_type', ''),
+                'variant_flags': supplier.get('variant_flags', ''),
+                'qty_requested': quantity,
+                'qty_sent': '',
+                'supplier': supplier['name'],
+                'region': supplier['region'],
+                'supplier_qty': supplier['total_qty'],
+                'qualifying_total': qualifying_total,
+                'qualifying_americas': qualifying_americas,
+                'qualifying_europe': qualifying_europe,
+                'selected_count': selected_count,
+                'status': 'COOLDOWN',
+                'timestamp': datetime.now().isoformat(),
+                'error': f'Cooldown active (last RFQ: {cooldown_date})',
+                'worker_id': worker_id
+            })
+            continue
+
         try:
             await page.goto(config.BASE_URL)
             await sleep_with_jitter(2)
@@ -746,6 +779,15 @@ async def process_part(page, part_number, quantity, line_number, worker_id, cpc=
                     'error': '',
                     'worker_id': worker_id
                 })
+
+                # Record RFQ for cooldown tracking
+                rfq_history.record_rfq(
+                    supplier=supplier['name'],
+                    mpn=part_number,
+                    qty=rfq_qty,
+                    rfq_id=rfq_number,
+                    region=supplier['region']
+                )
             else:
                 results.append({
                     'line_number': line_number,
@@ -865,7 +907,8 @@ async def worker(worker_id, parts_queue, results_list, results_lock):
                             part['quantity'],
                             part['line_number'],
                             worker_id,
-                            part.get('cpc', '')
+                            part.get('cpc', ''),
+                            rfq_number=part.get('rfq_number', '')
                         )
 
                     # Thread-safe append to results
@@ -1040,9 +1083,10 @@ async def main():
         print(f'Output file: {output_file}')
         print('=' * 60)
 
-        # Create queue and populate with parts
+        # Create queue and populate with parts (include rfq_number for history tracking)
         parts_queue = asyncio.Queue()
         for part in parts:
+            part['rfq_number'] = rfq_number
             await parts_queue.put(part)
 
         # Shared results list with lock
@@ -1072,6 +1116,7 @@ async def main():
         failed_count = len([r for r in results_list if r['status'] == 'FAILED'])
         no_suppliers = len([r for r in results_list if r['status'] == 'NO_SUPPLIERS'])
         omitted_count = len([r for r in results_list if r['status'] == 'OMITTED'])
+        cooldown_count = len([r for r in results_list if r['status'] == 'COOLDOWN'])
 
         # Supplier distribution analysis
         supplier_counts = {}
@@ -1101,6 +1146,7 @@ async def main():
         print(f'Failed: {failed_count}')
         if not CHECK_ONLY_MODE:
             print(f'Omitted (min order filter): {omitted_count}')
+            print(f'Cooldown (recently RFQ\'d): {cooldown_count}')
         print(f'No suppliers found: {no_suppliers}')
         print(f'Total time: {total_time:.1f}s ({total_time/60:.1f} min)')
         print(f'Avg time per part: {total_time/len(parts):.1f}s')

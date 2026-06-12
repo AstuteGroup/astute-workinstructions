@@ -119,6 +119,29 @@ When searching for a part, NetComponents may return variants with different suff
 For all Europe supplier RFQs, the message field automatically includes:
 > "Please confirm country of origin."
 
+### RFQ Cooldown (Same Part / Same Supplier)
+
+Prevents repeatedly blasting the same broker for the same part. Before sending an RFQ, the system checks if we've already RFQ'd that supplier+MPN combination recently.
+
+**Cooldown Windows:**
+
+| Scenario | Window |
+|----------|--------|
+| Default | 60 days |
+| Memory products (DRAM, Flash, SRAM) | 14 days (prices change frequently) |
+| Supplier said no-bid | 90 days (longer cooldown) |
+
+**Memory Product Prefixes:** MT, K4, K9, H5, W25, IS42, NT, AS4, CY7, IS6
+
+**Implementation:**
+- `rfq_history.py` module with `check_cooldown()` and `record_rfq()` functions
+- History stored in `rfq_history.json`
+- Suppliers on cooldown show status `COOLDOWN` in output (light blue highlighting)
+
+**Output columns added:**
+- Status `COOLDOWN` indicates supplier was skipped due to recent RFQ
+- Error column shows the date of the previous RFQ
+
 ## Scripts
 
 Both Node.js and Python implementations are available with identical functionality.
@@ -444,6 +467,6 @@ The search results table has a hierarchical structure:
 - [x] Date code prioritization
 - [x] Quantity adjustment to encourage quoting
 - [x] MPN variant prioritization (EXACT > PACKAGING_SAFE > COMPLIANCE/SPEC)
-- [ ] Same part / same supplier cooldown (60 days)
+- [x] Same part / same supplier cooldown (60 days) — integrated 2026-06-12
 - [ ] No-bid filtering (skip vendor+MPN if no-bid within 90 days)
 - [ ] Supplier fatigue tracking

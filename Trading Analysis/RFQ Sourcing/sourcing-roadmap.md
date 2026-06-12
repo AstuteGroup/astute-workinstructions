@@ -1416,7 +1416,8 @@ Placeholder entry — scope to be refined. Intent: surface quote/VQ text that ne
 | 2026-03-03 | — | Consolidated roadmaps, organized by process flow |
 | 2026-03-10 | B | B1 Cooldown tracking implemented (rfq_history.py + supplier template prioritization) |
 | 2026-04-07 | C | C10 done: vq-writer auto-captures packaging + date code; C9 added (extract vqPackaging in 7 distributor modules) |
+| 2026-06-12 | B | B1 Cooldown integrated into batch_rfqs_from_system.py (was module-only, now active in production workflow) |
 
 ---
 
-*Last updated: 2026-04-07*
+*Last updated: 2026-06-12*
