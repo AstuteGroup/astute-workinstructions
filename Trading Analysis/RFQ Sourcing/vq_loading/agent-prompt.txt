@@ -185,7 +185,9 @@ Decide Type 1 vs Type 2 (affects vendor resolution + line count expectations):
 
 Buyer resolution (the operator-on-record who DID the sourcing — NOT necessarily the outer forwarder). Run these tiers in order, first match wins:
 
-  - **Tier A — Internal forward chain (primary signal).** If the OUTER From: is `@astutegroup.com` AND there is a DEEPER `@astutegroup.com` From: in the quoted block, the outer is just a forwarder (support staff, intermediary) and the DEEPER one is the buyer. Resolve via:
+  - **Tier A-0 — Known buyer short-circuit (check FIRST).** If the OUTER From: is `@astutegroup.com`, resolve the outer sender's ad_user_id via `resolveAstuteUserByEmail(outerFrom)`. Then check the buyers registry at `shared/data/user-role-registry.json`. **If the outer sender is in the `buyers[]` list, use them as the buyer — do NOT walk deeper.** Known buyers don't forward on behalf of other buyers; if they send to vq@, they did the work. This prevents sales-rep → sourcer chains (Alex asks Serena to source; Serena replies to vq@) from incorrectly picking the sales rep.
+
+  - **Tier A — Internal forward chain (support-staff pattern).** If Tier A-0 didn't fire (outer sender is NOT a known buyer) AND the OUTER From: is `@astutegroup.com` AND there is a DEEPER `@astutegroup.com` From: in the quoted block, the outer is just a forwarder (support staff, intermediary) and the DEEPER one is the buyer. Resolve via:
         const { resolveAstuteUserByEmail } = require('/home/analytics_user/workspace/astute-workinstructions/shared/partner-lookup');
         const owner = resolveAstuteUserByEmail(deepestInternalEmail);  // returns {userId, name, email} or null
     Use `owner.userId` as the buyerId. This catches BOTH the Type 2 chain (Feong → Leonard → Jake → vq@ picks Feong) AND the support-staff-on-behalf-of pattern (broker → Stephanie → Gopal-assistant → vq@ picks Stephanie). It supersedes the Type 1 default.
@@ -228,13 +230,14 @@ the correct buyer.
 
 **Implications for your extraction:**
 
-  - Prefer the deepest internal actor your chain walk can reach. Don't stop
-    at a support-tagged email if a deeper buyer is visible in the chain.
+  - **Check Tier A-0 FIRST:** If the outer sender is a known buyer (in the
+    registry's `buyers[]` list), use them immediately. Do NOT walk deeper.
+  - Only walk deeper (Tier A) when the outer sender is NOT in the buyers list
+    (e.g., support staff like Ivy/Gopal, or an unknown forwarder).
   - If Tier A only resolves to Ivy/Gopal/Lathis with no deeper actor, that's
     OK — the handler will escalate cleanly. Don't try to "force" a buyer.
-  - You don't need to read the registry yourself. The handler does it. Just
-    pass your best Tier A → D candidate as `buyerId` and the handler decides
-    whether to load or escalate.
+  - The handler still validates against the registry as a safety net, but
+    Tier A-0 should prevent most false escalations.
   - The handler's escalation breadcrumb is `escalated-buyer-unknown`. Reads
     "Buyer not in registry — ..." in `~/workspace/.offer-pipeline/breadcrumbs.jsonl`.
 
@@ -297,17 +300,33 @@ The agent must find the right RFQ for these quotes. In priority order:
 
      Concrete example (UID 8366 calibration): vendor quoted `BTS50162EKAXUMA1` (the cut-tape variant with `XUMA1` suffix). RFQ 1132427 has `BTS5016-2EKA` / clean `BTS50162EKA`. Pass 1 misses; Pass 2 matches because `BTS50162EKAXUMA1` starts with `BTS50162EKA`. The match is the customer's RFQ MPN — the vendor's full MPN goes into `vendorQuotedMpn` per the .md Alternate MPN rule.
 
-  4. **Multi-write fan-out rule** — decide which RFQ(s) get the VQ:
+  4. **RFQ selection rule (7-day window + match-count heuristic)**:
 
      Let `matches` = all active RFQs returned by Pass 1 or Pass 2 above (deduplicated by `r.value`), ordered by `r.created DESC`.
 
-     - **`len(matches) == 0`** → no active RFQ for this MPN. Route `need_info_vendor` with `{missing: ['rfq_number'], extracted: {<partial quotes>}, subject, outerFrom}`. Sidecar waits for Jake to clarify which RFQ.
-     - **`len(matches) == 1`** → write to that single RFQ. Age is irrelevant (could be 3 days or 6 months — single match means no ambiguity to resolve).
-     - **`len(matches) > 1` AND at least one match has `created >= NOW() - INTERVAL '30 days'`** → write to ALL matches inside the 30-day window. Set `rfqSearchKey` to the most recent of those, `secondaryRfqSearchKeys` to the rest within the window. RFQs older than 30 days are ignored.
-     - **`len(matches) > 1` AND no match is within 30 days** → write only to the single most-recent match (`rfqSearchKey` = `matches[0].value`, no secondaries). "For reference" — the older RFQs may still be open and the buyer can use the price/availability signal.
+     **CRITICAL: Write to exactly ONE RFQ per email (no multi-write fan-out).** The 30-day fan-out was retired 2026-06-15 after it caused VQs to load to both current and stale RFQs.
+
+     **Step 4a — Compute match counts:** For each candidate RFQ, count how many of the extracted MPNs from this email match that RFQ's lines. This is the "match count" for that RFQ.
+
+     **Step 4b — Apply decision tree:**
+
+     - **`len(matches) == 0`** → no active RFQ for any MPN. Route `need_info_vendor` with `{missing: ['rfq_number'], extracted: {<partial quotes>}, subject, outerFrom}`. Sidecar waits for operator to clarify which RFQ.
+
+     - **`len(matches) == 1`** → write to that single RFQ. Age is irrelevant (single match = no ambiguity).
+
+     - **`len(matches) > 1` AND at least one match is within 7 days (`created >= NOW() - INTERVAL '7 days'`)**:
+       * Filter to only RFQs within the 7-day window.
+       * If exactly 1 RFQ remains → write to it.
+       * If multiple RFQs remain, apply **match-count tiebreaker**:
+         - Compute match count for each (how many extracted MPNs match each RFQ).
+         - If one RFQ has **≥70% of the extracted MPNs** AND all others have **<30%** → auto-select the high-overlap RFQ. Stamp `vendorNotes`: `'RFQ auto-selected via match-count heuristic: <N>/<total> MPNs matched vs <M>/<total> for next candidate'`.
+         - Otherwise → route `need_info_vendor` with `{missing: ['rfq_number'], rfq_candidates: [{rfq: '<value>', created: '<date>', match_count: N, match_pct: 'X%'}, ...], extracted, subject, outerFrom, investigation_summary: 'Multiple RFQs within 7 days; match counts: RFQ X has N/M MPNs, RFQ Y has P/M MPNs. Please specify which RFQ.'}`.
+
+     - **`len(matches) > 1` AND no match is within 7 days**:
+       * Do NOT auto-select the most recent. Route `need_info_vendor` with `{missing: ['rfq_number'], rfq_candidates: [{rfq: '<value>', created: '<date>', match_count: N, age_days: D}, ...], extracted, subject, outerFrom, investigation_summary: 'No RFQ within 7 days. Possible candidates: RFQ X (created <date>, <N> MPN matches), RFQ Y (created <date>, <M> MPN matches). Please specify which RFQ or confirm most recent.'}`.
 
      Qty alignment is NOT a gate. If a fan-out RFQ asks 10 and the broker quotes 1815, write the VQ anyway. Buyers and sellers use the price/availability data regardless of qty match.
-  4. **Ambiguous** (multiple candidate RFQs, no single covers all) → route `needs_review` with `{reason: "RFQ resolution ambiguous", details: "<candidate RFQs>"}`.
+
   5. **None found** → route `need_info_vendor` with `{missing: ["rfq_number"], extracted: {<partial quotes>}, subject, outerFrom}`.
 
 Validate the RFQ exists and is active:
@@ -316,7 +335,7 @@ Validate the RFQ exists and is active:
 
 **If the subject-cited or body-cited RFQ is INACTIVE (returns 0 rows above), do NOT bounce.** Fall through to step 3.6.3 (MPN matching against ALL active RFQs) — the cited RFQ may have been deactivated and replaced. The MPN match will find the live RFQ. Treat the cited number as a hint that lost authority, not a load target.
 
-**If the subject-cited RFQ is active AND MPN matching also finds different active RFQs:** the subject is the authoritative target (operator's explicit reference). Use it as the primary. Apply multi-write fan-out (step 3.6.4) only if MPN matching surfaces ADDITIONAL active RFQs within 30 days — those become secondaries.
+**If the subject-cited or body-cited RFQ is active:** use it as the target — the explicit RFQ # takes priority. Do NOT apply MPN matching to find additional RFQs. The cited RFQ is the single target; no fan-out. (Multi-write fan-out was retired 2026-06-15.)
 
 **EXCEPTION — Cited RFQ has ZERO MPN overlap:** If the subject-cited or body-cited RFQ is active but NONE of the extracted MPNs appear on that RFQ's lines, AND MPN matching (step 3.6.3) finds a clean unique match to a DIFFERENT active RFQ, **trust the MPN match**. The cite was likely a copy-paste error, a mis-forward, or stale reference. Rules:
   - "Zero overlap" means: query the cited RFQ's lines for the extracted MPNs, get 0 rows.
@@ -526,9 +545,9 @@ Apply these recovery steps in order. Each one is a "before you bounce, try this"
 
        **Principle:** silent wrong MFRs propagate downstream (wrong supplier picks, wrong cross-refs, wrong reconciliation). A blank MFR is recoverable by the reconciler; a wrong one is a latent data corruption.
 
-  (b) **Multi-RFQ ambiguity is not ambiguity — it's fan-out.** Same MPN appearing on multiple active RFQs is the normal pattern (different customers asking for the same part). Per step 3.6.4's multi-write rule, write to ALL matches inside the 30-day window. Never route this to `needs_review` — that was the 13:00 failure mode for UIDs 8413/8414/8415.
+  (b) **Multi-RFQ matches → use match-count heuristic, NOT blind escalation.** Same MPN appearing on multiple active RFQs is normal (different customers asking for the same part). Per step 3.6.4's revised rule (2026-06-15): apply the match-count heuristic to pick the best RFQ. If one RFQ has ≥70% of the email's MPNs and others have <30%, auto-select it. Only escalate when match counts are ambiguous. The old "write to ALL matches" fan-out was retired — it caused VQs to load to stale RFQs.
 
-  (b') **Different MPN sets per RFQ in one email — partition into multiple load_vq calls, do NOT escalate.** Distinct from (b) [same-MPN fan-out via secondaryRfqSearchKeys]: when an inbound email carries N MPN groups where each group ties to a DIFFERENT pre-existing RFQ (e.g., "block 27 → RFQ A; blocks 29-33 → RFQ B"), emit ONE `load_vq` route call per RFQ with that RFQ's quotes. Multiple route calls per agent tick are supported by the poller — the line in the SUMMARY footer that calls load_vq "one per email" is descriptive of the common case, NOT a hard limit. Surfaced via UID 8598 (Betty 5/14 stock-buy sheet via Ivy): agent escalated needs_review citing "single-route load_vq can't span multiple RFQs" — wrong. The right move is N calls. Only escalate the SUBSET that genuinely needs new-RFQ creation (no existing RFQ at all) via the dedicated `forward_to_rfq_loading` action below — NOT needs_review.
+  (b') **Different MPN sets per RFQ in one email — partition into multiple load_vq calls, do NOT escalate.** When an inbound email carries N MPN groups where each group ties to a DIFFERENT pre-existing RFQ (e.g., "block 27 → RFQ A; blocks 29-33 → RFQ B"), emit ONE `load_vq` route call per RFQ with that RFQ's quotes. Each call targets exactly one RFQ (per the 2026-06-15 single-RFQ rule). Multiple route calls per agent tick are supported by the poller — the line in the SUMMARY footer that calls load_vq "one per email" is descriptive of the common case, NOT a hard limit. Surfaced via UID 8598 (Betty 5/14 stock-buy sheet via Ivy): agent escalated needs_review citing "single-route load_vq can't span multiple RFQs" — wrong. The right move is N calls. Only escalate the SUBSET that genuinely needs new-RFQ creation (no existing RFQ at all) via the dedicated `forward_to_rfq_loading` action below — NOT needs_review.
 
   (b'') **MPN blocks with no existing RFQ + operator-specified customer/sales/type — route `forward_to_rfq_loading`, NOT `needs_review`.** When the inbound email contains MPN blocks that don't match any existing RFQ AND the operator's note explicitly states the customer / sales-rep / type for a new RFQ (e.g., "Please help to create the RFQ for VQs if didn't link to specific RFQ. Customer name Astute Group, sales Aran, shortage."), emit a `forward_to_rfq_loading` route call. The handler synthesizes an RFQ-creation request email to rfqloading@orangetsunami.com (with the operator's verbatim instruction below for audit), pre-assigns a correlation Message-ID, and parks the broker quotes in a sidecar (kind=`waiting_for_new_rfq`). The `vq-loading-resumer` cron picks the parked load up once the new RFQ exists in OT — operator does NOT need to manually re-forward the quotes. Payload: `{ customer, salesRep, type, lines: [{ mpn, qty, mfr?, cpc?, description? }, ...], pendingQuotes: [<load-bulk-summary quote objects>], subject?, originalBodySnippet?, reason? }`. Use this when the operator instruction is explicit; for cases where the customer/sales/type aren't specified, still escalate `needs_review`.
 
@@ -693,19 +712,17 @@ For each (rfqSearchKey, quote) pair, check for an existing active VQ with the sa
     AND vq.created >= NOW() AT TIME ZONE 'America/Chicago' - INTERVAL '30 days';
 
 Routing decision after dup check across all targets:
-  - If EVERY (rfq, quote) pair is a dup → route `dup_skip` with the first existing `existingVqId`. Move to Duplicates. Don't load_vq.
-  - If SOME targets are dup and others are fresh → route `load_vq` with `rfqSearchKey` + `secondaryRfqSearchKeys` set to ONLY the non-dup target RFQs. The handler writes to whatever's left. Breadcrumb the dup-skipped RFQs in the route output's `notes` field.
-  - If NO duplicates → route `load_vq` with the full target list.
+  - Dup found → route `dup_skip` with the existing `existingVqId`. Move to Duplicates. Don't load_vq.
+  - No duplicate → route `load_vq`.
 
 ────────────────────────────────────────────
 3.10 — Pre-load PAYLOAD.
 ────────────────────────────────────────────
 
-Build the payload:
+Build the payload (writing to exactly ONE RFQ — fan-out retired 2026-06-15):
 
   {
-    "rfqSearchKey": "<primary RFQ value — most recent of the chosen targets>",
-    "secondaryRfqSearchKeys": ["<other target RFQ values within the 30d window>", ...],
+    "rfqSearchKey": "<the single target RFQ value>",
     "buyerId": <AD_User_ID per Buyer field rule>,
     "quotes": [<reconciled quote objects from 3.7>],
     "subject": "<email subject — needed for the consolidated-clarify email>",
@@ -722,15 +739,14 @@ Build the payload:
     ]
   }
 
-`secondaryRfqSearchKeys` and `clarifications` are both OPTIONAL. Omit / pass `[]` when not needed.
+`clarifications` is OPTIONAL. Omit / pass `[]` when not needed. Do NOT pass `secondaryRfqSearchKeys` — multi-RFQ fan-out was retired.
 
 Dispatch:
   node /home/analytics_user/workspace/astute-workinstructions/shared/email-workflow-poller.js route <uid> load_vq --workflow vq-loading --payload '<json>'
 
-The handler iterates over `[rfqSearchKey, ...secondaryRfqSearchKeys]`, calls `loadBulkSummary` once per RFQ with the same `quotes`, and returns:
+The handler calls `loadBulkSummary` for the single `rfqSearchKey` and returns:
   {
     primaryResult: { rfqSearchKey, written, skipped, failed, gaps, ... },
-    secondaryResults: [{ rfqSearchKey, written, ... }, ...],
     totals: { rfqsWritten, vqsWritten, vqsSkipped, vqsFailed }
   }
 
@@ -754,7 +770,7 @@ At the end, print a single-line summary:
 
   VQ-LOADING-AGENT SUMMARY: processed=<N> load_vq=<N> rfqs_written=<N> vqs_written=<N> vqs_skipped=<N> vqs_failed=<N> forward_to_rfq_loading=<N> need_info_vendor=<N> clarify_vendor=<N> needs_vendor=<N> needs_review=<N> no_bid=<N> not_vq=<N> dup_skip=<N> outbound_pending=<N> errors=<N>
 
-`load_vq` counts route calls (typically one per email; can be N when the email carries different MPN sets per RFQ — see step 3.10.0(b')). `rfqs_written` is the total distinct RFQs that received at least one VQ across all routes — distinct from load_vq because (a) multi-RFQ fan-out within one call via secondaryRfqSearchKeys pushes one route into N RFQs, AND (b) emitting N load_vq calls also produces N RFQs. `vqs_written` sums across all RFQs.
+`load_vq` counts route calls (typically one per email; can be N when the email carries different MPN sets per RFQ — see step 3.7.5(b')). `rfqs_written` equals `load_vq` since each load_vq now targets exactly one RFQ (fan-out retired 2026-06-15). `vqs_written` sums VQs across all routes.
 
 If a single message hits a transient error (loadBulkSummary throws, attachment unreadable, vendor lookup 5xx), log the error in your output and continue with the next message. Do not abort the batch on per-message failure.
 

@@ -110,7 +110,7 @@ Extract ALL available fields from each quote. Required fields must be present; o
 
 | Field | Column Name | Required | Description |
 |-------|-------------|----------|-------------|
-| **RFQ Search Key** | `RFQ Search Key` | Yes | Matched via MPN lookup (30-day window) |
+| **RFQ Search Key** | `RFQ Search Key` | Yes | Matched via MPN lookup (7-day window for multi-match; single-match loads regardless of age) |
 | **Buyer** | `Buyer` | Yes | **Astute employee who forwarded the email** (from outer From: field) |
 | **Forwarder Email** | `forwarder_email` | Yes | Email of Astute employee who forwarded to vq@ (e.g., jake.harris@astutegroup.com) |
 
@@ -118,9 +118,11 @@ Extract ALL available fields from each quote. Required fields must be present; o
 
 The Buyer is the **Astute employee who did the sourcing work** (the operator-on-record), NOT the customer contact from the RFQ and NOT necessarily whoever forwarded the email. Resolve in this order, first match wins:
 
-- **Tier A — Internal forward chain (primary signal).** If the **outer `From:`** is `@astutegroup.com` AND there is a **deeper `@astutegroup.com` `From:`** in the quoted block, the **outer is the forwarder** and the **deeper one is the buyer**. Resolve the deeper email via `resolveAstuteUserByEmail(deeperEmail)` from `shared/partner-lookup.js`. This is the dead giveaway for support staff forwarding on behalf of someone — it does not require any text hint and supersedes the Type 1 default.
-  - Example (Type 2 + internal chain): `From: Feong → Leonard → Jake → vq@` — Tier A picks Feong (the deepest internal sender), correctly.
-  - Example (Type 1 + support staff): `From: <broker> → Stephanie → vq@` is direct Type 1 (Stephanie is the buyer). But `From: <broker> → Stephanie → Gopal-the-assistant → vq@` is the support-staff case — Tier A picks Stephanie.
+- **Tier A-0 — Known buyer short-circuit (check FIRST).** If the **outer `From:`** is `@astutegroup.com`, check if that user is in the `buyers[]` list in `shared/data/user-role-registry.json`. **If yes, use them as the buyer — do NOT walk deeper.** Known buyers don't forward on behalf of other buyers; if they send to vq@, they did the work.
+  - Example: `From: Alex (sales) → Serena (buyer) → vq@` — Serena is the outer From and IS in the buyers registry, so Tier A-0 picks Serena. We do NOT walk deeper to Alex.
+- **Tier A — Internal forward chain (support-staff pattern).** If Tier A-0 didn't fire (outer sender is NOT a known buyer) AND the **outer `From:`** is `@astutegroup.com` AND there is a **deeper `@astutegroup.com` `From:`** in the quoted block, the **outer is the forwarder** and the **deeper one is the buyer**. Resolve the deeper email via `resolveAstuteUserByEmail(deeperEmail)` from `shared/partner-lookup.js`. This catches support staff forwarding on behalf of buyers.
+  - Example (Type 2 + internal chain): `From: Feong → Leonard → Jake → vq@` — if Jake is NOT a known buyer, Tier A picks Feong (the deepest internal sender).
+  - Example (support staff): `From: <broker> → Stephanie → Gopal-the-assistant → vq@` — Gopal is NOT a known buyer, so Tier A picks Stephanie.
 - **Tier B — Explicit text hint (fallback).** If Tier A doesn't fire, scan the forwarder's note + signature + subject for explicit hints like `sourced by <Name>`, `on behalf of <Name>`, `buyer: <Name>`. If found, call `resolveAstuteUserByName(name)`:
   - `unambiguous: true` → that's the buyer.
   - `ambiguous: true` → escalate via `need_info_vendor` with the candidate list rather than guessing.
@@ -904,6 +906,8 @@ Maintained as part of the cross-loader changelog discipline — see [`shared/loa
 
 | Date | Change | Commit |
 |---|---|---|
+| 2026-06-15 | **RFQ selection: retired 30-day multi-write fan-out.** VQs now load to exactly ONE RFQ per email. New 7-day window + match-count heuristic: (1) explicit RFQ # in subject/body → use it directly; (2) single MPN match → use it regardless of age; (3) multiple matches within 7 days → auto-select if one RFQ has ≥70% MPN overlap, else ask for clarity with match counts; (4) no matches within 7 days → reply with candidate RFQs and ask operator. Triggered by incident where VQs loaded to both 06/04 RFQ and stale 05/20 RFQ. | _(uncommitted)_ |
+| 2026-06-12 | **Tier A-0 known-buyer short-circuit.** If the outer From is a known buyer (in registry's `buyers[]` list), use them immediately — do NOT walk deeper. Fixes false escalations on sales-rep → sourcer chains (e.g., Alex asks Serena to source; Serena replies to vq@ — Serena is the buyer, not Alex). Triggered by UID 9168 (ESP-WROOM-02-N2 / RFQ 1131857). | _(uncommitted)_ |
 | 2026-05-26 | **Escalations internal-only.** Retired broker-outreach + the two-email split (`41b6362`). `resolveOutreachRecipients` now returns ONE internal recipient list (operator + internal forwarder + buyer via `resolveAstuteUserById(buyerId)` + internal Cc); external broker recorded but never emailed. `sendSplitRecipientEmail` collapsed to one email; new `recipientsFooter`/`externalSenderLabel` show the operator exactly who got it. Breadcrumb logs `recipients` + `external_sender_not_emailed`. Triggered by UID 8684 (forwarder Ivy's separate copy was invisible to operator → read as "skipped"). Test: `oneoffs/test-vq-internal-only-recipients-2026-05-26.js`. | _(uncommitted)_ |
 | 2026-05-22 | Cross-workflow forward+park (`forward_to_rfq_loading` action + `vq-loading-resumer` cron). When MPN blocks need a new RFQ AND the operator note specifies customer/sales/type, agent forwards to rfq-loading and parks the broker quotes; resumer picks up after RFQ exists. | `cb1ceb9` |
 | 2026-05-22 | Envelope-From determinism + multi-RFQ partition guidance. Poller now provides `ctx.currentFrom` / `ctx.currentCc`; `resolveOutreachRecipients` trusts these over agent-supplied values. Agent prompt §3.10.0(b'/b'') clarifies when to emit N `load_vq` calls vs `forward_to_rfq_loading`. | `5410587` |
