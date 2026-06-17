@@ -163,20 +163,251 @@ Touchpoint: `Trading Analysis/Inventory File Cleanup/inventory_cleanup.js` (the 
 
 ---
 
-## End-to-End Workflow (TO BE WRITTEN at pilot)
+## End-to-End Workflow
 
-This section will be filled in once LAM Dead pilot is shaped. Expected structure:
+### Relationship to Active Sourcing
 
-1. Identify candidate lines for this cycle (priority + round-robin selection query)
-2. Lookup-or-create the per-warehouse weekly RFQ
-3. PATCH NetComponents export to mask the in-flight 500
-4. Submit RFQ through standard franchise API enrichment
-5. Invoke broker sourcing workflow on the RFQ
-6. Wait for VQs (1-3 day SLA — TBD)
-7. Run progression rules → compute recommended resale per line
-8. PATCH `apl_offer_recommendedresale` on the offer lines
-9. Restore NetComponents listing at new prices
-10. Mark RFQ closed for the cycle
+This workflow runs AFTER an Active Sourcing batch completes. Active Sourcing does:
+
+1. Select 200 delisted MPNs from `~/.delisted-parts-queue.json`
+2. Create "Active Sourcing AS-YYYY-MM-DD" RFQ
+3. **Franchise API enrichment** (DigiKey, Mouser, Arrow, TTI, Future) — writes franchise VQs
+4. Submit broker RFQs via NetComponents
+5. Wait 3-5 days for broker VQs to arrive
+
+**This resale workflow then:**
+- Triages the batch (SOURCED vs NOT_SOURCED)
+- Analyzes broker VQs + franchise VQs to compute resale prices
+- Flags alignment issues with our sales/CQ history
+
+See: `Trading Analysis/Market Profiling/market-profiling.md` for full Active Sourcing workflow.
+
+---
+
+### Data Source: Active Sourcing RFQs
+
+**The primary input is parts that were DELISTED from inventory and PRICE-CHECKED via Active Sourcing.**
+
+Active Sourcing RFQs are identified by:
+- RFQ Type: Stock (1000007)
+- Description pattern: `Active Sourcing AS-YYYY-MM-DD`
+
+These RFQs contain delisted parts that were sent to the broker market for pricing. VQs that come back on these RFQs are the market truth we use for resale assignment.
+
+**DO NOT use:**
+- Random VQs floating in the system
+- Stock RFQ VQs (those are for order processing, not market intelligence)
+- VQs where vendor is Astute (internal pricing, not external market)
+
+---
+
+### Step 1: Identify the Active Sourcing Batch
+
+Query for recent Active Sourcing RFQs:
+
+```sql
+SELECT r.chuboe_rfq_id, r.value AS rfq_number, r.description, r.created
+FROM adempiere.chuboe_rfq r
+WHERE r.isactive = 'Y'
+  AND r.chuboe_rfq_type_id = 1000007  -- Stock
+  AND r.description ILIKE '%active sourcing%'
+  AND r.created > NOW() - INTERVAL '14 days'
+ORDER BY r.created DESC;
+```
+
+---
+
+### Step 2: Triage — SOURCED vs NOT_SOURCED
+
+For each MPN in the batch, check if broker VQs with cost > 0 came back:
+
+```sql
+WITH batch_mpns AS (
+  SELECT DISTINCT lm.chuboe_mpn_clean AS mpn
+  FROM adempiere.chuboe_rfq_line_mpn lm
+  WHERE lm.chuboe_rfq_id = $rfqId AND lm.isactive = 'Y'
+),
+vq_check AS (
+  SELECT bm.mpn,
+    EXISTS (
+      SELECT 1 FROM adempiere.chuboe_vq_line v
+      JOIN adempiere.c_bpartner bp ON bp.c_bpartner_id = v.c_bpartner_id
+      WHERE v.chuboe_mpn_clean = bm.mpn
+        AND v.isactive = 'Y' AND v.cost > 0
+        AND v.created > $rfqCreatedDate
+        AND bp.name NOT ILIKE '%astute%'  -- Exclude our own BPs
+    ) AS has_broker_vqs
+  FROM batch_mpns bm
+)
+SELECT mpn,
+  CASE WHEN has_broker_vqs THEN 'SOURCED' ELSE 'NOT_SOURCED' END AS status
+FROM vq_check;
+```
+
+| Status | Action |
+|--------|--------|
+| **SOURCED** | Continue to Step 3 — assign resale |
+| **NOT_SOURCED** | Return to delisted queue for re-sourcing in next batch |
+
+---
+
+### Step 3: Gather Market Data for SOURCED Parts
+
+For each SOURCED MPN, collect:
+
+**A. Broker VQ Pricing (primary market signal)**
+```sql
+SELECT
+  v.chuboe_mpn_clean AS mpn,
+  COUNT(DISTINCT v.c_bpartner_id) AS broker_count,
+  MIN(v.cost) AS broker_low,
+  AVG(v.cost) AS broker_mid,
+  MAX(v.cost) AS broker_high
+FROM adempiere.chuboe_vq_line v
+JOIN adempiere.c_bpartner bp ON bp.c_bpartner_id = v.c_bpartner_id
+WHERE v.chuboe_mpn_clean = $mpn
+  AND v.isactive = 'Y' AND v.cost > 0
+  AND v.created > $rfqCreatedDate
+  AND bp.name NOT ILIKE '%astute%'
+GROUP BY v.chuboe_mpn_clean;
+```
+
+**B. Franchise Intelligence (market condition)**
+
+Active Sourcing runs franchise API enrichment (Step 5) BEFORE broker RFQs, so franchise VQs are already written to the same RFQ.
+
+**Source 1: Franchise VQs on the Active Sourcing RFQ**
+```sql
+SELECT
+  v.chuboe_mpn_clean AS mpn,
+  MIN(v.cost) AS franchise_low,
+  SUM(v.qty) AS franchise_stock,
+  v.chuboe_lead_time AS lead_time
+FROM adempiere.chuboe_vq_line v
+JOIN adempiere.c_bpartner bp ON bp.c_bpartner_id = v.c_bpartner_id
+WHERE v.chuboe_rfq_id = $rfqId
+  AND v.chuboe_mpn_clean = $mpn
+  AND v.isactive = 'Y' AND v.cost > 0
+  AND bp.chuboe_vendortype_id = 1000002  -- Franchise vendor type
+GROUP BY v.chuboe_mpn_clean, v.chuboe_lead_time;
+```
+
+**Source 2: API cache (if fresher data needed)**
+- Location: `shared/data/api-pricing-cache/{MPN}_{date}.json`
+- Use `extractPriceAtQty()` from `shared/api-result-writer.js`
+
+**Extract:**
+- `franchise_stock` — total units across all distributors
+- `franchise_price` — lowest unit price (the ceiling)
+- `franchise_lead_time` — identifies long-lead parts (≥12 weeks = scarcity)
+- `franchise_lifecycle` — obsolete/EOL = scarcity signal
+
+**C. RFQ Activity (demand signal)**
+```sql
+SELECT COUNT(DISTINCT lm.chuboe_rfq_line_mpn_id) AS rfq_count
+FROM adempiere.chuboe_rfq_line_mpn lm
+JOIN adempiere.chuboe_rfq r ON r.chuboe_rfq_id = lm.chuboe_rfq_id
+WHERE lm.chuboe_mpn_clean = $mpn
+  AND lm.isactive = 'Y' AND r.isactive = 'Y'
+  AND r.created > NOW() - INTERVAL '30 days';
+```
+
+**D. Our Sales History (last 60 days)**
+```sql
+SELECT AVG(ol.priceentered) AS avg_sold, COUNT(*) AS sale_count
+FROM adempiere.c_orderline ol
+JOIN adempiere.c_order o ON o.c_order_id = ol.c_order_id
+WHERE ol.chuboe_mpn_clean = $mpn
+  AND ol.isactive = 'Y' AND o.issotrx = 'Y'
+  AND o.docstatus IN ('CO', 'CL')
+  AND ol.created > NOW() - INTERVAL '60 days';
+```
+
+**E. Our CQ History (last 90 days)**
+```sql
+SELECT AVG(cq.priceentered) AS avg_cq, COUNT(*) AS cq_count
+FROM adempiere.chuboe_cq_line cq
+WHERE cq.chuboe_mpn_clean = $mpn
+  AND cq.isactive = 'Y'
+  AND cq.created > NOW() - INTERVAL '90 days';
+```
+
+---
+
+### Step 4: Classify Market Condition
+
+| Condition | Criteria | Meaning |
+|-----------|----------|---------|
+| **SCARCITY** | Long lead (≥12wk) OR obsolete OR (low franchise + few brokers) | We have pricing power |
+| **COMMODITY** | Well-stocked franchise (≥500) + many brokers (≥4) | Price is the driver |
+| **MIDDLE** | Everything else | Balanced approach |
+
+---
+
+### Step 5: Compute Resale Price
+
+**Inputs:**
+- `broker_low`, `broker_mid`, `broker_high` — competitor pricing
+- `franchise_price` — ceiling (suppresses market)
+- `classification` — SCARCITY / COMMODITY / MIDDLE
+- `rfq_count` — demand validation
+
+**Logic:**
+
+```
+IF franchise has stock:
+  ceiling = franchise_price  (can't go above — customers would just buy there)
+ELSE:
+  ceiling = NULL  (open market)
+
+CASE classification:
+  SCARCITY:  target = broker_high (we have leverage)
+  COMMODITY: target = broker_low × 0.95 (win on price)
+  MIDDLE:    target = broker_mid
+
+IF rfq_count >= 3:  -- Hot part, validated demand
+  Lean toward higher end of range
+
+floor = our_cost × 1.10  (never sell at a loss)
+
+resale = MAX(target, floor)
+IF ceiling: resale = MIN(resale, ceiling)
+```
+
+---
+
+### Step 6: Flag Alignment Issues
+
+Compare computed resale against our history:
+
+| Condition | Flag | Action |
+|-----------|------|--------|
+| `avg_sold < broker_low × 0.90` | 🔴 **UNDERSOLD** | We've been selling below market |
+| `avg_cq < broker_low × 0.90` | 🔴 **QUOTING_LOW** | Leaving money on table |
+| `avg_cq > broker_high × 1.10` | 🟡 **QUOTING_HIGH** | May be losing deals |
+| Otherwise | ⚪ ALIGNED | — |
+
+---
+
+### Step 7: Write Resale
+
+PATCH `chuboe_offer_line.apl_offer_recommendedresale` for matching inventory lines.
+
+**Match criteria:** `chuboe_mpn_clean` against active inventory offers.
+
+---
+
+### Test Script
+
+**Location:** `Trading Analysis/Inventory Recommended Resale/test-resale-logic.js`
+
+```bash
+# Analyze specific Active Sourcing batch
+node test-resale-logic.js --rfq 1137344
+
+# Analyze specific MPNs
+node test-resale-logic.js W631GG6NB12 STM32G030K6T6TR
+```
 
 ---
 
