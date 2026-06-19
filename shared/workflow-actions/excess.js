@@ -20,13 +20,20 @@ const fs = require('fs');
 const path = require('path');
 const { execSync } = require('child_process');
 
-const { writeOffer } = require('../offer-writeback');
+const { writeOffer, deactivatePriorOffers } = require('../offer-writeback');
 const writerAttribution = require('../writer-attribution');
 const offerRouter = require('../offer-router');
 const breadcrumbs = require('../breadcrumbs');
 const pending = require('../workflow-pending-state');
 const { createGate } = require('../large-payload-gate');
 const { makeApprovalActions } = require('./_approval');
+
+// ─── LAM KITTING INVENTORY DEACTIVATION ───────────────────────────────────────
+// LAM Kitting Inventory is a snapshot of current consignment stock. Each new
+// load supersedes all prior active offers of the same type. Deactivate old
+// offers before writing the new one.
+const LAM_KITTING_OFFER_TYPE_ID = 1000025;
+const LAM_RESEARCH_BP_ID = 1000730;
 
 // ─── PARTNER NAME LOOKUP ──────────────────────────────────────────────────────
 // Look up partner name from bpartnerId if not provided in payload.
@@ -69,7 +76,7 @@ const offerGate = createGate({
 // Type IDs whose route is 'customer-excess-analysis' (= the expensive path).
 // Mirrored from offer-router.TYPE_ID_TO_ROUTE so we can decide whether to gate
 // BEFORE invoking the router.
-const ANALYSIS_TYPE_IDS = new Set([1000000, 1000003]);
+const ANALYSIS_TYPE_IDS = new Set([1000000, 1000003, 1000025]);
 
 function shouldGateRoute(offerType) {
   const typeId = offerRouter.resolveTypeId(offerType);
@@ -139,6 +146,26 @@ async function action_load_offer(payload, ctx) {
           uid: dupCheck.breadcrumb.uid,
         },
       };
+    }
+  }
+
+  // ── LAM Kitting Inventory: deactivate prior offers before writing ──────────
+  // LAM Kitting is a point-in-time snapshot. Each new load supersedes the prior
+  // active inventory. Without this, multiple active offers accumulate and the
+  // RFQ matcher sees stale inventory lines.
+  let priorDeactivation = null;
+  if (offerType === LAM_KITTING_OFFER_TYPE_ID || offerType === 'LAM Kitting Inventory') {
+    const typeId = offerType === 'LAM Kitting Inventory' ? LAM_KITTING_OFFER_TYPE_ID : offerType;
+    priorDeactivation = await deactivatePriorOffers(LAM_RESEARCH_BP_ID, typeId);
+    if (priorDeactivation.offersDeactivated > 0) {
+      breadcrumbs.write({
+        cog: 'offer-poller',
+        event: 'lam-kitting-prior-deactivated',
+        uid: ctx.uid,
+        offersDeactivated: priorDeactivation.offersDeactivated,
+        linesDeactivated: priorDeactivation.linesDeactivated,
+        deactivatedOffers: priorDeactivation.deactivatedOffers.map(o => o.value),
+      });
     }
   }
 
@@ -375,6 +402,10 @@ This offer is now in Orange Tsunami and available for matching against open RFQs
     linesWritten: result.linesWritten,
     errors: result.errors,
     gateStatus,
+    priorDeactivation: priorDeactivation ? {
+      offersDeactivated: priorDeactivation.offersDeactivated,
+      linesDeactivated: priorDeactivation.linesDeactivated,
+    } : null,
   };
 }
 

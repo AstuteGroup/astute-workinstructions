@@ -73,7 +73,28 @@ For each unseen message, the agent decides **one** routing action. Order of chec
 4. **Offer type determination:**
    - Default for `excess@` = **Customer Excess** (`1000000`)
    - Body hint `Type: Broker` / `Type: Customer Excess` / `Type: Franchise Offers` / `Type: Customer Lead Time Buy` overrides
+   - **LAM kitting/dashboard:** if subject or body contains "LAM kitting" or "LAM dashboard" (case-insensitive), use **LAM Kitting Inventory** (`1000025`). This is consignment inventory from LAM Research — different downstream treatment. **Use LAM column mapping** (see below).
    - **Vendor-only flip:** if resolved partner has `iscustomer='N'` AND `isvendor='Y'`, flip Customer Excess → **Broker Stock Offer** (`1000001`). Catches broker liquidation lists landing in `excess@`.
+
+   **LAM Kitting Inventory column mapping** (when offer type = 1000025):
+
+   Reference the canonical offer or `lam-kitting-customer-offer.js` for the exact mapping. The Kitting DB Excel has these columns:
+
+   | Excel Column | → OT Field | Notes |
+   |---|---|---|
+   | `Lam P/N` | `chuboe_cpc` | LAM's internal part number |
+   | `MPN` | `chuboe_mpn` | Industry MPN |
+   | `Manufacturer` | `chuboe_mfr_text` | Manufacturer name |
+   | `Item Description` | `description` | Part description |
+   | `Resale Price` | `priceentered` | **Resale price** (borrowed — normally cost) |
+   | `Lead Time` | `chuboe_lead_time` | e.g., "12 Weeks" |
+   | `MOQ` | `chuboe_moq` | Hardcoded to "YES" |
+   | `Base Unit Price` | (skip) | Not used |
+   | (from W111+W115 CSVs) | `qty` | Summed inventory quantity |
+
+   **Partner for LAM offers:** Always use **Lam Research** (BP ID `1000730`).
+
+   **Prior offer deactivation:** LAM Kitting Inventory is a point-in-time snapshot of current consignment stock. Each new load **supersedes all prior active offers** of this type. Before writing a new LAM Kitting offer, the handler automatically deactivates all existing active offers with `chuboe_offer_type_id = 1000025` and `c_bpartner_id = 1000730`. This prevents stale inventory from appearing in RFQ matching.
 
 5. **Cross-forward dedup check** (preempts the write):
    ```sql
@@ -619,6 +640,7 @@ Maintained as part of the cross-loader changelog discipline — see [`shared/loa
 
 | Date | Change | Commit |
 |---|---|---|
+| 2026-06-19 | LAM Kitting Inventory prior offer deactivation. Each new LAM Kitting load now auto-deactivates all prior active offers of type 1000025 before writing. Prevents stale inventory accumulation. | — |
 | 2026-05-22 | Vendor alias tier in `resolveBP` (Tier 0). Shared with all loaders. | `fefc2cc` |
 | 2026-05-22 | Writer-attribution per-row failure log wired into `action_load_offer`. | `9823ede` |
 | 2026-05-22 | Handler-level Message-ID dedup via `breadcrumbs.hasMessageIdAlreadyLoaded()`. The `loaded` breadcrumb now persists `messageId` (was missing pre-fix) so future ticks can detect replays. Defends against manual IMAP folder-move replays and accidental re-polls. | `2a04ffe` |
