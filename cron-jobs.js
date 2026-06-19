@@ -493,6 +493,20 @@ module.exports = [
     logFile: '/tmp/nc-response-monitor.log',
     description: 'Every 4h — monitor for NetComponents datamaster@ replies. Forwards to Jake if he wasn\'t CC\'d. Self-terminates once any response is detected.',
   },
+
+  // ─── SALES PULSE REPORTS ───────────────────────────────────────────────────
+  {
+    name: 'vp-daily-brief',
+    cadence: 'fixed',
+    // 13:00 UTC = 6:00 AM PDT (summer) / 5:00 AM PST (winter) — Mon-Fri
+    // Note: DST causes 1-hour shift between summer/winter
+    cadenceCron: '0 13 * * 1-5',
+    command: `node "${WORKSPACE}/Sales Pulse Daily/scripts/email-vp-daily-brief.js"`,
+    cwd: WORKSPACE,
+    needsOT: true,
+    logFile: '/tmp/vp-daily-brief.log',
+    description: 'Mon-Fri 13:00 UTC (6am PDT / 5am PST) — VP Daily Brief for Josh Pucci. Generates report + emails to josh.pucci@ and melissa.bojar@',
+  },
 ];
 
 // Helper: convert cadence string to milliseconds (used by sentinel + runner).
