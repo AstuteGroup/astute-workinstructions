@@ -2,23 +2,24 @@
 
 Inbox-driven automation that matches customer RFQs against VQs, market offers, and stock — and emails the result back to the requestor.
 
-## How it works (current mode: forward-from-Jake)
+## How it works
 
-1. **You forward** any customer RFQ email to **`vortex@orangetsunami.com`**.
+1. **Anyone with an internal email** (`@astutegroup.com` or `@orangetsunami.com`) can email **`vortex@orangetsunami.com`** with an RFQ number in the subject or body. External senders are rejected with a notification to Jake.
 2. Every 20 minutes, **`vortex-poller.js`** wakes up, connects to that inbox, and processes any UNSEEN messages.
-3. For each forwarded message it:
-   - Parses the inner forwarded headers to recover the **original sender** and **original Cc list**.
+3. For each message it:
    - Extracts the **RFQ number** (7-digit) from subject or body. Prefers `RFQ ####### ` patterns; falls back to any standalone 7-digit number.
    - Runs the match logic against `bi_market_offer_line_v` + `bi_vendor_quote_line_v`.
    - Sends a result email **from `vortex@orangetsunami.com`** with:
-     - **To:** `jake.harris@astutegroup.com`
-     - **Cc:** original sender + everyone on the original Cc (deduped, Jake removed since he's already in To)
+     - **Direct emails:** To = sender, Cc = Jake + any Cc from inbound
+     - **Forwarded emails:** To = Jake, Cc = original sender + original Cc list
      - **Body:** HTML summary table (line counts per bucket)
-     - **Attachments:** the same xlsx files described below
+     - **Attachments:** the xlsx files described below
    - Marks the source message Seen so it won't be reprocessed.
-4. On any failure (RFQ not found, no number in subject/body, DB error) it emails **only Jake** with the error and still marks Seen — so the broken message doesn't loop forever.
+4. On any failure (RFQ not found, no number in subject/body, DB error) it emails **the sender + Jake** with the error and still marks Seen — so the broken message doesn't loop forever.
 
-> **Future mode:** A second trigger path (DB poll for newly created RFQs) will email Jake + the assigned seller. Not built yet — see Roadmap.
+> **Forwarding mode:** If you forward an email to vortex@, the poller parses the inner From/Cc headers and includes internal recipients only. External addresses (customers, vendors) are filtered out — results never leave the company.
+>
+> **Domain restrictions:** Only `@astutegroup.com` and `@orangetsunami.com` addresses can send requests or receive results.
 
 ## Files
 

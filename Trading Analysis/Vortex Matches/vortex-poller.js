@@ -2,10 +2,8 @@
 /**
  * Vortex Poller — inbox-driven Vortex Matches automation
  *
- * Polls vortex@orangetsunami.com for UNSEEN messages, treats each as a
- * forwarded RFQ from Jake, extracts the RFQ number and the original
- * sender/Cc list, runs Vortex Matches, and emails the result back to
- * Jake + the original requestor + original Ccs.
+ * Polls vortex@orangetsunami.com for UNSEEN messages, extracts the RFQ
+ * number, runs Vortex Matches, and emails the result back to the requestor.
  *
  * Designed to be invoked on a 20-minute schedule (cron / Claude scheduled
  * trigger). Idempotent: messages are marked Seen after successful processing
@@ -17,13 +15,13 @@
  *                                       and don't mark as Seen
  *   node vortex-poller.js --uid <n>    # process only the given UID
  *
- * Recipient policy (forward-from-Jake mode, current default):
- *   To  = Jake
- *   Cc  = original sender of the forwarded message + their Cc list
- *         (deduped, vortex inbox + Jake removed from Cc to avoid dupes)
+ * Recipient policy:
+ *   - Direct email: To = sender, Cc = Jake + any Cc from inbound
+ *   - Forwarded email: To = Jake, Cc = original sender + original Cc list
+ *   (deduped, vortex inbox removed from Cc to avoid dupes)
  *
- * On error: emails Jake with the failure detail, marks message Seen so
- * the same broken message isn't retried forever.
+ * On error: emails Jake + the sender with the failure detail, marks message
+ * Seen so the same broken message isn't retried forever.
  */
 
 const path = require('path');
@@ -42,6 +40,18 @@ const { sendWithFallback } = require('../../shared/verified-send');
 const VORTEX_EMAIL = 'vortex@orangetsunami.com';
 const FALLBACK_EMAIL = process.env.VORTEX_FALLBACK_SENDER || 'excess@orangetsunami.com';
 const JAKE_EMAIL = 'jake.harris@astutegroup.com';
+
+// Only accept requests from these domains; only send results to these domains
+const INTERNAL_DOMAINS = ['astutegroup.com', 'orangetsunami.com'];
+
+/**
+ * Check if an email address belongs to an internal domain.
+ */
+function isInternalEmail(addr) {
+  if (!addr) return false;
+  const domain = addr.toLowerCase().split('@')[1];
+  return domain && INTERNAL_DOMAINS.includes(domain);
+}
 
 const IMAP_HOST = process.env.IMAP_HOST || 'imap.mail.us-east-1.awsapps.com';
 const IMAP_PORT = parseInt(process.env.IMAP_PORT || '993', 10);
@@ -157,18 +167,49 @@ function parseForwardedHeaders(body) {
 
 /**
  * Build the recipient list for the outgoing Vortex result email.
+ *
+ * Two modes:
+ *   - Forwarded email (originalFrom found): To = Jake, Cc = original sender + original Cc
+ *   - Direct email (no originalFrom): To = sender, Cc = Jake + inbound Cc
+ *
+ * @param {string} senderAddr - The address that sent to vortex@
+ * @param {string|null} originalFrom - Extracted from forwarded headers (null if direct)
+ * @param {string[]} originalCc - Extracted from forwarded headers
+ * @param {string[]} inboundCc - Cc recipients on the inbound email to vortex@
  */
-function buildRecipients(originalFrom, originalCc) {
+function buildRecipients(senderAddr, originalFrom, originalCc, inboundCc = []) {
   const exclude = new Set([VORTEX_EMAIL.toLowerCase()]);
-  // Jake is always To
-  const to = [JAKE_EMAIL];
-  // CC = originalFrom + originalCc, dedupe, drop Jake (already in To) and vortex
+
+  // Forwarded mode: Jake sent it, result goes to Jake with original requestor in Cc
+  if (originalFrom) {
+    const to = [JAKE_EMAIL];
+    const cc = [];
+    const seen = new Set([JAKE_EMAIL.toLowerCase(), ...exclude]);
+    // Only include internal addresses in Cc
+    const candidates = [originalFrom, ...originalCc].filter(Boolean).filter(isInternalEmail);
+    for (const addr of candidates) {
+      const a = addr.toLowerCase();
+      if (seen.has(a)) continue;
+      seen.add(a);
+      cc.push(addr);
+    }
+    return { to, cc };
+  }
+
+  // Direct mode: sender gets the result, Jake in Cc for visibility
+  const to = [senderAddr];
   const cc = [];
-  const seen = new Set([JAKE_EMAIL.toLowerCase(), ...exclude]);
-  const candidates = [originalFrom, ...originalCc].filter(Boolean);
-  for (const addr of candidates) {
+  const seen = new Set([senderAddr.toLowerCase(), ...exclude]);
+  // Add Jake to Cc (unless sender is Jake)
+  if (!seen.has(JAKE_EMAIL.toLowerCase())) {
+    seen.add(JAKE_EMAIL.toLowerCase());
+    cc.push(JAKE_EMAIL);
+  }
+  // Add any Cc from inbound email (already filtered to internal at extraction)
+  for (const addr of inboundCc) {
     const a = addr.toLowerCase();
     if (seen.has(a)) continue;
+    if (!isInternalEmail(addr)) continue;  // double-check
     seen.add(a);
     cc.push(addr);
   }
@@ -176,7 +217,8 @@ function buildRecipients(originalFrom, originalCc) {
 }
 
 /**
- * Send an error notification to Jake when a message can't be processed.
+ * Send an error notification when a message can't be processed.
+ * Goes to both the original sender and Jake for visibility.
  */
 async function sendErrorEmail(subject, errorMsg, sourceMeta) {
   const html = `<html><body style="font-family:Arial,sans-serif;font-size:13px">
@@ -191,11 +233,20 @@ async function sendErrorEmail(subject, errorMsg, sourceMeta) {
     log('[dry-run] would send error email:', subject);
     return;
   }
+
+  // Build recipient list: sender (if known) + Jake
+  const recipients = [];
+  const senderAddr = sourceMeta.from;
+  if (senderAddr && senderAddr.toLowerCase() !== JAKE_EMAIL.toLowerCase()) {
+    recipients.push(senderAddr);
+  }
+  recipients.push(JAKE_EMAIL);
+
   try {
     await sendWithFallback({
       primary:  { from: VORTEX_EMAIL,   pass: WORKMAIL_PASS, displayName: 'Vortex Matches' },
       fallback: { from: FALLBACK_EMAIL, pass: WORKMAIL_PASS, displayName: 'Vortex Matches' },
-      mail: { to: JAKE_EMAIL, subject, html },
+      mail: { to: recipients.join(', '), subject, html },
       log
     });
   } catch (e) {
@@ -226,12 +277,24 @@ async function processMessage(client, uid) {
   const subject = parsed.subject || '';
   const senderAddr = (parsed.from && parsed.from.value && parsed.from.value[0] && parsed.from.value[0].address) || '';
 
-  // We're in forward-from-Jake mode: only process forwards from Jake himself
-  if (senderAddr.toLowerCase() !== JAKE_EMAIL.toLowerCase()) {
-    log(`  UID ${uid}: sender ${senderAddr} not Jake, marking Seen and skipping`);
+  // Reject requests from external senders
+  if (!isInternalEmail(senderAddr)) {
+    log(`  UID ${uid}: sender ${senderAddr} is external, notifying Jake and marking Seen`);
+    await sendErrorEmail(
+      `Vortex Matches — external sender rejected`,
+      `Request from external address ${senderAddr} was rejected. Only internal (astutegroup.com / orangetsunami.com) requests are accepted.`,
+      { uid, subject, from: senderAddr }
+    );
     if (!DRY_RUN) await client.messageFlagsAdd(String(uid), ['\\Seen'], { uid: true });
-    return { uid, status: 'skipped', reason: `sender ${senderAddr}` };
+    return { uid, status: 'rejected', reason: `external sender ${senderAddr}` };
   }
+
+  // Extract Cc recipients from the inbound email (for direct-send mode), internal only
+  const inboundCc = (parsed.cc && parsed.cc.value || [])
+    .map(v => v.address)
+    .filter(Boolean)
+    .map(a => a.toLowerCase())
+    .filter(isInternalEmail);
 
   const bodyText = parsed.text || parsed.html || '';
   const { originalFrom, originalCc } = parseForwardedHeaders(bodyText);
@@ -280,7 +343,7 @@ async function processMessage(client, uid) {
   // explain why we can't help. Mark Seen so we don't loop.
   if (isRecap && result && result.ok === false) {
     log(`  UID ${uid}: sourcing-recap declined (${result.error}): ${result.message}`);
-    const { to, cc } = buildRecipients(originalFrom, originalCc);
+    const { to, cc } = buildRecipients(senderAddr, originalFrom, originalCc, inboundCc);
     const subj = result.error === 'stock_rfq'
       ? `Sourcing Recap — RFQ ${rfqNumber}: Stock RFQ (use Vortex Matches)`
       : `Sourcing Recap — RFQ ${rfqNumber}: ${result.error}`;
@@ -294,7 +357,7 @@ async function processMessage(client, uid) {
   }
 
   // Build recipients + body (success path, both flavors)
-  const { to, cc } = buildRecipients(originalFrom, originalCc);
+  const { to, cc } = buildRecipients(senderAddr, originalFrom, originalCc, inboundCc);
   const html = isRecap ? buildRecapSummaryHtml(result) : buildSummaryHtml(result);
   const emailSubject = isRecap
     ? `Sourcing Recap — RFQ ${rfqNumber} (${result.customer})`
