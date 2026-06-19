@@ -45,16 +45,17 @@ module.exports = [
     logFile: '/tmp/inventory-cleanup.log',
     description: 'Mon 11 UTC — pull Infor xlsx, clean, write offers via OT API',
   },
-  {
-    name: 'nc-listing',
-    cadence: 'twice-weekly',
-    cadenceCron: '0 12 * * 1,4',
-    command: `node "${ASTUTE}/Trading Analysis/Inventory File Cleanup/nc-listing.js"`,
-    cwd: ASTUTE,
-    needsOT: false,
-    logFile: '/tmp/nc-listing.log',
-    description: 'Mon/Thu 12 UTC — generate NC portal CSVs with exclusions, send upload emails',
-  },
+  // PAUSED 2026-06-18 by operator — inventory sourcing paused
+  // {
+  //   name: 'nc-listing',
+  //   cadence: 'twice-weekly',
+  //   cadenceCron: '0 12 * * 1,4',
+  //   command: `node "${ASTUTE}/Trading Analysis/Inventory File Cleanup/nc-listing.js"`,
+  //   cwd: ASTUTE,
+  //   needsOT: false,
+  //   logFile: '/tmp/nc-listing.log',
+  //   description: 'Mon/Thu 12 UTC — generate NC portal CSVs with exclusions, send upload emails',
+  // },
   {
     name: 'lam-kitting-runner',
     cadence: 'weekly',
@@ -386,6 +387,20 @@ module.exports = [
   },
 
   {
+    name: 'per-seller-vq-digest',
+    cadence: 'fixed',
+    // 10:05 UTC — 5 min after APAC digest so they don't race
+    // Sends each seller their own email with VQs loaded by APAC buyers for their RFQs.
+    // Each RFQ gets its own Excel tab. CC: buyers + Ivy + Jake.
+    cadenceCron: '5 10 * * *',
+    command: `node "${ASTUTE}/Trading Analysis/RFQ Sourcing/vq_loading/per-seller-vq-digest.js" --send`,
+    cwd: ASTUTE,
+    needsOT: false,
+    logFile: '/tmp/per-seller-vq-digest.log',
+    description: 'Daily 10:05 UTC — Per-seller VQ digest (APAC buyers only). One email per seller with tabs by RFQ. CC buyers + Ivy + Jake. Window driven by .seller-vq-digest-state.json.',
+  },
+
+  {
     name: 'offer-breadcrumbs-prune',
     cadence: 'weekly',
     // Sunday 02:00 UTC — quiet window
@@ -416,59 +431,63 @@ module.exports = [
     logFile: '/tmp/heilind-producer.log',
     description: 'Daily 12 UTC (08 EDT) — build Heilind BOM tool upload (linecard × 30d demand, cache-filtered ±25% qty), stage to outbox/heilind/, email operator',
   },
-  {
-    name: 'scrape-inbox-watcher',
-    cadence: 'every 15m',
-    cadenceCron: '*/15 * * * *',
-    command: `node "${ASTUTE}/Trading Analysis/Distributor Scrape Loading/inbox-watcher.js"`,
-    cwd: ASTUTE,
-    needsOT: true,
-    logFile: '/tmp/scrape-inbox-watcher.log',
-    description: 'Every 15m — scan inbox/<source>/, dispatch via mappers/<source>.js, write VQs + pricing cache + negative cache, move to done/. Anomaly email on flagged/errored.',
-  },
+  // PAUSED 2026-06-18 by operator — desktop sourcing not active
+  // {
+  //   name: 'scrape-inbox-watcher',
+  //   cadence: 'every 15m',
+  //   cadenceCron: '*/15 * * * *',
+  //   command: `node "${ASTUTE}/Trading Analysis/Distributor Scrape Loading/inbox-watcher.js"`,
+  //   cwd: ASTUTE,
+  //   needsOT: true,
+  //   logFile: '/tmp/scrape-inbox-watcher.log',
+  //   description: 'Every 15m — scan inbox/<source>/, dispatch via mappers/<source>.js, write VQs + pricing cache + negative cache, move to done/. Anomaly email on flagged/errored.',
+  // },
 
   // ─── MARKET INTELLIGENCE ───────────────────────────────────────────────────
   // Two complementary workflows: Market Profiling (scrape-only, continuous)
   // and Active Sourcing (full RFQ submission, 2×/week).
   // See Trading Analysis/Market Profiling/market-profiling.md
 
-  {
-    name: 'market-profiler',
-    cadence: 'every 60m',
-    cadenceCron: '0 * * * *',
-    command: `node "${ASTUTE}/Trading Analysis/Market Profiling/market-profiler.js" --commit`,
-    cwd: ASTUTE,
-    needsOT: true,
-    logFile: '/tmp/market-profiler.log',
-    description: 'Hourly — Market profiling: NC check-only scrape for unprofiled inventory MPNs (~50/tick), loads $0 availability VQs. Does NOT send RFQ emails.',
-  },
+  // PAUSED 2026-06-18 by operator — process not fully built yet
+  // {
+  //   name: 'market-profiler',
+  //   cadence: 'every 60m',
+  //   cadenceCron: '0 * * * *',
+  //   command: `node "${ASTUTE}/Trading Analysis/Market Profiling/market-profiler.js" --commit`,
+  //   cwd: ASTUTE,
+  //   needsOT: true,
+  //   logFile: '/tmp/market-profiler.log',
+  //   description: 'Hourly — Market profiling: NC check-only scrape for unprofiled inventory MPNs (~50/tick), loads $0 availability VQs. Does NOT send RFQ emails.',
+  // },
 
-  {
-    name: 'active-sourcing',
-    cadence: 'fixed',
-    // Mon + Thu at 11:30 UTC — BEFORE nc-listing (12:00) so exclusions are applied
-    // Mon: skips hot RFQ parts (preserves for customer RFQs)
-    // Thu: includes hot RFQ parts
-    cadenceCron: '30 11 * * 1,4',
-    command: `node "${ASTUTE}/Trading Analysis/Market Profiling/active-sourcing-runner.js" --limit 200 --commit`,
-    cwd: ASTUTE,
-    needsOT: true,
-    logFile: '/tmp/active-sourcing.log',
-    description: 'Mon/Thu 11:30 UTC (6:30am CT) — Active Sourcing: select 200 priority MPNs, add to exclusions, source via NC. Runs BEFORE nc-listing so exclusions apply.',
-  },
+  // PAUSED 2026-06-18 by operator — NC profiling process not fully built yet
+  // {
+  //   name: 'active-sourcing',
+  //   cadence: 'fixed',
+  //   // Mon + Thu at 11:30 UTC — BEFORE nc-listing (12:00) so exclusions are applied
+  //   // Mon: skips hot RFQ parts (preserves for customer RFQs)
+  //   // Thu: includes hot RFQ parts
+  //   cadenceCron: '30 11 * * 1,4',
+  //   command: `node "${ASTUTE}/Trading Analysis/Market Profiling/active-sourcing-runner.js" --limit 200 --commit`,
+  //   cwd: ASTUTE,
+  //   needsOT: true,
+  //   logFile: '/tmp/active-sourcing.log',
+  //   description: 'Mon/Thu 11:30 UTC (6:30am CT) — Active Sourcing: select 200 priority MPNs, add to exclusions, source via NC. Runs BEFORE nc-listing so exclusions apply.',
+  // },
 
-  {
-    name: 'inventory-gate-poller',
-    cadence: 'hourly',
-    // Hourly on Mon/Thu — checks stockrfq@ for NC upload confirmation or Jake's forward.
-    // Re-enabled 2026-06-11 after shakeout complete.
-    cadenceCron: '15 * * * 1,4',
-    command: `node "${ASTUTE}/Trading Analysis/Market Profiling/inventory-gate-poller.js"`,
-    cwd: ASTUTE,
-    needsOT: false,
-    logFile: '/tmp/inventory-gate-poller.log',
-    description: 'Hourly Mon/Thu — polls stockrfq@ for NC upload confirmation. Sets gate so Active Sourcing can proceed.',
-  },
+  // PAUSED 2026-06-18 by operator
+  // {
+  //   name: 'inventory-gate-poller',
+  //   cadence: 'hourly',
+  //   // Hourly on Mon/Thu — checks stockrfq@ for NC upload confirmation or Jake's forward.
+  //   // Re-enabled 2026-06-11 after shakeout complete.
+  //   cadenceCron: '15 * * * 1,4',
+  //   command: `node "${ASTUTE}/Trading Analysis/Market Profiling/inventory-gate-poller.js"`,
+  //   cwd: ASTUTE,
+  //   needsOT: false,
+  //   logFile: '/tmp/inventory-gate-poller.log',
+  //   description: 'Hourly Mon/Thu — polls stockrfq@ for NC upload confirmation. Sets gate so Active Sourcing can proceed.',
+  // },
 
   {
     name: 'exclusion-cleanup',
@@ -482,17 +501,18 @@ module.exports = [
     description: 'Sunday 03 UTC — remove expired sourcing exclusions from .sourcing-exclusions.json',
   },
 
-  {
-    name: 'nc-response-monitor',
-    cadence: 'every 4h',
-    // Every 4 hours at :30 — checks stockrfq@ for replies from datamaster@netcomponents.com
-    cadenceCron: '30 */4 * * *',
-    command: `node "${ASTUTE}/scripts/nc-response-monitor.js"`,
-    cwd: ASTUTE,
-    needsOT: false,
-    logFile: '/tmp/nc-response-monitor.log',
-    description: 'Every 4h — monitor for NetComponents datamaster@ replies. Forwards to Jake if he wasn\'t CC\'d. Self-terminates once any response is detected.',
-  },
+  // PAUSED 2026-06-18 by operator
+  // {
+  //   name: 'nc-response-monitor',
+  //   cadence: 'every 4h',
+  //   // Every 4 hours at :30 — checks stockrfq@ for replies from datamaster@netcomponents.com
+  //   cadenceCron: '30 */4 * * *',
+  //   command: `node "${ASTUTE}/scripts/nc-response-monitor.js"`,
+  //   cwd: ASTUTE,
+  //   needsOT: false,
+  //   logFile: '/tmp/nc-response-monitor.log',
+  //   description: 'Every 4h — monitor for NetComponents datamaster@ replies. Forwards to Jake if he wasn\'t CC\'d. Self-terminates once any response is detected.',
+  // },
 
   // ─── SALES PULSE REPORTS ───────────────────────────────────────────────────
   {
