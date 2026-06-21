@@ -255,13 +255,13 @@ async function writeOffer(opts) {
   // ── TIER 1: Global budget check ──
   // Estimated writes: lines + optional MPN records
   const estimatedWrites = lines.length + (writeMpnRecords ? lines.length : 0);
-  const caller = 'offer-writeback'; // Will be 'excess-agent' or 'inventory-cleanup' in practice
+  const caller = process.env.OFFER_WRITEBACK_CALLER || 'offer-writeback'; // P4 override via OFFER_WRITEBACK_CALLER=rfq-loading-agent
 
   // ── CHUNKED MODE for large offers ──
   // Offers with many lines would fail the budget check outright. Instead of
   // rejecting, we write in chunks with delays to stay under rate limits.
   // This allows legitimate large customer excess lists (1000+ lines) to load.
-  const LARGE_OFFER_THRESHOLD = 500;  // lines
+  const LARGE_OFFER_THRESHOLD = 300;  // lines (lowered from 500: 301+ lines × 2 writes > 600/5-min burst limit)
   const CHUNK_SIZE = 150;             // lines per chunk (300 writes with MPN)
   const CHUNK_DELAY_MS = 2000;        // 2s between chunks
   const useChunkedMode = lines.length > LARGE_OFFER_THRESHOLD;
@@ -356,14 +356,99 @@ async function writeOffer(opts) {
   // Helper for chunked delay
   const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 
+  // Track writes for incremental budget recording in chunked mode
+  let lastRecordedWrites = 0;
+
   // ── Insert Lines ──
   for (let i = 0; i < lines.length; i++) {
-    // Chunked mode: pause between chunks to stay under rate limits
+    // Chunked mode: check budget and pause between chunks to stay under rate limits
     if (useChunkedMode && i > 0 && i % CHUNK_SIZE === 0) {
       const chunkNum = Math.floor(i / CHUNK_SIZE);
       const totalChunks = Math.ceil(lines.length / CHUNK_SIZE);
+
+      // Record this chunk's writes to the budget BEFORE checking for next chunk
+      // This ensures the budget accurately reflects what we've written so far
+      const currentTotalWrites = linesWritten + mpnsWritten;
+      const chunkWrites = currentTotalWrites - lastRecordedWrites;
+      if (chunkWrites > 0) {
+        otBudget.recordWrites('chuboe_offer_line', chunkWrites, {
+          caller,
+          success: true,
+          durationMs: 0, // individual chunk timing not tracked
+        });
+        lastRecordedWrites = currentTotalWrites;
+      }
+
       logger.info(`Chunk ${chunkNum}/${totalChunks} complete (${linesWritten} lines written). Pausing ${CHUNK_DELAY_MS}ms...`);
       await sleep(CHUNK_DELAY_MS);
+
+      // ── Per-chunk budget gate (priority-aware) ──
+      // Low-priority callers (offer-writeback = P0) must yield to higher-priority
+      // callers when budget is constrained. Check before each chunk and WAIT for
+      // budget to clear instead of aborting.
+      //
+      // Wait-and-retry constants:
+      //   - BURST_WAIT_POLL_MS: how often to re-check budget while waiting
+      //   - BURST_WAIT_MAX_MS: max total wait time before giving up (30 min)
+      //   - Burst window is 5 minutes, so waiting 5-6 min should clear it
+      const BURST_WAIT_POLL_MS = 30000;   // Check every 30 seconds
+      const BURST_WAIT_MAX_MS = 1800000;  // 30 minutes max total wait
+
+      let chunkCheck = otBudget.checkBudget({
+        table: 'chuboe_offer_line',
+        count: Math.min(CHUNK_SIZE, lines.length - i), // remaining in this chunk
+        caller,
+        isBackfill,
+      });
+
+      if (!chunkCheck.allowed) {
+        // Budget exhausted — WAIT for burst window to clear instead of aborting.
+        // The 5-minute burst window is rolling, so old writes "fall off" over time.
+        logger.info(`Chunk ${chunkNum}/${totalChunks}: budget constrained (${chunkCheck.reason}). Waiting for burst window to clear...`);
+
+        const waitStart = Date.now();
+        let waitElapsed = 0;
+        let waitIterations = 0;
+
+        while (!chunkCheck.allowed && waitElapsed < BURST_WAIT_MAX_MS) {
+          waitIterations++;
+          const waitRemaining = Math.ceil((BURST_WAIT_MAX_MS - waitElapsed) / 60000);
+          logger.info(`  Waiting for budget... (${Math.round(waitElapsed / 1000)}s elapsed, ${waitRemaining}m max remaining)`);
+
+          await sleep(BURST_WAIT_POLL_MS);
+          waitElapsed = Date.now() - waitStart;
+
+          // Re-check budget
+          chunkCheck = otBudget.checkBudget({
+            table: 'chuboe_offer_line',
+            count: Math.min(CHUNK_SIZE, lines.length - i),
+            caller,
+            isBackfill,
+          });
+        }
+
+        if (!chunkCheck.allowed) {
+          // Still not allowed after max wait — now we abort
+          logger.warn(`Chunked write aborted at chunk ${chunkNum}/${totalChunks} after ${Math.round(waitElapsed / 1000)}s wait: ${chunkCheck.reason}`);
+          return {
+            offerId,
+            searchKey,
+            linesWritten,
+            mpnsWritten,
+            errors,
+            rateLimited: true,
+            rateLimitReason: `${chunkCheck.reason} (waited ${Math.round(waitElapsed / 1000)}s, gave up)`,
+            rateLimitTier: 'chunk',
+            otUnreachable,
+            chunkedMode: true,
+            partialWrite: true,
+            linesRemaining: lines.length - i,
+          };
+        }
+
+        // Budget cleared — continue writing
+        logger.info(`  Budget cleared after ${Math.round(waitElapsed / 1000)}s (${waitIterations} checks). Resuming chunk ${chunkNum + 1}/${totalChunks}...`);
+      }
     }
 
     const line = lines[i];
@@ -453,11 +538,14 @@ async function writeOffer(opts) {
     }
   }
 
-  // ── Record writes and release backfill slot ──
+  // ── Record remaining writes and release backfill slot ──
+  // In chunked mode, most writes were already recorded per-chunk. Only record
+  // the final partial chunk (or all writes if not in chunked mode).
   const writeDuration = Date.now() - writeStartTime;
   const totalWritten = linesWritten + mpnsWritten;
-  if (totalWritten > 0) {
-    otBudget.recordWrites('chuboe_offer_line', totalWritten, {
+  const remainingToRecord = totalWritten - lastRecordedWrites;
+  if (remainingToRecord > 0) {
+    otBudget.recordWrites('chuboe_offer_line', remainingToRecord, {
       caller,
       success: true,
       durationMs: writeDuration,

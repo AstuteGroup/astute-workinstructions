@@ -26,6 +26,52 @@ The SessionStart greeting reads this file and surfaces all open items, sorted by
 
 ### Active workstreams (next session pickup)
 
+- [ ] 🟢 **PRIORITY: Inventory Cleanup Burst Fix Validation** *(opened 2026-06-21, MONDAY)*
+  - **Context:** Inventory cleanup was failing 70× due to burst limit (600/5min) aborting chunked writes mid-way, creating 407 garbage partial offers since June 15. Root cause: when burst limit hit, `offer-writeback.js` returned `partialWrite: true` immediately instead of waiting for the burst window to clear.
+  - **Fix applied:** Changed chunked mode to WAIT for burst window to clear (poll every 30s, max 30 min) instead of aborting. This allows large batch jobs (~5000 lines) to complete over ~45 minutes by waiting through multiple burst windows.
+  - **Cleanup done:**
+    - Deactivated all 407 partial offers from June 15-21
+    - Reactivated June 1 complete offers (11 warehouses, 4,991 lines)
+    - Paused inventory-cleanup job (`.inventory-cleanup-paused` + sentinel set to 2099)
+  - **Why waiting:** Need to validate fix works before re-enabling automation.
+  - **Ready when:** Monday 2026-06-22 (scheduled inventory run day)
+  - **How:**
+    1. Remove pause: `rm ~/workspace/.inventory-cleanup-paused`
+    2. Reset sentinel: Update `~/workspace/.cron-sentinels/inventory-cleanup.json` with `nextDue: "2026-06-22T11:00:00.000Z"`
+    3. Let cron run at 11:00 UTC Monday, OR manually test with `--force`
+    4. Monitor logs: `tail -f /tmp/inventory-cleanup.log`
+    5. Verify: Should see "Waiting for budget..." messages, then "Budget cleared after Xs", then complete all 11 warehouses
+    6. If success: Job should exit 0, sentinel advances to June 29
+  - **Files:**
+    - Fix: `shared/offer-writeback.js` (lines 385-451, wait-and-retry logic)
+    - Sentinel: `~/.cron-sentinels/inventory-cleanup.json`
+    - Pause file: `~/.inventory-cleanup-paused`
+  - **Rollback if broken:** Re-create pause file, investigate logs
+
+- [ ] 🟢 **Per-Seller VQ Digest: Mimecast blocking emails** *(opened 2026-06-17, priority)*
+  - **Context:** Per-seller VQ digest implemented and cron registered (`5 10 * * *`). Script works — sends each seller their own email with VQs for their RFQs, one Excel tab per RFQ, CC buyers + Ivy + Jake. However, emails are being blocked by Mimecast (astutegroup.com spam filter) with "DMARC Fail" error.
+  - **Puzzle:** APAC VQ digest (same `vq@orangetsunami.com` sender) arrives fine. Per-seller digest gets blocked. Differences:
+    - From Name: "APAC VQ Digest" vs "VQ Digest"
+    - TO/CC structure: APAC sends to multiple in TO; per-seller sends single TO + multiple CC
+    - Subject format slightly different
+  - **Why blocked:** Need to investigate Mimecast logs or adjust email format to match APAC digest pattern.
+  - **Ready when:** 2026-06-18 (tomorrow, operator marked priority)
+  - **How:**
+    1. Check Mimecast admin for specific block reason on `vq@orangetsunami.com` → `@astutegroup.com`
+    2. Option A: Whitelist sender in Mimecast
+    3. Option B: Change fromName to "APAC VQ Digest" to match known-good sender
+    4. Option C: Fix DMARC/SPF/DKIM for orangetsunami.com in AWS WorkMail + Route53
+    5. Test with `--limit 1` to verify fix before full deployment
+  - **Files:**
+    - Script: `Trading Analysis/RFQ Sourcing/vq_loading/per-seller-vq-digest.js`
+    - Cron: registered in `cron-jobs.js` as `per-seller-vq-digest`
+    - State: `~/.seller-vq-digest-state.json` (was advanced — first production window will be from 2026-06-17T12:33:00Z)
+  - **Test commands:**
+    - Preview: `node per-seller-vq-digest.js --since 24`
+    - Test send: `node per-seller-vq-digest.js --send --test --limit 2`
+    - Production: `node per-seller-vq-digest.js --send`
+  - **Created / source:** 2026-06-17 session, implementation complete but blocked by email delivery issue.
+
 - [ ] 🟢 **VQ Loading: Support .eml/.msg attachments for batch quote loading** *(opened 2026-06-12, operator request)*
   - **Context:** Operator has many broker quote emails to load as VQs. Current workflow requires forwarding each email individually to `vq@`. Operator asked if they could attach multiple emails (.eml or .msg files) to a single email and have them all processed. Current system does NOT support this — it processes one email = one quote entity, and attachment handling is limited to PDF/Excel/CSV within a single email.
   - **Why blocked:** Feature doesn't exist. Operator flagged as "priority for next week" (2026-06-12).
