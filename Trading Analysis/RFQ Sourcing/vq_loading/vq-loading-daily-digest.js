@@ -51,7 +51,10 @@ const { isKnownBuyer, isKnownSupport } = require('../../../shared/partner-lookup
 
 const BREADCRUMBS = path.join(process.env.HOME, 'workspace', '.offer-pipeline', 'breadcrumbs.jsonl');
 const ATTRIBUTION_LOG = path.join(process.env.HOME, 'workspace', '.vq-batch-attribution.jsonl');
-const RECIPIENT = 'jake.harris@astutegroup.com';
+const RECIPIENTS = [
+  'jake.harris@astutegroup.com',
+  'justin.oberhofer@astutegroup.com',
+];
 const CLAUDE_USER_ID = 1049524;
 
 // Load per-VQ attribution rows from the local JSONL log. Maps each
@@ -698,11 +701,11 @@ Top-section "Active in OT (since window)" only counts rows created in this windo
   });
   const today = new Date().toISOString().slice(0, 10);
   await notifier.sendEmail(
-    RECIPIENT,
+    RECIPIENTS,
     `VQ Loading — Daily Digest (${today})`,
     html,
     { html: true },
   );
-  console.log(`Sent to ${RECIPIENT}`);
+  console.log(`Sent to ${RECIPIENTS.join(', ')}`);
   console.log(`Activity: ${activityShown.map(a => `${a.loader.replace(/Claude as /, 'C-')}=${a.vqs}`).join(' / ')} · ${batches.length} batch(es)`);
 })().catch(err => { console.error('FATAL:', err); process.exit(1); });
