@@ -122,6 +122,44 @@ function buildEnvelope(searchResult, mpn, qty, source) {
           })),
         });
       }
+    } else if (Array.isArray(d.allSkus) && d.allSkus.length > 0) {
+      // ─── MULTI-SKU PATH (DigiKey, others) ───────────────────────────────────
+      // When allSkus[] is present, emit one Pricings entry per SKU with full
+      // price breaks. This captures all packaging variations (Cut Tape, T&R, etc.)
+      // with their respective stock levels, SKU IDs, and pricing ladders.
+      for (const sku of d.allSkus) {
+        const breaks = (sku.priceBreaks && sku.priceBreaks.length > 0)
+          ? sku.priceBreaks
+          : (sku.unitPrice > 0 ? [{ qty: 1, unitPrice: sku.unitPrice }] : []);
+        pricingsArray.push({
+          SupplierName: d.name || d.distributor,
+          ManufacturerName: sku.manufacturer || d.vqManufacturer || '',
+          ManufacturerPartNumber: sku.mpn || d.vqMpn || mpn,
+          RequestedPartNumber: mpn,
+          CurrentStockQty: sku.stock || 0,
+          MinimumBuy: sku.moq ? parseInt(sku.moq) || 1 : 1,
+          Multiplier: sku.spq ? parseInt(sku.spq) || 1 : 1,
+          LeadTime: sku.leadTime || null,
+          Currency: 'USD',
+          RoHS: sku.rohs || null,
+          LifeCycleStatus: null,
+          CountryOfOrigin: null,
+          DataSheetUrl: null,
+          ProductUrl: null,
+          Packaging: sku.packageType || null,
+          Description: sku.description || d.vqDescription || null,
+          VendorNotes: `DigiKey stock: ${(sku.stock || 0).toLocaleString()} | DigiKey PN: ${sku.digiKeyPn || 'N/A'} | Pkg: ${sku.packageType || 'N/A'}`,
+          DateCode: null,
+          HTSCode: sku.hts || null,
+          ECCN: sku.eccn || null,
+          SourceChannel: d.name || d.distributor,
+          SourcePartId: sku.digiKeyPn || null,  // DigiKey PN as SKU identifier
+          Pricings: breaks.map(pb => ({
+            QtyBreak: pb.qty,
+            UnitPrice: pb.unitPrice,
+          })),
+        });
+      }
     } else {
       pricingsArray.push({
         SupplierName: d.name || d.distributor,

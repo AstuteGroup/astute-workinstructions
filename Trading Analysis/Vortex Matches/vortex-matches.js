@@ -46,6 +46,7 @@ const COLUMN_DEFS = {
   'Supplier MFR': { width: 18, format: 'text' },
   'Supplier/Excess Partner': { width: 28, format: 'text' },
   'Qty': { width: 12, format: 'number' },
+  'Tier Min Qty': { width: 13, format: 'number' },  // API CACHE: qty break that unlocks this price
   'Supplier Price': { width: 14, format: 'currency_precise' },
   'Currency': { width: 8, format: 'text' },
   '% Under Target': { width: 14, format: 'percent' },
@@ -63,13 +64,13 @@ const COLUMNS = {
   'Good Prices': [
     'RFQ Number', '% Under Target', 'RFQ Created', 'RFQ Customer', 'RFQ MPN', 'RFQ MFR', 'RFQ Qty', 'RFQ Target',
     'Customer Part Number', 'Type', 'MO Type', 'Supplier MPN', 'Supplier MFR',
-    'Supplier/Excess Partner', 'Qty', 'Supplier Price', 'Currency',
+    'Supplier/Excess Partner', 'Qty', 'Tier Min Qty', 'Supplier Price', 'Currency',
     'Supply', 'lead_time', 'Date Code', 'Created Date', 'Days Btw MO/VQ & RFQ', '% of Demand', 'Opp Amount'
   ],
   'All Prices': [
     'RFQ Number', 'RFQ Created', 'RFQ Customer', 'RFQ MPN', 'RFQ MFR', 'RFQ Qty',
     'Customer Part Number', 'Type', 'MO Type', 'Supplier MPN', 'Supplier MFR',
-    'Supplier/Excess Partner', 'Qty', 'Supplier Price', 'Currency',
+    'Supplier/Excess Partner', 'Qty', 'Tier Min Qty', 'Supplier Price', 'Currency',
     'Supply', 'lead_time', 'Date Code', 'Created Date', 'Days Btw MO/VQ & RFQ', '% of Demand', 'Opp Amount'
   ],
   'No Prices': [
@@ -81,7 +82,7 @@ const COLUMNS = {
   'Stock': [
     'RFQ Number', 'RFQ Created', 'RFQ Customer', 'RFQ MPN', 'RFQ MFR', 'RFQ Qty', 'RFQ Target',
     'Customer Part Number', 'MO Type', 'Supplier MPN', 'Supplier MFR',
-    'Supplier/Excess Partner', 'Qty', 'Supplier Price', 'Currency',
+    'Supplier/Excess Partner', 'Qty', 'Tier Min Qty', 'Supplier Price', 'Currency',
     'Supply', 'lead_time', 'Date Code', 'Created Date', 'Days Btw MO/VQ & RFQ', '% of Demand', 'Opp Amount'
   ]
 };
@@ -468,6 +469,7 @@ async function fetchCachedEnvelopes(cleanMpns, skipMpns = new Set()) {
           // Canonical BP name so dedup keys + displayed partner match the VQ side
           supplier_partner: canonicalSupplierName(supplierName),
           qty: p.CurrentStockQty || 0,  // distributor stock at the time of pull
+          tier_min_qty: tierMinQty,     // qty break that unlocks this price tier
           supplier_price: price,
           lead_time: p.LeadTime || '',
           date_code: p.DateCode || '',
@@ -535,8 +537,12 @@ function joinData(rfqRows, offers) {
         oppAmount = rfqTarget * rfqQty;
       }
 
-      const leadTimeText = offer.lead_time || '';
-      const supplyState = computeSupplyState(supplierQty, leadTimeText);
+      const leadTimeRaw = offer.lead_time || '';
+      const supplyState = computeSupplyState(supplierQty, leadTimeRaw);
+      // Make stock vs lead-time crystal clear: if Supply is STOCK, show "In Stock"
+      // instead of blank. Users found blank lead_time confusing next to rows with
+      // explicit lead times like "30 Weeks".
+      const leadTimeDisplay = supplyState === 'STOCK' ? 'In Stock' : leadTimeRaw;
 
       results.push({
         'RFQ Number': rfq.rfq_number,
@@ -553,11 +559,12 @@ function joinData(rfqRows, offers) {
         'Supplier MFR': offer.supplier_mfr || '',
         'Supplier/Excess Partner': offer.supplier_partner || '',
         'Qty': supplierQty,
+        'Tier Min Qty': offer.tier_min_qty || '',  // API CACHE only: qty break for this price
         'Supplier Price': supplierPrice,
         'Currency': offer._originalCurrency || 'USD',
         '% Under Target': percentUnderTarget,
         'Supply': supplyState,
-        'lead_time': leadTimeText,
+        'lead_time': leadTimeDisplay,
         'Date Code': offer.date_code || '',
         'Created Date': offerDate,
         'Days Btw MO/VQ & RFQ': daysBetween,

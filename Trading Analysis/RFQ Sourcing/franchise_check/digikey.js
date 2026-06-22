@@ -510,13 +510,66 @@ function parseSearchResults(json, searchMpn, rfqQty, searchOptions = {}) {
     result.vqVendorNotes += ` | MOQ: ${result.vqMoq.toLocaleString()}`;
   }
 
-  // Collect all matches for reference
+  // Collect all matches for reference (legacy - summary only)
   result.allMatches = json.Products.map(p => ({
     mpn: p.ManufacturerProductNumber,
     manufacturer: p.Manufacturer?.Name,
     qty: p.QuantityAvailable,
     unitPrice: p.UnitPrice,
   }));
+
+  // ─── ALL SKUS: Full extraction of every matching product + variation ────────
+  // Each entry is VQ-ready with SKU, stock, pricing, lead time.
+  // Consumers can use this instead of the single "best" result above.
+  const { mpnMatch } = require('../../../shared/mpn-match');
+  result.allSkus = [];
+
+  for (const product of json.Products) {
+    // Only include products that pass MPN match
+    const match = mpnMatch(searchMpn, product.ManufacturerProductNumber, {
+      mfr: searchOptions?.mfr,
+      candidateMfr: product.Manufacturer?.Name,
+    });
+    if (!match) continue;
+
+    const variations = product.ProductVariations || [];
+    if (variations.length === 0) continue;
+
+    // Product-level data shared across all variations
+    const productBase = {
+      mpn: product.ManufacturerProductNumber,
+      manufacturer: product.Manufacturer?.Name || '',
+      description: product.Description?.ProductDescription || '',
+      productStock: product.QuantityAvailable || 0,
+      leadTime: product.ManufacturerLeadWeeks ? `${product.ManufacturerLeadWeeks} Weeks` : null,
+      hts: product.Classifications?.HtsusCode || null,
+      eccn: product.Classifications?.ExportControlClassNumber || null,
+      rohs: product.Classifications?.RohsStatus || null,
+      matchType: match.matchType,
+    };
+
+    // Extract each variation as a separate SKU
+    for (const variation of variations) {
+      const pricing = variation.StandardPricing || [];
+      const priceBreaks = pricing
+        .map(p => ({ qty: p.BreakQuantity, unitPrice: p.UnitPrice }))
+        .sort((a, b) => a.qty - b.qty);
+
+      result.allSkus.push({
+        ...productBase,
+        digiKeyPn: variation.DigiKeyProductNumber,
+        packageType: variation.PackageType?.Name || null,
+        moq: variation.MinimumOrderQuantity || 1,
+        spq: variation.StandardPackage || null,
+        // Stock: use variation's QuantityAvailable if present, else product-level
+        stock: variation.QuantityAvailable ?? product.QuantityAvailable ?? 0,
+        unitPrice: pricing[0]?.UnitPrice || null,
+        bulkPrice: pricing[pricing.length - 1]?.UnitPrice || null,
+        rfqPrice: getPriceAtQty(pricing, rfqQty),
+        priceBreaks,
+      });
+    }
+  }
 
   return result;
 }
