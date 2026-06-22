@@ -35,6 +35,12 @@ const {
   runSourcingRecapForRFQ,
   buildSummaryHtml: buildRecapSummaryHtml
 } = require('../Sourcing Recap/sourcing-recap');
+const {
+  runFranchiseXref,
+  buildSummaryHtml: buildFranchiseSummaryHtml,
+  discoverFranchises,
+  matchKeywordToFranchise
+} = require('../Franchise Catalog Cross-Reference/franchise-xref');
 const { sendWithFallback } = require('../../shared/verified-send');
 
 const VORTEX_EMAIL = 'vortex@orangetsunami.com';
@@ -91,6 +97,62 @@ function isSourcingRecapRequest(subject) {
   if (!subject) return false;
   // Standalone "best" token (not inside another word), case-insensitive.
   return /\bbest\b/i.test(subject) && /\b\d{7}\b/.test(subject);
+}
+
+/**
+ * Subject-keyword router: does this message ask for Franchise Cross-Reference?
+ *
+ * Patterns:
+ *   "1234567 franchise"  → all franchise catalogs
+ *   "1234567 HTC"        → HTC Korea catalog only
+ *   "1234567 ATGBICS"    → ATGBICS catalog only
+ *   "franchise 1234567"  → all (order doesn't matter)
+ *
+ * Returns { isFranchise: true, franchises: ['htc-korea'] } or
+ *         { isFranchise: true, franchises: ['all'] } or
+ *         { isFranchise: false, franchises: [] }
+ */
+function parseFranchiseRequest(subject) {
+  if (!subject) return { isFranchise: false, franchises: [] };
+
+  // Must have a 7-digit RFQ number
+  if (!/\b\d{7}\b/.test(subject)) return { isFranchise: false, franchises: [] };
+
+  const subjectLower = subject.toLowerCase();
+
+  // Discover available franchises to match keywords dynamically
+  const availableFranchises = discoverFranchises();
+  const matchedFranchises = [];
+
+  // Check each word in the subject against franchise keywords
+  const words = subjectLower.split(/\s+/);
+  for (const word of words) {
+    const cleanWord = word.replace(/[^a-z0-9]/g, '');
+    if (!cleanWord) continue;
+
+    // Check against available franchise keywords
+    const franchiseKey = matchKeywordToFranchise(cleanWord, availableFranchises);
+    if (franchiseKey && !matchedFranchises.includes(franchiseKey)) {
+      matchedFranchises.push(franchiseKey);
+    }
+  }
+
+  // Check for the generic "franchise" keyword
+  if (/\bfranchise\b/i.test(subject)) {
+    // "franchise" without specific franchise name means all
+    if (matchedFranchises.length === 0) {
+      return { isFranchise: true, franchises: ['all'] };
+    }
+    // "franchise htc" means just HTC (explicit overrides generic)
+    return { isFranchise: true, franchises: matchedFranchises };
+  }
+
+  // If we matched specific franchise keywords, that's a franchise request
+  if (matchedFranchises.length > 0) {
+    return { isFranchise: true, franchises: matchedFranchises };
+  }
+
+  return { isFranchise: false, franchises: [] };
 }
 
 /**
@@ -311,26 +373,38 @@ async function processMessage(client, uid) {
     return { uid, status: 'error', reason: 'no rfq number' };
   }
 
-  // Subject-keyword router: BEST + RFQ# → Sourcing Recap path; everything
-  // else stays on Vortex Matches. See isSourcingRecapRequest above.
-  const isRecap = isSourcingRecapRequest(subject);
-  const flavor = isRecap ? 'recap' : 'vortex';
+  // Subject-keyword router: determines which analysis to run.
+  //   - "franchise" or specific franchise name → Franchise Cross-Reference
+  //   - "best" → Sourcing Recap
+  //   - Everything else → Vortex Matches
+  const franchiseReq = parseFranchiseRequest(subject);
+  const isRecap = !franchiseReq.isFranchise && isSourcingRecapRequest(subject);
+  const flavor = franchiseReq.isFranchise ? 'franchise' : (isRecap ? 'recap' : 'vortex');
 
-  log(`  UID ${uid}: RFQ=${rfqNumber}  flavor=${flavor}  originalFrom=${originalFrom || '(none)'}  ccCount=${originalCc.length}`);
+  log(`  UID ${uid}: RFQ=${rfqNumber}  flavor=${flavor}${franchiseReq.isFranchise ? ` (${franchiseReq.franchises.join(',')})` : ''}  originalFrom=${originalFrom || '(none)'}  ccCount=${originalCc.length}`);
 
-  // Run the chosen analysis. Both share the same { customer, attachments[] }
+  // Run the chosen analysis. All share the same { customer, attachments[] }
   // contract on success — the email path below treats them uniformly.
   let result;
   try {
-    if (isRecap) {
+    if (franchiseReq.isFranchise) {
+      result = await runFranchiseXref(rfqNumber, {
+        franchises: franchiseReq.franchises,
+        log: m => log('   ', m)
+      });
+      // Normalize result shape to match Vortex/Recap: flatten results[].attachment into attachments[]
+      result.attachments = result.results.map(r => r.attachment);
+    } else if (isRecap) {
       result = await runSourcingRecapForRFQ(rfqNumber, { log: m => log('   ', m) });
     } else {
       result = await runVortexForRFQ(rfqNumber, { log: m => log('   ', m) });
     }
   } catch (err) {
     log(`  UID ${uid}: ${flavor} run failed: ${err.message}`);
+    const flavorLabel = flavor === 'franchise' ? 'Franchise Cross-Ref'
+      : (flavor === 'recap' ? 'Sourcing Recap' : 'Vortex Matches');
     await sendErrorEmail(
-      `${isRecap ? 'Sourcing Recap' : 'Vortex Matches'} — RFQ ${rfqNumber} failed`,
+      `${flavorLabel} — RFQ ${rfqNumber} failed`,
       err.message,
       { uid, subject, from: senderAddr }
     );
@@ -356,12 +430,34 @@ async function processMessage(client, uid) {
     return { uid, status: 'declined', rfqNumber, reason: result.error };
   }
 
-  // Build recipients + body (success path, both flavors)
+  // Franchise Cross-Ref with no matches: still send a reply explaining no matches found
+  if (franchiseReq.isFranchise && result.results.length === 0) {
+    log(`  UID ${uid}: franchise xref found no matches`);
+    const { to, cc } = buildRecipients(senderAddr, originalFrom, originalCc, inboundCc);
+    const subj = `Franchise Cross-Ref — RFQ ${rfqNumber}: No Matches`;
+    if (!DRY_RUN) {
+      await sendVortexResult({
+        to, cc, subject: subj, html: buildFranchiseSummaryHtml(result), attachments: []
+      });
+      await client.messageFlagsAdd(String(uid), ['\\Seen'], { uid: true });
+    }
+    return { uid, status: 'no-matches', rfqNumber, flavor };
+  }
+
+  // Build recipients + body (success path, all flavors)
   const { to, cc } = buildRecipients(senderAddr, originalFrom, originalCc, inboundCc);
-  const html = isRecap ? buildRecapSummaryHtml(result) : buildSummaryHtml(result);
-  const emailSubject = isRecap
-    ? `Sourcing Recap — RFQ ${rfqNumber} (${result.customer})`
-    : `Vortex Matches — RFQ ${rfqNumber} (${result.customer})`;
+  let html, emailSubject;
+  if (franchiseReq.isFranchise) {
+    html = buildFranchiseSummaryHtml(result);
+    const franchiseNames = result.results.map(r => r.displayName).join(', ');
+    emailSubject = `Franchise Cross-Ref — RFQ ${rfqNumber} (${result.customer}) — ${franchiseNames}`;
+  } else if (isRecap) {
+    html = buildRecapSummaryHtml(result);
+    emailSubject = `Sourcing Recap — RFQ ${rfqNumber} (${result.customer})`;
+  } else {
+    html = buildSummaryHtml(result);
+    emailSubject = `Vortex Matches — RFQ ${rfqNumber} (${result.customer})`;
+  }
 
   if (DRY_RUN) {
     log(`  [dry-run] would send (${flavor}) to=${to.join(',')} cc=${cc.join(',')} attachments=${result.attachments.length}`);
