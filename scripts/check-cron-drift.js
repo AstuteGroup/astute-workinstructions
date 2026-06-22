@@ -114,6 +114,29 @@ function detectDrift() {
     }
   }
 
+  // 6. Enrich-poller watermark staleness — job may "succeed" but not actually process anything
+  //    Added 2026-06-22 after 20-day outage where poller ran successfully but rate limiter blocked all work.
+  const watermarkFile = path.join(process.env.HOME || '/home/analytics_user', 'workspace/.last-rfq-enrich');
+  try {
+    if (fs.existsSync(watermarkFile)) {
+      const watermark = fs.readFileSync(watermarkFile, 'utf8').trim();
+      const watermarkMs = new Date(watermark).getTime();
+      const ageMs = Date.now() - watermarkMs;
+      const ageHours = Math.round(ageMs / (60 * 60 * 1000));
+      const ageDays = Math.round(ageMs / (24 * 60 * 60 * 1000));
+      // Alert if watermark is >2 hours behind (normal backfill should clear in ~1h)
+      if (ageHours > 2) {
+        issues.push({
+          severity: ageHours > 24 ? 'error' : 'warn',
+          kind: 'enrich-watermark-stale',
+          message: `Enrich-poller watermark is ${ageDays > 0 ? ageDays + 'd' : ageHours + 'h'} behind (${watermark.slice(0, 19)}Z) — RFQs are not being enriched!`,
+        });
+      }
+    }
+  } catch (err) {
+    // Ignore read errors — watermark file might not exist on fresh install
+  }
+
   return issues;
 }
 

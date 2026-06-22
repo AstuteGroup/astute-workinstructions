@@ -891,43 +891,57 @@ async function main() {
     return;
   }
 
-  // ─── RATE LIMITING CHECK (added 2026-06-02) ─────────────────────────────────
-  // Reset session counters at start of each tick
+  // ─── RATE LIMITING BY MPN COUNT (fixed 2026-06-22) ──────────────────────────
+  // Cap by MPN count, not RFQ count. One 500-MPN RFQ shouldn't block 100 single-MPN RFQs.
   enrichmentRateLimiter.resetSession();
 
-  // Count total RFQs we want to enrich (immediate + potential backlog)
   const bl = backlogStats();
+  const totalUnenrichedRfqs = immediate.length + bl.pending;
+  const totalUnenrichedMpns = immediate.reduce((s, r) => s + (Number(r.line_mpns) || 0), 0);
+  const backfillMode = totalUnenrichedMpns >= 200; // ~200 MPNs = entering backfill territory
+
+  // MPN limits per tick: conservative in backfill mode to avoid API 429s
+  const maxMpnsPerTick = backfillMode ? 500 : 2000;
+
+  // Select RFQs until we hit the MPN limit (process in priority/FIFO order)
+  const immediateThisTick = [];
+  let mpnBudget = maxMpnsPerTick;
+  for (const r of immediate) {
+    const mpns = Number(r.line_mpns) || 0;
+    if (mpns <= mpnBudget) {
+      immediateThisTick.push(r);
+      mpnBudget -= mpns;
+    } else if (immediateThisTick.length === 0 && mpns > 0) {
+      // First RFQ exceeds budget but we must make progress — take it anyway
+      immediateThisTick.push(r);
+      mpnBudget = 0;
+      break;
+    }
+    // else: skip this RFQ for now, try to fit smaller ones (greedy, not optimal but simple)
+  }
+
+  const selectedMpns = maxMpnsPerTick - mpnBudget;
+  const deferredCount = immediate.length - immediateThisTick.length;
+  const deferredMpns = totalUnenrichedMpns - selectedMpns;
+
+  if (deferredCount > 0) {
+    log(`BACKFILL: Processing ${immediateThisTick.length} RFQs (${selectedMpns} MPNs) this tick; ${deferredCount} RFQs (${deferredMpns} MPNs) deferred`);
+  }
+
+  // Backlog drain uses remaining MPN budget
   const maxBacklogToProcess = Math.min(bl.pending, BACKLOG_BATCH_SIZE);
-  const totalToEnrich = immediate.length + maxBacklogToProcess;
-  const totalUnenriched = immediate.length + bl.pending;
 
-  // Check rate limit
-  const rateCheck = enrichmentRateLimiter.checkEnrichmentLimit(totalToEnrich, {
-    unenrichedCount: totalUnenriched,
-  });
-
-  if (!rateCheck.allowed) {
-    log(`RATE LIMIT: ${rateCheck.reason}`);
-    log(`  Deferring enrichment of ${totalToEnrich} RFQs (${totalUnenriched} total unenriched)`);
-    log(`  Status: ${JSON.stringify(enrichmentRateLimiter.getStatus())}`);
-    // Don't update watermark - we'll try again next tick
-    await pool.end();
-    return;
+  if (backfillMode) {
+    log(`BACKFILL MODE: ${totalUnenrichedRfqs} RFQs / ${totalUnenrichedMpns} MPNs unenriched; processing ${immediateThisTick.length} RFQs (${selectedMpns} MPNs) this tick`);
   }
 
-  if (rateCheck.backfillMode) {
-    log(`BACKFILL MODE: ${totalUnenriched} unenriched RFQs, using slower enrichment rate`);
-  }
+  const enrichDelay = backfillMode ? 100 : 0; // Small delay between RFQs in backfill mode
 
-  const enrichDelay = enrichmentRateLimiter.getRecommendedDelay(totalUnenriched);
-
-  // Record enrichment attempt
-  enrichmentRateLimiter.recordEnrichmentAttempt(totalToEnrich);
-
-  // Phase 3: Process Tier 1-3 immediately
+  // Phase 3: Process Tier 1-3 immediately (capped to immediateThisTick)
   const batchResults = [];
-  for (let idx = 0; idx < immediate.length; idx++) {
-    const r = immediate[idx];
+  let lastProcessedLineMpnCreated = null; // Track for watermark advancement
+  for (let idx = 0; idx < immediateThisTick.length; idx++) {
+    const r = immediateThisTick[idx];
     log(`Enriching ${r.rfq_number} (${r.rfq_type} ${r.priority}, ${r.line_mpns} MPNs)${r._gateApproved ? ' [gate-approved]' : ''}...`);
     try {
       const enrichOpts = { priority: r.priority };
@@ -948,9 +962,13 @@ async function main() {
       }
       batchResults.push(result);
       log(`  done: ${result.apiCalls} API, ${result.cacheHits} cache, ${result.vqsWritten} VQs, ${result.errors?.length || 0} err`);
+      // Track the line_mpn_created for watermark (use the RFQ's timestamp, not current time)
+      if (r.line_mpn_created) {
+        lastProcessedLineMpnCreated = r.line_mpn_created;
+      }
 
       // Apply rate limit delay if in backfill mode
-      if (enrichDelay > 0 && idx < immediate.length - 1) {
+      if (enrichDelay > 0 && idx < immediateThisTick.length - 1) {
         await new Promise(resolve => setTimeout(resolve, enrichDelay));
       }
     } catch (err) {
@@ -979,22 +997,16 @@ async function main() {
   const dkQuota = readQuotaState();
   const dkRemaining = dkQuota?.remainingCalls ?? '?';
 
-  const candidates = nextBatch(BACKLOG_BATCH_SIZE);
+  const candidates = nextBatch(maxBacklogToProcess);
 
-  // Apply rate limiting to backlog drain too
-  const remainingCapacity = rateCheck.limits.maxEnrichmentsPerRun - enrichmentRateLimiter.getStatus().sessionEnrichments;
-  const candidatesToProcess = candidates.slice(0, Math.max(0, remainingCapacity));
-
-  if (candidatesToProcess.length > 0) {
+  if (candidates.length > 0) {
     const dkNote = dkBlocked
       ? ` (note: DigiKey 429-blocked — other 6 distributors will still run)`
       : ` (DigiKey: ${dkRemaining} remaining)`;
-    log(`Draining Tier 4 backlog: ${candidatesToProcess.length} candidate(s)${dkNote}`);
+    log(`Draining Tier 4 backlog: ${candidates.length} candidate(s)${dkNote}`);
   }
 
-  if (candidatesToProcess.length < candidates.length) {
-    log(`  Rate limited: processing ${candidatesToProcess.length}/${candidates.length} backlog candidates`);
-  }
+  const candidatesToProcess = candidates;
 
   for (let idx = 0; idx < candidatesToProcess.length; idx++) {
     const item = candidatesToProcess[idx];
@@ -1135,9 +1147,20 @@ async function main() {
   }
 
   // Advance watermark after everything completes.
+  // BUG FIX (2026-06-22): When in backfill mode, only advance to the last processed
+  // RFQ's timestamp, not to current time. This ensures next tick picks up remaining RFQs.
   if (!DRY_RUN) {
-    writeWatermark(untilIso);
-    log(`Watermark advanced to ${untilIso}`);
+    let newWatermark;
+    if (deferredCount > 0 && lastProcessedLineMpnCreated) {
+      // Backfill mode: advance only to what we processed
+      newWatermark = new Date(lastProcessedLineMpnCreated).toISOString();
+      log(`BACKFILL: Watermark advanced to ${newWatermark} (${deferredCount} RFQs remaining for next tick)`);
+    } else {
+      // Normal mode: advance to current time
+      newWatermark = untilIso;
+      log(`Watermark advanced to ${newWatermark}`);
+    }
+    writeWatermark(newWatermark);
   }
 
   await pool.end();
