@@ -201,7 +201,8 @@ async function collectData() {
     cq_lines: data.regionalActivity.reduce((sum, r) => sum + parseInt(r.cq_lines || 0), 0),
     cq_sold: data.regionalActivity.reduce((sum, r) => sum + parseInt(r.cq_sold || 0), 0),
     so_lines: data.regionalActivity.reduce((sum, r) => sum + parseInt(r.so_lines || 0), 0),
-    so_revenue: data.regionalActivity.reduce((sum, r) => sum + parseFloat(r.so_revenue || 0), 0)
+    so_revenue: data.regionalActivity.reduce((sum, r) => sum + parseFloat(r.so_revenue || 0), 0),
+    so_gp: data.regionalActivity.reduce((sum, r) => sum + parseFloat(r.so_gp || 0), 0)
   };
 
   console.log('\n✓ Data collection complete\n');
@@ -238,7 +239,7 @@ function getNewCustomersSold(queryFile) {
   if (!sqlMatch) return [];
 
   return parseRows(execQuery(sqlMatch[0]), [
-    'seller_name', 'region', 'customer_name', 'order_number', 'total_revenue',
+    'seller_name', 'region', 'customer_name', 'order_number', 'total_revenue', 'total_gp',
     'mpns', 'mfr_names', 'total_qty', 'customer_location', 'contact_name', 'promise_date'
   ]);
 }
@@ -258,7 +259,7 @@ function getStrategicAccountsActivity(queryFile) {
   if (!sqlMatch) return [];
 
   return parseRows(execQuery(sqlMatch[0]), [
-    'account_name', 'ise_name', 'region', 'rfq_lines', 'cq_lines', 'cq_sold', 'so_count', 'so_revenue', 'color_code'
+    'account_name', 'ise_name', 'region', 'rfq_lines', 'cq_lines', 'cq_sold', 'so_count', 'so_revenue', 'so_gp', 'color_code'
   ]);
 }
 
@@ -413,7 +414,7 @@ function getRegionalActivity(queryFile) {
   if (!sqlMatch) return [];
 
   return parseRows(execQuery(sqlMatch[0]), [
-    'region', 'manager', 'rfq_lines', 'cq_lines', 'cq_sold', 'so_lines', 'so_revenue'
+    'region', 'manager', 'rfq_lines', 'cq_lines', 'cq_sold', 'so_lines', 'so_revenue', 'so_gp'
   ]);
 }
 
@@ -664,6 +665,7 @@ function generateSection1(data) {
           <th>Region</th>
           <th>Customer</th>
           <th style="text-align: right;">Revenue</th>
+          <th style="text-align: right;">GP</th>
           <th>MPNs</th>
           <th>MFR</th>
           <th>QTY</th>
@@ -681,6 +683,7 @@ function generateSection1(data) {
           <td>${cust.region}</td>
           <td><strong>${cust.customer_name}</strong></td>
           <td class="number">${formatCurrency(cust.total_revenue)}</td>
+          <td class="number">${formatCurrency(cust.total_gp)}</td>
           <td style="font-size: 10px;">${cust.mpns || 'N/A'}</td>
           <td style="font-size: 11px;">${cust.mfr_names || 'N/A'}</td>
           <td class="number">${formatNumber(cust.total_qty)}</td>
@@ -710,6 +713,7 @@ function generateSection1(data) {
           <th style="text-align: center;">CQ Sold</th>
           <th style="text-align: center;">SOs</th>
           <th style="text-align: right;">Revenue</th>
+          <th style="text-align: right;">GP</th>
         </tr>
       </thead>
       <tbody>`;
@@ -722,6 +726,7 @@ function generateSection1(data) {
       const soldStyle = parseInt(acct.cq_sold) > 0 ? winStyle : '';
       const soStyle = parseInt(acct.so_count) > 0 ? winStyle : '';
       const revenueStyle = parseFloat(acct.so_revenue || 0) > 0 ? winStyle : '';
+      const gpStyle = parseFloat(acct.so_gp || 0) > 0 ? winStyle : '';
       html += `
         <tr>
           <td><strong style="${nameStyle}">${acct.account_name}</strong></td>
@@ -732,6 +737,7 @@ function generateSection1(data) {
           <td style="text-align: center; ${soldStyle}">${formatNumber(acct.cq_sold)}</td>
           <td style="text-align: center; ${soStyle}">${formatNumber(acct.so_count)}</td>
           <td class="number" style="${revenueStyle}">${formatCurrency(acct.so_revenue)}</td>
+          <td class="number" style="${gpStyle}">${formatCurrency(acct.so_gp)}</td>
         </tr>`;
     });
 
@@ -985,6 +991,7 @@ function generateSection3(data) {
           <th style="text-align: center;">CQ Sold</th>
           <th style="text-align: center;">SO Lines</th>
           <th style="text-align: right;">Revenue</th>
+          <th style="text-align: right;">GP</th>
         </tr>
       </thead>
       <tbody>`;
@@ -999,6 +1006,7 @@ function generateSection3(data) {
           <td style="text-align: center;">${formatNumber(region.cq_sold)}</td>
           <td style="text-align: center;">${formatNumber(region.so_lines)}</td>
           <td class="number">${formatCurrency(region.so_revenue)}</td>
+          <td class="number">${formatCurrency(region.so_gp)}</td>
         </tr>`;
     });
 
@@ -1011,6 +1019,7 @@ function generateSection3(data) {
         <td style="text-align: center;">${formatNumber(data.regionalTotals.cq_sold)}</td>
         <td style="text-align: center;">${formatNumber(data.regionalTotals.so_lines)}</td>
         <td class="number"><strong>${formatCurrency(data.regionalTotals.so_revenue)}</strong></td>
+        <td class="number"><strong>${formatCurrency(data.regionalTotals.so_gp)}</strong></td>
       </tr>`;
 
     html += '</tbody></table>';

@@ -85,6 +85,9 @@ SELECT
   bp.name as customer_name,
   o.documentno as order_number,
   o.grandtotal as total_revenue,
+  (SELECT COALESCE(SUM(bi.s_order_line_gp), 0)
+   FROM adempiere.bi_order_line_v bi
+   WHERE bi.order_id = o.c_order_id) as total_gp,
   (SELECT STRING_AGG(DISTINCT ol.chuboe_mpn, ', ' ORDER BY ol.chuboe_mpn)
    FROM adempiere.c_orderline ol
    WHERE ol.c_order_id = o.c_order_id
@@ -223,10 +226,12 @@ so_activity AS (
       ELSE 'Other'
     END as region,
     COUNT(DISTINCT o.c_order_id) as so_count,
-    SUM(o.grandtotal) as so_revenue
+    SUM(o.grandtotal) as so_revenue,
+    COALESCE(SUM(bi.s_order_line_gp), 0) as so_gp
   FROM strategic_accounts sa
   JOIN adempiere.c_order o ON sa.c_bpartner_id = o.c_bpartner_id
   JOIN adempiere.ad_user u ON o.salesrep_id = u.ad_user_id
+  LEFT JOIN adempiere.bi_order_line_v bi ON o.c_order_id = bi.order_id
   WHERE o.created::date = CASE WHEN EXTRACT(DOW FROM CURRENT_DATE) = 1 THEN CURRENT_DATE - INTERVAL '3 days' ELSE CURRENT_DATE - INTERVAL '1 day' END
     AND o.isactive = 'Y'
     AND o.issotrx = 'Y'
@@ -244,7 +249,8 @@ all_activity_detailed AS (
     COALESCE(cq.cq_count, 0) as cq_lines,
     COALESCE(cq.cq_sold_count, 0) as cq_sold,
     COALESCE(so.so_count, 0) as so_count,
-    COALESCE(so.so_revenue, 0) as so_revenue
+    COALESCE(so.so_revenue, 0) as so_revenue,
+    COALESCE(so.so_gp, 0) as so_gp
   FROM strategic_accounts sa
   LEFT JOIN rfq_activity rfq ON sa.name = rfq.account_name
   LEFT JOIN cq_activity cq ON sa.name = cq.account_name AND COALESCE(rfq.ise_name, cq.ise_name) = cq.ise_name
@@ -277,6 +283,7 @@ SELECT
   COALESCE(ad.cq_sold, 0) as cq_sold,
   COALESCE(ad.so_count, 0) as so_count,
   COALESCE(ad.so_revenue, 0) as so_revenue,
+  COALESCE(ad.so_gp, 0) as so_gp,
   CASE
     WHEN pt.total_rfq IS NULL AND pt.total_cq IS NULL AND pt.total_so IS NULL
     THEN 'red'
@@ -798,6 +805,14 @@ SELECT
    WHERE ru2.region = ru.region
      AND o.created::date = CASE WHEN EXTRACT(DOW FROM CURRENT_DATE) = 1 THEN CURRENT_DATE - INTERVAL '3 days' ELSE CURRENT_DATE - INTERVAL '1 day' END
      AND o.isactive = 'Y'
-     AND o.issotrx = 'Y') as so_revenue
+     AND o.issotrx = 'Y') as so_revenue,
+  (SELECT COALESCE(SUM(bi.s_order_line_gp), 0)
+   FROM adempiere.c_order o
+   JOIN regional_users ru2 ON o.salesrep_id = ru2.ad_user_id
+   LEFT JOIN adempiere.bi_order_line_v bi ON o.c_order_id = bi.order_id
+   WHERE ru2.region = ru.region
+     AND o.created::date = CASE WHEN EXTRACT(DOW FROM CURRENT_DATE) = 1 THEN CURRENT_DATE - INTERVAL '3 days' ELSE CURRENT_DATE - INTERVAL '1 day' END
+     AND o.isactive = 'Y'
+     AND o.issotrx = 'Y') as so_gp
 FROM (SELECT DISTINCT region, manager FROM regional_users) ru
 ORDER BY region;
