@@ -1,0 +1,601 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sales Pulse — VP Strategic Edition</title>
+<style>
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif;
+    font-size: 13px;
+    line-height: 1.5;
+    color: #333;
+    max-width: 900px;
+    margin: 0 auto;
+    padding: 20px;
+    background: #f5f5f5;
+  }
+  .container {
+    background: white;
+    padding: 24px;
+    border-radius: 8px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+  }
+  h1 {
+    font-size: 20px;
+    font-weight: 600;
+    margin: 0 0 4px 0;
+    color: #1a1a1a;
+  }
+  .subtitle {
+    font-size: 11px;
+    color: #666;
+    margin-bottom: 20px;
+  }
+  .mockup-banner {
+    background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+    color: white;
+    padding: 12px 20px;
+    border-radius: 6px;
+    margin-bottom: 20px;
+    text-align: center;
+    font-weight: 700;
+    font-size: 14px;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+  }
+  .section {
+    margin-bottom: 24px;
+    padding-bottom: 24px;
+    border-bottom: 2px solid #e0e0e0;
+  }
+  .section:last-child {
+    border-bottom: none;
+  }
+  .section-title {
+    font-size: 15px;
+    font-weight: 600;
+    margin-bottom: 12px;
+    color: #1a1a1a;
+  }
+
+  /* Executive Brief Styles */
+  .exec-brief {
+    background: linear-gradient(135deg, #fef3c7 0%, #fef9e7 100%);
+    border: 2px solid #f59e0b;
+    border-radius: 8px;
+    padding: 20px;
+    margin-bottom: 24px;
+  }
+  .exec-brief h2 {
+    margin: 0 0 16px 0;
+    font-size: 16px;
+    font-weight: 700;
+    color: #92400e;
+  }
+  .priority-section {
+    margin-bottom: 20px;
+  }
+  .priority-header {
+    font-weight: 700;
+    font-size: 13px;
+    margin-bottom: 8px;
+    padding-bottom: 4px;
+    border-bottom: 2px solid rgba(0,0,0,0.1);
+  }
+  .priority-red { color: #dc2626; border-color: #dc2626; }
+  .priority-yellow { color: #d97706; border-color: #d97706; }
+  .priority-green { color: #16a34a; border-color: #16a34a; }
+
+  .action-item {
+    background: white;
+    border-left: 4px solid #dc2626;
+    padding: 12px;
+    margin-bottom: 12px;
+    border-radius: 4px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+  }
+  .action-item.yellow { border-left-color: #f59e0b; }
+  .action-item.green { border-left-color: #16a34a; }
+
+  .action-title {
+    font-weight: 700;
+    font-size: 13px;
+    margin-bottom: 6px;
+    color: #1a1a1a;
+  }
+  .action-detail {
+    font-size: 12px;
+    color: #666;
+    margin: 4px 0;
+    padding-left: 12px;
+  }
+
+  /* Alert Cards */
+  .alert-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 16px;
+    margin-top: 12px;
+  }
+  .alert-card {
+    background: white;
+    border-radius: 6px;
+    padding: 16px;
+    border-left: 4px solid #94a3b8;
+  }
+  .alert-card.red { border-left-color: #dc2626; background: #fef2f2; }
+  .alert-card.yellow { border-left-color: #f59e0b; background: #fffbeb; }
+  .alert-card.green { border-left-color: #16a34a; background: #f0fdf4; }
+
+  .alert-label {
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: #64748b;
+    font-weight: 600;
+    margin-bottom: 4px;
+  }
+  .alert-value {
+    font-size: 24px;
+    font-weight: 700;
+    color: #1e293b;
+    margin-bottom: 4px;
+  }
+  .alert-trend {
+    font-size: 12px;
+    color: #64748b;
+  }
+  .trend-up { color: #16a34a; }
+  .trend-down { color: #dc2626; }
+
+  /* Table Styles */
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 12px;
+  }
+  th {
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    padding: 8px;
+    text-align: left;
+    font-weight: 600;
+    font-size: 11px;
+    color: #475569;
+  }
+  td {
+    border: 1px solid #e2e8f0;
+    padding: 8px;
+  }
+  tr:hover {
+    background: #fafafa;
+  }
+
+  .badge {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 12px;
+    font-size: 11px;
+    font-weight: 600;
+  }
+  .badge-red { background: #fee2e2; color: #991b1b; }
+  .badge-yellow { background: #fef3c7; color: #92400e; }
+  .badge-green { background: #dcfce7; color: #166534; }
+  .badge-gray { background: #f1f5f9; color: #475569; }
+
+  .insight-box {
+    background: #f8fafc;
+    border-left: 3px solid #3b82f6;
+    padding: 12px;
+    margin-top: 12px;
+    font-size: 12px;
+    border-radius: 4px;
+  }
+  .insight-box strong {
+    color: #1e40af;
+  }
+
+  .metric-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 8px 0;
+    border-bottom: 1px solid #e2e8f0;
+  }
+  .metric-row:last-child {
+    border-bottom: none;
+  }
+  .metric-label {
+    font-size: 12px;
+    color: #64748b;
+  }
+  .metric-value {
+    font-size: 14px;
+    font-weight: 600;
+    color: #1e293b;
+  }
+</style>
+</head>
+<body>
+
+<div class="container">
+  <div class="mockup-banner">📋 MOCKUP — CONCEPT REVIEW (Illustrative Data)</div>
+  <h1>Sales Pulse — VP Strategic Edition</h1>
+  <div class="subtitle">Tuesday, June 4, 2026 | Market Cycle: Constrained → Pre-Allocation</div>
+
+  <!-- Section 0: Strategic Actions -->
+  <div class="exec-brief">
+    <h2>🎯 Strategic Actions — Today</h2>
+
+    <div class="priority-section">
+      <div class="priority-header priority-red">🔴 STRATEGIC (This Week)</div>
+
+      <div class="action-item">
+        <div class="action-title">1. APAC Demand Spike → USA Allocation Prep</div>
+        <div class="action-detail">• APAC RFQ volume +87% week-over-week (memory heavy)</div>
+        <div class="action-detail">• Memory lead times extending: Micron 12wks → 18wks, Samsung 10wks → 16wks</div>
+        <div class="action-detail">• <strong>Action:</strong> Pre-position USA team for Q3 allocation (alternates, tier 2/3 readiness)</div>
+      </div>
+
+      <div class="action-item">
+        <div class="action-title">2. Tier 2/3 Line Card Effectiveness Review</div>
+        <div class="action-detail">• Added 14 tier 2/3 manufacturers (Apr-May), but only 3% of quotes use them</div>
+        <div class="action-detail">• Customer pushback on alternates: 18% rejection rate on non-tier-1 quotes</div>
+        <div class="action-detail">• <strong>Action:</strong> Review with Jeff/Joel/Laurel: training needed or strategic messaging?</div>
+      </div>
+
+      <div class="action-item">
+        <div class="action-title">3. Concentration Risk — Top 3 Manufacturers = 47% Pipeline</div>
+        <div class="action-detail">• Texas Instruments: $3.2M active quotes (22% of total)</div>
+        <div class="action-detail">• Micron Technology: $2.1M active quotes (15%)</div>
+        <div class="action-detail">• Infineon: $1.4M active quotes (10%)</div>
+        <div class="action-detail">• <strong>Action:</strong> If these 3 allocate, half our pipeline is at risk</div>
+      </div>
+    </div>
+
+    <div class="priority-section">
+      <div class="priority-header priority-yellow">🟡 MONITOR (This Month)</div>
+      <div class="action-item yellow">
+        <div class="action-title">• APAC Regional Divergence</div>
+        <div class="action-detail">Singapore/Philippines heating up (+120% RFQs), India flat (supply chain shift?)</div>
+      </div>
+      <div class="action-item yellow">
+        <div class="action-title">• Raw Material Signals</div>
+        <div class="action-detail">Substrate shortages reported by 2 vendors (Kyocera, NGK) — could cascade to passive components</div>
+      </div>
+    </div>
+
+    <div class="priority-section">
+      <div class="priority-header priority-green">🟢 POSITIVE SIGNALS</div>
+      <div class="action-item green">
+        <div class="action-title">• New Customer Acquisition Strong</div>
+        <div class="action-detail">12 new customers onboarded in last 30 days (vs 7 prior month) — diversifying base pre-allocation</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Section 1: Allocation Market Signals -->
+  <div class="section">
+    <div class="section-title">📊 Allocation Market Signals (30-Day Trend)</div>
+
+    <div class="alert-grid">
+      <div class="alert-card red">
+        <div class="alert-label">APAC Demand</div>
+        <div class="alert-value">+87%</div>
+        <div class="alert-trend trend-up">vs Prior Month • Leading Indicator</div>
+      </div>
+
+      <div class="alert-card yellow">
+        <div class="alert-label">Memory Lead Times</div>
+        <div class="alert-value">+45%</div>
+        <div class="alert-trend trend-up">Avg 10wks → 14.5wks • Constrained</div>
+      </div>
+
+      <div class="alert-card yellow">
+        <div class="alert-label">USA Demand</div>
+        <div class="alert-value">+12%</div>
+        <div class="alert-trend">Lagging APAC by 3-4 weeks</div>
+      </div>
+
+      <div class="alert-card green">
+        <div class="alert-label">MEX Demand</div>
+        <div class="alert-value">-5%</div>
+        <div class="alert-trend trend-down">Stable • Not seeing APAC trend yet</div>
+      </div>
+    </div>
+
+    <div class="insight-box">
+      <strong>Market Cycle Position:</strong> APAC entering Constrained phase (demand exceeds supply, lead times extending).
+      Historical pattern: USA follows APAC by 3-4 weeks, EMEA by 6-8 weeks. If Q3 allocation hits, expect tier 1 manufacturers
+      to ration supply with spot premiums. Current tier 2/3 line card additions position us for alternate recommendations.
+    </div>
+
+    <table style="margin-top: 16px;">
+      <thead>
+        <tr>
+          <th>Manufacturer</th>
+          <th>Commodity</th>
+          <th>RFQ Volume (30d)</th>
+          <th>Lead Time Trend</th>
+          <th>Allocation Risk</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>Micron Technology</td>
+          <td>Memory (DRAM/Flash)</td>
+          <td>259 RFQs from 42 customers</td>
+          <td class="trend-up">12wks → 18wks (+50%)</td>
+          <td><span class="badge badge-red">High</span></td>
+        </tr>
+        <tr>
+          <td>Samsung Electronics</td>
+          <td>Memory (NAND)</td>
+          <td>187 RFQs from 31 customers</td>
+          <td class="trend-up">10wks → 16wks (+60%)</td>
+          <td><span class="badge badge-red">High</span></td>
+        </tr>
+        <tr>
+          <td>Texas Instruments</td>
+          <td>Power Management</td>
+          <td>312 RFQs from 58 customers</td>
+          <td class="trend-up">6wks → 10wks (+67%)</td>
+          <td><span class="badge badge-yellow">Medium</span></td>
+        </tr>
+        <tr>
+          <td>Infineon Technologies</td>
+          <td>Power Semiconductors</td>
+          <td>143 RFQs from 39 customers</td>
+          <td class="trend-up">8wks → 12wks (+50%)</td>
+          <td><span class="badge badge-yellow">Medium</span></td>
+        </tr>
+        <tr>
+          <td>STMicroelectronics</td>
+          <td>MCUs</td>
+          <td>98 RFQs from 27 customers</td>
+          <td>6wks (stable)</td>
+          <td><span class="badge badge-green">Low</span></td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- Section 2: Line Card Strategy -->
+  <div class="section">
+    <div class="section-title">🔧 Line Card Strategy Performance</div>
+
+    <div style="margin-bottom: 16px;">
+      <div class="metric-row">
+        <div class="metric-label">Tier 2/3 Manufacturers Added (Apr-May)</div>
+        <div class="metric-value">14 new lines <span class="badge badge-green">+40% expansion</span></div>
+      </div>
+      <div class="metric-row">
+        <div class="metric-label">Quotes Using Tier 2/3 Alternates</div>
+        <div class="metric-value">3% of total <span class="badge badge-red">Low adoption</span></div>
+      </div>
+      <div class="metric-row">
+        <div class="metric-label">Customer Acceptance Rate (Tier 2/3)</div>
+        <div class="metric-value">82% <span class="badge badge-yellow">18% rejection</span></div>
+      </div>
+      <div class="metric-row">
+        <div class="metric-label">Avg Price Premium (Tier 2/3 vs Tier 1)</div>
+        <div class="metric-value">-12% <span class="badge badge-green">Cost competitive</span></div>
+      </div>
+    </div>
+
+    <div class="insight-box">
+      <strong>Strategic Gap Identified:</strong> Despite adding 14 tier 2/3 manufacturers to support allocation
+      scenarios, only 3% of quotes leverage them. This suggests either: (a) sellers need training on when to
+      recommend alternates, or (b) customer education needed on tier 2/3 quality/reliability. With Q3 allocation
+      risk rising, this readiness gap should be closed proactively.
+    </div>
+
+    <table style="margin-top: 16px;">
+      <thead>
+        <tr>
+          <th>Tier 2/3 Manufacturer</th>
+          <th>Quotes (30d)</th>
+          <th>Win Rate</th>
+          <th>Avg Margin</th>
+          <th>Top Use Case</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>IXYS (Power MOS/IGBT)</td>
+          <td>12</td>
+          <td>67%</td>
+          <td>28%</td>
+          <td>Infineon alternates</td>
+        </tr>
+        <tr>
+          <td>ISSI (Memory)</td>
+          <td>8</td>
+          <td>50%</td>
+          <td>22%</td>
+          <td>Micron SRAM alternates</td>
+        </tr>
+        <tr>
+          <td>Diodes Inc (Discretes)</td>
+          <td>18</td>
+          <td>83%</td>
+          <td>31%</td>
+          <td>ON Semi alternates</td>
+        </tr>
+        <tr>
+          <td>Vishay (Passives)</td>
+          <td>6</td>
+          <td>33%</td>
+          <td>18%</td>
+          <td>TDK/Murata alternates</td>
+        </tr>
+        <tr>
+          <td>Cypress (MCU/Memory)</td>
+          <td>3</td>
+          <td>100%</td>
+          <td>35%</td>
+          <td>STM alternates (small sample)</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- Section 3: Regional Market Intelligence -->
+  <div class="section">
+    <div class="section-title">🌍 Regional Market Intelligence (APAC as Leading Indicator)</div>
+
+    <table>
+      <thead>
+        <tr>
+          <th>Region</th>
+          <th>RFQ Trend (30d)</th>
+          <th>Memory Concentration</th>
+          <th>Quote Velocity</th>
+          <th>Market Phase</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><strong>APAC</strong> (Singapore/PHL)</td>
+          <td class="trend-up">+120% ⬆️</td>
+          <td>38% of RFQs</td>
+          <td>2.1 days (accelerating)</td>
+          <td><span class="badge badge-red">Constrained</span></td>
+        </tr>
+        <tr>
+          <td><strong>APAC</strong> (India)</td>
+          <td>+2% →</td>
+          <td>12% of RFQs</td>
+          <td>4.3 days (stable)</td>
+          <td><span class="badge badge-green">Normal</span></td>
+        </tr>
+        <tr>
+          <td><strong>USA</strong></td>
+          <td class="trend-up">+12% ⬆️</td>
+          <td>22% of RFQs</td>
+          <td>3.8 days (stable)</td>
+          <td><span class="badge badge-yellow">Pre-Constrained</span></td>
+        </tr>
+        <tr>
+          <td><strong>MEX</strong></td>
+          <td class="trend-down">-5% ⬇️</td>
+          <td>18% of RFQs</td>
+          <td>5.1 days (slowing)</td>
+          <td><span class="badge badge-green">Normal</span></td>
+        </tr>
+      </tbody>
+    </table>
+
+    <div class="insight-box">
+      <strong>APAC Divergence Signal:</strong> Singapore/Philippines showing aggressive demand growth (+120%) with
+      heavy memory concentration (38% of RFQs). India flat despite being in same region — suggests supply chain
+      shift toward SEA hubs for AI/datacenter builds. Historical pattern: When APAC enters Constrained phase,
+      USA follows 3-4 weeks later. USA currently at +12% (early warning). MEX not seeing trend yet (local manufacturing focus).
+    </div>
+  </div>
+
+  <!-- Section 4: Strategic Pipeline at Risk -->
+  <div class="section">
+    <div class="section-title">💰 Strategic Pipeline Health</div>
+
+    <div class="alert-grid">
+      <div class="alert-card">
+        <div class="alert-label">Total Active Pipeline</div>
+        <div class="alert-value">$14.2M</div>
+        <div class="alert-trend">Across 1,847 active quotes</div>
+      </div>
+
+      <div class="alert-card red">
+        <div class="alert-label">Allocation-Exposed Pipeline</div>
+        <div class="alert-value">$6.7M</div>
+        <div class="alert-trend">47% exposed to top 3 MFRs</div>
+      </div>
+
+      <div class="alert-card yellow">
+        <div class="alert-label">Customer Concentration</div>
+        <div class="alert-value">Top 5 = 38%</div>
+        <div class="alert-trend">$5.4M from 5 customers</div>
+      </div>
+
+      <div class="alert-card green">
+        <div class="alert-label">New Customers (30d)</div>
+        <div class="alert-value">12 added</div>
+        <div class="alert-trend trend-up">+71% vs prior month</div>
+      </div>
+    </div>
+
+    <div style="margin-top: 20px;">
+      <strong style="font-size: 13px; display: block; margin-bottom: 8px;">High-Value Allocation-Exposed Opportunities (Top 5)</strong>
+      <table>
+        <thead>
+          <tr>
+            <th>Customer</th>
+            <th>Pipeline $</th>
+            <th>Exposed MFR</th>
+            <th>Alternate Available?</th>
+            <th>Risk Level</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>GE Aerospace</td>
+            <td>$1.2M</td>
+            <td>TI, Infineon</td>
+            <td><span class="badge badge-green">Yes (IXYS)</span></td>
+            <td><span class="badge badge-yellow">Medium</span></td>
+          </tr>
+          <tr>
+            <td>Applied Materials</td>
+            <td>$890K</td>
+            <td>Micron, Samsung</td>
+            <td><span class="badge badge-red">Limited</span></td>
+            <td><span class="badge badge-red">High</span></td>
+          </tr>
+          <tr>
+            <td>MKS Instruments</td>
+            <td>$780K</td>
+            <td>TI</td>
+            <td><span class="badge badge-green">Yes (AD, LTC)</span></td>
+            <td><span class="badge badge-green">Low</span></td>
+          </tr>
+          <tr>
+            <td>Lam Research</td>
+            <td>$650K</td>
+            <td>Infineon, STM</td>
+            <td><span class="badge badge-green">Yes (IXYS)</span></td>
+            <td><span class="badge badge-yellow">Medium</span></td>
+          </tr>
+          <tr>
+            <td>RTX Corporation</td>
+            <td>$520K</td>
+            <td>Micron</td>
+            <td><span class="badge badge-yellow">Partial</span></td>
+            <td><span class="badge badge-red">High</span></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="insight-box" style="margin-top: 16px;">
+      <strong>Mitigation Priority:</strong> $1.57M pipeline (Applied + RTX) has limited alternate options for
+      memory components. If Micron/Samsung allocate in Q3, these opportunities become at-risk. Consider:
+      (1) Pre-sourcing inventory for critical MPNs, (2) Customer qualification of ISSI alternates, or
+      (3) Franchise channel positioning before spot premiums spike.
+    </div>
+  </div>
+
+  <!-- Footer -->
+  <div style="margin-top: 24px; padding-top: 16px; border-top: 1px solid #e0e0e0; font-size: 11px; color: #666;">
+    <p><strong>Data Sources:</strong> 30-day rolling window (May 5 - June 4, 2026) • OT RFQ/VQ/CQ pipeline data</p>
+    <p><strong>Market Cycle Framework:</strong> Normal → Constrained (demand > supply, lead times +50%) →
+    Allocated (rationed supply, spot premiums) → Recovery (capacity catches up)</p>
+    <p><strong>Regional Leading Indicator:</strong> APAC enters phases 3-4 weeks before USA, 6-8 weeks before EMEA</p>
+    <p><strong>Tier 2/3 Strategy:</strong> 14 manufacturers added Apr-May to support alternate recommendations during allocation</p>
+  </div>
+
+</div>
+
+</body>
+</html>

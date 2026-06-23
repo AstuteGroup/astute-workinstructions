@@ -1,0 +1,990 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sales Pulse Daily — USA Team (Jeff Wallace)</title>
+<style>
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif;
+    font-size: 13px;
+    line-height: 1.5;
+    color: #333;
+    max-width: 900px;
+    margin: 0 auto;
+    padding: 20px;
+    background: #f5f5f5;
+  }
+  .container {
+    background: white;
+    padding: 24px;
+    border-radius: 8px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+  }
+  h1 {
+    font-size: 20px;
+    font-weight: 600;
+    margin: 0 0 4px 0;
+    color: #1a1a1a;
+  }
+  .subtitle {
+    font-size: 11px;
+    color: #666;
+    margin-bottom: 20px;
+  }
+  .section {
+    margin-bottom: 24px;
+    padding-bottom: 24px;
+    border-bottom: 2px solid #e0e0e0;
+  }
+  .section:last-child {
+    border-bottom: none;
+  }
+  .section-title {
+    font-size: 15px;
+    font-weight: 600;
+    margin-bottom: 12px;
+    color: #1a1a1a;
+  }
+
+  /* Executive Brief */
+  .exec-brief {
+    background: linear-gradient(135deg, #dbeafe 0%, #eff6ff 100%);
+    border: 2px solid #3b82f6;
+    border-radius: 8px;
+    padding: 20px;
+    margin-bottom: 24px;
+  }
+  .exec-brief h2 {
+    margin: 0 0 16px 0;
+    font-size: 16px;
+    font-weight: 700;
+    color: #1e40af;
+  }
+  .priority-section {
+    margin-bottom: 20px;
+  }
+  .priority-header {
+    font-weight: 700;
+    font-size: 13px;
+    margin-bottom: 8px;
+    padding-bottom: 4px;
+    border-bottom: 2px solid rgba(0,0,0,0.1);
+  }
+  .priority-red { color: #dc2626; border-color: #dc2626; }
+  .priority-yellow { color: #d97706; border-color: #d97706; }
+  .priority-green { color: #16a34a; border-color: #16a34a; }
+
+  .action-item {
+    background: white;
+    border-left: 4px solid #dc2626;
+    padding: 12px;
+    margin-bottom: 12px;
+    border-radius: 4px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+  }
+  .action-item.yellow { border-left-color: #f59e0b; }
+  .action-item.green { border-left-color: #16a34a; }
+
+  .action-title {
+    font-weight: 700;
+    font-size: 13px;
+    margin-bottom: 6px;
+    color: #1a1a1a;
+  }
+  .action-detail {
+    font-size: 12px;
+    color: #666;
+    margin: 4px 0;
+    padding-left: 12px;
+  }
+  .action-arrow {
+    color: #dc2626;
+    font-weight: 600;
+    font-size: 12px;
+    margin-top: 6px;
+  }
+
+  /* Scorecard Grid */
+  .scorecard-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+    margin-bottom: 12px;
+  }
+  .scorecard-card {
+    background: #f8f9fa;
+    padding: 16px;
+    border-radius: 6px;
+    border: 1px solid #e0e0e0;
+  }
+  .scorecard-header {
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: #666;
+    margin-bottom: 8px;
+  }
+  .scorecard-metric {
+    font-size: 24px;
+    font-weight: 700;
+    color: #1a1a1a;
+    margin-bottom: 4px;
+  }
+  .scorecard-trend {
+    font-size: 12px;
+    font-weight: 600;
+  }
+  .trend-up { color: #16a34a; }
+  .trend-down { color: #dc2626; }
+  .trend-neutral { color: #666; }
+  .scorecard-detail {
+    font-size: 11px;
+    color: #666;
+    margin-top: 4px;
+  }
+
+  /* Seller Cards */
+  .seller-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+    margin-bottom: 12px;
+  }
+  .seller-card {
+    background: #f8f9fa;
+    border: 1px solid #e0e0e0;
+    border-radius: 6px;
+    padding: 12px;
+  }
+  .seller-card.highlight {
+    background: #f0fdf4;
+    border-color: #16a34a;
+  }
+  .seller-card.needs-help {
+    background: #fff7ed;
+    border-color: #f59e0b;
+  }
+  .seller-name {
+    font-weight: 700;
+    font-size: 13px;
+    margin-bottom: 8px;
+    color: #1a1a1a;
+  }
+  .seller-metrics {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 8px;
+    font-size: 11px;
+  }
+  .seller-metric {
+    text-align: center;
+  }
+  .seller-metric-value {
+    font-weight: 700;
+    font-size: 14px;
+    color: #1a1a1a;
+  }
+  .seller-metric-label {
+    color: #666;
+    font-size: 10px;
+  }
+
+  /* Progress Bars */
+  .progress-bar-container {
+    background: #f0f0f0;
+    height: 20px;
+    border-radius: 10px;
+    overflow: hidden;
+    margin: 4px 0;
+    position: relative;
+  }
+  .progress-bar {
+    height: 100%;
+    background: linear-gradient(90deg, #10b981 0%, #059669 100%);
+    transition: width 0.3s ease;
+    border-radius: 10px 0 0 10px;
+  }
+  .progress-bar.warning { background: linear-gradient(90deg, #f59e0b 0%, #d97706 100%); }
+  .progress-bar.danger { background: linear-gradient(90deg, #ef4444 0%, #dc2626 100%); }
+  .progress-label {
+    position: absolute;
+    top: 2px;
+    left: 8px;
+    font-size: 11px;
+    font-weight: 600;
+    color: #1a1a1a;
+  }
+  .seller-block {
+    background: #f8f9fa;
+    border-radius: 6px;
+    padding: 12px;
+    margin-bottom: 12px;
+    border: 1px solid #e0e0e0;
+  }
+  .seller-block.highlight {
+    background: #f0fdf4;
+    border-color: #16a34a;
+  }
+  .seller-block.needs-help {
+    background: #fff7ed;
+    border-color: #f59e0b;
+  }
+  .seller-header {
+    font-weight: 700;
+    font-size: 12px;
+    margin-bottom: 8px;
+    color: #1a1a1a;
+  }
+  .progress-row {
+    display: flex;
+    align-items: center;
+    margin-bottom: 6px;
+  }
+  .progress-row-label {
+    width: 50px;
+    font-size: 11px;
+    font-weight: 600;
+    color: #666;
+  }
+  .progress-row-bar {
+    flex: 1;
+    margin: 0 8px;
+  }
+  .progress-row-value {
+    width: 100px;
+    font-size: 11px;
+    text-align: right;
+  }
+
+  /* Market Pulse Comparison */
+  .comparison-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+    margin-bottom: 16px;
+  }
+  .comparison-card {
+    background: #f8f9fa;
+    border: 1px solid #e0e0e0;
+    border-radius: 6px;
+    padding: 16px;
+  }
+  .comparison-card.usa {
+    background: #dbeafe;
+    border-color: #3b82f6;
+  }
+  .comparison-card.global {
+    background: #f3f4f6;
+    border-color: #6b7280;
+  }
+  .comparison-title {
+    font-weight: 700;
+    font-size: 12px;
+    margin-bottom: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+  .comparison-title.usa { color: #1e40af; }
+  .comparison-title.global { color: #374151; }
+  .comparison-item {
+    font-size: 12px;
+    padding: 6px 0;
+    border-bottom: 1px solid rgba(0,0,0,0.05);
+  }
+  .comparison-item:last-child {
+    border-bottom: none;
+  }
+
+  /* Collapsible */
+  .collapsible {
+    background: #f8f9fa;
+    border: 1px solid #e0e0e0;
+    border-radius: 4px;
+    margin-bottom: 12px;
+    cursor: pointer;
+    padding: 12px;
+    font-weight: 600;
+    font-size: 13px;
+    transition: background 0.2s;
+  }
+  .collapsible:hover {
+    background: #e9ecef;
+  }
+  .collapsible::after {
+    content: ' ▼';
+    font-size: 10px;
+    color: #666;
+  }
+  .collapsible.active::after {
+    content: ' ▲';
+  }
+  .collapsible-content {
+    display: none;
+    padding: 12px;
+    background: white;
+    border: 1px solid #e0e0e0;
+    border-top: none;
+    border-radius: 0 0 4px 4px;
+    margin-top: -12px;
+  }
+  .collapsible-content.show {
+    display: block;
+  }
+
+  /* Insight Box */
+  .insight-box {
+    background: #eff6ff;
+    border-left: 4px solid #3b82f6;
+    padding: 12px;
+    margin: 8px 0;
+    border-radius: 4px;
+    font-size: 12px;
+  }
+  .insight-box strong {
+    color: #1e40af;
+  }
+  .insight-box.success {
+    background: #f0fdf4;
+    border-left-color: #16a34a;
+  }
+  .insight-box.success strong {
+    color: #15803d;
+  }
+  .insight-box.warning {
+    background: #fff7ed;
+    border-left-color: #f59e0b;
+  }
+  .insight-box.warning strong {
+    color: #c2410c;
+  }
+
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 11px;
+  }
+  th {
+    text-align: left;
+    padding: 6px;
+    background: #f8f8f8;
+    font-weight: 600;
+    border-bottom: 2px solid #e0e0e0;
+    font-size: 10px;
+  }
+  td {
+    padding: 6px;
+    border-bottom: 1px solid #f0f0f0;
+  }
+
+  .footnote {
+    font-size: 11px;
+    color: #999;
+    margin-top: 8px;
+    font-style: italic;
+  }
+  .footer {
+    margin-top: 20px;
+    padding-top: 16px;
+    border-top: 1px solid #e0e0e0;
+    font-size: 11px;
+    color: #999;
+    text-align: center;
+  }
+</style>
+</head>
+<body>
+<div class="container">
+  <h1>📊 Sales Pulse — USA Team (Jeff Wallace)</h1>
+  <div class="subtitle">Manager View — Tuesday, June 2, 2026 | Data as of 6:00am PT</div>
+
+  <!-- EXECUTIVE BRIEF -->
+  <div class="exec-brief">
+    <h2>🎯 USA TEAM ACTIONS TODAY</h2>
+
+    <div class="priority-section">
+      <div class="priority-header priority-red">🔴 URGENT (Coach These Sellers Today)</div>
+
+      <div class="action-item">
+        <div class="action-title">1. Justin Goodwin — Strong WTD but zero activity yesterday</div>
+        <div class="action-detail">• Week-to-date: 3 RFQs, 24 CQs, 21 sold, $456K booked (crushing it!)</div>
+        <div class="action-detail">• Yesterday: 3 RFQs, 2 CQs, 0 sold, $0 (unusual silence after strong start)</div>
+        <div class="action-arrow">→ Check in: Pipeline issue or taking a breather after strong Monday?</div>
+      </div>
+
+      <div class="action-item">
+        <div class="action-title">2. Michael Stifter — High RFQ volume, low conversion</div>
+        <div class="action-detail">• 14 RFQs yesterday (34% of team total) but only 1 CQ (6%)</div>
+        <div class="action-detail">• Week-to-date: 14 RFQs, 1 CQ, 1 sold (7% conversion vs 20% expected)</div>
+        <div class="action-arrow">→ Sourcing bottleneck or quote discipline issue?</div>
+      </div>
+
+      <div class="action-item">
+        <div class="action-title">3. Thomas Haynes — 8 RFQs, zero CQs (week-to-date: 11 RFQs, 1 CQ)</div>
+        <div class="action-detail">• 11 RFQs this week but only 1 CQ (9% conversion)</div>
+        <div class="action-detail">• No sales yet this week despite activity</div>
+        <div class="action-arrow">→ Quote discipline coaching needed?</div>
+      </div>
+    </div>
+
+    <div class="priority-section">
+      <div class="priority-header priority-green">🟢 CELEBRATE (Top Performers Yesterday)</div>
+
+      <div class="action-item green">
+        <div class="action-title">🥇 Jake Mcaloose — Team leader, strong execution</div>
+        <div class="action-detail">• Yesterday: 8 RFQs, 6 CQs, 3 sold, 8 SOs ($37K to GE Aerospace)</div>
+        <div class="action-detail">• Week-to-date: 9 RFQs, 8 CQs, 3 sold, $252K booked (balanced pipeline)</div>
+      </div>
+
+      <div class="action-item green">
+        <div class="action-title">🥈 Josh Syre — Consistent high performance</div>
+        <div class="action-detail">• Yesterday: 7 RFQs, 8 CQs, 4 sold, 2 SOs ($16K to Applied/Parker)</div>
+        <div class="action-detail">• Week-to-date: 9 RFQs, 10 CQs, 6 sold, $126K booked</div>
+      </div>
+    </div>
+
+    <div class="priority-section">
+      <div class="priority-header priority-yellow">🟡 MONITOR (Check Before EOD)</div>
+      <div class="action-item yellow">
+        <div class="action-detail">• Team pipeline health: 41 RFQs yesterday vs 5-day avg (spot-check trend)</div>
+        <div class="action-detail">• Aaron Mendoza: Only 1 RFQ yesterday (unusual for him)</div>
+        <div class="action-detail">• Dan Reiser: Zero activity yesterday (check if on PTO or needs support)</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- SECTION 1: USA TEAM SCORECARD -->
+  <div class="section">
+    <div class="section-title">📊 USA Team Scorecard — Monday, June 1, 2026</div>
+
+    <div class="scorecard-grid">
+      <div class="scorecard-card">
+        <div class="scorecard-header">Pipeline Input</div>
+        <div class="scorecard-metric">41 <span style="font-size: 14px; color: #666;">RFQs</span></div>
+        <div class="scorecard-trend trend-up">✅ Strong input</div>
+        <div class="scorecard-detail">8 sellers active • 49% sourced</div>
+      </div>
+
+      <div class="scorecard-card">
+        <div class="scorecard-header">Quoting Activity</div>
+        <div class="scorecard-metric">17 <span style="font-size: 14px; color: #666;">CQs</span></div>
+        <div class="scorecard-trend trend-neutral">41% conversion</div>
+        <div class="scorecard-detail">8 sold (47% close rate)</div>
+      </div>
+
+      <div class="scorecard-card">
+        <div class="scorecard-header">Wins</div>
+        <div class="scorecard-metric">$62K</div>
+        <div class="scorecard-trend trend-up">✅ 18 SO lines</div>
+        <div class="scorecard-detail">GE ($37K), Blue Origin ($10K), Applied ($10K)</div>
+      </div>
+
+      <div class="scorecard-card">
+        <div class="scorecard-header">Team Performance</div>
+        <div class="scorecard-metric">8 <span style="font-size: 14px; color: #666;">sellers</span></div>
+        <div class="scorecard-trend trend-up">✅ All active</div>
+        <div class="scorecard-detail">Top: Jake (8 RFQs), Michael (14 RFQs), Josh (7 RFQs)</div>
+      </div>
+    </div>
+
+    <div class="insight-box success">
+      <strong>🟢 USA Highlight:</strong> Team delivered $62K revenue from 18 SO lines across 4 major accounts. Jake and Josh leading with balanced pipeline execution.
+    </div>
+  </div>
+
+  <!-- SECTION 2: BY SELLER PERFORMANCE -->
+  <div class="section">
+    <div class="section-title">👥 By Seller — Yesterday's Activity</div>
+
+    <div class="seller-grid">
+      <!-- Jake Mcaloose -->
+      <div class="seller-card highlight">
+        <div class="seller-name">🥇 Jake Mcaloose</div>
+        <div class="seller-metrics">
+          <div class="seller-metric">
+            <div class="seller-metric-value">8</div>
+            <div class="seller-metric-label">RFQs</div>
+          </div>
+          <div class="seller-metric">
+            <div class="seller-metric-value">6</div>
+            <div class="seller-metric-label">CQs</div>
+          </div>
+          <div class="seller-metric">
+            <div class="seller-metric-value">3</div>
+            <div class="seller-metric-label">Sold</div>
+          </div>
+          <div class="seller-metric">
+            <div class="seller-metric-value">8</div>
+            <div class="seller-metric-label">SOs</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Josh Syre -->
+      <div class="seller-card highlight">
+        <div class="seller-name">🥈 Josh Syre</div>
+        <div class="seller-metrics">
+          <div class="seller-metric">
+            <div class="seller-metric-value">7</div>
+            <div class="seller-metric-label">RFQs</div>
+          </div>
+          <div class="seller-metric">
+            <div class="seller-metric-value">8</div>
+            <div class="seller-metric-label">CQs</div>
+          </div>
+          <div class="seller-metric">
+            <div class="seller-metric-value">4</div>
+            <div class="seller-metric-label">Sold</div>
+          </div>
+          <div class="seller-metric">
+            <div class="seller-metric-value">2</div>
+            <div class="seller-metric-label">SOs</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Michael Stifter -->
+      <div class="seller-card needs-help">
+        <div class="seller-name">⚠️ Michael Stifter</div>
+        <div class="seller-metrics">
+          <div class="seller-metric">
+            <div class="seller-metric-value">14</div>
+            <div class="seller-metric-label">RFQs</div>
+          </div>
+          <div class="seller-metric">
+            <div class="seller-metric-value">1</div>
+            <div class="seller-metric-label">CQs</div>
+          </div>
+          <div class="seller-metric">
+            <div class="seller-metric-value">1</div>
+            <div class="seller-metric-label">Sold</div>
+          </div>
+          <div class="seller-metric">
+            <div class="seller-metric-value">0</div>
+            <div class="seller-metric-label">SOs</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Thomas Haynes -->
+      <div class="seller-card needs-help">
+        <div class="seller-name">⚠️ Thomas Haynes</div>
+        <div class="seller-metrics">
+          <div class="seller-metric">
+            <div class="seller-metric-value">8</div>
+            <div class="seller-metric-label">RFQs</div>
+          </div>
+          <div class="seller-metric">
+            <div class="seller-metric-value">0</div>
+            <div class="seller-metric-label">CQs</div>
+          </div>
+          <div class="seller-metric">
+            <div class="seller-metric-value">0</div>
+            <div class="seller-metric-label">Sold</div>
+          </div>
+          <div class="seller-metric">
+            <div class="seller-metric-value">0</div>
+            <div class="seller-metric-label">SOs</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Justin Goodwin -->
+      <div class="seller-card">
+        <div class="seller-name">Justin Goodwin</div>
+        <div class="seller-metrics">
+          <div class="seller-metric">
+            <div class="seller-metric-value">3</div>
+            <div class="seller-metric-label">RFQs</div>
+          </div>
+          <div class="seller-metric">
+            <div class="seller-metric-value">2</div>
+            <div class="seller-metric-label">CQs</div>
+          </div>
+          <div class="seller-metric">
+            <div class="seller-metric-value">0</div>
+            <div class="seller-metric-label">Sold</div>
+          </div>
+          <div class="seller-metric">
+            <div class="seller-metric-value">0</div>
+            <div class="seller-metric-label">SOs</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Aaron Mendoza -->
+      <div class="seller-card">
+        <div class="seller-name">Aaron Mendoza</div>
+        <div class="seller-metrics">
+          <div class="seller-metric">
+            <div class="seller-metric-value">1</div>
+            <div class="seller-metric-label">RFQs</div>
+          </div>
+          <div class="seller-metric">
+            <div class="seller-metric-value">0</div>
+            <div class="seller-metric-label">CQs</div>
+          </div>
+          <div class="seller-metric">
+            <div class="seller-metric-value">0</div>
+            <div class="seller-metric-label">Sold</div>
+          </div>
+          <div class="seller-metric">
+            <div class="seller-metric-value">0</div>
+            <div class="seller-metric-label">SOs</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- James Diaz -->
+      <div class="seller-card">
+        <div class="seller-name">James Diaz</div>
+        <div class="seller-metrics">
+          <div class="seller-metric">
+            <div class="seller-metric-value">0</div>
+            <div class="seller-metric-label">RFQs</div>
+          </div>
+          <div class="seller-metric">
+            <div class="seller-metric-value">0</div>
+            <div class="seller-metric-label">CQs</div>
+          </div>
+          <div class="seller-metric">
+            <div class="seller-metric-value">0</div>
+            <div class="seller-metric-label">Sold</div>
+          </div>
+          <div class="seller-metric">
+            <div class="seller-metric-value">8</div>
+            <div class="seller-metric-label">SOs</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Dan Reiser -->
+      <div class="seller-card">
+        <div class="seller-name">Dan Reiser</div>
+        <div class="seller-metrics">
+          <div class="seller-metric">
+            <div class="seller-metric-value">0</div>
+            <div class="seller-metric-label">RFQs</div>
+          </div>
+          <div class="seller-metric">
+            <div class="seller-metric-value">0</div>
+            <div class="seller-metric-label">CQs</div>
+          </div>
+          <div class="seller-metric">
+            <div class="seller-metric-value">0</div>
+            <div class="seller-metric-label">Sold</div>
+          </div>
+          <div class="seller-metric">
+            <div class="seller-metric-value">0</div>
+            <div class="seller-metric-label">SOs</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="insight-box warning">
+      <strong>⚠️ Conversion Alert:</strong> Michael and Thomas have high RFQ volume (14 + 8 = 22 RFQs, 54% of team) but low CQ output (1 + 0 = 1 CQ, 6% of team). Sourcing support needed?
+    </div>
+  </div>
+
+  <!-- SECTION 3: WEEK-TO-DATE PACE (SELLER DRILL-DOWN) -->
+  <div class="section">
+    <div class="section-title">📅 Week-to-Date Pace — By Seller (Day 1 of 5)</div>
+    <div class="footnote" style="margin-bottom: 12px;">
+      Weekly targets per seller: 20 RFQs, 15 CQs, 4.5 sold (× 8 sellers = 160/120/36 team target)
+    </div>
+
+    <!-- Justin Goodwin -->
+    <div class="seller-block highlight">
+      <div class="seller-header">🌟 Justin Goodwin — Crushing it!</div>
+      <div class="progress-row">
+        <div class="progress-row-label">RFQs:</div>
+        <div class="progress-row-bar">
+          <div class="progress-bar-container">
+            <div class="progress-bar" style="width: 15%;"></div>
+            <div class="progress-label">3 / 20</div>
+          </div>
+        </div>
+        <div class="progress-row-value">15% 🟢 On pace</div>
+      </div>
+      <div class="progress-row">
+        <div class="progress-row-label">CQs:</div>
+        <div class="progress-row-bar">
+          <div class="progress-bar-container">
+            <div class="progress-bar" style="width: 100%;"></div>
+            <div class="progress-label">24 / 15</div>
+          </div>
+        </div>
+        <div class="progress-row-value">160% 🔥 Way ahead!</div>
+      </div>
+      <div class="progress-row">
+        <div class="progress-row-label">Sold:</div>
+        <div class="progress-row-bar">
+          <div class="progress-bar-container">
+            <div class="progress-bar" style="width: 100%;"></div>
+            <div class="progress-label">21 / 4.5</div>
+          </div>
+        </div>
+        <div class="progress-row-value">467% 🚀 Superstar!</div>
+      </div>
+      <div class="progress-row">
+        <div class="progress-row-label">Revenue:</div>
+        <div class="progress-row-bar"></div>
+        <div class="progress-row-value"><strong>$456K</strong></div>
+      </div>
+    </div>
+
+    <!-- Jake Mcaloose -->
+    <div class="seller-block highlight">
+      <div class="seller-header">Jake Mcaloose</div>
+      <div class="progress-row">
+        <div class="progress-row-label">RFQs:</div>
+        <div class="progress-row-bar">
+          <div class="progress-bar-container">
+            <div class="progress-bar" style="width: 45%;"></div>
+            <div class="progress-label">9 / 20</div>
+          </div>
+        </div>
+        <div class="progress-row-value">45% 🟢 Ahead</div>
+      </div>
+      <div class="progress-row">
+        <div class="progress-row-label">CQs:</div>
+        <div class="progress-row-bar">
+          <div class="progress-bar-container">
+            <div class="progress-bar" style="width: 53%;"></div>
+            <div class="progress-label">8 / 15</div>
+          </div>
+        </div>
+        <div class="progress-row-value">53% 🟢 Ahead</div>
+      </div>
+      <div class="progress-row">
+        <div class="progress-row-label">Sold:</div>
+        <div class="progress-row-bar">
+          <div class="progress-bar-container">
+            <div class="progress-bar" style="width: 67%;"></div>
+            <div class="progress-label">3 / 4.5</div>
+          </div>
+        </div>
+        <div class="progress-row-value">67% 🟢 On track</div>
+      </div>
+      <div class="progress-row">
+        <div class="progress-row-label">Revenue:</div>
+        <div class="progress-row-bar"></div>
+        <div class="progress-row-value"><strong>$252K</strong></div>
+      </div>
+    </div>
+
+    <!-- Josh Syre -->
+    <div class="seller-block highlight">
+      <div class="seller-header">Josh Syre</div>
+      <div class="progress-row">
+        <div class="progress-row-label">RFQs:</div>
+        <div class="progress-row-bar">
+          <div class="progress-bar-container">
+            <div class="progress-bar" style="width: 45%;"></div>
+            <div class="progress-label">9 / 20</div>
+          </div>
+        </div>
+        <div class="progress-row-value">45% 🟢 Ahead</div>
+      </div>
+      <div class="progress-row">
+        <div class="progress-row-label">CQs:</div>
+        <div class="progress-row-bar">
+          <div class="progress-bar-container">
+            <div class="progress-bar" style="width: 67%;"></div>
+            <div class="progress-label">10 / 15</div>
+          </div>
+        </div>
+        <div class="progress-row-value">67% 🟢 Ahead</div>
+      </div>
+      <div class="progress-row">
+        <div class="progress-row-label">Sold:</div>
+        <div class="progress-row-bar">
+          <div class="progress-bar-container">
+            <div class="progress-bar" style="width: 100%;"></div>
+            <div class="progress-label">6 / 4.5</div>
+          </div>
+        </div>
+        <div class="progress-row-value">133% 🔥 Ahead!</div>
+      </div>
+      <div class="progress-row">
+        <div class="progress-row-label">Revenue:</div>
+        <div class="progress-row-bar"></div>
+        <div class="progress-row-value"><strong>$126K</strong></div>
+      </div>
+    </div>
+
+    <div class="collapsible">View Other 5 Sellers (Michael, Thomas, Aaron, James, Dan)</div>
+    <div class="collapsible-content">
+      <!-- Michael Stifter -->
+      <div class="seller-block needs-help">
+        <div class="seller-header">⚠️ Michael Stifter — High RFQs, low conversion</div>
+        <div class="progress-row">
+          <div class="progress-row-label">RFQs:</div>
+          <div class="progress-row-bar">
+            <div class="progress-bar-container">
+              <div class="progress-bar" style="width: 70%;"></div>
+              <div class="progress-label">14 / 20</div>
+            </div>
+          </div>
+          <div class="progress-row-value">70% 🟢 Ahead</div>
+        </div>
+        <div class="progress-row">
+          <div class="progress-row-label">CQs:</div>
+          <div class="progress-row-bar">
+            <div class="progress-bar-container">
+              <div class="progress-bar danger" style="width: 7%;"></div>
+              <div class="progress-label">1 / 15</div>
+            </div>
+          </div>
+          <div class="progress-row-value">7% 🔴 Behind</div>
+        </div>
+        <div class="progress-row">
+          <div class="progress-row-label">Sold:</div>
+          <div class="progress-row-bar">
+            <div class="progress-bar-container">
+              <div class="progress-bar warning" style="width: 22%;"></div>
+              <div class="progress-label">1 / 4.5</div>
+            </div>
+          </div>
+          <div class="progress-row-value">22% 🟡 Below pace</div>
+        </div>
+        <div class="progress-row">
+          <div class="progress-row-label">Revenue:</div>
+          <div class="progress-row-bar"></div>
+          <div class="progress-row-value"><strong>$0</strong></div>
+        </div>
+      </div>
+
+      <!-- Thomas Haynes -->
+      <div class="seller-block needs-help">
+        <div class="seller-header">⚠️ Thomas Haynes — Quoting discipline issue?</div>
+        <div class="progress-row">
+          <div class="progress-row-label">RFQs:</div>
+          <div class="progress-row-bar">
+            <div class="progress-bar-container">
+              <div class="progress-bar" style="width: 55%;"></div>
+              <div class="progress-label">11 / 20</div>
+            </div>
+          </div>
+          <div class="progress-row-value">55% 🟢 Ahead</div>
+        </div>
+        <div class="progress-row">
+          <div class="progress-row-label">CQs:</div>
+          <div class="progress-row-bar">
+            <div class="progress-bar-container">
+              <div class="progress-bar danger" style="width: 7%;"></div>
+              <div class="progress-label">1 / 15</div>
+            </div>
+          </div>
+          <div class="progress-row-value">7% 🔴 Behind</div>
+        </div>
+        <div class="progress-row">
+          <div class="progress-row-label">Sold:</div>
+          <div class="progress-row-bar">
+            <div class="progress-bar-container">
+              <div class="progress-bar danger" style="width: 0%;"></div>
+              <div class="progress-label">0 / 4.5</div>
+            </div>
+          </div>
+          <div class="progress-row-value">0% 🔴 Behind</div>
+        </div>
+        <div class="progress-row">
+          <div class="progress-row-label">Revenue:</div>
+          <div class="progress-row-bar"></div>
+          <div class="progress-row-value"><strong>$0</strong></div>
+        </div>
+      </div>
+
+      <!-- Aaron, James, Dan (minimal activity) -->
+      <div style="font-size: 11px; color: #666; margin-top: 12px;">
+        <strong>Low Activity Sellers (check for PTO or support needs):</strong><br>
+        • Aaron Mendoza: 1 RFQ, 0 CQs, 0 sold, $0<br>
+        • James Diaz: 0 RFQs, 0 CQs, 0 sold, $1.2K (8 SOs - converting old pipeline)<br>
+        • Dan Reiser: 2 RFQs, 0 CQs, 0 sold, $0
+      </div>
+    </div>
+  </div>
+
+  <!-- SECTION 4: MARKET PULSE (USA vs GLOBAL) -->
+  <div class="section">
+    <div class="section-title">📈 Market Pulse — USA Team vs Global Trends</div>
+    <div class="footnote" style="margin-bottom: 12px;">
+      Last 5 business days — Where is USA team aligned or misaligned with global demand?
+    </div>
+
+    <div class="comparison-grid">
+      <div class="comparison-card usa">
+        <div class="comparison-title usa">🔵 USA Team Focus</div>
+        <div style="font-size: 11px; font-weight: 600; margin-bottom: 8px;">Top Manufacturers</div>
+        <div class="comparison-item"><strong>1. Analog Devices</strong> — 18 RFQs from USA</div>
+        <div class="comparison-item"><strong>2. Texas Instruments</strong> — 12 RFQs from USA</div>
+        <div class="comparison-item"><strong>3. Micron Technology</strong> — 11 RFQs from USA</div>
+        <div style="font-size: 11px; font-weight: 600; margin: 12px 0 8px 0;">Top Parts</div>
+        <div class="comparison-item"><strong>FT2232HL-REEL</strong> — 7 RFQs (32% of global)</div>
+        <div class="comparison-item"><strong>Various</strong> — Diversified portfolio</div>
+      </div>
+
+      <div class="comparison-card global">
+        <div class="comparison-title global">🌍 Global Trends</div>
+        <div style="font-size: 11px; font-weight: 600; margin-bottom: 8px;">Top Manufacturers</div>
+        <div class="comparison-item"><strong>1. Texas Instruments</strong> — 259 RFQs (19 customers)</div>
+        <div class="comparison-item"><strong>2. Vishay</strong> — 89 RFQs (9 customers)</div>
+        <div class="comparison-item"><strong>3. Micron Technology</strong> — 87 RFQs (16 customers)</div>
+        <div style="font-size: 11px; font-weight: 600; margin: 12px 0 8px 0;">Top Parts</div>
+        <div class="comparison-item"><strong>FT2232HL-REEL</strong> — 22 RFQs (7 customers)</div>
+        <div class="comparison-item"><strong>MT47H128M16RT-25E:C</strong> — 22 RFQs (Micron)</div>
+      </div>
+    </div>
+
+    <div class="insight-box warning">
+      <strong>📊 Alignment Check:</strong> USA team has only 12 of 259 TI RFQs (5% of global volume). MEX/APAC dominating TI demand. Is this intentional specialization or missed opportunity?
+    </div>
+
+    <div class="insight-box success">
+      <strong>💪 USA Strength:</strong> Team is 32% of global FT2232HL-REEL activity (7 of 22 RFQs). This part has 77% quote rate but 0% sold globally — opportunity to be first to close.
+    </div>
+
+    <div class="collapsible">View Full Global Trending Tables</div>
+    <div class="collapsible-content">
+      <table>
+        <thead>
+          <tr>
+            <th>Manufacturer</th>
+            <th>Customers</th>
+            <th>RFQs</th>
+            <th>Quoted</th>
+            <th>Sold</th>
+            <th>Conv.</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr><td>Texas Instruments</td><td>19</td><td>259</td><td>19</td><td>1</td><td>0%</td></tr>
+          <tr><td>Vishay</td><td>9</td><td>89</td><td>2</td><td>1</td><td>1%</td></tr>
+          <tr><td>Micron Technology</td><td>16</td><td>87</td><td>4</td><td>1</td><td>1%</td></tr>
+          <tr><td>Analog Devices</td><td>15</td><td>78</td><td>13</td><td>1</td><td>1%</td></tr>
+          <tr><td>Murata</td><td>9</td><td>51</td><td>0</td><td>0</td><td>0%</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="footer">
+    ✅ Manager View Mockup — USA Team (Jeff Wallace)<br>
+    Compare with VP View: <a href="sales-pulse-MOCKUP-action-first.html">sales-pulse-MOCKUP-action-first.html</a>
+  </div>
+</div>
+
+<script>
+// Collapsible functionality
+document.querySelectorAll('.collapsible').forEach(function(elem) {
+  elem.addEventListener('click', function() {
+    this.classList.toggle('active');
+    var content = this.nextElementSibling;
+    content.classList.toggle('show');
+  });
+});
+</script>
+</body>
+</html>

@@ -1,0 +1,367 @@
+
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<style>
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif; margin: 0; padding: 20px; background-color: #f5f5f5; }
+  .container { max-width: 900px; margin: 0 auto; background: white; padding: 30px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+  h1 { color: #1a1a1a; margin: 0 0 10px 0; font-size: 28px; }
+  .subtitle { color: #666; font-size: 14px; margin-bottom: 25px; }
+  .section { margin-bottom: 35px; }
+  .section-title { font-size: 18px; font-weight: 600; color: #2c5282; margin-bottom: 15px; padding-bottom: 8px; border-bottom: 2px solid #e2e8f0; }
+  table { width: 100%; border-collapse: collapse; margin-top: 12px; font-size: 14px; }
+  th { background-color: #f7fafc; padding: 10px; text-align: left; font-weight: 600; color: #2d3748; border-bottom: 2px solid #e2e8f0; }
+  td { padding: 10px; border-bottom: 1px solid #e2e8f0; }
+  .metric-card { display: inline-block; background: #f8f9fa; padding: 15px 20px; margin: 8px 8px 8px 0; border-radius: 6px; border-left: 4px solid #4299e1; }
+  .metric-label { font-size: 12px; color: #666; text-transform: uppercase; font-weight: 600; }
+  .metric-value { font-size: 24px; font-weight: 700; color: #1a1a1a; margin: 5px 0; }
+  .metric-change { font-size: 13px; color: #666; }
+  .metric-change.positive { color: #48bb78; }
+  .metric-change.negative { color: #f56565; }
+  .win-item { padding: 12px; background: #f7fafc; margin-bottom: 8px; border-radius: 4px; border-left: 3px solid #48bb78; }
+  .alert-item { padding: 12px; background: #fff5f5; margin-bottom: 8px; border-radius: 4px; border-left: 3px solid #fc8181; }
+  .region-usa { border-left-color: #4299e1; }
+  .region-mex { border-left-color: #48bb78; }
+  .region-apac { border-left-color: #ed8936; }
+  .target-status { display: inline-block; padding: 3px 8px; border-radius: 3px; font-size: 12px; font-weight: 600; }
+  .target-on-track { background: #c6f6d5; color: #22543d; }
+  .target-below { background: #fed7d7; color: #742a2a; }
+  .target-exceeded { background: #bee3f8; color: #2c5282; }
+  .footer { margin-top: 30px; padding-top: 20px; border-top: 1px solid #e2e8f0; color: #718096; font-size: 12px; }
+</style>
+</head>
+<body>
+<div class="container">
+  <h1>📊 Sales Pulse — Weekly Edition</h1>
+  <div class="subtitle">Week of Monday, May 25, 2026 - Friday, May 29, 2026 | Generated Thursday, June 4, 2026</div>
+
+  <!-- Section 1: Week Summary -->
+  <div class="section">
+    <div class="section-title">📈 Last Week Summary (vs Prior Week)</div>
+
+    <div class="metric-card">
+      <div class="metric-label">RFQ Lines Entered</div>
+      <div class="metric-value">1229</div>
+      <div class="metric-change negative">
+        ▼ 1073 (47%) vs prior week
+      </div>
+    </div>
+
+    <div class="metric-card">
+      <div class="metric-label">CQ Lines Entered</div>
+      <div class="metric-value">143</div>
+      <div class="metric-change negative">
+        ▼ 52 (27%) vs prior week
+      </div>
+    </div>
+
+    <div class="metric-card">
+      <div class="metric-label">CQ Lines Sold</div>
+      <div class="metric-value">94</div>
+    </div>
+
+    <div class="metric-card">
+      <div class="metric-label">SO Lines Booked</div>
+      <div class="metric-value">89</div>
+      <div class="metric-change negative">
+        ▼ 35 (28%) vs prior week
+      </div>
+    </div>
+
+    <div class="metric-card">
+      <div class="metric-label">$ Booked</div>
+      <div class="metric-value">$3.6M</div>
+      <div class="metric-change positive">
+        ▲ $1.1M (47%) vs prior week
+      </div>
+    </div>
+  </div>
+
+  <!-- Section 2: By Region -->
+  <div class="section">
+    <div class="section-title">🌍 By Region (Week Totals vs Prior Week)</div>
+    <table>
+      <thead>
+        <tr>
+          <th>Region</th>
+          <th>RFQ Lines</th>
+          <th>CQ Lines</th>
+          <th>CQ Sold</th>
+          <th>$ Booked</th>
+        </tr>
+      </thead>
+      <tbody>
+        
+          <tr>
+            <td><strong>USA</strong></td>
+            <td>121 <span style="color: #f56565; font-size: 12px;">(▼14%)</span></td>
+            <td>72 <span style="color: #f56565; font-size: 12px;">(▼20%)</span></td>
+            <td>39</td>
+            <td>$565K <span style="color: #f56565; font-size: 12px;">(▼50%)</span></td>
+          </tr>
+        
+          <tr>
+            <td><strong>MEX</strong></td>
+            <td>470 <span style="color: #f56565; font-size: 12px;">(▼11%)</span></td>
+            <td>8 <span style="color: #f56565; font-size: 12px;">(▼82%)</span></td>
+            <td>7</td>
+            <td>$226K <span style="color: #f56565; font-size: 12px;">(▼54%)</span></td>
+          </tr>
+        
+          <tr>
+            <td><strong>APAC-Laurel</strong></td>
+            <td>77 <span style="color: #f56565; font-size: 12px;">(▼45%)</span></td>
+            <td>27 <span style="color: #48bb78; font-size: 12px;">(▲286%)</span></td>
+            <td>25</td>
+            <td>$2.3M <span style="color: #48bb78; font-size: 12px;">(▲427%)</span></td>
+          </tr>
+        
+          <tr>
+            <td><strong>APAC-Kris</strong></td>
+            <td>259 <span style="color: #f56565; font-size: 12px;">(▼81%)</span></td>
+            <td>27 <span style="color: #f56565; font-size: 12px;">(▼40%)</span></td>
+            <td>16</td>
+            <td>$363K <span style="color: #48bb78; font-size: 12px;">(▲52%)</span></td>
+          </tr>
+        
+          <tr>
+            <td><strong>APAC-Lavanya</strong></td>
+            <td>302 <span style="color: #48bb78; font-size: 12px;">(▲114%)</span></td>
+            <td>9 <span style="color: #48bb78; font-size: 12px;">(▲0%)</span></td>
+            <td>7</td>
+            <td>$82K <span style="color: #f56565; font-size: 12px;">(▼31%)</span></td>
+          </tr>
+        
+      </tbody>
+    </table>
+  </div>
+
+  <!-- Section 3: Week's Wins -->
+  <div class="section">
+    <div class="section-title">🎉 Week's Wins (Top 20 Orders)</div>
+    
+    
+      <div class="win-item region-apac">
+        <strong>Marvell</strong> — $873K (13 lines)<br>
+        <span style="color: #718096; font-size: 13px;">Seller: Laurel Kee (APAC)</span>
+      </div>
+    
+      <div class="win-item region-apac">
+        <strong>Netapp</strong> — $487K (3 lines)<br>
+        <span style="color: #718096; font-size: 13px;">Seller: Renald Ng (APAC)</span>
+      </div>
+    
+      <div class="win-item region-apac">
+        <strong>Astute Group (Astute Electronics)</strong> — $321K (3 lines)<br>
+        <span style="color: #718096; font-size: 13px;">Seller: Laurel Kee (APAC)</span>
+      </div>
+    
+      <div class="win-item region-apac">
+        <strong>Plexus Corp.</strong> — $317K (6 lines)<br>
+        <span style="color: #718096; font-size: 13px;">Seller: Wing Zhang (APAC)</span>
+      </div>
+    
+      <div class="win-item region-usa">
+        <strong>Flock Safety</strong> — $249K (5 lines)<br>
+        <span style="color: #718096; font-size: 13px;">Seller: Justin Goodwin (USA)</span>
+      </div>
+    
+      <div class="win-item region-apac">
+        <strong>S.A.S. Electronic Co., Ltd</strong> — $241K (1 lines)<br>
+        <span style="color: #718096; font-size: 13px;">Seller: Renald Ng (APAC)</span>
+      </div>
+    
+      <div class="win-item region-mex">
+        <strong>Plexus Corp.</strong> — $208K (2 lines)<br>
+        <span style="color: #718096; font-size: 13px;">Seller: Salvador Horner (MEX)</span>
+      </div>
+    
+      <div class="win-item region-apac">
+        <strong>BENCHMARK ELECTRONICS</strong> — $201K (2 lines)<br>
+        <span style="color: #718096; font-size: 13px;">Seller: Renald Ng (APAC)</span>
+      </div>
+    
+      <div class="win-item region-usa">
+        <strong>Emerson</strong> — $181K (3 lines)<br>
+        <span style="color: #718096; font-size: 13px;">Seller: Justin Goodwin (USA)</span>
+      </div>
+    
+      <div class="win-item region-apac">
+        <strong>Emerson</strong> — $159K (1 lines)<br>
+        <span style="color: #718096; font-size: 13px;">Seller: Renald Ng (APAC)</span>
+      </div>
+    
+    <p style="color: #718096; margin-top: 10px;">10 more wins ($301K)</p>
+  </div>
+
+  <!-- Section 4: Persistent Issues -->
+  <div class="section">
+    <div class="section-title">⚠️ Persistent Issues (3+ Days Open This Week)</div>
+    
+    
+      <div class="alert-item">
+        <strong>RTX</strong> — $65K (4 lines)<br>
+        <span style="color: #718096; font-size: 13px;">
+          Created 2026-05-28 (7 days ago) | Shortage | Seller: Thomas Haynes
+        </span>
+      </div>
+    
+  </div>
+
+  <!-- Section 5: Week vs Targets -->
+  <div class="section">
+    <div class="section-title">🎯 Week vs Targets (Regional)</div>
+    <table>
+      <thead>
+        <tr>
+          <th>Region</th>
+          <th>RFQ Lines</th>
+          <th>CQ Lines</th>
+          <th>CQ Sold</th>
+          <th>Status</th>
+        </tr>
+      </thead>
+      <tbody>
+        
+          <tr>
+            <td><strong>USA</strong></td>
+            <td>121 / 180 <span style="color: #f56565;">(67%)</span></td>
+            <td>72 / 135 <span style="color: #f56565;">(53%)</span></td>
+            <td>39 / 41 <span style="color: #48bb78;">(95%)</span></td>
+            <td><span class="target-status target-below">⚠️ Below</span></td>
+          </tr>
+        
+          <tr>
+            <td><strong>MEX</strong></td>
+            <td>470 / 180 <span style="color: #48bb78;">(261%)</span></td>
+            <td>8 / 135 <span style="color: #f56565;">(6%)</span></td>
+            <td>7 / 41 <span style="color: #f56565;">(17%)</span></td>
+            <td><span class="target-status target-exceeded">🎉 Exceeded</span></td>
+          </tr>
+        
+          <tr>
+            <td><strong>APAC-Laurel</strong></td>
+            <td>77 / 220 <span style="color: #f56565;">(35%)</span></td>
+            <td>27 / 165 <span style="color: #f56565;">(16%)</span></td>
+            <td>25 / 50 <span style="color: #f56565;">(50%)</span></td>
+            <td><span class="target-status target-below">⚠️ Below</span></td>
+          </tr>
+        
+          <tr>
+            <td><strong>APAC-Kris</strong></td>
+            <td>259 / 220 <span style="color: #48bb78;">(118%)</span></td>
+            <td>27 / 165 <span style="color: #f56565;">(16%)</span></td>
+            <td>16 / 50 <span style="color: #f56565;">(32%)</span></td>
+            <td><span class="target-status target-exceeded">🎉 Exceeded</span></td>
+          </tr>
+        
+          <tr>
+            <td><strong>APAC-Lavanya</strong></td>
+            <td>302 / 220 <span style="color: #48bb78;">(137%)</span></td>
+            <td>9 / 165 <span style="color: #f56565;">(5%)</span></td>
+            <td>7 / 50 <span style="color: #f56565;">(14%)</span></td>
+            <td><span class="target-status target-exceeded">🎉 Exceeded</span></td>
+          </tr>
+        
+      </tbody>
+    </table>
+  </div>
+
+  <!-- Section 6: Conversion Funnel -->
+  <div class="section">
+    <div class="section-title">📊 Conversion Funnel (Last Week vs Prior Week)</div>
+    <table>
+      <thead>
+        <tr>
+          <th>Stage</th>
+          <th>Last Week</th>
+          <th>Prior Week</th>
+          <th>Change</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><strong>RFQ Lines → VQ Received</strong></td>
+          <td>58% (709/1229)</td>
+          <td>70% (1602/2302)</td>
+          <td style="color: #f56565;">
+            ▼ 12pp
+          </td>
+        </tr>
+        <tr>
+          <td><strong>VQ Received → CQ Created</strong></td>
+          <td>20% (143/709)</td>
+          <td>12% (195/1602)</td>
+          <td style="color: #48bb78;">
+            ▲ 8pp
+          </td>
+        </tr>
+        <tr>
+          <td><strong>CQ Created → SO Booked</strong></td>
+          <td>62% (89/143)</td>
+          <td>64% (124/195)</td>
+          <td style="color: #f56565;">
+            ▼ 2pp
+          </td>
+        </tr>
+        <tr style="background: #f7fafc; font-weight: 600;">
+          <td><strong>Overall: RFQ → SO</strong></td>
+          <td>7%</td>
+          <td>5%</td>
+          <td style="color: #48bb78;">
+            ▲ 2pp
+          </td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- Observations -->
+  <div class="section">
+    <div class="section-title">💡 Key Observations</div>
+    
+      <div style="padding: 12px; background: #f7fafc; margin-bottom: 8px; border-radius: 4px; border-left: 3px solid #4299e1;">
+        **Quality over quantity:** 1073 fewer RFQs but $1.1M more revenue (47% increase)
+      </div>
+    
+      <div style="padding: 12px; background: #f7fafc; margin-bottom: 8px; border-radius: 4px; border-left: 3px solid #4299e1;">
+        **APAC-Laurel dominated:** 65% of total revenue ($$2.3M)
+      </div>
+    
+      <div style="padding: 12px; background: #f7fafc; margin-bottom: 8px; border-radius: 4px; border-left: 3px solid #4299e1;">
+        **MEX sourcing concern:** 470 RFQs but only 8 CQs (2% conversion - investigate)
+      </div>
+    
+      <div style="padding: 12px; background: #f7fafc; margin-bottom: 8px; border-radius: 4px; border-left: 3px solid #4299e1;">
+        **APAC-Lavanya sourcing concern:** 302 RFQs but only 9 CQs (3% conversion - investigate)
+      </div>
+    
+  </div>
+
+  <!-- Section 7: Market Pulse -->
+  <div class="section">
+    <div class="section-title">📊 Market Pulse (Trending Manufacturers)</div>
+    <table>
+      <thead>
+        <tr>
+          <th>Manufacturer</th>
+          <th>RFQ Lines</th>
+          <th>Customers</th>
+          <th>vs Last Week</th>
+        </tr>
+      </thead>
+      <tbody>
+        
+      </tbody>
+    </table>
+  </div>
+
+  <div class="footer">
+    📧 Questions? Reply to this email<br>
+    Generated with Claude Code • Thursday, June 4, 2026
+  </div>
+</div>
+</body>
+</html>
+  

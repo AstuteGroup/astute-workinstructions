@@ -1,0 +1,122 @@
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+SALES PULSE — Thursday, May 28, 2026
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Data as of 6:00am PT | Reflects activity through EOD Wed May 27
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+📊 GLOBAL SNAPSHOT — Yesterday vs. Last Week
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+PIPELINE INPUT
+  RFQ Lines Entered in OT                     47 lines (22 distinct customers)   ↑ +8
+  RFQ Lines with 1+ VQ                        38 lines (81% sourced)             ↑ +6
+  Buyer Queue Time (routed → picked)          0.6 days avg                       ✅ -0.1d
+  Sourcing Cycle Time (picked → VQ loaded)    1.2 days avg                       → flat
+  Total VQ Response Time (routed → loaded)    1.8 days avg                       ✅ -0.2d
+
+QUOTING ACTIVITY
+  CQ Lines Entered in OT                      32 lines (15 distinct customers)   ↓ -5
+  CQ Lines Selected as 'Sold'                 15 lines                           ↑ +4
+  Avg Quote Age - Short-cycle*                6.8 days                           ⚠️ +0.6d
+  Avg Quote Age - Long-cycle**                18.3 days                          ✅ -2.1d
+
+  * Short-cycle: Shortage (10d auto-close), PPV/Cost Saving (15d), Other (30d)
+  ** Long-cycle: Mil-Aero/EOL/Obsolete/LTB (64d auto-close)
+
+WINS
+  SO Lines Booked                             12 lines                           ↑ +3
+  $ Booked                                    $67K                               ↑ +$18K
+
+SYSTEM DISCIPLINE
+  CQs entered within 2hrs of marking 'sold'   8 of 15 (53%)                      ↓ -10%
+  Retroactive CQ entry rate                   47% of sold CQs                    → flat
+
+  Note: These numbers reflect OT activity only. Actual pipeline may be higher
+        due to off-system work.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+📍 BY REGION (Yesterday's Activity)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+                        RFQ     RFQ w/  VQ      CQ      CQ      SO      Quote
+                        Lines   VQs     Resp.   Lines   Lines   Lines   Age
+                        Enter           Time    Enter   Sold    Booked  (Short)
+  ──────────────────────────────────────────────────────────────────────────────
+  USA (Jeff)            22 ↑    18(82%) 1.6d✅  18 →    8 ↑     7 ↑     6.1d ✅
+  MEX (Joel)            8 →     6(75%)  2.1d    5 ↓     3 →     2 →     8.8d ⚠️
+
+  APAC TOTAL            17 ↓    14(82%) 1.9d    9 ↓     4 ↑     3 ↑     7.9d ⚠️
+    ↳ Laurel (SGP)      8       7(88%)  1.5d    5       2       2       7.2d
+    ↳ Kris/Silvia (PHL) 3       2(67%)  2.8d    2       1       0       10.3d
+    ↳ Lavanya (IND)     5       4(80%)  1.7d    2       1       1       6.5d
+    ↳ Edyna (KOR)       1       1(100%) 1.2d    0       0       0       —
+  ──────────────────────────────────────────────────────────────────────────────
+  GLOBAL                47      38(81%) 1.8d    32      15      12      6.8d
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+🚨 NEEDS ATTENTION (as of 6am PT)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  ⚠️  23 open quotes aging 7-14 days (no customer response yet)
+      → USA: 12  |  MEX: 4  |  APAC: 7
+      → ACTION: Follow up today or mark lost
+
+  ⚠️  8 RFQ lines with no VQs after 3+ days (sourcing bottleneck)
+      → USA: 3  |  MEX: 1  |  APAC: 4
+      → ACTION: Escalate to sourcing or close out
+
+  🔥  5 open quotes aging 15-30 days (going stale - last chance)
+      → USA: 2 (Acme Corp $18K, Widget Co $7K)
+      → MEX: 0
+      → APAC: 3 (Samsung $24K, Foxconn $11K, Delta $5K)
+      → ACTION: Final push or close out by EOD Friday
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+🎉 YESTERDAY'S WINS (orders booked Wed 5/27)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  ✅  USA: $47K across 7 lines
+      → Premier Electronics — 4 lines, $32K (Dan Reiser)
+      → TechSource — 3 lines, $15K (Jake McAloose)
+      💡 Premier order came from 3-day-old quote (fast close!)
+
+  ✅  MEX: $8K across 2 lines
+      → Grupo Industrial — 2 lines, $8K (Carlos Moreno)
+
+  ✅  APAC: $12K across 3 lines
+      → Delta Electronics — 2 lines, $9K (Jasper Kee - Laurel's team)
+      → LG Display — 1 line, $3K (Meenakshi Chidambaram - Lavanya's team)
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+📈 WEEK-TO-DATE (Mon-Thu, 4 of 5 days)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+               RFQ      CQ       CQ       SO       $        Pace
+               Lines    Lines    Lines    Lines    Booked
+               Enter    Enter    Sold     Booked
+  ─────────────────────────────────────────────────────────────────────
+  USA           89       72       32       25       $189K    ✅ On track
+  MEX           30       19       11        7       $39K     ⚠️ Slow week
+  APAC          65       40       17       12       $70K     ✅ On track
+  ─────────────────────────────────────────────────────────────────────
+  GLOBAL       184      131       60       44       $298K    ✅ On track
+
+  Weekly Target: 50 SO lines, $350K
+  Current Pace: 55 SO lines, $373K (projected) → ✅ On track to exceed
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+📝 OBSERVATIONS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  • USA leading on velocity (6.1d avg quote age vs 6.8d global short-cycle)
+  • MEX quote output down vs last week - sourcing issue or lighter RFQ load?
+  • APAC has 3 high-value stale quotes ($40K total) - worth a final push
+  • System discipline slipping: only 53% of CQs entered within 2hrs of
+    marking sold (down 10% vs last week)
+  • Buyer queue time improved this week (0.6d avg, down from 0.7d) — good trend
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Questions? Reply to this email or ping analytics team.
+Next digest: Tomorrow 6am PT

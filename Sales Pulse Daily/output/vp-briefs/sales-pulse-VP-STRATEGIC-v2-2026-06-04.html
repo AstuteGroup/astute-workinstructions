@@ -1,0 +1,562 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sales Pulse — VP Strategic Edition</title>
+<style>
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif;
+    font-size: 13px;
+    line-height: 1.5;
+    color: #333;
+    max-width: 900px;
+    margin: 0 auto;
+    padding: 20px;
+    background: #f5f5f5;
+  }
+  .container {
+    background: white;
+    padding: 24px;
+    border-radius: 8px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+  }
+  .mockup-banner {
+    background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+    color: white;
+    padding: 12px 20px;
+    border-radius: 6px;
+    margin-bottom: 20px;
+    text-align: center;
+    font-weight: 700;
+    font-size: 14px;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+  }
+  h1 {
+    font-size: 20px;
+    font-weight: 600;
+    margin: 0 0 4px 0;
+    color: #1a1a1a;
+  }
+  .subtitle {
+    font-size: 11px;
+    color: #666;
+    margin-bottom: 20px;
+  }
+  .section {
+    margin-bottom: 24px;
+    padding-bottom: 24px;
+    border-bottom: 2px solid #e0e0e0;
+  }
+  .section:last-child {
+    border-bottom: none;
+  }
+  .section-title {
+    font-size: 15px;
+    font-weight: 600;
+    margin-bottom: 12px;
+    color: #1a1a1a;
+  }
+
+  /* Executive Brief Styles */
+  .exec-brief {
+    background: linear-gradient(135deg, #fef3c7 0%, #fef9e7 100%);
+    border: 2px solid #f59e0b;
+    border-radius: 8px;
+    padding: 20px;
+    margin-bottom: 24px;
+  }
+  .exec-brief h2 {
+    margin: 0 0 16px 0;
+    font-size: 16px;
+    font-weight: 700;
+    color: #92400e;
+  }
+  .priority-section {
+    margin-bottom: 20px;
+  }
+  .priority-header {
+    font-weight: 700;
+    font-size: 13px;
+    margin-bottom: 8px;
+    padding-bottom: 4px;
+    border-bottom: 2px solid rgba(0,0,0,0.1);
+  }
+  .priority-red { color: #dc2626; border-color: #dc2626; }
+  .priority-yellow { color: #d97706; border-color: #d97706; }
+  .priority-green { color: #16a34a; border-color: #16a34a; }
+
+  .action-item {
+    background: white;
+    border-left: 4px solid #dc2626;
+    padding: 12px;
+    margin-bottom: 12px;
+    border-radius: 4px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+  }
+  .action-item.yellow { border-left-color: #f59e0b; }
+  .action-item.green { border-left-color: #16a34a; }
+
+  .action-title {
+    font-weight: 700;
+    font-size: 13px;
+    margin-bottom: 6px;
+    color: #1a1a1a;
+  }
+  .action-detail {
+    font-size: 12px;
+    color: #666;
+    margin: 4px 0;
+    padding-left: 12px;
+  }
+
+  /* Alert Cards */
+  .alert-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 16px;
+    margin-top: 12px;
+  }
+  .alert-card {
+    background: white;
+    border-radius: 6px;
+    padding: 16px;
+    border-left: 4px solid #94a3b8;
+  }
+  .alert-card.red { border-left-color: #dc2626; background: #fef2f2; }
+  .alert-card.yellow { border-left-color: #f59e0b; background: #fffbeb; }
+  .alert-card.green { border-left-color: #16a34a; background: #f0fdf4; }
+
+  .alert-label {
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: #64748b;
+    font-weight: 600;
+    margin-bottom: 4px;
+  }
+  .alert-value {
+    font-size: 24px;
+    font-weight: 700;
+    color: #1e293b;
+    margin-bottom: 4px;
+  }
+  .alert-trend {
+    font-size: 12px;
+    color: #64748b;
+  }
+  .trend-up { color: #16a34a; }
+  .trend-down { color: #dc2626; }
+
+  /* Table Styles */
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 12px;
+  }
+  th {
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    padding: 8px;
+    text-align: left;
+    font-weight: 600;
+    font-size: 11px;
+    color: #475569;
+  }
+  td {
+    border: 1px solid #e2e8f0;
+    padding: 8px;
+  }
+  tr:hover {
+    background: #fafafa;
+  }
+
+  .badge {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 12px;
+    font-size: 11px;
+    font-weight: 600;
+  }
+  .badge-red { background: #fee2e2; color: #991b1b; }
+  .badge-yellow { background: #fef3c7; color: #92400e; }
+  .badge-green { background: #dcfce7; color: #166534; }
+  .badge-gray { background: #f1f5f9; color: #475569; }
+
+  .insight-box {
+    background: #f8fafc;
+    border-left: 3px solid #3b82f6;
+    padding: 12px;
+    margin-top: 12px;
+    font-size: 12px;
+    border-radius: 4px;
+  }
+  .insight-box strong {
+    color: #1e40af;
+  }
+
+  .metric-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 8px 0;
+    border-bottom: 1px solid #e2e8f0;
+  }
+  .metric-row:last-child {
+    border-bottom: none;
+  }
+  .metric-label {
+    font-size: 12px;
+    color: #64748b;
+  }
+  .metric-value {
+    font-size: 14px;
+    font-weight: 600;
+    color: #1e293b;
+  }
+</style>
+</head>
+<body>
+
+<div class="container">
+  <div class="mockup-banner">✅ REAL DATA — Executive Snapshot Integration (Jun 4, 2026)</div>
+  <h1>Sales Pulse — VP Strategic Edition</h1>
+  <div class="subtitle">Tuesday, June 4, 2026 | Market Cycle: Constrained → Pre-Allocation</div>
+
+  <!-- Section 0: Strategic Actions -->
+  <div class="exec-brief">
+    <h2>🎯 Strategic Actions — Today</h2>
+
+    <div class="priority-section">
+      <div class="priority-header priority-red">🔴 URGENT (This Week)</div>
+
+      <div class="action-item">
+        <div class="action-title">1. B to I Ratio Collapse — Delivery Crisis or Booking Slowdown?</div>
+        <div class="action-detail">• Q1 2026: 2.38 (booking $2.38 for every $1 invoiced)</div>
+        <div class="action-detail">• Q2 2026: 0.59 (invoicing faster than booking) — 75% COLLAPSE</div>
+        <div class="action-detail">• <strong>Action:</strong> Is this backlog clearing (good) or booking pipeline drying up (bad)? Review Q3 booking forecast immediately.</div>
+      </div>
+
+      <div class="action-item">
+        <div class="action-title">2. June Delivery Concentration Risk — $9.4M Backlog Spike</div>
+        <div class="action-detail">• 80% of total backlog ($9.4M) scheduled for June delivery</div>
+        <div class="action-detail">• All other months (Jul-Dec): <$500K each</div>
+        <div class="action-detail">• <strong>Risk:</strong> If June deliveries slip or suppliers allocate, entire H2 revenue at risk</div>
+        <div class="action-detail">• <strong>Action:</strong> Identify top 10 suppliers in June backlog — what's their allocation risk?</div>
+      </div>
+
+      <div class="action-item">
+        <div class="action-title">3. MEX Performance Gap — 60% to Goal, Minimal Backlog</div>
+        <div class="action-detail">• MEX: 60.4% to goal ($2.5M invoiced, only $554K backlog)</div>
+        <div class="action-detail">• APAC: 366% to goal ($18.6M invoiced, $8.64M backlog) — 6× better</div>
+        <div class="action-detail">• <strong>Action:</strong> Is MEX lag market-driven (not entering constrained yet) or execution issue? Low backlog leaves no buffer.</div>
+      </div>
+    </div>
+
+    <div class="priority-section">
+      <div class="priority-header priority-yellow">🟡 MONITOR (This Month)</div>
+      <div class="action-item yellow">
+        <div class="action-title">• APAC Margin Sustainability</div>
+        <div class="action-detail">Q2 GM 42.1% (+5.6pts vs Q1) — can this hold if allocation spreads globally and competition increases?</div>
+      </div>
+      <div class="action-item yellow">
+        <div class="action-title">• Regional Divergence Widening</div>
+        <div class="action-detail">APAC 366%, USA 83%, MEX 60% — gap growing (not just execution, market-driven)</div>
+      </div>
+    </div>
+
+    <div class="priority-section">
+      <div class="priority-header priority-green">🟢 POSITIVE SIGNALS</div>
+      <div class="action-item green">
+        <div class="action-title">• Gross Margin Expansion</div>
+        <div class="action-detail">Q1 36.5% → Q2 42.1% validates pricing power in constrained market</div>
+      </div>
+      <div class="action-item green">
+        <div class="action-title">• YoY Growth Strong</div>
+        <div class="action-detail">+80% YoY ($14.8M → $26.7M) despite slowing from 2025's +104% (still healthy)</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Section 1: Financial Health Signals -->
+  <div class="section">
+    <div class="section-title">💰 Q2 2026 Financial Health</div>
+
+    <div class="alert-grid">
+      <div class="alert-card green">
+        <div class="alert-label">Invoiced GP</div>
+        <div class="alert-value">$15.7M</div>
+        <div class="alert-trend trend-up">+43% vs Q1 ($10.96M)</div>
+      </div>
+
+      <div class="alert-card green">
+        <div class="alert-label">Gross Margin</div>
+        <div class="alert-value">42.1%</div>
+        <div class="alert-trend trend-up">+5.6pts vs Q1 (36.5%)</div>
+      </div>
+
+      <div class="alert-card red">
+        <div class="alert-label">B to I Ratio</div>
+        <div class="alert-value">0.59</div>
+        <div class="alert-trend trend-down">-75% vs Q1 (2.38) 🚨</div>
+      </div>
+
+      <div class="alert-card yellow">
+        <div class="alert-label">Total Backlog</div>
+        <div class="alert-value">$11.7M</div>
+        <div class="alert-trend">$9.4M in June alone (80%)</div>
+      </div>
+    </div>
+
+    <div class="insight-box">
+      <strong>B to I Ratio Collapse:</strong> Q1 2.38 → Q2 0.59 signals either backlog clearing OR booking slowdown.
+      Combined with June's $9.4M delivery spike (80% of total backlog), suggests allocation-driven delivery concentration.
+      Suppliers may be rationing delivery windows. <strong>Margin expansion to 42.1%</strong> validates constrained market
+      pricing power — customers accepting higher prices.
+    </div>
+
+    <table style="margin-top: 16px;">
+      <thead>
+        <tr>
+          <th>Quarter</th>
+          <th>Booked GP</th>
+          <th>Invoiced GP</th>
+          <th>GM%</th>
+          <th>B to I</th>
+          <th>Signal</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>Q1 2026</td>
+          <td>$26.06M</td>
+          <td>$10.96M</td>
+          <td>36.5%</td>
+          <td>2.38</td>
+          <td><span class="badge badge-green">Strong Bookings</span></td>
+        </tr>
+        <tr>
+          <td>Q2 2026</td>
+          <td>$9.24M</td>
+          <td>$15.70M</td>
+          <td>42.1%</td>
+          <td>0.59</td>
+          <td><span class="badge badge-red">Booking Slowdown?</span></td>
+        </tr>
+        <tr>
+          <td>Q3 2026 (Proj)</td>
+          <td colspan="5" style="text-align: center; color: #64748b;">Monitor booking pipeline — is Q2 booking drop temporary or trend?</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- Section 2: Regional Performance to Goal -->
+  <div class="section">
+    <div class="section-title">🌍 Regional Performance to Goal (2026 YTD)</div>
+
+    <table>
+      <thead>
+        <tr>
+          <th>Region</th>
+          <th>YTD Goal</th>
+          <th>Invoiced GP</th>
+          <th>% to Goal</th>
+          <th>Backlog</th>
+          <th>Projected GP</th>
+          <th>Status</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><strong>APAC</strong></td>
+          <td>$5.08M</td>
+          <td>$18.60M</td>
+          <td class="trend-up">366% ✅</td>
+          <td>$8.64M</td>
+          <td>$27.24M</td>
+          <td><span class="badge badge-green">Crushing It</span></td>
+        </tr>
+        <tr>
+          <td><strong>USA</strong></td>
+          <td>$5.75M</td>
+          <td>$4.78M</td>
+          <td class="trend-down">83% ⚠️</td>
+          <td>$2.04M</td>
+          <td>$6.82M</td>
+          <td><span class="badge badge-yellow">Below Target</span></td>
+        </tr>
+        <tr>
+          <td><strong>MEX</strong></td>
+          <td>$4.14M</td>
+          <td>$2.50M</td>
+          <td class="trend-down">60% 🚨</td>
+          <td>$554K</td>
+          <td>$3.05M</td>
+          <td><span class="badge badge-red">Struggling</span></td>
+        </tr>
+        <tr style="background: #f8fafc; font-weight: 600;">
+          <td><strong>GLOBAL</strong></td>
+          <td>$16.25M</td>
+          <td>$26.66M</td>
+          <td class="trend-up">164% ✅</td>
+          <td>$11.71M</td>
+          <td>$38.37M</td>
+          <td><span class="badge badge-green">Ahead</span></td>
+        </tr>
+      </tbody>
+    </table>
+
+    <div class="insight-box" style="margin-top: 16px;">
+      <strong>Regional Divergence = Market Signal:</strong> APAC performing 6× better than MEX (366% vs 60% to goal)
+      isn't just execution — APAC's constrained market entry allows premium pricing (42% GM) and allocation capture.
+      USA/MEX lag by 3-4 weeks in market cycle. <strong>MEX's low backlog ($554K)</strong> is critical — if allocation
+      spreads and Q3 bookings slow, MEX has no buffer to sustain revenue.
+    </div>
+  </div>
+
+  <!-- Section 3: June Backlog Concentration Risk -->
+  <div class="section">
+    <div class="section-title">📦 Backlog Concentration Risk (Delivery Schedule)</div>
+
+    <div style="margin-bottom: 16px;">
+      <div class="metric-row">
+        <div class="metric-label">Total Scheduled Backlog (Rest of 2026)</div>
+        <div class="metric-value">$11.71M</div>
+      </div>
+      <div class="metric-row">
+        <div class="metric-label">June Delivery Concentration</div>
+        <div class="metric-value" style="color: #dc2626;">$9.40M (80%)</div>
+      </div>
+      <div class="metric-row">
+        <div class="metric-label">July-December Combined</div>
+        <div class="metric-value">$2.31M (20%)</div>
+      </div>
+      <div class="metric-row">
+        <div class="metric-label">Risk Level</div>
+        <div class="metric-value"><span class="badge badge-red">HIGH</span></div>
+      </div>
+    </div>
+
+    <table>
+      <thead>
+        <tr>
+          <th>Month</th>
+          <th>Scheduled GP</th>
+          <th>% of Backlog</th>
+          <th>Risk Signal</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr style="background: #fef2f2;">
+          <td><strong>June 2026</strong></td>
+          <td><strong>$9.40M</strong></td>
+          <td><strong>80.3%</strong></td>
+          <td><span class="badge badge-red">Critical Concentration</span></td>
+        </tr>
+        <tr>
+          <td>July 2026</td>
+          <td>$872K</td>
+          <td>7.4%</td>
+          <td><span class="badge badge-gray">Normal</span></td>
+        </tr>
+        <tr>
+          <td>August 2026</td>
+          <td>$235K</td>
+          <td>2.0%</td>
+          <td><span class="badge badge-gray">Normal</span></td>
+        </tr>
+        <tr>
+          <td>September 2026</td>
+          <td>$145K</td>
+          <td>1.2%</td>
+          <td><span class="badge badge-gray">Normal</span></td>
+        </tr>
+        <tr>
+          <td>October-December 2026</td>
+          <td>$1.06M</td>
+          <td>9.1%</td>
+          <td><span class="badge badge-gray">Normal</span></td>
+        </tr>
+      </tbody>
+    </table>
+
+    <div class="insight-box" style="margin-top: 16px;">
+      <strong>Allocation Pattern Alert:</strong> 80% of backlog concentrated in June delivery is NOT normal distribution.
+      This pattern aligns with allocation market behavior — suppliers forcing delivery windows rather than continuous flow.
+      <strong>Mitigation:</strong> Identify top 10 suppliers in June backlog and assess allocation risk. If deliveries slip,
+      H2 revenue projections collapse.
+    </div>
+  </div>
+
+  <!-- Section 4: Market Allocation Signals (Illustrative Framework) -->
+  <div class="section">
+    <div class="section-title">📊 Allocation Market Signals Framework</div>
+
+    <div style="background: #fffbeb; border: 1px solid #fbbf24; padding: 12px; border-radius: 6px; margin-bottom: 16px; font-size: 12px;">
+      <strong>Note:</strong> Manufacturer-specific lead time and allocation data requires additional tracking.
+      Framework below shows what strategic signals would look like when implemented.
+    </div>
+
+    <table>
+      <thead>
+        <tr>
+          <th>Signal Category</th>
+          <th>Current Indicator</th>
+          <th>Threshold</th>
+          <th>Status</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><strong>Regional Demand</strong></td>
+          <td>APAC 366% to goal, USA 83%</td>
+          <td>APAC >300% = constrained</td>
+          <td><span class="badge badge-red">Constrained</span></td>
+        </tr>
+        <tr>
+          <td><strong>Margin Expansion</strong></td>
+          <td>Q2 42.1% (+5.6pts)</td>
+          <td>QoQ increase >5pts = pricing power</td>
+          <td><span class="badge badge-red">Constrained</span></td>
+        </tr>
+        <tr>
+          <td><strong>Backlog Concentration</strong></td>
+          <td>80% in single month</td>
+          <td>>50% in one month = forced delivery</td>
+          <td><span class="badge badge-red">Allocation Pattern</span></td>
+        </tr>
+        <tr>
+          <td><strong>B to I Ratio</strong></td>
+          <td>0.59 (booking < invoicing)</td>
+          <td><0.8 = booking slowdown</td>
+          <td><span class="badge badge-yellow">Monitor</span></td>
+        </tr>
+      </tbody>
+    </table>
+
+    <div class="insight-box" style="margin-top: 16px;">
+      <strong>Market Cycle Assessment:</strong> Three of four indicators (Regional Demand, Margin Expansion, Backlog Concentration)
+      confirm APAC entering Constrained phase. Historical pattern: USA follows APAC by 3-4 weeks. <strong>Prepare for:</strong>
+      <ul style="margin: 8px 0 0 20px; padding: 0;">
+        <li>Tier 2/3 manufacturer activation (alternate recommendations)</li>
+        <li>Customer pre-positioning discussions (lock in allocation before rationing)</li>
+        <li>Franchise channel partnerships (broker access if direct allocates)</li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- Footer -->
+  <div style="margin-top: 24px; padding-top: 16px; border-top: 1px solid #e0e0e0; font-size: 11px; color: #666;">
+    <p><strong>Data Sources:</strong> Executive Snapshot (Jun 4, 2026) • OT RFQ/VQ/CQ pipeline data (30-day rolling)</p>
+    <p><strong>Financial Metrics:</strong> Real YTD performance through Q2 2026</p>
+    <p><strong>Market Cycle Framework:</strong> Normal → Constrained (we are here) → Allocated → Recovery</p>
+    <p><strong>Regional Pattern:</strong> APAC enters phases 3-4 weeks before USA, 6-8 weeks before EMEA (validated by 366% APAC performance vs 60% MEX)</p>
+  </div>
+
+</div>
+
+</body>
+</html>

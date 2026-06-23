@@ -1,0 +1,53 @@
+{
+  "date": "2026-05-29T15:54:10.293Z",
+  "global": {
+    "rfqLinesEntered": 57,
+    "rfqCustomers": 17,
+    "vqLinesLoaded": 91,
+    "vqWithBuyer": 79,
+    "vqClaude": 0,
+    "vqNoBuyer": 12,
+    "vqToRfqRatio": 160,
+    "vqBuyerPct": 86.8,
+    "vqNoBuyerPct": 13.2,
+    "cqLinesEntered": 54,
+    "cqLinesSold": 19,
+    "cqCloseRate": 35.2,
+    "soLinesBooked": 8,
+    "soTotalBooked": 244345
+  },
+  "buyerQueue": {
+    "linesRouted": 194,
+    "earliestDay": "2026-05-26",
+    "latestDay": "2026-05-28",
+    "totalRouted": 194,
+    "withBuyerVQ": 3,
+    "responsePct": 1.5,
+    "avgResponseHrs": null,
+    "stuckCount": 495,
+    "stuckPct": 98.8,
+    "trend": 0.7,
+    "trendDirection": "improving",
+    "avgPerDay": 67
+  },
+  "dailyBreakdown": [
+    {
+      "day": "2026-05-26",
+      "routed": 86,
+      "responded": 1,
+      "responsePct": 1.2
+    },
+    {
+      "day": "2026-05-27",
+      "routed": 62,
+      "responded": 1,
+      "responsePct": 1.6
+    },
+    {
+      "day": "2026-05-28",
+      "routed": 52,
+      "responded": 1,
+      "responsePct": 1.9
+    }
+  ]
+}

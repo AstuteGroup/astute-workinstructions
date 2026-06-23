@@ -1,0 +1,46 @@
+{
+  "pipelineInput": {
+    "rfqLines": 57,
+    "rfqCustomers": 17,
+    "rfqAvg": 291,
+    "rfqChange": -80.4,
+    "responseLines": 22,
+    "responsePct": 38.6,
+    "responseAvg": 98.4,
+    "responseChange": -77.6
+  },
+  "quotingActivity": {
+    "cqLines": 54,
+    "cqCustomers": 16,
+    "cqAvg": 40.6,
+    "cqChange": 33,
+    "cqSold": 18,
+    "cqSoldAvg": 14.6,
+    "cqSoldChange": 23.3,
+    "shortCycleDays": 12.6,
+    "shortCycleAvg": 12.7,
+    "shortCycleChange": -0.8,
+    "longCycleDays": 30,
+    "longCycleAvg": 29.6,
+    "longCycleChange": 1.4
+  },
+  "wins": {
+    "soLines": 8,
+    "soAvg": 12,
+    "soChange": -33.3,
+    "amount": 244345,
+    "amountAvg": 1661908.64,
+    "amountChange": -85.3
+  },
+  "systemDiscipline": {
+    "totalSold": 18,
+    "within2hrs": 8,
+    "within2hrsPct": 44.4,
+    "within2hrsAvg": 48.7,
+    "within2hrsChange": -4.3,
+    "retroactive": 0,
+    "retroactivePct": 0,
+    "retroactiveAvg": 0,
+    "retroactiveChange": 0
+  }
+}

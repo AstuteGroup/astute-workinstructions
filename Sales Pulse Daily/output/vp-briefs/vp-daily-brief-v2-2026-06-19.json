@@ -1,0 +1,267 @@
+{
+  "today": "2026-06-19T13:33:01.379Z",
+  "yesterday": "2026-06-18T13:33:01.379Z",
+  "todayFormatted": "Friday, June 19, 2026",
+  "yesterdayFormatted": "Thursday, June 18, 2026",
+  "top5Orders": [],
+  "newCustomers": [],
+  "strategicAccounts": [
+    {
+      "account_name": "GE Healthcare",
+      "ise_name": "Aaron Mendoza",
+      "region": "USA",
+      "rfq_lines": "0",
+      "cq_lines": "1",
+      "cq_sold": "0",
+      "so_count": "0"
+    },
+    {
+      "account_name": "Parker Meggitt",
+      "ise_name": "Josh Syre",
+      "region": "USA",
+      "rfq_lines": "1",
+      "cq_lines": "1",
+      "cq_sold": "1",
+      "so_count": "1"
+    },
+    {
+      "account_name": "RTX",
+      "ise_name": "Thomas Haynes",
+      "region": "USA",
+      "rfq_lines": "1",
+      "cq_lines": "0",
+      "cq_sold": "0",
+      "so_count": "0"
+    },
+    {
+      "account_name": "THALES",
+      "ise_name": "James Diaz",
+      "region": "USA",
+      "rfq_lines": "0",
+      "cq_lines": "1",
+      "cq_sold": "0",
+      "so_count": "0"
+    }
+  ],
+  "reactivatedCustomers": [
+    {
+      "seller_name": "Josh Syre",
+      "region": "USA",
+      "customer_name": "Applied Materials",
+      "c_bpartner_id": "1000724",
+      "order_count": "2",
+      "order_numbers": "SO507523, SO507517",
+      "total_revenue": "52100.86",
+      "mpns": null,
+      "mfr_names": null,
+      "total_qty": "0",
+      "customer_location": "Bldg 37, 9700 Hwy 290 East, Austin, TX 78724, United States",
+      "contact_name": null,
+      "promise_date": "2026-06-19",
+      "last_order_date": "2025-12-19",
+      "days_since_last_order": "182",
+      "previous_sales_rep": "Josh Syre"
+    },
+    {
+      "seller_name": "Wing Zhang",
+      "region": "APAC-Silvia",
+      "customer_name": "Plexus Corp.",
+      "c_bpartner_id": "1000077",
+      "order_count": "2",
+      "order_numbers": "SO507512, SO507514",
+      "total_revenue": "50980.00",
+      "mpns": null,
+      "mfr_names": null,
+      "total_qty": "0",
+      "customer_location": "C01, N0. 2, Jian an Road, Chang 'an Town, Jiaxing, Zhejiang,  , China",
+      "contact_name": null,
+      "promise_date": "2026-07-01",
+      "last_order_date": "2025-12-18",
+      "days_since_last_order": "183",
+      "previous_sales_rep": "Wing Zhang"
+    },
+    {
+      "seller_name": "Silvia Munoz",
+      "region": "APAC-Silvia",
+      "customer_name": "Advantech Co., LTD",
+      "c_bpartner_id": "1003918",
+      "order_count": "1",
+      "order_numbers": "SO507519",
+      "total_revenue": "44118",
+      "mpns": null,
+      "mfr_names": null,
+      "total_qty": "0",
+      "customer_location": "No.27-3, Wende Road, Guishan Dist., Taoyuan,  33371, Taiwan",
+      "contact_name": null,
+      "promise_date": "2026-06-19",
+      "last_order_date": "2025-12-17",
+      "days_since_last_order": "184",
+      "previous_sales_rep": "Jasper Kee"
+    },
+    {
+      "seller_name": "Josh Syre",
+      "region": "USA",
+      "customer_name": "Parker Meggitt",
+      "c_bpartner_id": "1000230",
+      "order_count": "1",
+      "order_numbers": "SO507516",
+      "total_revenue": "17790.00",
+      "mpns": null,
+      "mfr_names": null,
+      "total_qty": "0",
+      "customer_location": "1955 Surveyor Ave, Bldg 3, Simi Valley, CA 93063, United States",
+      "contact_name": null,
+      "promise_date": "2026-06-30",
+      "last_order_date": "2025-12-19",
+      "days_since_last_order": "182",
+      "previous_sales_rep": "Josh Syre"
+    },
+    {
+      "seller_name": "Jake Mcaloose",
+      "region": "USA",
+      "customer_name": "GE Aerospace (Formerly GE Aviation)",
+      "c_bpartner_id": "1000062",
+      "order_count": "2",
+      "order_numbers": "SO507522, SO507515",
+      "total_revenue": "6735.00",
+      "mpns": null,
+      "mfr_names": null,
+      "total_qty": "0",
+      "customer_location": "3290 Patterson Avenue, Grand Rapids, MI 49512, United States",
+      "contact_name": null,
+      "promise_date": "2026-06-30",
+      "last_order_date": "2025-12-17",
+      "days_since_last_order": "184",
+      "previous_sales_rep": "Jake Mcaloose"
+    },
+    {
+      "seller_name": "Laurel Kee",
+      "region": "APAC-Laurel",
+      "customer_name": "Marvell",
+      "c_bpartner_id": "1006121",
+      "order_count": "1",
+      "order_numbers": "SO507513",
+      "total_revenue": "4845.00",
+      "mpns": null,
+      "mfr_names": null,
+      "total_qty": "0",
+      "customer_location": null,
+      "contact_name": null,
+      "promise_date": "2026-07-10",
+      "last_order_date": "2025-10-23",
+      "days_since_last_order": "239",
+      "previous_sales_rep": "Laurel Kee"
+    },
+    {
+      "seller_name": "Joel Flores",
+      "region": "MEX",
+      "customer_name": "Abaco Systems",
+      "c_bpartner_id": "1000063",
+      "order_count": "1",
+      "order_numbers": "SO507520",
+      "total_revenue": "1850.00",
+      "mpns": null,
+      "mfr_names": null,
+      "total_qty": "0",
+      "customer_location": "1701 East Industrial Boulevard, Hidalgo, TX 78557, United States",
+      "contact_name": null,
+      "promise_date": "2026-06-22",
+      "last_order_date": "2025-12-17",
+      "days_since_last_order": "184",
+      "previous_sales_rep": "Joel Flores"
+    }
+  ],
+  "lateShipments": [],
+  "pastDueSummary": [
+    {
+      "region": "MEX",
+      "so_lines_past_due": "1",
+      "total_revenue_past_due": "2400.0"
+    }
+  ],
+  "iseAlerts": [
+    {
+      "ise_name": "James Xu",
+      "manager": "Silvia Munoz",
+      "region": "APAC-Silvia",
+      "last_rfq_date": "2026-05-20 00:00:00",
+      "days_inactive": "30",
+      "color_code": "red"
+    },
+    {
+      "ise_name": "Michael Stifter",
+      "manager": "Jeff Wallace",
+      "region": "USA",
+      "last_rfq_date": "2026-06-11 00:00:00",
+      "days_inactive": "8",
+      "color_code": "red"
+    },
+    {
+      "ise_name": "Alfredo Martinez",
+      "manager": "Joel Marquez",
+      "region": "MEX",
+      "last_rfq_date": "2026-06-16 00:00:00",
+      "days_inactive": "3",
+      "color_code": "yellow"
+    },
+    {
+      "ise_name": "Carlos Moreno",
+      "manager": "Joel Marquez",
+      "region": "MEX",
+      "last_rfq_date": "2026-06-16 00:00:00",
+      "days_inactive": "3",
+      "color_code": "yellow"
+    },
+    {
+      "ise_name": "Carolina Hinestroza",
+      "manager": "Joel Marquez",
+      "region": "MEX",
+      "last_rfq_date": "2026-06-16 00:00:00",
+      "days_inactive": "3",
+      "color_code": "yellow"
+    }
+  ],
+  "lowMarginOrders": [],
+  "globalActivity": {
+    "rfq_lines": 0,
+    "rfq_customers": 0,
+    "cq_lines": 0,
+    "cq_sold": 0,
+    "so_lines": 0,
+    "so_revenue": 0
+  },
+  "regionalActivity": [
+    {
+      "region": "APAC-Laurel",
+      "manager": "Laurel Kee",
+      "rfq_lines": "20",
+      "cq_lines": "4",
+      "cq_sold": "3",
+      "so_lines": "1"
+    },
+    {
+      "region": "APAC-Silvia",
+      "manager": "Silvia Munoz",
+      "rfq_lines": "19",
+      "cq_lines": "76",
+      "cq_sold": "3",
+      "so_lines": "3"
+    },
+    {
+      "region": "MEX",
+      "manager": "Joel Marquez",
+      "rfq_lines": "96",
+      "cq_lines": "3",
+      "cq_sold": "3",
+      "so_lines": "1"
+    },
+    {
+      "region": "USA",
+      "manager": "Jeff Wallace",
+      "rfq_lines": "285",
+      "cq_lines": "23",
+      "cq_sold": "11",
+      "so_lines": "7"
+    }
+  ]
+}

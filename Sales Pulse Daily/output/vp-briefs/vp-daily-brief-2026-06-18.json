@@ -1,0 +1,120 @@
+{
+  "today": "2026-06-18T14:10:41.749Z",
+  "yesterday": "2026-06-17T14:10:41.749Z",
+  "isMonday": false,
+  "todayFormatted": "Thursday, June 18, 2026",
+  "yesterdayFormatted": "Wednesday, June 17, 2026",
+  "globalSnapshot": {
+    "rfqLines": 3428,
+    "rfqCustomers": 27,
+    "cqLines": 66,
+    "cqSold": 38,
+    "soLines": 26,
+    "soRevenue": 1525295.29,
+    "cqCloseRate": 0.5757575757575758
+  },
+  "regionalPerformance": [
+    {
+      "region": "USA",
+      "rfqLines": 29,
+      "cqLines": 18,
+      "cqSold": 11,
+      "soLines": 9
+    },
+    {
+      "region": "MEX",
+      "rfqLines": 38,
+      "cqLines": 15,
+      "cqSold": 15,
+      "soLines": 7
+    },
+    {
+      "region": "Laurel",
+      "rfqLines": 43,
+      "cqLines": 6,
+      "cqSold": 6,
+      "soLines": 5
+    },
+    {
+      "region": "Kris",
+      "rfqLines": 99,
+      "cqLines": 8,
+      "cqSold": 5,
+      "soLines": 2
+    },
+    {
+      "region": "Lavanya",
+      "rfqLines": 40,
+      "cqLines": 1,
+      "cqSold": 1,
+      "soLines": 3
+    }
+  ],
+  "yesterdaysWins": [
+    {
+      "customer": "THALES",
+      "revenue": "1221120.00",
+      "line_count": "2",
+      "ise_name": "Laurel Kee"
+    },
+    {
+      "customer": "Sanmina Corporation",
+      "revenue": "135130.0",
+      "line_count": "4",
+      "ise_name": "Ricardo Morales"
+    },
+    {
+      "customer": "Marvell",
+      "revenue": "70800.0",
+      "line_count": "3",
+      "ise_name": "Laurel Kee"
+    },
+    {
+      "customer": "Bharat Electronics Ltd",
+      "revenue": "26880.6",
+      "line_count": "2",
+      "ise_name": "Meenakshi"
+    },
+    {
+      "customer": "Parker Meggitt",
+      "revenue": "18967.00",
+      "line_count": "2",
+      "ise_name": "Josh Syre"
+    },
+    {
+      "customer": "Applied Materials",
+      "revenue": "18212.75",
+      "line_count": "4",
+      "ise_name": "Josh Syre"
+    },
+    {
+      "customer": "Plexus Corp.",
+      "revenue": "12915.0",
+      "line_count": "1",
+      "ise_name": "Wing Zhang"
+    },
+    {
+      "customer": "Celestica",
+      "revenue": "11894.13",
+      "line_count": "1",
+      "ise_name": "Spring Tu"
+    },
+    {
+      "customer": "Arrow Global Supply Chain Services",
+      "revenue": "5541.16",
+      "line_count": "3",
+      "ise_name": "Joel Flores"
+    },
+    {
+      "customer": "GE Vernova (Energy Businesses)",
+      "revenue": "2250.00",
+      "line_count": "1",
+      "ise_name": "Lavanya Manohar"
+    }
+  ],
+  "needsAttention": {
+    "lateShipments": [],
+    "inactiveISEs": [],
+    "newCustomers": []
+  }
+}

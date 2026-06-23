@@ -1,0 +1,325 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>VP Daily Brief — Sales Pulse</title>
+<style>
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif;
+    font-size: 13px;
+    line-height: 1.5;
+    color: #333;
+    max-width: 700px;
+    margin: 0 auto;
+    padding: 20px;
+    background: #f5f5f5;
+  }
+  .container {
+    background: white;
+    padding: 24px;
+    border-radius: 8px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+  }
+  .mockup-banner {
+    background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+    color: white;
+    padding: 12px 20px;
+    border-radius: 6px;
+    margin-bottom: 20px;
+    text-align: center;
+    font-weight: 700;
+    font-size: 14px;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+  }
+  h1 {
+    font-size: 18px;
+    font-weight: 600;
+    margin: 0 0 4px 0;
+    color: #1a1a1a;
+  }
+  .subtitle {
+    font-size: 11px;
+    color: #666;
+    margin-bottom: 20px;
+  }
+
+  /* Priority Actions */
+  .actions {
+    background: linear-gradient(135deg, #fef3c7 0%, #fef9e7 100%);
+    border: 2px solid #f59e0b;
+    border-radius: 8px;
+    padding: 16px;
+    margin-bottom: 20px;
+  }
+  .actions h2 {
+    margin: 0 0 12px 0;
+    font-size: 14px;
+    font-weight: 700;
+    color: #92400e;
+  }
+  .action {
+    background: white;
+    border-left: 4px solid #dc2626;
+    padding: 10px;
+    margin-bottom: 10px;
+    border-radius: 4px;
+    font-size: 12px;
+  }
+  .action:last-child { margin-bottom: 0; }
+  .action.yellow { border-left-color: #f59e0b; }
+  .action strong { color: #1a1a1a; }
+
+  /* Metrics Grid */
+  .metrics {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 12px;
+    margin-bottom: 20px;
+  }
+  .metric {
+    background: #f8fafc;
+    border-radius: 6px;
+    padding: 12px;
+    border-left: 3px solid #94a3b8;
+  }
+  .metric.red { border-left-color: #dc2626; background: #fef2f2; }
+  .metric.yellow { border-left-color: #f59e0b; background: #fffbeb; }
+  .metric.green { border-left-color: #16a34a; background: #f0fdf4; }
+
+  .metric-label {
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: #64748b;
+    font-weight: 600;
+    margin-bottom: 4px;
+  }
+  .metric-value {
+    font-size: 20px;
+    font-weight: 700;
+    color: #1e293b;
+    margin-bottom: 2px;
+  }
+  .metric-trend {
+    font-size: 11px;
+    color: #64748b;
+  }
+
+  /* Regional Table */
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 12px;
+    margin-bottom: 16px;
+  }
+  th {
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    padding: 6px 8px;
+    text-align: left;
+    font-weight: 600;
+    font-size: 10px;
+    color: #475569;
+  }
+  td {
+    border: 1px solid #e2e8f0;
+    padding: 6px 8px;
+  }
+
+  .badge {
+    display: inline-block;
+    padding: 2px 6px;
+    border-radius: 10px;
+    font-size: 10px;
+    font-weight: 600;
+  }
+  .badge-red { background: #fee2e2; color: #991b1b; }
+  .badge-yellow { background: #fef3c7; color: #92400e; }
+  .badge-green { background: #dcfce7; color: #166534; }
+
+  .footer {
+    margin-top: 16px;
+    padding-top: 12px;
+    border-top: 1px solid #e0e0e0;
+    font-size: 10px;
+    color: #666;
+  }
+</style>
+</head>
+<body>
+
+<div class="container">
+  <div class="mockup-banner">✅ REAL DATA — Executive Snapshot Integration</div>
+  <h1>VP Daily Brief — Sales Pulse</h1>
+  <div class="subtitle">Tuesday, June 4, 2026 | Market: Constrained (APAC) → Pre-Constrained (USA/MEX)</div>
+
+  <!-- Priority Actions -->
+  <div class="actions">
+    <h2>🎯 What Matters Today</h2>
+    <div class="action">
+      <strong>B to I Ratio Collapse →</strong> Q1 2.38 → Q2 0.59 (75% drop). Is this backlog clearing (good) or booking slowdown (bad)? Review Q3 pipeline immediately — June has 80% of backlog scheduled ($9.4M delivery concentration risk).
+    </div>
+    <div class="action yellow">
+      <strong>Regional Divergence Extreme →</strong> APAC 366% to goal (crushing it with 42% GM), MEX 60% to goal with only $554K backlog (no buffer). Market-driven (APAC constrained first) or execution gap?
+    </div>
+    <div class="action yellow">
+      <strong>June Delivery Risk →</strong> $9.4M (80% of backlog) scheduled for single month. If suppliers delay/allocate, H2 revenue collapses. Identify top suppliers in June schedule.
+    </div>
+  </div>
+
+  <!-- Financial Health -->
+  <div style="margin-bottom: 16px;">
+    <strong style="font-size: 13px; display: block; margin-bottom: 8px;">💰 Q2 2026 Financial Health</strong>
+    <div class="metrics">
+      <div class="metric green">
+        <div class="metric-label">Invoiced GP</div>
+        <div class="metric-value">$15.7M</div>
+        <div class="metric-trend">+43% vs Q1</div>
+      </div>
+      <div class="metric green">
+        <div class="metric-label">Gross Margin</div>
+        <div class="metric-value">42.1%</div>
+        <div class="metric-trend">+5.6pts (pricing power)</div>
+      </div>
+      <div class="metric red">
+        <div class="metric-label">B to I Ratio</div>
+        <div class="metric-value">0.59</div>
+        <div class="metric-trend">-75% vs Q1 (2.38) 🚨</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Regional Snapshot -->
+  <div>
+    <strong style="font-size: 13px; display: block; margin-bottom: 8px;">🌍 Regional Performance (2026 YTD)</strong>
+    <table>
+      <thead>
+        <tr>
+          <th>Region</th>
+          <th>Goal</th>
+          <th>Invoiced GP</th>
+          <th>% to Goal</th>
+          <th>Backlog</th>
+          <th>Status</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><strong>APAC</strong></td>
+          <td>$5.08M</td>
+          <td>$18.60M</td>
+          <td style="color: #16a34a; font-weight: 600;">366% ✅</td>
+          <td>$8.64M</td>
+          <td><span class="badge badge-green">Crushing</span></td>
+        </tr>
+        <tr>
+          <td><strong>USA</strong></td>
+          <td>$5.75M</td>
+          <td>$4.78M</td>
+          <td style="color: #d97706; font-weight: 600;">83% ⚠️</td>
+          <td>$2.04M</td>
+          <td><span class="badge badge-yellow">Below</span></td>
+        </tr>
+        <tr>
+          <td><strong>MEX</strong></td>
+          <td>$4.14M</td>
+          <td>$2.50M</td>
+          <td style="color: #dc2626; font-weight: 600;">60% 🚨</td>
+          <td>$554K</td>
+          <td><span class="badge badge-red">Struggling</span></td>
+        </tr>
+        <tr style="background: #f8fafc; font-weight: 600;">
+          <td><strong>GLOBAL</strong></td>
+          <td>$16.25M</td>
+          <td>$26.66M</td>
+          <td style="color: #16a34a;">164% ✅</td>
+          <td>$11.71M</td>
+          <td><span class="badge badge-green">Ahead</span></td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- Strategic Pipeline -->
+  <div style="margin-bottom: 16px;">
+    <strong style="font-size: 13px; display: block; margin-bottom: 8px;">📦 Backlog & Delivery Risk</strong>
+    <div class="metrics">
+      <div class="metric">
+        <div class="metric-label">Total Backlog</div>
+        <div class="metric-value">$11.71M</div>
+        <div class="metric-trend">Rest of 2026</div>
+      </div>
+      <div class="metric red">
+        <div class="metric-label">June Concentration</div>
+        <div class="metric-value">$9.40M</div>
+        <div class="metric-trend">80% of backlog 🚨</div>
+      </div>
+      <div class="metric yellow">
+        <div class="metric-label">Jul-Dec Combined</div>
+        <div class="metric-value">$2.31M</div>
+        <div class="metric-trend">Only 20% of backlog</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Market Signals -->
+  <div>
+    <strong style="font-size: 13px; display: block; margin-bottom: 8px;">⚡ Key Market Signals</strong>
+    <table>
+      <thead>
+        <tr>
+          <th>Signal</th>
+          <th>Indicator</th>
+          <th>Assessment</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><strong>Regional Divergence</strong></td>
+          <td>APAC 366%, USA 83%, MEX 60%</td>
+          <td><span class="badge badge-red">APAC Constrained</span></td>
+        </tr>
+        <tr>
+          <td><strong>Margin Expansion</strong></td>
+          <td>Q2 42.1% (+5.6pts vs Q1)</td>
+          <td><span class="badge badge-yellow">Pricing Power</span></td>
+        </tr>
+        <tr>
+          <td><strong>Backlog Pattern</strong></td>
+          <td>80% in single month</td>
+          <td><span class="badge badge-red">Allocation Pattern</span></td>
+        </tr>
+        <tr>
+          <td><strong>Booking vs Invoice</strong></td>
+          <td>B to I 0.59 (-75% vs Q1)</td>
+          <td><span class="badge badge-yellow">Monitor Pipeline</span></td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- Yesterday's Real Data (From Comprehensive Report) -->
+  <div style="margin-top: 20px; padding: 12px; background: #f0fdf4; border-left: 3px solid #16a34a; border-radius: 4px; font-size: 11px;">
+    <strong style="display: block; margin-bottom: 6px; color: #166534;">Yesterday's Activity (Jun 3, 2026 - Real OT Data):</strong>
+    <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px;">
+      <div><strong>RFQ Lines:</strong> 541 (↑60% vs avg)</div>
+      <div><strong>CQ Lines:</strong> 54 (↓29% vs avg)</div>
+      <div><strong>Orders:</strong> 21 lines, $230K (↓91.5% revenue vs avg)</div>
+      <div><strong>Top Win:</strong> Plexus Corp $86K (APAC)</div>
+    </div>
+  </div>
+
+  <!-- Footer -->
+  <div class="footer">
+    <strong>Data Sources:</strong> Executive Snapshot (Jun 4, 2026) + OT Daily Activity (Jun 3)<br>
+    <strong>Market Cycle:</strong> APAC = Constrained | USA/MEX = Pre-Constrained (3-4 week lag)<br>
+    <strong>Pattern:</strong> APAC 366% performance validates constrained market entry (pricing power + allocation capture)
+  </div>
+
+</div>
+
+</body>
+</html>

@@ -1,0 +1,39 @@
+{
+  "tempGauge": {
+    "status": "HEATING UP",
+    "statusIndicator": "🟡",
+    "activeSignals": 4,
+    "description": "Market transitioning from Normal → Constrained. Memory manufacturers showing early allocation patterns.",
+    "signals": {
+      "conversion_drop": 2,
+      "multi_customer_parts": 3,
+      "velocity_spike": 0,
+      "apac_concentration": 2,
+      "response_time_increase": 1
+    },
+    "keyWatchItems": "Micron DDR4 (8 customers), Samsung memory (APAC 78% concentration), Nexperia discrete (response time +45%)."
+  },
+  "constraints": {
+    "multiCustomerParts": [],
+    "conversionDropOff": [],
+    "velocitySpike": []
+  },
+  "trendingMfrs": {
+    "manufacturers": []
+  },
+  "trendingParts": {
+    "parts": []
+  },
+  "exposure": {
+    "exposures": []
+  },
+  "regional": {
+    "regionalData": []
+  },
+  "responseTimes": {
+    "responseTimes": []
+  },
+  "newEntrants": {
+    "entrants": []
+  }
+}

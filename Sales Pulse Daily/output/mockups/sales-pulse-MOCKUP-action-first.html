@@ -1,0 +1,849 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sales Pulse Daily — Action-First Mockup</title>
+<style>
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif;
+    font-size: 13px;
+    line-height: 1.5;
+    color: #333;
+    max-width: 900px;
+    margin: 0 auto;
+    padding: 20px;
+    background: #f5f5f5;
+  }
+  .container {
+    background: white;
+    padding: 24px;
+    border-radius: 8px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+  }
+  h1 {
+    font-size: 20px;
+    font-weight: 600;
+    margin: 0 0 4px 0;
+    color: #1a1a1a;
+  }
+  .subtitle {
+    font-size: 11px;
+    color: #666;
+    margin-bottom: 20px;
+  }
+  .section {
+    margin-bottom: 24px;
+    padding-bottom: 24px;
+    border-bottom: 2px solid #e0e0e0;
+  }
+  .section:last-child {
+    border-bottom: none;
+  }
+  .section-title {
+    font-size: 15px;
+    font-weight: 600;
+    margin-bottom: 12px;
+    color: #1a1a1a;
+  }
+
+  /* Executive Brief Styles */
+  .exec-brief {
+    background: linear-gradient(135deg, #fef3c7 0%, #fef9e7 100%);
+    border: 2px solid #f59e0b;
+    border-radius: 8px;
+    padding: 20px;
+    margin-bottom: 24px;
+  }
+  .exec-brief h2 {
+    margin: 0 0 16px 0;
+    font-size: 16px;
+    font-weight: 700;
+    color: #92400e;
+  }
+  .priority-section {
+    margin-bottom: 20px;
+  }
+  .priority-header {
+    font-weight: 700;
+    font-size: 13px;
+    margin-bottom: 8px;
+    padding-bottom: 4px;
+    border-bottom: 2px solid rgba(0,0,0,0.1);
+  }
+  .priority-red { color: #dc2626; border-color: #dc2626; }
+  .priority-yellow { color: #d97706; border-color: #d97706; }
+  .priority-green { color: #16a34a; border-color: #16a34a; }
+
+  .action-item {
+    background: white;
+    border-left: 4px solid #dc2626;
+    padding: 12px;
+    margin-bottom: 12px;
+    border-radius: 4px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+  }
+  .action-item.yellow { border-left-color: #f59e0b; }
+  .action-item.green { border-left-color: #16a34a; }
+
+  .action-title {
+    font-weight: 700;
+    font-size: 13px;
+    margin-bottom: 6px;
+    color: #1a1a1a;
+  }
+  .action-detail {
+    font-size: 12px;
+    color: #666;
+    margin: 4px 0;
+    padding-left: 12px;
+  }
+  .action-arrow {
+    color: #dc2626;
+    font-weight: 600;
+    font-size: 12px;
+    margin-top: 6px;
+  }
+
+  /* Scorecard Grid */
+  .scorecard-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+    margin-bottom: 12px;
+  }
+  .scorecard-card {
+    background: #f8f9fa;
+    padding: 16px;
+    border-radius: 6px;
+    border: 1px solid #e0e0e0;
+  }
+  .scorecard-header {
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: #666;
+    margin-bottom: 8px;
+  }
+  .scorecard-metric {
+    font-size: 24px;
+    font-weight: 700;
+    color: #1a1a1a;
+    margin-bottom: 4px;
+  }
+  .scorecard-trend {
+    font-size: 12px;
+    font-weight: 600;
+  }
+  .trend-up { color: #16a34a; }
+  .trend-down { color: #dc2626; }
+  .trend-neutral { color: #666; }
+  .scorecard-detail {
+    font-size: 11px;
+    color: #666;
+    margin-top: 4px;
+  }
+
+  /* Regional Status Table */
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 12px;
+  }
+  th {
+    text-align: left;
+    padding: 8px;
+    background: #f8f8f8;
+    font-weight: 600;
+    border-bottom: 2px solid #e0e0e0;
+    font-size: 11px;
+  }
+  td {
+    padding: 8px;
+    border-bottom: 1px solid #f0f0f0;
+  }
+  .status-badge {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 12px;
+    font-size: 11px;
+    font-weight: 600;
+  }
+  .status-strong { background: #d1fae5; color: #065f46; }
+  .status-solid { background: #dbeafe; color: #1e40af; }
+  .status-crisis { background: #fee2e2; color: #991b1b; }
+
+  /* Progress Bars */
+  .progress-bar-container {
+    background: #f0f0f0;
+    height: 20px;
+    border-radius: 10px;
+    overflow: hidden;
+    margin: 4px 0;
+    position: relative;
+  }
+  .progress-bar {
+    height: 100%;
+    background: linear-gradient(90deg, #10b981 0%, #059669 100%);
+    transition: width 0.3s ease;
+    border-radius: 10px 0 0 10px;
+  }
+  .progress-bar.warning { background: linear-gradient(90deg, #f59e0b 0%, #d97706 100%); }
+  .progress-bar.danger { background: linear-gradient(90deg, #ef4444 0%, #dc2626 100%); }
+  .progress-label {
+    position: absolute;
+    top: 2px;
+    left: 8px;
+    font-size: 11px;
+    font-weight: 600;
+    color: #1a1a1a;
+  }
+  .region-block {
+    background: #f8f9fa;
+    border-radius: 6px;
+    padding: 16px;
+    margin-bottom: 16px;
+    border: 1px solid #e0e0e0;
+  }
+  .region-header {
+    font-weight: 700;
+    font-size: 13px;
+    margin-bottom: 12px;
+    color: #1a1a1a;
+  }
+  .progress-row {
+    display: flex;
+    align-items: center;
+    margin-bottom: 8px;
+  }
+  .progress-row-label {
+    width: 60px;
+    font-size: 12px;
+    font-weight: 600;
+    color: #666;
+  }
+  .progress-row-bar {
+    flex: 1;
+    margin: 0 12px;
+  }
+  .progress-row-value {
+    width: 120px;
+    font-size: 12px;
+    text-align: right;
+  }
+
+  /* Collapsible Sections */
+  .collapsible {
+    background: #f8f9fa;
+    border: 1px solid #e0e0e0;
+    border-radius: 4px;
+    margin-bottom: 12px;
+    cursor: pointer;
+    padding: 12px;
+    font-weight: 600;
+    font-size: 13px;
+    transition: background 0.2s;
+  }
+  .collapsible:hover {
+    background: #e9ecef;
+  }
+  .collapsible::after {
+    content: ' ▼';
+    font-size: 10px;
+    color: #666;
+  }
+  .collapsible.active::after {
+    content: ' ▲';
+  }
+  .collapsible-content {
+    display: none;
+    padding: 12px;
+    background: white;
+    border: 1px solid #e0e0e0;
+    border-top: none;
+    border-radius: 0 0 4px 4px;
+    margin-top: -12px;
+  }
+  .collapsible-content.show {
+    display: block;
+  }
+
+  /* Alert Boxes */
+  .alert-box {
+    margin-bottom: 16px;
+    padding: 12px;
+    border-radius: 4px;
+    border-left: 4px solid #ccc;
+    background: #f8f8f8;
+  }
+  .alert-box.critical { border-left-color: #dc2626; background: #fef2f2; }
+  .alert-box.opportunity { border-left-color: #16a34a; background: #f0fdf4; }
+  .alert-box.warning { border-left-color: #ea580c; background: #fff7ed; }
+  .alert-title {
+    font-weight: 600;
+    margin-bottom: 8px;
+    font-size: 13px;
+  }
+  .alert-item {
+    padding: 4px 0;
+    font-size: 12px;
+  }
+
+  /* Insight Boxes */
+  .insight-box {
+    background: #eff6ff;
+    border-left: 4px solid #3b82f6;
+    padding: 12px;
+    margin: 8px 0;
+    border-radius: 4px;
+    font-size: 12px;
+  }
+  .insight-box strong {
+    color: #1e40af;
+  }
+
+  .footnote {
+    font-size: 11px;
+    color: #999;
+    margin-top: 8px;
+    font-style: italic;
+  }
+  .footer {
+    margin-top: 20px;
+    padding-top: 16px;
+    border-top: 1px solid #e0e0e0;
+    font-size: 11px;
+    color: #999;
+    text-align: center;
+  }
+</style>
+</head>
+<body>
+<div class="container">
+  <h1>📊 Sales Pulse — Tuesday, June 2, 2026</h1>
+  <div class="subtitle">Action-First Design Mockup | Data as of 6:00am PT</div>
+
+  <!-- EXECUTIVE BRIEF (NEW SECTION 0) -->
+  <div class="exec-brief">
+    <h2>🚨 CRITICAL ACTIONS TODAY</h2>
+
+    <div class="priority-section">
+      <div class="priority-header priority-red">🔴 URGENT (Do First — Next 2 Hours)</div>
+
+      <div class="action-item">
+        <div class="action-title">1. MEX Region Crisis — Call Joel Marquez</div>
+        <div class="action-detail">• 173 RFQs → only 3 CQs (2% conversion vs 20% expected)</div>
+        <div class="action-detail">• Only 2 sold WTD vs 41 target (95% behind pace)</div>
+        <div class="action-arrow">→ Root cause: Sourcing bottleneck or quoting delay?</div>
+      </div>
+
+      <div class="action-item">
+        <div class="action-title">2. New Customer Risk — Etron Technology (MEX - Alejandro)</div>
+        <div class="action-detail">• 162 RFQ lines waiting 7 days with NO quotes</div>
+        <div class="action-detail">• First-time customer — risk losing if not quoted today</div>
+        <div class="action-arrow">→ Escalate to sourcing team immediately</div>
+      </div>
+
+      <div class="action-item">
+        <div class="action-title">3. Revenue Drop Investigation</div>
+        <div class="action-detail">• $92K yesterday vs $2.6M avg (↓96%)</div>
+        <div class="action-detail">• Week-to-date on pace, but daily avg seems inflated</div>
+        <div class="action-arrow">→ Review last week's data for anomalies</div>
+      </div>
+    </div>
+
+    <div class="priority-section">
+      <div class="priority-header priority-yellow">🟡 MONITOR (Check Before EOD)</div>
+
+      <div class="action-item yellow">
+        <div class="action-title">High-Value Follow-Up: GE Aerospace $699K quote (Jake M)</div>
+        <div class="action-detail">• 1 day old, 41.7% win rate, Shortage type (10d window)</div>
+        <div class="action-arrow">→ Confirm Jake has follow-up plan</div>
+      </div>
+
+      <div class="action-item yellow">
+        <div class="action-title">Texas Instruments Pattern: 259 RFQs, 0% conversion</div>
+        <div class="action-detail">• 19 customers asking, but we're not winning</div>
+        <div class="action-arrow">→ Spot-check pricing vs market (pricing benchmark?)</div>
+      </div>
+
+      <div class="action-item yellow">
+        <div class="action-title">Week-to-Date Pace (only 1 of 5 days complete)</div>
+        <div class="action-detail">• USA: On pace ✅ | MEX: Behind on CQ/sold 🚨 | APAC: Need strong Wed-Fri ⚠️</div>
+      </div>
+    </div>
+
+    <div class="priority-section">
+      <div class="priority-header priority-green">🟢 ON TRACK (FYI Only)</div>
+      <div class="action-item green">
+        <div class="action-detail">• Pipeline Input: +76% RFQ inflow vs 5-day avg ✅</div>
+        <div class="action-detail">• System Discipline: 0% retroactive CQ entries ✅</div>
+        <div class="action-detail">• Sourcing Response: No stuck items >3 days ✅</div>
+        <div class="action-detail">• USA Region: All metrics trending positive ✅</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- SECTION 1: YESTERDAY'S SCORECARD -->
+  <div class="section">
+    <div class="section-title">📊 Yesterday's Scorecard — Monday, June 1, 2026</div>
+
+    <div class="scorecard-grid">
+      <div class="scorecard-card">
+        <div class="scorecard-header">Pipeline Input</div>
+        <div class="scorecard-metric">565 <span style="font-size: 14px; color: #666;">RFQs</span></div>
+        <div class="scorecard-trend trend-up">↑ 76% vs 5-day avg ✅</div>
+        <div class="scorecard-detail">74 customers • 126 sourced (22%)</div>
+      </div>
+
+      <div class="scorecard-card">
+        <div class="scorecard-header">Quoting Activity</div>
+        <div class="scorecard-metric">30 <span style="font-size: 14px; color: #666;">CQs</span></div>
+        <div class="scorecard-trend trend-down">↓ 16% vs 5-day avg ⚠️</div>
+        <div class="scorecard-detail">13 customers • 26 sold (87%)</div>
+      </div>
+
+      <div class="scorecard-card">
+        <div class="scorecard-header">Wins</div>
+        <div class="scorecard-metric">$92K</div>
+        <div class="scorecard-trend trend-down">↓ 96% vs 5-day avg 🚨</div>
+        <div class="scorecard-detail">21 SO lines (↑14%)</div>
+      </div>
+
+      <div class="scorecard-card">
+        <div class="scorecard-header">System Discipline</div>
+        <div class="scorecard-metric">19% <span style="font-size: 14px; color: #666;">on-time</span></div>
+        <div class="scorecard-trend trend-down">↓ 8pts vs 5-day avg ⚠️</div>
+        <div class="scorecard-detail">0% retroactive entries ✅</div>
+      </div>
+    </div>
+
+    <div class="scorecard-card" style="margin-top: 8px;">
+      <div class="scorecard-header">Quote Aging</div>
+      <div style="display: flex; gap: 24px;">
+        <div style="flex: 1;">
+          <div style="font-size: 11px; color: #666; margin-bottom: 4px;">Short-cycle (Shortage/PPV/Stock)</div>
+          <div class="scorecard-metric" style="font-size: 18px;">9.6 days</div>
+          <div class="scorecard-trend trend-up">✅ ↓23% (faster close)</div>
+        </div>
+        <div style="flex: 1;">
+          <div style="font-size: 11px; color: #666; margin-bottom: 4px;">Long-cycle (EOL/LTB)</div>
+          <div class="scorecard-metric" style="font-size: 18px;">32.6 days</div>
+          <div class="scorecard-trend trend-down">⚠️ ↑8% (aging)</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- SECTION 2: REGIONAL PERFORMANCE -->
+  <div class="section">
+    <div class="section-title">📍 Regional Performance — Yesterday's Activity</div>
+
+    <table>
+      <thead>
+        <tr>
+          <th>Region</th>
+          <th>RFQs</th>
+          <th>Sourced</th>
+          <th>CQs</th>
+          <th>Sold</th>
+          <th>SOs</th>
+          <th>Status</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><strong>USA</strong> (Jeff, 8)</td>
+          <td>41</td>
+          <td>49% ✅</td>
+          <td>17</td>
+          <td>8</td>
+          <td>18</td>
+          <td><span class="status-badge status-strong">🟢 Strong</span></td>
+        </tr>
+        <tr>
+          <td><strong>MEX</strong> (Joel, 8)</td>
+          <td>173</td>
+          <td>36% ⚠️</td>
+          <td>3</td>
+          <td>0</td>
+          <td>1</td>
+          <td><span class="status-badge status-crisis">🔴 Crisis</span></td>
+        </tr>
+        <tr>
+          <td><strong>APAC</strong> (3 mgrs, 12)</td>
+          <td>10</td>
+          <td>40% ✅</td>
+          <td>4</td>
+          <td>4</td>
+          <td>2</td>
+          <td><span class="status-badge status-solid">🟢 Solid</span></td>
+        </tr>
+      </tbody>
+    </table>
+
+    <div class="insight-box" style="margin-top: 12px;">
+      <strong>🔴 MEX Red Flag:</strong> 173 RFQs but only 3 CQs (2% conversion vs 20% expected) → Sourcing bottleneck? Quoting delay? Needs immediate investigation.
+    </div>
+
+    <div class="insight-box">
+      <strong>🟢 USA Highlight:</strong> 49% sourced, 18 SOs closed (strong execution across all metrics).
+    </div>
+
+    <div class="collapsible">View APAC Subregion Breakdown</div>
+    <div class="collapsible-content">
+      <table style="margin-top: 12px;">
+        <thead>
+          <tr>
+            <th>Subregion</th>
+            <th>RFQs</th>
+            <th>Sourced</th>
+            <th>CQs</th>
+            <th>Sold</th>
+            <th>SOs</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>↳ Laurel (SGP, 3)</td>
+            <td>6</td>
+            <td>1 (17%)</td>
+            <td>3</td>
+            <td>3</td>
+            <td>1</td>
+          </tr>
+          <tr>
+            <td>↳ Silvia (PHL/China, 6)</td>
+            <td>1</td>
+            <td>0 (0%)</td>
+            <td>0</td>
+            <td>0</td>
+            <td>0</td>
+          </tr>
+          <tr>
+            <td>↳ Lavanya (IND, 3)</td>
+            <td>3</td>
+            <td>3 (100%)</td>
+            <td>1</td>
+            <td>1</td>
+            <td>1</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- SECTION 3: NEEDS ATTENTION (Action-Oriented) -->
+  <div class="section">
+    <div class="section-title">🚨 Needs Attention — Fresh Items (Last 5 Days)</div>
+
+    <div style="font-weight: 600; font-size: 13px; margin-bottom: 8px;">Priority 1: High-Value Pipeline ($2.5M)</div>
+    <div class="alert-box critical">
+      <div class="alert-item">1. GE Aerospace — <strong>$699K</strong> (Shortage, 1d old) — Jake M<br>
+        <span style="font-size: 11px; color: #666;">→ 41.7% win rate customer, 9 days left in window</span>
+      </div>
+      <div class="alert-item">2. MKS Instruments — <strong>$695K</strong> (EOL, 6d old) — Josh S<br>
+        <span style="font-size: 11px; color: #666;">→ 58 days left in long-cycle window</span>
+      </div>
+      <div class="alert-item">3. GE Healthcare — <strong>$562K</strong> (Shortage, 5d old) — Aaron M</div>
+    </div>
+    <div class="collapsible">View All 5 High-Value Quotes (+$2.5M Total)</div>
+    <div class="collapsible-content">
+      <div class="alert-item">4. RTX — <strong>$253K</strong> (Shortage, 5d old) — Thomas H</div>
+      <div class="alert-item">5. Parker Meggitt — <strong>$242K</strong> (EOL, 6d old) — Josh S</div>
+    </div>
+
+    <div style="font-weight: 600; font-size: 13px; margin: 16px 0 8px 0;">Priority 2: New Customer Risk (168 RFQ lines, no quotes)</div>
+    <div class="alert-box opportunity">
+      <div class="alert-item" style="background: #fee2e2; padding: 8px; border-radius: 4px;">
+        🚨 <strong>Etron Technology</strong> — 162 lines, 7 days old — Alejandro P<br>
+        <span style="font-size: 11px; color: #666;">→ First-time customer, needs quotes TODAY or risk losing</span>
+      </div>
+    </div>
+    <div class="collapsible">View All 5 New Customer Opportunities</div>
+    <div class="collapsible-content">
+      <div class="alert-item">2. Vista Consoles Electronics — 3 lines, 6 days old — Lavanya M</div>
+      <div class="alert-item">3. TVSMotor — 1 line, 6 days old — Manikandan</div>
+      <div class="alert-item">4. Optimized Solutions — 1 line, 6 days old — Lavanya M</div>
+      <div class="alert-item">5. STS Manufacturing — 1 line, 6 days old — Carlos M</div>
+    </div>
+
+    <div style="font-weight: 600; font-size: 13px; margin: 16px 0 8px 0;">Priority 3: High-Probability Wins ($778K)</div>
+    <div class="alert-box opportunity">
+      <div class="alert-item">• Eastman Kodak — $2K (50% win rate) — Aaron M</div>
+      <div class="alert-item">• GE Aerospace — $699K (41.7% win rate) — Jake M (also in Priority 1)</div>
+    </div>
+    <div class="collapsible">View All 5 High-Probability Quotes</div>
+    <div class="collapsible-content">
+      <div class="alert-item">3. GE Aerospace — $42K (41.7% win rate) — Jake M</div>
+      <div class="alert-item">4. GE Aerospace — $18K (41.7% win rate) — Jake M</div>
+      <div class="alert-item">5. GE Aerospace — $17K (41.7% win rate) — Jake M</div>
+    </div>
+
+    <div style="font-weight: 600; font-size: 13px; margin: 16px 0 8px 0;">FYI: Pricing Benchmarks (monitor, no action needed)</div>
+    <div class="alert-box">
+      <div class="alert-item">• Unqualified Broker — 223 lines quoted, 0% win rate</div>
+      <div class="alert-item">• RTX — 36 lines quoted, 0% win rate</div>
+    </div>
+  </div>
+
+  <!-- SECTION 4: WEEK-TO-DATE PACE (Progress Bars) -->
+  <div class="section">
+    <div class="section-title">📅 Week-to-Date Pace — Day 1 of 5 (20% Complete)</div>
+
+    <div class="region-block">
+      <div class="region-header">USA (Jeff Wallace, 8 sellers)</div>
+      <div class="progress-row">
+        <div class="progress-row-label">RFQs:</div>
+        <div class="progress-row-bar">
+          <div class="progress-bar-container">
+            <div class="progress-bar" style="width: 27%;"></div>
+            <div class="progress-label">48 / 180</div>
+          </div>
+        </div>
+        <div class="progress-row-value">27% 🟢 Ahead of pace</div>
+      </div>
+      <div class="progress-row">
+        <div class="progress-row-label">CQs:</div>
+        <div class="progress-row-bar">
+          <div class="progress-bar-container">
+            <div class="progress-bar" style="width: 31%;"></div>
+            <div class="progress-label">42 / 135</div>
+          </div>
+        </div>
+        <div class="progress-row-value">31% 🟢 Ahead of pace</div>
+      </div>
+      <div class="progress-row">
+        <div class="progress-row-label">Sold:</div>
+        <div class="progress-row-bar">
+          <div class="progress-bar-container">
+            <div class="progress-bar" style="width: 73%;"></div>
+            <div class="progress-label">30 / 41</div>
+          </div>
+        </div>
+        <div class="progress-row-value">73% 🟢 On track</div>
+      </div>
+      <div class="progress-row">
+        <div class="progress-row-label">Revenue:</div>
+        <div class="progress-row-bar"></div>
+        <div class="progress-row-value"><strong>$920K</strong></div>
+      </div>
+    </div>
+
+    <div class="region-block">
+      <div class="region-header">MEX (Joel Marquez, 8 sellers)</div>
+      <div class="progress-row">
+        <div class="progress-row-label">RFQs:</div>
+        <div class="progress-row-bar">
+          <div class="progress-bar-container">
+            <div class="progress-bar" style="width: 98%;"></div>
+            <div class="progress-label">177 / 180</div>
+          </div>
+        </div>
+        <div class="progress-row-value">98% 🟢 On track</div>
+      </div>
+      <div class="progress-row">
+        <div class="progress-row-label">CQs:</div>
+        <div class="progress-row-bar">
+          <div class="progress-bar-container">
+            <div class="progress-bar danger" style="width: 4%;"></div>
+            <div class="progress-label">5 / 135</div>
+          </div>
+        </div>
+        <div class="progress-row-value">4% 🔴 CRITICAL GAP</div>
+      </div>
+      <div class="progress-row">
+        <div class="progress-row-label">Sold:</div>
+        <div class="progress-row-bar">
+          <div class="progress-bar-container">
+            <div class="progress-bar danger" style="width: 5%;"></div>
+            <div class="progress-label">2 / 41</div>
+          </div>
+        </div>
+        <div class="progress-row-value">5% 🔴 CRITICAL GAP</div>
+      </div>
+      <div class="progress-row">
+        <div class="progress-row-label">Revenue:</div>
+        <div class="progress-row-bar"></div>
+        <div class="progress-row-value"><strong>$725</strong></div>
+      </div>
+    </div>
+
+    <div class="region-block">
+      <div class="region-header">APAC (3 managers, 12 sellers)</div>
+      <div class="progress-row">
+        <div class="progress-row-label">RFQs:</div>
+        <div class="progress-row-bar">
+          <div class="progress-bar-container">
+            <div class="progress-bar" style="width: 30%;"></div>
+            <div class="progress-label">66 / 220</div>
+          </div>
+        </div>
+        <div class="progress-row-value">30% 🟢 Ahead of pace</div>
+      </div>
+      <div class="progress-row">
+        <div class="progress-row-label">CQs:</div>
+        <div class="progress-row-bar">
+          <div class="progress-bar-container">
+            <div class="progress-bar warning" style="width: 7%;"></div>
+            <div class="progress-label">11 / 165</div>
+          </div>
+        </div>
+        <div class="progress-row-value">7% 🟡 Below pace</div>
+      </div>
+      <div class="progress-row">
+        <div class="progress-row-label">Sold:</div>
+        <div class="progress-row-bar">
+          <div class="progress-bar-container">
+            <div class="progress-bar" style="width: 22%;"></div>
+            <div class="progress-label">11 / 50</div>
+          </div>
+        </div>
+        <div class="progress-row-value">22% 🟢 On track</div>
+      </div>
+      <div class="progress-row">
+        <div class="progress-row-label">Revenue:</div>
+        <div class="progress-row-bar"></div>
+        <div class="progress-row-value"><strong>$729K</strong></div>
+      </div>
+    </div>
+
+    <div class="insight-box" style="background: #fee2e2; border-left-color: #dc2626;">
+      <strong>🔴 Critical:</strong> MEX needs 93 CQs + 39 sold in 4 days (impossible pace). Immediate intervention required.
+    </div>
+  </div>
+
+  <!-- SECTION 5: YESTERDAY'S WINS (Top 3 Only) -->
+  <div class="section">
+    <div class="section-title">🎉 Yesterday's Wins — $92K Total (21 lines)</div>
+
+    <div style="background: #f0fdf4; border-left: 4px solid #16a34a; padding: 12px; margin-bottom: 12px; border-radius: 4px;">
+      <div style="font-weight: 700; margin-bottom: 6px;">🥇 GE Aerospace — $37K (8 lines) — USA - Jake Mcaloose</div>
+      <div style="font-size: 11px; color: #666;">Generic Sales Product</div>
+    </div>
+
+    <div style="background: #f0fdf4; border-left: 4px solid #16a34a; padding: 12px; margin-bottom: 12px; border-radius: 4px;">
+      <div style="font-weight: 700; margin-bottom: 6px;">🥈 ABB — $27K (1 line) — APAC - Laurel Kee</div>
+      <div style="font-size: 11px; color: #666;">High-value single line (watch for follow-on opportunities)</div>
+    </div>
+
+    <div style="background: #f0fdf4; border-left: 4px solid #16a34a; padding: 12px; margin-bottom: 12px; border-radius: 4px;">
+      <div style="font-weight: 700; margin-bottom: 6px;">🥉 Blue Origin — $10K (8 lines) — USA - James Diaz</div>
+      <div style="font-size: 11px; color: #666;">Generic Sales Product</div>
+    </div>
+
+    <div class="collapsible">View All 7 Wins (+$28K More)</div>
+    <div class="collapsible-content">
+      <div style="padding: 8px 0; border-bottom: 1px solid #f0f0f0;">
+        <strong>Applied Materials</strong> — $10K (1 line) — USA - Josh Syre
+      </div>
+      <div style="padding: 8px 0; border-bottom: 1px solid #f0f0f0;">
+        <strong>Parker Meggitt</strong> — $6K (1 line) — USA - Josh Syre
+      </div>
+      <div style="padding: 8px 0; border-bottom: 1px solid #f0f0f0;">
+        <strong>Avalon</strong> — $2K (1 line) — APAC - Manikandan
+      </div>
+      <div style="padding: 8px 0;">
+        <strong>Abaco Systems</strong> — $725 (1 line) — MEX - Joel Flores
+      </div>
+    </div>
+  </div>
+
+  <!-- SECTION 6: MARKET PULSE (Insights Not Data) -->
+  <div class="section">
+    <div class="section-title">📈 Market Pulse — Last 5 Business Days</div>
+
+    <div style="font-weight: 600; font-size: 13px; margin-bottom: 8px;">🔥 Hot Manufacturers (Demand Spikes)</div>
+
+    <div class="insight-box">
+      <strong>1. Texas Instruments</strong> — 259 RFQs from 19 customers<br>
+      <span style="font-size: 11px;">→ Concentrated demand (13.6 RFQs/customer)</span><br>
+      <span style="font-size: 11px; color: #dc2626;">→ 0% conversion ⚠️ Pricing issue or benchmark activity?</span>
+    </div>
+
+    <div class="insight-box">
+      <strong>2. Micron Technology</strong> — 87 RFQs from 16 customers<br>
+      <span style="font-size: 11px;">→ 1% conversion (4 quoted, 1 sold)</span>
+    </div>
+
+    <div class="insight-box">
+      <strong>3. Analog Devices</strong> — 78 RFQs from 15 customers<br>
+      <span style="font-size: 11px;">→ 1% conversion (13 quoted, 1 sold)</span>
+    </div>
+
+    <div style="font-weight: 600; font-size: 13px; margin: 16px 0 8px 0;">💎 High-Conversion Parts (Close These!)</div>
+
+    <div class="insight-box" style="background: #f0fdf4; border-left-color: #16a34a;">
+      <strong>DCR1-AM</strong> (Sierra Safety) — 8 RFQs → 8 sold (100% win!) ⭐<br>
+      <span style="font-size: 11px;">→ Perfect conversion — what's working here?</span>
+    </div>
+
+    <div class="insight-box" style="background: #fff7ed; border-left-color: #f59e0b;">
+      <strong>FT2232HL-REEL</strong> (FTDI) — 22 RFQs from 7 customers, 17 quoted (77%), 0 sold<br>
+      <span style="font-size: 11px; color: #d97706;">→ Opportunity: High quote rate but not closing. Why?</span>
+    </div>
+
+    <div class="collapsible">View Full Trending Tables (Top 10 MFRs + Parts)</div>
+    <div class="collapsible-content">
+      <div style="font-weight: 600; margin-bottom: 8px;">Trending Manufacturers</div>
+      <table style="font-size: 11px;">
+        <thead>
+          <tr>
+            <th>Manufacturer</th>
+            <th>Customers</th>
+            <th>RFQs</th>
+            <th>Quoted</th>
+            <th>Sold</th>
+            <th>Conv.</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr><td>Texas Instruments</td><td>19</td><td>259</td><td>19</td><td>1</td><td>0%</td></tr>
+          <tr><td>Vishay</td><td>9</td><td>89</td><td>2</td><td>1</td><td>1%</td></tr>
+          <tr><td>Micron Technology</td><td>16</td><td>87</td><td>4</td><td>1</td><td>1%</td></tr>
+          <tr><td>Analog Devices</td><td>15</td><td>78</td><td>13</td><td>1</td><td>1%</td></tr>
+          <tr><td>Murata</td><td>9</td><td>51</td><td>0</td><td>0</td><td>0%</td></tr>
+        </tbody>
+      </table>
+      <div style="margin-top: 16px; font-weight: 600; margin-bottom: 8px;">Trending Parts</div>
+      <table style="font-size: 11px;">
+        <thead>
+          <tr>
+            <th>MPN</th>
+            <th>MFR</th>
+            <th>Cust.</th>
+            <th>RFQs</th>
+            <th>Quoted</th>
+            <th>Sold</th>
+            <th>Conv.</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr><td>FT2232HL-REEL</td><td>FTDI</td><td>7</td><td>22</td><td>17</td><td>0</td><td>0%</td></tr>
+          <tr><td>MT47H128M16RT-25E:C</td><td>Micron</td><td>4</td><td>22</td><td>0</td><td>0</td><td>0%</td></tr>
+          <tr><td>EPCS64SI16N</td><td>Altera</td><td>4</td><td>15</td><td>0</td><td>0</td><td>0%</td></tr>
+          <tr><td>DCR1-AM</td><td>Sierra Safety</td><td>1</td><td>8</td><td>8</td><td>8</td><td>100%</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="footer">
+    ✅ Action-First Design Mockup (June 2, 2026)<br>
+    Generated with Claude Code • <a href="#" onclick="alert('This would link to the original comprehensive version'); return false;">View Full Detailed Report</a>
+  </div>
+</div>
+
+<script>
+// Collapsible sections functionality
+document.querySelectorAll('.collapsible').forEach(function(elem) {
+  elem.addEventListener('click', function() {
+    this.classList.toggle('active');
+    var content = this.nextElementSibling;
+    content.classList.toggle('show');
+  });
+});
+</script>
+</body>
+</html>

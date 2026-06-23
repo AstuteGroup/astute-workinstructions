@@ -1,0 +1,92 @@
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+SALES PULSE — Wednesday, May 28, 2026
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Data as of 6:00am PT | Reflects activity through EOD Tue May 27
+
+📊 GLOBAL SNAPSHOT
+
+                         Yesterday  |  vs. Tue 5/20  |  Trend
+  ────────────────────────────────────────────────────────────────
+  RFQs Received          47 lines   |     +8         |    ↑
+  Quotes Sent            32 lines   |     -5         |    ↓
+  Orders Booked          12 lines   |     +3         |    ↑
+  Avg Quote Age          8.2 days   |    +0.8d       |    ⚠️
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+📍 BY REGION (Yesterday's Activity)
+
+               RFQs In  |  Quotes Out  |  Orders Won  |  Avg Quote Age
+  ──────────────────────────────────────────────────────────────────────
+  USA (Jeff)      22 ↑  |      18 →    |      7 ↑     |    7.1d  ✅
+  MEX (Joel)       8 →  |       5 ↓    |      2 →     |    9.8d  ⚠️
+  APAC (All)      17 ↓  |       9 ↓    |      3 ↑     |    8.9d  ⚠️
+  ──────────────────────────────────────────────────────────────────────
+  GLOBAL          47    |      32      |     12       |    8.2d
+
+  APAC breakdown: Laurel 8 RFQs, Lavanya 6, Kris 3
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+🚨 NEEDS ATTENTION (as of 6am PT)
+
+  ⚠️  23 quotes aging 7-14 days (no customer response yet)
+      → USA: 12  |  MEX: 4  |  APAC: 7
+      → ACTION: Follow up today or mark lost
+
+  ⚠️  8 RFQs with no VQs after 3+ days (sourcing bottleneck)
+      → USA: 3  |  MEX: 1  |  APAC: 4
+      → ACTION: Escalate to sourcing or close out
+
+  🔥  5 quotes aging 15-30 days (going stale - last chance)
+      → USA: 2 (Acme Corp $18K, Widget Co $7K)
+      → MEX: 0
+      → APAC: 3 (Samsung $24K, Foxconn $11K, Delta $5K)
+      → ACTION: Final push or close out by EOD Friday
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+🎉 YESTERDAY'S WINS (orders booked Tue 5/27)
+
+  ✅  USA: $47K across 7 lines
+      → Premier Electronics — 4 lines, $32K (Dan Reiser)
+      → TechSource — 3 lines, $15K (Jake McAloose)
+      💡 Premier order came from 3-day-old quote (fast close!)
+
+  ✅  MEX: $8K across 2 lines
+      → Grupo Industrial — 2 lines, $8K (Carlos Moreno)
+
+  ✅  APAC: $12K across 3 lines
+      → Delta Electronics — 2 lines, $9K (Jasper Kee)
+      → LG Display — 1 line, $3K (Meenakshi Chidambaram)
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+📈 WEEK-TO-DATE (Mon-Wed, 3 of 5 days)
+
+               RFQs In  |  Quotes Out  |  Orders Won  |  $ Booked  |  Pace
+  ───────────────────────────────────────────────────────────────────────
+  USA             67    |      54      |      18      |   $142K    |  ✅
+  MEX             22    |      14      |       5      |    $31K    |  ⚠️
+  APAC            48    |      31      |       9      |    $58K    |  ✅
+  ───────────────────────────────────────────────────────────────────────
+  GLOBAL         137    |      99      |      32      |   $231K    |  ✅
+
+  Weekly Target: 50 orders, $350K
+  Current Pace: 53 orders, $385K (projected) → ✅ On track to exceed
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+📝 NOTES
+
+  • USA leading on velocity (7.1d avg quote age vs 8.2d global)
+  • MEX quote output down vs last week - sourcing issue or lighter RFQ load?
+  • APAC has 3 high-value stale quotes ($40K total) - worth a push
+  • System capture reminder: These numbers reflect OT activity only. Actual
+    pipeline may be higher due to off-system work.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Questions? Reply to this email or ping analytics team.
+Next digest: Tomorrow 6am PT

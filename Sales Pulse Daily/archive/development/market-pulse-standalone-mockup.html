@@ -1,0 +1,1116 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Market Pulse — 30-Day Rolling View</title>
+<style>
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif;
+    font-size: 13px;
+    line-height: 1.5;
+    color: #333;
+    max-width: 1100px;
+    margin: 0 auto;
+    padding: 20px;
+    background: #f5f5f5;
+  }
+  .container {
+    background: white;
+    padding: 24px;
+    border-radius: 8px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+  }
+  .mockup-banner {
+    background: linear-gradient(135deg, #8b5cf6 0%, #6d28d9 100%);
+    color: white;
+    padding: 12px 20px;
+    border-radius: 6px;
+    margin-bottom: 20px;
+    text-align: center;
+    font-weight: 700;
+    font-size: 14px;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+  }
+  h1 {
+    font-size: 22px;
+    font-weight: 600;
+    margin: 0 0 4px 0;
+    color: #1a1a1a;
+  }
+  .subtitle {
+    font-size: 12px;
+    color: #666;
+    margin-bottom: 20px;
+  }
+  .section {
+    margin-bottom: 28px;
+    padding-bottom: 28px;
+    border-bottom: 2px solid #e0e0e0;
+  }
+  .section:last-child {
+    border-bottom: none;
+  }
+  .section-title {
+    font-size: 16px;
+    font-weight: 600;
+    margin-bottom: 12px;
+    color: #1a1a1a;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .section-subtitle {
+    font-size: 11px;
+    color: #666;
+    margin-bottom: 12px;
+    font-style: italic;
+  }
+
+  /* Temperature Gauge */
+  .temp-gauge {
+    background: linear-gradient(135deg, #fef3c7 0%, #fef9e7 100%);
+    border: 2px solid #f59e0b;
+    border-radius: 8px;
+    padding: 20px;
+    margin-bottom: 24px;
+  }
+  .temp-gauge h2 {
+    margin: 0 0 12px 0;
+    font-size: 16px;
+    font-weight: 700;
+    color: #92400e;
+  }
+  .gauge-status {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    margin-bottom: 16px;
+  }
+  .gauge-indicator {
+    font-size: 48px;
+    line-height: 1;
+  }
+  .gauge-text {
+    flex: 1;
+  }
+  .gauge-title {
+    font-size: 18px;
+    font-weight: 700;
+    color: #1a1a1a;
+    margin-bottom: 4px;
+  }
+  .gauge-detail {
+    font-size: 12px;
+    color: #666;
+  }
+  .signal-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 12px;
+    margin-top: 12px;
+  }
+  .signal-card {
+    background: white;
+    padding: 12px;
+    border-radius: 6px;
+    border-left: 3px solid #94a3b8;
+  }
+  .signal-card.active {
+    border-left-color: #dc2626;
+    background: #fef2f2;
+  }
+  .signal-label {
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: #64748b;
+    font-weight: 600;
+    margin-bottom: 4px;
+  }
+  .signal-value {
+    font-size: 18px;
+    font-weight: 700;
+    color: #1e293b;
+  }
+  .signal-card.active .signal-value {
+    color: #dc2626;
+  }
+
+  /* Tables */
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 12px;
+    margin-top: 8px;
+  }
+  th {
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    padding: 8px;
+    text-align: left;
+    font-weight: 600;
+    font-size: 11px;
+    color: #475569;
+  }
+  td {
+    border: 1px solid #e2e8f0;
+    padding: 8px;
+  }
+  tr:hover {
+    background: #fafafa;
+  }
+
+  /* Badges */
+  .badge {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 12px;
+    font-size: 11px;
+    font-weight: 600;
+  }
+  .badge-red { background: #fee2e2; color: #991b1b; }
+  .badge-yellow { background: #fef3c7; color: #92400e; }
+  .badge-green { background: #dcfce7; color: #166534; }
+  .badge-gray { background: #f1f5f9; color: #475569; }
+  .badge-purple { background: #f3e8ff; color: #6b21a8; }
+
+  /* Trend indicators */
+  .trend-up { color: #dc2626; font-weight: 600; }
+  .trend-down { color: #16a34a; font-weight: 600; }
+  .trend-neutral { color: #64748b; }
+
+  /* Alert boxes */
+  .alert-box {
+    background: #f8fafc;
+    border-left: 4px solid #3b82f6;
+    padding: 12px;
+    margin-top: 12px;
+    border-radius: 4px;
+    font-size: 12px;
+  }
+  .alert-box.warning {
+    background: #fffbeb;
+    border-left-color: #f59e0b;
+  }
+  .alert-box.critical {
+    background: #fef2f2;
+    border-left-color: #dc2626;
+  }
+  .alert-box strong {
+    color: #1e40af;
+  }
+  .alert-box.warning strong {
+    color: #92400e;
+  }
+  .alert-box.critical strong {
+    color: #991b1b;
+  }
+
+  /* Constraint indicators */
+  .constraint-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 16px;
+    margin-top: 12px;
+  }
+  .constraint-item {
+    background: white;
+    border: 1px solid #e2e8f0;
+    border-radius: 6px;
+    padding: 16px;
+  }
+  .constraint-header {
+    font-weight: 700;
+    font-size: 13px;
+    margin-bottom: 8px;
+    padding-bottom: 8px;
+    border-bottom: 2px solid #e2e8f0;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+  .constraint-count {
+    background: #dc2626;
+    color: white;
+    padding: 2px 10px;
+    border-radius: 12px;
+    font-size: 12px;
+  }
+  .constraint-list {
+    font-size: 12px;
+  }
+  .constraint-list-item {
+    padding: 6px 0;
+    border-bottom: 1px solid #f1f5f9;
+  }
+  .constraint-list-item:last-child {
+    border-bottom: none;
+  }
+
+  .footer {
+    margin-top: 24px;
+    padding-top: 16px;
+    border-top: 1px solid #e0e0e0;
+    font-size: 11px;
+    color: #666;
+  }
+</style>
+</head>
+<body>
+
+<div class="container">
+  <div class="mockup-banner">📊 MOCKUP — Market Pulse Standalone Report</div>
+
+  <h1>📈 Market Pulse — 30-Day Rolling View</h1>
+  <div class="subtitle">
+    As of June 4, 2026 | Rolling window: May 5 - June 4, 2026 (30 calendar days, ~22 business days)
+  </div>
+
+  <!-- TEMPERATURE GAUGE -->
+  <div class="temp-gauge">
+    <h2>🌡️ Market Temperature — Overall Status</h2>
+
+    <div class="gauge-status">
+      <div class="gauge-indicator">🟡</div>
+      <div class="gauge-text">
+        <div class="gauge-title">HEATING UP — 4 Constraint Signals Detected</div>
+        <div class="gauge-detail">
+          Market transitioning from Normal → Constrained. Memory manufacturers showing early allocation patterns.
+          APAC demand concentration increasing (early indicator — USA typically follows by 3-4 weeks).
+        </div>
+      </div>
+    </div>
+
+    <div class="signal-grid">
+      <div class="signal-card">
+        <div class="signal-label">MFRs with Margin Expansion</div>
+        <div class="signal-value">1</div>
+      </div>
+      <div class="signal-card active">
+        <div class="signal-label">MFRs with Conversion Drop</div>
+        <div class="signal-value">2 🔥</div>
+      </div>
+      <div class="signal-card">
+        <div class="signal-label">MFRs with Velocity Spike</div>
+        <div class="signal-value">0</div>
+      </div>
+      <div class="signal-card active">
+        <div class="signal-label">Parts with 5+ Customers</div>
+        <div class="signal-value">3 🔥</div>
+      </div>
+      <div class="signal-card active">
+        <div class="signal-label">MFRs with APAC >70%</div>
+        <div class="signal-value">2 🔥</div>
+      </div>
+      <div class="signal-card active">
+        <div class="signal-label">MFRs with Response Time ↑</div>
+        <div class="signal-value">1 🔥</div>
+      </div>
+    </div>
+
+    <div class="alert-box warning" style="margin-top: 16px;">
+      <strong>Key Watch Items:</strong> Micron DDR4 (8 customers), Samsung memory (APAC 78% concentration),
+      Nexperia discrete (response time +45%). Monitor for allocation announcements in next 2-3 weeks.
+    </div>
+  </div>
+
+  <!-- CONSTRAINT INDICATORS -->
+  <div class="section">
+    <div class="section-title">🔥 Constraint Indicators — Early Warning Signals</div>
+    <div class="section-subtitle">
+      These metrics identify parts/manufacturers moving toward allocation before official announcements
+    </div>
+
+    <div class="constraint-grid">
+      <!-- Multi-Customer Parts -->
+      <div class="constraint-item">
+        <div class="constraint-header">
+          <span>Multi-Customer Parts (5+ Customers)</span>
+          <span class="constraint-count">3</span>
+        </div>
+        <div class="constraint-list">
+          <div class="constraint-list-item">
+            <strong>MT47H128M16RT-25E:C</strong> (Micron)<br>
+            <span style="color: #666;">8 customers, 47 RFQ lines, 12% quoted</span>
+            <span class="badge badge-red">High Scarcity</span>
+          </div>
+          <div class="constraint-list-item">
+            <strong>FT2232HL-REEL</strong> (FTDI)<br>
+            <span style="color: #666;">6 customers, 35 RFQ lines, 68% quoted</span>
+            <span class="badge badge-yellow">Moderate</span>
+          </div>
+          <div class="constraint-list-item">
+            <strong>K4B2G1646F-BYMA</strong> (Samsung)<br>
+            <span style="color: #666;">5 customers, 28 RFQ lines, 25% quoted</span>
+            <span class="badge badge-yellow">Moderate</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Margin Expansion Leaders -->
+      <div class="constraint-item">
+        <div class="constraint-header">
+          <span>Margin Expansion Leaders (>5pts)</span>
+          <span class="constraint-count">1</span>
+        </div>
+        <div class="constraint-list">
+          <div class="constraint-list-item">
+            <strong>Samsung</strong><br>
+            <span style="color: #666;">Current: 28.5% margin (+7.2pts vs prior 30d)</span>
+            <span class="badge badge-red">Pricing Power</span>
+          </div>
+          <div class="constraint-list-item" style="color: #999;">
+            <em>No other manufacturers crossed +5pts threshold</em>
+          </div>
+        </div>
+      </div>
+
+      <!-- Conversion Drop-Off -->
+      <div class="constraint-item">
+        <div class="constraint-header">
+          <span>Conversion Drop-Off (>10pts)</span>
+          <span class="constraint-count">2</span>
+        </div>
+        <div class="constraint-list">
+          <div class="constraint-list-item">
+            <strong>Micron Technology</strong><br>
+            <span style="color: #666;">Current: 8.2% win rate (-14.3pts vs prior 30d)</span>
+            <span class="badge badge-red">Supply Tightening</span>
+          </div>
+          <div class="constraint-list-item">
+            <strong>Nexperia</strong><br>
+            <span style="color: #666;">Current: 5.1% win rate (-11.8pts vs prior 30d)</span>
+            <span class="badge badge-yellow">Watch</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Velocity Spike -->
+      <div class="constraint-item">
+        <div class="constraint-header">
+          <span>Velocity Spike (>50% increase)</span>
+          <span class="constraint-count" style="background: #64748b;">0</span>
+        </div>
+        <div class="constraint-list">
+          <div class="constraint-list-item" style="color: #999;">
+            <em>No manufacturers crossed +50% RFQ volume threshold</em><br>
+            <span style="color: #666; font-size: 11px;">Highest increase: Texas Instruments +38%</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="alert-box critical" style="margin-top: 16px;">
+      <strong>Allocation Risk Assessment:</strong> 3 constraint indicators active for Micron (multi-customer parts,
+      conversion drop, APAC concentration). Historical pattern suggests formal allocation announcement within 2-4 weeks
+      when 3+ signals align. Recommend proactive customer communication and alternative sourcing strategy.
+    </div>
+  </div>
+
+  <!-- TRENDING MANUFACTURERS (ENHANCED) -->
+  <div class="section">
+    <div class="section-title">🏭 Trending Manufacturers — Top 10 by RFQ Volume</div>
+    <div class="section-subtitle">
+      30-day window | New columns: Avg Quote Age, Margin Trend, WoW Velocity
+    </div>
+
+    <table>
+      <thead>
+        <tr>
+          <th>Manufacturer</th>
+          <th>Customers</th>
+          <th>RFQ Count</th>
+          <th>Quoted</th>
+          <th>Sold</th>
+          <th>Win %</th>
+          <th>Avg Quote Age</th>
+          <th>Margin Trend</th>
+          <th>WoW Velocity</th>
+          <th>Signals</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><strong>Texas Instruments</strong></td>
+          <td>52</td>
+          <td>823</td>
+          <td>142</td>
+          <td>28</td>
+          <td>3.4%</td>
+          <td>8.2d</td>
+          <td>22.1% <span class="trend-neutral">(+1.8)</span></td>
+          <td class="trend-up">↑ 38%</td>
+          <td><span class="badge badge-gray">Normal</span></td>
+        </tr>
+        <tr style="background: #fffbeb;">
+          <td><strong>Micron Technology</strong></td>
+          <td>48</td>
+          <td>687</td>
+          <td>98</td>
+          <td>8</td>
+          <td class="trend-down">8.2% ↓</td>
+          <td>12.5d</td>
+          <td>18.5% <span class="trend-neutral">(+2.1)</span></td>
+          <td class="trend-neutral">+12%</td>
+          <td><span class="badge badge-yellow">2 Signals</span></td>
+        </tr>
+        <tr style="background: #fef2f2;">
+          <td><strong>Samsung</strong></td>
+          <td>41</td>
+          <td>564</td>
+          <td>72</td>
+          <td>12</td>
+          <td>16.7%</td>
+          <td>14.8d</td>
+          <td class="trend-up">28.5% ↑ (+7.2)</td>
+          <td class="trend-neutral">+8%</td>
+          <td><span class="badge badge-red">3 Signals 🔥</span></td>
+        </tr>
+        <tr>
+          <td><strong>Analog Devices</strong></td>
+          <td>38</td>
+          <td>445</td>
+          <td>118</td>
+          <td>24</td>
+          <td>20.3%</td>
+          <td>6.5d</td>
+          <td>24.8% <span class="trend-neutral">(+0.5)</span></td>
+          <td class="trend-neutral">+15%</td>
+          <td><span class="badge badge-gray">Normal</span></td>
+        </tr>
+        <tr style="background: #fffbeb;">
+          <td><strong>Nexperia</strong></td>
+          <td>32</td>
+          <td>412</td>
+          <td>58</td>
+          <td>3</td>
+          <td class="trend-down">5.1% ↓</td>
+          <td>9.8d</td>
+          <td>16.2% <span class="trend-neutral">(+3.4)</span></td>
+          <td class="trend-neutral">+22%</td>
+          <td><span class="badge badge-yellow">2 Signals</span></td>
+        </tr>
+        <tr>
+          <td><strong>Infineon</strong></td>
+          <td>29</td>
+          <td>358</td>
+          <td>64</td>
+          <td>18</td>
+          <td>28.1%</td>
+          <td>7.2d</td>
+          <td>21.5% <span class="trend-down">(-1.2)</span></td>
+          <td class="trend-neutral">+6%</td>
+          <td><span class="badge badge-gray">Normal</span></td>
+        </tr>
+        <tr>
+          <td><strong>Vishay</strong></td>
+          <td>28</td>
+          <td>324</td>
+          <td>42</td>
+          <td>12</td>
+          <td>28.6%</td>
+          <td>5.8d</td>
+          <td>19.8% <span class="trend-neutral">(+2.1)</span></td>
+          <td class="trend-neutral">+18%</td>
+          <td><span class="badge badge-gray">Normal</span></td>
+        </tr>
+        <tr>
+          <td><strong>STMicroelectronics</strong></td>
+          <td>25</td>
+          <td>298</td>
+          <td>48</td>
+          <td>14</td>
+          <td>29.2%</td>
+          <td>8.5d</td>
+          <td>23.2% <span class="trend-neutral">(+1.5)</span></td>
+          <td class="trend-neutral">+9%</td>
+          <td><span class="badge badge-gray">Normal</span></td>
+        </tr>
+        <tr>
+          <td><strong>Murata</strong></td>
+          <td>24</td>
+          <td>276</td>
+          <td>38</td>
+          <td>8</td>
+          <td>21.1%</td>
+          <td>11.2d</td>
+          <td>17.5% <span class="trend-down">(-0.8)</span></td>
+          <td class="trend-neutral">+14%</td>
+          <td><span class="badge badge-gray">Normal</span></td>
+        </tr>
+        <tr>
+          <td><strong>Future Tech Devices (FTDI)</strong></td>
+          <td>22</td>
+          <td>268</td>
+          <td>182</td>
+          <td>8</td>
+          <td>4.4%</td>
+          <td>6.8d</td>
+          <td>32.5% <span class="trend-neutral">(+4.2)</span></td>
+          <td class="trend-neutral">+25%</td>
+          <td><span class="badge badge-gray">Normal</span></td>
+        </tr>
+      </tbody>
+    </table>
+
+    <div class="alert-box">
+      <strong>Interpretation:</strong> Samsung showing strongest constraint signals — margin expansion +7.2pts (pricing power),
+      APAC concentration 78%, multi-customer demand on key parts. Micron showing conversion drop -14.3pts (supply tightening).
+      Both memory manufacturers warrant closer monitoring.
+    </div>
+  </div>
+
+  <!-- TRENDING PARTS (ENHANCED) -->
+  <div class="section">
+    <div class="section-title">🔧 Trending Parts — Top 10 by RFQ Count</div>
+    <div class="section-subtitle">
+      30-day window | New columns: Customer Spread (multi-customer indicator), First Seen
+    </div>
+
+    <table>
+      <thead>
+        <tr>
+          <th>MPN</th>
+          <th>Manufacturer</th>
+          <th>Customers</th>
+          <th>RFQ Count</th>
+          <th>Quoted</th>
+          <th>Sold</th>
+          <th>Win %</th>
+          <th>First Seen</th>
+          <th>Scarcity Signal</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr style="background: #fef2f2;">
+          <td><strong>MT47H128M16RT-25E:C</strong></td>
+          <td>Micron Technology</td>
+          <td class="trend-up">8 🔥</td>
+          <td>47</td>
+          <td>6</td>
+          <td>0</td>
+          <td>0%</td>
+          <td>12d ago</td>
+          <td><span class="badge badge-red">High Scarcity</span></td>
+        </tr>
+        <tr style="background: #fffbeb;">
+          <td><strong>FT2232HL-REEL</strong></td>
+          <td>Future Tech Devices</td>
+          <td class="trend-up">6 ⚠️</td>
+          <td>35</td>
+          <td>24</td>
+          <td>2</td>
+          <td>8.3%</td>
+          <td>28d ago</td>
+          <td><span class="badge badge-yellow">Moderate</span></td>
+        </tr>
+        <tr>
+          <td><strong>TPS54531DDAR</strong></td>
+          <td>Texas Instruments</td>
+          <td>4</td>
+          <td>32</td>
+          <td>18</td>
+          <td>5</td>
+          <td>27.8%</td>
+          <td>22d ago</td>
+          <td><span class="badge badge-gray">Normal</span></td>
+        </tr>
+        <tr style="background: #fffbeb;">
+          <td><strong>K4B2G1646F-BYMA</strong></td>
+          <td>Samsung</td>
+          <td class="trend-up">5 ⚠️</td>
+          <td>28</td>
+          <td>7</td>
+          <td>2</td>
+          <td>28.6%</td>
+          <td>8d ago</td>
+          <td><span class="badge badge-yellow">Moderate</span></td>
+        </tr>
+        <tr>
+          <td><strong>EPCS64SI16N</strong></td>
+          <td>Altera</td>
+          <td>3</td>
+          <td>26</td>
+          <td>8</td>
+          <td>1</td>
+          <td>12.5%</td>
+          <td>18d ago</td>
+          <td><span class="badge badge-gray">Normal</span></td>
+        </tr>
+        <tr>
+          <td><strong>AD8065ARTZ-REEL7</strong></td>
+          <td>Analog Devices</td>
+          <td>4</td>
+          <td>24</td>
+          <td>14</td>
+          <td>6</td>
+          <td>42.9%</td>
+          <td>25d ago</td>
+          <td><span class="badge badge-gray">Normal</span></td>
+        </tr>
+        <tr>
+          <td><strong>PMEG4010ER,115</strong></td>
+          <td>Nexperia</td>
+          <td>3</td>
+          <td>22</td>
+          <td>4</td>
+          <td>0</td>
+          <td>0%</td>
+          <td>14d ago</td>
+          <td><span class="badge badge-gray">Normal</span></td>
+        </tr>
+        <tr>
+          <td><strong>W25Q128JVSIQ</strong></td>
+          <td>Winbond</td>
+          <td>4</td>
+          <td>21</td>
+          <td>12</td>
+          <td>3</td>
+          <td>25%</td>
+          <td>20d ago</td>
+          <td><span class="badge badge-gray">Normal</span></td>
+        </tr>
+        <tr>
+          <td><strong>LM358DR</strong></td>
+          <td>Texas Instruments</td>
+          <td>3</td>
+          <td>19</td>
+          <td>8</td>
+          <td>4</td>
+          <td>50%</td>
+          <td>16d ago</td>
+          <td><span class="badge badge-gray">Normal</span></td>
+        </tr>
+        <tr style="background: #f0fdf4;">
+          <td><strong>IPB65R190CFD</strong></td>
+          <td>Infineon</td>
+          <td>2</td>
+          <td>18</td>
+          <td>14</td>
+          <td>8</td>
+          <td>57.1%</td>
+          <td class="trend-up">3d ago 🆕</td>
+          <td><span class="badge badge-green">New Entrant</span></td>
+        </tr>
+      </tbody>
+    </table>
+
+    <div class="alert-box warning">
+      <strong>Multi-Customer Alert:</strong> MT47H128M16RT-25E:C (Micron DDR4) requested by 8 distinct customers in 30 days
+      with only 12% quoted — strong scarcity signal. FT2232HL-REEL (FTDI USB bridge) at 6 customers — elevated but stable supply.
+      K4B2G1646F-BYMA (Samsung DDR3) showing 5 customers, first seen 8 days ago — emerging hotspot.
+    </div>
+  </div>
+
+  <!-- MANUFACTURER EXPOSURE -->
+  <div class="section">
+    <div class="section-title">💼 Manufacturer Exposure — Pipeline Concentration Risk</div>
+    <div class="section-subtitle">
+      Top 10 MFRs by open pipeline value (RFQs + CQs not yet won/lost) — shows allocation exposure
+    </div>
+
+    <table>
+      <thead>
+        <tr>
+          <th>Manufacturer</th>
+          <th>Open RFQ Value</th>
+          <th>Open CQ Value</th>
+          <th>Total Exposure</th>
+          <th>% of Pipeline</th>
+          <th>Largest Customer</th>
+          <th>Risk Level</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><strong>Texas Instruments</strong></td>
+          <td>$1.82M</td>
+          <td>$645K</td>
+          <td><strong>$2.47M</strong></td>
+          <td>18.2%</td>
+          <td>Applied Materials ($482K)</td>
+          <td><span class="badge badge-gray">Low</span></td>
+        </tr>
+        <tr style="background: #fef2f2;">
+          <td><strong>Micron Technology</strong></td>
+          <td>$1.64M</td>
+          <td>$524K</td>
+          <td><strong>$2.16M</strong></td>
+          <td>15.9%</td>
+          <td>Plexus ($658K)</td>
+          <td><span class="badge badge-red">High 🔥</span></td>
+        </tr>
+        <tr>
+          <td><strong>Analog Devices</strong></td>
+          <td>$1.28M</td>
+          <td>$438K</td>
+          <td><strong>$1.72M</strong></td>
+          <td>12.7%</td>
+          <td>GE Aerospace ($312K)</td>
+          <td><span class="badge badge-gray">Low</span></td>
+        </tr>
+        <tr style="background: #fffbeb;">
+          <td><strong>Samsung</strong></td>
+          <td>$982K</td>
+          <td>$412K</td>
+          <td><strong>$1.39M</strong></td>
+          <td>10.3%</td>
+          <td>Sanmina ($384K)</td>
+          <td><span class="badge badge-yellow">Medium</span></td>
+        </tr>
+        <tr>
+          <td><strong>Infineon</strong></td>
+          <td>$846K</td>
+          <td>$268K</td>
+          <td><strong>$1.11M</strong></td>
+          <td>8.2%</td>
+          <td>Eaton ($228K)</td>
+          <td><span class="badge badge-gray">Low</span></td>
+        </tr>
+        <tr>
+          <td><strong>Nexperia</strong></td>
+          <td>$752K</td>
+          <td>$184K</td>
+          <td><strong>$936K</strong></td>
+          <td>6.9%</td>
+          <td>OnCore ($156K)</td>
+          <td><span class="badge badge-yellow">Medium</span></td>
+        </tr>
+        <tr>
+          <td><strong>Vishay</strong></td>
+          <td>$624K</td>
+          <td>$242K</td>
+          <td><strong>$866K</strong></td>
+          <td>6.4%</td>
+          <td>Taxan ($188K)</td>
+          <td><span class="badge badge-gray">Low</span></td>
+        </tr>
+        <tr>
+          <td><strong>STMicroelectronics</strong></td>
+          <td>$548K</td>
+          <td>$198K</td>
+          <td><strong>$746K</strong></td>
+          <td>5.5%</td>
+          <td>RTX ($142K)</td>
+          <td><span class="badge badge-gray">Low</span></td>
+        </tr>
+        <tr>
+          <td><strong>Altera</strong></td>
+          <td>$486K</td>
+          <td>$152K</td>
+          <td><strong>$638K</strong></td>
+          <td>4.7%</td>
+          <td>KLA ($248K)</td>
+          <td><span class="badge badge-gray">Low</span></td>
+        </tr>
+        <tr>
+          <td><strong>Murata</strong></td>
+          <td>$412K</td>
+          <td>$128K</td>
+          <td><strong>$540K</strong></td>
+          <td>4.0%</td>
+          <td>Spartronics ($98K)</td>
+          <td><span class="badge badge-gray">Low</span></td>
+        </tr>
+        <tr style="background: #f8fafc; font-weight: 600;">
+          <td><strong>TOP 10 TOTAL</strong></td>
+          <td>$9.37M</td>
+          <td>$3.19M</td>
+          <td><strong>$12.56M</strong></td>
+          <td>92.7%</td>
+          <td colspan="2">Remaining MFRs: $992K</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <div class="alert-box critical">
+      <strong>Concentration Risk:</strong> Micron represents $2.16M (15.9%) of open pipeline with HIGH allocation risk
+      (conversion drop -14.3pts, multi-customer parts, APAC concentration). If allocation announced, could impact $2M+ in
+      near-term revenue. Samsung at $1.39M (10.3%) also showing constraint signals. Combined memory exposure: $3.55M (26.2%).
+    </div>
+  </div>
+
+  <!-- REGIONAL DEMAND DIVERGENCE -->
+  <div class="section">
+    <div class="section-title">🌍 Regional Demand Divergence — Early Constraint Detector</div>
+    <div class="section-subtitle">
+      For top manufacturers, shows % of RFQs by region | APAC concentration >70% = early constraint signal
+    </div>
+
+    <table>
+      <thead>
+        <tr>
+          <th>Manufacturer</th>
+          <th>Total RFQs</th>
+          <th>APAC %</th>
+          <th>USA %</th>
+          <th>MEX %</th>
+          <th>Other %</th>
+          <th>Signal</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr style="background: #fef2f2;">
+          <td><strong>Samsung</strong></td>
+          <td>564</td>
+          <td class="trend-up">78% 🔥</td>
+          <td>14%</td>
+          <td>6%</td>
+          <td>2%</td>
+          <td><span class="badge badge-red">APAC Constrained</span></td>
+        </tr>
+        <tr style="background: #fef2f2;">
+          <td><strong>Micron Technology</strong></td>
+          <td>687</td>
+          <td class="trend-up">72% 🔥</td>
+          <td>18%</td>
+          <td>8%</td>
+          <td>2%</td>
+          <td><span class="badge badge-red">APAC Constrained</span></td>
+        </tr>
+        <tr>
+          <td><strong>Texas Instruments</strong></td>
+          <td>823</td>
+          <td>48%</td>
+          <td>32%</td>
+          <td>18%</td>
+          <td>2%</td>
+          <td><span class="badge badge-gray">Balanced</span></td>
+        </tr>
+        <tr style="background: #fffbeb;">
+          <td><strong>Nexperia</strong></td>
+          <td>412</td>
+          <td class="trend-neutral">64%</td>
+          <td>22%</td>
+          <td>12%</td>
+          <td>2%</td>
+          <td><span class="badge badge-yellow">APAC Elevated</span></td>
+        </tr>
+        <tr>
+          <td><strong>Analog Devices</strong></td>
+          <td>445</td>
+          <td>42%</td>
+          <td>38%</td>
+          <td>18%</td>
+          <td>2%</td>
+          <td><span class="badge badge-gray">Balanced</span></td>
+        </tr>
+        <tr>
+          <td><strong>Infineon</strong></td>
+          <td>358</td>
+          <td>38%</td>
+          <td>42%</td>
+          <td>16%</td>
+          <td>4%</td>
+          <td><span class="badge badge-gray">Balanced</span></td>
+        </tr>
+        <tr>
+          <td><strong>Vishay</strong></td>
+          <td>324</td>
+          <td>52%</td>
+          <td>28%</td>
+          <td>18%</td>
+          <td>2%</td>
+          <td><span class="badge badge-gray">Normal</span></td>
+        </tr>
+        <tr>
+          <td><strong>STMicroelectronics</strong></td>
+          <td>298</td>
+          <td>44%</td>
+          <td>34%</td>
+          <td>20%</td>
+          <td>2%</td>
+          <td><span class="badge badge-gray">Balanced</span></td>
+        </tr>
+      </tbody>
+    </table>
+
+    <div class="alert-box">
+      <strong>Regional Pattern Insight:</strong> Samsung (78% APAC) and Micron (72% APAC) showing strong regional concentration —
+      validates constraint-first in APAC. Historical pattern: USA follows APAC by 3-4 weeks, MEX by 6-8 weeks. Based on current
+      concentration, expect Samsung/Micron constraint signals in USA by late June, MEX by mid-July. Proactive customer
+      communication recommended for USA accounts now.
+    </div>
+  </div>
+
+  <!-- RESPONSE TIME TRENDS -->
+  <div class="section">
+    <div class="section-title">⏱️ Response Time Trends — Supply Chain Stress Indicator</div>
+    <div class="section-subtitle">
+      Avg days from RFQ created → first VQ loaded | Expanding response time = supplier sourcing difficulty
+    </div>
+
+    <table>
+      <thead>
+        <tr>
+          <th>Manufacturer</th>
+          <th>Current Avg Response Time</th>
+          <th>vs Prior 30d</th>
+          <th>Change %</th>
+          <th>Sample Size (RFQs with VQs)</th>
+          <th>Signal</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr style="background: #fef2f2;">
+          <td><strong>Nexperia</strong></td>
+          <td class="trend-up">4.8 days</td>
+          <td>+1.5d</td>
+          <td class="trend-up">+45% 🔥</td>
+          <td>58 RFQs</td>
+          <td><span class="badge badge-red">Slowing</span></td>
+        </tr>
+        <tr style="background: #fffbeb;">
+          <td><strong>Micron Technology</strong></td>
+          <td class="trend-up">3.6 days</td>
+          <td>+0.8d</td>
+          <td class="trend-up">+28%</td>
+          <td>98 RFQs</td>
+          <td><span class="badge badge-yellow">Watch</span></td>
+        </tr>
+        <tr>
+          <td><strong>Texas Instruments</strong></td>
+          <td>2.4 days</td>
+          <td>+0.2d</td>
+          <td class="trend-neutral">+9%</td>
+          <td>142 RFQs</td>
+          <td><span class="badge badge-gray">Normal</span></td>
+        </tr>
+        <tr>
+          <td><strong>Analog Devices</strong></td>
+          <td>2.1 days</td>
+          <td>-0.1d</td>
+          <td class="trend-down">-5%</td>
+          <td>118 RFQs</td>
+          <td><span class="badge badge-green">Improving</span></td>
+        </tr>
+        <tr>
+          <td><strong>Samsung</strong></td>
+          <td>3.2 days</td>
+          <td>+0.4d</td>
+          <td class="trend-neutral">+14%</td>
+          <td>72 RFQs</td>
+          <td><span class="badge badge-gray">Normal</span></td>
+        </tr>
+        <tr>
+          <td><strong>Infineon</strong></td>
+          <td>2.8 days</td>
+          <td>+0.2d</td>
+          <td class="trend-neutral">+8%</td>
+          <td>64 RFQs</td>
+          <td><span class="badge badge-gray">Normal</span></td>
+        </tr>
+        <tr>
+          <td><strong>Future Tech Devices (FTDI)</strong></td>
+          <td>1.8 days</td>
+          <td>-0.3d</td>
+          <td class="trend-down">-14%</td>
+          <td>182 RFQs</td>
+          <td><span class="badge badge-green">Improving</span></td>
+        </tr>
+        <tr>
+          <td><strong>Vishay</strong></td>
+          <td>2.6 days</td>
+          <td>+0.1d</td>
+          <td class="trend-neutral">+4%</td>
+          <td>42 RFQs</td>
+          <td><span class="badge badge-gray">Normal</span></td>
+        </tr>
+      </tbody>
+    </table>
+
+    <div class="alert-box warning">
+      <strong>Response Time Alert:</strong> Nexperia response time increased 45% (+1.5 days) — suppliers taking longer to source,
+      likely due to constrained inventory. Micron +28% also elevated. Both align with other constraint indicators (conversion drop,
+      multi-customer demand). Faster response times from ADI and FTDI suggest healthy supply for those manufacturers.
+    </div>
+  </div>
+
+  <!-- NEW ENTRANTS -->
+  <div class="section">
+    <div class="section-title">🆕 New Entrants — Emerging Hotspots</div>
+    <div class="section-subtitle">
+      Parts/Manufacturers that weren't in top 20 last 30 days but are trending now — early constraint warning
+    </div>
+
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Name</th>
+          <th>First Appeared</th>
+          <th>RFQ Count (30d)</th>
+          <th>Customers</th>
+          <th>Quote Coverage</th>
+          <th>Why Trending</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><strong>Part</strong></td>
+          <td>IPB65R190CFD (Infineon)</td>
+          <td>3 days ago</td>
+          <td>18</td>
+          <td>2</td>
+          <td>77.8%</td>
+          <td>High-power MOSFET, likely EV/industrial demand spike</td>
+        </tr>
+        <tr>
+          <td><strong>Part</strong></td>
+          <td>K4B2G1646F-BYMA (Samsung)</td>
+          <td>8 days ago</td>
+          <td>28</td>
+          <td>5</td>
+          <td>25%</td>
+          <td>DDR3 for legacy systems, multi-customer demand</td>
+        </tr>
+        <tr>
+          <td><strong>MFR</strong></td>
+          <td>Renesas</td>
+          <td>6 days ago</td>
+          <td>42</td>
+          <td>8</td>
+          <td>35.7%</td>
+          <td>Automotive MCUs, sudden uptick from 3 new customers</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <div class="alert-box">
+      <strong>Emerging Pattern:</strong> K4B2G1646F-BYMA (Samsung DDR3) appeared 8 days ago and already has 5 customers —
+      faster broadening than typical. Renesas automotive MCUs showing sudden interest from 3 new customers simultaneously —
+      possible supply disruption or OEM allocation. Monitor for formal announcements.
+    </div>
+  </div>
+
+  <!-- FOOTER -->
+  <div class="footer">
+    <p><strong>Data Sources:</strong> OT RFQ/VQ/CQ pipeline (30-day rolling window: May 5 - Jun 4, 2026)</p>
+    <p><strong>Constraint Signal Thresholds:</strong></p>
+    <ul style="margin: 4px 0 0 20px; padding: 0; list-style: disc;">
+      <li>Margin Expansion: >5pts vs prior 30d</li>
+      <li>Conversion Drop: >10pts vs prior 30d</li>
+      <li>Velocity Spike: >50% RFQ volume increase vs prior 30d</li>
+      <li>Multi-Customer Parts: 5+ distinct customers in 30d</li>
+      <li>Regional Concentration: APAC >70% of total RFQs</li>
+      <li>Response Time Increase: >20% slower vs prior 30d</li>
+    </ul>
+    <p style="margin-top: 12px;"><strong>Allocation Risk Framework:</strong></p>
+    <ul style="margin: 4px 0 0 20px; padding: 0; list-style: disc;">
+      <li>0-1 signals = <span class="badge badge-gray">Normal Market</span></li>
+      <li>2-3 signals = <span class="badge badge-yellow">Heating Up</span> — prepare for constraint</li>
+      <li>4-5 signals = <span class="badge badge-red">Constrained</span> — allocation likely within 2-4 weeks</li>
+      <li>6+ signals = <span class="badge badge-red">Critical</span> — allocation imminent or active</li>
+    </ul>
+    <p style="margin-top: 12px; font-style: italic;">
+      Generated with Claude Code • Market Pulse v1.0 Mockup
+    </p>
+  </div>
+
+</div>
+
+</body>
+</html>

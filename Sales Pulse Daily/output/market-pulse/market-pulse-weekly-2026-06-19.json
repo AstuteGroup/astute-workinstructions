@@ -1,0 +1,1214 @@
+{
+  "performanceSnapshot": {
+    "currentWeek": 24,
+    "priorWeek": 23,
+    "bookings": {
+      "current": {
+        "byTeam": {
+          "APAC - Silvia": {
+            "revenue": 842861,
+            "gp": 249947,
+            "orders": 42,
+            "customers": 7,
+            "gm": 0.2965459310609935
+          },
+          "APAC - Lavanya": {
+            "revenue": 106335,
+            "gp": 6792,
+            "orders": 5,
+            "customers": 3,
+            "gm": 0.06387360699675554
+          },
+          "APAC - Laurel": {
+            "revenue": 940702,
+            "gp": 249144,
+            "orders": 8,
+            "customers": 5,
+            "gm": 0.2648490170107005
+          },
+          "Other": {
+            "revenue": 23741,
+            "gp": 22337,
+            "orders": 2,
+            "customers": 2,
+            "gm": 0.9408618002611516
+          },
+          "USA": {
+            "revenue": 380494,
+            "gp": 267031,
+            "orders": 24,
+            "customers": 9,
+            "gm": 0.7018008168328541
+          },
+          "MEX": {
+            "revenue": 441237,
+            "gp": 135237,
+            "orders": 13,
+            "customers": 7,
+            "gm": 0.30649514886557566
+          }
+        },
+        "apacTotal": {
+          "revenue": 1889898,
+          "gp": 505883,
+          "orders": 55,
+          "customers": 15,
+          "gm": 0.26767740904535586
+        },
+        "total": {
+          "revenue": 2735370,
+          "gp": 930488,
+          "orders": 94,
+          "customers": 33,
+          "gm": 0.34016897165648524
+        }
+      },
+      "prior": {
+        "byTeam": {
+          "APAC - Laurel": {
+            "revenue": 308791,
+            "gp": 90610,
+            "orders": 6,
+            "customers": 5,
+            "gm": 0.29343471798077014
+          },
+          "APAC - Lavanya": {
+            "revenue": 193238,
+            "gp": 166645,
+            "orders": 5,
+            "customers": 3,
+            "gm": 0.8623821401587679
+          },
+          "USA": {
+            "revenue": 1839115,
+            "gp": 1657029,
+            "orders": 38,
+            "customers": 17,
+            "gm": 0.9009925969827879
+          },
+          "MEX": {
+            "revenue": 388541,
+            "gp": 114983,
+            "orders": 9,
+            "customers": 5,
+            "gm": 0.29593530669864954
+          },
+          "APAC - Silvia": {
+            "revenue": 256172,
+            "gp": 189134,
+            "orders": 9,
+            "customers": 6,
+            "gm": 0.7383086363849288
+          },
+          "Other": {
+            "revenue": 4021,
+            "gp": 1885,
+            "orders": 4,
+            "customers": 4,
+            "gm": 0.4687888584929122
+          }
+        },
+        "apacTotal": {
+          "revenue": 758201,
+          "gp": 446389,
+          "orders": 20,
+          "customers": 14,
+          "gm": 0.5887475748515235
+        },
+        "total": {
+          "revenue": 2989878,
+          "gp": 2220286,
+          "orders": 71,
+          "customers": 40,
+          "gm": 0.7426008686642064
+        }
+      }
+    },
+    "billings": {
+      "current": {
+        "byTeam": {
+          "MEX": {
+            "revenue": 360925.17000000004,
+            "gp": 134296.27,
+            "orders": 11,
+            "customers": 7,
+            "gm": 0.37208895683279714
+          },
+          "APAC - Silvia": {
+            "revenue": 261370.8,
+            "gp": 74920.67,
+            "orders": 14,
+            "customers": 7,
+            "gm": 0.2866451416914208
+          },
+          "USA": {
+            "revenue": 622376.4199999999,
+            "gp": 196827.83,
+            "orders": 24,
+            "customers": 9,
+            "gm": 0.3162520681615798
+          },
+          "Other": {
+            "revenue": 48188.53,
+            "gp": 25541.739999999998,
+            "orders": 6,
+            "customers": 5,
+            "gm": 0.5300377496470633
+          },
+          "APAC - Laurel": {
+            "revenue": 4472024.0200000005,
+            "gp": 1821403.5699999998,
+            "orders": 20,
+            "customers": 7,
+            "gm": 0.4072884138936265
+          },
+          "APAC - Lavanya": {
+            "revenue": 93033.58,
+            "gp": 19270.33,
+            "orders": 9,
+            "customers": 7,
+            "gm": 0.20713305883746494
+          }
+        },
+        "apacTotal": {
+          "revenue": 4826428.4,
+          "gp": 1915594.5699999998,
+          "orders": 43,
+          "customers": 21,
+          "gm": 0.3968969207126329
+        },
+        "total": {
+          "revenue": 5857918.5200000005,
+          "gp": 2272260.41,
+          "orders": 84,
+          "customers": 42,
+          "gm": 0.38789553016862377
+        }
+      },
+      "prior": {
+        "byTeam": {
+          "MEX": {
+            "revenue": 1057606.34,
+            "gp": 250499.82,
+            "orders": 20,
+            "customers": 9,
+            "gm": 0.23685544472057532
+          },
+          "Other": {
+            "revenue": 800.49,
+            "gp": 415.49,
+            "orders": 11,
+            "customers": 6,
+            "gm": 0.5190445851915702
+          },
+          "USA": {
+            "revenue": 454104.7299999999,
+            "gp": 143979.26000000004,
+            "orders": 38,
+            "customers": 17,
+            "gm": 0.317061793212328
+          },
+          "APAC - Silvia": {
+            "revenue": 241502.72999999998,
+            "gp": 59588.08,
+            "orders": 11,
+            "customers": 4,
+            "gm": 0.24673874287052575
+          },
+          "APAC - Laurel": {
+            "revenue": 1040622.8,
+            "gp": 677650.4,
+            "orders": 5,
+            "customers": 2,
+            "gm": 0.6511969562842559
+          },
+          "APAC - Lavanya": {
+            "revenue": 15535.8,
+            "gp": 3653.8900000000003,
+            "orders": 4,
+            "customers": 3,
+            "gm": 0.23519162193128132
+          }
+        },
+        "apacTotal": {
+          "revenue": 1297661.33,
+          "gp": 740892.37,
+          "orders": 20,
+          "customers": 9,
+          "gm": 0.5709443233543839
+        },
+        "total": {
+          "revenue": 2810172.8899999997,
+          "gp": 1135786.94,
+          "orders": 89,
+          "customers": 41,
+          "gm": 0.4041697733408851
+        }
+      }
+    },
+    "bookingsExKLA": {
+      "current": {
+        "byTeam": {
+          "APAC - Silvia": {
+            "revenue": 842861,
+            "gp": 249947,
+            "orders": 42,
+            "customers": 7,
+            "gm": 0.2965459310609935
+          },
+          "APAC - Lavanya": {
+            "revenue": 106335,
+            "gp": 6792,
+            "orders": 5,
+            "customers": 3,
+            "gm": 0.06387360699675554
+          },
+          "APAC - Laurel": {
+            "revenue": 940702,
+            "gp": 249144,
+            "orders": 8,
+            "customers": 5,
+            "gm": 0.2648490170107005
+          },
+          "Other": {
+            "revenue": 23741,
+            "gp": 22337,
+            "orders": 2,
+            "customers": 2,
+            "gm": 0.9408618002611516
+          },
+          "USA": {
+            "revenue": 380494,
+            "gp": 267031,
+            "orders": 24,
+            "customers": 9,
+            "gm": 0.7018008168328541
+          },
+          "MEX": {
+            "revenue": 441237,
+            "gp": 135237,
+            "orders": 13,
+            "customers": 7,
+            "gm": 0.30649514886557566
+          }
+        },
+        "apacTotal": {
+          "revenue": 1889898,
+          "gp": 505883,
+          "orders": 55,
+          "customers": 15,
+          "gm": 0.26767740904535586
+        },
+        "total": {
+          "revenue": 2735370,
+          "gp": 930488,
+          "orders": 94,
+          "customers": 33,
+          "gm": 0.34016897165648524
+        }
+      },
+      "prior": {
+        "byTeam": {
+          "APAC - Laurel": {
+            "revenue": 230461,
+            "gp": 70420,
+            "orders": 4,
+            "customers": 4,
+            "gm": 0.3055614615922
+          },
+          "APAC - Lavanya": {
+            "revenue": 193238,
+            "gp": 166645,
+            "orders": 5,
+            "customers": 3,
+            "gm": 0.8623821401587679
+          },
+          "USA": {
+            "revenue": 1839115,
+            "gp": 1657029,
+            "orders": 38,
+            "customers": 17,
+            "gm": 0.9009925969827879
+          },
+          "MEX": {
+            "revenue": 388541,
+            "gp": 114983,
+            "orders": 9,
+            "customers": 5,
+            "gm": 0.29593530669864954
+          },
+          "APAC - Silvia": {
+            "revenue": 256172,
+            "gp": 189134,
+            "orders": 9,
+            "customers": 6,
+            "gm": 0.7383086363849288
+          },
+          "Other": {
+            "revenue": 4021,
+            "gp": 1885,
+            "orders": 4,
+            "customers": 4,
+            "gm": 0.4687888584929122
+          }
+        },
+        "apacTotal": {
+          "revenue": 679871,
+          "gp": 426199,
+          "orders": 18,
+          "customers": 13,
+          "gm": 0.6268821585271324
+        },
+        "total": {
+          "revenue": 2911548,
+          "gp": 2200096,
+          "orders": 69,
+          "customers": 39,
+          "gm": 0.7556447635415937
+        }
+      }
+    },
+    "billingsExKLA": {
+      "current": {
+        "byTeam": {
+          "MEX": {
+            "revenue": 360925.17000000004,
+            "gp": 134296.27,
+            "orders": 11,
+            "customers": 7,
+            "gm": 0.37208895683279714
+          },
+          "APAC - Silvia": {
+            "revenue": 261370.8,
+            "gp": 74920.67,
+            "orders": 14,
+            "customers": 7,
+            "gm": 0.2866451416914208
+          },
+          "USA": {
+            "revenue": 622376.4199999999,
+            "gp": 196827.83,
+            "orders": 24,
+            "customers": 9,
+            "gm": 0.3162520681615798
+          },
+          "Other": {
+            "revenue": 48188.53,
+            "gp": 25541.739999999998,
+            "orders": 6,
+            "customers": 5,
+            "gm": 0.5300377496470633
+          },
+          "APAC - Laurel": {
+            "revenue": 454599.01999999996,
+            "gp": 103724.51000000001,
+            "orders": 10,
+            "customers": 6,
+            "gm": 0.228167033884059
+          },
+          "APAC - Lavanya": {
+            "revenue": 93033.58,
+            "gp": 19270.33,
+            "orders": 9,
+            "customers": 7,
+            "gm": 0.20713305883746494
+          }
+        },
+        "apacTotal": {
+          "revenue": 809003.3999999999,
+          "gp": 197915.51,
+          "orders": 33,
+          "customers": 20,
+          "gm": 0.24464113500635476
+        },
+        "total": {
+          "revenue": 1840493.52,
+          "gp": 554581.35,
+          "orders": 74,
+          "customers": 41,
+          "gm": 0.30132208778436775
+        }
+      },
+      "prior": {
+        "byTeam": {
+          "MEX": {
+            "revenue": 1057606.34,
+            "gp": 250499.82,
+            "orders": 20,
+            "customers": 9,
+            "gm": 0.23685544472057532
+          },
+          "Other": {
+            "revenue": 800.49,
+            "gp": 415.49,
+            "orders": 11,
+            "customers": 6,
+            "gm": 0.5190445851915702
+          },
+          "USA": {
+            "revenue": 454104.7299999999,
+            "gp": 143979.26000000004,
+            "orders": 38,
+            "customers": 17,
+            "gm": 0.317061793212328
+          },
+          "APAC - Silvia": {
+            "revenue": 241502.72999999998,
+            "gp": 59588.08,
+            "orders": 11,
+            "customers": 4,
+            "gm": 0.24673874287052575
+          },
+          "APAC - Laurel": {
+            "revenue": 232.8,
+            "gp": 120.8,
+            "orders": 1,
+            "customers": 1,
+            "gm": 0.5189003436426116
+          },
+          "APAC - Lavanya": {
+            "revenue": 15535.8,
+            "gp": 3653.8900000000003,
+            "orders": 4,
+            "customers": 3,
+            "gm": 0.23519162193128132
+          }
+        },
+        "apacTotal": {
+          "revenue": 257271.32999999996,
+          "gp": 63362.770000000004,
+          "orders": 16,
+          "customers": 8,
+          "gm": 0.24628772277113045
+        },
+        "total": {
+          "revenue": 1769782.8900000001,
+          "gp": 458257.3400000001,
+          "orders": 85,
+          "customers": 40,
+          "gm": 0.2589342131113043
+        }
+      }
+    },
+    "kla": {
+      "bookings": {
+        "revenue": 0,
+        "gp": 0
+      },
+      "billings": {
+        "revenue": 4017425.0000000005,
+        "gp": 1717679.06
+      }
+    }
+  },
+  "tempGauge": {
+    "status": "CRITICAL",
+    "statusIndicator": "🔴",
+    "activeSignals": 42,
+    "description": "Market under severe stress. Allocation likely imminent or active.",
+    "signals": {
+      "conversion_drop": 4,
+      "multi_customer_parts": 10,
+      "velocity_spike": 3,
+      "apac_concentration": 15,
+      "response_time_increase": 10
+    },
+    "keyWatchItems": "MT47H128M16RT-25E:C (25 customers), Texas Instruments (APAC 93.6% concentration), Semtech (response time +39139.9%)."
+  },
+  "constraints": {
+    "multiCustomerParts": [
+      {
+        "mpn": "MT47H128M16RT-25E:C",
+        "manufacturer": "Micron Technology Inc",
+        "customer_count": "25",
+        "rfq_count": "127",
+        "quoted_count": "0"
+      },
+      {
+        "mpn": "EPCS64SI16N",
+        "manufacturer": "Altera",
+        "customer_count": "15",
+        "rfq_count": "58",
+        "quoted_count": "0"
+      },
+      {
+        "mpn": "FT2232HL-REEL",
+        "manufacturer": "Future Technology Devices International Ltd",
+        "customer_count": "12",
+        "rfq_count": "109",
+        "quoted_count": "0"
+      },
+      {
+        "mpn": "MT25QL128ABA8ESF-0AATTR",
+        "manufacturer": "Micron Technology Inc",
+        "customer_count": "11",
+        "rfq_count": "38",
+        "quoted_count": "6"
+      },
+      {
+        "mpn": "EP3C120F484I7N",
+        "manufacturer": "Altera",
+        "customer_count": "8",
+        "rfq_count": "30",
+        "quoted_count": "0"
+      },
+      {
+        "mpn": "206509-1",
+        "manufacturer": "TE Connectivity Ltd",
+        "customer_count": "7",
+        "rfq_count": "10",
+        "quoted_count": "0"
+      },
+      {
+        "mpn": "INA826AIDGKR",
+        "manufacturer": "Texas Instruments",
+        "customer_count": "7",
+        "rfq_count": "10",
+        "quoted_count": "0"
+      },
+      {
+        "mpn": "S25FL064LABNFI043",
+        "manufacturer": "Infineon Technologies",
+        "customer_count": "7",
+        "rfq_count": "28",
+        "quoted_count": "3"
+      },
+      {
+        "mpn": "MT40A256M16LY-062E AUT:F",
+        "manufacturer": "Micron Technology Inc",
+        "customer_count": "6",
+        "rfq_count": "39",
+        "quoted_count": "0"
+      },
+      {
+        "mpn": "IS42S16400J-7TLI-TR",
+        "manufacturer": "Issi",
+        "customer_count": "6",
+        "rfq_count": "21",
+        "quoted_count": "2"
+      }
+    ],
+    "conversionDropOff": [
+      {
+        "manufacturer": "Factored Manufacturer",
+        "current_quoted": "17",
+        "current_sold": "13",
+        "current_conversion_pct": "76.5",
+        "prior_conversion_pct": "120.0",
+        "conversion_change_pts": "-43.5"
+      },
+      {
+        "manufacturer": "Hirose Electric Co Ltd",
+        "current_quoted": "46",
+        "current_sold": "0",
+        "current_conversion_pct": "0.0",
+        "prior_conversion_pct": "39.1",
+        "conversion_change_pts": "-39.1"
+      },
+      {
+        "manufacturer": "APEM",
+        "current_quoted": "14",
+        "current_sold": "0",
+        "current_conversion_pct": "0.0",
+        "prior_conversion_pct": "20.0",
+        "conversion_change_pts": "-20.0"
+      },
+      {
+        "manufacturer": "KOA Speer Electronics Inc",
+        "current_quoted": "66",
+        "current_sold": "1",
+        "current_conversion_pct": "1.5",
+        "prior_conversion_pct": "20.0",
+        "conversion_change_pts": "-18.5"
+      }
+    ],
+    "velocitySpike": [
+      {
+        "manufacturer": "Texas Instruments",
+        "current_rfqs": "1802",
+        "prior_rfqs": "495",
+        "rfq_change": "1307",
+        "velocity_change_pct": "264.0"
+      },
+      {
+        "manufacturer": "Nexperia",
+        "current_rfqs": "732",
+        "prior_rfqs": "382",
+        "rfq_change": "350",
+        "velocity_change_pct": "91.6"
+      },
+      {
+        "manufacturer": "Analog Devices Inc",
+        "current_rfqs": "546",
+        "prior_rfqs": "268",
+        "rfq_change": "278",
+        "velocity_change_pct": "103.7"
+      }
+    ]
+  },
+  "trendingMfrs": [
+    {
+      "manufacturer": "Texas Instruments",
+      "customers": "62",
+      "rfq_count": "1802",
+      "quoted_count": "1166",
+      "sold_count": "22",
+      "win_pct": "1.9",
+      "booked_sales_30d": "1023398.6000",
+      "wow_velocity_pct": "264.0"
+    },
+    {
+      "manufacturer": "Sierra Safety Technology, Inc.",
+      "customers": "1",
+      "rfq_count": "17",
+      "quoted_count": "17",
+      "sold_count": "17",
+      "win_pct": "100.0",
+      "booked_sales_30d": "90788.75",
+      "wow_velocity_pct": "1600.0"
+    },
+    {
+      "manufacturer": "Analog Devices Inc",
+      "customers": "31",
+      "rfq_count": "546",
+      "quoted_count": "188",
+      "sold_count": "13",
+      "win_pct": "6.9",
+      "booked_sales_30d": "5913600.00",
+      "wow_velocity_pct": "103.7"
+    },
+    {
+      "manufacturer": "Factored Manufacturer",
+      "customers": "3",
+      "rfq_count": "16",
+      "quoted_count": "17",
+      "sold_count": "13",
+      "win_pct": "76.5",
+      "booked_sales_30d": "63647.03",
+      "wow_velocity_pct": "60.0"
+    },
+    {
+      "manufacturer": "Nexperia",
+      "customers": "29",
+      "rfq_count": "732",
+      "quoted_count": "1834",
+      "sold_count": "10",
+      "win_pct": "0.5",
+      "booked_sales_30d": "29685.00",
+      "wow_velocity_pct": "91.6"
+    },
+    {
+      "manufacturer": "Mcmaster-Carr",
+      "customers": "2",
+      "rfq_count": "7",
+      "quoted_count": "8",
+      "sold_count": "7",
+      "win_pct": "87.5",
+      "booked_sales_30d": "15553.72",
+      "wow_velocity_pct": "0.0"
+    },
+    {
+      "manufacturer": "Vishay",
+      "customers": "26",
+      "rfq_count": "398",
+      "quoted_count": "2296",
+      "sold_count": "6",
+      "win_pct": "0.3",
+      "booked_sales_30d": "259126.000",
+      "wow_velocity_pct": "150.3"
+    },
+    {
+      "manufacturer": "CNLINKO",
+      "customers": "4",
+      "rfq_count": "8",
+      "quoted_count": "8",
+      "sold_count": "6",
+      "win_pct": "75.0",
+      "booked_sales_30d": "5532.20",
+      "wow_velocity_pct": "14.3"
+    },
+    {
+      "manufacturer": "Good-Ark Semiconductor",
+      "customers": "2",
+      "rfq_count": "5",
+      "quoted_count": "9",
+      "sold_count": "6",
+      "win_pct": "66.7",
+      "booked_sales_30d": "9960.3000",
+      "wow_velocity_pct": "100.0"
+    },
+    {
+      "manufacturer": "Not Known Yet",
+      "customers": "3",
+      "rfq_count": "9",
+      "quoted_count": "8",
+      "sold_count": "5",
+      "win_pct": "62.5",
+      "booked_sales_30d": "0",
+      "wow_velocity_pct": "350.0"
+    }
+  ],
+  "trendingParts": [
+    {
+      "mpn": "MT47H128M16RT-25E:C",
+      "manufacturer": "Micron Technology Inc",
+      "customers": "25",
+      "rfq_count": "127",
+      "quoted_count": "0",
+      "sold_count": "0",
+      "win_pct": "0",
+      "first_seen": "2026-05-20",
+      "scarcity_signal": "Multi-Customer"
+    },
+    {
+      "mpn": "FT2232HL-REEL",
+      "manufacturer": "Future Technology Devices International Ltd",
+      "customers": "12",
+      "rfq_count": "109",
+      "quoted_count": "0",
+      "sold_count": "0",
+      "win_pct": "0",
+      "first_seen": "2026-05-20",
+      "scarcity_signal": "Multi-Customer"
+    },
+    {
+      "mpn": "EPCS64SI16N",
+      "manufacturer": "Altera",
+      "customers": "15",
+      "rfq_count": "58",
+      "quoted_count": "0",
+      "sold_count": "0",
+      "win_pct": "0",
+      "first_seen": "2026-05-20",
+      "scarcity_signal": "Multi-Customer"
+    },
+    {
+      "mpn": "MT40A256M16LY-062E AUT:F",
+      "manufacturer": "Micron Technology Inc",
+      "customers": "6",
+      "rfq_count": "39",
+      "quoted_count": "0",
+      "sold_count": "0",
+      "win_pct": "0",
+      "first_seen": "2026-05-20",
+      "scarcity_signal": "Multi-Customer"
+    },
+    {
+      "mpn": "MT25QL128ABA8ESF-0AATTR",
+      "manufacturer": "Micron Technology Inc",
+      "customers": "11",
+      "rfq_count": "38",
+      "quoted_count": "6",
+      "sold_count": "0",
+      "win_pct": "0.0",
+      "first_seen": "2026-05-20",
+      "scarcity_signal": "Multi-Customer"
+    },
+    {
+      "mpn": "EP3C120F484I7N",
+      "manufacturer": "Altera",
+      "customers": "8",
+      "rfq_count": "30",
+      "quoted_count": "0",
+      "sold_count": "0",
+      "win_pct": "0",
+      "first_seen": "2026-05-21",
+      "scarcity_signal": "Multi-Customer"
+    },
+    {
+      "mpn": "S25FL064LABNFI043",
+      "manufacturer": "Infineon Technologies",
+      "customers": "7",
+      "rfq_count": "28",
+      "quoted_count": "3",
+      "sold_count": "0",
+      "win_pct": "0.0",
+      "first_seen": "2026-05-20",
+      "scarcity_signal": "Multi-Customer"
+    },
+    {
+      "mpn": "W25Q128JVSIQ",
+      "manufacturer": "Winbond",
+      "customers": "4",
+      "rfq_count": "25",
+      "quoted_count": "0",
+      "sold_count": "0",
+      "win_pct": "0",
+      "first_seen": "2026-05-20",
+      "scarcity_signal": null
+    },
+    {
+      "mpn": "IS42S16400J-7TLI-TR",
+      "manufacturer": "Issi",
+      "customers": "6",
+      "rfq_count": "21",
+      "quoted_count": "2",
+      "sold_count": "0",
+      "win_pct": "0.0",
+      "first_seen": "2026-05-20",
+      "scarcity_signal": "Multi-Customer"
+    },
+    {
+      "mpn": "W631GG6NB-12",
+      "manufacturer": "Winbond",
+      "customers": "3",
+      "rfq_count": "20",
+      "quoted_count": "0",
+      "sold_count": "0",
+      "win_pct": "0",
+      "first_seen": "2026-05-21",
+      "scarcity_signal": null
+    }
+  ],
+  "exposure": [
+    {
+      "manufacturer": "St Micro",
+      "open_rfq_value": "4220199328717113.276050210946787000",
+      "open_cq_value": "338292159.4540",
+      "total_exposure": "4220199667009272.730050210946787000",
+      "pct_of_pipeline": "27.8",
+      "risk_level": "High"
+    },
+    {
+      "manufacturer": "Diodes Inc",
+      "open_rfq_value": "295867453815080.0905908761116728200",
+      "open_cq_value": "18649385.961400",
+      "total_exposure": "295867472464466.0519908761116728200",
+      "pct_of_pipeline": "1.9",
+      "risk_level": "Low"
+    },
+    {
+      "manufacturer": "Epcos",
+      "open_rfq_value": "242635224507057.86272769405097600",
+      "open_cq_value": "308811.91850",
+      "total_exposure": "242635224815869.78122769405097600",
+      "pct_of_pipeline": "1.6",
+      "risk_level": "Low"
+    },
+    {
+      "manufacturer": "Murata",
+      "open_rfq_value": "205775936703003.4825259018665046400",
+      "open_cq_value": "5674711.742937857142536",
+      "total_exposure": "205775942377715.2254637590090406400",
+      "pct_of_pipeline": "1.4",
+      "risk_level": "Low"
+    },
+    {
+      "manufacturer": "Samsung",
+      "open_rfq_value": "194505871789450.6000477136640148800",
+      "open_cq_value": "19069548.265600523",
+      "total_exposure": "194505890858998.8656482366640148800",
+      "pct_of_pipeline": "1.3",
+      "risk_level": "Low"
+    },
+    {
+      "manufacturer": "Rubycon",
+      "open_rfq_value": "137336312037617.33895552792777000",
+      "open_cq_value": "121034.940",
+      "total_exposure": "137336312158652.27895552792777000",
+      "pct_of_pipeline": "0.9",
+      "risk_level": "Low"
+    },
+    {
+      "manufacturer": "Fairchild",
+      "open_rfq_value": "130578245514820.59926486843370000",
+      "open_cq_value": "5677545.83500",
+      "total_exposure": "130578251192366.43426486843370000",
+      "pct_of_pipeline": "0.9",
+      "risk_level": "Low"
+    },
+    {
+      "manufacturer": "Vishay",
+      "open_rfq_value": "119956105007356.11062468537127816351565",
+      "open_cq_value": "3989917.72739600000030",
+      "total_exposure": "119956108997273.83802068537157816351565",
+      "pct_of_pipeline": "0.8",
+      "risk_level": "Low"
+    },
+    {
+      "manufacturer": "Bel Fuse",
+      "open_rfq_value": "114951867237555.45840073100",
+      "open_cq_value": "621430.00",
+      "total_exposure": "114951867858985.45840073100",
+      "pct_of_pipeline": "0.8",
+      "risk_level": "Low"
+    },
+    {
+      "manufacturer": "Panasonic",
+      "open_rfq_value": "48146281315890.117554519201502398578",
+      "open_cq_value": "645788.10597400000010",
+      "total_exposure": "48146281961678.223528519201602398578",
+      "pct_of_pipeline": "0.3",
+      "risk_level": "Low"
+    }
+  ],
+  "regional": [
+    {
+      "manufacturer": "Texas Instruments",
+      "total_rfqs": "1802",
+      "apac_pct": "93.6",
+      "usa_pct": "82.2",
+      "mex_pct": "73.7",
+      "signal": "APAC Concentration"
+    },
+    {
+      "manufacturer": "Nexperia",
+      "total_rfqs": "732",
+      "apac_pct": "95.5",
+      "usa_pct": "35.5",
+      "mex_pct": "29.4",
+      "signal": "APAC Concentration"
+    },
+    {
+      "manufacturer": "Analog Devices Inc",
+      "total_rfqs": "546",
+      "apac_pct": "98.9",
+      "usa_pct": "95.6",
+      "mex_pct": "72.9",
+      "signal": "APAC Concentration"
+    },
+    {
+      "manufacturer": "Micron Technology Inc",
+      "total_rfqs": "455",
+      "apac_pct": "96.7",
+      "usa_pct": "75.6",
+      "mex_pct": "25.1",
+      "signal": "APAC Concentration"
+    },
+    {
+      "manufacturer": "Murata",
+      "total_rfqs": "402",
+      "apac_pct": "97.8",
+      "usa_pct": "92.0",
+      "mex_pct": "89.1",
+      "signal": "APAC Concentration"
+    },
+    {
+      "manufacturer": "Vishay",
+      "total_rfqs": "398",
+      "apac_pct": "83.9",
+      "usa_pct": "83.7",
+      "mex_pct": "84.9",
+      "signal": "APAC Concentration"
+    },
+    {
+      "manufacturer": "On Semiconductor",
+      "total_rfqs": "335",
+      "apac_pct": "89.6",
+      "usa_pct": "69.6",
+      "mex_pct": "56.4",
+      "signal": "APAC Concentration"
+    },
+    {
+      "manufacturer": "Infineon",
+      "total_rfqs": "289",
+      "apac_pct": "74.0",
+      "usa_pct": "28.4",
+      "mex_pct": "41.9",
+      "signal": "APAC Concentration"
+    },
+    {
+      "manufacturer": "STMicroelectronics",
+      "total_rfqs": "274",
+      "apac_pct": "98.9",
+      "usa_pct": "43.4",
+      "mex_pct": "21.9",
+      "signal": "APAC Concentration"
+    },
+    {
+      "manufacturer": "Taiyo Yuden",
+      "total_rfqs": "214",
+      "apac_pct": "99.1",
+      "usa_pct": "99.1",
+      "mex_pct": "98.6",
+      "signal": "APAC Concentration"
+    },
+    {
+      "manufacturer": "Diodes Inc",
+      "total_rfqs": "194",
+      "apac_pct": "84.5",
+      "usa_pct": "61.9",
+      "mex_pct": "59.8",
+      "signal": "APAC Concentration"
+    },
+    {
+      "manufacturer": "Altera",
+      "total_rfqs": "169",
+      "apac_pct": "89.3",
+      "usa_pct": "78.7",
+      "mex_pct": "27.8",
+      "signal": "APAC Concentration"
+    },
+    {
+      "manufacturer": "TDK Corp",
+      "total_rfqs": "168",
+      "apac_pct": "100.0",
+      "usa_pct": "98.8",
+      "mex_pct": "97.6",
+      "signal": "APAC Concentration"
+    },
+    {
+      "manufacturer": "Panasonic",
+      "total_rfqs": "155",
+      "apac_pct": "79.4",
+      "usa_pct": "81.9",
+      "mex_pct": "79.4",
+      "signal": "APAC Concentration"
+    },
+    {
+      "manufacturer": "Samtec",
+      "total_rfqs": "146",
+      "apac_pct": "100.0",
+      "usa_pct": "100.0",
+      "mex_pct": "99.3",
+      "signal": "APAC Concentration"
+    }
+  ],
+  "responseTimes": [
+    {
+      "manufacturer": "Semtech",
+      "current_avg_response_days": "6.5",
+      "prior_avg_response_days": "0.0",
+      "change_pct": "39139.9",
+      "sample_size": "33",
+      "signal": "Response Time Increase"
+    },
+    {
+      "manufacturer": "Kyocera",
+      "current_avg_response_days": "3.0",
+      "prior_avg_response_days": "0.0",
+      "change_pct": "11858.2",
+      "sample_size": "96",
+      "signal": "Response Time Increase"
+    },
+    {
+      "manufacturer": "Yageo Corp",
+      "current_avg_response_days": "4.0",
+      "prior_avg_response_days": "0.0",
+      "change_pct": "10613.7",
+      "sample_size": "105",
+      "signal": "Response Time Increase"
+    },
+    {
+      "manufacturer": "Kemet Electronics Corp",
+      "current_avg_response_days": "4.0",
+      "prior_avg_response_days": "0.1",
+      "change_pct": "7627.5",
+      "sample_size": "108",
+      "signal": "Response Time Increase"
+    },
+    {
+      "manufacturer": "Epcos",
+      "current_avg_response_days": "4.8",
+      "prior_avg_response_days": "0.1",
+      "change_pct": "6774.4",
+      "sample_size": "24",
+      "signal": "Response Time Increase"
+    },
+    {
+      "manufacturer": "Dialight",
+      "current_avg_response_days": "0.1",
+      "prior_avg_response_days": "0.0",
+      "change_pct": "5744.6",
+      "sample_size": "29",
+      "signal": "Response Time Increase"
+    },
+    {
+      "manufacturer": "Fairchild Semiconductor",
+      "current_avg_response_days": "3.1",
+      "prior_avg_response_days": "0.1",
+      "change_pct": "4414.6",
+      "sample_size": "69",
+      "signal": "Response Time Increase"
+    },
+    {
+      "manufacturer": "TDK Corp",
+      "current_avg_response_days": "4.6",
+      "prior_avg_response_days": "0.2",
+      "change_pct": "2842.6",
+      "sample_size": "222",
+      "signal": "Response Time Increase"
+    },
+    {
+      "manufacturer": "Wurth",
+      "current_avg_response_days": "0.5",
+      "prior_avg_response_days": "0.0",
+      "change_pct": "2242.7",
+      "sample_size": "18",
+      "signal": "Response Time Increase"
+    },
+    {
+      "manufacturer": "Atmel",
+      "current_avg_response_days": "5.7",
+      "prior_avg_response_days": "0.3",
+      "change_pct": "1665.0",
+      "sample_size": "12",
+      "signal": "Response Time Increase"
+    }
+  ],
+  "newEntrants": [
+    {
+      "mpn": "EP3C120F484I7N",
+      "manufacturer": "Altera",
+      "current_rfqs": "30",
+      "prior_rfqs": "8",
+      "current_rank": "6",
+      "prior_rank": "21",
+      "status": "Jumped into Top 20"
+    },
+    {
+      "mpn": "S25FL064LABNFI043",
+      "manufacturer": "Infineon Technologies",
+      "current_rfqs": "28",
+      "prior_rfqs": "2",
+      "current_rank": "7",
+      "prior_rank": "1737",
+      "status": "Jumped into Top 20"
+    },
+    {
+      "mpn": "W631GG6NB-12",
+      "manufacturer": "Winbond",
+      "current_rfqs": "20",
+      "prior_rfqs": "4",
+      "current_rank": "10",
+      "prior_rank": "57",
+      "status": "Jumped into Top 20"
+    },
+    {
+      "mpn": "DCR1-AM",
+      "manufacturer": "Sierra Safety Technology, Inc.",
+      "current_rfqs": "17",
+      "prior_rfqs": "1",
+      "current_rank": "11",
+      "prior_rank": "2131",
+      "status": "Jumped into Top 20"
+    },
+    {
+      "mpn": "OPA1678IDR",
+      "manufacturer": "Texas Instruments",
+      "current_rfqs": "15",
+      "prior_rfqs": "3",
+      "current_rank": "14",
+      "prior_rank": "98",
+      "status": "Jumped into Top 20"
+    },
+    {
+      "mpn": "MT40A256M16LY-062E",
+      "manufacturer": "Micron Technology Inc",
+      "current_rfqs": "14",
+      "prior_rfqs": "5",
+      "current_rank": "16",
+      "prior_rank": "46",
+      "status": "Jumped into Top 20"
+    },
+    {
+      "mpn": "LTC2601IDD#TRPBF",
+      "manufacturer": "Analog Devices Inc",
+      "current_rfqs": "12",
+      "prior_rfqs": "7",
+      "current_rank": "19",
+      "prior_rank": "23",
+      "status": "Jumped into Top 20"
+    }
+  ]
+}

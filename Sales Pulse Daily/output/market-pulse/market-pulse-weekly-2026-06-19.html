@@ -1,0 +1,544 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Market Pulse — 30-Day Rolling View</title>
+<style>
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif;
+    font-size: 13px;
+    line-height: 1.5;
+    color: #333;
+    max-width: 1100px;
+    margin: 0 auto;
+    padding: 20px;
+    background: #f5f5f5;
+  }
+  .container {
+    background: white;
+    padding: 24px;
+    border-radius: 8px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+  }
+  h1 {
+    font-size: 22px;
+    font-weight: 600;
+    margin: 0 0 4px 0;
+    color: #1a1a1a;
+  }
+  .subtitle {
+    font-size: 12px;
+    color: #666;
+    margin-bottom: 20px;
+  }
+  .section {
+    margin-bottom: 28px;
+    padding-bottom: 28px;
+    border-bottom: 2px solid #e0e0e0;
+  }
+  .section:last-child {
+    border-bottom: none;
+  }
+  .section-title {
+    font-size: 16px;
+    font-weight: 600;
+    margin-bottom: 12px;
+    color: #1a1a1a;
+  }
+  .section-subtitle {
+    font-size: 11px;
+    color: #666;
+    margin-bottom: 12px;
+    font-style: italic;
+  }
+
+  /* Temperature Gauge */
+  .temp-gauge {
+    background: linear-gradient(135deg, #fee2e2 0%, #fef2f2 100%);
+    border: 2px solid #dc2626;
+    border-radius: 8px;
+    padding: 20px;
+    margin-bottom: 24px;
+  }
+  .temp-gauge h2 {
+    margin: 0 0 12px 0;
+    font-size: 16px;
+    font-weight: 700;
+    color: #991b1b;
+  }
+  .gauge-status {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    margin-bottom: 16px;
+  }
+  .gauge-indicator {
+    font-size: 48px;
+    line-height: 1;
+  }
+  .gauge-text {
+    flex: 1;
+  }
+  .gauge-title {
+    font-size: 18px;
+    font-weight: 700;
+    color: #1a1a1a;
+    margin-bottom: 4px;
+  }
+  .gauge-detail {
+    font-size: 12px;
+    color: #666;
+  }
+  .signal-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 12px;
+    margin-top: 12px;
+  }
+  .signal-card {
+    background: white;
+    padding: 12px;
+    border-radius: 6px;
+    border-left: 3px solid #94a3b8;
+  }
+  .signal-card.active {
+    border-left-color: #dc2626;
+    background: #fef2f2;
+  }
+  .signal-label {
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: #64748b;
+    font-weight: 600;
+    margin-bottom: 4px;
+  }
+  .signal-value {
+    font-size: 18px;
+    font-weight: 700;
+    color: #1e293b;
+  }
+  .signal-card.active .signal-value {
+    color: #dc2626;
+  }
+
+  /* Tables */
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 12px;
+    margin-top: 8px;
+  }
+  th {
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    padding: 8px;
+    text-align: left;
+    font-weight: 600;
+    font-size: 11px;
+    color: #475569;
+  }
+  td {
+    border: 1px solid #e2e8f0;
+    padding: 8px;
+  }
+  tr:hover {
+    background: #fafafa;
+  }
+
+  /* Badges */
+  .badge {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 12px;
+    font-size: 11px;
+    font-weight: 600;
+  }
+  .badge-red { background: #fee2e2; color: #991b1b; }
+  .badge-yellow { background: #fef3c7; color: #92400e; }
+  .badge-green { background: #dcfce7; color: #166534; }
+  .badge-gray { background: #f1f5f9; color: #475569; }
+
+  .alert-box {
+    background: #fef2f2;
+    border-left: 4px solid #dc2626;
+    padding: 12px;
+    margin-top: 16px;
+    border-radius: 4px;
+    font-size: 12px;
+  }
+  .alert-box strong {
+    color: #991b1b;
+  }
+
+  .footer {
+    margin-top: 24px;
+    padding-top: 16px;
+    border-top: 1px solid #e0e0e0;
+    font-size: 11px;
+    color: #666;
+  }
+</style>
+</head>
+<body>
+
+<div class="container">
+  <h1>📈 Market Pulse — 30-Day Rolling View</h1>
+  <div class="subtitle">
+    As of June 19, 2026 | Rolling window: May 20, 2026 - June 19, 2026 (30 calendar days)
+  </div>
+
+  
+  <!-- PERFORMANCE SNAPSHOT -->
+  <div class="section" style="background: #f8fafc; border: 2px solid #cbd5e1; border-radius: 8px; padding: 20px; margin-bottom: 24px;">
+    <div class="section-title">💰 Performance Snapshot — Infor Weekly Summary</div>
+    <div class="section-subtitle">Week 24 vs 23 (Completed weeks only) • Source: Infor ERP (Post-Sales)</div>
+
+    <!-- CORE BUSINESS (EX-KLA) -->
+    <div style="background: #ecfdf5; border: 2px solid #10b981; border-radius: 6px; padding: 16px; margin-bottom: 20px;">
+      <h3 style="font-size: 14px; font-weight: 700; margin: 0 0 12px 0; color: #065f46;">Core Business Performance (Excl. KLA)</h3>
+      <table style="margin: 0;">
+        <thead>
+          <tr>
+            <th style="width: 20%;">Metric</th>
+            <th style="width: 20%;">Week 24</th>
+            <th style="width: 20%;">Week 23</th>
+            <th style="width: 15%;">WoW Change</th>
+            <th style="width: 25%;">Status</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr style="background: #f0fdf4;">
+            <td><strong>Bookings</strong></td>
+            <td>$2.7M</td>
+            <td>$2.9M</td>
+            <td><strong>-6.1%</strong></td>
+            <td style="font-size: 11px;">34.0% GM</td>
+          </tr>
+          <tr style="background: #f0fdf4;">
+            <td><strong>Billings</strong></td>
+            <td>$1.8M</td>
+            <td>$1.8M</td>
+            <td><strong>+4.0%</strong></td>
+            <td style="font-size: 11px;">30.1% GM</td>
+          </tr>
+          <tr style="background: #dcfce7;">
+            <td><strong>Book-to-Bill</strong></td>
+            <td colspan="3"><strong style="font-size: 16px;">1.49x</strong></td>
+            <td style="font-size: 11px; font-weight: 600; color: #065f46;">
+              ✅ Building backlog
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- REGIONAL BREAKDOWN (TOTAL BUSINESS) -->
+    <h3 style="font-size: 14px; font-weight: 600; margin: 20px 0 8px 0;">Regional Breakdown — Week 24 (Total Business)</h3>
+    <table>
+      <thead>
+        <tr>
+          <th>Region</th>
+          <th>Bookings</th>
+          <th>Billings</th>
+          <th>B/B Ratio</th>
+          <th>Bookings GM</th>
+          <th>Billings GM</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+            <td><strong>USA</strong></td>
+            <td>$380K</td>
+            <td>$622K</td>
+            <td><strong>0.61</strong></td>
+            <td>70.2%</td>
+            <td>31.6%</td>
+          </tr><tr>
+            <td><strong>MEX</strong></td>
+            <td>$441K</td>
+            <td>$361K</td>
+            <td><strong>1.22</strong></td>
+            <td>30.6%</td>
+            <td>37.2%</td>
+          </tr><tr style="background: #fef3c7;">
+            <td><strong>APAC *</strong></td>
+            <td>$1.9M</td>
+            <td>$4.8M</td>
+            <td><strong>0.39</strong></td>
+            <td>26.8%</td>
+            <td>39.7%</td>
+          </tr><tr>
+            <td><strong>Other</strong></td>
+            <td>$24K</td>
+            <td>$48K</td>
+            <td><strong>0.49</strong></td>
+            <td>94.1%</td>
+            <td>53.0%</td>
+          </tr>
+      </tbody>
+    </table>
+    <p style="font-size: 11px; color: #666; margin-top: 8px; font-style: italic;">
+      * APAC includes KLA: $0 bookings / $4.0M billings
+    </p>
+
+    <!-- TOTAL BUSINESS (INCL. KLA) -->
+    <div style="background: #fef3c7; border: 2px solid #f59e0b; border-radius: 6px; padding: 12px; margin-top: 20px;">
+      <h3 style="font-size: 13px; font-weight: 600; margin: 0 0 8px 0; color: #92400e;">Total Business (Incl. KLA)</h3>
+      <div style="display: flex; gap: 24px; font-size: 12px;">
+        <div><strong>Bookings:</strong> $2.7M</div>
+        <div><strong>Billings:</strong> $5.9M</div>
+        <div><strong>B/B Ratio:</strong> 0.47x</div>
+        <div style="color: #92400e; font-style: italic;">Large KLA shipment ($4.0M) billed in Week 24</div>
+      </div>
+    </div>
+  </div>
+  
+
+  <!-- TEMPERATURE GAUGE -->
+  <div class="temp-gauge">
+    <h2>🌡️ Market Temperature — Overall Status</h2>
+
+    <div class="gauge-status">
+      <div class="gauge-indicator">🔴</div>
+      <div class="gauge-text">
+        <div class="gauge-title">CRITICAL — 42 Constraint Signals Detected</div>
+        <div class="gauge-detail">Market under severe stress. Allocation likely imminent or active.</div>
+      </div>
+    </div>
+
+    <div class="signal-grid">
+      <div class="signal-card active">
+        <div class="signal-label">Conversion Drop</div>
+        <div class="signal-value">4 🔥</div>
+      </div>
+      <div class="signal-card active">
+        <div class="signal-label">Velocity Spike</div>
+        <div class="signal-value">3 🔥</div>
+      </div>
+      <div class="signal-card active">
+        <div class="signal-label">Multi-Customer Parts</div>
+        <div class="signal-value">10 🔥</div>
+      </div>
+      <div class="signal-card active">
+        <div class="signal-label">APAC Concentration</div>
+        <div class="signal-value">15 🔥</div>
+      </div>
+      <div class="signal-card active">
+        <div class="signal-label">Response Time ↑</div>
+        <div class="signal-value">10 🔥</div>
+      </div>
+    </div>
+
+    <div class="alert-box">
+      <strong>Key Watch Items:</strong> MT47H128M16RT-25E:C (25 customers), Texas Instruments (APAC 93.6% concentration), Semtech (response time +39139.9%).
+    </div>
+  </div>
+
+  <!-- CONSTRAINT INDICATORS -->
+  <div class="section">
+    <div class="section-title">🔥 Constraint Indicators — Early Warning Signals</div>
+    <div class="section-subtitle">Parts/manufacturers showing allocation risk signals</div>
+
+    <h3 style="font-size: 14px; font-weight: 600; margin: 16px 0 8px 0;">Multi-Customer Parts (5+ Customers)</h3>
+    <p style="font-size: 11px; color: #666; margin-bottom: 8px;">When the same part is requested by 5+ distinct customers = scarcity signal</p>
+    <table>
+      <thead>
+        <tr>
+          <th>MPN</th>
+          <th>Manufacturer</th>
+          <th>Customers</th>
+          <th>RFQs</th>
+          <th>Quoted</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr><td>MT47H128M16RT-25E:C</td><td>Micron Technology Inc</td><td>25</td><td>127</td><td>0</td></tr><tr><td>EPCS64SI16N</td><td>Altera</td><td>15</td><td>58</td><td>0</td></tr><tr><td>FT2232HL-REEL</td><td>Future Technology Devices International Ltd</td><td>12</td><td>109</td><td>0</td></tr><tr><td>MT25QL128ABA8ESF-0AATTR</td><td>Micron Technology Inc</td><td>11</td><td>38</td><td>6</td></tr><tr><td>EP3C120F484I7N</td><td>Altera</td><td>8</td><td>30</td><td>0</td></tr><tr><td>206509-1</td><td>TE Connectivity Ltd</td><td>7</td><td>10</td><td>0</td></tr><tr><td>INA826AIDGKR</td><td>Texas Instruments</td><td>7</td><td>10</td><td>0</td></tr><tr><td>S25FL064LABNFI043</td><td>Infineon Technologies</td><td>7</td><td>28</td><td>3</td></tr><tr><td>MT40A256M16LY-062E AUT:F</td><td>Micron Technology Inc</td><td>6</td><td>39</td><td>0</td></tr><tr><td>IS42S16400J-7TLI-TR</td><td>Issi</td><td>6</td><td>21</td><td>2</td></tr>
+      </tbody>
+    </table>
+
+    <h3 style="font-size: 14px; font-weight: 600; margin: 24px 0 8px 0;">Conversion Drop-Off (>10pts decline)</h3>
+    <p style="font-size: 11px; color: #666; margin-bottom: 8px;">Win rate declining = supply tightening</p>
+    <table>
+      <thead>
+        <tr>
+          <th>Manufacturer</th>
+          <th>Current Conv %</th>
+          <th>Prior Conv %</th>
+          <th>Change (pts)</th>
+          <th>Sample Size</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr><td>Factored Manufacturer</td><td>76.5%</td><td>120.0%</td><td>-43.5</td><td>17</td></tr><tr><td>Hirose Electric Co Ltd</td><td>0.0%</td><td>39.1%</td><td>-39.1</td><td>46</td></tr><tr><td>APEM</td><td>0.0%</td><td>20.0%</td><td>-20.0</td><td>14</td></tr><tr><td>KOA Speer Electronics Inc</td><td>1.5%</td><td>20.0%</td><td>-18.5</td><td>66</td></tr>
+      </tbody>
+    </table>
+
+    <h3 style="font-size: 14px; font-weight: 600; margin: 24px 0 8px 0;">Velocity Spike (Top 3 by Volume Increase)</h3>
+    <p style="font-size: 11px; color: #666; margin-bottom: 8px;">Demand surge = allocation risk</p>
+    <table>
+      <thead>
+        <tr>
+          <th>Manufacturer</th>
+          <th>Current RFQs</th>
+          <th>Prior RFQs</th>
+          <th>Change</th>
+          <th>Velocity %</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr><td>Texas Instruments</td><td>1802</td><td>495</td><td>1307</td><td>264.0%</td></tr><tr><td>Nexperia</td><td>732</td><td>382</td><td>350</td><td>91.6%</td></tr><tr><td>Analog Devices Inc</td><td>546</td><td>268</td><td>278</td><td>103.7%</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- TRENDING MANUFACTURERS -->
+  <div class="section">
+    <div class="section-title">🏭 Trending Manufacturers (Top 10)</div>
+    <div class="section-subtitle">Ranked by sold count (30-day activity)</div>
+    <table>
+      <thead>
+        <tr>
+          <th>Manufacturer</th>
+          <th>Customers</th>
+          <th>RFQs</th>
+          <th>Quoted</th>
+          <th>Sold</th>
+          <th>Win %</th>
+          <th>Booked Sales</th>
+          <th>WoW Velocity %</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr><td>Texas Instruments</td><td>62</td><td>1802</td><td>1166</td><td>22</td><td>1.9%</td><td>$1.0M</td><td>264.0%</td></tr><tr><td>Sierra Safety Technology, Inc.</td><td>1</td><td>17</td><td>17</td><td>17</td><td>100.0%</td><td>$91K</td><td>1600.0%</td></tr><tr><td>Analog Devices Inc</td><td>31</td><td>546</td><td>188</td><td>13</td><td>6.9%</td><td>$5.9M</td><td>103.7%</td></tr><tr><td>Factored Manufacturer</td><td>3</td><td>16</td><td>17</td><td>13</td><td>76.5%</td><td>$64K</td><td>60.0%</td></tr><tr><td>Nexperia</td><td>29</td><td>732</td><td>1834</td><td>10</td><td>0.5%</td><td>$30K</td><td>91.6%</td></tr><tr><td>Mcmaster-Carr</td><td>2</td><td>7</td><td>8</td><td>7</td><td>87.5%</td><td>$16K</td><td>0.0%</td></tr><tr><td>Vishay</td><td>26</td><td>398</td><td>2296</td><td>6</td><td>0.3%</td><td>$259K</td><td>150.3%</td></tr><tr><td>CNLINKO</td><td>4</td><td>8</td><td>8</td><td>6</td><td>75.0%</td><td>$6K</td><td>14.3%</td></tr><tr><td>Good-Ark Semiconductor</td><td>2</td><td>5</td><td>9</td><td>6</td><td>66.7%</td><td>$10K</td><td>100.0%</td></tr><tr><td>Not Known Yet</td><td>3</td><td>9</td><td>8</td><td>5</td><td>62.5%</td><td>$0</td><td>350.0%</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- TRENDING PARTS -->
+  <div class="section">
+    <div class="section-title">🔧 Trending Parts (Top 10)</div>
+    <div class="section-subtitle">By RFQ count (30-day activity)</div>
+    <table>
+      <thead>
+        <tr>
+          <th>MPN</th>
+          <th>Manufacturer</th>
+          <th>Customers</th>
+          <th>RFQs</th>
+          <th>Quoted</th>
+          <th>Sold</th>
+          <th>Win %</th>
+          <th>Signal</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr><td>MT47H128M16RT-25E:C</td><td>Micron Technology Inc</td><td>25</td><td>127</td><td>0</td><td>0</td><td>0%</td><td><span class="badge badge-gray">Multi-Customer</span></td></tr><tr><td>FT2232HL-REEL</td><td>Future Technology Devices International Ltd</td><td>12</td><td>109</td><td>0</td><td>0</td><td>0%</td><td><span class="badge badge-gray">Multi-Customer</span></td></tr><tr><td>EPCS64SI16N</td><td>Altera</td><td>15</td><td>58</td><td>0</td><td>0</td><td>0%</td><td><span class="badge badge-gray">Multi-Customer</span></td></tr><tr><td>MT40A256M16LY-062E AUT:F</td><td>Micron Technology Inc</td><td>6</td><td>39</td><td>0</td><td>0</td><td>0%</td><td><span class="badge badge-gray">Multi-Customer</span></td></tr><tr><td>MT25QL128ABA8ESF-0AATTR</td><td>Micron Technology Inc</td><td>11</td><td>38</td><td>6</td><td>0</td><td>0.0%</td><td><span class="badge badge-gray">Multi-Customer</span></td></tr><tr><td>EP3C120F484I7N</td><td>Altera</td><td>8</td><td>30</td><td>0</td><td>0</td><td>0%</td><td><span class="badge badge-gray">Multi-Customer</span></td></tr><tr><td>S25FL064LABNFI043</td><td>Infineon Technologies</td><td>7</td><td>28</td><td>3</td><td>0</td><td>0.0%</td><td><span class="badge badge-gray">Multi-Customer</span></td></tr><tr><td>W25Q128JVSIQ</td><td>Winbond</td><td>4</td><td>25</td><td>0</td><td>0</td><td>0%</td><td></td></tr><tr><td>IS42S16400J-7TLI-TR</td><td>Issi</td><td>6</td><td>21</td><td>2</td><td>0</td><td>0.0%</td><td><span class="badge badge-gray">Multi-Customer</span></td></tr><tr><td>W631GG6NB-12</td><td>Winbond</td><td>3</td><td>20</td><td>0</td><td>0</td><td>0%</td><td></td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- MANUFACTURER EXPOSURE -->
+  <div class="section">
+    <div class="section-title">💼 Manufacturer Exposure — Pipeline Concentration Risk</div>
+    <div class="section-subtitle">Open RFQ/CQ pipeline value by manufacturer</div>
+    <table>
+      <thead>
+        <tr>
+          <th>Manufacturer</th>
+          <th>Open RFQ Value</th>
+          <th>Open CQ Value</th>
+          <th>Total Exposure</th>
+          <th>% of Pipeline</th>
+          <th>Risk Level</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr><td>St Micro</td><td>$4220199328.7M</td><td>$338.3M</td><td>$4220199667.0M</td><td>27.8%</td><td><span class="badge badge-red">High</span></td></tr><tr><td>Diodes Inc</td><td>$295867453.8M</td><td>$18.6M</td><td>$295867472.5M</td><td>1.9%</td><td><span class="badge badge-green">Low</span></td></tr><tr><td>Epcos</td><td>$242635224.5M</td><td>$309K</td><td>$242635224.8M</td><td>1.6%</td><td><span class="badge badge-green">Low</span></td></tr><tr><td>Murata</td><td>$205775936.7M</td><td>$5.7M</td><td>$205775942.4M</td><td>1.4%</td><td><span class="badge badge-green">Low</span></td></tr><tr><td>Samsung</td><td>$194505871.8M</td><td>$19.1M</td><td>$194505890.9M</td><td>1.3%</td><td><span class="badge badge-green">Low</span></td></tr><tr><td>Rubycon</td><td>$137336312.0M</td><td>$121K</td><td>$137336312.2M</td><td>0.9%</td><td><span class="badge badge-green">Low</span></td></tr><tr><td>Fairchild</td><td>$130578245.5M</td><td>$5.7M</td><td>$130578251.2M</td><td>0.9%</td><td><span class="badge badge-green">Low</span></td></tr><tr><td>Vishay</td><td>$119956105.0M</td><td>$4.0M</td><td>$119956109.0M</td><td>0.8%</td><td><span class="badge badge-green">Low</span></td></tr><tr><td>Bel Fuse</td><td>$114951867.2M</td><td>$621K</td><td>$114951867.9M</td><td>0.8%</td><td><span class="badge badge-green">Low</span></td></tr><tr><td>Panasonic</td><td>$48146281.3M</td><td>$646K</td><td>$48146282.0M</td><td>0.3%</td><td><span class="badge badge-green">Low</span></td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- REGIONAL DEMAND -->
+  <div class="section">
+    <div class="section-title">🌏 Regional Demand Divergence</div>
+    <div class="section-subtitle">APAC concentration signals (APAC constraint typically hits 3-4 weeks before USA)</div>
+    <table>
+      <thead>
+        <tr>
+          <th>Manufacturer</th>
+          <th>Total RFQs</th>
+          <th>APAC %</th>
+          <th>USA %</th>
+          <th>MEX %</th>
+          <th>Signal</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr><td>Texas Instruments</td><td>1802</td><td>93.6%</td><td>82.2%</td><td>73.7%</td><td><span class="badge badge-red">🔥 APAC Concentration</span></td></tr><tr><td>Nexperia</td><td>732</td><td>95.5%</td><td>35.5%</td><td>29.4%</td><td><span class="badge badge-red">🔥 APAC Concentration</span></td></tr><tr><td>Analog Devices Inc</td><td>546</td><td>98.9%</td><td>95.6%</td><td>72.9%</td><td><span class="badge badge-red">🔥 APAC Concentration</span></td></tr><tr><td>Micron Technology Inc</td><td>455</td><td>96.7%</td><td>75.6%</td><td>25.1%</td><td><span class="badge badge-red">🔥 APAC Concentration</span></td></tr><tr><td>Murata</td><td>402</td><td>97.8%</td><td>92.0%</td><td>89.1%</td><td><span class="badge badge-red">🔥 APAC Concentration</span></td></tr><tr><td>Vishay</td><td>398</td><td>83.9%</td><td>83.7%</td><td>84.9%</td><td><span class="badge badge-red">🔥 APAC Concentration</span></td></tr><tr><td>On Semiconductor</td><td>335</td><td>89.6%</td><td>69.6%</td><td>56.4%</td><td><span class="badge badge-red">🔥 APAC Concentration</span></td></tr><tr><td>Infineon</td><td>289</td><td>74.0%</td><td>28.4%</td><td>41.9%</td><td><span class="badge badge-red">🔥 APAC Concentration</span></td></tr><tr><td>STMicroelectronics</td><td>274</td><td>98.9%</td><td>43.4%</td><td>21.9%</td><td><span class="badge badge-red">🔥 APAC Concentration</span></td></tr><tr><td>Taiyo Yuden</td><td>214</td><td>99.1%</td><td>99.1%</td><td>98.6%</td><td><span class="badge badge-red">🔥 APAC Concentration</span></td></tr><tr><td>Diodes Inc</td><td>194</td><td>84.5%</td><td>61.9%</td><td>59.8%</td><td><span class="badge badge-red">🔥 APAC Concentration</span></td></tr><tr><td>Altera</td><td>169</td><td>89.3%</td><td>78.7%</td><td>27.8%</td><td><span class="badge badge-red">🔥 APAC Concentration</span></td></tr><tr><td>TDK Corp</td><td>168</td><td>100.0%</td><td>98.8%</td><td>97.6%</td><td><span class="badge badge-red">🔥 APAC Concentration</span></td></tr><tr><td>Panasonic</td><td>155</td><td>79.4%</td><td>81.9%</td><td>79.4%</td><td><span class="badge badge-red">🔥 APAC Concentration</span></td></tr><tr><td>Samtec</td><td>146</td><td>100.0%</td><td>100.0%</td><td>99.3%</td><td><span class="badge badge-red">🔥 APAC Concentration</span></td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- RESPONSE TIME TRENDS -->
+  <div class="section">
+    <div class="section-title">⏱️ Response Time Trends</div>
+    <div class="section-subtitle">Supply chain stress indicator (expanding response time = suppliers struggling to source)</div>
+    <table>
+      <thead>
+        <tr>
+          <th>Manufacturer</th>
+          <th>Current Avg Days</th>
+          <th>Prior Avg Days</th>
+          <th>Change %</th>
+          <th>Sample Size</th>
+          <th>Signal</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr><td>Semtech</td><td>6.5</td><td>0.0</td><td>39139.9%</td><td>33</td><td><span class="badge badge-red">🔥 Response Time Increase</span></td></tr><tr><td>Kyocera</td><td>3.0</td><td>0.0</td><td>11858.2%</td><td>96</td><td><span class="badge badge-red">🔥 Response Time Increase</span></td></tr><tr><td>Yageo Corp</td><td>4.0</td><td>0.0</td><td>10613.7%</td><td>105</td><td><span class="badge badge-red">🔥 Response Time Increase</span></td></tr><tr><td>Kemet Electronics Corp</td><td>4.0</td><td>0.1</td><td>7627.5%</td><td>108</td><td><span class="badge badge-red">🔥 Response Time Increase</span></td></tr><tr><td>Epcos</td><td>4.8</td><td>0.1</td><td>6774.4%</td><td>24</td><td><span class="badge badge-red">🔥 Response Time Increase</span></td></tr><tr><td>Dialight</td><td>0.1</td><td>0.0</td><td>5744.6%</td><td>29</td><td><span class="badge badge-red">🔥 Response Time Increase</span></td></tr><tr><td>Fairchild Semiconductor</td><td>3.1</td><td>0.1</td><td>4414.6%</td><td>69</td><td><span class="badge badge-red">🔥 Response Time Increase</span></td></tr><tr><td>TDK Corp</td><td>4.6</td><td>0.2</td><td>2842.6%</td><td>222</td><td><span class="badge badge-red">🔥 Response Time Increase</span></td></tr><tr><td>Wurth</td><td>0.5</td><td>0.0</td><td>2242.7%</td><td>18</td><td><span class="badge badge-red">🔥 Response Time Increase</span></td></tr><tr><td>Atmel</td><td>5.7</td><td>0.3</td><td>1665.0%</td><td>12</td><td><span class="badge badge-red">🔥 Response Time Increase</span></td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- NEW ENTRANTS -->
+  <div class="section">
+    <div class="section-title">✨ New Entrants — Emerging Hotspots</div>
+    <div class="section-subtitle">Parts that weren't in top 20 last period but are trending now</div>
+    <table>
+      <thead>
+        <tr>
+          <th>MPN</th>
+          <th>Manufacturer</th>
+          <th>Current RFQs</th>
+          <th>Current Rank</th>
+          <th>Status</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr><td>EP3C120F484I7N</td><td>Altera</td><td>30</td><td>6</td><td><span class="badge badge-gray">Jumped into Top 20</span></td></tr><tr><td>S25FL064LABNFI043</td><td>Infineon Technologies</td><td>28</td><td>7</td><td><span class="badge badge-gray">Jumped into Top 20</span></td></tr><tr><td>W631GG6NB-12</td><td>Winbond</td><td>20</td><td>10</td><td><span class="badge badge-gray">Jumped into Top 20</span></td></tr><tr><td>DCR1-AM</td><td>Sierra Safety Technology, Inc.</td><td>17</td><td>11</td><td><span class="badge badge-gray">Jumped into Top 20</span></td></tr><tr><td>OPA1678IDR</td><td>Texas Instruments</td><td>15</td><td>14</td><td><span class="badge badge-gray">Jumped into Top 20</span></td></tr><tr><td>MT40A256M16LY-062E</td><td>Micron Technology Inc</td><td>14</td><td>16</td><td><span class="badge badge-gray">Jumped into Top 20</span></td></tr><tr><td>LTC2601IDD#TRPBF</td><td>Analog Devices Inc</td><td>12</td><td>19</td><td><span class="badge badge-gray">Jumped into Top 20</span></td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="footer">
+    <p><strong>Data Sources:</strong></p>
+    <ul style="margin: 8px 0; padding-left: 20px; font-size: 11px;">
+      <li><strong>Performance Snapshot (Bookings + Billings):</strong> Infor ERP exports (Post-Sales actuals) — Completed sales transactions and invoiced revenue. Source of truth for financial performance.</li>
+      <li><strong>Market Intelligence (Sections 2-8):</strong> OT Database (Pre-Sales pipeline) — Customer RFQs, vendor quotes, and customer quotes over 30-day rolling window. Forward-looking demand signals and market trends.</li>
+    </ul>
+    <p style="margin-top: 12px; font-size: 11px; color: #666;">
+      <strong>Report Focus:</strong> This report is primarily focused on <strong>pre-sales market intelligence</strong> to identify demand trends, constraint signals, and emerging opportunities.
+      The Performance Snapshot provides context on actual sales performance (where we've been) to inform forward-looking strategy (where we're going).
+    </p>
+    <p style="margin-top: 12px; font-style: italic; font-size: 11px;">
+      Generated with Claude Code • Market Pulse Weekly
+    </p>
+  </div>
+
+</div>
+
+</body>
+</html>
+  

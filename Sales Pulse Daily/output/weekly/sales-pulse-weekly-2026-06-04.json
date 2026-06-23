@@ -1,0 +1,418 @@
+{
+  "section1": {
+    "lw_rfq_lines": "1229",
+    "lw_rfq_customers": "63",
+    "lw_rfq_with_response": 0,
+    "lw_cq_lines": "143",
+    "lw_cq_customers": "40",
+    "lw_cq_sold": "94",
+    "lw_so_lines": "89",
+    "lw_so_amount": "3554185.69",
+    "pw_rfq_lines": "2302",
+    "pw_rfq_customers": "71",
+    "pw_rfq_with_response": 0,
+    "pw_cq_lines": "195",
+    "pw_cq_customers": "51",
+    "pw_cq_sold": "102",
+    "pw_so_lines": "124",
+    "pw_so_amount": "2410535.08",
+    "lastWeekStart": "2026-05-25T16:15:58.679Z",
+    "lastWeekEnd": "2026-05-29T16:15:58.679Z"
+  },
+  "section2": [
+    {
+      "region": "USA",
+      "rfq_lines": "121",
+      "with_response": "100",
+      "response_pct": "82.6",
+      "cq_lines": "72",
+      "cq_sold": "39",
+      "so_lines": "35",
+      "so_amount": "564792.68",
+      "pw_rfq_lines": "140",
+      "pw_cq_lines": "90",
+      "pw_cq_sold": "40",
+      "pw_so_lines": "59",
+      "pw_so_amount": "1123723.96"
+    },
+    {
+      "region": "MEX",
+      "rfq_lines": "470",
+      "with_response": "266",
+      "response_pct": "56.6",
+      "cq_lines": "8",
+      "cq_sold": "7",
+      "so_lines": "5",
+      "so_amount": "225717.00",
+      "pw_rfq_lines": "530",
+      "pw_cq_lines": "44",
+      "pw_cq_sold": "37",
+      "pw_so_lines": "36",
+      "pw_so_amount": "488889.36"
+    },
+    {
+      "region": "APAC-Laurel",
+      "rfq_lines": "77",
+      "with_response": "37",
+      "response_pct": "48.1",
+      "cq_lines": "27",
+      "cq_sold": "25",
+      "so_lines": "26",
+      "so_amount": "2318814.01",
+      "pw_rfq_lines": "139",
+      "pw_cq_lines": "7",
+      "pw_cq_sold": "3",
+      "pw_so_lines": "6",
+      "pw_so_amount": "440306.20"
+    },
+    {
+      "region": "APAC-Kris",
+      "rfq_lines": "259",
+      "with_response": "193",
+      "response_pct": "74.5",
+      "cq_lines": "27",
+      "cq_sold": "16",
+      "so_lines": "17",
+      "so_amount": "362924.00",
+      "pw_rfq_lines": "1352",
+      "pw_cq_lines": "45",
+      "pw_cq_sold": "15",
+      "pw_so_lines": "15",
+      "pw_so_amount": "238905.70"
+    },
+    {
+      "region": "APAC-Lavanya",
+      "rfq_lines": "302",
+      "with_response": "113",
+      "response_pct": "37.4",
+      "cq_lines": "9",
+      "cq_sold": "7",
+      "so_lines": "6",
+      "so_amount": "81938.00",
+      "pw_rfq_lines": "141",
+      "pw_cq_lines": "9",
+      "pw_cq_sold": "7",
+      "pw_so_lines": "8",
+      "pw_so_amount": "118709.86"
+    }
+  ],
+  "section3": [
+    {
+      "customer": "Marvell",
+      "line_count": "13",
+      "amount": "873488.90",
+      "seller": "Laurel Kee",
+      "region": "APAC",
+      "first_line_date": "2026-05-26",
+      "last_line_date": "2026-05-29"
+    },
+    {
+      "customer": "Netapp",
+      "line_count": "3",
+      "amount": "486738.75",
+      "seller": "Renald Ng",
+      "region": "APAC",
+      "first_line_date": "2026-05-25",
+      "last_line_date": "2026-05-29"
+    },
+    {
+      "customer": "Astute Group (Astute Electronics)",
+      "line_count": "3",
+      "amount": "320717.76",
+      "seller": "Laurel Kee",
+      "region": "APAC",
+      "first_line_date": "2026-05-29",
+      "last_line_date": "2026-05-29"
+    },
+    {
+      "customer": "Plexus Corp.",
+      "line_count": "6",
+      "amount": "317066.00",
+      "seller": "Wing Zhang",
+      "region": "APAC",
+      "first_line_date": "2026-05-25",
+      "last_line_date": "2026-05-29"
+    },
+    {
+      "customer": "Flock Safety",
+      "line_count": "5",
+      "amount": "248967.25",
+      "seller": "Justin Goodwin",
+      "region": "USA",
+      "first_line_date": "2026-05-26",
+      "last_line_date": "2026-05-29"
+    },
+    {
+      "customer": "S.A.S. Electronic Co., Ltd",
+      "line_count": "1",
+      "amount": "240864.00",
+      "seller": "Renald Ng",
+      "region": "APAC",
+      "first_line_date": "2026-05-25",
+      "last_line_date": "2026-05-25"
+    },
+    {
+      "customer": "Plexus Corp.",
+      "line_count": "2",
+      "amount": "208150",
+      "seller": "Salvador Horner",
+      "region": "MEX",
+      "first_line_date": "2026-05-26",
+      "last_line_date": "2026-05-29"
+    },
+    {
+      "customer": "BENCHMARK ELECTRONICS",
+      "line_count": "2",
+      "amount": "200563.30",
+      "seller": "Renald Ng",
+      "region": "APAC",
+      "first_line_date": "2026-05-26",
+      "last_line_date": "2026-05-29"
+    },
+    {
+      "customer": "Emerson",
+      "line_count": "3",
+      "amount": "180840.00",
+      "seller": "Justin Goodwin",
+      "region": "USA",
+      "first_line_date": "2026-05-26",
+      "last_line_date": "2026-05-26"
+    },
+    {
+      "customer": "Emerson",
+      "line_count": "1",
+      "amount": "159440.00",
+      "seller": "Renald Ng",
+      "region": "APAC",
+      "first_line_date": "2026-05-26",
+      "last_line_date": "2026-05-26"
+    },
+    {
+      "customer": "Applied Materials",
+      "line_count": "16",
+      "amount": "108844.23",
+      "seller": "Josh Syre",
+      "region": "USA",
+      "first_line_date": "2026-05-25",
+      "last_line_date": "2026-05-29"
+    },
+    {
+      "customer": "Avalon",
+      "line_count": "2",
+      "amount": "59908.00",
+      "seller": "Manikandan",
+      "region": "APAC",
+      "first_line_date": "2026-05-26",
+      "last_line_date": "2026-05-27"
+    },
+    {
+      "customer": "TT Electronics",
+      "line_count": "1",
+      "amount": "31638.00",
+      "seller": "Spring Tu",
+      "region": "APAC",
+      "first_line_date": "2026-05-26",
+      "last_line_date": "2026-05-26"
+    },
+    {
+      "customer": "GE Aerospace (Formerly GE Aviation)",
+      "line_count": "7",
+      "amount": "20581.20",
+      "seller": "Jake Mcaloose",
+      "region": "USA",
+      "first_line_date": "2026-05-27",
+      "last_line_date": "2026-05-29"
+    },
+    {
+      "customer": "Zetwerk Manufacturing Businesses Pvt Ltd.",
+      "line_count": "3",
+      "amount": "20230.00",
+      "seller": "Manikandan",
+      "region": "APAC",
+      "first_line_date": "2026-05-26",
+      "last_line_date": "2026-05-26"
+    },
+    {
+      "customer": "Sanmina Corporation",
+      "line_count": "2",
+      "amount": "16172.00",
+      "seller": "Ricardo Morales",
+      "region": "MEX",
+      "first_line_date": "2026-05-25",
+      "last_line_date": "2026-05-27"
+    },
+    {
+      "customer": "Sanmina Corporation",
+      "line_count": "1",
+      "amount": "15720.00",
+      "seller": "Renald Ng",
+      "region": "APAC",
+      "first_line_date": "2026-05-29",
+      "last_line_date": "2026-05-29"
+    },
+    {
+      "customer": "ABB",
+      "line_count": "1",
+      "amount": "15375.50",
+      "seller": "Laurel Kee",
+      "region": "APAC",
+      "first_line_date": "2026-05-26",
+      "last_line_date": "2026-05-26"
+    },
+    {
+      "customer": "Astec",
+      "line_count": "8",
+      "amount": "6820.00",
+      "seller": "Silvia Munoz",
+      "region": "APAC",
+      "first_line_date": "2026-05-29",
+      "last_line_date": "2026-05-29"
+    },
+    {
+      "customer": "S.A.S. Electronic Co., Ltd",
+      "line_count": "1",
+      "amount": "5905.80",
+      "seller": "Laurel Kee",
+      "region": "APAC",
+      "first_line_date": "2026-05-27",
+      "last_line_date": "2026-05-27"
+    }
+  ],
+  "section4": {
+    "persistentQuotes": [
+      {
+        "customer": "RTX",
+        "total_value": "64683.87",
+        "created_date": "2026-05-28",
+        "days_open": "7",
+        "rfq_type": "Shortage",
+        "seller": "Thomas Haynes",
+        "line_count": "4"
+      }
+    ]
+  },
+  "section5": [
+    {
+      "region": "USA",
+      "rfq_lines": "121",
+      "with_response": "100",
+      "response_pct": "82.6",
+      "cq_lines": "72",
+      "cq_sold": "39",
+      "so_lines": "35",
+      "so_amount": "564792.68",
+      "pw_rfq_lines": "140",
+      "pw_cq_lines": "90",
+      "pw_cq_sold": "40",
+      "pw_so_lines": "59",
+      "pw_so_amount": "1123723.96",
+      "target_rfq": 180,
+      "target_cq": 135,
+      "target_cq_sold": 41,
+      "rfq_vs_target": 67,
+      "cq_vs_target": 53,
+      "cq_sold_vs_target": 95
+    },
+    {
+      "region": "MEX",
+      "rfq_lines": "470",
+      "with_response": "266",
+      "response_pct": "56.6",
+      "cq_lines": "8",
+      "cq_sold": "7",
+      "so_lines": "5",
+      "so_amount": "225717.00",
+      "pw_rfq_lines": "530",
+      "pw_cq_lines": "44",
+      "pw_cq_sold": "37",
+      "pw_so_lines": "36",
+      "pw_so_amount": "488889.36",
+      "target_rfq": 180,
+      "target_cq": 135,
+      "target_cq_sold": 41,
+      "rfq_vs_target": 261,
+      "cq_vs_target": 6,
+      "cq_sold_vs_target": 17
+    },
+    {
+      "region": "APAC-Laurel",
+      "rfq_lines": "77",
+      "with_response": "37",
+      "response_pct": "48.1",
+      "cq_lines": "27",
+      "cq_sold": "25",
+      "so_lines": "26",
+      "so_amount": "2318814.01",
+      "pw_rfq_lines": "139",
+      "pw_cq_lines": "7",
+      "pw_cq_sold": "3",
+      "pw_so_lines": "6",
+      "pw_so_amount": "440306.20",
+      "target_rfq": 220,
+      "target_cq": 165,
+      "target_cq_sold": 50,
+      "rfq_vs_target": 35,
+      "cq_vs_target": 16,
+      "cq_sold_vs_target": 50
+    },
+    {
+      "region": "APAC-Kris",
+      "rfq_lines": "259",
+      "with_response": "193",
+      "response_pct": "74.5",
+      "cq_lines": "27",
+      "cq_sold": "16",
+      "so_lines": "17",
+      "so_amount": "362924.00",
+      "pw_rfq_lines": "1352",
+      "pw_cq_lines": "45",
+      "pw_cq_sold": "15",
+      "pw_so_lines": "15",
+      "pw_so_amount": "238905.70",
+      "target_rfq": 220,
+      "target_cq": 165,
+      "target_cq_sold": 50,
+      "rfq_vs_target": 118,
+      "cq_vs_target": 16,
+      "cq_sold_vs_target": 32
+    },
+    {
+      "region": "APAC-Lavanya",
+      "rfq_lines": "302",
+      "with_response": "113",
+      "response_pct": "37.4",
+      "cq_lines": "9",
+      "cq_sold": "7",
+      "so_lines": "6",
+      "so_amount": "81938.00",
+      "pw_rfq_lines": "141",
+      "pw_cq_lines": "9",
+      "pw_cq_sold": "7",
+      "pw_so_lines": "8",
+      "pw_so_amount": "118709.86",
+      "target_rfq": 220,
+      "target_cq": 165,
+      "target_cq_sold": 50,
+      "rfq_vs_target": 137,
+      "cq_vs_target": 5,
+      "cq_sold_vs_target": 14
+    }
+  ],
+  "section6": {
+    "lastWeek": {
+      "rfq_lines": "1229",
+      "rfq_with_response": "709",
+      "cq_lines": "143",
+      "so_lines": "89"
+    },
+    "priorWeek": {
+      "rfq_lines": "2302",
+      "rfq_with_response": "1602",
+      "cq_lines": "195",
+      "so_lines": "124"
+    }
+  },
+  "section7": {
+    "trendingMfrs": []
+  }
+}

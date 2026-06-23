@@ -1,0 +1,482 @@
+{
+  "today": "2026-06-23T13:47:46.757Z",
+  "yesterday": "2026-06-22T13:47:46.757Z",
+  "todayFormatted": "Tuesday, June 23, 2026",
+  "yesterdayFormatted": "Monday, June 22, 2026",
+  "top5Orders": [
+    {
+      "seller_name": "Laurel Kee",
+      "region": "APAC-Laurel",
+      "customer_name": "KLA",
+      "order_number": "SO507536",
+      "revenue": "468000.0",
+      "part_numbers": "PK8071305120600S RMGL"
+    },
+    {
+      "seller_name": "Laurel Kee",
+      "region": "APAC-Laurel",
+      "customer_name": "THALES",
+      "order_number": "SO507537",
+      "revenue": "407040.00",
+      "part_numbers": "K4AAG165WA-BCWE "
+    },
+    {
+      "seller_name": "Josh Syre",
+      "region": "USA",
+      "customer_name": "Applied Materials",
+      "order_number": "SO507541",
+      "revenue": "82223.52",
+      "part_numbers": "A2A5328-22G5MBAS"
+    },
+    {
+      "seller_name": "Justin Goodwin",
+      "region": "USA",
+      "customer_name": "BENCHMARK ELECTRONICS",
+      "order_number": "SO507543",
+      "revenue": "74541.60",
+      "part_numbers": "MT25QL01GBBB8E12-0SIT"
+    },
+    {
+      "seller_name": "Wing Zhang",
+      "region": "APAC-Silvia",
+      "customer_name": "Plexus Corp.",
+      "order_number": "SO507544",
+      "revenue": "66750.00",
+      "part_numbers": "MT29F4G08ABADAWP:D TR"
+    }
+  ],
+  "newCustomers": [
+    {
+      "seller_name": "Leah Griffin",
+      "region": "Other",
+      "customer_name": "Chiplytics Inc.",
+      "order_number": "SO507539",
+      "total_revenue": "200.00",
+      "mpns": null,
+      "mfr_names": null,
+      "total_qty": "0",
+      "customer_location": "35 Sawgrass Dr., Bellport, NY 11713, United States",
+      "contact_name": null,
+      "promise_date": "2026-06-25"
+    }
+  ],
+  "strategicAccounts": [
+    {
+      "account_name": "ABB",
+      "ise_name": "Laurel Kee",
+      "region": "APAC-Laurel",
+      "rfq_lines": "5",
+      "cq_lines": "0",
+      "cq_sold": "0",
+      "so_count": "0",
+      "color_code": "normal"
+    },
+    {
+      "account_name": "Eaton",
+      "ise_name": null,
+      "region": null,
+      "rfq_lines": "0",
+      "cq_lines": "0",
+      "cq_sold": "0",
+      "so_count": "0",
+      "color_code": "red"
+    },
+    {
+      "account_name": "GE Healthcare",
+      "ise_name": "Aaron Mendoza",
+      "region": "USA",
+      "rfq_lines": "2",
+      "cq_lines": "0",
+      "cq_sold": "0",
+      "so_count": "0",
+      "color_code": "normal"
+    },
+    {
+      "account_name": "Parker Meggitt",
+      "ise_name": "Josh Syre",
+      "region": "USA",
+      "rfq_lines": "8",
+      "cq_lines": "1",
+      "cq_sold": "0",
+      "so_count": "0",
+      "color_code": "normal"
+    },
+    {
+      "account_name": "RTX",
+      "ise_name": "Thomas Haynes",
+      "region": "USA",
+      "rfq_lines": "1",
+      "cq_lines": "2",
+      "cq_sold": "0",
+      "so_count": "0",
+      "color_code": "normal"
+    },
+    {
+      "account_name": "THALES",
+      "ise_name": "Laurel Kee",
+      "region": "APAC-Laurel",
+      "rfq_lines": "0",
+      "cq_lines": "1",
+      "cq_sold": "1",
+      "so_count": "1",
+      "color_code": "normal"
+    }
+  ],
+  "reactivatedCustomers": [
+    {
+      "sales_order_date": "2026-06-22",
+      "seller_name": "Laurel Kee",
+      "region": "APAC-Laurel",
+      "customer_name": "KLA",
+      "c_bpartner_id": "1000729",
+      "order_count": "1",
+      "order_numbers": "SO507536",
+      "total_revenue": "468000.0",
+      "mpns": null,
+      "mfr_names": null,
+      "total_qty": "0",
+      "customer_location": "1 Technology Drive, Milpitas, CA 95035, United States",
+      "contact_name": null,
+      "promise_date": "2026-07-10",
+      "last_order_date": "2025-12-24",
+      "days_since_last_order": "181",
+      "previous_sales_rep": "Laurel Kee"
+    },
+    {
+      "sales_order_date": "2026-06-22",
+      "seller_name": "Laurel Kee",
+      "region": "APAC-Laurel",
+      "customer_name": "THALES",
+      "c_bpartner_id": "1000268",
+      "order_count": "1",
+      "order_numbers": "SO507537",
+      "total_revenue": "407040.00",
+      "mpns": null,
+      "mfr_names": null,
+      "total_qty": "0",
+      "customer_location": null,
+      "contact_name": null,
+      "promise_date": "2026-07-02",
+      "last_order_date": "2025-11-11",
+      "days_since_last_order": "224",
+      "previous_sales_rep": "Joel Flores"
+    },
+    {
+      "sales_order_date": "2026-06-22",
+      "seller_name": "Josh Syre",
+      "region": "USA",
+      "customer_name": "Applied Materials",
+      "c_bpartner_id": "1000724",
+      "order_count": "1",
+      "order_numbers": "SO507541",
+      "total_revenue": "82223.52",
+      "mpns": null,
+      "mfr_names": null,
+      "total_qty": "0",
+      "customer_location": "Bldg 37, 9700 Hwy 290 East, Austin, TX 78724, United States",
+      "contact_name": null,
+      "promise_date": "2026-07-10",
+      "last_order_date": "2025-12-23",
+      "days_since_last_order": "182",
+      "previous_sales_rep": "Josh Syre"
+    },
+    {
+      "sales_order_date": "2026-06-22",
+      "seller_name": "Justin Goodwin",
+      "region": "USA",
+      "customer_name": "BENCHMARK ELECTRONICS",
+      "c_bpartner_id": "1000020",
+      "order_count": "1",
+      "order_numbers": "SO507543",
+      "total_revenue": "74541.60",
+      "mpns": null,
+      "mfr_names": null,
+      "total_qty": "0",
+      "customer_location": null,
+      "contact_name": null,
+      "promise_date": "2026-07-02",
+      "last_order_date": "2025-12-15",
+      "days_since_last_order": "190",
+      "previous_sales_rep": "Renald Ng"
+    },
+    {
+      "sales_order_date": "2026-06-22",
+      "seller_name": "Wing Zhang",
+      "region": "APAC-Silvia",
+      "customer_name": "Plexus Corp.",
+      "c_bpartner_id": "1000077",
+      "order_count": "1",
+      "order_numbers": "SO507544",
+      "total_revenue": "66750.00",
+      "mpns": null,
+      "mfr_names": null,
+      "total_qty": "0",
+      "customer_location": "No. 6 Xiangxing 2 Road, Pilot Free Trade Zone, Xiamen,  361006, China",
+      "contact_name": null,
+      "promise_date": "2026-07-06",
+      "last_order_date": "2025-12-24",
+      "days_since_last_order": "181",
+      "previous_sales_rep": "Wing Zhang"
+    },
+    {
+      "sales_order_date": "2026-06-22",
+      "seller_name": "Lavanya Manohar",
+      "region": "APAC-Lavanya",
+      "customer_name": "STJ ELECTRONICS PVT. LTD",
+      "c_bpartner_id": "1010571",
+      "order_count": "1",
+      "order_numbers": "SO507538",
+      "total_revenue": "3000.0",
+      "mpns": null,
+      "mfr_names": null,
+      "total_qty": "0",
+      "customer_location": "X-51,Okhla Industrial Area,, Phase 2,  New Delhi,  110020, India",
+      "contact_name": null,
+      "promise_date": "2026-07-30",
+      "last_order_date": "2025-10-03",
+      "days_since_last_order": "263",
+      "previous_sales_rep": "Lavanya Manohar"
+    },
+    {
+      "sales_order_date": "2026-06-22",
+      "seller_name": "Jasper Kee",
+      "region": "APAC-Laurel",
+      "customer_name": "CEI",
+      "c_bpartner_id": "1006313",
+      "order_count": "1",
+      "order_numbers": "SO507540",
+      "total_revenue": "650.00",
+      "mpns": null,
+      "mfr_names": null,
+      "total_qty": "0",
+      "customer_location": null,
+      "contact_name": null,
+      "promise_date": "2026-07-17",
+      "last_order_date": "2025-10-27",
+      "days_since_last_order": "239",
+      "previous_sales_rep": "Jasper Kee"
+    }
+  ],
+  "highValueLateLines": [
+    {
+      "customer_name": "Honeywell Aerospace Technologies",
+      "sales_order": "SO507002",
+      "line_number": "10",
+      "ise_name": "Jake Mcaloose",
+      "region": "USA",
+      "promise_date": "2026-05-29",
+      "days_late": "25",
+      "qty_unshipped": "39",
+      "line_revenue": "428025.00",
+      "mpn": "216T9NGBGA13FH",
+      "color_code": "red"
+    },
+    {
+      "customer_name": "Flock Safety",
+      "sales_order": "SO504885",
+      "line_number": "170",
+      "ise_name": "Justin Goodwin",
+      "region": "USA",
+      "promise_date": "2026-06-02",
+      "days_late": "21",
+      "qty_unshipped": "143",
+      "line_revenue": "366544.75",
+      "mpn": "RC PLUS 2",
+      "color_code": "red"
+    },
+    {
+      "customer_name": "Flock Safety",
+      "sales_order": "SO504885",
+      "line_number": "15",
+      "ise_name": "Justin Goodwin",
+      "region": "USA",
+      "promise_date": "2026-06-02",
+      "days_late": "21",
+      "qty_unshipped": "15",
+      "line_revenue": "303915.00",
+      "mpn": "DJI DOCK 3",
+      "color_code": "red"
+    },
+    {
+      "customer_name": "Plexus Corp.",
+      "sales_order": "SO507049",
+      "line_number": "10",
+      "ise_name": "Winnie Lee",
+      "region": "APAC-Silvia",
+      "promise_date": "2026-05-25",
+      "days_late": "29",
+      "qty_unshipped": "1220",
+      "line_revenue": "286700.00",
+      "mpn": "ADATE207BBPZ ",
+      "color_code": "red"
+    },
+    {
+      "customer_name": "Arrow Global Supply Chain Services",
+      "sales_order": "SO507115",
+      "line_number": "10",
+      "ise_name": "Joel Flores",
+      "region": "MEX",
+      "promise_date": "2026-05-28",
+      "days_late": "26",
+      "qty_unshipped": "2280",
+      "line_revenue": "211903.20",
+      "mpn": "MT40A1G16KD-062E:E",
+      "color_code": "red"
+    },
+    {
+      "customer_name": "Plexus Corp.",
+      "sales_order": "SO507277",
+      "line_number": "10",
+      "ise_name": "Salvador Horner",
+      "region": "MEX",
+      "promise_date": "2026-06-12",
+      "days_late": "11",
+      "qty_unshipped": "797",
+      "line_revenue": "206423.00",
+      "mpn": "MT25QL01GBBB8E12-0AUT",
+      "color_code": "red"
+    }
+  ],
+  "top5LateLines": [
+    {
+      "customer_name": "Applied Materials",
+      "sales_order": "SO507368",
+      "line_number": "10",
+      "ise_name": "Josh Syre",
+      "region": "USA",
+      "promise_date": "2026-06-20",
+      "days_late": "3",
+      "qty_unshipped": "1600",
+      "line_revenue": "181584.00",
+      "mpn": "MT29F16G08ABABAWP-IT:B",
+      "color_code": "yellow"
+    },
+    {
+      "customer_name": "Marvell",
+      "sales_order": "SO507270",
+      "line_number": "10",
+      "ise_name": "Laurel Kee",
+      "region": "APAC-Laurel",
+      "promise_date": "2026-06-05",
+      "days_late": "18",
+      "qty_unshipped": "34496",
+      "line_revenue": "163856.00",
+      "mpn": "ADN8834ACBZ-R7",
+      "color_code": "red"
+    },
+    {
+      "customer_name": "Vinyas Innovative Technologies Pvt Ltd",
+      "sales_order": "SO507306",
+      "line_number": "10",
+      "ise_name": "Lavanya Manohar",
+      "region": "APAC-Lavanya",
+      "promise_date": "2026-06-18",
+      "days_late": "5",
+      "qty_unshipped": "2000",
+      "line_revenue": "158000.00",
+      "mpn": "MT40A512M16TB-062E IT:R ",
+      "color_code": "yellow"
+    },
+    {
+      "customer_name": "Larsen & Toubro",
+      "sales_order": "SO505882",
+      "line_number": "10",
+      "ise_name": "Lavanya Manohar",
+      "region": "APAC-Lavanya",
+      "promise_date": "2026-06-15",
+      "days_late": "8",
+      "qty_unshipped": "449",
+      "line_revenue": "156701.00",
+      "mpn": "PBD-58/16.2M",
+      "color_code": "red"
+    },
+    {
+      "customer_name": "Plexus Corp.",
+      "sales_order": "SO507305",
+      "line_number": "10",
+      "ise_name": "Wing Zhang",
+      "region": "APAC-Silvia",
+      "promise_date": "2026-06-16",
+      "days_late": "7",
+      "qty_unshipped": "1880",
+      "line_revenue": "83660.00",
+      "mpn": "MT25QU01GBBB8E12-0SIT TR  ",
+      "color_code": "yellow"
+    }
+  ],
+  "iseAlerts": [
+    {
+      "ise_name": "Michael Stifter",
+      "manager": "Jeff Wallace",
+      "region": "USA",
+      "last_rfq_date": "2026-06-11 00:00:00",
+      "days_inactive": "8",
+      "color_code": "red"
+    },
+    {
+      "ise_name": "Alejandro Padilla",
+      "manager": "Joel Marquez",
+      "region": "MEX",
+      "last_rfq_date": "2026-06-17 00:00:00",
+      "days_inactive": "4",
+      "color_code": "yellow"
+    },
+    {
+      "ise_name": "Manikandan",
+      "manager": "Lavanya Manohar",
+      "region": null,
+      "last_rfq_date": "2026-06-17 00:00:00",
+      "days_inactive": "4",
+      "color_code": "yellow"
+    }
+  ],
+  "lowMarginOrders": [],
+  "regionalActivity": [
+    {
+      "region": "APAC-Laurel",
+      "manager": "Laurel Kee",
+      "rfq_lines": "8",
+      "cq_lines": "1",
+      "cq_sold": "1",
+      "so_lines": "3"
+    },
+    {
+      "region": "APAC-Silvia",
+      "manager": "Silvia Munoz",
+      "rfq_lines": "34",
+      "cq_lines": "39",
+      "cq_sold": "1",
+      "so_lines": "1"
+    },
+    {
+      "region": "MEX",
+      "manager": "Joel Marquez",
+      "rfq_lines": "15",
+      "cq_lines": "5",
+      "cq_sold": "5",
+      "so_lines": "0"
+    },
+    {
+      "region": "Other",
+      "manager": null,
+      "rfq_lines": "264",
+      "cq_lines": "18",
+      "cq_sold": "3",
+      "so_lines": "2"
+    },
+    {
+      "region": "USA",
+      "manager": "Jeff Wallace",
+      "rfq_lines": "114",
+      "cq_lines": "23",
+      "cq_sold": "9",
+      "so_lines": "3"
+    }
+  ],
+  "regionalTotals": {
+    "rfq_lines": 435,
+    "cq_lines": 86,
+    "cq_sold": 19,
+    "so_lines": 9
+  }
+}

@@ -1,0 +1,197 @@
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+SALES PULSE — Thursday, May 28, 2026
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Data as of 6:00am PT | Reflects activity through EOD Wed May 27
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+📊 GLOBAL SNAPSHOT — Yesterday vs. 5-Day Rolling Avg
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+PIPELINE INPUT
+  RFQ Lines Entered in OT                     47 (22 customers)      5d avg: 42     ↑ +12%
+  RFQ Lines with 1+ Response (VQ/No-Bid)      38 (81% sourced)       5d avg: 35     ↑ +9%
+  Buyer Queue Time (routed → picked)          0.6 days               5d avg: 0.7d   ✅ -14%
+  Buyer Response Time (picked → response)     1.2 days               5d avg: 1.3d   ✅ -8%
+  Total Response Time (routed → response)     1.8 days               5d avg: 2.1d   ✅ -14%
+
+QUOTING ACTIVITY
+  CQ Lines Entered in OT                      32 (15 customers)      5d avg: 34     ↓ -6%
+  CQ Lines Selected as 'Sold'                 15                     5d avg: 12     ↑ +25%
+  Avg Quote Age - Short-cycle*                6.8 days               5d avg: 6.4d   ⚠️ +6%
+  Avg Quote Age - Long-cycle**                18.3 days              5d avg: 19.8d  ✅ -8%
+
+  * Short-cycle: Shortage (10d auto-close), PPV/Cost Saving (15d), Other (30d)
+  ** Long-cycle: Mil-Aero/EOL/Obsolete/LTB (64d auto-close)
+
+WINS
+  SO Lines Booked                             12                     5d avg: 10     ↑ +20%
+  $ Booked                                    $67K                   5d avg: $58K   ↑ +16%
+
+SYSTEM DISCIPLINE
+  CQs entered within 2hrs of marking 'sold'   8 of 15 (53%)          5d avg: 62%    ↓ -9pts
+  Retroactive CQ entry rate                   47%                    5d avg: 45%    ⚠️ +2pts
+
+  Note: These numbers reflect OT activity only. Actual pipeline may be higher
+        due to off-system work.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+📍 BY REGION (Yesterday's Activity)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+                        RFQ     RFQ w/  Total   CQ      CQ      SO      Quote
+                        Lines   Resp.   Resp.   Lines   Lines   Lines   Age
+                        Enter           Time    Enter   Sold    Booked  (Short)
+  ──────────────────────────────────────────────────────────────────────────────
+  USA (Jeff, 9)         22 ↑    18(82%) 1.6d✅  18 →    8 ↑     7 ↑     6.1d ✅
+  MEX (Joel, 9)         8 →     6(75%)  2.1d    5 ↓     3 →     2 →     8.8d ⚠️
+
+  APAC TOTAL (11)       17 ↓    14(82%) 1.9d    9 ↓     4 ↑     3 ↑     7.9d ⚠️
+    ↳ Laurel (SGP, 3)   8       7(88%)  1.5d    5       2       2       7.2d
+    ↳ Kris/Silv (PHL,5) 3       2(67%)  2.8d    2       1       0       10.3d
+    ↳ Lavanya (IND, 3)  5       4(80%)  1.7d    2       1       1       6.5d
+  ──────────────────────────────────────────────────────────────────────────────
+  GLOBAL (29)           47      38(81%) 1.8d    32      15      12      6.8d
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+🎉 YESTERDAY'S WINS (orders booked Wed 5/27)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  ✅  USA: $47K across 7 lines
+      → Premier Electronics — 4 lines, $32K (Dan Reiser)
+      → TechSource — 3 lines, $15K (Jake McAloose)
+      💡 Premier order came from 3-day-old quote (fast close!)
+
+  ✅  MEX: $8K across 2 lines
+      → Grupo Industrial — 2 lines, $8K (Carlos Moreno)
+
+  ✅  APAC: $12K across 3 lines
+      → Delta Electronics — 2 lines, $9K (Jasper Kee - Laurel's team)
+      → LG Display — 1 line, $3K (Meenakshi Chidambaram - Lavanya's team)
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+🚨 NEEDS ATTENTION (Last 5 Business Days)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Showing alerts from last 5 business days to keep focus fresh and actionable
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+🔥 HIGH-VALUE AGING QUOTES (>$10K, entered aging window in last 5 days) — Top 5
+
+  1. Samsung Electronics - $24K quote, 18 days old (Shortage - expect 10d close)
+     (APAC - Jasper Kee)
+  2. Acme Corp - $18K quote, 22 days old (PPV - expect 15d close)
+     (USA - Dan Reiser) ← 75% win rate
+  3. Foxconn - $11K quote, 21 days old (Shortage - expect 10d close)
+     (APAC - Ray Ng)
+  4. Widget Co - $10K quote, 16 days old (Other - expect 30d close)
+     (USA - Jake McAloose)
+  5. Delta Electronics - $9K quote, 12 days old (EOL - expect 64d close)
+     (APAC - Meenakshi)
+
+  → ACTION: Prioritize by RFQ type — Shortage/PPV quotes are overdue, EOL is
+            on track — combined $72K at risk
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+💎 HIGH-PROBABILITY CUSTOMERS (30-50% win rate, quotes needing follow-up
+                                in last 5 days) — Top 5
+
+  1. Premier Electronics - $9K quote, 8 days old (Shortage)
+     (USA - Jake McAloose) ← 45% win rate
+  2. Grupo Industrial - $6K quote, 11 days old (PPV)
+     (MEX - Carlos Moreno) ← 42% win rate, won last 3
+  3. LG Display - $7K quote, 9 days old (Shortage)
+     (APAC - Lavanya team) ← 38% win rate
+  4. TechSource - $5K quote, 7 days old (Other)
+     (USA - Justin Goodwin) ← 35% win rate
+  5. Positronic - $4K quote, 10 days old (Shortage)
+     (USA - Thomas Haynes) ← 33% win rate
+
+  → ACTION: Follow up today — likely to close with nudge (combined $31K)
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+🆕 NEW CUSTOMER OPPORTUNITIES (first-time RFQs in last 5 days, no quotes yet)
+                                — Top 5
+
+  1. TechGlobal Inc - 4 RFQ lines, 5 days old (USA - Justin Goodwin)
+  2. Delta Systems - 3 RFQ lines, 3 days old (APAC - Lavanya team)
+  3. Innovatech - 2 RFQ lines, 4 days old (MEX - Joel team)
+  4. Quantum Electronics - 2 RFQ lines, 2 days old (USA - Dan Reiser)
+  5. Apex Manufacturing - 1 RFQ line, 1 day old (APAC - Laurel team)
+
+  → ACTION: Prioritize for fast response — first impression matters (12 lines)
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+⚠️ PRICING BENCHMARKS (last 30 days: 30+ lines quoted, <10% win rate)
+
+  • WidgetCorp - 47 lines quoted, 3 won (6% win rate)
+    → Price not competitive or wrong fit
+  • GlobalTech - 32 lines quoted, 2 won (6% win rate)
+    → Review pricing strategy
+
+  → NOTE: Use for pricing intel / market benchmarking (not pursuit priority).
+          These alerts persist for 5 days after first appearance, then fall
+          off unless pattern continues.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+⚠️ SOURCING STUCK (routed RFQ lines with no response after 3+ days)
+
+  USA: 3 lines | MEX: 1 line | APAC: 4 lines (8 total)
+
+  → ACTION: Escalate to sourcing or close out. Only includes RFQ lines that
+            were routed to buyer queue 3+ days ago with no VQ or no-bid/no-stock
+            response yet.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+📈 WEEK-TO-DATE (Mon-Thu, 4 of 5 days)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+               RFQ      CQ       CQ       Weekly         Pace
+               Lines    Lines    Sold     Target*
+  ─────────────────────────────────────────────────────────────────────
+  USA (9)       89       72       32      180/135/41     ✅ On track
+  MEX (9)       30       19       11      180/135/41     ⚠️ Below pace
+  APAC (11)     65       40       17      220/165/50     ✅ On track
+  ─────────────────────────────────────────────────────────────────────
+  GLOBAL (29)   184      131      60      580/435/132    ✅ On track
+
+  * Weekly Target format: RFQ Lines / CQ Lines / CQ Sold
+  Per-seller KPIs: 20 RFQ lines, 15 CQ lines, 4.5 CQ sold (30% close rate)
+  Projected week-end: 230 RFQ lines, 164 CQ lines, 75 CQ sold → ✅ On pace
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+📊 MARKET PULSE (5-Day Rolling Trends)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+🔥 HOT: Microchip Technology Parts
+   23 RFQ lines from 10 distinct customers this week
+   vs 9 lines / 4 customers last week (+156% demand spike)
+
+📈 TRENDING UP: Parts with Prefix "74LS"
+   Booking 2.3× faster than 30-day avg (2.1 days to close vs 4.8 days)
+   Hot commodity — prioritize sourcing and quoting for these parts
+
+📉 TRENDING DOWN: PPV/Cost Saving RFQs
+   Down 12% vs prior 5-day period
+   Customers less price-sensitive this week or shift to shortage demand?
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+📝 OBSERVATIONS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  • USA leading on velocity (6.1d avg quote age vs 6.8d global short-cycle)
+  • System discipline slipping: only 53% of CQs entered within 2hrs of marking
+    sold (down from 62% 5-day avg)
+  • Buyer response time improving (1.8d total vs 2.1d 5-day avg) — good trend
+  • MEX below weekly pace — lighter RFQ load or sourcing bottleneck?
+  • Watch Microchip parts — 156% demand spike signals market opportunity
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Questions? Reply to this email or ping analytics team.
+Next digest: Tomorrow 6am PT

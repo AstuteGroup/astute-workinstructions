@@ -1,0 +1,455 @@
+{
+  "section1": {
+    "pipelineInput": {
+      "rfqLines": 66,
+      "rfqCustomers": 7,
+      "rfqAvg": 259.5,
+      "rfqChange": -74.6,
+      "responseLines": 27,
+      "responsePct": 40.9,
+      "responseAvg": 81.8,
+      "responseChange": -67
+    },
+    "quotingActivity": {
+      "cqLines": 5,
+      "cqCustomers": 2,
+      "cqAvg": 37,
+      "cqChange": -86.5,
+      "cqSold": 2,
+      "cqSoldAvg": 20.8,
+      "cqSoldChange": -90.4,
+      "shortCycleDays": 12.5,
+      "shortCycleAvg": 12.4,
+      "shortCycleChange": 0.8,
+      "longCycleDays": 31.6,
+      "longCycleAvg": 29.8,
+      "longCycleChange": 6
+    },
+    "wins": {
+      "soLines": 2,
+      "soAvg": 17.8,
+      "soChange": -88.8,
+      "amount": 22570,
+      "amountAvg": 2528649.29,
+      "amountChange": -99.1
+    },
+    "systemDiscipline": {
+      "totalSold": 2,
+      "within2hrs": 0,
+      "within2hrsPct": 0,
+      "within2hrsAvg": 38.1,
+      "within2hrsChange": -38.1,
+      "retroactive": 0,
+      "retroactivePct": 0,
+      "retroactiveAvg": 0,
+      "retroactiveChange": 0
+    }
+  },
+  "section2": [
+    {
+      "region": "MEX",
+      "rfq_lines": "4",
+      "with_response": "3",
+      "response_pct": "75.0",
+      "avg_response_days": "0.8",
+      "cq_lines": "1",
+      "cq_sold": "0",
+      "so_lines": "2",
+      "short_cycle_age": "12.9"
+    },
+    {
+      "region": "APAC-Laurel",
+      "rfq_lines": "20",
+      "with_response": "0",
+      "response_pct": "0.0",
+      "avg_response_days": "0",
+      "cq_lines": "2",
+      "cq_sold": "2",
+      "so_lines": "0",
+      "short_cycle_age": "12.1"
+    },
+    {
+      "region": "APAC-Kris",
+      "rfq_lines": "34",
+      "with_response": "23",
+      "response_pct": "67.6",
+      "avg_response_days": "0.6",
+      "cq_lines": "0",
+      "cq_sold": "0",
+      "so_lines": "0",
+      "short_cycle_age": "14.1"
+    },
+    {
+      "region": "APAC-Lavanya",
+      "rfq_lines": "8",
+      "with_response": "1",
+      "response_pct": "12.5",
+      "avg_response_days": "0.4",
+      "cq_lines": "0",
+      "cq_sold": "0",
+      "so_lines": "0",
+      "short_cycle_age": "7.0"
+    }
+  ],
+  "section3": [
+    {
+      "region": "MEX",
+      "customer": "Jabil Inc",
+      "seller": "Alex Partida",
+      "parts": "Generic Sales Product",
+      "buyers": "TBD - buyer lookup",
+      "lines": "1",
+      "amount": "21850"
+    },
+    {
+      "region": "MEX",
+      "customer": "Sanmina Corporation",
+      "seller": "Ricardo Morales",
+      "parts": "Generic Sales Product",
+      "buyers": "TBD - buyer lookup",
+      "lines": "1",
+      "amount": "720.0"
+    }
+  ],
+  "section4": {
+    "highValue": [
+      {
+        "rfq_id": "1144371",
+        "customer": "Fortinet",
+        "quote_value": "3892896.00",
+        "cq_line_count": "1",
+        "days_ago": "6",
+        "rfq_type": "Shortage",
+        "seller": "Michael Stifter",
+        "region": "USA"
+      },
+      {
+        "rfq_id": "1145085",
+        "customer": "MKS Instruments, Inc.",
+        "quote_value": "694890.00",
+        "cq_line_count": "1",
+        "days_ago": "5",
+        "rfq_type": "EOL/LTB",
+        "seller": "Josh Syre",
+        "region": "USA"
+      },
+      {
+        "rfq_id": "1145149",
+        "customer": "GE Healthcare",
+        "quote_value": "561500.00",
+        "cq_line_count": "1",
+        "days_ago": "4",
+        "rfq_type": "Shortage",
+        "seller": "Aaron Mendoza",
+        "region": "USA"
+      },
+      {
+        "rfq_id": "1144115",
+        "customer": "RTX",
+        "quote_value": "253320.00",
+        "cq_line_count": "2",
+        "days_ago": "4",
+        "rfq_type": "Shortage",
+        "seller": "Thomas Haynes",
+        "region": "USA"
+      },
+      {
+        "rfq_id": "1145142",
+        "customer": "Parker Meggitt",
+        "quote_value": "242444.80",
+        "cq_line_count": "1",
+        "days_ago": "5",
+        "rfq_type": "EOL/LTB",
+        "seller": "Josh Syre",
+        "region": "USA"
+      }
+    ],
+    "highProbability": [
+      {
+        "rfq_id": "1143532",
+        "customer": "Eastman Kodak Company",
+        "quote_value": "1670",
+        "cq_line_count": "1",
+        "days_ago": "6",
+        "rfq_type": "Shortage",
+        "seller": "Aaron Mendoza",
+        "region": "USA",
+        "win_rate": "50.0"
+      },
+      {
+        "rfq_id": "1145169",
+        "customer": "GE Aerospace (Formerly GE Aviation)",
+        "quote_value": "42075.00",
+        "cq_line_count": "1",
+        "days_ago": "4",
+        "rfq_type": "Shortage",
+        "seller": "Jake Mcaloose",
+        "region": "USA",
+        "win_rate": "41.7"
+      },
+      {
+        "rfq_id": "1145075",
+        "customer": "GE Aerospace (Formerly GE Aviation)",
+        "quote_value": "16475.00",
+        "cq_line_count": "3",
+        "days_ago": "6",
+        "rfq_type": "Shortage",
+        "seller": "Jake Mcaloose",
+        "region": "USA",
+        "win_rate": "41.7"
+      },
+      {
+        "rfq_id": "1145074",
+        "customer": "GE Aerospace (Formerly GE Aviation)",
+        "quote_value": "9525.00",
+        "cq_line_count": "1",
+        "days_ago": "4",
+        "rfq_type": "Shortage",
+        "seller": "Jake Mcaloose",
+        "region": "USA",
+        "win_rate": "41.7"
+      },
+      {
+        "rfq_id": "1144625",
+        "customer": "GE Aerospace (Formerly GE Aviation)",
+        "quote_value": "5286.50",
+        "cq_line_count": "2",
+        "days_ago": "6",
+        "rfq_type": "Shortage",
+        "seller": "Jake Mcaloose",
+        "region": "USA",
+        "win_rate": "41.7"
+      }
+    ],
+    "newCustomers": [
+      {
+        "customer": "Etron Technology",
+        "rfq_lines": "162",
+        "days_ago": "6",
+        "seller": "Alejandro Padilla",
+        "region": "MEX"
+      },
+      {
+        "customer": "Vista consoles electronics pvt Ltd",
+        "rfq_lines": "3",
+        "days_ago": "5",
+        "seller": "Lavanya Manohar",
+        "region": "APAC-Lavanya"
+      },
+      {
+        "customer": "Optimized Solutions",
+        "rfq_lines": "1",
+        "days_ago": "5",
+        "seller": "Lavanya Manohar",
+        "region": "APAC-Lavanya"
+      },
+      {
+        "customer": "STS Manufacturing",
+        "rfq_lines": "1",
+        "days_ago": "5",
+        "seller": "Carlos Moreno",
+        "region": "MEX"
+      },
+      {
+        "customer": "TVSMotor",
+        "rfq_lines": "1",
+        "days_ago": "5",
+        "seller": "Manikandan",
+        "region": "APAC-Lavanya"
+      }
+    ],
+    "pricingBenchmarks": [
+      {
+        "customer": "Unqualified Broker",
+        "lines_quoted": "141",
+        "lines_won": "0",
+        "win_rate": "0.0"
+      },
+      {
+        "customer": "RTX",
+        "lines_quoted": "36",
+        "lines_won": "0",
+        "win_rate": "0.0"
+      }
+    ],
+    "sourcingStuck": []
+  },
+  "section5": [
+    {
+      "region": "USA",
+      "rfq_lines_wtd": "28",
+      "cq_lines_wtd": "13",
+      "cq_sold_wtd": "4",
+      "so_lines_wtd": "9",
+      "so_amount_wtd": "28641.50"
+    },
+    {
+      "region": "MEX",
+      "rfq_lines_wtd": "14",
+      "cq_lines_wtd": "3",
+      "cq_sold_wtd": "0",
+      "so_lines_wtd": "1",
+      "so_amount_wtd": "725"
+    },
+    {
+      "region": "APAC-Laurel",
+      "rfq_lines_wtd": "0",
+      "cq_lines_wtd": "0",
+      "cq_sold_wtd": "0",
+      "so_lines_wtd": "1",
+      "so_amount_wtd": "27370"
+    },
+    {
+      "region": "APAC-Kris",
+      "rfq_lines_wtd": "1",
+      "cq_lines_wtd": "0",
+      "cq_sold_wtd": "0",
+      "so_lines_wtd": "0",
+      "so_amount_wtd": "0"
+    },
+    {
+      "region": "APAC-Lavanya",
+      "rfq_lines_wtd": "3",
+      "cq_lines_wtd": "1",
+      "cq_sold_wtd": "1",
+      "so_lines_wtd": "1",
+      "so_amount_wtd": "1612.80"
+    }
+  ],
+  "section6": {
+    "trendingManufacturers": [
+      {
+        "manufacturer": "Texas Instruments",
+        "rfq_count": "123",
+        "quoted_count": "7",
+        "sold_count": "1"
+      },
+      {
+        "manufacturer": "Vishay",
+        "rfq_count": "83",
+        "quoted_count": "1",
+        "sold_count": "0"
+      },
+      {
+        "manufacturer": "Analog Devices Inc",
+        "rfq_count": "47",
+        "quoted_count": "3",
+        "sold_count": "1"
+      },
+      {
+        "manufacturer": "Micro Commercial Components",
+        "rfq_count": "44",
+        "quoted_count": "0",
+        "sold_count": "0"
+      },
+      {
+        "manufacturer": "Murata",
+        "rfq_count": "43",
+        "quoted_count": "0",
+        "sold_count": "0"
+      },
+      {
+        "manufacturer": "Diodes Inc",
+        "rfq_count": "42",
+        "quoted_count": "0",
+        "sold_count": "0"
+      },
+      {
+        "manufacturer": "On Semiconductor",
+        "rfq_count": "40",
+        "quoted_count": "0",
+        "sold_count": "0"
+      },
+      {
+        "manufacturer": "Nexperia",
+        "rfq_count": "35",
+        "quoted_count": "2",
+        "sold_count": "1"
+      },
+      {
+        "manufacturer": "St",
+        "rfq_count": "33",
+        "quoted_count": "0",
+        "sold_count": "0"
+      },
+      {
+        "manufacturer": "Infineon",
+        "rfq_count": "27",
+        "quoted_count": "2",
+        "sold_count": "0"
+      }
+    ],
+    "trendingParts": [
+      {
+        "mpn": "DCR1-AM",
+        "manufacturer": "Sierra Safety Technology, Inc.",
+        "rfq_count": "8",
+        "quoted_count": "8",
+        "sold_count": "8"
+      },
+      {
+        "mpn": "MT47H128M16RT-25E:C",
+        "manufacturer": "Micron Technology Inc",
+        "rfq_count": "6",
+        "quoted_count": "0",
+        "sold_count": "0"
+      },
+      {
+        "mpn": "FT2232HL-REEL",
+        "manufacturer": "Future Technology Devices International Ltd",
+        "rfq_count": "3",
+        "quoted_count": "0",
+        "sold_count": "0"
+      },
+      {
+        "mpn": "B016-D33-01",
+        "manufacturer": "Corning Gilbert Inc",
+        "rfq_count": "2",
+        "quoted_count": "1",
+        "sold_count": "0"
+      },
+      {
+        "mpn": "ADN8834ACBZ-R7",
+        "manufacturer": "Analog Devices Inc",
+        "rfq_count": "2",
+        "quoted_count": "1",
+        "sold_count": "1"
+      },
+      {
+        "mpn": "1250003H",
+        "manufacturer": "Littelfuse Inc",
+        "rfq_count": "2",
+        "quoted_count": "0",
+        "sold_count": "0"
+      },
+      {
+        "mpn": "961VUS504EFT093",
+        "manufacturer": "Winchester Interconnect",
+        "rfq_count": "2",
+        "quoted_count": "0",
+        "sold_count": "0"
+      },
+      {
+        "mpn": "5SGSMD4H2F35I2LG",
+        "manufacturer": "Altera",
+        "rfq_count": "2",
+        "quoted_count": "0",
+        "sold_count": "0"
+      },
+      {
+        "mpn": "0451004.MRL",
+        "manufacturer": "Littelfuse Inc",
+        "rfq_count": "2",
+        "quoted_count": "0",
+        "sold_count": "0"
+      },
+      {
+        "mpn": "ADUM4402BRWZ-RL",
+        "manufacturer": "Analog Devices Inc",
+        "rfq_count": "2",
+        "quoted_count": "0",
+        "sold_count": "0"
+      }
+    ]
+  }
+}

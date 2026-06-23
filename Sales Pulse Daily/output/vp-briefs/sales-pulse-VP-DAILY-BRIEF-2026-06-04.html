@@ -1,0 +1,330 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>VP Daily Brief — Sales Pulse</title>
+<style>
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif;
+    font-size: 13px;
+    line-height: 1.5;
+    color: #333;
+    max-width: 700px;
+    margin: 0 auto;
+    padding: 20px;
+    background: #f5f5f5;
+  }
+  .container {
+    background: white;
+    padding: 24px;
+    border-radius: 8px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+  }
+  h1 {
+    font-size: 18px;
+    font-weight: 600;
+    margin: 0 0 4px 0;
+    color: #1a1a1a;
+  }
+  .subtitle {
+    font-size: 11px;
+    color: #666;
+    margin-bottom: 20px;
+  }
+  .mockup-banner {
+    background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+    color: white;
+    padding: 12px 20px;
+    border-radius: 6px;
+    margin-bottom: 20px;
+    text-align: center;
+    font-weight: 700;
+    font-size: 14px;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+  }
+
+  /* Priority Actions */
+  .actions {
+    background: linear-gradient(135deg, #fef3c7 0%, #fef9e7 100%);
+    border: 2px solid #f59e0b;
+    border-radius: 8px;
+    padding: 16px;
+    margin-bottom: 20px;
+  }
+  .actions h2 {
+    margin: 0 0 12px 0;
+    font-size: 14px;
+    font-weight: 700;
+    color: #92400e;
+  }
+  .action {
+    background: white;
+    border-left: 4px solid #dc2626;
+    padding: 10px;
+    margin-bottom: 10px;
+    border-radius: 4px;
+    font-size: 12px;
+  }
+  .action:last-child { margin-bottom: 0; }
+  .action.yellow { border-left-color: #f59e0b; }
+  .action strong { color: #1a1a1a; }
+
+  /* Metrics Grid */
+  .metrics {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 12px;
+    margin-bottom: 20px;
+  }
+  .metric {
+    background: #f8fafc;
+    border-radius: 6px;
+    padding: 12px;
+    border-left: 3px solid #94a3b8;
+  }
+  .metric.red { border-left-color: #dc2626; background: #fef2f2; }
+  .metric.yellow { border-left-color: #f59e0b; background: #fffbeb; }
+  .metric.green { border-left-color: #16a34a; background: #f0fdf4; }
+
+  .metric-label {
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: #64748b;
+    font-weight: 600;
+    margin-bottom: 4px;
+  }
+  .metric-value {
+    font-size: 20px;
+    font-weight: 700;
+    color: #1e293b;
+    margin-bottom: 2px;
+  }
+  .metric-trend {
+    font-size: 11px;
+    color: #64748b;
+  }
+
+  /* Regional Table */
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 12px;
+    margin-bottom: 16px;
+  }
+  th {
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    padding: 6px 8px;
+    text-align: left;
+    font-weight: 600;
+    font-size: 10px;
+    color: #475569;
+  }
+  td {
+    border: 1px solid #e2e8f0;
+    padding: 6px 8px;
+  }
+
+  .badge {
+    display: inline-block;
+    padding: 2px 6px;
+    border-radius: 10px;
+    font-size: 10px;
+    font-weight: 600;
+  }
+  .badge-red { background: #fee2e2; color: #991b1b; }
+  .badge-yellow { background: #fef3c7; color: #92400e; }
+  .badge-green { background: #dcfce7; color: #166534; }
+
+  .footer {
+    margin-top: 16px;
+    padding-top: 12px;
+    border-top: 1px solid #e0e0e0;
+    font-size: 10px;
+    color: #666;
+  }
+</style>
+</head>
+<body>
+
+<div class="container">
+  <div class="mockup-banner">📋 MOCKUP — CONCEPT REVIEW (Illustrative Data)</div>
+  <h1>VP Daily Brief — Sales Pulse</h1>
+  <div class="subtitle">Tuesday, June 4, 2026 | Market: Pre-Constrained</div>
+
+  <!-- Priority Actions -->
+  <div class="actions">
+    <h2>🎯 What Matters Today</h2>
+    <div class="action">
+      <strong>APAC Demand Acceleration →</strong> Singapore/Philippines RFQ volume +87% week-over-week (memory-heavy).
+      If pattern holds, USA sees similar spike in 3-4 weeks. Prep regional managers for Q3 allocation scenario.
+    </div>
+    <div class="action yellow">
+      <strong>Tier 2/3 Adoption Gap →</strong> Added 14 alt manufacturers but only 3% of quotes use them.
+      Sellers need training or customers need education before allocation hits.
+    </div>
+    <div class="action yellow">
+      <strong>Pipeline Concentration Risk →</strong> Top 3 manufacturers (TI, Micron, Infineon) = 47% of active pipeline ($6.7M).
+      If these allocate, half our revenue at risk.
+    </div>
+  </div>
+
+  <!-- Market Signals -->
+  <div style="margin-bottom: 16px;">
+    <strong style="font-size: 13px; display: block; margin-bottom: 8px;">⚡ Market Signals (30-Day Trend)</strong>
+    <div class="metrics">
+      <div class="metric red">
+        <div class="metric-label">APAC Demand</div>
+        <div class="metric-value">+87%</div>
+        <div class="metric-trend">Leading indicator</div>
+      </div>
+      <div class="metric yellow">
+        <div class="metric-label">Memory Lead Times</div>
+        <div class="metric-value">+45%</div>
+        <div class="metric-trend">10wks → 14.5wks avg</div>
+      </div>
+      <div class="metric green">
+        <div class="metric-label">USA Demand</div>
+        <div class="metric-value">+12%</div>
+        <div class="metric-trend">Lags APAC 3-4wks</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Regional Snapshot -->
+  <div>
+    <strong style="font-size: 13px; display: block; margin-bottom: 8px;">🌍 Regional Snapshot (Yesterday)</strong>
+    <table>
+      <thead>
+        <tr>
+          <th>Region</th>
+          <th>RFQs</th>
+          <th>Quotes</th>
+          <th>Won</th>
+          <th>Status</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><strong>USA</strong> (Jeff, 8)</td>
+          <td>41</td>
+          <td>17</td>
+          <td>8</td>
+          <td><span class="badge badge-green">Strong</span></td>
+        </tr>
+        <tr>
+          <td><strong>MEX</strong> (Joel, 8)</td>
+          <td>173</td>
+          <td>3</td>
+          <td>0</td>
+          <td><span class="badge badge-red">Crisis</span></td>
+        </tr>
+        <tr>
+          <td><strong>APAC-Laurel</strong> (3)</td>
+          <td>6</td>
+          <td>3</td>
+          <td>3</td>
+          <td><span class="badge badge-green">Solid</span></td>
+        </tr>
+        <tr>
+          <td><strong>APAC-Silvia</strong> (5)</td>
+          <td>4</td>
+          <td>1</td>
+          <td>1</td>
+          <td><span class="badge badge-green">On Track</span></td>
+        </tr>
+        <tr>
+          <td><strong>APAC-Lavanya</strong> (3)</td>
+          <td>0</td>
+          <td>0</td>
+          <td>0</td>
+          <td><span class="badge badge-yellow">Quiet</span></td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- Strategic Pipeline -->
+  <div style="margin-bottom: 16px;">
+    <strong style="font-size: 13px; display: block; margin-bottom: 8px;">💰 Strategic Pipeline Health</strong>
+    <div class="metrics">
+      <div class="metric">
+        <div class="metric-label">Total Pipeline</div>
+        <div class="metric-value">$14.2M</div>
+        <div class="metric-trend">1,847 active quotes</div>
+      </div>
+      <div class="metric red">
+        <div class="metric-label">Allocation Risk</div>
+        <div class="metric-value">$6.7M</div>
+        <div class="metric-trend">47% exposed (Top 3 MFRs)</div>
+      </div>
+      <div class="metric green">
+        <div class="metric-label">New Customers</div>
+        <div class="metric-value">12</div>
+        <div class="metric-trend">Last 30 days (+71%)</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Top Allocation-Exposed Opportunities -->
+  <div>
+    <strong style="font-size: 13px; display: block; margin-bottom: 8px;">🚨 Top Allocation-Exposed Deals</strong>
+    <table>
+      <thead>
+        <tr>
+          <th>Customer</th>
+          <th>Value</th>
+          <th>Exposed MFR</th>
+          <th>Alt Available?</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>GE Aerospace</td>
+          <td>$1.2M</td>
+          <td>TI, Infineon</td>
+          <td><span class="badge badge-green">Yes</span></td>
+        </tr>
+        <tr>
+          <td>Applied Materials</td>
+          <td>$890K</td>
+          <td>Micron, Samsung</td>
+          <td><span class="badge badge-red">Limited</span></td>
+        </tr>
+        <tr>
+          <td>MKS Instruments</td>
+          <td>$780K</td>
+          <td>TI</td>
+          <td><span class="badge badge-green">Yes</span></td>
+        </tr>
+        <tr>
+          <td>Lam Research</td>
+          <td>$650K</td>
+          <td>Infineon, STM</td>
+          <td><span class="badge badge-green">Yes</span></td>
+        </tr>
+        <tr>
+          <td>RTX Corporation</td>
+          <td>$520K</td>
+          <td>Micron</td>
+          <td><span class="badge badge-yellow">Partial</span></td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- Footer -->
+  <div class="footer">
+    <strong>Market Cycle:</strong> Normal → Constrained (we are here) → Allocated → Recovery<br>
+    <strong>Pattern:</strong> APAC leads by 3-4 weeks | Singapore/PHL heating up, India flat<br>
+    <strong>Strategy:</strong> 14 tier 2/3 manufacturers added for alternates (low adoption so far)
+  </div>
+
+</div>
+
+</body>
+</html>

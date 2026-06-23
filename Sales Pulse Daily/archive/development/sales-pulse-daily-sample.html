@@ -1,0 +1,365 @@
+<!DOCTYPE html>
+<html>
+<head>
+<style>
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif;
+    font-size: 13px;
+    line-height: 1.5;
+    color: #333;
+    max-width: 800px;
+    margin: 0 auto;
+    padding: 20px;
+    background: #f5f5f5;
+  }
+  .container {
+    background: white;
+    padding: 24px;
+    border-radius: 8px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+  }
+  h1 {
+    font-size: 20px;
+    font-weight: 600;
+    margin: 0 0 4px 0;
+    color: #1a1a1a;
+  }
+  .subtitle {
+    font-size: 11px;
+    color: #666;
+    margin-bottom: 20px;
+  }
+  .section {
+    margin-bottom: 24px;
+    padding-bottom: 24px;
+    border-bottom: 2px solid #e0e0e0;
+  }
+  .section:last-child {
+    border-bottom: none;
+  }
+  .section-title {
+    font-size: 15px;
+    font-weight: 600;
+    margin-bottom: 12px;
+    color: #1a1a1a;
+  }
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13px;
+  }
+  th {
+    text-align: left;
+    padding: 8px 12px;
+    background: #f8f8f8;
+    font-weight: 600;
+    border-bottom: 2px solid #e0e0e0;
+  }
+  td {
+    padding: 8px 12px;
+    border-bottom: 1px solid #f0f0f0;
+  }
+  .metric-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 16px;
+    margin-bottom: 16px;
+  }
+  .metric {
+    background: #f8f8f8;
+    padding: 12px 16px;
+    border-radius: 6px;
+  }
+  .metric-label {
+    font-size: 11px;
+    color: #666;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 4px;
+  }
+  .metric-value {
+    font-size: 24px;
+    font-weight: 600;
+    color: #1a1a1a;
+  }
+  .metric-change {
+    font-size: 12px;
+    margin-top: 4px;
+  }
+  .up { color: #16a34a; }
+  .down { color: #dc2626; }
+  .flat { color: #666; }
+  .warning { color: #ea580c; }
+  .alert-box {
+    background: #fef3c7;
+    border-left: 4px solid #f59e0b;
+    padding: 12px 16px;
+    margin-bottom: 12px;
+    border-radius: 4px;
+  }
+  .alert-box.critical {
+    background: #fee2e2;
+    border-left-color: #dc2626;
+  }
+  .alert-title {
+    font-weight: 600;
+    margin-bottom: 4px;
+  }
+  .alert-detail {
+    font-size: 12px;
+    color: #666;
+    margin-top: 4px;
+  }
+  .win-item {
+    background: #f0fdf4;
+    border-left: 4px solid #16a34a;
+    padding: 12px 16px;
+    margin-bottom: 12px;
+    border-radius: 4px;
+  }
+  .win-title {
+    font-weight: 600;
+    margin-bottom: 4px;
+  }
+  .insight {
+    font-size: 12px;
+    color: #666;
+    font-style: italic;
+    margin-top: 4px;
+  }
+  .notes {
+    background: #f8f8f8;
+    padding: 12px 16px;
+    border-radius: 6px;
+    font-size: 12px;
+    color: #666;
+  }
+  .notes ul {
+    margin: 8px 0;
+    padding-left: 20px;
+  }
+  .notes li {
+    margin-bottom: 4px;
+  }
+  .footer {
+    margin-top: 20px;
+    padding-top: 16px;
+    border-top: 1px solid #e0e0e0;
+    font-size: 11px;
+    color: #999;
+    text-align: center;
+  }
+  .status-good { color: #16a34a; font-weight: 600; }
+  .status-warn { color: #ea580c; font-weight: 600; }
+</style>
+</head>
+<body>
+<div class="container">
+
+  <h1>📊 Sales Pulse — Wednesday, May 28, 2026</h1>
+  <div class="subtitle">Data as of 6:00am PT | Reflects activity through EOD Tue May 27</div>
+
+  <!-- GLOBAL SNAPSHOT -->
+  <div class="section">
+    <div class="section-title">Global Snapshot</div>
+    <div class="metric-grid">
+      <div class="metric">
+        <div class="metric-label">RFQs Received</div>
+        <div class="metric-value">47</div>
+        <div class="metric-change up">↑ +8 vs yesterday | +12 vs last Wed</div>
+      </div>
+      <div class="metric">
+        <div class="metric-label">Quotes Sent</div>
+        <div class="metric-value">32</div>
+        <div class="metric-change down">↓ -5 vs yesterday | -5 vs last Wed</div>
+      </div>
+      <div class="metric">
+        <div class="metric-label">Orders Booked</div>
+        <div class="metric-value">12</div>
+        <div class="metric-change up">↑ +3 vs yesterday | +3 vs last Wed</div>
+      </div>
+      <div class="metric">
+        <div class="metric-label">Avg Quote Age</div>
+        <div class="metric-value">8.2d</div>
+        <div class="metric-change warning">⚠️ +0.8d vs last Wed</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- BY REGION -->
+  <div class="section">
+    <div class="section-title">📍 By Region (Yesterday's Activity)</div>
+    <table>
+      <thead>
+        <tr>
+          <th>Region</th>
+          <th>RFQs In</th>
+          <th>Quotes Out</th>
+          <th>Orders Won</th>
+          <th>Avg Quote Age</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><strong>USA</strong> (Jeff)</td>
+          <td>22 <span class="up">↑</span></td>
+          <td>18 <span class="flat">→</span></td>
+          <td>7 <span class="up">↑</span></td>
+          <td><span class="status-good">7.1d ✅</span></td>
+        </tr>
+        <tr>
+          <td><strong>MEX</strong> (Joel)</td>
+          <td>8 <span class="flat">→</span></td>
+          <td>5 <span class="down">↓</span></td>
+          <td>2 <span class="flat">→</span></td>
+          <td><span class="status-warn">9.8d ⚠️</span></td>
+        </tr>
+        <tr>
+          <td><strong>APAC</strong> (All)</td>
+          <td>17 <span class="down">↓</span></td>
+          <td>9 <span class="down">↓</span></td>
+          <td>3 <span class="up">↑</span></td>
+          <td><span class="status-warn">8.9d ⚠️</span></td>
+        </tr>
+        <tr style="border-top: 2px solid #e0e0e0; font-weight: 600;">
+          <td>GLOBAL</td>
+          <td>47</td>
+          <td>32</td>
+          <td>12</td>
+          <td>8.2d</td>
+        </tr>
+      </tbody>
+    </table>
+    <div style="font-size: 11px; color: #666; margin-top: 8px;">
+      APAC breakdown: Laurel 8 RFQs, Lavanya 6, Kris 3
+    </div>
+  </div>
+
+  <!-- NEEDS ATTENTION -->
+  <div class="section">
+    <div class="section-title">🚨 Needs Attention (as of 6am PT)</div>
+
+    <div class="alert-box">
+      <div class="alert-title">⚠️ 23 quotes aging 7-14 days (no customer response yet)</div>
+      <div>USA: 12 | MEX: 4 | APAC: 7</div>
+      <div class="alert-detail"><strong>ACTION:</strong> Follow up today or mark lost</div>
+    </div>
+
+    <div class="alert-box">
+      <div class="alert-title">⚠️ 8 RFQs with no VQs after 3+ days (sourcing bottleneck)</div>
+      <div>USA: 3 | MEX: 1 | APAC: 4</div>
+      <div class="alert-detail"><strong>ACTION:</strong> Escalate to sourcing or close out</div>
+    </div>
+
+    <div class="alert-box critical">
+      <div class="alert-title">🔥 5 quotes aging 15-30 days (going stale - last chance)</div>
+      <div style="margin-top: 4px;">
+        • USA: 2 (Acme Corp $18K, Widget Co $7K)<br>
+        • MEX: 0<br>
+        • APAC: 3 (Samsung $24K, Foxconn $11K, Delta $5K)
+      </div>
+      <div class="alert-detail"><strong>ACTION:</strong> Final push or close out by EOD Friday</div>
+    </div>
+  </div>
+
+  <!-- YESTERDAY'S WINS -->
+  <div class="section">
+    <div class="section-title">🎉 Yesterday's Wins (orders booked Tue 5/27)</div>
+
+    <div class="win-item">
+      <div class="win-title">✅ USA: $47K across 7 lines</div>
+      <div>
+        • Premier Electronics — 4 lines, $32K (Dan Reiser)<br>
+        • TechSource — 3 lines, $15K (Jake McAloose)
+      </div>
+      <div class="insight">💡 Premier order came from 3-day-old quote (fast close!)</div>
+    </div>
+
+    <div class="win-item">
+      <div class="win-title">✅ MEX: $8K across 2 lines</div>
+      <div>• Grupo Industrial — 2 lines, $8K (Carlos Moreno)</div>
+    </div>
+
+    <div class="win-item">
+      <div class="win-title">✅ APAC: $12K across 3 lines</div>
+      <div>
+        • Delta Electronics — 2 lines, $9K (Jasper Kee)<br>
+        • LG Display — 1 line, $3K (Meenakshi Chidambaram)
+      </div>
+    </div>
+  </div>
+
+  <!-- WEEK-TO-DATE -->
+  <div class="section">
+    <div class="section-title">📈 Week-to-Date (Mon-Wed, 3 of 5 days)</div>
+    <table>
+      <thead>
+        <tr>
+          <th>Region</th>
+          <th>RFQs In</th>
+          <th>Quotes Out</th>
+          <th>Orders Won</th>
+          <th>$ Booked</th>
+          <th>Pace</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><strong>USA</strong></td>
+          <td>67</td>
+          <td>54</td>
+          <td>18</td>
+          <td>$142K</td>
+          <td><span class="status-good">✅ On track</span></td>
+        </tr>
+        <tr>
+          <td><strong>MEX</strong></td>
+          <td>22</td>
+          <td>14</td>
+          <td>5</td>
+          <td>$31K</td>
+          <td><span class="status-warn">⚠️ Slow week</span></td>
+        </tr>
+        <tr>
+          <td><strong>APAC</strong></td>
+          <td>48</td>
+          <td>31</td>
+          <td>9</td>
+          <td>$58K</td>
+          <td><span class="status-good">✅ On track</span></td>
+        </tr>
+        <tr style="border-top: 2px solid #e0e0e0; font-weight: 600;">
+          <td>GLOBAL</td>
+          <td>137</td>
+          <td>99</td>
+          <td>32</td>
+          <td>$231K</td>
+          <td><span class="status-good">✅ On track</span></td>
+        </tr>
+      </tbody>
+    </table>
+    <div style="font-size: 12px; color: #666; margin-top: 12px;">
+      <strong>Weekly Target:</strong> 50 orders, $350K<br>
+      <strong>Current Pace:</strong> 53 orders, $385K (projected) → <span class="status-good">✅ On track to exceed</span>
+    </div>
+  </div>
+
+  <!-- NOTES -->
+  <div class="notes">
+    <div style="font-weight: 600; margin-bottom: 8px;">📝 Notes</div>
+    <ul>
+      <li>USA leading on velocity (7.1d avg quote age vs 8.2d global)</li>
+      <li>MEX quote output down vs last week - sourcing issue or lighter RFQ load?</li>
+      <li>APAC has 3 high-value stale quotes ($40K total) - worth a push</li>
+      <li><strong>System capture reminder:</strong> These numbers reflect OT activity only. Actual pipeline may be higher due to off-system work.</li>
+    </ul>
+  </div>
+
+  <div class="footer">
+    Questions? Reply to this email or ping analytics team.<br>
+    Next digest: Tomorrow 6am PT
+  </div>
+
+</div>
+</body>
+</html>
