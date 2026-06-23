@@ -90,11 +90,12 @@ SELECT
    WHERE ol.c_order_id = o.c_order_id
      AND ol.isactive = 'Y'
      AND ol.chuboe_mpn IS NOT NULL) as mpns,
-  (SELECT STRING_AGG(DISTINCT ol.chuboe_mfr_name, ', ' ORDER BY ol.chuboe_mfr_name)
+  (SELECT STRING_AGG(DISTINCT mfr.name, ', ' ORDER BY mfr.name)
    FROM adempiere.c_orderline ol
+   LEFT JOIN adempiere.chuboe_mfr mfr ON ol.chuboe_mfr_id = mfr.chuboe_mfr_id AND mfr.isactive = 'Y'
    WHERE ol.c_order_id = o.c_order_id
      AND ol.isactive = 'Y'
-     AND ol.chuboe_mfr_name IS NOT NULL) as mfr_names,
+     AND mfr.name IS NOT NULL) as mfr_names,
   (SELECT COALESCE(SUM(ol.qtyordered), 0)
    FROM adempiere.c_orderline ol
    WHERE ol.c_order_id = o.c_order_id
