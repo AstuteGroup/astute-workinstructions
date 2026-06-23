@@ -815,22 +815,22 @@ function generateSection2(data) {
 
   // 2.2A High Value Late SO Lines ($200K+)
   html += '<div class="subsection-header">High Value Late SO Lines ($200K+, 3-31 days past due)</div>';
-  html += '<div style="font-size: 11px; color: #666; margin-bottom: 8px;">🟡 Yellow: 3-7 days late | 🔴 Red: 8+ days late | Rolling 31-day window</div>';
+  html += '<div style="font-size: 11px; color: #666; margin-bottom: 8px;">🟡 Yellow: 3-7 days late | 🔴 Red: 8+ days late | Rolling 31-day window | Unshipped amounts shown</div>';
   if (data.highValueLateLines.length > 0) {
     html += `<table>
       <thead>
         <tr>
           <th>Customer</th>
           <th>SO#</th>
-          <th>Line</th>
+          <th style="text-align: center;">Ln</th>
           <th>MPN</th>
           <th>ISE</th>
-          <th>Region</th>
-          <th>Promise Date</th>
-          <th style="text-align: center;">Days Late</th>
-          <th style="text-align: right;">Qty Unshipped</th>
-          <th style="text-align: right;">Unshipped Line Revenue</th>
-          <th style="text-align: right;">Unshipped Line GP</th>
+          <th>Rgn</th>
+          <th>Promise</th>
+          <th style="text-align: center;">Late</th>
+          <th style="text-align: right;">Qty</th>
+          <th style="text-align: right;">Revenue</th>
+          <th style="text-align: right;">GP</th>
         </tr>
       </thead>
       <tbody>`;
@@ -840,17 +840,17 @@ function generateSection2(data) {
       const daysLateColor = line.color_code === 'red' ? '#d32f2f' : '#f57c00';
       html += `
         <tr style="background-color: ${rowColor};">
-          <td><strong>${line.customer_name}</strong></td>
-          <td>${line.sales_order}</td>
-          <td style="text-align: center;">${line.line_number}</td>
-          <td style="font-size: 10px;">${line.mpn || 'N/A'}</td>
-          <td>${line.ise_name || 'N/A'}</td>
-          <td>${line.region}</td>
-          <td>${line.promise_date}</td>
-          <td style="text-align: center; color: ${daysLateColor}; font-weight: bold;">${line.days_late}</td>
-          <td class="number">${formatNumber(line.qty_unshipped)}</td>
-          <td class="number">${formatCurrency(line.line_revenue)}</td>
-          <td class="number">${formatCurrency(line.line_gp)}</td>
+          <td style="font-size: 11px;"><strong>${line.customer_name}</strong></td>
+          <td style="font-size: 10px;">${line.sales_order}</td>
+          <td style="text-align: center; font-size: 10px;">${line.line_number}</td>
+          <td style="font-size: 9px;">${line.mpn || 'N/A'}</td>
+          <td style="font-size: 10px;">${line.ise_name || 'N/A'}</td>
+          <td style="font-size: 10px;">${line.region}</td>
+          <td style="font-size: 10px;">${line.promise_date}</td>
+          <td style="text-align: center; color: ${daysLateColor}; font-weight: bold; font-size: 10px;">${line.days_late}</td>
+          <td class="number" style="font-size: 10px;">${formatNumber(line.qty_unshipped)}</td>
+          <td class="number" style="font-size: 11px;">${formatCurrency(line.line_revenue)}</td>
+          <td class="number" style="font-size: 11px;">${formatCurrency(line.line_gp)}</td>
         </tr>`;
     });
 
@@ -861,22 +861,22 @@ function generateSection2(data) {
 
   // 2.2B Top 5 Late SO Lines (Under $200K)
   html += '<div class="subsection-header">Top 5 Late SO Lines (Under $200K, 3-31 days past due)</div>';
-  html += '<div style="font-size: 11px; color: #666; margin-bottom: 8px;">🟡 Yellow: 3-7 days late | 🔴 Red: 8+ days late</div>';
+  html += '<div style="font-size: 11px; color: #666; margin-bottom: 8px;">🟡 Yellow: 3-7 days late | 🔴 Red: 8+ days late | Unshipped amounts shown</div>';
   if (data.top5LateLines.length > 0) {
     html += `<table>
       <thead>
         <tr>
           <th>Customer</th>
           <th>SO#</th>
-          <th>Line</th>
+          <th style="text-align: center;">Ln</th>
           <th>MPN</th>
           <th>ISE</th>
-          <th>Region</th>
-          <th>Promise Date</th>
-          <th style="text-align: center;">Days Late</th>
-          <th style="text-align: right;">Qty Unshipped</th>
-          <th style="text-align: right;">Unshipped Line Revenue</th>
-          <th style="text-align: right;">Unshipped Line GP</th>
+          <th>Rgn</th>
+          <th>Promise</th>
+          <th style="text-align: center;">Late</th>
+          <th style="text-align: right;">Qty</th>
+          <th style="text-align: right;">Revenue</th>
+          <th style="text-align: right;">GP</th>
         </tr>
       </thead>
       <tbody>`;
@@ -886,17 +886,17 @@ function generateSection2(data) {
       const daysLateColor = line.color_code === 'red' ? '#d32f2f' : '#f57c00';
       html += `
         <tr style="background-color: ${rowColor};">
-          <td><strong>${line.customer_name}</strong></td>
-          <td>${line.sales_order}</td>
-          <td style="text-align: center;">${line.line_number}</td>
-          <td style="font-size: 10px;">${line.mpn || 'N/A'}</td>
-          <td>${line.ise_name || 'N/A'}</td>
-          <td>${line.region}</td>
-          <td>${line.promise_date}</td>
-          <td style="text-align: center; color: ${daysLateColor}; font-weight: bold;">${line.days_late}</td>
-          <td class="number">${formatNumber(line.qty_unshipped)}</td>
-          <td class="number">${formatCurrency(line.line_revenue)}</td>
-          <td class="number">${formatCurrency(line.line_gp)}</td>
+          <td style="font-size: 11px;"><strong>${line.customer_name}</strong></td>
+          <td style="font-size: 10px;">${line.sales_order}</td>
+          <td style="text-align: center; font-size: 10px;">${line.line_number}</td>
+          <td style="font-size: 9px;">${line.mpn || 'N/A'}</td>
+          <td style="font-size: 10px;">${line.ise_name || 'N/A'}</td>
+          <td style="font-size: 10px;">${line.region}</td>
+          <td style="font-size: 10px;">${line.promise_date}</td>
+          <td style="text-align: center; color: ${daysLateColor}; font-weight: bold; font-size: 10px;">${line.days_late}</td>
+          <td class="number" style="font-size: 10px;">${formatNumber(line.qty_unshipped)}</td>
+          <td class="number" style="font-size: 11px;">${formatCurrency(line.line_revenue)}</td>
+          <td class="number" style="font-size: 11px;">${formatCurrency(line.line_gp)}</td>
         </tr>`;
     });
 
