@@ -222,7 +222,7 @@ function getTop5Orders(queryFile) {
   if (!sqlMatch) return [];
 
   return parseRows(execQuery(sqlMatch[0]), [
-    'seller_name', 'region', 'customer_name', 'order_number', 'revenue', 'part_numbers'
+    'seller_name', 'region', 'customer_name', 'order_number', 'revenue', 'gp', 'part_numbers'
   ]);
 }
 
@@ -278,7 +278,7 @@ function getReactivatedCustomers(queryFile) {
 
   return parseRows(execQuery(sqlMatch[0]), [
     'sales_order_date', 'seller_name', 'region', 'customer_name', 'c_bpartner_id', 'order_count',
-    'order_numbers', 'total_revenue', 'mpns', 'mfr_names', 'total_qty',
+    'order_numbers', 'total_revenue', 'total_gp', 'mpns', 'mfr_names', 'total_qty',
     'customer_location', 'contact_name', 'promise_date', 'last_order_date',
     'days_since_last_order', 'previous_sales_rep'
   ]);
@@ -315,7 +315,7 @@ function getHighValueLateLines(queryFile) {
   if (!sqlMatch) return [];
 
   return parseRows(execQuery(sqlMatch[0]), [
-    'customer_name', 'sales_order', 'line_number', 'ise_name', 'region', 'promise_date', 'days_late', 'qty_unshipped', 'line_revenue', 'mpn', 'color_code'
+    'customer_name', 'sales_order', 'line_number', 'ise_name', 'region', 'promise_date', 'days_late', 'qty_unshipped', 'line_revenue', 'line_gp', 'mpn', 'color_code'
   ]);
 }
 
@@ -332,7 +332,7 @@ function getTop5LateLines(queryFile) {
   if (!sqlMatch) return [];
 
   return parseRows(execQuery(sqlMatch[0]), [
-    'customer_name', 'sales_order', 'line_number', 'ise_name', 'region', 'promise_date', 'days_late', 'qty_unshipped', 'line_revenue', 'mpn', 'color_code'
+    'customer_name', 'sales_order', 'line_number', 'ise_name', 'region', 'promise_date', 'days_late', 'qty_unshipped', 'line_revenue', 'line_gp', 'mpn', 'color_code'
   ]);
 }
 
@@ -631,6 +631,7 @@ function generateSection1(data) {
           <th>Customer</th>
           <th>SO#</th>
           <th style="text-align: right;">Revenue</th>
+          <th style="text-align: right;">GP</th>
           <th>Part Numbers</th>
         </tr>
       </thead>
@@ -646,6 +647,7 @@ function generateSection1(data) {
           <td>${order.customer_name}</td>
           <td style="font-size: 11px;">${order.order_number}</td>
           <td class="number">${formatCurrency(order.revenue)}</td>
+          <td class="number">${formatCurrency(order.gp)}</td>
           <td style="font-size: 11px;">${order.part_numbers || 'N/A'}</td>
         </tr>`;
     });
@@ -760,6 +762,7 @@ function generateSection1(data) {
           <th>BP ID</th>
           <th>SO #s</th>
           <th style="text-align: right;">Total Revenue</th>
+          <th style="text-align: right;">Total GP</th>
           <th style="text-align: center;">Gap (Days)</th>
           <th>Last Order</th>
           <th>Previous Rep</th>
@@ -778,6 +781,7 @@ function generateSection1(data) {
           <td style="font-size: 10px;">${cust.c_bpartner_id}</td>
           <td style="font-size: 10px;">${cust.order_numbers}</td>
           <td class="number">${formatCurrency(cust.total_revenue)}</td>
+          <td class="number">${formatCurrency(cust.total_gp)}</td>
           <td style="text-align: center;"><span class="badge badge-green">${formatNumber(cust.days_since_last_order)}</span></td>
           <td>${cust.last_order_date}</td>
           <td>${cust.previous_sales_rep || 'N/A'}</td>
@@ -786,10 +790,12 @@ function generateSection1(data) {
 
     // Add total row
     const totalRevenue = data.reactivatedCustomers.reduce((sum, cust) => sum + parseFloat(cust.total_revenue || 0), 0);
+    const totalGP = data.reactivatedCustomers.reduce((sum, cust) => sum + parseFloat(cust.total_gp || 0), 0);
     html += `
       <tr style="border-top: 2px solid #333; background-color: #f5f5f5; font-weight: bold;">
         <td colspan="7" style="text-align: right;"><strong>TOTAL</strong></td>
         <td class="number"><strong>${formatCurrency(totalRevenue)}</strong></td>
+        <td class="number"><strong>${formatCurrency(totalGP)}</strong></td>
         <td colspan="3"></td>
       </tr>`;
 
@@ -824,6 +830,7 @@ function generateSection2(data) {
           <th style="text-align: center;">Days Late</th>
           <th style="text-align: right;">Qty Unshipped</th>
           <th style="text-align: right;">Unshipped Line Revenue</th>
+          <th style="text-align: right;">Unshipped Line GP</th>
         </tr>
       </thead>
       <tbody>`;
@@ -843,6 +850,7 @@ function generateSection2(data) {
           <td style="text-align: center; color: ${daysLateColor}; font-weight: bold;">${line.days_late}</td>
           <td class="number">${formatNumber(line.qty_unshipped)}</td>
           <td class="number">${formatCurrency(line.line_revenue)}</td>
+          <td class="number">${formatCurrency(line.line_gp)}</td>
         </tr>`;
     });
 
@@ -868,6 +876,7 @@ function generateSection2(data) {
           <th style="text-align: center;">Days Late</th>
           <th style="text-align: right;">Qty Unshipped</th>
           <th style="text-align: right;">Unshipped Line Revenue</th>
+          <th style="text-align: right;">Unshipped Line GP</th>
         </tr>
       </thead>
       <tbody>`;
@@ -887,6 +896,7 @@ function generateSection2(data) {
           <td style="text-align: center; color: ${daysLateColor}; font-weight: bold;">${line.days_late}</td>
           <td class="number">${formatNumber(line.qty_unshipped)}</td>
           <td class="number">${formatCurrency(line.line_revenue)}</td>
+          <td class="number">${formatCurrency(line.line_gp)}</td>
         </tr>`;
     });
 

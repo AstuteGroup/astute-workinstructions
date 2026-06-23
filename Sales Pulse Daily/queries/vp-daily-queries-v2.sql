@@ -47,6 +47,9 @@ SELECT
   bp.name as customer_name,
   o.documentno as order_number,
   o.grandtotal as revenue,
+  (SELECT COALESCE(SUM(bi.s_order_line_gp), 0)
+   FROM adempiere.bi_order_line_v bi
+   WHERE bi.order_id = o.c_order_id) as gp,
   COALESCE(op.part_numbers, 'N/A') as part_numbers
 FROM adempiere.c_order o
 JOIN adempiere.c_bpartner bp ON o.c_bpartner_id = bp.c_bpartner_id AND bp.isactive = 'Y'
@@ -331,6 +334,13 @@ yesterday_orders AS (
     COUNT(DISTINCT o.c_order_id) as order_count,
     STRING_AGG(o.documentno, ', ' ORDER BY o.grandtotal DESC) as order_numbers,
     SUM(o.grandtotal) as total_revenue,
+    (SELECT COALESCE(SUM(bi.s_order_line_gp), 0)
+     FROM adempiere.c_order o2
+     LEFT JOIN adempiere.bi_order_line_v bi ON o2.c_order_id = bi.order_id
+     WHERE o2.c_bpartner_id = o.c_bpartner_id
+       AND o2.created::date = CASE WHEN EXTRACT(DOW FROM CURRENT_DATE) = 1 THEN CURRENT_DATE - INTERVAL '3 days' ELSE CURRENT_DATE - INTERVAL '1 day' END
+       AND o2.isactive = 'Y'
+       AND o2.issotrx = 'Y') as total_gp,
     (ARRAY_AGG(o.c_bpartner_location_id ORDER BY o.created DESC))[1] as bploc_id,
     (ARRAY_AGG(o.ad_user_id ORDER BY o.created DESC))[1] as contact_id,
     MIN(o.datepromised::date) as earliest_promise_date
@@ -358,6 +368,7 @@ SELECT
   yo.order_count,
   yo.order_numbers,
   yo.total_revenue,
+  yo.total_gp,
   '' as mpns,  -- Temporarily removed for performance
   '' as mfr_names,  -- Temporarily removed for performance
   0 as total_qty,  -- Temporarily removed for performance
@@ -497,6 +508,9 @@ SELECT
   CURRENT_DATE - ol.datepromised::date as days_late,
   ol.qtyordered - COALESCE(SUM(iol.movementqty), 0) as qty_unshipped,
   ROUND(((ol.qtyordered - COALESCE(SUM(iol.movementqty), 0)) / NULLIF(ol.qtyordered, 0)) * ol.linenetamt, 2) as line_revenue,
+  (SELECT COALESCE(ROUND(bi.s_order_line_gp * ((ol.qtyordered - COALESCE(SUM(iol.movementqty), 0)) / NULLIF(ol.qtyordered, 0)), 2), 0)
+   FROM adempiere.bi_order_line_v bi
+   WHERE bi.order_line_id = ol.c_orderline_id) as line_gp,
   ol.chuboe_mpn as mpn,
   CASE
     WHEN CURRENT_DATE - ol.datepromised::date >= 8 THEN 'red'
@@ -548,6 +562,9 @@ SELECT
   CURRENT_DATE - ol.datepromised::date as days_late,
   ol.qtyordered - COALESCE(SUM(iol.movementqty), 0) as qty_unshipped,
   ROUND(((ol.qtyordered - COALESCE(SUM(iol.movementqty), 0)) / NULLIF(ol.qtyordered, 0)) * ol.linenetamt, 2) as line_revenue,
+  (SELECT COALESCE(ROUND(bi.s_order_line_gp * ((ol.qtyordered - COALESCE(SUM(iol.movementqty), 0)) / NULLIF(ol.qtyordered, 0)), 2), 0)
+   FROM adempiere.bi_order_line_v bi
+   WHERE bi.order_line_id = ol.c_orderline_id) as line_gp,
   ol.chuboe_mpn as mpn,
   CASE
     WHEN CURRENT_DATE - ol.datepromised::date >= 8 THEN 'red'
