@@ -61,7 +61,14 @@ const site = poRow['Site (as needed)'] || '';
 | PO | PO number from document | POV0069002 |
 | Item | MPN from line item | CRCW080510R0F |
 | Ordered | Quantity from line item | 5000 |
+| Description | DB lookup or inferred | RES THICK FILM 0805 |
 | U/M | Default | EA |
+| Product Code | Based on description | PA |
+| Name | MFR code from lookup | M11888 |
+| MFR | Manufacturer name | VISHAY |
+
+**Column Order (must match original):**
+`Consignment Partner | Site | PO | Item | Ordered | Description | U/M | Product Code | Name | MFR | OTIN | Location`
 
 ### Step 4: Identify Customer Internal Part Numbers
 
@@ -182,14 +189,14 @@ Example: `excess-inspection-buildout-POV0069002.xlsx`
 ### Sample Output
 
 ```
-Partner      | Site        | PO          | Item              | Ordered | Description                   | Code | Name    | MFR
-─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
-GE Aviation  | Long Island | POV0069002  | 6292              |       2 | 6292                          | BTP  | M99999  |
-GE Aviation  | Long Island | POV0069002  | CRCW080510R0F     |    5000 | RES THICK FILM 0805           | PA   | M11888  | VISHAY
-GE Aviation  | Long Island | POV0069002  | C1206C102J5GAC    |    7977 | CAP 1206 1000PF 5% 50WVDC NPO | PA   | M03110  | KEMET
-GE Aviation  | Long Island | POV0069002  | MC79L12ABD        |    2329 | IC VOLTAGE REG NEGATIVE       | SC   | M04180  | ON SEMICONDUCTOR
-GE Aviation  | Long Island | POV0069002  | SMCJ58A-E3/57T    |     850 | DIODE TVS                     | SC   | M03395  | LITTELFUSE
-GE Aviation  | Long Island | POV0069002  | WTA20SACJTL       |       8 | CONNECTOR                     | CO   | M06355  | WINCHESTER
+Partner      | Site        | PO          | Item              | Ord   | Description                   | U/M | Code | Name    | MFR
+───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+GE Aviation  | Long Island | POV0069002  | 6292              |     2 | 6292                          | EA  | BTP  | M99999  |
+GE Aviation  | Long Island | POV0069002  | CRCW080510R0F     |  5000 | RES THICK FILM 0805           | EA  | PA   | M11888  | VISHAY
+GE Aviation  | Long Island | POV0069002  | C1206C102J5GAC    |  7977 | CAP 1206 1000PF 5% 50WVDC NPO | EA  | PA   | M03110  | KEMET
+GE Aviation  | Long Island | POV0069002  | MC79L12ABD        |  2329 | IC VOLTAGE REG NEGATIVE       | EA  | SC   | M04180  | ON SEMICONDUCTOR
+GE Aviation  | Long Island | POV0069002  | SMCJ58A-E3/57T    |   850 | DIODE TVS                     | EA  | SC   | M03395  | LITTELFUSE
+GE Aviation  | Long Island | POV0069002  | WTA20SACJTL       |     8 | CONNECTOR                     | EA  | CO   | M06355  | WINCHESTER
 ```
 
 ---
@@ -214,4 +221,4 @@ These columns are left blank and filled during inspection:
 ---
 
 *Created: 2026-06-08*
-*Updated: 2026-06-23 - Added GE Aviation workflow, Site lookup, BTP code, M99999 for unknown MFR*
+*Updated: 2026-06-23 - Added GE Aviation workflow, Site lookup, BTP code, M99999 for unknown MFR, fixed column order (Description before U/M)*
