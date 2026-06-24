@@ -67,37 +67,37 @@ Only a subset are relevant for Approve Order flow:
 
 ## Pre-Approval Checklist (MUST do before POSTing R_Request)
 
-**ALWAYS run `shared/vq-purchase-validator.js` before posting an approve-order R_Request or PATCHing `IsPurchased='Y'`.** The validator turns this checklist into an enforced gate — it returns a violations list and you must not proceed if `ok === false`.
+> **Full workflow documentation:** See [`shared/vq-purchase-workflow.md`](vq-purchase-workflow.md) for the complete end-to-end VQ purchase process with numbered steps, required fields, program-specific defaults, validation error troubleshooting, and code examples.
+
+**DO NOT call `apiPost('r_request', ...)` directly.** Use the enforced wrapper:
 
 ```javascript
-const { validateVQForPurchase } = require('../shared/vq-purchase-validator');
-const report = await validateVQForPurchase(vqId, { program: 'LAM_KITTING' });
-if (!report.ok) {
-  console.error('VQ cannot be purchased — violations:');
-  report.violations.forEach(v => console.error(`  - ${v}`));
-  throw new Error(`Aborting approval for VQ ${vqId}`);
-}
-// safe to PATCH IsPurchased='Y' and POST the R_Request
+const { tickVQForPurchase } = require('../shared/vq-patcher');
+const { postApproveOrder } = require('../shared/r-request-writer');
+
+// Step 1: Tick the VQ (validates all Tier 2 fields, auto-unticks competitors)
+await tickVQForPurchase(vqId, {
+  program: 'LAM_KITTING',
+  extra: { Chuboe_Lead_Time: 'STOCK', DatePromised: '2026-04-24' },
+});
+
+// Step 2: Post approval (re-validates, forces Jake routing + Submitted status)
+await postApproveOrder({
+  vqId, program: 'LAM_KITTING', rfqId,
+  summary: 'approve order — Master R-78C3.3-1.0 (LAM Kitting)',
+  approvalText: copyTextBlock,
+});
 ```
 
-What the validator enforces (expanded from the prose checklist that was repeatedly not walked through):
+**What the validator enforces:**
+1. VQ is active with valid MPN, vendor BP, cost > 0, qty > 0
+2. Date trio: `Chuboe_Date_Code`, `Chuboe_Lead_Time`, `DatePromised`
+3. Packaging + traceability populated
+4. Notes split correctly (no internal content in public/private notes)
+5. Program-specific ship-to (warehouse, warehouse_group, shipper, incoterm)
+6. Competing VQs unticked
 
-1. **VQ is active** and has a valid MPN, vendor BP, cost > 0, qty > 0
-2. **Date fields populated:** `Chuboe_Date_Code`, `Chuboe_Lead_Time`, `DatePromised` — all three required (most-missed trio)
-3. **Packaging + traceability populated:** `Chuboe_Packaging_ID` (REEL / CUT TAPE / BULK / TRAY / etc.), `Chuboe_Traceability_ID` (Franchise=1000001 / Non-Traceable=1000003)
-4. **Notes split correctly (three fields on `chuboe_vq_line`):**
-   - `Chuboe_Note_Public` → "Public Vendor Order Notes" — flows to the POV that the vendor receives. Must be vendor-safe or empty.
-   - `Chuboe_Note_Private` → "Notes to Inspector" — QC / receiving team sees this on intake. Not a buyer-internal dump.
-   - `Chuboe_Note_User` → "Buyer Internal Notes" — this is where our sourcing enrichment (stock counts, MOQ, MFR tags, auto-purchase rationale, etc.) goes.
-   The validator regex-sweeps `Chuboe_Note_Public` AND `Chuboe_Note_Private` for internal markers and rejects either if they leak the sourcing narrative.
-5. **Program-specific ship-to matches:** `Chuboe_Warehouse_ID`, `Chuboe_Warehouse_Group_ID`, `M_Shipper_ID`, `Chuboe_Inco_Term_ID` must hit the values encoded for the program (e.g., LAM Kitting → warehouse 1000015 W111 + **group 1000008 BROWNSVILLE**, FedEx Ground shipper, EXW incoterm). Warehouse alone doesn't determine ship-to; the group ID is the actual location pointer (don't confuse 1000000 AUSTIN with 1000008 BROWNSVILLE).
-6. **Competing VQs unticked:** any other `IsPurchased='Y'` on the same RFQ line must be flipped back to `N` before the new winner is ticked.
-
-**Then** POST the R_Request per the template below.
-
-### History — why this gate exists
-
-Before the validator, we repeatedly posted approvals with: missing promise date, missing lead time, "Master stock: 619 | MOQ: 5 | Mfr: RECOM" in the vendor-facing public note, wrong warehouse_group_id (Austin vs Brownsville), and — after the first fix — the same enrichment note mistakenly routed to `Chuboe_Note_Private` (Notes to Inspector) instead of `Chuboe_Note_User` (Buyer Internal Notes). Each mistake required a manual fix in OT by the buyer. The prose checklist existed in this file; it wasn't followed. The validator is the forcing function.
+See `vq-purchase-workflow.md` for the full field list, program defaults, and error remediation.
 
 ### Domestic shipping flag (`ischuboedomesticshipping`)
 
@@ -158,13 +158,14 @@ Bad:
 
 **MUST match OT's "Copy Text" output.** OT's RFQ view has a Copy Text feature that emits a structured, multi-section block (RFQ → RFQ Line → Customer Quote → Customer Quote Reference → Vendor Quote) containing every field support/managers need to approve. Support and managers pattern-match on this exact structure — custom shorthand formats break their scan.
 
-**How to use it:**
-1. Buyer pastes the full OT copy text into the conversation.
-2. Script/agent extracts ONLY the lines relevant to the vendor/part being approved (copy text contains ALL lines on the RFQ, not just the new ones — see `feedback_copy_text_context.md`).
-3. The extracted block becomes the `Chuboe_Approval_Text` body.
-4. ONE-OFF context (auto-approval disclosure, compliance note, excess-qty caveat) gets appended AFTER the block, not woven into it.
+**We synthesize this ourselves from DB data.** Query the RFQ tree and build the block to match OT's format exactly:
+1. Query the specific RFQ line, CQ, CQ Reference, and VQ being approved
+2. Format each section in the canonical order below
+3. Use 2-space indentation, blank lines between sections
+4. Format numbers properly: `$1,234.56` for currency, `20.0%` for margins
+5. ONE-OFF context (auto-approval disclosure, compliance note) gets appended AFTER the block, not woven into it
 
-**DO NOT synthesize the block from raw DB queries.** Walking the RFQ tree to reproduce OT's format introduces drift (field ordering, whitespace, nested indentation) that support will notice. Always source from an actual OT copy-text paste.
+**The format must be exact.** Wrong field order, missing sections, or inconsistent formatting will break support's pattern-matching. See `vq-purchase-workflow.md` § Copy Text for the full specification.
 
 **Canonical block shape (from OT copy text, reproduced verbatim):**
 
