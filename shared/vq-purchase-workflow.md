@@ -153,9 +153,18 @@ OT's RFQ window has a **Copy Text** button that emits a structured, multi-sectio
 - Wrong field order, missing fields, or different formatting breaks their workflow
 - The format must match what OT's Copy Text button produces — exactly
 
-### Canonical Format (Match OT Exactly)
+### Two Scenarios: VQ with CQ vs VQ-Only
 
-Build this from DB queries for the specific RFQ line/VQ being approved:
+| Scenario | When | Sections Included |
+|----------|------|-------------------|
+| **VQ with CQ** | Most cases — VQ is linked to a Customer Quote | RFQ → RFQ Line → Customer Quote → Customer Quote Reference → Vendor Quote |
+| **VQ-Only** | No CQ exists (stock buy, spec buy, pre-positioning) | RFQ → RFQ Line → Vendor Quote |
+
+---
+
+### Format A: VQ with CQ (Full Format)
+
+Use when a Customer Quote exists for the VQ being approved:
 
 ```
 RFQ
@@ -210,13 +219,54 @@ Vendor Quote
   Lead Time: <lead time>
 ```
 
+---
+
+### Format B: VQ-Only (No CQ)
+
+Use when no Customer Quote exists — omit Customer Quote and Customer Quote Reference sections:
+
+```
+RFQ
+  Customer: <c_bpartner.name from rfq>
+  Total Revenue: <n/a or $0.00>
+  Total Cost: <rfq-level total cost>
+  Gross Profit: <n/a>
+  Profit Margin: <n/a>
+
+RFQ Line
+  RFQ Line #: <line number>
+  Purchase Qty: <qty buying from vendor>
+  Sold Qty: <0 or blank>
+  MPN: <chuboe_rfq_line_mpn.mpn>
+  MFR: <chuboe_mfr.name>
+  Sales Rep: <ad_user.name>
+  Public Customer Notes: <or blank>
+  Private Customer Notes: <or blank>
+
+Vendor Quote
+  Vendor: <c_bpartner.name>
+  Vendor Type: <chuboe_vendortype.name>
+  Traceability: <chuboe_traceability.name>
+  Contact: <ad_user.name>
+  MPN: <vq mpn>
+  MFR: <vq mfr name>
+  Quantity: <qty>
+  Cost: <cost> USD
+  Date Code: <dc>
+  COO: <country name or PENDING>
+  Lead Time: <lead time>
+```
+
+---
+
 ### Building It (Do Not Skip)
 
-1. **Query the specific line's data** — RFQ, RFQ Line, CQ, CQ Reference, VQ with all joins
-2. **Format each section** in the exact order above
-3. **Use 2-space indentation** for fields within each section
-4. **Include blank lines** between sections (RFQ, RFQ Line, etc.)
-5. **Format numbers properly** — `$1,234.56` for currency, `20.0%` for percentages
+1. **Check if CQ exists** — if yes, use Format A; if no, use Format B
+2. **Query the specific line's data** — RFQ, RFQ Line, (CQ, CQ Reference if exists), VQ
+3. **Format each section** in the exact order above
+4. **Use 2-space indentation** for fields within each section
+5. **Include blank lines** between sections
+6. **Format numbers properly** — `$1,234.56` for currency, `20.0%` for percentages
 6. **Append one-off context AFTER** the block (auto-approval rationale, compliance notes)
 
 ### Common Mistakes
