@@ -123,6 +123,8 @@ const LIMITS = {
   priorities: {
     'rfq-loading-agent': 4,         // Highest - customer-facing RFQs
     'rfq-fast-loader': 4,           // Same tier as rfq-loading
+    'operator-request': 4,          // Manual requests from terminal - top priority
+    'manual-enrichment': 4,         // Manual enrichment via Claude - top priority
     'vq-loading-agent': 3,          // Second - vendor quotes
     'excess-agent': 2,              // Third - market offers
     'stockrfq-agent': 1,            // Broker data capture

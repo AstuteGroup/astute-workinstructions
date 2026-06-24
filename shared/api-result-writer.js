@@ -95,7 +95,10 @@ function buildEnvelope(searchResult, mpn, qty, source) {
           ManufacturerName: sub.manufacturer || d.vqManufacturer || '',
           ManufacturerPartNumber: sub.mpn || d.vqMpn || mpn,
           RequestedPartNumber: mpn,
-          CurrentStockQty: sub.qty || 0,
+          // Use sub.stock (actual distributor stock) when available; fall back to
+          // sub.qty for backward compat. Fixes lead-time row bug where sub.qty is
+          // the factory-order qty, not stock — see 2026-06-24 DigiKey LT diagnosis.
+          CurrentStockQty: sub.stock ?? sub.qty ?? 0,
           MinimumBuy: sub.moq ? parseInt(sub.moq) || 1 : 1,
           Multiplier: sub.spq ? parseInt(sub.spq) || 1 : 1,
           LeadTime: sub.leadTime || null,
@@ -463,7 +466,7 @@ async function writeDb(mpn, envelope, rfqId) {
  * @returns {Promise<object>} { cacheFile, dbId, success }
  */
 async function writePricingResult(opts) {
-  const { searchResult, mpn, qty, rfqId, source } = opts;
+  const { searchResult, mpn, qty, rfqId, source, caller = 'enrich-poller' } = opts;
 
   if (!searchResult || !mpn) {
     return { cacheFile: null, dbId: null, success: false, error: 'Missing searchResult or mpn' };
@@ -479,7 +482,7 @@ async function writePricingResult(opts) {
   const globalCheck = otBudget.checkBudget({
     table: 'chuboe_pricing_api_result',
     count: 1,
-    caller: 'enrich-poller',
+    caller,
     isBackfill: false,
   });
 
@@ -490,7 +493,7 @@ async function writePricingResult(opts) {
     rateLimited = true;
   } else {
     // Reserve budget before write
-    otBudget.reserve('chuboe_pricing_api_result', 1, 'enrich-poller');
+    otBudget.reserve('chuboe_pricing_api_result', 1, caller);
     const writeStartTime = Date.now();
 
     // Write to DB via API if available (non-blocking — failure doesn't affect cache)
@@ -500,7 +503,7 @@ async function writePricingResult(opts) {
     const writeDuration = Date.now() - writeStartTime;
     if (dbId) {
       otBudget.recordWrites('chuboe_pricing_api_result', 1, {
-        caller: 'enrich-poller',
+        caller,
         success: true,
         durationMs: writeDuration,
       });

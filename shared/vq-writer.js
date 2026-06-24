@@ -1044,6 +1044,7 @@ function resolveRFQLineExact(rfq, mpn, cpc) {
  */
 async function writeVQBatch(rfqSearchKey, items, opts = {}) {
   const unseenEmailCount = opts.unseenEmailCount || 0;
+  const caller = opts.caller || 'vq-loading-agent';
   const estimatedVQs = items.length * 10; // rough estimate: 10 VQs per item on average
   const isBackfill = unseenEmailCount >= 20;
 
@@ -1058,7 +1059,7 @@ async function writeVQBatch(rfqSearchKey, items, opts = {}) {
     const globalCheck = otBudget.checkBudget({
       table: 'chuboe_vq_line',
       count: estimatedVQs,
-      caller: 'vq-loading-agent',
+      caller,
       isBackfill,
     });
 
@@ -1285,7 +1286,7 @@ async function writeVQBatch(rfqSearchKey, items, opts = {}) {
   if (allWritten.length > 0) {
     // Global budget tracking
     otBudget.recordWrites('chuboe_vq_line', allWritten.length, {
-      caller: 'vq-loading-agent',
+      caller,
       success: true,
       durationMs: writeDuration,
     });
