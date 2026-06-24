@@ -19,6 +19,89 @@ const fs = require('fs');
 const path = require('path');
 
 const STATE_FILE = path.join(process.env.HOME, 'workspace', '.ot-api-budget.json');
+const RATE_LIMIT_LOG = path.join(process.env.HOME, 'workspace', '.ot-rate-limit-events.ndjson');
+
+// ─── RATE LIMIT EVENT LOGGING ────────────────────────────────────────────────
+
+/**
+ * Log a rate limit event to persistent storage for historical analysis.
+ * Uses NDJSON format (one JSON object per line) for easy parsing.
+ *
+ * @param {object} event - Rate limit event details
+ * @param {string} event.caller - Agent that was rate limited
+ * @param {string} event.table - Target table
+ * @param {number} event.requestedCount - How many writes were requested
+ * @param {string} event.reason - Why the request was denied
+ * @param {number} event.priority - Caller's priority level
+ * @param {string} event.limitType - Which limit was hit (5min, 15min, hourly, daily, table)
+ */
+function logRateLimitEvent(event) {
+  try {
+    const entry = {
+      timestamp: new Date().toISOString(),
+      ts: Date.now(),
+      ...event,
+    };
+    fs.appendFileSync(RATE_LIMIT_LOG, JSON.stringify(entry) + '\n');
+  } catch (e) {
+    // Don't let logging failures break the budget system
+    console.warn(`[ot-api-budget] Could not log rate limit event: ${e.message}`);
+  }
+}
+
+/**
+ * Read rate limit events from the log file.
+ * @param {number} days - How many days of history to load (default: 14)
+ * @returns {Array} Array of rate limit events
+ */
+function getRateLimitHistory(days = 14) {
+  try {
+    if (!fs.existsSync(RATE_LIMIT_LOG)) return [];
+
+    const cutoff = Date.now() - (days * 24 * 60 * 60 * 1000);
+    const content = fs.readFileSync(RATE_LIMIT_LOG, 'utf8');
+    const events = content
+      .split('\n')
+      .filter(Boolean)
+      .map(line => {
+        try { return JSON.parse(line); }
+        catch { return null; }
+      })
+      .filter(e => e && e.ts > cutoff);
+
+    return events;
+  } catch (e) {
+    console.warn(`[ot-api-budget] Could not read rate limit history: ${e.message}`);
+    return [];
+  }
+}
+
+/**
+ * Rotate the rate limit log file (keep last 30 days).
+ * Called automatically during state cleanup.
+ */
+function rotateRateLimitLog() {
+  try {
+    if (!fs.existsSync(RATE_LIMIT_LOG)) return;
+
+    const cutoff = Date.now() - (30 * 24 * 60 * 60 * 1000);
+    const content = fs.readFileSync(RATE_LIMIT_LOG, 'utf8');
+    const lines = content.split('\n').filter(Boolean);
+
+    const kept = lines.filter(line => {
+      try {
+        const e = JSON.parse(line);
+        return e.ts > cutoff;
+      } catch { return false; }
+    });
+
+    if (kept.length < lines.length) {
+      fs.writeFileSync(RATE_LIMIT_LOG, kept.join('\n') + (kept.length ? '\n' : ''));
+    }
+  } catch (e) {
+    // Non-critical, ignore
+  }
+}
 
 // ─── GLOBAL LIMITS ───────────────────────────────────────────────────────────
 
@@ -126,6 +209,11 @@ function loadState() {
   // Clean stale backfills (older than 2 hours)
   const twoHoursAgo = now - (2 * 60 * 60 * 1000);
   _state.backfills = _state.backfills.filter(b => b.startedAt > twoHoursAgo);
+
+  // Rotate rate limit log occasionally (1% chance per load to avoid overhead)
+  if (Math.random() < 0.01) {
+    rotateRateLimitLog();
+  }
 
   return _state;
 }
@@ -267,6 +355,7 @@ function checkBudget(opts = {}) {
   // Check circuit breaker first
   const circuit = checkCircuitBreaker();
   if (circuit.open) {
+    logRateLimitEvent({ caller, table, requestedCount: count, reason: circuit.reason, priority, limitType: 'circuit-breaker' });
     return { allowed: false, reason: circuit.reason, limits: LIMITS, priority };
   }
 
@@ -274,6 +363,7 @@ function checkBudget(opts = {}) {
   if (isBackfill) {
     const backfillCheck = checkBackfillSlot(caller);
     if (!backfillCheck.allowed) {
+      logRateLimitEvent({ caller, table, requestedCount: count, reason: backfillCheck.reason, priority, limitType: 'backfill-slot' });
       return { allowed: false, reason: backfillCheck.reason, limits: LIMITS, priority };
     }
   }
@@ -290,12 +380,9 @@ function checkBudget(opts = {}) {
       // P4 exempt but log for monitoring
       console.warn(`[ot-api-budget] P4 caller ${caller} bypassing 5-min burst limit: ${counts.last5Min + count}/${limit5Min}`);
     } else {
-      return {
-        allowed: false,
-        reason: `Global 5-min burst limit: ${counts.last5Min}/${limit5Min} (prevents sustained overload, P4 exempt)${isBackfill ? ' [backfill mode]' : ''}`,
-        limits: LIMITS,
-        priority,
-      };
+      const reason = `Global 5-min burst limit: ${counts.last5Min}/${limit5Min} (prevents sustained overload, P4 exempt)${isBackfill ? ' [backfill mode]' : ''}`;
+      logRateLimitEvent({ caller, table, requestedCount: count, reason, priority, limitType: '5min', current: counts.last5Min, limit: limit5Min });
+      return { allowed: false, reason, limits: LIMITS, priority };
     }
   }
 
@@ -306,20 +393,14 @@ function checkBudget(opts = {}) {
 
   if (counts.last15Min + count > LIMITS.maxWritesPer15Min) {
     // Hard limit - even high-priority blocked
-    return {
-      allowed: false,
-      reason: `Global 15-min HARD limit: ${counts.last15Min}/${LIMITS.maxWritesPer15Min} (priority ${priority})`,
-      limits: LIMITS,
-      priority,
-    };
+    const reason = `Global 15-min HARD limit: ${counts.last15Min}/${LIMITS.maxWritesPer15Min} (priority ${priority})`;
+    logRateLimitEvent({ caller, table, requestedCount: count, reason, priority, limitType: '15min-hard', current: counts.last15Min, limit: LIMITS.maxWritesPer15Min });
+    return { allowed: false, reason, limits: LIMITS, priority };
   } else if (counts.last15Min + count > effectiveLimit15Min && priority < 3) {
     // Soft limit - only block low-priority (< P3)
-    return {
-      allowed: false,
-      reason: `Global 15-min limit: ${counts.last15Min}/${effectiveLimit15Min} (reserved for P3+ callers, you are P${priority})`,
-      limits: LIMITS,
-      priority,
-    };
+    const reason = `Global 15-min limit: ${counts.last15Min}/${effectiveLimit15Min} (reserved for P3+ callers, you are P${priority})`;
+    logRateLimitEvent({ caller, table, requestedCount: count, reason, priority, limitType: '15min-soft', current: counts.last15Min, limit: effectiveLimit15Min });
+    return { allowed: false, reason, limits: LIMITS, priority };
   }
 
   // Priority-aware hourly check
@@ -327,31 +408,22 @@ function checkBudget(opts = {}) {
   const effectiveLimitHourly = LIMITS.maxWritesPerHour - reservedHourly;
 
   if (counts.lastHour + count > LIMITS.maxWritesPerHour) {
-    return {
-      allowed: false,
-      reason: `Global hourly HARD limit: ${counts.lastHour}/${LIMITS.maxWritesPerHour} (priority ${priority})`,
-      limits: LIMITS,
-      priority,
-    };
+    const reason = `Global hourly HARD limit: ${counts.lastHour}/${LIMITS.maxWritesPerHour} (priority ${priority})`;
+    logRateLimitEvent({ caller, table, requestedCount: count, reason, priority, limitType: 'hourly-hard', current: counts.lastHour, limit: LIMITS.maxWritesPerHour });
+    return { allowed: false, reason, limits: LIMITS, priority };
   } else if (counts.lastHour + count > effectiveLimitHourly && priority < 3) {
-    return {
-      allowed: false,
-      reason: `Global hourly limit: ${counts.lastHour}/${effectiveLimitHourly} (reserved for P3+ callers, you are P${priority})`,
-      limits: LIMITS,
-      priority,
-    };
+    const reason = `Global hourly limit: ${counts.lastHour}/${effectiveLimitHourly} (reserved for P3+ callers, you are P${priority})`;
+    logRateLimitEvent({ caller, table, requestedCount: count, reason, priority, limitType: 'hourly-soft', current: counts.lastHour, limit: effectiveLimitHourly });
+    return { allowed: false, reason, limits: LIMITS, priority };
   }
 
   // Check daily window
   // P4 callers (RFQ loading) are EXEMPT from daily limit - customer-facing, always allowed
   // Other callers still subject to hard cap to prevent runaway automation
   if (priority < 4 && counts.lastDay + count > LIMITS.maxWritesPerDay) {
-    return {
-      allowed: false,
-      reason: `Global daily limit: ${counts.lastDay}/${LIMITS.maxWritesPerDay} already used (P4 exempt, you are P${priority})`,
-      limits: LIMITS,
-      priority,
-    };
+    const reason = `Global daily limit: ${counts.lastDay}/${LIMITS.maxWritesPerDay} already used (P4 exempt, you are P${priority})`;
+    logRateLimitEvent({ caller, table, requestedCount: count, reason, priority, limitType: 'daily', current: counts.lastDay, limit: LIMITS.maxWritesPerDay });
+    return { allowed: false, reason, limits: LIMITS, priority };
   }
 
   // Check per-table limit (no priority - prevents one table from dominating)
@@ -359,12 +431,9 @@ function checkBudget(opts = {}) {
     const tableCount = counts.perTable[table] || 0;
     const tableLimit = LIMITS.perTable[table].maxPerHour;
     if (tableCount + count > tableLimit) {
-      return {
-        allowed: false,
-        reason: `Table ${table} hourly limit: ${tableCount}/${tableLimit} already used`,
-        limits: LIMITS,
-        priority,
-      };
+      const reason = `Table ${table} hourly limit: ${tableCount}/${tableLimit} already used`;
+      logRateLimitEvent({ caller, table, requestedCount: count, reason, priority, limitType: 'per-table', current: tableCount, limit: tableLimit });
+      return { allowed: false, reason, limits: LIMITS, priority };
     }
   }
 
@@ -499,4 +568,8 @@ module.exports = {
   getStatus,
   reset,
   LIMITS,
+  // Rate limit history
+  getRateLimitHistory,
+  rotateRateLimitLog,
+  RATE_LIMIT_LOG,
 };
