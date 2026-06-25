@@ -27,6 +27,56 @@ The "Cross-applies?" column is the load-bearing one — say which sibling loader
 
 ---
 
+## Loader Applicability Matrix
+
+Use this matrix to quickly determine which changes apply across loaders.
+
+### Change Categories
+
+| Category | Description | Typical Scope |
+|----------|-------------|---------------|
+| **Shared resolver** | BP, MFR, contact lookup changes | ALL loaders using that resolver |
+| **Writer pattern** | Chunking, retry, attribution | All writers of same shape (batch vs single-record) |
+| **Handler pattern** | Idempotency, breadcrumbs, email threading | All handlers with same architecture |
+| **Email escalation** | Recipient routing, formatting, threading | All email-driven workflows |
+| **Extraction logic** | Parsing, validation, field mapping | Usually workflow-specific |
+| **Edge case fix** | Bean-callout trap, API quirk | All writers hitting that API endpoint |
+
+### Loader Shape Reference
+
+| Loader | Write Shape | Architecture | Sends Confirmation | External Recipients |
+|--------|-------------|--------------|-------------------|---------------------|
+| **rfq-loading** | Batch (queue-backed) | Daemon + handler | ✅ Yes | ❌ Internal only |
+| **vq-loading** | Batch (inline) | Handler | ✅ Yes | ❌ Internal only |
+| **stockrfq** | Single-record | Handler | ❌ No | ❌ N/A |
+| **stockrfq-cq** | Single-record | Handler | ❌ No | ❌ N/A |
+| **excess/offers** | Batch (inline) | Handler | ✅ Yes | ⚠️ Configurable |
+
+### Quick Applicability Rules
+
+1. **Confirmation email changes** → rfq-loading, vq-loading, excess/offers (not stockrfq/cq)
+2. **Rate-limit / chunking** → all batch writers (rfq-writer, vq-writer, offer-writeback)
+3. **Message-ID dedup** → all handlers (pattern differs: queue-backed vs inline)
+4. **Failure-rate gate** → batch loaders only (need >10 items for meaningful rate)
+5. **Writer attribution** → all loaders (helper handles both batch + single-record)
+6. **Reply stitching** → all email-driven handlers with escalation paths
+
+---
+
+## 2026-06-25
+
+| Date | Loader(s) | Change | Cross-applies? | Commit |
+|---|---|---|---|---|
+| 2026-06-25 | rfq-loading, vq-loading, excess, broker-offers | **Aligned confirmation email format.** Standardized what each loader shows in success confirmations. **RFQ:** Customer, RFQ #, Type, Seller, Lines, Description. **VQ:** Customer, RFQ #, Buyer, VQs, Vendors (no type/description - N/A). **Excess/Broker:** Partner, Offer #, Type, Contact (Jake Harris), Lines, Description. Added lookup helpers: `lookupRfqTypeName`, `lookupContactName`, `lookupCustomerFromRfq`, `lookupOfferTypeName`. All breadcrumbs now include metadata for audit. | **APPLIED TO ALL** confirmation-sending loaders. stockrfq + stockrfq-cq don't send confirmations. | _(uncommitted)_ |
+| 2026-06-25 | (shared poller) | **Stuck email recovery: reduced grace period.** Changed `STUCK_MIN_AGE_MINS` from 60 to 20 minutes. Emails that arrive pre-marked SEEN now recover in 20 min instead of 60. Root cause: "FW: Critical parts" sat stuck because it arrived SEEN. | ALL email workflows benefit (shared poller change). | _(uncommitted)_ |
+| 2026-06-25 | (shared) | **Created `shared/loader-patterns.js`.** Extracted reusable patterns: `classifyApiError()` (transient vs permanent), `withRetry()` (exponential backoff), `retryLine()` (line-level retry wrapper). Ready for incremental adoption by rfq-fast-loader.js and offer-writeback.js. | ALL batch writers can adopt. Single-record writers (stockrfq, cq) less critical but can use. | _(uncommitted)_ |
+| 2026-06-25 | (infra) | **Added pre-commit hook for loader-changelog reminder.** `.git/hooks/pre-commit` prints a reminder when any loader file is modified. Non-blocking — just a nudge to check cross-applicability. | N/A (infrastructure). | _(uncommitted)_ |
+| 2026-06-25 | rfq-fast-loader, offer-writeback | **Wired `retryLine` from `loader-patterns.js`.** Line-level writes now retry transient errors (503, ECONNRESET, rate-limit 429) with exponential backoff (max 3 attempts, 500ms→10s delays). Reduces partial-load failures from transient API flakiness. | **APPLIED TO BOTH** batch writers. Single-record writers (stockrfq, cq) less critical — can adopt if needed. | _(uncommitted)_ |
+| 2026-06-25 | rfq-loader-daemon, excess | **Wired `evaluateFailureRate` from `failure-rate-gate.js`.** After load completes, checks if error rate exceeds threshold. If so: logs warning, writes `high-failure-rate` breadcrumb, sends alert email to operator. Matches VQ loader pattern. | **APPLIED** to both queue-backed (rfq-loading) and inline (excess) batch loaders. vq-loading + stockrfq-cq already had this. stockrfq doesn't need it (single-record). | _(uncommitted)_ |
+| 2026-06-25 | rfq-loader-daemon | **Added writer attribution logging.** `writerAttribution.persistWriterDetails()` now called after load completes. Persists count-style errors[] to `~/.writer-attribution.jsonl` for post-mortem forensics. excess.js already had this. | **Pattern extended** to rfq-loading. excess + broker-offers already have it. VQ uses bucket-style (richer). stockrfq + cq use single-record writes (different shape). | _(uncommitted)_ |
+
+---
+
 ## 2026-06-12
 
 | Date | Loader(s) | Change | Cross-applies? | Commit |

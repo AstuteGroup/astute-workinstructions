@@ -101,9 +101,28 @@ function evaluateFailureRate(opts = {}) {
   // against (primary + secondaries). See NO_MPN_MATCH handling below.
   const fanOut = !!opts.fanOut;
 
-  const written = Array.isArray(result.written) ? result.written.length : 0;
+  // Support both bucket-style (written[], skipped[], failed[]) and count-style
+  // (linesWritten, errors[]) results. Count-style gives less signal (no reason
+  // classification) but still enables basic failure rate alerting.
+  const isBucketStyle = Array.isArray(result.written);
+  const written = isBucketStyle
+    ? result.written.length
+    : (result.linesWritten || 0);
   const skipped = Array.isArray(result.skipped) ? result.skipped : [];
-  const failedRows = Array.isArray(result.failed) ? result.failed : [];
+  // For count-style: errors[] is array of strings. Convert to objects for
+  // consistent handling. OT_UNREACHABLE detection via string pattern match.
+  let failedRows;
+  if (Array.isArray(result.failed)) {
+    failedRows = result.failed;
+  } else if (Array.isArray(result.errors)) {
+    // Count-style: convert string errors to objects, detect OT_UNREACHABLE
+    failedRows = result.errors.map(msg => {
+      const isNetwork = /OT_UNREACHABLE|ECONNRESET|ETIMEDOUT|network|timeout/i.test(msg);
+      return { message: msg, network: isNetwork, reason: isNetwork ? OT_UNREACHABLE : 'UNKNOWN' };
+    });
+  } else {
+    failedRows = [];
+  }
 
   // Split failed rows: network/transport (OT down — retryable, NOT a data
   // problem) vs logical (bad FK, missing field, bean-callout reject — real).

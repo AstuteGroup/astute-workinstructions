@@ -41,6 +41,7 @@ const logger = require('./logger').createLogger('FastLoader');
 const { apiPost } = require('./api-client');
 const { cleanMpn } = require('./db-helpers');
 const otBudget = require('./ot-api-budget');
+const { retryLine } = require('./loader-patterns');
 
 // ─── CONSTANTS ───────────────────────────────────────────────────────────────
 
@@ -221,16 +222,19 @@ async function loadRFQ(opts) {
       }
 
       try {
-        // POST chuboe_rfq_line
-        const lineRes = await apiPost('chuboe_rfq_line', {
-          Chuboe_RFQ_ID: rfqId,
-          Line: lineNum,
-          Qty: line.qty || 0,
-          PriceEntered: line.targetPrice || 0,
-          ...(line.cpc ? { Chuboe_CPC: line.cpc } : {}),
-        }, {
-          naturalKeyFields: ['Chuboe_RFQ_ID', 'Line'],
-        });
+        // POST chuboe_rfq_line (with retry for transient errors)
+        const lineRes = await retryLine(
+          () => apiPost('chuboe_rfq_line', {
+            Chuboe_RFQ_ID: rfqId,
+            Line: lineNum,
+            Qty: line.qty || 0,
+            PriceEntered: line.targetPrice || 0,
+            ...(line.cpc ? { Chuboe_CPC: line.cpc } : {}),
+          }, {
+            naturalKeyFields: ['Chuboe_RFQ_ID', 'Line'],
+          }),
+          { lineLabel: `RFQ ${rfqId} line ${myIdx + 1}` }
+        );
 
         const lineId = lineRes.id;
         if (!lineId) {
@@ -239,7 +243,7 @@ async function loadRFQ(opts) {
         }
         linesWritten++;
 
-        // POST chuboe_rfq_line_mpn — raw text only, no Chuboe_MFR_ID
+        // POST chuboe_rfq_line_mpn — raw text only, no Chuboe_MFR_ID (with retry)
         const mpnPayload = {
           Chuboe_RFQ_Line_ID: lineId,
           Chuboe_RFQ_ID: rfqId,
@@ -252,9 +256,12 @@ async function loadRFQ(opts) {
         if (line.description) mpnPayload.Description = line.description;
         if (line.dateCode) mpnPayload.Chuboe_Date_Code = line.dateCode;
 
-        await apiPost('chuboe_rfq_line_mpn', mpnPayload, {
-          naturalKeyFields: ['Chuboe_RFQ_Line_ID', 'Chuboe_MPN_Clean'],
-        });
+        await retryLine(
+          () => apiPost('chuboe_rfq_line_mpn', mpnPayload, {
+            naturalKeyFields: ['Chuboe_RFQ_Line_ID', 'Chuboe_MPN_Clean'],
+          }),
+          { lineLabel: `RFQ ${rfqId} line ${myIdx + 1} MPN` }
+        );
         mpnsWritten++;
 
       } catch (e) {

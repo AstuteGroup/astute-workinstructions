@@ -328,19 +328,23 @@ function isInternalAddress(addr) {
 //
 // SELF-HEALING: Before listing UNSEEN emails, this command automatically
 // recovers any "stuck" emails — messages that were read (marked SEEN) but
-// never routed out of the source folder. This happens when an agent crashes,
-// times out, or is paused mid-processing.
+// never routed out of the source folder. This happens when:
+//   - Agent crashes or times out mid-processing
+//   - Email arrives pre-marked SEEN (forwarding client quirk)
+//   - Manual read via webmail without processing
 //
-// Recovery window: emails between 60 minutes and 24 hours old get auto-recovered.
-// - Under 60 minutes: might still be in-flight (agent processing)
+// Recovery window: emails between 20 minutes and 24 hours old get auto-recovered.
+// - Under 20 minutes: might still be in-flight (agent processing typically <5 min,
+//   but allow buffer for large RFQs). Reduced from 60 min on 2026-06-25 after
+//   "FW: Critical parts" sat stuck for hours because it arrived pre-marked SEEN.
 // - Over 24 hours: too old, probably intentionally marked as read (spam/test/etc.)
 //   → flagged in Operations Digest for manual review, not auto-recovered.
 
-const STUCK_MIN_AGE_MINS = 60;       // Don't recover if newer than this (might be in-flight)
+const STUCK_MIN_AGE_MINS = 20;       // Don't recover if newer than this (might be in-flight)
 const STUCK_MAX_AGE_MINS = 24 * 60;  // Don't auto-recover if older than this (needs manual review)
 
 async function recoverStuckEmailsIfNeeded(client) {
-  const minCutoff = new Date(Date.now() - STUCK_MIN_AGE_MINS * 60 * 1000);  // 60 min ago
+  const minCutoff = new Date(Date.now() - STUCK_MIN_AGE_MINS * 60 * 1000);  // 20 min ago
   const maxCutoff = new Date(Date.now() - STUCK_MAX_AGE_MINS * 60 * 1000);  // 24 hours ago
   const seenUids = (await client.search({ seen: true }, { uid: true })) || [];
   if (seenUids.length === 0) return 0;
@@ -349,7 +353,7 @@ async function recoverStuckEmailsIfNeeded(client) {
   for await (const msg of client.fetch(seenUids, { envelope: true }, { uid: true })) {
     const env = msg.envelope || {};
     const msgDate = env.date ? new Date(env.date) : null;
-    // Only recover emails in the window: older than 60 min but newer than 24 hours
+    // Only recover emails in the window: older than 20 min but newer than 24 hours
     if (msgDate && msgDate < minCutoff && msgDate > maxCutoff) {
       stuckUids.push(msg.uid);
     }

@@ -29,6 +29,8 @@ const breadcrumbs = require('../shared/breadcrumbs');
 const { createNotifier } = require('../shared/notifier');
 const { resolveOutreachRecipients } = require('../shared/outreach-recipients');
 const { execSync } = require('child_process');
+const { evaluateFailureRate } = require('../shared/failure-rate-gate');
+const writerAttribution = require('../shared/writer-attribution');
 
 /**
  * Look up partner name from bpartnerId if not provided in payload.
@@ -38,6 +40,42 @@ function lookupPartnerName(bpartnerId) {
   if (!bpartnerId) return null;
   try {
     const sql = `SELECT name FROM adempiere.c_bpartner WHERE c_bpartner_id = ${parseInt(bpartnerId, 10)} LIMIT 1`;
+    const result = execSync(`psql -t -A -c "${sql}"`, {
+      encoding: 'utf-8',
+      timeout: 5000,
+      env: { ...process.env, PGUSER: 'analytics_user', PGDATABASE: 'idempiere_replica' },
+    }).trim();
+    return result || null;
+  } catch (e) {
+    return null;
+  }
+}
+
+/**
+ * Look up RFQ type name from type ID.
+ */
+function lookupRfqTypeName(typeId) {
+  if (!typeId) return null;
+  try {
+    const sql = `SELECT name FROM adempiere.chuboe_rfq_type WHERE chuboe_rfq_type_id = ${parseInt(typeId, 10)} LIMIT 1`;
+    const result = execSync(`psql -t -A -c "${sql}"`, {
+      encoding: 'utf-8',
+      timeout: 5000,
+      env: { ...process.env, PGUSER: 'analytics_user', PGDATABASE: 'idempiere_replica' },
+    }).trim();
+    return result || null;
+  } catch (e) {
+    return null;
+  }
+}
+
+/**
+ * Look up contact name from userId (ad_user_id).
+ */
+function lookupContactName(userId) {
+  if (!userId) return null;
+  try {
+    const sql = `SELECT name FROM adempiere.ad_user WHERE ad_user_id = ${parseInt(userId, 10)} LIMIT 1`;
     const result = execSync(`psql -t -A -c "${sql}"`, {
       encoding: 'utf-8',
       timeout: 5000,
@@ -220,6 +258,80 @@ async function runJob(item) {
     // best-effort — never fail the load completion on a breadcrumb write
   }
 
+  // ── Writer attribution: persist per-row error details to JSONL ─────────────
+  // rfq-fast-loader returns count-style errors[]. writerAttribution handles both
+  // bucket-style and count-style results. See shared/writer-attribution.js.
+  const payload = item.payload || {};
+  try {
+    writerAttribution.persistWriterDetails({
+      workflow: 'rfq-loading',
+      ctx: {
+        uid: payload.sourceUid || null,
+        currentMessageId: payload.messageId || null,
+      },
+      result,
+    });
+  } catch (_) {
+    // best-effort — never fail the load completion on an attribution write
+  }
+
+  // ── Failure rate evaluation ────────────────────────────────────────────────
+  // Check if the load had an unhealthy failure rate. Alert operator if so.
+  // Uses count-style result (linesWritten, errors[]) not bucket-style.
+  const lineCount = item.lineCount || payload.lines?.length || 0;
+  try {
+    const gateEval = evaluateFailureRate({
+      result: {
+        linesWritten: totalWritten,
+        errors: result.errors,
+      },
+      // Adjust minSubmitted since we're evaluating against total lines attempted
+      minSubmitted: 10,
+    });
+
+    if (gateEval.flag && gateEval.severity !== 'none') {
+      const customerName = payload.partnerName || lookupPartnerName(payload.bpartnerId) || '(unknown)';
+      log(`  ⚠️  High failure rate detected: ${gateEval.reason}`);
+      breadcrumbs.write({
+        cog: 'rfq-loader-daemon',
+        event: 'high-failure-rate',
+        jobId: item.id,
+        rfqId: result.rfqId,
+        searchKey: result.searchKey,
+        severity: gateEval.severity,
+        reason: gateEval.reason,
+        linesAttempted: lineCount,
+        linesWritten: totalWritten,
+        errorCount: result.errors.length,
+        ratios: gateEval.ratios,
+      });
+
+      // Send alert email to operator
+      const alertSubject = `⚠️ RFQ Load Alert: ${result.searchKey || 'unknown'} — ${gateEval.severity} failure rate`;
+      const alertBody = `RFQ load completed with high failure rate.
+
+RFQ #: ${result.searchKey || '(not created)'}
+Customer: ${customerName}
+Severity: ${gateEval.severity}
+Reason: ${gateEval.reason}
+
+Lines attempted: ${lineCount}
+Lines written: ${totalWritten}
+Errors: ${result.errors.length}
+Failure rate: ${(gateEval.ratios.failed * 100).toFixed(1)}%
+
+Sample errors:
+${result.errors.slice(0, 5).map(e => `  • ${e}`).join('\n')}
+${result.errors.length > 5 ? `  ... +${result.errors.length - 5} more` : ''}
+
+— RFQ Loader Daemon (automated alert)`;
+
+      await notifier.sendEmail('jake.harris@astutegroup.com', alertSubject, alertBody);
+    }
+  } catch (e) {
+    log(`  Failure rate evaluation error: ${e.message}`);
+  }
+
   // ── Send confirmation email to internal Astute people ─────────────────────
   // Mirrors the excess.js pattern: reply with the RFQ # so the forwarder knows
   // it was loaded successfully.
@@ -231,7 +343,7 @@ async function runJob(item) {
   if (!actuallyLoaded) {
     log(`  Skipping confirmation email — job ${finalStatus}, rfqId=${result.rfqId}, lines=${totalWritten}`);
   } else try {
-    const payload = item.payload || {};
+    // payload already declared above in failure rate section
     const envelope = resolveOutreachRecipients({
       outerFrom: payload.originalSender,
       salesrepId: payload.salesrepId,
@@ -246,17 +358,30 @@ async function runJob(item) {
       const toEmail = envelope.recipientList[0];
       const ccList = envelope.recipientList.slice(1);
 
-      // Look up partner name if not provided in payload
+      // Look up metadata if not provided in payload
       const customerName = payload.partnerName || lookupPartnerName(payload.bpartnerId) || '(unknown)';
+      const rfqTypeName = lookupRfqTypeName(payload.type) || '(unknown)';
+      const sellerName = lookupContactName(payload.salesrepId) || '(unknown)';
+      const description = payload.description || '';
 
       const confirmSubject = payload.originalSubject
         ? `Re: ${payload.originalSubject}`
         : `RFQ ${result.searchKey} loaded`;
-      const confirmBody = `RFQ loaded.
+
+      // Build confirmation body with all metadata
+      let confirmBody = `RFQ loaded.
 
 Customer: ${customerName}
 RFQ #: ${result.searchKey}
-Lines loaded: ${totalWritten}
+Type: ${rfqTypeName}
+Seller: ${sellerName}
+Lines loaded: ${totalWritten}`;
+
+      if (description) {
+        confirmBody += `\nDescription: ${description}`;
+      }
+
+      confirmBody += `
 
 This RFQ is now in Orange Tsunami.
 
@@ -277,6 +402,10 @@ This RFQ is now in Orange Tsunami.
         jobId: item.id,
         rfqId: result.rfqId,
         searchKey: result.searchKey,
+        customer: customerName,
+        rfqType: rfqTypeName,
+        seller: sellerName,
+        linesLoaded: totalWritten,
         to: toEmail,
         cc: ccList,
       });

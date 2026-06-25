@@ -72,6 +72,7 @@ const { psqlQuery, cleanMpn } = require('./db-helpers');
 const { lookupMfr } = require('./mfr-lookup');
 const { resolveMfrForRow } = require('./mfr-resolver');
 const otBudget = require('./ot-api-budget');
+const { retryLine } = require('./loader-patterns');
 
 // Offer type name → chuboe_offer_type_id mapping
 const OFFER_TYPES = {
@@ -503,9 +504,13 @@ async function writeOffer(opts) {
       // and not all have CPC. Note: this does NOT protect against the
       // server-side CPC bean-callout collapse (separate concern documented
       // in shared/data-model.md and project_chuboe_offer_line_cpc_collapse.md).
-      const lineResponse = await apiPost('chuboe_offer_line', linePayload, {
-        naturalKeyFields: ['Chuboe_Offer_ID', 'Chuboe_MPN'],
-      });
+      // Wrapped with retryLine for transient error recovery.
+      const lineResponse = await retryLine(
+        () => apiPost('chuboe_offer_line', linePayload, {
+          naturalKeyFields: ['Chuboe_Offer_ID', 'Chuboe_MPN'],
+        }),
+        { lineLabel: `Offer ${offerId} line ${i + 1}` }
+      );
       lineId = lineResponse.id;
       if (!lineId) throw new Error('No ID returned in response');
     } catch (e) {
@@ -526,9 +531,12 @@ async function writeOffer(opts) {
         };
         if (line.description) mpnPayload.Description = line.description;
 
-        await apiPost('chuboe_offer_line_mpn', mpnPayload, {
-          naturalKeyFields: ['Chuboe_Offer_Line_ID', 'Chuboe_MPN_Clean'],
-        });
+        await retryLine(
+          () => apiPost('chuboe_offer_line_mpn', mpnPayload, {
+            naturalKeyFields: ['Chuboe_Offer_Line_ID', 'Chuboe_MPN_Clean'],
+          }),
+          { lineLabel: `Offer ${offerId} line ${i + 1} MPN` }
+        );
         mpnsWritten++;
       } catch (e) {
         const net = isOtUnreachableError(e);
