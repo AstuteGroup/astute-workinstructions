@@ -212,6 +212,12 @@ async function action_need_info(payload, ctx) {
   // Without this, operator sees "Lines parsed so far: 5" but no idea what MPNs.
   const extractedLinesHtml = formatExtractedLinesTable(extracted);
 
+  // Investigation summary block — shows the agent's reasoning about what went wrong.
+  // Parity with VQ UID 10064 fix.
+  const investigationBlock = investigation_summary
+    ? `<p><b>Agent investigation:</b></p><pre style="background:#eef6ff;padding:8px;white-space:pre-wrap;font-size:12px;border-left:3px solid #369">${esc(investigation_summary)}</pre>`
+    : '';
+
   const html = `<html><body style="font-family:Arial,sans-serif;font-size:13px">
 <h2 style="color:#b00">RFQ Loading — info needed</h2>
 <p><b>Subject:</b> ${esc(subject)}<br/>
@@ -222,6 +228,7 @@ async function action_need_info(payload, ctx) {
    <b>Lines parsed so far:</b> ${linesCount}</p>
 <p><b>Missing fields:</b></p>
 <ul>${missingItems || '<li>(none specified)</li>'}</ul>
+${investigationBlock}
 ${extractedLinesHtml}
 <p style="background:#f5f5f5;padding:10px;border-left:3px solid #b00">
    <b>Reply to ${esc(ctx.inbox)} with the missing values</b> — the next agent tick will merge your answers with the parsed lines and enqueue the RFQ. One-line prose answers are fine.
@@ -238,11 +245,21 @@ ${recipientsFooter(envelope)}
       would_write_sidecar: { anchor: ctx.anchorMessageId, extracted, missing: missingList },
     };
   }
+  // Email threading: set In-Reply-To and References so escalation lands in
+  // the same Gmail/Outlook thread as the original. Parity with VQ UID 10064 fix.
+  const opts = { html: true, replyTo: ctx.inbox };
+  if (ctx.currentMessageId) {
+    opts.inReplyTo = ctx.currentMessageId;
+    const refs = Array.isArray(ctx.currentReferences) ? [...ctx.currentReferences] : [];
+    if (!refs.includes(ctx.currentMessageId)) refs.push(ctx.currentMessageId);
+    if (refs.length > 0) opts.references = refs;
+  }
+
   await ctx.notifier.sendEmail(
     envelope.to,
     `RFQ Loading — needs info: ${subject || '(no subject)'}`,
     html,
-    { html: true, replyTo: ctx.inbox },
+    opts,
   );
   return {
     notified: envelope.to,
@@ -253,14 +270,32 @@ ${recipientsFooter(envelope)}
   };
 }
 
-function missingLabel(key) {
-  switch (key) {
+function missingLabel(item) {
+  // Handle object format: { field, context? }
+  // Agent may pass rich objects with context (e.g., RFQ type ambiguity).
+  // See VQ UID 10064 bug: objects were rendering as [object Object].
+  if (item && typeof item === 'object') {
+    const field = item.field || 'unknown';
+    const fieldLabel = {
+      mpn: 'MPN list',
+      qty: 'Quantities',
+      rfq_type: 'RFQ type',
+      contact: 'Contact',
+      customer: 'Company / account',
+    }[field] || field;
+    if (item.context) {
+      return `${fieldLabel} — ${item.context}`;
+    }
+    return fieldLabel;
+  }
+  // Legacy string format
+  switch (item) {
     case 'mpn':      return 'MPN list — couldn\'t extract part numbers';
     case 'qty':      return 'Quantities — missing for some line items';
     case 'rfq_type': return 'RFQ type (Shortage / PPV / EOL/LTB / 3PL/VMI / Hot Parts)';
     case 'contact':  return 'Contact — sender doesn\'t match a contact on file';
     case 'customer': return 'Company / account to load under';
-    default:         return key;
+    default:         return String(item);  // Defensive: always return string
   }
 }
 
@@ -332,12 +367,18 @@ async function action_needs_review(payload, ctx) {
   // Resolve internal recipients (operator + internal forwarders + salesrep)
   const envelope = resolveOutreachRecipients(payload, ctx);
 
+  // Investigation summary block — shows the agent's reasoning.
+  const investigationBlock = investigation_summary
+    ? `<p><b>Agent investigation:</b></p><pre style="background:#eef6ff;padding:8px;white-space:pre-wrap;font-size:12px;border-left:3px solid #369">${esc(investigation_summary)}</pre>`
+    : '';
+
   const html = `<html><body style="font-family:Arial,sans-serif;font-size:13px">
 <h2 style="color:#b00">RFQ Loading — needs manual review</h2>
 <p><b>Subject:</b> ${esc(subject)}<br/>
    <b>From:</b> ${esc(externalSenderLabel(envelope, from))}<br/>
    <b>UID:</b> ${ctx.uid}</p>
 <p><b>Reason:</b> ${esc(reason)}</p>
+${investigationBlock}
 ${details ? `<pre style="background:#f5f5f5;padding:8px;white-space:pre-wrap;font-size:11px">${esc(details)}</pre>` : ''}
 <p style="color:#666;font-size:11px">Message moved to NeedsReview in ${ctx.inbox} inbox.</p>
 ${recipientsFooter(envelope)}
@@ -345,11 +386,21 @@ ${recipientsFooter(envelope)}
   if (ctx.dryRun) {
     return { dry_run: true, would_notify: { to: envelope.to, reason } };
   }
+
+  // Email threading headers
+  const opts = { html: true };
+  if (ctx.currentMessageId) {
+    opts.inReplyTo = ctx.currentMessageId;
+    const refs = Array.isArray(ctx.currentReferences) ? [...ctx.currentReferences] : [];
+    if (!refs.includes(ctx.currentMessageId)) refs.push(ctx.currentMessageId);
+    if (refs.length > 0) opts.references = refs;
+  }
+
   await ctx.notifier.sendEmail(
     envelope.to,
     `RFQ Loading — needs review: ${subject || '(no subject)'}`,
     html,
-    { html: true },
+    opts,
   );
   breadcrumbs.write({
     cog: 'rfq-loading-agent',

@@ -26,6 +26,7 @@
 
 const fs = require('fs');
 const path = require('path');
+const { execSync } = require('child_process');
 const { loadBulkSummary } = require('../load-bulk-summary');
 const { isKnownBuyer, isKnownSupport, resolveBuyerFromRegistry, resolveAstuteUserById } = require('../partner-lookup');
 const pending = require('../workflow-pending-state');
@@ -35,6 +36,27 @@ const writerAttribution = require('../writer-attribution');
 const { notifyHighFailureRate, notifyOtUnreachable } = require('../failure-rate-gate');
 
 const JAKE_USER_ID = 1000004;
+
+/**
+ * Look up customer name from RFQ search key.
+ * Returns the BP name for the customer on the RFQ.
+ */
+function lookupCustomerFromRfq(rfqSearchKey) {
+  if (!rfqSearchKey) return null;
+  try {
+    // Escape single quotes in search key
+    const escaped = String(rfqSearchKey).replace(/'/g, "''");
+    const sql = `SELECT bp.name FROM adempiere.chuboe_rfq r JOIN adempiere.c_bpartner bp ON r.c_bpartner_id = bp.c_bpartner_id WHERE r.value = '${escaped}' LIMIT 1`;
+    const result = execSync(`psql -t -A -c "${sql}"`, {
+      encoding: 'utf-8',
+      timeout: 5000,
+      env: { ...process.env, PGUSER: 'analytics_user', PGDATABASE: 'idempiere_replica' },
+    }).trim();
+    return result || null;
+  } catch (e) {
+    return null;
+  }
+}
 
 // ─── Unknown Vendor Placeholder BP ──────────────────────────────────────────
 // When operator replies "note vendor in VQ notes" to a needs_vendor escalation,
@@ -564,12 +586,19 @@ async function action_load_vq(payload, ctx) {
         const toEmail = envelope.recipientList[0];
         const ccList = envelope.recipientList.slice(1);
 
+        // Look up metadata for confirmation
+        const customerName = lookupCustomerFromRfq(rfqSearchKey) || '(unknown)';
+        const buyerInfo = resolveAstuteUserById(validatedBuyerId);
+        const buyerName = buyerInfo ? buyerInfo.name : '(unknown)';
+
         const confirmSubject = subject
           ? `Re: ${subject}`
           : `VQs loaded for RFQ ${rfqSearchKey}`;
         const confirmBody = `VQs loaded successfully.
 
+Customer: ${customerName}
 RFQ #: ${rfqSearchKey}${secondaryRfqSearchKeys && secondaryRfqSearchKeys.length ? ` (+ ${secondaryRfqSearchKeys.length} secondary)` : ''}
+Buyer: ${buyerName}
 VQs loaded: ${totals.vqsWritten}
 Vendors: ${loadedVendorLabels.slice(0, 5).join(', ')}${loadedVendorLabels.length > 5 ? ` (+${loadedVendorLabels.length - 5} more)` : ''}
 
@@ -592,6 +621,8 @@ These quotes are now in Orange Tsunami.
           event: 'confirmation-sent',
           uid: ctx.uid,
           rfq: rfqSearchKey,
+          customer: customerName,
+          buyer: buyerName,
           vqs_written: totals.vqsWritten,
           to: toEmail,
           cc: ccList,
@@ -842,6 +873,12 @@ async function action_need_info_vendor(payload, ctx) {
   // MPNs/vendors were extracted, making it hard to identify the right RFQ.
   const extractedQuotesHtml = formatExtractedQuotesTable(extracted);
 
+  // Investigation summary block — shows the agent's reasoning about what went wrong.
+  // UID 10064 bug: this was captured in breadcrumb but not displayed in email.
+  const investigationBlock = investigation_summary
+    ? `<p><b>Agent investigation:</b></p><pre style="background:#eef6ff;padding:8px;white-space:pre-wrap;font-size:12px;border-left:3px solid #369">${esc(investigation_summary)}</pre>`
+    : '';
+
   // Sender-facing (outreach mode) — friendly, no internal jargon, no sidecar paths.
   const senderHtml = `<html><body style="font-family:Arial,sans-serif;font-size:13px">
 <p>Hello,</p>
@@ -863,6 +900,7 @@ async function action_need_info_vendor(payload, ctx) {
    <b>Quotes parsed so far:</b> ${quotesParsed}</p>
 <p><b>Missing fields:</b></p>
 <ul>${missingItemsOperator || '<li>(none specified)</li>'}</ul>
+${investigationBlock}
 ${extractedQuotesHtml}
 <p style="background:#f5f5f5;padding:10px;border-left:3px solid #b00">
    <b>Reply to ${esc(ctx.inbox)} with the missing values</b> (or have the buyer/forwarder reply) — the next agent tick will merge the answers with the parsed quotes and load the VQs.
@@ -894,8 +932,34 @@ ${recipientsFooter(envelope)}
   };
 }
 
-function missingLabel(key) {
-  switch (key) {
+function missingLabel(item) {
+  // Handle object format: { field, mpn?, context? }
+  // Agent may pass rich objects with per-MPN context (e.g., RFQ matching issues).
+  // See UID 10064 bug: objects were rendering as [object Object].
+  if (item && typeof item === 'object') {
+    const field = item.field || 'unknown';
+    const parts = [];
+    // Map field to human-readable label
+    const fieldLabel = {
+      qty: 'Quantity',
+      cost: 'Unit cost',
+      mfr: 'Manufacturer',
+      mpn: 'MPN',
+      rfq: 'RFQ #',
+      rfq_number: 'RFQ #',
+      buyer: 'Buyer',
+      date_code: 'Date code',
+    }[field] || field;
+    if (item.mpn) {
+      parts.push(`${fieldLabel} for ${item.mpn}`);
+    } else {
+      parts.push(fieldLabel);
+    }
+    if (item.context) parts.push(item.context);
+    return parts.join(' — ');
+  }
+  // Legacy string format
+  switch (item) {
     case 'qty':           return 'Quantity — vendor didn\'t state offered qty';
     case 'cost':          return 'Unit cost — vendor didn\'t state price';
     case 'mfr':           return 'Manufacturer — needed for the right alt';
@@ -903,7 +967,7 @@ function missingLabel(key) {
     case 'rfq_number':    return 'RFQ # — couldn\'t resolve which RFQ this quote is for';
     case 'buyer':         return 'Buyer (Astute sourcer) — ambiguous in forward chain';
     case 'date_code':     return 'Date code — vendor quote didn\'t include it';
-    default:              return key;
+    default:              return String(item);  // Defensive: always return string
   }
 }
 
@@ -1020,6 +1084,11 @@ async function action_clarify_vendor(payload, ctx) {
   // Extracted quotes table — helps operator see what data is waiting on this vendor pick
   const extractedQuotesHtml = formatExtractedQuotesTable(extracted);
 
+  // Investigation summary block — shows agent reasoning. Parity with VQ UID 10064 fix.
+  const investigationBlock = investigation_summary
+    ? `<p><b>Agent investigation:</b></p><pre style="background:#eef6ff;padding:8px;white-space:pre-wrap;font-size:12px;border-left:3px solid #369">${esc(investigation_summary)}</pre>`
+    : '';
+
   // Sender-facing list — names only, no search keys / match reasons.
   const senderCandidateRows = candidateList.map((c, i) =>
     `<li><b>${esc(c.name || '(unnamed)')}</b></li>`
@@ -1053,6 +1122,7 @@ async function action_clarify_vendor(payload, ctx) {
   <tr><th></th><th style="text-align:left;padding-right:14px">Search Key</th><th style="text-align:left;padding-right:14px">Name</th><th style="text-align:left">Match reason</th></tr>
   ${rows}
 </table>
+${investigationBlock}
 <p style="background:#fff3cd;padding:10px;border-left:3px solid #b58900">
    <b>Reply to ${esc(ctx.inbox)}</b> with either the search key (e.g. <code>1009842</code>) or the row number (<code>1</code>). If none of these is right, reply with <code>NEW</code> and add the vendor to OT first.
 </p>
@@ -1133,6 +1203,11 @@ async function action_needs_vendor(payload, ctx) {
   // Extracted quotes table — helps operator see what data is waiting on vendor creation
   const extractedQuotesHtml = formatExtractedQuotesTable(extracted);
 
+  // Investigation summary block — shows agent reasoning. Parity with VQ UID 10064 fix.
+  const investigationBlock = investigation_summary
+    ? `<p><b>Agent investigation:</b></p><pre style="background:#eef6ff;padding:8px;white-space:pre-wrap;font-size:12px;border-left:3px solid #369">${esc(investigation_summary)}</pre>`
+    : '';
+
   const senderHtml = `<html><body style="font-family:Arial,sans-serif;font-size:13px">
 <p>Hello,</p>
 <p>Thanks for your quote. We don't see your company in our records yet — to add you so we can process this and future quotes, could you reply with:</p>
@@ -1158,6 +1233,7 @@ async function action_needs_vendor(payload, ctx) {
 <p style="background:#f5f5f5;padding:10px;border-left:3px solid #b00">
    <b>Add the vendor to OT</b> (BP table — set IsVendor='Y', IsCustomer='N', vendor type per relationship). The next agent tick will auto-detect the new BP and load the ${quotesParsed} parsed quote${quotesParsed === 1 ? '' : 's'} without further action.
 </p>
+${investigationBlock}
 ${extractedQuotesHtml}
 <p style="color:#888;font-size:11px">If this isn't a real vendor (e.g. broker forwarded from a personal address with no company), reply with <code>SKIP</code>, <code>DROP</code>, <code>IGNORE</code>, or <code>DISCARD</code> on the first line to discard the parsed quotes.</p>
 <p style="color:#666;font-size:11px">Sidecar: <code>~/workspace/.vq-loading-pending/${esc(ctx.anchorMessageId || '(no anchor)')}.json</code></p>
@@ -1343,12 +1419,18 @@ async function action_clarify_buyer(payload, ctx) {
     });
   }
 
+  // Investigation summary block — shows agent reasoning. Parity with VQ UID 10064 fix.
+  const investigationBlock = investigation_summary
+    ? `<p><b>Agent investigation:</b></p><pre style="background:#eef6ff;padding:8px;white-space:pre-wrap;font-size:12px;border-left:3px solid #369">${esc(investigation_summary)}</pre>`
+    : '';
+
   const operatorHtml = `<html><body style="font-family:Arial,sans-serif;font-size:13px">
 <h2 style="color:#b80">VQ Loading — Clarify buyer</h2>
 <p><b>Subject:</b> ${esc(subject)}<br/>
    <b>From:</b> ${esc(outerFrom || '(unknown)')}<br/>
    <b>UID:</b> ${ctx.uid}</p>
 <p><b>Reason:</b> ${esc(reason || '')}</p>
+${investigationBlock}
 ${details ? `<pre style="background:#fff8e0;padding:8px;white-space:pre-wrap;font-size:11px">${esc(details)}</pre>` : ''}
 <p><b>To resolve, reply to this email with the buyer:</b></p>
 <ul>
@@ -1368,11 +1450,20 @@ ${details ? `<pre style="background:#fff8e0;padding:8px;white-space:pre-wrap;fon
     };
   }
 
+  // Email threading headers — escalation lands in same thread as original
+  const opts = { html: true, replyTo: ctx.inbox };
+  if (ctx.currentMessageId) {
+    opts.inReplyTo = ctx.currentMessageId;
+    const refs = Array.isArray(ctx.currentReferences) ? [...ctx.currentReferences] : [];
+    if (!refs.includes(ctx.currentMessageId)) refs.push(ctx.currentMessageId);
+    if (refs.length > 0) opts.references = refs;
+  }
+
   await ctx.notifier.sendEmail(
     ctx.jakeEmail,
     `VQ Loading — Clarify buyer: ${subject || '(no subject)'}`,
     operatorHtml,
-    { html: true, replyTo: ctx.inbox },
+    opts,
   );
   breadcrumbs.write({
     cog: 'vq-loading-agent',
@@ -1773,6 +1864,27 @@ async function sendSplitRecipientEmail(ctx, {
 }) {
   void senderHtml; // internal-only policy: no separate external-sender copy
   const opts = { html: true, replyTo: ctx.inbox };
+
+  // Email threading: set In-Reply-To and References so the outbound email
+  // lands in the same Gmail/Outlook thread as the original. Without this,
+  // operators see escalations as separate threads even though the subject
+  // matches. UID 10064 surfaced this gap.
+  //
+  // ctx.currentMessageId = RFC822 Message-ID of the email being processed
+  // ctx.currentReferences = array of Message-IDs in the original email's
+  //                         References header (the thread chain)
+  if (ctx.currentMessageId) {
+    opts.inReplyTo = ctx.currentMessageId;
+    // Build References: original chain + the email we're replying to
+    const refs = Array.isArray(ctx.currentReferences) ? [...ctx.currentReferences] : [];
+    if (!refs.includes(ctx.currentMessageId)) {
+      refs.push(ctx.currentMessageId);
+    }
+    if (refs.length > 0) {
+      opts.references = refs;
+    }
+  }
+
   return ctx.notifier.sendEmail(envelope.to, subject, operatorHtml, opts);
 }
 
@@ -1781,8 +1893,28 @@ async function sendSplitRecipientEmail(ctx, {
  * Operator-facing version uses the existing missingLabel() — this is a
  * lighter, less-jargon version suited for an external broker.
  */
-function missingLabelForSender(key) {
-  switch (key) {
+function missingLabelForSender(item) {
+  // Handle object format: { field, mpn?, context? }
+  // Sender-facing version: simpler language, no internal jargon.
+  if (item && typeof item === 'object') {
+    const field = item.field || 'unknown';
+    const fieldLabel = {
+      qty: 'Quantity offered',
+      cost: 'Unit price',
+      mfr: 'Manufacturer',
+      mpn: 'Part number',
+      rfq: 'Which request this quote is for',
+      rfq_number: 'Which request this quote is for',
+      buyer: 'Which of our team requested this',
+      date_code: 'Date code',
+    }[field] || field;
+    if (item.mpn) {
+      return `${fieldLabel} (${item.mpn})`;
+    }
+    return fieldLabel;
+  }
+  // Legacy string format
+  switch (item) {
     case 'qty':           return 'Quantity offered';
     case 'cost':          return 'Unit price';
     case 'mfr':           return 'Manufacturer';
@@ -1790,7 +1922,7 @@ function missingLabelForSender(key) {
     case 'rfq_number':    return 'Which RFQ this quote is for';
     case 'buyer':         return 'Which of our buyers requested this';
     case 'date_code':     return 'Date code';
-    default:              return key;
+    default:              return String(item);  // Defensive: always return string
   }
 }
 

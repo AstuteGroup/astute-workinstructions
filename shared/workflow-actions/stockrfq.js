@@ -501,10 +501,15 @@ async function doWriteRFQ(payload, ctx) {
  * Optional: { details }
  */
 async function action_needs_review(payload, ctx) {
-  const { reason, subject, outerFrom, details } = payload;
+  const { reason, subject, outerFrom, details, investigation_summary } = payload;
 
   // Resolve internal recipients (operator + internal forwarders)
   const envelope = resolveOutreachRecipients(payload, ctx);
+
+  // Investigation summary block — shows agent reasoning. Parity with VQ UID 10064 fix.
+  const investigationBlock = investigation_summary
+    ? `<p><b>Agent investigation:</b></p><pre style="background:#eef6ff;padding:8px;white-space:pre-wrap;font-size:12px;border-left:3px solid #369">${esc(investigation_summary)}</pre>`
+    : '';
 
   const html = `<html><body style="font-family:Arial,sans-serif;font-size:13px">
 <h2 style="color:#b00">Stock RFQ — needs manual review</h2>
@@ -512,6 +517,7 @@ async function action_needs_review(payload, ctx) {
    <b>From:</b> ${esc(externalSenderLabel(envelope, outerFrom))}<br/>
    <b>UID:</b> ${ctx.uid}</p>
 <p><b>Reason:</b> ${esc(reason)}</p>
+${investigationBlock}
 ${details ? `<pre style="background:#f5f5f5;padding:8px;white-space:pre-wrap;font-size:11px">${esc(details)}</pre>` : ''}
 <p style="color:#666;font-size:11px">Message moved to NeedsReview folder.</p>
 ${recipientsFooter(envelope)}
@@ -521,11 +527,20 @@ ${recipientsFooter(envelope)}
     return { dry_run: true, would_notify: { to: envelope.to, reason } };
   }
 
+  // Email threading headers — escalation lands in same thread as original
+  const opts = { html: true };
+  if (ctx.currentMessageId) {
+    opts.inReplyTo = ctx.currentMessageId;
+    const refs = Array.isArray(ctx.currentReferences) ? [...ctx.currentReferences] : [];
+    if (!refs.includes(ctx.currentMessageId)) refs.push(ctx.currentMessageId);
+    if (refs.length > 0) opts.references = refs;
+  }
+
   await ctx.notifier.sendEmail(
     envelope.to,
     `Stock RFQ — needs review: ${subject || '(no subject)'}`,
     html,
-    { html: true },
+    opts,
   );
 
   breadcrumbs.write({
@@ -535,6 +550,7 @@ ${recipientsFooter(envelope)}
     subject,
     outerFrom,
     reason,
+    investigation_summary: investigation_summary || null,
     recipients: envelope.recipientList,
     external_sender_not_emailed: envelope.externalSender || null,
   });

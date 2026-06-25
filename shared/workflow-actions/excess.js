@@ -23,6 +23,7 @@ const { execSync } = require('child_process');
 const { writeOffer, deactivatePriorOffers } = require('../offer-writeback');
 const writerAttribution = require('../writer-attribution');
 const offerRouter = require('../offer-router');
+const { evaluateFailureRate } = require('../failure-rate-gate');
 const breadcrumbs = require('../breadcrumbs');
 const pending = require('../workflow-pending-state');
 const { createGate } = require('../large-payload-gate');
@@ -43,6 +44,28 @@ function lookupPartnerName(bpartnerId) {
   if (!bpartnerId) return null;
   try {
     const sql = `SELECT name FROM adempiere.c_bpartner WHERE c_bpartner_id = ${parseInt(bpartnerId, 10)} LIMIT 1`;
+    const result = execSync(`psql -t -A -c "${sql}"`, {
+      encoding: 'utf-8',
+      timeout: 5000,
+      env: { ...process.env, PGUSER: 'analytics_user', PGDATABASE: 'idempiere_replica' },
+    }).trim();
+    return result || null;
+  } catch (e) {
+    return null;
+  }
+}
+
+/**
+ * Look up offer type name from type ID.
+ */
+function lookupOfferTypeName(offerTypeId) {
+  if (!offerTypeId) return null;
+  // Handle string type names passed directly
+  if (typeof offerTypeId === 'string' && isNaN(parseInt(offerTypeId, 10))) {
+    return offerTypeId; // Already a name like "Customer Excess"
+  }
+  try {
+    const sql = `SELECT name FROM adempiere.chuboe_offer_type WHERE chuboe_offer_type_id = ${parseInt(offerTypeId, 10)} LIMIT 1`;
     const result = execSync(`psql -t -A -c "${sql}"`, {
       encoding: 'utf-8',
       timeout: 5000,
@@ -231,6 +254,60 @@ async function action_load_offer(payload, ctx) {
     chunkedMode: result.chunkedMode || false,
   });
 
+  // ── Failure rate evaluation ─────────────────────────────────────────────────
+  // Check if the load had an unhealthy failure rate. Alert operator if so.
+  // Uses count-style result (linesWritten, errors[]) like rfq-loader-daemon.
+  try {
+    const gateEval = evaluateFailureRate({
+      result: {
+        linesWritten: result.linesWritten,
+        errors: result.errors,
+      },
+      minSubmitted: 10,
+    });
+
+    if (gateEval.flag && gateEval.severity !== 'none') {
+      console.error(`[excess.load_offer] High failure rate detected: ${gateEval.reason}`);
+      breadcrumbs.write({
+        cog: 'offer-poller',
+        event: 'high-failure-rate',
+        uid: ctx.uid,
+        offerId: result.offerId,
+        searchKey: result.searchKey,
+        severity: gateEval.severity,
+        reason: gateEval.reason,
+        linesAttempted: lines.length,
+        linesWritten: result.linesWritten,
+        errorCount: result.errors.length,
+        ratios: gateEval.ratios,
+      });
+
+      // Send alert email to operator
+      const alertSubject = `⚠️ Offer Load Alert: ${result.searchKey || 'unknown'} — ${gateEval.severity} failure rate`;
+      const alertBody = `Market Offer load completed with high failure rate.
+
+Offer #: ${result.searchKey || '(not created)'}
+Partner: ${partnerName || '(unknown)'}
+Severity: ${gateEval.severity}
+Reason: ${gateEval.reason}
+
+Lines attempted: ${lines.length}
+Lines written: ${result.linesWritten}
+Errors: ${result.errors.length}
+Failure rate: ${(gateEval.ratios.failed * 100).toFixed(1)}%
+
+Sample errors:
+${result.errors.slice(0, 5).map(e => `  • ${e}`).join('\n')}
+${result.errors.length > 5 ? `  ... +${result.errors.length - 5} more` : ''}
+
+— Excess Offer System (automated alert)`;
+
+      await ctx.notifier.sendEmail(ctx.jakeEmail, alertSubject, alertBody);
+    }
+  } catch (e) {
+    console.error(`[excess.load_offer] Failure rate evaluation error: ${e.message}`);
+  }
+
   // Per-row error attribution. offer-writeback returns errors[] as bare strings;
   // persistWriterDetails handles both bucket-style and count-style.
   writerAttribution.persistWriterDetails({
@@ -358,14 +435,27 @@ async function action_load_offer(payload, ctx) {
         const toEmail = internalRecipients[0];
         const ccList = internalRecipients.slice(1);
 
+        // Look up metadata for confirmation
+        const offerTypeName = lookupOfferTypeName(offerType) || '(unknown)';
+
         const confirmSubject = originalSubject
           ? `Re: ${originalSubject}`
           : `Market Offer ${result.searchKey} loaded`;
-        const confirmBody = `Excess offer loaded.
+
+        // Build confirmation body with all metadata
+        let confirmBody = `Excess offer loaded.
 
 Partner: ${partnerName || '(unknown)'}
 Market Offer #: ${result.searchKey}
-Lines loaded: ${result.linesWritten}
+Type: ${offerTypeName}
+Contact: Jake Harris
+Lines loaded: ${result.linesWritten}`;
+
+        if (description) {
+          confirmBody += `\nDescription: ${description}`;
+        }
+
+        confirmBody += `
 
 This offer is now in Orange Tsunami and available for matching against open RFQs.
 
@@ -387,6 +477,9 @@ This offer is now in Orange Tsunami and available for matching against open RFQs
           uid: ctx.uid,
           offerId: result.offerId,
           searchKey: result.searchKey,
+          partner: partnerName,
+          offerType: offerTypeName,
+          linesLoaded: result.linesWritten,
           to: toEmail,
           cc: ccList,
         });
@@ -426,6 +519,11 @@ async function action_needs_partner(payload, ctx) {
   // Build extracted-lines table so operator can see what data is waiting
   const extractedLinesHtml = formatExtractedLinesTable(extracted);
 
+  // Investigation summary block — shows agent reasoning. Parity with VQ UID 10064 fix.
+  const investigationBlock = investigation_summary
+    ? `<p><b>Agent investigation:</b></p><pre style="background:#eef6ff;padding:8px;white-space:pre-wrap;font-size:12px;border-left:3px solid #369">${esc(investigation_summary)}</pre>`
+    : '';
+
   const html = `<html><body style="font-family:Arial,sans-serif;font-size:13px">
 <h2 style="color:#b00">Customer Excess — partner unresolved</h2>
 <p><b>Subject:</b> ${esc(subject)}<br/>
@@ -434,6 +532,7 @@ async function action_needs_partner(payload, ctx) {
    <b>Inbox:</b> ${esc(ctx.inbox)}<br/>
    <b>Lines parsed:</b> ${fmt(linesCount)}</p>
 <p><b>What was tried:</b><br/>${esc(hints || '(no hints provided)')}</p>
+${investigationBlock}
 ${extractedLinesHtml}
 <p style="background:#f5f5f5;padding:10px;border-left:3px solid #b00">
    <b>Reply with:</b><br/>
@@ -446,11 +545,20 @@ ${extractedLinesHtml}
     return { dry_run: true, would_notify_jake: { subject, outerFrom } };
   }
 
+  // Email threading headers — escalation lands in same thread as original
+  const opts = { html: true };
+  if (ctx.currentMessageId) {
+    opts.inReplyTo = ctx.currentMessageId;
+    const refs = Array.isArray(ctx.currentReferences) ? [...ctx.currentReferences] : [];
+    if (!refs.includes(ctx.currentMessageId)) refs.push(ctx.currentMessageId);
+    if (refs.length > 0) opts.references = refs;
+  }
+
   await ctx.notifier.sendEmail(
     ctx.jakeEmail,
     `Customer Excess — NeedsPartner: ${subject || '(no subject)'}`,
     html,
-    { html: true },
+    opts,
   );
 
   breadcrumbs.write({
@@ -520,6 +628,12 @@ async function action_clarify_partner(payload, ctx) {
   }
 
   const retryCount = sidecarRecord ? sidecarRecord.retry_count : 0;
+
+  // Investigation summary block — shows agent reasoning. Parity with VQ UID 10064 fix.
+  const investigationBlock = investigation_summary
+    ? `<p><b>Agent investigation:</b></p><pre style="background:#eef6ff;padding:8px;white-space:pre-wrap;font-size:12px;border-left:3px solid #369">${esc(investigation_summary)}</pre>`
+    : '';
+
   const html = `<html><body style="font-family:Arial,sans-serif;font-size:13px">
 <h2 style="color:#b00">Customer Excess — partner clarification needed</h2>
 <p><b>Subject:</b> ${esc(subject)}<br/>
@@ -530,6 +644,7 @@ async function action_clarify_partner(payload, ctx) {
    <b>Offer type:</b> ${esc(offerType || '(default)')}<br/>
    <b>Line count:</b> ${fmt(linesCount)}</p>
 <p><b>Why partner didn't resolve:</b><br/>${esc(hints || '(no hints provided)')}</p>
+${investigationBlock}
 ${extractedLinesHtml}
 <p style="background:#f5f5f5;padding:10px;border-left:3px solid #b00">
    <b>Reply to ${esc(ctx.inbox)} with the company name</b> (one line is fine — e.g., <code>Customer is Liyijing Electronics</code>). The next agent tick will merge your reply with the parsed lines and load the offer. Or use the structured directive: <code>PARTNER: ${ctx.uid} = &lt;BP search key OR company name&gt;</code>
@@ -548,11 +663,20 @@ ${extractedLinesHtml}
 
   // Reply-To MUST be the excess inbox — Jake's reply needs to land here for
   // the agent to pick up the pending_state on next tick.
+  // Email threading headers — escalation lands in same thread as original
+  const opts = { html: true, replyTo: ctx.inbox };
+  if (ctx.currentMessageId) {
+    opts.inReplyTo = ctx.currentMessageId;
+    const refs = Array.isArray(ctx.currentReferences) ? [...ctx.currentReferences] : [];
+    if (!refs.includes(ctx.currentMessageId)) refs.push(ctx.currentMessageId);
+    if (refs.length > 0) opts.references = refs;
+  }
+
   await ctx.notifier.sendEmail(
     ctx.jakeEmail,
     `Customer Excess — clarify partner: ${subject || '(no subject)'}`,
     html,
-    { html: true, replyTo: ctx.inbox },
+    opts,
   );
 
   breadcrumbs.write({
@@ -585,12 +709,19 @@ ${extractedLinesHtml}
  */
 async function action_needs_review(payload, ctx) {
   const { reason, subject, outerFrom, details, investigation_summary } = payload;
+
+  // Investigation summary block — shows agent reasoning. Parity with VQ UID 10064 fix.
+  const investigationBlock = investigation_summary
+    ? `<p><b>Agent investigation:</b></p><pre style="background:#eef6ff;padding:8px;white-space:pre-wrap;font-size:12px;border-left:3px solid #369">${esc(investigation_summary)}</pre>`
+    : '';
+
   const html = `<html><body style="font-family:Arial,sans-serif;font-size:13px">
 <h2 style="color:#b00">Customer Excess — needs manual review</h2>
 <p><b>Subject:</b> ${esc(subject)}<br/>
    <b>From:</b> ${esc(outerFrom)}<br/>
    <b>UID:</b> ${ctx.uid}</p>
 <p><b>Reason:</b> ${esc(reason)}</p>
+${investigationBlock}
 ${details ? `<pre style="background:#f5f5f5;padding:8px;white-space:pre-wrap;font-size:11px">${esc(details)}</pre>` : ''}
 <p style="color:#666;font-size:11px">Message moved to NeedsReview folder.</p>
 </body></html>`;
@@ -599,11 +730,20 @@ ${details ? `<pre style="background:#f5f5f5;padding:8px;white-space:pre-wrap;fon
     return { dry_run: true, would_notify_jake: { reason } };
   }
 
+  // Email threading headers — escalation lands in same thread as original
+  const opts = { html: true };
+  if (ctx.currentMessageId) {
+    opts.inReplyTo = ctx.currentMessageId;
+    const refs = Array.isArray(ctx.currentReferences) ? [...ctx.currentReferences] : [];
+    if (!refs.includes(ctx.currentMessageId)) refs.push(ctx.currentMessageId);
+    if (refs.length > 0) opts.references = refs;
+  }
+
   await ctx.notifier.sendEmail(
     ctx.jakeEmail,
     `Customer Excess — needs review: ${subject || '(no subject)'}`,
     html,
-    { html: true },
+    opts,
   );
 
   breadcrumbs.write({

@@ -231,12 +231,21 @@ async function action_load_offer(payload, ctx) {
         const confirmSubject = originalSubject
           ? `Re: ${originalSubject}`
           : `Market Offer ${result.searchKey} loaded`;
-        const confirmBody = `Broker/franchise offer loaded.
+
+        // Build confirmation body with all metadata
+        let confirmBody = `Broker/franchise offer loaded.
 
 Partner: ${partnerName || '(unknown)'}
 Market Offer #: ${result.searchKey}
-Offer Type: ${offerTypeName}
-Lines loaded: ${result.linesWritten}
+Type: ${offerTypeName}
+Contact: Jake Harris
+Lines loaded: ${result.linesWritten}`;
+
+        if (description) {
+          confirmBody += `\nDescription: ${description}`;
+        }
+
+        confirmBody += `
 
 This offer is now in Orange Tsunami.
 
@@ -257,6 +266,9 @@ This offer is now in Orange Tsunami.
           uid: ctx.uid,
           offerId: result.offerId,
           searchKey: result.searchKey,
+          partner: partnerName,
+          offerType: offerTypeName,
+          linesLoaded: result.linesWritten,
           to: toEmail,
           cc: ccList,
         });
@@ -286,6 +298,11 @@ async function action_needs_partner(payload, ctx) {
 
   const extractedLinesHtml = formatExtractedLinesTable(extracted);
 
+  // Investigation summary block — shows agent reasoning. Parity with VQ UID 10064 fix.
+  const investigationBlock = investigation_summary
+    ? `<p><b>Agent investigation:</b></p><pre style="background:#eef6ff;padding:8px;white-space:pre-wrap;font-size:12px;border-left:3px solid #369">${esc(investigation_summary)}</pre>`
+    : '';
+
   const html = `<html><body style="font-family:Arial,sans-serif;font-size:13px">
 <h2 style="color:#b00">Broker Offers — partner unresolved</h2>
 <p><b>Subject:</b> ${esc(subject)}<br/>
@@ -294,6 +311,7 @@ async function action_needs_partner(payload, ctx) {
    <b>Inbox:</b> ${esc(ctx.inbox)}<br/>
    <b>Lines parsed:</b> ${fmt(linesCount)}</p>
 <p><b>What was tried:</b><br/>${esc(hints || '(no hints provided)')}</p>
+${investigationBlock}
 ${extractedLinesHtml}
 <p style="background:#f5f5f5;padding:10px;border-left:3px solid #b00">
    <b>Reply with:</b><br/>
@@ -306,11 +324,20 @@ ${extractedLinesHtml}
     return { dry_run: true, would_notify_jake: { subject, outerFrom } };
   }
 
+  // Email threading headers — escalation lands in same thread as original
+  const opts = { html: true };
+  if (ctx.currentMessageId) {
+    opts.inReplyTo = ctx.currentMessageId;
+    const refs = Array.isArray(ctx.currentReferences) ? [...ctx.currentReferences] : [];
+    if (!refs.includes(ctx.currentMessageId)) refs.push(ctx.currentMessageId);
+    if (refs.length > 0) opts.references = refs;
+  }
+
   await ctx.notifier.sendEmail(
     ctx.jakeEmail,
     `Broker Offers — NeedsPartner: ${subject || '(no subject)'}`,
     html,
-    { html: true },
+    opts,
   );
 
   breadcrumbs.write({
@@ -356,6 +383,12 @@ async function action_clarify_partner(payload, ctx) {
   }
 
   const retryCount = sidecarRecord ? sidecarRecord.retry_count : 0;
+
+  // Investigation summary block — shows agent reasoning. Parity with VQ UID 10064 fix.
+  const investigationBlock = investigation_summary
+    ? `<p><b>Agent investigation:</b></p><pre style="background:#eef6ff;padding:8px;white-space:pre-wrap;font-size:12px;border-left:3px solid #369">${esc(investigation_summary)}</pre>`
+    : '';
+
   const html = `<html><body style="font-family:Arial,sans-serif;font-size:13px">
 <h2 style="color:#b00">Broker Offers — partner clarification needed</h2>
 <p><b>Subject:</b> ${esc(subject)}<br/>
@@ -366,6 +399,7 @@ async function action_clarify_partner(payload, ctx) {
    <b>Offer type:</b> ${esc(offerType || '(to be determined)')}<br/>
    <b>Line count:</b> ${fmt(linesCount)}</p>
 <p><b>Why partner didn't resolve:</b><br/>${esc(hints || '(no hints provided)')}</p>
+${investigationBlock}
 ${extractedLinesHtml}
 <p style="background:#f5f5f5;padding:10px;border-left:3px solid #b00">
    <b>Reply to ${esc(ctx.inbox)} with the company name</b> (one line is fine — e.g., <code>Partner is Future Electronics</code>). The next agent tick will merge your reply with the parsed lines and load the offer. Or use the structured directive: <code>PARTNER: ${ctx.uid} = &lt;BP search key OR company name&gt;</code>
@@ -383,11 +417,20 @@ ${extractedLinesHtml}
   }
 
   // Reply-To MUST be the broker-offers inbox — Jake's reply needs to land here
+  // Email threading headers — escalation lands in same thread as original
+  const opts = { html: true, replyTo: ctx.inbox };
+  if (ctx.currentMessageId) {
+    opts.inReplyTo = ctx.currentMessageId;
+    const refs = Array.isArray(ctx.currentReferences) ? [...ctx.currentReferences] : [];
+    if (!refs.includes(ctx.currentMessageId)) refs.push(ctx.currentMessageId);
+    if (refs.length > 0) opts.references = refs;
+  }
+
   await ctx.notifier.sendEmail(
     ctx.jakeEmail,
     `Broker Offers — clarify partner: ${subject || '(no subject)'}`,
     html,
-    { html: true, replyTo: ctx.inbox },
+    opts,
   );
 
   breadcrumbs.write({
@@ -417,12 +460,19 @@ ${extractedLinesHtml}
  */
 async function action_needs_review(payload, ctx) {
   const { reason, subject, outerFrom, details, investigation_summary } = payload;
+
+  // Investigation summary block — shows agent reasoning. Parity with VQ UID 10064 fix.
+  const investigationBlock = investigation_summary
+    ? `<p><b>Agent investigation:</b></p><pre style="background:#eef6ff;padding:8px;white-space:pre-wrap;font-size:12px;border-left:3px solid #369">${esc(investigation_summary)}</pre>`
+    : '';
+
   const html = `<html><body style="font-family:Arial,sans-serif;font-size:13px">
 <h2 style="color:#b00">Broker Offers — needs manual review</h2>
 <p><b>Subject:</b> ${esc(subject)}<br/>
    <b>From:</b> ${esc(outerFrom)}<br/>
    <b>UID:</b> ${ctx.uid}</p>
 <p><b>Reason:</b> ${esc(reason)}</p>
+${investigationBlock}
 ${details ? `<pre style="background:#f5f5f5;padding:8px;white-space:pre-wrap;font-size:11px">${esc(details)}</pre>` : ''}
 <p style="color:#666;font-size:11px">Message moved to NeedsReview folder.</p>
 </body></html>`;
@@ -431,11 +481,20 @@ ${details ? `<pre style="background:#f5f5f5;padding:8px;white-space:pre-wrap;fon
     return { dry_run: true, would_notify_jake: { reason } };
   }
 
+  // Email threading headers — escalation lands in same thread as original
+  const opts = { html: true };
+  if (ctx.currentMessageId) {
+    opts.inReplyTo = ctx.currentMessageId;
+    const refs = Array.isArray(ctx.currentReferences) ? [...ctx.currentReferences] : [];
+    if (!refs.includes(ctx.currentMessageId)) refs.push(ctx.currentMessageId);
+    if (refs.length > 0) opts.references = refs;
+  }
+
   await ctx.notifier.sendEmail(
     ctx.jakeEmail,
     `Broker Offers — needs review: ${subject || '(no subject)'}`,
     html,
-    { html: true },
+    opts,
   );
 
   breadcrumbs.write({
