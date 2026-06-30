@@ -247,11 +247,13 @@ ${recipientsFooter(envelope)}
   }
   // Email threading: set In-Reply-To and References so escalation lands in
   // the same Gmail/Outlook thread as the original. Parity with VQ UID 10064 fix.
+  // Fallback to anchorMessageId when currentMessageId is null (fetch failed)
   const opts = { html: true, replyTo: ctx.inbox };
-  if (ctx.currentMessageId) {
-    opts.inReplyTo = ctx.currentMessageId;
+  const threadId = ctx.currentMessageId || ctx.anchorMessageId;
+  if (threadId) {
+    opts.inReplyTo = threadId;
     const refs = Array.isArray(ctx.currentReferences) ? [...ctx.currentReferences] : [];
-    if (!refs.includes(ctx.currentMessageId)) refs.push(ctx.currentMessageId);
+    if (!refs.includes(threadId)) refs.push(threadId);
     if (refs.length > 0) opts.references = refs;
   }
 
@@ -387,12 +389,13 @@ ${recipientsFooter(envelope)}
     return { dry_run: true, would_notify: { to: envelope.to, reason } };
   }
 
-  // Email threading headers
+  // Email threading headers — fallback to anchorMessageId when currentMessageId is null
   const opts = { html: true };
-  if (ctx.currentMessageId) {
-    opts.inReplyTo = ctx.currentMessageId;
+  const threadId = ctx.currentMessageId || ctx.anchorMessageId;
+  if (threadId) {
+    opts.inReplyTo = threadId;
     const refs = Array.isArray(ctx.currentReferences) ? [...ctx.currentReferences] : [];
-    if (!refs.includes(ctx.currentMessageId)) refs.push(ctx.currentMessageId);
+    if (!refs.includes(threadId)) refs.push(threadId);
     if (refs.length > 0) opts.references = refs;
   }
 

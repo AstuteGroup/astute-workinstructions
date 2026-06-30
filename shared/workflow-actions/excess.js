@@ -462,12 +462,14 @@ This offer is now in Orange Tsunami and available for matching against open RFQs
 — Excess Offer System (automated)`;
 
         // Thread confirmation into the original email chain using Message-ID
+        // Fallback to anchorMessageId when currentMessageId is null (fetch failed)
         const threadingOpts = {
           cc: ccList.length > 0 ? ccList : undefined,
         };
-        if (ctx.currentMessageId) {
-          threadingOpts.inReplyTo = ctx.currentMessageId;
-          threadingOpts.references = ctx.currentMessageId;
+        const threadId = ctx.currentMessageId || ctx.anchorMessageId;
+        if (threadId) {
+          threadingOpts.inReplyTo = threadId;
+          threadingOpts.references = threadId;
         }
         await ctx.notifier.sendEmail(toEmail, confirmSubject, confirmBody, threadingOpts);
 
@@ -546,11 +548,13 @@ ${extractedLinesHtml}
   }
 
   // Email threading headers — escalation lands in same thread as original
+  // Fallback to anchorMessageId when currentMessageId is null (fetch failed)
   const opts = { html: true };
-  if (ctx.currentMessageId) {
-    opts.inReplyTo = ctx.currentMessageId;
+  const threadId = ctx.currentMessageId || ctx.anchorMessageId;
+  if (threadId) {
+    opts.inReplyTo = threadId;
     const refs = Array.isArray(ctx.currentReferences) ? [...ctx.currentReferences] : [];
-    if (!refs.includes(ctx.currentMessageId)) refs.push(ctx.currentMessageId);
+    if (!refs.includes(threadId)) refs.push(threadId);
     if (refs.length > 0) opts.references = refs;
   }
 
@@ -664,11 +668,13 @@ ${extractedLinesHtml}
   // Reply-To MUST be the excess inbox — Jake's reply needs to land here for
   // the agent to pick up the pending_state on next tick.
   // Email threading headers — escalation lands in same thread as original
+  // Fallback to anchorMessageId when currentMessageId is null (fetch failed)
   const opts = { html: true, replyTo: ctx.inbox };
-  if (ctx.currentMessageId) {
-    opts.inReplyTo = ctx.currentMessageId;
+  const threadId = ctx.currentMessageId || ctx.anchorMessageId;
+  if (threadId) {
+    opts.inReplyTo = threadId;
     const refs = Array.isArray(ctx.currentReferences) ? [...ctx.currentReferences] : [];
-    if (!refs.includes(ctx.currentMessageId)) refs.push(ctx.currentMessageId);
+    if (!refs.includes(threadId)) refs.push(threadId);
     if (refs.length > 0) opts.references = refs;
   }
 
@@ -731,11 +737,13 @@ ${details ? `<pre style="background:#f5f5f5;padding:8px;white-space:pre-wrap;fon
   }
 
   // Email threading headers — escalation lands in same thread as original
+  // Fallback to anchorMessageId when currentMessageId is null (fetch failed)
   const opts = { html: true };
-  if (ctx.currentMessageId) {
-    opts.inReplyTo = ctx.currentMessageId;
+  const threadId = ctx.currentMessageId || ctx.anchorMessageId;
+  if (threadId) {
+    opts.inReplyTo = threadId;
     const refs = Array.isArray(ctx.currentReferences) ? [...ctx.currentReferences] : [];
-    if (!refs.includes(ctx.currentMessageId)) refs.push(ctx.currentMessageId);
+    if (!refs.includes(threadId)) refs.push(threadId);
     if (refs.length > 0) opts.references = refs;
   }
 
