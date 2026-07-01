@@ -39,6 +39,7 @@ const path = require('path');
 require('dotenv').config({ path: path.resolve(__dirname, '../../.env') });
 
 const logger = require('./logger').createLogger('APIClient');
+const breadcrumbs = require('./breadcrumbs');
 
 // Production iDempiere uses a self-signed cert. Node's built-in fetch (undici)
 // rejects self-signed certs by default with an opaque "fetch failed" error.
@@ -369,6 +370,9 @@ function buildNaturalKeyFilter(fields, body, sinceTimestamp) {
  *   Example: ['Chuboe_RFQ_Line_ID', 'Chuboe_MPN_Clean', 'Chuboe_MFR_ID']
  * @param {number} [options.maxRetries] - Max attempts when naturalKeyFields
  *   is set. Defaults to MAX_RETRIES. Ignored when naturalKeyFields is absent.
+ * @param {string} [options.context] - Workflow context for audit trail (e.g.,
+ *   'vq-loading', 'stockrfq', 'excess'). Writes without context are flagged
+ *   as 'ad-hoc' in the Ops Digest.
  * @returns {Promise<object>} Created record with server-assigned ID
  */
 async function apiPost(table, payload, options = {}) {
@@ -376,6 +380,7 @@ async function apiPost(table, payload, options = {}) {
     includeDefaults = true,
     naturalKeyFields = null,
     maxRetries = MAX_RETRIES,
+    context = null,
   } = options;
 
   const body = includeDefaults
@@ -389,6 +394,16 @@ async function apiPost(table, payload, options = {}) {
   if (!naturalKeyFields) {
     const result = await request('POST', `/models/${table}`, body);
     logger.debug(`Created ${table} record: id=${result.id || 'unknown'}`);
+    // Audit breadcrumb for API write tracking
+    breadcrumbs.write({
+      cog: 'api-client',
+      event: 'write',
+      operation: 'POST',
+      table,
+      recordId: result.id,
+      searchKey: result.Value || null,
+      context: context || 'ad-hoc',
+    });
     return result;
   }
 
@@ -403,6 +418,16 @@ async function apiPost(table, payload, options = {}) {
     try {
       const result = await request('POST', `/models/${table}`, body);
       logger.debug(`Created ${table} record: id=${result.id || 'unknown'}${attempt > 1 ? ` (attempt ${attempt})` : ''}`);
+      // Audit breadcrumb for API write tracking
+      breadcrumbs.write({
+        cog: 'api-client',
+        event: 'write',
+        operation: 'POST',
+        table,
+        recordId: result.id,
+        searchKey: result.Value || null,
+        context: context || 'ad-hoc',
+      });
       return result;
     } catch (e) {
       lastError = e;
@@ -435,6 +460,17 @@ async function apiPost(table, payload, options = {}) {
       const found = verify.records && verify.records[0];
       if (found) {
         logger.warn(`POST ${table} returned ${e.statusCode || 'network error'} but row was committed: id=${found.id} (attempt ${attempt}) — treating as success`);
+        // Audit breadcrumb for API write tracking (verified-after-error)
+        breadcrumbs.write({
+          cog: 'api-client',
+          event: 'write',
+          operation: 'POST',
+          table,
+          recordId: found.id,
+          searchKey: found.Value || null,
+          context: context || 'ad-hoc',
+          note: 'verified-after-error',
+        });
         return found;
       }
 
@@ -488,12 +524,24 @@ async function apiGet(table, options = {}) {
  * @param {string} table - Table name
  * @param {number} id - Record ID
  * @param {object} payload - Fields to update
+ * @param {object} [options]
+ * @param {string} [options.context] - Workflow context for audit trail
  * @returns {Promise<object>} Updated record
  */
-async function apiPut(table, id, payload) {
+async function apiPut(table, id, payload, options = {}) {
+  const { context = null } = options;
   const body = { ...payload };
   const result = await request('PUT', `/models/${table}/${id}`, body);
   logger.debug(`Updated ${table}/${id}`);
+  // Audit breadcrumb for API write tracking
+  breadcrumbs.write({
+    cog: 'api-client',
+    event: 'write',
+    operation: 'PUT',
+    table,
+    recordId: id,
+    context: context || 'ad-hoc',
+  });
   return result;
 }
 
@@ -515,11 +563,28 @@ async function apiDelete(table, id) {
  * Use for independent, sibling-level writes only — NOT parent-child.
  *
  * @param {Array<{method: string, resource: string, body?: object}>} operations
+ * @param {object} [options]
+ * @param {string} [options.context] - Workflow context for audit trail
  * @returns {Promise<object>} Batch response
  */
-async function apiBatch(operations) {
+async function apiBatch(operations, options = {}) {
+  const { context = null } = options;
   const result = await request('POST', '/batch', operations);
   logger.debug(`Batch executed: ${operations.length} operations`);
+  // Audit breadcrumb for API write tracking (batch)
+  // Extract table names from operations for the audit
+  const tables = [...new Set(operations.map(op => {
+    const match = op.resource && op.resource.match(/\/models\/([^/]+)/);
+    return match ? match[1] : 'unknown';
+  }))];
+  breadcrumbs.write({
+    cog: 'api-client',
+    event: 'write',
+    operation: 'BATCH',
+    tables,
+    operationCount: operations.length,
+    context: context || 'ad-hoc',
+  });
   return result;
 }
 

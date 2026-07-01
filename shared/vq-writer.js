@@ -991,6 +991,7 @@ async function writeVQFromAPI(rfqSearchKey, cpc, franchiseResults, opts = {}) {
     try {
       const result = await apiPost('Chuboe_VQ_Line', payload, {
         naturalKeyFields: NATURAL_KEY_FIELDS,
+        context: 'vq-loading',
       });
       written.push({
         vqLineId: result.id, mpn, vendor: vendorDisplay, bpId: bp.id,

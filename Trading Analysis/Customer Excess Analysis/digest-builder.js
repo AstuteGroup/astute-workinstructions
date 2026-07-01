@@ -679,8 +679,94 @@ function buildSection5StockRFQ(crumbs) {
   };
 }
 
-// Section 6 = Cron job health in window (every job, success/failure/skip).
-function buildSection6CronHealth(crumbs) {
+// Section 6 = Claude API Write Audit (all tables written via api-client).
+// Surfaces what Claude wrote to OT in this window, grouped by workflow context.
+// Ad-hoc writes (no context) are flagged.
+function buildSection6ApiWriteAudit(crumbs) {
+  const writes = crumbs.filter(c => c.cog === 'api-client' && c.event === 'write');
+  if (writes.length === 0) {
+    return { html: `<p style="color:#666">No API writes in this window.</p>`, count: 0, flaggedCount: 0 };
+  }
+
+  // Context labels for display
+  const CONTEXT_LABELS = {
+    'vq-loading': 'VQ Loading',
+    'stockrfq': 'Stock RFQ Loading',
+    'stockrfq-cq': 'Stock RFQ CQ',
+    'excess': 'Customer Excess',
+    'rfq-loading': 'RFQ Loading',
+    'broker-offers': 'Broker/Franchise Offers',
+    'tracking': 'Tracking Loading',
+    'enrichment': 'RFQ Enrichment',
+    'mfr-reconciler': 'MFR Reconciler',
+    'ad-hoc': '⚠ Ad-hoc / Manual',
+  };
+
+  // Aggregate by context
+  const byContext = new Map();
+  for (const w of writes) {
+    const ctx = w.context || 'ad-hoc';
+    if (!byContext.has(ctx)) {
+      byContext.set(ctx, { context: ctx, tables: new Map(), totalCount: 0 });
+    }
+    const entry = byContext.get(ctx);
+    entry.totalCount += 1;
+
+    // Track tables within this context
+    const tables = w.operation === 'BATCH' ? (w.tables || ['unknown']) : [w.table];
+    for (const t of tables) {
+      if (!entry.tables.has(t)) entry.tables.set(t, 0);
+      entry.tables.set(t, entry.tables.get(t) + 1);
+    }
+  }
+
+  const entries = [...byContext.values()].sort((a, b) => {
+    // Ad-hoc first (flagged), then by count desc
+    if ((a.context === 'ad-hoc') !== (b.context === 'ad-hoc')) {
+      return a.context === 'ad-hoc' ? -1 : 1;
+    }
+    return b.totalCount - a.totalCount;
+  });
+
+  const flaggedCount = byContext.get('ad-hoc')?.totalCount || 0;
+
+  const rows = entries.map(e => {
+    const isAdHoc = e.context === 'ad-hoc';
+    const label = CONTEXT_LABELS[e.context] || e.context;
+    const contextCell = isAdHoc
+      ? `<span style="color:#c0392b;font-weight:bold">${escapeHtml(label)}</span>`
+      : escapeHtml(label);
+    // Format tables as "chuboe_vq_line (45), chuboe_rfq (3)"
+    const tablesSummary = [...e.tables.entries()]
+      .sort((a, b) => b[1] - a[1])
+      .map(([t, n]) => `${t} (${n})`)
+      .join(', ');
+    return `
+    <tr${isAdHoc ? ' style="background:#fff3cd"' : ''}>
+      <td>${contextCell}</td>
+      <td style="text-align:right">${fmtQty(e.totalCount)}</td>
+      <td style="font-size:11px">${escapeHtml(tablesSummary)}</td>
+    </tr>`;
+  }).join('');
+
+  const flaggedWarning = flaggedCount > 0
+    ? `<p style="color:#c0392b;margin-bottom:8px">⚠ <b>${flaggedCount} ad-hoc write${flaggedCount === 1 ? '' : 's'}</b> — writes without workflow context require review</p>`
+    : '';
+
+  return {
+    html: `${flaggedWarning}
+      <table ${TABLE_STYLE}>
+        <tr><th ${TH_STYLE}>Workflow</th><th ${TH_STYLE}>Writes</th><th ${TH_STYLE}>Tables</th></tr>
+        ${rows}
+      </table>
+      <p style="color:#666;font-size:11px;margin-top:6px">Ad-hoc writes (no workflow context) are flagged. All writes should flow through documented workflows.</p>`,
+    count: writes.length,
+    flaggedCount,
+  };
+}
+
+// Section 7 = Cron job health in window (every job, success/failure/skip).
+function buildSection7CronHealth(crumbs) {
   const events = crumbs.filter(c => c.cog === 'cron-runner');
   if (events.length === 0) {
     return {
@@ -756,7 +842,8 @@ async function buildDigestEmail({ since, until, crumbs }) {
   const s3 = buildSection3DrillDown(crumbs);
   const s4 = await buildSection4OpenQueue(crumbs);
   const s5 = buildSection5StockRFQ(crumbs);
-  const s6 = buildSection6CronHealth(crumbs);
+  const s6 = buildSection6ApiWriteAudit(crumbs);
+  const s7 = buildSection7CronHealth(crumbs);
 
   // Check for paused jobs (global, agent-tier, per-job)
   const pauseStatus = checkPausedJobs();
@@ -768,15 +855,19 @@ async function buildDigestEmail({ since, until, crumbs }) {
   const stuckWarning = buildStuckEmailWarningSection(stuckResults);
   const stuckCount = stuckWarning.count;
 
-  // Activity is window-scoped (sections 1-3, 5, 6); the open queue is current state.
-  const windowActivity = s1.count + s2.count + s3.count + s5.count;
+  // Activity is window-scoped (sections 1-3, 5-7); the open queue is current state.
+  const windowActivity = s1.count + s2.count + s3.count + s5.count + s6.count;
   const openQueue = s4.count;
-  const cronFailures = s6.failureCount || 0;
+  const cronFailures = s7.failureCount || 0;
+  const flaggedWrites = s6.flaggedCount || 0;
 
   const headlines = [];
   // Stuck emails and paused jobs warnings take priority (shown first in red/orange)
   if (stuckCount > 0) {
     headlines.push(`<span style="color:#c0392b"><b>📧 ${stuckCount} stuck email${stuckCount === 1 ? '' : 's'}</b></span>`);
+  }
+  if (flaggedWrites > 0) {
+    headlines.push(`<span style="color:#c0392b"><b>⚠ ${flaggedWrites} flagged write${flaggedWrites === 1 ? '' : 's'}</b></span>`);
   }
   if (pausedCount > 0) {
     if (pauseStatus.global) {
@@ -807,21 +898,24 @@ async function buildDigestEmail({ since, until, crumbs }) {
     ${pauseWarning.html}
 
     <h3 ${SECTION_HEADER}>1. Cron job health (this window)</h3>
+    ${s7.html}
+
+    <h3 ${SECTION_HEADER}>2. Claude API Write Audit</h3>
     ${s6.html}
 
-    <h3 ${SECTION_HEADER}>2. Customer Excess — offers loaded</h3>
+    <h3 ${SECTION_HEADER}>3. Customer Excess — offers loaded</h3>
     ${s1.html}
 
-    <h3 ${SECTION_HEADER}>3. Customer Excess — type-router decisions</h3>
+    <h3 ${SECTION_HEADER}>4. Customer Excess — type-router decisions</h3>
     ${s2.html}
 
-    <h3 ${SECTION_HEADER}>4. Stock RFQ — RFQs loaded</h3>
+    <h3 ${SECTION_HEADER}>5. Stock RFQ — RFQs loaded</h3>
     ${s5.html}
 
-    <h3 ${SECTION_HEADER}>5. Drill-down candidates (Customer Excess Analysis)</h3>
+    <h3 ${SECTION_HEADER}>6. Drill-down candidates (Customer Excess Analysis)</h3>
     ${s3.html}
 
-    <h3 ${SECTION_HEADER}>6. Open Action Queue (carries forward across digests)</h3>
+    <h3 ${SECTION_HEADER}>7. Open Action Queue (carries forward across digests)</h3>
     ${s4.html}
 
     <p style="color:#888;font-size:11px;margin-top:24px">
@@ -831,9 +925,12 @@ async function buildDigestEmail({ since, until, crumbs }) {
   </body></html>`;
 
   const subjBits = [];
-  // Stuck emails and paused jobs warnings take priority in subject line
+  // Stuck emails, flagged writes, and paused jobs warnings take priority in subject line
   if (stuckCount > 0) {
     subjBits.push(`📧 ${stuckCount} stuck`);
+  }
+  if (flaggedWrites > 0) {
+    subjBits.push(`⚠ ${flaggedWrites} flagged write${flaggedWrites === 1 ? '' : 's'}`);
   }
   if (pausedCount > 0) {
     if (pauseStatus.global) {
@@ -858,7 +955,7 @@ async function buildDigestEmail({ since, until, crumbs }) {
     ? `Ops Digest — quiet window (${fmtTime(until)})`
     : `Ops Digest — ${subjBits.join(', ')} (${fmtTime(until)})`;
 
-  return { subject, html, totalActivity: windowActivity + openQueue + cronFailures + pausedCount + stuckCount };
+  return { subject, html, totalActivity: windowActivity + openQueue + cronFailures + pausedCount + stuckCount + flaggedWrites };
 }
 
 async function main() {
