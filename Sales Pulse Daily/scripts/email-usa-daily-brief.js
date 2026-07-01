@@ -3,7 +3,8 @@
 /**
  * Email USA Daily Brief
  *
- * Generates the USA Daily Brief and emails it to Jeff Wallace and Melissa Bojar
+ * Generates the USA Daily Brief and emails it as an HTML attachment
+ * Recipients: Jeff Wallace, Melissa Bojar
  * Scheduled to run weekdays at 6am via cron
  */
 
@@ -44,10 +45,7 @@ async function main() {
       throw new Error(`HTML file not found at ${htmlPath}`);
     }
 
-    const htmlContent = fs.readFileSync(htmlPath, 'utf8');
-
-    // Step 3: Prepare email
-    // Calculate previous business day (Friday if Monday, else yesterday)
+    // Step 3: Calculate previous business day (Friday if Monday, else yesterday)
     const now = new Date();
     const dayOfWeek = now.getDay(); // 0 = Sunday, 1 = Monday, etc.
     const businessDay = new Date(now);
@@ -68,14 +66,81 @@ async function main() {
 
     const subject = `USA Daily Brief - Sales Pulse (${yesterdayFormatted})`;
 
-    // Step 4: Send to each recipient
+    // Step 4: Create simple email body with instructions
+    const emailBodyHTML = `
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<style>
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif;
+    font-size: 14px;
+    line-height: 1.6;
+    color: #333;
+    max-width: 600px;
+    margin: 0 auto;
+    padding: 20px;
+  }
+  .info-box {
+    background: #f8fafc;
+    border-left: 4px solid #3b82f6;
+    padding: 16px;
+    margin: 20px 0;
+    border-radius: 4px;
+  }
+  .section-list {
+    margin: 12px 0;
+    padding-left: 24px;
+  }
+  .section-list li {
+    margin: 8px 0;
+  }
+  .footer {
+    margin-top: 24px;
+    padding-top: 16px;
+    border-top: 2px solid #e5e7eb;
+    font-size: 13px;
+    color: #6b7280;
+  }
+</style>
+</head>
+<body>
+  <p>Good morning,</p>
+
+  <p>Your USA Daily Brief for <strong>${yesterdayFormatted}</strong> is attached. This report provides a quick review of USA sales team performance from yesterday.</p>
+
+  <div class="info-box">
+    <p style="margin-top: 0;"><strong>📎 How to View:</strong></p>
+    <p>Open the attached HTML file in your web browser for the full interactive report with collapsible sections and detailed tables.</p>
+  </div>
+
+  <p><strong>Report Sections:</strong></p>
+  <ul class="section-list">
+    <li><strong>Section 1: Yesterday's Top Wins</strong> — Top 15 orders booked (5 visible + 10 collapsible), new customers won, strategic account activity, and customer reactivations</li>
+    <li><strong>Section 2: Needs Attention</strong> — Top 10 late shipments, top 5 scheduled to ship this month (backlog view), inactive sales reps, and low-margin orders requiring review</li>
+    <li><strong>Section 3: Yesterday's Activity by Sales Rep</strong> — Individual USA sales representative performance breakdown</li>
+  </ul>
+
+  <div class="footer">
+    <p>Questions or feedback? Contact Melissa Bojar at melissa.bojar@astutegroup.com</p>
+  </div>
+</body>
+</html>
+    `;
+
+    // Step 5: Send to each recipient with HTML attachment
     console.log('\n📧 Sending emails...');
     for (const recipient of RECIPIENTS) {
       console.log(`  Sending to ${recipient}...`);
-      const success = await notifier.sendEmail(
+      const success = await notifier.sendWithAttachment(
         recipient,
         subject,
-        htmlContent,
+        emailBodyHTML,
+        [{
+          filename: `usa-daily-brief-${today}.html`,
+          path: htmlPath
+        }],
         { html: true }
       );
 

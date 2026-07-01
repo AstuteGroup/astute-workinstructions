@@ -166,7 +166,7 @@ async function collectData() {
 
   // SECTION 1: Yesterday's Top Wins
   console.log('Section 1: Yesterday\'s Top Wins');
-  console.log('  - Fetching top 5 orders...');
+  console.log('  - Fetching top 15 orders...');
   data.top5Orders = getTop5Orders(queryFile);
 
   console.log('  - Fetching new customers sold...');
@@ -182,6 +182,9 @@ async function collectData() {
   console.log('\nSection 2: Needs Attention');
   console.log('  - Fetching past due summary...');
   data.highValueLateLines = getHighValueLateLines(queryFile);
+
+  console.log('  - Fetching top 5 scheduled to ship this month...');
+  data.top5LateLines = getTop5LateLines(queryFile);
 
   console.log('  - Fetching ISE alerts...');
   data.iseAlerts = getISEAlerts(queryFile);
@@ -209,15 +212,15 @@ async function collectData() {
 }
 
 /**
- * Section 1.1: Top 5 Orders Won
+ * Section 1.1: Top 15 Orders Won (5 visible + 10 collapsible)
  */
 function getTop5Orders(queryFile) {
   const queries = fs.readFileSync(queryFile, 'utf8');
-  const top5Query = queries.split('1.1 TOP 5 ORDERS WON')[1]
+  const top5Query = queries.split('1.1 TOP 15 ORDERS WON')[1]
     .split('1.2 NEW CUSTOMERS SOLD')[0]
     .trim();
 
-  const sqlMatch = top5Query.match(/WITH[\s\S]+?LIMIT 5;/);
+  const sqlMatch = top5Query.match(/WITH[\s\S]+?LIMIT 15;/);
   if (!sqlMatch) return [];
 
   return parseRows(execQuery(sqlMatch[0]), [
@@ -263,23 +266,23 @@ function getStrategicAccountsActivity(queryFile) {
 }
 
 /**
- * Section 1.4: Reactivated Customers
+ * Section 1.4: Reactivated Customers (Location-Level Tracking)
  */
 function getReactivatedCustomers(queryFile) {
-  // Shows unique customers (grouped by c_bpartner_id) who returned after 180+ day gap
+  // Hybrid: Location-level for OEMs, Customer-level for others, 30-day minimum
   const queries = fs.readFileSync(queryFile, 'utf8');
-  const reactivatedQuery = queries.split('1.4 REACTIVATED CUSTOMERS')[1]
+  const reactivatedQuery = queries.split('1.4 CUSTOMERS REACTIVATED YESTERDAY')[1]
     .split('SECTION 2: NEEDS ATTENTION')[0]
     .trim();
 
-  const sqlMatch = reactivatedQuery.match(/WITH[\s\S]+?ORDER BY yo\.total_revenue DESC;/);
+  const sqlMatch = reactivatedQuery.match(/WITH[\s\S]+?LIMIT 5;/);
   if (!sqlMatch) return [];
 
   return parseRows(execQuery(sqlMatch[0]), [
-    'sales_order_date', 'seller_name', 'region', 'customer_name', 'c_bpartner_id', 'order_count',
-    'order_numbers', 'total_revenue', 'total_gp', 'mpns', 'mfr_names', 'total_qty',
-    'customer_location', 'contact_name', 'promise_date', 'last_order_date',
-    'days_since_last_order', 'previous_sales_rep'
+    'customer_name', 'facility_location', 'tracked_at_location_level', 'first_order_date',
+    'last_order_date', 'days_gap', 'yesterday_orders', 'yesterday_revenue', 'yesterday_gp',
+    'seller_name', 'region', 'lifetime_orders', 'lifetime_revenue', 'typical_cycle_days',
+    'gap_multiplier', 'reactivation_type', 'significance_score'
   ]);
 }
 
@@ -307,7 +310,7 @@ function getLateShipments(queryFile) {
 function getHighValueLateLines(queryFile) {
   const queries = fs.readFileSync(queryFile, 'utf8');
   const summaryQuery = queries.split('2.2A TOP 10 LATE SO LINES')[1]
-    .split('2.3 INSIDE SALES REPS ALERT')[0]
+    .split('2.2B TOP 5 SCHEDULED')[0]
     .trim();
 
   const sqlMatch = summaryQuery.match(/SELECT[\s\S]+?LIMIT 10;/);
@@ -315,6 +318,25 @@ function getHighValueLateLines(queryFile) {
 
   return parseRows(execQuery(sqlMatch[0]), [
     'customer_name', 'sales_order', 'line_number', 'ise_name', 'region', 'promise_date', 'days_late', 'qty_unshipped', 'line_revenue', 'line_gp', 'mpn', 'color_code'
+  ]);
+}
+
+/**
+ * Section 2.2B: Top 5 Scheduled to Ship This Month (by GP)
+ */
+function getTop5LateLines(queryFile) {
+  const queries = fs.readFileSync(queryFile, 'utf8');
+  const lateQuery = queries.split('2.2B TOP 5 SCHEDULED TO SHIP THIS MONTH')[1]
+    .split('2.3 INSIDE SALES REPS ALERT')[0]
+    .trim();
+
+  const sqlMatch = lateQuery.match(/SELECT[\s\S]+?LIMIT 5;/);
+  if (!sqlMatch) return [];
+
+  return parseRows(execQuery(sqlMatch[0]), [
+    'customer_name', 'sales_order', 'line_number', 'ise_name', 'region', 'promise_date',
+    'days_until_promise', 'qty_unshipped', 'line_revenue', 'line_gp', 'mpn', 'in_stock',
+    'action_status', 'color_code'
   ]);
 }
 
@@ -577,8 +599,8 @@ function generateHTML(data) {
 function generateSection1(data) {
   let html = '<div class="section-header">🏆 Section 1: Yesterday\'s Top Wins</div>';
 
-  // 1.1 Top 5 Orders
-  html += '<div class="subsection-header">Top 5 Orders Won</div>';
+  // 1.1 Top 15 Orders (5 visible + 10 collapsible)
+  html += '<div class="subsection-header">Top 15 Orders Won</div>';
   if (data.top5Orders.length > 0) {
     html += `<table>
       <thead>
@@ -595,7 +617,8 @@ function generateSection1(data) {
       </thead>
       <tbody>`;
 
-    data.top5Orders.forEach((order, i) => {
+    // Top 5 always visible
+    data.top5Orders.slice(0, 5).forEach((order, i) => {
       const medal = i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : `#${i+1}`;
       html += `
         <tr>
@@ -611,6 +634,45 @@ function generateSection1(data) {
     });
 
     html += '</tbody></table>';
+
+    // Next 10 collapsible
+    if (data.top5Orders.length > 5) {
+      html += `
+        <details style="margin-top: 12px;">
+          <summary style="cursor: pointer; font-size: 11px; color: #666; padding: 6px 0;">
+            ▸ Show orders #6-#15 (${data.top5Orders.length - 5} more)
+          </summary>
+          <table style="margin-top: 8px;">
+            <thead>
+              <tr>
+                <th>Rank</th>
+                <th>Seller</th>
+                <th>Region</th>
+                <th>Customer</th>
+                <th>SO#</th>
+                <th style="text-align: right;">Revenue</th>
+                <th style="text-align: right;">GP</th>
+                <th>Part Numbers</th>
+              </tr>
+            </thead>
+            <tbody>`;
+
+      data.top5Orders.slice(5).forEach((order, i) => {
+        html += `
+          <tr>
+            <td><strong>#${i+6}</strong></td>
+            <td>${order.seller_name}</td>
+            <td>${order.region}</td>
+            <td>${order.customer_name}</td>
+            <td style="font-size: 11px;">${order.order_number}</td>
+            <td class="number">${formatCurrency(order.revenue)}</td>
+            <td class="number">${formatCurrency(order.gp)}</td>
+            <td style="font-size: 11px;">${order.part_numbers || 'N/A'}</td>
+          </tr>`;
+      });
+
+      html += '</tbody></table></details>';
+    }
   } else {
     html += '<div class="empty-state">No orders won yesterday</div>';
   }
@@ -706,58 +768,59 @@ function generateSection1(data) {
     html += '<div class="empty-state">No strategic account activity yesterday</div>';
   }
 
-  // 1.4 Reactivated Customers
-  html += '<div class="subsection-header">Reactivated Customers (6+ Month Gap)</div>';
+  // 1.4 Reactivated Customers (Location-Level Tracking)
+  html += '<div class="subsection-header">Reactivated Customers (30+ Day Gap)</div>';
   if (data.reactivatedCustomers.length > 0) {
     html += `<table>
       <thead>
         <tr>
-          <th>SO Date</th>
+          <th>Customer</th>
+          <th>Facility</th>
           <th>Seller</th>
           <th>Region</th>
-          <th>Customer</th>
-          <th>Location</th>
-          <th>BP ID</th>
           <th>SO #s</th>
-          <th style="text-align: right;">Total Revenue</th>
-          <th style="text-align: right;">Total GP</th>
+          <th style="text-align: right;">Yesterday Revenue</th>
+          <th style="text-align: right;">Yesterday GP</th>
           <th style="text-align: center;">Gap (Days)</th>
           <th>Last Order</th>
-          <th>Previous Rep</th>
+          <th style="text-align: center;">Gap Multiplier</th>
+          <th>Type</th>
         </tr>
       </thead>
       <tbody>`;
 
     data.reactivatedCustomers.forEach(cust => {
+      const gapMultiplier = cust.gap_multiplier ? parseFloat(cust.gap_multiplier).toFixed(1) + 'x' : 'N/A';
+      const typeDisplay = cust.reactivation_type ? cust.reactivation_type.replace(/_/g, ' ') : 'other';
       html += `
         <tr>
-          <td>${cust.sales_order_date}</td>
+          <td><strong>${cust.customer_name}</strong></td>
+          <td style="font-size: 10px;">${cust.facility_location || 'N/A'}</td>
           <td>${cust.seller_name}</td>
           <td>${cust.region}</td>
-          <td><strong>${cust.customer_name}</strong></td>
-          <td style="font-size: 9px;">${cust.customer_location || 'N/A'}</td>
-          <td style="font-size: 10px;">${cust.c_bpartner_id}</td>
-          <td style="font-size: 10px;">${cust.order_numbers}</td>
-          <td class="number">${formatCurrency(cust.total_revenue)}</td>
-          <td class="number">${formatCurrency(cust.total_gp)}</td>
-          <td style="text-align: center;"><span class="badge badge-green">${formatNumber(cust.days_since_last_order)}</span></td>
+          <td style="font-size: 10px;">${cust.yesterday_orders}</td>
+          <td class="number">${formatCurrency(cust.yesterday_revenue)}</td>
+          <td class="number">${formatCurrency(cust.yesterday_gp)}</td>
+          <td style="text-align: center;"><span class="badge badge-green">${formatNumber(cust.days_gap)}</span></td>
           <td>${cust.last_order_date}</td>
-          <td>${cust.previous_sales_rep || 'N/A'}</td>
+          <td style="text-align: center;">${gapMultiplier}</td>
+          <td style="font-size: 10px;">${typeDisplay}</td>
         </tr>`;
     });
 
     // Add total row
-    const totalRevenue = data.reactivatedCustomers.reduce((sum, cust) => sum + parseFloat(cust.total_revenue || 0), 0);
-    const totalGP = data.reactivatedCustomers.reduce((sum, cust) => sum + parseFloat(cust.total_gp || 0), 0);
+    const totalRevenue = data.reactivatedCustomers.reduce((sum, cust) => sum + parseFloat(cust.yesterday_revenue || 0), 0);
+    const totalGP = data.reactivatedCustomers.reduce((sum, cust) => sum + parseFloat(cust.yesterday_gp || 0), 0);
     html += `
       <tr style="border-top: 2px solid #333; background-color: #f5f5f5; font-weight: bold;">
-        <td colspan="7" style="text-align: right;"><strong>TOTAL</strong></td>
+        <td colspan="5" style="text-align: right;"><strong>TOTAL</strong></td>
         <td class="number"><strong>${formatCurrency(totalRevenue)}</strong></td>
         <td class="number"><strong>${formatCurrency(totalGP)}</strong></td>
-        <td colspan="3"></td>
+        <td colspan="4"></td>
       </tr>`;
 
     html += '</tbody></table>';
+    html += '<div style="font-size: 10px; color: #666; margin-top: 8px;"><em>Note: Tracked at Ship-To City level. Gap multiplier shows how much longer this gap is vs typical order frequency.</em></div>';
   } else {
     html += '<div class="empty-state">No reactivated customers yesterday</div>';
   }
@@ -815,6 +878,53 @@ function generateSection2(data) {
     html += '</tbody></table>';
   } else {
     html += '<div class="alert-box green">✓ No lines past due (3+ days)</div>';
+  }
+
+  // 2.2B Top 5 Scheduled to Ship This Month (by GP)
+  html += '<div class="subsection-header">Top 5 Scheduled to Ship This Month (by GP)</div>';
+  html += '<div style="font-size: 11px; color: #666; margin-bottom: 8px;">🔴 Red: Past due | 🟡 Yellow: Due this week (0-7 days) | 🟢 Green: Future (8+ days)</div>';
+  if (data.top5LateLines && data.top5LateLines.length > 0) {
+    html += `<table>
+      <thead>
+        <tr>
+          <th>Customer</th>
+          <th>SO#</th>
+          <th style="text-align: center;">Ln</th>
+          <th>MPN</th>
+          <th>ISE</th>
+          <th>Rgn</th>
+          <th>Promise</th>
+          <th style="text-align: center;">+/- Days</th>
+          <th style="text-align: right;">Qty</th>
+          <th style="text-align: right;">Revenue</th>
+          <th style="text-align: right;">GP</th>
+        </tr>
+      </thead>
+      <tbody>`;
+
+    data.top5LateLines.forEach(line => {
+      const rowColor = line.color_code === 'red' ? '#ffebee' : line.color_code === 'yellow' ? '#fff9c4' : '#e8f5e9';
+      const daysColor = line.color_code === 'red' ? '#d32f2f' : line.color_code === 'yellow' ? '#f57c00' : '#388e3c';
+      const daysSign = parseInt(line.days_until_promise) >= 0 ? '+' : '';
+      html += `
+        <tr style="background-color: ${rowColor};">
+          <td style="font-size: 11px;"><strong>${line.customer_name}</strong></td>
+          <td style="font-size: 10px;">${line.sales_order}</td>
+          <td style="text-align: center; font-size: 10px;">${line.line_number}</td>
+          <td style="font-size: 9px;">${line.mpn || 'N/A'}</td>
+          <td style="font-size: 10px;">${line.ise_name || 'N/A'}</td>
+          <td style="font-size: 10px;">${line.region}</td>
+          <td style="font-size: 10px;">${line.promise_date}</td>
+          <td style="text-align: center; color: ${daysColor}; font-weight: bold; font-size: 10px;">${daysSign}${line.days_until_promise}</td>
+          <td class="number" style="font-size: 10px;">${formatNumber(line.qty_unshipped)}</td>
+          <td class="number" style="font-size: 11px;">${formatCurrency(line.line_revenue)}</td>
+          <td class="number" style="font-size: 11px;">${formatCurrency(line.line_gp)}</td>
+        </tr>`;
+    });
+
+    html += '</tbody></table>';
+  } else {
+    html += '<div class="alert-box green">✓ No backlog items for this month</div>';
   }
 
   // 2.3 ISE Alerts
@@ -958,15 +1068,16 @@ function generateFooter() {
 
     <strong>Section 1: Yesterday's Top Wins</strong>
     <ul>
-      <li><strong>Top 5 Orders:</strong> Orders booked yesterday ranked by revenue</li>
+      <li><strong>Top 15 Orders:</strong> Orders booked yesterday ranked by revenue (top 5 visible, next 10 collapsible)</li>
       <li><strong>New Customers Sold:</strong> Customers placing their first order ever</li>
       <li><strong>Strategic Accounts:</strong> ABB, Eaton, GE Healthcare, Parker-Meggitt, RTX, Thales</li>
-      <li><strong>Reactivated Customers:</strong> Customer IDs with no orders in the past 6+ months</li>
+      <li><strong>Reactivated Customers:</strong> Location-level tracking (30+ day gap, significance-scored)</li>
     </ul>
 
     <strong>Section 2: Needs Attention</strong>
     <ul>
       <li><strong>Top 10 Late Lines:</strong> Top 10 SO lines by revenue that are 3+ days past promise date (rolling 31-day window, no revenue minimum)</li>
+      <li><strong>Top 5 Scheduled to Ship This Month:</strong> Top 5 unshipped lines by GP with promise date in current month (backlog view)</li>
       <li><strong>ISE Alerts:</strong> Inside sales reps with no RFQ loaded in 3+ business days (Yellow: 3-6 days, Red: 7+ days)</li>
       <li><strong>Low Margin Trail:</strong> Orders <18% GM (Josh-approved audit trail)</li>
       <li style="margin-top: 6px;"><em>* Note: Some lines may show $0 GP when cost data is not available in the BI view. Investigating data source discrepancies.</em></li>
@@ -1020,13 +1131,14 @@ async function main() {
   console.log();
   console.log('📊 Summary:');
   console.log(`  Section 1 - Yesterday's Top Wins:`);
-  console.log(`    - Top 5 Orders: ${data.top5Orders.length}`);
+  console.log(`    - Top 15 Orders: ${data.top5Orders.length}`);
   console.log(`    - New Customers: ${data.newCustomers.length}`);
   console.log(`    - Strategic Accounts: ${data.strategicAccounts.length}`);
   console.log(`    - Reactivated Customers: ${data.reactivatedCustomers.length}`);
   console.log();
   console.log(`  Section 2 - Needs Attention:`);
   console.log(`    - Top 10 Late Lines: ${data.highValueLateLines.length}`);
+  console.log(`    - Top 5 Scheduled to Ship: ${data.top5LateLines ? data.top5LateLines.length : 0}`);
   console.log(`    - ISE Alerts: ${data.iseAlerts.length}`);
   console.log(`    - Low Margin Orders: ${data.lowMarginOrders.length}`);
   console.log();

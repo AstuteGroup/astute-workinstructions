@@ -14,8 +14,10 @@ Daily snapshot for USA Regional Manager showing yesterday's sales activity for t
 **Key Differences from VP Daily Brief:**
 - Filtered to USA region only (except Global Strategic Accounts section)
 - Section 3 shows individual sales rep performance instead of regional rollup
-- Section 2 shows top 10 high-value late lines (not all)
-- Removed "Top 5 Late SO Lines" subsection
+- Section 1.1 shows top 15 orders (same as VP) with collapsible section
+- Section 1.4 uses location-level reactivation tracking (same as VP)
+- Section 2.2A shows top 10 late lines (USA-specific, VP uses $250K threshold)
+- Section 2.2B shows top 5 scheduled to ship this month (USA-specific, VP shows top 15)
 
 **Delivery:** Mon-Fri at 6:00 AM PT via email
 
@@ -68,11 +70,17 @@ All sections filtered to USA team (ad_user_ids: 1039413, 1047077, 1000011, 10428
 ### 2. Individual Sales Rep Breakdown ✅
 Section 3 shows activity by sales rep name instead of regional rollup.
 
-### 3. Top 10 Late Lines (No Revenue Filter) ✅
-Section 2 shows top 10 late lines by revenue with no minimum revenue requirement.
+### 3. Top 15 Orders with Collapsible Section ✅
+Section 1.1 shows top 15 orders (5 visible with medals, next 10 in collapsible section).
 
-### 4. Streamlined Needs Attention ✅
-Removed "Top 5 Late SO Lines" subsection for cleaner focus.
+### 4. Location-Level Reactivation Tracking ✅
+Section 1.4 uses Ship-To City tracking with significance scoring to identify meaningful customer reactivations (30+ day minimum gap).
+
+### 5. Backlog View: Scheduled to Ship This Month ✅
+Section 2.2B shows top 5 unshipped lines by GP with promise date in current month, color-coded by urgency.
+
+### 6. Top 10 Late Lines (No Revenue Filter) ✅
+Section 2.2A shows top 10 late lines by revenue with no minimum revenue requirement.
 
 ---
 
@@ -83,16 +91,16 @@ Removed "Top 5 Late SO Lines" subsection for cleaner focus.
 **Purpose:** Highlight USA team wins
 
 **Subsections:**
-- **Top 5 Orders Won** - Highest revenue orders by USA sales reps
+- **Top 15 Orders Won** - Highest revenue orders by USA sales reps (5 visible + 10 collapsible)
 - **New Customers Sold** - First-time customer wins by USA team
 - **Global Strategic Accounts Activity** - Shows ALL regions (not filtered to USA)
-- **Reactivated Customers** - USA customers returning after 6+ month gap
+- **Reactivated Customers** - USA customers returning after 30+ day gap (location-level tracking with significance scoring)
 
 ---
 
 ### 2. Needs Attention (USA Only)
 
-**Three Alert Types:**
+**Four Alert Types:**
 
 #### A. Top 10 Late SO Lines (No Revenue Filter) 🔴
 
@@ -112,7 +120,25 @@ Removed "Top 5 Late SO Lines" subsection for cleaner focus.
 - BI view has not been populated for that line
 The report footer includes a note that this is under investigation.
 
-#### B. Inactive ISEs (No RFQ/CQ in 3+ days) 🟡
+#### B. Top 5 Scheduled to Ship This Month (by GP) 🟢🟡🔴
+
+**Criteria:**
+- Unshipped lines with promise date in current month
+- USA region only
+- Sorted by GP (not revenue)
+- No revenue threshold filter
+- Shows TOP 5 only
+
+**Fields Shown:** Customer, SO#, Line #, MPN, ISE, Region, Promise Date, Days +/- from Promise, Qty Unshipped, Revenue, GP
+
+**Color Coding:**
+- 🔴 Red: Past due (promise date before today)
+- 🟡 Yellow: Due this week (0-7 days)
+- 🟢 Green: Future (8+ days)
+
+**Why It Matters:** Backlog view showing what needs to ship by end of month to meet sales goals
+
+#### C. Inactive ISEs (No RFQ/CQ in 3+ days) 🟡
 
 **Criteria (USA Only):**
 - No chuboe_rfq created in last 3 days AND
@@ -125,7 +151,7 @@ The report footer includes a note that this is under investigation.
 
 **Why It Matters:** Sellers going dark indicates process breakdown or capacity issues
 
-#### C. New Customers Sold (First-Time Wins) 🟢
+#### D. New Customers Sold (First-Time Wins) 🟢
 
 **Criteria (USA Only):**
 - Order created yesterday AND
@@ -272,9 +298,11 @@ LIMIT 10  -- Change top 10 threshold
 | **Recipient** | Jeff Wallace (USA Manager) | Josh Pucci (VP Sales) |
 | **Focus** | USA team performance | Global strategic actions |
 | **Region Filter** | USA only (except Strategic Accounts) | All regions |
+| **Section 1.1 Orders** | Top 15 (5 visible + 10 collapsible) | Top 15 (5 visible + 10 collapsible) |
+| **Section 1.4 Reactivations** | Location-level, 30+ day gap, USA only | Location-level, 30+ day gap, all regions |
+| **Section 2.2A Late Lines** | Top 10 by revenue (no minimum) | High Value $250K+ |
+| **Section 2.2B Scheduled to Ship** | Top 5 by GP (USA only) | Top 15 by GP (all regions) |
 | **Section 3** | Individual sales reps | Regional rollup by manager |
-| **Late Lines Section** | Top 10 by revenue (no minimum) | All lines $200K+ |
-| **Top 5 Late Lines Section** | Removed | Included |
 
 ---
 
@@ -295,6 +323,18 @@ LIMIT 10  -- Change top 10 threshold
 
 ## Changelog
 
+**2026-07-01** - Updated to match VP Daily Brief improvements
+- **Section 1.1:** Changed from Top 5 to Top 15 orders with collapsible section (5 visible + 10 hidden)
+- **Section 1.4:** Updated to location-level reactivation tracking (Customer Name + City) with significance scoring
+  - Changed from 180-day to 30-day minimum gap
+  - Uses statistical anomaly detection and gap multipliers
+  - Tracks at Ship-To Address level to prevent false positives
+- **Section 2.2B:** Added "Top 5 Scheduled to Ship This Month (by GP)" backlog view
+  - Shows unshipped lines with promise date in current month
+  - Sorted by GP (not revenue)
+  - Color-coded: Red (past due), Yellow (due this week), Green (future)
+- Updated SQL queries and JavaScript functions to match VP Daily Brief structure
+
 **2026-06-25** - Initial release based on VP Daily Brief V2
 - Filtered to USA region (except Strategic Accounts section)
 - Section 3 shows individual sales reps instead of regional rollup
@@ -303,4 +343,4 @@ LIMIT 10  -- Change top 10 threshold
 
 ---
 
-*Last Updated: 2026-06-25*
+*Last Updated: 2026-07-01*
