@@ -14,10 +14,11 @@
 -- ============================================================================
 
 -- ----------------------------------------------------------------------------
--- 1.1 TOP 5 ORDERS WON (by revenue)
+-- 1.1 TOP 15 ORDERS WON (by revenue)
 -- ----------------------------------------------------------------------------
 -- Fields: Seller name, Region, Customer name, Revenue, Part number (MPN)
 -- OPTIMIZED: Use grandtotal from c_order instead of aggregating c_orderline
+-- Display: Top 5 visible, next 10 collapsible
 
 WITH business_day AS (
   SELECT CASE
@@ -41,7 +42,6 @@ SELECT
     WHEN u.ad_user_id IN (1047106, 1026393, 1042653, 1038225, 1026394, 1010361, 1012788, 1038224) THEN 'MEX'
     WHEN u.ad_user_id IN (1041139, 1023803, 1016958) THEN 'APAC-Laurel'
     WHEN u.ad_user_id IN (1039414, 1009866, 1013042, 1009528, 1009478, 1009210) THEN 'APAC-Silvia'
-    WHEN u.ad_user_id IN (1017011, 1023478, 1024444) THEN 'APAC-Lavanya'
     ELSE 'Other'
   END as region,
   bp.name as customer_name,
@@ -60,7 +60,7 @@ WHERE o.created::date = CASE WHEN EXTRACT(DOW FROM CURRENT_DATE) = 1 THEN CURREN
   AND o.isactive = 'Y'
   AND o.issotrx = 'Y'
 ORDER BY o.grandtotal DESC
-LIMIT 5;
+LIMIT 15;
 
 
 -- ----------------------------------------------------------------------------
@@ -82,10 +82,10 @@ SELECT
     WHEN u.ad_user_id IN (1047106, 1026393, 1042653, 1038225, 1026394, 1010361, 1012788, 1038224) THEN 'MEX'
     WHEN u.ad_user_id IN (1041139, 1023803, 1016958) THEN 'APAC-Laurel'
     WHEN u.ad_user_id IN (1039414, 1009866, 1013042, 1009528, 1009478, 1009210) THEN 'APAC-Silvia'
-    WHEN u.ad_user_id IN (1017011, 1023478, 1024444) THEN 'APAC-Lavanya'
     ELSE 'Other'
   END as region,
   bp.name as customer_name,
+  bp.c_bpartner_id,
   o.documentno as order_number,
   o.grandtotal as total_revenue,
   (SELECT COALESCE(SUM(bi.s_order_line_gp), 0)
@@ -301,10 +301,11 @@ ORDER BY account_name, ise_name;
 
 
 -- ----------------------------------------------------------------------------
--- 1.4 REACTIVATED CUSTOMERS (6+ month gap)
+-- 1.4 CUSTOMERS REACTIVATED YESTERDAY
 -- ----------------------------------------------------------------------------
--- Shows unique customers (by c_bpartner_id) who placed orders yesterday
--- after 180+ day gap. Aggregates multiple orders from same customer.
+-- Hybrid approach: Location-level for OEMs, Customer-level for others
+-- 30-day minimum threshold + Statistical anomaly detection
+-- Strong filtering: only truly noteworthy reactivations
 
 WITH business_day AS (
   SELECT CASE
@@ -312,83 +313,163 @@ WITH business_day AS (
     ELSE CURRENT_DATE - INTERVAL '1 day'
   END as report_date
 ),
-last_orders AS (
-  SELECT
-    o.c_bpartner_id,
-    MAX(o.created) as last_order_date,
-    (ARRAY_AGG(u.name ORDER BY o.created DESC))[1] as previous_rep
-  FROM adempiere.c_order o
-  JOIN adempiere.ad_user u ON o.salesrep_id = u.ad_user_id AND u.isactive = 'Y'
-  WHERE o.created::date < CURRENT_DATE - INTERVAL '180 days'
-    AND o.isactive = 'Y'
-    AND o.issotrx = 'Y'
-  GROUP BY o.c_bpartner_id
+-- Exclude brokers, distributors, traders, and non-OEM/EMS customers
+excluded_customers AS (
+  SELECT DISTINCT c_bpartner_id
+  FROM adempiere.c_bpartner
+  WHERE isactive = 'Y'
+    AND (
+      -- Brokers and traders
+      UPPER(name) LIKE '%BROKER%' OR
+      UPPER(name) LIKE '%TRADING%' OR
+      UPPER(name) LIKE '%TRADER%' OR
+      -- Distributors
+      UPPER(name) LIKE '%DISTRIBUTION%' OR
+      UPPER(name) LIKE '%DISTRIBUTOR%' OR
+      -- Surplus/Excess dealers
+      UPPER(name) LIKE '%SURPLUS%' OR
+      UPPER(name) LIKE '%EXCESS%' OR
+      -- Specific brokers to exclude
+      UPPER(name) LIKE '%A2 GLOBAL%' OR
+      UPPER(name) LIKE '%SOURCEABILITY%' OR
+      -- Generic suppliers (not OEM/EMS)
+      (UPPER(name) LIKE '%SUPPLY%' OR UPPER(name) LIKE '%SUPPLIER%')
+      AND NOT (UPPER(name) LIKE '%POWER SUPPLY%' OR UPPER(name) LIKE '%SUPPLY CHAIN%')
+    )
 ),
+-- Yesterday's orders with Customer Name + City tracking
 yesterday_orders AS (
   SELECT
-    o.c_bpartner_id,
-    bp.c_bpartner_id as bp_id,
+    bp.name || ' | ' || COALESCE(loc.city, 'Unknown City') as tracking_key,
     bp.name as customer_name,
-    (ARRAY_AGG(u.name ORDER BY o.created DESC))[1] as seller_name,
-    (ARRAY_AGG(u.ad_user_id ORDER BY o.created DESC))[1] as seller_id,
-    COUNT(DISTINCT o.c_order_id) as order_count,
-    STRING_AGG(o.documentno, ', ' ORDER BY o.grandtotal DESC) as order_numbers,
-    SUM(o.grandtotal) as total_revenue,
-    (SELECT COALESCE(SUM(bi.s_order_line_gp), 0)
-     FROM adempiere.c_order o2
-     LEFT JOIN adempiere.bi_order_line_v bi ON o2.c_order_id = bi.order_id
-     WHERE o2.c_bpartner_id = o.c_bpartner_id
-       AND o2.created::date = CASE WHEN EXTRACT(DOW FROM CURRENT_DATE) = 1 THEN CURRENT_DATE - INTERVAL '3 days' ELSE CURRENT_DATE - INTERVAL '1 day' END
-       AND o2.isactive = 'Y'
-       AND o2.issotrx = 'Y') as total_gp,
-    (ARRAY_AGG(o.c_bpartner_location_id ORDER BY o.created DESC))[1] as bploc_id,
-    (ARRAY_AGG(o.ad_user_id ORDER BY o.created DESC))[1] as contact_id,
-    MIN(o.datepromised::date) as earliest_promise_date
+    loc.city as ship_to_city,
+    STRING_AGG(DISTINCT o.documentno, ', ' ORDER BY o.documentno) as order_numbers,
+    SUM(o.grandtotal) as yesterday_revenue,
+    COALESCE((SELECT SUM(bi.s_order_line_gp)
+     FROM adempiere.bi_order_line_v bi
+     WHERE bi.order_id IN (
+       SELECT o2.c_order_id
+       FROM adempiere.c_order o2
+       JOIN adempiere.c_bpartner bp2 ON o2.c_bpartner_id = bp2.c_bpartner_id
+       LEFT JOIN adempiere.c_bpartner_location bploc2 ON o2.c_bpartner_location_id = bploc2.c_bpartner_location_id
+       LEFT JOIN adempiere.c_location loc2 ON bploc2.c_location_id = loc2.c_location_id
+       WHERE bp2.name = bp.name
+         AND COALESCE(loc2.city, 'Unknown City') = COALESCE(loc.city, 'Unknown City')
+         AND o2.created::date = (SELECT report_date FROM business_day)
+         AND o2.isactive = 'Y' AND o2.issotrx = 'Y'
+     )), 0) as yesterday_gp,
+    (ARRAY_AGG(u.name ORDER BY o.grandtotal DESC))[1] as seller_name,
+    (ARRAY_AGG(u.ad_user_id ORDER BY o.grandtotal DESC))[1] as seller_id
   FROM adempiere.c_order o
-  JOIN adempiere.c_bpartner bp ON o.c_bpartner_id = bp.c_bpartner_id AND bp.isactive = 'Y'
-  JOIN adempiere.ad_user u ON o.salesrep_id = u.ad_user_id AND u.isactive = 'Y'
-  WHERE o.created::date = CASE WHEN EXTRACT(DOW FROM CURRENT_DATE) = 1 THEN CURRENT_DATE - INTERVAL '3 days' ELSE CURRENT_DATE - INTERVAL '1 day' END
-    AND o.isactive = 'Y'
-    AND o.issotrx = 'Y'
-  GROUP BY o.c_bpartner_id, bp.c_bpartner_id, bp.name
+  JOIN adempiere.c_bpartner bp ON o.c_bpartner_id = bp.c_bpartner_id
+  LEFT JOIN adempiere.c_bpartner_location bploc ON o.c_bpartner_location_id = bploc.c_bpartner_location_id AND bploc.isactive = 'Y'
+  LEFT JOIN adempiere.c_location loc ON bploc.c_location_id = loc.c_location_id
+  LEFT JOIN adempiere.ad_user u ON o.salesrep_id = u.ad_user_id AND u.isactive = 'Y'
+  WHERE o.created::date = (SELECT report_date FROM business_day)
+    AND o.isactive = 'Y' AND o.issotrx = 'Y'
+    AND bp.c_bpartner_id NOT IN (SELECT c_bpartner_id FROM excluded_customers)
+    -- Exclude Jake Harris (different role)
+    AND u.ad_user_id != 1000004
+    -- Only include component sales (order lines with linked CQ line)
+    AND EXISTS (
+      SELECT 1 FROM adempiere.c_orderline ol
+      WHERE ol.c_order_id = o.c_order_id
+        AND ol.isactive = 'Y'
+        AND ol.chuboe_cq_line_id IS NOT NULL
+    )
+  GROUP BY tracking_key, bp.name, loc.city
+),
+-- Last order date per tracking key (Customer Name + City)
+last_order_per_key AS (
+  SELECT
+    bp.name || ' | ' || COALESCE(loc.city, 'Unknown City') as tracking_key,
+    MAX(o.created::date) as last_order_date,
+    COUNT(DISTINCT o.c_order_id) as lifetime_orders,
+    SUM(o.grandtotal) as lifetime_revenue,
+    MIN(o.created::date) as first_order_date
+  FROM adempiere.c_order o
+  JOIN adempiere.c_bpartner bp ON o.c_bpartner_id = bp.c_bpartner_id
+  LEFT JOIN adempiere.c_bpartner_location bploc ON o.c_bpartner_location_id = bploc.c_bpartner_location_id
+  LEFT JOIN adempiere.c_location loc ON bploc.c_location_id = loc.c_location_id
+  CROSS JOIN business_day
+  WHERE o.created::date < (SELECT report_date FROM business_day)
+    AND o.isactive = 'Y' AND o.issotrx = 'Y'
+    AND bp.c_bpartner_id NOT IN (SELECT c_bpartner_id FROM excluded_customers)
+  GROUP BY tracking_key
+),
+-- Calculate order frequency statistics per tracking key
+order_gaps AS (
+  SELECT
+    tracking_key,
+    PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY gap_days) as median_gap,
+    AVG(gap_days) as avg_gap,
+    COUNT(*) as total_gaps
+  FROM (
+    SELECT
+      bp.name || ' | ' || COALESCE(loc.city, 'Unknown City') as tracking_key,
+      o.created::date - LAG(o.created::date) OVER (
+        PARTITION BY bp.name || ' | ' || COALESCE(loc.city, 'Unknown City')
+        ORDER BY o.created::date
+      ) as gap_days
+    FROM adempiere.c_order o
+    JOIN adempiere.c_bpartner bp ON o.c_bpartner_id = bp.c_bpartner_id
+    LEFT JOIN adempiere.c_bpartner_location bploc ON o.c_bpartner_location_id = bploc.c_bpartner_location_id
+    LEFT JOIN adempiere.c_location loc ON bploc.c_location_id = loc.c_location_id
+    WHERE o.isactive = 'Y' AND o.issotrx = 'Y'
+      AND bp.c_bpartner_id NOT IN (SELECT c_bpartner_id FROM excluded_customers)
+  ) gaps
+  WHERE gap_days IS NOT NULL AND gap_days > 0
+  GROUP BY tracking_key
 )
 SELECT
-  business_day.report_date::date as sales_order_date,
+  yo.customer_name,
+  yo.ship_to_city as facility_location,
+  'Y' as tracked_at_location_level,
+  lopk.first_order_date,
+  lopk.last_order_date,
+  CURRENT_DATE - lopk.last_order_date as days_gap,
+  yo.order_numbers as yesterday_orders,
+  yo.yesterday_revenue,
+  yo.yesterday_gp,
   yo.seller_name,
   CASE
     WHEN yo.seller_id IN (1039413, 1047077, 1000011, 1042807, 1005243, 1025669, 1047795, 1000017) THEN 'USA'
     WHEN yo.seller_id IN (1047106, 1026393, 1042653, 1038225, 1026394, 1010361, 1012788, 1038224) THEN 'MEX'
     WHEN yo.seller_id IN (1041139, 1023803, 1016958) THEN 'APAC-Laurel'
-    WHEN yo.seller_id IN (1039414, 1009866, 1013042, 1009528, 1009478, 1009210) THEN 'APAC-Silvia'
-    WHEN yo.seller_id IN (1017011, 1023478, 1024444) THEN 'APAC-Lavanya'
+    WHEN yo.seller_id IN (1039414, 1009866, 1013042, 1009528, 1009478, 1009210) THEN 'APAC-Kris'
     ELSE 'Other'
   END as region,
-  yo.customer_name,
-  yo.bp_id as c_bpartner_id,
-  yo.order_count,
-  yo.order_numbers,
-  yo.total_revenue,
-  yo.total_gp,
-  '' as mpns,  -- Temporarily removed for performance
-  '' as mfr_names,  -- Temporarily removed for performance
-  0 as total_qty,  -- Temporarily removed for performance
-  loc.address1 || COALESCE(', ' || loc.address2, '') || ', ' ||
-    loc.city || ', ' || COALESCE(loc.regionname, '') || ' ' ||
-    COALESCE(loc.postal, '') || ', ' || c.name as customer_location,
-  contact.name as contact_name,
-  yo.earliest_promise_date as promise_date,
-  lo.last_order_date::date as last_order_date,
-  CURRENT_DATE - lo.last_order_date::date as days_since_last_order,
-  lo.previous_rep as previous_sales_rep
+  lopk.lifetime_orders,
+  lopk.lifetime_revenue,
+  COALESCE(og.median_gap, 0) as typical_cycle_days,
+  CASE
+    WHEN og.median_gap > 0 THEN ROUND((CURRENT_DATE - lopk.last_order_date)::numeric / NULLIF(og.median_gap::numeric, 0), 2)
+    ELSE 0
+  END as gap_multiplier,
+  -- Reactivation type
+  CASE
+    WHEN yo.yesterday_revenue >= 100000 AND CURRENT_DATE - lopk.last_order_date >= 90 THEN 'high_value_long'
+    WHEN og.median_gap > 0 AND (CURRENT_DATE - lopk.last_order_date) > og.median_gap * 3.0 AND CURRENT_DATE - lopk.last_order_date >= 30 THEN 'anomalous_pattern'
+    WHEN lopk.lifetime_orders < 10 AND CURRENT_DATE - lopk.last_order_date >= 120 THEN 'small_customer_long'
+    WHEN CURRENT_DATE - lopk.last_order_date >= 180 THEN 'dormant_long'
+    ELSE 'other'
+  END as reactivation_type,
+  -- Significance score (higher = more noteworthy)
+  CASE
+    WHEN yo.yesterday_revenue >= 100000 AND CURRENT_DATE - lopk.last_order_date >= 90 THEN
+      (CURRENT_DATE - lopk.last_order_date) * LN(yo.yesterday_revenue + 1) * 2.0
+    WHEN og.median_gap > 0 AND (CURRENT_DATE - lopk.last_order_date) > og.median_gap * 3.0 THEN
+      ((CURRENT_DATE - lopk.last_order_date)::numeric / NULLIF(og.median_gap, 0)) * LN(yo.yesterday_revenue + 1) * 10
+    WHEN CURRENT_DATE - lopk.last_order_date >= 180 THEN
+      (CURRENT_DATE - lopk.last_order_date) * LN(yo.yesterday_revenue + 1)
+    ELSE (CURRENT_DATE - lopk.last_order_date) * LN(yo.yesterday_revenue + 1) * 0.5
+  END as significance_score
 FROM yesterday_orders yo
-JOIN last_orders lo ON yo.c_bpartner_id = lo.c_bpartner_id
-LEFT JOIN adempiere.c_bpartner_location bploc ON yo.bploc_id = bploc.c_bpartner_location_id AND bploc.isactive = 'Y'
-LEFT JOIN adempiere.c_location loc ON bploc.c_location_id = loc.c_location_id
-LEFT JOIN adempiere.c_country c ON loc.c_country_id = c.c_country_id
-LEFT JOIN adempiere.ad_user contact ON yo.contact_id = contact.ad_user_id AND contact.isactive = 'Y'
-CROSS JOIN business_day
-WHERE CURRENT_DATE - lo.last_order_date::date >= 180
-ORDER BY yo.total_revenue DESC;
+JOIN last_order_per_key lopk ON yo.tracking_key = lopk.tracking_key
+LEFT JOIN order_gaps og ON yo.tracking_key = og.tracking_key
+WHERE CURRENT_DATE - lopk.last_order_date >= 30
+ORDER BY days_gap DESC
+LIMIT 5;
 
 
 -- ============================================================================
@@ -447,7 +528,6 @@ SELECT
     WHEN u.ad_user_id IN (1047106, 1026393, 1042653, 1038225, 1026394, 1010361, 1012788, 1038224) THEN 'MEX'
     WHEN u.ad_user_id IN (1041139, 1023803, 1016958) THEN 'APAC-Laurel'
     WHEN u.ad_user_id IN (1039414, 1009866, 1013042, 1009528, 1009478, 1009210) THEN 'APAC-Silvia'
-    WHEN u.ad_user_id IN (1017011, 1023478, 1024444) THEN 'APAC-Lavanya'
     ELSE 'Other'
   END as region,
   o.grandtotal as total_revenue,
@@ -501,7 +581,6 @@ SELECT
     WHEN u.ad_user_id IN (1047106, 1026393, 1042653, 1038225, 1026394, 1010361, 1012788, 1038224) THEN 'MEX'
     WHEN u.ad_user_id IN (1041139, 1023803, 1016958) THEN 'APAC-Laurel'
     WHEN u.ad_user_id IN (1039414, 1009866, 1013042, 1009528, 1009478, 1009210) THEN 'APAC-Silvia'
-    WHEN u.ad_user_id IN (1017011, 1023478, 1024444) THEN 'APAC-Lavanya'
     ELSE 'Other'
   END as region,
   ol.datepromised::date as promise_date,
@@ -539,11 +618,13 @@ ORDER BY ol.linenetamt DESC;
 
 
 -- ----------------------------------------------------------------------------
--- 2.2B TOP 5 LATE SO LINES (Under $200K, 3-31 days past due)
+-- 2.2B TOP 15 SCHEDULED TO SHIP THIS MONTH (by GP)
 -- ----------------------------------------------------------------------------
--- Shows top 5 smaller-value lines by revenue that are currently past due
--- Same rolling 31-day window logic as 2.2A
--- Color coding: Yellow 3-7 days, Red 8+ days
+-- Shows top 15 lines by GP scheduled to ship in current month (backlog view)
+-- Display: Top 5 visible, next 10 collapsible
+-- Promise date can be past due, today, or future - as long as it's in current month
+-- Purpose: Backlog that needs to ship by end of month to meet sales goals
+-- Color coding: Red if past due, Yellow if due this week, Green if future
 
 SELECT
   bp.name as customer_name,
@@ -555,20 +636,32 @@ SELECT
     WHEN u.ad_user_id IN (1047106, 1026393, 1042653, 1038225, 1026394, 1010361, 1012788, 1038224) THEN 'MEX'
     WHEN u.ad_user_id IN (1041139, 1023803, 1016958) THEN 'APAC-Laurel'
     WHEN u.ad_user_id IN (1039414, 1009866, 1013042, 1009528, 1009478, 1009210) THEN 'APAC-Silvia'
-    WHEN u.ad_user_id IN (1017011, 1023478, 1024444) THEN 'APAC-Lavanya'
     ELSE 'Other'
   END as region,
   ol.datepromised::date as promise_date,
-  CURRENT_DATE - ol.datepromised::date as days_late,
+  ol.datepromised::date - CURRENT_DATE as days_until_promise,
   ol.qtyordered - COALESCE(SUM(iol.movementqty), 0) as qty_unshipped,
   ROUND(((ol.qtyordered - COALESCE(SUM(iol.movementqty), 0)) / NULLIF(ol.qtyordered, 0)) * ol.linenetamt, 2) as line_revenue,
   (SELECT COALESCE(ROUND(bi.s_order_line_gp * ((ol.qtyordered - COALESCE(SUM(iol.movementqty), 0)) / NULLIF(ol.qtyordered, 0)), 2), 0)
    FROM adempiere.bi_order_line_v bi
    WHERE bi.order_line_id = ol.c_orderline_id) as line_gp,
   ol.chuboe_mpn as mpn,
+  -- TODO: Stock check - m_storage table not found in database
+  -- Currently defaults to 'N' - needs proper inventory table identification
+  'N' as in_stock,
+  -- Action status based on due date only (until inventory data is available)
+  -- Red = past due (urgent), Yellow = due this week (attention), Green = future (OK)
   CASE
-    WHEN CURRENT_DATE - ol.datepromised::date >= 8 THEN 'red'
-    WHEN CURRENT_DATE - ol.datepromised::date >= 3 THEN 'yellow'
+    WHEN ol.datepromised::date < CURRENT_DATE
+    THEN 'red'  -- Past due = URGENT
+    WHEN ol.datepromised::date <= CURRENT_DATE + INTERVAL '7 days'
+    THEN 'yellow'  -- Due soon = ATTENTION
+    ELSE 'green'  -- Future = OK
+  END as action_status,
+  CASE
+    WHEN ol.datepromised::date < CURRENT_DATE THEN 'red'  -- Past due
+    WHEN ol.datepromised::date <= CURRENT_DATE + INTERVAL '7 days' THEN 'yellow'  -- Due this week
+    ELSE 'green'  -- Future
   END as color_code
 FROM adempiere.c_orderline ol
 JOIN adempiere.c_order o ON ol.c_order_id = o.c_order_id
@@ -584,13 +677,14 @@ WHERE ol.isactive = 'Y'
   AND o.issotrx = 'Y'
   AND ol.qtyordered > 0
   AND ol.datepromised IS NOT NULL
-  AND ol.datepromised >= CURRENT_DATE - INTERVAL '31 days'  -- Rolling 31-day window
-  AND ol.datepromised <= CURRENT_DATE - INTERVAL '3 days'   -- At least 3 days late
-  AND ol.linenetamt < 200000  -- Under $200K
+  AND ol.datepromised >= DATE_TRUNC('month', CURRENT_DATE)  -- Start of current month
+  AND ol.datepromised < DATE_TRUNC('month', CURRENT_DATE) + INTERVAL '1 month'  -- End of current month
 GROUP BY ol.c_orderline_id, ol.c_order_id, o.documentno, bp.name, ol.line, ol.qtyordered, ol.datepromised, ol.linenetamt, ol.chuboe_mpn, u.name, u.ad_user_id
 HAVING ol.qtyordered > COALESCE(SUM(iol.movementqty), 0)  -- Has unshipped quantity
-ORDER BY ol.linenetamt DESC
-LIMIT 5;
+ORDER BY (SELECT COALESCE(ROUND(bi.s_order_line_gp * ((ol.qtyordered - COALESCE(SUM(iol.movementqty), 0)) / NULLIF(ol.qtyordered, 0)), 2), 0)
+   FROM adempiere.bi_order_line_v bi
+   WHERE bi.order_line_id = ol.c_orderline_id) DESC  -- Order by GP, highest first
+LIMIT 15;
 
 
 -- ----------------------------------------------------------------------------
@@ -614,15 +708,13 @@ WITH seller_list AS (
       WHEN ad_user_id IN (1047106, 1026393, 1042653, 1038225, 1026394, 1010361, 1012788, 1038224) THEN 'Joel Marquez'
       WHEN ad_user_id IN (1041139, 1023803, 1016958) THEN 'Laurel Kee'
       WHEN ad_user_id IN (1039414, 1009866, 1013042, 1009528, 1009478, 1009210) THEN 'Silvia Munoz'
-      WHEN ad_user_id IN (1017011, 1023478, 1024444) THEN 'Lavanya Manohar'
     END as manager
   FROM adempiere.ad_user
   WHERE ad_user_id IN (
     1039413, 1047077, 1000011, 1042807, 1005243, 1025669, 1047795, 1000017,
     1047106, 1026393, 1042653, 1038225, 1026394, 1010361, 1012788, 1038224,
     1041139, 1023803, 1016958,
-    1039414, 1009866, 1013042, 1009528, 1009478, 1009210,
-    1017011, 1023478, 1024444
+    1039414, 1009866, 1013042, 1009528, 1009478, 1009210
   )
   AND isactive = 'Y'
 ),
@@ -639,7 +731,7 @@ SELECT
   sl.name as ise_name,
   sl.manager,
   sl.region,
-  COALESCE(ra.last_rfq_date::date, CURRENT_DATE - INTERVAL '30 days') as last_rfq_date,
+  COALESCE(ra.last_rfq_date::date, (CURRENT_DATE - INTERVAL '30 days')::date) as last_rfq_date,
   -- Calculate business days only (Mon-Fri, excluding weekends)
   COALESCE(
     (SELECT COUNT(*)
@@ -692,7 +784,6 @@ SELECT
     WHEN u.ad_user_id IN (1047106, 1026393, 1042653, 1038225, 1026394, 1010361, 1012788, 1038224) THEN 'MEX'
     WHEN u.ad_user_id IN (1041139, 1023803, 1016958) THEN 'APAC-Laurel'
     WHEN u.ad_user_id IN (1039414, 1009866, 1013042, 1009528, 1009478, 1009210) THEN 'APAC-Silvia'
-    WHEN u.ad_user_id IN (1017011, 1023478, 1024444) THEN 'APAC-Lavanya'
     ELSE 'Other'
   END as region,
   SUM(ol.linenetamt) as revenue,

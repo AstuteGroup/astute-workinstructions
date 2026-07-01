@@ -19,6 +19,69 @@ Weekly market intelligence report providing 30-day rolling window analysis of:
 **Delivery:** HTML email (weekly schedule TBD)
 **Recipients:** Sales leadership (Josh, regional managers)
 
+**Current Format:** Option A Dashboard (as of 2026-06-29)
+**Active Script:** `market-pulse-option-a.js`
+
+---
+
+## External Market Research (REQUIRED BEFORE EACH REPORT)
+
+**Critical:** Market intelligence must be **current** - this report keeps our finger on the market pulse. Do fresh research for each week's report, **not before**.
+
+### Research Process
+
+**Timing:** Complete this as part of report generation, typically Thursday for the current week.
+
+**Step 1: Search for Latest Articles (Past 7-14 Days)**
+
+Search on these recommended sources for the most current articles:
+
+**Primary Sources:**
+- **Evertiq** (https://evertiq.com/) - European electronics manufacturing news, component shortages, supply chain
+- **Sourceability** - Market intelligence, lead time trackers, allocation alerts
+- **FindChips** (https://blog.findchips.com/) - Real-time inventory data, pricing trends
+- **Tom's Hardware** - Consumer/enterprise memory market coverage
+- **Avnet** - Franchise distributor reports, component lifecycle
+
+**Additional Sources:**
+- **773 GROUP** - Component market analysis
+- **EE News Europe** - European electronics industry news
+- **Apex Component** - Supply chain intelligence
+- **J2 Sourcing** - Component shortage updates
+- **Texas Instruments** - Logic IC inventory and availability
+
+**Search Topics:**
+- Memory shortages (HBM, DRAM, NAND)
+- MLCC constraints and allocation
+- MCU availability (STM32, Renesas, etc.)
+- Logic IC supply (TI, commodity parts)
+- Power Management trends
+- Any emerging component shortages
+
+**Step 2: Update External Data Sources Section**
+
+Organize articles by constraint category:
+- 🔴 Memory (DRAM/NAND/HBM)
+- 🔴 MLCCs (Passives)
+- 🔴 MCUs (STM32, Renesas)
+- 🟢 Logic ICs (Commodity)
+- 🟡 Power Management
+
+For each article:
+- Include publication date (e.g., "Jun 29, 2026" or "Q2 2026")
+- Verify link works
+- Write concise description of what it covers
+
+**Step 3: Replace Outdated Sources**
+
+- If an article from the previous week is still the latest available, keep it
+- If there's a newer article on the same topic, replace it
+- Prioritize articles dated within the past 7-14 days
+
+**Step 4: Verify Coverage**
+
+Ensure each constraint category mentioned in the report has at least 1-2 source links explaining why it's allocated/constrained/normal.
+
 ---
 
 ## What Makes This Different from Sales Pulse?
@@ -181,16 +244,31 @@ Parts/manufacturers that weren't in top 20 last period but are trending now
 
 ## How to Run (Current State)
 
-### Test Run (Placeholder Data)
+### Option A Dashboard (Current Format - Active as of 2026-06-29)
+
+**Schedule:** Weekly, typically **Thursday** for the current week
+
+**Before Running:**
+1. **Do fresh external market research** (see "External Market Research" section above)
+2. Update `getExternalMarketData()` function if market conditions changed
+3. Verify week number is correct
+
+**Generate Report:**
 ```bash
-node "Sales Pulse Daily/market-pulse-weekly.js"
+node "Sales Pulse Daily/scripts/market-pulse-option-a.js" <week_number>
+
+# Example for Week 27
+node "Sales Pulse Daily/scripts/market-pulse-option-a.js" 27
 ```
 
-**Note:** Currently generates HTML with placeholder data. SQL queries still in development.
+**Output files:**
+- `output/market-pulse/market-pulse-option-a-week<N>-YYYY-MM-DD.html` - Email-ready HTML report
 
-Output files:
-- `output/market-pulse-weekly-YYYY-MM-DD.html` - Email-ready HTML
-- `output/market-pulse-weekly-YYYY-MM-DD.json` - Raw data for debugging
+**What it includes:**
+- Executive Brief (Performance WoW, Market Shifts WoW, Top 3 Actions)
+- Constraint Signals (Hot Part Families, Trending Manufacturers, Franchise Lead Times)
+- External Market Validation (industry sources cross-referenced with OT data)
+- External Data Sources (current article links organized by constraint category)
 
 ---
 

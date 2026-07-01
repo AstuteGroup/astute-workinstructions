@@ -3,6 +3,7 @@
 **Status:** ✅ Daily Live | ✅ Weekly Built (Ready to Deploy) | ✅ Market Pulse Built
 **Created:** 2026-05-28 (Daily), 2026-06-01 (Weekly), 2026-06-11 (Market Pulse)
 **Owner:** Melissa Bojar (Sales Productivity Analyst)
+**Market Pulse Standard Format:** Option A Dashboard (as of 2026-06-29)
 
 ---
 

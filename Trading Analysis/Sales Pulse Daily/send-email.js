@@ -8,7 +8,7 @@
 
 const fs = require('fs');
 const path = require('path');
-const { createNotifier } = require('../../astute-workinstructions/shared/notifier');
+const { createNotifier } = require('../../shared/notifier');
 
 // Get today's date in YYYY-MM-DD format
 function getToday() {
@@ -26,13 +26,13 @@ const toIndex = args.indexOf('--to');
 const recipientOverride = toIndex >= 0 && args[toIndex + 1] ? args[toIndex + 1] : null;
 
 // Email configuration
-const FROM_EMAIL = 'analytics@orangetsunami.com';
+const FROM_EMAIL = 'salesanalytics@orangetsunami.com';
 const FROM_NAME = 'Sales Pulse Daily';
 
 // Default recipients (can be overridden with --to)
 const DEFAULT_RECIPIENTS = [
   'melissa.bojar@astutegroup.com',
-  'josh.pucci@astutegroup.com'
+  'jeff.wallace@astutegroup.com'
 ];
 
 // Test recipient (when --test flag is used)

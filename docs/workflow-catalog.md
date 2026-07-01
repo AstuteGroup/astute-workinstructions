@@ -36,6 +36,15 @@ Complete list of available workflows with descriptions. This is the canonical so
 
 ---
 
+## Sales & Reporting Workflows
+
+| # | Workflow | Description | Documentation |
+|---|----------|-------------|---------------|
+| 26 | **VP Daily Brief** | Strategic 1-page daily snapshot for VP Sales showing yesterday's global sales activity | `Sales Pulse Daily/docs/vp-daily-brief-workflow.md` |
+| 27 | **USA Daily Brief** | Daily snapshot for USA Regional Manager (Jeff Wallace) showing USA team performance with individual sales rep breakdown | `Sales Pulse Daily/docs/usa-daily-brief-workflow.md` |
+
+---
+
 ## Workflow Trigger Patterns
 
 Some workflows have specific trigger patterns:

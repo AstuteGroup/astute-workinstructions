@@ -1,6 +1,6 @@
 {
-  "today": "2026-06-23T13:47:46.757Z",
-  "yesterday": "2026-06-22T13:47:46.757Z",
+  "today": "2026-06-23T20:00:50.996Z",
+  "yesterday": "2026-06-22T20:00:50.996Z",
   "todayFormatted": "Tuesday, June 23, 2026",
   "yesterdayFormatted": "Monday, June 22, 2026",
   "top5Orders": [
@@ -10,6 +10,7 @@
       "customer_name": "KLA",
       "order_number": "SO507536",
       "revenue": "468000.0",
+      "gp": "180000.0000000000000000",
       "part_numbers": "PK8071305120600S RMGL"
     },
     {
@@ -18,6 +19,7 @@
       "customer_name": "THALES",
       "order_number": "SO507537",
       "revenue": "407040.00",
+      "gp": "101376.0000000000000000",
       "part_numbers": "K4AAG165WA-BCWE "
     },
     {
@@ -26,6 +28,7 @@
       "customer_name": "Applied Materials",
       "order_number": "SO507541",
       "revenue": "82223.52",
+      "gp": "13815.8400000000000000",
       "part_numbers": "A2A5328-22G5MBAS"
     },
     {
@@ -34,6 +37,7 @@
       "customer_name": "BENCHMARK ELECTRONICS",
       "order_number": "SO507543",
       "revenue": "74541.60",
+      "gp": "8307.6000000000000000",
       "part_numbers": "MT25QL01GBBB8E12-0SIT"
     },
     {
@@ -42,6 +46,7 @@
       "customer_name": "Plexus Corp.",
       "order_number": "SO507544",
       "revenue": "66750.00",
+      "gp": "14750.0000000000000000",
       "part_numbers": "MT29F4G08ABADAWP:D TR"
     }
   ],
@@ -52,8 +57,9 @@
       "customer_name": "Chiplytics Inc.",
       "order_number": "SO507539",
       "total_revenue": "200.00",
-      "mpns": null,
-      "mfr_names": null,
+      "total_gp": "200.00000000000000000000",
+      "mpns": "MTFC512GAYAXHF-WT",
+      "mfr_names": "Micron Technology Inc",
       "total_qty": "0",
       "customer_location": "35 Sawgrass Dr., Bellport, NY 11713, United States",
       "contact_name": null,
@@ -69,6 +75,8 @@
       "cq_lines": "0",
       "cq_sold": "0",
       "so_count": "0",
+      "so_revenue": "0",
+      "so_gp": "0",
       "color_code": "normal"
     },
     {
@@ -79,6 +87,8 @@
       "cq_lines": "0",
       "cq_sold": "0",
       "so_count": "0",
+      "so_revenue": "0",
+      "so_gp": "0",
       "color_code": "red"
     },
     {
@@ -89,6 +99,8 @@
       "cq_lines": "0",
       "cq_sold": "0",
       "so_count": "0",
+      "so_revenue": "0",
+      "so_gp": "0",
       "color_code": "normal"
     },
     {
@@ -97,8 +109,10 @@
       "region": "USA",
       "rfq_lines": "8",
       "cq_lines": "1",
-      "cq_sold": "0",
+      "cq_sold": "1",
       "so_count": "0",
+      "so_revenue": "0",
+      "so_gp": "0",
       "color_code": "normal"
     },
     {
@@ -109,6 +123,8 @@
       "cq_lines": "2",
       "cq_sold": "0",
       "so_count": "0",
+      "so_revenue": "0",
+      "so_gp": "0",
       "color_code": "normal"
     },
     {
@@ -119,6 +135,8 @@
       "cq_lines": "1",
       "cq_sold": "1",
       "so_count": "1",
+      "so_revenue": "407040.00",
+      "so_gp": "101376.0000000000000000",
       "color_code": "normal"
     }
   ],
@@ -132,6 +150,7 @@
       "order_count": "1",
       "order_numbers": "SO507536",
       "total_revenue": "468000.0",
+      "total_gp": "180000.0000000000000000",
       "mpns": null,
       "mfr_names": null,
       "total_qty": "0",
@@ -151,6 +170,7 @@
       "order_count": "1",
       "order_numbers": "SO507537",
       "total_revenue": "407040.00",
+      "total_gp": "101376.0000000000000000",
       "mpns": null,
       "mfr_names": null,
       "total_qty": "0",
@@ -170,6 +190,7 @@
       "order_count": "1",
       "order_numbers": "SO507541",
       "total_revenue": "82223.52",
+      "total_gp": "13815.8400000000000000",
       "mpns": null,
       "mfr_names": null,
       "total_qty": "0",
@@ -189,6 +210,7 @@
       "order_count": "1",
       "order_numbers": "SO507543",
       "total_revenue": "74541.60",
+      "total_gp": "8307.6000000000000000",
       "mpns": null,
       "mfr_names": null,
       "total_qty": "0",
@@ -208,6 +230,7 @@
       "order_count": "1",
       "order_numbers": "SO507544",
       "total_revenue": "66750.00",
+      "total_gp": "14750.0000000000000000",
       "mpns": null,
       "mfr_names": null,
       "total_qty": "0",
@@ -227,6 +250,7 @@
       "order_count": "1",
       "order_numbers": "SO507538",
       "total_revenue": "3000.0",
+      "total_gp": "1000.00000000000000000000",
       "mpns": null,
       "mfr_names": null,
       "total_qty": "0",
@@ -246,6 +270,7 @@
       "order_count": "1",
       "order_numbers": "SO507540",
       "total_revenue": "650.00",
+      "total_gp": "249.50000000000000000000",
       "mpns": null,
       "mfr_names": null,
       "total_qty": "0",
@@ -268,6 +293,7 @@
       "days_late": "25",
       "qty_unshipped": "39",
       "line_revenue": "428025.00",
+      "line_gp": "96525.00",
       "mpn": "216T9NGBGA13FH",
       "color_code": "red"
     },
@@ -281,6 +307,7 @@
       "days_late": "21",
       "qty_unshipped": "143",
       "line_revenue": "366544.75",
+      "line_gp": "0",
       "mpn": "RC PLUS 2",
       "color_code": "red"
     },
@@ -294,6 +321,7 @@
       "days_late": "21",
       "qty_unshipped": "15",
       "line_revenue": "303915.00",
+      "line_gp": "0",
       "mpn": "DJI DOCK 3",
       "color_code": "red"
     },
@@ -307,6 +335,7 @@
       "days_late": "29",
       "qty_unshipped": "1220",
       "line_revenue": "286700.00",
+      "line_gp": "59780.00",
       "mpn": "ADATE207BBPZ ",
       "color_code": "red"
     },
@@ -320,6 +349,7 @@
       "days_late": "26",
       "qty_unshipped": "2280",
       "line_revenue": "211903.20",
+      "line_gp": "24943.20",
       "mpn": "MT40A1G16KD-062E:E",
       "color_code": "red"
     },
@@ -333,6 +363,7 @@
       "days_late": "11",
       "qty_unshipped": "797",
       "line_revenue": "206423.00",
+      "line_gp": "45429.00",
       "mpn": "MT25QL01GBBB8E12-0AUT",
       "color_code": "red"
     }
@@ -348,6 +379,7 @@
       "days_late": "3",
       "qty_unshipped": "1600",
       "line_revenue": "181584.00",
+      "line_gp": "0",
       "mpn": "MT29F16G08ABABAWP-IT:B",
       "color_code": "yellow"
     },
@@ -361,6 +393,7 @@
       "days_late": "18",
       "qty_unshipped": "34496",
       "line_revenue": "163856.00",
+      "line_gp": "74166.40",
       "mpn": "ADN8834ACBZ-R7",
       "color_code": "red"
     },
@@ -374,6 +407,7 @@
       "days_late": "5",
       "qty_unshipped": "2000",
       "line_revenue": "158000.00",
+      "line_gp": "30000.00",
       "mpn": "MT40A512M16TB-062E IT:R ",
       "color_code": "yellow"
     },
@@ -387,6 +421,7 @@
       "days_late": "8",
       "qty_unshipped": "449",
       "line_revenue": "156701.00",
+      "line_gp": "17511.00",
       "mpn": "PBD-58/16.2M",
       "color_code": "red"
     },
@@ -400,6 +435,7 @@
       "days_late": "7",
       "qty_unshipped": "1880",
       "line_revenue": "83660.00",
+      "line_gp": "21620.00",
       "mpn": "MT25QU01GBBB8E12-0SIT TR  ",
       "color_code": "yellow"
     }
@@ -412,14 +448,6 @@
       "last_rfq_date": "2026-06-11 00:00:00",
       "days_inactive": "8",
       "color_code": "red"
-    },
-    {
-      "ise_name": "Alejandro Padilla",
-      "manager": "Joel Marquez",
-      "region": "MEX",
-      "last_rfq_date": "2026-06-17 00:00:00",
-      "days_inactive": "4",
-      "color_code": "yellow"
     },
     {
       "ise_name": "Manikandan",
@@ -438,7 +466,9 @@
       "rfq_lines": "8",
       "cq_lines": "1",
       "cq_sold": "1",
-      "so_lines": "3"
+      "so_lines": "3",
+      "so_revenue": "875690.00",
+      "so_gp": "281625.50000000000000000000"
     },
     {
       "region": "APAC-Silvia",
@@ -446,7 +476,9 @@
       "rfq_lines": "34",
       "cq_lines": "39",
       "cq_sold": "1",
-      "so_lines": "1"
+      "so_lines": "1",
+      "so_revenue": "66750.00",
+      "so_gp": "14750.0000000000000000"
     },
     {
       "region": "MEX",
@@ -454,7 +486,9 @@
       "rfq_lines": "15",
       "cq_lines": "5",
       "cq_sold": "5",
-      "so_lines": "0"
+      "so_lines": "0",
+      "so_revenue": "0",
+      "so_gp": "0"
     },
     {
       "region": "Other",
@@ -462,21 +496,27 @@
       "rfq_lines": "264",
       "cq_lines": "18",
       "cq_sold": "3",
-      "so_lines": "2"
+      "so_lines": "2",
+      "so_revenue": "3200.00",
+      "so_gp": "1200.00000000000000000000"
     },
     {
       "region": "USA",
       "manager": "Jeff Wallace",
       "rfq_lines": "114",
       "cq_lines": "23",
-      "cq_sold": "9",
-      "so_lines": "3"
+      "cq_sold": "10",
+      "so_lines": "3",
+      "so_revenue": "156765.12",
+      "so_gp": "22123.440000000000000000000000"
     }
   ],
   "regionalTotals": {
     "rfq_lines": 435,
     "cq_lines": 86,
-    "cq_sold": 19,
-    "so_lines": 9
+    "cq_sold": 20,
+    "so_lines": 9,
+    "so_revenue": 1102405.12,
+    "so_gp": 319698.94
   }
 }

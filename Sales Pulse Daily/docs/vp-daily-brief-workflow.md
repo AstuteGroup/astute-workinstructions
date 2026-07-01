@@ -3,7 +3,7 @@
 **Status:** ✅ Production Ready
 **Created:** 2026-06-18 (based on June 4, 2026 feedback from Josh Pucci)
 **Owner:** Melissa Bojar (Sales Productivity Analyst)
-**Recipient:** Josh Pucci (VP Sales)
+**Recipients:** Josh Pucci (VP Sales), Melissa Bojar (Sales Productivity Analyst), Aran Coker
 
 ---
 
@@ -18,7 +18,10 @@ Strategic 1-page daily snapshot for VP Sales showing yesterday's sales activity 
 - Cleaner, more scannable format for executive review
 - Monday-only week summary (full report not cluttered daily)
 
-**Delivery:** Mon-Fri at 6:00 AM PT via email
+**Delivery:** Mon-Fri at 8:00 AM via email as HTML attachment
+- Simple email body with viewing instructions and section outline
+- Full interactive report as HTML attachment (opens in web browser)
+- Collapsible sections work properly when attachment is opened in browser
 
 ---
 
@@ -225,10 +228,9 @@ All queries are in `/queries/vp-daily-queries-v2.sql`
 'MEX': [1047106, 1026393, 1042653, 1038225, 1026394, 1010361, 1012788, 1038224]
 'APAC-Laurel': [1041139, 1023803, 1016958]
 'APAC-Kris': [1039414, 1009866, 1013042, 1009528, 1009478, 1009210]
-'APAC-Lavanya': [1024444, 1023478, 1017011]
 ```
 
-*29 active sellers total*
+*24 active sellers total (India team removed: Lavanya/Manikandan/Meenakashi; Korea team removed: Edyna Lee/Erin Lee)*
 
 ---
 
@@ -262,8 +264,8 @@ node email-vp-daily-brief.js
 ```
 
 **Output Files:**
-- `../output/vp-daily-brief-v2-YYYY-MM-DD.html` - Formatted email body
-- `../output/vp-daily-brief-v2-YYYY-MM-DD.json` - Raw data for debugging
+- `../output/vp-briefs/vp-daily-brief-v2-YYYY-MM-DD.html` - Full interactive report (sent as attachment)
+- `../output/vp-briefs/vp-daily-brief-v2-YYYY-MM-DD.json` - Raw data for debugging
 
 ### Automated Delivery
 
@@ -271,9 +273,14 @@ node email-vp-daily-brief.js
 
 **Script:** `scripts/email-vp-daily-brief.js`
 
+**Delivery Format:** HTML attachment with simple email body
+- Email body: Professional greeting, viewing instructions, and section outline
+- Attachment: Full interactive HTML report with collapsible sections
+
 **Recipients:**
 - Josh Pucci (josh.pucci@astutegroup.com)
 - Melissa Bojar (melissa.bojar@astutegroup.com)
+- Aran Coker (aran.coker@astutegroup.com)
 
 **Email Sender:** salesanalytics@orangetsunami.com
 
@@ -413,6 +420,31 @@ WHERE COALESCE(CURRENT_DATE - ra.last_rfq_date::date, 30) >= 3  -- Change 3-day 
 
 ## Changelog
 
+**2026-07-01** - Email delivery format changed to HTML attachment
+- Changed from embedded HTML email to HTML attachment approach for better email client compatibility
+- Collapsible sections now work properly when attachment is opened in web browser
+- Simplified email body with professional greeting, viewing instructions, and section outline
+- Added Aran Coker (aran.coker@astutegroup.com) to distribution list
+- Recipients now: Josh Pucci, Melissa Bojar, Aran Coker
+- Updated contact info in email footer to direct questions to Melissa Bojar
+
+**2026-06-30** - Multiple updates per Josh feedback
+- Removed inactive sellers from ISE alerts (India team: Lavanya/Manikandan/Meenakashi; Korea team: Edyna Lee/Erin Lee)
+- Updated seller count from 29 to 24 active sellers
+- Expanded Section 1.1 "Top 5 Orders Won" to show 15 orders with collapsible section
+  - Top 5 orders always visible with medals (🥇🥈🥉)
+  - Next 10 orders (ranks #6-#15) in expandable section
+  - Maintains full order details (seller, region, customer, revenue, GP, parts)
+- Repurposed Section 2.2B from "Late SO Lines" to "Top 5 Scheduled to Ship This Month (by GP)"
+  - Now shows backlog view: unshipped lines with promise date in current month
+  - Sorted by GP (not revenue), no threshold filter
+  - Color coding: Red (past due), Yellow (due this week), Green (future)
+  - Shows days +/- from promise date instead of days late
+- Updated Section 1.4 "Reactivated Customers" to use Ship-To Address filtering
+  - Changed from c_bpartner_id to c_bpartner_location_id grouping
+  - Prevents showing same customer with different BP IDs as "reactivated"
+  - Only shows true engagement pickup after 6+ month gap at specific location
+
 **2026-06-19** - Business day logic implemented (Monday shows Friday, not Sunday)
 - Updated `sales-pulse-vp-daily-v2.js` with business day calculation
 - Updated `email-vp-daily-brief.js` with matching logic for subject line
@@ -422,4 +454,4 @@ WHERE COALESCE(CURRENT_DATE - ra.last_rfq_date::date, 30) >= 3  -- Change 3-day 
 
 ---
 
-*Last Updated: 2026-06-19*
+*Last Updated: 2026-07-01*

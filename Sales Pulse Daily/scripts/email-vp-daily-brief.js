@@ -3,7 +3,8 @@
 /**
  * Email VP Daily Brief V2
  *
- * Generates the VP Daily Brief and emails it to Josh Pucci and Melissa Bojar
+ * Generates the VP Daily Brief and emails it as an HTML attachment
+ * Recipients: Josh Pucci, Melissa Bojar, Aran Coker
  * Scheduled to run weekdays at 8am via cron
  */
 
@@ -12,7 +13,7 @@ const fs = require('fs');
 const path = require('path');
 
 // Load notifier from shared utilities
-const { createNotifier } = require(path.resolve(__dirname, '../../astute-workinstructions/shared/notifier'));
+const { createNotifier } = require(path.resolve(__dirname, '../../shared/notifier'));
 
 const notifier = createNotifier({
   fromEmail: 'salesanalytics@orangetsunami.com',
@@ -22,7 +23,8 @@ const notifier = createNotifier({
 // Recipients
 const RECIPIENTS = [
   'josh.pucci@astutegroup.com',
-  'melissa.bojar@astutegroup.com'
+  'melissa.bojar@astutegroup.com',
+  'aran.coker@astutegroup.com'
 ];
 
 async function main() {
@@ -38,16 +40,13 @@ async function main() {
 
     // Step 2: Get the generated HTML file
     const today = new Date().toISOString().split('T')[0]; // YYYY-MM-DD
-    const htmlPath = path.join(__dirname, '../output', `vp-daily-brief-v2-${today}.html`);
+    const htmlPath = path.join(__dirname, '../output/vp-briefs', `vp-daily-brief-v2-${today}.html`);
 
     if (!fs.existsSync(htmlPath)) {
       throw new Error(`HTML file not found at ${htmlPath}`);
     }
 
-    const htmlContent = fs.readFileSync(htmlPath, 'utf8');
-
-    // Step 3: Prepare email
-    // Calculate previous business day (Friday if Monday, else yesterday)
+    // Step 3: Calculate previous business day (Friday if Monday, else yesterday)
     const now = new Date();
     const dayOfWeek = now.getDay(); // 0 = Sunday, 1 = Monday, etc.
     const businessDay = new Date(now);
@@ -68,14 +67,81 @@ async function main() {
 
     const subject = `VP Daily Brief - Sales Pulse (${yesterdayFormatted})`;
 
-    // Step 4: Send to each recipient
+    // Step 4: Create simple email body with instructions
+    const emailBodyHTML = `
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<style>
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif;
+    font-size: 14px;
+    line-height: 1.6;
+    color: #333;
+    max-width: 600px;
+    margin: 0 auto;
+    padding: 20px;
+  }
+  .info-box {
+    background: #f8fafc;
+    border-left: 4px solid #3b82f6;
+    padding: 16px;
+    margin: 20px 0;
+    border-radius: 4px;
+  }
+  .section-list {
+    margin: 12px 0;
+    padding-left: 24px;
+  }
+  .section-list li {
+    margin: 8px 0;
+  }
+  .footer {
+    margin-top: 24px;
+    padding-top: 16px;
+    border-top: 2px solid #e5e7eb;
+    font-size: 13px;
+    color: #6b7280;
+  }
+</style>
+</head>
+<body>
+  <p>Good morning,</p>
+
+  <p>Your VP Daily Brief for <strong>${yesterdayFormatted}</strong> is attached. This report provides a quick 60-second review of Astute Inc.'s sales performance from yesterday.</p>
+
+  <div class="info-box">
+    <p style="margin-top: 0;"><strong>📎 How to View:</strong></p>
+    <p>Open the attached HTML file in your web browser for the full interactive report with collapsible sections and detailed tables.</p>
+  </div>
+
+  <p><strong>Report Sections:</strong></p>
+  <ul class="section-list">
+    <li><strong>Section 1: Yesterday's Top Wins</strong> — Top orders booked, new customers won, strategic account activity, and customer reactivations</li>
+    <li><strong>Section 2: Needs Attention</strong> — High-value late shipments, upcoming scheduled shipments, inactive sales reps, and low-margin orders requiring review</li>
+    <li><strong>Section 3: Yesterday's Activity by Region</strong> — Regional performance breakdown across USA, MEX, APAC-Laurel, APAC-Silvia, and Other</li>
+  </ul>
+
+  <div class="footer">
+    <p>Questions or feedback? Contact Melissa Bojar at melissa.bojar@astutegroup.com</p>
+  </div>
+</body>
+</html>
+    `;
+
+    // Step 5: Send to each recipient with HTML attachment
     console.log('\n📧 Sending emails...');
     for (const recipient of RECIPIENTS) {
       console.log(`  Sending to ${recipient}...`);
-      const success = await notifier.sendEmail(
+      const success = await notifier.sendWithAttachment(
         recipient,
         subject,
-        htmlContent,
+        emailBodyHTML,
+        [{
+          filename: `vp-daily-brief-${today}.html`,
+          path: htmlPath
+        }],
         { html: true }
       );
 

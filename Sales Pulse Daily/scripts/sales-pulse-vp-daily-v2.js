@@ -210,15 +210,15 @@ async function collectData() {
 }
 
 /**
- * Section 1.1: Top 5 Orders Won
+ * Section 1.1: Top 15 Orders Won (5 visible + 10 collapsible)
  */
 function getTop5Orders(queryFile) {
   const queries = fs.readFileSync(queryFile, 'utf8');
-  const top5Query = queries.split('1.1 TOP 5 ORDERS WON')[1]
+  const top5Query = queries.split('1.1 TOP 15 ORDERS WON')[1]
     .split('1.2 NEW CUSTOMERS SOLD')[0]
     .trim();
 
-  const sqlMatch = top5Query.match(/WITH[\s\S]+?LIMIT 5;/);
+  const sqlMatch = top5Query.match(/WITH[\s\S]+?LIMIT 15;/);
   if (!sqlMatch) return [];
 
   return parseRows(execQuery(sqlMatch[0]), [
@@ -239,7 +239,7 @@ function getNewCustomersSold(queryFile) {
   if (!sqlMatch) return [];
 
   return parseRows(execQuery(sqlMatch[0]), [
-    'seller_name', 'region', 'customer_name', 'order_number', 'total_revenue', 'total_gp',
+    'seller_name', 'region', 'customer_name', 'c_bpartner_id', 'order_number', 'total_revenue', 'total_gp',
     'mpns', 'mfr_names', 'total_qty', 'customer_location', 'contact_name', 'promise_date'
   ]);
 }
@@ -267,20 +267,20 @@ function getStrategicAccountsActivity(queryFile) {
  * Section 1.4: Reactivated Customers
  */
 function getReactivatedCustomers(queryFile) {
-  // Shows unique customers (grouped by c_bpartner_id) who returned after 180+ day gap
+  // Hybrid: Location-level for OEMs, Customer-level for others, 30-day minimum
   const queries = fs.readFileSync(queryFile, 'utf8');
-  const reactivatedQuery = queries.split('1.4 REACTIVATED CUSTOMERS')[1]
+  const reactivatedQuery = queries.split('1.4 CUSTOMERS REACTIVATED YESTERDAY')[1]
     .split('SECTION 2: NEEDS ATTENTION')[0]
     .trim();
 
-  const sqlMatch = reactivatedQuery.match(/WITH[\s\S]+?ORDER BY yo\.total_revenue DESC;/);
+  const sqlMatch = reactivatedQuery.match(/WITH[\s\S]+?LIMIT 5;/);
   if (!sqlMatch) return [];
 
   return parseRows(execQuery(sqlMatch[0]), [
-    'sales_order_date', 'seller_name', 'region', 'customer_name', 'c_bpartner_id', 'order_count',
-    'order_numbers', 'total_revenue', 'total_gp', 'mpns', 'mfr_names', 'total_qty',
-    'customer_location', 'contact_name', 'promise_date', 'last_order_date',
-    'days_since_last_order', 'previous_sales_rep'
+    'customer_name', 'facility_location', 'tracked_at_location_level', 'first_order_date',
+    'last_order_date', 'days_gap', 'yesterday_orders', 'yesterday_revenue', 'yesterday_gp',
+    'seller_name', 'region', 'lifetime_orders', 'lifetime_revenue', 'typical_cycle_days',
+    'gap_multiplier', 'reactivation_type', 'significance_score'
   ]);
 }
 
@@ -320,19 +320,19 @@ function getHighValueLateLines(queryFile) {
 }
 
 /**
- * Section 2.2B: Top 5 Late SO Lines (Under $200K)
+ * Section 2.2B: Top 15 Scheduled to Ship This Month (by GP) - 5 visible + 10 collapsible
  */
 function getTop5LateLines(queryFile) {
   const queries = fs.readFileSync(queryFile, 'utf8');
-  const summaryQuery = queries.split('2.2B TOP 5 LATE SO LINES')[1]
+  const summaryQuery = queries.split('2.2B TOP 15 SCHEDULED TO SHIP THIS MONTH')[1]
     .split('2.3 INSIDE SALES REPS ALERT')[0]
     .trim();
 
-  const sqlMatch = summaryQuery.match(/SELECT[\s\S]+?LIMIT 5;/);
+  const sqlMatch = summaryQuery.match(/SELECT[\s\S]+?LIMIT 15;/);
   if (!sqlMatch) return [];
 
   return parseRows(execQuery(sqlMatch[0]), [
-    'customer_name', 'sales_order', 'line_number', 'ise_name', 'region', 'promise_date', 'days_late', 'qty_unshipped', 'line_revenue', 'line_gp', 'mpn', 'color_code'
+    'customer_name', 'sales_order', 'line_number', 'ise_name', 'region', 'promise_date', 'days_until_promise', 'qty_unshipped', 'line_revenue', 'line_gp', 'mpn', 'in_stock', 'action_status', 'color_code'
   ]);
 }
 
@@ -595,6 +595,29 @@ function generateHTML(data) {
     border-radius: 4px;
     margin-bottom: 12px;
   }
+
+  /* Collapsible Details */
+  details {
+    margin-bottom: 12px;
+  }
+  details summary {
+    cursor: pointer;
+    font-weight: 600;
+    color: #1a1a1a;
+    padding: 8px 12px;
+    background: #f8fafc;
+    border-radius: 4px;
+    border: 1px solid #e2e8f0;
+    transition: background 0.2s;
+  }
+  details summary:hover {
+    background: #e2e8f0;
+  }
+  details[open] summary {
+    margin-bottom: 8px;
+    border-bottom-left-radius: 0;
+    border-bottom-right-radius: 0;
+  }
 </style>
 </head>
 <body>
@@ -619,7 +642,7 @@ function generateHTML(data) {
 function generateSection1(data) {
   let html = '<div class="section-header">🏆 Section 1: Yesterday\'s Top Wins</div>';
 
-  // 1.1 Top 5 Orders
+  // 1.1 Top 15 Orders (5 visible + 10 collapsible)
   html += '<div class="subsection-header">Top 5 Orders Won</div>';
   if (data.top5Orders.length > 0) {
     html += `<table>
@@ -637,7 +660,8 @@ function generateSection1(data) {
       </thead>
       <tbody>`;
 
-    data.top5Orders.forEach((order, i) => {
+    // Show first 5 orders (always visible)
+    data.top5Orders.slice(0, 5).forEach((order, i) => {
       const medal = i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : `#${i+1}`;
       html += `
         <tr>
@@ -653,9 +677,65 @@ function generateSection1(data) {
     });
 
     html += '</tbody></table>';
+
+    // Add collapsible section for orders 6-15 if available
+    if (data.top5Orders.length > 5) {
+      html += `
+        <input type="checkbox" id="toggle-orders" style="display:none;">
+        <label for="toggle-orders" style="cursor: pointer; font-weight: 600; color: #1a1a1a; padding: 8px; background: #f8fafc; border-radius: 4px; border: 1px solid #e2e8f0; display: block; margin-top: 8px; user-select: none;">
+          <span class="toggle-icon">▶</span> 📋 Show Next ${Math.min(data.top5Orders.length - 5, 10)} Orders (Ranks #6-${Math.min(data.top5Orders.length, 15)})
+        </label>
+        <div class="collapsible-content" style="display: none; margin-top: 8px;">
+          <table style="margin-top: 8px;">
+            <thead>
+              <tr>
+                <th>Rank</th>
+                <th>Seller</th>
+                <th>Region</th>
+                <th>Customer</th>
+                <th>SO#</th>
+                <th style="text-align: right;">Revenue</th>
+                <th style="text-align: right;">GP</th>
+                <th>Part Numbers</th>
+              </tr>
+            </thead>
+            <tbody>`;
+
+      // Show orders 6-15 (collapsible)
+      data.top5Orders.slice(5, 15).forEach((order, i) => {
+        const rank = i + 6;
+        html += `
+          <tr>
+            <td><strong>#${rank}</strong></td>
+            <td>${order.seller_name}</td>
+            <td>${order.region}</td>
+            <td>${order.customer_name}</td>
+            <td style="font-size: 11px;">${order.order_number}</td>
+            <td class="number">${formatCurrency(order.revenue)}</td>
+            <td class="number">${formatCurrency(order.gp)}</td>
+            <td style="font-size: 11px;">${order.part_numbers || 'N/A'}</td>
+          </tr>`;
+      });
+
+      html += `
+            </tbody>
+          </table>
+        </div>
+        <style>
+          #toggle-orders:checked ~ .collapsible-content { display: block !important; }
+          #toggle-orders:checked ~ label .toggle-icon::before { content: "▼"; }
+          .toggle-icon::before { content: "▶"; }
+        </style>`;
+    }
   } else {
     html += '<div class="empty-state">No orders won yesterday</div>';
   }
+
+  // Add footer note about GP = $0
+  html += '<div style="margin-top: 8px; padding: 8px; background: #fffbeb; border-left: 3px solid #f59e0b; font-size: 11px; color: #92400e;">';
+  html += '<strong>Note:</strong> When GP shows $0.00, it indicates that the <code>pricecost</code> field is null in the system. ';
+  html += 'This typically occurs when cost data has not yet been entered for the order line.';
+  html += '</div>';
 
   // 1.2 New Customers Sold
   html += '<div class="subsection-header">New Customers Sold (First-Time Wins)</div>';
@@ -666,13 +746,12 @@ function generateSection1(data) {
           <th>Seller</th>
           <th>Region</th>
           <th>Customer</th>
+          <th>BP ID</th>
+          <th>Location</th>
           <th style="text-align: right;">Revenue</th>
           <th style="text-align: right;">GP</th>
           <th>MPNs</th>
           <th>MFR</th>
-          <th>QTY</th>
-          <th>Location</th>
-          <th>Contact</th>
           <th>Promise Date</th>
         </tr>
       </thead>
@@ -684,13 +763,12 @@ function generateSection1(data) {
           <td>${cust.seller_name}</td>
           <td>${cust.region}</td>
           <td><strong>${cust.customer_name}</strong></td>
+          <td style="font-size: 10px;">${cust.c_bpartner_id || 'N/A'}</td>
+          <td style="font-size: 10px;">${cust.customer_location || 'N/A'}</td>
           <td class="number">${formatCurrency(cust.total_revenue)}</td>
           <td class="number">${formatCurrency(cust.total_gp)}</td>
           <td style="font-size: 10px;">${cust.mpns || 'N/A'}</td>
           <td style="font-size: 11px;">${cust.mfr_names || 'N/A'}</td>
-          <td class="number">${formatNumber(cust.total_qty)}</td>
-          <td style="font-size: 10px;">${cust.customer_location || 'N/A'}</td>
-          <td>${cust.contact_name || 'N/A'}</td>
           <td>${cust.promise_date || 'N/A'}</td>
         </tr>`;
     });
@@ -748,60 +826,75 @@ function generateSection1(data) {
     html += '<div class="empty-state">No strategic account activity yesterday</div>';
   }
 
-  // 1.4 Reactivated Customers
-  html += '<div class="subsection-header">Reactivated Customers (6+ Month Gap)</div>';
-  if (data.reactivatedCustomers.length > 0) {
-    html += `<table>
-      <thead>
-        <tr>
-          <th>SO Date</th>
-          <th>Seller</th>
-          <th>Region</th>
-          <th>Customer</th>
-          <th>Location</th>
-          <th>BP ID</th>
-          <th>SO #s</th>
-          <th style="text-align: right;">Total Revenue</th>
-          <th style="text-align: right;">Total GP</th>
-          <th style="text-align: center;">Gap (Days)</th>
-          <th>Last Order</th>
-          <th>Previous Rep</th>
-        </tr>
-      </thead>
-      <tbody>`;
+  // 1.4 Customers Reactivated Yesterday
+  html += '<div class="subsection-header">Customers Reactivated Yesterday</div>';
+  html += '<div style="font-size: 11px; color: #666; margin-bottom: 12px;">🏆 High-Value | 📊 Anomalous Pattern | 🕐 Long Dormant | 📍 Small Customer</div>';
+  html += '<div style="font-size: 10px; color: #888; margin-bottom: 12px; font-style: italic;"><strong>Customer Name + City tracking</strong> • Excludes brokers/distributors/traders/Jake Harris • 30-day minimum • CQ-linked sales only</div>';
 
-    data.reactivatedCustomers.forEach(cust => {
-      html += `
-        <tr>
-          <td>${cust.sales_order_date}</td>
-          <td>${cust.seller_name}</td>
-          <td>${cust.region}</td>
-          <td><strong>${cust.customer_name}</strong></td>
-          <td style="font-size: 9px;">${cust.customer_location || 'N/A'}</td>
-          <td style="font-size: 10px;">${cust.c_bpartner_id}</td>
-          <td style="font-size: 10px;">${cust.order_numbers}</td>
-          <td class="number">${formatCurrency(cust.total_revenue)}</td>
-          <td class="number">${formatCurrency(cust.total_gp)}</td>
-          <td style="text-align: center;"><span class="badge badge-green">${formatNumber(cust.days_since_last_order)}</span></td>
-          <td>${cust.last_order_date}</td>
-          <td>${cust.previous_sales_rep || 'N/A'}</td>
-        </tr>`;
+  if (data.reactivatedCustomers.length > 0) {
+    data.reactivatedCustomers.forEach((cust, index) => {
+      // Determine icon and label based on reactivation type
+      const icon = cust.reactivation_type === 'high_value_long' ? '🏆' :
+                   cust.reactivation_type === 'anomalous_pattern' ? '📊' :
+                   cust.reactivation_type === 'dormant_long' ? '🕐' :
+                   cust.reactivation_type === 'small_customer_long' ? '📍' : '✓';
+      const typeLabel = cust.reactivation_type === 'high_value_long' ? 'High-Value Long Gap' :
+                        cust.reactivation_type === 'anomalous_pattern' ? 'Anomalous Pattern' :
+                        cust.reactivation_type === 'dormant_long' ? 'Long Dormant (6+ months)' :
+                        cust.reactivation_type === 'small_customer_long' ? 'Small Customer Return' : 'Reactivated';
+
+      html += '<div style="border: 1px solid #e0e0e0; border-radius: 6px; padding: 14px; margin-bottom: 12px; background: white;">';
+
+      // Header line with customer name and icon
+      html += `<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">`;
+      html += `<div style="font-size: 14px; font-weight: bold; color: #1a1a1a;">${index + 1}. ${cust.customer_name} ${icon} <span style="color: #666; font-size: 11px; font-weight: normal;">${typeLabel}</span></div>`;
+      html += `</div>`;
+
+      // City location + gap analysis
+      html += `<div style="font-size: 11px; color: #666; margin-bottom: 10px;">`;
+      if (cust.facility_location && cust.facility_location !== 'Unknown City') {
+        html += `<strong>📍 ${cust.facility_location}</strong> (city-level tracking)`;
+      } else {
+        html += `City unknown`;
+      }
+
+      // Gap analysis
+      if (parseFloat(cust.typical_cycle_days) > 0 && parseFloat(cust.gap_multiplier) > 0) {
+        html += ` | Typical Cycle: ${formatNumber(cust.typical_cycle_days)} days | Actual Gap: <strong>${formatNumber(cust.days_gap)} days (${cust.gap_multiplier}x typical)</strong>`;
+      } else {
+        html += ` | Gap: <strong>${formatNumber(cust.days_gap)} days</strong>`;
+      }
+      html += `</div>`;
+
+      // Timeline
+      html += `<div style="font-size: 11px; color: #666; margin-bottom: 10px;">`;
+      html += `First Order: ${cust.first_order_date} | Last Order: ${cust.last_order_date}`;
+      html += `</div>`;
+
+      // Yesterday's order details
+      html += `<div style="background: #f8f9fa; padding: 10px; border-radius: 4px; margin-bottom: 8px;">`;
+      html += `<div style="font-size: 11px; font-weight: 600; color: #333; margin-bottom: 4px;">Yesterday's Order:</div>`;
+      html += `<div style="font-size: 11px; color: #1a1a1a;">`;
+      html += `${cust.yesterday_orders} | ${formatCurrency(cust.yesterday_revenue)} | GP: ${formatCurrency(cust.yesterday_gp)} | ${cust.seller_name} (${cust.region})`;
+      html += `</div></div>`;
+
+      // Lifetime metrics
+      html += `<div style="font-size: 11px; color: #555;">`;
+      html += `<strong>Lifetime:</strong> ${formatNumber(cust.lifetime_orders)} orders | ${formatCurrency(cust.lifetime_revenue)} revenue`;
+      html += `</div>`;
+
+      html += '</div>';
     });
 
-    // Add total row
-    const totalRevenue = data.reactivatedCustomers.reduce((sum, cust) => sum + parseFloat(cust.total_revenue || 0), 0);
-    const totalGP = data.reactivatedCustomers.reduce((sum, cust) => sum + parseFloat(cust.total_gp || 0), 0);
-    html += `
-      <tr style="border-top: 2px solid #333; background-color: #f5f5f5; font-weight: bold;">
-        <td colspan="7" style="text-align: right;"><strong>TOTAL</strong></td>
-        <td class="number"><strong>${formatCurrency(totalRevenue)}</strong></td>
-        <td class="number"><strong>${formatCurrency(totalGP)}</strong></td>
-        <td colspan="3"></td>
-      </tr>`;
+    // Summary total
+    const totalYesterdayRevenue = data.reactivatedCustomers.reduce((sum, cust) => sum + parseFloat(cust.yesterday_revenue || 0), 0);
+    const totalLifetimeRevenue = data.reactivatedCustomers.reduce((sum, cust) => sum + parseFloat(cust.lifetime_revenue || 0), 0);
+    html += '<div style="border-top: 2px solid #333; padding-top: 10px; margin-top: 10px; font-weight: bold;">';
+    html += `Total Yesterday: ${formatCurrency(totalYesterdayRevenue)} | Total Lifetime: ${formatCurrency(totalLifetimeRevenue)}`;
+    html += '</div>';
 
-    html += '</tbody></table>';
   } else {
-    html += '<div class="empty-state">No reactivated customers yesterday</div>';
+    html += '<div class="empty-state">No significant reactivations detected yesterday</div>';
   }
 
   return html;
@@ -859,9 +952,9 @@ function generateSection2(data) {
     html += '<div class="alert-box green">✓ No high-value lines ($200K+) past due</div>';
   }
 
-  // 2.2B Top 5 Late SO Lines (Under $200K)
-  html += '<div class="subsection-header">Top 5 Late SO Lines (Under $200K, 3-31 days past due)</div>';
-  html += '<div style="font-size: 11px; color: #666; margin-bottom: 8px;">🟡 Yellow: 3-7 days late | 🔴 Red: 8+ days late | Unshipped amounts shown</div>';
+  // 2.2B Top 15 Scheduled to Ship This Month (by GP) - 5 visible + 10 collapsible
+  html += '<div class="subsection-header">Top 5 Scheduled to Ship This Month (by GP)</div>';
+  html += '<div style="font-size: 11px; color: #666; margin-bottom: 8px;">🔴 Not in stock + past due | 🟡 Not in stock OR due soon | 🟢 In stock + future</div>';
   if (data.top5LateLines.length > 0) {
     html += `<table>
       <thead>
@@ -870,39 +963,105 @@ function generateSection2(data) {
           <th>SO#</th>
           <th style="text-align: center;">Ln</th>
           <th>MPN</th>
+          <th style="text-align: center;">Stock</th>
+          <th style="text-align: center;">Action</th>
           <th>ISE</th>
           <th>Rgn</th>
           <th>Promise</th>
-          <th style="text-align: center;">Late</th>
-          <th style="text-align: right;">Qty</th>
+          <th style="text-align: center;">Days</th>
           <th style="text-align: right;">Revenue</th>
           <th style="text-align: right;">GP</th>
         </tr>
       </thead>
       <tbody>`;
 
-    data.top5LateLines.forEach(line => {
-      const rowColor = line.color_code === 'red' ? '#ffebee' : '#fff9c4';
-      const daysLateColor = line.color_code === 'red' ? '#d32f2f' : '#f57c00';
+    // Show first 5 lines (always visible)
+    data.top5LateLines.slice(0, 5).forEach(line => {
+      const rowColor = line.color_code === 'red' ? '#ffebee' : line.color_code === 'yellow' ? '#fff9c4' : '#e8f5e9';
+      const daysColor = line.color_code === 'red' ? '#d32f2f' : line.color_code === 'yellow' ? '#f57c00' : '#2e7d32';
+      const daysText = parseInt(line.days_until_promise) >= 0 ? `+${line.days_until_promise}` : line.days_until_promise;
+      const actionEmoji = line.action_status === 'red' ? '🔴' : line.action_status === 'yellow' ? '🟡' : '🟢';
       html += `
         <tr style="background-color: ${rowColor};">
           <td style="font-size: 11px;"><strong>${line.customer_name}</strong></td>
           <td style="font-size: 10px;">${line.sales_order}</td>
           <td style="text-align: center; font-size: 10px;">${line.line_number}</td>
           <td style="font-size: 9px;">${line.mpn || 'N/A'}</td>
+          <td style="text-align: center; font-size: 10px;">${line.in_stock}</td>
+          <td style="text-align: center; font-size: 11px;">${actionEmoji}</td>
           <td style="font-size: 10px;">${line.ise_name || 'N/A'}</td>
           <td style="font-size: 10px;">${line.region}</td>
           <td style="font-size: 10px;">${line.promise_date}</td>
-          <td style="text-align: center; color: ${daysLateColor}; font-weight: bold; font-size: 10px;">${line.days_late}</td>
-          <td class="number" style="font-size: 10px;">${formatNumber(line.qty_unshipped)}</td>
-          <td class="number" style="font-size: 11px;">${formatCurrency(line.line_revenue)}</td>
-          <td class="number" style="font-size: 11px;">${formatCurrency(line.line_gp)}</td>
+          <td style="text-align: center; color: ${daysColor}; font-weight: bold; font-size: 10px;">${daysText}</td>
+          <td class="number">${formatCurrency(line.line_revenue)}</td>
+          <td class="number">${formatCurrency(line.line_gp)}</td>
         </tr>`;
     });
 
     html += '</tbody></table>';
+
+    // Add collapsible section for lines 6-15 if available
+    if (data.top5LateLines.length > 5) {
+      html += `
+        <input type="checkbox" id="toggle-lines" style="display:none;">
+        <label for="toggle-lines" style="cursor: pointer; font-weight: 600; color: #1a1a1a; padding: 8px; background: #f8fafc; border-radius: 4px; border: 1px solid #e2e8f0; display: block; margin-top: 8px; user-select: none;">
+          <span class="toggle-icon-lines">▶</span> 📋 Show Next ${Math.min(data.top5LateLines.length - 5, 10)} Lines (by GP)
+        </label>
+        <div class="collapsible-content-lines" style="display: none; margin-top: 8px;">
+          <table style="margin-top: 8px;">
+            <thead>
+              <tr>
+                <th>Customer</th>
+                <th>SO#</th>
+                <th style="text-align: center;">Ln</th>
+                <th>MPN</th>
+                <th style="text-align: center;">Stock</th>
+                <th style="text-align: center;">Action</th>
+                <th>ISE</th>
+                <th>Rgn</th>
+                <th>Promise</th>
+                <th style="text-align: center;">Days</th>
+                <th style="text-align: right;">Revenue</th>
+                <th style="text-align: right;">GP</th>
+              </tr>
+            </thead>
+            <tbody>`;
+
+      // Show lines 6-15 (collapsible)
+      data.top5LateLines.slice(5, 15).forEach(line => {
+        const rowColor = line.color_code === 'red' ? '#ffebee' : line.color_code === 'yellow' ? '#fff9c4' : '#e8f5e9';
+        const daysColor = line.color_code === 'red' ? '#d32f2f' : line.color_code === 'yellow' ? '#f57c00' : '#2e7d32';
+        const daysText = parseInt(line.days_until_promise) >= 0 ? `+${line.days_until_promise}` : line.days_until_promise;
+        const actionEmoji = line.action_status === 'red' ? '🔴' : line.action_status === 'yellow' ? '🟡' : '🟢';
+        html += `
+          <tr style="background-color: ${rowColor};">
+            <td style="font-size: 11px;"><strong>${line.customer_name}</strong></td>
+            <td style="font-size: 10px;">${line.sales_order}</td>
+            <td style="text-align: center; font-size: 10px;">${line.line_number}</td>
+            <td style="font-size: 9px;">${line.mpn || 'N/A'}</td>
+            <td style="text-align: center; font-size: 10px;">${line.in_stock}</td>
+            <td style="text-align: center; font-size: 11px;">${actionEmoji}</td>
+            <td style="font-size: 10px;">${line.ise_name || 'N/A'}</td>
+            <td style="font-size: 10px;">${line.region}</td>
+            <td style="font-size: 10px;">${line.promise_date}</td>
+            <td style="text-align: center; color: ${daysColor}; font-weight: bold; font-size: 10px;">${daysText}</td>
+            <td class="number">${formatCurrency(line.line_revenue)}</td>
+            <td class="number">${formatCurrency(line.line_gp)}</td>
+          </tr>`;
+      });
+
+      html += `
+            </tbody>
+          </table>
+        </div>
+        <style>
+          #toggle-lines:checked ~ .collapsible-content-lines { display: block !important; }
+          #toggle-lines:checked ~ label .toggle-icon-lines::before { content: "▼"; }
+          .toggle-icon-lines::before { content: "▶"; }
+        </style>`;
+    }
   } else {
-    html += '<div class="alert-box green">✓ No smaller lines (<$200K) past due</div>';
+    html += '<div class="alert-box green">✓ No unshipped lines scheduled this month</div>';
   }
 
   // 2.3 ISE Alerts
@@ -1048,22 +1207,22 @@ function generateFooter() {
 
     <strong>Section 1: Yesterday's Top Wins</strong>
     <ul>
-      <li><strong>Top 5 Orders:</strong> Orders booked yesterday ranked by revenue</li>
-      <li><strong>New Customers Sold:</strong> Customers placing their first order ever</li>
+      <li><strong>Top 15 Orders:</strong> Orders booked yesterday ranked by revenue (top 5 visible, next 10 collapsible). *Note: When GP = $0, pricecost field is null (cost data not yet entered).</li>
+      <li><strong>New Customers Sold:</strong> Customers placing their first order ever (includes BP ID for reference)</li>
       <li><strong>Strategic Accounts:</strong> ABB, Eaton, GE Healthcare, Parker-Meggitt, RTX, Thales</li>
-      <li><strong>Reactivated Customers:</strong> Customer IDs with no orders in the past 6+ months</li>
+      <li><strong>Customers Reactivated Yesterday:</strong> Hybrid tracking approach with 30-day minimum threshold. <strong>OEM/EMS customers only</strong> - excludes brokers, distributors, traders, and surplus dealers. Excludes non-component transactions (Generic Sales Product, qty=0 orders). OEMs (ABB, Eaton, GE, KLA, Marvell, Parker, Plexus, RTX, Viavi, etc.) tracked at facility level to catch dormant locations. Others tracked at customer level. Strong filters: High-value (≥$100K + 90+ days), Anomalous pattern (>3x typical cycle + 30+ days), Small customers (<10 orders + 120+ days), or Long dormant (180+ days). Limited to top 5 by significance score.</li>
     </ul>
 
     <strong>Section 2: Needs Attention</strong>
     <ul>
-      <li><strong>Late Shipments:</strong> 3+ days past promise date AND ($200K+ revenue OR strategic account OR new customer first order)</li>
-      <li><strong>ISE Alerts:</strong> Inside sales reps with no RFQ loaded in 3+ business days (Yellow: 3-6 days, Red: 7+ days)</li>
+      <li><strong>Top 15 Scheduled to Ship This Month:</strong> Unshipped lines with promise date in current month, ranked by GP (top 5 visible, next 10 collapsible). Includes In Stock (Y/N) and Action status: 🔴 Red = not in stock + past due (urgent), 🟡 Yellow = not in stock OR due this week (attention needed), 🟢 Green = in stock + future (OK).</li>
+      <li><strong>ISE Alerts:</strong> Inside sales reps with no RFQ loaded in 3+ business days (Yellow: 3-6 days, Red: 7+ days). Active sellers only (excludes departed India & Korea teams).</li>
       <li><strong>Low Margin Trail:</strong> Orders <18% GM (Josh-approved audit trail)</li>
     </ul>
 
     <strong>Section 3: Yesterday's Activity</strong>
     <ul>
-      <li><strong>Regions:</strong> USA (Jeff Wallace), MEX (Joel Marquez), APAC-Laurel (Laurel Kee), APAC-Silvia (Silvia Munoz), APAC-Lavanya (Lavanya Manohar), Other</li>
+      <li><strong>Regions:</strong> USA (Jeff Wallace), MEX (Joel Marquez), APAC-Laurel (Laurel Kee), APAC-Silvia (Silvia Munoz), Other</li>
     </ul>
 
     <div style="margin-top: 8px; padding-top: 8px; border-top: 1px solid #ddd;">
@@ -1088,7 +1247,7 @@ async function main() {
 
   // Save outputs
   const today = new Date().toISOString().split('T')[0];
-  const outputDir = path.join(__dirname, '../output');
+  const outputDir = path.join(__dirname, '../output/vp-briefs');
 
   if (!fs.existsSync(outputDir)) {
     fs.mkdirSync(outputDir, { recursive: true });
