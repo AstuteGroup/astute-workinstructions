@@ -11,8 +11,15 @@ Run: node /home/analytics_user/workspace/astute-workinstructions/shared/email-wo
 
 If 0 unseen messages, print "STOCKRFQ-CQ-AGENT SUMMARY: no unseen messages" and exit.
 
-STEP 3 — Process each message.
-For every UID returned, follow the per-message decision tree from the .md:
+STEP 3 — Process each message (WITH LIMITS).
+
+**BATCH LIMIT:** Process at most 15 emails per run. If there are more than 15 unseen messages, process the first 15 and leave the rest for the next cron tick. This prevents overwhelming OT with too many API calls in one run.
+
+**DURATION LIMIT:** If you have been running for more than 20 minutes, stop processing and print your summary. The next tick will continue with remaining emails. Check elapsed time after every 5 emails.
+
+**OT ERROR HANDLING:** If you get 3 or more consecutive 5xx errors from OT (writeCQ, patchRecord, etc.), STOP immediately — OT is likely overloaded. Print your partial summary and exit. Do not keep hammering a struggling server.
+
+For each UID (up to the batch limit), follow the per-message decision tree from the .md:
 
   3.1 — Run `read <uid> --workflow stockrfq-cq` to fetch body + headers (message_id, in_reply_to, references) + parsed forwarded headers + external_sender.
 

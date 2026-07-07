@@ -19,6 +19,12 @@
  *   needsOT      — true if the job writes to iDempiere REST API. Triggers OT health gate.
  *   logFile      — where the job's stdout/stderr is appended
  *   description  — one-line human-readable summary (shown in install output)
+ *   tier         — (optional) 'agent' for Claude-powered jobs; affects timeout default
+ *   timeoutMs    — (optional) hard execution timeout in ms. Defaults:
+ *                    - tier='agent': 30 min (1800000 ms) — Claude CLI has --max-turns
+ *                    - regular jobs: 2 hours (7200000 ms)
+ *                  Jobs exceeding this are killed with SIGTERM then SIGKILL.
+ *                  Added 2026-07-07 after stockrfq-cq-agent caused OT crash.
  */
 
 'use strict';
@@ -187,7 +193,7 @@ module.exports = [
     // is now unused by cron (kept on disk for history / possible reinstatement).
     // Revisit cadence if inbound latency becomes an issue or the workflow changes.
     cadence: 'every 1h',
-    cadenceCron: '0 * * * *',
+    cadenceCron: '3 * * * *',
     command: `/home/analytics_user/.local/bin/claude -p --model sonnet --permission-mode bypassPermissions --max-turns 80 < "${ASTUTE}/Trading Analysis/Stock RFQ Loading/agent-prompt.txt"`,
     cwd: AGENT_CWD,
     needsOT: true,
@@ -204,7 +210,7 @@ module.exports = [
     // capture with no live-decision pressure. Still content-gated, so an empty
     // OutboundPending hour costs zero LLM launches.
     cadence: 'every 1h',
-    cadenceCron: '5 * * * *',
+    cadenceCron: '8 * * * *',
     command: `if node "${ASTUTE}/scripts/should-run-stockrfq-cq-agent.js"; then /home/analytics_user/.local/bin/claude -p --model sonnet --permission-mode bypassPermissions --max-turns 120 < "${ASTUTE}/Trading Analysis/Stock RFQ Loading/cq-agent-prompt.txt"; fi`,
     cwd: AGENT_CWD,
     needsOT: true,
@@ -222,7 +228,7 @@ module.exports = [
     // polling for ~10m after an approval email goes out, then drops to
     // every-30m. Tunable via RFQLOADING_BURST_WINDOW_MIN env.
     cadence: 'every 5m',
-    cadenceCron: '*/5 * * * *',
+    cadenceCron: '1-59/5 * * * *',
     command: `if node "${ASTUTE}/scripts/should-run-rfqloading-agent.js"; then /home/analytics_user/.local/bin/claude -p --model sonnet --permission-mode bypassPermissions --max-turns 80 < "${ASTUTE}/Trading Analysis/RFQ Loading/agent-prompt.txt"; fi`,
     cwd: AGENT_CWD,
     needsOT: true,
@@ -250,7 +256,7 @@ module.exports = [
     name: 'vq-loading-agent',
     tier: 'agent',  // Claude-powered — paused by .cron-agents-paused
     cadence: 'every 5m',
-    cadenceCron: '*/5 * * * *',
+    cadenceCron: '2-59/5 * * * *',
     command: `if node "${ASTUTE}/scripts/should-run-vq-loading-agent.js"; then /home/analytics_user/.local/bin/claude -p --model sonnet --permission-mode bypassPermissions --max-turns 120 < "${ASTUTE}/Trading Analysis/RFQ Sourcing/vq_loading/agent-prompt.txt"; fi`,
     cwd: AGENT_CWD,
     needsOT: true,
@@ -287,7 +293,7 @@ module.exports = [
     name: 'broker-offers-agent',
     tier: 'agent',  // Claude-powered — paused by .cron-agents-paused
     cadence: 'every 30m',
-    cadenceCron: '*/30 * * * *',
+    cadenceCron: '9,39 * * * *',
     command: `/home/analytics_user/.local/bin/claude -p --model sonnet --permission-mode bypassPermissions --max-turns 80 < "${ASTUTE}/Trading Analysis/Broker Offers/agent-prompt.txt"`,
     cwd: AGENT_CWD,
     needsOT: true,
@@ -300,7 +306,7 @@ module.exports = [
     name: 'tracking-agent',
     tier: 'agent',  // Claude-powered — paused by .cron-agents-paused
     cadence: 'every 15m',
-    cadenceCron: '*/15 * * * *',
+    cadenceCron: '4,19,34,49 * * * *',
     command: `/home/analytics_user/.local/bin/claude -p --model sonnet --permission-mode bypassPermissions --max-turns 40 < "${ASTUTE}/Trading Analysis/Tracking Loading/agent-prompt.txt"`,
     cwd: AGENT_CWD,
     needsOT: true,
@@ -515,18 +521,8 @@ module.exports = [
   // },
 
   // ─── SALES PULSE REPORTS ───────────────────────────────────────────────────
-  {
-    name: 'vp-daily-brief',
-    cadence: 'fixed',
-    // 13:00 UTC = 6:00 AM PDT (summer) / 5:00 AM PST (winter) — Mon-Fri
-    // Note: DST causes 1-hour shift between summer/winter
-    cadenceCron: '0 13 * * 1-5',
-    command: `node "${ASTUTE}/Sales Pulse Daily/scripts/email-vp-daily-brief.js"`,
-    cwd: ASTUTE,
-    needsOT: true,
-    logFile: '/tmp/vp-daily-brief.log',
-    description: 'Mon-Fri 13:00 UTC (6am PDT / 5am PST) — VP Daily Brief for Josh Pucci. Generates report + emails to josh.pucci@ and melissa.bojar@',
-  },
+  // vp-daily-brief removed 2026-07-06: now runs from melissa.bojar's own crontab (owner-run). Do NOT re-add here or the fleet double-sends.
+
 ];
 
 // Helper: convert cadence string to milliseconds (used by sentinel + runner).

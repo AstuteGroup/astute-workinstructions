@@ -111,7 +111,25 @@ The drift check covers:
 
 ---
 
-## 8. Workflow Parity Check
+## 8. Hung Job Check
+
+Run `node ~/workspace/astute-workinstructions/scripts/check-hung-jobs.js --quiet`. If it exits non-zero (hung or stale jobs detected), surface the output at the top of the greeting under **Hung jobs detected:** so the operator can decide whether to kill them.
+
+The check detects:
+- Lock files held by dead PIDs (should auto-reclaim but verify)
+- Jobs running longer than their timeout (hung processes)
+- Jobs approaching their timeout threshold (warning)
+
+If issues are found, offer to run `--fix` to clean them up:
+```bash
+node ~/workspace/astute-workinstructions/scripts/check-hung-jobs.js --fix
+```
+
+Added 2026-07-07 after stockrfq-cq-agent ran for 69 minutes and crashed OT.
+
+---
+
+## 9. Workflow Parity Check
 
 Run `node ~/workspace/astute-workinstructions/scripts/check-workflow-parity.js --quiet`. If it exits non-zero (drift between `shared/workflow-registry.js` and the actual handler/cron code), surface the output at the top of the greeting under **Workflow drift detected:** — this means a recent change to one email-driven workflow wasn't propagated.
 
