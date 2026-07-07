@@ -157,19 +157,19 @@ function parseFranchiseRequest(subject) {
 
 /**
  * Extract a 7-digit RFQ number. Looks at subject first, then body.
- * Prefers numbers preceded by "RFQ" (e.g. "RFQ 1130895", "RFQ #1130895").
- * Falls back to the first standalone 7-digit run.
+ * Prefers numbers preceded by "RFQ" (e.g. "RFQ 1130895", "RFQ #1130895",
+ * "RFQ_1138852"). Falls back to the first standalone 7-digit run.
  */
 function extractRfqNumber(subject, body) {
   const sources = [subject || '', body || ''];
-  // Pass 1: "RFQ" + number
+  // Pass 1: "RFQ" + number (allows space, #, :, _, or nothing as separator)
   for (const src of sources) {
-    const m = src.match(/RFQ[\s#:]*?(\d{7})/i);
+    const m = src.match(/RFQ[\s#:_]*(\d{7})/i);
     if (m) return m[1];
   }
-  // Pass 2: bare 7-digit
+  // Pass 2: bare 7-digit (handles underscore prefix since _ is a word char)
   for (const src of sources) {
-    const m = src.match(/\b(\d{7})\b/);
+    const m = src.match(/(?:^|[^\d])(\d{7})(?:$|[^\d])/);
     if (m) return m[1];
   }
   return null;
