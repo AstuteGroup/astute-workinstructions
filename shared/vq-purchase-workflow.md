@@ -3,7 +3,7 @@
 **Scope:** The complete process for marking a VQ as purchased (`IsPurchased='Y'`) and posting the approve-order R_Request. This is the single source of truth for VQ purchase completion.
 
 **Sister documents:**
-- `shared/data-model.md` — Tier 1 vs Tier 2 field definitions
+- `shared/data-model.md` — VQ field definitions
 - `shared/r-requests.md` — R_Request payload template and routing
 - `shared/api-writeback.md` — general REST patterns
 
@@ -14,13 +14,48 @@
 
 ---
 
+## Anti-Patterns (DO NOT DO THIS)
+
+**These patterns bypass validation and WILL produce broken approvals:**
+
+```javascript
+// ❌ WRONG — bypasses validation, VQ may have missing fields
+await patchRecord('chuboe_vq_line', vqId, { IsPurchased: 'Y' });
+
+// ❌ WRONG — bypasses validation, R_Request won't link to RFQ
+await apiPost('r_request', {
+  R_RequestType_ID: 1000000,
+  Summary: 'approve order — ...',
+  // ... missing AD_Table_ID, Record_ID, validation
+});
+```
+
+**Use the enforced wrappers instead:**
+
+```javascript
+// ✓ CORRECT — validates all required fields, then ticks
+const { tickVQForPurchase } = require('../shared/vq-patcher');
+await tickVQForPurchase(vqId, { program: 'LAM_KITTING', extra: {...} });
+
+// ✓ CORRECT — validates VQ is ticked, links to RFQ
+const { postApproveOrder } = require('../shared/r-request-writer');
+await postApproveOrder({ vqId, rfqId, program, summary, approvalText });
+```
+
+**Why this matters:** On 2026-07-07, approval 1166798 was posted via direct API calls. Result:
+- All 9 VQs had `IsPurchased='N'` (not ticked)
+- R_Request had empty `record_id` (not linked to RFQ)
+- Multiple required fields missing (Date Code, Traceability, Warehouse, etc.)
+
+---
+
 ## End-to-End Workflow
 
-### Step 1: Ensure VQ Exists with Tier 1 Fields
+### Step 1: Ensure VQ Exists with Basic Fields
 
-The VQ must exist in OT with all Tier 1 fields populated. Tier 1 fields are written at VQ Loading time (see `vq-loading.md`).
+The VQ must exist in OT with all basic fields populated. These are written at VQ Loading time (see `vq-loading.md`).
 
-**Tier 1 fields (required at VQ creation):**
+**Basic VQ fields (populated at creation):**
 | Field | Column | Default |
 |-------|--------|---------|
 | MPN | `chuboe_mpn` | From vendor quote |
@@ -36,16 +71,37 @@ The VQ must exist in OT with all Tier 1 fields populated. Tier 1 fields are writ
 
 ---
 
-### Step 2: Populate Tier 2 Fields (Do Not Skip)
+### Step 2: Populate Required Fields Before Purchase (Do Not Skip)
 
-Before ticking, ALL Tier 2 fields must be populated. The validator will reject incomplete VQs.
+Before ticking, ALL fields below must be populated. **The validator (`vq-purchase-validator.js`) will reject incomplete VQs.**
 
-**Tier 2 fields (required for purchase):**
+**⚠️ CRITICAL: These three fields are frequently missed and WILL block PO processing:**
+- **MFR** (`chuboe_mfr_id`) — manufacturer must be resolved
+- **COO** (`c_country_id`) — country of origin (use PENDING=1000001 if unknown)
+- **Partner Location** (`c_bpartner_location_id`) — vendor's ship-from address
+
+**Fields required before purchase:**
 
 | Field | Column | Source / Default | Notes |
 |-------|--------|------------------|-------|
-| **Date Code** | `chuboe_date_code` | Vendor quote | e.g., "24+", "2023", "STOCK" |
-| **Lead Time** | `chuboe_lead_time` | Vendor quote | e.g., "STOCK", "3 WEEKS", "STOCK - 1 WEEK" |
+| **MFR** | `chuboe_mfr_id` | **REQUIRED** | Must be a non-system MFR record. Resolve via `mfr-lookup.js`. |
+| **COO** | `c_country_id` | **REQUIRED** | Country of origin. Use PENDING (1000001) if vendor didn't provide. |
+| **Partner Location** | `c_bpartner_location_id` | **REQUIRED** | Vendor's ship-from address. Look up via `c_bpartner_location`. |
+| **Date Code** | `chuboe_date_code` | Vendor quote | e.g., "24+", "2023", "2 years" — see defaults below |
+| **Lead Time** | `chuboe_lead_time` | Vendor quote | e.g., "STOCK", "3 WEEKS" — see defaults below |
+
+**Date Code / Lead Time Defaults (from `shared/vq-writer.js`):**
+
+For **franchise/authorized vendors** (Mouser, DigiKey, TTI, Master, etc.) when the vendor quote doesn't specify:
+
+| Row Type | Date Code Default | Lead Time Default |
+|----------|-------------------|-------------------|
+| Stock (in-stock parts) | `(current year - 2)+` e.g., "24+" | "STOCK" |
+| Lead time (ordered parts) | `(current year)+` e.g., "26+" | Specific time from vendor |
+
+**Do NOT confuse these fields:**
+- **Date Code** = manufacturing date stamp (e.g., "24+", "2023", "2 years")
+- **Lead Time** = availability (e.g., "STOCK", "3 WEEKS", "IN STOCK")
 | **Promise Date** | `datepromised` | Calculated | See derivation rules below |
 | **Due Date** | `duedate` | Same as promise date | |
 | **Packaging** | `chuboe_packaging_id` | Vendor quote | REEL, CUT TAPE, BULK, TRAY, etc. |
@@ -54,7 +110,16 @@ Before ticking, ALL Tier 2 fields must be populated. The validator will reject i
 | **Warehouse Group** | `chuboe_warehouse_group_id` | Deal-specific | See program defaults |
 | **Shipper** | `m_shipper_id` | 1000003 | FedEx Ground (default) |
 | **Incoterm** | `chuboe_inco_term_id` | 1000000 | EXW (default) |
-| **Partner Location** | `c_bpartner_location_id` | BP default | Most BPs have only 1 |
+
+**Partner Location Lookup:**
+```sql
+SELECT bpl.c_bpartner_location_id, bpl.name
+FROM c_bpartner_location bpl
+WHERE bpl.c_bpartner_id = <vendor_bp_id>
+  AND bpl.isactive = 'Y'
+ORDER BY bpl.c_bpartner_location_id
+LIMIT 1;
+```
 
 **Promise Date Derivation Rules:**
 - Lead time = "stock" or "in stock" → today + 5 business days
@@ -95,7 +160,7 @@ const { tickVQForPurchase } = require('../shared/vq-patcher');
 await tickVQForPurchase(vqId, {
   program: 'LAM_KITTING',  // or 'LAM_EPG', or null for non-program VQs
   extra: {
-    // Fill any missing Tier 2 fields at tick time:
+    // Fill any missing required fields at tick time:
     Chuboe_Lead_Time: 'STOCK - 1 WEEK',
     DatePromised: '2026-04-24',
     DueDate: '2026-04-24',
@@ -467,11 +532,13 @@ The validator does NOT auto-enforce this — set explicitly in auto-purchase flo
 
 **2026-04-22:** `vq-patcher.js` created as enforced wrapper to ensure validator is never bypassed.
 
+**2026-07-08:** Approval 1166798 (Mouser POV0075257, 9 VQ lines for RFQ 1131217) posted via direct `apiPost('r_request')` instead of `postApproveOrder()`. Result: all VQs had `IsPurchased='N'`, R_Request not linked to RFQ, DATE_CODE incorrectly set to "STOCK" (lead time value). Added Anti-Patterns section to this document and North Star principle to CLAUDE.md to enforce wrapper usage.
+
 ---
 
 ## Related
 
 - `shared/data-model.md` § VQ Field Requirements
 - `shared/r-requests.md` — full R_Request reference
-- `Trading Analysis/RFQ Sourcing/vq_loading/vq-loading.md` — VQ creation (Tier 1)
+- `Trading Analysis/RFQ Sourcing/vq_loading/vq-loading.md` — VQ creation
 - `Trading Analysis/LAM EPG Award/lam-epg-order-processing.md` — LAM EPG order workflow

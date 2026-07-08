@@ -37,6 +37,39 @@ If you catch yourself thinking "I remember how this works" - STOP and read the f
 
 ---
 
+# North Star: VQ Purchase Approvals Use Enforced Wrappers
+
+**NEVER bypass the enforced wrappers when approving VQ purchases.**
+
+| Action | WRONG (direct API) | CORRECT (enforced wrapper) |
+|--------|-------------------|---------------------------|
+| Tick VQ as purchased | `patchRecord('chuboe_vq_line', id, { IsPurchased: 'Y' })` | `tickVQForPurchase(vqId, opts)` |
+| Post approval request | `apiPost('r_request', payload)` | `postApproveOrder(opts)` |
+
+**Required modules:**
+```javascript
+const { tickVQForPurchase } = require('../shared/vq-patcher');
+const { postApproveOrder } = require('../shared/r-request-writer');
+```
+
+**What the wrappers enforce:**
+- `tickVQForPurchase()` validates ALL required fields before ticking (MFR, COO, Date Code, Lead Time, Promise Date, Packaging, Traceability, Warehouse, etc.)
+- `postApproveOrder()` validates VQ is ticked AND links R_Request to the RFQ
+
+**Why this exists:** On 2026-07-07, approval request 1166798 was posted with:
+- All 9 VQs missing `IsPurchased='Y'`
+- R_Request not linked to RFQ (empty `record_id`)
+- Multiple required fields unpopulated
+
+**Full workflow:** Read `shared/vq-purchase-workflow.md` before ANY VQ approval.
+
+**Date Code / Lead Time defaults:** For franchise vendors, use logic in `shared/vq-writer.js`:
+- Stock items: Date Code = `(current year - 2)+` (e.g., "24+")
+- Lead time items: Date Code = `(current year)+` (e.g., "26+")
+- Lead Time field: "STOCK" for in-stock, or specific time (e.g., "3 WEEKS")
+
+---
+
 # Session Greeting
 
 **TRIGGER:** On `SessionStart:startup hook success`, display the greeting immediately.
@@ -175,8 +208,9 @@ At the end of each session, update the `## Recent Sessions` section in MEMORY.md
 1. **`chuboe_offer_line` CPC dedup collapse** — two lines with same CPC will merge/deactivate
 2. **`Chuboe_CPC` non-updateable** — must be set at POST time only
 3. **Stale `mfr-cache.json`** — if cache lacks `isSystem`, MPN POSTs may 500
+4. **`chuboe_offer_line` auto-creates `chuboe_offer_line_mpn`** — do NOT set `writeMpnRecords: true` or you get duplicates (discovered 2026-07-07)
 
-**Full reference:** `shared/data-model.md` § chuboe_offer_line CPC bean-callout
+**Full reference:** `shared/data-model.md` § chuboe_offer_line bean-callouts
 
 ---
 
