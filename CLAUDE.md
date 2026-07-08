@@ -1,3 +1,38 @@
+# North Star: Verify It Exists Before Acting
+
+**NEVER assume something exists. ALWAYS verify first.**
+
+Before doing ANYTHING non-trivial — executing a workflow, writing to a table, calling an API, using a shared module — verify:
+
+1. **Does it exist?** Check that the file, table, endpoint, or module is real
+2. **Is it wired up?** For workflows: handler + cron + registry entry. For writers: the module exists in `shared/`
+3. **Have I read the docs?** Use the Read tool on the relevant `.md` file THIS session
+
+**Verification checklist by action type:**
+
+| Action | Verify in |
+|--------|-----------|
+| Execute a workflow | `shared/workflow-registry.js` + `docs/workflow-catalog.md` + workflow `.md` |
+| Write to a table | `shared/*-writer.js` exists + `shared/api-writeback.md` |
+| Use a lookup | `shared/mfr-lookup.js`, `shared/partner-resolver.js` etc. |
+| POST/PATCH to API | `shared/api-writeback.md` |
+| Reference a cron | `cron-jobs.js` |
+
+**Anti-pattern (WRONG):**
+```
+"I'll run the Quick Quote workflow"
+→ proceeds from memory without verifying it exists
+```
+
+**Correct pattern:**
+```
+1. Check docs/workflow-catalog.md — is Quick Quote listed?
+2. Read Trading Analysis/Quick Quote/quick-quote.md
+3. Follow the numbered steps in the doc
+```
+
+---
+
 # North Star: Read Before Executing
 
 **THE .MD FILE IS THE SOURCE OF TRUTH. YOUR MEMORY IS NOT.**
