@@ -169,12 +169,15 @@ await tickVQForPurchase(vqId, {
 ```
 
 **What `tickVQForPurchase()` does:**
-1. Applies `extra` fields via PATCH (so validator sees final state)
-2. Runs `validateVQForPurchase()` — aborts with violation list if any check fails
-3. Auto-unticks competing VQs on the same RFQ line (unless `skipUntickCompeting: true`)
-4. PATCHes `IsPurchased='Y'` only after all validations pass
+1. Checks current buyer — if Claude Harris (API user), auto-corrects to Jake Harris (or `opts.buyerId` if specified)
+2. Applies `extra` fields (+ buyer correction) via PATCH so validator sees final state
+3. Runs `validateVQForPurchase()` — aborts with violation list if any check fails
+4. Auto-unticks competing VQs on the same RFQ line (unless `skipUntickCompeting: true`)
+5. PATCHes `IsPurchased='Y'` only after all validations pass
 
-**Return value:** `{ vqId, ticked: true, untickedCompeting: [ids...] }`
+**Return value:** `{ vqId, ticked: true, untickedCompeting: [ids...], buyerCorrected: boolean }`
+
+**Buyer correction (2026-07-08):** Claude Harris (1049524) is the API user and should not be a buyer on VQs. This allows tracking opportunities Claude created while assigning the physical buyer correctly.
 
 ---
 
