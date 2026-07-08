@@ -53,8 +53,10 @@ const { postApproveOrder } = require('../shared/r-request-writer');
 ```
 
 **What the wrappers enforce:**
-- `tickVQForPurchase()` validates ALL required fields before ticking (MFR, COO, Date Code, Lead Time, Promise Date, Packaging, Traceability, Warehouse, etc.)
-- `postApproveOrder()` validates VQ is ticked AND links R_Request to the RFQ
+- `tickVQForPurchase()` validates ALL required fields before ticking (MFR, COO, Date Code, Lead Time, Promise Date, Packaging, Traceability, Warehouse, etc.) + auto-corrects buyer from Claude Harris → Jake Harris
+- `postApproveOrder()` validates ALL VQs are ticked AND links R_Request to the RFQ
+
+**One request per supplier per RFQ:** When buying multiple VQs from the same supplier on the same RFQ (e.g., 9 parts from Mouser on one POV), create ONE R_Request containing all VQs — not separate requests per line. Pass `vqIds: [id1, id2, ...]` to validate all.
 
 **Why this exists:** On 2026-07-07, approval request 1166798 was posted with:
 - All 9 VQs missing `IsPurchased='Y'`

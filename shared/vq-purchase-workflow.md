@@ -185,6 +185,8 @@ await tickVQForPurchase(vqId, {
 
 **REQUIRED:** Use `postApproveOrder()` — do NOT `apiPost('r_request', ...)` directly.
 
+**One request per supplier per RFQ:** When buying multiple VQs from the same supplier on the same RFQ (e.g., 9 parts from Mouser on one POV), create **one** R_Request containing all VQs — not 9 separate requests. The approval text should include all RFQ Line / Vendor Quote sections for the batch.
+
 ```javascript
 const { postApproveOrder } = require('../shared/r-request-writer');
 
