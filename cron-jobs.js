@@ -396,14 +396,40 @@ module.exports = [
     name: 'per-seller-vq-digest',
     cadence: 'fixed',
     // 10:05 UTC — 5 min after APAC digest so they don't race
-    // Sends each seller their own email with VQs loaded by APAC buyers for their RFQs.
-    // Each RFQ gets its own Excel tab. CC: buyers + Ivy + Jake.
+    // Sends each NON-ASIA seller their own email with VQs loaded by APAC buyers.
+    // Asia sellers are excluded — they get per-seller-vq-digest-asia twice daily.
     cadenceCron: '5 10 * * *',
     command: `node "${ASTUTE}/Trading Analysis/RFQ Sourcing/vq_loading/per-seller-vq-digest.js" --send`,
     cwd: ASTUTE,
     needsOT: false,
     logFile: '/tmp/per-seller-vq-digest.log',
-    description: 'Daily 10:05 UTC — Per-seller VQ digest (APAC buyers only). One email per seller with tabs by RFQ. CC buyers + Ivy + Jake. Window driven by .seller-vq-digest-state.json.',
+    description: 'Daily 10:05 UTC — Per-seller VQ digest for NON-ASIA sellers only (APAC buyers). Asia sellers excluded — they get twice-daily digest.',
+  },
+
+  {
+    name: 'per-seller-vq-digest-asia-am',
+    cadence: 'fixed',
+    // 03:00 UTC = 11 AM Shenzhen (UTC+8). Morning digest for Asia sellers.
+    // Rolling window: covers overnight activity since 5 PM previous day (~18h).
+    cadenceCron: '0 3 * * *',
+    command: `node "${ASTUTE}/Trading Analysis/RFQ Sourcing/vq_loading/per-seller-vq-digest-asia.js" --send`,
+    cwd: ASTUTE,
+    needsOT: false,
+    logFile: '/tmp/per-seller-vq-digest-asia.log',
+    description: 'Daily 03:00 UTC (11 AM Shenzhen) — Asia sellers VQ digest (morning). Rolling window since last digest.',
+  },
+
+  {
+    name: 'per-seller-vq-digest-asia-pm',
+    cadence: 'fixed',
+    // 09:00 UTC = 5 PM Shenzhen (UTC+8). Evening digest for Asia sellers.
+    // Rolling window: covers workday activity since 11 AM (~6h).
+    cadenceCron: '0 9 * * *',
+    command: `node "${ASTUTE}/Trading Analysis/RFQ Sourcing/vq_loading/per-seller-vq-digest-asia.js" --send`,
+    cwd: ASTUTE,
+    needsOT: false,
+    logFile: '/tmp/per-seller-vq-digest-asia.log',
+    description: 'Daily 09:00 UTC (5 PM Shenzhen) — Asia sellers VQ digest (evening). Rolling window since last digest.',
   },
 
   {

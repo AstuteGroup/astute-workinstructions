@@ -34,6 +34,7 @@ const { resolveOutreachRecipients: resolveOutreachRecipientsBase } = require('..
 const breadcrumbs = require('../breadcrumbs');
 const writerAttribution = require('../writer-attribution');
 const { notifyHighFailureRate, notifyOtUnreachable } = require('../failure-rate-gate');
+const { learnVendorAlias } = require('../vendor-aliases');
 
 const JAKE_USER_ID = 1000004;
 
@@ -379,6 +380,32 @@ async function action_load_vq(payload, ctx) {
           buyerId: validatedBuyerId,
         }));
       appendAttribution(attribRows);
+
+      // ─── Vendor alias learning ─────────────────────────────────────────────
+      // When a clarify_vendor stitch succeeds, learn the original-label →
+      // resolved-BP mapping so future emails with the same label auto-resolve.
+      // See shared/vendor-aliases.js for guards (min length, not-substring, etc.)
+      if (ctx.pendingSidecar && ctx.pendingSidecar.kind === 'clarify_vendor') {
+        const originalLabel = ctx.pendingSidecar.vendor_name;
+        // Get vendor info from the first quote (all quotes in a clarify_vendor
+        // resolution share the same vendor)
+        const firstQuote = Array.isArray(quotes) && quotes.length > 0 ? quotes[0] : null;
+        const resolvedSearchKey = firstQuote && (firstQuote.vendorSearchKey || firstQuote.vendorBpId);
+        const resolvedName = firstQuote && (firstQuote.vendorName || firstQuote.vendor);
+        if (originalLabel && resolvedSearchKey) {
+          const learnResult = learnVendorAlias(originalLabel, String(resolvedSearchKey), resolvedName || null);
+          if (learnResult.learned) {
+            breadcrumbs.write({
+              cog: 'vq-loading-agent',
+              event: 'vendor-alias-learned',
+              uid: ctx.uid,
+              label: originalLabel,
+              searchKey: String(resolvedSearchKey),
+              name: resolvedName || null,
+            });
+          }
+        }
+      }
     }
 
     // Per-row failure + skip attribution. Companion to the breadcrumb COUNT
