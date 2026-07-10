@@ -714,7 +714,7 @@ async function queryPendingOrders(exclusions) {
       o.created AS po_created,
       ol.chuboe_po_string AS pov_stamp,
       CURRENT_DATE - vl.created::date AS days_stuck,
-      u.name AS created_by
+      u_buyer.name AS buyer
     FROM chuboe_vq_line vl
     JOIN chuboe_rfq_line rl ON rl.chuboe_rfq_line_id = vl.chuboe_rfq_line_id
     JOIN chuboe_rfq rfq ON rfq.chuboe_rfq_id = rl.chuboe_rfq_id
@@ -722,7 +722,7 @@ async function queryPendingOrders(exclusions) {
     LEFT JOIN c_bpartner bp_vendor ON bp_vendor.c_bpartner_id = vl.c_bpartner_id
     LEFT JOIN c_orderline ol ON ol.chuboe_vq_line_id = vl.chuboe_vq_line_id
     LEFT JOIN c_order o ON o.c_order_id = ol.c_order_id
-    LEFT JOIN ad_user u ON u.ad_user_id = vl.createdby
+    LEFT JOIN ad_user u_buyer ON u_buyer.ad_user_id = o.salesrep_id
     WHERE rfq.c_bpartner_id = ${LAM_BP_ID}
       AND rfq.isactive = 'Y'
       AND vl.isactive = 'Y'
@@ -752,7 +752,7 @@ async function queryPendingOrders(exclusions) {
     const lines = content.split('\n').filter(l => l.trim());
     if (lines.length === 0) return [];
 
-    // Pipe-separated output: vq_id|rfq_number|mpn|manufacturer|qty|cost|promise_date|vq_created|ispurchased|supplier|ot_po_number|po_created|pov_stamp|days_stuck|created_by
+    // Pipe-separated output: vq_id|rfq_number|mpn|manufacturer|qty|cost|promise_date|vq_created|ispurchased|supplier|ot_po_number|po_created|pov_stamp|days_stuck|buyer
     const results = [];
 
     for (const line of lines) {
@@ -781,7 +781,7 @@ async function queryPendingOrders(exclusions) {
         po_created: values[11] || '',
         pov_stamp: values[12] || '',
         days_stuck: parseInt(values[13]) || 0,
-        created_by: values[14] || '',
+        buyer: values[14] || '',
       });
     }
 
@@ -830,7 +830,7 @@ function writeExcel(results, outputPath) {
     'Promise Date': r.promise_date ? r.promise_date.split('T')[0] : '',
     'Days Stuck': r.days_stuck,
     'POV Stamp': r.pov_stamp,
-    'Created By': r.created_by,
+    'Buyer': r.buyer,
     'Status': r.ot_po_number ? 'Has OT PO - needs Infor stamp' : 'VQ ticked - needs PO',
   }));
 
@@ -852,7 +852,7 @@ function writeExcel(results, outputPath) {
     { wch: 12 },  // Promise Date
     { wch: 10 },  // Days Stuck
     { wch: 15 },  // POV Stamp
-    { wch: 15 },  // Created By
+    { wch: 15 },  // Buyer
     { wch: 30 },  // Status
   ];
 
