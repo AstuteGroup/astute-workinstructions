@@ -74,9 +74,13 @@ async function flushOutput() {
   const leadTimeOnly = sourced.filter(r => !r.franchise.inStockSupplier && r.franchise.leadTimeSupplier).length;
   const noCoverage = results.filter(r => r.sourcingStatus === 'NO COVERAGE').length;
   const notSourced = results.filter(r => r.sourcingStatus === 'SKIPPED - TIMEOUT/ERROR').length;
+  const onOrder = results.filter(r => r.sourcingStatus.startsWith('SKIPPED - PENDING')).length;
   console.log(`  In Stock: ${inStock}`);
   console.log(`  Lead Time Only: ${leadTimeOnly}`);
   console.log(`  NO COVERAGE (APIs returned no match): ${noCoverage}`);
+  if (onOrder > 0) {
+    console.log(`  Skipped (on order): ${onOrder}`);
+  }
   if (notSourced > 0) {
     console.log(`  SKIPPED - TIMEOUT/ERROR (interrupted): ${notSourced}`);
   }
@@ -127,6 +131,7 @@ async function main() {
   const moqIdx = headers.indexOf('LAM MOQ');
   const shortfallIdx = headers.indexOf('Shortfall');
   const mfrIdx = headers.indexOf('Manufacturer');
+  const priorityIdx = headers.indexOf('Priority');
 
   if (mpnIdx === -1) {
     console.error('ERROR: MPN column not found');
@@ -138,7 +143,18 @@ async function main() {
     process.exit(1);
   }
 
-  console.log(`  ${csv.rows.length} items to source`);
+  // Skip PENDING RECEIPT and PENDING ORDER PLACEMENT items — already on order, no need to source
+  const SKIP_PRIORITIES = ['PENDING RECEIPT', 'PENDING ORDER PLACEMENT'];
+  const toSkip = priorityIdx >= 0
+    ? csv.rows.filter(r => SKIP_PRIORITIES.includes(r[priorityIdx])).length
+    : 0;
+  const toSource = csv.rows.length - toSkip;
+
+  console.log(`  ${csv.rows.length} total items`);
+  if (toSkip > 0) {
+    console.log(`  ${toSkip} items skipped (PENDING RECEIPT/ORDER PLACEMENT — already on order)`);
+  }
+  console.log(`  ${toSource} items to source`);
   console.log(`  Querying at MAX(MOQ, Shortfall) for accurate pricing`);
   console.log('');
 
@@ -178,14 +194,25 @@ async function main() {
   console.log('Running franchise screening...');
   console.log('');
 
+  let sourcedCount = 0;
   for (let i = 0; i < csv.rows.length; i++) {
     const row = csv.rows[i];
     const mpn = row[mpnIdx];
+    const priority = priorityIdx >= 0 ? row[priorityIdx] : '';
+
+    // Skip items already on order — no need to source
+    if (SKIP_PRIORITIES.includes(priority)) {
+      results[i].sourcingStatus = `SKIPPED - ${priority}`;
+      console.log(`[${i + 1}/${csv.rows.length}] ${mpn} — skipped (${priority})`);
+      continue;
+    }
+
+    sourcedCount++;
     const moq = parseInt(row[moqIdx]) || 100;
     const shortfall = shortfallIdx >= 0 ? (parseInt(row[shortfallIdx]) || 0) : 0;
     const queryQty = Math.max(moq, shortfall);
 
-    console.log(`[${i + 1}/${csv.rows.length}] ${mpn} (qty: ${queryQty}, MOQ: ${moq}, shortfall: ${shortfall})`);
+    console.log(`[${sourcedCount}/${toSource}] ${mpn} (qty: ${queryQty}, MOQ: ${moq}, shortfall: ${shortfall})`);
 
     try {
       // Query all franchise APIs at MOQ — sourcing workflow runs unchanged for
@@ -498,6 +525,16 @@ async function writeEnrichedOutput(results, originalHeaders, outputPath) {
       const cell = excelRow.getCell(statusCol);
       cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFD580' } };
       cell.font = { bold: true };
+    }
+
+    // W115 Stale Inventory cell — amber highlight when YES
+    const staleCol = allHeaders.indexOf('W115 Stale Inventory') + 1;
+    if (staleCol > 0) {
+      const staleVal = row[staleCol - 1];
+      if (staleVal === 'YES') {
+        const cell = excelRow.getCell(staleCol);
+        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFD580' } };
+      }
     }
   }
 

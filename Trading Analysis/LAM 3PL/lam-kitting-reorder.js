@@ -2,14 +2,27 @@
 /**
  * LAM 3PL Reorder Script
  *
- * Compares W111 + W115 inventory levels against MIN QTY thresholds
+ * Compares W111 + W115 inventory levels against Reorder Threshold
  * to generate reorder alerts with historical purchase data.
  *
+ * Contract data source: LAM_Master_Roster.xlsx (consolidated from Kitting DB,
+ * EPG SIPOC, and Phase 2 Adds via scripts/build-lam-master-roster.js)
+ *
+ * OUTPUT: Two files generated:
+ *   1. LAM_Reorder_Alerts_YYYY-MM-DD.csv   - Parts ready to order (approved pricing)
+ *   2. LAM_Reorder_Pending_Approvals_YYYY-MM-DD.xlsx - Parts awaiting LAM approval
+ *
+ * WORKFLOW:
+ *   - Reorder triggers identify parts needing replenishment
+ *   - Parts with approved pricing → Reorder Alerts file
+ *   - Parts needing price/lead time approval → Pending Approvals file
+ *   - When approval received (email or terminal) → update roster → part moves to Reorder
+ *
  * Usage:
- *   node lam-kitting-reorder.js <inventory-folder> <excel-file> [output-file]
+ *   node lam-kitting-reorder.js <inventory-folder> <master-roster-file> [output-file]
  *
  * Example:
- *   node lam-kitting-reorder.js "./Inventory 2026-03-11" "./Lam_Kitting_DB_03132026.xlsx"
+ *   node lam-kitting-reorder.js "./Inventory 2026-03-11" "./LAM_Master_Roster.xlsx"
  */
 
 const fs = require('fs');
@@ -22,8 +35,8 @@ const { readCSVFile } = require('../../shared/csv-utils');
 const { createNotifier } = require('../../shared/notifier');
 const { normalizeMPN } = require('../../shared/mpn-normalization');
 
-// Email configuration - same account as Inventory File Cleanup (triggered together)
-const EMAIL_ACCOUNT = 'excess';
+// Email configuration - LAM Kitting dedicated account
+const EMAIL_ACCOUNT = 'lamkitting';
 const NOTIFY_EMAIL = process.env.NOTIFY_EMAIL || 'jake.harris@astutegroup.com';
 const notifier = createNotifier({
   fromEmail: `${EMAIL_ACCOUNT}@orangetsunami.com`,
@@ -41,19 +54,29 @@ const W115_FILENAME = 'W115_LAM_Dead_Inventory.csv';
 const CHUBOE_MPN_COL = 'Chuboe_MPN';
 const CHUBOE_QTY_COL = 'Qty';
 
-// Column indices in Excel INVENTORY sheet (0-based)
-// A=0, B=1, C=2, D=3, E=4, F=5, G=6, H=7, I=8, J=9
-const EXCEL = {
-  CPC: 0,           // A - Lam P/N
-  MPN: 1,           // B - MPN
-  MANUFACTURER: 2,  // C - Manufacturer
-  DESCRIPTION: 3,   // D - Item Description
-  LEAD_TIME: 4,     // E - Lead Time
-  BASE_PRICE: 5,    // F - Base Unit Price
-  RESALE_PRICE: 6,  // G - Resale Price
-  MIN_QTY: 7,       // H - MIN QTY
-  MOQ: 8,           // I - MOQ
-  HIST_BUYER: 9     // J - Buyer (historical, from SIPOC)
+// Master Roster column names (header-based lookup, not index-based)
+// Source: LAM_Master_Roster.xlsx 'Master Roster' sheet
+// Built by scripts/build-lam-master-roster.js from 3 sources:
+//   - Lam_Kitting_DB (has thresholds)
+//   - Lam_EPG_SIPOC (no thresholds)
+//   - Phase 2 Adds (no thresholds)
+const ROSTER_COLS = {
+  CPC: 'CPC',
+  MPN: 'MPN',
+  MANUFACTURER: 'Manufacturer',
+  DESCRIPTION: 'Description',
+  AWARD: 'Award',
+  BASE_PRICE: 'Base Unit Price',
+  RESALE_PRICE: 'Resale Price',
+  PENDING: 'Pending',
+  PROPOSED_RESALE: 'Proposed Resale',
+  LAST_APPROVED: 'Last Approved',
+  THRESHOLD: 'Reorder Threshold',
+  MOQ: 'MOQ',
+  LEAD_TIME: 'Contractual Lead Time',
+  BUYER: 'Buyer',
+  STATUS: 'Status',
+  SUBMITTED_DATE: 'Submitted Date',
 };
 
 // -----------------------------------------------------------------------------
@@ -65,10 +88,10 @@ async function main() {
   const skipEmail = process.argv.includes('--no-email');
 
   if (args.length < 2) {
-    console.error('Usage: node lam-kitting-reorder.js <inventory-folder> <excel-file> [output-file] [--no-email]');
+    console.error('Usage: node lam-kitting-reorder.js <inventory-folder> <master-roster-file> [output-file] [--no-email]');
     console.error('');
     console.error('Example:');
-    console.error('  node lam-kitting-reorder.js "./Inventory 2026-03-11" "./Lam_Kitting_DB_03132026.xlsx"');
+    console.error('  node lam-kitting-reorder.js "./Inventory 2026-03-11" "./LAM_Master_Roster.xlsx"');
     process.exit(1);
   }
 
@@ -84,7 +107,7 @@ async function main() {
   console.log('LAM 3PL Reorder');
   console.log('===============');
   console.log(`Inventory folder: ${inventoryFolder}`);
-  console.log(`Excel file: ${excelFile}`);
+  console.log(`Master Roster: ${excelFile}`);
   console.log(`Output file: ${outputFile}`);
   console.log('');
 
@@ -105,11 +128,14 @@ async function main() {
   const aggregated = aggregateInventory(w111Inventory, w115Inventory);
   console.log(`  Combined: ${Object.keys(aggregated).length} unique MPNs`);
 
-  // Step 3: Load thresholds from Excel (all columns A-L except J)
+  // Step 3: Load contract data from Master Roster
   console.log('');
-  console.log('Step 3: Loading data from Excel...');
-  const excelData = loadExcelData(excelFile);
-  console.log(`  Excel rows loaded: ${Object.keys(excelData).length} MPNs`);
+  console.log('Step 3: Loading data from Master Roster...');
+  const { data: excelData, pendingApprovals } = loadExcelData(excelFile);
+  console.log(`  Master Roster rows loaded: ${Object.keys(excelData).length} MPNs`);
+  if (pendingApprovals.length > 0) {
+    console.log(`  Pending approval items: ${pendingApprovals.length}`);
+  }
 
   // Step 4: Load historical purchase data from ERP
   console.log('');
@@ -147,11 +173,36 @@ async function main() {
     }
   }
 
-  // Step 6: Generate output
+  // Step 6: Generate output files
   console.log('');
-  console.log('Step 6: Generating output...');
-  writeReorderAlerts(reorderAlerts, outputFile);
-  console.log(`  Output written to: ${outputFile}`);
+  console.log('Step 6: Generating output files...');
+
+  // 6a: Reorder Alert (parts ready to order - exclude pending approval items)
+  const readyToOrder = reorderAlerts.filter(alert => {
+    const mpn = alert.MPN;
+    const excel = excelData[mpn];
+    // Exclude if has pending approval status
+    if (excel && (excel.Pending || excel.Status === 'Pending Approval')) {
+      return false;
+    }
+    return true;
+  });
+  writeReorderAlerts(readyToOrder, outputFile);
+  console.log(`  Reorder alerts (ready to order): ${outputFile} (${readyToOrder.length} items)`);
+
+  // 6b: Pending Approvals Excel (cumulative - from roster)
+  const pendingApprovalsFile = outputFile.replace('.csv', '').replace('_Alerts', '_Pending_Approvals') + '.xlsx';
+  const pendingFile = writePendingApprovalsExcel(pendingApprovals, pendingApprovalsFile);
+
+  // 6c: Also write JSON sidecar for backward compatibility
+  if (pendingApprovals.length > 0) {
+    const pendingApprovalsJson = outputFile.replace('.csv', '_pending_approvals.json');
+    fs.writeFileSync(pendingApprovalsJson, JSON.stringify({
+      generated: new Date().toISOString(),
+      count: pendingApprovals.length,
+      items: pendingApprovals,
+    }, null, 2) + '\n');
+  }
 
   // Step 6b: Escalations sidecar (current inventory + POV state for every
   // manual-escalation MPN, even those now above threshold). Drives the
@@ -163,35 +214,47 @@ async function main() {
   console.log('');
   console.log('=== Summary ===');
   console.log(`Total items below threshold: ${reorderAlerts.length}`);
+  console.log(`  Ready to order: ${readyToOrder.length}`);
+  console.log(`  Pending LAM approval: ${pendingApprovals.length}`);
 
-  if (reorderAlerts.length > 0) {
-    const criticalPriority = reorderAlerts.filter(r => r.Priority === 'CRITICAL').length;
-    const highPriority = reorderAlerts.filter(r => r.Priority === 'HIGH').length;
-    const medPriority = reorderAlerts.filter(r => r.Priority === 'MEDIUM').length;
-    const lowPriority = reorderAlerts.filter(r => r.Priority === 'LOW').length;
-    const pendingOrder = reorderAlerts.filter(r => r.Priority === 'PENDING ORDER PLACEMENT').length;
-    const pendingReceipt = reorderAlerts.filter(r => r.Priority === 'PENDING RECEIPT').length;
+  if (readyToOrder.length > 0) {
+    const criticalPriority = readyToOrder.filter(r => r.Priority === 'CRITICAL').length;
+    const highPriority = readyToOrder.filter(r => r.Priority === 'HIGH').length;
+    const medPriority = readyToOrder.filter(r => r.Priority === 'MEDIUM').length;
+    const lowPriority = readyToOrder.filter(r => r.Priority === 'LOW').length;
+    const pendingOrder = readyToOrder.filter(r => r.Priority === 'PENDING ORDER PLACEMENT').length;
+    const pendingReceipt = readyToOrder.filter(r => r.Priority === 'PENDING RECEIPT').length;
+    console.log('');
+    console.log('Ready to Order breakdown:');
     console.log(`  CRITICAL priority (zero stock, no recent PO): ${criticalPriority}`);
     console.log(`  HIGH priority: ${highPriority}`);
     console.log(`  MEDIUM priority: ${medPriority}`);
     console.log(`  LOW priority: ${lowPriority}`);
-    console.log(`  PENDING ORDER PLACEMENT (no POV stamp yet — chase the PO): ${pendingOrder}`);
-    console.log(`  PENDING RECEIPT (POV stamped, waiting on vendor): ${pendingReceipt}`);
+    console.log(`  PENDING ORDER PLACEMENT (chase the PO): ${pendingOrder}`);
+    console.log(`  PENDING RECEIPT (waiting on vendor): ${pendingReceipt}`);
 
-    const withHistory = reorderAlerts.filter(r => r['OT Previous Supplier']).length;
+    const withHistory = readyToOrder.filter(r => r['OT Previous Supplier']).length;
     console.log(`  With historical purchase data: ${withHistory}`);
+  }
+
+  if (pendingApprovals.length > 0) {
+    const oldestDays = Math.max(...pendingApprovals.map(p => p['Days Pending'] || 0));
+    console.log('');
+    console.log('Pending Approvals breakdown:');
+    console.log(`  Total awaiting approval: ${pendingApprovals.length}`);
+    console.log(`  Oldest pending: ${oldestDays} days`);
   }
 
   // Show unmatched stats
   const inventoryMPNs = new Set(Object.keys(aggregated));
-  const excelMPNs = new Set(Object.keys(excelData));
-  const inInventoryNotExcel = [...inventoryMPNs].filter(mpn => !excelMPNs.has(mpn));
-  const inExcelNotInventory = [...excelMPNs].filter(mpn => !inventoryMPNs.has(mpn));
+  const rosterMPNs = new Set(Object.keys(excelData));
+  const inInventoryNotRoster = [...inventoryMPNs].filter(mpn => !rosterMPNs.has(mpn));
+  const inRosterNotInventory = [...rosterMPNs].filter(mpn => !inventoryMPNs.has(mpn));
 
   console.log('');
   console.log('=== Match Statistics ===');
-  console.log(`  In inventory but not in Excel: ${inInventoryNotExcel.length} MPNs`);
-  console.log(`  In Excel but not in inventory: ${inExcelNotInventory.length} MPNs`);
+  console.log(`  In inventory but not in Master Roster: ${inInventoryNotRoster.length} MPNs`);
+  console.log(`  In Master Roster but not in inventory: ${inRosterNotInventory.length} MPNs`);
 
   // Step 7: Email results (unless --no-email flag is set)
   if (skipEmail) {
@@ -200,30 +263,50 @@ async function main() {
   } else {
     console.log('');
     console.log('Step 7: Emailing results...');
-    const critCount = reorderAlerts.filter(r => r.Priority === 'CRITICAL').length;
-    const highCount = reorderAlerts.filter(r => r.Priority === 'HIGH').length;
-    const medCount = reorderAlerts.filter(r => r.Priority === 'MEDIUM').length;
-    const lowCount = reorderAlerts.filter(r => r.Priority === 'LOW').length;
-    const pendingOrderCount = reorderAlerts.filter(r => r.Priority === 'PENDING ORDER PLACEMENT').length;
-    const pendingReceiptCount = reorderAlerts.filter(r => r.Priority === 'PENDING RECEIPT').length;
+    const critCount = readyToOrder.filter(r => r.Priority === 'CRITICAL').length;
+    const highCount = readyToOrder.filter(r => r.Priority === 'HIGH').length;
+    const medCount = readyToOrder.filter(r => r.Priority === 'MEDIUM').length;
+    const lowCount = readyToOrder.filter(r => r.Priority === 'LOW').length;
+    const pendingOrderCount = readyToOrder.filter(r => r.Priority === 'PENDING ORDER PLACEMENT').length;
+    const pendingReceiptCount = readyToOrder.filter(r => r.Priority === 'PENDING RECEIPT').length;
 
-    const emailBody = `LAM 3PL Reorder Alerts generated ${getDateStamp()}.
+    // Calculate aging for pending approvals
+    const oldestPending = pendingApprovals.length > 0
+      ? Math.max(...pendingApprovals.map(p => p['Days Pending'] || 0))
+      : 0;
 
-${reorderAlerts.length} items below threshold:
+    let emailBody = `LAM 3PL Reorder Report - ${getDateStamp()}
+
+=== REORDER ALERTS (Ready to Order) ===
+${readyToOrder.length} items below threshold:
 - CRITICAL (zero stock, no recent PO): ${critCount}
 - HIGH: ${highCount}
 - MEDIUM: ${medCount}
 - LOW: ${lowCount}
-- PENDING ORDER PLACEMENT (no POV stamp yet — chase the PO): ${pendingOrderCount}
-- PENDING RECEIPT (POV stamped, waiting on vendor): ${pendingReceiptCount}
+- PENDING ORDER PLACEMENT (chase the PO): ${pendingOrderCount}
+- PENDING RECEIPT (waiting on vendor): ${pendingReceiptCount}
+
+=== PENDING APPROVALS ===
+${pendingApprovals.length} items awaiting LAM approval`;
+
+    if (pendingApprovals.length > 0) {
+      emailBody += `
+- Oldest pending: ${oldestPending} days`;
+    }
+
+    emailBody += `
 
 Inventory source: ${path.basename(inventoryFolder)}`;
 
+    // Attach both files
+    const attachments = [outputFile];
+    if (pendingFile) attachments.push(pendingFile);
+
     const sent = await sendEmail(
       NOTIFY_EMAIL,
-      `LAM 3PL Reorder Alerts - ${getDateStamp()}`,
+      `LAM 3PL Reorder Report - ${getDateStamp()}`,
       emailBody,
-      [outputFile]
+      attachments
     );
     console.log(sent ? '  Email sent.' : '  Email failed (check Himalaya config).');
   }
@@ -299,48 +382,113 @@ function aggregateInventory(w111, w115) {
 }
 
 // -----------------------------------------------------------------------------
-// Step 3: Load Excel Data (Columns A-L except J)
+// Step 3: Load Master Roster Data
 // -----------------------------------------------------------------------------
+
+// Helper to safely convert cell value to string (handles numeric MPNs with full precision)
+function cellToString(v) {
+  if (v == null) return '';
+  if (typeof v === 'number') return String(v);
+  return String(v).trim();
+}
 
 function loadExcelData(excelPath) {
   if (!fs.existsSync(excelPath)) {
-    console.error(`  ERROR: Excel file not found: ${excelPath}`);
-    return {};
+    console.error(`  ERROR: Master Roster not found: ${excelPath}`);
+    return { data: {}, pendingApprovals: [] };
   }
 
-  const workbook = XLSX.readFile(excelPath);
-  const sheet = workbook.Sheets['INVENTORY'];
+  // raw: true preserves numeric MPN cells at full precision
+  const workbook = XLSX.readFile(excelPath, { raw: true });
+  const sheet = workbook.Sheets['Master Roster'];
 
   if (!sheet) {
-    console.error('  ERROR: INVENTORY sheet not found in Excel file');
-    return {};
+    console.error('  ERROR: "Master Roster" sheet not found in Excel file');
+    return { data: {}, pendingApprovals: [] };
   }
 
-  const data = XLSX.utils.sheet_to_json(sheet, { header: 1 });
-  const excelData = {};
+  const rows = XLSX.utils.sheet_to_json(sheet, { header: 1, raw: true });
+  if (rows.length < 2) {
+    console.error('  ERROR: No data rows in Master Roster');
+    return { data: {}, pendingApprovals: [] };
+  }
 
-  // Skip header row (index 0)
-  for (let i = 1; i < data.length; i++) {
-    const row = data[i];
+  // Build column index map from header row
+  const header = rows[0];
+  const colIdx = {};
+  for (const [key, name] of Object.entries(ROSTER_COLS)) {
+    colIdx[key] = header.findIndex(h => cellToString(h) === name);
+    if (colIdx[key] < 0) {
+      console.warn(`  WARNING: Column "${name}" not found in Master Roster`);
+    }
+  }
+
+  const excelData = {};
+  const pendingApprovals = [];
+
+  // Process data rows (skip header)
+  for (let i = 1; i < rows.length; i++) {
+    const row = rows[i];
     if (!row || row.length === 0) continue;
 
-    const mpn = (row[EXCEL.MPN] || '').toString().trim();
+    const mpn = cellToString(row[colIdx.MPN]);
     if (!mpn) continue;
 
-    excelData[mpn] = {
-      CPC: (row[EXCEL.CPC] || '').toString().trim(),
-      Manufacturer: (row[EXCEL.MANUFACTURER] || '').toString().trim(),
-      Description: (row[EXCEL.DESCRIPTION] || '').toString().trim(),
-      Lead_Time: (row[EXCEL.LEAD_TIME] || '').toString().trim(),
-      Base_Unit_Price: parseFloat(row[EXCEL.BASE_PRICE]) || 0,
-      Resale_Price: parseFloat(row[EXCEL.RESALE_PRICE]) || 0,
-      MIN_QTY: parseFloat(row[EXCEL.MIN_QTY]) || 0,
-      MOQ: parseFloat(row[EXCEL.MOQ]) || 0,
-      Historical_Buyer: (row[EXCEL.HIST_BUYER] || '').toString().trim()
+    const pending = cellToString(row[colIdx.PENDING]);
+    const proposedResale = colIdx.PROPOSED_RESALE >= 0 ? row[colIdx.PROPOSED_RESALE] : null;
+
+    const status = colIdx.STATUS >= 0 ? cellToString(row[colIdx.STATUS]) : '';
+    const submittedDate = colIdx.SUBMITTED_DATE >= 0 ? cellToString(row[colIdx.SUBMITTED_DATE]) : '';
+
+    const record = {
+      CPC: cellToString(row[colIdx.CPC]),
+      Manufacturer: cellToString(row[colIdx.MANUFACTURER]),
+      Description: cellToString(row[colIdx.DESCRIPTION]),
+      Award: cellToString(row[colIdx.AWARD]),
+      Lead_Time: cellToString(row[colIdx.LEAD_TIME]),
+      Base_Unit_Price: colIdx.BASE_PRICE >= 0 ? (parseFloat(row[colIdx.BASE_PRICE]) || 0) : 0,
+      Resale_Price: colIdx.RESALE_PRICE >= 0 ? (parseFloat(row[colIdx.RESALE_PRICE]) || 0) : 0,
+      MIN_QTY: colIdx.THRESHOLD >= 0 ? (parseFloat(row[colIdx.THRESHOLD]) || 0) : 0,
+      MOQ: colIdx.MOQ >= 0 ? (parseFloat(row[colIdx.MOQ]) || 0) : 0,
+      Historical_Buyer: cellToString(row[colIdx.BUYER]),
+      // Pending approval workflow fields
+      Pending: pending,
+      Proposed_Resale: proposedResale != null ? (parseFloat(proposedResale) || null) : null,
+      Last_Approved: colIdx.LAST_APPROVED >= 0 ? cellToString(row[colIdx.LAST_APPROVED]) : '',
+      Status: status,
+      Submitted_Date: submittedDate,
     };
+
+    excelData[mpn] = record;
+
+    // Track parts with pending approval for the Pending Approvals file
+    if (pending || status === 'Pending Approval') {
+      // Calculate days pending
+      let daysPending = '';
+      if (submittedDate) {
+        const submitted = new Date(submittedDate);
+        const now = new Date();
+        daysPending = Math.floor((now - submitted) / (1000 * 60 * 60 * 24));
+      }
+
+      pendingApprovals.push({
+        MPN: mpn,
+        CPC: record.CPC,
+        Manufacturer: record.Manufacturer,
+        Description: record.Description,
+        Award: record.Award,
+        'Current Resale': record.Resale_Price,
+        'Proposed Resale': record.Proposed_Resale,
+        'Reason': pending,
+        'Submitted Date': submittedDate,
+        'Days Pending': daysPending,
+        'Last Approved': record.Last_Approved,
+        'Status': status,
+      });
+    }
   }
 
-  return excelData;
+  return { data: excelData, pendingApprovals };
 }
 
 // -----------------------------------------------------------------------------
@@ -651,7 +799,7 @@ const ALERT_COLUMNS = [
   'Item Description',
   // Inventory & priority
   'QTY ON HAND',
-  'Lam Owned Inventory?',
+  'W115 Stale Inventory',
   'Reorder Threshold',
   'Shortfall',
   'Priority',
@@ -702,7 +850,7 @@ function buildAlert(mpn, excel, totalQty, lamOwned, shortfall, priority, history
     'Manufacturer': excel.Manufacturer,
     'Item Description': excel.Description,
     'QTY ON HAND': totalQty,
-    'Lam Owned Inventory?': lamOwned,
+    'W115 Stale Inventory': lamOwned,
     'Reorder Threshold': excel.MIN_QTY,
     'Shortfall': shortfall,
     'Priority': priority,
@@ -816,6 +964,87 @@ function writeReorderAlerts(alerts, outputPath) {
   }
 
   fs.writeFileSync(outputPath, lines.join('\n'));
+}
+
+// -----------------------------------------------------------------------------
+// Write Pending Approvals Excel File
+// -----------------------------------------------------------------------------
+
+const PENDING_APPROVAL_COLUMNS = [
+  'CPC',
+  'MPN',
+  'Manufacturer',
+  'Description',
+  'Award',
+  'Current Resale',
+  'Proposed Resale',
+  'Reason',
+  'Submitted Date',
+  'Days Pending',
+  'Last Approved',
+  'Status',
+];
+
+function writePendingApprovalsExcel(pendingApprovals, outputPath) {
+  if (pendingApprovals.length === 0) {
+    console.log('  No pending approvals to write.');
+    return null;
+  }
+
+  const XLSX = require('xlsx');
+  const wb = XLSX.utils.book_new();
+
+  // Sort by days pending (oldest first) to highlight aging items
+  const sorted = [...pendingApprovals].sort((a, b) => {
+    const daysA = typeof a['Days Pending'] === 'number' ? a['Days Pending'] : -1;
+    const daysB = typeof b['Days Pending'] === 'number' ? b['Days Pending'] : -1;
+    return daysB - daysA; // Oldest first
+  });
+
+  // Create worksheet
+  const ws = XLSX.utils.json_to_sheet(sorted, { header: PENDING_APPROVAL_COLUMNS });
+
+  // Set column widths
+  ws['!cols'] = [
+    { wch: 18 },  // CPC
+    { wch: 25 },  // MPN
+    { wch: 25 },  // Manufacturer
+    { wch: 35 },  // Description
+    { wch: 8 },   // Award
+    { wch: 14 },  // Current Resale
+    { wch: 14 },  // Proposed Resale
+    { wch: 30 },  // Reason
+    { wch: 14 },  // Submitted Date
+    { wch: 12 },  // Days Pending
+    { wch: 14 },  // Last Approved
+    { wch: 15 },  // Status
+  ];
+
+  // Format currency columns
+  const range = XLSX.utils.decode_range(ws['!ref']);
+  for (let row = 1; row <= range.e.r; row++) {
+    const currentCell = ws[XLSX.utils.encode_cell({ r: row, c: 5 })]; // Current Resale
+    const proposedCell = ws[XLSX.utils.encode_cell({ r: row, c: 6 })]; // Proposed Resale
+    if (currentCell && typeof currentCell.v === 'number') currentCell.z = '$#,##0.00';
+    if (proposedCell && typeof proposedCell.v === 'number') proposedCell.z = '$#,##0.00';
+  }
+
+  XLSX.utils.book_append_sheet(wb, ws, 'Pending Approvals');
+
+  // Add summary sheet
+  const summaryData = [
+    { 'Metric': 'Total Pending', 'Value': pendingApprovals.length },
+    { 'Metric': 'Oldest (Days)', 'Value': Math.max(...pendingApprovals.map(p => p['Days Pending'] || 0)) },
+    { 'Metric': 'Generated', 'Value': new Date().toISOString().split('T')[0] },
+  ];
+  const summaryWs = XLSX.utils.json_to_sheet(summaryData);
+  summaryWs['!cols'] = [{ wch: 20 }, { wch: 20 }];
+  XLSX.utils.book_append_sheet(wb, summaryWs, 'Summary');
+
+  XLSX.writeFile(wb, outputPath);
+  console.log(`  Pending approvals written to: ${path.basename(outputPath)} (${pendingApprovals.length} items)`);
+
+  return outputPath;
 }
 
 // Write a sidecar JSON capturing the current state of every MPN listed in

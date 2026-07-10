@@ -8,23 +8,106 @@ Operational home for Astute's LAM 3PL program: W111 (LAM 3PL) + W115 (LAM Dead I
 
 ## Contract Purchase Price — Where to Look
 
-**RULE:** Any time someone asks "what is our contract purchase price for LAM on `<MPN>`?", the answer lives in one of these three files. Check them in order; the *first one that has the MPN* is authoritative (newer files supersede older for that MPN).
+**RULE:** The **LAM Master Roster** (`LAM_Master_Roster.xlsx`) is the single source of truth for all LAM contract pricing. It consolidates data from all three legacy sources.
 
-| # | Source | Path | Where the price lives | Scope |
-|---|--------|------|------------------------|-------|
-| 1 | **LAM Kitting DB** | `Trading Analysis/LAM 3PL/Lam_Kitting_DB_*.xlsx` (latest dated file) | Sheet `INVENTORY` → column `Base Unit Price` | Steady-state kitting roster (~964 parts) — the ongoing reorder program. Companion column `Resale Price` is the LAM contract resale. |
-| 2 | **EPG SIPOC (Phase 1)** | `Trading Analysis/LAM EPG Award/Lam_EPG_SIPOC.xlsx` | Sheet1 → column `Base Unit Price` | Initial EPG award (~208 parts). Watch for "averaged split pricing" — when SIPOC shows blended cost across vendors, the per-vendor `*_PO_Upload.xlsx` files in the same folder have the real per-POV unit cost. |
-| 3 | **Phase 2 Adds** | `Trading Analysis/LAM 3PL/Astute_New Part ADDS_ Working Copy - *.xlsx` (latest dated file) | Latest `Astute action list <date>` tab → column `Base Unit Price` | New parts being added to Astute's scope of supply post-EPG. Emailed bi-weekly to `rfqloading@orangetsunami.com`, subject "FW: Astute x Lam Bi-Weekly Updates." Replace the file on each new email — keep the most recent. |
+| Source | Path | Description |
+|--------|------|-------------|
+| **Master Roster** | `Trading Analysis/LAM 3PL/LAM_Master_Roster.xlsx` | Consolidated roster of all LAM parts (~1,244 parts). Sheet `Master Roster` → columns `Base Unit Price` (contract buy) and `Resale Price` (contract resale). |
 
 **Procedure:**
-1. Open the latest of file #1 (Kitting DB). Search the `INVENTORY` tab for the MPN. If found → `Base Unit Price` column is the contract buy.
-2. If not in #1 → open file #2 (EPG SIPOC). Search Sheet1.
-3. If not in #2 → open file #3 (Phase 2 Adds). Search the most recent `Astute action list <date>` tab.
-4. If not in any of the three → **no contract buy price exists** for that part under LAM. Don't guess. Report "not under contract" and offer to pull recent VQ/CQ history as a directional reference instead.
+1. Open `LAM_Master_Roster.xlsx` → sheet `Master Roster`
+2. Search for the MPN or CPC
+3. If found → `Base Unit Price` = contract buy, `Resale Price` = contract resale
+4. If not found → **no contract price exists** for that part. Report "not under contract."
 
-**Column semantics (locked):** The `Resale Price` column on the Kitting DB INVENTORY tab is explicitly called the "LAM contract resale" elsewhere in this doc. By direct symmetry, the paired `Base Unit Price` column is the contract buy. Same column name carries the same semantic on files #2 and #3.
+**Master Roster Columns:**
 
-**When a new Phase 2 Adds file arrives** (bi-weekly to `rfqloading@`): download the attachment into `Trading Analysis/LAM 3PL/`, keep prior versions for audit (don't delete), and update the "latest dated file" pointer above mentally.
+| Column | Description |
+|--------|-------------|
+| CPC | LAM Part Number |
+| MPN | Manufacturer Part Number |
+| Manufacturer | Mfr name |
+| Description | Part description |
+| Award | Award quantity |
+| Base Unit Price | Contract buy price (what we pay) |
+| Resale Price | Contract resale (what LAM pays us) |
+| Pending | Reason for pending approval (if any) |
+| Proposed Resale | New resale price being proposed |
+| Last Approved | Date of last LAM approval |
+| Reorder Threshold | Qty trigger for reorder |
+| MOQ | Minimum order quantity |
+| Contractual Lead Time | Lead time per contract |
+| Buyer | Assigned buyer |
+| Status | Part status (Has Issues, Pending Approval, etc.) |
+| Submitted Date | When approval was submitted to LAM |
+
+**Legacy sources (for reference only — data now consolidated in Master Roster):**
+- Lam_Kitting_DB_*.xlsx (original kitting roster)
+- Lam_EPG_SIPOC.xlsx (EPG award)
+- Astute_New Part ADDS_ Working Copy - *.xlsx (Phase 2 adds)
+
+---
+
+## Pending Approval Workflow
+
+When a reorder triggers a price or lead time change that needs LAM approval:
+
+### Two Output Files
+
+The reorder script generates two files:
+
+| File | Contents | Action |
+|------|----------|--------|
+| `LAM_Reorder_Alerts_YYYY-MM-DD.csv` | Parts ready to order (approved pricing) | Proceed with PO |
+| `LAM_Reorder_Pending_Approvals_YYYY-MM-DD.xlsx` | Parts awaiting LAM approval | Submit to LAM, wait for approval |
+
+Parts are mutually exclusive — a part appears on one file or the other, not both.
+
+### Marking a Part for Approval
+
+When a part needs LAM approval (price increase, lead time change, etc.):
+
+1. **Set `Pending`** = reason (e.g., "Cost increase - franchise price up 15%")
+2. **Set `Proposed Resale`** = new resale price being proposed
+3. **Set `Submitted Date`** = date submitted to LAM
+4. **Set `Status`** = "Pending Approval" (optional, for filtering)
+
+The part will appear on the Pending Approvals file (not Reorder Alerts) until approved.
+
+### Processing an Approval
+
+When LAM approves a price/lead time change:
+
+1. **Update `Resale Price`** = approved resale price
+2. **Clear `Pending`** = blank
+3. **Set `Last Approved`** = approval date
+4. **Clear `Status`** = blank (or keep other status if applicable)
+5. **Clear `Submitted Date`** = blank
+
+On next reorder run, the part moves to Reorder Alerts (ready to order).
+
+### Pending Approvals File Columns
+
+| Column | Description |
+|--------|-------------|
+| CPC | LAM Part Number |
+| MPN | Manufacturer Part Number |
+| Manufacturer | Mfr name |
+| Description | Part description |
+| Award | Award quantity |
+| Current Resale | Current contract resale |
+| Proposed Resale | New price being proposed |
+| Reason | Why approval is needed |
+| Submitted Date | When submitted to LAM |
+| Days Pending | Age (for escalation) |
+| Last Approved | Previous approval date |
+| Status | Current status |
+
+Sorted by Days Pending (oldest first) to highlight aging items.
+
+### Email Configuration
+
+All LAM workflow emails use: `lamkitting@orangetsunami.com`
 
 ---
 
@@ -34,9 +117,10 @@ Operational home for Astute's LAM 3PL program: W111 (LAM 3PL) + W115 (LAM Dead I
 |---------|-------|
 | Warehouses | W111 (LAM 3PL) + W115 (LAM Dead Inventory) — combined |
 | Trigger | Cron: Mondays at 12:00 PM (after Inventory Cleanup at 11:00 AM) |
-| Threshold Source | `Lam_Kitting_DB.xlsx` → INVENTORY sheet → Column H (Reorder Threshold) |
+| Roster Source | `LAM_Master_Roster.xlsx` → sheet `Master Roster` (~1,244 parts) |
 | Join Key | MPN (CPC not in source inventory data) |
 | Sourcing | Franchise-only — 8 APIs via `shared/franchise-api.js` |
+| Email Account | `lamkitting@orangetsunami.com` |
 | LAM bpartner_id | 1000730 |
 
 **Key Design Decisions:**
@@ -54,6 +138,7 @@ Operational home for Astute's LAM 3PL program: W111 (LAM 3PL) + W115 (LAM Dead I
 
 **Cron:** Mondays at 12:00 PM
 **Runner:** `lam-kitting-runner.js`
+**Email:** `lamkitting@orangetsunami.com`
 
 ```
 Inventory Cleanup (Monday 11:00 AM cron)
@@ -63,15 +148,22 @@ Produces W111_LAM_3PL.csv + W115_LAM_Dead_Inventory.csv
 LAM Kitting Runner (Monday 12:00 PM cron)
     ↓
 Step 1: Find today's inventory folder (or run cleanup if missing)
-Step 2: Find latest Lam_Kitting_DB*.xlsx
+Step 2: Load LAM_Master_Roster.xlsx
 Step 3: Run lam-kitting-reorder.js --no-email
+        → LAM_Reorder_Alerts_*.csv (ready to order)
+        → LAM_Reorder_Pending_Approvals_*.xlsx (awaiting LAM approval)
+        → "Available Stock (Other WH)" column flags parts with stock elsewhere
 Step 4: Run lam-kitting-source.js → _sourced.xlsx
 Step 4b: Run lam-kitting-rfq-writer.js → RFQ + VQ lines in OT
 Step 4c: Run lam-kitting-customer-offer.js → refresh customer BI offer
-Step 5: Email sourced report to jake.harris@astutegroup.com
+Step 5: Email sourced report + pending approvals to jake.harris@astutegroup.com
+Step 6: Run lam-wrong-warehouse-check.js (non-blocking)
+        → Separate email if misplaced LAM stock found (LAM bin in wrong warehouse)
 ```
 
-One email with the final sourced Excel (color-coded margins) + customer-offer status line. No intermediate unsourced email.
+**Two-file output:** Parts awaiting LAM approval (price/lead time changes) appear on the Pending Approvals file, NOT the Reorder Alerts. Parts are mutually exclusive between files. See "Pending Approval Workflow" section above.
+
+**Other warehouse stock:** The reorder output includes "Available Stock (Other WH)" and "Available Qty (Other WH)" columns that flag when a reorder part has stock in non-LAM warehouses. This is informational — review before ordering to avoid purchasing parts that can be transferred.
 
 ---
 
@@ -84,11 +176,13 @@ One email with the final sourced Excel (color-coded margins) + customer-offer st
 | `W111_LAM_3PL.csv` | Current W111 inventory (Chuboe format) |
 | `W115_LAM_Dead_Inventory.csv` | Current W115 inventory (Chuboe format) |
 
-### From LAM Kitting Database
+### From Master Roster
 
 | File | Sheet | Key Columns |
 |------|-------|-------------|
-| `Lam_Kitting_DB_*.xlsx` | INVENTORY | Lam P/N (A), MPN (B), Reorder Threshold (H), LAM MOQ (I), Buyer (J), Notes (K) |
+| `LAM_Master_Roster.xlsx` | `Master Roster` | CPC, MPN, Manufacturer, Description, Award, Base Unit Price, Resale Price, Pending, Proposed Resale, Last Approved, Reorder Threshold, MOQ, Contractual Lead Time, Buyer, Status, Submitted Date |
+
+The Master Roster consolidates all LAM contract data into a single source of truth (~1,244 parts). See "Contract Purchase Price — Where to Look" section for full column definitions.
 
 ### From ERP (LAM Purchases Only)
 
@@ -138,8 +232,8 @@ Review the color-coded Excel. Priority levels:
 | HIGH | 75%+ shortfall | Source soon |
 | MEDIUM | 50-74% shortfall | Source this week |
 | LOW | <50% shortfall | Monitor / source as needed |
-| PENDING ORDER PLACEMENT | Recent activity but no Infor POV stamp yet (OT PO without Infor stamp, OR VQ ticked with no PO at all). Recency = PO cut ≤90d OR promise date ≥ today | Chase the PO — order is committed but not fully placed. Informational on main tab |
-| PENDING RECEIPT | Infor POV stamped, qty undelivered, recency rule satisfied | Wait — vendor shipment in flight. Informational on main tab |
+| PENDING ORDER PLACEMENT | Recent activity but no Infor POV stamp yet (OT PO without Infor stamp, OR VQ ticked with no PO at all). Recency = PO cut ≤90d OR promise date ≥ today | Chase the PO — order is committed but not fully placed. Informational on main tab. **Skipped from franchise sourcing.** |
+| PENDING RECEIPT | Infor POV stamped, qty undelivered, recency rule satisfied | Wait — vendor shipment in flight. Informational on main tab. **Skipped from franchise sourcing.** |
 | STOCK ARRIVED | Escalations-tab synthesis only — manual escalation MPN that's now above threshold but has W111+W115 stock | Josh: confirm new LAM resale was approved + update Kitting DB Resale Price column. Then remove entry from `lam-escalations.json` |
 
 PENDING ORDER PLACEMENT and PENDING RECEIPT share `priorityOrder` value 4 — they sort together at the bottom of the main tab, with PENDING ORDER PLACEMENT first inside the bucket (more actionable: chase the PO vs wait for vendor).
@@ -238,6 +332,17 @@ node lam-kitting-customer-offer.js [inventory-folder] [excel-file] [--dry-run]
 
 ## Output Format
 
+### Two Reorder Output Files
+
+The reorder script generates two mutually exclusive files:
+
+| File | Purpose | Contents |
+|------|---------|----------|
+| `LAM_Reorder_Alerts_YYYY-MM-DD.csv` | Ready to order | Parts with approved pricing — proceed with PO |
+| `LAM_Reorder_Pending_Approvals_YYYY-MM-DD.xlsx` | Awaiting LAM approval | Parts with `Pending` set — need price/lead time approval before ordering |
+
+A part appears on one file or the other, never both.
+
 ### Customer-Facing Offer (`chuboe_offer_type_id=1000025`)
 
 | `chuboe_offer_line` field | Source |
@@ -264,7 +369,7 @@ Sidecar JSON: `output/LAM_Customer_Offer_<date>.json` — run metadata for the r
 | 3 | Part ID | Manufacturer | Excel |
 | 4 | Part ID | Item Description | Excel |
 | 5 | Inventory | QTY ON HAND | Inventory Files (W111+W115) |
-| 6 | Inventory | Lam Owned Inventory? | YES if W115 > 0 |
+| 6 | Inventory | W115 Stale Inventory | YES if W115 > 0 (amber highlight) |
 | 7 | Inventory | Reorder Threshold | Excel (Column H) |
 | 8 | Inventory | Shortfall | Threshold - QTY ON HAND |
 | 9 | Inventory | Priority | CRITICAL/HIGH/MEDIUM/LOW |
@@ -329,8 +434,9 @@ The rbash environment causes non-zero exit codes even on successful queries. The
 
 | Question | Answer |
 |----------|--------|
+| Source of truth? | **LAM_Master_Roster.xlsx** — consolidates all LAM contract data (~1,244 parts) |
 | Join key? | **MPN only** — CPC not in Infor Item Lots Report |
-| Threshold source? | INVENTORY sheet Column H (Reorder Threshold) |
+| Threshold source? | Master Roster → `Reorder Threshold` column |
 | Which warehouses? | W111 + W115 combined |
 | Dead stock? | Yes, counts toward inventory level |
 | Zero stock detection? | Yes, items in Excel but not in inventory = CRITICAL |
@@ -342,33 +448,57 @@ The rbash environment causes non-zero exit codes even on successful queries. The
 | Promise date vs order date? | **Promise date** (`c_orderline.datepromised`) |
 | LAM filter? | `rfq.c_bpartner_id = 1000730` (Lam Research only) |
 | CMs (Naprotek, etc)? | Filtered out of Last RFQ — those are sales TO CMs, not supplier purchases |
+| Email account? | `lamkitting@orangetsunami.com` — all LAM workflow emails |
+| Pending parts? | Appear on **Pending Approvals** file (not Reorder Alerts) until approved |
+| Two-file output? | Reorder Alerts (ready) + Pending Approvals (awaiting LAM) — mutually exclusive |
 
 ---
 
 ## Files
 
+### Core Data
+
+| File | Description |
+|------|-------------|
+| `LAM_Master_Roster.xlsx` | **Single source of truth** for all LAM contract data (~1,244 parts). Contains CPC, MPN, pricing, approval status, thresholds, etc. |
+
+### Scripts
+
 | File | Description |
 |------|-------------|
 | `lam-kitting-runner.js` | Cron runner — chains cleanup → reorder → sourcing → rfq-write → customer-offer → email |
-| `lam-kitting-reorder.js` | Reorder detection + ERP enrichment |
+| `lam-kitting-reorder.js` | Reorder detection + ERP enrichment + two-file output |
 | `lam-kitting-source.js` | Franchise sourcing via shared API module |
 | `lam-kitting-rfq-writer.js` | Writes RFQ + VQ lines for items without on-order |
 | `lam-kitting-customer-offer.js` | Refreshes the customer-facing BI dashboard offer (type 1000025) |
 | `lam-kitting-dashboard.js` | Dashboard generator |
-| `output/LAM_Reorder_Alerts_*.csv` | Generated reorder alerts |
-| `output/LAM_Reorder_Alerts_<date>_RFQ<N>_sourced.xlsx` | Sourced alerts + RFQ Line # column. RFQ search key baked into filename so the buyer can grep their inbox / Downloads folder by RFQ number. |
+
+### Output Files
+
+| File | Description |
+|------|-------------|
+| `output/LAM_Reorder_Alerts_*.csv` | Parts ready to order (approved pricing) |
+| `output/LAM_Reorder_Pending_Approvals_*.xlsx` | Parts awaiting LAM approval (with aging) |
+| `output/LAM_Reorder_Alerts_<date>_RFQ<N>_sourced.xlsx` | Sourced alerts + RFQ Line # column. RFQ search key baked into filename |
 | `output/LAM_Reorder_Alerts_<date>_rfq_mapping.json` | MPN → RFQ line number map + auto-approved R_Request document numbers |
-| `output/LAM_Reorder_Alerts_<date>_sourced_franchise_data.json` | Raw franchise API responses per MPN (used for auto-escalation margin checks against `chuboe_pricing_api_result`) |
-| `output/LAM_Reorder_Alerts_<date>_escalations_context.json` | Sidecar: per-MPN inventory + POV state for every manual-escalation entry, used to synthesize stock-arrived rows |
+| `output/LAM_Reorder_Alerts_<date>_sourced_franchise_data.json` | Raw franchise API responses per MPN (used for auto-escalation margin checks) |
+| `output/LAM_Reorder_Alerts_<date>_escalations_context.json` | Sidecar: per-MPN inventory + POV state for every manual-escalation entry |
 | `output/LAM_Customer_Offer_<date>.json` | Customer-offer run metadata (offer ID, search key, line counts) |
+
+### Supporting Data
+
+| File | Description |
+|------|-------------|
 | `lam-escalations.json` | Manual escalation entries — `{mpn, reason, date}`. Buyer-curated; auto-resolved only when MPN is off the reorder list AND zero stock |
-| `Lam_Kitting_DB_*.xlsx` | Source Excel with thresholds and buyer data |
-| `SIPOC FOR BUYER ADDITION.xlsx` | Original buyer reference (data now in Kitting DB Column J) |
+| `Lam_Kitting_DB_*.xlsx` | **Legacy** — original kitting database. Data now consolidated in Master Roster |
+| `Lam_EPG_SIPOC.xlsx` | **Legacy** — EPG award data. Now in Master Roster |
+| `Astute_New Part ADDS_*.xlsx` | **Legacy** — Phase 2 adds. Now in Master Roster |
 
 ---
 
 ## TODO
 
+### Completed
 - [x] Map columns — MPN is join key (CPC not in source)
 - [x] Build reorder script (Node.js) — detection + ERP enrichment
 - [x] Zero-stock detection (CRITICAL priority)
@@ -384,9 +514,15 @@ The rbash environment causes non-zero exit codes even on successful queries. The
 - [x] Use shared/franchise-api.js (all 8 APIs)
 - [x] Single buildAlert() function (prevents column sync issues)
 - [x] Excel number formatting (currency/integers)
+- [x] Customer-facing LAM Kitting Inventory offer auto-refresh (Step 4c — replaces manual weekly update)
+- [x] Master Roster consolidation — single source of truth replacing 3-file lookup (2026-07-10)
+- [x] Two-file reorder output — Reorder Alerts + Pending Approvals (2026-07-10)
+- [x] Email account migration to lamkitting@orangetsunami.com (2026-07-10)
+
+### Pending
 - [ ] Auto-load RFQ for reorder lines (via shared/rfq-writer.js)
 - [ ] Add Mouser API to shared/franchise-api.js distributor list (module exists, needs BP verification)
-- [x] Customer-facing LAM Kitting Inventory offer auto-refresh (Step 4c — replaces manual weekly update)
+- [ ] **Approval intake handler** — process email/terminal notifications when LAM approves price/lead time changes; update Master Roster and clear pending status
 - [ ] **Phase 2 — Roster-wide lead-time refresher.** Customer offer currently only refreshes lead times for parts on this week's reorder list (~14 of 945). Above-threshold parts keep whatever was in the Kitting DB. Build a separate refresher that hits cached franchise API data (or scheduled API calls — monthly default, more frequent for short-lead, less for long-lead) for the full roster. Preserve manual override codes (LTB, Obsolete, EOL, NRND, TBD, etc.) — only refresh weeks-form values
 - [ ] **Phase 3 — LAM EPG (round-2 wins) customer offer.** EPG is a separate award round under the same program. Build a parallel customer-facing offer with its own offer type (TBD — request from Chuck) so the BI dashboard can show kitting and EPG separately. Source data and pipeline to be defined
 
@@ -396,3 +532,4 @@ The rbash environment causes non-zero exit codes even on successful queries. The
 *Updated: 2026-03-24* — Major overhaul: LAM-filtered ERP data, correct RFQ join path, 8 franchise APIs, cron automation, column reorganization, single buildAlert() architecture
 *Updated: 2026-05-05* — Step 4c: customer-facing LAM Kitting Inventory offer auto-refresh (replaces manual weekly update). Roster-driven from Kitting DB; deactivate-prior + write-new pattern matches `inventory_cleanup.js`. Phase 2 (roster-wide lead-time refresh) and Phase 3 (LAM EPG separate offer) queued.
 *Updated: 2026-05-05* — Priority overhaul + Escalations tab plumbing. (1) `PENDING RECEIPT` split into `PENDING ORDER PLACEMENT` (no Infor POV stamp yet) + `PENDING RECEIPT` (POV stamped). (2) `loadRecentPOVs` SQL recency filter — keep open POs only when cut ≤90d ago OR promise date still ≥ today; stale 2024–2025 POVs no longer leak (951→178 rows LAM-wide). (3) Escalations tab now sources from three places: manual entries (`lam-escalations.json`), stock-arrived synthesis (manual MPN above threshold but stock on hand → "Action with seller — new LAM resale still pending"), and auto entries for restricted-MFR margin compression (franchise <18% margin vs current LAM resale → Josh: push new resale based on franchise ref). (4) Escalations sidecar (`_escalations_context.json`) drives `persistResolvedEscalations` — manual entries only auto-resolve when off list AND zero stock; never on stock presence alone (operator removes from JSON when LAM approves new pricing).
+*Updated: 2026-07-10* — **Master Roster consolidation + two-file output.** (1) LAM_Master_Roster.xlsx replaces 3-file lookup (Lam_Kitting_DB + Lam_EPG_SIPOC + New Part ADDS) as single source of truth (~1,244 parts). (2) Two-file reorder output: `LAM_Reorder_Alerts_*.csv` (ready to order) + `LAM_Reorder_Pending_Approvals_*.xlsx` (awaiting LAM approval). Parts are mutually exclusive — appear on one file or the other. (3) Added Pending column (reason), Proposed Resale, Submitted Date, Status, Days Pending (aging) for approval tracking. (4) Email account changed to `lamkitting@orangetsunami.com`. (5) Added "Pending Approval Workflow" section documenting how to mark parts for approval and process approvals.
