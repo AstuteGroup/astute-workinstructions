@@ -33,9 +33,8 @@ const { createNotifier } = require('../../../shared/notifier');
 
 const STATE_FILE = path.join(process.env.HOME, 'workspace', '.asia-seller-vq-digest-state.json');
 
-// Always CC Ivy + Jake on Asia seller digests
-// (Jake added 2026-07-09 for initial monitoring)
-const ALWAYS_CC = ['ivy.song@astutegroup.com', 'jake.harris@astutegroup.com'];
+// Always CC Ivy on Asia seller digests
+const ALWAYS_CC = ['ivy.song@astutegroup.com'];
 
 // Asia sellers — twice daily digest (11 AM + 5 PM Shenzhen)
 // Added 2026-07-09
