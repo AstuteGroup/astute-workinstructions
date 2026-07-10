@@ -47,10 +47,11 @@ const LAM_BP_ID = 1000730;
 // === MASTER ROSTER ===
 
 /**
- * Load Master Roster MPNs.
- * Only parts on the roster are part of the LAM kitting program.
+ * Load Master Roster CPCs.
+ * CPC is the stable identifier - MPN can have packaging variants (+T, etc.)
+ * Only parts with CPCs on the roster are part of the LAM kitting program.
  */
-function loadRosterMPNs() {
+function loadRosterCPCs() {
   if (!fs.existsSync(MASTER_ROSTER_PATH)) {
     console.error(`Master Roster not found: ${MASTER_ROSTER_PATH}`);
     return new Set();
@@ -64,15 +65,15 @@ function loadRosterMPNs() {
   }
 
   const data = XLSX.utils.sheet_to_json(ws);
-  const mpns = new Set();
+  const cpcs = new Set();
 
   for (const row of data) {
-    if (row.MPN) {
-      mpns.add(row.MPN.toString().trim().toUpperCase());
+    if (row.CPC) {
+      cpcs.add(row.CPC.toString().trim().toUpperCase());
     }
   }
 
-  return mpns;
+  return cpcs;
 }
 
 // Email config
@@ -654,10 +655,10 @@ async function main() {
   console.log('Dry run:', dryRun);
   console.log('');
 
-  // Load Master Roster (only roster parts are in scope)
+  // Load Master Roster CPCs (CPC is stable, MPN can have variants like +T)
   console.log('Step 1: Loading Master Roster...');
-  const rosterMPNs = loadRosterMPNs();
-  console.log(`  ${rosterMPNs.size} MPNs on roster`);
+  const rosterCPCs = loadRosterCPCs();
+  console.log(`  ${rosterCPCs.size} CPCs on roster`);
 
   // Load exclusions
   console.log('');
@@ -665,10 +666,10 @@ async function main() {
   const exclusions = loadExclusions();
   console.log(`  ${exclusions.size} VQ lines excluded`);
 
-  // Query for stuck orders (filtered to roster parts only)
+  // Query for stuck orders (filtered to roster CPCs only)
   console.log('');
   console.log('Step 3: Querying for pending orders...');
-  const results = await queryPendingOrders(exclusions, rosterMPNs);
+  const results = await queryPendingOrders(exclusions, rosterCPCs);
   console.log(`  Found ${results.length} stuck orders (roster parts only)`);
 
   if (results.length === 0) {
@@ -735,7 +736,7 @@ async function main() {
   };
 }
 
-async function queryPendingOrders(exclusions, rosterMPNs) {
+async function queryPendingOrders(exclusions, rosterCPCs) {
   const sql = `
     SELECT
       vl.chuboe_vq_line_id AS vq_id,
@@ -752,7 +753,8 @@ async function queryPendingOrders(exclusions, rosterMPNs) {
       o.created AS po_created,
       ol.chuboe_po_string AS pov_stamp,
       CURRENT_DATE - vl.created::date AS days_stuck,
-      u_buyer.name AS buyer
+      u_buyer.name AS buyer,
+      rl.chuboe_cpc AS cpc
     FROM chuboe_vq_line vl
     JOIN chuboe_rfq_line rl ON rl.chuboe_rfq_line_id = vl.chuboe_rfq_line_id
     JOIN chuboe_rfq rfq ON rfq.chuboe_rfq_id = rl.chuboe_rfq_id
@@ -790,24 +792,24 @@ async function queryPendingOrders(exclusions, rosterMPNs) {
     const lines = content.split('\n').filter(l => l.trim());
     if (lines.length === 0) return [];
 
-    // Pipe-separated output: vq_id|rfq_number|mpn|manufacturer|qty|cost|promise_date|vq_created|ispurchased|supplier|ot_po_number|po_created|pov_stamp|days_stuck|buyer
+    // Pipe-separated output: vq_id|rfq_number|mpn|manufacturer|qty|cost|promise_date|vq_created|ispurchased|supplier|ot_po_number|po_created|pov_stamp|days_stuck|buyer|cpc
     const results = [];
 
     for (const line of lines) {
       const values = line.split('|');
-      if (values.length < 15) continue;
+      if (values.length < 16) continue;
 
       const vqId = values[0];
-      const mpn = values[2] || '';
+      const cpc = values[15] || '';
 
       // Skip excluded VQ lines
       if (exclusions.has(String(vqId))) {
         continue;
       }
 
-      // Skip parts not on Master Roster (only roster parts are in scope)
-      if (rosterMPNs && rosterMPNs.size > 0) {
-        if (!rosterMPNs.has(mpn.trim().toUpperCase())) {
+      // Skip parts not on Master Roster (match by CPC, not MPN - MPN can have variants)
+      if (rosterCPCs && rosterCPCs.size > 0) {
+        if (!rosterCPCs.has(cpc.trim().toUpperCase())) {
           continue;
         }
       }
@@ -828,6 +830,7 @@ async function queryPendingOrders(exclusions, rosterMPNs) {
         pov_stamp: values[12] || '',
         days_stuck: parseInt(values[13]) || 0,
         buyer: values[14] || '',
+        cpc: cpc,
       });
     }
 
@@ -864,6 +867,7 @@ function writeExcel(results, outputPath) {
   const rows = results.map(r => ({
     'VQ ID': r.vq_id,
     'RFQ #': r.rfq_number,
+    'CPC': r.cpc,
     'MPN': r.mpn,
     'Manufacturer': r.manufacturer,
     'Qty': r.qty,
