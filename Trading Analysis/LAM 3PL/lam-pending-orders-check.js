@@ -39,9 +39,41 @@ require('dotenv').config({ path: path.join(__dirname, '../../.env') });
 const SCRIPT_DIR = __dirname;
 const OUTPUT_DIR = path.join(SCRIPT_DIR, 'output');
 const EXCLUSIONS_FILE = path.join(SCRIPT_DIR, 'lam-pending-orders-exclusions.json');
+const MASTER_ROSTER_PATH = path.join(SCRIPT_DIR, 'LAM_Master_Roster.xlsx');
 
 // LAM customer BP ID
 const LAM_BP_ID = 1000730;
+
+// === MASTER ROSTER ===
+
+/**
+ * Load Master Roster MPNs.
+ * Only parts on the roster are part of the LAM kitting program.
+ */
+function loadRosterMPNs() {
+  if (!fs.existsSync(MASTER_ROSTER_PATH)) {
+    console.error(`Master Roster not found: ${MASTER_ROSTER_PATH}`);
+    return new Set();
+  }
+
+  const wb = XLSX.readFile(MASTER_ROSTER_PATH);
+  const ws = wb.Sheets['Master Roster'];
+  if (!ws) {
+    console.error('Sheet "Master Roster" not found in roster file');
+    return new Set();
+  }
+
+  const data = XLSX.utils.sheet_to_json(ws);
+  const mpns = new Set();
+
+  for (const row of data) {
+    if (row.MPN) {
+      mpns.add(row.MPN.toString().trim().toUpperCase());
+    }
+  }
+
+  return mpns;
+}
 
 // Email config
 const EMAIL_ACCOUNT = 'lamkitting';
@@ -622,16 +654,22 @@ async function main() {
   console.log('Dry run:', dryRun);
   console.log('');
 
+  // Load Master Roster (only roster parts are in scope)
+  console.log('Step 1: Loading Master Roster...');
+  const rosterMPNs = loadRosterMPNs();
+  console.log(`  ${rosterMPNs.size} MPNs on roster`);
+
   // Load exclusions
-  console.log('Step 1: Loading exclusions...');
+  console.log('');
+  console.log('Step 2: Loading exclusions...');
   const exclusions = loadExclusions();
   console.log(`  ${exclusions.size} VQ lines excluded`);
 
-  // Query for stuck orders
+  // Query for stuck orders (filtered to roster parts only)
   console.log('');
-  console.log('Step 2: Querying for pending orders...');
-  const results = await queryPendingOrders(exclusions);
-  console.log(`  Found ${results.length} stuck orders`);
+  console.log('Step 3: Querying for pending orders...');
+  const results = await queryPendingOrders(exclusions, rosterMPNs);
+  console.log(`  Found ${results.length} stuck orders (roster parts only)`);
 
   if (results.length === 0) {
     console.log('');
@@ -697,7 +735,7 @@ async function main() {
   };
 }
 
-async function queryPendingOrders(exclusions) {
+async function queryPendingOrders(exclusions, rosterMPNs) {
   const sql = `
     SELECT
       vl.chuboe_vq_line_id AS vq_id,
@@ -760,10 +798,18 @@ async function queryPendingOrders(exclusions) {
       if (values.length < 15) continue;
 
       const vqId = values[0];
+      const mpn = values[2] || '';
 
       // Skip excluded VQ lines
       if (exclusions.has(String(vqId))) {
         continue;
+      }
+
+      // Skip parts not on Master Roster (only roster parts are in scope)
+      if (rosterMPNs && rosterMPNs.size > 0) {
+        if (!rosterMPNs.has(mpn.trim().toUpperCase())) {
+          continue;
+        }
       }
 
       results.push({
