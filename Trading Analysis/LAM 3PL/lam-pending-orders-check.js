@@ -20,9 +20,12 @@
  *   node lam-pending-orders-check.js --clear-exclusion <vq_id>
  *
  * Lookup commands:
- *   node lam-pending-orders-check.js --find-pov <pov_number>    # Find OT records by Infor POV
- *   node lam-pending-orders-check.js --find-mpn <mpn>           # Find LAM orders by MPN
+ *   node lam-pending-orders-check.js --find-pov <pov_number> [--inventory <file>]
+ *   node lam-pending-orders-check.js --find-mpn <mpn> [--inventory <file>]
  *   node lam-pending-orders-check.js --validate-pov <pov_file>  # Cross-reference POV file vs OT
+ *
+ * The --inventory flag cross-references against Infor inventory to show receipt status.
+ * Receipt status comes from Infor (not OT) - OT qtydelivered is always 0 for LAM.
  */
 
 const fs = require('fs');
@@ -72,11 +75,109 @@ function addExclusion(exclusions, vqId, reason) {
   });
 }
 
+// === INVENTORY FILE LOADING ===
+
+/**
+ * Load Infor inventory file and build MPN lookup.
+ * Returns Map of MPN -> { totalQty, warehouses: [{wh, qty, lot}] }
+ *
+ * IMPORTANT: Receipt status for LAM comes from Infor inventory, NOT OT.
+ * OT qtydelivered is always 0 for LAM orders.
+ */
+function loadInventoryFile(inventoryPath) {
+  if (!fs.existsSync(inventoryPath)) {
+    console.error(`Inventory file not found: ${inventoryPath}`);
+    return null;
+  }
+
+  const wb = XLSX.readFile(inventoryPath);
+  const ws = wb.Sheets[wb.SheetNames[0]];
+  const allData = XLSX.utils.sheet_to_json(ws, { header: 1 });
+
+  // Find header row (contains "Item" in first column)
+  let headerRowIndex = -1;
+  for (let i = 0; i < Math.min(15, allData.length); i++) {
+    if (allData[i] && allData[i][0] === 'Item') {
+      headerRowIndex = i;
+      break;
+    }
+  }
+
+  if (headerRowIndex === -1) {
+    console.error('Could not find header row in inventory file');
+    return null;
+  }
+
+  // Parse with correct header row
+  const data = XLSX.utils.sheet_to_json(ws, { range: headerRowIndex });
+
+  // LAM warehouses where receipts would appear
+  const LAM_WAREHOUSES = ['W111', 'W115', 'W118'];
+
+  // Build MPN -> inventory lookup
+  const inventory = new Map();
+
+  for (const row of data) {
+    const mpn = (row['Item'] || '').toString().trim().toUpperCase();
+    const wh = (row['Warehouse'] || '').toString().trim();
+    const qty = parseFloat(row['Lot Quantity'] || 0);
+    const lot = (row['Lot'] || '').toString().trim();
+
+    if (!mpn || qty <= 0) continue;
+
+    if (!inventory.has(mpn)) {
+      inventory.set(mpn, { totalQty: 0, lamQty: 0, warehouses: [] });
+    }
+
+    const inv = inventory.get(mpn);
+    inv.totalQty += qty;
+    if (LAM_WAREHOUSES.includes(wh)) {
+      inv.lamQty += qty;
+    }
+    inv.warehouses.push({ wh, qty: Math.round(qty), lot });
+  }
+
+  console.log(`Loaded inventory: ${inventory.size} unique MPNs`);
+  return inventory;
+}
+
+/**
+ * Check if an MPN has been received based on inventory.
+ * Returns { received: bool, lamQty: number, details: string }
+ */
+function checkReceiptStatus(mpn, orderedQty, inventory) {
+  if (!inventory) {
+    return { received: null, lamQty: null, details: 'No inventory file' };
+  }
+
+  const mpnUpper = mpn.trim().toUpperCase();
+  const inv = inventory.get(mpnUpper);
+
+  if (!inv) {
+    return { received: false, lamQty: 0, details: 'Not in inventory' };
+  }
+
+  // Check LAM warehouse stock specifically
+  const lamStock = inv.warehouses.filter(w => ['W111', 'W115', 'W118'].includes(w.wh));
+  const lamQty = lamStock.reduce((sum, w) => sum + w.qty, 0);
+
+  if (lamQty >= orderedQty) {
+    return { received: true, lamQty, details: `RECEIVED (${lamQty} in LAM)` };
+  } else if (lamQty > 0) {
+    return { received: 'partial', lamQty, details: `PARTIAL (${lamQty}/${orderedQty} in LAM)` };
+  } else if (inv.totalQty > 0) {
+    return { received: false, lamQty: 0, details: `In other WH (${inv.totalQty} total)` };
+  }
+
+  return { received: false, lamQty: 0, details: 'Not in inventory' };
+}
+
 // === LOOKUP FUNCTIONS ===
 
 /**
  * Find OT records by Infor POV number.
  * Searches chuboe_po_string field which contains the POV stamp.
+ * Returns structured results with tracking info.
  */
 async function findByPOV(povNumber) {
   // Normalize POV - handle with or without POV prefix
@@ -100,6 +201,7 @@ async function findByPOV(povNumber) {
       o.documentno AS ot_po_number,
       o.created AS po_created,
       ol.chuboe_po_string AS pov_stamp,
+      ol.chuboe_trackingnumbers AS tracking,
       CASE WHEN rfq.c_bpartner_id = ${LAM_BP_ID} THEN 'Y' ELSE 'N' END AS is_lam
     FROM chuboe_vq_line vl
     JOIN chuboe_rfq_line rl ON rl.chuboe_rfq_line_id = vl.chuboe_rfq_line_id
@@ -111,10 +213,31 @@ async function findByPOV(povNumber) {
     LEFT JOIN c_order o ON o.c_order_id = ol.c_order_id
     WHERE UPPER(ol.chuboe_po_string) = '${searchPov}'
       AND vl.isactive = 'Y'
-    ORDER BY vl.created DESC
+    ORDER BY rlm.chuboe_mpn
   `;
 
-  return executeQuery(sql, 'pov_search');
+  const rows = await executeQuery(sql, 'pov_search');
+
+  // Parse into structured objects
+  // Columns: vq_id, rfq, customer_bp, customer, mpn, mfr, qty, cost, promise, ispurchased, supplier, ot_po, po_created, pov, tracking, is_lam
+  return rows.map(r => ({
+    vqId: r[0],
+    rfq: r[1],
+    customerBpId: r[2],
+    customer: r[3],
+    mpn: r[4],
+    mfr: r[5],
+    qty: parseInt(r[6]) || 0,
+    cost: parseFloat(r[7]) || 0,
+    promiseDate: r[8],
+    isPurchased: r[9] === 'Y',
+    supplier: r[10],
+    otPo: r[11],
+    poCreated: r[12],
+    pov: r[13],
+    tracking: r[14] || '',
+    isLam: r[15] === 'Y',
+  }));
 }
 
 /**
@@ -330,9 +453,20 @@ async function main() {
     const pov = args[args.indexOf('--find-pov') + 1];
 
     if (!pov) {
-      console.error('Usage: node lam-pending-orders-check.js --find-pov <pov_number>');
-      console.error('Example: node lam-pending-orders-check.js --find-pov POV0075252');
+      console.error('Usage: node lam-pending-orders-check.js --find-pov <pov_number> [--inventory <file>]');
+      console.error('Example: node lam-pending-orders-check.js --find-pov POV0075252 --inventory ~/file-drop/ASTItemLotsReportInputs.xlsx');
       process.exit(1);
+    }
+
+    // Load inventory file if provided (for receipt status)
+    let inventory = null;
+    if (args.includes('--inventory')) {
+      const invPath = args[args.indexOf('--inventory') + 1];
+      if (invPath && fs.existsSync(invPath)) {
+        inventory = loadInventoryFile(invPath);
+      } else {
+        console.warn(`Warning: Inventory file not found: ${invPath}`);
+      }
     }
 
     console.log(`\n=== OT Records for POV: ${pov.toUpperCase()} ===\n`);
@@ -350,21 +484,45 @@ async function main() {
     }
 
     console.log(`Found ${results.length} record(s):\n`);
-    console.log('VQ ID      | RFQ #      | MPN                          | Qty  | Cost     | Supplier                   | OT PO      | LAM?');
-    console.log('-'.repeat(130));
 
-    for (const r of results) {
-      // Columns: vq_id, rfq, customer_bp, customer, mpn, mfr, qty, cost, promise, ispurchased, supplier, ot_po, po_created, pov, is_lam
-      const vqId = r[0].padEnd(10);
-      const rfq = (r[1] || '').padEnd(10);
-      const mpn = (r[4] || '').substring(0, 28).padEnd(28);
-      const qty = (r[6] || '').padStart(4);
-      const cost = ('$' + parseFloat(r[7] || 0).toFixed(2)).padStart(8);
-      const supplier = (r[10] || '').substring(0, 26).padEnd(26);
-      const otPo = (r[11] || '').padEnd(10);
-      const isLam = r[14];
+    if (inventory) {
+      // With inventory - show receipt status
+      console.log('MPN                          | Qty  | Cost     | Tracking         | Receipt Status');
+      console.log('-'.repeat(100));
 
-      console.log(`${vqId} | ${rfq} | ${mpn} | ${qty} | ${cost} | ${supplier} | ${otPo} | ${isLam}`);
+      for (const r of results) {
+        const mpn = (r.mpn || '').substring(0, 28).padEnd(28);
+        const qty = String(r.qty).padStart(4);
+        const cost = ('$' + r.cost.toFixed(2)).padStart(8);
+        const tracking = (r.tracking || '-').substring(0, 16).padEnd(16);
+        const receiptStatus = checkReceiptStatus(r.mpn, r.qty, inventory);
+
+        console.log(`${mpn} | ${qty} | ${cost} | ${tracking} | ${receiptStatus.details}`);
+      }
+
+      // Summary
+      const received = results.filter(r => checkReceiptStatus(r.mpn, r.qty, inventory).received === true).length;
+      const partial = results.filter(r => checkReceiptStatus(r.mpn, r.qty, inventory).received === 'partial').length;
+      const pending = results.length - received - partial;
+
+      console.log('');
+      console.log(`Summary: ${received} received, ${partial} partial, ${pending} pending`);
+    } else {
+      // Without inventory - show tracking only
+      console.log('MPN                          | Qty  | Cost     | Supplier                   | Tracking');
+      console.log('-'.repeat(110));
+      console.log('(Add --inventory <file> to see receipt status from Infor)');
+      console.log('');
+
+      for (const r of results) {
+        const mpn = (r.mpn || '').substring(0, 28).padEnd(28);
+        const qty = String(r.qty).padStart(4);
+        const cost = ('$' + r.cost.toFixed(2)).padStart(8);
+        const supplier = (r.supplier || '').substring(0, 26).padEnd(26);
+        const tracking = r.tracking || '-';
+
+        console.log(`${mpn} | ${qty} | ${cost} | ${supplier} | ${tracking}`);
+      }
     }
 
     return { found: true, pov, count: results.length, results };
