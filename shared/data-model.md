@@ -123,6 +123,24 @@ References:
 - memory: `feedback_avl_multi_mpn_loading.md`
 - memory: `project_chuboe_offer_line_cpc_collapse.md`
 
+#### ⚠️ chuboe_offer_line auto-creates chuboe_offer_line_mpn — DO NOT WRITE BOTH
+
+iDempiere has a **second bean callout** on `chuboe_offer_line` that **automatically creates** a `chuboe_offer_line_mpn` sub-record when an offer line is POSTed. This is invisible to API callers:
+
+1. POST `chuboe_offer_line` → returns `200 OK` with line ID
+2. Server-side, bean callout auto-creates a `chuboe_offer_line_mpn` record copying MPN/MFR from the line
+
+**The trap:** If you then POST your own `chuboe_offer_line_mpn` (as `offer-writeback.js` did with `writeMpnRecords: true`), you get **duplicate MPN records** — one from the callout, one from your explicit write.
+
+**Discovered 2026-07-07:** All Claude-created broker offers and customer excess offers had exactly 2x the expected `chuboe_offer_line_mpn` records (ratio 2.00 vs expected 1.00). Inventory offers (which never set `writeMpnRecords: true`) had ratio 1.00 — the bean callout alone.
+
+**Resolution:** Do NOT set `writeMpnRecords: true` in `writeOffer()`. Let the bean callout handle MPN sub-record creation. The default (`writeMpnRecords: false`) is correct.
+
+**Why this wasn't caught earlier:**
+- Rate limiter counts our API POSTs, not server-side record creation
+- `mpnsWritten` counter tracks our successful POSTs, not actual DB records
+- No verification query after writes to check actual record counts
+
 ---
 
 ### VQ (Vendor Quote — Supply Side)
@@ -195,30 +213,24 @@ All fields required by the VQ Mass Upload Template (see `vq-loading.md`). These 
 | Packaging | `chuboe_packaging_id` | From vendor quote | If provided; otherwise left blank |
 
 **Tier 2 — PO Processing (marking as purchased):**
+
+> **Full workflow documentation:** See [`shared/vq-purchase-workflow.md`](vq-purchase-workflow.md) for the complete end-to-end process with numbered steps, program-specific defaults, validation error troubleshooting, and code examples.
+
 ALL Tier 1 fields PLUS the following. A VQ **MUST NOT** be marked `IsPurchased = Y` unless every field is populated. No partial writes.
 
 | Field | Column | Source |
 |-------|--------|--------|
+| Date Code | `chuboe_date_code` | Vendor quote (e.g., "24+", "2023") |
+| Lead Time | `chuboe_lead_time` | Vendor quote (e.g., "STOCK", "3 WEEKS") |
+| Promise Date | `datepromised` | Derived from lead time |
+| Due Date | `duedate` | Same as promise date |
+| Packaging | `chuboe_packaging_id` | REEL, CUT TAPE, BULK, TRAY |
 | Partner Location | `c_bpartner_location_id` | BP default (most have only 1) |
 | Warehouse Group | `chuboe_warehouse_group_id` | Deal-specific (AUSTIN, HONG KONG, etc.) |
 | Ship-to Warehouse | `chuboe_warehouse_id` | Deal-specific (SPEC BUY, ALLOCATED, consignment, etc.) |
 | Shipper | `m_shipper_id` | Default: FedEx Ground (1000003) |
 | Incoterm | `chuboe_inco_term_id` | Default: EXW (1000000) unless otherwise noted |
-| Promise Date | `datepromised` | Derived from lead time: "stock" = today + 5 business days |
-| Due Date | `duedate` | Same as promise date |
 | IsPurchased | `ispurchased` | `Y` — set ONLY after all fields validated |
-
-**Warehouse routing rules:**
-- W103, W106, W107 → always Warehouse Group: AUSTIN (1000000)
-- W111 → always Warehouse Group: BROWNSVILLE (1000008)
-- ALLOCATED/PRESOLD → most commonly AUSTIN or HONG KONG
-
-**Promise date derivation:**
-- Lead time = "stock" or "in stock" → +5 business days from today
-- Lead time = numeric (e.g., "12 weeks") → calculate from today
-- Lead time = blank → must be provided at PO time
-
-**CRITICAL: The API does NOT enforce OT's mandatory field validation.** Records can be written via API with missing fields that OT would reject on save. All validation is enforced **client-side via `shared/vq-purchase-validator.js`**, which is the canonical source of truth for the Tier 2 checklist (date code, lead time, promise date, packaging, traceability, warehouse + warehouse_group pair per program, shipper, incoterm, public/private note split, competing-VQ untick).
 
 **Required writer paths — do not bypass:**
 
@@ -227,7 +239,7 @@ ALL Tier 1 fields PLUS the following. A VQ **MUST NOT** be marked `IsPurchased =
 | Tick `IsPurchased='Y'` | `shared/vq-patcher.js` → `tickVQForPurchase(vqId, {program, extra})` | `patchRecord('chuboe_vq_line', id, {IsPurchased: 'Y'})` |
 | POST approve-order R_Request | `shared/r-request-writer.js` → `postApproveOrder({vqId, program, rfqId, summary, approvalText})` | `apiPost('r_request', {...})` directly |
 
-Both wrappers run the validator internally and abort on any violation. The "don't bypass" rule exists because we empirically did bypass it on 2026-04-20 and shipped an approval with null promise date, null lead time, buyer-internal content in the public note, and Austin (1000000) where Brownsville (1000008) was expected.
+Both wrappers run the validator internally and abort on any violation.
 
 ---
 
@@ -288,6 +300,25 @@ Both wrappers run the validator internally and abort on any violation. The "don'
 - Also has its own `chuboe_mpn`, `chuboe_cpc`, `chuboe_mfr_id`, `chuboe_date_code`
 - `chuboe_po_string` = Infor POV number (filter: `LIKE 'POV%'`)
 
+**Where key fields live on `c_orderline`:**
+
+| Field | Column | Notes |
+|-------|--------|-------|
+| **MPN** | **`chuboe_mpn`** | ⚠️ Use this for MPN searches — NOT `description` |
+| **CPC** | `chuboe_cpc` | Customer Part Code |
+| **Manufacturer** | `chuboe_mfr_id` / `chuboe_mfr_text` | MFR ID or text |
+| **Date Code** | `chuboe_date_code` | Date code string |
+| **Infor POV** | `chuboe_po_string` | POV stamp from Infor (e.g., "POV0075252") |
+| **Description** | `description` | ⚠️ Text description — NOT the MPN |
+
+**CRITICAL: MPN vs Description**
+
+When searching for orders by MPN:
+- **CORRECT:** `WHERE ol.chuboe_mpn = 'DG406EUI+'` or `ILIKE '%DG406%'`
+- **WRONG:** `WHERE ol.description LIKE '%DG406%'` — this is the text description, not the MPN
+
+The `description` field contains human-readable text (e.g., "CAP,SMD,NPO,1.1NF,5%,10KV"). The `chuboe_mpn` field contains the actual part number (e.g., "6560N112J103P").
+
 ---
 
 ## Key Join Patterns
@@ -306,9 +337,10 @@ Both wrappers run the validator internally and abort on any violation. The "don'
 | Any → MFR | `*.chuboe_mfr_id = chuboe_mfr.chuboe_mfr_id` |
 | Any → BPartner | `*.c_bpartner_id = c_bpartner.c_bpartner_id` |
 
-**WARNING — Common Wrong Joins:**
+**WARNING — Common Wrong Joins & Field Mistakes:**
 - `c_orderline.chuboe_vq_line_id` → join to `chuboe_vq_line`, NOT `chuboe_rfq_line`
 - For RFQ MPN data, always go to `chuboe_rfq_line_mpn` — `chuboe_rfq_line.chuboe_mpn` may be NULL
+- **For PO/Order MPN searches, use `ol.chuboe_mpn`** — NOT `ol.description` (which is the text description)
 
 ---
 
@@ -348,20 +380,25 @@ Price means different things on different tables:
 
 Always use `c_bpartner.value` (search_key) when populating import templates.
 
-### `Value` (Search Key) on Chuboe Tables
+### ⚠️ CRITICAL: Search Key (`value`) is the Universal Identifier
+
+**ALWAYS use Search Key when referring to ANY OT document — RFQs, Offers, Orders, everything.**
 
 The `value` column on all chuboe header tables (`chuboe_rfq`, `chuboe_offer`, etc.) is the **search key** — the user-facing document number visible in the OT UI. This is NOT the same as the internal primary key.
 
 | Field | Example | Purpose |
 |-------|---------|---------|
-| `chuboe_rfq_id` (PK) | `1133457` | Internal database ID — used for joins and FK references |
-| `value` (search key) | `1124042` | User-facing RFQ number — what users reference in conversation and UI |
+| `chuboe_rfq_id` (PK) | `1147609` | Internal database ID — used for joins and FK references |
+| `value` (search key) | `1138194` | **THE RFQ NUMBER** — what users see, reference, and expect |
 
 **Rules:**
-- When reporting results to users, always use the search key (`value`), not the internal PK
+- **When reporting to users → Search Key** (e.g., "RFQ 1138194")
+- **When storing for API calls → Internal PK** (e.g., `chuboe_rfq_id = 1147609`)
+- **In conversation → ALWAYS Search Key** — users don't know or care about internal PKs
 - The REST API POST response includes both `id` (PK) and `Value` (search key) — extract both
-- In SQL queries, select `value` when you need to display a document number to the user
-- The PK is for programmatic use (joins, parent-child linking); the search key is for human use
+- In SQL queries, always SELECT `value` when displaying document numbers
+
+**Anti-pattern:** Saying "RFQ 1147609" when the Search Key is 1138194 — this will confuse everyone.
 
 ---
 

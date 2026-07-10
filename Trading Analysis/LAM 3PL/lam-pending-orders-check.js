@@ -5,7 +5,10 @@
  * Identifies orders that were processed in OT but not placed in Infor.
  * These are "stuck" POs that need to be chased.
  *
- * Criteria:
+ * Also provides lookup tools to cross-reference between OT, Infor inventory,
+ * and Infor POV files.
+ *
+ * Criteria for stuck orders:
  *   - VQ ticked as purchased OR OT PO exists
  *   - BUT no chuboe_po_string (POV stamp from Infor)
  *   - Recency: PO cut ≤90d OR promise date ≥ today
@@ -15,6 +18,11 @@
  *   node lam-pending-orders-check.js --list-exclusions
  *   node lam-pending-orders-check.js --mark-ok <vq_id> [reason]
  *   node lam-pending-orders-check.js --clear-exclusion <vq_id>
+ *
+ * Lookup commands:
+ *   node lam-pending-orders-check.js --find-pov <pov_number>    # Find OT records by Infor POV
+ *   node lam-pending-orders-check.js --find-mpn <mpn>           # Find LAM orders by MPN
+ *   node lam-pending-orders-check.js --validate-pov <pov_file>  # Cross-reference POV file vs OT
  */
 
 const fs = require('fs');
@@ -62,6 +70,198 @@ function addExclusion(exclusions, vqId, reason) {
     reason: reason || 'Intentionally not placed yet',
     date: new Date().toISOString().split('T')[0],
   });
+}
+
+// === LOOKUP FUNCTIONS ===
+
+/**
+ * Find OT records by Infor POV number.
+ * Searches chuboe_po_string field which contains the POV stamp.
+ */
+async function findByPOV(povNumber) {
+  // Normalize POV - handle with or without POV prefix
+  const searchPov = povNumber.toUpperCase().startsWith('POV')
+    ? povNumber.toUpperCase()
+    : `POV${povNumber}`;
+
+  const sql = `
+    SELECT
+      vl.chuboe_vq_line_id AS vq_id,
+      rfq.value AS rfq_number,
+      rfq.c_bpartner_id AS customer_bp_id,
+      bp_cust.name AS customer,
+      rlm.chuboe_mpn AS mpn,
+      rlm.chuboe_mfr_text AS manufacturer,
+      vl.qty AS qty,
+      vl.cost AS cost,
+      vl.datepromised AS promise_date,
+      vl.ispurchased,
+      bp_vendor.name AS supplier,
+      o.documentno AS ot_po_number,
+      o.created AS po_created,
+      ol.chuboe_po_string AS pov_stamp,
+      CASE WHEN rfq.c_bpartner_id = ${LAM_BP_ID} THEN 'Y' ELSE 'N' END AS is_lam
+    FROM chuboe_vq_line vl
+    JOIN chuboe_rfq_line rl ON rl.chuboe_rfq_line_id = vl.chuboe_rfq_line_id
+    JOIN chuboe_rfq rfq ON rfq.chuboe_rfq_id = rl.chuboe_rfq_id
+    JOIN c_bpartner bp_cust ON bp_cust.c_bpartner_id = rfq.c_bpartner_id
+    LEFT JOIN chuboe_rfq_line_mpn rlm ON rlm.chuboe_rfq_line_id = rl.chuboe_rfq_line_id
+    LEFT JOIN c_bpartner bp_vendor ON bp_vendor.c_bpartner_id = vl.c_bpartner_id
+    LEFT JOIN c_orderline ol ON ol.chuboe_vq_line_id = vl.chuboe_vq_line_id
+    LEFT JOIN c_order o ON o.c_order_id = ol.c_order_id
+    WHERE UPPER(ol.chuboe_po_string) = '${searchPov}'
+      AND vl.isactive = 'Y'
+    ORDER BY vl.created DESC
+  `;
+
+  return executeQuery(sql, 'pov_search');
+}
+
+/**
+ * Find LAM orders by MPN (all statuses - pending, ordered, received).
+ * Useful when you have a part but don't know the POV.
+ */
+async function findByMPN(mpn) {
+  const normalizedMpn = mpn.trim().toUpperCase();
+
+  const sql = `
+    SELECT
+      vl.chuboe_vq_line_id AS vq_id,
+      rfq.value AS rfq_number,
+      rlm.chuboe_mpn AS mpn,
+      rlm.chuboe_mfr_text AS manufacturer,
+      vl.qty AS qty,
+      vl.cost AS cost,
+      vl.datepromised AS promise_date,
+      vl.created AS vq_created,
+      vl.ispurchased,
+      bp_vendor.name AS supplier,
+      o.documentno AS ot_po_number,
+      o.created AS po_created,
+      ol.chuboe_po_string AS pov_stamp,
+      CASE
+        WHEN ol.chuboe_po_string LIKE 'POV%' THEN 'PLACED IN INFOR'
+        WHEN o.c_order_id IS NOT NULL THEN 'OT PO EXISTS - NO INFOR'
+        WHEN vl.ispurchased = 'Y' THEN 'VQ TICKED - NO PO'
+        ELSE 'VQ NOT TICKED'
+      END AS status
+    FROM chuboe_vq_line vl
+    JOIN chuboe_rfq_line rl ON rl.chuboe_rfq_line_id = vl.chuboe_rfq_line_id
+    JOIN chuboe_rfq rfq ON rfq.chuboe_rfq_id = rl.chuboe_rfq_id
+    LEFT JOIN chuboe_rfq_line_mpn rlm ON rlm.chuboe_rfq_line_id = rl.chuboe_rfq_line_id
+    LEFT JOIN c_bpartner bp_vendor ON bp_vendor.c_bpartner_id = vl.c_bpartner_id
+    LEFT JOIN c_orderline ol ON ol.chuboe_vq_line_id = vl.chuboe_vq_line_id
+    LEFT JOIN c_order o ON o.c_order_id = ol.c_order_id
+    WHERE rfq.c_bpartner_id = ${LAM_BP_ID}
+      AND rfq.isactive = 'Y'
+      AND vl.isactive = 'Y'
+      AND UPPER(TRIM(rlm.chuboe_mpn)) = '${normalizedMpn}'
+      AND vl.created >= CURRENT_DATE - INTERVAL '180 days'
+    ORDER BY vl.created DESC
+  `;
+
+  return executeQuery(sql, 'mpn_search');
+}
+
+/**
+ * Validate a POV file from Infor against OT records.
+ * Identifies:
+ * - Items in POV but not in OT (missing in OT)
+ * - Items in OT but not stamped (stuck)
+ */
+async function validatePOVFile(povFilePath) {
+  const XLSX = require('xlsx');
+  const wb = XLSX.readFile(povFilePath);
+  const ws = wb.Sheets[wb.SheetNames[0]];
+  const data = XLSX.utils.sheet_to_json(ws);
+
+  // Extract POV items
+  const povItems = [];
+  let povNumber = null;
+
+  for (const row of data) {
+    const pov = row['PO'] || row['POV'] || '';
+    const mpn = row['Item'] || '';
+    const qty = parseInt(row['Ordered'] || row['Qty'] || 0);
+    const status = row['Line Status'] || row['Status'] || '';
+    const vendor = row['Vendor Name'] || row['Vendor'] || '';
+
+    if (pov && mpn) {
+      if (!povNumber) povNumber = pov;
+      povItems.push({ pov, mpn: mpn.trim().toUpperCase(), qty, status, vendor });
+    }
+  }
+
+  console.log(`Loaded ${povItems.length} items from POV file (${povNumber || 'unknown'})`);
+
+  // Get OT records for this POV
+  const otRecords = povNumber ? await findByPOV(povNumber) : [];
+  console.log(`Found ${otRecords.length} OT records with POV stamp`);
+
+  // Build lookup of OT records by MPN
+  const otByMpn = new Map();
+  for (const rec of otRecords) {
+    const mpn = (rec.mpn || '').trim().toUpperCase();
+    if (!otByMpn.has(mpn)) otByMpn.set(mpn, []);
+    otByMpn.get(mpn).push(rec);
+  }
+
+  // Compare
+  const results = {
+    matched: [],
+    inPovNotOt: [],
+    povNumber,
+    otRecordCount: otRecords.length,
+    povItemCount: povItems.length,
+  };
+
+  for (const povItem of povItems) {
+    const otMatches = otByMpn.get(povItem.mpn) || [];
+    if (otMatches.length > 0) {
+      results.matched.push({
+        ...povItem,
+        otMatches: otMatches.map(m => ({
+          vq_id: m.vq_id,
+          rfq: m.rfq_number,
+          ot_po: m.ot_po_number,
+        })),
+      });
+    } else {
+      results.inPovNotOt.push(povItem);
+    }
+  }
+
+  return results;
+}
+
+/**
+ * Execute a SQL query and return parsed results.
+ */
+function executeQuery(sql, queryName) {
+  const tmpFile = `/tmp/${queryName}_${Date.now()}.sql`;
+  const outFile = `/tmp/${queryName}_${Date.now()}.out`;
+
+  fs.writeFileSync(tmpFile, sql);
+
+  try {
+    execSync(
+      `psql -U analytics_user -d idempiere_replica -t -A -F '|' -f "${tmpFile}" -o "${outFile}"`,
+      { encoding: 'utf-8', timeout: 30000, maxBuffer: 10 * 1024 * 1024 }
+    );
+
+    const content = fs.readFileSync(outFile, 'utf8').trim();
+    if (!content) return [];
+
+    const lines = content.split('\n').filter(l => l.trim());
+    return lines.map(line => {
+      const values = line.split('|');
+      // Return as array - caller knows the column order
+      return values;
+    });
+  } finally {
+    try { fs.unlinkSync(tmpFile); } catch (e) {}
+    try { fs.unlinkSync(outFile); } catch (e) {}
+  }
 }
 
 // === MAIN ===
@@ -123,6 +323,131 @@ async function main() {
       console.log(`No exclusion found for VQ ${vqId}`);
     }
     return { cleared: true, vqId };
+  }
+
+  // Handle POV lookup
+  if (args.includes('--find-pov')) {
+    const pov = args[args.indexOf('--find-pov') + 1];
+
+    if (!pov) {
+      console.error('Usage: node lam-pending-orders-check.js --find-pov <pov_number>');
+      console.error('Example: node lam-pending-orders-check.js --find-pov POV0075252');
+      process.exit(1);
+    }
+
+    console.log(`\n=== OT Records for POV: ${pov.toUpperCase()} ===\n`);
+    const results = await findByPOV(pov);
+
+    if (results.length === 0) {
+      console.log('No OT records found with this POV stamp.');
+      console.log('This could mean:');
+      console.log('  1. The POV was never entered in OT (order not placed through OT)');
+      console.log('  2. The POV number is incorrect');
+      console.log('  3. The POV stamp hasnt been applied to the OT order lines yet');
+      console.log('\nTry searching by MPN instead:');
+      console.log('  node lam-pending-orders-check.js --find-mpn <mpn>');
+      return { found: false, pov };
+    }
+
+    console.log(`Found ${results.length} record(s):\n`);
+    console.log('VQ ID      | RFQ #      | MPN                          | Qty  | Cost     | Supplier                   | OT PO      | LAM?');
+    console.log('-'.repeat(130));
+
+    for (const r of results) {
+      // Columns: vq_id, rfq, customer_bp, customer, mpn, mfr, qty, cost, promise, ispurchased, supplier, ot_po, po_created, pov, is_lam
+      const vqId = r[0].padEnd(10);
+      const rfq = (r[1] || '').padEnd(10);
+      const mpn = (r[4] || '').substring(0, 28).padEnd(28);
+      const qty = (r[6] || '').padStart(4);
+      const cost = ('$' + parseFloat(r[7] || 0).toFixed(2)).padStart(8);
+      const supplier = (r[10] || '').substring(0, 26).padEnd(26);
+      const otPo = (r[11] || '').padEnd(10);
+      const isLam = r[14];
+
+      console.log(`${vqId} | ${rfq} | ${mpn} | ${qty} | ${cost} | ${supplier} | ${otPo} | ${isLam}`);
+    }
+
+    return { found: true, pov, count: results.length, results };
+  }
+
+  // Handle MPN lookup
+  if (args.includes('--find-mpn')) {
+    const mpn = args[args.indexOf('--find-mpn') + 1];
+
+    if (!mpn) {
+      console.error('Usage: node lam-pending-orders-check.js --find-mpn <mpn>');
+      console.error('Example: node lam-pending-orders-check.js --find-mpn DG406EUI+');
+      process.exit(1);
+    }
+
+    console.log(`\n=== LAM Orders for MPN: ${mpn.toUpperCase()} (last 180 days) ===\n`);
+    const results = await findByMPN(mpn);
+
+    if (results.length === 0) {
+      console.log('No LAM orders found for this MPN in the last 180 days.');
+      return { found: false, mpn };
+    }
+
+    console.log(`Found ${results.length} order(s):\n`);
+    console.log('VQ ID      | RFQ #      | Qty  | Cost     | Supplier                   | OT PO      | POV Stamp      | Status');
+    console.log('-'.repeat(130));
+
+    for (const r of results) {
+      // Columns: vq_id, rfq, mpn, mfr, qty, cost, promise, created, ispurchased, supplier, ot_po, po_created, pov, status
+      const vqId = r[0].padEnd(10);
+      const rfq = (r[1] || '').padEnd(10);
+      const qty = (r[4] || '').padStart(4);
+      const cost = ('$' + parseFloat(r[5] || 0).toFixed(2)).padStart(8);
+      const supplier = (r[9] || '').substring(0, 26).padEnd(26);
+      const otPo = (r[10] || '').padEnd(10);
+      const pov = (r[12] || '-').padEnd(14);
+      const status = r[13] || '';
+
+      console.log(`${vqId} | ${rfq} | ${qty} | ${cost} | ${supplier} | ${otPo} | ${pov} | ${status}`);
+    }
+
+    return { found: true, mpn, count: results.length, results };
+  }
+
+  // Handle POV file validation
+  if (args.includes('--validate-pov')) {
+    const povFile = args[args.indexOf('--validate-pov') + 1];
+
+    if (!povFile) {
+      console.error('Usage: node lam-pending-orders-check.js --validate-pov <pov_file.xlsx>');
+      process.exit(1);
+    }
+
+    if (!fs.existsSync(povFile)) {
+      console.error(`File not found: ${povFile}`);
+      process.exit(1);
+    }
+
+    console.log(`\n=== Validating POV File: ${povFile} ===\n`);
+    const results = await validatePOVFile(povFile);
+
+    console.log(`POV: ${results.povNumber || 'Unknown'}`);
+    console.log(`Items in POV file: ${results.povItemCount}`);
+    console.log(`OT records with stamp: ${results.otRecordCount}`);
+    console.log(`Matched: ${results.matched.length}`);
+    console.log(`In POV but not in OT: ${results.inPovNotOt.length}`);
+
+    if (results.inPovNotOt.length > 0) {
+      console.log('\n--- Items in POV file but NOT found in OT ---');
+      console.log('(These may not have been ordered through OT, or MPN doesnt match)\n');
+      console.log('MPN                          | Qty  | Status    | Vendor');
+      console.log('-'.repeat(80));
+
+      for (const item of results.inPovNotOt) {
+        const mpn = item.mpn.substring(0, 28).padEnd(28);
+        const qty = String(item.qty).padStart(4);
+        const status = (item.status || '').substring(0, 9).padEnd(9);
+        const vendor = (item.vendor || '').substring(0, 25);
+        console.log(`${mpn} | ${qty} | ${status} | ${vendor}`);
+      }
+    }
+
+    return results;
   }
 
   console.log('=== LAM Pending Orders Check ===');
