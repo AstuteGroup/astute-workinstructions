@@ -202,7 +202,8 @@ async function findByPOV(povNumber) {
       o.created AS po_created,
       ol.chuboe_po_string AS pov_stamp,
       ol.chuboe_trackingnumbers AS tracking,
-      CASE WHEN rfq.c_bpartner_id = ${LAM_BP_ID} THEN 'Y' ELSE 'N' END AS is_lam
+      CASE WHEN rfq.c_bpartner_id = ${LAM_BP_ID} THEN 'Y' ELSE 'N' END AS is_lam,
+      u_buyer.name AS buyer
     FROM chuboe_vq_line vl
     JOIN chuboe_rfq_line rl ON rl.chuboe_rfq_line_id = vl.chuboe_rfq_line_id
     JOIN chuboe_rfq rfq ON rfq.chuboe_rfq_id = rl.chuboe_rfq_id
@@ -211,6 +212,7 @@ async function findByPOV(povNumber) {
     LEFT JOIN c_bpartner bp_vendor ON bp_vendor.c_bpartner_id = vl.c_bpartner_id
     LEFT JOIN c_orderline ol ON ol.chuboe_vq_line_id = vl.chuboe_vq_line_id
     LEFT JOIN c_order o ON o.c_order_id = ol.c_order_id
+    LEFT JOIN ad_user u_buyer ON u_buyer.ad_user_id = o.salesrep_id
     WHERE UPPER(ol.chuboe_po_string) = '${searchPov}'
       AND vl.isactive = 'Y'
     ORDER BY rlm.chuboe_mpn
@@ -219,7 +221,7 @@ async function findByPOV(povNumber) {
   const rows = await executeQuery(sql, 'pov_search');
 
   // Parse into structured objects
-  // Columns: vq_id, rfq, customer_bp, customer, mpn, mfr, qty, cost, promise, ispurchased, supplier, ot_po, po_created, pov, tracking, is_lam
+  // Columns: vq_id, rfq, customer_bp, customer, mpn, mfr, qty, cost, promise, ispurchased, supplier, ot_po, po_created, pov, tracking, is_lam, buyer
   return rows.map(r => ({
     vqId: r[0],
     rfq: r[1],
@@ -237,6 +239,7 @@ async function findByPOV(povNumber) {
     pov: r[13],
     tracking: r[14] || '',
     isLam: r[15] === 'Y',
+    buyer: r[16] || '',
   }));
 }
 
@@ -483,7 +486,14 @@ async function main() {
       return { found: false, pov };
     }
 
-    console.log(`Found ${results.length} record(s):\n`);
+    // Show header info from first result
+    const first = results[0];
+    console.log(`Found ${results.length} record(s):`);
+    console.log(`  Customer: ${first.customer || 'Unknown'}`);
+    console.log(`  Supplier: ${first.supplier || 'Unknown'}`);
+    console.log(`  Buyer:    ${first.buyer || 'Unknown'}`);
+    console.log(`  OT PO:    ${first.otPo || 'Unknown'}`);
+    console.log('');
 
     if (inventory) {
       // With inventory - show receipt status
