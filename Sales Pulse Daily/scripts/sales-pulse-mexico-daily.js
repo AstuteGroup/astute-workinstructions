@@ -1,13 +1,13 @@
 #!/usr/bin/env node
 /**
- * USA Daily Brief - Sales Pulse
+ * Mexico Daily Brief - Sales Pulse
  *
- * Purpose: Daily snapshot for USA Regional Manager (Jeff Wallace)
+ * Purpose: Daily snapshot for Mexico Regional Manager (Joel Marquez)
  * Structure: 3-Section Format
  *
  * Section 1: Yesterday's Top Wins
  * Section 2: Needs Attention
- * Section 3: Yesterday's Activity by USA Sales Rep
+ * Section 3: Yesterday's Activity by Mexico Sales Rep
  *
  * Cadence: Mon-Fri at 6:00 AM PT
  */
@@ -140,7 +140,7 @@ function formatPercent(decimal) {
 // ============================================================================
 
 async function collectData() {
-  console.log('Collecting data for USA Daily Brief...\n');
+  console.log('Collecting data for Mexico Daily Brief...\n');
 
   const today = new Date();
 
@@ -162,7 +162,7 @@ async function collectData() {
     yesterdayFormatted: formatDate(businessDay)
   };
 
-  const queryFile = path.join(__dirname, '../queries/usa-daily-queries.sql');
+  const queryFile = path.join(__dirname, '../queries/mexico-daily-queries.sql');
 
   // SECTION 1: Yesterday's Top Wins
   console.log('Section 1: Yesterday\'s Top Wins');
@@ -193,7 +193,7 @@ async function collectData() {
   data.lowMarginOrders = getLowMarginOrders(queryFile);
 
   // SECTION 3: Yesterday's Activity
-  console.log('\nSection 3: Yesterday\'s Activity by USA Sales Rep');
+  console.log('\nSection 3: Yesterday\'s Activity by Mexico Sales Rep');
   console.log('  - Fetching rep activity...');
   data.repActivity = getRepActivity(queryFile);
 
@@ -408,7 +408,7 @@ function generateHTML(data) {
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>USA Daily Brief — Sales Pulse</title>
+<title>Mexico Daily Brief — Sales Pulse</title>
 <style>
   body {
     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif;
@@ -580,7 +580,7 @@ function generateHTML(data) {
 <body>
 
 <div class="container">
-  <h1>📊 USA Daily Brief — Sales Pulse</h1>
+  <h1>📊 Mexico Daily Brief — Sales Pulse</h1>
   <div class="subtitle">${data.todayFormatted} | Data as of EOD ${data.yesterdayFormatted}</div>
 
   ${generateSection1(data)}
@@ -1006,10 +1006,10 @@ function generateSection2(data) {
 }
 
 /**
- * SECTION 3: Yesterday's Activity by USA Sales Rep
+ * SECTION 3: Yesterday's Activity by Mexico Sales Rep
  */
 function generateSection3(data) {
-  let html = '<div class="section-header">📊 Section 3: Yesterday\'s Activity by USA Sales Rep</div>';
+  let html = '<div class="section-header">📊 Section 3: Yesterday\'s Activity by Mexico Sales Rep</div>';
 
   // Sales Rep Breakdown with Total row
   if (data.repActivity.length > 0) {
@@ -1097,7 +1097,7 @@ function generateFooter() {
 
     <strong>Section 3: Yesterday's Activity</strong>
     <ul>
-      <li><strong>Sales Rep:</strong> Individual USA sales representatives</li>
+      <li><strong>Sales Rep:</strong> Individual Mexico sales representatives</li>
     </ul>
 
     <div style="margin-top: 8px; padding-top: 8px; border-top: 1px solid #ddd;">
@@ -1113,7 +1113,7 @@ function generateFooter() {
 
 async function main() {
   console.log('='.repeat(60));
-  console.log('USA DAILY BRIEF - SALES PULSE');
+  console.log('MEXICO DAILY BRIEF - SALES PULSE');
   console.log('='.repeat(60));
   console.log();
 
@@ -1122,20 +1122,20 @@ async function main() {
 
   // Save outputs
   const today = new Date().toISOString().split('T')[0];
-  const outputDir = path.join(__dirname, '../output/usa-briefs');
+  const outputDir = path.join(__dirname, '../output/mexico-briefs');
 
   if (!fs.existsSync(outputDir)) {
     fs.mkdirSync(outputDir, { recursive: true });
   }
 
-  const htmlPath = path.join(outputDir, `usa-daily-brief-${today}.html`);
-  const jsonPath = path.join(outputDir, `usa-daily-brief-${today}.json`);
+  const htmlPath = path.join(outputDir, `mexico-daily-brief-${today}.html`);
+  const jsonPath = path.join(outputDir, `mexico-daily-brief-${today}.json`);
 
   fs.writeFileSync(htmlPath, html);
   fs.writeFileSync(jsonPath, JSON.stringify(data, null, 2));
 
   console.log('='.repeat(60));
-  console.log('✅ USA DAILY BRIEF GENERATED SUCCESSFULLY');
+  console.log('✅ MEXICO DAILY BRIEF GENERATED SUCCESSFULLY');
   console.log('='.repeat(60));
   console.log();
   console.log(`HTML: ${htmlPath}`);

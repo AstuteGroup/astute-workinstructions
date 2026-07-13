@@ -1,7 +1,8 @@
--- VP Daily Brief - Queries V2 (Restructured per Josh feedback)
--- Created: 2026-06-18
--- Updated: 2026-06-19 - Added weekend-aware business day logic
+-- Mexico Daily Brief - Queries V2 (Restructured per Josh feedback)
+-- Created: 2026-06-25
+-- Based on: vp-daily-queries-v2.sql
 -- Structure: Section 1 (Wins) → Section 2 (Needs Attention) → Section 3 (Regional Activity)
+-- MODIFIED: Filtered to MEX region for most sections, individual rep breakout in Section 3.2
 
 -- BUSINESS DAY LOGIC:
 -- All queries use "last business day" instead of literal "yesterday"
@@ -14,7 +15,7 @@
 -- ============================================================================
 
 -- ----------------------------------------------------------------------------
--- 1.1 TOP 15 ORDERS WON (by revenue)
+-- 1.1 TOP 15 ORDERS WON (by revenue) - MEXICO ONLY
 -- ----------------------------------------------------------------------------
 -- Fields: Seller name, Region, Customer name, Revenue, Part number (MPN)
 -- OPTIMIZED: Use grandtotal from c_order instead of aggregating c_orderline
@@ -42,6 +43,7 @@ SELECT
     WHEN u.ad_user_id IN (1047106, 1026393, 1042653, 1038225, 1026394, 1010361, 1012788, 1038224) THEN 'MEX'
     WHEN u.ad_user_id IN (1041139, 1023803, 1016958) THEN 'APAC-Laurel'
     WHEN u.ad_user_id IN (1039414, 1009866, 1013042, 1009528, 1009478, 1009210) THEN 'APAC-Silvia'
+    WHEN u.ad_user_id IN (1017011, 1023478, 1024444) THEN 'APAC-Lavanya'
     ELSE 'Other'
   END as region,
   bp.name as customer_name,
@@ -59,12 +61,13 @@ CROSS JOIN business_day
 WHERE o.created::date = CASE WHEN EXTRACT(DOW FROM CURRENT_DATE) = 1 THEN CURRENT_DATE - INTERVAL '3 days' ELSE CURRENT_DATE - INTERVAL '1 day' END
   AND o.isactive = 'Y'
   AND o.issotrx = 'Y'
+  AND u.ad_user_id IN (1047106, 1026393, 1042653, 1038225, 1026394, 1010361, 1012788, 1038224)  -- MEXICO ONLY
 ORDER BY o.grandtotal DESC
 LIMIT 15;
 
 
 -- ----------------------------------------------------------------------------
--- 1.2 NEW CUSTOMERS SOLD (first-time orders)
+-- 1.2 NEW CUSTOMERS SOLD (first-time orders) - MEXICO ONLY
 -- ----------------------------------------------------------------------------
 -- Fields: Seller, Region, Customer, Revenue, MPN, MFR, QTY,
 --         Customer Location/Address, Contact Name, Promise Date
@@ -82,10 +85,10 @@ SELECT
     WHEN u.ad_user_id IN (1047106, 1026393, 1042653, 1038225, 1026394, 1010361, 1012788, 1038224) THEN 'MEX'
     WHEN u.ad_user_id IN (1041139, 1023803, 1016958) THEN 'APAC-Laurel'
     WHEN u.ad_user_id IN (1039414, 1009866, 1013042, 1009528, 1009478, 1009210) THEN 'APAC-Silvia'
+    WHEN u.ad_user_id IN (1017011, 1023478, 1024444) THEN 'APAC-Lavanya'
     ELSE 'Other'
   END as region,
   bp.name as customer_name,
-  bp.c_bpartner_id,
   o.documentno as order_number,
   o.grandtotal as total_revenue,
   (SELECT COALESCE(SUM(bi.s_order_line_gp), 0)
@@ -122,6 +125,7 @@ CROSS JOIN business_day
 WHERE o.created::date = CASE WHEN EXTRACT(DOW FROM CURRENT_DATE) = 1 THEN CURRENT_DATE - INTERVAL '3 days' ELSE CURRENT_DATE - INTERVAL '1 day' END
   AND o.isactive = 'Y'
   AND o.issotrx = 'Y'
+  AND u.ad_user_id IN (1047106, 1026393, 1042653, 1038225, 1026394, 1010361, 1012788, 1038224)  -- MEXICO ONLY
   -- Ensure this is their first order ever
   AND NOT EXISTS (
     SELECT 1 FROM adempiere.c_order o2
@@ -137,6 +141,7 @@ ORDER BY total_revenue DESC;
 -- ----------------------------------------------------------------------------
 -- Accounts: ABB, Eaton, GE Healthcare (GE Medical/Healthcare), Parker-Meggitt, RTX, Thales
 -- Show: RFQs, CQs, CQ Sold, SOs created with ISE and Region
+-- NOTE: NOT filtered by region - shows all regions for these strategic accounts
 
 WITH business_day AS (
   SELECT CASE
@@ -176,7 +181,7 @@ rfq_activity AS (
     sa.name as account_name,
     u.name as ise_name,
     CASE
-      WHEN u.ad_user_id IN (1039413, 1047077, 1000011, 1042807, 1005243, 1025669, 1047795, 1000017) THEN 'USA'
+      WHEN u.ad_user_id IN (1047106, 1026393, 1042653, 1038225, 1026394, 1010361, 1012788, 1038224) THEN 'USA'
       WHEN u.ad_user_id IN (1047106, 1026393, 1042653, 1038225, 1026394, 1010361, 1012788, 1038224) THEN 'MEX'
       WHEN u.ad_user_id IN (1041139, 1023803, 1016958) THEN 'APAC-Laurel'
       WHEN u.ad_user_id IN (1039414, 1009866, 1013042, 1009528, 1009478, 1009210) THEN 'APAC-Silvia'
@@ -199,7 +204,7 @@ cq_activity AS (
     sa.name as account_name,
     u.name as ise_name,
     CASE
-      WHEN u.ad_user_id IN (1039413, 1047077, 1000011, 1042807, 1005243, 1025669, 1047795, 1000017) THEN 'USA'
+      WHEN u.ad_user_id IN (1047106, 1026393, 1042653, 1038225, 1026394, 1010361, 1012788, 1038224) THEN 'USA'
       WHEN u.ad_user_id IN (1047106, 1026393, 1042653, 1038225, 1026394, 1010361, 1012788, 1038224) THEN 'MEX'
       WHEN u.ad_user_id IN (1041139, 1023803, 1016958) THEN 'APAC-Laurel'
       WHEN u.ad_user_id IN (1039414, 1009866, 1013042, 1009528, 1009478, 1009210) THEN 'APAC-Silvia'
@@ -222,7 +227,7 @@ so_activity AS (
     sa.name as account_name,
     u.name as ise_name,
     CASE
-      WHEN u.ad_user_id IN (1039413, 1047077, 1000011, 1042807, 1005243, 1025669, 1047795, 1000017) THEN 'USA'
+      WHEN u.ad_user_id IN (1047106, 1026393, 1042653, 1038225, 1026394, 1010361, 1012788, 1038224) THEN 'USA'
       WHEN u.ad_user_id IN (1047106, 1026393, 1042653, 1038225, 1026394, 1010361, 1012788, 1038224) THEN 'MEX'
       WHEN u.ad_user_id IN (1041139, 1023803, 1016958) THEN 'APAC-Laurel'
       WHEN u.ad_user_id IN (1039414, 1009866, 1013042, 1009528, 1009478, 1009210) THEN 'APAC-Silvia'
@@ -301,9 +306,9 @@ ORDER BY account_name, ise_name;
 
 
 -- ----------------------------------------------------------------------------
--- 1.4 CUSTOMERS REACTIVATED YESTERDAY
+-- 1.4 CUSTOMERS REACTIVATED YESTERDAY - USA ONLY
 -- ----------------------------------------------------------------------------
--- Hybrid approach: Location-level for OEMs, Customer-level for others
+-- Hybrid approach: Location-level tracking (Customer Name + City)
 -- 30-day minimum threshold + Statistical anomaly detection
 -- Strong filtering: only truly noteworthy reactivations
 
@@ -368,6 +373,7 @@ yesterday_orders AS (
   WHERE o.created::date = (SELECT report_date FROM business_day)
     AND o.isactive = 'Y' AND o.issotrx = 'Y'
     AND bp.c_bpartner_id NOT IN (SELECT c_bpartner_id FROM excluded_customers)
+    AND u.ad_user_id IN (1047106, 1026393, 1042653, 1038225, 1026394, 1010361, 1012788, 1038224)  -- MEXICO ONLY
     -- Exclude Jake Harris (different role)
     AND u.ad_user_id != 1000004
     -- Only include component sales (order lines with linked CQ line)
@@ -432,13 +438,7 @@ SELECT
   yo.yesterday_revenue,
   yo.yesterday_gp,
   yo.seller_name,
-  CASE
-    WHEN yo.seller_id IN (1039413, 1047077, 1000011, 1042807, 1005243, 1025669, 1047795, 1000017) THEN 'USA'
-    WHEN yo.seller_id IN (1047106, 1026393, 1042653, 1038225, 1026394, 1010361, 1012788, 1038224) THEN 'MEX'
-    WHEN yo.seller_id IN (1041139, 1023803, 1016958) THEN 'APAC-Laurel'
-    WHEN yo.seller_id IN (1039414, 1009866, 1013042, 1009528, 1009478, 1009210) THEN 'APAC-Silvia'
-    ELSE 'Other'
-  END as region,
+  'MEX' as region,
   lopk.lifetime_orders,
   lopk.lifetime_revenue,
   COALESCE(og.median_gap, 0) as typical_cycle_days,
@@ -528,6 +528,7 @@ SELECT
     WHEN u.ad_user_id IN (1047106, 1026393, 1042653, 1038225, 1026394, 1010361, 1012788, 1038224) THEN 'MEX'
     WHEN u.ad_user_id IN (1041139, 1023803, 1016958) THEN 'APAC-Laurel'
     WHEN u.ad_user_id IN (1039414, 1009866, 1013042, 1009528, 1009478, 1009210) THEN 'APAC-Silvia'
+    WHEN u.ad_user_id IN (1017011, 1023478, 1024444) THEN 'APAC-Lavanya'
     ELSE 'Other'
   END as region,
   o.grandtotal as total_revenue,
@@ -565,11 +566,12 @@ ORDER BY days_late DESC, total_revenue DESC;
 
 
 -- ----------------------------------------------------------------------------
--- 2.2A HIGH VALUE LATE SO LINES ($200K+ Revenue, 3-31 days past due)
+-- 2.2A TOP 10 LATE SO LINES (3-31 days past due) - USA ONLY
 -- ----------------------------------------------------------------------------
--- Shows ALL high-value lines that are currently past due (rolling 31-day window)
+-- Shows top 10 late lines by revenue that are currently past due (rolling 31-day window)
 -- ISEs should be updating promise dates, so old items indicate stale data
 -- Color coding: Yellow 3-7 days, Red 8+ days
+-- NO REVENUE FILTER - shows top 10 regardless of line value
 
 SELECT
   bp.name as customer_name,
@@ -581,6 +583,7 @@ SELECT
     WHEN u.ad_user_id IN (1047106, 1026393, 1042653, 1038225, 1026394, 1010361, 1012788, 1038224) THEN 'MEX'
     WHEN u.ad_user_id IN (1041139, 1023803, 1016958) THEN 'APAC-Laurel'
     WHEN u.ad_user_id IN (1039414, 1009866, 1013042, 1009528, 1009478, 1009210) THEN 'APAC-Silvia'
+    WHEN u.ad_user_id IN (1017011, 1023478, 1024444) THEN 'APAC-Lavanya'
     ELSE 'Other'
   END as region,
   ol.datepromised::date as promise_date,
@@ -611,17 +614,17 @@ WHERE ol.isactive = 'Y'
   AND ol.datepromised IS NOT NULL
   AND ol.datepromised >= CURRENT_DATE - INTERVAL '31 days'  -- Rolling 31-day window
   AND ol.datepromised <= CURRENT_DATE - INTERVAL '3 days'   -- At least 3 days late
-  AND ol.linenetamt >= 200000  -- High value lines only
+  AND u.ad_user_id IN (1047106, 1026393, 1042653, 1038225, 1026394, 1010361, 1012788, 1038224)  -- MEXICO ONLY
 GROUP BY ol.c_orderline_id, ol.c_order_id, o.documentno, bp.name, ol.line, ol.qtyordered, ol.datepromised, ol.linenetamt, ol.chuboe_mpn, u.name, u.ad_user_id
 HAVING ol.qtyordered > COALESCE(SUM(iol.movementqty), 0)  -- Has unshipped quantity
-ORDER BY ol.linenetamt DESC;
+ORDER BY ol.linenetamt DESC
+LIMIT 10;
 
 
 -- ----------------------------------------------------------------------------
--- 2.2B TOP 15 SCHEDULED TO SHIP THIS MONTH (by GP)
+-- 2.2B TOP 5 SCHEDULED TO SHIP THIS MONTH (by GP) - USA ONLY
 -- ----------------------------------------------------------------------------
--- Shows top 15 lines by GP scheduled to ship in current month (backlog view)
--- Display: Top 5 visible, next 10 collapsible
+-- Shows top 5 lines by GP scheduled to ship in current month (backlog view)
 -- Promise date can be past due, today, or future - as long as it's in current month
 -- Purpose: Backlog that needs to ship by end of month to meet sales goals
 -- Color coding: Red if past due, Yellow if due this week, Green if future
@@ -632,7 +635,7 @@ SELECT
   ol.line as line_number,
   u.name as ise_name,
   CASE
-    WHEN u.ad_user_id IN (1039413, 1047077, 1000011, 1042807, 1005243, 1025669, 1047795, 1000017) THEN 'USA'
+    WHEN u.ad_user_id IN (1047106, 1026393, 1042653, 1038225, 1026394, 1010361, 1012788, 1038224) THEN 'USA'
     WHEN u.ad_user_id IN (1047106, 1026393, 1042653, 1038225, 1026394, 1010361, 1012788, 1038224) THEN 'MEX'
     WHEN u.ad_user_id IN (1041139, 1023803, 1016958) THEN 'APAC-Laurel'
     WHEN u.ad_user_id IN (1039414, 1009866, 1013042, 1009528, 1009478, 1009210) THEN 'APAC-Silvia'
@@ -646,11 +649,8 @@ SELECT
    FROM adempiere.bi_order_line_v bi
    WHERE bi.order_line_id = ol.c_orderline_id) as line_gp,
   ol.chuboe_mpn as mpn,
-  -- TODO: Stock check - m_storage table not found in database
-  -- Currently defaults to 'N' - needs proper inventory table identification
   'N' as in_stock,
-  -- Action status based on due date only (until inventory data is available)
-  -- Red = past due (urgent), Yellow = due this week (attention), Green = future (OK)
+  -- Action status based on due date only
   CASE
     WHEN ol.datepromised::date < CURRENT_DATE
     THEN 'red'  -- Past due = URGENT
@@ -679,16 +679,17 @@ WHERE ol.isactive = 'Y'
   AND ol.datepromised IS NOT NULL
   AND ol.datepromised >= DATE_TRUNC('month', CURRENT_DATE)  -- Start of current month
   AND ol.datepromised < DATE_TRUNC('month', CURRENT_DATE) + INTERVAL '1 month'  -- End of current month
+  AND u.ad_user_id IN (1047106, 1026393, 1042653, 1038225, 1026394, 1010361, 1012788, 1038224)  -- MEXICO ONLY
 GROUP BY ol.c_orderline_id, ol.c_order_id, o.documentno, bp.name, ol.line, ol.qtyordered, ol.datepromised, ol.linenetamt, ol.chuboe_mpn, u.name, u.ad_user_id
 HAVING ol.qtyordered > COALESCE(SUM(iol.movementqty), 0)  -- Has unshipped quantity
 ORDER BY (SELECT COALESCE(ROUND(bi.s_order_line_gp * ((ol.qtyordered - COALESCE(SUM(iol.movementqty), 0)) / NULLIF(ol.qtyordered, 0)), 2), 0)
    FROM adempiere.bi_order_line_v bi
    WHERE bi.order_line_id = ol.c_orderline_id) DESC  -- Order by GP, highest first
-LIMIT 15;
+LIMIT 5;
 
 
 -- ----------------------------------------------------------------------------
--- 2.3 INSIDE SALES REPS ALERT (No RFQ in 3+ days)
+-- 2.3 INSIDE SALES REPS ALERT (No RFQ in 3+ days) - USA ONLY
 -- ----------------------------------------------------------------------------
 -- Fields: ISE, Manager, Region, Last RFQ Date, Days Inactive (BUSINESS DAYS only)
 -- Color: Yellow 3-6 days, Red 7+ days
@@ -698,23 +699,21 @@ WITH seller_list AS (
     ad_user_id,
     name,
     CASE
-      WHEN ad_user_id IN (1039413, 1047077, 1000011, 1042807, 1005243, 1025669, 1047795, 1000017) THEN 'USA'
+      WHEN ad_user_id IN (1047106, 1026393, 1042653, 1038225, 1026394, 1010361, 1012788, 1038224) THEN 'USA'
       WHEN ad_user_id IN (1047106, 1026393, 1042653, 1038225, 1026394, 1010361, 1012788, 1038224) THEN 'MEX'
       WHEN ad_user_id IN (1041139, 1023803, 1016958) THEN 'APAC-Laurel'
       WHEN ad_user_id IN (1039414, 1009866, 1013042, 1009528, 1009478, 1009210) THEN 'APAC-Silvia'
     END as region,
     CASE
-      WHEN ad_user_id IN (1039413, 1047077, 1000011, 1042807, 1005243, 1025669, 1047795, 1000017) THEN 'Jeff Wallace'
+      WHEN ad_user_id IN (1047106, 1026393, 1042653, 1038225, 1026394, 1010361, 1012788, 1038224) THEN 'Joel Marquez'
       WHEN ad_user_id IN (1047106, 1026393, 1042653, 1038225, 1026394, 1010361, 1012788, 1038224) THEN 'Joel Marquez'
       WHEN ad_user_id IN (1041139, 1023803, 1016958) THEN 'Laurel Kee'
       WHEN ad_user_id IN (1039414, 1009866, 1013042, 1009528, 1009478, 1009210) THEN 'Silvia Munoz'
+      WHEN ad_user_id IN (1017011, 1023478, 1024444) THEN 'Lavanya Manohar'
     END as manager
   FROM adempiere.ad_user
   WHERE ad_user_id IN (
-    1039413, 1047077, 1000011, 1042807, 1005243, 1025669, 1047795, 1000017,
-    1047106, 1026393, 1042653, 1038225, 1026394, 1010361, 1012788, 1038224,
-    1041139, 1023803, 1016958,
-    1039414, 1009866, 1013042, 1009528, 1009478, 1009210
+    1047106, 1026393, 1042653, 1038225, 1026394, 1010361, 1012788, 1038224  -- MEXICO ONLY
   )
   AND isactive = 'Y'
 ),
@@ -731,7 +730,7 @@ SELECT
   sl.name as ise_name,
   sl.manager,
   sl.region,
-  COALESCE(ra.last_rfq_date::date, (CURRENT_DATE - INTERVAL '30 days')::date) as last_rfq_date,
+  COALESCE(ra.last_rfq_date::date, CURRENT_DATE - INTERVAL '30 days') as last_rfq_date,
   -- Calculate business days only (Mon-Fri, excluding weekends)
   COALESCE(
     (SELECT COUNT(*)
@@ -784,6 +783,7 @@ SELECT
     WHEN u.ad_user_id IN (1047106, 1026393, 1042653, 1038225, 1026394, 1010361, 1012788, 1038224) THEN 'MEX'
     WHEN u.ad_user_id IN (1041139, 1023803, 1016958) THEN 'APAC-Laurel'
     WHEN u.ad_user_id IN (1039414, 1009866, 1013042, 1009528, 1009478, 1009210) THEN 'APAC-Silvia'
+    WHEN u.ad_user_id IN (1017011, 1023478, 1024444) THEN 'APAC-Lavanya'
     ELSE 'Other'
   END as region,
   SUM(ol.linenetamt) as revenue,
@@ -850,77 +850,58 @@ SELECT
 
 
 -- ----------------------------------------------------------------------------
--- 3.2 ACTIVITY BY REGION (Yesterday)
+-- 3.2 ACTIVITY BY USA SALES REP (Yesterday)
 -- ----------------------------------------------------------------------------
--- Rolled up by region: USA (Jeff), MEX (Joel), APAC-Laurel, APAC-Silvia, APAC-Lavanya, Other
+-- Shows individual USA sales rep activity (not rolled up by region)
 -- Inline business day logic in each subquery since CTEs can't be referenced from SELECT subqueries
 
-WITH regional_users AS (
+WITH mexico_users AS (
   SELECT
     ad_user_id,
-    CASE
-      WHEN ad_user_id IN (1039413, 1047077, 1000011, 1042807, 1005243, 1025669, 1047795, 1000017) THEN 'USA'
-      WHEN ad_user_id IN (1047106, 1026393, 1042653, 1038225, 1026394, 1010361, 1012788, 1038224) THEN 'MEX'
-      WHEN ad_user_id IN (1041139, 1023803, 1016958) THEN 'APAC-Laurel'
-      WHEN ad_user_id IN (1039414, 1009866, 1013042, 1009528, 1009478, 1009210) THEN 'APAC-Silvia'
-      ELSE 'Other'
-    END as region,
-    CASE
-      WHEN ad_user_id IN (1039413, 1047077, 1000011, 1042807, 1005243, 1025669, 1047795, 1000017) THEN 'Jeff Wallace'
-      WHEN ad_user_id IN (1047106, 1026393, 1042653, 1038225, 1026394, 1010361, 1012788, 1038224) THEN 'Joel Marquez'
-      WHEN ad_user_id IN (1041139, 1023803, 1016958) THEN 'Laurel Kee'
-      WHEN ad_user_id IN (1039414, 1009866, 1013042, 1009528, 1009478, 1009210) THEN 'Silvia Munoz'
-      ELSE ''
-    END as manager
+    name
   FROM adempiere.ad_user
-  WHERE isactive = 'Y'
+  WHERE ad_user_id IN (1047106, 1026393, 1042653, 1038225, 1026394, 1010361, 1012788, 1038224)
+    AND isactive = 'Y'
 )
 SELECT
-  ru.region,
-  ru.manager,
+  u.name as sales_rep_name,
   (SELECT COUNT(DISTINCT rl.chuboe_rfq_line_id)
    FROM adempiere.chuboe_rfq r
    JOIN adempiere.chuboe_rfq_line rl ON r.chuboe_rfq_id = rl.chuboe_rfq_id AND rl.isactive = 'Y'
-   JOIN regional_users ru2 ON r.salesrep_id = ru2.ad_user_id
-   WHERE ru2.region = ru.region
+   WHERE r.salesrep_id = u.ad_user_id
      AND r.created::date = CASE WHEN EXTRACT(DOW FROM CURRENT_DATE) = 1 THEN CURRENT_DATE - INTERVAL '3 days' ELSE CURRENT_DATE - INTERVAL '1 day' END
      AND r.isactive = 'Y') as rfq_lines,
   (SELECT COUNT(DISTINCT cq.chuboe_cq_line_id)
    FROM adempiere.chuboe_rfq r
    JOIN adempiere.chuboe_cq_line cq ON r.chuboe_rfq_id = cq.chuboe_rfq_id AND cq.isactive = 'Y'
-   JOIN regional_users ru2 ON r.salesrep_id = ru2.ad_user_id
-   WHERE ru2.region = ru.region
+   WHERE r.salesrep_id = u.ad_user_id
      AND cq.created::date = CASE WHEN EXTRACT(DOW FROM CURRENT_DATE) = 1 THEN CURRENT_DATE - INTERVAL '3 days' ELSE CURRENT_DATE - INTERVAL '1 day' END
      AND r.isactive = 'Y') as cq_lines,
   (SELECT COUNT(DISTINCT cq.chuboe_cq_line_id)
    FROM adempiere.chuboe_rfq r
    JOIN adempiere.chuboe_cq_line cq ON r.chuboe_rfq_id = cq.chuboe_rfq_id AND cq.isactive = 'Y'
-   JOIN regional_users ru2 ON r.salesrep_id = ru2.ad_user_id
-   WHERE ru2.region = ru.region
+   WHERE r.salesrep_id = u.ad_user_id
      AND cq.created::date = CASE WHEN EXTRACT(DOW FROM CURRENT_DATE) = 1 THEN CURRENT_DATE - INTERVAL '3 days' ELSE CURRENT_DATE - INTERVAL '1 day' END
      AND cq.issold = 'Y'
      AND r.isactive = 'Y') as cq_sold,
   (SELECT COUNT(DISTINCT o.c_order_id)
    FROM adempiere.c_order o
-   JOIN regional_users ru2 ON o.salesrep_id = ru2.ad_user_id
-   WHERE ru2.region = ru.region
+   WHERE o.salesrep_id = u.ad_user_id
      AND o.created::date = CASE WHEN EXTRACT(DOW FROM CURRENT_DATE) = 1 THEN CURRENT_DATE - INTERVAL '3 days' ELSE CURRENT_DATE - INTERVAL '1 day' END
      AND o.isactive = 'Y'
      AND o.issotrx = 'Y') as so_lines,
   (SELECT COALESCE(SUM(o.grandtotal), 0)
    FROM adempiere.c_order o
-   JOIN regional_users ru2 ON o.salesrep_id = ru2.ad_user_id
-   WHERE ru2.region = ru.region
+   WHERE o.salesrep_id = u.ad_user_id
      AND o.created::date = CASE WHEN EXTRACT(DOW FROM CURRENT_DATE) = 1 THEN CURRENT_DATE - INTERVAL '3 days' ELSE CURRENT_DATE - INTERVAL '1 day' END
      AND o.isactive = 'Y'
      AND o.issotrx = 'Y') as so_revenue,
   (SELECT COALESCE(SUM(bi.s_order_line_gp), 0)
    FROM adempiere.c_order o
-   JOIN regional_users ru2 ON o.salesrep_id = ru2.ad_user_id
    LEFT JOIN adempiere.bi_order_line_v bi ON o.c_order_id = bi.order_id
-   WHERE ru2.region = ru.region
+   WHERE o.salesrep_id = u.ad_user_id
      AND o.created::date = CASE WHEN EXTRACT(DOW FROM CURRENT_DATE) = 1 THEN CURRENT_DATE - INTERVAL '3 days' ELSE CURRENT_DATE - INTERVAL '1 day' END
      AND o.isactive = 'Y'
      AND o.issotrx = 'Y') as so_gp
-FROM (SELECT DISTINCT region, manager FROM regional_users) ru
-ORDER BY region;
+FROM mexico_users u
+ORDER BY u.name;

@@ -1166,29 +1166,41 @@ function generateSection3(data) {
       <tbody>`;
 
     data.regionalActivity.forEach(region => {
+      const rfqStyle = (!region.rfq_lines || region.rfq_lines === '0' || region.rfq_lines === 0) ? 'color: #d32f2f;' : '';
+      const cqStyle = (!region.cq_lines || region.cq_lines === '0' || region.cq_lines === 0) ? 'color: #d32f2f;' : '';
+      const soldStyle = (!region.cq_sold || region.cq_sold === '0' || region.cq_sold === 0) ? 'color: #d32f2f;' : '';
+      const soStyle = (!region.so_lines || region.so_lines === '0' || region.so_lines === 0) ? 'color: #d32f2f;' : '';
+      const revStyle = (!region.so_revenue || region.so_revenue === '0' || region.so_revenue === 0 || parseFloat(region.so_revenue) === 0) ? 'color: #d32f2f;' : '';
+      const gpStyle = (!region.so_gp || region.so_gp === '0' || region.so_gp === 0 || parseFloat(region.so_gp) === 0) ? 'color: #d32f2f;' : '';
       html += `
         <tr>
           <td><strong>${region.region}</strong></td>
           <td>${region.manager}</td>
-          <td style="text-align: center;">${formatNumber(region.rfq_lines)}</td>
-          <td style="text-align: center;">${formatNumber(region.cq_lines)}</td>
-          <td style="text-align: center;">${formatNumber(region.cq_sold)}</td>
-          <td style="text-align: center;">${formatNumber(region.so_lines)}</td>
-          <td class="number">${formatCurrency(region.so_revenue)}</td>
-          <td class="number">${formatCurrency(region.so_gp)}</td>
+          <td style="text-align: center; ${rfqStyle}">${formatNumber(region.rfq_lines)}</td>
+          <td style="text-align: center; ${cqStyle}">${formatNumber(region.cq_lines)}</td>
+          <td style="text-align: center; ${soldStyle}">${formatNumber(region.cq_sold)}</td>
+          <td style="text-align: center; ${soStyle}">${formatNumber(region.so_lines)}</td>
+          <td class="number" style="${revStyle}">${formatCurrency(region.so_revenue)}</td>
+          <td class="number" style="${gpStyle}">${formatCurrency(region.so_gp)}</td>
         </tr>`;
     });
 
     // Add TOTAL row
+    const totalRfqStyle = (!data.regionalTotals.rfq_lines || data.regionalTotals.rfq_lines === 0) ? 'color: #d32f2f;' : '';
+    const totalCqStyle = (!data.regionalTotals.cq_lines || data.regionalTotals.cq_lines === 0) ? 'color: #d32f2f;' : '';
+    const totalSoldStyle = (!data.regionalTotals.cq_sold || data.regionalTotals.cq_sold === 0) ? 'color: #d32f2f;' : '';
+    const totalSoStyle = (!data.regionalTotals.so_lines || data.regionalTotals.so_lines === 0) ? 'color: #d32f2f;' : '';
+    const totalRevStyle = (!data.regionalTotals.so_revenue || data.regionalTotals.so_revenue === 0) ? 'color: #d32f2f;' : '';
+    const totalGpStyle = (!data.regionalTotals.so_gp || data.regionalTotals.so_gp === 0) ? 'color: #d32f2f;' : '';
     html += `
       <tr style="border-top: 2px solid #333; background-color: #f5f5f5; font-weight: bold;">
         <td colspan="2"><strong>TOTAL</strong></td>
-        <td style="text-align: center;">${formatNumber(data.regionalTotals.rfq_lines)}</td>
-        <td style="text-align: center;">${formatNumber(data.regionalTotals.cq_lines)}</td>
-        <td style="text-align: center;">${formatNumber(data.regionalTotals.cq_sold)}</td>
-        <td style="text-align: center;">${formatNumber(data.regionalTotals.so_lines)}</td>
-        <td class="number"><strong>${formatCurrency(data.regionalTotals.so_revenue)}</strong></td>
-        <td class="number"><strong>${formatCurrency(data.regionalTotals.so_gp)}</strong></td>
+        <td style="text-align: center; ${totalRfqStyle}">${formatNumber(data.regionalTotals.rfq_lines)}</td>
+        <td style="text-align: center; ${totalCqStyle}">${formatNumber(data.regionalTotals.cq_lines)}</td>
+        <td style="text-align: center; ${totalSoldStyle}">${formatNumber(data.regionalTotals.cq_sold)}</td>
+        <td style="text-align: center; ${totalSoStyle}">${formatNumber(data.regionalTotals.so_lines)}</td>
+        <td class="number" style="${totalRevStyle}"><strong>${formatCurrency(data.regionalTotals.so_revenue)}</strong></td>
+        <td class="number" style="${totalGpStyle}"><strong>${formatCurrency(data.regionalTotals.so_gp)}</strong></td>
       </tr>`;
 
     html += '</tbody></table>';
