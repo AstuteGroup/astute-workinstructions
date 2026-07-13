@@ -1163,7 +1163,15 @@ async function main() {
     writeWatermark(newWatermark);
   }
 
-  await pool.end();
+  // Shutdown with timeout — pool.end() can hang indefinitely if a connection
+  // was never properly released (seen 2026-07-07: process stuck for 6 days).
+  // Watermark is already persisted above, so timeout exit is safe — next tick
+  // will pick up from the saved checkpoint.
+  const poolEndTimeout = new Promise(resolve => setTimeout(() => {
+    log('WARN: pool.end() timed out after 10s — forcing exit (watermark already saved)');
+    resolve();
+  }, 10000));
+  await Promise.race([pool.end(), poolEndTimeout]);
 }
 
 if (require.main === module) {
