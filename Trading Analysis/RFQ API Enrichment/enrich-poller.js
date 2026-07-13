@@ -906,12 +906,17 @@ async function main() {
     }
   }
 
-  // Sort immediate work so P1 (express) runs before P2 (main), NEWEST FIRST within tier.
-  // Newest-first ensures fresh RFQs get enriched promptly even during backfill recovery.
+  // Sort immediate work: P1a → P1b → P2 → P1c, NEWEST FIRST within tier.
+  // PPV (P1c) is demoted after P2 so real demand (Shortage, Stock, EOL) gets
+  // enriched before pricing exercises, especially during backfill recovery.
+  // Newest-first ensures fresh RFQs get enriched promptly.
+  const BACKFILL_PRIORITY_ORDER = { 'P1a': 1, 'P1b': 2, 'P2': 3, 'P1c': 4, 'P3': 5 };
   const immediate = newRFQs
     .filter(r => isImmediate(r.priority))
     .sort((a, b) => {
-      if (a.priority !== b.priority) return a.priority.localeCompare(b.priority);
+      const aOrder = BACKFILL_PRIORITY_ORDER[a.priority] || 99;
+      const bOrder = BACKFILL_PRIORITY_ORDER[b.priority] || 99;
+      if (aOrder !== bOrder) return aOrder - bOrder;
       return new Date(b.created) - new Date(a.created);  // DESC = newest first
     });
   const backlogNew = newRFQs.filter(r => r.priority === PRIORITY.BACKLOG);
