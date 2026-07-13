@@ -45,6 +45,7 @@ const enrichmentRateLimiter = require('../../shared/enrichment-rate-limiter');
 
 const WATERMARK_FILE = path.resolve(process.env.HOME || '/home/analytics_user', 'workspace/.last-rfq-enrich');
 const ROLLUP_FILE = path.resolve(process.env.HOME || '/home/analytics_user', 'workspace/.enrich-poller-rollup.json');
+const BACKFILL_TRACKER_FILE = path.resolve(process.env.HOME || '/home/analytics_user', 'workspace/.enrich-backfill-tracker.json');
 const JAKE_EMAIL = 'jake.harris@astutegroup.com';
 const FROM_EMAIL = process.env.VORTEX_EMAIL || 'vortex@orangetsunami.com';
 const FALLBACK_EMAIL = process.env.VORTEX_FALLBACK_SENDER || 'excess@orangetsunami.com';
@@ -86,6 +87,46 @@ function writeWatermark(iso) {
     fs.writeFileSync(WATERMARK_FILE, iso, 'utf-8');
   } catch (err) {
     log('WARN: failed to write watermark:', err.message);
+  }
+}
+
+// ─── Backfill tracker ───────────────────────────────────────────────────────
+// During backfill (when processing newest-first), we can't advance the watermark
+// until all RFQs in the window are processed. Track processed RFQ IDs so we
+// don't reprocess them on subsequent ticks. Clear when backlog is empty.
+function readBackfillTracker() {
+  try {
+    if (!fs.existsSync(BACKFILL_TRACKER_FILE)) return { processed: new Set(), sinceIso: null };
+    const obj = JSON.parse(fs.readFileSync(BACKFILL_TRACKER_FILE, 'utf-8'));
+    return {
+      processed: new Set(obj.processed || []),
+      sinceIso: obj.sinceIso || null,
+    };
+  } catch {
+    return { processed: new Set(), sinceIso: null };
+  }
+}
+
+function writeBackfillTracker(tracker) {
+  try {
+    fs.writeFileSync(BACKFILL_TRACKER_FILE, JSON.stringify({
+      processed: [...tracker.processed],
+      sinceIso: tracker.sinceIso,
+      updatedAt: new Date().toISOString(),
+    }, null, 2), 'utf-8');
+  } catch (err) {
+    log('WARN: failed to write backfill tracker:', err.message);
+  }
+}
+
+function clearBackfillTracker() {
+  try {
+    if (fs.existsSync(BACKFILL_TRACKER_FILE)) {
+      fs.unlinkSync(BACKFILL_TRACKER_FILE);
+      log('Backfill tracker cleared (backlog empty)');
+    }
+  } catch (err) {
+    log('WARN: failed to clear backfill tracker:', err.message);
   }
 }
 
@@ -181,7 +222,7 @@ async function findNewRFQs(sinceIso, untilIso) {
     HAVING COUNT(rlm.chuboe_rfq_line_mpn_id) > 0
        AND MAX(rlm.created AT TIME ZONE 'America/Chicago' AT TIME ZONE 'UTC') >  $1::timestamp
        AND MAX(rlm.created AT TIME ZONE 'America/Chicago' AT TIME ZONE 'UTC') <= $2::timestamp
-    ORDER BY MAX(rlm.created AT TIME ZONE 'America/Chicago' AT TIME ZONE 'UTC') ASC
+    ORDER BY MAX(rlm.created AT TIME ZONE 'America/Chicago' AT TIME ZONE 'UTC') DESC
   `, [sinceIso, untilIso]);
   return rows;
 }
@@ -821,6 +862,17 @@ async function main() {
   }
   newRFQs = filteredNew;
 
+  // ─── Backfill tracker: filter out already-processed RFQs ───────────────────
+  // During backfill (newest-first processing), we don't advance the watermark
+  // until all RFQs are processed. Track which ones we've done to avoid reprocessing.
+  const backfillTracker = readBackfillTracker();
+  const beforeFilterCount = newRFQs.length;
+  newRFQs = newRFQs.filter(r => !backfillTracker.processed.has(r.rfq_number));
+  const filteredByTracker = beforeFilterCount - newRFQs.length;
+  if (filteredByTracker > 0) {
+    log(`Backfill tracker: skipped ${filteredByTracker} already-processed RFQ(s)`);
+  }
+
   // Pick up any previously-approved sentinels that didn't fall into this
   // tick's findNewRFQs window. Re-shape them into the same row format.
   const clearedSentinels = largeRfqGate.listClearedUnprocessed();
@@ -854,12 +906,13 @@ async function main() {
     }
   }
 
-  // Sort immediate work so P1 (express) runs before P2 (main), FIFO within tier
+  // Sort immediate work so P1 (express) runs before P2 (main), NEWEST FIRST within tier.
+  // Newest-first ensures fresh RFQs get enriched promptly even during backfill recovery.
   const immediate = newRFQs
     .filter(r => isImmediate(r.priority))
     .sort((a, b) => {
       if (a.priority !== b.priority) return a.priority.localeCompare(b.priority);
-      return new Date(a.created) - new Date(b.created);
+      return new Date(b.created) - new Date(a.created);  // DESC = newest first
     });
   const backlogNew = newRFQs.filter(r => r.priority === PRIORITY.BACKLOG);
 
@@ -981,6 +1034,21 @@ async function main() {
         errors: [{ stage: 'enrich', message: err.message }], durationMs: 0,
       });
     }
+  }
+
+  // ─── Update backfill tracker with processed RFQs ──────────────────────────
+  // Track all RFQs we just processed so we don't reprocess them on next tick.
+  // This is critical for newest-first processing where watermark doesn't advance
+  // until the entire backlog is cleared.
+  if (immediateThisTick.length > 0) {
+    for (const r of immediateThisTick) {
+      backfillTracker.processed.add(r.rfq_number);
+    }
+    // Remember the original watermark so we know when we're caught up
+    if (!backfillTracker.sinceIso) {
+      backfillTracker.sinceIso = sinceIso;
+    }
+    writeBackfillTracker(backfillTracker);
   }
 
   // Phase 4: Drain Tier 4 backlog
@@ -1147,20 +1215,20 @@ async function main() {
   }
 
   // Advance watermark after everything completes.
-  // BUG FIX (2026-06-22): When in backfill mode, only advance to the last processed
-  // RFQ's timestamp, not to current time. This ensures next tick picks up remaining RFQs.
+  // NEWEST-FIRST LOGIC (2026-07-13): During backfill, we process newest RFQs first
+  // but can't advance the watermark until ALL RFQs in the window are processed.
+  // The backfill tracker keeps track of processed RFQs. Only when there are no
+  // deferred RFQs do we advance the watermark to current time and clear the tracker.
   if (!DRY_RUN) {
-    let newWatermark;
-    if (deferredCount > 0 && lastProcessedLineMpnCreated) {
-      // Backfill mode: advance only to what we processed
-      newWatermark = new Date(lastProcessedLineMpnCreated).toISOString();
-      log(`BACKFILL: Watermark advanced to ${newWatermark} (${deferredCount} RFQs remaining for next tick)`);
+    if (deferredCount > 0) {
+      // Backfill mode: DON'T advance watermark — tracker handles dedup
+      log(`BACKFILL: ${deferredCount} RFQs remaining — watermark held at ${sinceIso}, tracker has ${backfillTracker.processed.size} processed`);
     } else {
-      // Normal mode: advance to current time
-      newWatermark = untilIso;
-      log(`Watermark advanced to ${newWatermark}`);
+      // Backlog cleared: advance watermark to current time and clear tracker
+      writeWatermark(untilIso);
+      clearBackfillTracker();
+      log(`Watermark advanced to ${untilIso} (backlog cleared)`);
     }
-    writeWatermark(newWatermark);
   }
 
   // Shutdown with timeout — pool.end() can hang indefinitely if a connection
