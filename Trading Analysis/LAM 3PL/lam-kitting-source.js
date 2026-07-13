@@ -14,6 +14,7 @@
 
 const fs = require('fs');
 const path = require('path');
+const XLSX = require('xlsx');
 
 // Use shared franchise API module (single source of truth for all distributor APIs)
 const { searchAllDistributors } = require('../../shared/franchise-api');
@@ -24,6 +25,78 @@ const { isRestrictedMfr } = require('../../shared/restricted-mfrs');
 const { readCSVFile } = require('../../shared/csv-utils');
 
 const DELAY_BETWEEN_PARTS = 500; // ms between parts to avoid rate limiting
+const DELAY_BETWEEN_MPNS = 200;  // ms between MPN queries within same CPC
+
+// -----------------------------------------------------------------------------
+// AVL Loader - Load complete AVL for multi-MPN sourcing
+// -----------------------------------------------------------------------------
+
+let _avlCache = null;
+
+/**
+ * Load the complete AVL (CPC -> [MPN, MPN, ...])
+ * Returns a Map of CPC -> array of { mpn, mfr, preferred }
+ */
+function loadAVL() {
+  if (_avlCache) return _avlCache;
+
+  const avlPath = path.join(__dirname, 'LAM_Complete_AVL.xlsx');
+  if (!fs.existsSync(avlPath)) {
+    console.log('  WARNING: LAM_Complete_AVL.xlsx not found - using roster MPN only');
+    _avlCache = new Map();
+    return _avlCache;
+  }
+
+  const wb = XLSX.readFile(avlPath);
+  const ws = wb.Sheets['Complete AVL'];
+  if (!ws) {
+    console.log('  WARNING: Complete AVL sheet not found');
+    _avlCache = new Map();
+    return _avlCache;
+  }
+
+  const data = XLSX.utils.sheet_to_json(ws);
+  _avlCache = new Map();
+
+  for (const row of data) {
+    const cpc = row.CPC;
+    if (!cpc) continue;
+
+    if (!_avlCache.has(cpc)) {
+      _avlCache.set(cpc, []);
+    }
+
+    _avlCache.get(cpc).push({
+      mpn: row.MPN,
+      mfr: row.Manufacturer,
+      preferred: row.Preferred === 'Y',
+      source: row.Source
+    });
+  }
+
+  return _avlCache;
+}
+
+/**
+ * Get all approved MPNs for a CPC
+ * Returns array sorted by preference (preferred first)
+ */
+function getApprovedMPNs(cpc, rosterMpn) {
+  const avl = loadAVL();
+  const entries = avl.get(cpc);
+
+  if (!entries || entries.length === 0) {
+    // No AVL data - use roster MPN as sole option
+    return [{ mpn: rosterMpn, mfr: '', preferred: true, source: 'Roster-Fallback' }];
+  }
+
+  // Sort: preferred first, then alphabetically
+  return entries.sort((a, b) => {
+    if (a.preferred && !b.preferred) return -1;
+    if (!a.preferred && b.preferred) return 1;
+    return (a.mpn || '').localeCompare(b.mpn || '');
+  });
+}
 
 // -----------------------------------------------------------------------------
 // Shared state for partial-write support
@@ -75,6 +148,9 @@ async function flushOutput() {
   const noCoverage = results.filter(r => r.sourcingStatus === 'NO COVERAGE').length;
   const notSourced = results.filter(r => r.sourcingStatus === 'SKIPPED - TIMEOUT/ERROR').length;
   const onOrder = results.filter(r => r.sourcingStatus.startsWith('SKIPPED - PENDING')).length;
+  const usedAlternate = results.filter(r => r.selectedMpn).length;
+  const multiMpnCpcs = results.filter(r => r.avlCount > 1).length;
+
   console.log(`  In Stock: ${inStock}`);
   console.log(`  Lead Time Only: ${leadTimeOnly}`);
   console.log(`  NO COVERAGE (APIs returned no match): ${noCoverage}`);
@@ -83,6 +159,14 @@ async function flushOutput() {
   }
   if (notSourced > 0) {
     console.log(`  SKIPPED - TIMEOUT/ERROR (interrupted): ${notSourced}`);
+  }
+
+  // AVL stats
+  if (multiMpnCpcs > 0) {
+    console.log('');
+    console.log('=== AVL Multi-MPN Stats ===');
+    console.log(`  CPCs with multiple approved MPNs: ${multiMpnCpcs}`);
+    console.log(`  Used alternate MPN (better option): ${usedAlternate}`);
   }
 }
 
@@ -123,11 +207,18 @@ async function main() {
   console.log(`Output: ${outputFile}`);
   console.log('');
 
+  // Load AVL for multi-MPN sourcing
+  console.log('Loading AVL...');
+  const avl = loadAVL();
+  console.log(`  ${avl.size} CPCs in AVL`);
+
   // Load reorder alerts
+  console.log('');
   console.log('Loading reorder alerts...');
   const csv = readCSVFile(inputFile);
   const headers = csv.headers;
   const mpnIdx = headers.indexOf('MPN');
+  const cpcIdx = headers.indexOf('Lam P/N') !== -1 ? headers.indexOf('Lam P/N') : headers.indexOf('CPC');
   const moqIdx = headers.indexOf('LAM MOQ');
   const shortfallIdx = headers.indexOf('Shortfall');
   const mfrIdx = headers.indexOf('Manufacturer');
@@ -184,26 +275,30 @@ async function main() {
     franchise: {
       inStockSupplier: '', inStockPrice: '', inStockQty: '',
       leadTimeSupplier: '', leadTimePrice: '', leadTimeWeeks: '',
-    }
+    },
+    selectedMpn: '',      // MPN that was selected (if different from roster)
+    avlCount: 1,          // Number of approved MPNs for this CPC
+    mpnsQueried: 0,       // Number of MPNs actually queried
   }));
 
   // Register shared state so signal handlers can flush
   _outputState = { results, totalItems: csv.rows.length, headers, outputFile };
 
   // Process each item
-  console.log('Running franchise screening...');
+  console.log('Running franchise screening (with AVL multi-MPN lookup)...');
   console.log('');
 
   let sourcedCount = 0;
   for (let i = 0; i < csv.rows.length; i++) {
     const row = csv.rows[i];
-    const mpn = row[mpnIdx];
+    const rosterMpn = row[mpnIdx];
+    const cpc = cpcIdx >= 0 ? row[cpcIdx] : '';
     const priority = priorityIdx >= 0 ? row[priorityIdx] : '';
 
     // Skip items already on order — no need to source
     if (SKIP_PRIORITIES.includes(priority)) {
       results[i].sourcingStatus = `SKIPPED - ${priority}`;
-      console.log(`[${i + 1}/${csv.rows.length}] ${mpn} — skipped (${priority})`);
+      console.log(`[${i + 1}/${csv.rows.length}] ${rosterMpn} — skipped (${priority})`);
       continue;
     }
 
@@ -212,36 +307,93 @@ async function main() {
     const shortfall = shortfallIdx >= 0 ? (parseInt(row[shortfallIdx]) || 0) : 0;
     const queryQty = Math.max(moq, shortfall);
 
-    console.log(`[${sourcedCount}/${toSource}] ${mpn} (qty: ${queryQty}, MOQ: ${moq}, shortfall: ${shortfall})`);
+    // Get all approved MPNs for this CPC
+    const approvedMpns = getApprovedMPNs(cpc, rosterMpn);
+    results[i].avlCount = approvedMpns.length;
+
+    if (approvedMpns.length > 1) {
+      console.log(`[${sourcedCount}/${toSource}] ${cpc} (${approvedMpns.length} approved MPNs, qty: ${queryQty})`);
+    } else {
+      console.log(`[${sourcedCount}/${toSource}] ${rosterMpn} (qty: ${queryQty})`);
+    }
 
     try {
-      // Query all franchise APIs at MOQ — sourcing workflow runs unchanged for
-      // every line so chuboe_pricing_api_result captures market intel even on
-      // restricted MFRs (per shared/restricted-mfrs.json policy). The
-      // RESTRICTED display masking below is LAM-Kitting-specific because this
-      // is a franchise-only program — the buyer can't act on the franchise
-      // pricing. Other programs (Stock RFQ, RFQ Sourcing, Market Offer) keep
-      // showing the data as-is.
-      const { trimmed, raw } = await queryFranchiseAPIs(mpn, queryQty);
+      // Query ALL approved MPNs and find the best option across all
+      let bestInStock = null;
+      let bestLeadTime = null;
+      let bestInStockMpn = '';
+      let bestLeadTimeMpn = '';
+      let allRawResults = {};
+      let mpnsQueried = 0;
+      let anyRestricted = false;
+      let restrictedCanonical = null;
 
-      const mfrText = mfrIdx >= 0 ? row[mfrIdx] : '';
-      const restrictedCanonical = isRestrictedMfr({ mfrName: mfrText });
+      for (const avlEntry of approvedMpns) {
+        const mpn = avlEntry.mpn;
+        if (!mpn) continue;
 
-      // Find best in-stock option and best lead time option
-      const inStockOption = findBestInStock(trimmed, queryQty);
-      const leadTimeOption = findBestLeadTime(trimmed);
+        // Check if this MPN's manufacturer is restricted
+        const mfrText = avlEntry.mfr || (mfrIdx >= 0 ? row[mfrIdx] : '');
+        const restricted = isRestrictedMfr({ mfrName: mfrText });
+        if (restricted) {
+          anyRestricted = true;
+          restrictedCanonical = restricted;
+          // Still query for market intel, but won't use for sourcing
+        }
 
-      // Update the pre-built entry. Distinguish "APIs returned coverage" (SOURCED) from
-      // "APIs returned cleanly but zero matches" (NO COVERAGE) — the latter is the genuine
-      // signal that the part needs manual franchise sourcing or broker routing, and was
-      // previously mis-labeled SOURCED (misleading when buyer scans column AG).
-      const foundAny = !!(inStockOption || leadTimeOption);
+        const { trimmed, raw } = await queryFranchiseAPIs(mpn, queryQty);
+        mpnsQueried++;
+        allRawResults[mpn] = raw;
 
-      if (restrictedCanonical) {
-        // LAM is franchise-only and cannot purchase ADI/Maxim/Linear/TI through
-        // distribution. Hide the franchise pricing so the buyer doesn't act on
-        // it; rawFranchise stays populated for chuboe_pricing_api_result and
-        // for the rfq-writer (which applies its own write-side gate).
+        if (restricted) {
+          // Skip using this MPN for actual sourcing (restricted)
+          if (approvedMpns.length > 1) {
+            console.log(`    [${mpn}] ⊘ RESTRICTED (${restricted})`);
+          }
+        } else {
+          // Find best options for this MPN
+          const inStockOption = findBestInStock(trimmed, queryQty);
+          const leadTimeOption = findBestLeadTime(trimmed);
+
+          // Compare to current best
+          if (inStockOption) {
+            if (!bestInStock || inStockOption.price < bestInStock.price) {
+              bestInStock = inStockOption;
+              bestInStockMpn = mpn;
+            }
+            if (approvedMpns.length > 1) {
+              console.log(`    [${mpn}] ✓ In Stock: ${inStockOption.supplier} - $${inStockOption.price} x ${inStockOption.qty}`);
+            }
+          }
+
+          if (leadTimeOption) {
+            if (!bestLeadTime || leadTimeOption.price < bestLeadTime.price) {
+              bestLeadTime = leadTimeOption;
+              bestLeadTimeMpn = mpn;
+            }
+            if (approvedMpns.length > 1 && !inStockOption) {
+              console.log(`    [${mpn}] ~ Lead Time: ${leadTimeOption.supplier} - $${leadTimeOption.price}`);
+            }
+          }
+
+          if (!inStockOption && !leadTimeOption && approvedMpns.length > 1) {
+            console.log(`    [${mpn}] ✗ No coverage`);
+          }
+        }
+
+        // Delay between MPN queries
+        if (mpnsQueried < approvedMpns.length) {
+          await sleep(DELAY_BETWEEN_MPNS);
+        }
+      }
+
+      results[i].mpnsQueried = mpnsQueried;
+
+      // Determine final status and selected MPN
+      const foundAny = !!(bestInStock || bestLeadTime);
+
+      // If ALL MPNs are restricted, mark as restricted
+      if (anyRestricted && !foundAny && approvedMpns.length === 1) {
         results[i].sourcingStatus = `RESTRICTED - ${restrictedCanonical}`;
         results[i].franchise = {
           inStockSupplier: '', inStockPrice: '', inStockQty: '',
@@ -250,26 +402,47 @@ async function main() {
       } else {
         results[i].sourcingStatus = foundAny ? 'SOURCED' : 'NO COVERAGE';
         results[i].franchise = {
-          inStockSupplier: inStockOption?.supplier || '',
-          inStockPrice: inStockOption?.price || '',
-          inStockQty: inStockOption?.qty || '',
-          leadTimeSupplier: leadTimeOption?.supplier || '',
-          leadTimePrice: leadTimeOption?.price || '',
-          leadTimeWeeks: leadTimeOption?.leadTime || '',
+          inStockSupplier: bestInStock?.supplier || '',
+          inStockPrice: bestInStock?.price || '',
+          inStockQty: bestInStock?.qty || '',
+          leadTimeSupplier: bestLeadTime?.supplier || '',
+          leadTimePrice: bestLeadTime?.price || '',
+          leadTimeWeeks: bestLeadTime?.leadTime || '',
         };
-      }
-      // Save raw franchise results for VQ writing downstream
-      results[i].rawFranchise = raw;
 
-      // Brief status
-      if (restrictedCanonical) {
-        console.log(`    ⊘ RESTRICTED (${restrictedCanonical}) — franchise pricing hidden, manual sourcing required`);
-      } else if (inStockOption) {
-        console.log(`    ✓ In Stock: ${inStockOption.supplier} - $${inStockOption.price} x ${inStockOption.qty}`);
-      } else if (leadTimeOption) {
-        console.log(`    ~ Lead Time: ${leadTimeOption.supplier} - $${leadTimeOption.price} (${leadTimeOption.leadTime})`);
+        // Track selected MPN if different from roster
+        const selectedMpn = bestInStockMpn || bestLeadTimeMpn || '';
+        if (selectedMpn && selectedMpn !== rosterMpn) {
+          results[i].selectedMpn = selectedMpn;
+        }
+      }
+
+      // Save raw franchise results for all queried MPNs
+      results[i].rawFranchise = allRawResults;
+
+      // Summary for this CPC
+      if (approvedMpns.length === 1) {
+        // Single MPN - show standard output
+        if (results[i].sourcingStatus.startsWith('RESTRICTED')) {
+          console.log(`    ⊘ RESTRICTED (${restrictedCanonical}) — franchise pricing hidden`);
+        } else if (bestInStock) {
+          console.log(`    ✓ In Stock: ${bestInStock.supplier} - $${bestInStock.price} x ${bestInStock.qty}`);
+        } else if (bestLeadTime) {
+          console.log(`    ~ Lead Time: ${bestLeadTime.supplier} - $${bestLeadTime.price} (${bestLeadTime.leadTime})`);
+        } else {
+          console.log(`    ✗ No franchise coverage`);
+        }
       } else {
-        console.log(`    ✗ No franchise coverage`);
+        // Multi-MPN - show winner summary
+        if (bestInStock) {
+          const altNote = bestInStockMpn !== rosterMpn ? ` ★ ALT: ${bestInStockMpn}` : '';
+          console.log(`    → BEST: ${bestInStock.supplier} - $${bestInStock.price} x ${bestInStock.qty}${altNote}`);
+        } else if (bestLeadTime) {
+          const altNote = bestLeadTimeMpn !== rosterMpn ? ` ★ ALT: ${bestLeadTimeMpn}` : '';
+          console.log(`    → BEST: ${bestLeadTime.supplier} - $${bestLeadTime.price} (${bestLeadTime.leadTime})${altNote}`);
+        } else {
+          console.log(`    → No coverage across ${mpnsQueried} MPNs`);
+        }
       }
     } catch (err) {
       console.log(`    ✗ ERROR: ${err.message}`);
@@ -396,7 +569,7 @@ async function writeEnrichedOutput(results, originalHeaders, outputPath) {
   // Get resale price index for margin calculations
   const resaleIdx = originalHeaders.indexOf('Resale Price');
 
-  // Simplified columns: In Stock option + Lead Time option + Margins + Status
+  // Simplified columns: In Stock option + Lead Time option + Margins + Status + AVL info
   const newHeaders = [
     'In Stock Supplier',
     'In Stock Price',
@@ -407,6 +580,8 @@ async function writeEnrichedOutput(results, originalHeaders, outputPath) {
     'Lead Time (Weeks)',
     'Lead Time Margin %',
     'Sourcing Status',
+    'Selected MPN',    // MPN used (if different from roster - alternate was better)
+    'AVL Count',       // Number of approved MPNs for this CPC
   ];
 
   const allHeaders = [...originalHeaders, ...newHeaders];
@@ -456,6 +631,8 @@ async function writeEnrichedOutput(results, originalHeaders, outputPath) {
       result.franchise.leadTimeWeeks || '',
       leadTimeMarginNum,  // Store as number for coloring
       result.sourcingStatus || 'SOURCED',
+      result.selectedMpn || '',           // MPN used if alternate was better
+      result.avlCount || 1,               // Number of approved MPNs
     ];
 
     rows.push([...originalValues, ...franchiseValues]);
@@ -534,6 +711,17 @@ async function writeEnrichedOutput(results, originalHeaders, outputPath) {
       if (staleVal === 'YES') {
         const cell = excelRow.getCell(staleCol);
         cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFD580' } };
+      }
+    }
+
+    // Selected MPN cell — light blue highlight when alternate was used
+    const selectedMpnCol = allHeaders.indexOf('Selected MPN') + 1;
+    if (selectedMpnCol > 0) {
+      const selectedMpnVal = row[selectedMpnCol - 1];
+      if (selectedMpnVal) {
+        const cell = excelRow.getCell(selectedMpnCol);
+        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF87CEEB' } };  // Light blue
+        cell.font = { bold: true };
       }
     }
   }
