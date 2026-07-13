@@ -17,7 +17,7 @@ const BASE_DIR = '/home/analytics_user/workspace/astute-workinstructions/Trading
 const FILE_DROP = '/home/analytics_user/workspace/file-drop';
 
 /**
- * Load Kitting AVL from MPNs sheet
+ * Load Kitting AVL from MPNs sheet AND Astute HVM list sheet
  * Format: Multiple MFRs and MPNs per row, newline-separated
  * (P) = Primary, (A) = Alternate
  */
@@ -29,71 +29,102 @@ function loadKittingAVL() {
   }
 
   const wb = XLSX.readFile(filePath);
-  const ws = wb.Sheets['MPNs'];
-  if (!ws) {
-    console.log('  WARNING: MPNs sheet not found');
-    return {};
-  }
-
-  const data = XLSX.utils.sheet_to_json(ws, { header: 1 });
-
-  // Find header row
-  let headerIdx = -1;
-  for (let i = 0; i < 10; i++) {
-    if (data[i] && data[i].includes('Number')) {
-      headerIdx = i;
-      break;
-    }
-  }
-
-  if (headerIdx === -1) {
-    console.log('  WARNING: Could not find header row in MPNs sheet');
-    return {};
-  }
-
-  const headers = data[headerIdx];
-  const numIdx = headers.indexOf('Number');
-  const mfrIdx = headers.indexOf('Mfg Name');
-  const mpnIdx = headers.indexOf('Mfg Part Number');
-
   const avl = {};
   let totalEntries = 0;
 
-  for (let i = headerIdx + 1; i < data.length; i++) {
-    const row = data[i];
-    if (!row || !row[numIdx]) continue;
+  // ─── Load from MPNs sheet ───────────────────────────────────────────────────
+  const mpnsWs = wb.Sheets['MPNs'];
+  if (mpnsWs) {
+    const data = XLSX.utils.sheet_to_json(mpnsWs, { header: 1 });
 
-    const cpc = String(row[numIdx]).trim();
-    const mfrCell = row[mfrIdx] ? String(row[mfrIdx]) : '';
-    const mpnCell = row[mpnIdx] ? String(row[mpnIdx]) : '';
-
-    // Split by newlines
-    const mfrs = mfrCell.split(/\r?\n/).map(s => s.trim()).filter(Boolean);
-    const mpns = mpnCell.split(/\r?\n/).map(s => s.trim()).filter(Boolean);
-
-    if (!avl[cpc]) avl[cpc] = [];
-
-    // Pair up MFRs and MPNs
-    const maxLen = Math.max(mfrs.length, mpns.length);
-    for (let j = 0; j < maxLen; j++) {
-      const mfr = mfrs[j] || mfrs[0] || '';
-      const mpn = mpns[j] || mpns[0] || '';
-
-      // Check if (P) primary or (A) alternate
-      const isPrimary = mfr.includes('(P)');
-      const cleanMfr = mfr.replace(/\s*\([PA]\)\s*/g, '').trim();
-
-      avl[cpc].push({
-        mpn: mpn,
-        mfr: cleanMfr,
-        preferred: isPrimary,
-        source: 'Kitting-AVL'
-      });
-      totalEntries++;
+    // Find header row
+    let headerIdx = -1;
+    for (let i = 0; i < 10; i++) {
+      if (data[i] && data[i].includes('Number')) {
+        headerIdx = i;
+        break;
+      }
     }
+
+    if (headerIdx !== -1) {
+      const headers = data[headerIdx];
+      const numIdx = headers.indexOf('Number');
+      const mfrIdx = headers.indexOf('Mfg Name');
+      const mpnIdx = headers.indexOf('Mfg Part Number');
+
+      for (let i = headerIdx + 1; i < data.length; i++) {
+        const row = data[i];
+        if (!row || !row[numIdx]) continue;
+
+        const cpc = String(row[numIdx]).trim();
+        const mfrCell = row[mfrIdx] ? String(row[mfrIdx]) : '';
+        const mpnCell = row[mpnIdx] ? String(row[mpnIdx]) : '';
+
+        // Split by newlines
+        const mfrs = mfrCell.split(/\r?\n/).map(s => s.trim()).filter(Boolean);
+        const mpns = mpnCell.split(/\r?\n/).map(s => s.trim()).filter(Boolean);
+
+        if (!avl[cpc]) avl[cpc] = [];
+
+        // Pair up MFRs and MPNs
+        const maxLen = Math.max(mfrs.length, mpns.length);
+        for (let j = 0; j < maxLen; j++) {
+          const mfr = mfrs[j] || mfrs[0] || '';
+          const mpn = mpns[j] || mpns[0] || '';
+
+          // Check if (P) primary or (A) alternate
+          const isPrimary = mfr.includes('(P)');
+          const cleanMfr = mfr.replace(/\s*\([PA]\)\s*/g, '').trim();
+
+          avl[cpc].push({
+            mpn: mpn,
+            mfr: cleanMfr,
+            preferred: isPrimary,
+            source: 'Kitting-AVL'
+          });
+          totalEntries++;
+        }
+      }
+    }
+    console.log(`  [MPNs] sheet: ${Object.keys(avl).length} CPCs`);
   }
 
-  console.log(`  Kitting AVL: ${Object.keys(avl).length} CPCs, ${totalEntries} MPN entries`);
+  // ─── Load from Astute HVM list sheet ────────────────────────────────────────
+  const hvmWs = wb.Sheets['Astute HVM list'];
+  if (hvmWs) {
+    const data = XLSX.utils.sheet_to_json(hvmWs, { header: 1 });
+    let hvmCount = 0;
+
+    // Header row is row 1: Lam PN, Item Description, Manufacturer, Item, ...
+    for (let i = 2; i < data.length; i++) {
+      const row = data[i];
+      if (!row || !row[0]) continue;
+
+      const cpc = String(row[0]).trim();
+      const mfr = row[2] ? String(row[2]).trim() : '';
+      const mpn = row[3] ? String(row[3]).trim() : '';
+
+      if (!cpc || !mpn) continue;
+
+      if (!avl[cpc]) avl[cpc] = [];
+
+      // Check if this MPN already exists for this CPC
+      const exists = avl[cpc].some(e => e.mpn === mpn);
+      if (!exists) {
+        avl[cpc].push({
+          mpn: mpn,
+          mfr: mfr,
+          preferred: true,  // HVM list parts are preferred
+          source: 'Kitting-HVM'
+        });
+        totalEntries++;
+        hvmCount++;
+      }
+    }
+    console.log(`  [Astute HVM list] sheet: ${hvmCount} additional entries`);
+  }
+
+  console.log(`  Kitting AVL total: ${Object.keys(avl).length} CPCs, ${totalEntries} MPN entries`);
   return avl;
 }
 
