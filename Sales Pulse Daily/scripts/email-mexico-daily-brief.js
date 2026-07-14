@@ -1,10 +1,10 @@
 #!/usr/bin/env node
 
 /**
- * Email USA Daily Brief
+ * Email Mexico Daily Brief
  *
- * Generates the USA Daily Brief and emails it as an HTML attachment
- * Recipients: Jeff Wallace, Melissa Bojar
+ * Generates the Mexico Daily Brief and emails it as an HTML attachment
+ * Recipients: Joel Marquez, Melissa Bojar
  * Scheduled to run weekdays at 6am via cron
  */
 
@@ -22,14 +22,14 @@ const notifier = createNotifier({
 
 // Recipients
 const RECIPIENTS = [
-  'jeff.wallace@astutegroup.com',
+  'joel.marquez@astutegroup.com',
   'melissa.bojar@astutegroup.com'
 ];
 
 async function main() {
   try {
     console.log('============================================================');
-    console.log('USA DAILY BRIEF - EMAIL DISTRIBUTION');
+    console.log('MEXICO DAILY BRIEF - EMAIL DISTRIBUTION');
     console.log('============================================================\n');
 
     // Step 0: Validate regional filtering fixes are in place
@@ -40,16 +40,16 @@ async function main() {
       console.log('✅ Validation passed - regional fixes confirmed\n');
     } catch (validationError) {
       console.error('❌ VALIDATION FAILED - Regional fixes NOT in place');
-      console.error('Aborting USA Daily Brief send to prevent incorrect data\n');
+      console.error('Aborting Mexico Daily Brief send to prevent incorrect data\n');
 
       // Send alert email to Melissa
       await notifier.sendEmail(
         'melissa.bojar@astutegroup.com',
-        '🚨 ALERT: USA Daily Brief Validation Failed - NOT SENT',
-        `USA Daily Brief automated send was blocked due to validation failure.
+        '🚨 ALERT: Mexico Daily Brief Validation Failed - NOT SENT',
+        `Mexico Daily Brief automated send was blocked due to validation failure.
 
 The regional filtering validation script detected that fixes are NOT in place.
-This prevents sending reports with incorrect region labels.
+This prevents sending reports with incorrect region labels (Mexico sellers shown as USA).
 
 ACTION REQUIRED:
 1. Run validation manually: node ~/workspace/astute-workinstructions/Sales\\ Pulse\\ Daily/scripts/validate-regional-fixes.js
@@ -58,7 +58,7 @@ ACTION REQUIRED:
 4. Do NOT manually run email scripts until validation passes
 
 Recipients who did NOT receive today's brief:
-- Jeff Wallace
+- Joel Marquez
 - Melissa Bojar
 
 The brief will NOT be sent until validation passes.
@@ -73,13 +73,13 @@ ${validationError.stdout || validationError.message}
     }
 
     // Step 1: Generate the report
-    console.log('📊 Generating USA Daily Brief...');
-    const scriptPath = path.join(__dirname, 'sales-pulse-usa-daily.js');
+    console.log('📊 Generating Mexico Daily Brief...');
+    const scriptPath = path.join(__dirname, 'sales-pulse-mexico-daily.js');
     execSync(`node "${scriptPath}"`, { encoding: 'utf8', stdio: 'inherit' });
 
     // Step 2: Get the generated HTML file
     const today = new Date().toISOString().split('T')[0]; // YYYY-MM-DD
-    const htmlPath = path.join(__dirname, '../output/usa-briefs', `usa-daily-brief-${today}.html`);
+    const htmlPath = path.join(__dirname, '../output/mexico-briefs', `mexico-daily-brief-${today}.html`);
 
     if (!fs.existsSync(htmlPath)) {
       throw new Error(`HTML file not found at ${htmlPath}`);
@@ -104,7 +104,7 @@ ${validationError.stdout || validationError.message}
       day: 'numeric'
     });
 
-    const subject = `USA Daily Brief - Sales Pulse (${yesterdayFormatted})`;
+    const subject = `Mexico Daily Brief - Sales Pulse (${yesterdayFormatted})`;
 
     // Step 4: Create simple email body with instructions
     const emailBodyHTML = `
@@ -148,7 +148,7 @@ ${validationError.stdout || validationError.message}
 <body>
   <p>Good morning,</p>
 
-  <p>Your USA Daily Brief for <strong>${yesterdayFormatted}</strong> is attached. This report provides a quick review of USA sales team performance from yesterday.</p>
+  <p>Your Mexico Daily Brief for <strong>${yesterdayFormatted}</strong> is attached. This report provides a quick review of Mexico sales team performance from yesterday.</p>
 
   <div class="info-box">
     <p style="margin-top: 0;"><strong>📎 How to View:</strong></p>
@@ -178,7 +178,7 @@ ${validationError.stdout || validationError.message}
         subject,
         emailBodyHTML,
         [{
-          filename: `usa-daily-brief-${today}.html`,
+          filename: `mexico-daily-brief-${today}.html`,
           path: htmlPath
         }],
         { html: true }
