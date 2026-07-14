@@ -786,10 +786,14 @@ function loadRecentPOVs() {
   //
   // On Order Qty = SUM of open qty across all RECENT activity for the MPN.
   // Recent POV cell shows the single most-recent activity row (preferring PO over VQ_TICKED).
+  // KEY CHANGE: Join by CPC (via RFQ line), not MPN.
+  // This ensures that when we buy an alternate MPN for a CPC, the pending receipt
+  // shows up for the roster MPN (keyed by CPC).
   const sql = `
     WITH all_activity AS (
       -- Open POs (with or without Infor POV stamp)
       SELECT
+        TRIM(rl.chuboe_cpc) AS cpc,
         TRIM(ol.chuboe_mpn) AS mpn,
         CASE WHEN ol.chuboe_po_string LIKE 'POV%' THEN ol.chuboe_po_string ELSE '' END AS pov_number,
         o.documentno AS ot_po_number,
@@ -807,14 +811,15 @@ function loadRecentPOVs() {
       JOIN adempiere.c_order o ON ol.c_order_id = o.c_order_id
       JOIN adempiere.c_bpartner bp ON o.c_bpartner_id = bp.c_bpartner_id
       LEFT JOIN adempiere.chuboe_vq_line vl ON ol.chuboe_vq_line_id = vl.chuboe_vq_line_id
+      LEFT JOIN adempiere.chuboe_rfq_line rl ON vl.chuboe_rfq_line_id = rl.chuboe_rfq_line_id
       LEFT JOIN adempiere.chuboe_rfq rfq ON vl.chuboe_rfq_id = rfq.chuboe_rfq_id
       LEFT JOIN adempiere.ad_user u_buyer ON u_buyer.ad_user_id = o.salesrep_id
       WHERE o.issotrx = 'N'
         AND o.isactive = 'Y'
         AND o.docstatus IN ('CO', 'IP', 'DR')
         AND ol.qtyordered > ol.qtydelivered
-        AND ol.chuboe_mpn IS NOT NULL
-        AND ol.chuboe_mpn != ''
+        AND rl.chuboe_cpc IS NOT NULL
+        AND rl.chuboe_cpc != ''
         AND rfq.c_bpartner_id = 1000730
         -- Drop stale orphans: keep iff PO cut recently OR promise date still ≥ today
         AND (
@@ -826,6 +831,7 @@ function loadRecentPOVs() {
 
       -- VQs ticked (ispurchased='Y') but no PO cut yet → buyer committed, procurement catching up
       SELECT
+        TRIM(rl.chuboe_cpc) AS cpc,
         TRIM(vl.chuboe_mpn) AS mpn,
         '' AS pov_number,
         '' AS ot_po_number,
@@ -841,6 +847,7 @@ function loadRecentPOVs() {
         u_vq_buyer.name AS buyer
       FROM adempiere.chuboe_vq_line vl
       JOIN adempiere.chuboe_rfq rfq ON vl.chuboe_rfq_id = rfq.chuboe_rfq_id
+      JOIN adempiere.chuboe_rfq_line rl ON vl.chuboe_rfq_line_id = rl.chuboe_rfq_line_id
       JOIN adempiere.c_bpartner bp ON vl.c_bpartner_id = bp.c_bpartner_id
       LEFT JOIN adempiere.ad_user u_vq_buyer ON u_vq_buyer.ad_user_id = vl.createdby
       LEFT JOIN adempiere.c_orderline ol2
@@ -850,8 +857,8 @@ function loadRecentPOVs() {
         AND rfq.c_bpartner_id = 1000730
         AND rfq.isactive = 'Y'
         AND ol2.c_orderline_id IS NULL
-        AND vl.chuboe_mpn IS NOT NULL
-        AND vl.chuboe_mpn != ''
+        AND rl.chuboe_cpc IS NOT NULL
+        AND rl.chuboe_cpc != ''
         -- Same recency rule: keep iff RFQ created recently OR VQ promise date still ≥ today
         AND (
           rfq.created::date >= CURRENT_DATE - INTERVAL '90 days'
@@ -860,11 +867,11 @@ function loadRecentPOVs() {
     ),
     ranked AS (
       SELECT *,
-        ROW_NUMBER() OVER (PARTITION BY mpn ORDER BY preference ASC, sort_date DESC NULLS LAST) AS rn,
-        SUM(qty) OVER (PARTITION BY mpn) AS total_qty
+        ROW_NUMBER() OVER (PARTITION BY cpc ORDER BY preference ASC, sort_date DESC NULLS LAST) AS rn,
+        SUM(qty) OVER (PARTITION BY cpc) AS total_qty
       FROM all_activity
     )
-    SELECT mpn, pov_number, ot_po_number, qty, total_qty, promise_date, po_created_date,
+    SELECT cpc, mpn, pov_number, ot_po_number, qty, total_qty, promise_date, po_created_date,
            supplier, rfq_number, state, tracking, buyer
     FROM ranked
     WHERE rn = 1;
@@ -873,20 +880,21 @@ function loadRecentPOVs() {
   const result = runPsql(sql, 'povs');
   const povData = {};
   for (const line of result.trim().split('\n').filter(l => l.trim() && l.includes('|'))) {
-    const [mpn, pov, otPo, qty, totalQty, promiseDate, poCreated, supplier, rfqNum, state, tracking, buyer] = line.split('|');
-    const key = normalizeMPN(mpn);
+    const [cpc, mpn, pov, otPo, qty, totalQty, promiseDate, poCreated, supplier, rfqNum, state, tracking, buyer] = line.split('|');
+    const key = (cpc || '').trim();  // Key by CPC, not MPN
     if (key) {
       // Recency is enforced in SQL — anything returned here is by definition still relevant.
       povData[key] = {
         State: (state || '').trim(),                    // 'PO' or 'VQ_TICKED'
         POV_Number: (pov || '').trim(),                 // populated once Infor stamps
         OT_PO_Number: (otPo || '').trim(),              // OT PO# (pre-Infor-stamp fallback)
+        Purchased_MPN: (mpn || '').trim(),              // The actual MPN purchased (may differ from roster)
         POV_Qty: parseFloat(qty) || 0,                  // qty on the displayed row
         POV_Date: (promiseDate || '').trim(),           // vendor promise date on the displayed row
         PO_Created_Date: (poCreated || '').trim(),      // when we cut the PO
         POV_Supplier: (supplier || '').trim(),
         RFQ_Number: (rfqNum || '').trim(),
-        Qty_On_Order: parseFloat(totalQty) || 0,        // total across all RECENT open activity for the MPN
+        Qty_On_Order: parseFloat(totalQty) || 0,        // total across all RECENT open activity for the CPC
         Tracking: (tracking || '').trim(),              // tracking number or notes
         Buyer: (buyer || '').trim(),                    // OT buyer (salesrep on PO, or VQ creator)
       };
@@ -950,6 +958,7 @@ const ALERT_COLUMNS = [
   // Part identification
   'Lam P/N',
   'MPN',
+  'Purchased MPN',  // Shows alternate MPN if sourced differently from roster
   'Manufacturer',
   'Item Description',
   // Inventory & priority
@@ -960,6 +969,7 @@ const ALERT_COLUMNS = [
   'Shortfall',
   'Priority',
   'On Order Qty',
+  'OT PO',
   'Recent POV',
   'Tracking',
   'Last Promise Date',
@@ -1003,9 +1013,12 @@ function formatPOVCell(pov) {
 }
 
 function buildAlert(mpn, excel, totalQty, lamOwned, shortfall, priority, history, pov, pendingTransfer = null) {
+  // Show purchased MPN only if it differs from roster MPN (alternate sourcing)
+  const purchasedMpn = pov && pov.Purchased_MPN && pov.Purchased_MPN !== mpn ? pov.Purchased_MPN : '';
   return {
     'Lam P/N': excel.CPC,
     'MPN': mpn,
+    'Purchased MPN': purchasedMpn,  // Shows alternate MPN if sourced differently
     'Manufacturer': excel.Manufacturer,
     'Item Description': excel.Description,
     'QTY ON HAND': totalQty,
@@ -1015,6 +1028,7 @@ function buildAlert(mpn, excel, totalQty, lamOwned, shortfall, priority, history
     'Shortfall': shortfall,
     'Priority': priority,
     'On Order Qty': pov ? (pov.Qty_On_Order || '') : '',
+    'OT PO': pov ? (pov.OT_PO_Number || '') : '',
     'Recent POV': formatPOVCell(pov),
     'Tracking': pov ? (pov.Tracking || '') : '',
     'Base Unit Price': excel.Base_Unit_Price,
@@ -1113,12 +1127,13 @@ function identifyReorderCandidates(aggregated, excelData, historicalData, recent
         basePriority = shortfallPct >= 75 ? 'HIGH' : shortfallPct >= 50 ? 'MEDIUM' : 'LOW';
       }
 
-      const key = normalizeMPN(rosterMpn);
-      const priority = resolvePriority(basePriority, recentPOVs[key]);
+      // Look up POV by CPC - we may have ordered an alternate MPN
+      const pov = recentPOVs[cpc];
+      const priority = resolvePriority(basePriority, pov);
       const lamOwned = cpcInv.w115 > 0 ? 'YES' : 'NO';
 
       const alert = buildAlert(rosterMpn, excel, totalQty, lamOwned, shortfall, priority,
-        historicalData[key] || {}, recentPOVs[key], cpcInv.pendingTransfer);
+        historicalData[normalizeMPN(rosterMpn)] || {}, pov, cpcInv.pendingTransfer);
 
       // Add note if stock is spread across multiple MPNs
       if (cpcInv.mpnsWithStock.length > 1) {
@@ -1167,10 +1182,9 @@ function identifyReorderCandidates(aggregated, excelData, historicalData, recent
 
     // Above threshold but has pending transfer - add for visibility
     const totalQty = cpcInv.total;
-    const key = normalizeMPN(rosterMpn);
 
     const alert = buildAlert(rosterMpn, excel, totalQty, cpcInv.w115 > 0 ? 'YES' : 'NO',
-      0, 'PENDING WAREHOUSE TRANSFER', historicalData[key] || {}, recentPOVs[key], cpcInv.pendingTransfer);
+      0, 'PENDING WAREHOUSE TRANSFER', historicalData[normalizeMPN(rosterMpn)] || {}, recentPOVs[cpc], cpcInv.pendingTransfer);
 
     alerts.push(alert);
   }
