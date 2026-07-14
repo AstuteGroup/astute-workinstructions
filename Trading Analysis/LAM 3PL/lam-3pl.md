@@ -156,9 +156,11 @@ Step 3: Run lam-kitting-reorder.js --no-email
 Step 4: Run lam-kitting-source.js → _sourced.xlsx
 Step 4b: Run lam-kitting-rfq-writer.js → RFQ + VQ lines in OT
 Step 4c: Run lam-kitting-customer-offer.js → refresh customer BI offer
-Step 5: Email sourced report + pending approvals to jake.harris@astutegroup.com
-Step 6: Run lam-wrong-warehouse-check.js (non-blocking)
-        → Separate email if misplaced LAM stock found (LAM bin in wrong warehouse)
+Step 5a: Run verification checks (results added to output as columns)
+         → Wrong warehouse check: flags parts in non-LAM warehouses
+         → Pending orders check: flags stuck orders (VQ ticked, no POV stamp)
+Step 5b: Email sourced report + pending approvals to jake.harris@astutegroup.com
+         → Output includes "Check: Wrong WH" and "Check: Pending Order" columns
 ```
 
 **Two-file output:** Parts awaiting LAM approval (price/lead time changes) appear on the Pending Approvals file, NOT the Reorder Alerts. Parts are mutually exclusive between files. See "Pending Approval Workflow" section above.
@@ -202,6 +204,54 @@ The Master Roster consolidates all LAM contract data into a single source of tru
 
 ---
 
+## AVL Multi-MPN Handling
+
+LAM parts often have multiple approved alternates in the AVL (Approved Vendor List). The workflow handles this in two places:
+
+### Inventory Aggregation (Reorder Check)
+
+When checking if a CPC is below threshold, the reorder script sums inventory across ALL approved MPNs for that CPC.
+
+**Example:** CPC 608-096583-504 has two approved MPNs:
+- TS63Y504KR10 (roster MPN): 0 pcs in W111
+- 84WR500KLF (alt MPN): 105 pcs in W111
+
+**Old behavior:** Would flag as CRITICAL (0 stock for roster MPN)
+**New behavior:** Correctly shows 105 pcs total across approved MPNs
+
+When stock is spread across multiple MPNs, the output includes a `Stock Detail` column showing the breakdown (e.g., "84WR500KLF:105, TS63Y504KR10:0").
+
+### Sourcing (Alt MPN Selection)
+
+When sourcing, the script queries ALL approved MPNs and picks the best option (lowest in-stock price, or best lead time if no stock).
+
+If an alternate MPN has better sourcing than the roster MPN:
+- Output shows `Selected MPN` column (highlighted light blue)
+- Switch is logged to `lam-mpn-switches.json` as a **candidate**
+
+### MPN Switch Tracking
+
+**File:** `lam-mpn-switches.json`
+
+Contains two arrays:
+- `candidates`: Switch suggestions from sourcing (auto-populated, pending review)
+- `switches`: Confirmed permanent switches (manually moved from candidates)
+
+**Workflow:**
+1. Sourcing finds better alt MPN → logs to `candidates[]`
+2. Review candidates after each sourcing run
+3. If switch is permanent (we'll always buy the alt), move to `switches[]` and update Master Roster MPN column
+
+**When to confirm a switch:**
+- Alt MPN is consistently better priced/available
+- We're actively stocking the alt MPN
+- Original MPN is obsolete or consistently unavailable
+
+**Updating the roster:**
+When confirming a switch, update the `MPN` column in `LAM_Master_Roster.xlsx` to the new active MPN. The Master Roster MPN should always reflect "what we're actually buying/stocking" for that CPC.
+
+---
+
 ## End-to-End Workflow
 
 ### Step 1: Run Automated Pipeline (Cron)
@@ -218,8 +268,11 @@ Or run manually:
 # Reorder detection only
 node lam-kitting-reorder.js "<inventory-folder>" "<excel-file>" [--no-email]
 
-# Sourcing only
+# Sourcing only (DO NOT pass output path - script auto-generates _sourced.xlsx)
 node lam-kitting-source.js output/LAM_Reorder_Alerts_YYYY-MM-DD.csv
+
+# WRONG - passing xlsx output path breaks the file format:
+# node lam-kitting-source.js input.csv output.xlsx  ← DON'T DO THIS
 ```
 
 ### Step 2: Review Sourced Report

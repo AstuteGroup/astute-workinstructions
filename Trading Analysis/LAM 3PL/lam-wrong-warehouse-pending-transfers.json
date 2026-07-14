@@ -1,0 +1,18 @@
+{
+  "PLT0805Z2502AST5": {
+    "mpn": "PLT0805Z2502AST5",
+    "cpc": "615-162505-007",
+    "qty": 249,
+    "fromWh": "MAIN",
+    "date": "2026-07-13",
+    "notes": "Transfer submitted"
+  },
+  "S25FL512SAGBHIA10": {
+    "mpn": "S25FL512SAGBHIA10",
+    "cpc": "630-A08069-001",
+    "qty": 100,
+    "fromWh": "MAIN",
+    "date": "2026-07-13",
+    "notes": "Physical + system transfer needed"
+  }
+}

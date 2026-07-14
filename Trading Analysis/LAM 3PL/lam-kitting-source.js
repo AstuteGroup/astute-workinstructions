@@ -27,6 +27,53 @@ const { readCSVFile } = require('../../shared/csv-utils');
 const DELAY_BETWEEN_PARTS = 500; // ms between parts to avoid rate limiting
 const DELAY_BETWEEN_MPNS = 200;  // ms between MPN queries within same CPC
 
+// MPN switch tracking file
+const MPN_SWITCH_FILE = path.join(__dirname, 'lam-mpn-switches.json');
+
+/**
+ * Log an MPN switch when sourcing picks an alternate MPN over the roster MPN.
+ * These are CANDIDATES for switching - user confirms which ones to actually buy.
+ *
+ * @param {Object} switchData - { cpc, fromMPN, toMPN, reason, qtyNeeded, supplier, price }
+ */
+function logMPNSwitchCandidate(switchData) {
+  let data = { description: 'Tracks MPN switch candidates from sourcing. User confirms actual switches.', candidates: [], switches: [] };
+
+  if (fs.existsSync(MPN_SWITCH_FILE)) {
+    try {
+      data = JSON.parse(fs.readFileSync(MPN_SWITCH_FILE, 'utf-8'));
+      // Ensure both arrays exist (backwards compat)
+      if (!data.candidates) data.candidates = [];
+      if (!data.switches) data.switches = [];
+    } catch (e) {
+      console.log(`  WARNING: Could not parse ${MPN_SWITCH_FILE}: ${e.message}`);
+    }
+  }
+
+  // Add to candidates (not confirmed switches yet)
+  const today = new Date().toISOString().split('T')[0];
+  const candidate = {
+    cpc: switchData.cpc,
+    fromMPN: switchData.fromMPN,
+    toMPN: switchData.toMPN,
+    date: today,
+    reason: switchData.reason || 'Sourcing found better option',
+    supplier: switchData.supplier || '',
+    price: switchData.price || '',
+    qtyNeeded: switchData.qtyNeeded || 0,
+  };
+
+  // Check if already a candidate (don't duplicate)
+  const exists = data.candidates.some(c =>
+    c.cpc === candidate.cpc && c.fromMPN === candidate.fromMPN && c.toMPN === candidate.toMPN
+  );
+
+  if (!exists) {
+    data.candidates.push(candidate);
+    fs.writeFileSync(MPN_SWITCH_FILE, JSON.stringify(data, null, 2) + '\n');
+  }
+}
+
 // -----------------------------------------------------------------------------
 // AVL Loader - Load complete AVL for multi-MPN sourcing
 // -----------------------------------------------------------------------------
@@ -79,7 +126,7 @@ function loadAVL() {
 
 /**
  * Get all approved MPNs for a CPC
- * Returns array sorted by preference (preferred first)
+ * Returns array sorted by: LAM-AVL source first, then preferred, then alphabetically
  */
 function getApprovedMPNs(cpc, rosterMpn) {
   const avl = loadAVL();
@@ -90,8 +137,21 @@ function getApprovedMPNs(cpc, rosterMpn) {
     return [{ mpn: rosterMpn, mfr: '', preferred: true, source: 'Roster-Fallback' }];
   }
 
-  // Sort: preferred first, then alphabetically
+  // Source priority: LAM-AVL > Kitting > NewParts > others
+  const sourcePriority = {
+    'LAM-AVL': 1,
+    'Kitting-AVL': 2,
+    'Kitting-HVM': 2,
+    'NewParts-AVL': 3,
+    'EPG-Alternates': 4,
+    'Roster-Only': 5
+  };
+
+  // Sort: LAM-AVL first, then preferred, then alphabetically
   return entries.sort((a, b) => {
+    const aPri = sourcePriority[a.source] || 10;
+    const bPri = sourcePriority[b.source] || 10;
+    if (aPri !== bPri) return aPri - bPri;
     if (a.preferred && !b.preferred) return -1;
     if (!a.preferred && b.preferred) return 1;
     return (a.mpn || '').localeCompare(b.mpn || '');
@@ -168,6 +228,44 @@ async function flushOutput() {
     console.log(`  CPCs with multiple approved MPNs: ${multiMpnCpcs}`);
     console.log(`  Used alternate MPN (better option): ${usedAlternate}`);
   }
+
+  // Log MPN switch candidates (when sourcing found a better alternate)
+  const cpcIdx = headers.indexOf('Lam P/N') !== -1 ? headers.indexOf('Lam P/N') : headers.indexOf('CPC');
+  const mpnIdx = headers.indexOf('MPN');
+  const moqIdx = headers.indexOf('LAM MOQ');
+
+  const switchCandidates = results.filter(r => r.selectedMpn && r.sourcingStatus === 'SOURCED');
+  if (switchCandidates.length > 0) {
+    console.log('');
+    console.log('=== MPN Switch Candidates ===');
+    console.log(`  ${switchCandidates.length} items where alternate MPN had better sourcing:`);
+
+    for (const r of switchCandidates) {
+      const cpc = r.originalRow[cpcIdx] || '';
+      const rosterMpn = r.originalRow[mpnIdx] || '';
+      const altMpn = r.selectedMpn;
+      const qtyNeeded = parseInt(r.originalRow[moqIdx]) || 0;
+      const supplier = r.franchise.inStockSupplier || r.franchise.leadTimeSupplier || '';
+      const price = r.franchise.inStockPrice || r.franchise.leadTimePrice || '';
+
+      console.log(`    ${cpc}: ${rosterMpn} → ${altMpn} (${supplier} @ $${price})`);
+
+      // Log to switch tracking file
+      logMPNSwitchCandidate({
+        cpc,
+        fromMPN: rosterMpn,
+        toMPN: altMpn,
+        reason: 'Sourcing found better franchise option',
+        qtyNeeded,
+        supplier,
+        price,
+      });
+    }
+
+    console.log('');
+    console.log('  Switch candidates logged to lam-mpn-switches.json');
+    console.log('  Review and confirm which switches to make permanent.');
+  }
 }
 
 // Register signal handlers — flush partial results before exit
@@ -199,7 +297,16 @@ async function main() {
   }
 
   const inputFile = args[0];
-  const outputFile = args[1] || inputFile.replace('.csv', '_sourced.csv');
+  let outputFile = args[1] || inputFile.replace('.csv', '_sourced.csv');
+
+  // Normalize output path - must be .csv (xlsx is auto-generated)
+  if (outputFile.endsWith('.xlsx')) {
+    console.warn('WARNING: Output must be .csv path (xlsx is auto-generated). Converting...');
+    outputFile = outputFile.replace(/\.xlsx$/, '.csv');
+  }
+  if (!outputFile.endsWith('.csv')) {
+    outputFile = outputFile + '.csv';
+  }
 
   console.log('LAM Kitting Sourcing');
   console.log('====================');

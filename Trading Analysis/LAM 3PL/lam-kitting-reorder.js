@@ -44,6 +44,75 @@ const notifier = createNotifier({
 });
 
 // -----------------------------------------------------------------------------
+// AVL Loader - Load complete AVL for multi-MPN inventory aggregation
+// -----------------------------------------------------------------------------
+
+let _avlCache = null;
+let _avlByCpcCache = null;
+
+/**
+ * Load the complete AVL (CPC -> [MPN, MPN, ...])
+ * Returns a Map of CPC -> array of MPN strings
+ */
+function loadAVL() {
+  if (_avlByCpcCache) return _avlByCpcCache;
+
+  const avlPath = path.join(__dirname, 'LAM_Complete_AVL.xlsx');
+  if (!fs.existsSync(avlPath)) {
+    console.log('  WARNING: LAM_Complete_AVL.xlsx not found - using roster MPN only');
+    _avlByCpcCache = new Map();
+    return _avlByCpcCache;
+  }
+
+  const wb = XLSX.readFile(avlPath);
+  const ws = wb.Sheets['Complete AVL'];
+  if (!ws) {
+    console.log('  WARNING: Complete AVL sheet not found');
+    _avlByCpcCache = new Map();
+    return _avlByCpcCache;
+  }
+
+  const data = XLSX.utils.sheet_to_json(ws);
+  _avlByCpcCache = new Map();
+
+  for (const row of data) {
+    const cpc = row.CPC;
+    const mpn = row.MPN;
+    if (!cpc || !mpn) continue;
+
+    if (!_avlByCpcCache.has(cpc)) {
+      _avlByCpcCache.set(cpc, []);
+    }
+    _avlByCpcCache.get(cpc).push(mpn);
+  }
+
+  return _avlByCpcCache;
+}
+
+/**
+ * Get all approved MPNs for a CPC
+ * @param {string} cpc - The CPC
+ * @param {string} rosterMpn - The MPN from the Master Roster (fallback if no AVL)
+ * @returns {string[]} Array of all approved MPNs
+ */
+function getAllApprovedMPNs(cpc, rosterMpn) {
+  const avl = loadAVL();
+  const mpns = avl.get(cpc);
+
+  if (!mpns || mpns.length === 0) {
+    // No AVL data - use roster MPN as sole option
+    return rosterMpn ? [rosterMpn] : [];
+  }
+
+  // Ensure roster MPN is included even if not in AVL
+  if (rosterMpn && !mpns.includes(rosterMpn)) {
+    return [rosterMpn, ...mpns];
+  }
+
+  return mpns;
+}
+
+// -----------------------------------------------------------------------------
 // Configuration
 // -----------------------------------------------------------------------------
 
@@ -122,6 +191,22 @@ async function main() {
   console.log(`  W111 (LAM 3PL): ${Object.keys(w111Inventory).length} unique MPNs`);
   console.log(`  W115 (Dead Inventory): ${Object.keys(w115Inventory).length} unique MPNs`);
 
+  // Step 1b: Check inventory file age - warn if stale (>14 days old)
+  if (fs.existsSync(w111Path)) {
+    const fileStats = fs.statSync(w111Path);
+    const fileAgeDays = Math.floor((Date.now() - fileStats.mtime.getTime()) / (1000 * 60 * 60 * 24));
+    if (fileAgeDays > 14) {
+      console.log('');
+      console.log('  !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!');
+      console.log(`  WARNING: Inventory file is ${fileAgeDays} days old!`);
+      console.log('  This data may be stale. Check if inventory cleanup cron is running.');
+      console.log('  File:', path.basename(w111Path));
+      console.log('  Modified:', fileStats.mtime.toISOString().split('T')[0]);
+      console.log('  !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!');
+      console.log('');
+    }
+  }
+
   // Step 2: Aggregate by MPN
   console.log('');
   console.log('Step 2: Aggregating inventory by MPN...');
@@ -136,6 +221,13 @@ async function main() {
   if (pendingApprovals.length > 0) {
     console.log(`  Pending approval items: ${pendingApprovals.length}`);
   }
+
+  // Step 3b: Load AVL for multi-MPN inventory aggregation
+  console.log('');
+  console.log('Step 3b: Loading AVL for multi-MPN aggregation...');
+  const avl = loadAVL();
+  const multiMpnCPCs = [...avl.entries()].filter(([_, mpns]) => mpns.length > 1).length;
+  console.log(`  AVL loaded: ${avl.size} CPCs (${multiMpnCPCs} with multiple approved MPNs)`);
 
   // Step 4: Load historical purchase data from ERP
   console.log('');
@@ -653,12 +745,15 @@ function loadRecentPOVs() {
         rfq.value AS rfq_number,
         'PO' AS state,
         1 AS preference,
-        COALESCE(ol.datepromised, o.created) AS sort_date
+        COALESCE(ol.datepromised, o.created) AS sort_date,
+        COALESCE(ol.chuboe_trackingnumbers, '') AS tracking,
+        u_buyer.name AS buyer
       FROM adempiere.c_orderline ol
       JOIN adempiere.c_order o ON ol.c_order_id = o.c_order_id
       JOIN adempiere.c_bpartner bp ON o.c_bpartner_id = bp.c_bpartner_id
       LEFT JOIN adempiere.chuboe_vq_line vl ON ol.chuboe_vq_line_id = vl.chuboe_vq_line_id
       LEFT JOIN adempiere.chuboe_rfq rfq ON vl.chuboe_rfq_id = rfq.chuboe_rfq_id
+      LEFT JOIN adempiere.ad_user u_buyer ON u_buyer.ad_user_id = o.salesrep_id
       WHERE o.issotrx = 'N'
         AND o.isactive = 'Y'
         AND o.docstatus IN ('CO', 'IP', 'DR')
@@ -686,10 +781,13 @@ function loadRecentPOVs() {
         rfq.value AS rfq_number,
         'VQ_TICKED' AS state,
         2 AS preference,
-        rfq.created AS sort_date
+        rfq.created AS sort_date,
+        '' AS tracking,
+        u_vq_buyer.name AS buyer
       FROM adempiere.chuboe_vq_line vl
       JOIN adempiere.chuboe_rfq rfq ON vl.chuboe_rfq_id = rfq.chuboe_rfq_id
       JOIN adempiere.c_bpartner bp ON vl.c_bpartner_id = bp.c_bpartner_id
+      LEFT JOIN adempiere.ad_user u_vq_buyer ON u_vq_buyer.ad_user_id = vl.createdby
       LEFT JOIN adempiere.c_orderline ol2
         ON ol2.chuboe_vq_line_id = vl.chuboe_vq_line_id AND ol2.isactive = 'Y'
       WHERE vl.ispurchased = 'Y'
@@ -712,7 +810,7 @@ function loadRecentPOVs() {
       FROM all_activity
     )
     SELECT mpn, pov_number, ot_po_number, qty, total_qty, promise_date, po_created_date,
-           supplier, rfq_number, state
+           supplier, rfq_number, state, tracking, buyer
     FROM ranked
     WHERE rn = 1;
   `;
@@ -720,7 +818,7 @@ function loadRecentPOVs() {
   const result = runPsql(sql, 'povs');
   const povData = {};
   for (const line of result.trim().split('\n').filter(l => l.trim() && l.includes('|'))) {
-    const [mpn, pov, otPo, qty, totalQty, promiseDate, poCreated, supplier, rfqNum, state] = line.split('|');
+    const [mpn, pov, otPo, qty, totalQty, promiseDate, poCreated, supplier, rfqNum, state, tracking, buyer] = line.split('|');
     const key = normalizeMPN(mpn);
     if (key) {
       // Recency is enforced in SQL — anything returned here is by definition still relevant.
@@ -734,6 +832,8 @@ function loadRecentPOVs() {
         POV_Supplier: (supplier || '').trim(),
         RFQ_Number: (rfqNum || '').trim(),
         Qty_On_Order: parseFloat(totalQty) || 0,        // total across all RECENT open activity for the MPN
+        Tracking: (tracking || '').trim(),              // tracking number or notes
+        Buyer: (buyer || '').trim(),                    // OT buyer (salesrep on PO, or VQ creator)
       };
     }
   }
@@ -805,6 +905,7 @@ const ALERT_COLUMNS = [
   'Priority',
   'On Order Qty',
   'Recent POV',
+  'Tracking',
   'Last Promise Date',
   'Last RFQ',
   // Pricing
@@ -821,6 +922,8 @@ const ALERT_COLUMNS = [
   // Other warehouse stock
   'Available Stock (Other WH)',
   'Available Qty (Other WH)',
+  // Multi-MPN aggregation (when stock spread across original + alt MPNs)
+  'Stock Detail',
 ];
 
 // Render the "Recent POV" cell based on the activity state reported by loadRecentPOVs.
@@ -856,11 +959,12 @@ function buildAlert(mpn, excel, totalQty, lamOwned, shortfall, priority, history
     'Priority': priority,
     'On Order Qty': pov ? (pov.Qty_On_Order || '') : '',
     'Recent POV': formatPOVCell(pov),
+    'Tracking': pov ? (pov.Tracking || '') : '',
     'Base Unit Price': excel.Base_Unit_Price,
     'Resale Price': excel.Resale_Price,
     'Historical Purchase Price': history.Historical_Purchase_Price || '',
     'OT Previous Supplier': history.OT_Previous_Supplier || '',
-    'OT Buyer': history.OT_Buyer || '',
+    'OT Buyer': pov && pov.Buyer ? pov.Buyer : (history.OT_Buyer || ''),
     'Historical Buyer': excel.Historical_Buyer || '',
     'Last Promise Date': history.Last_Purchase_Date || '',
     'Last RFQ': history.RFQ_Number ? `${history.RFQ_Number} (${history.RFQ_Customer || ''})` : '',
@@ -884,36 +988,103 @@ function identifyReorderCandidates(aggregated, excelData, historicalData, recent
   const alerts = [];
   const inventoryMPNs = new Set(Object.keys(aggregated));
 
-  // First: Process items WITH inventory (may be below threshold)
-  for (const [mpn, invData] of Object.entries(aggregated)) {
-    const excel = excelData[mpn];
-    if (!excel) continue;
+  // Build CPC -> total inventory by summing ALL approved MPNs from AVL
+  // This handles cases where we have both original MPN and alternate(s) in stock
+  const cpcTotalInventory = new Map();  // CPC -> { total, w111, w115, mpnsWithStock }
+  const processedCPCs = new Set();
+
+  // First pass: aggregate inventory by CPC using AVL
+  for (const [rosterMpn, excel] of Object.entries(excelData)) {
+    const cpc = excel.CPC;
+    if (!cpc || processedCPCs.has(cpc)) continue;
+    processedCPCs.add(cpc);
+
+    const approvedMPNs = getAllApprovedMPNs(cpc, rosterMpn);
+    let totalQty = 0;
+    let w111Qty = 0;
+    let w115Qty = 0;
+    const mpnsWithStock = [];
+
+    for (const mpn of approvedMPNs) {
+      const inv = aggregated[mpn];
+      if (inv && inv.Total_Qty > 0) {
+        totalQty += inv.Total_Qty;
+        w111Qty += inv.W111_Qty || 0;
+        w115Qty += inv.W115_Qty || 0;
+        mpnsWithStock.push({ mpn, qty: inv.Total_Qty });
+      }
+    }
+
+    cpcTotalInventory.set(cpc, { total: totalQty, w111: w111Qty, w115: w115Qty, mpnsWithStock, approvedMPNs });
+  }
+
+  // Log multi-MPN inventory aggregation stats
+  const multiMpnCPCs = [...cpcTotalInventory.entries()].filter(([_, data]) => data.mpnsWithStock.length > 1);
+  if (multiMpnCPCs.length > 0) {
+    console.log(`  AVL multi-MPN aggregation: ${multiMpnCPCs.length} CPCs have stock across multiple approved MPNs`);
+  }
+
+  // Process by CPC using aggregated totals
+  processedCPCs.clear();
+  for (const [rosterMpn, excel] of Object.entries(excelData)) {
+    const cpc = excel.CPC;
+    if (!cpc || processedCPCs.has(cpc)) continue;
+    processedCPCs.add(cpc);
 
     const minQty = excel.MIN_QTY;
-    const totalQty = invData.Total_Qty;
+    const cpcInv = cpcTotalInventory.get(cpc) || { total: 0, w111: 0, w115: 0, mpnsWithStock: [] };
+    const totalQty = cpcInv.total;
 
+    // Check if below threshold
     if (totalQty < minQty) {
       const shortfall = minQty - totalQty;
       const shortfallPct = minQty > 0 ? (shortfall / minQty) * 100 : 0;
-      const basePriority = shortfallPct >= 75 ? 'HIGH' : shortfallPct >= 50 ? 'MEDIUM' : 'LOW';
-      const key = normalizeMPN(mpn);
-      const priority = resolvePriority(basePriority, recentPOVs[key]);
-      const lamOwned = invData.W115_Qty > 0 ? 'YES' : 'NO';
 
-      alerts.push(buildAlert(mpn, excel, totalQty, lamOwned, shortfall, priority,
-        historicalData[key] || {}, recentPOVs[key]));
+      // CRITICAL if zero stock across ALL approved MPNs
+      let basePriority;
+      if (totalQty === 0) {
+        basePriority = 'CRITICAL';
+      } else {
+        basePriority = shortfallPct >= 75 ? 'HIGH' : shortfallPct >= 50 ? 'MEDIUM' : 'LOW';
+      }
+
+      const key = normalizeMPN(rosterMpn);
+      const priority = resolvePriority(basePriority, recentPOVs[key]);
+      const lamOwned = cpcInv.w115 > 0 ? 'YES' : 'NO';
+
+      const alert = buildAlert(rosterMpn, excel, totalQty, lamOwned, shortfall, priority,
+        historicalData[key] || {}, recentPOVs[key]);
+
+      // Add note if stock is spread across multiple MPNs
+      if (cpcInv.mpnsWithStock.length > 1) {
+        const stockDetail = cpcInv.mpnsWithStock.map(m => `${m.mpn}:${m.qty}`).join(', ');
+        alert['Stock Detail'] = stockDetail;
+      }
+
+      alerts.push(alert);
     }
   }
 
-  // Second: Process items in Excel but NOT in inventory (zero qty - CRITICAL unless recent activity)
+  // Handle items in Excel with no CPC (shouldn't happen, but defensive)
   for (const [mpn, excel] of Object.entries(excelData)) {
-    if (inventoryMPNs.has(mpn)) continue;
-    if (excel.MIN_QTY <= 0) continue;
+    if (excel.CPC) continue;  // Already processed by CPC
+    if (!inventoryMPNs.has(mpn)) continue;
 
     const key = normalizeMPN(mpn);
-    const priority = resolvePriority('CRITICAL', recentPOVs[key]);
+    const pov = recentPOVs[key];
+
+    // Parts with no threshold: still include but flag appropriately
+    if (excel.MIN_QTY <= 0) {
+      // Zero stock + no threshold = flag as NO THRESHOLD unless there's recent activity
+      const priority = pov ? resolvePriority('NO THRESHOLD', pov) : 'NO THRESHOLD';
+      alerts.push(buildAlert(mpn, excel, 0, 'NO', 0, priority,
+        historicalData[key] || {}, pov));
+      continue;
+    }
+
+    const priority = resolvePriority('CRITICAL', pov);
     alerts.push(buildAlert(mpn, excel, 0, 'NO', excel.MIN_QTY, priority,
-      historicalData[key] || {}, recentPOVs[key]));
+      historicalData[key] || {}, pov));
   }
 
   // Sort: CRITICAL first (must source now), shortfall-based severity next,
@@ -922,6 +1093,7 @@ function identifyReorderCandidates(aggregated, excelData, historicalData, recent
   // PO is more actionable than waiting on a vendor that's already been ordered from.
   const priorityOrder = {
     'CRITICAL': 0, 'HIGH': 1, 'MEDIUM': 2, 'LOW': 3,
+    'NO THRESHOLD': 3.5,  // After LOW, before PENDING - need threshold from LAM
     'PENDING ORDER PLACEMENT': 4,
     'PENDING RECEIPT': 4,
   };
