@@ -7,11 +7,6 @@
   },
   "entries": [
     {
-      "mpn": "SN74LVC125ARGYR",
-      "reason": "New base price approval needed — franchise quotes 250 @ $0.236 (Mouser) or 200 @ $0.306 (TTI) vs current base $0.200",
-      "date": "2026-04-20"
-    },
-    {
       "mpn": "65100516121",
       "reason": "Mouser pricing: $1.17 @ 4,315 qty (vs base $1.148 — 1.9% above, effectively at-cost). Review LAM MOQ of 60 — not reflected on Mouser cut-tape availability; likely stale LAM-internal/contract setting rather than vendor minimum. Candidate to lower toward real demand.",
       "date": "2026-04-20"
@@ -65,6 +60,16 @@
       "mpn": "LT1491ACS#PBF",
       "reason": "Restricted MFR (ADI/Linear) — LAM Kitting franchise-only. Sent to Tracy 2026-04-28 for direct sourcing. LAM MOQ 60.",
       "date": "2026-04-28"
+    },
+    {
+      "mpn": "CCHD-957X-25-49.152",
+      "reason": "VQ written: Digi-Key $37.56 × 50, ETA 09/15/26. Current base $36.42 — +3.1%. Needs LAM approval before ordering. VQ 2228128.",
+      "date": "2026-07-14"
+    },
+    {
+      "mpn": "9290-05-00",
+      "reason": "VQ written: Master $7.62 × 100 (1,228 in stock). Current base $8.87 — -14% below base. Needs LAM approval before ordering. VQ 2228136.",
+      "date": "2026-07-14"
     }
   ]
 }
