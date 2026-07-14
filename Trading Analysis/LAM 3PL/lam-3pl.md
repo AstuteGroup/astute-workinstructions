@@ -252,6 +252,52 @@ When confirming a switch, update the `MPN` column in `LAM_Master_Roster.xlsx` to
 
 ---
 
+## Pending Warehouse Transfers
+
+Parts identified in wrong warehouses that need to be transferred to LAM warehouses are tracked for visibility.
+
+### Workflow
+
+1. **Wrong Warehouse Check** identifies parts in non-LAM warehouses (MAIN, W104, W105, etc.)
+2. **Add to pending transfers** file when transfer is initiated
+3. **Reorder file** shows them as **PENDING WAREHOUSE TRANSFER** priority
+4. **Remove from pending transfers** when stock arrives in LAM warehouse
+
+### Tracking File
+
+**File:** `lam-wrong-warehouse-pending-transfers.json`
+
+```json
+{
+  "S25FL512SAGBHIA10": {
+    "mpn": "S25FL512SAGBHIA10",
+    "cpc": "630-A08069-001",
+    "qty": 100,
+    "fromWh": "MAIN",
+    "date": "2026-07-13",
+    "notes": "Physical + system transfer needed"
+  }
+}
+```
+
+### Reorder File Display
+
+Parts with pending transfers appear on the reorder file with:
+- **Priority:** `PENDING WAREHOUSE TRANSFER`
+- **Pending Transfer column:** Shows qty and source (e.g., "100 from MAIN")
+- **QTY ON HAND:** Includes pending transfer qty in total
+
+These items remain visible even when above threshold, providing tracking until transfer completes.
+
+### Completing a Transfer
+
+When stock arrives in the LAM warehouse:
+1. Verify inventory file shows stock in W111/W115
+2. Remove entry from `lam-wrong-warehouse-pending-transfers.json`
+3. Part will drop off reorder list (or show normal priority if below threshold)
+
+---
+
 ## End-to-End Workflow
 
 ### Step 1: Run Automated Pipeline (Cron)
@@ -287,9 +333,10 @@ Review the color-coded Excel. Priority levels:
 | LOW | <50% shortfall | Monitor / source as needed |
 | PENDING ORDER PLACEMENT | Recent activity but no Infor POV stamp yet (OT PO without Infor stamp, OR VQ ticked with no PO at all). Recency = PO cut ≤90d OR promise date ≥ today | Chase the PO — order is committed but not fully placed. Informational on main tab. **Skipped from franchise sourcing.** |
 | PENDING RECEIPT | Infor POV stamped, qty undelivered, recency rule satisfied | Wait — vendor shipment in flight. Informational on main tab. **Skipped from franchise sourcing.** |
+| PENDING WAREHOUSE TRANSFER | Stock in non-LAM warehouse with transfer in progress | Wait — transfer in flight. Shows "Pending Transfer" column with qty and source warehouse. **Skipped from franchise sourcing.** |
 | STOCK ARRIVED | Escalations-tab synthesis only — manual escalation MPN that's now above threshold but has W111+W115 stock | Josh: confirm new LAM resale was approved + update Kitting DB Resale Price column. Then remove entry from `lam-escalations.json` |
 
-PENDING ORDER PLACEMENT and PENDING RECEIPT share `priorityOrder` value 4 — they sort together at the bottom of the main tab, with PENDING ORDER PLACEMENT first inside the bucket (more actionable: chase the PO vs wait for vendor).
+PENDING ORDER PLACEMENT and PENDING RECEIPT share `priorityOrder` value 4 — they sort together at the bottom of the main tab, with PENDING ORDER PLACEMENT first inside the bucket (more actionable: chase the PO vs wait for vendor). PENDING WAREHOUSE TRANSFER sorts last (value 5) — these are internal transfers, not external orders.
 
 **Recency filter (loadRecentPOVs SQL):** open POs are dropped entirely when `c_order.created < CURRENT_DATE − 90 days` AND `datepromised < CURRENT_DATE`. Same rule for VQ_TICKED (using `rfq.created` and `vl.datepromised`). Stuck/orphan 2024–2025 POs no longer leak into the Recent POV cell or trigger PENDING priorities.
 
