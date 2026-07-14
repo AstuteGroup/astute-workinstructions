@@ -148,6 +148,38 @@ const ROSTER_COLS = {
   SUBMITTED_DATE: 'Submitted Date',
 };
 
+// Pending transfers file - parts being transferred TO LAM warehouses
+const PENDING_TRANSFERS_FILE = path.join(__dirname, 'lam-wrong-warehouse-pending-transfers.json');
+
+/**
+ * Load pending transfers (parts being moved to LAM warehouses)
+ * Returns Map of MPN -> { qty, fromWh, notes }
+ */
+function loadPendingTransfers() {
+  if (!fs.existsSync(PENDING_TRANSFERS_FILE)) {
+    return new Map();
+  }
+
+  try {
+    const data = JSON.parse(fs.readFileSync(PENDING_TRANSFERS_FILE, 'utf-8'));
+    const transfers = new Map();
+
+    for (const [mpn, info] of Object.entries(data)) {
+      transfers.set(mpn, {
+        qty: info.qty || 0,
+        fromWh: info.fromWh || '',
+        notes: info.notes || '',
+        cpc: info.cpc || ''
+      });
+    }
+
+    return transfers;
+  } catch (e) {
+    console.log(`  WARNING: Could not parse ${PENDING_TRANSFERS_FILE}: ${e.message}`);
+    return new Map();
+  }
+}
+
 // -----------------------------------------------------------------------------
 // Main
 // -----------------------------------------------------------------------------
@@ -212,6 +244,25 @@ async function main() {
   console.log('Step 2: Aggregating inventory by MPN...');
   const aggregated = aggregateInventory(w111Inventory, w115Inventory);
   console.log(`  Combined: ${Object.keys(aggregated).length} unique MPNs`);
+
+  // Step 2b: Load and apply pending transfers (parts being moved to LAM warehouses)
+  console.log('');
+  console.log('Step 2b: Loading pending transfers...');
+  const pendingTransfers = loadPendingTransfers();
+  if (pendingTransfers.size > 0) {
+    console.log(`  Pending transfers: ${pendingTransfers.size} MPNs`);
+    for (const [mpn, transfer] of pendingTransfers) {
+      if (!aggregated[mpn]) {
+        aggregated[mpn] = { W111_Qty: 0, W115_Qty: 0, Total_Qty: 0, Pending_Transfer: 0 };
+      }
+      aggregated[mpn].Pending_Transfer = transfer.qty;
+      aggregated[mpn].Total_Qty += transfer.qty;
+      aggregated[mpn].Pending_From = transfer.fromWh;
+      console.log(`    ${mpn}: +${transfer.qty} pcs from ${transfer.fromWh} (${transfer.notes})`);
+    }
+  } else {
+    console.log('  No pending transfers');
+  }
 
   // Step 3: Load contract data from Master Roster
   console.log('');
@@ -899,6 +950,7 @@ const ALERT_COLUMNS = [
   'Item Description',
   // Inventory & priority
   'QTY ON HAND',
+  'Pending Transfer',
   'W115 Stale Inventory',
   'Reorder Threshold',
   'Shortfall',
@@ -946,13 +998,14 @@ function formatPOVCell(pov) {
   return '';
 }
 
-function buildAlert(mpn, excel, totalQty, lamOwned, shortfall, priority, history, pov) {
+function buildAlert(mpn, excel, totalQty, lamOwned, shortfall, priority, history, pov, pendingTransfer = null) {
   return {
     'Lam P/N': excel.CPC,
     'MPN': mpn,
     'Manufacturer': excel.Manufacturer,
     'Item Description': excel.Description,
     'QTY ON HAND': totalQty,
+    'Pending Transfer': pendingTransfer ? `${pendingTransfer.qty} from ${pendingTransfer.fromWh}` : '',
     'W115 Stale Inventory': lamOwned,
     'Reorder Threshold': excel.MIN_QTY,
     'Shortfall': shortfall,
@@ -1003,6 +1056,8 @@ function identifyReorderCandidates(aggregated, excelData, historicalData, recent
     let totalQty = 0;
     let w111Qty = 0;
     let w115Qty = 0;
+    let pendingTransferQty = 0;
+    let pendingTransferFrom = '';
     const mpnsWithStock = [];
 
     for (const mpn of approvedMPNs) {
@@ -1012,10 +1067,16 @@ function identifyReorderCandidates(aggregated, excelData, historicalData, recent
         w111Qty += inv.W111_Qty || 0;
         w115Qty += inv.W115_Qty || 0;
         mpnsWithStock.push({ mpn, qty: inv.Total_Qty });
+        // Track pending transfer if any
+        if (inv.Pending_Transfer > 0) {
+          pendingTransferQty += inv.Pending_Transfer;
+          pendingTransferFrom = inv.Pending_From || '';
+        }
       }
     }
 
-    cpcTotalInventory.set(cpc, { total: totalQty, w111: w111Qty, w115: w115Qty, mpnsWithStock, approvedMPNs });
+    const pendingTransfer = pendingTransferQty > 0 ? { qty: pendingTransferQty, fromWh: pendingTransferFrom } : null;
+    cpcTotalInventory.set(cpc, { total: totalQty, w111: w111Qty, w115: w115Qty, mpnsWithStock, approvedMPNs, pendingTransfer });
   }
 
   // Log multi-MPN inventory aggregation stats
@@ -1053,7 +1114,7 @@ function identifyReorderCandidates(aggregated, excelData, historicalData, recent
       const lamOwned = cpcInv.w115 > 0 ? 'YES' : 'NO';
 
       const alert = buildAlert(rosterMpn, excel, totalQty, lamOwned, shortfall, priority,
-        historicalData[key] || {}, recentPOVs[key]);
+        historicalData[key] || {}, recentPOVs[key], cpcInv.pendingTransfer);
 
       // Add note if stock is spread across multiple MPNs
       if (cpcInv.mpnsWithStock.length > 1) {
