@@ -383,11 +383,11 @@ function getLowMarginOrders(queryFile) {
 }
 
 /**
- * Section 3: USA Sales Rep Activity
+ * Section 3: Mexico Sales Rep Activity
  */
 function getRepActivity(queryFile) {
   const queries = fs.readFileSync(queryFile, 'utf8');
-  const repQuery = queries.split('3.2 ACTIVITY BY USA SALES REP')[1]
+  const repQuery = queries.split('3.2 ACTIVITY BY MEXICO SALES REP')[1]
     .trim();
 
   const sqlMatch = repQuery.match(/WITH[\s\S]+?ORDER BY u\.name;/);

@@ -306,7 +306,7 @@ ORDER BY account_name, ise_name;
 
 
 -- ----------------------------------------------------------------------------
--- 1.4 CUSTOMERS REACTIVATED YESTERDAY - USA ONLY
+-- 1.4 CUSTOMERS REACTIVATED YESTERDAY - MEXICO ONLY
 -- ----------------------------------------------------------------------------
 -- Hybrid approach: Location-level tracking (Customer Name + City)
 -- 30-day minimum threshold + Statistical anomaly detection
@@ -566,7 +566,7 @@ ORDER BY days_late DESC, total_revenue DESC;
 
 
 -- ----------------------------------------------------------------------------
--- 2.2A TOP 10 LATE SO LINES (3-31 days past due) - USA ONLY
+-- 2.2A TOP 10 LATE SO LINES (3-31 days past due) - MEXICO ONLY
 -- ----------------------------------------------------------------------------
 -- Shows top 10 late lines by revenue that are currently past due (rolling 31-day window)
 -- ISEs should be updating promise dates, so old items indicate stale data
@@ -622,7 +622,7 @@ LIMIT 10;
 
 
 -- ----------------------------------------------------------------------------
--- 2.2B TOP 5 SCHEDULED TO SHIP THIS MONTH (by GP) - USA ONLY
+-- 2.2B TOP 5 SCHEDULED TO SHIP THIS MONTH (by GP) - MEXICO ONLY
 -- ----------------------------------------------------------------------------
 -- Shows top 5 lines by GP scheduled to ship in current month (backlog view)
 -- Promise date can be past due, today, or future - as long as it's in current month
@@ -689,7 +689,7 @@ LIMIT 5;
 
 
 -- ----------------------------------------------------------------------------
--- 2.3 INSIDE SALES REPS ALERT (No RFQ in 3+ days) - USA ONLY
+-- 2.3 INSIDE SALES REPS ALERT (No RFQ in 3+ days) - MEXICO ONLY
 -- ----------------------------------------------------------------------------
 -- Fields: ISE, Manager, Region, Last RFQ Date, Days Inactive (BUSINESS DAYS only)
 -- Color: Yellow 3-6 days, Red 7+ days
@@ -699,13 +699,11 @@ WITH seller_list AS (
     ad_user_id,
     name,
     CASE
-      WHEN ad_user_id IN (1047106, 1026393, 1042653, 1038225, 1026394, 1010361, 1012788, 1038224) THEN 'USA'
       WHEN ad_user_id IN (1047106, 1026393, 1042653, 1038225, 1026394, 1010361, 1012788, 1038224) THEN 'MEX'
       WHEN ad_user_id IN (1041139, 1023803, 1016958) THEN 'APAC-Laurel'
       WHEN ad_user_id IN (1039414, 1009866, 1013042, 1009528, 1009478, 1009210) THEN 'APAC-Silvia'
     END as region,
     CASE
-      WHEN ad_user_id IN (1047106, 1026393, 1042653, 1038225, 1026394, 1010361, 1012788, 1038224) THEN 'Joel Marquez'
       WHEN ad_user_id IN (1047106, 1026393, 1042653, 1038225, 1026394, 1010361, 1012788, 1038224) THEN 'Joel Marquez'
       WHEN ad_user_id IN (1041139, 1023803, 1016958) THEN 'Laurel Kee'
       WHEN ad_user_id IN (1039414, 1009866, 1013042, 1009528, 1009478, 1009210) THEN 'Silvia Munoz'
@@ -850,9 +848,9 @@ SELECT
 
 
 -- ----------------------------------------------------------------------------
--- 3.2 ACTIVITY BY USA SALES REP (Yesterday)
+-- 3.2 ACTIVITY BY MEXICO SALES REP (Yesterday)
 -- ----------------------------------------------------------------------------
--- Shows individual USA sales rep activity (not rolled up by region)
+-- Shows individual Mexico sales rep activity (not rolled up by region)
 -- Inline business day logic in each subquery since CTEs can't be referenced from SELECT subqueries
 
 WITH mexico_users AS (
