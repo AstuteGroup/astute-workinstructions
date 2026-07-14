@@ -367,6 +367,7 @@ async function main() {
     const lowPriority = readyToOrder.filter(r => r.Priority === 'LOW').length;
     const pendingOrder = readyToOrder.filter(r => r.Priority === 'PENDING ORDER PLACEMENT').length;
     const pendingReceipt = readyToOrder.filter(r => r.Priority === 'PENDING RECEIPT').length;
+    const pendingTransfer = readyToOrder.filter(r => r.Priority === 'PENDING WAREHOUSE TRANSFER').length;
     console.log('');
     console.log('Ready to Order breakdown:');
     console.log(`  CRITICAL priority (zero stock, no recent PO): ${criticalPriority}`);
@@ -375,6 +376,9 @@ async function main() {
     console.log(`  LOW priority: ${lowPriority}`);
     console.log(`  PENDING ORDER PLACEMENT (chase the PO): ${pendingOrder}`);
     console.log(`  PENDING RECEIPT (waiting on vendor): ${pendingReceipt}`);
+    if (pendingTransfer > 0) {
+      console.log(`  PENDING WAREHOUSE TRANSFER (warehouse transfer in progress): ${pendingTransfer}`);
+    }
 
     const withHistory = readyToOrder.filter(r => r['OT Previous Supplier']).length;
     console.log(`  With historical purchase data: ${withHistory}`);
@@ -1148,18 +1152,43 @@ function identifyReorderCandidates(aggregated, excelData, historicalData, recent
       historicalData[key] || {}, pov));
   }
 
+  // Add PENDING WAREHOUSE TRANSFER items - parts with transfers in flight, even if above threshold
+  // These need visibility tracking like PENDING RECEIPT
+  for (const [rosterMpn, excel] of Object.entries(excelData)) {
+    const cpc = excel.CPC;
+    if (!cpc) continue;
+
+    const cpcInv = cpcTotalInventory.get(cpc);
+    if (!cpcInv || !cpcInv.pendingTransfer) continue;
+
+    // Check if this CPC is already on the alerts list
+    const alreadyListed = alerts.some(a => a['Lam P/N'] === cpc);
+    if (alreadyListed) continue;  // Already on list (below threshold case)
+
+    // Above threshold but has pending transfer - add for visibility
+    const totalQty = cpcInv.total;
+    const key = normalizeMPN(rosterMpn);
+
+    const alert = buildAlert(rosterMpn, excel, totalQty, cpcInv.w115 > 0 ? 'YES' : 'NO',
+      0, 'PENDING WAREHOUSE TRANSFER', historicalData[key] || {}, recentPOVs[key], cpcInv.pendingTransfer);
+
+    alerts.push(alert);
+  }
+
   // Sort: CRITICAL first (must source now), shortfall-based severity next,
   // then the PENDING bucket last (informational). Within the PENDING bucket,
   // PENDING ORDER PLACEMENT comes before PENDING RECEIPT — chasing an unplaced
   // PO is more actionable than waiting on a vendor that's already been ordered from.
+  // PENDING WAREHOUSE TRANSFER is last (just tracking until transfer completes).
   const priorityOrder = {
     'CRITICAL': 0, 'HIGH': 1, 'MEDIUM': 2, 'LOW': 3,
     'NO THRESHOLD': 3.5,  // After LOW, before PENDING - need threshold from LAM
     'PENDING ORDER PLACEMENT': 4,
     'PENDING RECEIPT': 4,
+    'PENDING WAREHOUSE TRANSFER': 5,  // Informational - tracking until transfer completes
   };
   // Within the PENDING bucket only, sub-order ORDER_PLACEMENT before RECEIPT.
-  const pendingSubOrder = { 'PENDING ORDER PLACEMENT': 0, 'PENDING RECEIPT': 1 };
+  const pendingSubOrder = { 'PENDING ORDER PLACEMENT': 0, 'PENDING RECEIPT': 1, 'PENDING WAREHOUSE TRANSFER': 2 };
   alerts.sort((a, b) => {
     if (priorityOrder[a.Priority] !== priorityOrder[b.Priority]) {
       return priorityOrder[a.Priority] - priorityOrder[b.Priority];
