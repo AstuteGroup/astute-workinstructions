@@ -821,10 +821,12 @@ function loadRecentPOVs() {
         AND rl.chuboe_cpc IS NOT NULL
         AND rl.chuboe_cpc != ''
         AND rfq.c_bpartner_id = 1000730
-        -- Drop stale orphans: keep iff PO cut recently OR promise date still ≥ today
+        -- Keep if: has POV stamp (Infor validated), OR recent, OR promise date not yet passed
+        -- Only filter out truly stale orphans: no POV + old + passed promise
         AND (
-          o.created::date >= CURRENT_DATE - INTERVAL '90 days'
-          OR ol.datepromised::date >= CURRENT_DATE
+          ol.chuboe_po_string LIKE 'POV%'                         -- Infor validated = keep
+          OR o.created::date >= CURRENT_DATE - INTERVAL '90 days' -- Recent = keep
+          OR ol.datepromised::date >= CURRENT_DATE                -- Not yet due = keep
         )
 
       UNION ALL
