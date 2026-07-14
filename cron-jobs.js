@@ -549,6 +549,18 @@ module.exports = [
   // ─── SALES PULSE REPORTS ───────────────────────────────────────────────────
   // vp-daily-brief removed 2026-07-06: now runs from melissa.bojar's own crontab (owner-run). Do NOT re-add here or the fleet double-sends.
 
+  {
+    name: 'rfq-creation-digest',
+    cadence: 'fixed',
+    // 12:00 UTC = 8am EDT (May–Nov) / 7am EST (Nov–Mar). DST drift acceptable
+    // per ops convention. Mon-Fri only (weekend gate built into script).
+    cadenceCron: '0 12 * * 1-5',
+    command: `node "${WORKSPACE}/reports/daily-rfq-report.js" --send`,
+    cwd: WORKSPACE,
+    needsOT: false,
+    logFile: '/tmp/rfq-creation-digest.log',
+    description: 'Mon-Fri 8am EDT (12:00 UTC) — RFQ Creation digest to justin.oberhofer@. Shows: (1) Activity by Creator (who created RFQs, with role and salesperson breakdown), (2) Seller Activity Breakdown (how each salesperson\'s RFQs were created: by Claude/Support/Self).',
+  },
 ];
 
 // Helper: convert cadence string to milliseconds (used by sentinel + runner).
