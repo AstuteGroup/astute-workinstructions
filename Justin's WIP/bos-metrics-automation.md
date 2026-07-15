@@ -44,19 +44,25 @@ Three key metrics for CSE queue management:
 
 ### Cron Schedule
 
-```bash
-# BOS Metrics Report - 1st of month at noon EST (17:00 UTC)
-0 17 1 * * /usr/bin/node /home/justin.oberhofer/workspace/scripts/generate-bos-metrics.js --email justin.oberhofer@astutegroup.com >> /home/justin.oberhofer/workspace/logs/bos-metrics.log 2>&1
+**Registry:** `cron-jobs.js` (managed via `scripts/install-crons.js`)
+
+```javascript
+{
+  name: 'bos-metrics-report',
+  cadence: 'monthly',
+  cadenceCron: '0 17 1 * *',  // 1st of month at 17:00 UTC (12pm EST)
+  command: `node "${WORKSPACE}/scripts/generate-bos-metrics.js"`,
+  ...
+}
 ```
 
-**Installed on:** justin.oberhofer's crontab
 **Runs:** 1st of every month at 12:00 PM EST (17:00 UTC)
-**Log file:** `~/workspace/logs/bos-metrics.log`
+**Log file:** `/tmp/bos-metrics.log`
 
 ### Email Configuration
 
 **Sender:** bizops@orangetsunami.com
-**Recipient:** justin.oberhofer@astutegroup.com
+**Recipients:** justin.oberhofer@astutegroup.com, leah.griffin@astutegroup.com
 **SMTP:** AWS WorkMail (smtp.mail.us-east-1.awsapps.com:465)
 
 Credentials stored in `~/workspace/.env`:
@@ -110,11 +116,10 @@ node ~/workspace/scripts/generate-bos-metrics.js
 
 ## Maintenance
 
-### To change recipient
-Edit cron job:
-```bash
-crontab -e
-# Change --email parameter
+### To change recipients
+Edit `scripts/generate-bos-metrics.js`:
+```javascript
+const DEFAULT_EMAIL = 'justin.oberhofer@astutegroup.com,leah.griffin@astutegroup.com';
 ```
 
 ### To change CSE user list
@@ -154,15 +159,14 @@ crontab -l | grep BOS
 
 ## Recent Run
 
-**Last test:** 2026-07-06 19:31:28 UTC
+**Last test:** 2026-07-15 14:00:55 UTC
 **Report:** BOS Metrics - June 2026.xlsx
 **Status:** ✅ Email sent successfully
-**Recipient:** justin.oberhofer@astutegroup.com
+**Recipients:** justin.oberhofer@astutegroup.com, leah.griffin@astutegroup.com
 
 Log excerpt:
 ```
-[2026-07-06T19:31:28.286Z] INFO: Email with attachment sent to justin.oberhofer@astutegroup.com: BOS Metrics Report - June 2026
-Email sent to: justin.oberhofer@astutegroup.com
+[2026-07-15T14:00:55.548Z] INFO: Email with attachment sent to justin.oberhofer@astutegroup.com,leah.griffin@astutegroup.com: BOS Metrics - June 2026 (TEST)
 ```
 
 ## Related Work

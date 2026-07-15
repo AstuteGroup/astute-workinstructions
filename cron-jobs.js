@@ -561,6 +561,18 @@ module.exports = [
     logFile: '/tmp/rfq-creation-digest.log',
     description: 'Mon-Fri 8am EDT (12:00 UTC) — RFQ Creation digest to justin.oberhofer@. Shows: (1) Activity by Creator (who created RFQs, with role and salesperson breakdown), (2) Seller Activity Breakdown (how each salesperson\'s RFQs were created: by Claude/Support/Self).',
   },
+
+  {
+    name: 'bos-metrics-report',
+    cadence: 'monthly',
+    // 17:00 UTC = 12pm EST (Nov–Mar) / 1pm EDT (Mar–Nov). 1st of month.
+    cadenceCron: '0 17 1 * *',
+    command: `node "${WORKSPACE}/scripts/generate-bos-metrics.js"`,
+    cwd: WORKSPACE,
+    needsOT: false,
+    logFile: '/tmp/bos-metrics.log',
+    description: '1st of month 12pm EST (17:00 UTC) — BOS Metrics report (CSE queue activity: claims, answered, closed) to justin.oberhofer@ and leah.griffin@.',
+  },
 ];
 
 // Helper: convert cadence string to milliseconds (used by sentinel + runner).
