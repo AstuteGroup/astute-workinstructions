@@ -1,0 +1,285 @@
+{
+  "today": "2026-07-08T13:00:03.368Z",
+  "yesterday": "2026-07-07T13:00:03.368Z",
+  "todayFormatted": "Wednesday, July 8, 2026",
+  "yesterdayFormatted": "Tuesday, July 7, 2026",
+  "top5Orders": [
+    {
+      "seller_name": "Joel Flores",
+      "region": "USA",
+      "customer_name": "Arrow Global Supply Chain Services",
+      "order_number": "SO507716",
+      "revenue": "371760.00",
+      "gp": "51760.0000000000000000",
+      "part_numbers": "MT40A1G16KD-062E:E"
+    },
+    {
+      "seller_name": "Joel Flores",
+      "region": "USA",
+      "customer_name": "Abaco Systems",
+      "order_number": "SO507714",
+      "revenue": "93112.20",
+      "gp": "38103.1200000000000000",
+      "part_numbers": "SN74VMEH22501ADGVR"
+    },
+    {
+      "seller_name": "Joel Flores",
+      "region": "USA",
+      "customer_name": "Abaco Systems",
+      "order_number": "SO507715",
+      "revenue": "31916.64",
+      "gp": "20185.1800000000000000",
+      "part_numbers": "SN74VMEH22501ADGVR, SN74VMEH22501ADGVR "
+    },
+    {
+      "seller_name": "Alex Partida",
+      "region": "USA",
+      "customer_name": "East West Manufacturing",
+      "order_number": "SO507704",
+      "revenue": "14146.50",
+      "gp": "4146.5000000000000000",
+      "part_numbers": "EFR32FG23A010F512GM48-CR"
+    },
+    {
+      "seller_name": "Alex Partida",
+      "region": "USA",
+      "customer_name": "East West Manufacturing",
+      "order_number": "SO507711",
+      "revenue": "10400.00",
+      "gp": "2256.00000000000000000000",
+      "part_numbers": "0900BL15C050E"
+    },
+    {
+      "seller_name": "Salvador Horner",
+      "region": "USA",
+      "customer_name": "Plexus Corp.",
+      "order_number": "SO507713",
+      "revenue": "1945.00",
+      "gp": "1609.0000000000000000",
+      "part_numbers": "BR86"
+    },
+    {
+      "seller_name": "Alex Partida",
+      "region": "USA",
+      "customer_name": "East West Manufacturing",
+      "order_number": "SO507705",
+      "revenue": "985.00",
+      "gp": "625.00000000000000000000",
+      "part_numbers": "TPS54824RNVR"
+    }
+  ],
+  "newCustomers": [],
+  "strategicAccounts": [
+    {
+      "account_name": "ABB",
+      "ise_name": "Laurel Kee",
+      "region": "APAC-Laurel",
+      "rfq_lines": "11",
+      "cq_lines": "0",
+      "cq_sold": "0",
+      "so_count": "0",
+      "so_revenue": "0",
+      "so_gp": "0",
+      "color_code": "normal"
+    },
+    {
+      "account_name": "Eaton",
+      "ise_name": null,
+      "region": null,
+      "rfq_lines": "0",
+      "cq_lines": "0",
+      "cq_sold": "0",
+      "so_count": "0",
+      "so_revenue": "0",
+      "so_gp": "0",
+      "color_code": "red"
+    },
+    {
+      "account_name": "GE Healthcare",
+      "ise_name": "Aaron Mendoza",
+      "region": "USA",
+      "rfq_lines": "1",
+      "cq_lines": "0",
+      "cq_sold": "0",
+      "so_count": "0",
+      "so_revenue": "0",
+      "so_gp": "0",
+      "color_code": "normal"
+    },
+    {
+      "account_name": "Parker-Meggitt",
+      "ise_name": null,
+      "region": null,
+      "rfq_lines": "0",
+      "cq_lines": "0",
+      "cq_sold": "0",
+      "so_count": "0",
+      "so_revenue": "0",
+      "so_gp": "0",
+      "color_code": "red"
+    },
+    {
+      "account_name": "RTX",
+      "ise_name": "Thomas Haynes",
+      "region": "USA",
+      "rfq_lines": "3",
+      "cq_lines": "0",
+      "cq_sold": "0",
+      "so_count": "0",
+      "so_revenue": "0",
+      "so_gp": "0",
+      "color_code": "normal"
+    },
+    {
+      "account_name": "Thales",
+      "ise_name": null,
+      "region": null,
+      "rfq_lines": "0",
+      "cq_lines": "0",
+      "cq_sold": "0",
+      "so_count": "0",
+      "so_revenue": "0",
+      "so_gp": "0",
+      "color_code": "red"
+    }
+  ],
+  "reactivatedCustomers": [
+    {
+      "customer_name": "Venture Corporation Ltd",
+      "facility_location": "Singapore",
+      "tracked_at_location_level": "Y",
+      "first_order_date": "2024-10-09",
+      "last_order_date": "2024-10-14",
+      "days_gap": "632",
+      "yesterday_orders": "SO507706",
+      "yesterday_revenue": "58500.0",
+      "yesterday_gp": "15300.0000000000000000",
+      "seller_name": "Laurel Kee",
+      "region": "APAC-Laurel",
+      "lifetime_orders": "11",
+      "lifetime_revenue": "10187.50",
+      "typical_cycle_days": "3",
+      "gap_multiplier": "210.67",
+      "reactivation_type": "anomalous_pattern",
+      "significance_score": "23124.456827738246"
+    }
+  ],
+  "highValueLateLines": [
+    {
+      "customer_name": "Abaco Systems",
+      "sales_order": "SO507317",
+      "line_number": "10",
+      "ise_name": "Joel Flores",
+      "region": "MEX",
+      "promise_date": "2026-06-22",
+      "days_late": "16",
+      "qty_unshipped": "144",
+      "line_revenue": "311040.00",
+      "line_gp": "77760.00",
+      "mpn": "BCM56861A1IFSBG",
+      "color_code": "red"
+    },
+    {
+      "customer_name": "Plexus Corp.",
+      "sales_order": "SO507277",
+      "line_number": "10",
+      "ise_name": "Salvador Horner",
+      "region": "MEX",
+      "promise_date": "2026-06-12",
+      "days_late": "26",
+      "qty_unshipped": "797",
+      "line_revenue": "206423.00",
+      "line_gp": "45429.00",
+      "mpn": "MT25QL01GBBB8E12-0AUT",
+      "color_code": "red"
+    }
+  ],
+  "top5LateLines": [],
+  "iseAlerts": [
+    {
+      "ise_name": "Michael Stifter",
+      "manager": "Jeff Wallace",
+      "region": "USA",
+      "last_rfq_date": "2026-06-25",
+      "days_inactive": "9",
+      "color_code": "red"
+    },
+    {
+      "ise_name": "Alfredo Martinez",
+      "manager": "Joel Marquez",
+      "region": "MEX",
+      "last_rfq_date": "2026-07-03",
+      "days_inactive": "3",
+      "color_code": "yellow"
+    },
+    {
+      "ise_name": "Carlos Moreno",
+      "manager": "Joel Marquez",
+      "region": "MEX",
+      "last_rfq_date": "2026-07-03",
+      "days_inactive": "3",
+      "color_code": "yellow"
+    }
+  ],
+  "lowMarginOrders": [],
+  "regionalActivity": [
+    {
+      "region": "APAC-Laurel",
+      "manager": "Laurel Kee",
+      "rfq_lines": "23",
+      "cq_lines": "1",
+      "cq_sold": "1",
+      "so_lines": "1",
+      "so_revenue": "58500.0",
+      "so_gp": "15300.0000000000000000"
+    },
+    {
+      "region": "APAC-Silvia",
+      "manager": "Silvia Munoz",
+      "rfq_lines": "160",
+      "cq_lines": "10",
+      "cq_sold": "2",
+      "so_lines": "0",
+      "so_revenue": "0",
+      "so_gp": "0"
+    },
+    {
+      "region": "MEX",
+      "manager": "Joel Marquez",
+      "rfq_lines": "1580",
+      "cq_lines": "20",
+      "cq_sold": "20",
+      "so_lines": "7",
+      "so_revenue": "524265.34",
+      "so_gp": "118684.80000000000000000000"
+    },
+    {
+      "region": "Other",
+      "manager": null,
+      "rfq_lines": "79",
+      "cq_lines": "23",
+      "cq_sold": "0",
+      "so_lines": "1",
+      "so_revenue": "11235.00",
+      "so_gp": "11235.00000000000000000000"
+    },
+    {
+      "region": "USA",
+      "manager": "Jeff Wallace",
+      "rfq_lines": "19",
+      "cq_lines": "11",
+      "cq_sold": "0",
+      "so_lines": "4",
+      "so_revenue": "13620.00",
+      "so_gp": "6768.16000000000000000000"
+    }
+  ],
+  "regionalTotals": {
+    "rfq_lines": 1861,
+    "cq_lines": 65,
+    "cq_sold": 23,
+    "so_lines": 13,
+    "so_revenue": 607620.3400000001,
+    "so_gp": 151987.96
+  }
+}

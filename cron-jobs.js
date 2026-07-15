@@ -517,15 +517,42 @@ module.exports = [
   // ─── SALES PULSE REPORTS ───────────────────────────────────────────────────
   {
     name: 'vp-daily-brief',
+    owner: 'melissa.bojar',
     cadence: 'fixed',
     // 13:00 UTC = 6:00 AM PDT (summer) / 5:00 AM PST (winter) — Mon-Fri
     // Note: DST causes 1-hour shift between summer/winter
     cadenceCron: '0 13 * * 1-5',
     command: `node "${ASTUTE}/Sales Pulse Daily/scripts/email-vp-daily-brief.js"`,
     cwd: ASTUTE,
-    needsOT: true,
+    needsOT: false, // reads replica + emails only; no OT writes
     logFile: '/tmp/vp-daily-brief.log',
     description: 'Mon-Fri 13:00 UTC (6am PDT / 5am PST) — VP Daily Brief for Josh Pucci. Generates report + emails to josh.pucci@ and melissa.bojar@',
+  },
+
+  {
+    name: 'usa-daily-brief',
+    owner: 'melissa.bojar',
+    cadence: 'fixed',
+    // 13:00 UTC = 6:00 AM PDT (summer) / 5:00 AM PST (winter) — Mon-Fri
+    cadenceCron: '0 13 * * 1-5',
+    command: `node "${ASTUTE}/Sales Pulse Daily/scripts/email-usa-daily-brief.js"`,
+    cwd: ASTUTE,
+    needsOT: false, // reads replica + emails only; no OT writes
+    logFile: '/tmp/usa-daily-brief.log',
+    description: 'Mon-Fri 13:00 UTC (6am PDT / 5am PST) — USA Daily Brief for Jeff Wallace. Generates report + emails to jeff.wallace@ and melissa.bojar@',
+  },
+
+  {
+    name: 'mexico-daily-brief',
+    owner: 'melissa.bojar',
+    cadence: 'fixed',
+    // 13:00 UTC = 6:00 AM PDT (summer) / 5:00 AM PST (winter) — Mon-Fri
+    cadenceCron: '0 13 * * 1-5',
+    command: `node "${ASTUTE}/Sales Pulse Daily/scripts/email-mexico-daily-brief.js"`,
+    cwd: ASTUTE,
+    needsOT: false, // reads replica + emails only; no OT writes
+    logFile: '/tmp/mexico-daily-brief.log',
+    description: 'Mon-Fri 13:00 UTC (6am PDT / 5am PST) — Mexico Daily Brief for Joel Marquez. Generates report + emails to joel.marquez@ and melissa.bojar@',
   },
 ];
 

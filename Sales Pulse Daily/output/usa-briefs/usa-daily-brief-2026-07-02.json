@@ -1,0 +1,511 @@
+{
+  "today": "2026-07-02T13:41:55.565Z",
+  "yesterday": "2026-07-01T13:41:55.565Z",
+  "todayFormatted": "Thursday, July 2, 2026",
+  "yesterdayFormatted": "Wednesday, July 1, 2026",
+  "top5Orders": [
+    {
+      "seller_name": "Josh Syre",
+      "region": "USA",
+      "customer_name": "Applied Materials",
+      "order_number": "SO507653",
+      "revenue": "16293.60",
+      "gp": "6700.3700000000000000",
+      "part_numbers": "HI3-0201-5Z"
+    },
+    {
+      "seller_name": "Josh Syre",
+      "region": "USA",
+      "customer_name": "Applied Materials",
+      "order_number": "SO507649",
+      "revenue": "9815.00",
+      "gp": "1963.0000000000000000",
+      "part_numbers": "DCR1-AM"
+    },
+    {
+      "seller_name": "Josh Syre",
+      "region": "USA",
+      "customer_name": "Applied Materials",
+      "order_number": "SO507659",
+      "revenue": "7066.40",
+      "gp": "4186.6000000000000000",
+      "part_numbers": "HI3-0201-5Z"
+    },
+    {
+      "seller_name": "Jake Mcaloose",
+      "region": "USA",
+      "customer_name": "GE Aerospace (Formerly GE Aviation)",
+      "order_number": "SO507648",
+      "revenue": "5280.00",
+      "gp": "1500.0000000000000000",
+      "part_numbers": "PCM-AFSS-M0512"
+    },
+    {
+      "seller_name": "Josh Syre",
+      "region": "USA",
+      "customer_name": "Applied Materials",
+      "order_number": "SO507651",
+      "revenue": "4050.00",
+      "gp": "810.0000000000000000",
+      "part_numbers": "90298A209"
+    },
+    {
+      "seller_name": "James Diaz",
+      "region": "USA",
+      "customer_name": "Blue Origin",
+      "order_number": "SO507645",
+      "revenue": "2960",
+      "gp": "1786.0000000000000000",
+      "part_numbers": "MPQ2967GQKTE-0034-AEC1-Z"
+    },
+    {
+      "seller_name": "Daniel Reiser",
+      "region": "USA",
+      "customer_name": "Amphenol Borisch Technologies",
+      "order_number": "SO507658",
+      "revenue": "2530.0",
+      "gp": "1288.0000000000000000",
+      "part_numbers": "XCF04SVOG20C"
+    },
+    {
+      "seller_name": "Daniel Reiser",
+      "region": "USA",
+      "customer_name": "Amphenol Borisch Technologies",
+      "order_number": "SO507660",
+      "revenue": "2156.25",
+      "gp": "914.2500000000000000",
+      "part_numbers": "XC3S1000-4-FTG256I"
+    },
+    {
+      "seller_name": "Daniel Reiser",
+      "region": "USA",
+      "customer_name": "Amphenol Borisch Technologies",
+      "order_number": "SO507650",
+      "revenue": "2100.0",
+      "gp": "2040.00000000000000000000",
+      "part_numbers": "SI2309DS-T1-E3"
+    },
+    {
+      "seller_name": "Josh Syre",
+      "region": "USA",
+      "customer_name": "Applied Materials",
+      "order_number": "SO507654",
+      "revenue": "1201.20",
+      "gp": "751.8000000000000000",
+      "part_numbers": "L717HDAH26POL2RM5"
+    }
+  ],
+  "newCustomers": [],
+  "strategicAccounts": [
+    {
+      "account_name": "ABB",
+      "ise_name": null,
+      "region": null,
+      "rfq_lines": "0",
+      "cq_lines": "0",
+      "cq_sold": "0",
+      "so_count": "0",
+      "so_revenue": "0",
+      "so_gp": "0",
+      "color_code": "red"
+    },
+    {
+      "account_name": "Eaton",
+      "ise_name": null,
+      "region": null,
+      "rfq_lines": "0",
+      "cq_lines": "0",
+      "cq_sold": "0",
+      "so_count": "0",
+      "so_revenue": "0",
+      "so_gp": "0",
+      "color_code": "red"
+    },
+    {
+      "account_name": "GE Healthcare",
+      "ise_name": null,
+      "region": null,
+      "rfq_lines": "0",
+      "cq_lines": "0",
+      "cq_sold": "0",
+      "so_count": "0",
+      "so_revenue": "0",
+      "so_gp": "0",
+      "color_code": "red"
+    },
+    {
+      "account_name": "Parker Meggitt",
+      "ise_name": "Josh Syre",
+      "region": "USA",
+      "rfq_lines": "2",
+      "cq_lines": "1",
+      "cq_sold": "1",
+      "so_count": "0",
+      "so_revenue": "0",
+      "so_gp": "0",
+      "color_code": "normal"
+    },
+    {
+      "account_name": "RTX",
+      "ise_name": "Thomas Haynes",
+      "region": "USA",
+      "rfq_lines": "1",
+      "cq_lines": "3",
+      "cq_sold": "0",
+      "so_count": "0",
+      "so_revenue": "0",
+      "so_gp": "0",
+      "color_code": "normal"
+    },
+    {
+      "account_name": "Thales",
+      "ise_name": null,
+      "region": null,
+      "rfq_lines": "0",
+      "cq_lines": "0",
+      "cq_sold": "0",
+      "so_count": "0",
+      "so_revenue": "0",
+      "so_gp": "0",
+      "color_code": "red"
+    }
+  ],
+  "reactivatedCustomers": [
+    {
+      "customer_name": "Amphenol Borisch Technologies",
+      "facility_location": "Grand Rapids",
+      "tracked_at_location_level": "Y",
+      "first_order_date": "2025-02-20",
+      "last_order_date": "2026-03-18",
+      "days_gap": "106",
+      "yesterday_orders": "SO507650, SO507658, SO507660",
+      "yesterday_revenue": "6786.25",
+      "yesterday_gp": "4242.25000000000000000000",
+      "seller_name": "Daniel Reiser",
+      "region": "USA",
+      "lifetime_orders": "19",
+      "lifetime_revenue": "474329.95",
+      "typical_cycle_days": "33",
+      "gap_multiplier": "3.21",
+      "reactivation_type": "anomalous_pattern",
+      "significance_score": "283.39906663698235"
+    }
+  ],
+  "highValueLateLines": [
+    {
+      "customer_name": "Flock Safety",
+      "sales_order": "SO504885",
+      "line_number": "170",
+      "ise_name": "Justin Goodwin",
+      "region": "USA",
+      "promise_date": "2026-06-02",
+      "days_late": "30",
+      "qty_unshipped": "143",
+      "line_revenue": "366544.75",
+      "line_gp": "0",
+      "mpn": "RC PLUS 2",
+      "color_code": "red"
+    },
+    {
+      "customer_name": "Flock Safety",
+      "sales_order": "SO504885",
+      "line_number": "15",
+      "ise_name": "Justin Goodwin",
+      "region": "USA",
+      "promise_date": "2026-06-02",
+      "days_late": "30",
+      "qty_unshipped": "15",
+      "line_revenue": "303915.00",
+      "line_gp": "0",
+      "mpn": "DJI DOCK 3",
+      "color_code": "red"
+    },
+    {
+      "customer_name": "Applied Materials",
+      "sales_order": "SO507368",
+      "line_number": "10",
+      "ise_name": "Josh Syre",
+      "region": "USA",
+      "promise_date": "2026-06-20",
+      "days_late": "12",
+      "qty_unshipped": "970",
+      "line_revenue": "110085.30",
+      "line_gp": "45095.30",
+      "mpn": "MT29F16G08ABABAWP-IT:B",
+      "color_code": "red"
+    },
+    {
+      "customer_name": "Wintronics Inc",
+      "sales_order": "SO507167",
+      "line_number": "10",
+      "ise_name": "Daniel Reiser",
+      "region": "USA",
+      "promise_date": "2026-06-05",
+      "days_late": "27",
+      "qty_unshipped": "4249",
+      "line_revenue": "43977.15",
+      "line_gp": "5736.15",
+      "mpn": "AD597ARZ",
+      "color_code": "red"
+    },
+    {
+      "customer_name": "Acron Aviation",
+      "sales_order": "SO507038",
+      "line_number": "10",
+      "ise_name": "Daniel Reiser",
+      "region": "USA",
+      "promise_date": "2026-06-15",
+      "days_late": "17",
+      "qty_unshipped": "757",
+      "line_revenue": "34193.69",
+      "line_gp": "8569.24",
+      "mpn": "MIC38300HYHL-TR",
+      "color_code": "red"
+    },
+    {
+      "customer_name": "Wintronics Inc",
+      "sales_order": "SO507167",
+      "line_number": "20",
+      "ise_name": "Daniel Reiser",
+      "region": "USA",
+      "promise_date": "2026-06-05",
+      "days_late": "27",
+      "qty_unshipped": "1642",
+      "line_revenue": "16994.70",
+      "line_gp": "2216.70",
+      "mpn": "AD597ARZ",
+      "color_code": "red"
+    },
+    {
+      "customer_name": "BAE SYSTEMS",
+      "sales_order": "SO505736",
+      "line_number": "20",
+      "ise_name": "Thomas Haynes",
+      "region": "USA",
+      "promise_date": "2026-06-15",
+      "days_late": "17",
+      "qty_unshipped": "97",
+      "line_revenue": "9700.00",
+      "line_gp": "0",
+      "mpn": "MP03332",
+      "color_code": "red"
+    },
+    {
+      "customer_name": "GE Aerospace (Formerly GE Aviation)",
+      "sales_order": "SO505716",
+      "line_number": "10",
+      "ise_name": "Jake Mcaloose",
+      "region": "USA",
+      "promise_date": "2026-06-01",
+      "days_late": "31",
+      "qty_unshipped": "42",
+      "line_revenue": "9030.00",
+      "line_gp": "0",
+      "mpn": "M28861/05-010TB",
+      "color_code": "red"
+    },
+    {
+      "customer_name": "Flock Safety",
+      "sales_order": "SO504885",
+      "line_number": "180",
+      "ise_name": "Justin Goodwin",
+      "region": "USA",
+      "promise_date": "2026-06-02",
+      "days_late": "30",
+      "qty_unshipped": "3",
+      "line_revenue": "7689.75",
+      "line_gp": "1780.35",
+      "mpn": "RC PLUS 2",
+      "color_code": "red"
+    },
+    {
+      "customer_name": "GE Aerospace (Formerly GE Aviation)",
+      "sales_order": "SO505716",
+      "line_number": "20",
+      "ise_name": "Jake Mcaloose",
+      "region": "USA",
+      "promise_date": "2026-06-01",
+      "days_late": "31",
+      "qty_unshipped": "4",
+      "line_revenue": "6200.00",
+      "line_gp": "0",
+      "mpn": "M28861/05-010TB - 660 TESTING",
+      "color_code": "red"
+    }
+  ],
+  "top5LateLines": [
+    {
+      "customer_name": "GE Healthcare",
+      "sales_order": "SO507569",
+      "line_number": "10",
+      "ise_name": "Aaron Mendoza",
+      "region": "USA",
+      "promise_date": "2026-07-06",
+      "days_until_promise": "4",
+      "qty_unshipped": "648",
+      "line_revenue": "545778.00",
+      "line_gp": "151146.00",
+      "mpn": "5CGXFC7D6F31I7N",
+      "in_stock": "N",
+      "action_status": "yellow",
+      "color_code": "yellow"
+    },
+    {
+      "customer_name": "Acron Aviation",
+      "sales_order": "SO507065",
+      "line_number": "10",
+      "ise_name": "Daniel Reiser",
+      "region": "USA",
+      "promise_date": "2026-07-24",
+      "days_until_promise": "22",
+      "qty_unshipped": "995",
+      "line_revenue": "243775.00",
+      "line_gp": "33830.00",
+      "mpn": "MT29F64G08AJABAWP-IT:B",
+      "in_stock": "N",
+      "action_status": "green",
+      "color_code": "green"
+    },
+    {
+      "customer_name": "General Dynamics",
+      "sales_order": "SO507641",
+      "line_number": "10",
+      "ise_name": "Jake Mcaloose",
+      "region": "USA",
+      "promise_date": "2026-07-27",
+      "days_until_promise": "25",
+      "qty_unshipped": "690",
+      "line_revenue": "35880.00",
+      "line_gp": "24322.50",
+      "mpn": "ADV7441ABSTZ-5P",
+      "in_stock": "N",
+      "action_status": "green",
+      "color_code": "green"
+    },
+    {
+      "customer_name": "Acron Aviation",
+      "sales_order": "SO507065",
+      "line_number": "50",
+      "ise_name": "Daniel Reiser",
+      "region": "USA",
+      "promise_date": "2026-07-24",
+      "days_until_promise": "22",
+      "qty_unshipped": "372",
+      "line_revenue": "91140.00",
+      "line_gp": "16740.00",
+      "mpn": "MT29F64G08AJABAWP-IT:B",
+      "in_stock": "N",
+      "action_status": "green",
+      "color_code": "green"
+    },
+    {
+      "customer_name": "Acron Aviation",
+      "sales_order": "SO507065",
+      "line_number": "30",
+      "ise_name": "Daniel Reiser",
+      "region": "USA",
+      "promise_date": "2026-07-24",
+      "days_until_promise": "22",
+      "qty_unshipped": "100",
+      "line_revenue": "24500.00",
+      "line_gp": "9200.00",
+      "mpn": "MT29F64G08AJABAWP-IT:B",
+      "in_stock": "N",
+      "action_status": "green",
+      "color_code": "green"
+    }
+  ],
+  "iseAlerts": [
+    {
+      "ise_name": "Michael Stifter",
+      "manager": "Jeff Wallace",
+      "region": "USA",
+      "last_rfq_date": "2026-06-25 00:00:00",
+      "days_inactive": "5",
+      "color_code": "yellow"
+    }
+  ],
+  "lowMarginOrders": [],
+  "repActivity": [
+    {
+      "sales_rep_name": "Aaron Mendoza",
+      "rfq_lines": "2",
+      "cq_lines": "1",
+      "cq_sold": "1",
+      "so_lines": "0",
+      "so_revenue": "0",
+      "so_gp": "0"
+    },
+    {
+      "sales_rep_name": "Daniel Reiser",
+      "rfq_lines": "0",
+      "cq_lines": "0",
+      "cq_sold": "0",
+      "so_lines": "3",
+      "so_revenue": "6786.25",
+      "so_gp": "4242.25000000000000000000"
+    },
+    {
+      "sales_rep_name": "Jake Mcaloose",
+      "rfq_lines": "2",
+      "cq_lines": "4",
+      "cq_sold": "1",
+      "so_lines": "1",
+      "so_revenue": "5280.00",
+      "so_gp": "1500.0000000000000000"
+    },
+    {
+      "sales_rep_name": "James Diaz",
+      "rfq_lines": "0",
+      "cq_lines": "0",
+      "cq_sold": "0",
+      "so_lines": "1",
+      "so_revenue": "2960",
+      "so_gp": "1786.0000000000000000"
+    },
+    {
+      "sales_rep_name": "Josh Syre",
+      "rfq_lines": "7",
+      "cq_lines": "6",
+      "cq_sold": "4",
+      "so_lines": "5",
+      "so_revenue": "38426.20",
+      "so_gp": "14411.7700000000000000"
+    },
+    {
+      "sales_rep_name": "Justin Goodwin",
+      "rfq_lines": "2",
+      "cq_lines": "0",
+      "cq_sold": "0",
+      "so_lines": "0",
+      "so_revenue": "0",
+      "so_gp": "0"
+    },
+    {
+      "sales_rep_name": "Michael Stifter",
+      "rfq_lines": "0",
+      "cq_lines": "0",
+      "cq_sold": "0",
+      "so_lines": "0",
+      "so_revenue": "0",
+      "so_gp": "0"
+    },
+    {
+      "sales_rep_name": "Thomas Haynes",
+      "rfq_lines": "2",
+      "cq_lines": "4",
+      "cq_sold": "0",
+      "so_lines": "0",
+      "so_revenue": "0",
+      "so_gp": "0"
+    }
+  ],
+  "repTotals": {
+    "rfq_lines": 15,
+    "cq_lines": 15,
+    "cq_sold": 6,
+    "so_lines": 10,
+    "so_revenue": 53452.45,
+    "so_gp": 21940.02
+  }
+}

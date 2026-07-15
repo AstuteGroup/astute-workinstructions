@@ -1,0 +1,492 @@
+{
+  "today": "2026-07-09T13:00:02.947Z",
+  "yesterday": "2026-07-08T13:00:02.947Z",
+  "todayFormatted": "Thursday, July 9, 2026",
+  "yesterdayFormatted": "Wednesday, July 8, 2026",
+  "top5Orders": [
+    {
+      "seller_name": "Joel Flores",
+      "region": "USA",
+      "customer_name": "Abaco Systems",
+      "order_number": "SO507718",
+      "revenue": "105040.56",
+      "gp": "18039.4200000000000000",
+      "part_numbers": "COUNTERFEIT TESTING, ISL41334IRZ-T7A"
+    },
+    {
+      "seller_name": "Joel Flores",
+      "region": "USA",
+      "customer_name": "Arrow Global Supply Chain Services",
+      "order_number": "SO507727",
+      "revenue": "8148.00",
+      "gp": "2205.3080000000000000",
+      "part_numbers": "DAC8801IDRBT"
+    },
+    {
+      "seller_name": "Alex Partida",
+      "region": "USA",
+      "customer_name": "East West Manufacturing",
+      "order_number": "SO507720",
+      "revenue": "3941.30",
+      "gp": "1411.30000000000000000000",
+      "part_numbers": "PJSD05W_R1_00001"
+    },
+    {
+      "seller_name": "Salvador Horner",
+      "region": "USA",
+      "customer_name": "Plexus Corp.",
+      "order_number": "SO507722",
+      "revenue": "1945.00",
+      "gp": "1862.90000000000000000000",
+      "part_numbers": "BR86"
+    },
+    {
+      "seller_name": "Alex Partida",
+      "region": "USA",
+      "customer_name": "East West Manufacturing",
+      "order_number": "SO507719",
+      "revenue": "1792.0",
+      "gp": "328.0000000000000000",
+      "part_numbers": "AFE5828ZAV"
+    },
+    {
+      "seller_name": "Ricardo Morales",
+      "region": "USA",
+      "customer_name": "Sanmina Corporation",
+      "order_number": "SO507732",
+      "revenue": "1100.0",
+      "gp": "492.00000000000000000000",
+      "part_numbers": "SG-8101CG 16.800000MHZ TBGSA"
+    },
+    {
+      "seller_name": "Joel Flores",
+      "region": "USA",
+      "customer_name": "Abaco Systems",
+      "order_number": "SO507717",
+      "revenue": "31.92",
+      "gp": "0",
+      "part_numbers": "COUNTERFEIT TESTING, K4B2G0846C-HCH9, K4B2G0846D-HCK0"
+    }
+  ],
+  "newCustomers": [],
+  "strategicAccounts": [
+    {
+      "account_name": "ABB",
+      "ise_name": null,
+      "region": null,
+      "rfq_lines": "0",
+      "cq_lines": "0",
+      "cq_sold": "0",
+      "so_count": "0",
+      "so_revenue": "0",
+      "so_gp": "0",
+      "color_code": "red"
+    },
+    {
+      "account_name": "Eaton",
+      "ise_name": "Carolina Hinestroza",
+      "region": "USA",
+      "rfq_lines": "1",
+      "cq_lines": "0",
+      "cq_sold": "0",
+      "so_count": "0",
+      "so_revenue": "0",
+      "so_gp": "0",
+      "color_code": "normal"
+    },
+    {
+      "account_name": "GE Healthcare",
+      "ise_name": "Aaron Mendoza",
+      "region": "Other",
+      "rfq_lines": "0",
+      "cq_lines": "3",
+      "cq_sold": "3",
+      "so_count": "1",
+      "so_revenue": "900",
+      "so_gp": "449.3200000000000000",
+      "color_code": "normal"
+    },
+    {
+      "account_name": "Parker-Meggitt",
+      "ise_name": null,
+      "region": null,
+      "rfq_lines": "0",
+      "cq_lines": "0",
+      "cq_sold": "0",
+      "so_count": "0",
+      "so_revenue": "0",
+      "so_gp": "0",
+      "color_code": "red"
+    },
+    {
+      "account_name": "RTX",
+      "ise_name": "Thomas Haynes",
+      "region": "Other",
+      "rfq_lines": "5",
+      "cq_lines": "1",
+      "cq_sold": "0",
+      "so_count": "0",
+      "so_revenue": "0",
+      "so_gp": "0",
+      "color_code": "normal"
+    },
+    {
+      "account_name": "THALES",
+      "ise_name": "Laurel Kee",
+      "region": "APAC-Laurel",
+      "rfq_lines": "1",
+      "cq_lines": "0",
+      "cq_sold": "0",
+      "so_count": "0",
+      "so_revenue": "0",
+      "so_gp": "0",
+      "color_code": "normal"
+    }
+  ],
+  "reactivatedCustomers": [
+    {
+      "customer_name": "East West Manufacturing",
+      "facility_location": null,
+      "tracked_at_location_level": "Y",
+      "first_order_date": "2025-06-08",
+      "last_order_date": "2026-06-08",
+      "days_gap": "31",
+      "yesterday_orders": "SO507719",
+      "yesterday_revenue": "1792.0",
+      "yesterday_gp": "328.0000000000000000",
+      "seller_name": "Alex Partida",
+      "region": "MEX",
+      "lifetime_orders": "12",
+      "lifetime_revenue": "105468.61",
+      "typical_cycle_days": "30",
+      "gap_multiplier": "1.03",
+      "reactivation_type": "other",
+      "significance_score": "116.12050484087956"
+    }
+  ],
+  "highValueLateLines": [
+    {
+      "customer_name": "Abaco Systems",
+      "sales_order": "SO507317",
+      "line_number": "10",
+      "ise_name": "Joel Flores",
+      "region": "USA",
+      "promise_date": "2026-06-22",
+      "days_late": "17",
+      "qty_unshipped": "144",
+      "line_revenue": "311040.00",
+      "line_gp": "77760.00",
+      "mpn": "BCM56861A1IFSBG",
+      "color_code": "red"
+    },
+    {
+      "customer_name": "Plexus Corp.",
+      "sales_order": "SO507277",
+      "line_number": "10",
+      "ise_name": "Salvador Horner",
+      "region": "USA",
+      "promise_date": "2026-06-12",
+      "days_late": "27",
+      "qty_unshipped": "797",
+      "line_revenue": "206423.00",
+      "line_gp": "45429.00",
+      "mpn": "MT25QL01GBBB8E12-0AUT",
+      "color_code": "red"
+    },
+    {
+      "customer_name": "Sanmina Corporation",
+      "sales_order": "SO507508",
+      "line_number": "10",
+      "ise_name": "Ricardo Morales",
+      "region": "USA",
+      "promise_date": "2026-06-30",
+      "days_late": "9",
+      "qty_unshipped": "4460",
+      "line_revenue": "86970.00",
+      "line_gp": "17840.00",
+      "mpn": "88E6390-A0-TLA2I000",
+      "color_code": "red"
+    },
+    {
+      "customer_name": "Sanmina Corporation",
+      "sales_order": "SO507508",
+      "line_number": "30",
+      "ise_name": "Ricardo Morales",
+      "region": "USA",
+      "promise_date": "2026-06-30",
+      "days_late": "9",
+      "qty_unshipped": "940",
+      "line_revenue": "18330.00",
+      "line_gp": "3290.00",
+      "mpn": "88E6390-A0-TLA2I000",
+      "color_code": "red"
+    },
+    {
+      "customer_name": "Plexus Corp.",
+      "sales_order": "SO507488",
+      "line_number": "30",
+      "ise_name": "Salvador Horner",
+      "region": "USA",
+      "promise_date": "2026-06-30",
+      "days_late": "9",
+      "qty_unshipped": "17",
+      "line_revenue": "15385.00",
+      "line_gp": "0",
+      "mpn": "5AGXFA5H4F35I3G",
+      "color_code": "red"
+    },
+    {
+      "customer_name": "OnCore Manufacturing",
+      "sales_order": "SO507355",
+      "line_number": "10",
+      "ise_name": "Carolina Hinestroza",
+      "region": "USA",
+      "promise_date": "2026-06-12",
+      "days_late": "27",
+      "qty_unshipped": "5000",
+      "line_revenue": "12500.00",
+      "line_gp": "4905.00",
+      "mpn": "TLK1221RHAR",
+      "color_code": "red"
+    },
+    {
+      "customer_name": "Sensata Technologies",
+      "sales_order": "SO507548",
+      "line_number": "30",
+      "ise_name": "Ricardo Morales",
+      "region": "USA",
+      "promise_date": "2026-07-01",
+      "days_late": "8",
+      "qty_unshipped": "16500",
+      "line_revenue": "12375.00",
+      "line_gp": "2310.00",
+      "mpn": "KTY81/110, 112",
+      "color_code": "red"
+    },
+    {
+      "customer_name": "Plexus Corp.",
+      "sales_order": "SO507468",
+      "line_number": "10",
+      "ise_name": "Salvador Horner",
+      "region": "USA",
+      "promise_date": "2026-06-30",
+      "days_late": "9",
+      "qty_unshipped": "100",
+      "line_revenue": "3000.00",
+      "line_gp": "2400.00",
+      "mpn": "ADG201HSKR",
+      "color_code": "red"
+    },
+    {
+      "customer_name": "Abaco Systems",
+      "sales_order": "SO507589",
+      "line_number": "10",
+      "ise_name": "Joel Flores",
+      "region": "USA",
+      "promise_date": "2026-07-03",
+      "days_late": "6",
+      "qty_unshipped": "180",
+      "line_revenue": "2408.40",
+      "line_gp": "887.40",
+      "mpn": "WG82574L SLBA9",
+      "color_code": "yellow"
+    },
+    {
+      "customer_name": "Sensata Technologies",
+      "sales_order": "SO507443",
+      "line_number": "40",
+      "ise_name": "Ricardo Morales",
+      "region": "USA",
+      "promise_date": "2026-06-17",
+      "days_late": "22",
+      "qty_unshipped": "120",
+      "line_revenue": "18.84",
+      "line_gp": "-575.80",
+      "mpn": "RNF-3000-24/8-0-SP",
+      "color_code": "red"
+    }
+  ],
+  "top5LateLines": [
+    {
+      "customer_name": "Abaco Systems",
+      "sales_order": "SO507718",
+      "line_number": "10",
+      "ise_name": "Joel Flores",
+      "region": "USA",
+      "promise_date": "2026-07-24",
+      "days_until_promise": "15",
+      "qty_unshipped": "6489",
+      "line_revenue": "104992.02",
+      "line_gp": "18039.42",
+      "mpn": "ISL41334IRZ-T7A",
+      "in_stock": "N",
+      "action_status": "green",
+      "color_code": "green"
+    },
+    {
+      "customer_name": "Abaco Systems",
+      "sales_order": "SO507715",
+      "line_number": "20",
+      "ise_name": "Joel Flores",
+      "region": "USA",
+      "promise_date": "2026-07-17",
+      "days_until_promise": "8",
+      "qty_unshipped": "590",
+      "line_revenue": "9746.80",
+      "line_gp": "7268.80",
+      "mpn": "SN74VMEH22501ADGVR ",
+      "in_stock": "N",
+      "action_status": "green",
+      "color_code": "green"
+    },
+    {
+      "customer_name": "Abaco Systems",
+      "sales_order": "SO507715",
+      "line_number": "10",
+      "ise_name": "Joel Flores",
+      "region": "USA",
+      "promise_date": "2026-07-17",
+      "days_until_promise": "8",
+      "qty_unshipped": "486",
+      "line_revenue": "8028.72",
+      "line_gp": "4699.62",
+      "mpn": "SN74VMEH22501ADGVR ",
+      "in_stock": "N",
+      "action_status": "green",
+      "color_code": "green"
+    },
+    {
+      "customer_name": "Sensata Technologies",
+      "sales_order": "SO507548",
+      "line_number": "30",
+      "ise_name": "Ricardo Morales",
+      "region": "USA",
+      "promise_date": "2026-07-01",
+      "days_until_promise": "-8",
+      "qty_unshipped": "16500",
+      "line_revenue": "12375.00",
+      "line_gp": "2310.00",
+      "mpn": "KTY81/110, 112",
+      "in_stock": "N",
+      "action_status": "red",
+      "color_code": "red"
+    },
+    {
+      "customer_name": "Abaco Systems",
+      "sales_order": "SO507589",
+      "line_number": "10",
+      "ise_name": "Joel Flores",
+      "region": "USA",
+      "promise_date": "2026-07-03",
+      "days_until_promise": "-6",
+      "qty_unshipped": "180",
+      "line_revenue": "2408.40",
+      "line_gp": "887.40",
+      "mpn": "WG82574L SLBA9",
+      "in_stock": "N",
+      "action_status": "red",
+      "color_code": "red"
+    }
+  ],
+  "iseAlerts": [
+    {
+      "ise_name": "Alfredo Martinez",
+      "manager": "Joel Marquez",
+      "region": "USA",
+      "last_rfq_date": "2026-07-03 00:00:00",
+      "days_inactive": "4",
+      "color_code": "yellow"
+    },
+    {
+      "ise_name": "Carlos Moreno",
+      "manager": "Joel Marquez",
+      "region": "USA",
+      "last_rfq_date": "2026-07-03 00:00:00",
+      "days_inactive": "4",
+      "color_code": "yellow"
+    }
+  ],
+  "lowMarginOrders": [],
+  "repActivity": [
+    {
+      "sales_rep_name": "Alejandro Padilla",
+      "rfq_lines": "0",
+      "cq_lines": "0",
+      "cq_sold": "0",
+      "so_lines": "0",
+      "so_revenue": "0",
+      "so_gp": "0"
+    },
+    {
+      "sales_rep_name": "Alex Partida",
+      "rfq_lines": "27",
+      "cq_lines": "0",
+      "cq_sold": "0",
+      "so_lines": "2",
+      "so_revenue": "5733.30",
+      "so_gp": "1739.30000000000000000000"
+    },
+    {
+      "sales_rep_name": "Alfredo Martinez",
+      "rfq_lines": "0",
+      "cq_lines": "0",
+      "cq_sold": "0",
+      "so_lines": "0",
+      "so_revenue": "0",
+      "so_gp": "0"
+    },
+    {
+      "sales_rep_name": "Carlos Moreno",
+      "rfq_lines": "0",
+      "cq_lines": "0",
+      "cq_sold": "0",
+      "so_lines": "0",
+      "so_revenue": "0",
+      "so_gp": "0"
+    },
+    {
+      "sales_rep_name": "Carolina Hinestroza",
+      "rfq_lines": "5",
+      "cq_lines": "0",
+      "cq_sold": "0",
+      "so_lines": "0",
+      "so_revenue": "0",
+      "so_gp": "0"
+    },
+    {
+      "sales_rep_name": "Joel Flores",
+      "rfq_lines": "2",
+      "cq_lines": "7",
+      "cq_sold": "6",
+      "so_lines": "3",
+      "so_revenue": "113220.48",
+      "so_gp": "20244.7280000000000000"
+    },
+    {
+      "sales_rep_name": "Ricardo Morales",
+      "rfq_lines": "37",
+      "cq_lines": "2",
+      "cq_sold": "2",
+      "so_lines": "1",
+      "so_revenue": "1100.0",
+      "so_gp": "492.00000000000000000000"
+    },
+    {
+      "sales_rep_name": "Salvador Horner",
+      "rfq_lines": "2",
+      "cq_lines": "3",
+      "cq_sold": "2",
+      "so_lines": "1",
+      "so_revenue": "1945.00",
+      "so_gp": "1862.90000000000000000000"
+    }
+  ],
+  "repTotals": {
+    "rfq_lines": 73,
+    "cq_lines": 12,
+    "cq_sold": 10,
+    "so_lines": 7,
+    "so_revenue": 121998.78,
+    "so_gp": 24338.928
+  }
+}

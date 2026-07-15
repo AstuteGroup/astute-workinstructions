@@ -1,0 +1,1987 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>Reactivated Customers - Customer Name + City Method (30 Days)</title>
+<style>
+body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; margin: 40px; background: #f5f5f5; }
+.container { max-width: 1200px; margin: 0 auto; background: white; padding: 30px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+h1 { color: #1a1a1a; border-bottom: 3px solid #2563eb; padding-bottom: 10px; margin-bottom: 10px; }
+.subtitle { font-size: 12px; color: #666; margin-bottom: 20px; }
+.criteria { font-size: 10px; color: #888; font-style: italic; margin-bottom: 30px; border-left: 3px solid #ddd; padding-left: 12px; }
+.summary { background: #e0f2fe; border: 1px solid #0284c7; padding: 16px; border-radius: 6px; margin-bottom: 30px; }
+.reactivation { border: 1px solid #e0e0e0; border-radius: 6px; padding: 14px; margin-bottom: 12px; background: white; }
+.reactivation-header { font-size: 14px; font-weight: bold; color: #1a1a1a; margin-bottom: 8px; }
+.badge { display: inline-block; padding: 2px 8px; border-radius: 3px; font-size: 10px; font-weight: 600; margin-left: 8px; }
+.badge-high-value { background: #fef3c7; color: #92400e; }
+.badge-anomalous { background: #e0e7ff; color: #3730a3; }
+.badge-dormant { background: #fee2e2; color: #991b1b; }
+.badge-small { background: #dbeafe; color: #1e40af; }
+.badge-standard { background: #f3f4f6; color: #374151; }
+.detail-line { font-size: 11px; color: #666; margin-bottom: 6px; }
+.metrics { background: #f8f9fa; padding: 10px; border-radius: 4px; margin-top: 8px; font-size: 11px; }
+.icon { font-size: 16px; margin-right: 4px; }
+</style>
+</head>
+<body>
+<div class="container">
+<h1>🔄 Reactivated Customers - Customer Name + City Method</h1>
+<div class="subtitle">Testing Period: Last 30 Days (June 1-30, 2026)</div>
+<div class="criteria"><strong>New Method:</strong> Customer Name + Ship-To City concatenation • Excludes brokers/distributors/traders • 30-day minimum gap • CQ-linked sales only</div>
+
+<div class="summary">
+<strong>📊 Results Summary:</strong> Found <strong>106 reactivations</strong> using Customer Name + City tracking (vs 3 with current method)<br>
+<strong>Key Difference:</strong> This method tracks each customer+city combination separately, providing more granular visibility into reactivations.
+</div>
+
+<h2 style="margin-top: 30px; color: #374151; font-size: 16px;">All Reactivations (106 total, sorted by gap)</h2>
+
+<div class="reactivation">
+  <div class="reactivation-header">
+    <span class="icon">📍</span>1. A2 Global Electronics + Solutions
+    <span class="badge badge-small">Small Customer Return</span>
+  </div>
+  <div class="detail-line">📍 <strong>St. Petersburg</strong> (city-level tracking)</div>
+  <div class="detail-line">
+    Gap: <strong>806 days</strong> | Typical Cycle: 791 days | <strong>1.02x typical</strong>
+  </div>
+  <div class="detail-line">
+    First Order: 2024-04-15 | Last Order: 2024-04-15
+  </div>
+  <div class="metrics">
+    <strong>Order Details:</strong> SO507469 | $2,207 revenue<br>
+    <strong>Seller:</strong> Jake Harris (Other)<br>
+    <strong>Lifetime:</strong> 1 orders, $0 total revenue
+  </div>
+</div>
+<div class="reactivation">
+  <div class="reactivation-header">
+    <span class="icon">📍</span>2. Sourceability North America
+    <span class="badge badge-small">Small Customer Return</span>
+  </div>
+  <div class="detail-line">📍 <strong>Austin</strong> (city-level tracking)</div>
+  <div class="detail-line">
+    Gap: <strong>651 days</strong> | Typical Cycle: 630 days | <strong>1.03x typical</strong>
+  </div>
+  <div class="detail-line">
+    First Order: 2024-09-17 | Last Order: 2024-09-17
+  </div>
+  <div class="metrics">
+    <strong>Order Details:</strong> SO507383 | $21,103 revenue<br>
+    <strong>Seller:</strong> Jake Harris (Other)<br>
+    <strong>Lifetime:</strong> 1 orders, $600 total revenue
+  </div>
+</div>
+<div class="reactivation">
+  <div class="reactivation-header">
+    <span class="icon">📊</span>3. Ontic
+    <span class="badge badge-anomalous">Anomalous Pattern</span>
+  </div>
+  <div class="detail-line">📍 <strong>Chatsworth</strong> (city-level tracking)</div>
+  <div class="detail-line">
+    Gap: <strong>440 days</strong> | Typical Cycle: 38 days | <strong>11.58x typical</strong>
+  </div>
+  <div class="detail-line">
+    First Order: 2024-06-14 | Last Order: 2025-04-16
+  </div>
+  <div class="metrics">
+    <strong>Order Details:</strong> SO507456 | $2,170 revenue<br>
+    <strong>Seller:</strong> Aaron Mendoza (USA)<br>
+    <strong>Lifetime:</strong> 8 orders, $11,528 total revenue
+  </div>
+</div>
+<div class="reactivation">
+  <div class="reactivation-header">
+    <span class="icon">📊</span>4. General Dynamics
+    <span class="badge badge-anomalous">Anomalous Pattern</span>
+  </div>
+  <div class="detail-line">📍 <strong>Groton</strong> (city-level tracking)</div>
+  <div class="detail-line">
+    Gap: <strong>322 days</strong> | Typical Cycle: 54 days | <strong>5.96x typical</strong>
+  </div>
+  <div class="detail-line">
+    First Order: 2024-05-09 | Last Order: 2025-08-12
+  </div>
+  <div class="metrics">
+    <strong>Order Details:</strong> SO507601 | $32,013 revenue<br>
+    <strong>Seller:</strong> Daniel Reiser (USA)<br>
+    <strong>Lifetime:</strong> 7 orders, $57,018 total revenue
+  </div>
+</div>
+<div class="reactivation">
+  <div class="reactivation-header">
+    <span class="icon">📍</span>5. Vyrian Inc.
+    <span class="badge badge-small">Small Customer Return</span>
+  </div>
+  <div class="detail-line">📍 <strong>Houston</strong> (city-level tracking)</div>
+  <div class="detail-line">
+    Gap: <strong>309 days</strong> | Typical Cycle: 112 days | <strong>2.76x typical</strong>
+  </div>
+  <div class="detail-line">
+    First Order: 2025-01-14 | Last Order: 2025-08-25
+  </div>
+  <div class="metrics">
+    <strong>Order Details:</strong> SO507310 | $250 revenue<br>
+    <strong>Seller:</strong> Jake Harris (Other)<br>
+    <strong>Lifetime:</strong> 3 orders, $1,741 total revenue
+  </div>
+</div>
+<div class="reactivation">
+  <div class="reactivation-header">
+    <span class="icon">📍</span>6. Viavi Solutions Inc
+    <span class="badge badge-small">Small Customer Return</span>
+  </div>
+  <div class="detail-line">📍 <strong>Wichita</strong> (city-level tracking)</div>
+  <div class="detail-line">
+    Gap: <strong>295 days</strong> | Typical Cycle: 294 days | <strong>1.00x typical</strong>
+  </div>
+  <div class="detail-line">
+    First Order: 2025-09-08 | Last Order: 2025-09-08
+  </div>
+  <div class="metrics">
+    <strong>Order Details:</strong> SO507628 | $26,120 revenue<br>
+    <strong>Seller:</strong> Renald Ng (APAC-Laurel)<br>
+    <strong>Lifetime:</strong> 1 orders, $0 total revenue
+  </div>
+</div>
+<div class="reactivation">
+  <div class="reactivation-header">
+    <span class="icon">📍</span>7. Adamson Systems Engineering INC
+    <span class="badge badge-small">Small Customer Return</span>
+  </div>
+  <div class="detail-line">📍 <strong>port terry</strong> (city-level tracking)</div>
+  <div class="detail-line">
+    Gap: <strong>273 days</strong> | Typical Cycle: 259 days | <strong>1.05x typical</strong>
+  </div>
+  <div class="detail-line">
+    First Order: 2025-09-30 | Last Order: 2025-09-30
+  </div>
+  <div class="metrics">
+    <strong>Order Details:</strong> SO507486 | $8,959 revenue<br>
+    <strong>Seller:</strong> James Diaz (USA)<br>
+    <strong>Lifetime:</strong> 1 orders, $5,759 total revenue
+  </div>
+</div>
+<div class="reactivation">
+  <div class="reactivation-header">
+    <span class="icon">📊</span>8. SigmaTron International 
+    <span class="badge badge-anomalous">Anomalous Pattern</span>
+  </div>
+  <div class="detail-line">📍 <strong>EL PASO</strong> (city-level tracking)</div>
+  <div class="detail-line">
+    Gap: <strong>245 days</strong> | Typical Cycle: 36 days | <strong>6.81x typical</strong>
+  </div>
+  <div class="detail-line">
+    First Order: 2024-08-07 | Last Order: 2025-10-28
+  </div>
+  <div class="metrics">
+    <strong>Order Details:</strong> SO507444, SO507445 | $2,179 revenue<br>
+    <strong>Seller:</strong> Carolina Hinestroza (MEX)<br>
+    <strong>Lifetime:</strong> 10 orders, $71,381 total revenue
+  </div>
+</div>
+<div class="reactivation">
+  <div class="reactivation-header">
+    <span class="icon">📍</span>9. Holdelec
+    <span class="badge badge-small">Small Customer Return</span>
+  </div>
+  <div class="detail-line">📍 <strong>Wervicq-Sud</strong> (city-level tracking)</div>
+  <div class="detail-line">
+    Gap: <strong>236 days</strong> | Typical Cycle: 231 days | <strong>1.02x typical</strong>
+  </div>
+  <div class="detail-line">
+    First Order: 2025-11-06 | Last Order: 2025-11-06
+  </div>
+  <div class="metrics">
+    <strong>Order Details:</strong> SO507585 | $400 revenue<br>
+    <strong>Seller:</strong> Jake Harris (Other)<br>
+    <strong>Lifetime:</strong> 1 orders, $1,925 total revenue
+  </div>
+</div>
+<div class="reactivation">
+  <div class="reactivation-header">
+    <span class="icon">📊</span>10. Nationgate Solution (M) Sdn Bhd
+    <span class="badge badge-anomalous">Anomalous Pattern</span>
+  </div>
+  <div class="detail-line">📍 <strong>Penang</strong> (city-level tracking)</div>
+  <div class="detail-line">
+    Gap: <strong>229 days</strong> | Typical Cycle: 63 days | <strong>3.63x typical</strong>
+  </div>
+  <div class="detail-line">
+    First Order: 2024-09-19 | Last Order: 2025-11-13
+  </div>
+  <div class="metrics">
+    <strong>Order Details:</strong> SO507340 | $1,581 revenue<br>
+    <strong>Seller:</strong> Winnie Lee (APAC-Kris)<br>
+    <strong>Lifetime:</strong> 5 orders, $5,776 total revenue
+  </div>
+</div>
+<div class="reactivation">
+  <div class="reactivation-header">
+    <span class="icon">📊</span>11. PCI PRIVATE LIMITED
+    <span class="badge badge-anomalous">Anomalous Pattern</span>
+  </div>
+  <div class="detail-line">📍 <strong>SINGAPORE</strong> (city-level tracking)</div>
+  <div class="detail-line">
+    Gap: <strong>223 days</strong> | Typical Cycle: 26 days | <strong>8.58x typical</strong>
+  </div>
+  <div class="detail-line">
+    First Order: 2024-05-17 | Last Order: 2025-11-19
+  </div>
+  <div class="metrics">
+    <strong>Order Details:</strong> SO507434 | $4,482 revenue<br>
+    <strong>Seller:</strong> Renald Ng (APAC-Laurel)<br>
+    <strong>Lifetime:</strong> 13 orders, $172,649 total revenue
+  </div>
+</div>
+<div class="reactivation">
+  <div class="reactivation-header">
+    <span class="icon">📊</span>12. Flock Safety
+    <span class="badge badge-anomalous">Anomalous Pattern</span>
+  </div>
+  <div class="detail-line">📍 <strong>Scottsboro</strong> (city-level tracking)</div>
+  <div class="detail-line">
+    Gap: <strong>196 days</strong> | Typical Cycle: 4 days | <strong>49.00x typical</strong>
+  </div>
+  <div class="detail-line">
+    First Order: 2024-08-28 | Last Order: 2025-12-16
+  </div>
+  <div class="metrics">
+    <strong>Order Details:</strong> SO507323 | $2,154 revenue<br>
+    <strong>Seller:</strong> Justin Goodwin (USA)<br>
+    <strong>Lifetime:</strong> 41 orders, $263,296 total revenue
+  </div>
+</div>
+<div class="reactivation">
+  <div class="reactivation-header">
+    <span class="icon">📍</span>13. Advantech Co., LTD
+    <span class="badge badge-small">Small Customer Return</span>
+  </div>
+  <div class="detail-line">📍 <strong>Singapore </strong> (city-level tracking)</div>
+  <div class="detail-line">
+    Gap: <strong>195 days</strong> | Typical Cycle: 179 days | <strong>1.09x typical</strong>
+  </div>
+  <div class="detail-line">
+    First Order: 2025-12-17 | Last Order: 2025-12-17
+  </div>
+  <div class="metrics">
+    <strong>Order Details:</strong> SO507452 | $1,340 revenue<br>
+    <strong>Seller:</strong> Jasper Kee (APAC-Laurel)<br>
+    <strong>Lifetime:</strong> 1 orders, $3,478 total revenue
+  </div>
+</div>
+<div class="reactivation">
+  <div class="reactivation-header">
+    <span class="icon">📍</span>14. Prime Technological Services, INC
+    <span class="badge badge-small">Small Customer Return</span>
+  </div>
+  <div class="detail-line">📍 <strong>Suwanee</strong> (city-level tracking)</div>
+  <div class="detail-line">
+    Gap: <strong>173 days</strong> | Typical Cycle: 73 days | <strong>2.37x typical</strong>
+  </div>
+  <div class="detail-line">
+    First Order: 2026-01-08 | Last Order: 2026-01-08
+  </div>
+  <div class="metrics">
+    <strong>Order Details:</strong> SO507313, SO507327 | $45,820 revenue<br>
+    <strong>Seller:</strong> Justin Goodwin (USA)<br>
+    <strong>Lifetime:</strong> 1 orders, $6,567 total revenue
+  </div>
+</div>
+<div class="reactivation">
+  <div class="reactivation-header">
+    <span class="icon">📍</span>15. FreedomUSA
+    <span class="badge badge-small">Small Customer Return</span>
+  </div>
+  <div class="detail-line">📍 <strong>Odessa</strong> (city-level tracking)</div>
+  <div class="detail-line">
+    Gap: <strong>168 days</strong> | Typical Cycle: 258 days | <strong>0.65x typical</strong>
+  </div>
+  <div class="detail-line">
+    First Order: 2025-01-06 | Last Order: 2026-01-13
+  </div>
+  <div class="metrics">
+    <strong>Order Details:</strong> SO507354 | $2,915 revenue<br>
+    <strong>Seller:</strong> Jake Harris (Other)<br>
+    <strong>Lifetime:</strong> 2 orders, $7,951 total revenue
+  </div>
+</div>
+<div class="reactivation">
+  <div class="reactivation-header">
+    <span class="icon">📍</span>16. ICB Electronics, Inc
+    <span class="badge badge-small">Small Customer Return</span>
+  </div>
+  <div class="detail-line">📍 <strong>Scottsboro</strong> (city-level tracking)</div>
+  <div class="detail-line">
+    Gap: <strong>147 days</strong> | Typical Cycle: 68 days | <strong>2.16x typical</strong>
+  </div>
+  <div class="detail-line">
+    First Order: 2026-01-20 | Last Order: 2026-02-03
+  </div>
+  <div class="metrics">
+    <strong>Order Details:</strong> SO507348 | $905 revenue<br>
+    <strong>Seller:</strong> Justin Goodwin (USA)<br>
+    <strong>Lifetime:</strong> 2 orders, $3,125 total revenue
+  </div>
+</div>
+<div class="reactivation">
+  <div class="reactivation-header">
+    <span class="icon">📍</span>17. WWD USA Group, LLC. 
+    <span class="badge badge-small">Small Customer Return</span>
+  </div>
+  <div class="detail-line">📍 <strong>Davie</strong> (city-level tracking)</div>
+  <div class="detail-line">
+    Gap: <strong>138 days</strong> | Typical Cycle: 219 days | <strong>0.63x typical</strong>
+  </div>
+  <div class="detail-line">
+    First Order: 2025-03-21 | Last Order: 2026-02-12
+  </div>
+  <div class="metrics">
+    <strong>Order Details:</strong> SO507308 | $550 revenue<br>
+    <strong>Seller:</strong> Jake Harris (Other)<br>
+    <strong>Lifetime:</strong> 2 orders, $834 total revenue
+  </div>
+</div>
+<div class="reactivation">
+  <div class="reactivation-header">
+    <span class="icon">📊</span>18. Bharat Electronics Ltd
+    <span class="badge badge-anomalous">Anomalous Pattern</span>
+  </div>
+  <div class="detail-line">📍 <strong>Bangalore</strong> (city-level tracking)</div>
+  <div class="detail-line">
+    Gap: <strong>137 days</strong> | Typical Cycle: 5 days | <strong>27.40x typical</strong>
+  </div>
+  <div class="detail-line">
+    First Order: 2025-02-25 | Last Order: 2026-02-13
+  </div>
+  <div class="metrics">
+    <strong>Order Details:</strong> SO507498, SO507499, SO507563 | $28,982 revenue<br>
+    <strong>Seller:</strong> Meenakshi (Other)<br>
+    <strong>Lifetime:</strong> 13 orders, $33,875 total revenue
+  </div>
+</div>
+<div class="reactivation">
+  <div class="reactivation-header">
+    <span class="icon">✓</span>19. Mercury Systems 
+    <span class="badge badge-standard">Standard</span>
+  </div>
+  <div class="detail-line">📍 <strong>Phoenix</strong> (city-level tracking)</div>
+  <div class="detail-line">
+    Gap: <strong>113 days</strong> | Typical Cycle: 95 days | <strong>1.19x typical</strong>
+  </div>
+  <div class="detail-line">
+    First Order: 2024-08-21 | Last Order: 2026-03-09
+  </div>
+  <div class="metrics">
+    <strong>Order Details:</strong> SO507446 | $6,825 revenue<br>
+    <strong>Seller:</strong> James Diaz (USA)<br>
+    <strong>Lifetime:</strong> 7 orders, $121,771 total revenue
+  </div>
+</div>
+<div class="reactivation">
+  <div class="reactivation-header">
+    <span class="icon">✓</span>20. Sanmina Corporation
+    <span class="badge badge-standard">Standard</span>
+  </div>
+  <div class="detail-line">📍 <strong>EL SALTO</strong> (city-level tracking)</div>
+  <div class="detail-line">
+    Gap: <strong>113 days</strong> | Typical Cycle: 40 days | <strong>2.86x typical</strong>
+  </div>
+  <div class="detail-line">
+    First Order: 2024-06-25 | Last Order: 2026-03-09
+  </div>
+  <div class="metrics">
+    <strong>Order Details:</strong> SO507479, SO507480 | $13,095 revenue<br>
+    <strong>Seller:</strong> Joel Flores (MEX)<br>
+    <strong>Lifetime:</strong> 13 orders, $256,930 total revenue
+  </div>
+</div>
+<div class="reactivation">
+  <div class="reactivation-header">
+    <span class="icon">✓</span>21. Johnson Controls, Inc.
+    <span class="badge badge-standard">Standard</span>
+  </div>
+  <div class="detail-line">📍 <strong>Weslaco</strong> (city-level tracking)</div>
+  <div class="detail-line">
+    Gap: <strong>110 days</strong> | Typical Cycle: 89 days | <strong>1.24x typical</strong>
+  </div>
+  <div class="detail-line">
+    First Order: 2025-06-16 | Last Order: 2026-03-12
+  </div>
+  <div class="metrics">
+    <strong>Order Details:</strong> SO507384 | $0 revenue<br>
+    <strong>Seller:</strong> Justin Goodwin (USA)<br>
+    <strong>Lifetime:</strong> 3 orders, $3,444 total revenue
+  </div>
+</div>
+<div class="reactivation">
+  <div class="reactivation-header">
+    <span class="icon">📊</span>22. Sanmina Corporation
+    <span class="badge badge-anomalous">Anomalous Pattern</span>
+  </div>
+  <div class="detail-line">📍 <strong>Tlajomulco de Zuniga</strong> (city-level tracking)</div>
+  <div class="detail-line">
+    Gap: <strong>110 days</strong> | Typical Cycle: 7 days | <strong>16.92x typical</strong>
+  </div>
+  <div class="detail-line">
+    First Order: 2024-04-26 | Last Order: 2026-03-12
+  </div>
+  <div class="metrics">
+    <strong>Order Details:</strong> SO507328, SO507546, SO507573 | $33,392 revenue<br>
+    <strong>Seller:</strong> Joel Flores (MEX)<br>
+    <strong>Lifetime:</strong> 30 orders, $677,639 total revenue
+  </div>
+</div>
+<div class="reactivation">
+  <div class="reactivation-header">
+    <span class="icon">✓</span>23. Ribbon Communications
+    <span class="badge badge-standard">Standard</span>
+  </div>
+  <div class="detail-line">📍 <strong>Unknown City</strong> (city-level tracking)</div>
+  <div class="detail-line">
+    Gap: <strong>98 days</strong>
+  </div>
+  <div class="detail-line">
+    First Order: 2026-03-24 | Last Order: 2026-03-24
+  </div>
+  <div class="metrics">
+    <strong>Order Details:</strong> SO507316, SO507318 | $22,948 revenue<br>
+    <strong>Seller:</strong> Joel Flores (MEX)<br>
+    <strong>Lifetime:</strong> 2 orders, $6,739 total revenue
+  </div>
+</div>
+<div class="reactivation">
+  <div class="reactivation-header">
+    <span class="icon">📊</span>24. THALES
+    <span class="badge badge-anomalous">Anomalous Pattern</span>
+  </div>
+  <div class="detail-line">📍 <strong>Clarksburg</strong> (city-level tracking)</div>
+  <div class="detail-line">
+    Gap: <strong>98 days</strong> | Typical Cycle: 21 days | <strong>4.67x typical</strong>
+  </div>
+  <div class="detail-line">
+    First Order: 2024-10-17 | Last Order: 2026-03-24
+  </div>
+  <div class="metrics">
+    <strong>Order Details:</strong> SO507419 | $12,180 revenue<br>
+    <strong>Seller:</strong> James Diaz (USA)<br>
+    <strong>Lifetime:</strong> 15 orders, $213,000 total revenue
+  </div>
+</div>
+<div class="reactivation">
+  <div class="reactivation-header">
+    <span class="icon">✓</span>25. SRX Global (Malaysia) Sdn Bhd
+    <span class="badge badge-standard">Standard</span>
+  </div>
+  <div class="detail-line">📍 <strong>Johor</strong> (city-level tracking)</div>
+  <div class="detail-line">
+    Gap: <strong>96 days</strong>
+  </div>
+  <div class="detail-line">
+    First Order: 2024-12-17 | Last Order: 2026-03-26
+  </div>
+  <div class="metrics">
+    <strong>Order Details:</strong> SO507331, SO507347 | $19,000 revenue<br>
+    <strong>Seller:</strong> Winnie Lee (APAC-Kris)<br>
+    <strong>Lifetime:</strong> 12 orders, $38,625 total revenue
+  </div>
+</div>
+<div class="reactivation">
+  <div class="reactivation-header">
+    <span class="icon">📊</span>26. L3Harris Corp.
+    <span class="badge badge-anomalous">Anomalous Pattern</span>
+  </div>
+  <div class="detail-line">📍 <strong>Camden</strong> (city-level tracking)</div>
+  <div class="detail-line">
+    Gap: <strong>95 days</strong> | Typical Cycle: 28 days | <strong>3.39x typical</strong>
+  </div>
+  <div class="detail-line">
+    First Order: 2024-11-21 | Last Order: 2026-03-27
+  </div>
+  <div class="metrics">
+    <strong>Order Details:</strong> SO507350 | $630 revenue<br>
+    <strong>Seller:</strong> Daniel Reiser (USA)<br>
+    <strong>Lifetime:</strong> 13 orders, $79,471 total revenue
+  </div>
+</div>
+<div class="reactivation">
+  <div class="reactivation-header">
+    <span class="icon">✓</span>27. STJ ELECTRONICS PVT. LTD
+    <span class="badge badge-standard">Standard</span>
+  </div>
+  <div class="detail-line">📍 <strong> New Delhi</strong> (city-level tracking)</div>
+  <div class="detail-line">
+    Gap: <strong>95 days</strong> | Typical Cycle: 80 days | <strong>1.19x typical</strong>
+  </div>
+  <div class="detail-line">
+    First Order: 2025-07-09 | Last Order: 2026-03-27
+  </div>
+  <div class="metrics">
+    <strong>Order Details:</strong> SO507455, SO507538 | $6,000 revenue<br>
+    <strong>Seller:</strong> Lavanya Manohar (Other)<br>
+    <strong>Lifetime:</strong> 4 orders, $6,000 total revenue
+  </div>
+</div>
+<div class="reactivation">
+  <div class="reactivation-header">
+    <span class="icon">✓</span>28. Fortinet
+    <span class="badge badge-standard">Standard</span>
+  </div>
+  <div class="detail-line">📍 <strong>Sunnyvale</strong> (city-level tracking)</div>
+  <div class="detail-line">
+    Gap: <strong>92 days</strong> | Typical Cycle: 36 days | <strong>2.59x typical</strong>
+  </div>
+  <div class="detail-line">
+    First Order: 2026-03-25 | Last Order: 2026-03-30
+  </div>
+  <div class="metrics">
+    <strong>Order Details:</strong> SO507335 | $0 revenue<br>
+    <strong>Seller:</strong> Michael Stifter (USA)<br>
+    <strong>Lifetime:</strong> 2 orders, $0 total revenue
+  </div>
+</div>
+<div class="reactivation">
+  <div class="reactivation-header">
+    <span class="icon">✓</span>29. Jabil Inc
+    <span class="badge badge-standard">Standard</span>
+  </div>
+  <div class="detail-line">📍 <strong>Hong Kong</strong> (city-level tracking)</div>
+  <div class="detail-line">
+    Gap: <strong>89 days</strong> | Typical Cycle: 38 days | <strong>2.37x typical</strong>
+  </div>
+  <div class="detail-line">
+    First Order: 2026-04-02 | Last Order: 2026-04-02
+  </div>
+  <div class="metrics">
+    <strong>Order Details:</strong> SO507472, SO507473 | $163,922 revenue<br>
+    <strong>Seller:</strong> Renald Ng (APAC-Laurel)<br>
+    <strong>Lifetime:</strong> 1 orders, $43,320 total revenue
+  </div>
+</div>
+<div class="reactivation">
+  <div class="reactivation-header">
+    <span class="icon">✓</span>30. GLOBESYNC ELECTRONICS PRIVATE LIMITED
+    <span class="badge badge-standard">Standard</span>
+  </div>
+  <div class="detail-line">📍 <strong>hyderabad</strong> (city-level tracking)</div>
+  <div class="detail-line">
+    Gap: <strong>89 days</strong> | Typical Cycle: 67 days | <strong>1.33x typical</strong>
+  </div>
+  <div class="detail-line">
+    First Order: 2026-04-02 | Last Order: 2026-04-02
+  </div>
+  <div class="metrics">
+    <strong>Order Details:</strong> SO507358 | $4,296 revenue<br>
+    <strong>Seller:</strong> Meenakshi (Other)<br>
+    <strong>Lifetime:</strong> 1 orders, $1,125 total revenue
+  </div>
+</div>
+<div class="reactivation">
+  <div class="reactivation-header">
+    <span class="icon">✓</span>31. Astute Group (Astute Electronics)
+    <span class="badge badge-standard">Standard</span>
+  </div>
+  <div class="detail-line">📍 <strong>Unknown City</strong> (city-level tracking)</div>
+  <div class="detail-line">
+    Gap: <strong>86 days</strong> | Typical Cycle: 52 days | <strong>1.65x typical</strong>
+  </div>
+  <div class="detail-line">
+    First Order: 2025-04-30 | Last Order: 2026-04-05
+  </div>
+  <div class="metrics">
+    <strong>Order Details:</strong> SO507427, SO507429 | $293,000 revenue<br>
+    <strong>Seller:</strong> Laurel Kee (APAC-Laurel)<br>
+    <strong>Lifetime:</strong> 5 orders, $49,934 total revenue
+  </div>
+</div>
+<div class="reactivation">
+  <div class="reactivation-header">
+    <span class="icon">✓</span>32. Sensata Technologies
+    <span class="badge badge-standard">Standard</span>
+  </div>
+  <div class="detail-line">📍 <strong>Aguascalientes</strong> (city-level tracking)</div>
+  <div class="detail-line">
+    Gap: <strong>85 days</strong> | Typical Cycle: 38 days | <strong>2.24x typical</strong>
+  </div>
+  <div class="detail-line">
+    First Order: 2024-06-04 | Last Order: 2026-04-06
+  </div>
+  <div class="metrics">
+    <strong>Order Details:</strong> SO507443 | $9,661 revenue<br>
+    <strong>Seller:</strong> Ricardo Morales (MEX)<br>
+    <strong>Lifetime:</strong> 14 orders, $71,567 total revenue
+  </div>
+</div>
+<div class="reactivation">
+  <div class="reactivation-header">
+    <span class="icon">✓</span>33. Sanmina Corporation
+    <span class="badge badge-standard">Standard</span>
+  </div>
+  <div class="detail-line">📍 <strong>tlajomulco de zuñiga</strong> (city-level tracking)</div>
+  <div class="detail-line">
+    Gap: <strong>84 days</strong> | Typical Cycle: 49 days | <strong>1.71x typical</strong>
+  </div>
+  <div class="detail-line">
+    First Order: 2026-03-24 | Last Order: 2026-04-07
+  </div>
+  <div class="metrics">
+    <strong>Order Details:</strong> SO507632 | $5,460 revenue<br>
+    <strong>Seller:</strong> Ricardo Morales (MEX)<br>
+    <strong>Lifetime:</strong> 2 orders, $123,900 total revenue
+  </div>
+</div>
+<div class="reactivation">
+  <div class="reactivation-header">
+    <span class="icon">📊</span>34. BAE SYSTEMS
+    <span class="badge badge-anomalous">Anomalous Pattern</span>
+  </div>
+  <div class="detail-line">📍 <strong>Endicott</strong> (city-level tracking)</div>
+  <div class="detail-line">
+    Gap: <strong>83 days</strong> | Typical Cycle: 19 days | <strong>4.49x typical</strong>
+  </div>
+  <div class="detail-line">
+    First Order: 2024-04-02 | Last Order: 2026-04-08
+  </div>
+  <div class="metrics">
+    <strong>Order Details:</strong> SO507351 | $113,750 revenue<br>
+    <strong>Seller:</strong> Thomas Haynes (USA)<br>
+    <strong>Lifetime:</strong> 32 orders, $507,796 total revenue
+  </div>
+</div>
+<div class="reactivation">
+  <div class="reactivation-header">
+    <span class="icon">📊</span>35. BK electronics
+    <span class="badge badge-anomalous">Anomalous Pattern</span>
+  </div>
+  <div class="detail-line">📍 <strong>Unknown City</strong> (city-level tracking)</div>
+  <div class="detail-line">
+    Gap: <strong>83 days</strong> | Typical Cycle: 3 days | <strong>27.67x typical</strong>
+  </div>
+  <div class="detail-line">
+    First Order: 2024-08-22 | Last Order: 2026-04-08
+  </div>
+  <div class="metrics">
+    <strong>Order Details:</strong> SO507524 | $3,330 revenue<br>
+    <strong>Seller:</strong> Unknown (Other)<br>
+    <strong>Lifetime:</strong> 74 orders, $701,996 total revenue
+  </div>
+</div>
+<div class="reactivation">
+  <div class="reactivation-header">
+    <span class="icon">📊</span>36. Sanmina Corporation
+    <span class="badge badge-anomalous">Anomalous Pattern</span>
+  </div>
+  <div class="detail-line">📍 <strong>TLAJOMULCO DE ZUÑIGA</strong> (city-level tracking)</div>
+  <div class="detail-line">
+    Gap: <strong>83 days</strong> | Typical Cycle: 7 days | <strong>11.86x typical</strong>
+  </div>
+  <div class="detail-line">
+    First Order: 2025-06-03 | Last Order: 2026-04-08
+  </div>
+  <div class="metrics">
+    <strong>Order Details:</strong> SO507510, SO507590, SO507591 | $18,625 revenue<br>
+    <strong>Seller:</strong> Ricardo Morales (MEX)<br>
+    <strong>Lifetime:</strong> 4 orders, $3,238 total revenue
+  </div>
+</div>
+<div class="reactivation">
+  <div class="reactivation-header">
+    <span class="icon">📊</span>37. Parker Meggitt
+    <span class="badge badge-anomalous">Anomalous Pattern</span>
+  </div>
+  <div class="detail-line">📍 <strong>Oro Valley</strong> (city-level tracking)</div>
+  <div class="detail-line">
+    Gap: <strong>83 days</strong> | Typical Cycle: 14 days | <strong>5.93x typical</strong>
+  </div>
+  <div class="detail-line">
+    First Order: 2024-08-28 | Last Order: 2026-04-08
+  </div>
+  <div class="metrics">
+    <strong>Order Details:</strong> SO507501 | $11,175 revenue<br>
+    <strong>Seller:</strong> Josh Syre (USA)<br>
+    <strong>Lifetime:</strong> 39 orders, $298,462 total revenue
+  </div>
+</div>
+<div class="reactivation">
+  <div class="reactivation-header">
+    <span class="icon">✓</span>38. RTX
+    <span class="badge badge-standard">Standard</span>
+  </div>
+  <div class="detail-line">📍 <strong>Largo</strong> (city-level tracking)</div>
+  <div class="detail-line">
+    Gap: <strong>82 days</strong> | Typical Cycle: 37 days | <strong>2.22x typical</strong>
+  </div>
+  <div class="detail-line">
+    First Order: 2024-07-15 | Last Order: 2026-04-09
+  </div>
+  <div class="metrics">
+    <strong>Order Details:</strong> SO507387 | $12,948 revenue<br>
+    <strong>Seller:</strong> Thomas Haynes (USA)<br>
+    <strong>Lifetime:</strong> 13 orders, $76,833 total revenue
+  </div>
+</div>
+<div class="reactivation">
+  <div class="reactivation-header">
+    <span class="icon">✓</span>39. Applied Materials
+    <span class="badge badge-standard">Standard</span>
+  </div>
+  <div class="detail-line">📍 <strong>Kaohsiung City</strong> (city-level tracking)</div>
+  <div class="detail-line">
+    Gap: <strong>78 days</strong> | Typical Cycle: 51 days | <strong>1.53x typical</strong>
+  </div>
+  <div class="detail-line">
+    First Order: 2025-12-11 | Last Order: 2026-04-13
+  </div>
+  <div class="metrics">
+    <strong>Order Details:</strong> SO507326 | $372 revenue<br>
+    <strong>Seller:</strong> Josh Syre (USA)<br>
+    <strong>Lifetime:</strong> 3 orders, $19,569 total revenue
+  </div>
+</div>
+<div class="reactivation">
+  <div class="reactivation-header">
+    <span class="icon">✓</span>40. Marvell
+    <span class="badge badge-standard">Standard</span>
+  </div>
+  <div class="detail-line">📍 <strong>Singapore</strong> (city-level tracking)</div>
+  <div class="detail-line">
+    Gap: <strong>76 days</strong> | Typical Cycle: 54 days | <strong>1.41x typical</strong>
+  </div>
+  <div class="detail-line">
+    First Order: 2024-04-16 | Last Order: 2026-04-15
+  </div>
+  <div class="metrics">
+    <strong>Order Details:</strong> SO507389 | $38,250 revenue<br>
+    <strong>Seller:</strong> Laurel Kee (APAC-Laurel)<br>
+    <strong>Lifetime:</strong> 9 orders, $105,123 total revenue
+  </div>
+</div>
+<div class="reactivation">
+  <div class="reactivation-header">
+    <span class="icon">✓</span>41. KLA
+    <span class="badge badge-standard">Standard</span>
+  </div>
+  <div class="detail-line">📍 <strong>Milpitas</strong> (city-level tracking)</div>
+  <div class="detail-line">
+    Gap: <strong>75 days</strong> | Typical Cycle: 40 days | <strong>1.88x typical</strong>
+  </div>
+  <div class="detail-line">
+    First Order: 2024-05-01 | Last Order: 2026-04-16
+  </div>
+  <div class="metrics">
+    <strong>Order Details:</strong> SO507536, SO507565 | $846,300 revenue<br>
+    <strong>Seller:</strong> Laurel Kee (APAC-Laurel)<br>
+    <strong>Lifetime:</strong> 3 orders, $3,011 total revenue
+  </div>
+</div>
+<div class="reactivation">
+  <div class="reactivation-header">
+    <span class="icon">✓</span>42. Wistron
+    <span class="badge badge-standard">Standard</span>
+  </div>
+  <div class="detail-line">📍 <strong>Unknown City</strong> (city-level tracking)</div>
+  <div class="detail-line">
+    Gap: <strong>71 days</strong> | Typical Cycle: 65 days | <strong>1.09x typical</strong>
+  </div>
+  <div class="detail-line">
+    First Order: 2026-04-20 | Last Order: 2026-04-20
+  </div>
+  <div class="metrics">
+    <strong>Order Details:</strong> SO507561 | $1,557,158 revenue<br>
+    <strong>Seller:</strong> Michael Stifter (USA)<br>
+    <strong>Lifetime:</strong> 1 orders, $244,276 total revenue
+  </div>
+</div>
+<div class="reactivation">
+  <div class="reactivation-header">
+    <span class="icon">✓</span>43. Blue Origin
+    <span class="badge badge-standard">Standard</span>
+  </div>
+  <div class="detail-line">📍 <strong>Kent</strong> (city-level tracking)</div>
+  <div class="detail-line">
+    Gap: <strong>71 days</strong> | Typical Cycle: 26 days | <strong>2.73x typical</strong>
+  </div>
+  <div class="detail-line">
+    First Order: 2024-12-13 | Last Order: 2026-04-20
+  </div>
+  <div class="metrics">
+    <strong>Order Details:</strong> SO507588 | $39,120 revenue<br>
+    <strong>Seller:</strong> James Diaz (USA)<br>
+    <strong>Lifetime:</strong> 5 orders, $21,292 total revenue
+  </div>
+</div>
+<div class="reactivation">
+  <div class="reactivation-header">
+    <span class="icon">📊</span>44. VVDN Technologies Pvt Ltd
+    <span class="badge badge-anomalous">Anomalous Pattern</span>
+  </div>
+  <div class="detail-line">📍 <strong>Unknown City</strong> (city-level tracking)</div>
+  <div class="detail-line">
+    Gap: <strong>70 days</strong> | Typical Cycle: 20 days | <strong>3.50x typical</strong>
+  </div>
+  <div class="detail-line">
+    First Order: 2024-05-22 | Last Order: 2026-04-21
+  </div>
+  <div class="metrics">
+    <strong>Order Details:</strong> SO507525, SO507602 | $25,235 revenue<br>
+    <strong>Seller:</strong> Manikandan (USA)<br>
+    <strong>Lifetime:</strong> 16 orders, $532,310 total revenue
+  </div>
+</div>
+<div class="reactivation">
+  <div class="reactivation-header">
+    <span class="icon">✓</span>45. Plexus Corp.
+    <span class="badge badge-standard">Standard</span>
+  </div>
+  <div class="detail-line">📍 <strong>Buffalo Grove</strong> (city-level tracking)</div>
+  <div class="detail-line">
+    Gap: <strong>69 days</strong> | Typical Cycle: 35 days | <strong>2.00x typical</strong>
+  </div>
+  <div class="detail-line">
+    First Order: 2024-08-20 | Last Order: 2026-04-22
+  </div>
+  <div class="metrics">
+    <strong>Order Details:</strong> SO507336, SO507640 | $2,003 revenue<br>
+    <strong>Seller:</strong> Salvador Horner (MEX)<br>
+    <strong>Lifetime:</strong> 3 orders, $4,814 total revenue
+  </div>
+</div>
+<div class="reactivation">
+  <div class="reactivation-header">
+    <span class="icon">📊</span>46. Celestica
+    <span class="badge badge-anomalous">Anomalous Pattern</span>
+  </div>
+  <div class="detail-line">📍 <strong>NEW TERRITORIES</strong> (city-level tracking)</div>
+  <div class="detail-line">
+    Gap: <strong>69 days</strong> | Typical Cycle: 6 days | <strong>11.50x typical</strong>
+  </div>
+  <div class="detail-line">
+    First Order: 2025-11-10 | Last Order: 2026-04-22
+  </div>
+  <div class="metrics">
+    <strong>Order Details:</strong> SO507448, SO507450, SO507451, SO507511, SO507560, SO507592, SO507597 | $71,671 revenue<br>
+    <strong>Seller:</strong> Spring Tu (APAC-Kris)<br>
+    <strong>Lifetime:</strong> 11 orders, $112,405 total revenue
+  </div>
+</div>
+<div class="reactivation">
+  <div class="reactivation-header">
+    <span class="icon">📊</span>47. Flock Safety
+    <span class="badge badge-anomalous">Anomalous Pattern</span>
+  </div>
+  <div class="detail-line">📍 <strong>Austin</strong> (city-level tracking)</div>
+  <div class="detail-line">
+    Gap: <strong>69 days</strong> | Typical Cycle: 4 days | <strong>17.25x typical</strong>
+  </div>
+  <div class="detail-line">
+    First Order: 2025-02-18 | Last Order: 2026-04-22
+  </div>
+  <div class="metrics">
+    <strong>Order Details:</strong> SO507603 | $707 revenue<br>
+    <strong>Seller:</strong> Justin Goodwin (USA)<br>
+    <strong>Lifetime:</strong> 62 orders, $23,542,062 total revenue
+  </div>
+</div>
+<div class="reactivation">
+  <div class="reactivation-header">
+    <span class="icon">📊</span>48. GE Aerospace (Formerly GE Aviation)
+    <span class="badge badge-anomalous">Anomalous Pattern</span>
+  </div>
+  <div class="detail-line">📍 <strong>Bohemia</strong> (city-level tracking)</div>
+  <div class="detail-line">
+    Gap: <strong>67 days</strong> | Typical Cycle: 6 days | <strong>11.17x typical</strong>
+  </div>
+  <div class="detail-line">
+    First Order: 2024-04-05 | Last Order: 2026-04-24
+  </div>
+  <div class="metrics">
+    <strong>Order Details:</strong> SO507423, SO507625 | $2,220 revenue<br>
+    <strong>Seller:</strong> Jake Mcaloose (USA)<br>
+    <strong>Lifetime:</strong> 92 orders, $552,287 total revenue
+  </div>
+</div>
+<div class="reactivation">
+  <div class="reactivation-header">
+    <span class="icon">📊</span>49. General Dynamics
+    <span class="badge badge-anomalous">Anomalous Pattern</span>
+  </div>
+  <div class="detail-line">📍 <strong>Unknown City</strong> (city-level tracking)</div>
+  <div class="detail-line">
+    Gap: <strong>65 days</strong> | Typical Cycle: 14 days | <strong>4.64x typical</strong>
+  </div>
+  <div class="detail-line">
+    First Order: 2024-04-14 | Last Order: 2026-04-26
+  </div>
+  <div class="metrics">
+    <strong>Order Details:</strong> SO507568, SO507620 | $5,445 revenue<br>
+    <strong>Seller:</strong> Jake Mcaloose (USA)<br>
+    <strong>Lifetime:</strong> 36 orders, $640,603 total revenue
+  </div>
+</div>
+<div class="reactivation">
+  <div class="reactivation-header">
+    <span class="icon">📊</span>50. Parker Meggitt
+    <span class="badge badge-anomalous">Anomalous Pattern</span>
+  </div>
+  <div class="detail-line">📍 <strong>Simi Valley</strong> (city-level tracking)</div>
+  <div class="detail-line">
+    Gap: <strong>65 days</strong> | Typical Cycle: 16 days | <strong>4.06x typical</strong>
+  </div>
+  <div class="detail-line">
+    First Order: 2024-05-17 | Last Order: 2026-04-26
+  </div>
+  <div class="metrics">
+    <strong>Order Details:</strong> SO507299, SO507506, SO507516, SO507557, SO507571 | $45,508 revenue<br>
+    <strong>Seller:</strong> Josh Syre (USA)<br>
+    <strong>Lifetime:</strong> 25 orders, $181,532 total revenue
+  </div>
+</div>
+<div class="reactivation">
+  <div class="reactivation-header">
+    <span class="icon">✓</span>51. OnCore Manufacturing
+    <span class="badge badge-standard">Standard</span>
+  </div>
+  <div class="detail-line">📍 <strong>El PASO</strong> (city-level tracking)</div>
+  <div class="detail-line">
+    Gap: <strong>65 days</strong> | Typical Cycle: 38 days | <strong>1.71x typical</strong>
+  </div>
+  <div class="detail-line">
+    First Order: 2026-04-26 | Last Order: 2026-04-26
+  </div>
+  <div class="metrics">
+    <strong>Order Details:</strong> SO507329 | $3,780 revenue<br>
+    <strong>Seller:</strong> Carolina Hinestroza (MEX)<br>
+    <strong>Lifetime:</strong> 1 orders, $12,720 total revenue
+  </div>
+</div>
+<div class="reactivation">
+  <div class="reactivation-header">
+    <span class="icon">✓</span>52. KLA
+    <span class="badge badge-standard">Standard</span>
+  </div>
+  <div class="detail-line">📍 <strong>Singapore</strong> (city-level tracking)</div>
+  <div class="detail-line">
+    Gap: <strong>65 days</strong> | Typical Cycle: 160 days | <strong>0.41x typical</strong>
+  </div>
+  <div class="detail-line">
+    First Order: 2025-08-13 | Last Order: 2026-04-26
+  </div>
+  <div class="metrics">
+    <strong>Order Details:</strong> SO507610 | $110,000 revenue<br>
+    <strong>Seller:</strong> Laurel Kee (APAC-Laurel)<br>
+    <strong>Lifetime:</strong> 2 orders, $19,430 total revenue
+  </div>
+</div>
+<div class="reactivation">
+  <div class="reactivation-header">
+    <span class="icon">📊</span>53. Advantech Co., LTD
+    <span class="badge badge-anomalous">Anomalous Pattern</span>
+  </div>
+  <div class="detail-line">📍 <strong>Taoyuan</strong> (city-level tracking)</div>
+  <div class="detail-line">
+    Gap: <strong>62 days</strong> | Typical Cycle: 5 days | <strong>12.40x typical</strong>
+  </div>
+  <div class="detail-line">
+    First Order: 2026-04-23 | Last Order: 2026-04-29
+  </div>
+  <div class="metrics">
+    <strong>Order Details:</strong> SO507379, SO507519 | $342,000 revenue<br>
+    <strong>Seller:</strong> Silvia Munoz (APAC-Laurel)<br>
+    <strong>Lifetime:</strong> 4 orders, $753,840 total revenue
+  </div>
+</div>
+<div class="reactivation">
+  <div class="reactivation-header">
+    <span class="icon">📊</span>54. Venture Corporation Ltd
+    <span class="badge badge-anomalous">Anomalous Pattern</span>
+  </div>
+  <div class="detail-line">📍 <strong>Unknown City</strong> (city-level tracking)</div>
+  <div class="detail-line">
+    Gap: <strong>61 days</strong> | Typical Cycle: 6 days | <strong>10.17x typical</strong>
+  </div>
+  <div class="detail-line">
+    First Order: 2024-07-10 | Last Order: 2026-04-30
+  </div>
+  <div class="metrics">
+    <strong>Order Details:</strong> SO507615, SO507616 | $710,050 revenue<br>
+    <strong>Seller:</strong> Laurel Kee (APAC-Laurel)<br>
+    <strong>Lifetime:</strong> 72 orders, $749,226 total revenue
+  </div>
+</div>
+<div class="reactivation">
+  <div class="reactivation-header">
+    <span class="icon">📊</span>55. Parker Meggitt
+    <span class="badge badge-anomalous">Anomalous Pattern</span>
+  </div>
+  <div class="detail-line">📍 <strong>Irvine</strong> (city-level tracking)</div>
+  <div class="detail-line">
+    Gap: <strong>61 days</strong> | Typical Cycle: 20 days | <strong>3.05x typical</strong>
+  </div>
+  <div class="detail-line">
+    First Order: 2024-04-03 | Last Order: 2026-04-30
+  </div>
+  <div class="metrics">
+    <strong>Order Details:</strong> SO507302, SO507353, SO507579 | $19,609 revenue<br>
+    <strong>Seller:</strong> Josh Syre (USA)<br>
+    <strong>Lifetime:</strong> 23 orders, $40,084 total revenue
+  </div>
+</div>
+<div class="reactivation">
+  <div class="reactivation-header">
+    <span class="icon">✓</span>56. RTX
+    <span class="badge badge-standard">Standard</span>
+  </div>
+  <div class="detail-line">📍 <strong>Tucson</strong> (city-level tracking)</div>
+  <div class="detail-line">
+    Gap: <strong>61 days</strong> | Typical Cycle: 30 days | <strong>2.03x typical</strong>
+  </div>
+  <div class="detail-line">
+    First Order: 2024-12-19 | Last Order: 2026-04-30
+  </div>
+  <div class="metrics">
+    <strong>Order Details:</strong> SO507390, SO507391, SO507624 | $122,552 revenue<br>
+    <strong>Seller:</strong> Thomas Haynes (USA)<br>
+    <strong>Lifetime:</strong> 6 orders, $110,450 total revenue
+  </div>
+</div>
+<div class="reactivation">
+  <div class="reactivation-header">
+    <span class="icon">✓</span>57. Plexus Corp.
+    <span class="badge badge-standard">Standard</span>
+  </div>
+  <div class="detail-line">📍 <strong>Zapopan</strong> (city-level tracking)</div>
+  <div class="detail-line">
+    Gap: <strong>60 days</strong> | Typical Cycle: 38 days | <strong>1.58x typical</strong>
+  </div>
+  <div class="detail-line">
+    First Order: 2025-03-14 | Last Order: 2026-05-01
+  </div>
+  <div class="metrics">
+    <strong>Order Details:</strong> SO507369 | $1,800 revenue<br>
+    <strong>Seller:</strong> Salvador Horner (MEX)<br>
+    <strong>Lifetime:</strong> 7 orders, $110,340 total revenue
+  </div>
+</div>
+<div class="reactivation">
+  <div class="reactivation-header">
+    <span class="icon">📊</span>58. Flock Safety
+    <span class="badge badge-anomalous">Anomalous Pattern</span>
+  </div>
+  <div class="detail-line">📍 <strong>Mableton</strong> (city-level tracking)</div>
+  <div class="detail-line">
+    Gap: <strong>57 days</strong> | Typical Cycle: 6 days | <strong>9.50x typical</strong>
+  </div>
+  <div class="detail-line">
+    First Order: 2025-03-04 | Last Order: 2026-05-04
+  </div>
+  <div class="metrics">
+    <strong>Order Details:</strong> SO507339 | $0 revenue<br>
+    <strong>Seller:</strong> Justin Goodwin (USA)<br>
+    <strong>Lifetime:</strong> 49 orders, $12,947,974 total revenue
+  </div>
+</div>
+<div class="reactivation">
+  <div class="reactivation-header">
+    <span class="icon">✓</span>59. CEI
+    <span class="badge badge-standard">Standard</span>
+  </div>
+  <div class="detail-line">📍 <strong>Unknown City</strong> (city-level tracking)</div>
+  <div class="detail-line">
+    Gap: <strong>57 days</strong> | Typical Cycle: 32 days | <strong>1.81x typical</strong>
+  </div>
+  <div class="detail-line">
+    First Order: 2024-04-17 | Last Order: 2026-05-04
+  </div>
+  <div class="metrics">
+    <strong>Order Details:</strong> SO507471, SO507540 | $1,300 revenue<br>
+    <strong>Seller:</strong> Jasper Kee (APAC-Laurel)<br>
+    <strong>Lifetime:</strong> 17 orders, $97,037 total revenue
+  </div>
+</div>
+<div class="reactivation">
+  <div class="reactivation-header">
+    <span class="icon">✓</span>60. Control Design, Inc
+    <span class="badge badge-standard">Standard</span>
+  </div>
+  <div class="detail-line">📍 <strong>Pittsburgh</strong> (city-level tracking)</div>
+  <div class="detail-line">
+    Gap: <strong>56 days</strong> | Typical Cycle: 22 days | <strong>2.60x typical</strong>
+  </div>
+  <div class="detail-line">
+    First Order: 2026-05-05 | Last Order: 2026-05-05
+  </div>
+  <div class="metrics">
+    <strong>Order Details:</strong> SO507505 | $145 revenue<br>
+    <strong>Seller:</strong> Justin Goodwin (USA)<br>
+    <strong>Lifetime:</strong> 2 orders, $2,121 total revenue
+  </div>
+</div>
+<div class="reactivation">
+  <div class="reactivation-header">
+    <span class="icon">✓</span>61. TAXAN
+    <span class="badge badge-standard">Standard</span>
+  </div>
+  <div class="detail-line">📍 <strong>Unknown City</strong> (city-level tracking)</div>
+  <div class="detail-line">
+    Gap: <strong>55 days</strong> | Typical Cycle: 44 days | <strong>1.25x typical</strong>
+  </div>
+  <div class="detail-line">
+    First Order: 2025-06-26 | Last Order: 2026-05-06
+  </div>
+  <div class="metrics">
+    <strong>Order Details:</strong> SO507529 | $2,825 revenue<br>
+    <strong>Seller:</strong> Alfredo Martinez (MEX)<br>
+    <strong>Lifetime:</strong> 4 orders, $2,254 total revenue
+  </div>
+</div>
+<div class="reactivation">
+  <div class="reactivation-header">
+    <span class="icon">✓</span>62. Plexus Corp.
+    <span class="badge badge-standard">Standard</span>
+  </div>
+  <div class="detail-line">📍 <strong>ZAPOPAN </strong> (city-level tracking)</div>
+  <div class="detail-line">
+    Gap: <strong>54 days</strong> | Typical Cycle: 40 days | <strong>1.35x typical</strong>
+  </div>
+  <div class="detail-line">
+    First Order: 2024-08-22 | Last Order: 2026-05-07
+  </div>
+  <div class="metrics">
+    <strong>Order Details:</strong> SO507604 | $27,000 revenue<br>
+    <strong>Seller:</strong> Salvador Horner (MEX)<br>
+    <strong>Lifetime:</strong> 13 orders, $285,595 total revenue
+  </div>
+</div>
+<div class="reactivation">
+  <div class="reactivation-header">
+    <span class="icon">📊</span>63. GE Aerospace (Formerly GE Aviation)
+    <span class="badge badge-anomalous">Anomalous Pattern</span>
+  </div>
+  <div class="detail-line">📍 <strong>Loves Park</strong> (city-level tracking)</div>
+  <div class="detail-line">
+    Gap: <strong>54 days</strong> | Typical Cycle: 8 days | <strong>6.75x typical</strong>
+  </div>
+  <div class="detail-line">
+    First Order: 2024-04-08 | Last Order: 2026-05-07
+  </div>
+  <div class="metrics">
+    <strong>Order Details:</strong> SO507458, SO507465 | $2,050 revenue<br>
+    <strong>Seller:</strong> Jake Mcaloose (USA)<br>
+    <strong>Lifetime:</strong> 52 orders, $898,042 total revenue
+  </div>
+</div>
+<div class="reactivation">
+  <div class="reactivation-header">
+    <span class="icon">📊</span>64. Jabil Inc
+    <span class="badge badge-anomalous">Anomalous Pattern</span>
+  </div>
+  <div class="detail-line">📍 <strong>Unknown City</strong> (city-level tracking)</div>
+  <div class="detail-line">
+    Gap: <strong>54 days</strong> | Typical Cycle: 17 days | <strong>3.27x typical</strong>
+  </div>
+  <div class="detail-line">
+    First Order: 2026-03-17 | Last Order: 2026-05-07
+  </div>
+  <div class="metrics">
+    <strong>Order Details:</strong> SO507288 | $21,850 revenue<br>
+    <strong>Seller:</strong> Alex Partida (MEX)<br>
+    <strong>Lifetime:</strong> 4 orders, $302,207 total revenue
+  </div>
+</div>
+<div class="reactivation">
+  <div class="reactivation-header">
+    <span class="icon">📊</span>65. GE Healthcare
+    <span class="badge badge-anomalous">Anomalous Pattern</span>
+  </div>
+  <div class="detail-line">📍 <strong>Oak Creek</strong> (city-level tracking)</div>
+  <div class="detail-line">
+    Gap: <strong>54 days</strong> | Typical Cycle: 15 days | <strong>3.60x typical</strong>
+  </div>
+  <div class="detail-line">
+    First Order: 2026-04-14 | Last Order: 2026-05-07
+  </div>
+  <div class="metrics">
+    <strong>Order Details:</strong> SO507532 | $3,400 revenue<br>
+    <strong>Seller:</strong> Aaron Mendoza (USA)<br>
+    <strong>Lifetime:</strong> 3 orders, $1,663 total revenue
+  </div>
+</div>
+<div class="reactivation">
+  <div class="reactivation-header">
+    <span class="icon">📊</span>66. Plexus Corp.
+    <span class="badge badge-anomalous">Anomalous Pattern</span>
+  </div>
+  <div class="detail-line">📍 <strong>Penang</strong> (city-level tracking)</div>
+  <div class="detail-line">
+    Gap: <strong>54 days</strong> | Typical Cycle: 7 days | <strong>8.31x typical</strong>
+  </div>
+  <div class="detail-line">
+    First Order: 2024-06-21 | Last Order: 2026-05-07
+  </div>
+  <div class="metrics">
+    <strong>Order Details:</strong> SO507330, SO507406, SO507462, SO507638 | $183,106 revenue<br>
+    <strong>Seller:</strong> Winnie Lee (APAC-Kris)<br>
+    <strong>Lifetime:</strong> 37 orders, $1,478,271 total revenue
+  </div>
+</div>
+<div class="reactivation">
+  <div class="reactivation-header">
+    <span class="icon">📊</span>67. Hana Microelectronics Public Co., LTD
+    <span class="badge badge-anomalous">Anomalous Pattern</span>
+  </div>
+  <div class="detail-line">📍 <strong>Unknown City</strong> (city-level tracking)</div>
+  <div class="detail-line">
+    Gap: <strong>51 days</strong> | Typical Cycle: 17 days | <strong>3.00x typical</strong>
+  </div>
+  <div class="detail-line">
+    First Order: 2025-06-19 | Last Order: 2026-05-10
+  </div>
+  <div class="metrics">
+    <strong>Order Details:</strong> SO507349 | $18,000 revenue<br>
+    <strong>Seller:</strong> Rotsarin Phromsatcha (APAC-Kris)<br>
+    <strong>Lifetime:</strong> 6 orders, $8,955 total revenue
+  </div>
+</div>
+<div class="reactivation">
+  <div class="reactivation-header">
+    <span class="icon">📊</span>68. East West Manufacturing
+    <span class="badge badge-anomalous">Anomalous Pattern</span>
+  </div>
+  <div class="detail-line">📍 <strong>Whitewater</strong> (city-level tracking)</div>
+  <div class="detail-line">
+    Gap: <strong>50 days</strong> | Typical Cycle: 8 days | <strong>6.25x typical</strong>
+  </div>
+  <div class="detail-line">
+    First Order: 2025-03-26 | Last Order: 2026-05-11
+  </div>
+  <div class="metrics">
+    <strong>Order Details:</strong> SO507478, SO507553 | $4,752 revenue<br>
+    <strong>Seller:</strong> Alex Partida (MEX)<br>
+    <strong>Lifetime:</strong> 38 orders, $270,756 total revenue
+  </div>
+</div>
+<div class="reactivation">
+  <div class="reactivation-header">
+    <span class="icon">📊</span>69. East West Manufacturing
+    <span class="badge badge-anomalous">Anomalous Pattern</span>
+  </div>
+  <div class="detail-line">📍 <strong>San Jose</strong> (city-level tracking)</div>
+  <div class="detail-line">
+    Gap: <strong>50 days</strong> | Typical Cycle: 6 days | <strong>8.33x typical</strong>
+  </div>
+  <div class="detail-line">
+    First Order: 2025-04-13 | Last Order: 2026-05-11
+  </div>
+  <div class="metrics">
+    <strong>Order Details:</strong> SO507555 | $1,639 revenue<br>
+    <strong>Seller:</strong> Alex Partida (MEX)<br>
+    <strong>Lifetime:</strong> 49 orders, $249,145 total revenue
+  </div>
+</div>
+<div class="reactivation">
+  <div class="reactivation-header">
+    <span class="icon">✓</span>70. Plexus Corp.
+    <span class="badge badge-standard">Standard</span>
+  </div>
+  <div class="detail-line">📍 <strong>Jiaxing, Zhejiang</strong> (city-level tracking)</div>
+  <div class="detail-line">
+    Gap: <strong>50 days</strong>
+  </div>
+  <div class="detail-line">
+    First Order: 2024-04-26 | Last Order: 2026-05-11
+  </div>
+  <div class="metrics">
+    <strong>Order Details:</strong> SO507333, SO507392, SO507393, SO507394, SO507395, SO507396, SO507399, SO507400, SO507401, SO507402, SO507403, SO507404, SO507405, SO507407, SO507408, SO507409, SO507410, SO507411, SO507413, SO507414, SO507415, SO507416, SO507422, SO507425, SO507431, SO507476, SO507477, SO507514, SO507533, SO507608, SO507613, SO507630, SO507631, SO507633 | $376,506 revenue<br>
+    <strong>Seller:</strong> Wing Zhang (APAC-Kris)<br>
+    <strong>Lifetime:</strong> 58 orders, $1,307,114 total revenue
+  </div>
+</div>
+<div class="reactivation">
+  <div class="reactivation-header">
+    <span class="icon">✓</span>71. East West Manufacturing
+    <span class="badge badge-standard">Standard</span>
+  </div>
+  <div class="detail-line">📍 <strong>Unknown City</strong> (city-level tracking)</div>
+  <div class="detail-line">
+    Gap: <strong>49 days</strong> | Typical Cycle: 27 days | <strong>1.81x typical</strong>
+  </div>
+  <div class="detail-line">
+    First Order: 2025-06-08 | Last Order: 2026-05-12
+  </div>
+  <div class="metrics">
+    <strong>Order Details:</strong> SO507371, SO507372 | $9,480 revenue<br>
+    <strong>Seller:</strong> Alex Partida (MEX)<br>
+    <strong>Lifetime:</strong> 10 orders, $95,989 total revenue
+  </div>
+</div>
+<div class="reactivation">
+  <div class="reactivation-header">
+    <span class="icon">📊</span>72. Arrow Global Supply Chain Services
+    <span class="badge badge-anomalous">Anomalous Pattern</span>
+  </div>
+  <div class="detail-line">📍 <strong>Centennial</strong> (city-level tracking)</div>
+  <div class="detail-line">
+    Gap: <strong>48 days</strong> | Typical Cycle: 8 days | <strong>6.00x typical</strong>
+  </div>
+  <div class="detail-line">
+    First Order: 2024-08-21 | Last Order: 2026-05-13
+  </div>
+  <div class="metrics">
+    <strong>Order Details:</strong> SO507432, SO507453, SO507494, SO507495, SO507496 | $98,481 revenue<br>
+    <strong>Seller:</strong> Joel Flores (MEX)<br>
+    <strong>Lifetime:</strong> 49 orders, $3,120,748 total revenue
+  </div>
+</div>
+<div class="reactivation">
+  <div class="reactivation-header">
+    <span class="icon">📊</span>73. Sanmina Corporation
+    <span class="badge badge-anomalous">Anomalous Pattern</span>
+  </div>
+  <div class="detail-line">📍 <strong>India</strong> (city-level tracking)</div>
+  <div class="detail-line">
+    Gap: <strong>47 days</strong> | Typical Cycle: 5 days | <strong>9.40x typical</strong>
+  </div>
+  <div class="detail-line">
+    First Order: 2024-05-31 | Last Order: 2026-05-14
+  </div>
+  <div class="metrics">
+    <strong>Order Details:</strong> SO507332, SO507334, SO507447 | $16,483 revenue<br>
+    <strong>Seller:</strong> Lavanya Manohar (Other)<br>
+    <strong>Lifetime:</strong> 55 orders, $576,990 total revenue
+  </div>
+</div>
+<div class="reactivation">
+  <div class="reactivation-header">
+    <span class="icon">📊</span>74. KLA
+    <span class="badge badge-anomalous">Anomalous Pattern</span>
+  </div>
+  <div class="detail-line">📍 <strong>Unknown City</strong> (city-level tracking)</div>
+  <div class="detail-line">
+    Gap: <strong>46 days</strong> | Typical Cycle: 1 days | <strong>46.00x typical</strong>
+  </div>
+  <div class="detail-line">
+    First Order: 2025-06-20 | Last Order: 2026-05-15
+  </div>
+  <div class="metrics">
+    <strong>Order Details:</strong> SO507319, SO507320, SO507437, SO507535, SO507627 | $119,665 revenue<br>
+    <strong>Seller:</strong> Laurel Kee (APAC-Laurel)<br>
+    <strong>Lifetime:</strong> 138 orders, $47,348,203 total revenue
+  </div>
+</div>
+<div class="reactivation">
+  <div class="reactivation-header">
+    <span class="icon">📊</span>75. OnCore Manufacturing
+    <span class="badge badge-anomalous">Anomalous Pattern</span>
+  </div>
+  <div class="detail-line">📍 <strong>EL PASO</strong> (city-level tracking)</div>
+  <div class="detail-line">
+    Gap: <strong>46 days</strong> | Typical Cycle: 1 days | <strong>46.00x typical</strong>
+  </div>
+  <div class="detail-line">
+    First Order: 2025-12-11 | Last Order: 2026-05-15
+  </div>
+  <div class="metrics">
+    <strong>Order Details:</strong> SO507355, SO507385, SO507386, SO507388 | $53,830 revenue<br>
+    <strong>Seller:</strong> Carolina Hinestroza (MEX)<br>
+    <strong>Lifetime:</strong> 6 orders, $158,228 total revenue
+  </div>
+</div>
+<div class="reactivation">
+  <div class="reactivation-header">
+    <span class="icon">📊</span>76. Plexus Corp.
+    <span class="badge badge-anomalous">Anomalous Pattern</span>
+  </div>
+  <div class="detail-line">📍 <strong>Neenah</strong> (city-level tracking)</div>
+  <div class="detail-line">
+    Gap: <strong>44 days</strong> | Typical Cycle: 14 days | <strong>3.14x typical</strong>
+  </div>
+  <div class="detail-line">
+    First Order: 2024-08-07 | Last Order: 2026-05-17
+  </div>
+  <div class="metrics">
+    <strong>Order Details:</strong> SO507468, SO507488 | $20,000 revenue<br>
+    <strong>Seller:</strong> Salvador Horner (MEX)<br>
+    <strong>Lifetime:</strong> 21 orders, $112,211 total revenue
+  </div>
+</div>
+<div class="reactivation">
+  <div class="reactivation-header">
+    <span class="icon">📊</span>77. S.A.S. Electronic Co., Ltd
+    <span class="badge badge-anomalous">Anomalous Pattern</span>
+  </div>
+  <div class="detail-line">📍 <strong>Taoyuan City </strong> (city-level tracking)</div>
+  <div class="detail-line">
+    Gap: <strong>42 days</strong> | Typical Cycle: 12 days | <strong>3.50x typical</strong>
+  </div>
+  <div class="detail-line">
+    First Order: 2025-08-04 | Last Order: 2026-05-19
+  </div>
+  <div class="metrics">
+    <strong>Order Details:</strong> SO507304, SO507307, SO507397 | $306,677 revenue<br>
+    <strong>Seller:</strong> Renald Ng (APAC-Laurel)<br>
+    <strong>Lifetime:</strong> 9 orders, $1,884,788 total revenue
+  </div>
+</div>
+<div class="reactivation">
+  <div class="reactivation-header">
+    <span class="icon">✓</span>78. Matrix Comesec Pvt Ltd
+    <span class="badge badge-standard">Standard</span>
+  </div>
+  <div class="detail-line">📍 <strong>Gujarat</strong> (city-level tracking)</div>
+  <div class="detail-line">
+    Gap: <strong>41 days</strong> | Typical Cycle: 26 days | <strong>1.58x typical</strong>
+  </div>
+  <div class="detail-line">
+    First Order: 2025-02-04 | Last Order: 2026-05-20
+  </div>
+  <div class="metrics">
+    <strong>Order Details:</strong> SO507464 | $1 revenue<br>
+    <strong>Seller:</strong> Lavanya Manohar (Other)<br>
+    <strong>Lifetime:</strong> 6 orders, $99,399 total revenue
+  </div>
+</div>
+<div class="reactivation">
+  <div class="reactivation-header">
+    <span class="icon">📊</span>79. Abaco Systems
+    <span class="badge badge-anomalous">Anomalous Pattern</span>
+  </div>
+  <div class="detail-line">📍 <strong>Hidalgo</strong> (city-level tracking)</div>
+  <div class="detail-line">
+    Gap: <strong>41 days</strong> | Typical Cycle: 5 days | <strong>9.11x typical</strong>
+  </div>
+  <div class="detail-line">
+    First Order: 2024-05-24 | Last Order: 2026-05-20
+  </div>
+  <div class="metrics">
+    <strong>Order Details:</strong> SO507296, SO507317, SO507487, SO507490, SO507520, SO507575, SO507589 | $384,983 revenue<br>
+    <strong>Seller:</strong> Joel Flores (MEX)<br>
+    <strong>Lifetime:</strong> 110 orders, $2,036,655 total revenue
+  </div>
+</div>
+<div class="reactivation">
+  <div class="reactivation-header">
+    <span class="icon">✓</span>80. Viavi Solutions Inc
+    <span class="badge badge-standard">Standard</span>
+  </div>
+  <div class="detail-line">📍 <strong>Unknown City</strong> (city-level tracking)</div>
+  <div class="detail-line">
+    Gap: <strong>41 days</strong> | Typical Cycle: 25 days | <strong>1.67x typical</strong>
+  </div>
+  <div class="detail-line">
+    First Order: 2026-05-11 | Last Order: 2026-05-20
+  </div>
+  <div class="metrics">
+    <strong>Order Details:</strong> SO507614 | $13,060 revenue<br>
+    <strong>Seller:</strong> Renald Ng (APAC-Laurel)<br>
+    <strong>Lifetime:</strong> 2 orders, $0 total revenue
+  </div>
+</div>
+<div class="reactivation">
+  <div class="reactivation-header">
+    <span class="icon">✓</span>81. Applied Materials
+    <span class="badge badge-standard">Standard</span>
+  </div>
+  <div class="detail-line">📍 <strong>Santa Clara</strong> (city-level tracking)</div>
+  <div class="detail-line">
+    Gap: <strong>40 days</strong> | Typical Cycle: 17 days | <strong>2.35x typical</strong>
+  </div>
+  <div class="detail-line">
+    First Order: 2025-01-29 | Last Order: 2026-05-21
+  </div>
+  <div class="metrics">
+    <strong>Order Details:</strong> SO507418, SO507442, SO507461, SO507481 | $19,033 revenue<br>
+    <strong>Seller:</strong> Josh Syre (USA)<br>
+    <strong>Lifetime:</strong> 13 orders, $30,988 total revenue
+  </div>
+</div>
+<div class="reactivation">
+  <div class="reactivation-header">
+    <span class="icon">📊</span>82. East West Manufacturing
+    <span class="badge badge-anomalous">Anomalous Pattern</span>
+  </div>
+  <div class="detail-line">📍 <strong>El Paso</strong> (city-level tracking)</div>
+  <div class="detail-line">
+    Gap: <strong>40 days</strong> | Typical Cycle: 1 days | <strong>40.00x typical</strong>
+  </div>
+  <div class="detail-line">
+    First Order: 2024-04-08 | Last Order: 2026-05-21
+  </div>
+  <div class="metrics">
+    <strong>Order Details:</strong> SO507373, SO507380, SO507436, SO507491, SO507534, SO507577, SO507578, SO507635, SO507636 | $124,421 revenue<br>
+    <strong>Seller:</strong> Alex Partida (MEX)<br>
+    <strong>Lifetime:</strong> 371 orders, $4,497,151 total revenue
+  </div>
+</div>
+<div class="reactivation">
+  <div class="reactivation-header">
+    <span class="icon">📊</span>83. Vinyas Innovative Technologies Pvt Ltd
+    <span class="badge badge-anomalous">Anomalous Pattern</span>
+  </div>
+  <div class="detail-line">📍 <strong>Mysore</strong> (city-level tracking)</div>
+  <div class="detail-line">
+    Gap: <strong>40 days</strong> | Typical Cycle: 3 days | <strong>13.33x typical</strong>
+  </div>
+  <div class="detail-line">
+    First Order: 2024-11-20 | Last Order: 2026-05-21
+  </div>
+  <div class="metrics">
+    <strong>Order Details:</strong> SO507306 | $158,000 revenue<br>
+    <strong>Seller:</strong> Lavanya Manohar (Other)<br>
+    <strong>Lifetime:</strong> 43 orders, $363,061 total revenue
+  </div>
+</div>
+<div class="reactivation">
+  <div class="reactivation-header">
+    <span class="icon">📊</span>84. GE Aerospace (Formerly GE Aviation)
+    <span class="badge badge-anomalous">Anomalous Pattern</span>
+  </div>
+  <div class="detail-line">📍 <strong>Grand Rapids</strong> (city-level tracking)</div>
+  <div class="detail-line">
+    Gap: <strong>40 days</strong> | Typical Cycle: 3 days | <strong>13.33x typical</strong>
+  </div>
+  <div class="detail-line">
+    First Order: 2024-04-26 | Last Order: 2026-05-21
+  </div>
+  <div class="metrics">
+    <strong>Order Details:</strong> SO507292, SO507293, SO507361, SO507466, SO507467, SO507522 | $138,491 revenue<br>
+    <strong>Seller:</strong> Jake Mcaloose (USA)<br>
+    <strong>Lifetime:</strong> 134 orders, $5,028,172 total revenue
+  </div>
+</div>
+<div class="reactivation">
+  <div class="reactivation-header">
+    <span class="icon">📊</span>85. Sanmina Corporation
+    <span class="badge badge-anomalous">Anomalous Pattern</span>
+  </div>
+  <div class="detail-line">📍 <strong>TLAJOMULCO</strong> (city-level tracking)</div>
+  <div class="detail-line">
+    Gap: <strong>40 days</strong> | Typical Cycle: 2 days | <strong>20.00x typical</strong>
+  </div>
+  <div class="detail-line">
+    First Order: 2025-01-14 | Last Order: 2026-05-21
+  </div>
+  <div class="metrics">
+    <strong>Order Details:</strong> SO507457, SO507459, SO507460, SO507474 | $98,365 revenue<br>
+    <strong>Seller:</strong> Joel Flores (MEX)<br>
+    <strong>Lifetime:</strong> 15 orders, $357,266 total revenue
+  </div>
+</div>
+<div class="reactivation">
+  <div class="reactivation-header">
+    <span class="icon">📊</span>86. Sanmina Corporation
+    <span class="badge badge-anomalous">Anomalous Pattern</span>
+  </div>
+  <div class="detail-line">📍 <strong>Tlajomulco de zuniga</strong> (city-level tracking)</div>
+  <div class="detail-line">
+    Gap: <strong>39 days</strong> | Typical Cycle: 11 days | <strong>3.55x typical</strong>
+  </div>
+  <div class="detail-line">
+    First Order: 2024-07-18 | Last Order: 2026-05-22
+  </div>
+  <div class="metrics">
+    <strong>Order Details:</strong> SO507287 | $720 revenue<br>
+    <strong>Seller:</strong> Ricardo Morales (MEX)<br>
+    <strong>Lifetime:</strong> 16 orders, $484,333 total revenue
+  </div>
+</div>
+<div class="reactivation">
+  <div class="reactivation-header">
+    <span class="icon">📊</span>87. S.A.S. Electronic Co., Ltd
+    <span class="badge badge-anomalous">Anomalous Pattern</span>
+  </div>
+  <div class="detail-line">📍 <strong>Unknown City</strong> (city-level tracking)</div>
+  <div class="detail-line">
+    Gap: <strong>39 days</strong> | Typical Cycle: 4 days | <strong>9.75x typical</strong>
+  </div>
+  <div class="detail-line">
+    First Order: 2024-06-06 | Last Order: 2026-05-22
+  </div>
+  <div class="metrics">
+    <strong>Order Details:</strong> SO507374, SO507375, SO507580, SO507581, SO507596 | $1,101,620 revenue<br>
+    <strong>Seller:</strong> Spring Tu (APAC-Laurel)<br>
+    <strong>Lifetime:</strong> 22 orders, $1,632,446 total revenue
+  </div>
+</div>
+<div class="reactivation">
+  <div class="reactivation-header">
+    <span class="icon">✓</span>88. DCX Systems Limited
+    <span class="badge badge-standard">Standard</span>
+  </div>
+  <div class="detail-line">📍 <strong>Bangalore</strong> (city-level tracking)</div>
+  <div class="detail-line">
+    Gap: <strong>39 days</strong> | Typical Cycle: 33 days | <strong>1.18x typical</strong>
+  </div>
+  <div class="detail-line">
+    First Order: 2024-11-12 | Last Order: 2026-05-22
+  </div>
+  <div class="metrics">
+    <strong>Order Details:</strong> SO507562 | $5 revenue<br>
+    <strong>Seller:</strong> Meenakshi (Other)<br>
+    <strong>Lifetime:</strong> 13 orders, $86,190 total revenue
+  </div>
+</div>
+<div class="reactivation">
+  <div class="reactivation-header">
+    <span class="icon">✓</span>89. GE Vernova (Energy Businesses)
+    <span class="badge badge-standard">Standard</span>
+  </div>
+  <div class="detail-line">📍 <strong>Chennai</strong> (city-level tracking)</div>
+  <div class="detail-line">
+    Gap: <strong>36 days</strong> | Typical Cycle: 14 days | <strong>2.57x typical</strong>
+  </div>
+  <div class="detail-line">
+    First Order: 2025-01-23 | Last Order: 2026-05-25
+  </div>
+  <div class="metrics">
+    <strong>Order Details:</strong> SO507500, SO507558, SO507559 | $3,850 revenue<br>
+    <strong>Seller:</strong> Lavanya Manohar (Other)<br>
+    <strong>Lifetime:</strong> 7 orders, $368,879 total revenue
+  </div>
+</div>
+<div class="reactivation">
+  <div class="reactivation-header">
+    <span class="icon">📊</span>90. ABB
+    <span class="badge badge-anomalous">Anomalous Pattern</span>
+  </div>
+  <div class="detail-line">📍 <strong>Unknown City</strong> (city-level tracking)</div>
+  <div class="detail-line">
+    Gap: <strong>35 days</strong> | Typical Cycle: 10 days | <strong>3.50x typical</strong>
+  </div>
+  <div class="detail-line">
+    First Order: 2024-04-10 | Last Order: 2026-05-26
+  </div>
+  <div class="metrics">
+    <strong>Order Details:</strong> SO507289, SO507551, SO507612 | $174,960 revenue<br>
+    <strong>Seller:</strong> Laurel Kee (APAC-Laurel)<br>
+    <strong>Lifetime:</strong> 21 orders, $97,060 total revenue
+  </div>
+</div>
+<div class="reactivation">
+  <div class="reactivation-header">
+    <span class="icon">✓</span>91. Emerson
+    <span class="badge badge-standard">Standard</span>
+  </div>
+  <div class="detail-line">📍 <strong>Cheung Sha Wan</strong> (city-level tracking)</div>
+  <div class="detail-line">
+    Gap: <strong>35 days</strong> | Typical Cycle: 28 days | <strong>1.25x typical</strong>
+  </div>
+  <div class="detail-line">
+    First Order: 2025-10-22 | Last Order: 2026-05-26
+  </div>
+  <div class="metrics">
+    <strong>Order Details:</strong> SO507547, SO507574 | $102,207 revenue<br>
+    <strong>Seller:</strong> Justin Goodwin (USA)<br>
+    <strong>Lifetime:</strong> 4 orders, $234,740 total revenue
+  </div>
+</div>
+<div class="reactivation">
+  <div class="reactivation-header">
+    <span class="icon">📊</span>92. GE Aerospace (Formerly GE Aviation)
+    <span class="badge badge-anomalous">Anomalous Pattern</span>
+  </div>
+  <div class="detail-line">📍 <strong>Clearwater</strong> (city-level tracking)</div>
+  <div class="detail-line">
+    Gap: <strong>34 days</strong> | Typical Cycle: 2 days | <strong>17.00x typical</strong>
+  </div>
+  <div class="detail-line">
+    First Order: 2024-04-09 | Last Order: 2026-05-27
+  </div>
+  <div class="metrics">
+    <strong>Order Details:</strong> SO507291, SO507298, SO507417, SO507463, SO507515 | $13,967 revenue<br>
+    <strong>Seller:</strong> Jake Mcaloose (USA)<br>
+    <strong>Lifetime:</strong> 200 orders, $2,944,408 total revenue
+  </div>
+</div>
+<div class="reactivation">
+  <div class="reactivation-header">
+    <span class="icon">📊</span>93. GE Aerospace (Formerly GE Aviation)
+    <span class="badge badge-anomalous">Anomalous Pattern</span>
+  </div>
+  <div class="detail-line">📍 <strong>Dayton</strong> (city-level tracking)</div>
+  <div class="detail-line">
+    Gap: <strong>34 days</strong> | Typical Cycle: 5 days | <strong>6.80x typical</strong>
+  </div>
+  <div class="detail-line">
+    First Order: 2024-05-09 | Last Order: 2026-05-27
+  </div>
+  <div class="metrics">
+    <strong>Order Details:</strong> SO507297, SO507325, SO507483, SO507484, SO507567, SO507621, SO507622 | $54,355 revenue<br>
+    <strong>Seller:</strong> Jake Mcaloose (USA)<br>
+    <strong>Lifetime:</strong> 49 orders, $267,637 total revenue
+  </div>
+</div>
+<div class="reactivation">
+  <div class="reactivation-header">
+    <span class="icon">✓</span>94. Avalon
+    <span class="badge badge-standard">Standard</span>
+  </div>
+  <div class="detail-line">📍 <strong>Chennai</strong> (city-level tracking)</div>
+  <div class="detail-line">
+    Gap: <strong>34 days</strong> | Typical Cycle: 18 days | <strong>1.89x typical</strong>
+  </div>
+  <div class="detail-line">
+    First Order: 2024-09-13 | Last Order: 2026-05-27
+  </div>
+  <div class="metrics">
+    <strong>Order Details:</strong> SO507290 | $1,613 revenue<br>
+    <strong>Seller:</strong> Manikandan (Other)<br>
+    <strong>Lifetime:</strong> 11 orders, $119,299 total revenue
+  </div>
+</div>
+<div class="reactivation">
+  <div class="reactivation-header">
+    <span class="icon">📊</span>95. Applied Materials
+    <span class="badge badge-anomalous">Anomalous Pattern</span>
+  </div>
+  <div class="detail-line">📍 <strong>Tracy</strong> (city-level tracking)</div>
+  <div class="detail-line">
+    Gap: <strong>34 days</strong> | Typical Cycle: 6 days | <strong>5.67x typical</strong>
+  </div>
+  <div class="detail-line">
+    First Order: 2024-09-27 | Last Order: 2026-05-27
+  </div>
+  <div class="metrics">
+    <strong>Order Details:</strong> SO507342, SO507366, SO507531, SO507570, SO507586 | $14,533 revenue<br>
+    <strong>Seller:</strong> Josh Syre (USA)<br>
+    <strong>Lifetime:</strong> 27 orders, $71,295 total revenue
+  </div>
+</div>
+<div class="reactivation">
+  <div class="reactivation-header">
+    <span class="icon">📊</span>96. Sanmina Corporation
+    <span class="badge badge-anomalous">Anomalous Pattern</span>
+  </div>
+  <div class="detail-line">📍 <strong>Reynosa</strong> (city-level tracking)</div>
+  <div class="detail-line">
+    Gap: <strong>34 days</strong> | Typical Cycle: 2 days | <strong>17.00x typical</strong>
+  </div>
+  <div class="detail-line">
+    First Order: 2024-04-03 | Last Order: 2026-05-27
+  </div>
+  <div class="metrics">
+    <strong>Order Details:</strong> SO507344, SO507508, SO507528, SO507572, SO507605, SO507607 | $248,265 revenue<br>
+    <strong>Seller:</strong> Ricardo Morales (MEX)<br>
+    <strong>Lifetime:</strong> 195 orders, $3,379,795 total revenue
+  </div>
+</div>
+<div class="reactivation">
+  <div class="reactivation-header">
+    <span class="icon">✓</span>97. GE Aerospace (Formerly GE Aviation)
+    <span class="badge badge-standard">Standard</span>
+  </div>
+  <div class="detail-line">📍 <strong>Pompano Beach</strong> (city-level tracking)</div>
+  <div class="detail-line">
+    Gap: <strong>33 days</strong> | Typical Cycle: 13 days | <strong>2.54x typical</strong>
+  </div>
+  <div class="detail-line">
+    First Order: 2024-04-08 | Last Order: 2026-05-28
+  </div>
+  <div class="metrics">
+    <strong>Order Details:</strong> SO507623 | $2,700 revenue<br>
+    <strong>Seller:</strong> Jake Mcaloose (USA)<br>
+    <strong>Lifetime:</strong> 45 orders, $335,179 total revenue
+  </div>
+</div>
+<div class="reactivation">
+  <div class="reactivation-header">
+    <span class="icon">📊</span>98. BENCHMARK ELECTRONICS
+    <span class="badge badge-anomalous">Anomalous Pattern</span>
+  </div>
+  <div class="detail-line">📍 <strong>Unknown City</strong> (city-level tracking)</div>
+  <div class="detail-line">
+    Gap: <strong>32 days</strong> | Typical Cycle: 5 days | <strong>6.40x typical</strong>
+  </div>
+  <div class="detail-line">
+    First Order: 2024-04-16 | Last Order: 2026-05-29
+  </div>
+  <div class="metrics">
+    <strong>Order Details:</strong> SO507301, SO507543, SO507606, SO507629 | $114,151 revenue<br>
+    <strong>Seller:</strong> Renald Ng (USA)<br>
+    <strong>Lifetime:</strong> 30 orders, $921,179 total revenue
+  </div>
+</div>
+<div class="reactivation">
+  <div class="reactivation-header">
+    <span class="icon">📊</span>99. Marvell
+    <span class="badge badge-anomalous">Anomalous Pattern</span>
+  </div>
+  <div class="detail-line">📍 <strong>Unknown City</strong> (city-level tracking)</div>
+  <div class="detail-line">
+    Gap: <strong>32 days</strong> | Typical Cycle: 1 days | <strong>32.00x typical</strong>
+  </div>
+  <div class="detail-line">
+    First Order: 2024-04-18 | Last Order: 2026-05-29
+  </div>
+  <div class="metrics">
+    <strong>Order Details:</strong> SO507356, SO507359, SO507376, SO507398, SO507507, SO507513, SO507617, SO507618 | $588,585 revenue<br>
+    <strong>Seller:</strong> Laurel Kee (APAC-Laurel)<br>
+    <strong>Lifetime:</strong> 66 orders, $5,522,546 total revenue
+  </div>
+</div>
+<div class="reactivation">
+  <div class="reactivation-header">
+    <span class="icon">📊</span>100. Astec
+    <span class="badge badge-anomalous">Anomalous Pattern</span>
+  </div>
+  <div class="detail-line">📍 <strong>Santa Rosa Laguna</strong> (city-level tracking)</div>
+  <div class="detail-line">
+    Gap: <strong>32 days</strong> | Typical Cycle: 10 days | <strong>3.20x typical</strong>
+  </div>
+  <div class="detail-line">
+    First Order: 2024-07-14 | Last Order: 2026-05-29
+  </div>
+  <div class="metrics">
+    <strong>Order Details:</strong> SO507357, SO507426, SO507454 | $3,465 revenue<br>
+    <strong>Seller:</strong> Silvia Munoz (APAC-Kris)<br>
+    <strong>Lifetime:</strong> 7 orders, $16,861 total revenue
+  </div>
+</div>
+<div class="reactivation">
+  <div class="reactivation-header">
+    <span class="icon">📊</span>101. Plexus Corp.
+    <span class="badge badge-anomalous">Anomalous Pattern</span>
+  </div>
+  <div class="detail-line">📍 <strong>Xiamen</strong> (city-level tracking)</div>
+  <div class="detail-line">
+    Gap: <strong>32 days</strong> | Typical Cycle: 1 days | <strong>32.00x typical</strong>
+  </div>
+  <div class="detail-line">
+    First Order: 2024-04-18 | Last Order: 2026-05-29
+  </div>
+  <div class="metrics">
+    <strong>Order Details:</strong> SO507303, SO507305, SO507337, SO507370, SO507377, SO507378, SO507412, SO507433, SO507435, SO507449, SO507470, SO507492, SO507512, SO507544, SO507545, SO507576, SO507583, SO507584, SO507593, SO507611, SO507619, SO507634 | $620,198 revenue<br>
+    <strong>Seller:</strong> Wing Zhang (APAC-Kris)<br>
+    <strong>Lifetime:</strong> 523 orders, $12,270,486 total revenue
+  </div>
+</div>
+<div class="reactivation">
+  <div class="reactivation-header">
+    <span class="icon">✓</span>102. Astec
+    <span class="badge badge-standard">Standard</span>
+  </div>
+  <div class="detail-line">📍 <strong>Cavite</strong> (city-level tracking)</div>
+  <div class="detail-line">
+    Gap: <strong>32 days</strong> | Typical Cycle: 123 days | <strong>0.26x typical</strong>
+  </div>
+  <div class="detail-line">
+    First Order: 2024-10-20 | Last Order: 2026-05-29
+  </div>
+  <div class="metrics">
+    <strong>Order Details:</strong> SO507360 | $1,980 revenue<br>
+    <strong>Seller:</strong> Silvia Munoz (APAC-Kris)<br>
+    <strong>Lifetime:</strong> 3 orders, $7,888 total revenue
+  </div>
+</div>
+<div class="reactivation">
+  <div class="reactivation-header">
+    <span class="icon">📊</span>103. Applied Materials
+    <span class="badge badge-anomalous">Anomalous Pattern</span>
+  </div>
+  <div class="detail-line">📍 <strong>Singapore</strong> (city-level tracking)</div>
+  <div class="detail-line">
+    Gap: <strong>32 days</strong> | Typical Cycle: 2 days | <strong>16.00x typical</strong>
+  </div>
+  <div class="detail-line">
+    First Order: 2025-07-03 | Last Order: 2026-05-29
+  </div>
+  <div class="metrics">
+    <strong>Order Details:</strong> SO507309, SO507321, SO507362, SO507363, SO507364, SO507365, SO507382, SO507441, SO507502, SO507527, SO507598, SO507599 | $42,349 revenue<br>
+    <strong>Seller:</strong> Josh Syre (USA)<br>
+    <strong>Lifetime:</strong> 89 orders, $1,298,500 total revenue
+  </div>
+</div>
+<div class="reactivation">
+  <div class="reactivation-header">
+    <span class="icon">📊</span>104. Astute Group (Astute Electronics)
+    <span class="badge badge-anomalous">Anomalous Pattern</span>
+  </div>
+  <div class="detail-line">📍 <strong>Feldkirchen-Westerham</strong> (city-level tracking)</div>
+  <div class="detail-line">
+    Gap: <strong>32 days</strong> | Typical Cycle: 10 days | <strong>3.37x typical</strong>
+  </div>
+  <div class="detail-line">
+    First Order: 2025-06-26 | Last Order: 2026-05-29
+  </div>
+  <div class="metrics">
+    <strong>Order Details:</strong> SO507489 | $68,871 revenue<br>
+    <strong>Seller:</strong> Laurel Kee (APAC-Laurel)<br>
+    <strong>Lifetime:</strong> 24 orders, $65,751 total revenue
+  </div>
+</div>
+<div class="reactivation">
+  <div class="reactivation-header">
+    <span class="icon">📊</span>105. Astute Group (Astute Electronics)
+    <span class="badge badge-anomalous">Anomalous Pattern</span>
+  </div>
+  <div class="detail-line">📍 <strong>Stevenage</strong> (city-level tracking)</div>
+  <div class="detail-line">
+    Gap: <strong>32 days</strong> | Typical Cycle: 8 days | <strong>4.00x typical</strong>
+  </div>
+  <div class="detail-line">
+    First Order: 2024-04-03 | Last Order: 2026-05-29
+  </div>
+  <div class="metrics">
+    <strong>Order Details:</strong> SO507346, SO507566 | $492 revenue<br>
+    <strong>Seller:</strong> Julie White (Other)<br>
+    <strong>Lifetime:</strong> 68 orders, $1,680,717 total revenue
+  </div>
+</div>
+<div class="reactivation">
+  <div class="reactivation-header">
+    <span class="icon">📊</span>106. Applied Materials
+    <span class="badge badge-anomalous">Anomalous Pattern</span>
+  </div>
+  <div class="detail-line">📍 <strong>Austin</strong> (city-level tracking)</div>
+  <div class="detail-line">
+    Gap: <strong>32 days</strong> | Typical Cycle: 1 days | <strong>32.00x typical</strong>
+  </div>
+  <div class="detail-line">
+    First Order: 2024-05-08 | Last Order: 2026-05-29
+  </div>
+  <div class="metrics">
+    <strong>Order Details:</strong> SO507295, SO507311, SO507312, SO507314, SO507315, SO507322, SO507324, SO507367, SO507368, SO507428, SO507430, SO507482, SO507485, SO507497, SO507503, SO507504, SO507517, SO507523, SO507530, SO507541, SO507556, SO507587, SO507594, SO507595, SO507600, SO507639 | $571,899 revenue<br>
+    <strong>Seller:</strong> Josh Syre (USA)<br>
+    <strong>Lifetime:</strong> 222 orders, $2,796,137 total revenue
+  </div>
+</div>
+<div style="margin-top: 40px; padding-top: 20px; border-top: 2px solid #e5e7eb; color: #6b7280; font-size: 11px;">
+<strong>Method Comparison:</strong>
+<table style="width: 100%; margin-top: 10px; font-size: 11px;">
+<tr style="background: #f9fafb;">
+  <th style="text-align: left; padding: 8px;">Aspect</th>
+  <th style="text-align: left; padding: 8px;">Current Method</th>
+  <th style="text-align: left; padding: 8px;">Customer Name + City</th>
+</tr>
+<tr>
+  <td style="padding: 8px;">Tracking Granularity</td>
+  <td style="padding: 8px;">OEMs: Location ID<br>Others: Fuzzy name match</td>
+  <td style="padding: 8px;"><strong>Everyone: Name + City</strong></td>
+</tr>
+<tr style="background: #f9fafb;">
+  <td style="padding: 8px;">Results (30 days)</td>
+  <td style="padding: 8px;">3 reactivations</td>
+  <td style="padding: 8px;"><strong>106 reactivations</strong></td>
+</tr>
+<tr>
+  <td style="padding: 8px;">Query Complexity</td>
+  <td style="padding: 8px;">Complex (OEM lists, fuzzy matching, multiple CTEs)</td>
+  <td style="padding: 8px;"><strong>Simple (direct concatenation)</strong></td>
+</tr>
+<tr style="background: #f9fafb;">
+  <td style="padding: 8px;">Human Readability</td>
+  <td style="padding: 8px;">Location IDs (OEM:12345) or Base Names</td>
+  <td style="padding: 8px;"><strong>Clear (KLA | Singapore)</strong></td>
+</tr>
+<tr>
+  <td style="padding: 8px;">Maintenance</td>
+  <td style="padding: 8px;">Must update OEM lists when adding new OEMs</td>
+  <td style="padding: 8px;"><strong>No maintenance needed</strong></td>
+</tr>
+</table>
+
+<p style="margin-top: 20px;"><strong>Recommendation:</strong> Switch to Customer Name + City method for better visibility and simpler maintenance.</p>
+</div>
+
+</div>
+</body>
+</html>

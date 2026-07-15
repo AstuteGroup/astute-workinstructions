@@ -1,0 +1,944 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>VP Daily Brief — Sales Pulse</title>
+<style>
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif;
+    font-size: 13px;
+    line-height: 1.5;
+    color: #333;
+    max-width: 800px;
+    margin: 0 auto;
+    padding: 20px;
+    background: #f5f5f5;
+  }
+  .container {
+    background: white;
+    padding: 28px;
+    border-radius: 8px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+  }
+  h1 {
+    font-size: 22px;
+    font-weight: 700;
+    margin: 0 0 6px 0;
+    color: #1a1a1a;
+  }
+  .subtitle {
+    font-size: 12px;
+    color: #666;
+    margin-bottom: 24px;
+  }
+
+  /* Section Headers */
+  .section-header {
+    font-size: 16px;
+    font-weight: 700;
+    margin: 28px 0 12px 0;
+    padding-bottom: 8px;
+    border-bottom: 2px solid #e0e0e0;
+    color: #1a1a1a;
+  }
+  .section-header:first-of-type {
+    margin-top: 0;
+  }
+  .subsection-header {
+    font-size: 14px;
+    font-weight: 600;
+    margin: 16px 0 8px 0;
+    color: #444;
+  }
+
+  /* Tables */
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 12px;
+    margin-bottom: 16px;
+  }
+  th {
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    padding: 8px;
+    text-align: left;
+    font-weight: 600;
+    font-size: 11px;
+    color: #475569;
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+  }
+  td {
+    border: 1px solid #e2e8f0;
+    padding: 8px;
+    vertical-align: top;
+  }
+  tr:hover { background: #f8fafc; }
+  td.number { text-align: right; font-weight: 600; }
+
+  /* Badges */
+  .badge {
+    display: inline-block;
+    padding: 3px 8px;
+    border-radius: 12px;
+    font-size: 10px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+  }
+  .badge-yellow { background: #fef3c7; color: #92400e; }
+  .badge-red { background: #fee2e2; color: #991b1b; }
+  .badge-green { background: #dcfce7; color: #166534; }
+
+  /* Alert Boxes */
+  .alert-box {
+    margin-bottom: 14px;
+    padding: 12px 14px;
+    border-radius: 6px;
+    border-left: 4px solid #ccc;
+    background: #f8f8f8;
+    font-size: 12px;
+  }
+  .alert-box.yellow { border-left-color: #f59e0b; background: #fffbeb; }
+  .alert-box.red { border-left-color: #dc2626; background: #fef2f2; }
+  .alert-box.green { border-left-color: #16a34a; background: #f0fdf4; }
+
+  /* Metrics Cards */
+  .metrics {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 12px;
+    margin-bottom: 16px;
+  }
+  .metric {
+    background: #f8fafc;
+    border-radius: 6px;
+    padding: 14px;
+    border-left: 3px solid #94a3b8;
+  }
+  .metric-label {
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: #64748b;
+    font-weight: 600;
+    margin-bottom: 4px;
+  }
+  .metric-value {
+    font-size: 22px;
+    font-weight: 700;
+    color: #1e293b;
+    margin-bottom: 2px;
+  }
+  .metric-trend {
+    font-size: 11px;
+    color: #64748b;
+  }
+
+  /* Footer */
+  .footer {
+    margin-top: 24px;
+    padding-top: 16px;
+    border-top: 2px solid #e0e0e0;
+    font-size: 10px;
+    color: #666;
+    line-height: 1.6;
+  }
+  .footer-title {
+    font-weight: 700;
+    font-size: 11px;
+    margin-bottom: 6px;
+    color: #444;
+  }
+  .footer ul {
+    margin: 4px 0;
+    padding-left: 18px;
+  }
+  .footer li {
+    margin-bottom: 3px;
+  }
+
+  /* Empty State */
+  .empty-state {
+    padding: 12px;
+    text-align: center;
+    color: #666;
+    font-style: italic;
+    background: #f8f8f8;
+    border-radius: 4px;
+    margin-bottom: 12px;
+  }
+
+  /* Collapsible Details */
+  details {
+    margin-bottom: 12px;
+  }
+  details summary {
+    cursor: pointer;
+    font-weight: 600;
+    color: #1a1a1a;
+    padding: 8px 12px;
+    background: #f8fafc;
+    border-radius: 4px;
+    border: 1px solid #e2e8f0;
+    transition: background 0.2s;
+  }
+  details summary:hover {
+    background: #e2e8f0;
+  }
+  details[open] summary {
+    margin-bottom: 8px;
+    border-bottom-left-radius: 0;
+    border-bottom-right-radius: 0;
+  }
+</style>
+</head>
+<body>
+
+<div class="container">
+  <h1>📊 VP Daily Brief — Sales Pulse</h1>
+  <div class="subtitle">Tuesday, July 14, 2026 | Data as of EOD Monday, July 13, 2026</div>
+
+  <div class="section-header">🏆 Section 1: Yesterday's Top Wins</div><div class="subsection-header">Top 5 Orders Won</div><table>
+      <thead>
+        <tr>
+          <th>Rank</th>
+          <th>Seller</th>
+          <th>Region</th>
+          <th>Customer</th>
+          <th>SO#</th>
+          <th style="text-align: right;">Revenue</th>
+          <th style="text-align: right;">GP</th>
+          <th>Part Numbers</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><strong>🥇</strong></td>
+          <td>Wing Zhang</td>
+          <td>APAC-Silvia</td>
+          <td>Plexus Corp.</td>
+          <td style="font-size: 11px;">SO507762</td>
+          <td class="number">$177K</td>
+          <td class="number">$27K</td>
+          <td style="font-size: 11px;">MT41K128M16JT-125 AAT:K, W632GU6NB-12</td>
+        </tr>
+        <tr>
+          <td><strong>🥈</strong></td>
+          <td>Laurel Kee</td>
+          <td>APAC-Laurel</td>
+          <td>ABB</td>
+          <td style="font-size: 11px;">SO507764</td>
+          <td class="number">$175K</td>
+          <td class="number">$138K</td>
+          <td style="font-size: 11px;">XC2S150-6FGG256C</td>
+        </tr>
+        <tr>
+          <td><strong>🥉</strong></td>
+          <td>Laurel Kee</td>
+          <td>APAC-Laurel</td>
+          <td>ABB</td>
+          <td style="font-size: 11px;">SO507763</td>
+          <td class="number">$117K</td>
+          <td class="number">$84K</td>
+          <td style="font-size: 11px;">XC2S150-6FGG256C</td>
+        </tr>
+        <tr>
+          <td><strong>#4</strong></td>
+          <td>Laurel Kee</td>
+          <td>APAC-Laurel</td>
+          <td>THALES</td>
+          <td style="font-size: 11px;">SO507774</td>
+          <td class="number">$63K</td>
+          <td class="number">$12K</td>
+          <td style="font-size: 11px;">K4AAG165WA-BCWE </td>
+        </tr>
+        <tr>
+          <td><strong>#5</strong></td>
+          <td>Joel Flores</td>
+          <td>MEX</td>
+          <td>Arrow Global Supply Chain Services</td>
+          <td style="font-size: 11px;">SO507771</td>
+          <td class="number">$21K</td>
+          <td class="number">$5K</td>
+          <td style="font-size: 11px;">TPS54824RNVR</td>
+        </tr></tbody></table>
+        <input type="checkbox" id="toggle-orders" style="display:none;">
+        <label for="toggle-orders" style="cursor: pointer; font-weight: 600; color: #1a1a1a; padding: 8px; background: #f8fafc; border-radius: 4px; border: 1px solid #e2e8f0; display: block; margin-top: 8px; user-select: none;">
+          <span class="toggle-icon">▶</span> 📋 Show Next 8 Orders (Ranks #6-13)
+        </label>
+        <div class="collapsible-content" style="display: none; margin-top: 8px;">
+          <table style="margin-top: 8px;">
+            <thead>
+              <tr>
+                <th>Rank</th>
+                <th>Seller</th>
+                <th>Region</th>
+                <th>Customer</th>
+                <th>SO#</th>
+                <th style="text-align: right;">Revenue</th>
+                <th style="text-align: right;">GP</th>
+                <th>Part Numbers</th>
+              </tr>
+            </thead>
+            <tbody>
+          <tr>
+            <td><strong>#6</strong></td>
+            <td>Jake Mcaloose</td>
+            <td>USA</td>
+            <td>Honeywell Aerospace Technologies</td>
+            <td style="font-size: 11px;">SO507765</td>
+            <td class="number">$15K</td>
+            <td class="number">$9K</td>
+            <td style="font-size: 11px;">KVR26S19S8/8 </td>
+          </tr>
+          <tr>
+            <td><strong>#7</strong></td>
+            <td>Ricardo Morales</td>
+            <td>MEX</td>
+            <td>Sanmina Corporation</td>
+            <td style="font-size: 11px;">SO507770</td>
+            <td class="number">$9K</td>
+            <td class="number">$4K</td>
+            <td style="font-size: 11px;"> 15EJT1</td>
+          </tr>
+          <tr>
+            <td><strong>#8</strong></td>
+            <td>Jake Mcaloose</td>
+            <td>USA</td>
+            <td>General Dynamics</td>
+            <td style="font-size: 11px;">SO507773</td>
+            <td class="number">$8K</td>
+            <td class="number">$5K</td>
+            <td style="font-size: 11px;">ISL8203MIRZ</td>
+          </tr>
+          <tr>
+            <td><strong>#9</strong></td>
+            <td>Wing Zhang</td>
+            <td>APAC-Silvia</td>
+            <td>WUXI SHENNAN CIRCUITS CO,LTD</td>
+            <td style="font-size: 11px;">SO507772</td>
+            <td class="number">$3K</td>
+            <td class="number">$500</td>
+            <td style="font-size: 11px;">ACPL-K64L-560E</td>
+          </tr>
+          <tr>
+            <td><strong>#10</strong></td>
+            <td>Jake Harris</td>
+            <td>Other</td>
+            <td>AED Inc.</td>
+            <td style="font-size: 11px;">SO507769</td>
+            <td class="number">$2K</td>
+            <td class="number">$2K</td>
+            <td style="font-size: 11px;">VOM452T</td>
+          </tr>
+          <tr>
+            <td><strong>#11</strong></td>
+            <td>Justin Goodwin</td>
+            <td>USA</td>
+            <td>Flock Safety</td>
+            <td style="font-size: 11px;">SO507767</td>
+            <td class="number">$1K</td>
+            <td class="number">$140</td>
+            <td style="font-size: 11px;">LP16-RJ45-MP-MRJ-6D1M-XXX</td>
+          </tr>
+          <tr>
+            <td><strong>#12</strong></td>
+            <td>Jake Harris</td>
+            <td>Other</td>
+            <td>Aerospace Elite Electronics, Inc.</td>
+            <td style="font-size: 11px;">SO507768</td>
+            <td class="number">$690</td>
+            <td class="number">$242</td>
+            <td style="font-size: 11px;"> XCR3512XL-12FT256I</td>
+          </tr>
+          <tr>
+            <td><strong>#13</strong></td>
+            <td>Jake Mcaloose</td>
+            <td>USA</td>
+            <td>GE Aerospace (Formerly GE Aviation)</td>
+            <td style="font-size: 11px;">SO507766</td>
+            <td class="number">$250</td>
+            <td class="number">$250</td>
+            <td style="font-size: 11px;">MHF+2805S</td>
+          </tr>
+            </tbody>
+          </table>
+        </div>
+        <style>
+          #toggle-orders:checked ~ .collapsible-content { display: block !important; }
+          #toggle-orders:checked ~ label .toggle-icon::before { content: "▼"; }
+          .toggle-icon::before { content: "▶"; }
+        </style><div style="margin-top: 8px; padding: 8px; background: #fffbeb; border-left: 3px solid #f59e0b; font-size: 11px; color: #92400e;"><strong>Note:</strong> When GP shows $0.00, it indicates that the <code>pricecost</code> field is null in the system. This typically occurs when cost data has not yet been entered for the order line.</div><div class="subsection-header">New Customers Sold (First-Time Wins)</div><table>
+      <thead>
+        <tr>
+          <th>Seller</th>
+          <th>Region</th>
+          <th>Customer</th>
+          <th>BP ID</th>
+          <th>Location</th>
+          <th style="text-align: right;">Revenue</th>
+          <th style="text-align: right;">GP</th>
+          <th>MPNs</th>
+          <th>MFR</th>
+          <th>Promise Date</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>Jake Harris</td>
+          <td>Other</td>
+          <td><strong>Aerospace Elite Electronics, Inc.</strong></td>
+          <td style="font-size: 10px;">1011564</td>
+          <td style="font-size: 10px;">Global Electronic Testing Attn: Orders, 2631 Success Drive , Odessa, FL 33556, United States</td>
+          <td class="number">$690</td>
+          <td class="number">$242</td>
+          <td style="font-size: 10px;"> XCR3512XL-12FT256I</td>
+          <td style="font-size: 11px;">Xilinx Inc</td>
+          <td>2026-07-13</td>
+        </tr></tbody></table><div class="subsection-header">Global Strategic Accounts Activity</div><div style="font-size: 11px; color: #666; margin-bottom: 8px;">ABB, Eaton, GE Healthcare, Parker-Meggitt, RTX, Thales</div><table>
+      <thead>
+        <tr>
+          <th>Account</th>
+          <th>ISE</th>
+          <th>Region</th>
+          <th style="text-align: center;">RFQ Lines</th>
+          <th style="text-align: center;">CQ Lines</th>
+          <th style="text-align: center;">CQ Sold</th>
+          <th style="text-align: center;">SOs</th>
+          <th style="text-align: right;">Revenue</th>
+          <th style="text-align: right;">GP</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><strong style="">ABB</strong></td>
+          <td>Laurel Kee</td>
+          <td>APAC-Laurel</td>
+          <td style="text-align: center; background-color: #1b5e20; color: white; font-weight: bold;">2</td>
+          <td style="text-align: center; background-color: #1b5e20; color: white; font-weight: bold;">4</td>
+          <td style="text-align: center; background-color: #1b5e20; color: white; font-weight: bold;">3</td>
+          <td style="text-align: center; background-color: #1b5e20; color: white; font-weight: bold;">2</td>
+          <td class="number" style="background-color: #1b5e20; color: white; font-weight: bold;">$641K</td>
+          <td class="number" style="background-color: #1b5e20; color: white; font-weight: bold;">$222K</td>
+        </tr>
+        <tr>
+          <td><strong style="color: #d32f2f;">Eaton</strong></td>
+          <td>—</td>
+          <td>—</td>
+          <td style="text-align: center; ">0</td>
+          <td style="text-align: center; ">0</td>
+          <td style="text-align: center; ">0</td>
+          <td style="text-align: center; ">0</td>
+          <td class="number" style="">$0</td>
+          <td class="number" style="">$0</td>
+        </tr>
+        <tr>
+          <td><strong style="color: #d32f2f;">GE Healthcare</strong></td>
+          <td>—</td>
+          <td>—</td>
+          <td style="text-align: center; ">0</td>
+          <td style="text-align: center; ">0</td>
+          <td style="text-align: center; ">0</td>
+          <td style="text-align: center; ">0</td>
+          <td class="number" style="">$0</td>
+          <td class="number" style="">$0</td>
+        </tr>
+        <tr>
+          <td><strong style="">Parker Meggitt</strong></td>
+          <td>Josh Syre</td>
+          <td>USA</td>
+          <td style="text-align: center; background-color: #1b5e20; color: white; font-weight: bold;">1</td>
+          <td style="text-align: center; ">0</td>
+          <td style="text-align: center; ">0</td>
+          <td style="text-align: center; ">0</td>
+          <td class="number" style="">$0</td>
+          <td class="number" style="">$0</td>
+        </tr>
+        <tr>
+          <td><strong style="color: #d32f2f;">RTX</strong></td>
+          <td>—</td>
+          <td>—</td>
+          <td style="text-align: center; ">0</td>
+          <td style="text-align: center; ">0</td>
+          <td style="text-align: center; ">0</td>
+          <td style="text-align: center; ">0</td>
+          <td class="number" style="">$0</td>
+          <td class="number" style="">$0</td>
+        </tr>
+        <tr>
+          <td><strong style="">THALES</strong></td>
+          <td>Laurel Kee</td>
+          <td>APAC-Laurel</td>
+          <td style="text-align: center; ">0</td>
+          <td style="text-align: center; background-color: #1b5e20; color: white; font-weight: bold;">1</td>
+          <td style="text-align: center; background-color: #1b5e20; color: white; font-weight: bold;">1</td>
+          <td style="text-align: center; background-color: #1b5e20; color: white; font-weight: bold;">1</td>
+          <td class="number" style="background-color: #1b5e20; color: white; font-weight: bold;">$63K</td>
+          <td class="number" style="background-color: #1b5e20; color: white; font-weight: bold;">$12K</td>
+        </tr></tbody></table><div class="subsection-header">Customers Reactivated Yesterday</div><div style="font-size: 11px; color: #666; margin-bottom: 12px;">🏆 High-Value | 📊 Anomalous Pattern | 🕐 Long Dormant | 📍 Small Customer</div><div style="font-size: 10px; color: #888; margin-bottom: 12px; font-style: italic;"><strong>Customer Name + City tracking</strong> • Excludes brokers/distributors/traders/Jake Harris • 30-day minimum • CQ-linked sales only</div><div class="empty-state">No significant reactivations detected yesterday</div>
+  <div class="section-header">⚠️ Section 2: Needs Attention</div><div class="subsection-header">High Value Late SO Lines ($200K+, 3-31 days past due)</div><div style="font-size: 11px; color: #666; margin-bottom: 8px;">🟡 Yellow: 3-7 days late | 🔴 Red: 8+ days late | Rolling 31-day window | Unshipped amounts shown</div><table>
+      <thead>
+        <tr>
+          <th>Customer</th>
+          <th>SO#</th>
+          <th style="text-align: center;">Ln</th>
+          <th>MPN</th>
+          <th>ISE</th>
+          <th>Rgn</th>
+          <th>Promise</th>
+          <th style="text-align: center;">Late</th>
+          <th style="text-align: right;">Qty</th>
+          <th style="text-align: right;">Revenue</th>
+          <th style="text-align: right;">GP</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr style="background-color: #ffebee;">
+          <td style="font-size: 11px;"><strong>Abaco Systems</strong></td>
+          <td style="font-size: 10px;">SO507317</td>
+          <td style="text-align: center; font-size: 10px;">10</td>
+          <td style="font-size: 9px;">BCM56861A1IFSBG</td>
+          <td style="font-size: 10px;">Joel Flores</td>
+          <td style="font-size: 10px;">MEX</td>
+          <td style="font-size: 10px;">2026-06-22</td>
+          <td style="text-align: center; color: #d32f2f; font-weight: bold; font-size: 10px;">22</td>
+          <td class="number" style="font-size: 10px;">144</td>
+          <td class="number" style="font-size: 11px;">$311K</td>
+          <td class="number" style="font-size: 11px;">$78K</td>
+        </tr>
+        <tr style="background-color: #ffebee;">
+          <td style="font-size: 11px;"><strong>Sanmina Corporation</strong></td>
+          <td style="font-size: 10px;">SO507508</td>
+          <td style="text-align: center; font-size: 10px;">10</td>
+          <td style="font-size: 9px;">88E6390-A0-TLA2I000</td>
+          <td style="font-size: 10px;">Ricardo Morales</td>
+          <td style="font-size: 10px;">MEX</td>
+          <td style="font-size: 10px;">2026-06-30</td>
+          <td style="text-align: center; color: #d32f2f; font-weight: bold; font-size: 10px;">14</td>
+          <td class="number" style="font-size: 10px;">4,460</td>
+          <td class="number" style="font-size: 11px;">$87K</td>
+          <td class="number" style="font-size: 11px;">$18K</td>
+        </tr>
+        <tr style="background-color: #ffebee;">
+          <td style="font-size: 11px;"><strong>Sanmina Corporation</strong></td>
+          <td style="font-size: 10px;">SO507508</td>
+          <td style="text-align: center; font-size: 10px;">30</td>
+          <td style="font-size: 9px;">88E6390-A0-TLA2I000</td>
+          <td style="font-size: 10px;">Ricardo Morales</td>
+          <td style="font-size: 10px;">MEX</td>
+          <td style="font-size: 10px;">2026-06-30</td>
+          <td style="text-align: center; color: #d32f2f; font-weight: bold; font-size: 10px;">14</td>
+          <td class="number" style="font-size: 10px;">940</td>
+          <td class="number" style="font-size: 11px;">$18K</td>
+          <td class="number" style="font-size: 11px;">$3K</td>
+        </tr>
+        <tr style="background-color: #ffebee;">
+          <td style="font-size: 11px;"><strong>Plexus Corp.</strong></td>
+          <td style="font-size: 10px;">SO507488</td>
+          <td style="text-align: center; font-size: 10px;">30</td>
+          <td style="font-size: 9px;">5AGXFA5H4F35I3G</td>
+          <td style="font-size: 10px;">Salvador Horner</td>
+          <td style="font-size: 10px;">MEX</td>
+          <td style="font-size: 10px;">2026-06-30</td>
+          <td style="text-align: center; color: #d32f2f; font-weight: bold; font-size: 10px;">14</td>
+          <td class="number" style="font-size: 10px;">14</td>
+          <td class="number" style="font-size: 11px;">$13K</td>
+          <td class="number" style="font-size: 11px;">$0</td>
+        </tr>
+        <tr style="background-color: #ffebee;">
+          <td style="font-size: 11px;"><strong>Sensata Technologies</strong></td>
+          <td style="font-size: 10px;">SO507548</td>
+          <td style="text-align: center; font-size: 10px;">30</td>
+          <td style="font-size: 9px;">KTY81/110, 112</td>
+          <td style="font-size: 10px;">Ricardo Morales</td>
+          <td style="font-size: 10px;">MEX</td>
+          <td style="font-size: 10px;">2026-07-01</td>
+          <td style="text-align: center; color: #d32f2f; font-weight: bold; font-size: 10px;">13</td>
+          <td class="number" style="font-size: 10px;">16,500</td>
+          <td class="number" style="font-size: 11px;">$12K</td>
+          <td class="number" style="font-size: 11px;">$2K</td>
+        </tr>
+        <tr style="background-color: #ffebee;">
+          <td style="font-size: 11px;"><strong>Plexus Corp.</strong></td>
+          <td style="font-size: 10px;">SO507468</td>
+          <td style="text-align: center; font-size: 10px;">10</td>
+          <td style="font-size: 9px;">ADG201HSKR</td>
+          <td style="font-size: 10px;">Salvador Horner</td>
+          <td style="font-size: 10px;">MEX</td>
+          <td style="font-size: 10px;">2026-06-30</td>
+          <td style="text-align: center; color: #d32f2f; font-weight: bold; font-size: 10px;">14</td>
+          <td class="number" style="font-size: 10px;">100</td>
+          <td class="number" style="font-size: 11px;">$3K</td>
+          <td class="number" style="font-size: 11px;">$2K</td>
+        </tr>
+        <tr style="background-color: #ffebee;">
+          <td style="font-size: 11px;"><strong>Plexus Corp.</strong></td>
+          <td style="font-size: 10px;">SO507488</td>
+          <td style="text-align: center; font-size: 10px;">40</td>
+          <td style="font-size: 9px;">5AGXFA5H4F35I3G</td>
+          <td style="font-size: 10px;">Salvador Horner</td>
+          <td style="font-size: 10px;">MEX</td>
+          <td style="font-size: 10px;">2026-06-30</td>
+          <td style="text-align: center; color: #d32f2f; font-weight: bold; font-size: 10px;">14</td>
+          <td class="number" style="font-size: 10px;">3</td>
+          <td class="number" style="font-size: 11px;">$3K</td>
+          <td class="number" style="font-size: 11px;">$0</td>
+        </tr>
+        <tr style="background-color: #ffebee;">
+          <td style="font-size: 11px;"><strong>Abaco Systems</strong></td>
+          <td style="font-size: 10px;">SO507589</td>
+          <td style="text-align: center; font-size: 10px;">10</td>
+          <td style="font-size: 9px;">WG82574L SLBA9</td>
+          <td style="font-size: 10px;">Joel Flores</td>
+          <td style="font-size: 10px;">MEX</td>
+          <td style="font-size: 10px;">2026-07-03</td>
+          <td style="text-align: center; color: #d32f2f; font-weight: bold; font-size: 10px;">11</td>
+          <td class="number" style="font-size: 10px;">180</td>
+          <td class="number" style="font-size: 11px;">$2K</td>
+          <td class="number" style="font-size: 11px;">$887</td>
+        </tr>
+        <tr style="background-color: #ffebee;">
+          <td style="font-size: 11px;"><strong>Sensata Technologies</strong></td>
+          <td style="font-size: 10px;">SO507443</td>
+          <td style="text-align: center; font-size: 10px;">40</td>
+          <td style="font-size: 9px;">RNF-3000-24/8-0-SP</td>
+          <td style="font-size: 10px;">Ricardo Morales</td>
+          <td style="font-size: 10px;">MEX</td>
+          <td style="font-size: 10px;">2026-06-17</td>
+          <td style="text-align: center; color: #d32f2f; font-weight: bold; font-size: 10px;">27</td>
+          <td class="number" style="font-size: 10px;">120</td>
+          <td class="number" style="font-size: 11px;">$19</td>
+          <td class="number" style="font-size: 11px;">$-576</td>
+        </tr>
+        <tr style="background-color: #ffebee;">
+          <td style="font-size: 11px;"><strong>Sensata Technologies</strong></td>
+          <td style="font-size: 10px;">SO507443</td>
+          <td style="text-align: center; font-size: 10px;">50</td>
+          <td style="font-size: 9px;">TARIFF</td>
+          <td style="font-size: 10px;">Ricardo Morales</td>
+          <td style="font-size: 10px;">MEX</td>
+          <td style="font-size: 10px;">2026-06-17</td>
+          <td style="text-align: center; color: #d32f2f; font-weight: bold; font-size: 10px;">27</td>
+          <td class="number" style="font-size: 10px;">1</td>
+          <td class="number" style="font-size: 11px;">$0</td>
+          <td class="number" style="font-size: 11px;">$0</td>
+        </tr></tbody></table><div class="subsection-header">Top 5 Scheduled to Ship This Month (by GP)</div><div style="font-size: 11px; color: #666; margin-bottom: 8px;">🔴 Not in stock + past due | 🟡 Not in stock OR due soon | 🟢 In stock + future</div><table>
+      <thead>
+        <tr>
+          <th>Customer</th>
+          <th>SO#</th>
+          <th style="text-align: center;">Ln</th>
+          <th>MPN</th>
+          <th style="text-align: center;">Stock</th>
+          <th style="text-align: center;">Action</th>
+          <th>ISE</th>
+          <th>Rgn</th>
+          <th>Promise</th>
+          <th style="text-align: center;">Days</th>
+          <th style="text-align: right;">Revenue</th>
+          <th style="text-align: right;">GP</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr style="background-color: #e8f5e9;">
+          <td style="font-size: 11px;"><strong>Acron Aviation</strong></td>
+          <td style="font-size: 10px;">SO507065</td>
+          <td style="text-align: center; font-size: 10px;">120</td>
+          <td style="font-size: 9px;">MT29F64G08AJABAWP-IT:B</td>
+          <td style="text-align: center; font-size: 10px;">N</td>
+          <td style="text-align: center; font-size: 11px;">🟢</td>
+          <td style="font-size: 10px;">Daniel Reiser</td>
+          <td style="font-size: 10px;">USA</td>
+          <td style="font-size: 10px;">2026-07-24</td>
+          <td style="text-align: center; color: #2e7d32; font-weight: bold; font-size: 10px;">+10</td>
+          <td class="number">$287K</td>
+          <td class="number">$89K</td>
+        </tr>
+        <tr style="background-color: #e8f5e9;">
+          <td style="font-size: 11px;"><strong>ABB</strong></td>
+          <td style="font-size: 10px;">SO507764</td>
+          <td style="text-align: center; font-size: 10px;">20</td>
+          <td style="font-size: 9px;">XC2S150-6FGG256C</td>
+          <td style="text-align: center; font-size: 10px;">N</td>
+          <td style="text-align: center; font-size: 11px;">🟢</td>
+          <td style="font-size: 10px;">Laurel Kee</td>
+          <td style="font-size: 10px;">APAC-Laurel</td>
+          <td style="font-size: 10px;">2026-07-30</td>
+          <td style="text-align: center; color: #2e7d32; font-weight: bold; font-size: 10px;">+16</td>
+          <td class="number">$113K</td>
+          <td class="number">$88K</td>
+        </tr>
+        <tr style="background-color: #e8f5e9;">
+          <td style="font-size: 11px;"><strong>Applied Materials</strong></td>
+          <td style="font-size: 10px;">SO507691</td>
+          <td style="text-align: center; font-size: 10px;">30</td>
+          <td style="font-size: 9px;">XC7A50T-2FGG484C</td>
+          <td style="text-align: center; font-size: 10px;">N</td>
+          <td style="text-align: center; font-size: 11px;">🟢</td>
+          <td style="font-size: 10px;">Josh Syre</td>
+          <td style="font-size: 10px;">USA</td>
+          <td style="font-size: 10px;">2026-07-31</td>
+          <td style="text-align: center; color: #2e7d32; font-weight: bold; font-size: 10px;">+17</td>
+          <td class="number">$74K</td>
+          <td class="number">$40K</td>
+        </tr>
+        <tr style="background-color: #e8f5e9;">
+          <td style="font-size: 11px;"><strong>Acron Aviation</strong></td>
+          <td style="font-size: 10px;">SO507065</td>
+          <td style="text-align: center; font-size: 10px;">10</td>
+          <td style="font-size: 9px;">MT29F64G08AJABAWP-IT:B</td>
+          <td style="text-align: center; font-size: 10px;">N</td>
+          <td style="text-align: center; font-size: 11px;">🟢</td>
+          <td style="font-size: 10px;">Daniel Reiser</td>
+          <td style="font-size: 10px;">USA</td>
+          <td style="font-size: 10px;">2026-07-24</td>
+          <td style="text-align: center; color: #2e7d32; font-weight: bold; font-size: 10px;">+10</td>
+          <td class="number">$244K</td>
+          <td class="number">$34K</td>
+        </tr>
+        <tr style="background-color: #e8f5e9;">
+          <td style="font-size: 11px;"><strong>Applied Materials</strong></td>
+          <td style="font-size: 10px;">SO507691</td>
+          <td style="text-align: center; font-size: 10px;">20</td>
+          <td style="font-size: 9px;">XC7A50T-2FGG484C</td>
+          <td style="text-align: center; font-size: 10px;">N</td>
+          <td style="text-align: center; font-size: 11px;">🟢</td>
+          <td style="font-size: 10px;">Josh Syre</td>
+          <td style="font-size: 10px;">USA</td>
+          <td style="font-size: 10px;">2026-07-31</td>
+          <td style="text-align: center; color: #2e7d32; font-weight: bold; font-size: 10px;">+17</td>
+          <td class="number">$74K</td>
+          <td class="number">$34K</td>
+        </tr></tbody></table>
+        <input type="checkbox" id="toggle-lines" style="display:none;">
+        <label for="toggle-lines" style="cursor: pointer; font-weight: 600; color: #1a1a1a; padding: 8px; background: #f8fafc; border-radius: 4px; border: 1px solid #e2e8f0; display: block; margin-top: 8px; user-select: none;">
+          <span class="toggle-icon-lines">▶</span> 📋 Show Next 10 Lines (by GP)
+        </label>
+        <div class="collapsible-content-lines" style="display: none; margin-top: 8px;">
+          <table style="margin-top: 8px;">
+            <thead>
+              <tr>
+                <th>Customer</th>
+                <th>SO#</th>
+                <th style="text-align: center;">Ln</th>
+                <th>MPN</th>
+                <th style="text-align: center;">Stock</th>
+                <th style="text-align: center;">Action</th>
+                <th>ISE</th>
+                <th>Rgn</th>
+                <th>Promise</th>
+                <th style="text-align: center;">Days</th>
+                <th style="text-align: right;">Revenue</th>
+                <th style="text-align: right;">GP</th>
+              </tr>
+            </thead>
+            <tbody>
+          <tr style="background-color: #e8f5e9;">
+            <td style="font-size: 11px;"><strong>General Dynamics</strong></td>
+            <td style="font-size: 10px;">SO507641</td>
+            <td style="text-align: center; font-size: 10px;">10</td>
+            <td style="font-size: 9px;">ADV7441ABSTZ-5P</td>
+            <td style="text-align: center; font-size: 10px;">N</td>
+            <td style="text-align: center; font-size: 11px;">🟢</td>
+            <td style="font-size: 10px;">Jake Mcaloose</td>
+            <td style="font-size: 10px;">USA</td>
+            <td style="font-size: 10px;">2026-07-27</td>
+            <td style="text-align: center; color: #2e7d32; font-weight: bold; font-size: 10px;">+13</td>
+            <td class="number">$36K</td>
+            <td class="number">$24K</td>
+          </tr>
+          <tr style="background-color: #e8f5e9;">
+            <td style="font-size: 11px;"><strong>Abaco Systems</strong></td>
+            <td style="font-size: 10px;">SO507718</td>
+            <td style="text-align: center; font-size: 10px;">10</td>
+            <td style="font-size: 9px;">ISL41334IRZ-T7A</td>
+            <td style="text-align: center; font-size: 10px;">N</td>
+            <td style="text-align: center; font-size: 11px;">🟢</td>
+            <td style="font-size: 10px;">Joel Flores</td>
+            <td style="font-size: 10px;">MEX</td>
+            <td style="font-size: 10px;">2026-07-24</td>
+            <td style="text-align: center; color: #2e7d32; font-weight: bold; font-size: 10px;">+10</td>
+            <td class="number">$105K</td>
+            <td class="number">$18K</td>
+          </tr>
+          <tr style="background-color: #e8f5e9;">
+            <td style="font-size: 11px;"><strong>Acron Aviation</strong></td>
+            <td style="font-size: 10px;">SO507065</td>
+            <td style="text-align: center; font-size: 10px;">50</td>
+            <td style="font-size: 9px;">MT29F64G08AJABAWP-IT:B</td>
+            <td style="text-align: center; font-size: 10px;">N</td>
+            <td style="text-align: center; font-size: 11px;">🟢</td>
+            <td style="font-size: 10px;">Daniel Reiser</td>
+            <td style="font-size: 10px;">USA</td>
+            <td style="font-size: 10px;">2026-07-24</td>
+            <td style="text-align: center; color: #2e7d32; font-weight: bold; font-size: 10px;">+10</td>
+            <td class="number">$91K</td>
+            <td class="number">$17K</td>
+          </tr>
+          <tr style="background-color: #ffebee;">
+            <td style="font-size: 11px;"><strong>Applied Materials</strong></td>
+            <td style="font-size: 10px;">SO507595</td>
+            <td style="text-align: center; font-size: 10px;">10</td>
+            <td style="font-size: 9px;">MT29F16G08ABABAWP-AIT:B</td>
+            <td style="text-align: center; font-size: 10px;">N</td>
+            <td style="text-align: center; font-size: 11px;">🔴</td>
+            <td style="font-size: 10px;">Josh Syre</td>
+            <td style="font-size: 10px;">USA</td>
+            <td style="font-size: 10px;">2026-07-05</td>
+            <td style="text-align: center; color: #d32f2f; font-weight: bold; font-size: 10px;">-9</td>
+            <td class="number">$42K</td>
+            <td class="number">$17K</td>
+          </tr>
+          <tr style="background-color: #e8f5e9;">
+            <td style="font-size: 11px;"><strong>Acron Aviation</strong></td>
+            <td style="font-size: 10px;">SO507723</td>
+            <td style="text-align: center; font-size: 10px;">10</td>
+            <td style="font-size: 9px;">XIO3130IZHC</td>
+            <td style="text-align: center; font-size: 10px;">N</td>
+            <td style="text-align: center; font-size: 11px;">🟢</td>
+            <td style="font-size: 10px;">Daniel Reiser</td>
+            <td style="font-size: 10px;">USA</td>
+            <td style="font-size: 10px;">2026-07-31</td>
+            <td style="text-align: center; color: #2e7d32; font-weight: bold; font-size: 10px;">+17</td>
+            <td class="number">$49K</td>
+            <td class="number">$11K</td>
+          </tr>
+          <tr style="background-color: #ffebee;">
+            <td style="font-size: 11px;"><strong>S.A.S. Electronic Co., Ltd</strong></td>
+            <td style="font-size: 10px;">SO507581</td>
+            <td style="text-align: center; font-size: 10px;">10</td>
+            <td style="font-size: 9px;">JMK105BC6475MV-F</td>
+            <td style="text-align: center; font-size: 10px;">N</td>
+            <td style="text-align: center; font-size: 11px;">🔴</td>
+            <td style="font-size: 10px;">Spring Tu</td>
+            <td style="font-size: 10px;">APAC-Silvia</td>
+            <td style="font-size: 10px;">2026-07-01</td>
+            <td style="text-align: center; color: #d32f2f; font-weight: bold; font-size: 10px;">-13</td>
+            <td class="number">$29K</td>
+            <td class="number">$10K</td>
+          </tr>
+          <tr style="background-color: #ffebee;">
+            <td style="font-size: 11px;"><strong>Marvell</strong></td>
+            <td style="font-size: 10px;">SO507690</td>
+            <td style="text-align: center; font-size: 10px;">20</td>
+            <td style="font-size: 9px;">AD5593RBCBZ-RL7</td>
+            <td style="text-align: center; font-size: 10px;">N</td>
+            <td style="text-align: center; font-size: 11px;">🔴</td>
+            <td style="font-size: 10px;">Laurel Kee</td>
+            <td style="font-size: 10px;">APAC-Laurel</td>
+            <td style="font-size: 10px;">2026-07-10</td>
+            <td style="text-align: center; color: #d32f2f; font-weight: bold; font-size: 10px;">-4</td>
+            <td class="number">$45K</td>
+            <td class="number">$10K</td>
+          </tr>
+          <tr style="background-color: #e8f5e9;">
+            <td style="font-size: 11px;"><strong>Acron Aviation</strong></td>
+            <td style="font-size: 10px;">SO507065</td>
+            <td style="text-align: center; font-size: 10px;">30</td>
+            <td style="font-size: 9px;">MT29F64G08AJABAWP-IT:B</td>
+            <td style="text-align: center; font-size: 10px;">N</td>
+            <td style="text-align: center; font-size: 11px;">🟢</td>
+            <td style="font-size: 10px;">Daniel Reiser</td>
+            <td style="font-size: 10px;">USA</td>
+            <td style="font-size: 10px;">2026-07-24</td>
+            <td style="text-align: center; color: #2e7d32; font-weight: bold; font-size: 10px;">+10</td>
+            <td class="number">$25K</td>
+            <td class="number">$9K</td>
+          </tr>
+          <tr style="background-color: #fff9c4;">
+            <td style="font-size: 11px;"><strong>Abaco Systems</strong></td>
+            <td style="font-size: 10px;">SO507715</td>
+            <td style="text-align: center; font-size: 10px;">20</td>
+            <td style="font-size: 9px;">SN74VMEH22501ADGVR </td>
+            <td style="text-align: center; font-size: 10px;">N</td>
+            <td style="text-align: center; font-size: 11px;">🟡</td>
+            <td style="font-size: 10px;">Joel Flores</td>
+            <td style="font-size: 10px;">MEX</td>
+            <td style="font-size: 10px;">2026-07-17</td>
+            <td style="text-align: center; color: #f57c00; font-weight: bold; font-size: 10px;">+3</td>
+            <td class="number">$10K</td>
+            <td class="number">$7K</td>
+          </tr>
+          <tr style="background-color: #e8f5e9;">
+            <td style="font-size: 11px;"><strong>Abaco Systems</strong></td>
+            <td style="font-size: 10px;">SO507714</td>
+            <td style="text-align: center; font-size: 10px;">10</td>
+            <td style="font-size: 9px;">SN74VMEH22501ADGVR</td>
+            <td style="text-align: center; font-size: 10px;">N</td>
+            <td style="text-align: center; font-size: 11px;">🟢</td>
+            <td style="font-size: 10px;">Joel Flores</td>
+            <td style="font-size: 10px;">MEX</td>
+            <td style="font-size: 10px;">2026-07-23</td>
+            <td style="text-align: center; color: #2e7d32; font-weight: bold; font-size: 10px;">+9</td>
+            <td class="number">$13K</td>
+            <td class="number">$5K</td>
+          </tr>
+            </tbody>
+          </table>
+        </div>
+        <style>
+          #toggle-lines:checked ~ .collapsible-content-lines { display: block !important; }
+          #toggle-lines:checked ~ label .toggle-icon-lines::before { content: "▼"; }
+          .toggle-icon-lines::before { content: "▶"; }
+        </style><div class="subsection-header">Inside Sales Reps Alert (No RFQ in 3+ Days)</div><table>
+      <thead>
+        <tr>
+          <th>ISE</th>
+          <th>Manager</th>
+          <th>Region</th>
+          <th>Last RFQ Date</th>
+          <th style="text-align: center;">Days Inactive</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><strong>Michael Stifter</strong></td>
+          <td>Jeff Wallace</td>
+          <td>USA</td>
+          <td>2026-07-08</td>
+          <td style="text-align: center; background-color: #fef3c7;"><span class="badge badge-yellow" style="font-weight: bold; color: #92400e;">4 days</span></td>
+        </tr>
+        <tr>
+          <td><strong>Aaron Mendoza</strong></td>
+          <td>Jeff Wallace</td>
+          <td>USA</td>
+          <td>2026-07-09</td>
+          <td style="text-align: center; background-color: #fef3c7;"><span class="badge badge-yellow" style="font-weight: bold; color: #92400e;">3 days</span></td>
+        </tr></tbody></table><div class="subsection-header">Low Margin Orders Trail (<18% GM)</div><div class="alert-box green">✓ No low margin orders (<18% GM) yesterday</div>
+  <div class="section-header">📊 Section 3: Yesterday's Activity by Region</div>
+  
+  <div class="footer">
+    <div class="footer-title">Report Criteria & Definitions:</div>
+
+    <strong>Section 1: Yesterday's Top Wins</strong>
+    <ul>
+      <li><strong>Top 15 Orders:</strong> Orders booked yesterday ranked by revenue (top 5 visible, next 10 collapsible). *Note: When GP = $0, pricecost field is null (cost data not yet entered).</li>
+      <li><strong>New Customers Sold:</strong> Customers placing their first order ever (includes BP ID for reference)</li>
+      <li><strong>Strategic Accounts:</strong> ABB, Eaton, GE Healthcare, Parker-Meggitt, RTX, Thales</li>
+      <li><strong>Customers Reactivated Yesterday:</strong> Hybrid tracking approach with 30-day minimum threshold. <strong>OEM/EMS customers only</strong> - excludes brokers, distributors, traders, and surplus dealers. Excludes non-component transactions (Generic Sales Product, qty=0 orders). OEMs (ABB, Eaton, GE, KLA, Marvell, Parker, Plexus, RTX, Viavi, etc.) tracked at facility level to catch dormant locations. Others tracked at customer level. Strong filters: High-value (≥$100K + 90+ days), Anomalous pattern (>3x typical cycle + 30+ days), Small customers (<10 orders + 120+ days), or Long dormant (180+ days). Limited to top 5 by significance score.</li>
+    </ul>
+
+    <strong>Section 2: Needs Attention</strong>
+    <ul>
+      <li><strong>Top 15 Scheduled to Ship This Month:</strong> Unshipped lines with promise date in current month, ranked by GP (top 5 visible, next 10 collapsible). Includes In Stock (Y/N) and Action status: 🔴 Red = not in stock + past due (urgent), 🟡 Yellow = not in stock OR due this week (attention needed), 🟢 Green = in stock + future (OK).</li>
+      <li><strong>ISE Alerts:</strong> Inside sales reps with no RFQ loaded in 3+ business days (Yellow: 3-6 days, Red: 7+ days). Active sellers only (excludes departed India & Korea teams).</li>
+      <li><strong>Low Margin Trail:</strong> Orders <18% GM (Josh-approved audit trail)</li>
+    </ul>
+
+    <strong>Section 3: Yesterday's Activity</strong>
+    <ul>
+      <li><strong>Regions:</strong> USA (Jeff Wallace), MEX (Joel Marquez), APAC-Laurel (Laurel Kee), APAC-Silvia (Silvia Munoz), Other</li>
+    </ul>
+
+    <div style="margin-top: 8px; padding-top: 8px; border-top: 1px solid #ddd;">
+      <em>Note: Criteria and thresholds are subject to refinement based on Josh's feedback.</em><br>
+      Questions? Reply to this email. | Next digest: Tomorrow 6:00 AM PT
+    </div>
+  </div>
+</div>
+
+</body>
+</html>

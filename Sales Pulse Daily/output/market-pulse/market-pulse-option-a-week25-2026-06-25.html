@@ -1,0 +1,1535 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Market Pulse — Week 25 (Option A: Dashboard)</title>
+<style>
+  * {
+    box-sizing: border-box;
+  }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif;
+    font-size: 13px;
+    line-height: 1.5;
+    color: #333;
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 20px;
+    background: #f5f5f5;
+  }
+  .container {
+    background: white;
+    padding: 24px;
+    border-radius: 8px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+  }
+  h1 {
+    font-size: 22px;
+    font-weight: 600;
+    margin: 0 0 4px 0;
+    color: #1a1a1a;
+  }
+  .subtitle {
+    font-size: 12px;
+    color: #666;
+    margin-bottom: 24px;
+  }
+
+  /* Tier 1: Executive Insights */
+  .tier1 {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 20px;
+    margin-bottom: 32px;
+    padding-bottom: 32px;
+    border-bottom: 3px solid #e0e0e0;
+  }
+  .insight-card {
+    background: #f5f5f5;
+    border: 2px solid #cbd5e1;
+    border-radius: 8px;
+    padding: 20px;
+    min-height: 360px;
+    display: flex;
+    flex-direction: column;
+  }
+  .insight-card h2 {
+    font-size: 14px;
+    font-weight: 700;
+    margin: 0 0 8px 0;
+    padding-bottom: 8px;
+    border-bottom: 2px solid #cbd5e1;
+    color: #1e293b;
+  }
+  .insight-card-body {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+  }
+
+  /* Market Lifecycle Grid (replacing single state) */
+  .lifecycle-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 10px;
+    margin: 16px 0;
+  }
+  .lifecycle-item {
+    background: white;
+    padding: 10px;
+    border-radius: 6px;
+    border-left: 3px solid #cbd5e1;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+  .lifecycle-item.allocated {
+    border-left-color: #dc2626;
+  }
+  .lifecycle-item.constrained {
+    border-left-color: #ea580c;
+  }
+  .lifecycle-item.recovery {
+    border-left-color: #3b82f6;
+  }
+  .lifecycle-item.normal {
+    border-left-color: #10b981;
+  }
+  .lifecycle-label {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 11px;
+    font-weight: 600;
+  }
+  .lifecycle-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+  }
+  .lifecycle-count {
+    font-size: 16px;
+    font-weight: 700;
+  }
+  .overall-state {
+    text-align: center;
+    padding: 12px;
+    background: white;
+    border-radius: 6px;
+    margin-top: 12px;
+  }
+  .overall-state-name {
+    font-size: 20px;
+    font-weight: 700;
+    margin-bottom: 4px;
+  }
+  .overall-state-sub {
+    font-size: 11px;
+    color: #666;
+  }
+
+  .breakdown {
+    font-size: 12px;
+    font-weight: 600;
+    margin-bottom: 8px;
+    color: #475569;
+  }
+  .breakdown-items {
+    font-size: 11px;
+    color: #666;
+    line-height: 1.8;
+  }
+  .metric-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    margin-bottom: 12px;
+    padding: 8px 0;
+    border-bottom: 1px solid #e2e8f0;
+  }
+  .metric-row:last-of-type {
+    border-bottom: none;
+  }
+  .metric-label {
+    font-size: 12px;
+    font-weight: 600;
+    color: #475569;
+  }
+  .metric-value {
+    font-size: 14px;
+    font-weight: 700;
+    color: #1e293b;
+  }
+  .metric-sub {
+    font-size: 11px;
+    color: #666;
+    margin-left: 8px;
+  }
+  .why-matters {
+    margin-top: 16px;
+    padding: 12px;
+    background: white;
+    border-left: 3px solid #3b82f6;
+    border-radius: 4px;
+    font-size: 11px;
+    color: #1e40af;
+    line-height: 1.5;
+  }
+  .why-matters strong {
+    display: block;
+    margin-bottom: 4px;
+    color: #1e293b;
+  }
+  .action-item {
+    background: white;
+    border-left: 3px solid #3b82f6;
+    border-radius: 4px;
+    padding: 10px;
+    margin-bottom: 10px;
+    font-size: 11px;
+  }
+  .action-item-title {
+    font-size: 12px;
+    font-weight: 700;
+    color: #1e293b;
+    margin-bottom: 6px;
+  }
+  .action-item-detail {
+    color: #475569;
+    margin-bottom: 3px;
+    line-height: 1.5;
+  }
+  .action-expand {
+    color: #3b82f6;
+    cursor: pointer;
+    font-size: 10px;
+    margin-top: 6px;
+    font-weight: 600;
+  }
+  .action-expand:hover {
+    text-decoration: underline;
+  }
+  .action-detail-content {
+    display: none;
+    margin-top: 8px;
+    padding: 8px;
+    background: #fffbeb;
+    border-radius: 4px;
+    font-size: 10px;
+    line-height: 1.6;
+  }
+  .action-detail-content.show {
+    display: block;
+  }
+  .warning-box {
+    margin-top: 12px;
+    padding: 8px;
+    background: #fef3c7;
+    border-left: 3px solid #f59e0b;
+    border-radius: 4px;
+    font-size: 10px;
+    color: #92400e;
+    line-height: 1.5;
+  }
+
+  /* Tier 2: Supporting Intelligence */
+  .tier2-title {
+    font-size: 18px;
+    font-weight: 700;
+    margin: 32px 0 16px 0;
+    color: #1e293b;
+    padding-bottom: 8px;
+    border-bottom: 2px solid #cbd5e1;
+  }
+  .expandable-section {
+    background: #f5f5f5;
+    border: 2px solid #cbd5e1;
+    border-radius: 8px;
+    margin-bottom: 16px;
+    overflow: hidden;
+  }
+  .expandable-header {
+    padding: 16px 20px;
+    cursor: pointer;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background: white;
+    border-bottom: 1px solid #cbd5e1;
+  }
+  .expandable-header:hover {
+    background: #f8fafc;
+  }
+  .expandable-title {
+    font-size: 14px;
+    font-weight: 700;
+    color: #1e293b;
+  }
+  .expandable-subtitle {
+    font-size: 11px;
+    color: #64748b;
+    font-style: italic;
+    margin-top: 2px;
+  }
+  .expandable-toggle {
+    font-size: 24px;
+    color: #3b82f6;
+    font-weight: 700;
+    line-height: 1;
+    user-select: none;
+  }
+  .expandable-content {
+    padding: 20px;
+    display: none;
+    background: white;
+  }
+  .expandable-content.expanded {
+    display: block;
+  }
+
+  /* Reference badge */
+  .reference-badge {
+    display: inline-block;
+    background: #f59e0b;
+    color: white;
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-size: 10px;
+    font-weight: 600;
+    margin-left: 8px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+
+  /* Tables */
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 11px;
+    margin: 16px 0;
+    background: white;
+  }
+  th {
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    padding: 8px;
+    text-align: left;
+    font-weight: 600;
+    font-size: 10px;
+    color: #475569;
+  }
+  td {
+    border: 1px solid #e2e8f0;
+    padding: 8px;
+    font-size: 11px;
+  }
+  tr:hover {
+    background: #fafafa !important;
+  }
+
+  /* Tabs */
+  .tabs {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 16px;
+    border-bottom: 2px solid #e2e8f0;
+  }
+  .tab {
+    padding: 10px 20px;
+    cursor: pointer;
+    font-size: 12px;
+    font-weight: 600;
+    color: #64748b;
+    border-bottom: 3px solid transparent;
+    margin-bottom: -2px;
+    user-select: none;
+  }
+  .tab:hover {
+    color: #3b82f6;
+    background: #f8fafc;
+  }
+  .tab.active {
+    color: #3b82f6;
+    border-bottom-color: #3b82f6;
+  }
+  .tab-content {
+    display: none;
+  }
+  .tab-content.active {
+    display: block;
+  }
+
+  .footer {
+    margin-top: 24px;
+    padding-top: 16px;
+    border-top: 1px solid #e0e0e0;
+    font-size: 11px;
+    color: #666;
+    line-height: 1.6;
+  }
+
+  /* Mobile responsive */
+  @media (max-width: 768px) {
+    .tier1 {
+      grid-template-columns: 1fr;
+    }
+    .lifecycle-grid {
+      grid-template-columns: 1fr;
+    }
+  }
+</style>
+<script>
+  function toggleSection(id) {
+    const content = document.getElementById(id);
+    const toggle = document.getElementById(id + '-toggle');
+    if (content.classList.contains('expanded')) {
+      content.classList.remove('expanded');
+      toggle.textContent = '+';
+    } else {
+      content.classList.add('expanded');
+      toggle.textContent = '−';
+    }
+  }
+
+  function showTab(sectionId, tabName) {
+    const section = document.getElementById(sectionId);
+    const tabs = section.querySelectorAll('.tab');
+    const contents = section.querySelectorAll('.tab-content');
+
+    tabs.forEach(tab => tab.classList.remove('active'));
+    contents.forEach(content => content.classList.remove('active'));
+
+    document.getElementById(sectionId + '-tab-' + tabName).classList.add('active');
+    document.getElementById(sectionId + '-content-' + tabName).classList.add('active');
+  }
+
+  function toggleActionDetail(id) {
+    const content = document.getElementById(id);
+    const link = document.getElementById(id + '-link');
+    if (content.classList.contains('show')) {
+      content.classList.remove('show');
+      link.textContent = '[+ View full details]';
+    } else {
+      content.classList.add('show');
+      link.textContent = '[− Hide details]';
+    }
+  }
+</script>
+</head>
+<body>
+<div class="container">
+  <h1>📊 Market Pulse — Week 25 (Option A: Dashboard Format)</h1>
+  <div class="subtitle">Executive insights at-a-glance • Deep dive data on demand</div>
+
+  <!-- TIER 1: EXECUTIVE INSIGHTS -->
+  <div class="tier1">
+
+    <!-- Card 1: Market Lifecycle States (replacing single Market State) -->
+    <div class="insight-card">
+      <h2>🌡️ MARKET LIFECYCLE SIGNALS</h2>
+      <div class="insight-card-body">
+        <div class="lifecycle-grid">
+          
+          <div class="lifecycle-item allocated">
+            <div class="lifecycle-label">
+              <span class="lifecycle-dot" style="background: #dc2626;"></span>
+              <span style="color: #dc2626;">ALLOCATED</span>
+            </div>
+            <div class="lifecycle-count" style="color: #dc2626;">2</div>
+          </div>
+          
+          
+          <div class="lifecycle-item constrained">
+            <div class="lifecycle-label">
+              <span class="lifecycle-dot" style="background: #ea580c;"></span>
+              <span style="color: #ea580c;">CONSTRAINED</span>
+            </div>
+            <div class="lifecycle-count" style="color: #ea580c;">13</div>
+          </div>
+          
+          
+        </div>
+
+        <div class="overall-state">
+          <div class="overall-state-name" style="color: #10b981;">
+            Overall: Allocated
+          </div>
+          <div class="overall-state-sub">
+            25 total signals: 15 mfr lead times + 10 shortage signals
+          </div>
+        </div>
+
+        <div class="why-matters">
+          <strong>📍 Why it matters:</strong>
+          Stable market conditions → Focus on conversion and margin optimization
+        </div>
+      </div>
+    </div>
+
+    <!-- Card 2: Business Performance -->
+    <div class="insight-card">
+      <h2>💰 BUSINESS PERFORMANCE</h2>
+      <div class="insight-card-body">
+        <div>
+          <div class="metric-row">
+            <span class="metric-label">Bookings (Ex-KLA)</span>
+            <div>
+              <span class="metric-value">$584K</span>
+              <span class="metric-sub" style="color: #10b981;">
+                +2120% WoW
+              </span>
+            </div>
+          </div>
+          <div class="metric-row">
+            <span class="metric-label">Billings (Ex-KLA)</span>
+            <div>
+              <span class="metric-value">$332K</span>
+              <span class="metric-sub" style="color: #dc2626;">
+                -41% WoW
+              </span>
+            </div>
+          </div>
+          <div class="metric-row">
+            <span class="metric-label">Gross Margin</span>
+            <div>
+              <span class="metric-value" style="color: #10b981;">
+                26.3%
+              </span>
+              <span class="metric-sub">(bookings)</span>
+            </div>
+          </div>
+          <div class="metric-row">
+            <span class="metric-label">B/B Ratio</span>
+            <span class="metric-value" style="color: #10b981;">
+              1.76x
+            </span>
+          </div>
+        </div>
+
+        <div class="why-matters">
+          <strong>📍 Insight:</strong>
+          Strong demand signal → Backlog building → 13.0 days ahead
+        </div>
+      </div>
+    </div>
+
+    <!-- Card 3: Top Actions -->
+    <div class="insight-card">
+      <h2>🎯 TOP 3 ACTIONS</h2>
+      <div class="insight-card-body">
+        
+        <div class="action-item">
+          <div class="action-item-title">1. Macronix Allocation Alert</div>
+          <div class="action-item-detail" style="color: #0f766e;">
+            <strong>Internal:</strong> 37.2w LT, 14 VQs
+          </div>
+          <div class="action-item-detail" style="color: #7c2d12;">
+            <strong>External:</strong> ALLOCATED (40+w LT)
+          </div>
+          <div class="action-expand" id="action-0-detail-link" onclick="toggleActionDetail('action-0-detail')">
+            [+ View full details]
+          </div>
+          <div id="action-0-detail" class="action-detail-content">
+            <strong style="color: #92400e;">ACTION:</strong> Verify with sourcing on current availability and pricing for MX* parts. Premium pricing justified by market-wide shortage. Multiple OEMs requesting = high demand signal.
+          </div>
+        </div>
+        
+        <div class="action-item">
+          <div class="action-item-title">2. MCUs Competitive Advantage</div>
+          <div class="action-item-detail" style="color: #0f766e;">
+            <strong>Internal:</strong> STM* showing 29.1w lead time (better than market)...
+          </div>
+          <div class="action-item-detail" style="color: #7c2d12;">
+            <strong>External:</strong> Allocated (55+w)
+          </div>
+          <div class="action-expand" id="action-1-detail-link" onclick="toggleActionDetail('action-1-detail')">
+            [+ View full details]
+          </div>
+          <div id="action-1-detail" class="action-detail-content">
+            <strong style="color: #92400e;">ACTION:</strong> Market aggressively with "in-stock when competitors are out" messaging. Our internal lead times are significantly better than industry. Verify current supply with sourcing and capture margin opportunity.
+          </div>
+        </div>
+        
+        <div class="action-item">
+          <div class="action-item-title">3. Watch TDK Corp Parts Rising</div>
+          <div class="action-item-detail" style="color: #0f766e;">
+            <strong>Internal:</strong> +53% WoW
+          </div>
+          <div class="action-item-detail" style="color: #7c2d12;">
+            <strong>External:</strong> Rising constraint signals
+          </div>
+          <div class="action-expand" id="action-2-detail-link" onclick="toggleActionDetail('action-2-detail')">
+            [+ View full details]
+          </div>
+          <div id="action-2-detail" class="action-detail-content">
+            <strong style="color: #92400e;">ACTION:</strong> Monitor these* parts closely. 0% of VQs showing 40+w lead times. May escalate to full allocation in 2-4 weeks. Early customer communication recommended if lead times extend further.
+          </div>
+        </div>
+        
+
+        <div class="warning-box">
+          <strong>⚠️ IMPORTANT:</strong> All actions require sourcing verification of current availability and pricing before customer commitments.
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- TIER 2: SUPPORTING INTELLIGENCE -->
+  <div class="tier2-title">📊 SUPPORTING INTELLIGENCE</div>
+  <div style="font-size: 11px; color: #64748b; margin-bottom: 20px; font-style: italic;">
+    Click any section below to expand detailed data tables and analysis
+  </div>
+
+  <!-- Section 1: Constraint Signals (Merged 3a + 4 + 3b) -->
+  <div class="expandable-section">
+    <div class="expandable-header" onclick="toggleSection('constraint-signals')">
+      <div>
+        <div class="expandable-title">🚨 Constraint Signals — Market Temperature (30-Day Rolling)</div>
+        <div class="expandable-subtitle">
+          Early warning signals from OT data: Part families, manufacturers, and franchise lead times
+        </div>
+      </div>
+      <div class="expandable-toggle" id="constraint-signals-toggle">+</div>
+    </div>
+    <div id="constraint-signals" class="expandable-content">
+      <p style="font-size: 11px; color: #666; margin-bottom: 16px; line-height: 1.6;">
+        <strong>What this shows:</strong> Three complementary views of supply constraints detected in OT data:<br>
+        • <strong>By Part Family:</strong> Which specific part families (TPS*, SN74*, etc.) have 2+ OEM customers requesting in shortage RFQs<br>
+        • <strong>By Manufacturer:</strong> Aggregated view showing which manufacturers are driving shortage-related revenue<br>
+        • <strong>By Lead Time:</strong> Franchise distributor lead times as early warning indicator of factory constraints
+      </p>
+
+      <div id="constraint-tabs">
+        <div class="tabs">
+          <div class="tab active" id="constraint-tabs-tab-families" onclick="showTab('constraint-tabs', 'families')">
+            By Part Family
+          </div>
+          <div class="tab" id="constraint-tabs-tab-manufacturers" onclick="showTab('constraint-tabs', 'manufacturers')">
+            By Manufacturer
+          </div>
+          <div class="tab" id="constraint-tabs-tab-leadtimes" onclick="showTab('constraint-tabs', 'leadtimes')">
+            By Lead Time
+          </div>
+        </div>
+
+        <!-- Tab 1: By Part Family (FULL DATA) -->
+        <div id="constraint-tabs-content-families" class="tab-content active">
+          <h4 style="font-size: 12px; font-weight: 600; margin: 16px 0 8px 0; color: #1e293b;">
+            🔥 Hot Part Families — Shortage Signals (2+ OEM Customers)
+          </h4>
+          
+    <table>
+      <thead>
+        <tr>
+          <th>Part Family</th>
+          <th>Manufacturer</th>
+          <th>Type</th>
+          <th style="text-align: right;">Customers</th>
+          <th style="text-align: right;">RFQ Lines</th>
+          <th style="text-align: right;">VQ Lines</th>
+          <th style="text-align: right;">CQ Lines</th>
+          <th style="text-align: right;">SO Lines</th>
+          <th style="text-align: right;">Booked GP</th>
+          <th style="text-align: right;">GM%</th>
+        </tr>
+      </thead>
+      <tbody>
+        
+        <tr style="background: #f0fdf4;">
+          <td><strong>🏆 K*</strong></td>
+          <td>Samsung</td>
+          <td style="font-size: 10px;">Other</td>
+          <td style="text-align: right;">6 (5 OEM)</td>
+          <td style="text-align: right;">7</td>
+          <td style="text-align: right;">14</td>
+          <td style="text-align: right;">6</td>
+          <td style="text-align: right;">6</td>
+          <td style="text-align: right; font-weight: 600; color: #10b981;">
+            $3,573,871
+          </td>
+          <td style="text-align: right; color: #10b981;">
+            2390.0%
+          </td>
+        </tr>
+        
+        <tr style="background: #f5f5f5;">
+          <td><strong>null*</strong></td>
+          <td>Altera</td>
+          <td style="font-size: 10px;">Other</td>
+          <td style="text-align: right;">9 (7 OEM)</td>
+          <td style="text-align: right;">27</td>
+          <td style="text-align: right;">20<span style="color: #dc2626;">(-1)</span></td>
+          <td style="text-align: right;">6</td>
+          <td style="text-align: right;">2</td>
+          <td style="text-align: right; font-weight: 600; color: #10b981;">
+            $625,142
+          </td>
+          <td style="text-align: right; color: #10b981;">
+            2630.0%
+          </td>
+        </tr>
+        
+        <tr style="background: #f5f5f5;">
+          <td><strong>XC*</strong></td>
+          <td>Xilinx Inc</td>
+          <td style="font-size: 10px;">FPGAs</td>
+          <td style="text-align: right;">7 (4 OEM)</td>
+          <td style="text-align: right;">20</td>
+          <td style="text-align: right;">25<span style="color: #dc2626;">(-1)</span></td>
+          <td style="text-align: right;">13</td>
+          <td style="text-align: right;">4</td>
+          <td style="text-align: right; font-weight: 600; color: #10b981;">
+            $189,250
+          </td>
+          <td style="text-align: right; color: #10b981;">
+            1970.0%
+          </td>
+        </tr>
+        
+        <tr style="background: #f5f5f5;">
+          <td><strong>TPS*</strong></td>
+          <td>Texas Instruments</td>
+          <td style="font-size: 10px;">Power Mgmt ICs</td>
+          <td style="text-align: right;">10 (7 OEM)</td>
+          <td style="text-align: right;">166</td>
+          <td style="text-align: right;">155<span style="color: #dc2626;">(-5)</span></td>
+          <td style="text-align: right;">33</td>
+          <td style="text-align: right;">8</td>
+          <td style="text-align: right; font-weight: 600; color: #10b981;">
+            $180,733
+          </td>
+          <td style="text-align: right; color: #10b981;">
+            2460.0%
+          </td>
+        </tr>
+        
+        <tr style="background: #f5f5f5;">
+          <td><strong>MT*</strong></td>
+          <td>Micron Technology Inc</td>
+          <td style="font-size: 10px;">Memory</td>
+          <td style="text-align: right;">11 (7 OEM)</td>
+          <td style="text-align: right;">83</td>
+          <td style="text-align: right;">299<span style="color: #dc2626;">(-3)</span></td>
+          <td style="text-align: right;">40</td>
+          <td style="text-align: right;">2</td>
+          <td style="text-align: right; font-weight: 600; color: #10b981;">
+            $90,858
+          </td>
+          <td style="text-align: right; color: #10b981;">
+            600.0%
+          </td>
+        </tr>
+        
+        <tr style="background: #f5f5f5;">
+          <td><strong>AD*</strong></td>
+          <td>Analog Devices Inc</td>
+          <td style="font-size: 10px;">Analog ICs</td>
+          <td style="text-align: right;">5 (3 OEM)</td>
+          <td style="text-align: right;">27</td>
+          <td style="text-align: right;">52<span style="color: #dc2626;">(-1)</span></td>
+          <td style="text-align: right;">5</td>
+          <td style="text-align: right;">3</td>
+          <td style="text-align: right; font-weight: 600; color: #10b981;">
+            $85,950
+          </td>
+          <td style="text-align: right; color: #10b981;">
+            4050.0%
+          </td>
+        </tr>
+        
+        <tr style="background: #f5f5f5;">
+          <td><strong>BCM*</strong></td>
+          <td>Broadcom</td>
+          <td style="font-size: 10px;">Other</td>
+          <td style="text-align: right;">3 (2 OEM)</td>
+          <td style="text-align: right;">9</td>
+          <td style="text-align: right;">5</td>
+          <td style="text-align: right;">7</td>
+          <td style="text-align: right;">4</td>
+          <td style="text-align: right; font-weight: 600; color: #10b981;">
+            $81,038
+          </td>
+          <td style="text-align: right; color: #10b981;">
+            2500.0%
+          </td>
+        </tr>
+        
+        <tr style="background: #f5f5f5;">
+          <td><strong>SN74*</strong></td>
+          <td>Texas Instruments</td>
+          <td style="font-size: 10px;">Logic ICs</td>
+          <td style="text-align: right;">9 (6 OEM)</td>
+          <td style="text-align: right;">76</td>
+          <td style="text-align: right;">16</td>
+          <td style="text-align: right;">13</td>
+          <td style="text-align: right;">1</td>
+          <td style="text-align: right; font-weight: 600; color: #10b981;">
+            $45,900
+          </td>
+          <td style="text-align: right; color: #10b981;">
+            3620.0%
+          </td>
+        </tr>
+        
+        <tr style="background: #f5f5f5;">
+          <td><strong>W*</strong></td>
+          <td>Winbond</td>
+          <td style="font-size: 10px;">Memory</td>
+          <td style="text-align: right;">8 (6 OEM)</td>
+          <td style="text-align: right;">47</td>
+          <td style="text-align: right;">103</td>
+          <td style="text-align: right;">14</td>
+          <td style="text-align: right;">2</td>
+          <td style="text-align: right; font-weight: 600; color: #10b981;">
+            $21,735
+          </td>
+          <td style="text-align: right; color: #10b981;">
+            1690.0%
+          </td>
+        </tr>
+        
+        <tr style="background: #f5f5f5;">
+          <td><strong>HMCG*</strong></td>
+          <td>Hynix</td>
+          <td style="font-size: 10px;">Memory</td>
+          <td style="text-align: right;">4 (3 OEM)</td>
+          <td style="text-align: right;">11</td>
+          <td style="text-align: right;">3</td>
+          <td style="text-align: right;">2</td>
+          <td style="text-align: right;">1</td>
+          <td style="text-align: right; font-weight: 600; color: #10b981;">
+            $19,200
+          </td>
+          <td style="text-align: right; color: #10b981;">
+            2500.0%
+          </td>
+        </tr>
+        
+      </tbody>
+    </table>
+    
+    <p style="font-size: 10px; color: #666; font-style: italic; margin-top: 8px;">Showing all 10 part families with 2+ OEM customers in shortage RFQs (30-day window).</p>
+        </div>
+
+        <!-- Tab 2: By Manufacturer (FULL DATA) -->
+        <div id="constraint-tabs-content-manufacturers" class="tab-content">
+          <h4 style="font-size: 12px; font-weight: 600; margin: 16px 0 8px 0; color: #1e293b;">
+            📊 Trending Shortage Manufacturers — All Results by Booked GP
+          </h4>
+          <p style="font-size: 10px; color: #ea580c; font-style: italic; margin-bottom: 12px;">
+            <strong>Note:</strong> This is manufacturer-level aggregation of the part family data shown in the previous tab. Same underlying shortage RFQ data, grouped differently.
+          </p>
+          
+    <table>
+      <thead>
+        <tr>
+          <th>Manufacturer</th>
+          <th style="text-align: right;">Customers</th>
+          <th style="text-align: right;">RFQ Lines</th>
+          <th style="text-align: right;">VQ Lines</th>
+          <th style="text-align: right;">CQ Lines</th>
+          <th style="text-align: right;">SO Lines</th>
+          <th style="text-align: right;">Win %</th>
+          <th style="text-align: right;">Booked GP</th>
+        </tr>
+      </thead>
+      <tbody>
+        
+        <tr style="background: #f0fdf4;">
+          <td><strong>🏆 Samsung</strong></td>
+          <td style="text-align: right;">14 (12 OEM)</td>
+          <td style="text-align: right;">62</td>
+          <td style="text-align: right;">605</td>
+          <td style="text-align: right;">8</td>
+          <td style="text-align: right;">6</td>
+          <td style="text-align: right; color: #10b981;">
+            100.0%
+          </td>
+          <td style="text-align: right; font-weight: 600; color: #10b981;">
+            $3,573,871
+          </td>
+        </tr>
+        
+        <tr style="background: #f5f5f5;">
+          <td><strong>Analog Devices Inc</strong></td>
+          <td style="text-align: right;">11 (8 OEM)</td>
+          <td style="text-align: right;">92</td>
+          <td style="text-align: right;">123</td>
+          <td style="text-align: right;">20</td>
+          <td style="text-align: right;">13</td>
+          <td style="text-align: right; color: #10b981;">
+            1060.0%
+          </td>
+          <td style="text-align: right; font-weight: 600; color: #10b981;">
+            $1,988,820
+          </td>
+        </tr>
+        
+        <tr style="background: #f5f5f5;">
+          <td><strong>Intel Corp</strong></td>
+          <td style="text-align: right;">10 (7 OEM)</td>
+          <td style="text-align: right;">26</td>
+          <td style="text-align: right;">18</td>
+          <td style="text-align: right;">20</td>
+          <td style="text-align: right;">10</td>
+          <td style="text-align: right; color: #10b981;">
+            5560.0%
+          </td>
+          <td style="text-align: right; font-weight: 600; color: #10b981;">
+            $1,468,264
+          </td>
+        </tr>
+        
+        <tr style="background: #f5f5f5;">
+          <td><strong>Altera</strong></td>
+          <td style="text-align: right;">12 (10 OEM)</td>
+          <td style="text-align: right;">43</td>
+          <td style="text-align: right;">45</td>
+          <td style="text-align: right;">14</td>
+          <td style="text-align: right;">2</td>
+          <td style="text-align: right; color: #10b981;">
+            440.0%
+          </td>
+          <td style="text-align: right; font-weight: 600; color: #10b981;">
+            $625,142
+          </td>
+        </tr>
+        
+        <tr style="background: #f5f5f5;">
+          <td><strong>Nexperia</strong></td>
+          <td style="text-align: right;">22 (19 OEM)</td>
+          <td style="text-align: right;">592</td>
+          <td style="text-align: right;">1417</td>
+          <td style="text-align: right;">40</td>
+          <td style="text-align: right;">8</td>
+          <td style="text-align: right; color: #10b981;">
+            60.0%
+          </td>
+          <td style="text-align: right; font-weight: 600; color: #10b981;">
+            $535,614
+          </td>
+        </tr>
+        
+        <tr style="background: #f5f5f5;">
+          <td><strong>On Semiconductor</strong></td>
+          <td style="text-align: right;">14 (12 OEM)</td>
+          <td style="text-align: right;">227</td>
+          <td style="text-align: right;">1081</td>
+          <td style="text-align: right;">12</td>
+          <td style="text-align: right;">6</td>
+          <td style="text-align: right; color: #10b981;">
+            60.0%
+          </td>
+          <td style="text-align: right; font-weight: 600; color: #10b981;">
+            $534,761
+          </td>
+        </tr>
+        
+        <tr style="background: #f5f5f5;">
+          <td><strong>Texas Instruments</strong></td>
+          <td style="text-align: right;">25 (21 OEM)</td>
+          <td style="text-align: right;">817</td>
+          <td style="text-align: right;">532</td>
+          <td style="text-align: right;">144</td>
+          <td style="text-align: right;">15</td>
+          <td style="text-align: right; color: #10b981;">
+            280.0%
+          </td>
+          <td style="text-align: right; font-weight: 600; color: #10b981;">
+            $261,296
+          </td>
+        </tr>
+        
+        <tr style="background: #f5f5f5;">
+          <td><strong>Xilinx Inc</strong></td>
+          <td style="text-align: right;">11 (8 OEM)</td>
+          <td style="text-align: right;">24</td>
+          <td style="text-align: right;">32</td>
+          <td style="text-align: right;">14</td>
+          <td style="text-align: right;">4</td>
+          <td style="text-align: right; color: #10b981;">
+            1250.0%
+          </td>
+          <td style="text-align: right; font-weight: 600; color: #10b981;">
+            $189,250
+          </td>
+        </tr>
+        
+        <tr style="background: #f5f5f5;">
+          <td><strong>Micron Technology Inc</strong></td>
+          <td style="text-align: right;">13 (9 OEM)</td>
+          <td style="text-align: right;">102</td>
+          <td style="text-align: right;">348</td>
+          <td style="text-align: right;">47</td>
+          <td style="text-align: right;">3</td>
+          <td style="text-align: right; color: #10b981;">
+            90.0%
+          </td>
+          <td style="text-align: right; font-weight: 600; color: #10b981;">
+            $93,674
+          </td>
+        </tr>
+        
+        <tr style="background: #f5f5f5;">
+          <td><strong>Broadcom</strong></td>
+          <td style="text-align: right;">9 (7 OEM)</td>
+          <td style="text-align: right;">35</td>
+          <td style="text-align: right;">43</td>
+          <td style="text-align: right;">7</td>
+          <td style="text-align: right;">4</td>
+          <td style="text-align: right; color: #10b981;">
+            930.0%
+          </td>
+          <td style="text-align: right; font-weight: 600; color: #10b981;">
+            $81,038
+          </td>
+        </tr>
+        
+      </tbody>
+    </table>
+    
+    <p style="font-size: 10px; color: #666; font-style: italic; margin-top: 8px;">Showing all 10 manufacturers from shortage RFQs (30-day window).</p>
+        </div>
+
+        <!-- Tab 3: By Lead Time (FULL DATA) -->
+        <div id="constraint-tabs-content-leadtimes" class="tab-content">
+          <h4 style="font-size: 12px; font-weight: 600; margin: 16px 0 8px 0; color: #1e293b;">
+            📊 Franchise Lead Time Analysis — Market Temperature by Part Type
+          </h4>
+          
+    <table>
+      <thead>
+        <tr>
+          <th>Part Family</th>
+          <th>Manufacturer</th>
+          <th style="text-align: right;">Current LT</th>
+          <th style="text-align: right;">Baseline</th>
+          <th style="text-align: right;">Change</th>
+          <th style="text-align: center;">Status</th>
+          <th style="text-align: right;">Sample</th>
+        </tr>
+      </thead>
+      <tbody>
+        
+        <tr style="background: #f5f5f5;">
+          <td><strong>MX*</strong></td>
+          <td>Macronix</td>
+          <td style="text-align: right; font-weight: 600; color: #dc2626;">
+            37.2w
+          </td>
+          <td style="text-align: right;">26.2w</td>
+          <td style="text-align: right; color: #dc2626;">
+            +42%
+          </td>
+          <td style="text-align: center;">
+            <span style="display: inline-block; width: 10px; height: 10px; background: #dc2626; border-radius: 50%; margin-right: 4px; vertical-align: middle;"></span><span style="color: #dc2626; font-weight: 600; font-size: 10px;">ALLOCATED</span>
+          </td>
+          <td style="text-align: right; font-size: 10px; color: #666;">14 VQs</td>
+        </tr>
+        
+        <tr style="background: #f5f5f5;">
+          <td><strong>VIPE*</strong></td>
+          <td>St</td>
+          <td style="text-align: right; font-weight: 600; color: #dc2626;">
+            33.8w
+          </td>
+          <td style="text-align: right;">26.2w</td>
+          <td style="text-align: right; color: #dc2626;">
+            +29%
+          </td>
+          <td style="text-align: center;">
+            <span style="display: inline-block; width: 10px; height: 10px; background: #ea580c; border-radius: 50%; margin-right: 4px; vertical-align: middle;"></span><span style="color: #ea580c; font-weight: 600; font-size: 10px;">CONSTRAINED</span>
+          </td>
+          <td style="text-align: right; font-size: 10px; color: #666;">15 VQs</td>
+        </tr>
+        
+        <tr style="background: #f5f5f5;">
+          <td><strong>SP*</strong></td>
+          <td>Infineon</td>
+          <td style="text-align: right; font-weight: 600; color: #dc2626;">
+            32.8w
+          </td>
+          <td style="text-align: right;">32.3w</td>
+          <td style="text-align: right; color: #dc2626;">
+            +2%
+          </td>
+          <td style="text-align: center;">
+            <span style="display: inline-block; width: 10px; height: 10px; background: #ea580c; border-radius: 50%; margin-right: 4px; vertical-align: middle;"></span><span style="color: #ea580c; font-weight: 600; font-size: 10px;">CONSTRAINED</span>
+          </td>
+          <td style="text-align: right; font-size: 10px; color: #666;">49 VQs</td>
+        </tr>
+        
+        <tr style="background: #f5f5f5;">
+          <td><strong>DMTH*</strong></td>
+          <td>Diodes Inc</td>
+          <td style="text-align: right; font-weight: 600; color: #dc2626;">
+            32.4w
+          </td>
+          <td style="text-align: right;">27.7w</td>
+          <td style="text-align: right; color: #dc2626;">
+            +17%
+          </td>
+          <td style="text-align: center;">
+            <span style="display: inline-block; width: 10px; height: 10px; background: #dc2626; border-radius: 50%; margin-right: 4px; vertical-align: middle;"></span><span style="color: #dc2626; font-weight: 600; font-size: 10px;">ALLOCATED</span>
+          </td>
+          <td style="text-align: right; font-size: 10px; color: #666;">10 VQs</td>
+        </tr>
+        
+        <tr style="background: #f5f5f5;">
+          <td><strong>STM*</strong></td>
+          <td>St</td>
+          <td style="text-align: right; font-weight: 600; color: #dc2626;">
+            30.6w
+          </td>
+          <td style="text-align: right;">30.0w</td>
+          <td style="text-align: right; color: #dc2626;">
+            +2%
+          </td>
+          <td style="text-align: center;">
+            <span style="display: inline-block; width: 10px; height: 10px; background: #ea580c; border-radius: 50%; margin-right: 4px; vertical-align: middle;"></span><span style="color: #ea580c; font-weight: 600; font-size: 10px;">CONSTRAINED</span>
+          </td>
+          <td style="text-align: right; font-size: 10px; color: #666;">49 VQs</td>
+        </tr>
+        
+        <tr style="background: #f5f5f5;">
+          <td><strong>MOX*</strong></td>
+          <td>Ohmite</td>
+          <td style="text-align: right; font-weight: 600; color: #3b82f6;">
+            27.3w
+          </td>
+          <td style="text-align: right;">27.9w</td>
+          <td style="text-align: right; color: #3b82f6;">
+            -2%
+          </td>
+          <td style="text-align: center;">
+            <span style="display: inline-block; width: 10px; height: 10px; background: #ea580c; border-radius: 50%; margin-right: 4px; vertical-align: middle;"></span><span style="color: #ea580c; font-weight: 600; font-size: 10px;">CONSTRAINED</span>
+          </td>
+          <td style="text-align: right; font-size: 10px; color: #666;">11 VQs</td>
+        </tr>
+        
+        <tr style="background: #f5f5f5;">
+          <td><strong>NVMF*</strong></td>
+          <td>On Semiconductor</td>
+          <td style="text-align: right; font-weight: 600; color: #3b82f6;">
+            25.7w
+          </td>
+          <td style="text-align: right;">31.6w</td>
+          <td style="text-align: right; color: #3b82f6;">
+            -19%
+          </td>
+          <td style="text-align: center;">
+            <span style="display: inline-block; width: 10px; height: 10px; background: #ea580c; border-radius: 50%; margin-right: 4px; vertical-align: middle;"></span><span style="color: #ea580c; font-weight: 600; font-size: 10px;">CONSTRAINED</span>
+          </td>
+          <td style="text-align: right; font-size: 10px; color: #666;">20 VQs</td>
+        </tr>
+        
+        <tr style="background: #f5f5f5;">
+          <td><strong>MMBZ*</strong></td>
+          <td>On Semiconductor</td>
+          <td style="text-align: right; font-weight: 600; color: #3b82f6;">
+            23.3w
+          </td>
+          <td style="text-align: right;">25.8w</td>
+          <td style="text-align: right; color: #3b82f6;">
+            -10%
+          </td>
+          <td style="text-align: center;">
+            <span style="display: inline-block; width: 10px; height: 10px; background: #ea580c; border-radius: 50%; margin-right: 4px; vertical-align: middle;"></span><span style="color: #ea580c; font-weight: 600; font-size: 10px;">CONSTRAINED</span>
+          </td>
+          <td style="text-align: right; font-size: 10px; color: #666;">15 VQs</td>
+        </tr>
+        
+        <tr style="background: #f5f5f5;">
+          <td><strong>MBR*</strong></td>
+          <td>On Semiconductor</td>
+          <td style="text-align: right; font-weight: 600; color: #dc2626;">
+            20.3w
+          </td>
+          <td style="text-align: right;">18.4w</td>
+          <td style="text-align: right; color: #dc2626;">
+            +10%
+          </td>
+          <td style="text-align: center;">
+            <span style="display: inline-block; width: 10px; height: 10px; background: #ea580c; border-radius: 50%; margin-right: 4px; vertical-align: middle;"></span><span style="color: #ea580c; font-weight: 600; font-size: 10px;">CONSTRAINED</span>
+          </td>
+          <td style="text-align: right; font-size: 10px; color: #666;">14 VQs</td>
+        </tr>
+        
+        <tr style="background: #f5f5f5;">
+          <td><strong>C*</strong></td>
+          <td>TDK Corp</td>
+          <td style="text-align: right; font-weight: 600; color: #dc2626;">
+            20.3w
+          </td>
+          <td style="text-align: right;">13.3w</td>
+          <td style="text-align: right; color: #dc2626;">
+            +53%
+          </td>
+          <td style="text-align: center;">
+            <span style="display: inline-block; width: 10px; height: 10px; background: #ea580c; border-radius: 50%; margin-right: 4px; vertical-align: middle;"></span><span style="color: #ea580c; font-weight: 600; font-size: 10px;">CONSTRAINED</span>
+          </td>
+          <td style="text-align: right; font-size: 10px; color: #666;">13 VQs</td>
+        </tr>
+        
+        <tr style="background: #f5f5f5;">
+          <td><strong>ERA*</strong></td>
+          <td>Panasonic</td>
+          <td style="text-align: right; font-weight: 600; color: #dc2626;">
+            19.6w
+          </td>
+          <td style="text-align: right;">14.1w</td>
+          <td style="text-align: right; color: #dc2626;">
+            +39%
+          </td>
+          <td style="text-align: center;">
+            <span style="display: inline-block; width: 10px; height: 10px; background: #ea580c; border-radius: 50%; margin-right: 4px; vertical-align: middle;"></span><span style="color: #ea580c; font-weight: 600; font-size: 10px;">CONSTRAINED</span>
+          </td>
+          <td style="text-align: right; font-size: 10px; color: #666;">14 VQs</td>
+        </tr>
+        
+        <tr style="background: #f5f5f5;">
+          <td><strong>MMBD*</strong></td>
+          <td>Fairchild Semiconductor</td>
+          <td style="text-align: right; font-weight: 600; color: #dc2626;">
+            18.2w
+          </td>
+          <td style="text-align: right;">15.7w</td>
+          <td style="text-align: right; color: #dc2626;">
+            +16%
+          </td>
+          <td style="text-align: center;">
+            <span style="display: inline-block; width: 10px; height: 10px; background: #ea580c; border-radius: 50%; margin-right: 4px; vertical-align: middle;"></span><span style="color: #ea580c; font-weight: 600; font-size: 10px;">CONSTRAINED</span>
+          </td>
+          <td style="text-align: right; font-size: 10px; color: #666;">13 VQs</td>
+        </tr>
+        
+        <tr style="background: #f5f5f5;">
+          <td><strong>BLM*</strong></td>
+          <td>Murata</td>
+          <td style="text-align: right; font-weight: 600; color: #dc2626;">
+            17.8w
+          </td>
+          <td style="text-align: right;">14.0w</td>
+          <td style="text-align: right; color: #dc2626;">
+            +27%
+          </td>
+          <td style="text-align: center;">
+            <span style="display: inline-block; width: 10px; height: 10px; background: #ea580c; border-radius: 50%; margin-right: 4px; vertical-align: middle;"></span><span style="color: #ea580c; font-weight: 600; font-size: 10px;">CONSTRAINED</span>
+          </td>
+          <td style="text-align: right; font-size: 10px; color: #666;">17 VQs</td>
+        </tr>
+        
+        <tr style="background: #f5f5f5;">
+          <td><strong>N/A*</strong></td>
+          <td>Dialight</td>
+          <td style="text-align: right; font-weight: 600; color: #dc2626;">
+            16.9w
+          </td>
+          <td style="text-align: right;">15.3w</td>
+          <td style="text-align: right; color: #dc2626;">
+            +11%
+          </td>
+          <td style="text-align: center;">
+            <span style="display: inline-block; width: 10px; height: 10px; background: #ea580c; border-radius: 50%; margin-right: 4px; vertical-align: middle;"></span><span style="color: #ea580c; font-weight: 600; font-size: 10px;">CONSTRAINED</span>
+          </td>
+          <td style="text-align: right; font-size: 10px; color: #666;">16 VQs</td>
+        </tr>
+        
+        <tr style="background: #f5f5f5;">
+          <td><strong>PSMN*</strong></td>
+          <td>Nexperia</td>
+          <td style="text-align: right; font-weight: 600; color: #3b82f6;">
+            16.4w
+          </td>
+          <td style="text-align: right;">22.8w</td>
+          <td style="text-align: right; color: #3b82f6;">
+            -28%
+          </td>
+          <td style="text-align: center;">
+            <span style="display: inline-block; width: 10px; height: 10px; background: #ea580c; border-radius: 50%; margin-right: 4px; vertical-align: middle;"></span><span style="color: #ea580c; font-weight: 600; font-size: 10px;">CONSTRAINED</span>
+          </td>
+          <td style="text-align: right; font-size: 10px; color: #666;">21 VQs</td>
+        </tr>
+        
+      </tbody>
+    </table>
+    
+    <p style="font-size: 10px; color: #666; font-style: italic; margin-top: 8px;">Showing all 15 part families with franchise lead time data.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Section 2: External Market Validation -->
+  <div class="expandable-section">
+    <div class="expandable-header" onclick="toggleSection('external-market')">
+      <div>
+        <div class="expandable-title">📡 External Market Validation — Industry Lifecycle Check</div>
+        <div class="expandable-subtitle">
+          How do external industry signals compare to our internal OT data?
+        </div>
+      </div>
+      <div class="expandable-toggle" id="external-market-toggle">+</div>
+    </div>
+    <div id="external-market" class="expandable-content">
+      <p style="font-size: 11px; color: #666; margin-bottom: 12px; line-height: 1.6;">
+        <strong>Data Source:</strong> Industry market reports (Sourceability, Avnet, J2 Sourcing, Deloitte)<br>
+        <strong>Last Updated:</strong> 2026-06-23<br>
+        <strong>Purpose:</strong> Validate whether our internal signals match market-wide trends or if we have competitive advantages
+      </p>
+      
+    <table>
+      <thead>
+        <tr>
+          <th style="width: 15%;">Category</th>
+          <th style="width: 12%; text-align: center;">External Status</th>
+          <th style="width: 30%;">Key Signals</th>
+          <th style="width: 12%; text-align: center;">Industry LT</th>
+          <th style="width: 15%; text-align: center;">Alignment</th>
+          <th style="width: 16%;">OT Internal Signal</th>
+        </tr>
+      </thead>
+      <tbody>
+        
+        <tr style="background: #f5f5f5;">
+          <td><strong>Memory</strong></td>
+          <td style="text-align: center; font-weight: 600;">
+            <span style="display: inline-block; width: 10px; height: 10px; background: #dc2626; border-radius: 50%; margin-right: 6px; vertical-align: middle;"></span><span style="color: #dc2626;">ALLOCATED</span>
+          </td>
+          <td style="font-size: 11px;">50% price spikes, severe shortages (ISSI, Micron, Macronix)</td>
+          <td style="text-align: center; font-weight: 600;">32-38w</td>
+          <td style="text-align: center; font-weight: 700; color: #10b981;">
+            ✅ MATCHES
+          </td>
+          <td style="font-size: 11px; color: #666;">MT*, IS*, MX* in shortage signals</td>
+        </tr>
+        
+        <tr style="background: #f5f5f5;">
+          <td><strong>MCUs</strong></td>
+          <td style="text-align: center; font-weight: 600;">
+            <span style="display: inline-block; width: 10px; height: 10px; background: #dc2626; border-radius: 50%; margin-right: 6px; vertical-align: middle;"></span><span style="color: #dc2626;">ALLOCATED</span>
+          </td>
+          <td style="font-size: 11px;">Lead times exceeding 55 weeks</td>
+          <td style="text-align: center; font-weight: 600;">55+w</td>
+          <td style="text-align: center; font-weight: 700; color: #3b82f6;">
+            ⚠️ BETTER SUPPLY
+          </td>
+          <td style="font-size: 11px; color: #666;">STM* showing 29.1w lead time (better than market)</td>
+        </tr>
+        
+        <tr style="background: #f5f5f5;">
+          <td><strong>Power Mgmt</strong></td>
+          <td style="text-align: center; font-weight: 600;">
+            <span style="display: inline-block; width: 10px; height: 10px; background: #ea580c; border-radius: 50%; margin-right: 6px; vertical-align: middle;"></span><span style="color: #ea580c;">CONSTRAINED</span>
+          </td>
+          <td style="font-size: 11px;">Automotive/AI demand, 16-24w lead times</td>
+          <td style="text-align: center; font-weight: 600;">16-24w</td>
+          <td style="text-align: center; font-weight: 700; color: #10b981;">
+            ✅ MATCHES
+          </td>
+          <td style="font-size: 11px; color: #666;">TPS* (10 OEM customers)</td>
+        </tr>
+        
+        <tr style="background: #f5f5f5;">
+          <td><strong>Logic ICs</strong></td>
+          <td style="text-align: center; font-weight: 600;">
+            <span style="display: inline-block; width: 10px; height: 10px; background: #ea580c; border-radius: 50%; margin-right: 6px; vertical-align: middle;"></span><span style="color: #ea580c;">CONSTRAINED</span>
+          </td>
+          <td style="font-size: 11px;">Supply tightening</td>
+          <td style="text-align: center; font-weight: 600;">12-20w</td>
+          <td style="text-align: center; font-weight: 700; color: #10b981;">
+            ✅ MATCHES
+          </td>
+          <td style="font-size: 11px; color: #666;">SN74* in shortage signals</td>
+        </tr>
+        
+        <tr style="background: #f5f5f5;">
+          <td><strong>Mature Nodes</strong></td>
+          <td style="text-align: center; font-weight: 600;">
+            <span style="display: inline-block; width: 10px; height: 10px; background: #3b82f6; border-radius: 50%; margin-right: 6px; vertical-align: middle;"></span><span style="color: #3b82f6;">RECOVERY</span>
+          </td>
+          <td style="font-size: 11px;">Inventory normalized, buyer-favorable</td>
+          <td style="text-align: center; font-weight: 600;">4-12w</td>
+          <td style="text-align: center; font-weight: 700; color: #ea580c;">
+            ⚠️ WATCH
+          </td>
+          <td style="font-size: 11px; color: #666;">May create pricing pressure</td>
+        </tr>
+        
+      </tbody>
+    </table>
+
+      <div style="margin-top: 16px; padding: 12px; background: white; border-left: 4px solid #3b82f6; border-radius: 4px;">
+        <p style="font-size: 11px; color: #1e40af; margin: 0; line-height: 1.6;">
+          <strong>💡 Sales Action Guide:</strong><br>
+          • ✅ <strong>MATCHES</strong> → Confirmed market-wide shortage; premium pricing justified, proactive customer outreach<br>
+          • ⚠️ <strong>BETTER SUPPLY</strong> → Competitive advantage! Market aggressively: "We have what competitors don't"<br>
+          • ⚠️ <strong>WATCH</strong> → Monitor for pricing pressure; may need to adjust margins to remain competitive
+        </p>
+      </div>
+    </div>
+  </div>
+
+  <!-- Section 3: Regional Performance Breakdown -->
+  <div class="expandable-section">
+    <div class="expandable-header" onclick="toggleSection('regional-performance')">
+      <div>
+        <div class="expandable-title">🌏 Regional Performance Breakdown — Week 25</div>
+        <div class="expandable-subtitle">
+          Bookings and billings by sales region (USA, MEX, APAC)
+        </div>
+      </div>
+      <div class="expandable-toggle" id="regional-performance-toggle">+</div>
+    </div>
+    <div id="regional-performance" class="expandable-content">
+      <p style="font-size: 11px; color: #666; margin-bottom: 12px;">
+        <strong>Data Source:</strong> Infor ERP (Post-Sales) via Power BI export<br>
+        <strong>Metrics:</strong> All values shown as Gross Profit (GP). B/B Ratio = Bookings GP / Billings GP
+      </p>
+      
+    <table>
+      <thead>
+        <tr>
+          <th>Region</th>
+          <th style="text-align: right;">Bookings GP</th>
+          <th style="text-align: right;">Billings GP</th>
+          <th style="text-align: right;">B/B Ratio</th>
+          <th style="text-align: right;">Bookings GM</th>
+          <th style="text-align: right;">Billings GM</th>
+        </tr>
+      </thead>
+      <tbody>
+        
+        <tr style="background: #f5f5f5;">
+          <td><strong>USA</strong></td>
+          <td style="text-align: right;">$91K</td>
+          <td style="text-align: right;">$93K</td>
+          <td style="text-align: right;"><strong style="color: #dc2626;">0.98</strong></td>
+          <td style="text-align: right; ">32.8%</td>
+          <td style="text-align: right; ">27.6%</td>
+        </tr>
+        <tr style="background: #f5f5f5;">
+          <td><strong>MEX</strong></td>
+          <td style="text-align: right;">$109K</td>
+          <td style="text-align: right;">$95K</td>
+          <td style="text-align: right;"><strong style="">1.15</strong></td>
+          <td style="text-align: right; ">24.3%</td>
+          <td style="text-align: right; ">20.0%</td>
+        </tr>
+        <tr style="background: #fef3c7;">
+          <td><strong>APAC *</strong></td>
+          <td style="text-align: right;">$384K</td>
+          <td style="text-align: right;">$132K</td>
+          <td style="text-align: right;"><strong style="">2.92</strong></td>
+          <td style="text-align: right; ">25.6%</td>
+          <td style="text-align: right; color: #dc2626; font-weight: 600;">15.0%</td>
+        </tr>
+        <tr style="background: #f5f5f5;">
+          <td><strong>Other</strong></td>
+          <td style="text-align: right;">$662</td>
+          <td style="text-align: right;">$762</td>
+          <td style="text-align: right;"><strong style="color: #dc2626;">0.87</strong></td>
+          <td style="text-align: right; ">30.0%</td>
+          <td style="text-align: right; ">30.3%</td>
+        </tr>
+        <tr style="background: #f3f4f6; font-weight: 600; border-top: 2px solid #cbd5e1;">
+          <td><strong>TOTAL</strong></td>
+          <td style="text-align: right;">$584K</td>
+          <td style="text-align: right;">$320K</td>
+          <td style="text-align: right;"><strong style="">1.83</strong></td>
+          <td style="text-align: right;">26.2%</td>
+          <td style="text-align: right;">18.9%</td>
+        </tr>
+      </tbody>
+    </table>
+
+    
+    <div style="margin-top: 12px; padding: 10px; background: #fef3c7; border-left: 3px solid #f59e0b; border-radius: 4px; font-size: 11px; color: #92400e;">
+      <strong>* APAC includes KLA business:</strong> $339 bookings / $-12K billings
+    </div>
+    
+    </div>
+  </div>
+
+  <!-- Section 4: Data Sources & Methodology (BLUEPRINT/REFERENCE) -->
+  <div class="expandable-section" style="opacity: 0.7;">
+    <div class="expandable-header" onclick="toggleSection('methodology')">
+      <div>
+        <div class="expandable-title">
+          📋 Data Sources & Methodology
+          <span class="reference-badge">Blueprint / Reference</span>
+        </div>
+        <div class="expandable-subtitle">
+          Background information for understanding report construction (testing/build-out only)
+        </div>
+      </div>
+      <div class="expandable-toggle" id="methodology-toggle">+</div>
+    </div>
+    <div id="methodology" class="expandable-content">
+      <div style="background: #fffbeb; border-left: 3px solid #f59e0b; padding: 12px; margin-bottom: 16px; border-radius: 4px;">
+        <p style="font-size: 11px; color: #92400e; margin: 0; line-height: 1.6;">
+          <strong>📝 Note:</strong> This section provides blueprint/reference information for understanding how the report is constructed.
+          It is included for testing and development purposes and may not be a permanent section in the final report.
+        </p>
+      </div>
+      
+    <div style="font-size: 11px; color: #475569; line-height: 1.6;">
+      <h4 style="font-size: 12px; font-weight: 600; margin: 0 0 8px 0; color: #1e293b;">Section 1: External Market Snapshot</h4>
+      <p style="margin: 0 0 12px 0;">
+        <strong>Data Source:</strong> Industry market reports (Sourceability, Avnet, J2 Sourcing, Deloitte)<br>
+        <strong>What it shows:</strong> External semiconductor market conditions (Allocated/Constrained/Recovery/Normal) by category<br>
+        <strong>Purpose:</strong> Validate whether our internal signals match market-wide trends or if we have competitive advantages<br>
+        <strong>Update Frequency:</strong> Manual review of industry reports (weekly or bi-weekly)
+      </p>
+
+      <h4 style="font-size: 12px; font-weight: 600; margin: 16px 0 8px 0; color: #1e293b;">Section 2: Constraint Indicators (30-Day Rolling)</h4>
+      <p style="margin: 0 0 8px 0;">
+        <strong>Data Source:</strong> Orange Tsunami (OT) database — RFQ, VQ, CQ activity<br>
+        <strong>Purpose:</strong> Early warning signs for supply constraints and allocation risk (2-4 week lead time before manufacturer announcements)
+      </p>
+
+      <div style="margin-left: 16px; margin-bottom: 12px;">
+        <h5 style="font-size: 11px; font-weight: 600; margin: 0 0 4px 0; color: #dc2626;">Hot Part Families (Shortage Signals)</h5>
+        <p style="margin: 0 0 8px 0; font-size: 10px;">
+          <strong>What it shows:</strong> Full conversion funnel (RFQ → VQ → CQ → SO) for part families requested by 2+ OEM customers<br>
+          <strong>Filters:</strong> Shortage RFQs only; excludes Tier 1 EMS (Sanmina, Jabil, etc.); sorted by Booked GP<br>
+          <strong>Time Window:</strong> RFQs from last 30 days; funnel conversions all-time
+        </p>
+
+        <h5 style="font-size: 11px; font-weight: 600; margin: 0 0 4px 0; color: #1e40af;">Franchise Lead Time Analysis</h5>
+        <p style="margin: 0 0 8px 0; font-size: 10px;">
+          <strong>What it shows:</strong> Factory lead times from franchise distributors (Arrow, Avnet, Mouser, Digi-Key, etc.)<br>
+          <strong>Comparison:</strong> Current 30-day average vs 90-day baseline<br>
+          <strong>Why it matters:</strong> Franchise lead times = earliest signal of manufacturer constraints
+        </p>
+
+        <h5 style="font-size: 11px; font-weight: 600; margin: 0 0 4px 0; color: #7c3aed;">Trending Manufacturers</h5>
+        <p style="margin: 0; font-size: 10px;">
+          <strong>What it shows:</strong> Top manufacturers by Booked GP from Shortage RFQs (same data as Part Families, aggregated by manufacturer)<br>
+          <strong>Why separate view:</strong> Helps identify which companies are driving shortage-related revenue
+        </p>
+      </div>
+
+      <h4 style="font-size: 12px; font-weight: 600; margin: 16px 0 8px 0; color: #1e293b;">Section 3: Performance Snapshot (Infor Weekly Summary)</h4>
+      <p style="margin: 0;">
+        <strong>Data Source:</strong> Infor ERP (Post-Sales) via Power BI export<br>
+        <strong>What it shows:</strong> Completed week bookings vs billings performance, all metrics shown as Gross Profit (GP)<br>
+        <strong>Metrics:</strong> B/B Ratio = Bookings GP / Billings GP (>1.0 = building backlog, <1.0 = consuming backlog)<br>
+        <strong>Regional Breakdown:</strong> USA (Jeff Wallace team), MEX (Joel Marquez team), APAC (Laurel, Silvia, Lavanya, Edyna teams)<br>
+        <strong>KLA Business:</strong> Shown separately due to large shipment variability and credit/return impact
+      </p>
+    </div>
+    </div>
+  </div>
+
+  <div class="footer">
+    <strong>Questions or feedback?</strong> Contact Melissa Bojar (Sales Productivity Analyst)<br>
+    Report generated for Josh Pucci (VP Sales) and regional sales leadership<br>
+    Generated Thursday, June 25, 2026 at 10:49 AM CT
+  </div>
+</div>
+</body>
+</html>

@@ -82,6 +82,13 @@ Status indicators:
 - Customer count per manufacturer
 - % change vs prior week
 
+**📌 NEXT RUN ONLY (then as-needed):**
+- **Include Microchip Price Increase Notice** (received 6.29.26)
+  - File: `data/Mirco Chip Price Increase - 6.29.26.png`
+  - Summary: Microchip Technology announcing price adjustments effective Aug 14, 2026 due to increased costs (raw materials, labor, logistics, energy)
+  - Action: Reference in Market Intelligence section for next report, then include only if still relevant/timely
+  - This is fresh market content - don't let it become stale
+
 ---
 
 ## How to Run

@@ -14,6 +14,7 @@ const path = require('path');
 
 // Load notifier from shared utilities
 const { createNotifier } = require(path.resolve(__dirname, '../../shared/notifier'));
+const { runHealthChecks, validateReportData } = require(path.join(__dirname, 'health-checks.js'));
 
 const notifier = createNotifier({
   fromEmail: 'salesanalytics@orangetsunami.com',
@@ -26,13 +27,60 @@ const RECIPIENTS = [
   'melissa.bojar@astutegroup.com'
 ];
 
+const ALERT_RECIPIENT = 'melissa.bojar@astutegroup.com';
+
+async function sendAlert(subject, body) {
+  await notifier.sendEmail(ALERT_RECIPIENT, subject, body);
+}
+
 async function main() {
   try {
     console.log('============================================================');
     console.log('USA DAILY BRIEF - EMAIL DISTRIBUTION');
     console.log('============================================================\n');
 
-    // Step 0: Validate regional filtering fixes are in place
+    // Step 0A: Run health checks (database connectivity, sample queries)
+    console.log('🏥 Running system health checks...');
+    const healthCheck = runHealthChecks();
+    if (!healthCheck.healthy) {
+      console.error('❌ HEALTH CHECK FAILED - System not ready');
+      console.error('Aborting USA Daily Brief send to prevent bad data\n');
+
+      await sendAlert(
+        '🚨 ALERT: USA Daily Brief Health Check Failed - NOT SENT',
+        `USA Daily Brief automated send was blocked due to system health issues.
+
+HEALTH CHECK FAILURES:
+${healthCheck.errors.map((e, i) => `${i + 1}. ${e}`).join('\n')}
+
+LIKELY CAUSES:
+- Database connection issues (network outage, database server down)
+- Database query timeouts
+- Stale/missing data in database
+
+ACTION REQUIRED:
+1. Check database connectivity: psql -c "SELECT 1;"
+2. Check recent orders: psql -c "SELECT COUNT(*) FROM adempiere.c_order WHERE created::date >= CURRENT_DATE - INTERVAL '7 days';"
+3. If database is down/unreachable, wait for connectivity to restore
+4. If database is up but returning no data, investigate data pipeline
+5. Do NOT manually run email scripts until health checks pass
+
+Recipients who did NOT receive today's brief:
+- Jeff Wallace
+- Melissa Bojar
+
+The brief will NOT be sent until system health is restored.
+
+---
+Run health checks manually: node ~/workspace/astute-workinstructions/Sales\\ Pulse\\ Daily/scripts/health-checks.js
+`
+      );
+
+      process.exit(1);
+    }
+    console.log('✅ Health checks passed\n');
+
+    // Step 0B: Validate regional filtering fixes are in place
     console.log('🔍 Running regional filtering validation...');
     const validationPath = path.join(__dirname, 'validate-regional-fixes.js');
     try {
@@ -77,13 +125,58 @@ ${validationError.stdout || validationError.message}
     const scriptPath = path.join(__dirname, 'sales-pulse-usa-daily.js');
     execSync(`node "${scriptPath}"`, { encoding: 'utf8', stdio: 'inherit' });
 
-    // Step 2: Get the generated HTML file
+    // Step 2: Get the generated HTML and JSON files
     const today = new Date().toISOString().split('T')[0]; // YYYY-MM-DD
     const htmlPath = path.join(__dirname, '../output/usa-briefs', `usa-daily-brief-${today}.html`);
+    const jsonPath = path.join(__dirname, '../output/usa-briefs', `usa-daily-brief-${today}.json`);
 
     if (!fs.existsSync(htmlPath)) {
       throw new Error(`HTML file not found at ${htmlPath}`);
     }
+
+    if (!fs.existsSync(jsonPath)) {
+      throw new Error(`JSON file not found at ${jsonPath}`);
+    }
+
+    // Step 2A: Validate report data quality
+    console.log('\n🔍 Validating report data quality...');
+    const reportData = JSON.parse(fs.readFileSync(jsonPath, 'utf8'));
+    const dataErrors = validateReportData(reportData, 'USA Daily Brief');
+
+    if (dataErrors.length > 0) {
+      console.error('❌ DATA VALIDATION FAILED - Report data looks suspicious');
+      console.error('Aborting USA Daily Brief send to prevent incomplete information\n');
+
+      await sendAlert(
+        '🚨 ALERT: USA Daily Brief Data Validation Failed - NOT SENT',
+        `USA Daily Brief automated send was blocked due to suspicious/incomplete data.
+
+DATA VALIDATION FAILURES:
+${dataErrors.map((e, i) => `${i + 1}. ${e}`).join('\n')}
+
+LIKELY CAUSES:
+- Database connection was slow/unstable during report generation
+- Queries returned partial results due to timeout
+- Database is missing recent data (replication lag, sync issues)
+
+WHAT TO CHECK:
+1. Verify database has recent orders: psql -c "SELECT COUNT(*) FROM adempiere.c_order WHERE created::date = CURRENT_DATE - INTERVAL '1 day';"
+2. Check if there was ACTUALLY zero activity yesterday (unlikely but possible)
+3. Review the generated JSON file manually: ~/workspace/astute-workinstructions/Sales\\ Pulse\\ Daily/output/usa-briefs/usa-daily-brief-${today}.json
+
+Recipients who did NOT receive today's brief:
+- Jeff Wallace
+- Melissa Bojar
+
+RECOMMENDED ACTION:
+If you confirm there was actually no activity yesterday, you can manually send the report.
+Otherwise, wait for database stability and re-run: node ~/workspace/astute-workinstructions/Sales\\ Pulse\\ Daily/scripts/email-usa-daily-brief.js
+`
+      );
+
+      process.exit(1);
+    }
+    console.log('✅ Data validation passed\n');
 
     // Step 3: Calculate previous business day (Friday if Monday, else yesterday)
     const now = new Date();

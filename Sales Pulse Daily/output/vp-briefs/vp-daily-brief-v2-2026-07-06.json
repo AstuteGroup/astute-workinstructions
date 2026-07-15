@@ -1,0 +1,272 @@
+{
+  "today": "2026-07-06T13:00:03.539Z",
+  "yesterday": "2026-07-03T13:00:03.539Z",
+  "todayFormatted": "Monday, July 6, 2026",
+  "yesterdayFormatted": "Friday, July 3, 2026",
+  "top5Orders": [],
+  "newCustomers": [],
+  "strategicAccounts": [
+    {
+      "account_name": "ABB",
+      "ise_name": null,
+      "region": null,
+      "rfq_lines": "0",
+      "cq_lines": "0",
+      "cq_sold": "0",
+      "so_count": "0",
+      "so_revenue": "0",
+      "so_gp": "0",
+      "color_code": "red"
+    },
+    {
+      "account_name": "Eaton",
+      "ise_name": null,
+      "region": null,
+      "rfq_lines": "0",
+      "cq_lines": "0",
+      "cq_sold": "0",
+      "so_count": "0",
+      "so_revenue": "0",
+      "so_gp": "0",
+      "color_code": "red"
+    },
+    {
+      "account_name": "GE Healthcare",
+      "ise_name": null,
+      "region": null,
+      "rfq_lines": "0",
+      "cq_lines": "0",
+      "cq_sold": "0",
+      "so_count": "0",
+      "so_revenue": "0",
+      "so_gp": "0",
+      "color_code": "red"
+    },
+    {
+      "account_name": "Parker-Meggitt",
+      "ise_name": null,
+      "region": null,
+      "rfq_lines": "0",
+      "cq_lines": "0",
+      "cq_sold": "0",
+      "so_count": "0",
+      "so_revenue": "0",
+      "so_gp": "0",
+      "color_code": "red"
+    },
+    {
+      "account_name": "RTX",
+      "ise_name": null,
+      "region": null,
+      "rfq_lines": "0",
+      "cq_lines": "0",
+      "cq_sold": "0",
+      "so_count": "0",
+      "so_revenue": "0",
+      "so_gp": "0",
+      "color_code": "red"
+    },
+    {
+      "account_name": "Thales",
+      "ise_name": null,
+      "region": null,
+      "rfq_lines": "0",
+      "cq_lines": "0",
+      "cq_sold": "0",
+      "so_count": "0",
+      "so_revenue": "0",
+      "so_gp": "0",
+      "color_code": "red"
+    }
+  ],
+  "reactivatedCustomers": [
+    {
+      "customer_name": "Emerson",
+      "facility_location": null,
+      "tracked_at_location_level": "Y",
+      "first_order_date": "2025-07-20",
+      "last_order_date": "2026-03-18",
+      "days_gap": "110",
+      "yesterday_orders": "SO507678, SO507684",
+      "yesterday_revenue": "5898.42",
+      "yesterday_gp": "2224.5300000000000000",
+      "seller_name": "Renald Ng",
+      "region": "APAC-Laurel",
+      "lifetime_orders": "4",
+      "lifetime_revenue": "8869.82",
+      "typical_cycle_days": "57.5",
+      "gap_multiplier": "1.91",
+      "reactivation_type": "other",
+      "significance_score": "477.5435125987242"
+    },
+    {
+      "customer_name": "Shenzhen Tianyue Electronic Co., Ltd",
+      "facility_location": null,
+      "tracked_at_location_level": "Y",
+      "first_order_date": "2025-09-23",
+      "last_order_date": "2026-04-20",
+      "days_gap": "77",
+      "yesterday_orders": "SO507683",
+      "yesterday_revenue": "69882.0",
+      "yesterday_gp": "6289.000000000000",
+      "seller_name": "Wing Zhang",
+      "region": "APAC-Kris",
+      "lifetime_orders": "3",
+      "lifetime_revenue": "567000.0",
+      "typical_cycle_days": "74",
+      "gap_multiplier": "1.04",
+      "reactivation_type": "other",
+      "significance_score": "429.4512412214988"
+    }
+  ],
+  "highValueLateLines": [
+    {
+      "customer_name": "Abaco Systems",
+      "sales_order": "SO507317",
+      "line_number": "10",
+      "ise_name": "Joel Flores",
+      "region": "MEX",
+      "promise_date": "2026-06-22",
+      "days_late": "14",
+      "qty_unshipped": "144",
+      "line_revenue": "311040.00",
+      "line_gp": "77760.00",
+      "mpn": "BCM56861A1IFSBG",
+      "color_code": "red"
+    },
+    {
+      "customer_name": "Plexus Corp.",
+      "sales_order": "SO507277",
+      "line_number": "10",
+      "ise_name": "Salvador Horner",
+      "region": "MEX",
+      "promise_date": "2026-06-12",
+      "days_late": "24",
+      "qty_unshipped": "797",
+      "line_revenue": "206423.00",
+      "line_gp": "45429.00",
+      "mpn": "MT25QL01GBBB8E12-0AUT",
+      "color_code": "red"
+    }
+  ],
+  "top5LateLines": [],
+  "iseAlerts": [
+    {
+      "ise_name": "Alejandro Padilla",
+      "manager": "Joel Marquez",
+      "region": "MEX",
+      "last_rfq_date": "2026-06-24",
+      "days_inactive": "8",
+      "color_code": "red"
+    },
+    {
+      "ise_name": "Michael Stifter",
+      "manager": "Jeff Wallace",
+      "region": "USA",
+      "last_rfq_date": "2026-06-25",
+      "days_inactive": "7",
+      "color_code": "red"
+    },
+    {
+      "ise_name": "Carolina Hinestroza",
+      "manager": "Joel Marquez",
+      "region": "MEX",
+      "last_rfq_date": "2026-06-30",
+      "days_inactive": "4",
+      "color_code": "yellow"
+    },
+    {
+      "ise_name": "Daniel Reiser",
+      "manager": "Jeff Wallace",
+      "region": "USA",
+      "last_rfq_date": "2026-06-30",
+      "days_inactive": "4",
+      "color_code": "yellow"
+    },
+    {
+      "ise_name": "Joel Flores",
+      "manager": "Joel Marquez",
+      "region": "MEX",
+      "last_rfq_date": "2026-07-01",
+      "days_inactive": "3",
+      "color_code": "yellow"
+    },
+    {
+      "ise_name": "Salvador Horner",
+      "manager": "Joel Marquez",
+      "region": "MEX",
+      "last_rfq_date": "2026-07-01",
+      "days_inactive": "3",
+      "color_code": "yellow"
+    },
+    {
+      "ise_name": "Aaron Mendoza",
+      "manager": "Jeff Wallace",
+      "region": "USA",
+      "last_rfq_date": "2026-07-01",
+      "days_inactive": "3",
+      "color_code": "yellow"
+    }
+  ],
+  "lowMarginOrders": [],
+  "regionalActivity": [
+    {
+      "region": "APAC-Laurel",
+      "manager": "Laurel Kee",
+      "rfq_lines": "3",
+      "cq_lines": "6",
+      "cq_sold": "6",
+      "so_lines": "7",
+      "so_revenue": "672798.42",
+      "so_gp": "213632.53000000000000000000"
+    },
+    {
+      "region": "APAC-Silvia",
+      "manager": "Silvia Munoz",
+      "rfq_lines": "11",
+      "cq_lines": "7",
+      "cq_sold": "3",
+      "so_lines": "4",
+      "so_revenue": "295052.00",
+      "so_gp": "69511.4999999999997000"
+    },
+    {
+      "region": "MEX",
+      "manager": "Joel Marquez",
+      "rfq_lines": "17",
+      "cq_lines": "0",
+      "cq_sold": "0",
+      "so_lines": "1",
+      "so_revenue": "18900.00",
+      "so_gp": "3450.00000000000000000000"
+    },
+    {
+      "region": "Other",
+      "manager": null,
+      "rfq_lines": "108",
+      "cq_lines": "0",
+      "cq_sold": "0",
+      "so_lines": "0",
+      "so_revenue": "0",
+      "so_gp": "0"
+    },
+    {
+      "region": "USA",
+      "manager": "Jeff Wallace",
+      "rfq_lines": "0",
+      "cq_lines": "0",
+      "cq_sold": "0",
+      "so_lines": "0",
+      "so_revenue": "0",
+      "so_gp": "0"
+    }
+  ],
+  "regionalTotals": {
+    "rfq_lines": 139,
+    "cq_lines": 13,
+    "cq_sold": 9,
+    "so_lines": 12,
+    "so_revenue": 986750.42,
+    "so_gp": 286594.03
+  }
+}

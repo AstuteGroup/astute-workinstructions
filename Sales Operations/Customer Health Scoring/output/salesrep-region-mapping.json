@@ -1,0 +1,712 @@
+{
+  "matched": [
+    {
+      "ad_user_id": "1039413",
+      "name": "Aaron Mendoza",
+      "region": "USA",
+      "location": "Astute HQ",
+      "title": "Sales Executive",
+      "manager": "Jeff Wallace"
+    },
+    {
+      "ad_user_id": "1047106",
+      "name": "Alejandro Padilla",
+      "region": "MEX",
+      "location": "LATAM Office ",
+      "title": "Sales Executive",
+      "manager": "Joel Marquez"
+    },
+    {
+      "ad_user_id": "1026393",
+      "name": "Alex Partida",
+      "region": "MEX",
+      "location": "LATAM Office ",
+      "title": "Senior Internal Sales Executive",
+      "manager": "Joel Marquez"
+    },
+    {
+      "ad_user_id": "1042653",
+      "name": "Alfredo Martinez",
+      "region": "MEX",
+      "location": "LATAM Office ",
+      "title": "Internal Sales Executive",
+      "manager": "Joel Marquez"
+    },
+    {
+      "ad_user_id": "1038225",
+      "name": "Carlos Moreno",
+      "region": "MEX",
+      "location": "LATAM Office ",
+      "title": "Sales Executive",
+      "manager": "Joel Marquez"
+    },
+    {
+      "ad_user_id": "1026394",
+      "name": "Carolina Hinestroza",
+      "region": "MEX",
+      "location": "Remote",
+      "title": "Internal Sales Executive",
+      "manager": "Joel Marquez"
+    },
+    {
+      "ad_user_id": "1017134",
+      "name": "Ivy Chew",
+      "region": "APAC",
+      "location": "Astute Electronics Inc Pte. Ltd.",
+      "title": "Internal Sales Associate",
+      "manager": "Laurel Kee"
+    },
+    {
+      "ad_user_id": "1042807",
+      "name": "James Diaz",
+      "region": "USA",
+      "location": "Astute HQ",
+      "title": "Internal Sales Executive",
+      "manager": "Jeff Wallace"
+    },
+    {
+      "ad_user_id": "1039414",
+      "name": "James Xu",
+      "region": "USA",
+      "location": "Remote",
+      "title": "Account Manager",
+      "manager": "Kris Munoz"
+    },
+    {
+      "ad_user_id": "1041139",
+      "name": "Jasper Kee",
+      "region": "APAC",
+      "location": "Astute Electronics Inc Pte. Ltd.",
+      "title": "Sales Executive",
+      "manager": "Laurel Kee"
+    },
+    {
+      "ad_user_id": "1036592",
+      "name": "Jeff Wallace",
+      "region": "USA",
+      "location": "Astute HQ",
+      "title": "Director of Sales",
+      "manager": "Josh Pucci"
+    },
+    {
+      "ad_user_id": "1010361",
+      "name": "Joel Flores",
+      "region": "MEX",
+      "location": "LATAM Office ",
+      "title": "Internal Sales Executive",
+      "manager": "Joel Marquez"
+    },
+    {
+      "ad_user_id": "1022776",
+      "name": "Joel Marquez",
+      "region": "MEX",
+      "location": "LATAM Office ",
+      "title": "Sales Manager",
+      "manager": "Josh Pucci"
+    },
+    {
+      "ad_user_id": "1047107",
+      "name": "Josh Pucci",
+      "region": "USA",
+      "location": "Astute HQ",
+      "title": "Vice President of Sales"
+    },
+    {
+      "ad_user_id": "1005243",
+      "name": "Josh Syre",
+      "region": "USA",
+      "location": "Astute HQ",
+      "title": "Internal Sales Executive",
+      "manager": "Jeff Wallace"
+    },
+    {
+      "ad_user_id": "1043104",
+      "name": "Juan Botero",
+      "region": "USA",
+      "location": "Remote",
+      "title": "Internal Sales Executive",
+      "manager": "Joel Marquez"
+    },
+    {
+      "ad_user_id": "1025669",
+      "name": "Justin Goodwin",
+      "region": "USA",
+      "location": "Astute HQ",
+      "title": "Internal Sales Executive",
+      "manager": "Jeff Wallace"
+    },
+    {
+      "ad_user_id": "1016958",
+      "name": "Laurel Kee",
+      "region": "APAC",
+      "location": "Astute Electronics Inc Pte. Ltd.",
+      "title": "Regional Sales Manager",
+      "manager": "Josh Pucci"
+    },
+    {
+      "ad_user_id": "1017011",
+      "name": "Lavanya Manohar",
+      "region": "APAC",
+      "location": "Bangalore",
+      "title": "Sales Manager",
+      "manager": "Josh Pucci"
+    },
+    {
+      "ad_user_id": "1046020",
+      "name": "Melissa Bojar",
+      "region": "USA",
+      "location": "Astute HQ",
+      "title": "Sales Productivity Analyst",
+      "manager": "Jeff Wallace"
+    },
+    {
+      "ad_user_id": "1047795",
+      "name": "Michael Stifter",
+      "region": "USA",
+      "location": "Remote",
+      "title": "Internal Sales Executive",
+      "manager": "Jeff Wallace"
+    },
+    {
+      "ad_user_id": "1012788",
+      "name": "Ricardo Morales",
+      "region": "MEX",
+      "location": "LATAM Office ",
+      "title": "Internal Sales Executive",
+      "manager": "Joel Marquez"
+    },
+    {
+      "ad_user_id": "1038224",
+      "name": "Salvador Horner",
+      "region": "MEX",
+      "location": "LATAM Office ",
+      "title": "Internal Sales Executive",
+      "manager": "Joel Marquez"
+    },
+    {
+      "ad_user_id": "1013042",
+      "name": "Spring Tu",
+      "region": "APAC",
+      "location": "Astute Electronics ShenZhen Ltd ",
+      "title": "Internal Sales Executive",
+      "manager": "Kris Munoz"
+    },
+    {
+      "ad_user_id": "1000017",
+      "name": "Thomas Haynes",
+      "region": "USA",
+      "location": "Astute HQ",
+      "title": "Internal Sales Executive",
+      "manager": "Jeff Wallace"
+    },
+    {
+      "ad_user_id": "1009528",
+      "name": "Wing Zhang",
+      "region": "APAC",
+      "location": "Astute Electronics ShenZhen Ltd ",
+      "title": "Internal Sales Executive",
+      "manager": "Kris Munoz"
+    },
+    {
+      "ad_user_id": "1009478",
+      "name": "Winnie Lee",
+      "region": "APAC",
+      "location": "Malaysia",
+      "title": "Internal Sales Executive",
+      "manager": "Kris Munoz"
+    }
+  ],
+  "rosterOnly": [
+    {
+      "name": "Dan Reiser",
+      "region": "USA",
+      "location": "Astute HQ",
+      "title": "Senior Sales Executive",
+      "manager": "Jeff Wallace"
+    },
+    {
+      "name": "Edyna Lee",
+      "region": "APAC",
+      "location": "Astute Electronics Incorporated Korea Branch",
+      "title": "Director of Sales",
+      "manager": "Josh Pucci"
+    },
+    {
+      "name": "Jake McAloose",
+      "region": "USA",
+      "location": "Remote",
+      "title": "Senior Sales Executive",
+      "manager": "Jeff Wallace"
+    },
+    {
+      "name": "Joy Phromsatcha",
+      "region": "APAC",
+      "location": "Thailand",
+      "title": "Account Manager",
+      "manager": "Kris Munoz"
+    },
+    {
+      "name": "Kris Munoz",
+      "region": "APAC",
+      "location": "Philippines",
+      "title": "Sales Manager",
+      "manager": "Josh Pucci"
+    },
+    {
+      "name": "Liz Shelley",
+      "region": "USA",
+      "location": "Remote",
+      "title": "Business Development Manager",
+      "manager": "Josh Pucci"
+    },
+    {
+      "name": "Manikandan Subramani",
+      "region": "APAC",
+      "location": "Bangalore",
+      "title": "Account Manager",
+      "manager": "Lavanya Manohar"
+    },
+    {
+      "name": "Meenakshi Chidambaram",
+      "region": "APAC",
+      "location": "Bangalore",
+      "title": "Internal Sales Executive",
+      "manager": "Lavanya Manohar"
+    },
+    {
+      "name": "NANDHINI .",
+      "region": "APAC",
+      "location": "Chennai",
+      "title": "Internal Sales Associate",
+      "manager": "Lavanya Manohar"
+    },
+    {
+      "name": "Ray Ng",
+      "region": "APAC",
+      "location": "Astute Electronics Inc Pte. Ltd.",
+      "title": "Account Manager",
+      "manager": "Laurel Kee"
+    },
+    {
+      "name": "Will Rob",
+      "region": "USA",
+      "location": "Astute HQ",
+      "title": "Senior Internal Sales Associate",
+      "manager": "Jeff Wallace"
+    }
+  ],
+  "dbOnly": [
+    {
+      "ad_user_id": "1033032",
+      "name": "Adriana LeBreton",
+      "issalesrep": "Y"
+    },
+    {
+      "ad_user_id": "1038666",
+      "name": "Agata Szczerba-Chlebinska",
+      "issalesrep": "Y"
+    },
+    {
+      "ad_user_id": "1017568",
+      "name": "Agnes Morocz",
+      "issalesrep": "Y"
+    },
+    {
+      "ad_user_id": "1015021",
+      "name": "Andrea Philipp",
+      "issalesrep": "Y"
+    },
+    {
+      "ad_user_id": "1018537",
+      "name": "Andrew Loughran",
+      "issalesrep": "Y"
+    },
+    {
+      "ad_user_id": "1000104",
+      "name": "Aran Coker",
+      "issalesrep": "Y"
+    },
+    {
+      "ad_user_id": "1016392",
+      "name": "Aysoo Gozalzade",
+      "issalesrep": "Y"
+    },
+    {
+      "ad_user_id": "1049897",
+      "name": "Begen Low",
+      "issalesrep": "Y"
+    },
+    {
+      "ad_user_id": "1034725",
+      "name": "Benedikt Glas",
+      "issalesrep": "Y"
+    },
+    {
+      "ad_user_id": "1011159",
+      "name": "Betty Song",
+      "issalesrep": "Y"
+    },
+    {
+      "ad_user_id": "1010160",
+      "name": "Britteny McFatridge",
+      "issalesrep": "Y"
+    },
+    {
+      "ad_user_id": "1045478",
+      "name": "Carina Pop",
+      "issalesrep": "Y"
+    },
+    {
+      "ad_user_id": "1001606",
+      "name": "Chuck Boecking",
+      "issalesrep": "Y"
+    },
+    {
+      "ad_user_id": "1049524",
+      "name": "Claude Harris",
+      "issalesrep": "Y"
+    },
+    {
+      "ad_user_id": "1015124",
+      "name": "Daisy Arnup",
+      "issalesrep": "Y"
+    },
+    {
+      "ad_user_id": "1000005",
+      "name": "Dane Reynolds",
+      "issalesrep": "Y"
+    },
+    {
+      "ad_user_id": "1047077",
+      "name": "Daniel Reiser",
+      "issalesrep": "Y"
+    },
+    {
+      "ad_user_id": "1043907",
+      "name": "Didier LeGoff",
+      "issalesrep": "Y"
+    },
+    {
+      "ad_user_id": "1017258",
+      "name": "Edgar Santana",
+      "issalesrep": "Y"
+    },
+    {
+      "ad_user_id": "1031965",
+      "name": "Edyna lee",
+      "issalesrep": "Y"
+    },
+    {
+      "ad_user_id": "1006326",
+      "name": "Elaine Liang",
+      "issalesrep": "Y"
+    },
+    {
+      "ad_user_id": "1041578",
+      "name": "Elizabeth Shelley",
+      "issalesrep": "Y"
+    },
+    {
+      "ad_user_id": "1043912",
+      "name": "Enzo Dileto",
+      "issalesrep": "Y"
+    },
+    {
+      "ad_user_id": "1041781",
+      "name": "Erik Graefenschnell",
+      "issalesrep": "Y"
+    },
+    {
+      "ad_user_id": "1016604",
+      "name": "Erika Timea",
+      "issalesrep": "Y"
+    },
+    {
+      "ad_user_id": "1047590",
+      "name": "Estefania Valladares",
+      "issalesrep": "Y"
+    },
+    {
+      "ad_user_id": "1005190",
+      "name": "Feong Chang",
+      "issalesrep": "Y"
+    },
+    {
+      "ad_user_id": "101",
+      "name": "GardenAdmin",
+      "issalesrep": "Y"
+    },
+    {
+      "ad_user_id": "102",
+      "name": "GardenUser",
+      "issalesrep": "Y"
+    },
+    {
+      "ad_user_id": "1000004",
+      "name": "Jake Harris",
+      "issalesrep": "Y"
+    },
+    {
+      "ad_user_id": "1000011",
+      "name": "Jake Mcaloose",
+      "issalesrep": "Y"
+    },
+    {
+      "ad_user_id": "1006958",
+      "name": "James Docherty",
+      "issalesrep": "Y"
+    },
+    {
+      "ad_user_id": "1050010",
+      "name": "Jaokim Stafwerfeldt",
+      "issalesrep": "Y"
+    },
+    {
+      "ad_user_id": "1043910",
+      "name": "Johan Bredenberg",
+      "issalesrep": "Y"
+    },
+    {
+      "ad_user_id": "1043913",
+      "name": "Johannes Schuster",
+      "issalesrep": "Y"
+    },
+    {
+      "ad_user_id": "1014795",
+      "name": "John McCarthy",
+      "issalesrep": "Y"
+    },
+    {
+      "ad_user_id": "1042806",
+      "name": "Joost Koelega",
+      "issalesrep": "Y"
+    },
+    {
+      "ad_user_id": "1033035",
+      "name": "JoseManuel Serrano",
+      "issalesrep": "Y"
+    },
+    {
+      "ad_user_id": "1033030",
+      "name": "Julien Marinoni",
+      "issalesrep": "Y"
+    },
+    {
+      "ad_user_id": "1014433",
+      "name": "Julius Lehle",
+      "issalesrep": "Y"
+    },
+    {
+      "ad_user_id": "1000015",
+      "name": "Justin Oberhofer",
+      "issalesrep": "Y"
+    },
+    {
+      "ad_user_id": "1045846",
+      "name": "Kalle Kulmala",
+      "issalesrep": "Y"
+    },
+    {
+      "ad_user_id": "1045847",
+      "name": "Karin Betz",
+      "issalesrep": "Y"
+    },
+    {
+      "ad_user_id": "1024894",
+      "name": "Karl Federle",
+      "issalesrep": "Y"
+    },
+    {
+      "ad_user_id": "1043217",
+      "name": "Kathrin Voelkl",
+      "issalesrep": "Y"
+    },
+    {
+      "ad_user_id": "1042107",
+      "name": "Kevin Szvath",
+      "issalesrep": "Y"
+    },
+    {
+      "ad_user_id": "1029873",
+      "name": "Kevin Wrobel",
+      "issalesrep": "Y"
+    },
+    {
+      "ad_user_id": "1041603",
+      "name": "Klaus Schuldes",
+      "issalesrep": "Y"
+    },
+    {
+      "ad_user_id": "1034722",
+      "name": "Krisztian Rus",
+      "issalesrep": "Y"
+    },
+    {
+      "ad_user_id": "1042110",
+      "name": "Lajos Nagy",
+      "issalesrep": "Y"
+    },
+    {
+      "ad_user_id": "1014366",
+      "name": "Lee Booker",
+      "issalesrep": "Y"
+    },
+    {
+      "ad_user_id": "1019529",
+      "name": "Leonard Tan",
+      "issalesrep": "Y"
+    },
+    {
+      "ad_user_id": "1003426",
+      "name": "Lukas Pflaum",
+      "issalesrep": "Y"
+    },
+    {
+      "ad_user_id": "1013701",
+      "name": "Mahmoud Fakhran",
+      "issalesrep": "Y"
+    },
+    {
+      "ad_user_id": "1024444",
+      "name": "Manikandan",
+      "issalesrep": "Y"
+    },
+    {
+      "ad_user_id": "1002316",
+      "name": "Marcus Seitz",
+      "issalesrep": "Y"
+    },
+    {
+      "ad_user_id": "1034724",
+      "name": "Martin Rings",
+      "issalesrep": "Y"
+    },
+    {
+      "ad_user_id": "1019425",
+      "name": "May Wu",
+      "issalesrep": "Y"
+    },
+    {
+      "ad_user_id": "1023478",
+      "name": "Meenakshi",
+      "issalesrep": "Y"
+    },
+    {
+      "ad_user_id": "1038226",
+      "name": "Mirco Zaccarelli",
+      "issalesrep": "Y"
+    },
+    {
+      "ad_user_id": "1011012",
+      "name": "Molly Huang",
+      "issalesrep": "Y"
+    },
+    {
+      "ad_user_id": "1015123",
+      "name": "Natalie Scammell",
+      "issalesrep": "Y"
+    },
+    {
+      "ad_user_id": "1006464",
+      "name": "Nigel McGhee",
+      "issalesrep": "Y"
+    },
+    {
+      "ad_user_id": "1042109",
+      "name": "Peter Gulyas",
+      "issalesrep": "Y"
+    },
+    {
+      "ad_user_id": "1016652",
+      "name": "Rajeev Ranjan",
+      "issalesrep": "Y"
+    },
+    {
+      "ad_user_id": "1023803",
+      "name": "Renald Ng",
+      "issalesrep": "Y"
+    },
+    {
+      "ad_user_id": "1042377",
+      "name": "Roberta Isca",
+      "issalesrep": "Y"
+    },
+    {
+      "ad_user_id": "1035489",
+      "name": "Roberto Blanco",
+      "issalesrep": "Y"
+    },
+    {
+      "ad_user_id": "1026374",
+      "name": "Rojda Cifci",
+      "issalesrep": "Y"
+    },
+    {
+      "ad_user_id": "1008130",
+      "name": "Ronen Moyal",
+      "issalesrep": "Y"
+    },
+    {
+      "ad_user_id": "1009866",
+      "name": "Rotsarin Phromsatcha",
+      "issalesrep": "Y"
+    },
+    {
+      "ad_user_id": "1033066",
+      "name": "Sandra Schreyer",
+      "issalesrep": "Y"
+    },
+    {
+      "ad_user_id": "1018538",
+      "name": "Serena Zhang",
+      "issalesrep": "Y"
+    },
+    {
+      "ad_user_id": "1015676",
+      "name": "Siena (User)",
+      "issalesrep": "Y"
+    },
+    {
+      "ad_user_id": "1009210",
+      "name": "Silvia Munoz",
+      "issalesrep": "Y"
+    },
+    {
+      "ad_user_id": "1009138",
+      "name": "Stephanie Hill",
+      "issalesrep": "Y"
+    },
+    {
+      "ad_user_id": "1009477",
+      "name": "Tracy Xie",
+      "issalesrep": "Y"
+    },
+    {
+      "ad_user_id": "1000008",
+      "name": "TsuAdmin",
+      "issalesrep": "Y"
+    },
+    {
+      "ad_user_id": "1035457",
+      "name": "Veronique Madeline",
+      "issalesrep": "Y"
+    },
+    {
+      "ad_user_id": "1014601",
+      "name": "William Robinson",
+      "issalesrep": "Y"
+    },
+    {
+      "ad_user_id": "1038668",
+      "name": "Zbigniew Ziobrowski",
+      "issalesrep": "Y"
+    },
+    {
+      "ad_user_id": "1038664",
+      "name": "Zoran Stamenkovic",
+      "issalesrep": "Y"
+    }
+  ],
+  "unknownRemote": [],
+  "generatedAt": "2026-06-26T19:48:34.836Z"
+}

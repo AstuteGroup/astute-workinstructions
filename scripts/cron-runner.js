@@ -42,7 +42,8 @@ function crumb(jobName, event, detail) {
   } catch (e) { /* breadcrumbs are advisory; never fail a run on crumb write */ }
 }
 
-const RUNNER_LOG = '/tmp/cron-runner.log';
+const os = require('os');
+const RUNNER_LOG = path.join(os.tmpdir(), `cron-runner-${os.userInfo().username}.log`);
 
 function logEvent(jobName, event, detail) {
   const line = JSON.stringify({

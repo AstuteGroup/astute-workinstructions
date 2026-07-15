@@ -1,0 +1,778 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Mexico Daily Brief — Sales Pulse</title>
+<style>
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif;
+    font-size: 13px;
+    line-height: 1.5;
+    color: #333;
+    max-width: 800px;
+    margin: 0 auto;
+    padding: 20px;
+    background: #f5f5f5;
+  }
+  .container {
+    background: white;
+    padding: 28px;
+    border-radius: 8px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+  }
+  h1 {
+    font-size: 22px;
+    font-weight: 700;
+    margin: 0 0 6px 0;
+    color: #1a1a1a;
+  }
+  .subtitle {
+    font-size: 12px;
+    color: #666;
+    margin-bottom: 24px;
+  }
+
+  /* Section Headers */
+  .section-header {
+    font-size: 16px;
+    font-weight: 700;
+    margin: 28px 0 12px 0;
+    padding-bottom: 8px;
+    border-bottom: 2px solid #e0e0e0;
+    color: #1a1a1a;
+  }
+  .section-header:first-of-type {
+    margin-top: 0;
+  }
+  .subsection-header {
+    font-size: 14px;
+    font-weight: 600;
+    margin: 16px 0 8px 0;
+    color: #444;
+  }
+
+  /* Tables */
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 12px;
+    margin-bottom: 16px;
+  }
+  th {
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    padding: 8px;
+    text-align: left;
+    font-weight: 600;
+    font-size: 11px;
+    color: #475569;
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+  }
+  td {
+    border: 1px solid #e2e8f0;
+    padding: 8px;
+    vertical-align: top;
+  }
+  tr:hover { background: #f8fafc; }
+  td.number { text-align: right; font-weight: 600; }
+
+  /* Badges */
+  .badge {
+    display: inline-block;
+    padding: 3px 8px;
+    border-radius: 12px;
+    font-size: 10px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+  }
+  .badge-yellow { background: #fef3c7; color: #92400e; }
+  .badge-red { background: #fee2e2; color: #991b1b; }
+  .badge-green { background: #dcfce7; color: #166534; }
+
+  /* Alert Boxes */
+  .alert-box {
+    margin-bottom: 14px;
+    padding: 12px 14px;
+    border-radius: 6px;
+    border-left: 4px solid #ccc;
+    background: #f8f8f8;
+    font-size: 12px;
+  }
+  .alert-box.yellow { border-left-color: #f59e0b; background: #fffbeb; }
+  .alert-box.red { border-left-color: #dc2626; background: #fef2f2; }
+  .alert-box.green { border-left-color: #16a34a; background: #f0fdf4; }
+
+  /* Metrics Cards */
+  .metrics {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 12px;
+    margin-bottom: 16px;
+  }
+  .metric {
+    background: #f8fafc;
+    border-radius: 6px;
+    padding: 14px;
+    border-left: 3px solid #94a3b8;
+  }
+  .metric-label {
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: #64748b;
+    font-weight: 600;
+    margin-bottom: 4px;
+  }
+  .metric-value {
+    font-size: 22px;
+    font-weight: 700;
+    color: #1e293b;
+    margin-bottom: 2px;
+  }
+  .metric-trend {
+    font-size: 11px;
+    color: #64748b;
+  }
+
+  /* Footer */
+  .footer {
+    margin-top: 24px;
+    padding-top: 16px;
+    border-top: 2px solid #e0e0e0;
+    font-size: 10px;
+    color: #666;
+    line-height: 1.6;
+  }
+  .footer-title {
+    font-weight: 700;
+    font-size: 11px;
+    margin-bottom: 6px;
+    color: #444;
+  }
+  .footer ul {
+    margin: 4px 0;
+    padding-left: 18px;
+  }
+  .footer li {
+    margin-bottom: 3px;
+  }
+
+  /* Empty State */
+  .empty-state {
+    padding: 12px;
+    text-align: center;
+    color: #666;
+    font-style: italic;
+    background: #f8f8f8;
+    border-radius: 4px;
+    margin-bottom: 12px;
+  }
+</style>
+</head>
+<body>
+
+<div class="container">
+  <h1>📊 Mexico Daily Brief — Sales Pulse</h1>
+  <div class="subtitle">Thursday, July 9, 2026 | Data as of EOD Wednesday, July 8, 2026</div>
+
+  <div class="section-header">🏆 Section 1: Yesterday's Top Wins</div><div class="subsection-header">Top 15 Orders Won</div><table>
+      <thead>
+        <tr>
+          <th>Rank</th>
+          <th>Seller</th>
+          <th>Region</th>
+          <th>Customer</th>
+          <th>SO#</th>
+          <th style="text-align: right;">Revenue</th>
+          <th style="text-align: right;">GP</th>
+          <th>Part Numbers</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><strong>🥇</strong></td>
+          <td>Joel Flores</td>
+          <td>USA</td>
+          <td>Abaco Systems</td>
+          <td style="font-size: 11px;">SO507718</td>
+          <td class="number">$105K</td>
+          <td class="number">$18K</td>
+          <td style="font-size: 11px;">COUNTERFEIT TESTING, ISL41334IRZ-T7A</td>
+        </tr>
+        <tr>
+          <td><strong>🥈</strong></td>
+          <td>Joel Flores</td>
+          <td>USA</td>
+          <td>Arrow Global Supply Chain Services</td>
+          <td style="font-size: 11px;">SO507727</td>
+          <td class="number">$8K</td>
+          <td class="number">$2K</td>
+          <td style="font-size: 11px;">DAC8801IDRBT</td>
+        </tr>
+        <tr>
+          <td><strong>🥉</strong></td>
+          <td>Alex Partida</td>
+          <td>USA</td>
+          <td>East West Manufacturing</td>
+          <td style="font-size: 11px;">SO507720</td>
+          <td class="number">$4K</td>
+          <td class="number">$1K</td>
+          <td style="font-size: 11px;">PJSD05W_R1_00001</td>
+        </tr>
+        <tr>
+          <td><strong>#4</strong></td>
+          <td>Salvador Horner</td>
+          <td>USA</td>
+          <td>Plexus Corp.</td>
+          <td style="font-size: 11px;">SO507722</td>
+          <td class="number">$2K</td>
+          <td class="number">$2K</td>
+          <td style="font-size: 11px;">BR86</td>
+        </tr>
+        <tr>
+          <td><strong>#5</strong></td>
+          <td>Alex Partida</td>
+          <td>USA</td>
+          <td>East West Manufacturing</td>
+          <td style="font-size: 11px;">SO507719</td>
+          <td class="number">$2K</td>
+          <td class="number">$328</td>
+          <td style="font-size: 11px;">AFE5828ZAV</td>
+        </tr></tbody></table>
+        <details style="margin-top: 12px;">
+          <summary style="cursor: pointer; font-size: 11px; color: #666; padding: 6px 0;">
+            ▸ Show orders #6-#15 (2 more)
+          </summary>
+          <table style="margin-top: 8px;">
+            <thead>
+              <tr>
+                <th>Rank</th>
+                <th>Seller</th>
+                <th>Region</th>
+                <th>Customer</th>
+                <th>SO#</th>
+                <th style="text-align: right;">Revenue</th>
+                <th style="text-align: right;">GP</th>
+                <th>Part Numbers</th>
+              </tr>
+            </thead>
+            <tbody>
+          <tr>
+            <td><strong>#6</strong></td>
+            <td>Ricardo Morales</td>
+            <td>USA</td>
+            <td>Sanmina Corporation</td>
+            <td style="font-size: 11px;">SO507732</td>
+            <td class="number">$1K</td>
+            <td class="number">$492</td>
+            <td style="font-size: 11px;">SG-8101CG 16.800000MHZ TBGSA</td>
+          </tr>
+          <tr>
+            <td><strong>#7</strong></td>
+            <td>Joel Flores</td>
+            <td>USA</td>
+            <td>Abaco Systems</td>
+            <td style="font-size: 11px;">SO507717</td>
+            <td class="number">$32</td>
+            <td class="number">$0</td>
+            <td style="font-size: 11px;">COUNTERFEIT TESTING, K4B2G0846C-HCH9, K4B2G0846D-HCK0</td>
+          </tr></tbody></table></details><div class="subsection-header">New Customers Sold (First-Time Wins)</div><div class="empty-state">No new customers sold yesterday</div><div class="subsection-header">Global Strategic Accounts Activity</div><div style="font-size: 11px; color: #666; margin-bottom: 8px;">ABB, Eaton, GE Healthcare, Parker-Meggitt, RTX, Thales</div><table>
+      <thead>
+        <tr>
+          <th>Account</th>
+          <th>ISE</th>
+          <th>Region</th>
+          <th style="text-align: center;">RFQ Lines</th>
+          <th style="text-align: center;">CQ Lines</th>
+          <th style="text-align: center;">CQ Sold</th>
+          <th style="text-align: center;">SOs</th>
+          <th style="text-align: right;">Revenue</th>
+          <th style="text-align: right;">GP</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><strong style="color: #d32f2f;">ABB</strong></td>
+          <td>—</td>
+          <td>—</td>
+          <td style="text-align: center; ">0</td>
+          <td style="text-align: center; ">0</td>
+          <td style="text-align: center; ">0</td>
+          <td style="text-align: center; ">0</td>
+          <td class="number" style="">$0</td>
+          <td class="number" style="">$0</td>
+        </tr>
+        <tr>
+          <td><strong style="">Eaton</strong></td>
+          <td>Carolina Hinestroza</td>
+          <td>USA</td>
+          <td style="text-align: center; background-color: #1b5e20; color: white; font-weight: bold;">1</td>
+          <td style="text-align: center; ">0</td>
+          <td style="text-align: center; ">0</td>
+          <td style="text-align: center; ">0</td>
+          <td class="number" style="">$0</td>
+          <td class="number" style="">$0</td>
+        </tr>
+        <tr>
+          <td><strong style="">GE Healthcare</strong></td>
+          <td>Aaron Mendoza</td>
+          <td>Other</td>
+          <td style="text-align: center; ">0</td>
+          <td style="text-align: center; background-color: #1b5e20; color: white; font-weight: bold;">3</td>
+          <td style="text-align: center; background-color: #1b5e20; color: white; font-weight: bold;">3</td>
+          <td style="text-align: center; background-color: #1b5e20; color: white; font-weight: bold;">1</td>
+          <td class="number" style="background-color: #1b5e20; color: white; font-weight: bold;">$900</td>
+          <td class="number" style="background-color: #1b5e20; color: white; font-weight: bold;">$449</td>
+        </tr>
+        <tr>
+          <td><strong style="color: #d32f2f;">Parker-Meggitt</strong></td>
+          <td>—</td>
+          <td>—</td>
+          <td style="text-align: center; ">0</td>
+          <td style="text-align: center; ">0</td>
+          <td style="text-align: center; ">0</td>
+          <td style="text-align: center; ">0</td>
+          <td class="number" style="">$0</td>
+          <td class="number" style="">$0</td>
+        </tr>
+        <tr>
+          <td><strong style="">RTX</strong></td>
+          <td>Thomas Haynes</td>
+          <td>Other</td>
+          <td style="text-align: center; background-color: #1b5e20; color: white; font-weight: bold;">5</td>
+          <td style="text-align: center; background-color: #1b5e20; color: white; font-weight: bold;">1</td>
+          <td style="text-align: center; ">0</td>
+          <td style="text-align: center; ">0</td>
+          <td class="number" style="">$0</td>
+          <td class="number" style="">$0</td>
+        </tr>
+        <tr>
+          <td><strong style="">THALES</strong></td>
+          <td>Laurel Kee</td>
+          <td>APAC-Laurel</td>
+          <td style="text-align: center; background-color: #1b5e20; color: white; font-weight: bold;">1</td>
+          <td style="text-align: center; ">0</td>
+          <td style="text-align: center; ">0</td>
+          <td style="text-align: center; ">0</td>
+          <td class="number" style="">$0</td>
+          <td class="number" style="">$0</td>
+        </tr></tbody></table><div class="subsection-header">Reactivated Customers (30+ Day Gap)</div><table>
+      <thead>
+        <tr>
+          <th>Customer</th>
+          <th>Facility</th>
+          <th>Seller</th>
+          <th>Region</th>
+          <th>SO #s</th>
+          <th style="text-align: right;">Yesterday Revenue</th>
+          <th style="text-align: right;">Yesterday GP</th>
+          <th style="text-align: center;">Gap (Days)</th>
+          <th>Last Order</th>
+          <th style="text-align: center;">Gap Multiplier</th>
+          <th>Type</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><strong>East West Manufacturing</strong></td>
+          <td style="font-size: 10px;">N/A</td>
+          <td>Alex Partida</td>
+          <td>MEX</td>
+          <td style="font-size: 10px;">SO507719</td>
+          <td class="number">$2K</td>
+          <td class="number">$328</td>
+          <td style="text-align: center;"><span class="badge badge-green">31</span></td>
+          <td>2026-06-08</td>
+          <td style="text-align: center;">1.0x</td>
+          <td style="font-size: 10px;">other</td>
+        </tr>
+      <tr style="border-top: 2px solid #333; background-color: #f5f5f5; font-weight: bold;">
+        <td colspan="5" style="text-align: right;"><strong>TOTAL</strong></td>
+        <td class="number"><strong>$2K</strong></td>
+        <td class="number"><strong>$328</strong></td>
+        <td colspan="4"></td>
+      </tr></tbody></table><div style="font-size: 10px; color: #666; margin-top: 8px;"><em>Note: Tracked at Ship-To City level. Gap multiplier shows how much longer this gap is vs typical order frequency.</em></div>
+  <div class="section-header">⚠️ Section 2: Needs Attention</div><div class="subsection-header">Top 10 Late SO Lines (3-31 days past due)</div><div style="font-size: 11px; color: #666; margin-bottom: 8px;">🟡 Yellow: 3-7 days late | 🔴 Red: 8+ days late | Rolling 31-day window | Top 10 by revenue (no minimum) | Unshipped amounts shown</div><table>
+      <thead>
+        <tr>
+          <th>Customer</th>
+          <th>SO#</th>
+          <th style="text-align: center;">Ln</th>
+          <th>MPN</th>
+          <th>ISE</th>
+          <th>Rgn</th>
+          <th>Promise</th>
+          <th style="text-align: center;">Late</th>
+          <th style="text-align: right;">Qty</th>
+          <th style="text-align: right;">Revenue</th>
+          <th style="text-align: right;">GP</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr style="background-color: #ffebee;">
+          <td style="font-size: 11px;"><strong>Abaco Systems</strong></td>
+          <td style="font-size: 10px;">SO507317</td>
+          <td style="text-align: center; font-size: 10px;">10</td>
+          <td style="font-size: 9px;">BCM56861A1IFSBG</td>
+          <td style="font-size: 10px;">Joel Flores</td>
+          <td style="font-size: 10px;">USA</td>
+          <td style="font-size: 10px;">2026-06-22</td>
+          <td style="text-align: center; color: #d32f2f; font-weight: bold; font-size: 10px;">17</td>
+          <td class="number" style="font-size: 10px;">144</td>
+          <td class="number" style="font-size: 11px;">$311K</td>
+          <td class="number" style="font-size: 11px;">$78K</td>
+        </tr>
+        <tr style="background-color: #ffebee;">
+          <td style="font-size: 11px;"><strong>Plexus Corp.</strong></td>
+          <td style="font-size: 10px;">SO507277</td>
+          <td style="text-align: center; font-size: 10px;">10</td>
+          <td style="font-size: 9px;">MT25QL01GBBB8E12-0AUT</td>
+          <td style="font-size: 10px;">Salvador Horner</td>
+          <td style="font-size: 10px;">USA</td>
+          <td style="font-size: 10px;">2026-06-12</td>
+          <td style="text-align: center; color: #d32f2f; font-weight: bold; font-size: 10px;">27</td>
+          <td class="number" style="font-size: 10px;">797</td>
+          <td class="number" style="font-size: 11px;">$206K</td>
+          <td class="number" style="font-size: 11px;">$45K</td>
+        </tr>
+        <tr style="background-color: #ffebee;">
+          <td style="font-size: 11px;"><strong>Sanmina Corporation</strong></td>
+          <td style="font-size: 10px;">SO507508</td>
+          <td style="text-align: center; font-size: 10px;">10</td>
+          <td style="font-size: 9px;">88E6390-A0-TLA2I000</td>
+          <td style="font-size: 10px;">Ricardo Morales</td>
+          <td style="font-size: 10px;">USA</td>
+          <td style="font-size: 10px;">2026-06-30</td>
+          <td style="text-align: center; color: #d32f2f; font-weight: bold; font-size: 10px;">9</td>
+          <td class="number" style="font-size: 10px;">4,460</td>
+          <td class="number" style="font-size: 11px;">$87K</td>
+          <td class="number" style="font-size: 11px;">$18K</td>
+        </tr>
+        <tr style="background-color: #ffebee;">
+          <td style="font-size: 11px;"><strong>Sanmina Corporation</strong></td>
+          <td style="font-size: 10px;">SO507508</td>
+          <td style="text-align: center; font-size: 10px;">30</td>
+          <td style="font-size: 9px;">88E6390-A0-TLA2I000</td>
+          <td style="font-size: 10px;">Ricardo Morales</td>
+          <td style="font-size: 10px;">USA</td>
+          <td style="font-size: 10px;">2026-06-30</td>
+          <td style="text-align: center; color: #d32f2f; font-weight: bold; font-size: 10px;">9</td>
+          <td class="number" style="font-size: 10px;">940</td>
+          <td class="number" style="font-size: 11px;">$18K</td>
+          <td class="number" style="font-size: 11px;">$3K</td>
+        </tr>
+        <tr style="background-color: #ffebee;">
+          <td style="font-size: 11px;"><strong>Plexus Corp.</strong></td>
+          <td style="font-size: 10px;">SO507488</td>
+          <td style="text-align: center; font-size: 10px;">30</td>
+          <td style="font-size: 9px;">5AGXFA5H4F35I3G</td>
+          <td style="font-size: 10px;">Salvador Horner</td>
+          <td style="font-size: 10px;">USA</td>
+          <td style="font-size: 10px;">2026-06-30</td>
+          <td style="text-align: center; color: #d32f2f; font-weight: bold; font-size: 10px;">9</td>
+          <td class="number" style="font-size: 10px;">17</td>
+          <td class="number" style="font-size: 11px;">$15K</td>
+          <td class="number" style="font-size: 11px;">$0</td>
+        </tr>
+        <tr style="background-color: #ffebee;">
+          <td style="font-size: 11px;"><strong>OnCore Manufacturing</strong></td>
+          <td style="font-size: 10px;">SO507355</td>
+          <td style="text-align: center; font-size: 10px;">10</td>
+          <td style="font-size: 9px;">TLK1221RHAR</td>
+          <td style="font-size: 10px;">Carolina Hinestroza</td>
+          <td style="font-size: 10px;">USA</td>
+          <td style="font-size: 10px;">2026-06-12</td>
+          <td style="text-align: center; color: #d32f2f; font-weight: bold; font-size: 10px;">27</td>
+          <td class="number" style="font-size: 10px;">5,000</td>
+          <td class="number" style="font-size: 11px;">$13K</td>
+          <td class="number" style="font-size: 11px;">$5K</td>
+        </tr>
+        <tr style="background-color: #ffebee;">
+          <td style="font-size: 11px;"><strong>Sensata Technologies</strong></td>
+          <td style="font-size: 10px;">SO507548</td>
+          <td style="text-align: center; font-size: 10px;">30</td>
+          <td style="font-size: 9px;">KTY81/110, 112</td>
+          <td style="font-size: 10px;">Ricardo Morales</td>
+          <td style="font-size: 10px;">USA</td>
+          <td style="font-size: 10px;">2026-07-01</td>
+          <td style="text-align: center; color: #d32f2f; font-weight: bold; font-size: 10px;">8</td>
+          <td class="number" style="font-size: 10px;">16,500</td>
+          <td class="number" style="font-size: 11px;">$12K</td>
+          <td class="number" style="font-size: 11px;">$2K</td>
+        </tr>
+        <tr style="background-color: #ffebee;">
+          <td style="font-size: 11px;"><strong>Plexus Corp.</strong></td>
+          <td style="font-size: 10px;">SO507468</td>
+          <td style="text-align: center; font-size: 10px;">10</td>
+          <td style="font-size: 9px;">ADG201HSKR</td>
+          <td style="font-size: 10px;">Salvador Horner</td>
+          <td style="font-size: 10px;">USA</td>
+          <td style="font-size: 10px;">2026-06-30</td>
+          <td style="text-align: center; color: #d32f2f; font-weight: bold; font-size: 10px;">9</td>
+          <td class="number" style="font-size: 10px;">100</td>
+          <td class="number" style="font-size: 11px;">$3K</td>
+          <td class="number" style="font-size: 11px;">$2K</td>
+        </tr>
+        <tr style="background-color: #fff9c4;">
+          <td style="font-size: 11px;"><strong>Abaco Systems</strong></td>
+          <td style="font-size: 10px;">SO507589</td>
+          <td style="text-align: center; font-size: 10px;">10</td>
+          <td style="font-size: 9px;">WG82574L SLBA9</td>
+          <td style="font-size: 10px;">Joel Flores</td>
+          <td style="font-size: 10px;">USA</td>
+          <td style="font-size: 10px;">2026-07-03</td>
+          <td style="text-align: center; color: #f57c00; font-weight: bold; font-size: 10px;">6</td>
+          <td class="number" style="font-size: 10px;">180</td>
+          <td class="number" style="font-size: 11px;">$2K</td>
+          <td class="number" style="font-size: 11px;">$887</td>
+        </tr>
+        <tr style="background-color: #ffebee;">
+          <td style="font-size: 11px;"><strong>Sensata Technologies</strong></td>
+          <td style="font-size: 10px;">SO507443</td>
+          <td style="text-align: center; font-size: 10px;">40</td>
+          <td style="font-size: 9px;">RNF-3000-24/8-0-SP</td>
+          <td style="font-size: 10px;">Ricardo Morales</td>
+          <td style="font-size: 10px;">USA</td>
+          <td style="font-size: 10px;">2026-06-17</td>
+          <td style="text-align: center; color: #d32f2f; font-weight: bold; font-size: 10px;">22</td>
+          <td class="number" style="font-size: 10px;">120</td>
+          <td class="number" style="font-size: 11px;">$19</td>
+          <td class="number" style="font-size: 11px;">$-576</td>
+        </tr></tbody></table><div class="subsection-header">Top 5 Scheduled to Ship This Month (by GP)</div><div style="font-size: 11px; color: #666; margin-bottom: 8px;">🔴 Red: Past due | 🟡 Yellow: Due this week (0-7 days) | 🟢 Green: Future (8+ days)</div><table>
+      <thead>
+        <tr>
+          <th>Customer</th>
+          <th>SO#</th>
+          <th style="text-align: center;">Ln</th>
+          <th>MPN</th>
+          <th>ISE</th>
+          <th>Rgn</th>
+          <th>Promise</th>
+          <th style="text-align: center;">+/- Days</th>
+          <th style="text-align: right;">Qty</th>
+          <th style="text-align: right;">Revenue</th>
+          <th style="text-align: right;">GP</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr style="background-color: #e8f5e9;">
+          <td style="font-size: 11px;"><strong>Abaco Systems</strong></td>
+          <td style="font-size: 10px;">SO507718</td>
+          <td style="text-align: center; font-size: 10px;">10</td>
+          <td style="font-size: 9px;">ISL41334IRZ-T7A</td>
+          <td style="font-size: 10px;">Joel Flores</td>
+          <td style="font-size: 10px;">USA</td>
+          <td style="font-size: 10px;">2026-07-24</td>
+          <td style="text-align: center; color: #388e3c; font-weight: bold; font-size: 10px;">+15</td>
+          <td class="number" style="font-size: 10px;">6,489</td>
+          <td class="number" style="font-size: 11px;">$105K</td>
+          <td class="number" style="font-size: 11px;">$18K</td>
+        </tr>
+        <tr style="background-color: #e8f5e9;">
+          <td style="font-size: 11px;"><strong>Abaco Systems</strong></td>
+          <td style="font-size: 10px;">SO507715</td>
+          <td style="text-align: center; font-size: 10px;">20</td>
+          <td style="font-size: 9px;">SN74VMEH22501ADGVR </td>
+          <td style="font-size: 10px;">Joel Flores</td>
+          <td style="font-size: 10px;">USA</td>
+          <td style="font-size: 10px;">2026-07-17</td>
+          <td style="text-align: center; color: #388e3c; font-weight: bold; font-size: 10px;">+8</td>
+          <td class="number" style="font-size: 10px;">590</td>
+          <td class="number" style="font-size: 11px;">$10K</td>
+          <td class="number" style="font-size: 11px;">$7K</td>
+        </tr>
+        <tr style="background-color: #e8f5e9;">
+          <td style="font-size: 11px;"><strong>Abaco Systems</strong></td>
+          <td style="font-size: 10px;">SO507715</td>
+          <td style="text-align: center; font-size: 10px;">10</td>
+          <td style="font-size: 9px;">SN74VMEH22501ADGVR </td>
+          <td style="font-size: 10px;">Joel Flores</td>
+          <td style="font-size: 10px;">USA</td>
+          <td style="font-size: 10px;">2026-07-17</td>
+          <td style="text-align: center; color: #388e3c; font-weight: bold; font-size: 10px;">+8</td>
+          <td class="number" style="font-size: 10px;">486</td>
+          <td class="number" style="font-size: 11px;">$8K</td>
+          <td class="number" style="font-size: 11px;">$5K</td>
+        </tr>
+        <tr style="background-color: #ffebee;">
+          <td style="font-size: 11px;"><strong>Sensata Technologies</strong></td>
+          <td style="font-size: 10px;">SO507548</td>
+          <td style="text-align: center; font-size: 10px;">30</td>
+          <td style="font-size: 9px;">KTY81/110, 112</td>
+          <td style="font-size: 10px;">Ricardo Morales</td>
+          <td style="font-size: 10px;">USA</td>
+          <td style="font-size: 10px;">2026-07-01</td>
+          <td style="text-align: center; color: #d32f2f; font-weight: bold; font-size: 10px;">-8</td>
+          <td class="number" style="font-size: 10px;">16,500</td>
+          <td class="number" style="font-size: 11px;">$12K</td>
+          <td class="number" style="font-size: 11px;">$2K</td>
+        </tr>
+        <tr style="background-color: #ffebee;">
+          <td style="font-size: 11px;"><strong>Abaco Systems</strong></td>
+          <td style="font-size: 10px;">SO507589</td>
+          <td style="text-align: center; font-size: 10px;">10</td>
+          <td style="font-size: 9px;">WG82574L SLBA9</td>
+          <td style="font-size: 10px;">Joel Flores</td>
+          <td style="font-size: 10px;">USA</td>
+          <td style="font-size: 10px;">2026-07-03</td>
+          <td style="text-align: center; color: #d32f2f; font-weight: bold; font-size: 10px;">-6</td>
+          <td class="number" style="font-size: 10px;">180</td>
+          <td class="number" style="font-size: 11px;">$2K</td>
+          <td class="number" style="font-size: 11px;">$887</td>
+        </tr></tbody></table><div class="subsection-header">Inside Sales Reps Alert (No RFQ in 3+ Days)</div><table>
+      <thead>
+        <tr>
+          <th>ISE</th>
+          <th>Manager</th>
+          <th>Region</th>
+          <th>Last RFQ Date</th>
+          <th style="text-align: center;">Days Inactive</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><strong>Alfredo Martinez</strong></td>
+          <td>Joel Marquez</td>
+          <td>USA</td>
+          <td>2026-07-03 00:00:00</td>
+          <td style="text-align: center; background-color: #fef3c7;"><span class="badge badge-yellow" style="font-weight: bold; color: #92400e;">4 days</span></td>
+        </tr>
+        <tr>
+          <td><strong>Carlos Moreno</strong></td>
+          <td>Joel Marquez</td>
+          <td>USA</td>
+          <td>2026-07-03 00:00:00</td>
+          <td style="text-align: center; background-color: #fef3c7;"><span class="badge badge-yellow" style="font-weight: bold; color: #92400e;">4 days</span></td>
+        </tr></tbody></table><div class="subsection-header">Low Margin Orders Trail (<18% GM)</div><div class="alert-box green">✓ No low margin orders (<18% GM) yesterday</div>
+  <div class="section-header">📊 Section 3: Yesterday's Activity by Mexico Sales Rep</div><table>
+      <thead>
+        <tr>
+          <th>Sales Rep</th>
+          <th style="text-align: center;">RFQ Lines</th>
+          <th style="text-align: center;">CQ Lines</th>
+          <th style="text-align: center;">CQ Sold</th>
+          <th style="text-align: center;">SO Lines</th>
+          <th style="text-align: right;">Revenue</th>
+          <th style="text-align: right;">GP</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><strong>Alejandro Padilla</strong></td>
+          <td style="text-align: center;">0</td>
+          <td style="text-align: center;">0</td>
+          <td style="text-align: center;">0</td>
+          <td style="text-align: center;">0</td>
+          <td class="number">$0</td>
+          <td class="number">$0</td>
+        </tr>
+        <tr>
+          <td><strong>Alex Partida</strong></td>
+          <td style="text-align: center;">27</td>
+          <td style="text-align: center;">0</td>
+          <td style="text-align: center;">0</td>
+          <td style="text-align: center;">2</td>
+          <td class="number">$6K</td>
+          <td class="number">$2K</td>
+        </tr>
+        <tr>
+          <td><strong>Alfredo Martinez</strong></td>
+          <td style="text-align: center;">0</td>
+          <td style="text-align: center;">0</td>
+          <td style="text-align: center;">0</td>
+          <td style="text-align: center;">0</td>
+          <td class="number">$0</td>
+          <td class="number">$0</td>
+        </tr>
+        <tr>
+          <td><strong>Carlos Moreno</strong></td>
+          <td style="text-align: center;">0</td>
+          <td style="text-align: center;">0</td>
+          <td style="text-align: center;">0</td>
+          <td style="text-align: center;">0</td>
+          <td class="number">$0</td>
+          <td class="number">$0</td>
+        </tr>
+        <tr>
+          <td><strong>Carolina Hinestroza</strong></td>
+          <td style="text-align: center;">5</td>
+          <td style="text-align: center;">0</td>
+          <td style="text-align: center;">0</td>
+          <td style="text-align: center;">0</td>
+          <td class="number">$0</td>
+          <td class="number">$0</td>
+        </tr>
+        <tr>
+          <td><strong>Joel Flores</strong></td>
+          <td style="text-align: center;">2</td>
+          <td style="text-align: center;">7</td>
+          <td style="text-align: center;">6</td>
+          <td style="text-align: center;">3</td>
+          <td class="number">$113K</td>
+          <td class="number">$20K</td>
+        </tr>
+        <tr>
+          <td><strong>Ricardo Morales</strong></td>
+          <td style="text-align: center;">37</td>
+          <td style="text-align: center;">2</td>
+          <td style="text-align: center;">2</td>
+          <td style="text-align: center;">1</td>
+          <td class="number">$1K</td>
+          <td class="number">$492</td>
+        </tr>
+        <tr>
+          <td><strong>Salvador Horner</strong></td>
+          <td style="text-align: center;">2</td>
+          <td style="text-align: center;">3</td>
+          <td style="text-align: center;">2</td>
+          <td style="text-align: center;">1</td>
+          <td class="number">$2K</td>
+          <td class="number">$2K</td>
+        </tr>
+      <tr style="border-top: 2px solid #333; background-color: #f5f5f5; font-weight: bold;">
+        <td><strong>TOTAL</strong></td>
+        <td style="text-align: center;">73</td>
+        <td style="text-align: center;">12</td>
+        <td style="text-align: center;">10</td>
+        <td style="text-align: center;">7</td>
+        <td class="number"><strong>$122K</strong></td>
+        <td class="number"><strong>$24K</strong></td>
+      </tr></tbody></table>
+  
+  <div class="footer">
+    <div class="footer-title">Report Criteria & Definitions:</div>
+
+    <strong>Section 1: Yesterday's Top Wins</strong>
+    <ul>
+      <li><strong>Top 15 Orders:</strong> Orders booked yesterday ranked by revenue (top 5 visible, next 10 collapsible)</li>
+      <li><strong>New Customers Sold:</strong> Customers placing their first order ever</li>
+      <li><strong>Strategic Accounts:</strong> ABB, Eaton, GE Healthcare, Parker-Meggitt, RTX, Thales</li>
+      <li><strong>Reactivated Customers:</strong> Location-level tracking (30+ day gap, significance-scored)</li>
+    </ul>
+
+    <strong>Section 2: Needs Attention</strong>
+    <ul>
+      <li><strong>Top 10 Late Lines:</strong> Top 10 SO lines by revenue that are 3+ days past promise date (rolling 31-day window, no revenue minimum)</li>
+      <li><strong>Top 5 Scheduled to Ship This Month:</strong> Top 5 unshipped lines by GP with promise date in current month (backlog view)</li>
+      <li><strong>ISE Alerts:</strong> Inside sales reps with no RFQ loaded in 3+ business days (Yellow: 3-6 days, Red: 7+ days)</li>
+      <li><strong>Low Margin Trail:</strong> Orders <18% GM (Josh-approved audit trail)</li>
+      <li style="margin-top: 6px;"><em>* Note: Some lines may show $0 GP when cost data is not available in the BI view. Investigating data source discrepancies.</em></li>
+    </ul>
+
+    <strong>Section 3: Yesterday's Activity</strong>
+    <ul>
+      <li><strong>Sales Rep:</strong> Individual Mexico sales representatives</li>
+    </ul>
+
+    <div style="margin-top: 8px; padding-top: 8px; border-top: 1px solid #ddd;">
+      <em>Note: Criteria and thresholds are subject to refinement based on feedback.</em><br>
+      Questions? Reply to this email. | Next digest: Tomorrow 6:00 AM PT
+    </div>
+  </div>
+</div>
+
+</body>
+</html>

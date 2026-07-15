@@ -21,12 +21,14 @@
 const fs = require('fs');
 const path = require('path');
 const { execSync } = require('child_process');
+const os = require('os');
 
 const REGISTRY = require('../cron-jobs');
 const { cadenceToMs } = require('../cron-jobs');
 const { listSentinels, SENTINEL_DIR } = require('../shared/cron-sentinel');
 
 const RUNNER_NAME = 'cron-runner.js';
+const CRON_USER = os.userInfo().username; // scope registry expectations to this account
 
 function getInstalledCrontab() {
   try {
@@ -46,7 +48,7 @@ function detectDrift() {
   const issues = [];
   const installed = getInstalledCrontab();
   const cronLines = parseCronLines(installed);
-  const registryNames = REGISTRY.filter((j) => typeof j === 'object' && j.name).map((j) => j.name);
+  const registryNames = REGISTRY.filter((j) => typeof j === 'object' && j.name && (j.owner || 'analytics_user') === CRON_USER).map((j) => j.name);
 
   // 1. Raw cron lines not going through cron-runner
   for (const line of cronLines) {
@@ -98,6 +100,7 @@ function detectDrift() {
   // 5. Stale jobs — lastSuccess older than 2× cadence
   for (const job of REGISTRY) {
     if (typeof job !== 'object' || !job.name) continue;
+    if ((job.owner || 'analytics_user') !== CRON_USER) continue;
     if (job.cadence === 'fixed') continue; // fixed jobs fire only at cron times; cadenceToMs is a 60s placeholder, so the 2× heuristic doesn't apply
     const sentinel = sentinels.find((s) => s.jobName === job.name);
     if (!sentinel || !sentinel.lastSuccess) continue; // never run yet — handled at install

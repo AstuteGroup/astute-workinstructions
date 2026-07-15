@@ -26,6 +26,7 @@ const { installCron, cadenceToMs } = require('../cron-jobs');
 
 const RUNNER_PATH = path.resolve(__dirname, 'cron-runner.js');
 const NODE = '/usr/bin/node';
+const CRON_USER = os.userInfo().username; // jobs are filtered + env-scoped to this account
 
 // ─── Crontab header — load-bearing env vars + provenance comment ────────────
 const HEADER = [
@@ -37,8 +38,8 @@ const HEADER = [
   '# PGDATABASE is load-bearing: pg_hba peer-auth is per-DB, and without it',
   '# psql under cron fails with "fe_sendauth: no password supplied" even when',
   '# PGUSER is set. Discovered 2026-05-04 from offer-poller-excess failures.',
-  'PGUSER=analytics_user',
-  'LOGNAME=analytics_user',
+  `PGUSER=${CRON_USER}`,
+  `LOGNAME=${CRON_USER}`,
   'PGDATABASE=idempiere_replica',
   '',
 ];
@@ -53,6 +54,7 @@ function buildCrontabBody() {
   const lines = [...HEADER];
   for (const job of REGISTRY) {
     if (typeof job !== 'object' || !job.name) continue; // skip helper exports
+    if ((job.owner || 'analytics_user') !== CRON_USER) continue; // only this account's jobs
     lines.push(`# ${job.name}: ${job.description}`);
     lines.push(buildCronLine(job));
     lines.push('');
@@ -90,6 +92,7 @@ function main() {
   console.log('============================================================');
   for (const job of REGISTRY) {
     if (typeof job !== 'object' || !job.name) continue;
+    if ((job.owner || 'analytics_user') !== CRON_USER) continue;
     printResilienceChecklist(job);
   }
 

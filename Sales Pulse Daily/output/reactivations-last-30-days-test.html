@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>Reactivated Customers - Last 30 Days (Test)</title>
+<style>
+body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; margin: 40px; background: #f5f5f5; }
+.container { max-width: 1000px; margin: 0 auto; background: white; padding: 30px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+h1 { color: #1a1a1a; border-bottom: 3px solid #2563eb; padding-bottom: 10px; margin-bottom: 10px; }
+.subtitle { font-size: 12px; color: #666; margin-bottom: 20px; }
+.criteria { font-size: 10px; color: #888; font-style: italic; margin-bottom: 30px; border-left: 3px solid #ddd; padding-left: 12px; }
+.reactivation { border: 1px solid #e0e0e0; border-radius: 6px; padding: 16px; margin-bottom: 16px; background: white; }
+.reactivation-header { font-size: 15px; font-weight: bold; color: #1a1a1a; margin-bottom: 10px; }
+.badge { display: inline-block; padding: 3px 10px; border-radius: 3px; font-size: 11px; font-weight: 600; margin-left: 8px; }
+.badge-high-value { background: #fef3c7; color: #92400e; }
+.badge-anomalous { background: #e0e7ff; color: #3730a3; }
+.badge-small { background: #dbeafe; color: #1e40af; }
+.detail-line { font-size: 12px; color: #666; margin-bottom: 6px; }
+.metrics { background: #f8f9fa; padding: 12px; border-radius: 4px; margin-top: 10px; font-size: 12px; }
+.icon { font-size: 18px; margin-right: 6px; }
+.no-handoffs { background: #fef3c7; border: 1px solid #fcd34d; padding: 16px; border-radius: 6px; margin: 20px 0; font-size: 13px; color: #92400e; }
+</style>
+</head>
+<body>
+<div class="container">
+<h1>🔄 Reactivated Customers - Last 30 Days (Test)</h1>
+<div class="subtitle">Testing Period: June 1-30, 2026</div>
+<div class="criteria"><strong>OEM/EMS only</strong> • Excludes brokers/distributors/traders • 30-day minimum gap • CQ-linked sales only (excludes service fees/adjustments) • OEMs tracked at facility level</div>
+
+<div class="no-handoffs">
+<strong>⚠️ Seller Handoff Analysis:</strong> No seller handoffs detected in this 30-day period. This means each reactivated customer only ordered once during this window, or the same seller handled all their orders. Seller handoffs occur when a customer account worked by one seller later gets an order from a different seller.
+</div>
+
+<h2 style="margin-top: 30px; color: #374151; font-size: 16px;">All Reactivations (3 total)</h2>
+
+<div class="reactivation">
+<div class="reactivation-header">
+<span class="icon">🏆</span>1. KLA
+<span class="badge badge-high-value">High-Value Long Gap</span>
+</div>
+<div class="detail-line">📍 <strong>Singapore, Singapore</strong> (facility-level tracking)</div>
+<div class="detail-line">
+Gap: <strong>321 days</strong> | Typical Cycle: 319 days | <strong>1.01x typical</strong>
+</div>
+<div class="detail-line">
+Last Order: 2025-08-13 | Lifetime: 1 orders
+</div>
+<div class="metrics">
+<strong>Order Details:</strong> $110,000 revenue | $20,000 GP<br>
+<strong>Seller:</strong> Laurel Kee (APAC-Laurel)
+</div>
+</div>
+
+<div class="reactivation">
+<div class="reactivation-header">
+<span class="icon">📍</span>2. Viavi Solutions Inc
+<span class="badge badge-small">Small Customer Return</span>
+</div>
+<div class="detail-line">📍 <strong>Wichita, KS</strong> (facility-level tracking)</div>
+<div class="detail-line">
+Gap: <strong>295 days</strong> | Typical Cycle: 294 days | <strong>1.00x typical</strong>
+</div>
+<div class="detail-line">
+Last Order: 2025-09-08 | Lifetime: 1 orders
+</div>
+<div class="metrics">
+<strong>Order Details:</strong> $26,120 revenue | $6,120 GP<br>
+<strong>Seller:</strong> Renald Ng (APAC-Laurel)
+</div>
+</div>
+
+<div class="reactivation">
+<div class="reactivation-header">
+<span class="icon">📊</span>3. Venture Corporation Ltd
+<span class="badge badge-anomalous">Anomalous Pattern</span>
+</div>
+<div class="detail-line">Customer-level tracking</div>
+<div class="detail-line">
+Gap: <strong>61 days</strong> | Typical Cycle: 8 days | <strong>7.63x typical</strong>
+</div>
+<div class="detail-line">
+Last Order: 2026-04-30 | Lifetime: 83 orders
+</div>
+<div class="metrics">
+<strong>Order Details:</strong> $710,050 revenue | $200,050 GP<br>
+<strong>Seller:</strong> Laurel Kee (APAC-Laurel)<br>
+<strong>Pattern:</strong> Venture typically orders every 8 days, but went 61 days without an order (7.6x their normal cycle). This suggests a potential issue or pause in the relationship that has now resumed.
+</div>
+</div>
+
+<div style="margin-top: 40px; padding-top: 20px; border-top: 2px solid #e5e7eb; color: #6b7280; font-size: 11px;">
+<strong>Report Criteria:</strong>
+<ul style="margin-top: 8px;">
+<li>30-day minimum gap threshold (filters out short gaps)</li>
+<li>OEMs tracked at facility level (KLA, Viavi, etc. - location-specific)</li>
+<li>Non-OEMs tracked at customer level with fuzzy name matching</li>
+<li>Excludes brokers, distributors, traders (name-based filtering)</li>
+<li>CQ-linked sales only (excludes service fees, adjustments, non-component transactions)</li>
+<li><strong>High-Value:</strong> ≥$100K revenue + 90+ day gap</li>
+<li><strong>Anomalous Pattern:</strong> Gap ≥3x typical order cycle</li>
+<li><strong>Small Customer:</strong> &lt;10 lifetime orders + 120+ day gap</li>
+<li><strong>Long Dormant:</strong> 180+ days (6+ months)</li>
+</ul>
+<p style="margin-top: 10px;"><em>Note: This test shows the production query behavior with corrected filtering. The filter now properly identifies component sales through CQ line linkage, rather than incorrectly excluding all orders based on the "Generic Sales Product" placeholder in m_product.</em></p>
+</div>
+
+</div>
+</body>
+</html>
