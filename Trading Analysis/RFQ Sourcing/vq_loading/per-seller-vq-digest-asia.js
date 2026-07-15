@@ -1,33 +1,25 @@
 #!/usr/bin/env node
 //
-// Per-Seller VQ Digest (APAC Team Only) — NON-ASIA SELLERS
+// Per-Seller VQ Digest — ASIA SELLERS (Twice Daily)
 //
-// Sends each NON-ASIA seller their own daily email with VQs loaded by the APAC
-// buying team for their RFQs. Sellers wake up to see overnight sourcing activity.
-// Each RFQ gets its own Excel tab. Buyers with VQs for that seller are CC'd.
+// Sends Asia-based sellers their VQ digest twice daily at:
+//   - 11 AM Shenzhen (03:00 UTC)
+//   - 5 PM Shenzhen (09:00 UTC)
+//
+// Rolling window: each digest covers "since last digest" for that seller.
 //
 // SCOPE: Only VQs where chuboe_buyer_id is an APAC buyer (8 buyers).
-// EXCLUDES: Asia sellers (17 users) — they get per-seller-vq-digest-asia.js twice daily.
+// SELLERS: Only the 17 Asia-based sellers listed in ASIA_SELLER_IDS.
 //
-// Schedule: Daily at 10:05 UTC (5 min after APAC digest = 6:05 PM Shenzhen)
-//
-// TO:  Seller's email (from ad_user.email via chuboe_rfq.salesrep_id)
-// CC:  All buyers (chuboe_buyer_id) with VQs for this seller's RFQs,
-//      plus ivy.song@astutegroup.com
-//
-// Attachment: Excel file with one worksheet per RFQ
-// Columns:    Same as APAC digest (Customer, RFQ, RFQ Type, CPC, Vendor, MPN,
-//             Qty, Price, Curr, Date Code, Lead Time, Notes, Buyer, Loader, VQ ID, Created)
-//
-// Window: Sentinel-driven (since last successful send). State stored at
-//   ~/workspace/.seller-vq-digest-state.json   { lastDigestTs: ISO }
+// TO:  Seller's email
+// CC:  Buyers who sourced for that seller + Ivy Song
 //
 // Usage:
-//   node per-seller-vq-digest.js              # preview to stdout + xlsx files, no email
-//   node per-seller-vq-digest.js --send       # email + advance state
-//   node per-seller-vq-digest.js --send --test # send all to jake@ instead of sellers (for review)
-//   node per-seller-vq-digest.js --since 48   # override window to N hours (no state advance)
-//   node per-seller-vq-digest.js --limit 2    # only process first N sellers (for testing)
+//   node per-seller-vq-digest-asia.js              # preview, no email
+//   node per-seller-vq-digest-asia.js --send       # email + advance state
+//   node per-seller-vq-digest-asia.js --send --test # send all to jake@ for review
+//   node per-seller-vq-digest-asia.js --since 12   # override window (no state advance)
+//   node per-seller-vq-digest-asia.js --reset-state # clear state file
 
 'use strict';
 
@@ -39,34 +31,14 @@ const { execSync } = require('child_process');
 const ExcelJS = require('exceljs');
 const { createNotifier } = require('../../../shared/notifier');
 
-const STATE_FILE = path.join(process.env.HOME, 'workspace', '.seller-vq-digest-state.json');
+const STATE_FILE = path.join(process.env.HOME, 'workspace', '.asia-seller-vq-digest-state.json');
 
-// Always CC Ivy on all seller digests
-// (Jake removed 2026-07-09 — he still receives if he's the seller on an RFQ)
+// Always CC Ivy on Asia seller digests
 const ALWAYS_CC = ['ivy.song@astutegroup.com'];
 
-// System-placeholder vendors that get auto-stamped to RFQ lines but are NOT
-// quotes the team actually sourced:
-//   1009435 StockCQ          — Calcuquote Customer Excess auto-match
-//   1008101 CalcuQuote       — CalcuQuote integration parent partner
-const SYSTEM_VENDOR_IDS = [1009435, 1008101];
-
-// APAC buyer IDs — only VQs from these buyers appear in the digest
-// (same roster as apac-vq-digest.js)
-const APAC_BUYER_IDS = [
-  1013784,  // Ivy Song
-  1018538,  // Serena Zhang
-  1005190,  // Feong Chang
-  1006326,  // Elaine Liang
-  1019425,  // May Wu
-  1009477,  // Tracy Xie
-  1011159,  // Betty Song
-  1034720,  // Grace Zheng
-];
-
-// Asia sellers — EXCLUDED from this script (they get per-seller-vq-digest-asia.js twice daily)
+// Asia sellers — twice daily digest (11 AM + 5 PM Shenzhen)
 // Added 2026-07-09
-const ASIA_SELLER_IDS = new Set([
+const ASIA_SELLER_IDS = [
   1021224,  // Spring Tu
   1011159,  // Betty Song
   1023803,  // Renald Ng (ray.ng@)
@@ -84,16 +56,29 @@ const ASIA_SELLER_IDS = new Set([
   1019425,  // May Wu
   1009477,  // Tracy Xie
   1034720,  // Grace Zheng
-]);
+];
 
-const MAX_WINDOW_HOURS = 14 * 24; // safety cap if state file is very stale
+// System-placeholder vendors (not real quotes)
+const SYSTEM_VENDOR_IDS = [1009435, 1008101];
+
+// APAC buyer IDs — only VQs from these buyers appear
+const APAC_BUYER_IDS = [
+  1013784,  // Ivy Song
+  1018538,  // Serena Zhang
+  1005190,  // Feong Chang
+  1006326,  // Elaine Liang
+  1019425,  // May Wu
+  1009477,  // Tracy Xie
+  1011159,  // Betty Song
+  1034720,  // Grace Zheng
+];
+
+const MAX_WINDOW_HOURS = 7 * 24; // 7 days max if state is stale
 
 const args = process.argv.slice(2);
 const SEND = args.includes('--send');
-const TEST_MODE = args.includes('--test');  // Send all digests to jake@ for review
+const TEST_MODE = args.includes('--test');
 const RESET_STATE = args.includes('--reset-state');
-const sellerIdx = args.indexOf('--seller');
-const SELLER_FILTER = sellerIdx >= 0 ? args[sellerIdx + 1]?.toLowerCase() : null;
 const sinceIdx = args.indexOf('--since');
 const SINCE_OVERRIDE_HOURS = sinceIdx >= 0 ? Number(args[sinceIdx + 1]) : null;
 const limitIdx = args.indexOf('--limit');
@@ -122,52 +107,50 @@ function utcToCTNaive(d) {
 }
 
 function readState() {
-  if (!fs.existsSync(STATE_FILE)) return null;
-  try { return JSON.parse(fs.readFileSync(STATE_FILE, 'utf8')); } catch (_) { return null; }
+  if (!fs.existsSync(STATE_FILE)) return {};
+  try { return JSON.parse(fs.readFileSync(STATE_FILE, 'utf8')); } catch (_) { return {}; }
 }
 
 function writeState(state) {
   fs.writeFileSync(STATE_FILE, JSON.stringify(state, null, 2) + '\n');
 }
 
-function determineWindow() {
+// Determine window for a specific seller (rolling per-seller state)
+function determineWindowForSeller(sellerId, state) {
   const now = Date.now();
   if (SINCE_OVERRIDE_HOURS != null) {
     return { sinceMs: now - SINCE_OVERRIDE_HOURS * 3600 * 1000, untilMs: now, source: `--since ${SINCE_OVERRIDE_HOURS}h` };
   }
-  const state = readState();
-  if (!state || !state.lastDigestTs) {
-    return { sinceMs: now - 24 * 3600 * 1000, untilMs: now, source: 'first run (default 24h)' };
+  const sellerState = state[sellerId];
+  if (!sellerState || !sellerState.lastDigestTs) {
+    // First run for this seller — default to 12 hours (half-day)
+    return { sinceMs: now - 12 * 3600 * 1000, untilMs: now, source: 'first run (default 12h)' };
   }
-  const last = Date.parse(state.lastDigestTs);
+  const last = Date.parse(sellerState.lastDigestTs);
   const oldest = now - MAX_WINDOW_HOURS * 3600 * 1000;
   const sinceMs = Math.max(last, oldest);
   return { sinceMs, untilMs: now, source: sinceMs === oldest ? `state stale — capped at ${MAX_WINDOW_HOURS}h` : 'since last digest' };
 }
 
-// Check if email is internal (@astutegroup.com or @orangetsunami.com)
 function isInternalEmail(email) {
   if (!email) return false;
   const domain = email.toLowerCase().split('@')[1];
   return domain === 'astutegroup.com' || domain === 'orangetsunami.com';
 }
 
-// Sanitize string for Excel sheet name (max 31 chars, no special chars)
 function sanitizeSheetName(name) {
   if (!name) return 'Sheet';
-  // Replace invalid chars: / \ ? * [ ] :
   let clean = String(name).replace(/[/\\?*[\]:]/g, '_');
-  // Excel sheet names max 31 chars
   if (clean.length > 31) clean = clean.slice(0, 31);
   return clean || 'Sheet';
 }
 
-// Pull APAC-buyer VQs in window, grouped by seller
-function pullVQsGroupedBySeller(sinceTs, untilTs) {
+// Pull VQs for a specific seller in a given window
+function pullVQsForSeller(sellerId, sinceTs, untilTs) {
   const scrub = (col) => `REGEXP_REPLACE(REGEXP_REPLACE(COALESCE(${col}, ''), E'[\\\\r\\\\n]+', ' ', 'g'), '\\\\|', '/', 'g')`;
 
   const sql =
-    `SELECT v.chuboe_vq_line_id, r.value AS rfq, r.salesrep_id,
+    `SELECT v.chuboe_vq_line_id, r.value AS rfq,
             ${scrub('rt.name')} AS rfq_type, ${scrub('cust.name')} AS customer,
             ${scrub('rl.chuboe_cpc')} AS cpc, ${scrub('bp.name')} AS vendor,
             ${scrub('v.chuboe_mpn')} AS mpn, v.cost,
@@ -197,24 +180,29 @@ function pullVQsGroupedBySeller(sinceTs, untilTs) {
        AND v.chuboe_buyer_id IN (${APAC_BUYER_IDS.join(',')})
        AND v.created >= '${sinceTs}'::timestamp
        AND v.created <  '${untilTs}'::timestamp
-       AND us.email IS NOT NULL
-     ORDER BY r.salesrep_id, r.value, rl.chuboe_cpc;`;
+       AND r.salesrep_id = ${sellerId}
+     ORDER BY r.value, rl.chuboe_cpc;`;
 
   const out = psqlPipe(sql);
   const rows = out.trim().split('\n').filter(Boolean);
 
-  // Group by seller
-  const sellerMap = new Map();
+  const vqs = [];
+  const buyerEmails = new Set();
+  let sellerName = '';
+  let sellerEmail = '';
 
   for (const line of rows) {
     const parts = line.split('|');
-    const [vqId, rfq, salesrepId, rfqType, customer, cpc, vendor, mpn, cost, currency, qty,
+    const [vqId, rfq, rfqType, customer, cpc, vendor, mpn, cost, currency, qty,
            dateCode, leadTime, noteP, noteX, noteU, buyer, buyerId, buyerEmail,
-           seller, sellerEmail, created, createdby, loader] = parts;
+           seller, sellerEmailVal, created, createdby, loader] = parts;
+
+    if (!sellerName) sellerName = seller || '';
+    if (!sellerEmail) sellerEmail = sellerEmailVal || '';
 
     const notes = [noteP, noteX, noteU].filter(Boolean).join(' | ').replace(/\r?\n/g, ' ').trim();
 
-    const vq = {
+    vqs.push({
       vqId: Number(vqId),
       rfq,
       rfqType: rfqType || '',
@@ -230,49 +218,40 @@ function pullVQsGroupedBySeller(sinceTs, untilTs) {
       notes,
       buyer: buyer || '',
       buyerId: buyerId ? Number(buyerId) : null,
-      buyerEmail: buyerEmail || '',
       created,
       loader: loader || '',
-    };
+    });
 
-    const key = salesrepId;
-    if (!sellerMap.has(key)) {
-      sellerMap.set(key, {
-        sellerId: Number(salesrepId),
-        sellerName: seller || '',
-        sellerEmail: sellerEmail || '',
-        vqs: [],
-        buyerEmails: new Set(),
-      });
-    }
-    const sellerData = sellerMap.get(key);
-    sellerData.vqs.push(vq);
-
-    // Collect buyer emails for CC
     if (buyerEmail && isInternalEmail(buyerEmail)) {
-      sellerData.buyerEmails.add(buyerEmail.toLowerCase());
+      buyerEmails.add(buyerEmail.toLowerCase());
     }
   }
 
-  return sellerMap;
+  return { vqs, buyerEmails, sellerName, sellerEmail };
 }
 
-async function buildSellerXlsx(sellerData) {
+// Look up seller info by ID
+function getSellerInfo(sellerId) {
+  const sql = `SELECT name, email FROM adempiere.ad_user WHERE ad_user_id = ${sellerId}`;
+  const out = psqlPipe(sql).trim();
+  if (!out) return { name: `ID ${sellerId}`, email: null };
+  const [name, email] = out.split('|');
+  return { name: name || `ID ${sellerId}`, email: email || null };
+}
+
+async function buildSellerXlsx(vqs) {
   const wb = new ExcelJS.Workbook();
-  wb.creator = 'Per-Seller VQ Digest';
+  wb.creator = 'Asia Seller VQ Digest';
   wb.created = new Date();
 
-  // Group VQs by RFQ
   const rfqMap = new Map();
-  for (const vq of sellerData.vqs) {
+  for (const vq of vqs) {
     if (!rfqMap.has(vq.rfq)) rfqMap.set(vq.rfq, []);
     rfqMap.get(vq.rfq).push(vq);
   }
 
-  // Safety: cap at 250 RFQs (Excel limit is 255 sheets)
   const rfqList = [...rfqMap.keys()].slice(0, 250);
 
-  // Columns spec
   const cols = [
     { header: 'Customer',     key: 'customer',  width: 28 },
     { header: 'RFQ',          key: 'rfq',       width: 10 },
@@ -301,8 +280,8 @@ async function buildSellerXlsx(sellerData) {
     ws.getRow(1).alignment = { vertical: 'middle' };
     ws.getRow(1).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFEEEEFF' } };
 
-    const vqs = rfqMap.get(rfq) || [];
-    for (const v of vqs) {
+    const rfqVqs = rfqMap.get(rfq) || [];
+    for (const v of rfqVqs) {
       const row = ws.addRow({
         customer: v.customer,
         rfq: v.rfq,
@@ -340,10 +319,9 @@ async function buildSellerXlsx(sellerData) {
   return Buffer.from(await wb.xlsx.writeBuffer());
 }
 
-function buildSellerHtml(sellerData, windowStr) {
-  // Group by RFQ for summary table
+function buildSellerHtml(sellerName, vqs, windowStr) {
   const rfqMap = new Map();
-  for (const vq of sellerData.vqs) {
+  for (const vq of vqs) {
     if (!rfqMap.has(vq.rfq)) {
       rfqMap.set(vq.rfq, { customer: vq.customer, count: 0, buyers: new Set() });
     }
@@ -353,10 +331,10 @@ function buildSellerHtml(sellerData, windowStr) {
   }
 
   let html = `<html><body style="font-family:Arial,sans-serif;font-size:13px;color:#222">
-<h2 style="color:#2a5;margin-bottom:4px">APAC Overnight Sourcing — ${esc(sellerData.sellerName)}</h2>
+<h2 style="color:#2a5;margin-bottom:4px">APAC Sourcing Update — ${esc(sellerName)}</h2>
 <p style="margin-top:0;color:#666">${esc(windowStr)}</p>
 <p style="margin:6px 0">
-  <b>${sellerData.vqs.length}</b> VQ${sellerData.vqs.length === 1 ? '' : 's'} from APAC buyers across
+  <b>${vqs.length}</b> VQ${vqs.length === 1 ? '' : 's'} from APAC buyers across
   <b>${rfqMap.size}</b> RFQ${rfqMap.size === 1 ? '' : 's'}
 </p>
 
@@ -378,8 +356,8 @@ ${[...rfqMap.entries()].map(([rfq, data]) =>
 <p style="color:#666;font-size:11px;margin-top:12px"><i>Full detail in attached xlsx (one tab per RFQ).</i></p>
 
 <p style="color:#999;font-size:11px;margin-top:16px;border-top:1px solid #eee;padding-top:8px">
-Generated by per-seller-vq-digest.js · Scheduled daily 10:05 UTC (6:05 PM Shenzhen).<br/>
-Scope: VQs loaded by APAC buying team (Ivy, Serena, Feong, Elaine, May, Tracy, Betty, Grace).<br/>
+Generated by per-seller-vq-digest-asia.js · Twice daily: 11 AM + 5 PM Shenzhen.<br/>
+Scope: VQs loaded by APAC buying team.<br/>
 Window labelled CT (chuboe_*.created storage convention).
 </p></body></html>`;
 
@@ -387,74 +365,67 @@ Window labelled CT (chuboe_*.created storage convention).
 }
 
 (async () => {
-  const { sinceMs, untilMs, source } = determineWindow();
-  const sinceTs = utcToCTNaive(new Date(sinceMs));
-  const untilTs = utcToCTNaive(new Date(untilMs));
-  const windowStr = `${sinceTs} CT → ${untilTs} CT`;
+  const state = readState();
+  const now = Date.now();
 
-  console.log(`Window: ${windowStr} (${source})`);
-
-  const sellerMap = pullVQsGroupedBySeller(sinceTs, untilTs);
-
-  // Early exit if no VQs at all — no emails sent, but state advances
-  if (sellerMap.size === 0) {
-    console.log('No VQs from APAC buyers in window — nothing to send.');
-    if (SEND && !TEST_MODE && !SINCE_OVERRIDE_HOURS) {
-      writeState({ lastDigestTs: new Date(untilMs).toISOString(), sellersSent: 0, totalVqs: 0 });
-      console.log(`State advanced to ${new Date(untilMs).toISOString()}`);
-    }
-    return;
-  }
-
-  console.log(`Sellers found: ${sellerMap.size}${LIMIT_SELLERS ? ` (limiting to ${LIMIT_SELLERS})` : ''}`);
+  console.log(`Asia Seller VQ Digest — ${new Date().toISOString()}`);
+  console.log(`Sellers in roster: ${ASIA_SELLER_IDS.length}`);
 
   let totalVqs = 0;
   let sellersSent = 0;
   let sellersSkipped = 0;
+  const newState = { ...state };
 
-  for (const [sellerId, data] of sellerMap) {
-    // Check limit
+  for (const sellerId of ASIA_SELLER_IDS) {
     if (LIMIT_SELLERS && sellersSent >= LIMIT_SELLERS) {
       console.log(`  (stopping at --limit ${LIMIT_SELLERS})`);
       break;
     }
-    // Skip Asia sellers — they get per-seller-vq-digest-asia.js (twice daily)
-    if (ASIA_SELLER_IDS.has(data.sellerId)) {
-      continue;
+
+    const { sinceMs, untilMs, source } = determineWindowForSeller(sellerId, state);
+    const sinceTs = utcToCTNaive(new Date(sinceMs));
+    const untilTs = utcToCTNaive(new Date(untilMs));
+    const windowStr = `${sinceTs} CT → ${untilTs} CT`;
+
+    const { vqs, buyerEmails, sellerName, sellerEmail } = pullVQsForSeller(sellerId, sinceTs, untilTs);
+
+    // If no email for seller, look it up
+    let finalName = sellerName;
+    let finalEmail = sellerEmail;
+    if (!finalEmail) {
+      const info = getSellerInfo(sellerId);
+      finalName = info.name;
+      finalEmail = info.email;
     }
-    // Filter by seller name if --seller flag provided
-    if (SELLER_FILTER && !data.sellerName.toLowerCase().includes(SELLER_FILTER)) {
-      continue;
-    }
-    // Skip sellers without email (shouldn't happen due to WHERE clause, but defensive)
-    if (!data.sellerEmail) {
-      console.log(`  SKIP: ${data.sellerName || sellerId} — no email`);
+
+    if (!finalEmail) {
+      console.log(`  SKIP: ${finalName || sellerId} — no email`);
       sellersSkipped++;
       continue;
     }
 
-    // Skip sellers with 0 VQs (shouldn't happen, but defensive)
-    if (data.vqs.length === 0) {
-      console.log(`  SKIP: ${data.sellerName} — 0 VQs`);
-      sellersSkipped++;
+    if (vqs.length === 0) {
+      // No VQs — still advance state but don't send email
+      if (SEND && !TEST_MODE && !SINCE_OVERRIDE_HOURS) {
+        newState[sellerId] = { lastDigestTs: new Date(untilMs).toISOString(), lastVqCount: 0 };
+      }
+      console.log(`  ${finalName}: 0 VQs (${source}) — skipped, state advanced`);
       continue;
     }
 
-    totalVqs += data.vqs.length;
+    totalVqs += vqs.length;
 
-    // Build CC list
-    // Remove seller from CC if they're also a buyer on their own RFQs
-    data.buyerEmails.delete(data.sellerEmail.toLowerCase());
-    const ccList = [...data.buyerEmails, ...ALWAYS_CC];
+    // Build CC list (remove seller if they're also a buyer)
+    buyerEmails.delete(finalEmail.toLowerCase());
+    const ccList = [...buyerEmails, ...ALWAYS_CC];
 
-    console.log(`  ${data.sellerName} <${data.sellerEmail}>: ${data.vqs.length} VQ${data.vqs.length === 1 ? '' : 's'}, CC: ${ccList.length} recipients`);
+    console.log(`  ${finalName} <${finalEmail}>: ${vqs.length} VQ${vqs.length === 1 ? '' : 's'} (${source}), CC: ${ccList.length}`);
 
-    const html = buildSellerHtml(data, windowStr);
-    const xlsxBuf = await buildSellerXlsx(data);
+    const html = buildSellerHtml(finalName, vqs, windowStr);
+    const xlsxBuf = await buildSellerXlsx(vqs);
 
     if (!SEND) {
-      // Preview mode: write xlsx to output/
-      const previewPath = path.join(__dirname, 'output', `seller-vq-digest-${data.sellerName.replace(/\s+/g, '-')}-${Date.now()}.xlsx`);
+      const previewPath = path.join(__dirname, 'output', `asia-seller-${finalName.replace(/\s+/g, '-')}-${Date.now()}.xlsx`);
       if (!fs.existsSync(path.dirname(previewPath))) fs.mkdirSync(path.dirname(previewPath), { recursive: true });
       fs.writeFileSync(previewPath, xlsxBuf);
       console.log(`    → Preview: ${previewPath}`);
@@ -462,20 +433,19 @@ Window labelled CT (chuboe_*.created storage convention).
       continue;
     }
 
-    // Send mode
     const today = new Date().toISOString().slice(0, 10);
-    const filename = `vq-digest-${data.sellerName.replace(/\s+/g, '-')}-${today}.xlsx`;
+    const timeLabel = new Date().toISOString().slice(11, 16).replace(':', '');
+    const filename = `vq-digest-${finalName.replace(/\s+/g, '-')}-${today}-${timeLabel}.xlsx`;
 
     const notifier = createNotifier({
       fromEmail: 'vq@orangetsunami.com',
       fromName: 'APAC VQ Digest',
     });
 
-    // In test mode, send to jake@ instead of the actual seller
-    const toAddr = TEST_MODE ? 'jake.harris@astutegroup.com' : data.sellerEmail;
+    const toAddr = TEST_MODE ? 'jake.harris@astutegroup.com' : finalEmail;
     const subject = TEST_MODE
-      ? `[TEST] APAC Overnight — ${data.sellerName} — ${data.vqs.length} VQs (${today})`
-      : `APAC Overnight — ${data.vqs.length} VQ${data.vqs.length === 1 ? '' : 's'} (${today})`;
+      ? `[TEST] APAC Update — ${finalName} — ${vqs.length} VQs (${today} ${timeLabel})`
+      : `APAC Sourcing — ${vqs.length} VQ${vqs.length === 1 ? '' : 's'} (${today})`;
 
     const ok = await notifier.sendWithAttachment(
       toAddr,
@@ -486,14 +456,16 @@ Window labelled CT (chuboe_*.created storage convention).
     );
 
     if (!ok) {
-      console.error(`    ✗ Email send failed for ${data.sellerName}`);
-      // Continue with other sellers
+      console.error(`    ✗ Email send failed for ${finalName}`);
     } else {
       console.log(`    ✓ Sent to ${toAddr}`);
       sellersSent++;
+      if (!TEST_MODE && !SINCE_OVERRIDE_HOURS) {
+        newState[sellerId] = { lastDigestTs: new Date(untilMs).toISOString(), lastVqCount: vqs.length };
+      }
     }
 
-    // Rate-limit: 2s delay between emails to avoid SMTP "421 too many commands"
+    // Rate-limit: 2s delay between emails
     await new Promise(r => setTimeout(r, 2000));
   }
 
@@ -504,11 +476,10 @@ Window labelled CT (chuboe_*.created storage convention).
     return;
   }
 
-  // Advance state only on successful send (even if 0 VQs)
-  if (!TEST_MODE) {
-    writeState({ lastDigestTs: new Date(untilMs).toISOString(), sellersSent, totalVqs });
-    console.log(`State advanced to ${new Date(untilMs).toISOString()}`);
-  } else {
-    console.log('(Test mode — state NOT advanced)');
+  if (!TEST_MODE && !SINCE_OVERRIDE_HOURS) {
+    writeState(newState);
+    console.log(`State updated for ${Object.keys(newState).length} sellers`);
+  } else if (TEST_MODE) {
+    console.log('(Test mode — state NOT updated)');
   }
 })().catch(err => { console.error('FATAL:', err); process.exit(1); });

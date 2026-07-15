@@ -19,6 +19,12 @@
  *   needsOT      — true if the job writes to iDempiere REST API. Triggers OT health gate.
  *   logFile      — where the job's stdout/stderr is appended
  *   description  — one-line human-readable summary (shown in install output)
+ *   tier         — (optional) 'agent' for Claude-powered jobs; affects timeout default
+ *   timeoutMs    — (optional) hard execution timeout in ms. Defaults:
+ *                    - tier='agent': 30 min (1800000 ms) — Claude CLI has --max-turns
+ *                    - regular jobs: 2 hours (7200000 ms)
+ *                  Jobs exceeding this are killed with SIGTERM then SIGKILL.
+ *                  Added 2026-07-07 after stockrfq-cq-agent caused OT crash.
  */
 
 'use strict';
@@ -187,7 +193,7 @@ module.exports = [
     // is now unused by cron (kept on disk for history / possible reinstatement).
     // Revisit cadence if inbound latency becomes an issue or the workflow changes.
     cadence: 'every 1h',
-    cadenceCron: '0 * * * *',
+    cadenceCron: '3 * * * *',
     command: `/home/analytics_user/.local/bin/claude -p --model sonnet --permission-mode bypassPermissions --max-turns 80 < "${ASTUTE}/Trading Analysis/Stock RFQ Loading/agent-prompt.txt"`,
     cwd: AGENT_CWD,
     needsOT: true,
@@ -204,7 +210,7 @@ module.exports = [
     // capture with no live-decision pressure. Still content-gated, so an empty
     // OutboundPending hour costs zero LLM launches.
     cadence: 'every 1h',
-    cadenceCron: '5 * * * *',
+    cadenceCron: '8 * * * *',
     command: `if node "${ASTUTE}/scripts/should-run-stockrfq-cq-agent.js"; then /home/analytics_user/.local/bin/claude -p --model sonnet --permission-mode bypassPermissions --max-turns 120 < "${ASTUTE}/Trading Analysis/Stock RFQ Loading/cq-agent-prompt.txt"; fi`,
     cwd: AGENT_CWD,
     needsOT: true,
@@ -222,7 +228,7 @@ module.exports = [
     // polling for ~10m after an approval email goes out, then drops to
     // every-30m. Tunable via RFQLOADING_BURST_WINDOW_MIN env.
     cadence: 'every 5m',
-    cadenceCron: '*/5 * * * *',
+    cadenceCron: '1-59/5 * * * *',
     command: `if node "${ASTUTE}/scripts/should-run-rfqloading-agent.js"; then /home/analytics_user/.local/bin/claude -p --model sonnet --permission-mode bypassPermissions --max-turns 80 < "${ASTUTE}/Trading Analysis/RFQ Loading/agent-prompt.txt"; fi`,
     cwd: AGENT_CWD,
     needsOT: true,
@@ -250,7 +256,7 @@ module.exports = [
     name: 'vq-loading-agent',
     tier: 'agent',  // Claude-powered — paused by .cron-agents-paused
     cadence: 'every 5m',
-    cadenceCron: '*/5 * * * *',
+    cadenceCron: '2-59/5 * * * *',
     command: `if node "${ASTUTE}/scripts/should-run-vq-loading-agent.js"; then /home/analytics_user/.local/bin/claude -p --model sonnet --permission-mode bypassPermissions --max-turns 120 < "${ASTUTE}/Trading Analysis/RFQ Sourcing/vq_loading/agent-prompt.txt"; fi`,
     cwd: AGENT_CWD,
     needsOT: true,
@@ -287,7 +293,7 @@ module.exports = [
     name: 'broker-offers-agent',
     tier: 'agent',  // Claude-powered — paused by .cron-agents-paused
     cadence: 'every 30m',
-    cadenceCron: '*/30 * * * *',
+    cadenceCron: '9,39 * * * *',
     command: `/home/analytics_user/.local/bin/claude -p --model sonnet --permission-mode bypassPermissions --max-turns 80 < "${ASTUTE}/Trading Analysis/Broker Offers/agent-prompt.txt"`,
     cwd: AGENT_CWD,
     needsOT: true,
@@ -300,7 +306,7 @@ module.exports = [
     name: 'tracking-agent',
     tier: 'agent',  // Claude-powered — paused by .cron-agents-paused
     cadence: 'every 15m',
-    cadenceCron: '*/15 * * * *',
+    cadenceCron: '4,19,34,49 * * * *',
     command: `/home/analytics_user/.local/bin/claude -p --model sonnet --permission-mode bypassPermissions --max-turns 40 < "${ASTUTE}/Trading Analysis/Tracking Loading/agent-prompt.txt"`,
     cwd: AGENT_CWD,
     needsOT: true,
@@ -390,14 +396,40 @@ module.exports = [
     name: 'per-seller-vq-digest',
     cadence: 'fixed',
     // 10:05 UTC — 5 min after APAC digest so they don't race
-    // Sends each seller their own email with VQs loaded by APAC buyers for their RFQs.
-    // Each RFQ gets its own Excel tab. CC: buyers + Ivy + Jake.
+    // Sends each NON-ASIA seller their own email with VQs loaded by APAC buyers.
+    // Asia sellers are excluded — they get per-seller-vq-digest-asia twice daily.
     cadenceCron: '5 10 * * *',
     command: `node "${ASTUTE}/Trading Analysis/RFQ Sourcing/vq_loading/per-seller-vq-digest.js" --send`,
     cwd: ASTUTE,
     needsOT: false,
     logFile: '/tmp/per-seller-vq-digest.log',
-    description: 'Daily 10:05 UTC — Per-seller VQ digest (APAC buyers only). One email per seller with tabs by RFQ. CC buyers + Ivy + Jake. Window driven by .seller-vq-digest-state.json.',
+    description: 'Daily 10:05 UTC — Per-seller VQ digest for NON-ASIA sellers only (APAC buyers). Asia sellers excluded — they get twice-daily digest.',
+  },
+
+  {
+    name: 'per-seller-vq-digest-asia-am',
+    cadence: 'fixed',
+    // 03:00 UTC = 11 AM Shenzhen (UTC+8). Morning digest for Asia sellers.
+    // Rolling window: covers overnight activity since 5 PM previous day (~18h).
+    cadenceCron: '0 3 * * *',
+    command: `node "${ASTUTE}/Trading Analysis/RFQ Sourcing/vq_loading/per-seller-vq-digest-asia.js" --send`,
+    cwd: ASTUTE,
+    needsOT: false,
+    logFile: '/tmp/per-seller-vq-digest-asia.log',
+    description: 'Daily 03:00 UTC (11 AM Shenzhen) — Asia sellers VQ digest (morning). Rolling window since last digest.',
+  },
+
+  {
+    name: 'per-seller-vq-digest-asia-pm',
+    cadence: 'fixed',
+    // 09:00 UTC = 5 PM Shenzhen (UTC+8). Evening digest for Asia sellers.
+    // Rolling window: covers workday activity since 11 AM (~6h).
+    cadenceCron: '0 9 * * *',
+    command: `node "${ASTUTE}/Trading Analysis/RFQ Sourcing/vq_loading/per-seller-vq-digest-asia.js" --send`,
+    cwd: ASTUTE,
+    needsOT: false,
+    logFile: '/tmp/per-seller-vq-digest-asia.log',
+    description: 'Daily 09:00 UTC (5 PM Shenzhen) — Asia sellers VQ digest (evening). Rolling window since last digest.',
   },
 
   {
@@ -515,6 +547,8 @@ module.exports = [
   // },
 
   // ─── SALES PULSE REPORTS ───────────────────────────────────────────────────
+  // vp-daily-brief removed 2026-07-06: now runs from melissa.bojar's own crontab (owner-run). Do NOT re-add here or the fleet double-sends.
+
   {
     name: 'vp-daily-brief',
     owner: 'melissa.bojar',
@@ -553,6 +587,31 @@ module.exports = [
     needsOT: false, // reads replica + emails only; no OT writes
     logFile: '/tmp/mexico-daily-brief.log',
     description: 'Mon-Fri 13:00 UTC (6am PDT / 5am PST) — Mexico Daily Brief for Joel Marquez. Generates report + emails to joel.marquez@ and melissa.bojar@',
+  },
+
+  {
+    name: 'rfq-creation-digest',
+    cadence: 'fixed',
+    // 12:00 UTC = 8am EDT (May–Nov) / 7am EST (Nov–Mar). DST drift acceptable
+    // per ops convention. Mon-Fri only (weekend gate built into script).
+    cadenceCron: '0 12 * * 1-5',
+    command: `node "${WORKSPACE}/reports/daily-rfq-report.js" --send`,
+    cwd: WORKSPACE,
+    needsOT: false,
+    logFile: '/tmp/rfq-creation-digest.log',
+    description: 'Mon-Fri 8am EDT (12:00 UTC) — RFQ Creation digest to justin.oberhofer@. Shows: (1) Activity by Creator (who created RFQs, with role and salesperson breakdown), (2) Seller Activity Breakdown (how each salesperson\'s RFQs were created: by Claude/Support/Self).',
+  },
+
+  {
+    name: 'bos-metrics-report',
+    cadence: 'monthly',
+    // 17:00 UTC = 12pm EST (Nov–Mar) / 1pm EDT (Mar–Nov). 1st of month.
+    cadenceCron: '0 17 1 * *',
+    command: `node "${WORKSPACE}/scripts/generate-bos-metrics.js"`,
+    cwd: WORKSPACE,
+    needsOT: false,
+    logFile: '/tmp/bos-metrics.log',
+    description: '1st of month 12pm EST (17:00 UTC) — BOS Metrics report (CSE queue activity: claims, answered, closed) to justin.oberhofer@ and leah.griffin@.',
   },
 ];
 

@@ -19,17 +19,7 @@
 
 ### Medium Priority (Future Enhancements)
 
-2. **Account Context Columns**
-   - Add "Months Assigned" - How long seller has been ISE Steward
-   - Add "First Assigned" - Earliest location assignment date
-   - Add "Last Sale Date" - Most recent invoice date for this account
-   - Provides tenure context for account relationship
-   - **Complexity:** Medium
-   - **Impact:** Medium
-   - **Technical Notes:**
-     - Months Assigned: Calculate from earliest `c_bpartner_location.created` where `chuboe_ise_steward_id = seller`
-     - First Assigned: MIN(created) from `c_bpartner_location` for this seller
-     - Last Sale Date: MAX(invoice_date) from invoices for this customer
+*No active items*
 
 ---
 
@@ -83,6 +73,7 @@
 - ✅ Tab name reflects forward quarter (Aaron Mendoza - Q3 2026)
 - ✅ Column reordering (B to I and % of Inv Total before Scheduled GP)
 - ✅ Freeze top row for scrolling
+- ✅ Account Context Columns - Months Assigned, First Assigned Date, Last Sale Date (2026-07-15)
 
 ---
 

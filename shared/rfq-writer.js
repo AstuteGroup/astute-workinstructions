@@ -223,6 +223,7 @@ async function writeRFQ(opts) {
       // Discovered 2026-05-06 during the 50% POST-failure run.
       const rfqResponse = await apiPost('chuboe_rfq', rfqPayload, {
         naturalKeyFields: ['C_BPartner_ID', 'Chuboe_RFQ_Type_ID', 'SalesRep_ID'],
+        context: 'rfq-loading',
       });
       rfqId = rfqResponse.id;
       searchKey = rfqResponse.Value || rfqResponse.value || null;
@@ -354,6 +355,7 @@ async function writeRFQ(opts) {
         if (line.cpc) linePayload.Chuboe_CPC = line.cpc;
         const lineResponse = await apiPost('chuboe_rfq_line', linePayload, {
           naturalKeyFields: ['Chuboe_RFQ_ID', 'Line'],
+          context: 'rfq-loading',
         });
         lineId = lineResponse.id;
         if (!lineId) throw new Error('No ID returned in response');
@@ -414,6 +416,7 @@ async function writeRFQ(opts) {
       // a dup retry, which is the safer default.
       await apiPost('chuboe_rfq_line_mpn', mpnPayload, {
         naturalKeyFields: ['Chuboe_RFQ_Line_ID', 'Chuboe_MPN_Clean', 'Chuboe_MFR_ID'],
+        context: 'rfq-loading',
       });
     } catch (e) {
       const net = isOtUnreachableError(e);

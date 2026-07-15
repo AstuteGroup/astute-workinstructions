@@ -1,3 +1,38 @@
+# North Star: Verify It Exists Before Acting
+
+**NEVER assume something exists. ALWAYS verify first.**
+
+Before doing ANYTHING non-trivial — executing a workflow, writing to a table, calling an API, using a shared module — verify:
+
+1. **Does it exist?** Check that the file, table, endpoint, or module is real
+2. **Is it wired up?** For workflows: handler + cron + registry entry. For writers: the module exists in `shared/`
+3. **Have I read the docs?** Use the Read tool on the relevant `.md` file THIS session
+
+**Verification checklist by action type:**
+
+| Action | Verify in |
+|--------|-----------|
+| Execute a workflow | `shared/workflow-registry.js` + `docs/workflow-catalog.md` + workflow `.md` |
+| Write to a table | `shared/*-writer.js` exists + `shared/api-writeback.md` |
+| Use a lookup | `shared/mfr-lookup.js`, `shared/partner-resolver.js` etc. |
+| POST/PATCH to API | `shared/api-writeback.md` |
+| Reference a cron | `cron-jobs.js` |
+
+**Anti-pattern (WRONG):**
+```
+"I'll run the Quick Quote workflow"
+→ proceeds from memory without verifying it exists
+```
+
+**Correct pattern:**
+```
+1. Check docs/workflow-catalog.md — is Quick Quote listed?
+2. Read Trading Analysis/Quick Quote/quick-quote.md
+3. Follow the numbered steps in the doc
+```
+
+---
+
 # North Star: Read Before Executing
 
 **THE .MD FILE IS THE SOURCE OF TRUTH. YOUR MEMORY IS NOT.**
@@ -34,6 +69,41 @@ If you catch yourself thinking "I remember how this works" - STOP and read the f
 4. **If multiple items are stuck**, fix first, then batch-recover all of them as validation.
 
 **Anti-pattern:** Process stuck item → fix bug → no way to verify. **Correct:** Fix bug → reprocess stuck item → verified.
+
+---
+
+# North Star: VQ Purchase Approvals Use Enforced Wrappers
+
+**NEVER bypass the enforced wrappers when approving VQ purchases.**
+
+| Action | WRONG (direct API) | CORRECT (enforced wrapper) |
+|--------|-------------------|---------------------------|
+| Tick VQ as purchased | `patchRecord('chuboe_vq_line', id, { IsPurchased: 'Y' })` | `tickVQForPurchase(vqId, opts)` |
+| Post approval request | `apiPost('r_request', payload)` | `postApproveOrder(opts)` |
+
+**Required modules:**
+```javascript
+const { tickVQForPurchase } = require('../shared/vq-patcher');
+const { postApproveOrder } = require('../shared/r-request-writer');
+```
+
+**What the wrappers enforce:**
+- `tickVQForPurchase()` validates ALL required fields before ticking (MFR, COO, Date Code, Lead Time, Promise Date, Packaging, Traceability, Warehouse, etc.) + auto-corrects buyer from Claude Harris → Jake Harris
+- `postApproveOrder()` validates ALL VQs are ticked AND links R_Request to the RFQ
+
+**One request per supplier per RFQ:** When buying multiple VQs from the same supplier on the same RFQ (e.g., 9 parts from Mouser on one POV), create ONE R_Request containing all VQs — not separate requests per line. Pass `vqIds: [id1, id2, ...]` to validate all.
+
+**Why this exists:** On 2026-07-07, approval request 1166798 was posted with:
+- All 9 VQs missing `IsPurchased='Y'`
+- R_Request not linked to RFQ (empty `record_id`)
+- Multiple required fields unpopulated
+
+**Full workflow:** Read `shared/vq-purchase-workflow.md` before ANY VQ approval.
+
+**Date Code / Lead Time defaults:** For franchise vendors, use logic in `shared/vq-writer.js`:
+- Stock items: Date Code = `(current year - 2)+` (e.g., "24+")
+- Lead time items: Date Code = `(current year)+` (e.g., "26+")
+- Lead Time field: "STOCK" for in-stock, or specific time (e.g., "3 WEEKS")
 
 ---
 
@@ -175,8 +245,9 @@ At the end of each session, update the `## Recent Sessions` section in MEMORY.md
 1. **`chuboe_offer_line` CPC dedup collapse** — two lines with same CPC will merge/deactivate
 2. **`Chuboe_CPC` non-updateable** — must be set at POST time only
 3. **Stale `mfr-cache.json`** — if cache lacks `isSystem`, MPN POSTs may 500
+4. **`chuboe_offer_line` auto-creates `chuboe_offer_line_mpn`** — do NOT set `writeMpnRecords: true` or you get duplicates (discovered 2026-07-07)
 
-**Full reference:** `shared/data-model.md` § chuboe_offer_line CPC bean-callout
+**Full reference:** `shared/data-model.md` § chuboe_offer_line bean-callouts
 
 ---
 

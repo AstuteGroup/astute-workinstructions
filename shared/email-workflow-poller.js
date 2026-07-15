@@ -575,6 +575,11 @@ async function cmdRoute(uid, actionName, payload) {
     console.error(`[poller] could not fetch current message for sidecar anchor: ${e.message}`);
   }
 
+  // Diagnostic: warn when Message-ID extraction failed (reply threading will break)
+  if (!currentMessageId) {
+    console.error(`[poller] WARNING: UID ${uid} has no Message-ID — In-Reply-To header will be missing on any escalation email. Check if email was moved before route command ran.`);
+  }
+
   // Thread-anchor resolution priority:
   //   1. payload.original_message_id (agent passed it explicitly — continuation)
   //   2. existing sidecar matched by this message's references chain

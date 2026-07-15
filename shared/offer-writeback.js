@@ -332,7 +332,7 @@ async function writeOffer(opts) {
   let searchKey = null;
   let otUnreachable = false;   // set when any write hit a network/transport failure (OT down) — retryable
   try {
-    const headerResponse = await apiPost('chuboe_offer', headerPayload);
+    const headerResponse = await apiPost('chuboe_offer', headerPayload, { context: 'excess' });
     offerId = headerResponse.id;
     searchKey = headerResponse.Value || headerResponse.value || null;
     if (!offerId) throw new Error('No ID returned in response');
@@ -508,6 +508,7 @@ async function writeOffer(opts) {
       const lineResponse = await retryLine(
         () => apiPost('chuboe_offer_line', linePayload, {
           naturalKeyFields: ['Chuboe_Offer_ID', 'Chuboe_MPN'],
+          context: 'excess',
         }),
         { lineLabel: `Offer ${offerId} line ${i + 1}` }
       );
@@ -534,6 +535,7 @@ async function writeOffer(opts) {
         await retryLine(
           () => apiPost('chuboe_offer_line_mpn', mpnPayload, {
             naturalKeyFields: ['Chuboe_Offer_Line_ID', 'Chuboe_MPN_Clean'],
+            context: 'excess',
           }),
           { lineLabel: `Offer ${offerId} line ${i + 1} MPN` }
         );

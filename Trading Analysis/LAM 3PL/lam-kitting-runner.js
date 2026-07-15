@@ -20,9 +20,9 @@ const restrictedMfr = require('../../shared/restricted-mfrs');
 
 const SCRIPT_DIR = __dirname;
 const INVENTORY_CLEANUP_DIR = path.join(SCRIPT_DIR, '../Inventory File Cleanup');
-const EXCEL_PATTERN = /^Lam_Kitting_DB.*\.xlsx$/;
+const MASTER_ROSTER_FILE = 'LAM_Master_Roster.xlsx';
 
-const EMAIL_ACCOUNT = 'excess';
+const EMAIL_ACCOUNT = 'lamkitting';
 const NOTIFY_EMAIL = process.env.NOTIFY_EMAIL || 'jake.harris@astutegroup.com';
 const notifier = createNotifier({
   fromEmail: `${EMAIL_ACCOUNT}@orangetsunami.com`,
@@ -381,6 +381,61 @@ function buildEscalationsTab(workbook, state, csv, allHeaders, rfqMapping, escal
   ws.views = [{ state: 'frozen', ySplit: 1 }];
 }
 
+// Build the Pending Approval worksheet — shows parts from the Master Roster
+// where the "Pending" column is non-empty (e.g., "Price Approval", "Removal").
+// This tab surfaces contract changes that need LAM sign-off.
+function buildPendingApprovalTab(workbook, pendingApprovalsPath) {
+  if (!fs.existsSync(pendingApprovalsPath)) return 0;
+
+  let data;
+  try {
+    data = JSON.parse(fs.readFileSync(pendingApprovalsPath, 'utf-8'));
+  } catch (err) {
+    log(`  WARNING: Could not parse pending approvals sidecar: ${err.message}`);
+    return 0;
+  }
+
+  const items = data.items || [];
+  if (items.length === 0) return 0;
+
+  const ws = workbook.addWorksheet('Pending Approval');
+
+  const headers = ['MPN', 'CPC', 'Manufacturer', 'Award', 'Current Resale', 'Proposed Resale', 'Pending', 'Last Approved'];
+  ws.addRow(headers);
+  const headerRow = ws.getRow(1);
+  headerRow.font = { bold: true };
+  headerRow.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFE699' } };  // Amber for attention
+
+  for (const item of items) {
+    ws.addRow([
+      item.MPN || '',
+      item.CPC || '',
+      item.Manufacturer || '',
+      item.Award || '',
+      item['Current Resale'] || '',
+      item['Proposed Resale'] || '',
+      item['Pending'] || '',
+      item['Last Approved'] || '',
+    ]);
+  }
+
+  // Column widths
+  ws.getColumn(1).width = 25;  // MPN
+  ws.getColumn(2).width = 20;  // CPC
+  ws.getColumn(3).width = 25;  // Manufacturer
+  ws.getColumn(4).width = 18;  // Award
+  ws.getColumn(5).width = 14;  // Current Resale
+  ws.getColumn(5).numFmt = '$#,##0.0000';
+  ws.getColumn(6).width = 14;  // Proposed Resale
+  ws.getColumn(6).numFmt = '$#,##0.0000';
+  ws.getColumn(7).width = 18;  // Pending
+  ws.getColumn(8).width = 14;  // Last Approved
+
+  ws.views = [{ state: 'frozen', ySplit: 1 }];
+
+  return items.length;
+}
+
 // Build an alert-style row from a sidecar context entry — used when an
 // escalation MPN is no longer on the reorder list (above threshold) but still
 // has stock on hand. Mirrors the columns from ALERT_COLUMNS so the row layout
@@ -497,6 +552,15 @@ async function rebuildExcelWithRfqLines(sourcedCsvPath, xlsxPath, rfqMapping) {
     }
   }
 
+  // Pending Approval tab — parts from Master Roster with non-empty "Pending"
+  // column (e.g., "Price Approval", "Removal"). Shows contract changes
+  // awaiting LAM sign-off.
+  const pendingApprovalsPath = sourcedCsvPath.replace('_sourced.csv', '_pending_approvals.json');
+  const pendingCount = buildPendingApprovalTab(workbook, pendingApprovalsPath);
+  if (pendingCount > 0) {
+    log(`  Pending Approval tab: ${pendingCount} items awaiting LAM approval`);
+  }
+
   await workbook.xlsx.writeFile(xlsxPath);
 }
 
@@ -505,10 +569,10 @@ async function main() {
   log('LAM KITTING REORDER - AUTOMATED RUN');
   log('============================================================');
 
-  // Step 1: Find today's inventory output folder
   const dateStr = getDateStamp();
   const inventoryFolder = path.join('/tmp', `Inventory ${dateStr}`);
 
+  // Step 1: Find today's inventory output folder
   log(`Step 1: Looking for inventory folder: ${inventoryFolder}`);
 
   if (!fs.existsSync(inventoryFolder)) {
@@ -539,20 +603,17 @@ async function main() {
   }
   log(`  Inventory folder found: ${inventoryFolder}`);
 
-  // Step 2: Find the latest Kitting DB Excel file
-  log('Step 2: Finding latest Kitting DB Excel...');
-  const excelFiles = fs.readdirSync(SCRIPT_DIR)
-    .filter(f => EXCEL_PATTERN.test(f))
-    .sort()
-    .reverse();
+  // Step 2: Verify Master Roster exists
+  log('Step 2: Checking for Master Roster...');
+  const masterRosterPath = path.join(SCRIPT_DIR, MASTER_ROSTER_FILE);
 
-  if (excelFiles.length === 0) {
-    log('  ERROR: No Lam_Kitting_DB*.xlsx found. Exiting.');
+  if (!fs.existsSync(masterRosterPath)) {
+    log(`  ERROR: ${MASTER_ROSTER_FILE} not found. Run scripts/build-lam-master-roster.js first.`);
     process.exit(1);
   }
 
-  const excelFile = path.join(SCRIPT_DIR, excelFiles[0]);
-  log(`  Using: ${excelFiles[0]}`);
+  const excelFile = masterRosterPath;
+  log(`  Using: ${MASTER_ROSTER_FILE}`);
 
   // Step 3: Run reorder detection (--no-email: we'll email the final sourced report instead)
   log('Step 3: Running reorder detection...');
@@ -837,6 +898,26 @@ Kitting DB: ${path.basename(excelFile)}`;
     emailBody,
     [attachment]
   );
+
+  // Step 6: Wrong warehouse check (runs after reorder email, non-blocking)
+  // Identifies roster parts in non-LAM warehouses and emails separately if misplaced items found
+  log('');
+  log('Step 6: Running wrong warehouse check...');
+  try {
+    const wwcResult = execSync(
+      `node "${path.join(SCRIPT_DIR, 'lam-wrong-warehouse-check.js')}" "${inventoryFolder}"`,
+      { encoding: 'utf-8', timeout: 120000 }
+    );
+    console.log(wwcResult);
+    log('  Wrong warehouse check complete');
+  } catch (err) {
+    log(`  WARNING: Wrong warehouse check failed: ${err.message}`);
+    // Non-fatal - reorder already sent
+  }
+
+  // NOTE: Pending orders check (lam-pending-orders-check.js) is available but run manually
+  // until automated PO report is available from Infor. Run with:
+  //   node lam-pending-orders-check.js [--dry-run]
 
   log('============================================================');
   if (rfqWriteFailed) {

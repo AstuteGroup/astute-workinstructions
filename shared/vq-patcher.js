@@ -21,10 +21,21 @@
  * the validator still reports violations after the extras are applied, the
  * call aborts before any PATCH is sent — guarantees the DB is either in a
  * fully-valid purchase state or untouched.
+ *
+ * BUYER CLEANUP (2026-07-08):
+ *   Claude Harris (1049524) is the API user and should NOT be a buyer on VQs.
+ *   If the VQ has Claude Harris as the buyer at tick time, this module auto-
+ *   corrects it to Jake Harris (1000004) unless a different buyer is specified
+ *   via opts.buyerId.
  */
 
 const { validateVQForPurchase } = require('./vq-purchase-validator');
 const { patchRecord } = require('./record-updater');
+
+// Claude Harris = API user, should not be a buyer
+const CLAUDE_HARRIS_USER_ID = 1049524;
+// Default buyer when Claude Harris is detected
+const JAKE_HARRIS_USER_ID = 1000004;
 
 /**
  * Tick a VQ as purchased. Enforces the pre-approval checklist via the validator.
@@ -36,22 +47,44 @@ const { patchRecord } = require('./record-updater');
  *                                         IsPurchased='Y' (DatePromised, etc.).
  *                                         Applied in a single PATCH so the
  *                                         validator sees the final state.
+ * @param {number} [opts.buyerId]          Override buyer. If not specified and
+ *                                         current buyer is Claude Harris, auto-
+ *                                         corrects to Jake Harris.
  * @param {boolean} [opts.skipUntickCompeting=false]
  *                                         If true, skip the auto-untick of
  *                                         competing VQs. Default is to untick
  *                                         them first so only one winner remains.
- * @returns {object} { vqId, ticked: true, untickedCompeting: number[] }
+ * @returns {object} { vqId, ticked: true, untickedCompeting: number[], buyerCorrected: boolean }
  * @throws {Error} with a `violations` list if the VQ can't be ticked
  */
 async function tickVQForPurchase(vqId, opts = {}) {
-  const { program = null, extra = {}, skipUntickCompeting = false, allowCompetingTicked = false } = opts;
+  const { program = null, extra = {}, buyerId = null, skipUntickCompeting = false, allowCompetingTicked = false } = opts;
 
-  // Apply extras FIRST so the validator sees the final state.
+  // Build the extras payload, potentially including buyer correction.
+  const patchPayload = { ...extra };
+  let buyerCorrected = false;
+
+  // Check current buyer — if Claude Harris, correct to Jake Harris (or specified override).
+  // This query runs before we apply extras so we see the current DB state.
+  const preflight = await validateVQForPurchase(vqId, { program, allowCompetingTicked });
+  if (preflight.vq) {
+    const currentBuyer = preflight.vq.chuboe_buyer_id;
+    if (currentBuyer === CLAUDE_HARRIS_USER_ID) {
+      patchPayload.Chuboe_Buyer_ID = buyerId || JAKE_HARRIS_USER_ID;
+      buyerCorrected = true;
+    } else if (buyerId && currentBuyer !== buyerId) {
+      // Caller explicitly specified a different buyer
+      patchPayload.Chuboe_Buyer_ID = buyerId;
+      buyerCorrected = true;
+    }
+  }
+
+  // Apply extras (and buyer correction) FIRST so the validator sees the final state.
   // This lets callers supply missing fields (lead time, promise date, etc.)
   // in the same operation — common pattern when a franchise-API VQ lands
   // incomplete and the buyer fills in the gaps at tick time.
-  if (Object.keys(extra).length > 0) {
-    await patchRecord('chuboe_vq_line', vqId, extra);
+  if (Object.keys(patchPayload).length > 0) {
+    await patchRecord('chuboe_vq_line', vqId, patchPayload);
   }
 
   // Validate. If the VQ still has violations after extras, abort.
@@ -92,7 +125,7 @@ async function tickVQForPurchase(vqId, opts = {}) {
 
   // All clear — tick it.
   await patchRecord('chuboe_vq_line', vqId, { IsPurchased: 'Y' });
-  return { vqId, ticked: true, untickedCompeting };
+  return { vqId, ticked: true, untickedCompeting, buyerCorrected };
 }
 
 module.exports = { tickVQForPurchase };

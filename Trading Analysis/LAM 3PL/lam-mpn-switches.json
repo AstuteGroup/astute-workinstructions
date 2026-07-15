@@ -1,0 +1,97 @@
+{
+  "description": "Tracks MPN switches for LAM kitting. 'switches' = confirmed permanent changes. 'candidates' = sourcing suggestions pending review.",
+  "candidates": [
+    {
+      "cpc": "670-037698-044",
+      "fromMPN": "FNQ-R-30",
+      "toMPN": "KLDR030.TXP",
+      "date": "2026-07-14",
+      "reason": "Sourcing found better franchise option",
+      "supplier": "Master",
+      "price": 22.72,
+      "qtyNeeded": 30
+    },
+    {
+      "cpc": "615-901294-101",
+      "fromMPN": "CRCW0805100RJNEA",
+      "toMPN": "RC0805JR-07100RL",
+      "date": "2026-07-14",
+      "reason": "Sourcing found better franchise option",
+      "supplier": "Rutronik",
+      "price": 0.0024,
+      "qtyNeeded": 5000
+    },
+    {
+      "cpc": "644-098425-001",
+      "fromMPN": "AZ881-2A-24DEA",
+      "toMPN": "DSP2A-DC24V",
+      "date": "2026-07-14",
+      "reason": "Sourcing found better franchise option",
+      "supplier": "Future",
+      "price": 3.25,
+      "qtyNeeded": 50
+    },
+    {
+      "cpc": "615-901294-473",
+      "fromMPN": "CRCW080547K0JNEA",
+      "toMPN": "RC0805JR-0747KL",
+      "date": "2026-07-14",
+      "reason": "Sourcing found better franchise option",
+      "supplier": "Waldom",
+      "price": 0.0015,
+      "qtyNeeded": 1
+    },
+    {
+      "cpc": "615-901294-913",
+      "fromMPN": "CRCW080591K0JNEA",
+      "toMPN": "RC0805JR-0791KL",
+      "date": "2026-07-14",
+      "reason": "Sourcing found better franchise option",
+      "supplier": "TTI",
+      "price": 0.0015,
+      "qtyNeeded": 1
+    }
+  ],
+  "switches": [
+    {
+      "cpc": "608-096583-504",
+      "fromMPN": "TS63Y504KR10",
+      "toMPN": "84WR500KLF",
+      "date": "2026-07-13",
+      "reason": "Historical - discovered during inventory audit",
+      "qtyInStock": 105
+    },
+    {
+      "cpc": "648-051878-224",
+      "fromMPN": "NMC0603X7R224K50TRPF",
+      "toMPN": "CC0603KRX7R9BB224",
+      "date": "2026-07-13",
+      "reason": "Historical - discovered during inventory audit",
+      "qtyInStock": 12000
+    },
+    {
+      "cpc": "668-096777-025",
+      "fromMPN": "K85X-BD-25P-CBR",
+      "toMPN": "DLS 3XP4AA35X",
+      "date": "2026-07-13",
+      "reason": "Historical - discovered during inventory audit",
+      "qtyInStock": 55
+    },
+    {
+      "cpc": "668-096776-015",
+      "fromMPN": "K85X-AD-15S-CBR",
+      "toMPN": "DLS2XS4AA35X",
+      "date": "2026-07-13",
+      "reason": "Historical - discovered during inventory audit",
+      "qtyInStock": 142
+    },
+    {
+      "cpc": "615-049171-124",
+      "fromMPN": "RG2012P-1242-B-T5",
+      "toMPN": "TNPW080512K4BEEA",
+      "date": "2026-07-13",
+      "reason": "Historical - discovered during inventory audit",
+      "qtyInStock": 5000
+    }
+  ]
+}

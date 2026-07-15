@@ -80,4 +80,75 @@ function lookupVendorAlias(label) {
   return aliases[key] || null;
 }
 
-module.exports = { lookupVendorAlias };
+/**
+ * Learn a vendor alias from a successful clarify_vendor resolution.
+ * Called automatically when an operator picks a vendor from the candidates
+ * and the VQ load succeeds.
+ *
+ * Guards:
+ *   - Label must be ≥ 3 chars (too short = too generic)
+ *   - Label must NOT be a substring of the BP name (historical fallback handles those)
+ *   - Alias must not already exist for this label
+ *
+ * @param {string} label      Original vendor label that failed to resolve
+ * @param {string} searchKey  BP search key (c_bpartner.value) that was selected
+ * @param {string} name       BP canonical name (for human readability)
+ * @returns {{ learned: boolean, reason: string }}
+ */
+function learnVendorAlias(label, searchKey, name) {
+  if (!label || typeof label !== 'string') {
+    return { learned: false, reason: 'no label' };
+  }
+  if (!searchKey || typeof searchKey !== 'string') {
+    return { learned: false, reason: 'no searchKey' };
+  }
+
+  const key = normalizeKey(label);
+  if (key.length < 3) {
+    return { learned: false, reason: 'label too short (< 3 chars)' };
+  }
+
+  // Don't learn if the label is a substring of the BP name — historical fallback handles those
+  const normName = normalizeKey(name || '');
+  if (normName && normName.includes(key)) {
+    return { learned: false, reason: 'label is substring of BP name (historical fallback will catch it)' };
+  }
+
+  // Check if already exists
+  const existing = lookupVendorAlias(label);
+  if (existing) {
+    if (existing.searchKey === searchKey) {
+      return { learned: false, reason: 'alias already exists (same mapping)' };
+    }
+    // Different mapping exists — don't overwrite, log warning
+    console.warn(`[vendor-aliases] CONFLICT: "${label}" already maps to ${existing.searchKey} (${existing.name}), not overwriting with ${searchKey} (${name})`);
+    return { learned: false, reason: `conflict: already maps to ${existing.searchKey}` };
+  }
+
+  // Read raw JSON, add entry, write back
+  try {
+    const raw = fs.readFileSync(FILE, 'utf8');
+    const obj = JSON.parse(raw);
+
+    // Use the original label casing as the key (normalized lookup still works)
+    obj[label.trim()] = {
+      searchKey: String(searchKey),
+      name: name || null,
+      learned: new Date().toISOString(),  // audit trail
+    };
+
+    fs.writeFileSync(FILE, JSON.stringify(obj, null, 2) + '\n');
+
+    // Invalidate cache so next lookup sees the new entry
+    _cache = null;
+    _cacheAt = 0;
+
+    console.log(`[vendor-aliases] LEARNED: "${label}" → ${searchKey} (${name})`);
+    return { learned: true, reason: 'added to vendor-aliases.json' };
+  } catch (err) {
+    console.error(`[vendor-aliases] Failed to learn alias: ${err.message}`);
+    return { learned: false, reason: `write error: ${err.message}` };
+  }
+}
+
+module.exports = { lookupVendorAlias, learnVendorAlias };

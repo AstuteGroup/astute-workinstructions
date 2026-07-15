@@ -522,24 +522,68 @@ WITH assigned_accounts AS (
 ),
 
 assignment_dates AS (
+  -- Get first interaction date with this seller as a proxy for assignment date
+  -- Uses earliest of: activity, RFQ, or order
   SELECT
-    bpl.c_bpartner_id,
-    MIN(bpl.created) AS first_assigned_date,
-    EXTRACT(MONTH FROM AGE(CURRENT_DATE, MIN(bpl.created)))::integer AS months_assigned
-  FROM c_bpartner_location bpl
-  WHERE bpl.chuboe_ise_steward_id = ${sellerId}
-    AND bpl.isactive = 'Y'
-  GROUP BY bpl.c_bpartner_id
+    bp.c_bpartner_id,
+    LEAST(
+      COALESCE(MIN(ca.startdate), '9999-12-31'::date),
+      COALESCE(MIN(rfq.created), '9999-12-31'::date),
+      COALESCE(MIN(o.dateordered), '9999-12-31'::date)
+    ) AS first_assigned_date,
+    (EXTRACT(YEAR FROM AGE(
+      CURRENT_DATE,
+      LEAST(
+        COALESCE(MIN(ca.startdate), '9999-12-31'::date),
+        COALESCE(MIN(rfq.created), '9999-12-31'::date),
+        COALESCE(MIN(o.dateordered), '9999-12-31'::date)
+      )
+    )) * 12 + EXTRACT(MONTH FROM AGE(
+      CURRENT_DATE,
+      LEAST(
+        COALESCE(MIN(ca.startdate), '9999-12-31'::date),
+        COALESCE(MIN(rfq.created), '9999-12-31'::date),
+        COALESCE(MIN(o.dateordered), '9999-12-31'::date)
+      )
+    )))::integer AS months_assigned
+  FROM c_bpartner bp
+  LEFT JOIN c_contactactivity ca ON bp.c_bpartner_id = (
+    SELECT u.c_bpartner_id
+    FROM ad_user u
+    WHERE u.ad_user_id = ca.ad_user_id
+  ) AND ca.salesrep_id = ${sellerId} AND ca.isactive = 'Y'
+  LEFT JOIN chuboe_rfq rfq ON bp.c_bpartner_id = rfq.c_bpartner_id
+    AND rfq.salesrep_id = ${sellerId} AND rfq.isactive = 'Y'
+  LEFT JOIN c_order o ON bp.c_bpartner_id = o.c_bpartner_id
+    AND o.salesrep_id = ${sellerId} AND o.isactive = 'Y'
+  WHERE bp.c_bpartner_id IN (
+    SELECT DISTINCT bpl.c_bpartner_id
+    FROM c_bpartner_location bpl
+    WHERE bpl.chuboe_ise_steward_id = ${sellerId} AND bpl.isactive = 'Y'
+  )
+  GROUP BY bp.c_bpartner_id
 ),
 
 last_sales AS (
+  -- Get most recent sale date by this seller (either invoice or order creation)
   SELECT
-    i.c_bpartner_id,
-    MAX(i.dateinvoiced) AS last_sale_date
-  FROM c_invoice i
-  WHERE i.isactive = 'Y'
-    AND i.docstatus IN ('CO', 'CL')
-  GROUP BY i.c_bpartner_id
+    bp.c_bpartner_id,
+    GREATEST(
+      COALESCE(MAX(i.dateinvoiced), '1900-01-01'::date),
+      COALESCE(MAX(o.created::date), '1900-01-01'::date)
+    ) AS last_sale_date
+  FROM c_bpartner bp
+  LEFT JOIN c_invoice i ON bp.c_bpartner_id = i.c_bpartner_id
+    AND i.salesrep_id = ${sellerId}
+    AND i.isactive = 'Y' AND i.docstatus IN ('CO', 'CL')
+  LEFT JOIN c_order o ON bp.c_bpartner_id = o.c_bpartner_id
+    AND o.salesrep_id = ${sellerId}
+    AND o.isactive = 'Y' AND o.docstatus != 'VO'
+  GROUP BY bp.c_bpartner_id
+  HAVING GREATEST(
+    COALESCE(MAX(i.dateinvoiced), '1900-01-01'::date),
+    COALESCE(MAX(o.created::date), '1900-01-01'::date)
+  ) > '1900-01-01'::date
 ),
 
 activities AS (
@@ -1172,7 +1216,7 @@ async function generateExcel(data, outputPath) {
     // Add "Not Assigned" header
     const notAssignedHeader = worksheet.addRow([
       'NOT ASSIGNED (Activity but no ISE Steward assignment + Infor-only sales)',
-      '', '', '', '', '', '', '', '', '', '', '', '', '', ''
+      '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', ''
     ]);
     notAssignedHeader.font = { bold: true, color: { argb: 'FFFF0000' } };
     notAssignedHeader.fill = {
@@ -1187,6 +1231,9 @@ async function generateExcel(data, outputPath) {
         account.accountName,
         account.inforName || '',
         account.locations,
+        '', // Months Assigned (not applicable)
+        '', // First Assigned (not applicable)
+        '', // Last Sale Date (not applicable)
         account.activities,
         account.rfqLines,
         account.cqLines,
@@ -1203,7 +1250,7 @@ async function generateExcel(data, outputPath) {
 
       // Format conversion rate
       if (account.conversionRate !== null) {
-        const cell = row.getCell(8);
+        const cell = row.getCell(11);
         cell.numFmt = '0.00%';
         cell.value = account.conversionRate;
 
@@ -1219,19 +1266,19 @@ async function generateExcel(data, outputPath) {
       }
 
       // Format currency (Booked GP, Invoiced GP, Scheduled GP, GP Target)
-      row.getCell(9).numFmt = '$#,##0.00';   // Booked GP
-      row.getCell(10).numFmt = '$#,##0.00';  // Invoiced GP
-      row.getCell(13).numFmt = '$#,##0.00';  // Scheduled GP
-      row.getCell(14).numFmt = '$#,##0.00';  // GP Target
+      row.getCell(12).numFmt = '$#,##0.00';  // Booked GP
+      row.getCell(13).numFmt = '$#,##0.00';  // Invoiced GP
+      row.getCell(16).numFmt = '$#,##0.00';  // Scheduled GP
+      row.getCell(17).numFmt = '$#,##0.00';  // GP Target
 
       // Format B to I ratio
       if (account.bToI !== null) {
-        row.getCell(11).numFmt = '0.00';
+        row.getCell(14).numFmt = '0.00';
       }
 
       // Format percentage
       if (account.pctInvTotal !== null) {
-        row.getCell(12).numFmt = '0.0%';
+        row.getCell(15).numFmt = '0.0%';
       }
     }
 
@@ -1240,6 +1287,9 @@ async function generateExcel(data, outputPath) {
       'NOT ASSIGNED TOTAL',
       '',
       notAssignedTotals.locations,
+      '', // Months Assigned (not applicable)
+      '', // First Assigned (not applicable)
+      '', // Last Sale Date (not applicable)
       notAssignedTotals.activities,
       notAssignedTotals.rfqLines,
       notAssignedTotals.cqLines,
@@ -1262,12 +1312,12 @@ async function generateExcel(data, outputPath) {
     };
 
     // Format subtotal row
-    notAssignedSubtotalRow.getCell(8).numFmt = '0.00%';       // Conversion Rate
-    notAssignedSubtotalRow.getCell(9).numFmt = '$#,##0.00';   // Booked GP
-    notAssignedSubtotalRow.getCell(10).numFmt = '$#,##0.00';  // Invoiced GP
-    notAssignedSubtotalRow.getCell(11).numFmt = '0.00';       // B to I
-    notAssignedSubtotalRow.getCell(12).numFmt = '0.0%';       // % of Inv Total
-    notAssignedSubtotalRow.getCell(13).numFmt = '$#,##0.00';  // Scheduled GP
+    notAssignedSubtotalRow.getCell(11).numFmt = '0.00%';      // Conversion Rate
+    notAssignedSubtotalRow.getCell(12).numFmt = '$#,##0.00';  // Booked GP
+    notAssignedSubtotalRow.getCell(13).numFmt = '$#,##0.00';  // Invoiced GP
+    notAssignedSubtotalRow.getCell(14).numFmt = '0.00';       // B to I
+    notAssignedSubtotalRow.getCell(15).numFmt = '0.0%';       // % of Inv Total
+    notAssignedSubtotalRow.getCell(16).numFmt = '$#,##0.00';  // Scheduled GP
   }
 
   // GRAND TOTAL row (combines both sections)
@@ -1297,6 +1347,9 @@ async function generateExcel(data, outputPath) {
     'GRAND TOTAL (Assigned + Not Assigned)',
     '',
     grandTotals.locations,
+    '', // Months Assigned (not applicable)
+    '', // First Assigned (not applicable)
+    '', // Last Sale Date (not applicable)
     grandTotals.activities,
     grandTotals.rfqLines,
     grandTotals.cqLines,
@@ -1320,30 +1373,30 @@ async function generateExcel(data, outputPath) {
   grandTotalRow.font = { bold: true, color: { argb: 'FFFFFFFF' } };
 
   // Format grand total row
-  grandTotalRow.getCell(8).numFmt = '0.00%';       // Conversion Rate
-  grandTotalRow.getCell(9).numFmt = '$#,##0.00';   // Booked GP
-  grandTotalRow.getCell(10).numFmt = '$#,##0.00';  // Invoiced GP
-  grandTotalRow.getCell(11).numFmt = '0.00';       // B to I
-  grandTotalRow.getCell(13).numFmt = '$#,##0.00';  // Scheduled GP
+  grandTotalRow.getCell(11).numFmt = '0.00%';      // Conversion Rate
+  grandTotalRow.getCell(12).numFmt = '$#,##0.00';  // Booked GP
+  grandTotalRow.getCell(13).numFmt = '$#,##0.00';  // Invoiced GP
+  grandTotalRow.getCell(14).numFmt = '0.00';       // B to I
+  grandTotalRow.getCell(16).numFmt = '$#,##0.00';  // Scheduled GP
 
-  // Add SUM formula for GP Target column (column 14)
+  // Add SUM formula for GP Target column (column 17)
   const grandTotalRowNum = grandTotalRow.number;
   const firstDataRow = 2; // Row after header
   const lastDataRow = grandTotalRowNum - 1;
-  grandTotalRow.getCell(14).value = { formula: `SUM(N${firstDataRow}:N${lastDataRow})` };
-  grandTotalRow.getCell(14).numFmt = '$#,##0.00';
+  grandTotalRow.getCell(17).value = { formula: `SUM(Q${firstDataRow}:Q${lastDataRow})` };
+  grandTotalRow.getCell(17).numFmt = '$#,##0.00';
 
   // Add GP Goal row (if goal was found)
   if (data.gpGoal !== null) {
     const gpGoalRow = worksheet.addRow([
       `${data.nextQuarter} ${data.nextQuarterYear} GP Goal`,
-      '', '', '', '', '', '', '', '', '', '', '', '',
+      '', '', '', '', '', '', '', '', '', '', '', '', '', '', '',
       data.gpGoal,
       ''
     ]);
     gpGoalRow.font = { bold: true };
-    gpGoalRow.getCell(14).numFmt = '$#,##0.00';
-    gpGoalRow.getCell(14).fill = {
+    gpGoalRow.getCell(17).numFmt = '$#,##0.00';
+    gpGoalRow.getCell(17).fill = {
       type: 'pattern',
       pattern: 'solid',
       fgColor: { argb: 'FFE2EFDA' } // Light green background
@@ -1352,15 +1405,15 @@ async function generateExcel(data, outputPath) {
     // Add Delta row (GP Target Sum - GP Goal)
     const deltaRow = worksheet.addRow([
       'Delta to Goal',
-      '', '', '', '', '', '', '', '', '', '', '', '',
-      { formula: `N${grandTotalRowNum}-N${gpGoalRow.number}` },
+      '', '', '', '', '', '', '', '', '', '', '', '', '', '', '',
+      { formula: `Q${grandTotalRowNum}-Q${gpGoalRow.number}` },
       ''
     ]);
     deltaRow.font = { bold: true };
-    deltaRow.getCell(14).numFmt = '$#,##0.00';
+    deltaRow.getCell(17).numFmt = '$#,##0.00';
 
     // Conditional formatting for Delta: RED if negative, GREEN if >= 0
-    const deltaCell = deltaRow.getCell(14);
+    const deltaCell = deltaRow.getCell(17);
     worksheet.addConditionalFormatting({
       ref: deltaCell.address,
       rules: [

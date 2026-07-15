@@ -528,11 +528,13 @@ ${recipientsFooter(envelope)}
   }
 
   // Email threading headers — escalation lands in same thread as original
+  // Fallback to anchorMessageId when currentMessageId is null (fetch failed)
   const opts = { html: true };
-  if (ctx.currentMessageId) {
-    opts.inReplyTo = ctx.currentMessageId;
+  const threadId = ctx.currentMessageId || ctx.anchorMessageId;
+  if (threadId) {
+    opts.inReplyTo = threadId;
     const refs = Array.isArray(ctx.currentReferences) ? [...ctx.currentReferences] : [];
-    if (!refs.includes(ctx.currentMessageId)) refs.push(ctx.currentMessageId);
+    if (!refs.includes(threadId)) refs.push(threadId);
     if (refs.length > 0) opts.references = refs;
   }
 

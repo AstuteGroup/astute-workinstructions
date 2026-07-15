@@ -11,6 +11,11 @@
  *
  * Logs structured events to /tmp/cron-runner.log.
  *
+ * SAFEGUARDS (added 2026-07-07 after stockrfq-cq-agent OT crash):
+ *   - Hard execution timeout: jobs are killed if they exceed timeoutMs (default 2h)
+ *   - Reduced stale lock timeout: from 24h to 2h
+ *   - Agent timeout: agent-tier jobs default to 30m (--max-turns already limits them)
+ *
  * Usage:
  *   node cron-runner.js --job=lam-kitting-runner
  *   node cron-runner.js --job=lam-kitting-runner --force   # bypass sentinel + health
@@ -21,7 +26,7 @@
 
 const fs = require('fs');
 const path = require('path');
-const { spawnSync } = require('child_process');
+const { spawn } = require('child_process');
 
 const REGISTRY = require('../cron-jobs');
 const { cadenceToMs } = require('../cron-jobs');
@@ -30,11 +35,16 @@ const { probeOT } = require('../shared/ot-health');
 const { acquireLock, releaseLock } = require('../shared/lockfile');
 const breadcrumbs = require('../shared/breadcrumbs');
 
-// Single-instance lock stale timeout. 24h means a legitimately slow run is
-// never force-taken on age alone — lockfile.js's alive-PID check is what
-// actually defends against stuck holders (dead PIDs are reclaimed immediately
-// regardless of age).
-const LOCK_STALE_MS = 24 * 60 * 60 * 1000;
+// Single-instance lock stale timeout. 2h is long enough for legitimate slow
+// runs but short enough to recover from hung processes that are still "alive"
+// but not doing useful work. Reduced from 24h on 2026-07-07 after OT crash.
+const LOCK_STALE_MS = 2 * 60 * 60 * 1000;
+
+// Hard execution timeout defaults. Jobs that exceed these are killed.
+// - Agent jobs (Claude CLI): 30 min — --max-turns already limits them
+// - Regular jobs: 2 hours — should be plenty for any batch process
+const DEFAULT_AGENT_TIMEOUT_MS = 30 * 60 * 1000;
+const DEFAULT_JOB_TIMEOUT_MS = 2 * 60 * 60 * 1000;
 
 function crumb(jobName, event, detail) {
   try {
@@ -162,33 +172,68 @@ async function main() {
   // on SIGKILL — but lockfile.js's alive-PID check reclaims dead-PID locks.
   process.on('exit', () => releaseLock(job.name));
 
-  // ─── Execute the job ───────────────────────────────────────────────────
+  // ─── Execute the job with timeout ─────────────────────────────────────
   const startedAt = Date.now();
-  logEvent(job.name, 'start', { command: job.command });
 
-  const result = spawnSync('bash', ['-c', job.command], {
+  // Determine timeout: job-specific > tier-based default
+  const timeoutMs = job.timeoutMs || (job.tier === 'agent' ? DEFAULT_AGENT_TIMEOUT_MS : DEFAULT_JOB_TIMEOUT_MS);
+
+  logEvent(job.name, 'start', { command: job.command, timeoutMs });
+
+  const child = spawn('bash', ['-c', job.command], {
     cwd: job.cwd,
     stdio: ['ignore', 'inherit', 'inherit'],
     env: process.env,
   });
 
-  const durationMs = Date.now() - startedAt;
-  const exitCode = result.status;
+  let killed = false;
+  let killReason = null;
 
-  if (exitCode === 0) {
-    markSuccess(job.name, cadenceMs);
-    logEvent(job.name, 'success', { durationMs });
-    crumb(job.name, 'job-success', { durationMs });
-    process.exit(0);
-  } else {
-    const reason = result.signal
-      ? `signal ${result.signal}`
-      : `exit ${exitCode}`;
-    markFailure(job.name, reason, cadenceMs);
-    logEvent(job.name, 'failure', { durationMs, exitCode, signal: result.signal });
-    crumb(job.name, 'job-failure', { durationMs, exitCode, signal: result.signal, reason });
-    process.exit(exitCode || 1);
-  }
+  // Set hard timeout — kill the job if it exceeds the limit
+  const timeoutHandle = setTimeout(() => {
+    killed = true;
+    killReason = `timeout after ${Math.round(timeoutMs / 60000)}m`;
+    logEvent(job.name, 'timeout-kill', { timeoutMs, durationMs: Date.now() - startedAt });
+    crumb(job.name, 'job-timeout-kill', { timeoutMs, durationMs: Date.now() - startedAt });
+    // SIGTERM first, then SIGKILL after 5s if still alive
+    child.kill('SIGTERM');
+    setTimeout(() => {
+      try { child.kill('SIGKILL'); } catch (e) { /* already dead */ }
+    }, 5000);
+  }, timeoutMs);
+
+  child.on('close', (exitCode, signal) => {
+    clearTimeout(timeoutHandle);
+    const durationMs = Date.now() - startedAt;
+
+    if (killed) {
+      // Job was killed due to timeout
+      markFailure(job.name, killReason, cadenceMs);
+      logEvent(job.name, 'failure', { durationMs, killed: true, reason: killReason });
+      crumb(job.name, 'job-failure', { durationMs, killed: true, reason: killReason });
+      process.exit(124); // standard timeout exit code
+    } else if (exitCode === 0) {
+      markSuccess(job.name, cadenceMs);
+      logEvent(job.name, 'success', { durationMs });
+      crumb(job.name, 'job-success', { durationMs });
+      process.exit(0);
+    } else {
+      const reason = signal ? `signal ${signal}` : `exit ${exitCode}`;
+      markFailure(job.name, reason, cadenceMs);
+      logEvent(job.name, 'failure', { durationMs, exitCode, signal });
+      crumb(job.name, 'job-failure', { durationMs, exitCode, signal, reason });
+      process.exit(exitCode || 1);
+    }
+  });
+
+  child.on('error', (err) => {
+    clearTimeout(timeoutHandle);
+    const durationMs = Date.now() - startedAt;
+    markFailure(job.name, `spawn error: ${err.message}`, cadenceMs);
+    logEvent(job.name, 'spawn-error', { durationMs, error: err.message });
+    crumb(job.name, 'job-spawn-error', { durationMs, error: err.message });
+    process.exit(1);
+  });
 }
 
 main().catch((err) => {

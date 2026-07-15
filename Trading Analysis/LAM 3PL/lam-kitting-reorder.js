@@ -2,14 +2,27 @@
 /**
  * LAM 3PL Reorder Script
  *
- * Compares W111 + W115 inventory levels against MIN QTY thresholds
+ * Compares W111 + W115 inventory levels against Reorder Threshold
  * to generate reorder alerts with historical purchase data.
  *
+ * Contract data source: LAM_Master_Roster.xlsx (consolidated from Kitting DB,
+ * EPG SIPOC, and Phase 2 Adds via scripts/build-lam-master-roster.js)
+ *
+ * OUTPUT: Two files generated:
+ *   1. LAM_Reorder_Alerts_YYYY-MM-DD.csv   - Parts ready to order (approved pricing)
+ *   2. LAM_Reorder_Pending_Approvals_YYYY-MM-DD.xlsx - Parts awaiting LAM approval
+ *
+ * WORKFLOW:
+ *   - Reorder triggers identify parts needing replenishment
+ *   - Parts with approved pricing → Reorder Alerts file
+ *   - Parts needing price/lead time approval → Pending Approvals file
+ *   - When approval received (email or terminal) → update roster → part moves to Reorder
+ *
  * Usage:
- *   node lam-kitting-reorder.js <inventory-folder> <excel-file> [output-file]
+ *   node lam-kitting-reorder.js <inventory-folder> <master-roster-file> [output-file]
  *
  * Example:
- *   node lam-kitting-reorder.js "./Inventory 2026-03-11" "./Lam_Kitting_DB_03132026.xlsx"
+ *   node lam-kitting-reorder.js "./Inventory 2026-03-11" "./LAM_Master_Roster.xlsx"
  */
 
 const fs = require('fs');
@@ -22,13 +35,82 @@ const { readCSVFile } = require('../../shared/csv-utils');
 const { createNotifier } = require('../../shared/notifier');
 const { normalizeMPN } = require('../../shared/mpn-normalization');
 
-// Email configuration - same account as Inventory File Cleanup (triggered together)
-const EMAIL_ACCOUNT = 'excess';
+// Email configuration - LAM Kitting dedicated account
+const EMAIL_ACCOUNT = 'lamkitting';
 const NOTIFY_EMAIL = process.env.NOTIFY_EMAIL || 'jake.harris@astutegroup.com';
 const notifier = createNotifier({
   fromEmail: `${EMAIL_ACCOUNT}@orangetsunami.com`,
   fromName: 'LAM 3PL'
 });
+
+// -----------------------------------------------------------------------------
+// AVL Loader - Load complete AVL for multi-MPN inventory aggregation
+// -----------------------------------------------------------------------------
+
+let _avlCache = null;
+let _avlByCpcCache = null;
+
+/**
+ * Load the complete AVL (CPC -> [MPN, MPN, ...])
+ * Returns a Map of CPC -> array of MPN strings
+ */
+function loadAVL() {
+  if (_avlByCpcCache) return _avlByCpcCache;
+
+  const avlPath = path.join(__dirname, 'LAM_Complete_AVL.xlsx');
+  if (!fs.existsSync(avlPath)) {
+    console.log('  WARNING: LAM_Complete_AVL.xlsx not found - using roster MPN only');
+    _avlByCpcCache = new Map();
+    return _avlByCpcCache;
+  }
+
+  const wb = XLSX.readFile(avlPath);
+  const ws = wb.Sheets['Complete AVL'];
+  if (!ws) {
+    console.log('  WARNING: Complete AVL sheet not found');
+    _avlByCpcCache = new Map();
+    return _avlByCpcCache;
+  }
+
+  const data = XLSX.utils.sheet_to_json(ws);
+  _avlByCpcCache = new Map();
+
+  for (const row of data) {
+    const cpc = row.CPC;
+    const mpn = row.MPN;
+    if (!cpc || !mpn) continue;
+
+    if (!_avlByCpcCache.has(cpc)) {
+      _avlByCpcCache.set(cpc, []);
+    }
+    _avlByCpcCache.get(cpc).push(mpn);
+  }
+
+  return _avlByCpcCache;
+}
+
+/**
+ * Get all approved MPNs for a CPC
+ * @param {string} cpc - The CPC
+ * @param {string} rosterMpn - The MPN from the Master Roster (fallback if no AVL)
+ * @returns {string[]} Array of all approved MPNs
+ */
+function getAllApprovedMPNs(cpc, rosterMpn) {
+  const avl = loadAVL();
+  const mpns = avl.get(cpc);
+
+  if (!mpns || mpns.length === 0) {
+    // No AVL data - use roster MPN as sole option
+    return rosterMpn ? [rosterMpn] : [];
+  }
+
+  // Ensure roster MPN is included even if not in AVL
+  if (rosterMpn && !mpns.includes(rosterMpn)) {
+    return [rosterMpn, ...mpns];
+  }
+
+  return mpns;
+}
 
 // -----------------------------------------------------------------------------
 // Configuration
@@ -41,20 +123,62 @@ const W115_FILENAME = 'W115_LAM_Dead_Inventory.csv';
 const CHUBOE_MPN_COL = 'Chuboe_MPN';
 const CHUBOE_QTY_COL = 'Qty';
 
-// Column indices in Excel INVENTORY sheet (0-based)
-// A=0, B=1, C=2, D=3, E=4, F=5, G=6, H=7, I=8, J=9
-const EXCEL = {
-  CPC: 0,           // A - Lam P/N
-  MPN: 1,           // B - MPN
-  MANUFACTURER: 2,  // C - Manufacturer
-  DESCRIPTION: 3,   // D - Item Description
-  LEAD_TIME: 4,     // E - Lead Time
-  BASE_PRICE: 5,    // F - Base Unit Price
-  RESALE_PRICE: 6,  // G - Resale Price
-  MIN_QTY: 7,       // H - MIN QTY
-  MOQ: 8,           // I - MOQ
-  HIST_BUYER: 9     // J - Buyer (historical, from SIPOC)
+// Master Roster column names (header-based lookup, not index-based)
+// Source: LAM_Master_Roster.xlsx 'Master Roster' sheet
+// Built by scripts/build-lam-master-roster.js from 3 sources:
+//   - Lam_Kitting_DB (has thresholds)
+//   - Lam_EPG_SIPOC (no thresholds)
+//   - Phase 2 Adds (no thresholds)
+const ROSTER_COLS = {
+  CPC: 'CPC',
+  MPN: 'MPN',
+  MANUFACTURER: 'Manufacturer',
+  DESCRIPTION: 'Description',
+  AWARD: 'Award',
+  BASE_PRICE: 'Base Unit Price',
+  RESALE_PRICE: 'Resale Price',
+  PENDING: 'Pending',
+  PROPOSED_RESALE: 'Proposed Resale',
+  LAST_APPROVED: 'Last Approved',
+  THRESHOLD: 'Reorder Threshold',
+  MOQ: 'MOQ',
+  LEAD_TIME: 'Contractual Lead Time',
+  BUYER: 'Buyer',
+  STATUS: 'Status',
+  SUBMITTED_DATE: 'Submitted Date',
 };
+
+// Pending transfers file - parts being transferred TO LAM warehouses
+const PENDING_TRANSFERS_FILE = path.join(__dirname, 'lam-wrong-warehouse-pending-transfers.json');
+
+/**
+ * Load pending transfers (parts being moved to LAM warehouses)
+ * Returns Map of MPN -> { qty, fromWh, notes }
+ */
+function loadPendingTransfers() {
+  if (!fs.existsSync(PENDING_TRANSFERS_FILE)) {
+    return new Map();
+  }
+
+  try {
+    const data = JSON.parse(fs.readFileSync(PENDING_TRANSFERS_FILE, 'utf-8'));
+    const transfers = new Map();
+
+    for (const [mpn, info] of Object.entries(data)) {
+      transfers.set(mpn, {
+        qty: info.qty || 0,
+        fromWh: info.fromWh || '',
+        notes: info.notes || '',
+        cpc: info.cpc || ''
+      });
+    }
+
+    return transfers;
+  } catch (e) {
+    console.log(`  WARNING: Could not parse ${PENDING_TRANSFERS_FILE}: ${e.message}`);
+    return new Map();
+  }
+}
 
 // -----------------------------------------------------------------------------
 // Main
@@ -65,10 +189,10 @@ async function main() {
   const skipEmail = process.argv.includes('--no-email');
 
   if (args.length < 2) {
-    console.error('Usage: node lam-kitting-reorder.js <inventory-folder> <excel-file> [output-file] [--no-email]');
+    console.error('Usage: node lam-kitting-reorder.js <inventory-folder> <master-roster-file> [output-file] [--no-email]');
     console.error('');
     console.error('Example:');
-    console.error('  node lam-kitting-reorder.js "./Inventory 2026-03-11" "./Lam_Kitting_DB_03132026.xlsx"');
+    console.error('  node lam-kitting-reorder.js "./Inventory 2026-03-11" "./LAM_Master_Roster.xlsx"');
     process.exit(1);
   }
 
@@ -84,7 +208,7 @@ async function main() {
   console.log('LAM 3PL Reorder');
   console.log('===============');
   console.log(`Inventory folder: ${inventoryFolder}`);
-  console.log(`Excel file: ${excelFile}`);
+  console.log(`Master Roster: ${excelFile}`);
   console.log(`Output file: ${outputFile}`);
   console.log('');
 
@@ -99,17 +223,62 @@ async function main() {
   console.log(`  W111 (LAM 3PL): ${Object.keys(w111Inventory).length} unique MPNs`);
   console.log(`  W115 (Dead Inventory): ${Object.keys(w115Inventory).length} unique MPNs`);
 
+  // Step 1b: Check inventory file age - warn if stale (>14 days old)
+  if (fs.existsSync(w111Path)) {
+    const fileStats = fs.statSync(w111Path);
+    const fileAgeDays = Math.floor((Date.now() - fileStats.mtime.getTime()) / (1000 * 60 * 60 * 24));
+    if (fileAgeDays > 14) {
+      console.log('');
+      console.log('  !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!');
+      console.log(`  WARNING: Inventory file is ${fileAgeDays} days old!`);
+      console.log('  This data may be stale. Check if inventory cleanup cron is running.');
+      console.log('  File:', path.basename(w111Path));
+      console.log('  Modified:', fileStats.mtime.toISOString().split('T')[0]);
+      console.log('  !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!');
+      console.log('');
+    }
+  }
+
   // Step 2: Aggregate by MPN
   console.log('');
   console.log('Step 2: Aggregating inventory by MPN...');
   const aggregated = aggregateInventory(w111Inventory, w115Inventory);
   console.log(`  Combined: ${Object.keys(aggregated).length} unique MPNs`);
 
-  // Step 3: Load thresholds from Excel (all columns A-L except J)
+  // Step 2b: Load and apply pending transfers (parts being moved to LAM warehouses)
   console.log('');
-  console.log('Step 3: Loading data from Excel...');
-  const excelData = loadExcelData(excelFile);
-  console.log(`  Excel rows loaded: ${Object.keys(excelData).length} MPNs`);
+  console.log('Step 2b: Loading pending transfers...');
+  const pendingTransfers = loadPendingTransfers();
+  if (pendingTransfers.size > 0) {
+    console.log(`  Pending transfers: ${pendingTransfers.size} MPNs`);
+    for (const [mpn, transfer] of pendingTransfers) {
+      if (!aggregated[mpn]) {
+        aggregated[mpn] = { W111_Qty: 0, W115_Qty: 0, Total_Qty: 0, Pending_Transfer: 0 };
+      }
+      aggregated[mpn].Pending_Transfer = transfer.qty;
+      aggregated[mpn].Total_Qty += transfer.qty;
+      aggregated[mpn].Pending_From = transfer.fromWh;
+      console.log(`    ${mpn}: +${transfer.qty} pcs from ${transfer.fromWh} (${transfer.notes})`);
+    }
+  } else {
+    console.log('  No pending transfers');
+  }
+
+  // Step 3: Load contract data from Master Roster
+  console.log('');
+  console.log('Step 3: Loading data from Master Roster...');
+  const { data: excelData, pendingApprovals } = loadExcelData(excelFile);
+  console.log(`  Master Roster rows loaded: ${Object.keys(excelData).length} MPNs`);
+  if (pendingApprovals.length > 0) {
+    console.log(`  Pending approval items: ${pendingApprovals.length}`);
+  }
+
+  // Step 3b: Load AVL for multi-MPN inventory aggregation
+  console.log('');
+  console.log('Step 3b: Loading AVL for multi-MPN aggregation...');
+  const avl = loadAVL();
+  const multiMpnCPCs = [...avl.entries()].filter(([_, mpns]) => mpns.length > 1).length;
+  console.log(`  AVL loaded: ${avl.size} CPCs (${multiMpnCPCs} with multiple approved MPNs)`);
 
   // Step 4: Load historical purchase data from ERP
   console.log('');
@@ -147,11 +316,36 @@ async function main() {
     }
   }
 
-  // Step 6: Generate output
+  // Step 6: Generate output files
   console.log('');
-  console.log('Step 6: Generating output...');
-  writeReorderAlerts(reorderAlerts, outputFile);
-  console.log(`  Output written to: ${outputFile}`);
+  console.log('Step 6: Generating output files...');
+
+  // 6a: Reorder Alert (parts ready to order - exclude pending approval items)
+  const readyToOrder = reorderAlerts.filter(alert => {
+    const mpn = alert.MPN;
+    const excel = excelData[mpn];
+    // Exclude if has pending approval status
+    if (excel && (excel.Pending || excel.Status === 'Pending Approval')) {
+      return false;
+    }
+    return true;
+  });
+  writeReorderAlerts(readyToOrder, outputFile);
+  console.log(`  Reorder alerts (ready to order): ${outputFile} (${readyToOrder.length} items)`);
+
+  // 6b: Pending Approvals Excel (cumulative - from roster)
+  const pendingApprovalsFile = outputFile.replace('.csv', '').replace('_Alerts', '_Pending_Approvals') + '.xlsx';
+  const pendingFile = writePendingApprovalsExcel(pendingApprovals, pendingApprovalsFile);
+
+  // 6c: Also write JSON sidecar for backward compatibility
+  if (pendingApprovals.length > 0) {
+    const pendingApprovalsJson = outputFile.replace('.csv', '_pending_approvals.json');
+    fs.writeFileSync(pendingApprovalsJson, JSON.stringify({
+      generated: new Date().toISOString(),
+      count: pendingApprovals.length,
+      items: pendingApprovals,
+    }, null, 2) + '\n');
+  }
 
   // Step 6b: Escalations sidecar (current inventory + POV state for every
   // manual-escalation MPN, even those now above threshold). Drives the
@@ -163,35 +357,51 @@ async function main() {
   console.log('');
   console.log('=== Summary ===');
   console.log(`Total items below threshold: ${reorderAlerts.length}`);
+  console.log(`  Ready to order: ${readyToOrder.length}`);
+  console.log(`  Pending LAM approval: ${pendingApprovals.length}`);
 
-  if (reorderAlerts.length > 0) {
-    const criticalPriority = reorderAlerts.filter(r => r.Priority === 'CRITICAL').length;
-    const highPriority = reorderAlerts.filter(r => r.Priority === 'HIGH').length;
-    const medPriority = reorderAlerts.filter(r => r.Priority === 'MEDIUM').length;
-    const lowPriority = reorderAlerts.filter(r => r.Priority === 'LOW').length;
-    const pendingOrder = reorderAlerts.filter(r => r.Priority === 'PENDING ORDER PLACEMENT').length;
-    const pendingReceipt = reorderAlerts.filter(r => r.Priority === 'PENDING RECEIPT').length;
+  if (readyToOrder.length > 0) {
+    const criticalPriority = readyToOrder.filter(r => r.Priority === 'CRITICAL').length;
+    const highPriority = readyToOrder.filter(r => r.Priority === 'HIGH').length;
+    const medPriority = readyToOrder.filter(r => r.Priority === 'MEDIUM').length;
+    const lowPriority = readyToOrder.filter(r => r.Priority === 'LOW').length;
+    const pendingOrder = readyToOrder.filter(r => r.Priority === 'PENDING ORDER PLACEMENT').length;
+    const pendingReceipt = readyToOrder.filter(r => r.Priority === 'PENDING RECEIPT').length;
+    const pendingTransfer = readyToOrder.filter(r => r.Priority === 'PENDING WAREHOUSE TRANSFER').length;
+    console.log('');
+    console.log('Ready to Order breakdown:');
     console.log(`  CRITICAL priority (zero stock, no recent PO): ${criticalPriority}`);
     console.log(`  HIGH priority: ${highPriority}`);
     console.log(`  MEDIUM priority: ${medPriority}`);
     console.log(`  LOW priority: ${lowPriority}`);
-    console.log(`  PENDING ORDER PLACEMENT (no POV stamp yet — chase the PO): ${pendingOrder}`);
-    console.log(`  PENDING RECEIPT (POV stamped, waiting on vendor): ${pendingReceipt}`);
+    console.log(`  PENDING ORDER PLACEMENT (chase the PO): ${pendingOrder}`);
+    console.log(`  PENDING RECEIPT (waiting on vendor): ${pendingReceipt}`);
+    if (pendingTransfer > 0) {
+      console.log(`  PENDING WAREHOUSE TRANSFER (warehouse transfer in progress): ${pendingTransfer}`);
+    }
 
-    const withHistory = reorderAlerts.filter(r => r['OT Previous Supplier']).length;
+    const withHistory = readyToOrder.filter(r => r['OT Previous Supplier']).length;
     console.log(`  With historical purchase data: ${withHistory}`);
+  }
+
+  if (pendingApprovals.length > 0) {
+    const oldestDays = Math.max(...pendingApprovals.map(p => p['Days Pending'] || 0));
+    console.log('');
+    console.log('Pending Approvals breakdown:');
+    console.log(`  Total awaiting approval: ${pendingApprovals.length}`);
+    console.log(`  Oldest pending: ${oldestDays} days`);
   }
 
   // Show unmatched stats
   const inventoryMPNs = new Set(Object.keys(aggregated));
-  const excelMPNs = new Set(Object.keys(excelData));
-  const inInventoryNotExcel = [...inventoryMPNs].filter(mpn => !excelMPNs.has(mpn));
-  const inExcelNotInventory = [...excelMPNs].filter(mpn => !inventoryMPNs.has(mpn));
+  const rosterMPNs = new Set(Object.keys(excelData));
+  const inInventoryNotRoster = [...inventoryMPNs].filter(mpn => !rosterMPNs.has(mpn));
+  const inRosterNotInventory = [...rosterMPNs].filter(mpn => !inventoryMPNs.has(mpn));
 
   console.log('');
   console.log('=== Match Statistics ===');
-  console.log(`  In inventory but not in Excel: ${inInventoryNotExcel.length} MPNs`);
-  console.log(`  In Excel but not in inventory: ${inExcelNotInventory.length} MPNs`);
+  console.log(`  In inventory but not in Master Roster: ${inInventoryNotRoster.length} MPNs`);
+  console.log(`  In Master Roster but not in inventory: ${inRosterNotInventory.length} MPNs`);
 
   // Step 7: Email results (unless --no-email flag is set)
   if (skipEmail) {
@@ -200,30 +410,50 @@ async function main() {
   } else {
     console.log('');
     console.log('Step 7: Emailing results...');
-    const critCount = reorderAlerts.filter(r => r.Priority === 'CRITICAL').length;
-    const highCount = reorderAlerts.filter(r => r.Priority === 'HIGH').length;
-    const medCount = reorderAlerts.filter(r => r.Priority === 'MEDIUM').length;
-    const lowCount = reorderAlerts.filter(r => r.Priority === 'LOW').length;
-    const pendingOrderCount = reorderAlerts.filter(r => r.Priority === 'PENDING ORDER PLACEMENT').length;
-    const pendingReceiptCount = reorderAlerts.filter(r => r.Priority === 'PENDING RECEIPT').length;
+    const critCount = readyToOrder.filter(r => r.Priority === 'CRITICAL').length;
+    const highCount = readyToOrder.filter(r => r.Priority === 'HIGH').length;
+    const medCount = readyToOrder.filter(r => r.Priority === 'MEDIUM').length;
+    const lowCount = readyToOrder.filter(r => r.Priority === 'LOW').length;
+    const pendingOrderCount = readyToOrder.filter(r => r.Priority === 'PENDING ORDER PLACEMENT').length;
+    const pendingReceiptCount = readyToOrder.filter(r => r.Priority === 'PENDING RECEIPT').length;
 
-    const emailBody = `LAM 3PL Reorder Alerts generated ${getDateStamp()}.
+    // Calculate aging for pending approvals
+    const oldestPending = pendingApprovals.length > 0
+      ? Math.max(...pendingApprovals.map(p => p['Days Pending'] || 0))
+      : 0;
 
-${reorderAlerts.length} items below threshold:
+    let emailBody = `LAM 3PL Reorder Report - ${getDateStamp()}
+
+=== REORDER ALERTS (Ready to Order) ===
+${readyToOrder.length} items below threshold:
 - CRITICAL (zero stock, no recent PO): ${critCount}
 - HIGH: ${highCount}
 - MEDIUM: ${medCount}
 - LOW: ${lowCount}
-- PENDING ORDER PLACEMENT (no POV stamp yet — chase the PO): ${pendingOrderCount}
-- PENDING RECEIPT (POV stamped, waiting on vendor): ${pendingReceiptCount}
+- PENDING ORDER PLACEMENT (chase the PO): ${pendingOrderCount}
+- PENDING RECEIPT (waiting on vendor): ${pendingReceiptCount}
+
+=== PENDING APPROVALS ===
+${pendingApprovals.length} items awaiting LAM approval`;
+
+    if (pendingApprovals.length > 0) {
+      emailBody += `
+- Oldest pending: ${oldestPending} days`;
+    }
+
+    emailBody += `
 
 Inventory source: ${path.basename(inventoryFolder)}`;
 
+    // Attach both files
+    const attachments = [outputFile];
+    if (pendingFile) attachments.push(pendingFile);
+
     const sent = await sendEmail(
       NOTIFY_EMAIL,
-      `LAM 3PL Reorder Alerts - ${getDateStamp()}`,
+      `LAM 3PL Reorder Report - ${getDateStamp()}`,
       emailBody,
-      [outputFile]
+      attachments
     );
     console.log(sent ? '  Email sent.' : '  Email failed (check Himalaya config).');
   }
@@ -299,48 +529,113 @@ function aggregateInventory(w111, w115) {
 }
 
 // -----------------------------------------------------------------------------
-// Step 3: Load Excel Data (Columns A-L except J)
+// Step 3: Load Master Roster Data
 // -----------------------------------------------------------------------------
+
+// Helper to safely convert cell value to string (handles numeric MPNs with full precision)
+function cellToString(v) {
+  if (v == null) return '';
+  if (typeof v === 'number') return String(v);
+  return String(v).trim();
+}
 
 function loadExcelData(excelPath) {
   if (!fs.existsSync(excelPath)) {
-    console.error(`  ERROR: Excel file not found: ${excelPath}`);
-    return {};
+    console.error(`  ERROR: Master Roster not found: ${excelPath}`);
+    return { data: {}, pendingApprovals: [] };
   }
 
-  const workbook = XLSX.readFile(excelPath);
-  const sheet = workbook.Sheets['INVENTORY'];
+  // raw: true preserves numeric MPN cells at full precision
+  const workbook = XLSX.readFile(excelPath, { raw: true });
+  const sheet = workbook.Sheets['Master Roster'];
 
   if (!sheet) {
-    console.error('  ERROR: INVENTORY sheet not found in Excel file');
-    return {};
+    console.error('  ERROR: "Master Roster" sheet not found in Excel file');
+    return { data: {}, pendingApprovals: [] };
   }
 
-  const data = XLSX.utils.sheet_to_json(sheet, { header: 1 });
-  const excelData = {};
+  const rows = XLSX.utils.sheet_to_json(sheet, { header: 1, raw: true });
+  if (rows.length < 2) {
+    console.error('  ERROR: No data rows in Master Roster');
+    return { data: {}, pendingApprovals: [] };
+  }
 
-  // Skip header row (index 0)
-  for (let i = 1; i < data.length; i++) {
-    const row = data[i];
+  // Build column index map from header row
+  const header = rows[0];
+  const colIdx = {};
+  for (const [key, name] of Object.entries(ROSTER_COLS)) {
+    colIdx[key] = header.findIndex(h => cellToString(h) === name);
+    if (colIdx[key] < 0) {
+      console.warn(`  WARNING: Column "${name}" not found in Master Roster`);
+    }
+  }
+
+  const excelData = {};
+  const pendingApprovals = [];
+
+  // Process data rows (skip header)
+  for (let i = 1; i < rows.length; i++) {
+    const row = rows[i];
     if (!row || row.length === 0) continue;
 
-    const mpn = (row[EXCEL.MPN] || '').toString().trim();
+    const mpn = cellToString(row[colIdx.MPN]);
     if (!mpn) continue;
 
-    excelData[mpn] = {
-      CPC: (row[EXCEL.CPC] || '').toString().trim(),
-      Manufacturer: (row[EXCEL.MANUFACTURER] || '').toString().trim(),
-      Description: (row[EXCEL.DESCRIPTION] || '').toString().trim(),
-      Lead_Time: (row[EXCEL.LEAD_TIME] || '').toString().trim(),
-      Base_Unit_Price: parseFloat(row[EXCEL.BASE_PRICE]) || 0,
-      Resale_Price: parseFloat(row[EXCEL.RESALE_PRICE]) || 0,
-      MIN_QTY: parseFloat(row[EXCEL.MIN_QTY]) || 0,
-      MOQ: parseFloat(row[EXCEL.MOQ]) || 0,
-      Historical_Buyer: (row[EXCEL.HIST_BUYER] || '').toString().trim()
+    const pending = cellToString(row[colIdx.PENDING]);
+    const proposedResale = colIdx.PROPOSED_RESALE >= 0 ? row[colIdx.PROPOSED_RESALE] : null;
+
+    const status = colIdx.STATUS >= 0 ? cellToString(row[colIdx.STATUS]) : '';
+    const submittedDate = colIdx.SUBMITTED_DATE >= 0 ? cellToString(row[colIdx.SUBMITTED_DATE]) : '';
+
+    const record = {
+      CPC: cellToString(row[colIdx.CPC]),
+      Manufacturer: cellToString(row[colIdx.MANUFACTURER]),
+      Description: cellToString(row[colIdx.DESCRIPTION]),
+      Award: cellToString(row[colIdx.AWARD]),
+      Lead_Time: cellToString(row[colIdx.LEAD_TIME]),
+      Base_Unit_Price: colIdx.BASE_PRICE >= 0 ? (parseFloat(row[colIdx.BASE_PRICE]) || 0) : 0,
+      Resale_Price: colIdx.RESALE_PRICE >= 0 ? (parseFloat(row[colIdx.RESALE_PRICE]) || 0) : 0,
+      MIN_QTY: colIdx.THRESHOLD >= 0 ? (parseFloat(row[colIdx.THRESHOLD]) || 0) : 0,
+      MOQ: colIdx.MOQ >= 0 ? (parseFloat(row[colIdx.MOQ]) || 0) : 0,
+      Historical_Buyer: cellToString(row[colIdx.BUYER]),
+      // Pending approval workflow fields
+      Pending: pending,
+      Proposed_Resale: proposedResale != null ? (parseFloat(proposedResale) || null) : null,
+      Last_Approved: colIdx.LAST_APPROVED >= 0 ? cellToString(row[colIdx.LAST_APPROVED]) : '',
+      Status: status,
+      Submitted_Date: submittedDate,
     };
+
+    excelData[mpn] = record;
+
+    // Track parts with pending approval for the Pending Approvals file
+    if (pending || status === 'Pending Approval') {
+      // Calculate days pending
+      let daysPending = '';
+      if (submittedDate) {
+        const submitted = new Date(submittedDate);
+        const now = new Date();
+        daysPending = Math.floor((now - submitted) / (1000 * 60 * 60 * 24));
+      }
+
+      pendingApprovals.push({
+        MPN: mpn,
+        CPC: record.CPC,
+        Manufacturer: record.Manufacturer,
+        Description: record.Description,
+        Award: record.Award,
+        'Current Resale': record.Resale_Price,
+        'Proposed Resale': record.Proposed_Resale,
+        'Reason': pending,
+        'Submitted Date': submittedDate,
+        'Days Pending': daysPending,
+        'Last Approved': record.Last_Approved,
+        'Status': status,
+      });
+    }
   }
 
-  return excelData;
+  return { data: excelData, pendingApprovals };
 }
 
 // -----------------------------------------------------------------------------
@@ -491,10 +786,14 @@ function loadRecentPOVs() {
   //
   // On Order Qty = SUM of open qty across all RECENT activity for the MPN.
   // Recent POV cell shows the single most-recent activity row (preferring PO over VQ_TICKED).
+  // KEY CHANGE: Join by CPC (via RFQ line), not MPN.
+  // This ensures that when we buy an alternate MPN for a CPC, the pending receipt
+  // shows up for the roster MPN (keyed by CPC).
   const sql = `
     WITH all_activity AS (
       -- Open POs (with or without Infor POV stamp)
       SELECT
+        TRIM(rl.chuboe_cpc) AS cpc,
         TRIM(ol.chuboe_mpn) AS mpn,
         CASE WHEN ol.chuboe_po_string LIKE 'POV%' THEN ol.chuboe_po_string ELSE '' END AS pov_number,
         o.documentno AS ot_po_number,
@@ -505,29 +804,36 @@ function loadRecentPOVs() {
         rfq.value AS rfq_number,
         'PO' AS state,
         1 AS preference,
-        COALESCE(ol.datepromised, o.created) AS sort_date
+        COALESCE(ol.datepromised, o.created) AS sort_date,
+        COALESCE(ol.chuboe_trackingnumbers, '') AS tracking,
+        u_buyer.name AS buyer
       FROM adempiere.c_orderline ol
       JOIN adempiere.c_order o ON ol.c_order_id = o.c_order_id
       JOIN adempiere.c_bpartner bp ON o.c_bpartner_id = bp.c_bpartner_id
       LEFT JOIN adempiere.chuboe_vq_line vl ON ol.chuboe_vq_line_id = vl.chuboe_vq_line_id
+      LEFT JOIN adempiere.chuboe_rfq_line rl ON vl.chuboe_rfq_line_id = rl.chuboe_rfq_line_id
       LEFT JOIN adempiere.chuboe_rfq rfq ON vl.chuboe_rfq_id = rfq.chuboe_rfq_id
+      LEFT JOIN adempiere.ad_user u_buyer ON u_buyer.ad_user_id = o.salesrep_id
       WHERE o.issotrx = 'N'
         AND o.isactive = 'Y'
         AND o.docstatus IN ('CO', 'IP', 'DR')
         AND ol.qtyordered > ol.qtydelivered
-        AND ol.chuboe_mpn IS NOT NULL
-        AND ol.chuboe_mpn != ''
+        AND rl.chuboe_cpc IS NOT NULL
+        AND rl.chuboe_cpc != ''
         AND rfq.c_bpartner_id = 1000730
-        -- Drop stale orphans: keep iff PO cut recently OR promise date still ≥ today
+        -- Keep if: has POV stamp (Infor validated), OR recent, OR promise date not yet passed
+        -- Only filter out truly stale orphans: no POV + old + passed promise
         AND (
-          o.created::date >= CURRENT_DATE - INTERVAL '90 days'
-          OR ol.datepromised::date >= CURRENT_DATE
+          ol.chuboe_po_string LIKE 'POV%'                         -- Infor validated = keep
+          OR o.created::date >= CURRENT_DATE - INTERVAL '90 days' -- Recent = keep
+          OR ol.datepromised::date >= CURRENT_DATE                -- Not yet due = keep
         )
 
       UNION ALL
 
       -- VQs ticked (ispurchased='Y') but no PO cut yet → buyer committed, procurement catching up
       SELECT
+        TRIM(rl.chuboe_cpc) AS cpc,
         TRIM(vl.chuboe_mpn) AS mpn,
         '' AS pov_number,
         '' AS ot_po_number,
@@ -538,10 +844,14 @@ function loadRecentPOVs() {
         rfq.value AS rfq_number,
         'VQ_TICKED' AS state,
         2 AS preference,
-        rfq.created AS sort_date
+        rfq.created AS sort_date,
+        '' AS tracking,
+        u_vq_buyer.name AS buyer
       FROM adempiere.chuboe_vq_line vl
       JOIN adempiere.chuboe_rfq rfq ON vl.chuboe_rfq_id = rfq.chuboe_rfq_id
+      JOIN adempiere.chuboe_rfq_line rl ON vl.chuboe_rfq_line_id = rl.chuboe_rfq_line_id
       JOIN adempiere.c_bpartner bp ON vl.c_bpartner_id = bp.c_bpartner_id
+      LEFT JOIN adempiere.ad_user u_vq_buyer ON u_vq_buyer.ad_user_id = vl.createdby
       LEFT JOIN adempiere.c_orderline ol2
         ON ol2.chuboe_vq_line_id = vl.chuboe_vq_line_id AND ol2.isactive = 'Y'
       WHERE vl.ispurchased = 'Y'
@@ -549,8 +859,8 @@ function loadRecentPOVs() {
         AND rfq.c_bpartner_id = 1000730
         AND rfq.isactive = 'Y'
         AND ol2.c_orderline_id IS NULL
-        AND vl.chuboe_mpn IS NOT NULL
-        AND vl.chuboe_mpn != ''
+        AND rl.chuboe_cpc IS NOT NULL
+        AND rl.chuboe_cpc != ''
         -- Same recency rule: keep iff RFQ created recently OR VQ promise date still ≥ today
         AND (
           rfq.created::date >= CURRENT_DATE - INTERVAL '90 days'
@@ -559,12 +869,12 @@ function loadRecentPOVs() {
     ),
     ranked AS (
       SELECT *,
-        ROW_NUMBER() OVER (PARTITION BY mpn ORDER BY preference ASC, sort_date DESC NULLS LAST) AS rn,
-        SUM(qty) OVER (PARTITION BY mpn) AS total_qty
+        ROW_NUMBER() OVER (PARTITION BY cpc ORDER BY preference ASC, sort_date DESC NULLS LAST) AS rn,
+        SUM(qty) OVER (PARTITION BY cpc) AS total_qty
       FROM all_activity
     )
-    SELECT mpn, pov_number, ot_po_number, qty, total_qty, promise_date, po_created_date,
-           supplier, rfq_number, state
+    SELECT cpc, mpn, pov_number, ot_po_number, qty, total_qty, promise_date, po_created_date,
+           supplier, rfq_number, state, tracking, buyer
     FROM ranked
     WHERE rn = 1;
   `;
@@ -572,20 +882,23 @@ function loadRecentPOVs() {
   const result = runPsql(sql, 'povs');
   const povData = {};
   for (const line of result.trim().split('\n').filter(l => l.trim() && l.includes('|'))) {
-    const [mpn, pov, otPo, qty, totalQty, promiseDate, poCreated, supplier, rfqNum, state] = line.split('|');
-    const key = normalizeMPN(mpn);
+    const [cpc, mpn, pov, otPo, qty, totalQty, promiseDate, poCreated, supplier, rfqNum, state, tracking, buyer] = line.split('|');
+    const key = (cpc || '').trim();  // Key by CPC, not MPN
     if (key) {
       // Recency is enforced in SQL — anything returned here is by definition still relevant.
       povData[key] = {
         State: (state || '').trim(),                    // 'PO' or 'VQ_TICKED'
         POV_Number: (pov || '').trim(),                 // populated once Infor stamps
         OT_PO_Number: (otPo || '').trim(),              // OT PO# (pre-Infor-stamp fallback)
+        Purchased_MPN: (mpn || '').trim(),              // The actual MPN purchased (may differ from roster)
         POV_Qty: parseFloat(qty) || 0,                  // qty on the displayed row
         POV_Date: (promiseDate || '').trim(),           // vendor promise date on the displayed row
         PO_Created_Date: (poCreated || '').trim(),      // when we cut the PO
         POV_Supplier: (supplier || '').trim(),
         RFQ_Number: (rfqNum || '').trim(),
-        Qty_On_Order: parseFloat(totalQty) || 0,        // total across all RECENT open activity for the MPN
+        Qty_On_Order: parseFloat(totalQty) || 0,        // total across all RECENT open activity for the CPC
+        Tracking: (tracking || '').trim(),              // tracking number or notes
+        Buyer: (buyer || '').trim(),                    // OT buyer (salesrep on PO, or VQ creator)
       };
     }
   }
@@ -647,16 +960,20 @@ const ALERT_COLUMNS = [
   // Part identification
   'Lam P/N',
   'MPN',
+  'Purchased MPN',  // Shows alternate MPN if sourced differently from roster
   'Manufacturer',
   'Item Description',
   // Inventory & priority
   'QTY ON HAND',
-  'Lam Owned Inventory?',
+  'Pending Transfer',
+  'W115 Stale Inventory',
   'Reorder Threshold',
   'Shortfall',
   'Priority',
   'On Order Qty',
+  'OT PO',
   'Recent POV',
+  'Tracking',
   'Last Promise Date',
   'Last RFQ',
   // Pricing
@@ -673,6 +990,8 @@ const ALERT_COLUMNS = [
   // Other warehouse stock
   'Available Stock (Other WH)',
   'Available Qty (Other WH)',
+  // Multi-MPN aggregation (when stock spread across original + alt MPNs)
+  'Stock Detail',
 ];
 
 // Render the "Recent POV" cell based on the activity state reported by loadRecentPOVs.
@@ -695,24 +1014,30 @@ function formatPOVCell(pov) {
   return '';
 }
 
-function buildAlert(mpn, excel, totalQty, lamOwned, shortfall, priority, history, pov) {
+function buildAlert(mpn, excel, totalQty, lamOwned, shortfall, priority, history, pov, pendingTransfer = null) {
+  // Show purchased MPN only if it differs from roster MPN (alternate sourcing)
+  const purchasedMpn = pov && pov.Purchased_MPN && pov.Purchased_MPN !== mpn ? pov.Purchased_MPN : '';
   return {
     'Lam P/N': excel.CPC,
     'MPN': mpn,
+    'Purchased MPN': purchasedMpn,  // Shows alternate MPN if sourced differently
     'Manufacturer': excel.Manufacturer,
     'Item Description': excel.Description,
     'QTY ON HAND': totalQty,
-    'Lam Owned Inventory?': lamOwned,
+    'Pending Transfer': pendingTransfer ? `${pendingTransfer.qty} from ${pendingTransfer.fromWh}` : '',
+    'W115 Stale Inventory': lamOwned,
     'Reorder Threshold': excel.MIN_QTY,
     'Shortfall': shortfall,
     'Priority': priority,
     'On Order Qty': pov ? (pov.Qty_On_Order || '') : '',
+    'OT PO': pov ? (pov.OT_PO_Number || '') : '',
     'Recent POV': formatPOVCell(pov),
+    'Tracking': pov ? (pov.Tracking || '') : '',
     'Base Unit Price': excel.Base_Unit_Price,
     'Resale Price': excel.Resale_Price,
     'Historical Purchase Price': history.Historical_Purchase_Price || '',
     'OT Previous Supplier': history.OT_Previous_Supplier || '',
-    'OT Buyer': history.OT_Buyer || '',
+    'OT Buyer': pov && pov.Buyer ? pov.Buyer : (history.OT_Buyer || ''),
     'Historical Buyer': excel.Historical_Buyer || '',
     'Last Promise Date': history.Last_Purchase_Date || '',
     'Last RFQ': history.RFQ_Number ? `${history.RFQ_Number} (${history.RFQ_Customer || ''})` : '',
@@ -736,49 +1061,150 @@ function identifyReorderCandidates(aggregated, excelData, historicalData, recent
   const alerts = [];
   const inventoryMPNs = new Set(Object.keys(aggregated));
 
-  // First: Process items WITH inventory (may be below threshold)
-  for (const [mpn, invData] of Object.entries(aggregated)) {
-    const excel = excelData[mpn];
-    if (!excel) continue;
+  // Build CPC -> total inventory by summing ALL approved MPNs from AVL
+  // This handles cases where we have both original MPN and alternate(s) in stock
+  const cpcTotalInventory = new Map();  // CPC -> { total, w111, w115, mpnsWithStock }
+  const processedCPCs = new Set();
+
+  // First pass: aggregate inventory by CPC using AVL
+  for (const [rosterMpn, excel] of Object.entries(excelData)) {
+    const cpc = excel.CPC;
+    if (!cpc || processedCPCs.has(cpc)) continue;
+    processedCPCs.add(cpc);
+
+    const approvedMPNs = getAllApprovedMPNs(cpc, rosterMpn);
+    let totalQty = 0;
+    let w111Qty = 0;
+    let w115Qty = 0;
+    let pendingTransferQty = 0;
+    let pendingTransferFrom = '';
+    const mpnsWithStock = [];
+
+    for (const mpn of approvedMPNs) {
+      const inv = aggregated[mpn];
+      if (inv && inv.Total_Qty > 0) {
+        totalQty += inv.Total_Qty;
+        w111Qty += inv.W111_Qty || 0;
+        w115Qty += inv.W115_Qty || 0;
+        mpnsWithStock.push({ mpn, qty: inv.Total_Qty });
+        // Track pending transfer if any
+        if (inv.Pending_Transfer > 0) {
+          pendingTransferQty += inv.Pending_Transfer;
+          pendingTransferFrom = inv.Pending_From || '';
+        }
+      }
+    }
+
+    const pendingTransfer = pendingTransferQty > 0 ? { qty: pendingTransferQty, fromWh: pendingTransferFrom } : null;
+    cpcTotalInventory.set(cpc, { total: totalQty, w111: w111Qty, w115: w115Qty, mpnsWithStock, approvedMPNs, pendingTransfer });
+  }
+
+  // Log multi-MPN inventory aggregation stats
+  const multiMpnCPCs = [...cpcTotalInventory.entries()].filter(([_, data]) => data.mpnsWithStock.length > 1);
+  if (multiMpnCPCs.length > 0) {
+    console.log(`  AVL multi-MPN aggregation: ${multiMpnCPCs.length} CPCs have stock across multiple approved MPNs`);
+  }
+
+  // Process by CPC using aggregated totals
+  processedCPCs.clear();
+  for (const [rosterMpn, excel] of Object.entries(excelData)) {
+    const cpc = excel.CPC;
+    if (!cpc || processedCPCs.has(cpc)) continue;
+    processedCPCs.add(cpc);
 
     const minQty = excel.MIN_QTY;
-    const totalQty = invData.Total_Qty;
+    const cpcInv = cpcTotalInventory.get(cpc) || { total: 0, w111: 0, w115: 0, mpnsWithStock: [] };
+    const totalQty = cpcInv.total;
 
+    // Check if below threshold
     if (totalQty < minQty) {
       const shortfall = minQty - totalQty;
       const shortfallPct = minQty > 0 ? (shortfall / minQty) * 100 : 0;
-      const basePriority = shortfallPct >= 75 ? 'HIGH' : shortfallPct >= 50 ? 'MEDIUM' : 'LOW';
-      const key = normalizeMPN(mpn);
-      const priority = resolvePriority(basePriority, recentPOVs[key]);
-      const lamOwned = invData.W115_Qty > 0 ? 'YES' : 'NO';
 
-      alerts.push(buildAlert(mpn, excel, totalQty, lamOwned, shortfall, priority,
-        historicalData[key] || {}, recentPOVs[key]));
+      // CRITICAL if zero stock across ALL approved MPNs
+      let basePriority;
+      if (totalQty === 0) {
+        basePriority = 'CRITICAL';
+      } else {
+        basePriority = shortfallPct >= 75 ? 'HIGH' : shortfallPct >= 50 ? 'MEDIUM' : 'LOW';
+      }
+
+      // Look up POV by CPC - we may have ordered an alternate MPN
+      const pov = recentPOVs[cpc];
+      const priority = resolvePriority(basePriority, pov);
+      const lamOwned = cpcInv.w115 > 0 ? 'YES' : 'NO';
+
+      const alert = buildAlert(rosterMpn, excel, totalQty, lamOwned, shortfall, priority,
+        historicalData[normalizeMPN(rosterMpn)] || {}, pov, cpcInv.pendingTransfer);
+
+      // Add note if stock is spread across multiple MPNs
+      if (cpcInv.mpnsWithStock.length > 1) {
+        const stockDetail = cpcInv.mpnsWithStock.map(m => `${m.mpn}:${m.qty}`).join(', ');
+        alert['Stock Detail'] = stockDetail;
+      }
+
+      alerts.push(alert);
     }
   }
 
-  // Second: Process items in Excel but NOT in inventory (zero qty - CRITICAL unless recent activity)
+  // Handle items in Excel with no CPC (shouldn't happen, but defensive)
   for (const [mpn, excel] of Object.entries(excelData)) {
-    if (inventoryMPNs.has(mpn)) continue;
-    if (excel.MIN_QTY <= 0) continue;
+    if (excel.CPC) continue;  // Already processed by CPC
+    if (!inventoryMPNs.has(mpn)) continue;
 
     const key = normalizeMPN(mpn);
-    const priority = resolvePriority('CRITICAL', recentPOVs[key]);
+    const pov = recentPOVs[key];
+
+    // Parts with no threshold: still include but flag appropriately
+    if (excel.MIN_QTY <= 0) {
+      // Zero stock + no threshold = flag as NO THRESHOLD unless there's recent activity
+      const priority = pov ? resolvePriority('NO THRESHOLD', pov) : 'NO THRESHOLD';
+      alerts.push(buildAlert(mpn, excel, 0, 'NO', 0, priority,
+        historicalData[key] || {}, pov));
+      continue;
+    }
+
+    const priority = resolvePriority('CRITICAL', pov);
     alerts.push(buildAlert(mpn, excel, 0, 'NO', excel.MIN_QTY, priority,
-      historicalData[key] || {}, recentPOVs[key]));
+      historicalData[key] || {}, pov));
+  }
+
+  // Add PENDING WAREHOUSE TRANSFER items - parts with transfers in flight, even if above threshold
+  // These need visibility tracking like PENDING RECEIPT
+  for (const [rosterMpn, excel] of Object.entries(excelData)) {
+    const cpc = excel.CPC;
+    if (!cpc) continue;
+
+    const cpcInv = cpcTotalInventory.get(cpc);
+    if (!cpcInv || !cpcInv.pendingTransfer) continue;
+
+    // Check if this CPC is already on the alerts list
+    const alreadyListed = alerts.some(a => a['Lam P/N'] === cpc);
+    if (alreadyListed) continue;  // Already on list (below threshold case)
+
+    // Above threshold but has pending transfer - add for visibility
+    const totalQty = cpcInv.total;
+
+    const alert = buildAlert(rosterMpn, excel, totalQty, cpcInv.w115 > 0 ? 'YES' : 'NO',
+      0, 'PENDING WAREHOUSE TRANSFER', historicalData[normalizeMPN(rosterMpn)] || {}, recentPOVs[cpc], cpcInv.pendingTransfer);
+
+    alerts.push(alert);
   }
 
   // Sort: CRITICAL first (must source now), shortfall-based severity next,
   // then the PENDING bucket last (informational). Within the PENDING bucket,
   // PENDING ORDER PLACEMENT comes before PENDING RECEIPT — chasing an unplaced
   // PO is more actionable than waiting on a vendor that's already been ordered from.
+  // PENDING WAREHOUSE TRANSFER is last (just tracking until transfer completes).
   const priorityOrder = {
     'CRITICAL': 0, 'HIGH': 1, 'MEDIUM': 2, 'LOW': 3,
+    'NO THRESHOLD': 3.5,  // After LOW, before PENDING - need threshold from LAM
     'PENDING ORDER PLACEMENT': 4,
     'PENDING RECEIPT': 4,
+    'PENDING WAREHOUSE TRANSFER': 5,  // Informational - tracking until transfer completes
   };
   // Within the PENDING bucket only, sub-order ORDER_PLACEMENT before RECEIPT.
-  const pendingSubOrder = { 'PENDING ORDER PLACEMENT': 0, 'PENDING RECEIPT': 1 };
+  const pendingSubOrder = { 'PENDING ORDER PLACEMENT': 0, 'PENDING RECEIPT': 1, 'PENDING WAREHOUSE TRANSFER': 2 };
   alerts.sort((a, b) => {
     if (priorityOrder[a.Priority] !== priorityOrder[b.Priority]) {
       return priorityOrder[a.Priority] - priorityOrder[b.Priority];
@@ -816,6 +1242,87 @@ function writeReorderAlerts(alerts, outputPath) {
   }
 
   fs.writeFileSync(outputPath, lines.join('\n'));
+}
+
+// -----------------------------------------------------------------------------
+// Write Pending Approvals Excel File
+// -----------------------------------------------------------------------------
+
+const PENDING_APPROVAL_COLUMNS = [
+  'CPC',
+  'MPN',
+  'Manufacturer',
+  'Description',
+  'Award',
+  'Current Resale',
+  'Proposed Resale',
+  'Reason',
+  'Submitted Date',
+  'Days Pending',
+  'Last Approved',
+  'Status',
+];
+
+function writePendingApprovalsExcel(pendingApprovals, outputPath) {
+  if (pendingApprovals.length === 0) {
+    console.log('  No pending approvals to write.');
+    return null;
+  }
+
+  const XLSX = require('xlsx');
+  const wb = XLSX.utils.book_new();
+
+  // Sort by days pending (oldest first) to highlight aging items
+  const sorted = [...pendingApprovals].sort((a, b) => {
+    const daysA = typeof a['Days Pending'] === 'number' ? a['Days Pending'] : -1;
+    const daysB = typeof b['Days Pending'] === 'number' ? b['Days Pending'] : -1;
+    return daysB - daysA; // Oldest first
+  });
+
+  // Create worksheet
+  const ws = XLSX.utils.json_to_sheet(sorted, { header: PENDING_APPROVAL_COLUMNS });
+
+  // Set column widths
+  ws['!cols'] = [
+    { wch: 18 },  // CPC
+    { wch: 25 },  // MPN
+    { wch: 25 },  // Manufacturer
+    { wch: 35 },  // Description
+    { wch: 8 },   // Award
+    { wch: 14 },  // Current Resale
+    { wch: 14 },  // Proposed Resale
+    { wch: 30 },  // Reason
+    { wch: 14 },  // Submitted Date
+    { wch: 12 },  // Days Pending
+    { wch: 14 },  // Last Approved
+    { wch: 15 },  // Status
+  ];
+
+  // Format currency columns
+  const range = XLSX.utils.decode_range(ws['!ref']);
+  for (let row = 1; row <= range.e.r; row++) {
+    const currentCell = ws[XLSX.utils.encode_cell({ r: row, c: 5 })]; // Current Resale
+    const proposedCell = ws[XLSX.utils.encode_cell({ r: row, c: 6 })]; // Proposed Resale
+    if (currentCell && typeof currentCell.v === 'number') currentCell.z = '$#,##0.00';
+    if (proposedCell && typeof proposedCell.v === 'number') proposedCell.z = '$#,##0.00';
+  }
+
+  XLSX.utils.book_append_sheet(wb, ws, 'Pending Approvals');
+
+  // Add summary sheet
+  const summaryData = [
+    { 'Metric': 'Total Pending', 'Value': pendingApprovals.length },
+    { 'Metric': 'Oldest (Days)', 'Value': Math.max(...pendingApprovals.map(p => p['Days Pending'] || 0)) },
+    { 'Metric': 'Generated', 'Value': new Date().toISOString().split('T')[0] },
+  ];
+  const summaryWs = XLSX.utils.json_to_sheet(summaryData);
+  summaryWs['!cols'] = [{ wch: 20 }, { wch: 20 }];
+  XLSX.utils.book_append_sheet(wb, summaryWs, 'Summary');
+
+  XLSX.writeFile(wb, outputPath);
+  console.log(`  Pending approvals written to: ${path.basename(outputPath)} (${pendingApprovals.length} items)`);
+
+  return outputPath;
 }
 
 // Write a sidecar JSON capturing the current state of every MPN listed in

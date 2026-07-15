@@ -82,12 +82,14 @@ async function validateVQForPurchase(vqId, opts = {}) {
   const { rows } = await pool.query(`
     SELECT vl.chuboe_vq_line_id, vl.chuboe_mpn, vl.chuboe_rfq_line_id,
            vl.cost, vl.qty, vl.c_bpartner_id, bp.name AS supplier,
+           vl.chuboe_mfr_id, vl.c_country_id, vl.c_bpartner_location_id,
            vl.chuboe_date_code, vl.chuboe_lead_time, vl.datepromised,
            vl.chuboe_packaging_id, vl.chuboe_traceability_id,
            vl.chuboe_warehouse_id, vl.chuboe_warehouse_group_id,
            vl.m_shipper_id, vl.chuboe_inco_term_id,
            vl.chuboe_note_public, vl.chuboe_note_private,
-           vl.ispurchased, vl.isactive
+           vl.ispurchased, vl.isactive,
+           vl.chuboe_buyer_id
     FROM adempiere.chuboe_vq_line vl
     LEFT JOIN adempiere.c_bpartner bp ON bp.c_bpartner_id = vl.c_bpartner_id
     WHERE vl.chuboe_vq_line_id = $1
@@ -107,6 +109,11 @@ async function validateVQForPurchase(vqId, opts = {}) {
   if (!vq.c_bpartner_id) violations.push('C_BPartner_ID is blank (no vendor)');
   if (vq.cost === null || Number(vq.cost) <= 0) violations.push(`Cost is ${vq.cost} (must be > 0)`);
   if (!vq.qty || Number(vq.qty) <= 0) violations.push(`Qty is ${vq.qty} (must be > 0)`);
+
+  // MFR, COO, Partner Location — required for PO processing
+  if (!vq.chuboe_mfr_id) violations.push('Chuboe_MFR_ID is blank (required — manufacturer must be set)');
+  if (!vq.c_country_id) violations.push('C_Country_ID is blank (required — COO must be set, use PENDING=1000001 if unknown)');
+  if (!vq.c_bpartner_location_id) violations.push('C_BPartner_Location_ID is blank (required — vendor ship-from address)');
 
   // Date fields — the trio that's most often missed
   if (!vq.chuboe_date_code) violations.push('Chuboe_Date_Code is blank (required — vendor-known date stamp on the part)');

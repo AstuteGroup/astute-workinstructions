@@ -2,12 +2,40 @@
 
 Automated RFQ (Request for Quote) submission to NetComponents suppliers for electronic component sourcing.
 
+---
+
+## ⚠️ CRITICAL: Inventory Check vs RFQ Submission
+
+**READ THIS FIRST.** These scripts do VERY different things:
+
+| Action | Script | What It Does |
+|--------|--------|--------------|
+| **INVENTORY CHECK** (read-only) | `list_suppliers.py` | Searches NC, returns supplier/qty/price. **NO RFQs sent.** |
+| **RFQ SUBMISSION** (sends emails) | `submit_rfqs.py`, `batch_rfqs.py`, `batch_rfqs_from_system.py` | **ACTUALLY SENDS RFQs to suppliers.** |
+
+### When to use each:
+
+**Use `list_suppliers.py` when:**
+- Checking market availability
+- Analyzing broker inventory levels
+- Research / opportunity spotting
+- You do NOT want to contact suppliers
+
+**Use `submit_rfqs.py` / `batch_rfqs.py` when:**
+- You ARE ready to request quotes from brokers
+- You want suppliers to respond with pricing
+- You have approval to source the parts
+
+**There is NO `--dry-run` flag that prevents RFQ submission in batch_rfqs.py.** If you run it, RFQs WILL be sent.
+
+---
+
 ## Overview
 
 This automation:
 1. Searches NetComponents for a part number
 2. Identifies qualifying in-stock suppliers
-3. Submits RFQs to multiple suppliers automatically
+3. Submits RFQs to multiple suppliers automatically (submit/batch scripts only)
 4. Tracks timing and results
 
 ## Business Logic
@@ -146,11 +174,15 @@ Prevents repeatedly blasting the same broker for the same part. Before sending a
 
 Both Node.js and Python implementations are available with identical functionality.
 
-### Node.js (`node/` directory)
+---
 
-#### `list_suppliers.js` - Market Check
+### 📋 READ-ONLY Scripts (Inventory Check)
 
-Preview available suppliers before submitting RFQs.
+These scripts **search only** — they do NOT send RFQs or contact suppliers.
+
+#### Node.js: `node/list_suppliers.js`
+
+Preview available suppliers and inventory levels.
 
 ```bash
 cd node
@@ -160,21 +192,7 @@ node list_suppliers.js "<part_number>" "<min_quantity>"
 node list_suppliers.js "DS3231SN#" "1000"
 ```
 
-#### `submit_rfqs.js` - RFQ Submission
-
-Submit RFQs to qualifying suppliers.
-
-```bash
-cd node
-node submit_rfqs.js "<part_number>" "<quantity>"
-
-# Example
-node submit_rfqs.js "DS3231SN#" "1000"
-```
-
-### Python (`python/` directory)
-
-#### `list_suppliers.py` - Market Check
+#### Python: `python/list_suppliers.py`
 
 ```bash
 cd python
@@ -184,7 +202,49 @@ python3 list_suppliers.py "<part_number>" "<min_quantity>"
 python3 list_suppliers.py "DS3231SN#" 1000
 ```
 
-#### `submit_rfqs.py` - RFQ Submission
+**Output:** Console table with supplier, qty, region, date code — NO RFQs sent.
+
+#### Python: `python/batch_list_suppliers.py` (Batch Inventory Check)
+
+Search multiple parts from a text file or Excel and output results to Excel.
+
+```bash
+cd python
+python3 batch_list_suppliers.py <input_file>
+
+# Examples
+python3 batch_list_suppliers.py mpn_list.txt        # Text file (one MPN per line)
+python3 batch_list_suppliers.py search_input.xlsx   # Excel with part_number column
+```
+
+**Input formats:**
+- Text file: One MPN per line
+- Excel: Must have column with "part" or "mpn" in header; optional "qty" column
+
+**Output:** `NC_Inventory_YYYYMMDD_HHMMSS.xlsx` with:
+- All supplier listings with qty, date code, region, country
+- Summary sheet with counts
+- NO RFQs sent
+
+---
+
+### ⚠️ RFQ SUBMISSION Scripts (Sends Emails to Suppliers)
+
+**WARNING:** These scripts **ACTUALLY SEND RFQs** to brokers via NetComponents. Suppliers will receive emails and may respond with quotes.
+
+#### Node.js: `node/submit_rfqs.js` ⚠️ SENDS RFQs
+
+Submit RFQs to qualifying suppliers for a single part.
+
+```bash
+cd node
+node submit_rfqs.js "<part_number>" "<quantity>"
+
+# Example
+node submit_rfqs.js "DS3231SN#" "1000"
+```
+
+#### Python: `python/submit_rfqs.py` ⚠️ SENDS RFQs
 
 ```bash
 cd python
@@ -194,9 +254,9 @@ python3 submit_rfqs.py "<part_number>" "<quantity>"
 python3 submit_rfqs.py "DS3231SN#" 1000
 ```
 
-#### `batch_rfqs.py` - Batch Processing with Excel Output
+#### Python: `python/batch_rfqs.py` ⚠️ SENDS RFQs
 
-Process multiple parts from an Excel file and output results to Excel.
+Process multiple parts from an Excel file. **RFQs are sent for ALL parts.**
 
 **Input Excel format:**
 | Part Number | Quantity |
@@ -214,9 +274,9 @@ python3 batch_rfqs.py rfq_input.xlsx
 
 **Output:** `RFQ_Results_YYYY-MM-DD_HHMMSS.xlsx`
 
-#### `batch_rfqs_from_system.py` - Batch Processing from System RFQ
+#### Python: `python/batch_rfqs_from_system.py` ⚠️ SENDS RFQs
 
-Process all line items from an RFQ in iDempiere and output results to Excel.
+Process all line items from an RFQ in iDempiere. **RFQs are sent for ALL lines.**
 
 ```bash
 cd python
@@ -283,9 +343,13 @@ RFQ_1130292/
 - Timing metrics (total time, avg per part)
 - Supplier distribution: unique suppliers used, top 10 by RFQ count
 
-#### `analyze_no_suppliers.py` - Post-Batch Analysis
+---
 
-Analyze batch results to identify CPCs that need manual sourcing attention.
+### 📋 Analysis Scripts (Post-Processing)
+
+#### Python: `python/analyze_no_suppliers.py` (READ-ONLY)
+
+Analyze batch results to identify CPCs that need manual sourcing attention. **Does NOT send RFQs.**
 
 ```bash
 cd python

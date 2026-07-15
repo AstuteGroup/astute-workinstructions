@@ -607,6 +607,7 @@ async function writeCQBatch(rfqSearchKey, lines, opts = {}) {
     try {
       const result = await apiPost('Chuboe_CQ_Line', payload, {
         naturalKeyFields: ['Chuboe_RFQ_Line_ID', 'Chuboe_MPN', 'C_BPartner_ID', 'PriceEntered'],
+        context: 'stockrfq-cq',
       });
       written.push({
         cqLineId: result.id,
