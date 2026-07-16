@@ -9,45 +9,55 @@ Extracts data from FedEx customs invoices (PDF) and populates the Tariff and Ove
 - **Template:** `uploaded files/Tariff and Oversized Shipment Tracker template.xlsx`
 - **Output:** `uploaded files/tariff_tracker_claude_YYYY-MM-DD.xlsx`
 
-## Data Extraction Mapping
+## Template Columns (DO NOT ADD EXTRA)
 
-### From FedEx Invoice (PDF)
-
-| Template Column | PDF Location |
-|-----------------|--------------|
+| Column | Description |
+|--------|-------------|
 | Customs Control Number | Entry No. (e.g., 1FX38290623) |
 | Entry Date | Customs Entry Date |
 | Duties/Taxes | Customs Duty amount |
 | MPF | Merchandise Processing Fee |
-| Oversized Charges | (if applicable) |
-| Total Fees | Total Duties, Tax, Customs, Other Fees |
+| Oversized Charges | Transportation charges (if >$1000) |
+| Total Fees | Sum of all fees |
 | Shipper | Sender name |
 | TR#/Reference Number | Tracking ID |
-| Invoice | Invoice Number |
-| SOURCE | Cust. Ref. / PO NO. (POV number) |
+| Invoice | Invoice Number(s) - comma-separated if multiple |
+| SOURCE | POV number(s) from Cust. Ref. / PO NO. |
+| MPN | Part number from OT lookup |
+| QTY | Quantity from OT lookup |
+| COV/Job | Customer order from OT lookup |
+| Buyer | PO salesrep from OT lookup |
+| Salesperson | SO salesrep from OT lookup |
 
-### From Database Lookups
+## Processing Rules
 
-| Template Column | Query Path |
-|-----------------|------------|
-| MPN | `bi_order_line_v` WHERE `order_line_infor_po_no` = POV |
-| QTY | `bi_order_line_v.order_line_qty_ordered` |
-| Buyer | PO `salesrep_id` → `ad_user.name` |
-| COV/Job | SO line `order_line_infor_co_no` (via allocation) |
-| Salesperson | SO `salesrep_id` → `ad_user.name` |
+### 1. POV Lookup Priority
+1. **Check Cust. Ref. field** in PDF for POV number
+2. **If no POV, check tracking number** against `c_orderline.chuboe_trackingnumbers`
+3. **If still no match**, leave MPN/QTY/COV/Buyer/Salesperson blank
 
-## Lookup Chain
+### 2. Transportation Charges (Oversized)
+- Only capture transportation-only invoices if **total > $1,000**
+- Put transportation charges in the **Oversized Charges** column
+- If same shipment has both customs and transportation invoices, **merge into one row**
+- Record **both invoice numbers** comma-separated in Invoice field
 
-```
-POV (INFOR PO Number)
-  → bi_order_line_v.order_line_infor_po_no
-  → PO document number (e.g., PO810169)
-  → chuboe_alloc_order_lot (allocation)
-  → SO line (e.g., SO507065)
-  → order_line_infor_co_no = COV number
-```
+### 3. Record Merging
+- If two records have **same tracking number AND same buyer AND same salesperson**, merge them
+- Record **both values** in cells that differ (SOURCE, MPN, QTY, COV)
+- Keep records **separate** if buyer or salesperson differ
 
-## Key Queries
+### 4. Under $250 Threshold
+- For customs entries with **total fees < $250**, only populate through SOURCE column
+- Leave MPN, QTY, COV, Buyer, Salesperson **blank**
+- **Exception**: If the entry shares an Entry No. with a record ≥$250, populate all fields
+
+### 5. MPN Source
+- **ONLY use MPN from OT database lookups**
+- Do NOT use commodity descriptions from the PDF
+- If no POV/tracking match, leave MPN blank
+
+## Lookup Queries
 
 ### Find PO and MPN from POV
 ```sql
@@ -70,19 +80,34 @@ LEFT JOIN adempiere.ad_user buyer ON buyer.ad_user_id = po.salesrep_id
 WHERE po.documentno = 'PO810169';
 ```
 
-### Get COV and Salesperson via Allocation
+### Search by Tracking Number
 ```sql
 SELECT
+  o.documentno as doc,
+  ol.chuboe_trackingnumbers as tracking,
+  bol.order_line_infor_po_no as pov,
+  bol.order_line_mpn as mpn,
+  bol.order_line_qty_ordered as qty,
+  u.name as buyer
+FROM adempiere.c_orderline ol
+JOIN adempiere.c_order o ON o.c_order_id = ol.c_order_id
+LEFT JOIN adempiere.bi_order_line_v bol ON bol.order_line_id = ol.c_orderline_id
+LEFT JOIN adempiere.ad_user u ON u.ad_user_id = o.salesrep_id
+WHERE ol.chuboe_trackingnumbers ILIKE '%872892678556%';
+```
+
+### Get COV and Salesperson via Allocation
+```sql
+SELECT DISTINCT
   po.documentno as po,
-  cov.documentno as so,
   sol.order_line_infor_co_no as cov,
   sales.name as salesperson
 FROM adempiere.c_order po
-JOIN adempiere.c_orderline pol ON pol.c_order_id = po.c_order_id
-JOIN adempiere.chuboe_alloc_order_lot alloc ON alloc.chuboe_poline_id = pol.c_orderline_id
-JOIN adempiere.c_orderline covl ON covl.c_orderline_id = alloc.c_orderline_id
-JOIN adempiere.c_order cov ON cov.c_order_id = covl.c_order_id
-JOIN adempiere.bi_order_line_v sol ON sol.order_document_number = cov.documentno
+JOIN adempiere.c_orderline poline ON poline.c_order_id = po.c_order_id
+JOIN adempiere.chuboe_alloc_order_lot alloc ON alloc.chuboe_poline_id = poline.c_orderline_id
+JOIN adempiere.c_orderline covline ON covline.c_orderline_id = alloc.c_orderline_id
+JOIN adempiere.c_order cov ON cov.c_order_id = covline.c_order_id
+JOIN adempiere.bi_order_line_v sol ON sol.order_line_id = covline.c_orderline_id
 LEFT JOIN adempiere.ad_user sales ON sales.ad_user_id = cov.salesrep_id
 WHERE po.documentno = 'PO810169';
 ```
@@ -93,25 +118,38 @@ WHERE po.documentno = 'PO810169';
 - **COV** = INFOR Customer Order number from `order_line_infor_co_no`, NOT the SO document number
 - **Salesperson** = `salesrep_id` on the SO (the sales rep for the customer)
 
-## Example Entry
+## Example Merged Entry
+
+When same tracking has multiple POVs with same buyer/salesperson:
 
 | Field | Value |
 |-------|-------|
-| Customs Control Number | 1FX38290623 |
-| Entry Date | 2026-05-28 |
-| Duties/Taxes | $14,400.00 |
-| MPF | $498.82 |
-| Total Fees | $14,898.82 |
-| Shipper | HAOXIN HK ELECTRONIC TECH CO LTD |
-| Tracking | 872275863012 |
-| Invoice | 2-566-63571 |
-| SOURCE | POV0076097 |
-| MPN | MT29F64G08AJABAWP-IT:B |
-| QTY | 720 |
-| COV/Job | COV0021931 |
-| Buyer | Feong C. |
-| Salesperson | Daniel R. |
+| Customs Control Number | 1FX56744907 |
+| Entry Date | 2026-06-12 |
+| Duties/Taxes | $3,699.50 |
+| MPF | $33.58 |
+| Total Fees | $3,733.08 |
+| SOURCE | POV0076521, POV0076442 |
+| MPN | SDINBDA4-256G, MPQ79500FSGQE-010C-AEC1-Z |
+| QTY | 50, 24 |
+| COV | COV0022230, COV0022174 |
+| Buyer | Elaine Liang |
+| Salesperson | James Diaz |
+
+## Example Combined Customs + Transportation
+
+| Field | Value |
+|-------|-------|
+| Customs Control Number | 1FX66454349 |
+| Entry Date | 2026-06-19 |
+| Duties/Taxes | $2,079.60 |
+| MPF | $72.04 |
+| Oversized Charges | $2,650.26 |
+| Total Fees | $4,801.90 |
+| Invoice | 2-576-93169, 2-577-44572 |
+| SOURCE | POV0073302 |
 
 ---
 
 *Created: 2026-06-23*
+*Updated: 2026-07-16 - Added processing rules for merging, thresholds, and transportation charges*
