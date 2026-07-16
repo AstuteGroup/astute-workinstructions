@@ -1730,10 +1730,26 @@ async function main() {
   console.log(`OT username: ${otUsername}`);
   console.log(`Infor username: ${username}${username !== otUsername ? ' (override)' : ''}`);
 
-  // File paths
+  // File paths - Use canonical location in Sales Pulse Daily/data/
   const projectDir = __dirname;
-  const bookedSalesPath = path.join(projectDir, 'Booked Sales - Account Review AI.csv');
-  const invoicedSalesPath = path.join(projectDir, 'Invoiced Sales - Account Review AI.csv');
+  const dataDir = path.join(projectDir, '..', '..', 'Sales Pulse Daily', 'data');
+
+  // Find most recent Infor CSV files
+  const bookedSalesFiles = fs.readdirSync(dataDir).filter(f => f.startsWith('Infor Booked Sales by Line YTD') && f.endsWith('.csv')).sort().reverse();
+  const invoicedSalesFiles = fs.readdirSync(dataDir).filter(f => f.startsWith('Invoiced Sales') && f.endsWith('.csv')).sort().reverse();
+
+  if (bookedSalesFiles.length === 0) {
+    throw new Error('No Infor Booked Sales CSV file found in Sales Pulse Daily/data/');
+  }
+  if (invoicedSalesFiles.length === 0) {
+    throw new Error('No Invoiced Sales CSV file found in Sales Pulse Daily/data/');
+  }
+
+  const bookedSalesPath = path.join(dataDir, bookedSalesFiles[0]);
+  const invoicedSalesPath = path.join(dataDir, invoicedSalesFiles[0]);
+
+  console.log(`Using Booked Sales: ${bookedSalesFiles[0]}`);
+  console.log(`Using Invoiced Sales: ${invoicedSalesFiles[0]}`);
 
   // Step 1: Query OT for assigned and not-assigned accounts
   const otAccountsAssigned = queryOT(userId, startDate, endDate);
