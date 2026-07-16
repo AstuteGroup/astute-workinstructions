@@ -123,7 +123,7 @@ function listAllSellers() {
     ORDER BY u.name;
   `;
 
-  const result = execSync(`psql -c "${query.replace(/"/g, '\\"')}" -t -A -F ","`, {
+  const result = execSync(`psql --csv -c "${query.replace(/"/g, '\\"')}" -t`, {
     encoding: 'utf8',
     maxBuffer: 10 * 1024 * 1024
   });
@@ -680,7 +680,7 @@ LEFT JOIN cq_won w ON aa.c_bpartner_id = w.c_bpartner_id
 ORDER BY aa.account_name;
 `;
 
-  const result = execSync(`psql -c "${query.replace(/"/g, '\\"')}" -t -A -F ","`, {
+  const result = execSync(`psql --csv -c "${query.replace(/"/g, '\\"')}" -t`, {
     encoding: 'utf8',
     maxBuffer: 10 * 1024 * 1024
   });
@@ -689,8 +689,15 @@ ORDER BY aa.account_name;
   const accounts = [];
 
   for (const line of lines) {
-    const parts = line.split(',');
-    if (parts.length < 11) continue;
+    // Use proper CSV parsing to handle commas in company names
+    const parsed = parseCSVSync(line, {
+      columns: false,
+      skip_empty_lines: true,
+      relax_column_count: true
+    });
+
+    if (parsed.length === 0 || parsed[0].length < 11) continue;
+    const parts = parsed[0];
 
     accounts.push({
       bpartnerId: parts[0],
@@ -870,7 +877,7 @@ LEFT JOIN cq_won w ON na.c_bpartner_id = w.c_bpartner_id
 ORDER BY na.account_name;
 `;
 
-  const result = execSync(`psql -c "${query.replace(/"/g, '\\"')}" -t -A -F ","`, {
+  const result = execSync(`psql --csv -c "${query.replace(/"/g, '\\"')}" -t`, {
     encoding: 'utf8',
     maxBuffer: 10 * 1024 * 1024
   });
@@ -879,8 +886,15 @@ ORDER BY na.account_name;
   const accounts = [];
 
   for (const line of lines) {
-    const parts = line.split(',');
-    if (parts.length < 8) continue;
+    // Use proper CSV parsing to handle commas in company names
+    const parsed = parseCSVSync(line, {
+      columns: false,
+      skip_empty_lines: true,
+      relax_column_count: true
+    });
+
+    if (parsed.length === 0 || parsed[0].length < 8) continue;
+    const parts = parsed[0];
 
     accounts.push({
       bpartnerId: parts[0],
