@@ -1036,48 +1036,16 @@ async function generateExcel(data, outputPath) {
   // Blank row
   worksheet.addRow([]);
 
-  // Report Title
+  // Report Title (merged and centered)
   const titleRow = worksheet.addRow([
-    `Account Review - ${data.sellerName} - ${data.quarter} ${data.year}`,
+    `${data.sellerName} - Account Review - ${data.nextQuarter} ${data.nextQuarterYear}`,
     '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', ''
   ]);
   titleRow.font = { bold: true, size: 14 };
+  titleRow.alignment = { horizontal: 'center' };
 
-  // Blank row
-  worksheet.addRow([]);
-
-  // How to Use section
-  const howToUseRow = worksheet.addRow([
-    'HOW TO USE:',
-    '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', ''
-  ]);
-  howToUseRow.font = { bold: true, size: 10 };
-  howToUseRow.fill = {
-    type: 'pattern',
-    pattern: 'solid',
-    fgColor: { argb: 'FFFFFF00' } // Light yellow
-  };
-
-  const instructionRow1 = worksheet.addRow([
-    '1. Review account portfolio for inactive accounts (RED zeros).',
-    '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', ''
-  ]);
-  instructionRow1.font = { size: 9 };
-  instructionRow1.alignment = { wrapText: true, vertical: 'top' };
-
-  const instructionRow2 = worksheet.addRow([
-    '2. Set GP targets for strategic accounts to meet/exceed quarter goal.',
-    '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', ''
-  ]);
-  instructionRow2.font = { size: 9 };
-  instructionRow2.alignment = { wrapText: true, vertical: 'top' };
-
-  const instructionRow3 = worksheet.addRow([
-    '3. Review unassigned accounts for potential assignments with supporting business case.',
-    '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', ''
-  ]);
-  instructionRow3.font = { size: 9 };
-  instructionRow3.alignment = { wrapText: true, vertical: 'top' };
+  // Merge cells A3:R3 for title
+  worksheet.mergeCells(`A${titleRow.number}:R${titleRow.number}`);
 
   // Blank row
   worksheet.addRow([]);
@@ -1132,9 +1100,9 @@ async function generateExcel(data, outputPath) {
   // Hide Column B (Account INFOR)
   worksheet.getColumn(2).hidden = true;
 
-  // Freeze header and everything above it (rows 1-10)
+  // Freeze header and everything above it (rows 1-5)
   worksheet.views = [
-    { state: 'frozen', ySplit: 10 }
+    { state: 'frozen', ySplit: 5 }
   ];
 
   // Calculate totals for ASSIGNED section
@@ -1512,7 +1480,7 @@ async function generateExcel(data, outputPath) {
 
   // Add SUM formula for GP Target column (column 17)
   const grandTotalRowNum = grandTotalRow.number;
-  const firstDataRow = 11; // Row after header (header is row 10)
+  const firstDataRow = 6; // Row after header (header is row 5)
   const lastDataRow = grandTotalRowNum - 1;
   grandTotalRow.getCell(17).value = { formula: `SUM(Q${firstDataRow}:Q${lastDataRow})` };
   grandTotalRow.getCell(17).numFmt = '$#,##0.00';
@@ -1591,6 +1559,42 @@ async function generateExcel(data, outputPath) {
       ]
     });
   }
+
+  // Add blank row
+  worksheet.addRow([]);
+
+  // How to Use section
+  const howToUseRow = worksheet.addRow([
+    'HOW TO USE:',
+    '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', ''
+  ]);
+  howToUseRow.font = { bold: true, size: 10 };
+  howToUseRow.fill = {
+    type: 'pattern',
+    pattern: 'solid',
+    fgColor: { argb: 'FFFFFF00' } // Light yellow
+  };
+
+  const instructionRow1 = worksheet.addRow([
+    '1. Review account portfolio for inactive accounts (RED zeros).',
+    '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', ''
+  ]);
+  instructionRow1.font = { size: 9 };
+  instructionRow1.alignment = { wrapText: true, vertical: 'top' };
+
+  const instructionRow2 = worksheet.addRow([
+    '2. Set GP targets for strategic accounts to meet/exceed quarter goal.',
+    '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', ''
+  ]);
+  instructionRow2.font = { size: 9 };
+  instructionRow2.alignment = { wrapText: true, vertical: 'top' };
+
+  const instructionRow3 = worksheet.addRow([
+    '3. Review unassigned accounts for potential assignments with supporting business case.',
+    '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', ''
+  ]);
+  instructionRow3.font = { size: 9 };
+  instructionRow3.alignment = { wrapText: true, vertical: 'top' };
 
   // Save
   await workbook.xlsx.writeFile(outputPath);
