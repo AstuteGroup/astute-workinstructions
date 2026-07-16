@@ -1579,22 +1579,25 @@ async function generateExcel(data, outputPath) {
     '1. Review account portfolio for inactive accounts (RED zeros).',
     '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', ''
   ]);
-  instructionRow1.font = { size: 9 };
-  instructionRow1.alignment = { wrapText: true, vertical: 'top' };
+  instructionRow1.font = { size: 11 };
+  instructionRow1.alignment = { horizontal: 'left', vertical: 'top' };
+  worksheet.mergeCells(`A${instructionRow1.number}:F${instructionRow1.number}`);
 
   const instructionRow2 = worksheet.addRow([
     '2. Set GP targets for strategic accounts to meet/exceed quarter goal.',
     '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', ''
   ]);
-  instructionRow2.font = { size: 9 };
-  instructionRow2.alignment = { wrapText: true, vertical: 'top' };
+  instructionRow2.font = { size: 11 };
+  instructionRow2.alignment = { horizontal: 'left', vertical: 'top' };
+  worksheet.mergeCells(`A${instructionRow2.number}:F${instructionRow2.number}`);
 
   const instructionRow3 = worksheet.addRow([
     '3. Review unassigned accounts for potential assignments with supporting business case.',
     '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', ''
   ]);
-  instructionRow3.font = { size: 9 };
-  instructionRow3.alignment = { wrapText: true, vertical: 'top' };
+  instructionRow3.font = { size: 11 };
+  instructionRow3.alignment = { horizontal: 'left', vertical: 'top' };
+  worksheet.mergeCells(`A${instructionRow3.number}:F${instructionRow3.number}`);
 
   // Save
   await workbook.xlsx.writeFile(outputPath);
