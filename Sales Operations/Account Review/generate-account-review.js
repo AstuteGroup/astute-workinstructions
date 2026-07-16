@@ -1020,6 +1020,68 @@ async function generateExcel(data, outputPath) {
     { width: 30 }, // Quarter Strategies
   ];
 
+  // Report Generated Date at top
+  const reportDate = new Date().toLocaleDateString('en-US', {
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    timeZone: 'America/Chicago'
+  });
+  const reportDateRow = worksheet.addRow([
+    `Report Generated: ${reportDate}`,
+    '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', ''
+  ]);
+  reportDateRow.font = { italic: true, size: 10 };
+
+  // Blank row
+  worksheet.addRow([]);
+
+  // Report Title
+  const titleRow = worksheet.addRow([
+    `Account Review - ${data.sellerName} - ${data.quarter} ${data.year}`,
+    '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', ''
+  ]);
+  titleRow.font = { bold: true, size: 14 };
+
+  // Blank row
+  worksheet.addRow([]);
+
+  // How to Use section
+  const howToUseRow = worksheet.addRow([
+    'HOW TO USE:',
+    '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', ''
+  ]);
+  howToUseRow.font = { bold: true, size: 10 };
+  howToUseRow.fill = {
+    type: 'pattern',
+    pattern: 'solid',
+    fgColor: { argb: 'FFFFFF00' } // Light yellow
+  };
+
+  const instructionRow1 = worksheet.addRow([
+    '1. Review account portfolio for inactive accounts (RED zeros).',
+    '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', ''
+  ]);
+  instructionRow1.font = { size: 9 };
+  instructionRow1.alignment = { wrapText: true, vertical: 'top' };
+
+  const instructionRow2 = worksheet.addRow([
+    '2. Set GP targets for strategic accounts to meet/exceed quarter goal.',
+    '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', ''
+  ]);
+  instructionRow2.font = { size: 9 };
+  instructionRow2.alignment = { wrapText: true, vertical: 'top' };
+
+  const instructionRow3 = worksheet.addRow([
+    '3. Review unassigned accounts for potential assignments with supporting business case.',
+    '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', ''
+  ]);
+  instructionRow3.font = { size: 9 };
+  instructionRow3.alignment = { wrapText: true, vertical: 'top' };
+
+  // Blank row
+  worksheet.addRow([]);
+
   // Header
   const headerRow = worksheet.addRow([
     'Account (OT)',
@@ -1070,9 +1132,9 @@ async function generateExcel(data, outputPath) {
   // Hide Column B (Account INFOR)
   worksheet.getColumn(2).hidden = true;
 
-  // Freeze top row (header)
+  // Freeze header and everything above it (rows 1-10)
   worksheet.views = [
-    { state: 'frozen', ySplit: 1 }
+    { state: 'frozen', ySplit: 10 }
   ];
 
   // Calculate totals for ASSIGNED section
@@ -1450,7 +1512,7 @@ async function generateExcel(data, outputPath) {
 
   // Add SUM formula for GP Target column (column 17)
   const grandTotalRowNum = grandTotalRow.number;
-  const firstDataRow = 2; // Row after header
+  const firstDataRow = 11; // Row after header (header is row 10)
   const lastDataRow = grandTotalRowNum - 1;
   grandTotalRow.getCell(17).value = { formula: `SUM(Q${firstDataRow}:Q${lastDataRow})` };
   grandTotalRow.getCell(17).numFmt = '$#,##0.00';
@@ -1529,60 +1591,6 @@ async function generateExcel(data, outputPath) {
       ]
     });
   }
-
-  // Add blank row
-  worksheet.addRow([]);
-
-  // Add Report Generated Date
-  const reportDate = new Date().toLocaleDateString('en-US', {
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-    timeZone: 'America/Chicago'
-  });
-  const reportDateRow = worksheet.addRow([
-    `Report Generated: ${reportDate}`,
-    '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', ''
-  ]);
-  reportDateRow.font = { italic: true, size: 10 };
-
-  // Add blank row
-  worksheet.addRow([]);
-
-  // Add How to Use instructions
-  const howToUseRow1 = worksheet.addRow([
-    'HOW TO USE:',
-    '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', ''
-  ]);
-  howToUseRow1.font = { bold: true, size: 10 };
-
-  const instructionRow1 = worksheet.addRow([
-    'Review account portfolio for inactive accounts (RED zeros).',
-    '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', ''
-  ]);
-  instructionRow1.font = { size: 9 };
-  instructionRow1.alignment = { wrapText: true, vertical: 'top' };
-
-  const instructionRow2 = worksheet.addRow([
-    'Set GP targets for strategic accounts to meet/exceed quarter goal.',
-    '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', ''
-  ]);
-  instructionRow2.font = { size: 9 };
-  instructionRow2.alignment = { wrapText: true, vertical: 'top' };
-
-  const instructionRow3 = worksheet.addRow([
-    'Input strategic actions per account.',
-    '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', ''
-  ]);
-  instructionRow3.font = { size: 9 };
-  instructionRow3.alignment = { wrapText: true, vertical: 'top' };
-
-  const instructionRow4 = worksheet.addRow([
-    'Review unassigned accounts for potential assignments with supporting business case.',
-    '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', ''
-  ]);
-  instructionRow4.font = { size: 9 };
-  instructionRow4.alignment = { wrapText: true, vertical: 'top' };
 
   // Save
   await workbook.xlsx.writeFile(outputPath);
