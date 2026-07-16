@@ -1029,11 +1029,32 @@ async function generateExcel(data, outputPath) {
   ]);
 
   headerRow.font = { bold: true };
+  headerRow.alignment = { horizontal: 'center', wrapText: true };
   headerRow.fill = {
     type: 'pattern',
     pattern: 'solid',
     fgColor: { argb: 'FFD9E1F2' }
   };
+
+  // Light yellow background for Q3 columns (Scheduled GP, GP Target, Strategies)
+  headerRow.getCell(16).fill = {
+    type: 'pattern',
+    pattern: 'solid',
+    fgColor: { argb: 'FFFFFF00' } // Light yellow
+  };
+  headerRow.getCell(17).fill = {
+    type: 'pattern',
+    pattern: 'solid',
+    fgColor: { argb: 'FFFFFF00' } // Light yellow
+  };
+  headerRow.getCell(18).fill = {
+    type: 'pattern',
+    pattern: 'solid',
+    fgColor: { argb: 'FFFFFF00' } // Light yellow
+  };
+
+  // Hide Column B (Account INFOR)
+  worksheet.getColumn(2).hidden = true;
 
   // Freeze top row (header)
   worksheet.views = [
@@ -1126,6 +1147,15 @@ async function generateExcel(data, outputPath) {
       row.getCell(15).numFmt = '0.0%';
     }
 
+    // Center alignment for specific columns (C, D, G, H, I, J, N)
+    row.getCell(3).alignment = { horizontal: 'center' };  // Locations
+    row.getCell(4).alignment = { horizontal: 'center' };  // Months Assigned
+    row.getCell(7).alignment = { horizontal: 'center' };  // Activities
+    row.getCell(8).alignment = { horizontal: 'center' };  // RFQ Lines
+    row.getCell(9).alignment = { horizontal: 'center' };  // CQ Lines
+    row.getCell(10).alignment = { horizontal: 'center' }; // CQ Lines Won
+    row.getCell(14).alignment = { horizontal: 'center' }; // B to I
+
     // Red font for zero activity indicators (RFQ Lines, CQ Lines, CQ Lines Won)
     // Column 8: RFQ Lines
     if (account.rfqLines === 0) {
@@ -1177,6 +1207,14 @@ async function generateExcel(data, outputPath) {
   assignedSubtotalRow.getCell(14).numFmt = '0.00';       // B to I
   assignedSubtotalRow.getCell(15).numFmt = '0.0%';       // % of Inv Total
   assignedSubtotalRow.getCell(16).numFmt = '$#,##0.00';  // Scheduled GP
+
+  // Center alignment for specific columns (C, D, G, H, I, J, N)
+  assignedSubtotalRow.getCell(3).alignment = { horizontal: 'center' };  // Locations
+  assignedSubtotalRow.getCell(7).alignment = { horizontal: 'center' };  // Activities
+  assignedSubtotalRow.getCell(8).alignment = { horizontal: 'center' };  // RFQ Lines
+  assignedSubtotalRow.getCell(9).alignment = { horizontal: 'center' };  // CQ Lines
+  assignedSubtotalRow.getCell(10).alignment = { horizontal: 'center' }; // CQ Lines Won
+  assignedSubtotalRow.getCell(14).alignment = { horizontal: 'center' }; // B to I
 
   // NOT ASSIGNED section (if any)
   let notAssignedTotals = {
@@ -1280,6 +1318,15 @@ async function generateExcel(data, outputPath) {
       if (account.pctInvTotal !== null) {
         row.getCell(15).numFmt = '0.0%';
       }
+
+      // Center alignment for specific columns (C, D, G, H, I, J, N)
+      row.getCell(3).alignment = { horizontal: 'center' };  // Locations
+      row.getCell(4).alignment = { horizontal: 'center' };  // Months Assigned
+      row.getCell(7).alignment = { horizontal: 'center' };  // Activities
+      row.getCell(8).alignment = { horizontal: 'center' };  // RFQ Lines
+      row.getCell(9).alignment = { horizontal: 'center' };  // CQ Lines
+      row.getCell(10).alignment = { horizontal: 'center' }; // CQ Lines Won
+      row.getCell(14).alignment = { horizontal: 'center' }; // B to I
     }
 
     // NOT ASSIGNED SUBTOTAL row
@@ -1318,6 +1365,14 @@ async function generateExcel(data, outputPath) {
     notAssignedSubtotalRow.getCell(14).numFmt = '0.00';       // B to I
     notAssignedSubtotalRow.getCell(15).numFmt = '0.0%';       // % of Inv Total
     notAssignedSubtotalRow.getCell(16).numFmt = '$#,##0.00';  // Scheduled GP
+
+    // Center alignment for specific columns (C, D, G, H, I, J, N)
+    notAssignedSubtotalRow.getCell(3).alignment = { horizontal: 'center' };  // Locations
+    notAssignedSubtotalRow.getCell(7).alignment = { horizontal: 'center' };  // Activities
+    notAssignedSubtotalRow.getCell(8).alignment = { horizontal: 'center' };  // RFQ Lines
+    notAssignedSubtotalRow.getCell(9).alignment = { horizontal: 'center' };  // CQ Lines
+    notAssignedSubtotalRow.getCell(10).alignment = { horizontal: 'center' }; // CQ Lines Won
+    notAssignedSubtotalRow.getCell(14).alignment = { horizontal: 'center' }; // B to I
   }
 
   // GRAND TOTAL row (combines both sections)
@@ -1386,6 +1441,14 @@ async function generateExcel(data, outputPath) {
   grandTotalRow.getCell(17).value = { formula: `SUM(Q${firstDataRow}:Q${lastDataRow})` };
   grandTotalRow.getCell(17).numFmt = '$#,##0.00';
 
+  // Center alignment for specific columns (C, D, G, H, I, J, N)
+  grandTotalRow.getCell(3).alignment = { horizontal: 'center' };  // Locations
+  grandTotalRow.getCell(7).alignment = { horizontal: 'center' };  // Activities
+  grandTotalRow.getCell(8).alignment = { horizontal: 'center' };  // RFQ Lines
+  grandTotalRow.getCell(9).alignment = { horizontal: 'center' };  // CQ Lines
+  grandTotalRow.getCell(10).alignment = { horizontal: 'center' }; // CQ Lines Won
+  grandTotalRow.getCell(14).alignment = { horizontal: 'center' }; // B to I
+
   // Add GP Goal row (if goal was found)
   if (data.gpGoal !== null) {
     const gpGoalRow = worksheet.addRow([
@@ -1452,6 +1515,60 @@ async function generateExcel(data, outputPath) {
       ]
     });
   }
+
+  // Add blank row
+  worksheet.addRow([]);
+
+  // Add Report Generated Date
+  const reportDate = new Date().toLocaleDateString('en-US', {
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    timeZone: 'America/Chicago'
+  });
+  const reportDateRow = worksheet.addRow([
+    `Report Generated: ${reportDate}`,
+    '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', ''
+  ]);
+  reportDateRow.font = { italic: true, size: 10 };
+
+  // Add blank row
+  worksheet.addRow([]);
+
+  // Add How to Use instructions
+  const howToUseRow1 = worksheet.addRow([
+    'HOW TO USE:',
+    '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', ''
+  ]);
+  howToUseRow1.font = { bold: true, size: 10 };
+
+  const instructionRow1 = worksheet.addRow([
+    'Review account portfolio for inactive accounts (RED zeros).',
+    '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', ''
+  ]);
+  instructionRow1.font = { size: 9 };
+  instructionRow1.alignment = { wrapText: true, vertical: 'top' };
+
+  const instructionRow2 = worksheet.addRow([
+    'Set GP targets for strategic accounts to meet/exceed quarter goal.',
+    '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', ''
+  ]);
+  instructionRow2.font = { size: 9 };
+  instructionRow2.alignment = { wrapText: true, vertical: 'top' };
+
+  const instructionRow3 = worksheet.addRow([
+    'Input strategic actions per account.',
+    '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', ''
+  ]);
+  instructionRow3.font = { size: 9 };
+  instructionRow3.alignment = { wrapText: true, vertical: 'top' };
+
+  const instructionRow4 = worksheet.addRow([
+    'Review unassigned accounts for potential assignments with supporting business case.',
+    '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', ''
+  ]);
+  instructionRow4.font = { size: 9 };
+  instructionRow4.alignment = { wrapText: true, vertical: 'top' };
 
   // Save
   await workbook.xlsx.writeFile(outputPath);
@@ -1804,7 +1921,7 @@ async function main() {
                       quarter === 'Q2' ? 'Q1' :
                       quarter === 'Q3' ? 'Q2' : 'Q3';
 
-  const outputPath = path.join(projectDir, `Account Review - ${sellerName.replace(/ /g, '_')} - ${quarter}_${year}.xlsx`);
+  const outputPath = path.join(projectDir, `Account Review - ${sellerName.replace(/ /g, '_')} - ${nextQuarter}_${nextQuarterYear}.xlsx`);
 
   await generateExcel({
     seller: sellerName,
