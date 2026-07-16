@@ -1038,7 +1038,7 @@ async function generateExcel(data, outputPath) {
 
   // Report Title (merged and centered)
   const titleRow = worksheet.addRow([
-    `${data.sellerName} - Account Review - ${data.nextQuarter} ${data.nextQuarterYear}`,
+    `${data.seller} - Account Review - ${data.nextQuarter} ${data.nextQuarterYear}`,
     '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', ''
   ]);
   titleRow.font = { bold: true, size: 14 };
