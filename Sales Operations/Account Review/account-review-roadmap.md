@@ -69,6 +69,9 @@
 - ✅ Freeze top row for scrolling
 - ✅ Account Context Columns - Months Assigned, First Assigned Date, Last Sale Date (2026-07-15) - Fixed 3 bugs: pre-employment dates, months calculation, last sale date blank
 - ✅ Write Workflow Documentation - Comprehensive user guide with command-line usage, column reference, troubleshooting (2026-07-15)
+- ✅ UI/UX Enhancements - Report Generated Date, light yellow Q3 column headers, How to Use instructions, center alignment, wrap text, hide Column B (2026-07-16)
+- ✅ Filename reflects forward quarter (Q3 2026) instead of historical quarter (Q2 2026) (2026-07-16)
+- ✅ CRITICAL BUG FIX: CSV parsing for company names with commas - Changed from `psql -F ","` to `psql --csv` to properly quote fields. Fixed S&B Industry showing 2,026 activities (was parsing date as activity count) → now correctly shows 4 activities. ASSIGNED total: 2635 → 613 (correct). (2026-07-16)
 
 ---
 
