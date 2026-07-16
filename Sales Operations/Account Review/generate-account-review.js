@@ -1950,7 +1950,7 @@ async function main() {
                       quarter === 'Q2' ? 'Q1' :
                       quarter === 'Q3' ? 'Q2' : 'Q3';
 
-  const outputPath = path.join(projectDir, `Account Review - ${sellerName.replace(/ /g, '_')} - ${nextQuarter}_${nextQuarterYear}.xlsx`);
+  const outputPath = path.join(projectDir, 'output', `Account Review - ${sellerName.replace(/ /g, '_')} - ${nextQuarter}_${nextQuarterYear}.xlsx`);
 
   await generateExcel({
     seller: sellerName,
