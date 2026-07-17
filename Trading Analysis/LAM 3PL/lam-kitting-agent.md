@@ -46,6 +46,7 @@ This workflow uses a hybrid approval pattern:
 
 | Type | Description | Action | Auto-Apply? |
 |------|-------------|--------|-------------|
+| **Price approvals (batch)** | LAM approves multiple CPCs | `approve_prices` | Yes (ONE email) |
 | **Price approval** | LAM approves proposed resale price | `approve_price` | Yes |
 | **Lead time approval** | LAM approves contractual lead time | `approve_leadtime` | Yes |
 | **Other field mentions** | MOQ, threshold, base price in email | Flagged | No — operator decides |
@@ -159,6 +160,29 @@ Parts with Status = "Additional Review" appear separately from "Pending Approval
 ---
 
 ## Actions
+
+### approve_prices (PREFERRED for multiple CPCs)
+Apply multiple price approvals in ONE call, send ONE consolidated email.
+
+**Payload:**
+```json
+{
+  "approvals": [
+    {"cpc": "660-345766-001", "approvedResale": 16.65, "mpn": "LTM4632EV#PBF", "emailMentions": {}},
+    {"cpc": "630-210849-001", "approvedResale": 10.51, "emailMentions": {"leadTime": "8 WEEKS"}}
+  ],
+  "investigation_summary": "4 CPCs approved per Josh's email."
+}
+```
+
+**Behavior:**
+1. Apply all resale prices to roster
+2. Detect discrepancies for each CPC (emailMentions vs roster)
+3. Send ONE consolidated email with:
+   - Table showing all CPCs with green/amber/gray status per field
+   - Green = match, Amber = mismatch (needs review), Gray = not mentioned
+4. CC original sender if different from Jake
+5. Set "Additional Review" on any parts with discrepancies
 
 ### approve_price
 Apply price approval + detect discrepancies.

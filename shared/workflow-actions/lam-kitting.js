@@ -219,6 +219,135 @@ async function action_approve_price(payload, ctx) {
 }
 
 /**
+ * Batch price approvals — ONE email per inbound message.
+ *
+ * Instead of calling approve_price 4 times (4 emails), the agent calls this
+ * once with all approvals, and we send ONE consolidated summary email.
+ *
+ * Required payload: { approvals: [{ cpc, approvedResale, mpn?, emailMentions? }, ...] }
+ * Optional: { approvalDate, investigation_summary }
+ */
+async function action_approve_prices(payload, ctx) {
+  const { approvals, approvalDate, investigation_summary } = payload;
+
+  if (!Array.isArray(approvals) || approvals.length === 0) {
+    return { error: 'approvals array is required and must not be empty', fallback: 'needs_review' };
+  }
+
+  const effectiveDate = approvalDate || new Date().toISOString().slice(0, 10);
+
+  if (ctx.dryRun) {
+    return {
+      dry_run: true,
+      would_update: approvals.map(a => ({ cpc: a.cpc, approvedResale: a.approvedResale })),
+    };
+  }
+
+  const results = [];
+  const allDiscrepancies = [];
+
+  for (const approval of approvals) {
+    const { cpc, mpn, approvedResale, emailMentions } = approval;
+
+    // Find the part
+    const match = findRosterRow(cpc, mpn);
+    if (!match.found) {
+      results.push({
+        cpc,
+        mpn,
+        error: `Part not found: CPC=${cpc}`,
+        success: false,
+      });
+      continue;
+    }
+
+    const { row, cols } = match;
+    const currentState = extractCurrentState(row, cols);
+    const previousResale = currentState.resalePrice;
+
+    // Detect discrepancies
+    const discrepancies = detectDiscrepancies(emailMentions, currentState);
+
+    // Apply the price change
+    const result = updateRosterPrice(cpc, mpn, {
+      resalePrice: approvedResale,
+      lastApproved: effectiveDate,
+      clearPending: true,
+      setAdditionalReview: discrepancies.length > 0,
+    });
+
+    if (!result.success) {
+      results.push({
+        cpc,
+        mpn,
+        error: result.error,
+        success: false,
+      });
+      continue;
+    }
+
+    // Track discrepancies for flagged review
+    if (discrepancies.length > 0) {
+      writeFlaggedReview(cpc, {
+        uid: ctx.uid,
+        messageId: ctx.currentMessageId || ctx.anchorMessageId,
+        flaggedAt: new Date().toISOString(),
+        discrepancies,
+        currentState,
+        appliedChange: { field: 'Resale Price', from: previousResale, to: approvedResale },
+      });
+      allDiscrepancies.push({ cpc, mpn: result.mpn || mpn, discrepancies, currentState });
+    }
+
+    results.push({
+      cpc,
+      mpn: result.mpn || mpn,
+      previousResale,
+      newResale: approvedResale,
+      discrepanciesFound: discrepancies.length,
+      currentState,        // Full state for display
+      emailMentions: emailMentions || {},  // What email mentioned
+      success: true,
+    });
+  }
+
+  // Build ONE consolidated email
+  const successfulUpdates = results.filter(r => r.success);
+  const failedUpdates = results.filter(r => !r.success);
+
+  if (successfulUpdates.length > 0) {
+    const html = buildBatchApprovalEmail({
+      updates: successfulUpdates,
+      failures: failedUpdates,
+      discrepancies: allDiscrepancies,
+      approvalDate: effectiveDate,
+    }, ctx);
+
+    const hasDiscrepancies = allDiscrepancies.length > 0;
+    const subject = hasDiscrepancies
+      ? `LAM Price Approvals Applied (${successfulUpdates.length}) + Review Needed`
+      : `LAM Price Approvals Applied (${successfulUpdates.length})`;
+
+    await ctx.notifier.sendEmail(
+      ctx.jakeEmail,
+      subject,
+      html,
+      buildEmailOpts(ctx),
+    );
+  }
+
+  return {
+    processed: approvals.length,
+    successful: successfulUpdates.length,
+    failed: failedUpdates.length,
+    results,
+    discrepanciesFound: allDiscrepancies.length,
+    notified: ctx.jakeEmail,
+    ccSender: ctx.currentFrom !== ctx.jakeEmail.toLowerCase() ? ctx.currentFrom : null,
+  };
+}
+
+/**
  * Lead time approval with discrepancy detection.
  *
  * Required payload: { cpc, newLeadTime }
@@ -1107,6 +1236,119 @@ ${notes ? `<p style="color:#666;margin-top:12px"><b>Notes:</b> ${esc(notes)}</p>
 </body></html>`;
 }
 
+/**
+ * Build consolidated email for batch price approvals.
+ * Single table with CPCs as rows, fields as columns.
+ * Green cell = match, Amber cell = mismatch, Gray = not mentioned.
+ */
+function buildBatchApprovalEmail(opts, ctx) {
+  const { updates, failures, discrepancies, approvalDate } = opts;
+
+  // Build single consolidated table
+  const dataRows = updates.map(u => {
+    const hasDisc = discrepancies.some(d => d.cpc === u.cpc);
+    const rowBg = hasDisc ? '#fff3e0' : '#e8f5e9';
+    const statusIcon = hasDisc ? '⚠️' : '✓';
+
+    // Helper to style a cell based on match status
+    const cellFor = (key) => {
+      const rosterVal = u.currentState ? u.currentState[key] : null;
+      const emailVal = u.emailMentions ? u.emailMentions[key] : null;
+      const mentioned = emailVal !== undefined && emailVal !== null && emailVal !== '';
+
+      if (!mentioned) {
+        // Not mentioned - show roster value, gray background
+        return `<td style="padding:4px 8px;border:1px solid #ddd;text-align:right;background:#f9f9f9;color:#666">${formatFieldValue(key, rosterVal)}</td>`;
+      }
+      // Compare
+      const match = normalizeValue(rosterVal) === normalizeValue(emailVal);
+      const bg = match ? '#e8f5e9' : '#fff3e0';
+      const color = match ? '#2e7d32' : '#e65100';
+      return `<td style="padding:4px 8px;border:1px solid #ddd;text-align:right;background:${bg};color:${color};font-weight:bold">${formatFieldValue(key, rosterVal)}</td>`;
+    };
+
+    return `<tr style="background:${rowBg}">
+      <td style="padding:4px 8px;border:1px solid #ddd">${statusIcon}</td>
+      <td style="padding:4px 8px;border:1px solid #ddd;font-weight:bold">${esc(u.cpc)}</td>
+      <td style="padding:4px 8px;border:1px solid #ddd">${esc(u.mpn)}</td>
+      <td style="padding:4px 8px;border:1px solid #ddd;text-align:right">${formatCurrency(u.previousResale)}</td>
+      <td style="padding:4px 8px;border:1px solid #ddd;text-align:right;color:#2e7d32;font-weight:bold">${formatCurrency(u.newResale)}</td>
+      ${cellFor('leadTime')}
+      ${cellFor('moq')}
+      ${cellFor('reorderThreshold')}
+      ${cellFor('basePrice')}
+    </tr>`;
+  }).join('');
+
+  // Build failures section if any
+  let failureSection = '';
+  if (failures.length > 0) {
+    const failRows = failures.map(f => `<tr style="background:#ffebee">
+      <td style="padding:4px 8px;border:1px solid #ddd">❌</td>
+      <td style="padding:4px 8px;border:1px solid #ddd">${esc(f.cpc)}</td>
+      <td style="padding:4px 8px;border:1px solid #ddd" colspan="7"><span style="color:#c00">${esc(f.error)}</span></td>
+    </tr>`).join('');
+    failureSection = failRows;
+  }
+
+  // Build action section if discrepancies exist
+  let actionSection = '';
+  if (discrepancies.length > 0) {
+    const replyCommands = discrepancies.flatMap(d =>
+      d.discrepancies.map(disc =>
+        `<code>APPROVE ${disc.field.toUpperCase()} ${d.cpc}</code>`
+      )
+    ).join('<br/>');
+
+    actionSection = `
+<div style="background:#fff3e0;padding:12px;border-left:3px solid #e65100;margin-top:16px">
+  <strong>⚠️ Action Needed</strong><br/>
+  <p style="margin:8px 0">Some fields differ from roster. Reply to ${esc(ctx.inbox)} with:</p>
+  ${replyCommands}<br/>
+  <code>SKIP ALL</code> — skip all flagged items
+</div>`;
+  }
+
+  return `<html><body style="font-family:Arial,sans-serif;font-size:13px">
+<h2 style="color:#2e7d32">LAM Price Approvals Applied</h2>
+<p><b>Date:</b> ${esc(approvalDate)} | <b>UID:</b> ${ctx.uid} | <b>Total:</b> ${updates.length} updated${failures.length ? `, ${failures.length} failed` : ''}</p>
+
+<table style="border-collapse:collapse;font-size:12px;width:100%">
+  <tr style="background:#f0f0f0">
+    <th style="padding:6px 8px;border:1px solid #ddd;width:30px"></th>
+    <th style="padding:6px 8px;border:1px solid #ddd;text-align:left">CPC</th>
+    <th style="padding:6px 8px;border:1px solid #ddd;text-align:left">MPN</th>
+    <th style="padding:6px 8px;border:1px solid #ddd;text-align:right">Prev Price</th>
+    <th style="padding:6px 8px;border:1px solid #ddd;text-align:right">New Price</th>
+    <th style="padding:6px 8px;border:1px solid #ddd;text-align:right">Lead Time</th>
+    <th style="padding:6px 8px;border:1px solid #ddd;text-align:right">MOQ</th>
+    <th style="padding:6px 8px;border:1px solid #ddd;text-align:right">Reorder</th>
+    <th style="padding:6px 8px;border:1px solid #ddd;text-align:right">Base Price</th>
+  </tr>
+  ${dataRows}
+  ${failureSection}
+</table>
+
+${actionSection}
+
+<p style="color:#666;font-size:11px;margin-top:12px">
+  <span style="background:#e8f5e9;padding:2px 6px">✓ Green row</span> = All OK&nbsp;&nbsp;
+  <span style="background:#fff3e0;padding:2px 6px">⚠️ Amber row</span> = Has mismatch&nbsp;&nbsp;
+  <span style="background:#f9f9f9;padding:2px 6px;color:#666">Gray cell</span> = Not in email (roster value shown)
+</p>
+</body></html>`;
+}
+
+/**
+ * Format field value based on field type.
+ */
+function formatFieldValue(key, val) {
+  if (val === null || val === undefined || val === '') return '<em>(empty)</em>';
+  if (key === 'basePrice') return formatCurrency(val);
+  if (key === 'moq' || key === 'reorderThreshold') return formatNumber(val);
+  return esc(String(val));
+}
+
 function buildRejectionEmail(payload, ctx) {
   const { cpc, mpn, reason, rejectedBy, investigation_summary } = payload;
 
@@ -1169,6 +1411,11 @@ module.exports = {
     fromName: 'LAM Kitting',
   },
   actions: {
+    approve_prices: {
+      folder: 'Processed',
+      requires: ['approvals'],
+      handler: action_approve_prices,
+    },
     approve_price: {
       folder: 'Processed',
       requires: ['cpc', 'approvedResale'],

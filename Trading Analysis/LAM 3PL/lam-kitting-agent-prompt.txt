@@ -103,8 +103,20 @@ For every UID returned, follow this decision tree:
 
   4. Pass emailMentions to the route payload so the handler can detect discrepancies
 
-3.6 ROUTE APPROVALS
-  For price approval:
+3.6 ROUTE APPROVALS — USE BATCH ACTION FOR MULTIPLE CPCS
+
+  IMPORTANT: When an email approves MULTIPLE CPCs, use `approve_prices` (plural)
+  to send ONE consolidated email instead of separate emails per CPC.
+
+  For multiple price approvals (PREFERRED):
+    node shared/email-workflow-poller.js route <uid> approve_prices --workflow lam-kitting \
+      --payload '{"approvals": [
+        {"cpc": "660-345766-001", "approvedResale": 16.65, "emailMentions": {}},
+        {"cpc": "630-210849-001", "approvedResale": 10.51, "emailMentions": {}},
+        {"cpc": "630-A52002-001", "approvedResale": 0.42, "emailMentions": {}}
+      ], "investigation_summary": "..."}'
+
+  For single price approval (fallback):
     node shared/email-workflow-poller.js route <uid> approve_price --workflow lam-kitting \
       --payload '{"cpc": "608-096583-504", "approvedResale": 12.50, "emailMentions": {"leadTime": "16 WEEKS"}, "investigation_summary": "..."}'
 
@@ -113,10 +125,11 @@ For every UID returned, follow this decision tree:
       --payload '{"cpc": "608-096583-504", "newLeadTime": "16 WEEKS", "emailMentions": {"moq": 100}, "investigation_summary": "..."}'
 
   The handler will:
-  - Apply the explicit approval immediately
-  - Detect discrepancies between emailMentions and roster
-  - Set Status = "Additional Review" if discrepancies found
-  - Send summary email with applied + flagged items
+  - Apply all approvals to the roster
+  - Detect discrepancies between emailMentions and roster for EACH part
+  - Set Status = "Additional Review" on parts with discrepancies
+  - Send ONE consolidated email showing ALL parts with field comparison table
+  - CC the original sender (Josh, etc.) if different from Jake
 
 3.7 FOR add_award — VALIDATE MFR FIRST
   Before routing add_award:
@@ -129,8 +142,10 @@ For every UID returned, follow this decision tree:
   If email says "All items approved as proposed":
 
   1. Read Master Roster to find pending items (Status = "Pending Approval" or Pending non-empty)
-  2. For each: route `approve_price` with CPC and Proposed Resale value
-  3. One route call per item
+  2. Build approvals array with all pending CPCs and their Proposed Resale values
+  3. Route ONCE with `approve_prices` (plural) containing all items:
+     node shared/email-workflow-poller.js route <uid> approve_prices --workflow lam-kitting \
+       --payload '{"approvals": [{"cpc": "...", "approvedResale": ...}, ...], "investigation_summary": "Blanket approval of N pending items"}'
 
 3.9 XLSX ATTACHMENTS
   If email has Excel attachment:
@@ -165,7 +180,18 @@ CRITICAL RULES
 PAYLOAD EXAMPLES
 ═══════════════════════════════════════════════════════════════════════════════
 
-approve_price (with discrepancy detection):
+approve_prices (PREFERRED for multiple CPCs — ONE email):
+  {
+    "approvals": [
+      {"cpc": "660-345766-001", "approvedResale": 16.65, "mpn": "LTM4632EV#PBF", "emailMentions": {}},
+      {"cpc": "630-210849-001", "approvedResale": 10.51, "mpn": "LT1491ACS#PBF", "emailMentions": {"leadTime": "8 WEEKS"}},
+      {"cpc": "630-A52002-001", "approvedResale": 0.42, "mpn": "SN74LVC125ARGYR", "emailMentions": {}},
+      {"cpc": "630-311348-001", "approvedResale": 18.16, "mpn": "ADS8688IDBTR", "emailMentions": {}}
+    ],
+    "investigation_summary": "4 CPCs approved per Josh's email. All prices match proposed values."
+  }
+
+approve_price (single CPC fallback):
   {
     "cpc": "608-096583-504",
     "approvedResale": 12.50,
