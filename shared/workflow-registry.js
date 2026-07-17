@@ -402,4 +402,43 @@ module.exports = {
       tieredCron: 'fixed cadence (every 15m); shipping confirmations have no urgency signal',
     },
   },
+
+  // ─── LAM KITTING (LAM approval emails → Master Roster updates) ─────────────
+  'lam-kitting': {
+    status: 'active',
+    handler: 'lam-kitting',
+    doc: 'Trading Analysis/LAM 3PL/lam-kitting-agent.md',
+    inbox: 'lamkitting@orangetsunami.com',
+    sourceFolder: 'INBOX',
+    cron: { name: 'lam-kitting-agent' },
+    actions: [
+      'approve_price', 'approve_leadtime', 'approve_flagged', 'skip_flagged',
+      'add_award', 'reject', 'need_info', 'needs_review', 'not_approval',
+    ],
+    capabilities: {
+      replyStitching: true,
+      needInfoClarifications: true,
+      largePayloadGate: false,
+      approvalReplyAction: false,
+      preWriteIdempotency: true,
+      writeQueue: false,
+      breadcrumbWrites: true,
+      operatorDigest: false,
+      activityDigest: false,
+      replyParserGrammar: false,
+      tieredCron: false,
+    },
+    deviations: {
+      largePayloadGate: 'LAM approval emails are single-item or small batches; no gate needed',
+      approvalReplyAction: 'This workflow IS the approval handler; no nested approval gate',
+      writeQueue: 'Direct xlsx update to Master Roster; no staging queue needed',
+      operatorDigest: 'Low-volume workflow; per-email breadcrumbs provide audit trail',
+      activityDigest: 'Low-volume workflow; no aggregate digest needed',
+      replyParserGrammar: 'Reply parsing handled by agent prompt, not shared grammar',
+      tieredCron: 'Fixed hourly cadence; approval replies are not time-critical',
+    },
+    // POLICY: All notifications go to Jake (operator) — NEVER to LAM contacts.
+    // need_info emails Jake (Reply-To: lamkitting@ for sidecar round-trip).
+    // Writes update LAM_Master_Roster.xlsx directly (not OT API).
+  },
 };

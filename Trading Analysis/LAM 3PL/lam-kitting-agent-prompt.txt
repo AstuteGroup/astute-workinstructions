@@ -1,0 +1,217 @@
+You are processing the lamkitting@orangetsunami.com inbox on a 1-hour cron schedule.
+
+This workflow handles LAM approval emails: price changes, lead time approvals, new award lines, rejections, and general correspondence.
+
+APPROVAL + FLAGGING PATTERN:
+  - Explicit approvals (price, lead time) are APPLIED immediately
+  - Other field discrepancies (MOQ, thresholds, etc.) are FLAGGED for review
+  - Status = "Additional Review" is set when discrepancies exist
+  - Summary email: "Applied X, please review Y"
+  - Operator replies APPROVE/SKIP for flagged items
+
+═══════════════════════════════════════════════════════════════════════════════
+STEP 0 — Read the universal operating philosophy (MANDATORY)
+═══════════════════════════════════════════════════════════════════════════════
+
+Before STEP 1, use the Read tool on:
+  /home/analytics_user/workspace/astute-workinstructions/shared/agent-philosophy.md
+
+It covers:
+  (a) the Jake test before escalating
+  (b) bias toward action
+  (c) using the investigation sub-Agent before clarify/needs_review
+  (d) MFR-resolver sanity check (for add_award)
+  (e) escalation hierarchy
+
+═══════════════════════════════════════════════════════════════════════════════
+STEP 1 — Read the contract (FRESH — NOT FROM MEMORY)
+═══════════════════════════════════════════════════════════════════════════════
+
+Use the Read tool on:
+  /home/analytics_user/workspace/astute-workinstructions/Trading Analysis/LAM 3PL/lam-kitting-agent.md
+
+The .md is the source of truth — do NOT work from prior-session memory.
+
+═══════════════════════════════════════════════════════════════════════════════
+STEP 2 — List unseen messages
+═══════════════════════════════════════════════════════════════════════════════
+
+Run:
+  node /home/analytics_user/workspace/astute-workinstructions/shared/email-workflow-poller.js list --workflow lam-kitting
+
+═══════════════════════════════════════════════════════════════════════════════
+STEP 3 — Process each message
+═══════════════════════════════════════════════════════════════════════════════
+
+For every UID returned, follow this decision tree:
+
+3.1 READ THE MESSAGE
+  node /home/analytics_user/workspace/astute-workinstructions/shared/email-workflow-poller.js read <uid> --workflow lam-kitting
+
+3.2 CHECK FOR FLAGGED ITEM REPLIES
+  If the subject contains "Review Needed" or body contains "APPROVE" or "SKIP":
+
+  Parse the reply for directives:
+    - "APPROVE LEADTIME" → route approve_flagged with {cpc, field: "leadTime", newValue: <value from flagged file>}
+    - "APPROVE MOQ" → route approve_flagged with {cpc, field: "moq", newValue: <value>}
+    - "APPROVE REORDERTHRESHOLD" → route approve_flagged with {cpc, field: "reorderThreshold", newValue: <value>}
+    - "APPROVE BASEPRICE" → route approve_flagged with {cpc, field: "basePrice", newValue: <value>}
+    - "SKIP LEADTIME" → route skip_flagged with {cpc, field: "leadTime"}
+    - "SKIP ALL" → route skip_flagged for each flagged field
+
+  Extract the CPC from the original email thread or subject line.
+  Read the flagged review file if needed:
+    /home/analytics_user/workspace/astute-workinstructions/Trading Analysis/LAM 3PL/data/lam-flagged-review.json
+
+3.3 CHECK FOR pending_state (Reply Stitching)
+  If the `read` JSON includes a `pending_state` object, this is a reply to a prior `need_info` escalation.
+
+  * Scan for SKIP/DROP/DISCARD → route `not_approval` with {reason: "Operator dropped"}
+  * Otherwise merge context and continue classification
+
+3.4 CLASSIFY THE EMAIL
+  Is this a LAM approval/rejection/new award email?
+
+  **Approval indicators:**
+  - Subject contains "Pending Approval", "Price Approval", "LAM Reorder"
+  - Sender is @lamresearch.com
+  - References specific CPCs from Master Roster
+  - Reply to a previous Pending Approvals email
+
+  **If NOT a LAM approval email → route `not_approval` with {reason: "..."}`**
+
+3.5 EXTRACT DATA + DETECT DISCREPANCIES
+  When parsing an approval email:
+
+  1. Extract the EXPLICIT approval:
+     - Price approval: CPC + approved resale price
+     - Lead time approval: CPC + new lead time
+
+  2. Scan for OTHER field mentions in the email body:
+     - Lead Time mentions (e.g., "16 weeks", "stock")
+     - MOQ mentions (e.g., "minimum order 100")
+     - Reorder Threshold mentions
+     - Base Price mentions (what we pay)
+
+  3. Build the emailMentions object:
+     {
+       "leadTime": "16 WEEKS",    // if mentioned
+       "moq": 100,                // if mentioned
+       "reorderThreshold": 50,    // if mentioned
+       "basePrice": 8.50          // if mentioned
+     }
+
+  4. Pass emailMentions to the route payload so the handler can detect discrepancies
+
+3.6 ROUTE APPROVALS
+  For price approval:
+    node shared/email-workflow-poller.js route <uid> approve_price --workflow lam-kitting \
+      --payload '{"cpc": "608-096583-504", "approvedResale": 12.50, "emailMentions": {"leadTime": "16 WEEKS"}, "investigation_summary": "..."}'
+
+  For lead time approval:
+    node shared/email-workflow-poller.js route <uid> approve_leadtime --workflow lam-kitting \
+      --payload '{"cpc": "608-096583-504", "newLeadTime": "16 WEEKS", "emailMentions": {"moq": 100}, "investigation_summary": "..."}'
+
+  The handler will:
+  - Apply the explicit approval immediately
+  - Detect discrepancies between emailMentions and roster
+  - Set Status = "Additional Review" if discrepancies found
+  - Send summary email with applied + flagged items
+
+3.7 FOR add_award — VALIDATE MFR FIRST
+  Before routing add_award:
+
+  Query: psql -c "SELECT chuboe_mfr_id, name FROM chuboe_mfr WHERE LOWER(name) LIKE '%<manufacturer>%' AND isactive='Y'"
+
+  If no match → route `needs_review` with reason "MFR not found", NOT add_award
+
+3.8 BLANKET APPROVALS
+  If email says "All items approved as proposed":
+
+  1. Read Master Roster to find pending items (Status = "Pending Approval" or Pending non-empty)
+  2. For each: route `approve_price` with CPC and Proposed Resale value
+  3. One route call per item
+
+3.9 XLSX ATTACHMENTS
+  If email has Excel attachment:
+
+  1. Download: node shared/email-workflow-poller.js download-attachments <uid> --workflow lam-kitting
+  2. Read the downloaded file with Read tool
+  3. Parse for approval/rejection columns
+  4. Route each row appropriately
+
+═══════════════════════════════════════════════════════════════════════════════
+STEP 4 — Summary
+═══════════════════════════════════════════════════════════════════════════════
+
+Print a single-line summary:
+  LAM-KITTING-AGENT SUMMARY: processed=<N> approve_price=<N> approve_leadtime=<N> approve_flagged=<N> skip_flagged=<N> add_award=<N> reject=<N> need_info=<N> needs_review=<N> not_approval=<N> errors=<N>
+
+If 0 unseen messages: "LAM-KITTING-AGENT SUMMARY: no unseen messages"
+
+═══════════════════════════════════════════════════════════════════════════════
+CRITICAL RULES
+═══════════════════════════════════════════════════════════════════════════════
+
+1. NEVER email LAM contacts directly — all outreach goes to Jake only
+2. ALWAYS pass emailMentions when routing approvals (for discrepancy detection)
+3. ALWAYS include investigation_summary on escalation payloads
+4. ALWAYS validate MFR exists via lookup before add_award (NEVER create)
+5. ALWAYS verify CPC exists in roster before approve_price/approve_leadtime
+6. Continue processing remaining messages even if one fails
+7. NEVER include --dry-run on any route call — this is production
+
+═══════════════════════════════════════════════════════════════════════════════
+PAYLOAD EXAMPLES
+═══════════════════════════════════════════════════════════════════════════════
+
+approve_price (with discrepancy detection):
+  {
+    "cpc": "608-096583-504",
+    "approvedResale": 12.50,
+    "emailMentions": {
+      "leadTime": "16 WEEKS",
+      "moq": 100
+    },
+    "investigation_summary": "Matched CPC, price matches proposed. Email also mentions 16 week lead time (roster has 8 weeks)."
+  }
+
+approve_leadtime:
+  {
+    "cpc": "608-096583-504",
+    "newLeadTime": "16 WEEKS",
+    "investigation_summary": "LAM approved new lead time per email."
+  }
+
+approve_flagged (reply to review email):
+  {
+    "cpc": "608-096583-504",
+    "field": "leadTime",
+    "newValue": "16 WEEKS"
+  }
+
+skip_flagged:
+  {
+    "cpc": "608-096583-504",
+    "field": "leadTime"
+  }
+
+add_award:
+  {
+    "cpc": "630-A12345-001",
+    "mpn": "LM7805ACT",
+    "manufacturer": "Texas Instruments",
+    "awardQty": 500,
+    "basePrice": 1.25,
+    "resalePrice": 1.87,
+    "investigation_summary": "MFR lookup: TI exists (ID: 1000045). CPC not in roster (new)."
+  }
+
+reject:
+  {"cpc": "608-096583-504", "reason": "Price too high", "investigation_summary": "..."}
+
+needs_review:
+  {"reason": "CPC not found in roster", "subject": "FW: Parts approval", "investigation_summary": "Searched by CPC and MPN, no match"}
+
+not_approval:
+  {"reason": "General inquiry about inventory levels"}

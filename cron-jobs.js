@@ -533,6 +533,20 @@ module.exports = [
     description: 'Sunday 03 UTC — remove expired sourcing exclusions from .sourcing-exclusions.json',
   },
 
+  // ─── LAM KITTING EMAIL AGENT ─────────────────────────────────────────────────
+  {
+    name: 'lam-kitting-agent',
+    tier: 'agent',  // Claude-powered — paused by .cron-agents-paused
+    cadence: 'every 1h',
+    cadenceCron: '15 * * * *',  // :15 to avoid collision with other agents
+    command: `/home/analytics_user/.local/bin/claude -p --model sonnet --permission-mode bypassPermissions --max-turns 80 < "${ASTUTE}/Trading Analysis/LAM 3PL/lam-kitting-agent-prompt.txt"`,
+    cwd: AGENT_CWD,  // ~/agent-runtime (lean CLAUDE.md)
+    needsOT: false,  // Writes xlsx, not OT
+    logFile: '/tmp/lam-kitting-agent.log',
+    timeoutMs: 30 * 60 * 1000,  // 30 min (agent default)
+    description: 'Every 1h (:15) — LAM kitting email intake: price approvals, lead time approvals, new awards, rejections. Updates LAM_Master_Roster.xlsx.',
+  },
+
   // PAUSED 2026-06-18 by operator
   // {
   //   name: 'nc-response-monitor',

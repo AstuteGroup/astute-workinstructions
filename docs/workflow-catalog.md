@@ -33,6 +33,8 @@ Complete list of available workflows with descriptions. This is the canonical so
 | 23 | **Sourcing Recap** | Per-RFQ best-option sourcing summary. Subject keyword "BEST" + RFQ# → Sourcing Recap | `Trading Analysis/Sourcing Recap/sourcing-recap.md` |
 | 24 | **Tracking Loading** | Process forwarded supplier shipping confirmations into OT PO tracking fields | `Trading Analysis/Tracking Loading/tracking-loading.md` |
 | 25 | **Broker/Franchise Offers** | Load market offers from external brokers and franchise distributors into OT | `Trading Analysis/Broker Offers/broker-offers.md` |
+| 26 | **VQ Purchase Completion** | Mark VQ as purchased + post approve-order R_Request (Tier 2 validation, program defaults) | `shared/vq-purchase-workflow.md` |
+| 27 | **LAM Kitting Email Agent** | Process LAM approval emails: price changes, lead time approvals, new award lines. Updates Master Roster xlsx | `Trading Analysis/LAM 3PL/lam-kitting-agent.md` |
 
 ---
 
@@ -68,3 +70,4 @@ Some workflows have specific trigger patterns:
 | `brokeroffers@orangetsunami.com` | Broker/Franchise Market Offers |
 | `excess@orangetsunami.com` | Customer Excess Analysis, Inventory File Cleanup |
 | `stockRFQ@orangetsunami.com` | Stock RFQ Loading, CRMA Form Filling |
+| `lamkitting@orangetsunami.com` | LAM Kitting Email Agent (LAM approval emails) |

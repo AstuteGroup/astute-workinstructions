@@ -35,6 +35,20 @@ const { readCSVFile } = require('../../shared/csv-utils');
 const { createNotifier } = require('../../shared/notifier');
 const { normalizeMPN } = require('../../shared/mpn-normalization');
 
+// LAM Kitting handler - for Additional Review visibility
+let _lamKittingHandler = null;
+function getFlaggedCPCsFromHandler() {
+  if (!_lamKittingHandler) {
+    try {
+      _lamKittingHandler = require('../../shared/workflow-actions/lam-kitting');
+    } catch (e) {
+      console.log('  WARNING: Could not load lam-kitting handler for flagged CPC visibility');
+      return [];
+    }
+  }
+  return _lamKittingHandler.getFlaggedCPCs ? _lamKittingHandler.getFlaggedCPCs() : [];
+}
+
 // Email configuration - LAM Kitting dedicated account
 const EMAIL_ACCOUNT = 'lamkitting';
 const NOTIFY_EMAIL = process.env.NOTIFY_EMAIL || 'jake.harris@astutegroup.com';
@@ -307,12 +321,25 @@ async function main() {
   const stockMatches = Object.keys(otherStock).filter(mpn => otherStock[mpn].length > 0).length;
   console.log(`  Stock matches found: ${stockMatches} MPNs in other warehouses`);
 
-  // Enrich alerts with other warehouse stock
+  // Enrich alerts with other warehouse stock (including pending transfers)
   for (const alert of reorderAlerts) {
     const matches = otherStock[alert['MPN']] || [];
-    if (matches.length > 0) {
-      alert['Available Stock (Other WH)'] = matches.map(m => m.warehouse).join(', ');
-      alert['Available Qty (Other WH)'] = matches.reduce((sum, m) => sum + m.qty, 0);
+    const warehouses = matches.map(m => m.warehouse);
+    let totalQty = matches.reduce((sum, m) => sum + m.qty, 0);
+
+    // Include pending transfer stock - it's still physically available until moved
+    if (alert['Pending Transfer']) {
+      const match = alert['Pending Transfer'].match(/(\d+) from (.+)/);
+      if (match) {
+        const [, qty, fromWh] = match;
+        warehouses.push(fromWh);
+        totalQty += parseInt(qty, 10);
+      }
+    }
+
+    if (warehouses.length > 0) {
+      alert['Available Stock (Other WH)'] = warehouses.join(', ');
+      alert['Available Qty (Other WH)'] = totalQty;
     }
   }
 
@@ -362,6 +389,7 @@ async function main() {
 
   if (readyToOrder.length > 0) {
     const criticalPriority = readyToOrder.filter(r => r.Priority === 'CRITICAL').length;
+    const vqTickedCount = readyToOrder.filter(r => r.Priority === 'VQ TICKED - NEED PO').length;
     const highPriority = readyToOrder.filter(r => r.Priority === 'HIGH').length;
     const medPriority = readyToOrder.filter(r => r.Priority === 'MEDIUM').length;
     const lowPriority = readyToOrder.filter(r => r.Priority === 'LOW').length;
@@ -371,10 +399,13 @@ async function main() {
     console.log('');
     console.log('Ready to Order breakdown:');
     console.log(`  CRITICAL priority (zero stock, no recent PO): ${criticalPriority}`);
+    if (vqTickedCount > 0) {
+      console.log(`  VQ TICKED - NEED PO (procurement bottleneck): ${vqTickedCount}`);
+    }
     console.log(`  HIGH priority: ${highPriority}`);
     console.log(`  MEDIUM priority: ${medPriority}`);
     console.log(`  LOW priority: ${lowPriority}`);
-    console.log(`  PENDING ORDER PLACEMENT (chase the PO): ${pendingOrder}`);
+    console.log(`  PENDING ORDER PLACEMENT (PO cut, awaiting Infor): ${pendingOrder}`);
     console.log(`  PENDING RECEIPT (waiting on vendor): ${pendingReceipt}`);
     if (pendingTransfer > 0) {
       console.log(`  PENDING WAREHOUSE TRANSFER (warehouse transfer in progress): ${pendingTransfer}`);
@@ -390,6 +421,20 @@ async function main() {
     console.log('Pending Approvals breakdown:');
     console.log(`  Total awaiting approval: ${pendingApprovals.length}`);
     console.log(`  Oldest pending: ${oldestDays} days`);
+  }
+
+  // Check for Additional Review parts (flagged discrepancies awaiting operator decision)
+  const flaggedCPCs = getFlaggedCPCsFromHandler();
+  const additionalReviewParts = Object.values(excelData).filter(e => e.Status === 'Additional Review');
+  if (additionalReviewParts.length > 0 || flaggedCPCs.length > 0) {
+    console.log('');
+    console.log('=== Additional Review (Flagged Discrepancies) ===');
+    console.log(`  Parts with discrepancies: ${additionalReviewParts.length}`);
+    if (flaggedCPCs.length > 0) {
+      console.log(`  CPCs with pending flags: ${flaggedCPCs.join(', ')}`);
+    }
+    console.log('  → Approval was applied, but email mentioned other field changes');
+    console.log('  → Reply to lamkitting@ with APPROVE/SKIP commands to resolve');
   }
 
   // Show unmatched stats
@@ -411,6 +456,7 @@ async function main() {
     console.log('');
     console.log('Step 7: Emailing results...');
     const critCount = readyToOrder.filter(r => r.Priority === 'CRITICAL').length;
+    const vqTickedEmailCount = readyToOrder.filter(r => r.Priority === 'VQ TICKED - NEED PO').length;
     const highCount = readyToOrder.filter(r => r.Priority === 'HIGH').length;
     const medCount = readyToOrder.filter(r => r.Priority === 'MEDIUM').length;
     const lowCount = readyToOrder.filter(r => r.Priority === 'LOW').length;
@@ -422,19 +468,44 @@ async function main() {
       ? Math.max(...pendingApprovals.map(p => p['Days Pending'] || 0))
       : 0;
 
+    const vqTickedLine = vqTickedEmailCount > 0 ? `\n- VQ TICKED - NEED PO (procurement bottleneck): ${vqTickedEmailCount}` : '';
+
+    // Check for Additional Review parts
+    const flaggedCPCs = getFlaggedCPCsFromHandler();
+    const additionalReviewParts = Object.values(excelData).filter(e => e.Status === 'Additional Review');
+
     let emailBody = `LAM 3PL Reorder Report - ${getDateStamp()}
 
 === REORDER ALERTS (Ready to Order) ===
 ${readyToOrder.length} items below threshold:
-- CRITICAL (zero stock, no recent PO): ${critCount}
+- CRITICAL (zero stock, no recent PO): ${critCount}${vqTickedLine}
 - HIGH: ${highCount}
 - MEDIUM: ${medCount}
 - LOW: ${lowCount}
-- PENDING ORDER PLACEMENT (chase the PO): ${pendingOrderCount}
+- PENDING ORDER PLACEMENT (PO cut, awaiting Infor): ${pendingOrderCount}
 - PENDING RECEIPT (waiting on vendor): ${pendingReceiptCount}
 
 === PENDING APPROVALS ===
 ${pendingApprovals.length} items awaiting LAM approval`;
+
+    // Add Additional Review section if any
+    if (additionalReviewParts.length > 0 || flaggedCPCs.length > 0) {
+      emailBody += `
+
+=== ADDITIONAL REVIEW (Flagged Discrepancies) ===
+${additionalReviewParts.length} parts have discrepancies flagged for operator review.
+These had their primary approval applied, but the email mentioned other field changes.
+
+Reply to lamkitting@orangetsunami.com with APPROVE/SKIP commands:
+  APPROVE LEADTIME — update lead time to email value
+  APPROVE MOQ — update MOQ to email value
+  SKIP ALL — skip all flagged items for this CPC`;
+      if (flaggedCPCs.length > 0) {
+        emailBody += `
+
+CPCs pending review: ${flaggedCPCs.join(', ')}`;
+      }
+    }
 
     if (pendingApprovals.length > 0) {
       emailBody += `
@@ -821,12 +892,11 @@ function loadRecentPOVs() {
         AND rl.chuboe_cpc IS NOT NULL
         AND rl.chuboe_cpc != ''
         AND rfq.c_bpartner_id = 1000730
-        -- Keep if: has POV stamp (Infor validated), OR recent, OR promise date not yet passed
-        -- Only filter out truly stale orphans: no POV + old + passed promise
+        -- Keep if: recent OR promise date not yet passed
+        -- Filter out stale orphans: old + passed promise (even if Infor-stamped)
         AND (
-          ol.chuboe_po_string LIKE 'POV%'                         -- Infor validated = keep
-          OR o.created::date >= CURRENT_DATE - INTERVAL '90 days' -- Recent = keep
-          OR ol.datepromised::date >= CURRENT_DATE                -- Not yet due = keep
+          o.created::date >= CURRENT_DATE - INTERVAL '90 days' -- Recent = keep
+          OR ol.datepromised::date >= CURRENT_DATE             -- Not yet due = keep
         )
 
       UNION ALL
@@ -998,18 +1068,20 @@ const ALERT_COLUMNS = [
 // Three states, in descending procurement maturity:
 //   PO + POV stamp: "POV0075568 (2026-04-13, 60 pcs from Master, RFQ 1132328)"
 //   PO only:        "OT PO809630 pending Infor stamp (2026-04-13, 60 pcs from Master, RFQ 1132328)"
-//   VQ ticked only: "VQ ticked — PO pending (60 pcs from Master, RFQ 1132328)"
+//   VQ ticked only: "VQ ticked - PO pending (60 pcs from Master, RFQ 1132328)"
+// Date shown is the PO issue date (when order was placed), not the promise date.
 function formatPOVCell(pov) {
   if (!pov || !pov.State) return '';
   const rfqTag = pov.RFQ_Number ? `, RFQ ${pov.RFQ_Number}` : '';
   if (pov.State === 'PO') {
     const id = pov.POV_Number || (pov.OT_PO_Number ? `OT ${pov.OT_PO_Number} pending Infor stamp` : '');
     if (!id) return '';
-    const datePart = pov.POV_Date ? `${pov.POV_Date}, ` : '';
+    // Use PO issue date, not promise date (promise dates are vendor ETAs, not reliable)
+    const datePart = pov.PO_Created_Date ? `${pov.PO_Created_Date}, ` : '';
     return `${id} (${datePart}${pov.POV_Qty} pcs from ${pov.POV_Supplier}${rfqTag})`;
   }
   if (pov.State === 'VQ_TICKED') {
-    return `VQ ticked — PO pending (${pov.POV_Qty} pcs from ${pov.POV_Supplier}${rfqTag})`;
+    return `VQ ticked - PO pending (${pov.POV_Qty} pcs from ${pov.POV_Supplier}${rfqTag})`;
   }
   return '';
 }
@@ -1039,7 +1111,7 @@ function buildAlert(mpn, excel, totalQty, lamOwned, shortfall, priority, history
     'OT Previous Supplier': history.OT_Previous_Supplier || '',
     'OT Buyer': pov && pov.Buyer ? pov.Buyer : (history.OT_Buyer || ''),
     'Historical Buyer': excel.Historical_Buyer || '',
-    'Last Promise Date': history.Last_Purchase_Date || '',
+    'Last Promise Date': pov && pov.POV_Date ? pov.POV_Date : (history.Last_Purchase_Date || ''),
     'Last RFQ': history.RFQ_Number ? `${history.RFQ_Number} (${history.RFQ_Customer || ''})` : '',
     'Lead Time': excel.Lead_Time,
     'LAM MOQ': excel.MOQ,
@@ -1049,12 +1121,14 @@ function buildAlert(mpn, excel, totalQty, lamOwned, shortfall, priority, history
 // If the MPN has recent in-flight purchase activity (gated by SQL: PO cut in last 90d
 // OR promise date still ≥ today), the row is informational — split into:
 //   - PENDING RECEIPT          → Infor POV stamp exists, waiting on shipment
-//   - PENDING ORDER PLACEMENT  → no POV stamp yet (OT PO without Infor stamp,
-//                                 or VQ ticked with no PO at all) — chase the PO
+//   - PENDING ORDER PLACEMENT  → PO cut but no Infor stamp yet
+//   - VQ APPROVED - CHASE PO   → VQ ticked but no PO cut — procurement bottleneck
 // Shortfall-based priority is retained when no recent activity exists.
 function resolvePriority(shortfallBasedPriority, pov) {
   if (!pov) return shortfallBasedPriority;
-  return pov.POV_Number ? 'PENDING RECEIPT' : 'PENDING ORDER PLACEMENT';
+  if (pov.POV_Number) return 'PENDING RECEIPT';
+  if (pov.State === 'VQ_TICKED') return 'VQ TICKED - NEED PO';
+  return 'PENDING ORDER PLACEMENT';
 }
 
 function identifyReorderCandidates(aggregated, excelData, historicalData, recentPOVs = {}) {
@@ -1197,7 +1271,9 @@ function identifyReorderCandidates(aggregated, excelData, historicalData, recent
   // PO is more actionable than waiting on a vendor that's already been ordered from.
   // PENDING WAREHOUSE TRANSFER is last (just tracking until transfer completes).
   const priorityOrder = {
-    'CRITICAL': 0, 'HIGH': 1, 'MEDIUM': 2, 'LOW': 3,
+    'CRITICAL': 0,
+    'VQ TICKED - NEED PO': 0.5,  // Procurement bottleneck - VQ approved but no PO cut
+    'HIGH': 1, 'MEDIUM': 2, 'LOW': 3,
     'NO THRESHOLD': 3.5,  // After LOW, before PENDING - need threshold from LAM
     'PENDING ORDER PLACEMENT': 4,
     'PENDING RECEIPT': 4,
