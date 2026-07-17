@@ -420,6 +420,12 @@ WHERE COALESCE(CURRENT_DATE - ra.last_rfq_date::date, 30) >= 3  -- Change 3-day 
 
 ## Changelog
 
+**2026-07-17** - CRITICAL BUG FIX: Race condition causing regional filter crossover
+- Fixed concurrent execution issue where USA/MEX/VP briefs overwrote each other's temp query files
+- Changed temp file from shared `temp-query.sql` to unique `temp-query-vp.sql`
+- This bug primarily affected USA/MEX briefs (cross-contamination), but VP was also at risk
+- See `docs/BUGFIX-2026-07-17-race-condition.md` for full details
+
 **2026-07-01** - Email delivery format changed to HTML attachment
 - Changed from embedded HTML email to HTML attachment approach for better email client compatibility
 - Collapsible sections now work properly when attachment is opened in web browser

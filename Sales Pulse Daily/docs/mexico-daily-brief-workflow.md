@@ -334,6 +334,12 @@ LIMIT 10  -- Change top 10 threshold
 
 ## Changelog
 
+**2026-07-17** - CRITICAL BUG FIX: Race condition causing regional filter crossover
+- Fixed concurrent execution issue where USA/MEX/VP briefs overwrote each other's temp query files
+- Changed temp file from shared `temp-query.sql` to unique `temp-query-mexico.sql`
+- Resolves issue where Mexico sellers (Alex Partida, Joel Flores) appeared in USA brief
+- See `docs/BUGFIX-2026-07-17-race-condition.md` for full details
+
 **2026-07-01** - Initial release based on USA Daily Brief
 - Filtered to Mexico region (except Strategic Accounts section)
 - Section 3 shows individual sales reps instead of regional rollup

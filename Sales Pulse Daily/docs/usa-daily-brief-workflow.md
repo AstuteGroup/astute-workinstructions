@@ -323,6 +323,13 @@ LIMIT 10  -- Change top 10 threshold
 
 ## Changelog
 
+**2026-07-17** - CRITICAL BUG FIX: Race condition causing regional filter crossover
+- Fixed concurrent execution issue where USA/MEX/VP briefs overwrote each other's temp query files
+- Changed temp file from shared `temp-query.sql` to unique `temp-query-usa.sql`
+- Resolves recurring issue where cron runs showed MEX sellers in USA brief
+- Manual runs were unaffected (only one script ran at a time)
+- See `docs/BUGFIX-2026-07-17-race-condition.md` for full details
+
 **2026-07-01** - Updated to match VP Daily Brief improvements
 - **Section 1.1:** Changed from Top 5 to Top 15 orders with collapsible section (5 visible + 10 hidden)
 - **Section 1.4:** Updated to location-level reactivation tracking (Customer Name + City) with significance scoring
