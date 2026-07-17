@@ -474,18 +474,12 @@ async function writeOffer(opts) {
     };
     // MFR resolution via the unified resolver: text path (Policy D #1) when
     // line.mfrText is provided; MPN-prefix inference + acquisition map
-    // (Policy D #3) as fallback when text is empty. Only set Chuboe_MFR_ID
-    // when the resolved record is non-system (system-level MFRs with
-    // AD_Client_ID=0 cause 500 errors via API: "System ID XXXX cannot be
-    // used in Chuboe_MFR_ID").
+    // (Policy D #3) as fallback when text is empty.
+    // Never send Chuboe_MFR_ID — server resolves from canonical name.
     if (line.mfrText || mpnRaw) {
       const mfrResult = resolveMfrForRow({ mfrText: line.mfrText, mpn: mpnRaw });
       if (mfrResult.canonical) {
-        linePayload.Chuboe_MFR_Text = mfrResult.canonical;
-      }
-      // System MFRs work fine — verified 2026-07-17 with Crystek
-      if (mfrResult.id) {
-        linePayload.Chuboe_MFR_ID = mfrResult.id;
+        linePayload.Chuboe_MFR_Text = mfrResult.canonical;  // exact chuboe_mfr.name
       }
     }
     if (line.qty != null) linePayload.Qty = line.qty;

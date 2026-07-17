@@ -111,7 +111,7 @@ async function createManualVQ(opts) {
     rfqLineId,
     mpn,
     mfrText,
-    mfrId: providedMfrId,
+    // mfrId is no longer used — server resolves from canonical name
     vendorBpId,
     vendorLocationId,
     qty,
@@ -174,17 +174,19 @@ async function createManualVQ(opts) {
     }
   }
 
-  // Resolve MFR ID if not provided
-  // NOTE: System MFRs (AD_Client_ID=0) work fine in VQs — verified 2026-07-17
-  // with Crystek (M01400, ID 1001625). Previous assumption that they were
-  // blocked was incorrect.
-  let mfrId = providedMfrId;
-  if (!mfrId) {
+  // Resolve MFR via lookup — get canonical name (exact chuboe_mfr.name value)
+  // NEVER send Chuboe_MFR_ID — iDempiere REST API rejects system MFR IDs.
+  // Instead, send the canonical name as Chuboe_MFR_Text. Server-side bean
+  // matches exact name to chuboe_mfr record reliably. This avoids both:
+  //   1. API rejection of system MFR IDs
+  //   2. Unreliable alias matching on free-form input text
+  let mfrCanonical = mfrText;  // default to input text (fallback)
+  if (!opts.skipMfrLookup) {
     const mfrLookup = lookupMfr(mfrText);
-    if (mfrLookup.id) {
-      mfrId = mfrLookup.id;
+    // Use canonical name if matched — this is the exact chuboe_mfr.name value
+    if (mfrLookup.matched && mfrLookup.canonical) {
+      mfrCanonical = mfrLookup.canonical;
     }
-    // If no match, we'll use mfrText and let server resolve
   }
 
   // Get vendor type for traceability
@@ -212,8 +214,7 @@ async function createManualVQ(opts) {
     C_BPartner_ID: vendorBpId,
     C_BPartner_Location_ID: vendorLocationId,
     Chuboe_MPN: mpn,
-    Chuboe_MFR_Text: mfrText,
-    ...(mfrId ? { Chuboe_MFR_ID: mfrId } : {}),
+    Chuboe_MFR_Text: mfrCanonical,  // exact chuboe_mfr.name — server resolves to MFR ID
     Qty: qty,
     Cost: cost,
 
@@ -262,8 +263,7 @@ async function createManualVQ(opts) {
     id: result.id,
     vqLineId: result.id,
     mpn,
-    mfrText,
-    mfrId,
+    mfrText: mfrCanonical,  // canonical name that was written
     vendorBpId,
     cost,
     qty,

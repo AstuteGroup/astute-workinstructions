@@ -390,9 +390,8 @@ async function writeRFQ(opts) {
       // for this MPN — operator-vetted ground truth beats prefix guess for
       // MPNs we have actually traded, and survives the prefix-resolver's known
       // overreach (CY7C, ISO*, ISL*, XC*, BCM*); falls back to MPN-prefix +
-      // acquisition map when neither hits. Only set Chuboe_MFR_ID for non-
-      // system records (system-level MFRs with AD_Client_ID=0 cause 500
-      // errors via API).
+      // acquisition map when neither hits.
+      // Never send Chuboe_MFR_ID — server resolves from canonical name.
       if (line.mfrText || mpnRaw) {
         const mfrResult = resolveMfrForRow({
           mfrText: line.mfrText,
@@ -400,23 +399,17 @@ async function writeRFQ(opts) {
           consultOTHistory: true,
         });
         if (mfrResult.canonical) {
-          mpnPayload.Chuboe_MFR_Text = mfrResult.canonical;
-        }
-        // System MFRs work fine — verified 2026-07-17 with Crystek
-        if (mfrResult.id) {
-          mpnPayload.Chuboe_MFR_ID = mfrResult.id;
+          mpnPayload.Chuboe_MFR_Text = mfrResult.canonical;  // exact chuboe_mfr.name
         }
       }
       if (mpnDescription) mpnPayload.Description = mpnDescription;
       if (dateCode) mpnPayload.Chuboe_Date_Code = dateCode;
 
-      // Natural key includes MFR so legitimate cross-MFR AVL alternates
-      // (e.g., DG441DY from both Renesas and Vishay on the same line) are
-      // not collapsed. If MFR is unset on the payload, the verify path is
-      // skipped — apiPost will throw on transient errors instead of risking
-      // a dup retry, which is the safer default.
+      // Natural key: MFR resolved server-side from text, so use text field here.
+      // If MFR text is unset, verify path is skipped — apiPost will throw on
+      // transient errors instead of risking a dup retry.
       await apiPost('chuboe_rfq_line_mpn', mpnPayload, {
-        naturalKeyFields: ['Chuboe_RFQ_Line_ID', 'Chuboe_MPN_Clean', 'Chuboe_MFR_ID'],
+        naturalKeyFields: ['Chuboe_RFQ_Line_ID', 'Chuboe_MPN_Clean', 'Chuboe_MFR_Text'],
         context: 'rfq-loading',
       });
     } catch (e) {

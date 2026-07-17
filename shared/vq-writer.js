@@ -772,19 +772,12 @@ async function writeVQFromAPI(rfqSearchKey, cpc, franchiseResults, opts = {}) {
       logger.info(`MFR inferred from MPN '${mpn}' via prefix '${mfrResult.prefix}' → ${mfrCanonical} (acquisition: ${mfrResult.originalMfr} → ${mfrCanonical})`);
     }
 
-    // Try to get MFR ID via cache or live DB lookup. Failures here are non-fatal.
-    // NOTE: System MFRs (AD_Client_ID=0) work fine — verified 2026-07-17 with Crystek.
-    let resolvedMfrId = null;
-    if (mfrResult.id) {
-      resolvedMfrId = mfrResult.id;
-    } else {
-      try {
-        const live = await resolveMFR(mfrCanonical);
-        if (live && live.id) resolvedMfrId = live.id;
-      } catch (_) { /* ignore — fall through to text-only write */ }
-    }
-    // resolvedMfrId may be null here (no match) — that's OK,
-    // the payload will omit Chuboe_MFR_ID and the server will resolve from text.
+    // NEVER send Chuboe_MFR_ID — iDempiere REST API rejects system MFR IDs.
+    // Send the canonical name as Chuboe_MFR_Text instead. Server-side bean
+    // matches exact chuboe_mfr.name to the MFR record reliably. This avoids:
+    //   1. API rejection of system MFR IDs
+    //   2. Unreliable alias matching on free-form input text
+    // The mfrCanonical value (from resolveMfrForRow) is the exact chuboe_mfr.name.
 
     // Build internal enrichment notes — combine parser-built notes (per-row or
     // top-level) with packaging context. Despite the legacy "vendorNotes" field
@@ -859,15 +852,13 @@ async function writeVQFromAPI(rfqSearchKey, cpc, franchiseResults, opts = {}) {
     }
 
     // Build payload — use searched MPN (our MPN), not the API's variant.
-    // Chuboe_MFR_ID is conditional: only include when we have a non-system client-level ID.
-    // Server resolves system-only / unknown MFRs from Chuboe_MFR_Text via bean callout.
+    // Never send Chuboe_MFR_ID — server resolves from Chuboe_MFR_Text (canonical name).
     const payload = {
       Chuboe_RFQ_ID: rfq.id,
       Chuboe_RFQ_Line_ID: rfqLineId,
       C_BPartner_ID: bp.id,
       Chuboe_MPN: opts.searchedMpn || mpn,
-      Chuboe_MFR_Text: mfrCanonical,
-      ...(resolvedMfrId ? { Chuboe_MFR_ID: resolvedMfrId } : {}),
+      Chuboe_MFR_Text: mfrCanonical,  // exact chuboe_mfr.name — server resolves to MFR ID
       Cost: price,
       Qty: qty,
       C_Currency_ID: row.currencyId || 100, // default USD; Farnell = 114 (GBP)

@@ -569,9 +569,8 @@ async function writeCQBatch(rfqSearchKey, lines, opts = {}) {
       payload.Chuboe_CPC = cpc;
       payload.Chuboe_CPC_Clean = cleanMpn(cpc);
     }
-    // MFR resolution: only set MFR ID if non-system record.
-    // System-level MFR records (AD_Client_ID=0) cause 500 errors via API.
-    if (mfrId) payload.Chuboe_MFR_ID = mfrId;
+    // Never send Chuboe_MFR_ID — server resolves from canonical name.
+    // mfrCanonical is the exact chuboe_mfr.name value.
     if (mfrCanonical) payload.Chuboe_MFR_Text = mfrCanonical;
 
     // All other optional fields — populate anything the caller provided
