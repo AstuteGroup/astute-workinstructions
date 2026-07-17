@@ -67,6 +67,23 @@ const DISCREPANCY_FIELDS = [
   { key: 'basePrice', col: 'BASE_PRICE', label: 'Base Unit Price' },
 ];
 
+// ─── EMAIL OPTIONS HELPER ────────────────────────────────────────────────────
+
+/**
+ * Build email options with CC to original sender (if different from Jake).
+ * All summary emails go to Jake AND the original email sender.
+ */
+function buildEmailOpts(ctx, extraOpts = {}) {
+  const opts = { html: true, replyTo: ctx.inbox, ...extraOpts };
+
+  // CC the original sender if different from Jake
+  if (ctx.currentFrom && ctx.currentFrom !== ctx.jakeEmail.toLowerCase()) {
+    opts.cc = ctx.currentFrom;
+  }
+
+  return opts;
+}
+
 // ─── HANDLERS ────────────────────────────────────────────────────────────────
 
 /**
@@ -184,7 +201,7 @@ async function action_approve_price(payload, ctx) {
       ? `LAM Approval Applied + Review Needed: ${cpc}`
       : `LAM Approval Applied: ${cpc}`,
     html,
-    { html: true, replyTo: ctx.inbox },
+    buildEmailOpts(ctx),
   );
 
   return {
@@ -197,6 +214,7 @@ async function action_approve_price(payload, ctx) {
     discrepanciesFound: discrepancies.length,
     additionalReviewSet: discrepancies.length > 0,
     notified: ctx.jakeEmail,
+    ccSender: ctx.currentFrom !== ctx.jakeEmail.toLowerCase() ? ctx.currentFrom : null,
   };
 }
 
@@ -294,7 +312,7 @@ async function action_approve_leadtime(payload, ctx) {
       ? `LAM Approval Applied + Review Needed: ${cpc}`
       : `LAM Approval Applied: ${cpc}`,
     html,
-    { html: true, replyTo: ctx.inbox },
+    buildEmailOpts(ctx),
   );
 
   return {
@@ -304,6 +322,7 @@ async function action_approve_leadtime(payload, ctx) {
     newLeadTime,
     lastApproved: effectiveDate,
     discrepanciesFound: discrepancies.length,
+    ccSender: ctx.currentFrom !== ctx.jakeEmail.toLowerCase() ? ctx.currentFrom : null,
     additionalReviewSet: discrepancies.length > 0,
     notified: ctx.jakeEmail,
   };
@@ -518,7 +537,7 @@ async function action_add_award(payload, ctx) {
     ctx.jakeEmail,
     `LAM New Award Added: ${cpc}`,
     html,
-    { html: true },
+    buildEmailOpts(ctx),
   );
 
   return {
@@ -528,6 +547,7 @@ async function action_add_award(payload, ctx) {
     manufacturer,
     awardQty,
     basePrice,
+    ccSender: ctx.currentFrom !== ctx.jakeEmail.toLowerCase() ? ctx.currentFrom : null,
     resalePrice,
     notified: ctx.jakeEmail,
   };
@@ -568,7 +588,7 @@ async function action_reject(payload, ctx) {
     ctx.jakeEmail,
     `LAM Rejection: ${cpc}`,
     html,
-    { html: true },
+    buildEmailOpts(ctx),
   );
 
   return {
@@ -576,6 +596,7 @@ async function action_reject(payload, ctx) {
     cpc,
     reason,
     notified: ctx.jakeEmail,
+    ccSender: ctx.currentFrom !== ctx.jakeEmail.toLowerCase() ? ctx.currentFrom : null,
   };
 }
 
@@ -629,7 +650,7 @@ ${investigationBlock}
     ctx.jakeEmail,
     `LAM Kitting — needs info: ${subject || '(no subject)'}`,
     html,
-    { html: true, replyTo: ctx.inbox },
+    buildEmailOpts(ctx),
   );
 
   breadcrumbs.write({
@@ -641,6 +662,7 @@ ${investigationBlock}
 
   return {
     notified: ctx.jakeEmail,
+    ccSender: ctx.currentFrom !== ctx.jakeEmail.toLowerCase() ? ctx.currentFrom : null,
     sidecar_anchor: ctx.anchorMessageId,
     retry_count: retryCount,
   };
@@ -675,7 +697,7 @@ ${details ? `<pre style="background:#f5f5f5;padding:8px;white-space:pre-wrap;fon
     ctx.jakeEmail,
     `LAM Kitting — needs review: ${subject || '(no subject)'}`,
     html,
-    { html: true },
+    buildEmailOpts(ctx),
   );
 
   breadcrumbs.write({
@@ -685,7 +707,10 @@ ${details ? `<pre style="background:#f5f5f5;padding:8px;white-space:pre-wrap;fon
     reason,
   });
 
-  return { notified: ctx.jakeEmail };
+  return {
+    notified: ctx.jakeEmail,
+    ccSender: ctx.currentFrom !== ctx.jakeEmail.toLowerCase() ? ctx.currentFrom : null,
+  };
 }
 
 /**
