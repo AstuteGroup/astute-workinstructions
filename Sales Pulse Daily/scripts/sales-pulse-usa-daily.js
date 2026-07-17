@@ -51,7 +51,8 @@ function execQueryFromFile(queryFile, queryName) {
 function execQuery(sql) {
   try {
     // Write query to temp file to avoid command-line escaping issues
-    const tempFile = path.join(__dirname, '../output/temp-query.sql');
+    // UNIQUE FILENAME to prevent race condition with MEX/VP briefs running simultaneously
+    const tempFile = path.join(__dirname, '../output/temp-query-usa.sql');
     fs.writeFileSync(tempFile, sql);
 
     const output = execSync(
