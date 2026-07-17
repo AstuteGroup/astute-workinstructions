@@ -772,19 +772,18 @@ async function writeVQFromAPI(rfqSearchKey, cpc, franchiseResults, opts = {}) {
       logger.info(`MFR inferred from MPN '${mpn}' via prefix '${mfrResult.prefix}' → ${mfrCanonical} (acquisition: ${mfrResult.originalMfr} → ${mfrCanonical})`);
     }
 
-    // Try to enrich with a non-system ID via live DB lookup. Failures here are non-fatal
-    // — we'll fall back to the cache result, and if that's also system-only we omit the ID.
+    // Try to get MFR ID via cache or live DB lookup. Failures here are non-fatal.
+    // NOTE: System MFRs (AD_Client_ID=0) work fine — verified 2026-07-17 with Crystek.
     let resolvedMfrId = null;
-    if (mfrResult.id && !mfrResult.isSystem) {
-      // Cache already has a client-level ID — trust it
+    if (mfrResult.id) {
       resolvedMfrId = mfrResult.id;
     } else {
       try {
         const live = await resolveMFR(mfrCanonical);
-        if (live && live.id && !live.isSystem) resolvedMfrId = live.id;
+        if (live && live.id) resolvedMfrId = live.id;
       } catch (_) { /* ignore — fall through to text-only write */ }
     }
-    // resolvedMfrId may be null here (system-only or no match) — that's OK,
+    // resolvedMfrId may be null here (no match) — that's OK,
     // the payload will omit Chuboe_MFR_ID and the server will resolve from text.
 
     // Build internal enrichment notes — combine parser-built notes (per-row or

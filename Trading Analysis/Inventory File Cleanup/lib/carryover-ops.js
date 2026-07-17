@@ -311,9 +311,10 @@ async function add(opts) {
             Chuboe_MPN_Clean: mpnClean,
             Qty: l.qty,
         };
+        // System MFRs work fine — verified 2026-07-17 with Crystek
         const mfrResult = resolveMfrForRow({ mfrText: l.mfrText, mpn: l.mpn });
         if (mfrResult.canonical) payload.Chuboe_MFR_Text = mfrResult.canonical;
-        if (mfrResult.id && !mfrResult.isSystem) payload.Chuboe_MFR_ID = mfrResult.id;
+        if (mfrResult.id) payload.Chuboe_MFR_ID = mfrResult.id;
         if (l.dateCode) payload.Chuboe_Date_Code = l.dateCode;
         if (l.packageDesc) payload.Chuboe_Package_Desc = l.packageDesc;
         if (l.price != null) payload.PriceEntered = l.price;

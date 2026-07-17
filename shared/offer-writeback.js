@@ -193,7 +193,9 @@ function applyConsignmentGuard(opts) {
  * @param {string} [opts.datetrx]           - Transaction date (ISO string). Defaults to now.
  * @param {number} [opts.userId]            - chuboe_user_id (optional)
  * @param {number} [opts.buyerId]           - chuboe_buyer_id (optional)
- * @param {boolean} [opts.writeMpnRecords=false] - Also write chuboe_offer_line_mpn records
+ * @param {boolean} [opts.writeMpnRecords=false] - ⚠️ DEPRECATED: Do NOT set to true.
+ *   iDempiere bean callout auto-creates chuboe_offer_line_mpn records. Setting true causes duplicates.
+ *   See data-model.md § chuboe_offer_line auto-creates chuboe_offer_line_mpn (2026-07-07)
  * @param {boolean} [opts.isBackfill=false] - Backfill mode (coordinates with global budget)
  * @param {Array}  opts.lines               - Array of line objects (required, at least 1)
  * @param {string} opts.lines[].mpn         - Part number (required)
@@ -236,6 +238,11 @@ async function writeOffer(opts) {
   if (!bpartnerId) throw new Error('offer-writeback: bpartnerId is required');
   if (!rawOfferType) throw new Error('offer-writeback: offerTypeId is required');
   if (!lines || lines.length === 0) throw new Error('offer-writeback: at least one line is required');
+
+  // ── Deprecation warning ──
+  if (writeMpnRecords) {
+    logger.warn('⚠️  writeMpnRecords=true is DEPRECATED. iDempiere bean callout auto-creates offer_line_mpn records. Setting this flag causes duplicates. See data-model.md § chuboe_offer_line auto-creates chuboe_offer_line_mpn');
+  }
 
   // Note: Suspended (vtype 1000004) / Prohibited (vtype 1000005) BPs are NOT
   // gated here. Loading is data capture; the approval flow downstream is the
@@ -476,7 +483,8 @@ async function writeOffer(opts) {
       if (mfrResult.canonical) {
         linePayload.Chuboe_MFR_Text = mfrResult.canonical;
       }
-      if (mfrResult.id && !mfrResult.isSystem) {
+      // System MFRs work fine — verified 2026-07-17 with Crystek
+      if (mfrResult.id) {
         linePayload.Chuboe_MFR_ID = mfrResult.id;
       }
     }

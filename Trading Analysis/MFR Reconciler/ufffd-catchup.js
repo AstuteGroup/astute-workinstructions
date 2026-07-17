@@ -89,7 +89,7 @@ function resolveRows(rows) {
       unresolved.set(text, (unresolved.get(text) || 0) + 1);
       continue;
     }
-    if (result.isSystem) { skippedSystem++; continue; }
+    // System MFRs work fine — verified 2026-07-17 with Crystek
     updates.push({ id: row.id, payload: { Chuboe_MFR_ID: result.id } });
   }
   return { updates, skippedSystem, skippedDistributor, unresolved };

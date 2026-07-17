@@ -268,13 +268,13 @@ async function resolveMfrForCQ(mfrText, mpn) {
   }
 
   const canonical = mfrResult.canonical || sanitizeMfrText(mfrText);
-  // Re-resolve via api-client.resolveMFR to ensure target system has the record
-  // (mfr-resolver's lookupMfr step uses the local cache; resolveMFR confirms
-  // against the live API and respects isSystem).
+  // Re-resolve via api-client.resolveMFR to ensure target system has the record.
+  // NOTE: System MFRs (AD_Client_ID=0) work fine — verified 2026-07-17 with
+  // Crystek (M01400). Previous isSystem skip was unnecessary.
   const resolved = await resolveMFR(canonical);
 
   return {
-    id: (resolved && !resolved.isSystem) ? resolved.id : null,
+    id: resolved ? resolved.id : null,
     canonical,
     flagReason: null,
     path: mfrResult.path,

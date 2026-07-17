@@ -16,9 +16,9 @@
  *   alias → cache → DB strict → DB fuzzy → passthrough
  *
  * Skip rules:
- *   - lookupMfr returns isSystem=true → skip (iDempiere REST rejects system IDs in client tables)
  *   - text matches a known distributor name → skip (data-entry error, not a real MFR)
  *   - lookupMfr returns matched=false → skip (passthrough only)
+ * NOTE: System MFRs (AD_Client_ID=0) work fine — verified 2026-07-17 with Crystek.
  *
  * USAGE:
  *   node mfr-reconciler.js                        # normal cron invocation
@@ -202,11 +202,7 @@ function resolveRows(rows) {
       continue;
     }
 
-    if (result.isSystem) {
-      skippedSystem++;
-      continue;
-    }
-
+    // System MFRs work fine — verified 2026-07-17 with Crystek. No skip needed.
     updates.push({ id: row.id, payload: { Chuboe_MFR_ID: result.id } });
   }
 

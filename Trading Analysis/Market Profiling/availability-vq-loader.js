@@ -301,9 +301,10 @@ async function writeAvailabilityVQ(rfq, row, dryRun = false) {
   }
 
   // Resolve MFR (try to infer from MPN if no data)
+  // System MFRs work fine — verified 2026-07-17 with Crystek
   const mfrResult = resolveMfrForRow({ mfrText: '', mpn: offeredMpn || mpn });
   const mfrText = mfrResult.canonical || '';
-  const mfrId = (mfrResult.id && !mfrResult.isSystem) ? mfrResult.id : null;
+  const mfrId = mfrResult.id || null;
 
   // Build notes
   const vendorDisplay = bpResult.source === 'placeholder' ? bpResult.vendorName : supplierName;

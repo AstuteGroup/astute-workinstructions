@@ -402,7 +402,8 @@ async function writeRFQ(opts) {
         if (mfrResult.canonical) {
           mpnPayload.Chuboe_MFR_Text = mfrResult.canonical;
         }
-        if (mfrResult.id && !mfrResult.isSystem) {
+        // System MFRs work fine — verified 2026-07-17 with Crystek
+        if (mfrResult.id) {
           mpnPayload.Chuboe_MFR_ID = mfrResult.id;
         }
       }

@@ -26,6 +26,9 @@
 | `offer-writeback.js` | Write market offers via REST API (header + line + optional line_mpn). Server-assigned IDs, batch write, deactivation of prior offers. | Writing any offer type to iDempiere | Market Offer Loading, Inventory File Cleanup, (future) VQ Loading |
 | `api-result-writer.js` | Capture full franchise API responses (all price breaks, stock, lead time) to cache + iDempiere. Extract qty-relevant prices for downstream consumers. | After any `searchAllDistributors()` call (write), or when Vortex/Quick Quote needs franchise pricing (read) | Franchise Screening, Suggested Resale, LAM Kitting (write); Vortex Matches, Quick Quote (read) |
 | `record-updater.js` | Generalized PATCH/PUT pattern: GET-then-PATCH idempotency, skip-if-not-null gating, validation, throttled batch, audit logs | Any backfill or enrichment that **updates** existing rows (HTS/ECCN backfill, alt-MPN linkage, dormant column populations, etc.) | HTS/ECCN backfill (W2), future enrichment passes |
+| `vq-purchase-validator.js` | Pre-flight gate for VQ purchase: validates Tier 2 fields, note-field split, program-specific ship-to, competing VQs | Before any `IsPurchased='Y'` tick or approve-order R_Request | vq-patcher.js, r-request-writer.js |
+| `vq-patcher.js` | Enforced wrapper for ticking VQ as purchased: runs validator, auto-unticks competitors, applies extra fields | Ticking any VQ as `IsPurchased='Y'` — DO NOT use `patchRecord` directly | LAM Kitting, LAM EPG, Stock RFQ purchases |
+| `r-request-writer.js` | Enforced wrapper for approve-order R_Requests: validates VQ, forces Jake routing + Submitted status | Posting any approve-order R_Request — DO NOT use `apiPost('r_request')` directly | LAM Kitting, LAM EPG, all purchase approvals |
 | `db-helpers.js` | Shared DB read utilities: `psqlQuery`, `sqlStr`, `sqlNum`, `cleanMpn`. Used for read queries only — writes go through `api-client.js`. | Any module reading from `adempiere` schema | rfq-writer.js, offer-writeback.js, api-result-writer.js, partner-lookup.js |
 | `api-negative-cache.js` | Global, cross-RFQ, persistent cache of franchise API outcomes (primarily "not carried"). SQLite-backed at `shared/data/negative-cache.sqlite`. Per-disty TTL + confirm-count + envelope/context gates in `DISTY_RULES`. Shadow mode via `NEG_CACHE_SHADOW=1`. | Before any `searchPart()` call — dedup across RFQs so we stop burning quota on repeat parts | franchise-api.js (integration point for all 10 disty cogs) |
 | `auth-failure-alerts.js` | Detects auth-style errors (`401`, `403`, `Unauthorized`, `invalid_client`, etc.) from any disty, emails operator with 24h debounce per disty. State file: `shared/data/auth-failure-state.json`. | Automatic — called from franchise-api.js::searchPart on any thrown or result.error. No per-cog changes needed. | franchise-api.js |
@@ -656,9 +659,9 @@ const bp = await resolveBP('1002331', 'DigiKey');  // → { id, name, searchKey 
 // Batch pre-warm (at start of a write batch)
 await resolveBPBatch([{ searchKey: '1002331', name: 'DigiKey' }, { name: 'Smartel' }]);
 
-// MFR: by name, returns isSystem flag
-const mfr = await resolveMFR('Analog Devices Inc');  // → { id, name, isSystem: true }
-// If isSystem=true, don't include Chuboe_MFR_ID in POST — use text only
+// MFR: by name
+const mfr = await resolveMFR('Analog Devices Inc');  // → { id, name }
+// System MFRs (AD_Client_ID=0) work fine in VQs/CQs — use the ID directly
 ```
 
 All results cached per session (one API call per unique vendor/manufacturer).
