@@ -50,6 +50,7 @@ This workflow uses a hybrid approval pattern:
 | **Price approval** | LAM approves proposed resale price | `approve_price` | Yes |
 | **Lead time approval** | LAM approves contractual lead time | `approve_leadtime` | Yes |
 | **Other field mentions** | MOQ, threshold, base price in email | Flagged | No — operator decides |
+| **New awards (batch)** | Multiple new CPCs to add | `add_awards` | Yes (creates RFQ + enriches) |
 | **New award** | LAM adds new CPC to contract | `add_award` | Yes (after MFR validation) |
 | **Rejection** | LAM rejects proposal | `reject` | N/A |
 | **Flagged item reply** | Operator approves/skips flagged item | `approve_flagged` / `skip_flagged` | Per operator |
@@ -246,6 +247,33 @@ Skip a flagged item without applying.
   "field": "leadTime"
 }
 ```
+
+### add_awards (PREFERRED for multiple new parts)
+Batch add new CPCs to roster with full onboarding workflow.
+
+**Payload:**
+```json
+{
+  "awards": [
+    {"cpc": "630-A12345-001", "mpn": "LM7805ACT", "manufacturer": "Texas Instruments", "moq": 50, "reorderThreshold": 25},
+    {"cpc": "630-A12346-001", "mpn": "LM7812ACT", "manufacturer": "Texas Instruments"}
+  ],
+  "investigation_summary": "New award CPCs from LAM email."
+}
+```
+
+**Behavior:**
+1. Add all parts to Master Roster (Status = "New Award")
+2. Create RFQ for franchise sourcing (type = 3PL/VMI)
+3. Call franchise APIs for pricing/availability
+4. Send ONE consolidated email with:
+   - Parts added with franchise stock/pricing
+   - Missing info flagged (not blocking)
+   - Next steps for initial ordering
+5. Parts then enter normal reorder workflow
+
+**Required per part:** `cpc`, `mpn`, `manufacturer`
+**Optional:** `moq`, `reorderThreshold`, `basePrice`, `resalePrice`, `leadTime`, `awardQty`
 
 ### add_award
 Add new CPC to roster (after MFR validation).

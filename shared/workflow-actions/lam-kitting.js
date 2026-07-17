@@ -683,6 +683,302 @@ async function action_add_award(payload, ctx) {
 }
 
 /**
+ * Batch add new awards — adds to roster, creates RFQ, enriches, sends summary.
+ *
+ * This is the complete "New Award Onboarding" workflow:
+ * 1. Add all parts to Master Roster
+ * 2. Create RFQ for franchise sourcing
+ * 3. Call franchise APIs for pricing/availability
+ * 4. Send consolidated email with results + missing info
+ * 5. Set Status = "New Award" for initial order tracking
+ *
+ * Required per part: { cpc, mpn, manufacturer }
+ * Optional per part: { description, awardQty, basePrice, resalePrice, moq, reorderThreshold, leadTime }
+ *
+ * Payload: { awards: [...], investigation_summary }
+ */
+async function action_add_awards(payload, ctx) {
+  const { awards, investigation_summary } = payload;
+
+  if (!Array.isArray(awards) || awards.length === 0) {
+    return { error: 'awards array is required and must not be empty', fallback: 'needs_review' };
+  }
+
+  if (ctx.dryRun) {
+    return { dry_run: true, would_add: awards.map(a => ({ cpc: a.cpc, mpn: a.mpn })) };
+  }
+
+  const results = {
+    added: [],
+    skipped: [],      // Already exists
+    failed: [],       // Error adding
+    missingInfo: [],  // Added but missing recommended fields
+  };
+
+  // Step 1: Add each part to roster
+  for (const award of awards) {
+    const { cpc, mpn, manufacturer } = award;
+
+    // Validate required fields
+    if (!cpc || !mpn) {
+      results.failed.push({ cpc: cpc || '?', mpn: mpn || '?', error: 'Missing CPC or MPN' });
+      continue;
+    }
+
+    // Check if already exists
+    const existing = findRosterRowByCpc(cpc);
+    if (existing.found) {
+      results.skipped.push({ cpc, mpn, reason: 'Already in roster' });
+      continue;
+    }
+
+    // Determine what's missing
+    const missing = [];
+    if (!manufacturer) missing.push('manufacturer');
+    if (!award.moq) missing.push('moq');
+    if (!award.reorderThreshold) missing.push('reorderThreshold');
+    if (!award.basePrice) missing.push('basePrice');
+    if (!award.resalePrice) missing.push('resalePrice');
+
+    // Add to roster with defaults
+    const addResult = appendRosterRow({
+      cpc,
+      mpn,
+      manufacturer: manufacturer || 'TBD',
+      description: award.description || '',
+      award: award.awardQty || 0,
+      basePrice: award.basePrice || 0,
+      resalePrice: award.resalePrice || 0,
+      reorderThreshold: award.reorderThreshold || 0,
+      moq: award.moq || 1,
+      leadTime: award.leadTime || '',
+      buyer: award.buyer || 'Jake Harris',
+      status: 'New Award',
+    });
+
+    if (!addResult.success) {
+      results.failed.push({ cpc, mpn, error: addResult.error });
+      continue;
+    }
+
+    results.added.push({
+      cpc,
+      mpn,
+      manufacturer: manufacturer || 'TBD',
+      awardQty: award.awardQty || 0,
+      moq: award.moq || 1,
+      reorderThreshold: award.reorderThreshold || 0,
+    });
+
+    if (missing.length > 0) {
+      results.missingInfo.push({ cpc, mpn, missing });
+    }
+  }
+
+  // Step 2: Create RFQ for added parts (if any)
+  let rfqResult = null;
+  if (results.added.length > 0) {
+    try {
+      const { writeRFQ } = require('../rfq-writer');
+      const { lookupMfr } = require('../mfr-lookup');
+
+      const rfqLines = [];
+      for (const part of results.added) {
+        const mfrId = lookupMfr(part.manufacturer);
+        rfqLines.push({
+          mpn: part.mpn,
+          mfrId: mfrId || null,
+          mfrName: part.manufacturer,
+          qty: part.moq || 1,
+          targetPrice: 0,
+          cpc: part.cpc,  // For reference
+        });
+      }
+
+      rfqResult = await writeRFQ({
+        bpartnerId: 1000730,  // LAM Research
+        type: '3PL/VMI',
+        description: `LAM New Awards - ${results.added.length} parts`,
+        lines: rfqLines,
+      });
+    } catch (err) {
+      console.error('Error creating RFQ:', err.message);
+      rfqResult = { error: err.message };
+    }
+  }
+
+  // Step 3: Enrich via franchise API
+  let enrichResults = [];
+  if (results.added.length > 0) {
+    try {
+      const { searchAllDistributors } = require('../franchise-api');
+
+      for (const part of results.added) {
+        try {
+          const franchiseData = await searchAllDistributors(part.mpn, part.moq || 1);
+          enrichResults.push({
+            cpc: part.cpc,
+            mpn: part.mpn,
+            totalStock: franchiseData.summary?.totalStock || 0,
+            lowestPrice: franchiseData.summary?.lowestPrice || null,
+            distributorCount: franchiseData.summary?.distributorCount || 0,
+            hasStock: (franchiseData.summary?.totalStock || 0) > 0,
+          });
+        } catch (err) {
+          enrichResults.push({
+            cpc: part.cpc,
+            mpn: part.mpn,
+            error: err.message,
+            hasStock: false,
+          });
+        }
+      }
+    } catch (err) {
+      console.error('Error loading franchise-api:', err.message);
+    }
+  }
+
+  // Step 4: Send consolidated summary email
+  const html = buildNewAwardsSummaryEmail(results, rfqResult, enrichResults, ctx);
+
+  await ctx.notifier.sendEmail(
+    ctx.jakeEmail,
+    `LAM New Awards Added (${results.added.length}) - Initial Order Required`,
+    html,
+    buildEmailOpts(ctx),
+  );
+
+  breadcrumbs.write({
+    cog: 'lam-kitting-agent',
+    event: 'awards-batch-added',
+    uid: ctx.uid,
+    added: results.added.length,
+    skipped: results.skipped.length,
+    failed: results.failed.length,
+    rfqId: rfqResult?.rfqId || null,
+  });
+
+  return {
+    added: results.added.length,
+    skipped: results.skipped.length,
+    failed: results.failed.length,
+    missingInfo: results.missingInfo.length,
+    rfqId: rfqResult?.rfqId || null,
+    rfqValue: rfqResult?.value || null,
+    enriched: enrichResults.length,
+    partsWithStock: enrichResults.filter(e => e.hasStock).length,
+    notified: ctx.jakeEmail,
+    ccSender: ctx.currentFrom !== ctx.jakeEmail.toLowerCase() ? ctx.currentFrom : null,
+    results,
+    enrichResults,
+  };
+}
+
+/**
+ * Build summary email for batch new awards.
+ */
+function buildNewAwardsSummaryEmail(results, rfqResult, enrichResults, ctx) {
+  const today = new Date().toISOString().slice(0, 10);
+
+  // Build main table of added parts with enrichment data
+  const enrichMap = new Map(enrichResults.map(e => [e.cpc, e]));
+
+  const addedRows = results.added.map(p => {
+    const enrich = enrichMap.get(p.cpc) || {};
+    const stockBg = enrich.hasStock ? '#e8f5e9' : '#fff3e0';
+    const stockIcon = enrich.hasStock ? '✓' : '⚠️';
+
+    return `<tr>
+      <td style="padding:4px 8px;border:1px solid #ddd">${esc(p.cpc)}</td>
+      <td style="padding:4px 8px;border:1px solid #ddd">${esc(p.mpn)}</td>
+      <td style="padding:4px 8px;border:1px solid #ddd">${esc(p.manufacturer)}</td>
+      <td style="padding:4px 8px;border:1px solid #ddd;text-align:right">${formatNumber(p.moq)}</td>
+      <td style="padding:4px 8px;border:1px solid #ddd;text-align:right">${formatNumber(p.reorderThreshold)}</td>
+      <td style="padding:4px 8px;border:1px solid #ddd;text-align:right;background:${stockBg}">${stockIcon} ${formatNumber(enrich.totalStock || 0)}</td>
+      <td style="padding:4px 8px;border:1px solid #ddd;text-align:right">${enrich.lowestPrice ? formatCurrency(enrich.lowestPrice) : '—'}</td>
+    </tr>`;
+  }).join('');
+
+  // Skipped section
+  let skippedSection = '';
+  if (results.skipped.length > 0) {
+    const skippedRows = results.skipped.map(s =>
+      `<tr><td style="padding:4px 8px;border:1px solid #ddd">${esc(s.cpc)}</td><td style="padding:4px 8px;border:1px solid #ddd">${esc(s.mpn)}</td><td style="padding:4px 8px;border:1px solid #ddd;color:#666">${esc(s.reason)}</td></tr>`
+    ).join('');
+    skippedSection = `
+<h3 style="color:#666;margin-top:16px">Skipped (${results.skipped.length})</h3>
+<table style="border-collapse:collapse;font-size:12px"><tr style="background:#f0f0f0"><th style="padding:4px 8px;border:1px solid #ddd">CPC</th><th style="padding:4px 8px;border:1px solid #ddd">MPN</th><th style="padding:4px 8px;border:1px solid #ddd">Reason</th></tr>${skippedRows}</table>`;
+  }
+
+  // Failed section
+  let failedSection = '';
+  if (results.failed.length > 0) {
+    const failedRows = results.failed.map(f =>
+      `<tr style="background:#ffebee"><td style="padding:4px 8px;border:1px solid #ddd">${esc(f.cpc)}</td><td style="padding:4px 8px;border:1px solid #ddd">${esc(f.mpn)}</td><td style="padding:4px 8px;border:1px solid #ddd;color:#c00">${esc(f.error)}</td></tr>`
+    ).join('');
+    failedSection = `
+<h3 style="color:#c00;margin-top:16px">Failed (${results.failed.length})</h3>
+<table style="border-collapse:collapse;font-size:12px"><tr style="background:#f0f0f0"><th style="padding:4px 8px;border:1px solid #ddd">CPC</th><th style="padding:4px 8px;border:1px solid #ddd">MPN</th><th style="padding:4px 8px;border:1px solid #ddd">Error</th></tr>${failedRows}</table>`;
+  }
+
+  // Missing info section
+  let missingSection = '';
+  if (results.missingInfo.length > 0) {
+    const missingRows = results.missingInfo.map(m =>
+      `<tr><td style="padding:4px 8px;border:1px solid #ddd">${esc(m.cpc)}</td><td style="padding:4px 8px;border:1px solid #ddd">${esc(m.mpn)}</td><td style="padding:4px 8px;border:1px solid #ddd;color:#e65100">${m.missing.join(', ')}</td></tr>`
+    ).join('');
+    missingSection = `
+<h3 style="color:#e65100;margin-top:16px">⚠️ Missing Info (${results.missingInfo.length})</h3>
+<p style="font-size:12px;color:#666">These parts were added but are missing recommended fields. Update the roster when available.</p>
+<table style="border-collapse:collapse;font-size:12px"><tr style="background:#f0f0f0"><th style="padding:4px 8px;border:1px solid #ddd">CPC</th><th style="padding:4px 8px;border:1px solid #ddd">MPN</th><th style="padding:4px 8px;border:1px solid #ddd">Missing</th></tr>${missingRows}</table>`;
+  }
+
+  // RFQ info
+  let rfqSection = '';
+  if (rfqResult && rfqResult.rfqId) {
+    rfqSection = `<p><strong>RFQ Created:</strong> ${rfqResult.value || rfqResult.rfqId} (${results.added.length} lines)</p>`;
+  } else if (rfqResult && rfqResult.error) {
+    rfqSection = `<p style="color:#c00"><strong>RFQ Error:</strong> ${esc(rfqResult.error)}</p>`;
+  }
+
+  return `<html><body style="font-family:Arial,sans-serif;font-size:13px">
+<h2 style="color:#2e7d32">LAM New Awards - Initial Order Required</h2>
+<p><b>Date:</b> ${esc(today)} | <b>UID:</b> ${ctx.uid} | <b>Added:</b> ${results.added.length} parts</p>
+${rfqSection}
+
+<h3 style="color:#2e7d32">New Parts Added (${results.added.length})</h3>
+<table style="border-collapse:collapse;font-size:12px;width:100%">
+  <tr style="background:#f0f0f0">
+    <th style="padding:4px 8px;border:1px solid #ddd;text-align:left">CPC</th>
+    <th style="padding:4px 8px;border:1px solid #ddd;text-align:left">MPN</th>
+    <th style="padding:4px 8px;border:1px solid #ddd;text-align:left">Manufacturer</th>
+    <th style="padding:4px 8px;border:1px solid #ddd;text-align:right">MOQ</th>
+    <th style="padding:4px 8px;border:1px solid #ddd;text-align:right">Reorder</th>
+    <th style="padding:4px 8px;border:1px solid #ddd;text-align:right">Franchise Stock</th>
+    <th style="padding:4px 8px;border:1px solid #ddd;text-align:right">Lowest Price</th>
+  </tr>
+  ${addedRows}
+</table>
+
+${skippedSection}
+${failedSection}
+${missingSection}
+
+<p style="background:#e3f2fd;padding:12px;border-left:3px solid #1976d2;margin-top:16px">
+  <strong>Next Steps:</strong><br/>
+  1. Review franchise availability above<br/>
+  2. Place initial orders for parts with stock<br/>
+  3. Parts will enter normal reorder workflow going forward
+</p>
+
+<p style="color:#666;font-size:11px;margin-top:12px">
+  <span style="background:#e8f5e9;padding:2px 6px">✓ Green</span> = Franchise stock available&nbsp;&nbsp;
+  <span style="background:#fff3e0;padding:2px 6px">⚠️ Amber</span> = No franchise stock found
+</p>
+</body></html>`;
+}
+
+/**
  * Rejection — LAM rejected the proposed price or lead time.
  */
 async function action_reject(payload, ctx) {
@@ -1158,6 +1454,9 @@ function appendRosterRow(rowData) {
   newRow[cols.LEAD_TIME] = rowData.leadTime;
   newRow[cols.BUYER] = rowData.buyer;
   newRow[cols.LAST_APPROVED] = new Date().toISOString().slice(0, 10);
+  if (rowData.status && cols.STATUS >= 0) {
+    newRow[cols.STATUS] = rowData.status;
+  }
 
   data.push(newRow);
   writeRoster(wb, data);
@@ -1440,6 +1739,11 @@ module.exports = {
       folder: 'Processed',
       requires: ['cpc', 'mpn', 'manufacturer', 'awardQty', 'basePrice', 'resalePrice'],
       handler: action_add_award,
+    },
+    add_awards: {
+      folder: 'Processed',
+      requires: ['awards'],
+      handler: action_add_awards,
     },
     reject: {
       folder: 'Rejected',

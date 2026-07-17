@@ -131,8 +131,33 @@ For every UID returned, follow this decision tree:
   - Send ONE consolidated email showing ALL parts with field comparison table
   - CC the original sender (Josh, etc.) if different from Jake
 
-3.7 FOR add_award — VALIDATE MFR FIRST
-  Before routing add_award:
+3.7 FOR NEW AWARD BATCHES — USE add_awards (PREFERRED)
+
+  When email contains MULTIPLE new CPCs not yet in roster, use `add_awards`:
+
+  1. Parse all new parts from email (CPC, MPN, Manufacturer required; MOQ/threshold optional)
+  2. Route ONCE with `add_awards`:
+     node shared/email-workflow-poller.js route <uid> add_awards --workflow lam-kitting \
+       --payload '{"awards": [
+         {"cpc": "630-A12345-001", "mpn": "LM7805ACT", "manufacturer": "Texas Instruments", "moq": 50, "reorderThreshold": 25},
+         {"cpc": "630-A12346-001", "mpn": "LM7812ACT", "manufacturer": "Texas Instruments", "moq": 100}
+       ], "investigation_summary": "N new award CPCs from LAM..."}'
+
+  The handler will:
+  - Add all parts to Master Roster with Status = "New Award"
+  - Create an RFQ for franchise sourcing
+  - Call franchise APIs for pricing/availability
+  - Send ONE consolidated email with:
+    - All parts added (with franchise stock/pricing)
+    - Missing info flagged (not blocking)
+    - Next steps for initial ordering
+  - Parts then enter normal reorder workflow going forward
+
+  NOTE: Missing fields (basePrice, resalePrice, etc.) are NOT blocking — handler
+  defaults to 0 and flags as "Missing Info" for later update.
+
+3.7.1 FOR SINGLE add_award — VALIDATE MFR FIRST
+  Before routing single add_award:
 
   Query: psql -c "SELECT chuboe_mfr_id, name FROM chuboe_mfr WHERE LOWER(name) LIKE '%<manufacturer>%' AND isactive='Y'"
 
@@ -190,6 +215,18 @@ approve_prices (PREFERRED for multiple CPCs — ONE email):
     ],
     "investigation_summary": "4 CPCs approved per Josh's email. All prices match proposed values."
   }
+
+add_awards (PREFERRED for NEW parts not in roster — creates RFQ + enriches):
+  {
+    "awards": [
+      {"cpc": "630-A12345-001", "mpn": "LM7805ACT", "manufacturer": "Texas Instruments", "moq": 50, "reorderThreshold": 25},
+      {"cpc": "630-A12346-001", "mpn": "LM7812ACT", "manufacturer": "Texas Instruments", "moq": 100, "reorderThreshold": 50},
+      {"cpc": "630-A12347-001", "mpn": "LM317T", "manufacturer": "Texas Instruments"}
+    ],
+    "investigation_summary": "3 new award CPCs from LAM email. MPN/MFR extracted from table."
+  }
+  NOTE: Only cpc, mpn, manufacturer required. Missing fields (moq, threshold, prices)
+  are defaulted and flagged for later update. Handler creates RFQ and calls franchise APIs.
 
 approve_price (single CPC fallback):
   {
