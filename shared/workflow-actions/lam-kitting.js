@@ -30,6 +30,7 @@ const XLSX = require('xlsx');
 
 const pending = require('../workflow-pending-state');
 const breadcrumbs = require('../breadcrumbs');
+const { psqlQuery } = require('../db-helpers');
 
 // ─── PATHS ───────────────────────────────────────────────────────────────────
 
@@ -82,6 +83,66 @@ function buildEmailOpts(ctx, extraOpts = {}) {
   }
 
   return opts;
+}
+
+// ─── CONTACT PERSON RESOLUTION ──────────────────────────────────────────────
+// Follows the same pattern as rfq-loading.md Step 7
+
+const LAM_RESEARCH_BP_ID = 1000730;
+
+/**
+ * Resolve contact person (ad_user_id) from email address.
+ * Looks up the email in ad_user under LAM Research BP.
+ * Falls back to any active LAM user if no exact match.
+ *
+ * @param {string} email - Email address to look up (e.g., "Rob.Johnson@lamresearch.com")
+ * @returns {object|null} { userId, name, email } or null
+ */
+function resolveContactFromEmail(email) {
+  if (!email) return null;
+  const cleanEmail = email.toLowerCase().trim().replace(/'/g, "''");
+
+  // First try exact match under LAM Research
+  let sql = `
+    SELECT u.ad_user_id, u.name, u.email
+    FROM adempiere.ad_user u
+    WHERE LOWER(u.email) = '${cleanEmail}'
+      AND u.isactive = 'Y'
+      AND u.c_bpartner_id = ${LAM_RESEARCH_BP_ID}
+    ORDER BY u.created DESC
+    LIMIT 1
+  `;
+
+  let result = psqlQuery(sql);
+  if (result && result.trim()) {
+    const [userId, name, userEmail] = result.split('|');
+    if (userId) {
+      return { userId: Number(userId), name, email: userEmail };
+    }
+  }
+
+  // Fallback: domain match under LAM Research
+  const domain = email.split('@')[1];
+  if (domain && domain.toLowerCase().includes('lamresearch')) {
+    sql = `
+      SELECT u.ad_user_id, u.name, u.email
+      FROM adempiere.ad_user u
+      WHERE u.isactive = 'Y'
+        AND u.c_bpartner_id = ${LAM_RESEARCH_BP_ID}
+        AND LOWER(u.email) LIKE '%@${domain.toLowerCase().replace(/'/g, "''")}'
+      ORDER BY u.created DESC
+      LIMIT 1
+    `;
+    result = psqlQuery(sql);
+    if (result && result.trim()) {
+      const [userId, name, userEmail] = result.split('|');
+      if (userId) {
+        return { userId: Number(userId), name, email: userEmail };
+      }
+    }
+  }
+
+  return null;
 }
 
 // ─── HANDLERS ────────────────────────────────────────────────────────────────
@@ -687,10 +748,13 @@ async function action_add_award(payload, ctx) {
  *
  * This is the complete "New Award Onboarding" workflow:
  * 1. Add all parts to Master Roster
- * 2. Create RFQ for franchise sourcing
+ * 2. Create RFQ for franchise sourcing (contact resolved from email sender per rfq-loading pattern)
  * 3. Call franchise APIs for pricing/availability
- * 4. Send consolidated email with results + missing info
+ * 4. Send consolidated email (plaintext like reorder alerts) + Excel attachment
  * 5. Set Status = "New Award" for initial order tracking
+ *
+ * FLAGGING: Parts that already exist are FLAGGED (not silently skipped) with their
+ * Award phase info so the operator can review why they're duplicates.
  *
  * Required per part: { cpc, mpn, manufacturer }
  * Optional per part: { description, awardQty, basePrice, resalePrice, moq, reorderThreshold, leadTime }
@@ -710,7 +774,7 @@ async function action_add_awards(payload, ctx) {
 
   const results = {
     added: [],
-    skipped: [],      // Already exists
+    flagged: [],      // Already exists - FLAGGED for review (not silently skipped)
     failed: [],       // Error adding
     missingInfo: [],  // Added but missing recommended fields
   };
@@ -725,10 +789,24 @@ async function action_add_awards(payload, ctx) {
       continue;
     }
 
-    // Check if already exists
+    // Check if already exists - if so, FLAG it with Award phase info
     const existing = findRosterRowByCpc(cpc);
     if (existing.found) {
-      results.skipped.push({ cpc, mpn, reason: 'Already in roster' });
+      const { row, cols } = existing;
+      const existingAward = row[cols.AWARD] || '';
+      const existingMpn = row[cols.MPN] || '';
+      const existingMfr = row[cols.MFR] || '';
+      const existingStatus = row[cols.STATUS] || '';
+      results.flagged.push({
+        cpc,
+        mpn,
+        manufacturer: manufacturer || '',
+        existingAward,   // Shows what phase it was added in (e.g., "Phase 2", "EPG")
+        existingMpn,     // MPN in roster (may differ from email)
+        existingMfr,
+        existingStatus,
+        reason: `Already in roster from: ${existingAward || 'unknown phase'}`,
+      });
       continue;
     }
 
@@ -766,6 +844,7 @@ async function action_add_awards(payload, ctx) {
       mpn,
       manufacturer: manufacturer || 'TBD',
       awardQty: award.awardQty || 0,
+      basePrice: award.basePrice || 0,
       moq: award.moq || 1,
       reorderThreshold: award.reorderThreshold || 0,
     });
@@ -775,7 +854,20 @@ async function action_add_awards(payload, ctx) {
     }
   }
 
-  // Step 2: Create RFQ for added parts (if any)
+  // Step 2: Resolve contact person from email sender (rfq-loading pattern)
+  // Look for LAM sender in forwarded headers or original email
+  let contactPerson = null;
+  const lamSenderEmail = ctx.externalSender || ctx.currentFrom || '';
+  if (lamSenderEmail && lamSenderEmail.toLowerCase().includes('lamresearch')) {
+    contactPerson = resolveContactFromEmail(lamSenderEmail);
+    if (contactPerson) {
+      console.log(`  Contact resolved: ${contactPerson.name} (${contactPerson.email}) → userId ${contactPerson.userId}`);
+    } else {
+      console.log(`  Contact not found in OT: ${lamSenderEmail} - RFQ will use default`);
+    }
+  }
+
+  // Step 3: Create RFQ for added parts (if any)
   let rfqResult = null;
   if (results.added.length > 0) {
     try {
@@ -790,14 +882,15 @@ async function action_add_awards(payload, ctx) {
           mfrId: mfrId || null,
           mfrName: part.manufacturer,
           qty: part.moq || 1,
-          targetPrice: 0,
-          cpc: part.cpc,  // For reference
+          targetPrice: part.basePrice || 0,
+          cpc: part.cpc,
         });
       }
 
       rfqResult = await writeRFQ({
-        bpartnerId: 1000730,  // LAM Research
+        bpartnerId: LAM_RESEARCH_BP_ID,
         type: '3PL/VMI',
+        userId: contactPerson?.userId || null,  // Contact person per rfq-loading pattern
         description: `LAM New Awards - ${results.added.length} parts`,
         lines: rfqLines,
       });
@@ -838,14 +931,20 @@ async function action_add_awards(payload, ctx) {
     }
   }
 
-  // Step 4: Send consolidated summary email
-  const html = buildNewAwardsSummaryEmail(results, rfqResult, enrichResults, ctx);
+  // Step 5: Generate Excel attachment (like reorder alerts)
+  const excelPath = writeNewAwardsExcel(results, enrichResults, rfqResult);
 
-  await ctx.notifier.sendEmail(
+  // Step 6: Build plaintext email (mirrors reorder alert format)
+  const emailBody = buildNewAwardsPlaintextEmail(results, rfqResult, enrichResults, contactPerson, ctx);
+
+  // Step 7: Send email with attachment
+  const attachments = excelPath ? [{ filename: path.basename(excelPath), path: excelPath }] : [];
+  await ctx.notifier.sendWithAttachment(
     ctx.jakeEmail,
-    `LAM New Awards Added (${results.added.length}) - Initial Order Required`,
-    html,
-    buildEmailOpts(ctx),
+    `LAM New Awards - ${results.added.length} Added, ${results.flagged.length} Flagged`,
+    emailBody,
+    attachments,
+    buildEmailOpts(ctx, { html: false }),  // Plaintext like reorder alerts
   );
 
   breadcrumbs.write({
@@ -853,14 +952,15 @@ async function action_add_awards(payload, ctx) {
     event: 'awards-batch-added',
     uid: ctx.uid,
     added: results.added.length,
-    skipped: results.skipped.length,
+    flagged: results.flagged.length,
     failed: results.failed.length,
     rfqId: rfqResult?.rfqId || null,
+    contactResolved: contactPerson?.name || null,
   });
 
   return {
     added: results.added.length,
-    skipped: results.skipped.length,
+    flagged: results.flagged.length,
     failed: results.failed.length,
     missingInfo: results.missingInfo.length,
     rfqId: rfqResult?.rfqId || null,
@@ -869,113 +969,198 @@ async function action_add_awards(payload, ctx) {
     partsWithStock: enrichResults.filter(e => e.hasStock).length,
     notified: ctx.jakeEmail,
     ccSender: ctx.currentFrom !== ctx.jakeEmail.toLowerCase() ? ctx.currentFrom : null,
+    contactResolved: contactPerson || null,
     results,
     enrichResults,
   };
 }
 
 /**
- * Build summary email for batch new awards.
+ * Write Excel file for new awards (mirrors reorder alerts format).
+ * Returns the file path.
  */
-function buildNewAwardsSummaryEmail(results, rfqResult, enrichResults, ctx) {
-  const today = new Date().toISOString().slice(0, 10);
+function writeNewAwardsExcel(results, enrichResults, rfqResult) {
+  const outputDir = path.join(ASTUTE, 'Trading Analysis/LAM 3PL/output');
+  if (!fs.existsSync(outputDir)) {
+    fs.mkdirSync(outputDir, { recursive: true });
+  }
 
-  // Build main table of added parts with enrichment data
+  const today = new Date().toISOString().slice(0, 10).replace(/-/g, '');
+  const outputPath = path.join(outputDir, `LAM_New_Awards_${today}.xlsx`);
+
   const enrichMap = new Map(enrichResults.map(e => [e.cpc, e]));
 
-  const addedRows = results.added.map(p => {
+  // Sheet 1: New Parts Added
+  const addedData = results.added.map(p => {
     const enrich = enrichMap.get(p.cpc) || {};
-    const stockBg = enrich.hasStock ? '#e8f5e9' : '#fff3e0';
-    const stockIcon = enrich.hasStock ? '✓' : '⚠️';
+    return {
+      'CPC': p.cpc,
+      'MPN': p.mpn,
+      'Manufacturer': p.manufacturer,
+      'Award Qty': p.awardQty,
+      'MOQ': p.moq,
+      'Reorder Threshold': p.reorderThreshold,
+      'Base Price': p.basePrice,
+      'Franchise Stock': enrich.totalStock || 0,
+      'Lowest Price': enrich.lowestPrice || '',
+      'Has Stock': enrich.hasStock ? 'YES' : 'NO',
+      'Status': 'New Award',
+    };
+  });
 
-    return `<tr>
-      <td style="padding:4px 8px;border:1px solid #ddd">${esc(p.cpc)}</td>
-      <td style="padding:4px 8px;border:1px solid #ddd">${esc(p.mpn)}</td>
-      <td style="padding:4px 8px;border:1px solid #ddd">${esc(p.manufacturer)}</td>
-      <td style="padding:4px 8px;border:1px solid #ddd;text-align:right">${formatNumber(p.moq)}</td>
-      <td style="padding:4px 8px;border:1px solid #ddd;text-align:right">${formatNumber(p.reorderThreshold)}</td>
-      <td style="padding:4px 8px;border:1px solid #ddd;text-align:right;background:${stockBg}">${stockIcon} ${formatNumber(enrich.totalStock || 0)}</td>
-      <td style="padding:4px 8px;border:1px solid #ddd;text-align:right">${enrich.lowestPrice ? formatCurrency(enrich.lowestPrice) : '—'}</td>
-    </tr>`;
-  }).join('');
+  // Sheet 2: Flagged (Already Exist) - PROMINENT
+  const flaggedData = results.flagged.map(f => ({
+    'CPC': f.cpc,
+    'MPN (Email)': f.mpn,
+    'MPN (Roster)': f.existingMpn,
+    'Manufacturer': f.manufacturer || f.existingMfr,
+    'Existing Award': f.existingAward,  // Shows Phase 2, EPG, etc.
+    'Existing Status': f.existingStatus,
+    'Reason': f.reason,
+  }));
 
-  // Skipped section
-  let skippedSection = '';
-  if (results.skipped.length > 0) {
-    const skippedRows = results.skipped.map(s =>
-      `<tr><td style="padding:4px 8px;border:1px solid #ddd">${esc(s.cpc)}</td><td style="padding:4px 8px;border:1px solid #ddd">${esc(s.mpn)}</td><td style="padding:4px 8px;border:1px solid #ddd;color:#666">${esc(s.reason)}</td></tr>`
-    ).join('');
-    skippedSection = `
-<h3 style="color:#666;margin-top:16px">Skipped (${results.skipped.length})</h3>
-<table style="border-collapse:collapse;font-size:12px"><tr style="background:#f0f0f0"><th style="padding:4px 8px;border:1px solid #ddd">CPC</th><th style="padding:4px 8px;border:1px solid #ddd">MPN</th><th style="padding:4px 8px;border:1px solid #ddd">Reason</th></tr>${skippedRows}</table>`;
+  // Sheet 3: Failed
+  const failedData = results.failed.map(f => ({
+    'CPC': f.cpc,
+    'MPN': f.mpn,
+    'Error': f.error,
+  }));
+
+  const wb = XLSX.utils.book_new();
+
+  // Added parts sheet
+  if (addedData.length > 0) {
+    const ws1 = XLSX.utils.json_to_sheet(addedData);
+    ws1['!cols'] = [
+      { wch: 18 }, { wch: 25 }, { wch: 30 }, { wch: 10 },
+      { wch: 8 }, { wch: 12 }, { wch: 12 }, { wch: 15 },
+      { wch: 12 }, { wch: 10 }, { wch: 12 },
+    ];
+    XLSX.utils.book_append_sheet(wb, ws1, 'New Parts Added');
+  }
+
+  // Flagged sheet (prominent if any exist)
+  if (flaggedData.length > 0) {
+    const ws2 = XLSX.utils.json_to_sheet(flaggedData);
+    ws2['!cols'] = [
+      { wch: 18 }, { wch: 25 }, { wch: 25 }, { wch: 30 },
+      { wch: 20 }, { wch: 15 }, { wch: 40 },
+    ];
+    XLSX.utils.book_append_sheet(wb, ws2, 'FLAGGED - Already Exist');
+  }
+
+  // Failed sheet
+  if (failedData.length > 0) {
+    const ws3 = XLSX.utils.json_to_sheet(failedData);
+    XLSX.utils.book_append_sheet(wb, ws3, 'Failed');
+  }
+
+  // Summary sheet
+  const summaryData = [
+    { 'Metric': 'Date', 'Value': new Date().toISOString().split('T')[0] },
+    { 'Metric': 'Parts Added', 'Value': results.added.length },
+    { 'Metric': 'Parts Flagged (Already Exist)', 'Value': results.flagged.length },
+    { 'Metric': 'Parts Failed', 'Value': results.failed.length },
+    { 'Metric': 'Parts with Franchise Stock', 'Value': enrichResults.filter(e => e.hasStock).length },
+    { 'Metric': 'RFQ Created', 'Value': rfqResult?.value || rfqResult?.error || 'N/A' },
+  ];
+  const wsSummary = XLSX.utils.json_to_sheet(summaryData);
+  wsSummary['!cols'] = [{ wch: 30 }, { wch: 30 }];
+  XLSX.utils.book_append_sheet(wb, wsSummary, 'Summary');
+
+  XLSX.writeFile(wb, outputPath);
+  console.log(`  New awards Excel written: ${path.basename(outputPath)}`);
+  return outputPath;
+}
+
+/**
+ * Build plaintext email for new awards (mirrors reorder alerts format).
+ */
+function buildNewAwardsPlaintextEmail(results, rfqResult, enrichResults, contactPerson, ctx) {
+  const today = new Date().toISOString().slice(0, 10);
+  const partsWithStock = enrichResults.filter(e => e.hasStock).length;
+  const partsNoStock = enrichResults.filter(e => !e.hasStock).length;
+
+  let body = `LAM New Awards Report - ${today}
+
+=== SUMMARY ===
+Total parts in email: ${results.added.length + results.flagged.length + results.failed.length}
+- NEW (added to roster): ${results.added.length}
+- FLAGGED (already exist): ${results.flagged.length}
+- FAILED: ${results.failed.length}
+`;
+
+  // RFQ info
+  if (rfqResult && rfqResult.value) {
+    body += `
+=== RFQ CREATED ===
+RFQ: ${rfqResult.value}
+Lines: ${results.added.length}
+Contact: ${contactPerson ? `${contactPerson.name} (${contactPerson.email})` : 'Not resolved'}
+`;
+  } else if (rfqResult && rfqResult.error) {
+    body += `
+=== RFQ ERROR ===
+${rfqResult.error}
+`;
+  }
+
+  // Franchise availability
+  if (results.added.length > 0) {
+    body += `
+=== FRANCHISE AVAILABILITY ===
+Parts with stock: ${partsWithStock}
+Parts without stock: ${partsNoStock}
+
+See attached Excel for full details including:
+- CPC, MPN, Manufacturer
+- Award Qty, MOQ, Reorder Threshold
+- Base Price
+- Franchise Stock & Lowest Price
+`;
+  }
+
+  // FLAGGED section (prominent)
+  if (results.flagged.length > 0) {
+    body += `
+=== ⚠️ FLAGGED - ALREADY IN ROSTER (${results.flagged.length}) ===
+These CPCs already exist in the Master Roster. Review for duplicates:
+
+`;
+    for (const f of results.flagged) {
+      body += `${f.cpc} | ${f.mpn}
+  Existing Award: ${f.existingAward || 'unknown'}
+  Existing MPN: ${f.existingMpn}
+  Reason: ${f.reason}
+
+`;
+    }
   }
 
   // Failed section
-  let failedSection = '';
   if (results.failed.length > 0) {
-    const failedRows = results.failed.map(f =>
-      `<tr style="background:#ffebee"><td style="padding:4px 8px;border:1px solid #ddd">${esc(f.cpc)}</td><td style="padding:4px 8px;border:1px solid #ddd">${esc(f.mpn)}</td><td style="padding:4px 8px;border:1px solid #ddd;color:#c00">${esc(f.error)}</td></tr>`
-    ).join('');
-    failedSection = `
-<h3 style="color:#c00;margin-top:16px">Failed (${results.failed.length})</h3>
-<table style="border-collapse:collapse;font-size:12px"><tr style="background:#f0f0f0"><th style="padding:4px 8px;border:1px solid #ddd">CPC</th><th style="padding:4px 8px;border:1px solid #ddd">MPN</th><th style="padding:4px 8px;border:1px solid #ddd">Error</th></tr>${failedRows}</table>`;
+    body += `
+=== ❌ FAILED (${results.failed.length}) ===
+`;
+    for (const f of results.failed) {
+      body += `${f.cpc}: ${f.error}\n`;
+    }
   }
 
-  // Missing info section
-  let missingSection = '';
-  if (results.missingInfo.length > 0) {
-    const missingRows = results.missingInfo.map(m =>
-      `<tr><td style="padding:4px 8px;border:1px solid #ddd">${esc(m.cpc)}</td><td style="padding:4px 8px;border:1px solid #ddd">${esc(m.mpn)}</td><td style="padding:4px 8px;border:1px solid #ddd;color:#e65100">${m.missing.join(', ')}</td></tr>`
-    ).join('');
-    missingSection = `
-<h3 style="color:#e65100;margin-top:16px">⚠️ Missing Info (${results.missingInfo.length})</h3>
-<p style="font-size:12px;color:#666">These parts were added but are missing recommended fields. Update the roster when available.</p>
-<table style="border-collapse:collapse;font-size:12px"><tr style="background:#f0f0f0"><th style="padding:4px 8px;border:1px solid #ddd">CPC</th><th style="padding:4px 8px;border:1px solid #ddd">MPN</th><th style="padding:4px 8px;border:1px solid #ddd">Missing</th></tr>${missingRows}</table>`;
-  }
+  // Next steps
+  body += `
+=== NEXT STEPS ===
+1. Review attached Excel for full part details
+2. Place initial orders for parts with franchise stock
+3. Source parts without stock via RFQ ${rfqResult?.value || '(pending)'}
+4. Parts will enter normal reorder workflow going forward
 
-  // RFQ info
-  let rfqSection = '';
-  if (rfqResult && rfqResult.rfqId) {
-    rfqSection = `<p><strong>RFQ Created:</strong> ${rfqResult.value || rfqResult.rfqId} (${results.added.length} lines)</p>`;
-  } else if (rfqResult && rfqResult.error) {
-    rfqSection = `<p style="color:#c00"><strong>RFQ Error:</strong> ${esc(rfqResult.error)}</p>`;
-  }
+---
+Email UID: ${ctx.uid}
+Processed: ${new Date().toISOString()}
+`;
 
-  return `<html><body style="font-family:Arial,sans-serif;font-size:13px">
-<h2 style="color:#2e7d32">LAM New Awards - Initial Order Required</h2>
-<p><b>Date:</b> ${esc(today)} | <b>UID:</b> ${ctx.uid} | <b>Added:</b> ${results.added.length} parts</p>
-${rfqSection}
-
-<h3 style="color:#2e7d32">New Parts Added (${results.added.length})</h3>
-<table style="border-collapse:collapse;font-size:12px;width:100%">
-  <tr style="background:#f0f0f0">
-    <th style="padding:4px 8px;border:1px solid #ddd;text-align:left">CPC</th>
-    <th style="padding:4px 8px;border:1px solid #ddd;text-align:left">MPN</th>
-    <th style="padding:4px 8px;border:1px solid #ddd;text-align:left">Manufacturer</th>
-    <th style="padding:4px 8px;border:1px solid #ddd;text-align:right">MOQ</th>
-    <th style="padding:4px 8px;border:1px solid #ddd;text-align:right">Reorder</th>
-    <th style="padding:4px 8px;border:1px solid #ddd;text-align:right">Franchise Stock</th>
-    <th style="padding:4px 8px;border:1px solid #ddd;text-align:right">Lowest Price</th>
-  </tr>
-  ${addedRows}
-</table>
-
-${skippedSection}
-${failedSection}
-${missingSection}
-
-<p style="background:#e3f2fd;padding:12px;border-left:3px solid #1976d2;margin-top:16px">
-  <strong>Next Steps:</strong><br/>
-  1. Review franchise availability above<br/>
-  2. Place initial orders for parts with stock<br/>
-  3. Parts will enter normal reorder workflow going forward
-</p>
-
-<p style="color:#666;font-size:11px;margin-top:12px">
-  <span style="background:#e8f5e9;padding:2px 6px">✓ Green</span> = Franchise stock available&nbsp;&nbsp;
-  <span style="background:#fff3e0;padding:2px 6px">⚠️ Amber</span> = No franchise stock found
-</p>
-</body></html>`;
+  return body;
 }
 
 /**
