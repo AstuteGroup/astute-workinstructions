@@ -399,6 +399,77 @@ The rebuilt xlsx adds a separate **Escalations** worksheet alongside the main re
 
 **Email body:** the runner email surfaces manual + auto + stock-arrived counts separately, with up to 5 auto-flagged MPNs inline so Josh sees the actionable items without opening the xlsx.
 
+---
+
+## New Add Workflow
+
+When new parts are added to the LAM program (Phase 3, EPG round 2, etc.), use the New Add workflow to enrich them before ordering.
+
+### Process
+
+```
+New Award Approval (email/RFQ)
+    ↓
+Step 1: Add parts to Master Roster
+    - Set Award column (e.g., "Phase 3")
+    - Fill CPC, MPN, Manufacturer, Description
+    - Fill Base Unit Price, Resale Price
+    - Fill MOQ, Reorder Threshold, Contractual Lead Time
+    ↓
+Step 2: Run New Add workflow
+    node lam-new-add.js --award "Phase 3" --run-sourcing --send-email
+    ↓
+Step 3: Review sourced output (same format as weekly reorder)
+    - In Stock → ready to order
+    - Lead Time → schedule based on program timing
+    - Restricted → manual sourcing (TI Store, ADI direct)
+    - No Coverage → manual franchise sourcing
+    ↓
+Step 4: Create VQs for ready items
+```
+
+### Usage
+
+```bash
+# Generate reorder-alert CSV only (for review)
+node lam-new-add.js --award "Phase 3"
+
+# Generate + run franchise sourcing
+node lam-new-add.js --award "Phase 3" --run-sourcing
+
+# Full pipeline: generate + source + email
+node lam-new-add.js --award "Phase 3" --run-sourcing --send-email
+
+# Dry run (show what would be done)
+node lam-new-add.js --award "Phase 3" --dry-run
+```
+
+### Output
+
+| File | Description |
+|------|-------------|
+| `output/LAM_NewAdd_<award>_<date>.csv` | Reorder-alert format CSV (input to sourcing) |
+| `output/LAM_NewAdd_<award>_<date>_sourced.xlsx` | Sourced output with margin analysis (same as weekly) |
+
+### Validation
+
+The script validates roster data before generating:
+- CPC, MPN required
+- Base Unit Price, Resale Price required (for margin analysis)
+
+Missing data is flagged as warnings. Fix in Master Roster before running sourcing.
+
+### How It Works
+
+1. **lam-new-add.js** filters Master Roster by Award column
+2. Generates reorder-alert format CSV (all parts marked CRITICAL, 0 inventory)
+3. Chains to **lam-kitting-source.js** (same sourcing as weekly reorder)
+4. Output is identical format to weekly — same columns, same margin colors
+
+This reuses the existing sourcing infrastructure. No separate enrichment logic.
+
+---
+
 ### Step 5: Customer-Facing Inventory Offer (auto)
 
 Runs as Step 4c of the runner — refreshes the LAM customer-facing BI dashboard's
@@ -568,7 +639,8 @@ The rbash environment causes non-zero exit codes even on successful queries. The
 |------|-------------|
 | `lam-kitting-runner.js` | Cron runner — chains cleanup → reorder → sourcing → rfq-write → customer-offer → email |
 | `lam-kitting-reorder.js` | Reorder detection + ERP enrichment + two-file output |
-| `lam-kitting-source.js` | Franchise sourcing via shared API module |
+| `lam-kitting-source.js` | Franchise sourcing via shared API module (standalone, used by both reorder and new-add) |
+| `lam-new-add.js` | New Add workflow — generates reorder-alert CSV for new parts, chains to sourcing |
 | `lam-kitting-rfq-writer.js` | Writes RFQ + VQ lines for items without on-order |
 | `lam-kitting-customer-offer.js` | Refreshes the customer-facing BI dashboard offer (type 1000025) |
 | `lam-kitting-dashboard.js` | Dashboard generator |
@@ -584,6 +656,8 @@ The rbash environment causes non-zero exit codes even on successful queries. The
 | `output/LAM_Reorder_Alerts_<date>_sourced_franchise_data.json` | Raw franchise API responses per MPN (used for auto-escalation margin checks) |
 | `output/LAM_Reorder_Alerts_<date>_escalations_context.json` | Sidecar: per-MPN inventory + POV state for every manual-escalation entry |
 | `output/LAM_Customer_Offer_<date>.json` | Customer-offer run metadata (offer ID, search key, line counts) |
+| `output/LAM_NewAdd_<award>_<date>.csv` | New Add workflow input (reorder-alert format) |
+| `output/LAM_NewAdd_<award>_<date>_sourced.xlsx` | New Add workflow sourced output |
 
 ### Supporting Data
 
@@ -618,6 +692,7 @@ The rbash environment causes non-zero exit codes even on successful queries. The
 - [x] Master Roster consolidation — single source of truth replacing 3-file lookup (2026-07-10)
 - [x] Two-file reorder output — Reorder Alerts + Pending Approvals (2026-07-10)
 - [x] Email account migration to lamkitting@orangetsunami.com (2026-07-10)
+- [x] New Add workflow for onboarding new award tranches (2026-07-17)
 
 ### Pending
 - [ ] Auto-load RFQ for reorder lines (via shared/rfq-writer.js)
@@ -633,3 +708,4 @@ The rbash environment causes non-zero exit codes even on successful queries. The
 *Updated: 2026-05-05* — Step 4c: customer-facing LAM Kitting Inventory offer auto-refresh (replaces manual weekly update). Roster-driven from Kitting DB; deactivate-prior + write-new pattern matches `inventory_cleanup.js`. Phase 2 (roster-wide lead-time refresh) and Phase 3 (LAM EPG separate offer) queued.
 *Updated: 2026-05-05* — Priority overhaul + Escalations tab plumbing. (1) `PENDING RECEIPT` split into `PENDING ORDER PLACEMENT` (no Infor POV stamp yet) + `PENDING RECEIPT` (POV stamped). (2) `loadRecentPOVs` SQL recency filter — keep open POs only when cut ≤90d ago OR promise date still ≥ today; stale 2024–2025 POVs no longer leak (951→178 rows LAM-wide). (3) Escalations tab now sources from three places: manual entries (`lam-escalations.json`), stock-arrived synthesis (manual MPN above threshold but stock on hand → "Action with seller — new LAM resale still pending"), and auto entries for restricted-MFR margin compression (franchise <18% margin vs current LAM resale → Josh: push new resale based on franchise ref). (4) Escalations sidecar (`_escalations_context.json`) drives `persistResolvedEscalations` — manual entries only auto-resolve when off list AND zero stock; never on stock presence alone (operator removes from JSON when LAM approves new pricing).
 *Updated: 2026-07-10* — **Master Roster consolidation + two-file output.** (1) LAM_Master_Roster.xlsx replaces 3-file lookup (Lam_Kitting_DB + Lam_EPG_SIPOC + New Part ADDS) as single source of truth (~1,244 parts). (2) Two-file reorder output: `LAM_Reorder_Alerts_*.csv` (ready to order) + `LAM_Reorder_Pending_Approvals_*.xlsx` (awaiting LAM approval). Parts are mutually exclusive — appear on one file or the other. (3) Added Pending column (reason), Proposed Resale, Submitted Date, Status, Days Pending (aging) for approval tracking. (4) Email account changed to `lamkitting@orangetsunami.com`. (5) Added "Pending Approval Workflow" section documenting how to mark parts for approval and process approvals.
+*Updated: 2026-07-17* — **New Add workflow.** Added `lam-new-add.js` for onboarding new award tranches (Phase 3, etc.). Generates reorder-alert format CSV filtered by Award column, chains to existing `lam-kitting-source.js` for franchise enrichment. Same output format as weekly reorder — no separate enrichment logic.
