@@ -76,32 +76,31 @@ Use `lib-load-vq-row.js` for franchise parts or manual API calls for broker part
 For each line:
 1. Check if VQ already exists (`psql` or API query)
 2. If not: POST `Chuboe_RFQ_Line_MPN` (for alt MPNs) then `writeVQFromAPI`
-3. PATCH Tier 2: `IsPurchased=Y`, warehouse, shipping, traceability, dates
+3. **Tick as purchased:** Follow [`shared/vq-purchase-workflow.md`](../../shared/vq-purchase-workflow.md) — use `tickVQForPurchase()` with `program: 'LAM_EPG'`
 
 ### Step 5: Post R_Request for Approval
 
-**CRITICAL — always include:**
-- `AD_Table_ID: 1000002` + `Record_ID: 1141455` (links to RFQ window)
-- `SalesRep_ID: 1000004` (Jake Harris — NOT Claude Harris)
-- **RFQ line numbers** in the approval text
-- POV reference in Summary
+> **Full workflow:** See [`shared/vq-purchase-workflow.md`](../../shared/vq-purchase-workflow.md) for the complete tick + approval process.
 
-**Only post for the vendor/lines we're actively working on.** Copy text contains ALL lines — filter to context.
+**Use the enforced wrapper** — do NOT `apiPost('R_Request', ...)` directly:
 
 ```javascript
-await apiPost('R_Request', {
-  R_RequestType_ID: 1000000,
-  R_Status_ID: 1000000,
-  Priority: '5',
-  Chuboe_RFQ_ID: 1141455,
-  C_BPartner_ID: vendorBpId,
-  SalesRep_ID: 1000004,  // Jake Harris
-  Summary: 'POV0075XXX — Vendor (N lines)',
-  Chuboe_Approval_Text: approvalText,  // include line numbers
-  AD_Table_ID: 1000002,
-  Record_ID: 1141455,
+const { postApproveOrder } = require('../shared/r-request-writer');
+
+await postApproveOrder({
+  vqId:         vqLineId,
+  program:      'LAM_EPG',
+  rfqId:        1141455,
+  summary:      'approve order — Vendor MPN (LAM EPG)',
+  approvalText: copyTextBlock,  // include RFQ line numbers
 });
 ```
+
+**Requirements:**
+- VQ must be ticked (`IsPurchased='Y'`) before posting approval
+- `postApproveOrder()` forces routing to Jake Harris (1000004) and status = Submitted
+- Include RFQ line numbers in the approval text
+- Only include lines for the vendor/POV being approved (filter copy text)
 
 ### Step 6: Retrieve PO Copies (when needed)
 

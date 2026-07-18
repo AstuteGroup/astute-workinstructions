@@ -810,11 +810,13 @@ async function processMessage(client, uid, config, log, sendNotice, sourceFolder
     const start = Date.now();
     let result;
     try {
+      // NOTE: writeMpnRecords deliberately omitted (default false).
+      // The iDempiere bean callout on chuboe_offer_line auto-creates the
+      // chuboe_offer_line_mpn record. Writing it ourselves caused duplicates.
       result = await writeOffer({
         bpartnerId: partner.c_bpartner_id,
         offerTypeId: offerType,
         description,
-        writeMpnRecords: true,
         lines: extracted.lines,
       });
     } catch (err) {

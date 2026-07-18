@@ -383,6 +383,60 @@ async function apiPost(table, payload, options = {}) {
     context = null,
   } = options;
 
+  // ─── PROTECTED TABLE ENFORCEMENT ───────────────────────────────────────────
+  // Certain tables require writes to go through enforced wrappers that validate
+  // business rules. Direct apiPost calls to these tables are blocked unless the
+  // caller passes an approved context. This prevents ad-hoc scripts from
+  // bypassing validation (e.g., creating VQs with missing warehouse/COO).
+  //
+  // Added 2026-07-09 after manual VQs were created with incomplete fields.
+  // See CLAUDE.md § "VQ Creation and Purchase Use Enforced Wrappers".
+  const PROTECTED_TABLES = {
+    'chuboe_vq_line': {
+      approved: ['vq-loading', 'manual-vq-creation', 'vq-patcher', 'profile-vq-deactivation'],
+      wrapper: 'shared/vq-manual-writer.js (createManualVQ) or shared/vq-writer.js (writeVQBatch)',
+    },
+    'Chuboe_VQ_Line': {  // case variant
+      approved: ['vq-loading', 'manual-vq-creation', 'vq-patcher', 'profile-vq-deactivation'],
+      wrapper: 'shared/vq-manual-writer.js (createManualVQ) or shared/vq-writer.js (writeVQBatch)',
+    },
+    'r_request': {
+      approved: ['r-request-writer', 'r-request-update'],
+      wrapper: 'shared/r-request-writer.js (postApproveOrder)',
+    },
+    'R_Request': {  // case variant
+      approved: ['r-request-writer', 'r-request-update'],
+      wrapper: 'shared/r-request-writer.js (postApproveOrder)',
+    },
+    // ─── BLOCKED TABLES (NO APPROVED CONTEXTS) ──────────────────────────────────
+    // These tables are NEVER writable via automation. Escalate to operator.
+    // Added 2026-07-17 after MFR records were created without approval.
+    // See CLAUDE.md § "Never Create Manufacturers".
+    'chuboe_mfr': {
+      approved: [],  // NO approved contexts — always blocked
+      wrapper: 'BLOCKED — do not create MFR records. Use chuboe_mfr_text fallback and escalate to operator.',
+    },
+    'Chuboe_MFR': {  // case variant
+      approved: [],
+      wrapper: 'BLOCKED — do not create MFR records. Use chuboe_mfr_text fallback and escalate to operator.',
+    },
+  };
+
+  const protection = PROTECTED_TABLES[table];
+  if (protection) {
+    if (!context || !protection.approved.includes(context)) {
+      const err = new Error(
+        `PROTECTED TABLE: Direct writes to '${table}' are blocked. ` +
+        `Use the enforced wrapper: ${protection.wrapper}. ` +
+        `(context='${context || 'none'}', approved=[${protection.approved.join(', ')}])`
+      );
+      err.code = 'PROTECTED_TABLE_VIOLATION';
+      err.table = table;
+      err.context = context;
+      throw err;
+    }
+  }
+
   const body = includeDefaults
     ? { ...IDEMPIERE_DEFAULTS, ...payload }
     : { ...payload };

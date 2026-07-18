@@ -37,7 +37,15 @@ function isInternalEmail(email) {
 
 function filterExternalRecipients(recipients) {
   if (!recipients) return { allowed: [], blocked: [] };
-  const list = Array.isArray(recipients) ? recipients : [recipients];
+  // Handle comma-separated string (e.g., "a@x.com,b@x.com") or array
+  let list;
+  if (Array.isArray(recipients)) {
+    list = recipients;
+  } else if (typeof recipients === 'string') {
+    list = recipients.split(',').map(r => r.trim()).filter(Boolean);
+  } else {
+    list = [recipients];
+  }
   const allowed = [];
   const blocked = [];
   for (const r of list) {

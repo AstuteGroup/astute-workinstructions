@@ -320,6 +320,7 @@ async function loadBulkSummary({ rfqSearchKey, buyerId, quotes, dryRun = false, 
         mpn: q.mpn,
         manufacturer: q.mfr,
         qty: 0,
+        stock: 0,                        // actual stock for cache envelope
         cost: 0,
         leadTime: null,                  // null -> Chuboe_Lead_Time blank
         dateCode: q.dateCode || null,

@@ -1,0 +1,1119 @@
+{
+  "rfqSearchKey": "1128025",
+  "buyerId": 1011012,
+  "runAt": "2026-06-11T13:59:02.378Z",
+  "sourceQuotes": "/tmp/quotes_9099_rfq1128025.json",
+  "result": {
+    "written": [
+      {
+        "vqLineId": 2193617,
+        "line": 130,
+        "mpn": "XC7VX415T-2FFG1158C",
+        "vendor": "Haoxin Hk Electronic Technology Co., Limited",
+        "cost": 430,
+        "qty": 500,
+        "fuzzyMatch": true,
+        "originalVendorLabel": "1006032",
+        "bpId": 1004036,
+        "noBid": false
+      },
+      {
+        "vqLineId": 2193618,
+        "line": 130,
+        "mpn": "XC7VX415T-2FFG1158C",
+        "vendor": "Fixchips Global Limited",
+        "cost": 934.5,
+        "qty": 407,
+        "fuzzyMatch": true,
+        "originalVendorLabel": "1002391",
+        "bpId": 1000387,
+        "noBid": false
+      }
+    ],
+    "skipped": [],
+    "failed": [],
+    "coverage": [
+      {
+        "lineNo": 10,
+        "lineId": 3029259,
+        "rfqQty": 54609,
+        "mpns": [
+          "AD652KPZ-REEL"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 20,
+        "lineId": 3029260,
+        "rfqQty": 30104,
+        "mpns": [
+          "AD7799BRUZ-REEL"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 30,
+        "lineId": 3029261,
+        "rfqQty": 66854,
+        "mpns": [
+          "AD8221ARZ-R7"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 40,
+        "lineId": 3029262,
+        "rfqQty": 45923,
+        "mpns": [
+          "SMP04ESZ-REEL"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 50,
+        "lineId": 3029263,
+        "rfqQty": 7928,
+        "mpns": [
+          "ADSP-2187NBSTZ-320"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 60,
+        "lineId": 3029264,
+        "rfqQty": 90381,
+        "mpns": [
+          "ADR03AUJZ-REEL7"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 70,
+        "lineId": 3029265,
+        "rfqQty": 14065,
+        "mpns": [
+          "ADE7932ARIZ-RL"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 80,
+        "lineId": 3029266,
+        "rfqQty": 42450,
+        "mpns": [
+          "LT6200CS6-5#TRMPBF"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 90,
+        "lineId": 3029267,
+        "rfqQty": 18221,
+        "mpns": [
+          "AD5449YRUZ-REEL"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 100,
+        "lineId": 3029268,
+        "rfqQty": 10238,
+        "mpns": [
+          "AD7663ASTZRL"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 110,
+        "lineId": 3029269,
+        "rfqQty": 3401,
+        "mpns": [
+          "ADSP-BF523KBCZ-6A"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 120,
+        "lineId": 3029270,
+        "rfqQty": 19386,
+        "mpns": [
+          "LT1787HVCS8#TRPBF"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 130,
+        "lineId": 3029271,
+        "rfqQty": 387,
+        "mpns": [
+          "XC7VX415T-2FFG1158C4672"
+        ],
+        "vqsThisBatch": 2
+      },
+      {
+        "lineNo": 140,
+        "lineId": 3029272,
+        "rfqQty": 97060,
+        "mpns": [
+          "AD8539ARZ-REEL7"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 150,
+        "lineId": 3029273,
+        "rfqQty": 862,
+        "mpns": [
+          "XCKU035-1SFVA784C"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 160,
+        "lineId": 3029274,
+        "rfqQty": 6183,
+        "mpns": [
+          "ADSP-21479BSWZ-2A"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 170,
+        "lineId": 3029275,
+        "rfqQty": 9991,
+        "mpns": [
+          "AD5420AREZ-REEL7"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 180,
+        "lineId": 3029276,
+        "rfqQty": 1608,
+        "mpns": [
+          "ADXL355BEZ"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 190,
+        "lineId": 3029277,
+        "rfqQty": 9727,
+        "mpns": [
+          "AD7799BRUZ-REEL"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 200,
+        "lineId": 3029278,
+        "rfqQty": 2377,
+        "mpns": [
+          "XC2C256-7TQG144I"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 210,
+        "lineId": 3029279,
+        "rfqQty": 35316,
+        "mpns": [
+          "AD822ARZ-REEL"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 220,
+        "lineId": 3029280,
+        "rfqQty": 12942,
+        "mpns": [
+          "MAX13035EETE+T"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 230,
+        "lineId": 3029281,
+        "rfqQty": 13419,
+        "mpns": [
+          "MAX1030BCEG+T"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 240,
+        "lineId": 3029282,
+        "rfqQty": 14525,
+        "mpns": [
+          "LTC3642IDD-3.3#TRPBF"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 250,
+        "lineId": 3029283,
+        "rfqQty": 15054,
+        "mpns": [
+          "DS3232SN#T&R"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 260,
+        "lineId": 3029284,
+        "rfqQty": 17955,
+        "mpns": [
+          "LT1638CS8#TRPBF"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 270,
+        "lineId": 3029285,
+        "rfqQty": 49729,
+        "mpns": [
+          "AD7740YRTZ-REEL7"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 280,
+        "lineId": 3029286,
+        "rfqQty": 16665,
+        "mpns": [
+          "AD8630ARUZ-REEL"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 290,
+        "lineId": 3029287,
+        "rfqQty": 14253,
+        "mpns": [
+          "AD5440YRUZ-REEL7"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 300,
+        "lineId": 3029288,
+        "rfqQty": 21162,
+        "mpns": [
+          "AD8672ARMZ-REEL"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 310,
+        "lineId": 3029289,
+        "rfqQty": 10341,
+        "mpns": [
+          "AD8643ACPZ-REEL7"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 320,
+        "lineId": 3029290,
+        "rfqQty": 8460,
+        "mpns": [
+          "AD5061BRJZ-1500RL7"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 330,
+        "lineId": 3029291,
+        "rfqQty": 19968,
+        "mpns": [
+          "OP2177ARMZ-R7"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 340,
+        "lineId": 3029292,
+        "rfqQty": 15876,
+        "mpns": [
+          "AD7278AUJZ-500RL7"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 350,
+        "lineId": 3029293,
+        "rfqQty": 7478,
+        "mpns": [
+          "MAX6126AASA21+T"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 360,
+        "lineId": 3029294,
+        "rfqQty": 8722,
+        "mpns": [
+          "AD5433YRUZ-REEL7"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 370,
+        "lineId": 3029295,
+        "rfqQty": 8140,
+        "mpns": [
+          "LT8610EMSE#TRPBF"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 380,
+        "lineId": 3029296,
+        "rfqQty": 1724,
+        "mpns": [
+          "AD734ANZ"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 390,
+        "lineId": 3029297,
+        "rfqQty": 8454,
+        "mpns": [
+          "LT3999IMSE#TRPBF"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 400,
+        "lineId": 3029298,
+        "rfqQty": 4823,
+        "mpns": [
+          "LTC2402IMS#PBF"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 410,
+        "lineId": 3029299,
+        "rfqQty": 16966,
+        "mpns": [
+          "ADA4610-2ARMZ-R7"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 420,
+        "lineId": 3029300,
+        "rfqQty": 12175,
+        "mpns": [
+          "LTC2055HVCMS8#TRPBF"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 430,
+        "lineId": 3029301,
+        "rfqQty": 228,
+        "mpns": [
+          "XCKU035-2FFVA1156E"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 440,
+        "lineId": 3029302,
+        "rfqQty": 2485,
+        "mpns": [
+          "AD420ARZ-32"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 450,
+        "lineId": 3029303,
+        "rfqQty": 369,
+        "mpns": [
+          "XCZU2CG-1SFVC784I"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 460,
+        "lineId": 3029304,
+        "rfqQty": 7920,
+        "mpns": [
+          "LTC3621EDCB-2#TRMPBF"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 470,
+        "lineId": 3029305,
+        "rfqQty": 2434,
+        "mpns": [
+          "AD605ARZ"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 480,
+        "lineId": 3029306,
+        "rfqQty": 1336,
+        "mpns": [
+          "AD600JRZ-R7"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 490,
+        "lineId": 3029307,
+        "rfqQty": 10261,
+        "mpns": [
+          "AD5424YRUZ-REEL7"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 500,
+        "lineId": 3029308,
+        "rfqQty": 2499,
+        "mpns": [
+          "LTC2400IS8#PBF"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 510,
+        "lineId": 3029309,
+        "rfqQty": 3821,
+        "mpns": [
+          "ADUM6422ABRNZ5-RL"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 520,
+        "lineId": 3029310,
+        "rfqQty": 13817,
+        "mpns": [
+          "AD820ARZ-REEL"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 530,
+        "lineId": 3029311,
+        "rfqQty": 1677,
+        "mpns": [
+          "ADSP-BF534BBCZ-4A"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 540,
+        "lineId": 3029312,
+        "rfqQty": 4984,
+        "mpns": [
+          "ADUM4160BRWZ-RL"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 550,
+        "lineId": 3029313,
+        "rfqQty": 4085,
+        "mpns": [
+          "AD9203ARUZRL7"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 560,
+        "lineId": 3029314,
+        "rfqQty": 8177,
+        "mpns": [
+          "AD5338ARMZ-REEL7"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 570,
+        "lineId": 3029315,
+        "rfqQty": 6558,
+        "mpns": [
+          "LT1763CDE#PBF"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 580,
+        "lineId": 3029316,
+        "rfqQty": 5845,
+        "mpns": [
+          "ADUM6421ABRNZ5-RL"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 590,
+        "lineId": 3029317,
+        "rfqQty": 13572,
+        "mpns": [
+          "LT1761IS5-3#TRPBF"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 600,
+        "lineId": 3029318,
+        "rfqQty": 7018,
+        "mpns": [
+          "LTC3122EMSE#TRPBF"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 610,
+        "lineId": 3029319,
+        "rfqQty": 823,
+        "mpns": [
+          "XC7A25T-1CSG325C"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 620,
+        "lineId": 3029320,
+        "rfqQty": 2287,
+        "mpns": [
+          "LTC2411-1IMS#PBF"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 630,
+        "lineId": 3029321,
+        "rfqQty": 13630,
+        "mpns": [
+          "MAX3295AUT+T"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 640,
+        "lineId": 3029322,
+        "rfqQty": 4272,
+        "mpns": [
+          "ADM2582EBRWZ-REEL7"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 650,
+        "lineId": 3029323,
+        "rfqQty": 4052,
+        "mpns": [
+          "MAX3250CAI+T"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 660,
+        "lineId": 3029324,
+        "rfqQty": 2504,
+        "mpns": [
+          "LTC1257IS8#PBF"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 670,
+        "lineId": 3029325,
+        "rfqQty": 1759,
+        "mpns": [
+          "LT2079IS#PBF"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 680,
+        "lineId": 3029326,
+        "rfqQty": 4081,
+        "mpns": [
+          "ADUM3160BRWZ-RL"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 690,
+        "lineId": 3029327,
+        "rfqQty": 3958,
+        "mpns": [
+          "ADM2582EBRWZ-REEL7"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 700,
+        "lineId": 3029328,
+        "rfqQty": 8159,
+        "mpns": [
+          "ADA4096-2ACPZ-R7"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 710,
+        "lineId": 3029329,
+        "rfqQty": 300,
+        "mpns": [
+          "XC7S75-2FGGA484C"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 720,
+        "lineId": 3029330,
+        "rfqQty": 5756,
+        "mpns": [
+          "ADUM3400BRWZ-RL"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 730,
+        "lineId": 3029331,
+        "rfqQty": 2320,
+        "mpns": [
+          "LT2078IS8#PBF"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 740,
+        "lineId": 3029332,
+        "rfqQty": 2569,
+        "mpns": [
+          "LTC3265EDHC#PBF"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 750,
+        "lineId": 3029333,
+        "rfqQty": 1329,
+        "mpns": [
+          "LT1074HVIT7#PBF"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 760,
+        "lineId": 3029334,
+        "rfqQty": 3942,
+        "mpns": [
+          "AD712KRZ-REEL7"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 770,
+        "lineId": 3029335,
+        "rfqQty": 1495,
+        "mpns": [
+          "LTM2882IY-3#PBF"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 780,
+        "lineId": 3029336,
+        "rfqQty": 2455,
+        "mpns": [
+          "ADR431BRZ-REEL7"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 790,
+        "lineId": 3029337,
+        "rfqQty": 4838,
+        "mpns": [
+          "LT4254IGN#PBF"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 800,
+        "lineId": 3029338,
+        "rfqQty": 4297,
+        "mpns": [
+          "LTC2484IDD#TRPBF"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 810,
+        "lineId": 3029339,
+        "rfqQty": 3674,
+        "mpns": [
+          "LTC6902IMS#TRPBF"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 820,
+        "lineId": 3029340,
+        "rfqQty": 1326,
+        "mpns": [
+          "LTM8048EY#PBF"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 830,
+        "lineId": 3029341,
+        "rfqQty": 5920,
+        "mpns": [
+          "ADUM1441ARQZ-RL7"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 840,
+        "lineId": 3029342,
+        "rfqQty": 1361,
+        "mpns": [
+          "LTC2871IFE#PBF"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 850,
+        "lineId": 3029343,
+        "rfqQty": 3671,
+        "mpns": [
+          "LT1213CS8#PBF"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 860,
+        "lineId": 3029344,
+        "rfqQty": 1479,
+        "mpns": [
+          "LTC2448IUHF#PBF"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 870,
+        "lineId": 3029345,
+        "rfqQty": 6364,
+        "mpns": [
+          "LTC6103CMS8#TRPBF"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 880,
+        "lineId": 3029346,
+        "rfqQty": 4224,
+        "mpns": [
+          "MAX4662CAE+T"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 890,
+        "lineId": 3029347,
+        "rfqQty": 13164,
+        "mpns": [
+          "ADM6710CARJZ-REEL7"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 900,
+        "lineId": 3029348,
+        "rfqQty": 1169,
+        "mpns": [
+          "AD605ARZ"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 910,
+        "lineId": 3029349,
+        "rfqQty": 2946,
+        "mpns": [
+          "AD5700-1BCPZ-R5"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 920,
+        "lineId": 3029350,
+        "rfqQty": 4951,
+        "mpns": [
+          "ADG714BRUZ-REEL7"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 930,
+        "lineId": 3029351,
+        "rfqQty": 5457,
+        "mpns": [
+          "LT1121CST-5#PBF"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 940,
+        "lineId": 3029352,
+        "rfqQty": 9031,
+        "mpns": [
+          "AD8607ARZ-REEL7"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 950,
+        "lineId": 3029353,
+        "rfqQty": 1941,
+        "mpns": [
+          "AD8253ARMZ"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 960,
+        "lineId": 3029354,
+        "rfqQty": 8944,
+        "mpns": [
+          "AD8030ARZ-REEL"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 970,
+        "lineId": 3029355,
+        "rfqQty": 5321,
+        "mpns": [
+          "AD8065ARZ-REEL7"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 980,
+        "lineId": 3029356,
+        "rfqQty": 8930,
+        "mpns": [
+          "ADR03AUJZ-REEL7"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 990,
+        "lineId": 3029357,
+        "rfqQty": 12928,
+        "mpns": [
+          "MAX3280EAUK+T"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 1000,
+        "lineId": 3029358,
+        "rfqQty": 2290,
+        "mpns": [
+          "ADUM3160BRWZ"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 1010,
+        "lineId": 3029359,
+        "rfqQty": 2399,
+        "mpns": [
+          "DS3232SN#T&R"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 1020,
+        "lineId": 3029360,
+        "rfqQty": 3055,
+        "mpns": [
+          "LTC3407EMSE#PBF"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 1030,
+        "lineId": 3029361,
+        "rfqQty": 2129,
+        "mpns": [
+          "ADUM1400BRWZ-RL"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 1040,
+        "lineId": 3029362,
+        "rfqQty": 1078,
+        "mpns": [
+          "LTC3642EDD#TRPBF"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 1050,
+        "lineId": 3029363,
+        "rfqQty": 662,
+        "mpns": [
+          "OP4177ARZ-REEL7"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 1060,
+        "lineId": 3029364,
+        "rfqQty": 335,
+        "mpns": [
+          "LTC1966IMS8#TRPBF"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 1070,
+        "lineId": 3029365,
+        "rfqQty": 167,
+        "mpns": [
+          "LT3029MPMSE#PBF"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 1080,
+        "lineId": 3029366,
+        "rfqQty": 362,
+        "mpns": [
+          "LT3995EMSE#TRPBF"
+        ],
+        "vqsThisBatch": 0
+      }
+    ],
+    "gaps": [
+      10,
+      20,
+      30,
+      40,
+      50,
+      60,
+      70,
+      80,
+      90,
+      100,
+      110,
+      120,
+      140,
+      150,
+      160,
+      170,
+      180,
+      190,
+      200,
+      210,
+      220,
+      230,
+      240,
+      250,
+      260,
+      270,
+      280,
+      290,
+      300,
+      310,
+      320,
+      330,
+      340,
+      350,
+      360,
+      370,
+      380,
+      390,
+      400,
+      410,
+      420,
+      430,
+      440,
+      450,
+      460,
+      470,
+      480,
+      490,
+      500,
+      510,
+      520,
+      530,
+      540,
+      550,
+      560,
+      570,
+      580,
+      590,
+      600,
+      610,
+      620,
+      630,
+      640,
+      650,
+      660,
+      670,
+      680,
+      690,
+      700,
+      710,
+      720,
+      730,
+      740,
+      750,
+      760,
+      770,
+      780,
+      790,
+      800,
+      810,
+      820,
+      830,
+      840,
+      850,
+      860,
+      870,
+      880,
+      890,
+      900,
+      910,
+      920,
+      930,
+      940,
+      950,
+      960,
+      970,
+      980,
+      990,
+      1000,
+      1010,
+      1020,
+      1030,
+      1040,
+      1050,
+      1060,
+      1070,
+      1080
+    ]
+  }
+}

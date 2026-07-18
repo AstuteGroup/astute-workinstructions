@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html>
+<head>
+<style>
+body { font-family: Arial, sans-serif; font-size: 14px; }
+table { border-collapse: collapse; width: 100%; margin: 15px 0; }
+th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+th { background-color: #4472C4; color: white; }
+tr:nth-child(even) { background-color: #f9f9f9; }
+.ok { background-color: #c6efce; }
+.low { background-color: #ffc7ce; }
+.shipped { background-color: #b4c6e7; }
+.enrichment { background-color: #e2efda; }
+h2 { color: #2e5090; }
+h3 { color: #2e5090; margin-top: 25px; }
+.summary-box { background-color: #f0f0f0; padding: 15px; border-radius: 5px; margin: 15px 0; }
+</style>
+</head>
+<body>
+
+<h2>LAM 77-Item Approval - VQ Status Summary</h2>
+<p>RFQ: <b>1137922</b> (Lam Research / Josh Syre)</p>
+
+<div class="summary-box">
+<h3 style="margin-top:0">Quick Summary</h3>
+<ul>
+<li><b>4 items</b> already purchased and shipped</li>
+<li><b>33 VQs</b> from API enrichment ready to buy (≥18% margin)</li>
+<li><b>16 VQs</b> from Stephanie meet 18% margin - ready for PO</li>
+<li><b>12 VQs</b> from Stephanie below 18% margin - need updated pricing</li>
+</ul>
+</div>
+
+<h3>Items Already Purchased (Shipped)</h3>
+<table>
+<tr><th>MPN</th><th>Vendor</th><th>PO</th><th>Status</th><th>Tracking</th></tr>
+<tr class="shipped"><td>FT234XD-R</td><td>Newark</td><td>PO810491</td><td>Shipped</td><td>526134749325</td></tr>
+<tr class="shipped"><td>IS25LP128-JBLE</td><td>Newark</td><td>PO810491</td><td>Shipped</td><td>1Z97X570AT04717123</td></tr>
+<tr class="shipped"><td>HFBR-1531ETZ</td><td>Mouser</td><td>PO809925</td><td>Shipped</td><td>528979457439</td></tr>
+<tr class="shipped"><td>551SCMGI</td><td>NAC Semi</td><td>PO809706</td><td>Shipped</td><td>1Z019F050396474319</td></tr>
+</table>
+
+<h3>API Enrichment VQs - Ready to Buy (33 VQs, all ≥18% margin)</h3>
+<table>
+<tr><th>MPN</th><th>Vendor</th><th>Buyer</th><th>Cost</th><th>Qty</th><th>LAM Price</th><th>Margin</th><th>RFQ Line</th></tr>
+<tr class="enrichment"><td>08053G105ZAT2A</td><td>Future Electronics</td><td>Claude Harris</td><td>$0.0498</td><td>8,000</td><td>$0.170</td><td>70.7%</td><td>630</td></tr>
+<tr class="enrichment"><td>94HAB16WRT</td><td>Verical</td><td>Claude Harris</td><td>$2.27</td><td>1,500</td><td>$5.99</td><td>62.1%</td><td>610</td></tr>
+<tr class="enrichment"><td>94HAB16WRT</td><td>Waldom Electronics</td><td>Claude Harris</td><td>$2.51</td><td>2,250</td><td>$5.99</td><td>58.1%</td><td>610</td></tr>
+<tr class="enrichment"><td>94HAB16WRT</td><td>Future Electronics</td><td>Claude Harris</td><td>$2.88</td><td>750</td><td>$5.99</td><td>51.9%</td><td>610</td></tr>
+<tr class="enrichment"><td>94HAB16WRT</td><td>Sager</td><td>Claude Harris</td><td>$3.54</td><td>750</td><td>$5.99</td><td>40.9%</td><td>610</td></tr>
+<tr class="enrichment"><td>94HAB16WRT</td><td>Verical</td><td>Claude Harris</td><td>$4.07</td><td>800</td><td>$5.99</td><td>32.0%</td><td>610</td></tr>
+<tr class="enrichment"><td>C1206C102K5RAC</td><td>Verical</td><td>Claude Harris</td><td>$0.0072</td><td>10,417</td><td>$0.308</td><td>97.7%</td><td>650</td></tr>
+<tr class="enrichment"><td>C1206C102K5RAC</td><td>Rutronik</td><td>Claude Harris</td><td>$0.0091</td><td>16,000</td><td>$0.308</td><td>97.0%</td><td>650</td></tr>
+<tr class="enrichment"><td>CRCW0805100RJNEA</td><td>Verical</td><td>Claude Harris</td><td>$0.0029</td><td>835,000</td><td>$0.110</td><td>97.4%</td><td>450</td></tr>
+<tr class="enrichment"><td>CRCW0805100RJNEA</td><td>Future Electronics</td><td>Claude Harris</td><td>$0.0029</td><td>2,285,000</td><td>$0.110</td><td>97.4%</td><td>450</td></tr>
+<tr class="enrichment"><td>CRCW0805100RJNEA</td><td>TTI</td><td>Claude Harris</td><td>$0.0031</td><td>100,000</td><td>$0.110</td><td>97.2%</td><td>450</td></tr>
+<tr class="enrichment"><td>CRCW080547K0JNEA</td><td>Verical</td><td>Claude Harris</td><td>$0.0029</td><td>5,000</td><td>$0.108</td><td>97.3%</td><td>480</td></tr>
+<tr class="enrichment"><td>CRCW080547K0JNEA</td><td>TTI</td><td>Claude Harris</td><td>$0.0029</td><td>375,000</td><td>$0.108</td><td>97.3%</td><td>480</td></tr>
+<tr class="enrichment"><td>CRCW080547K0JNEA</td><td>Future Electronics</td><td>Claude Harris</td><td>$0.0030</td><td>1,415,000</td><td>$0.108</td><td>97.2%</td><td>480</td></tr>
+<tr class="enrichment"><td>CRCW080547K0JNEA</td><td>Arrow</td><td>Claude Harris</td><td>$0.0049</td><td>503</td><td>$0.108</td><td>95.5%</td><td>480</td></tr>
+<tr class="enrichment"><td>EEE1VA331P</td><td>Verical</td><td>Claude Harris</td><td>$0.178</td><td>1,500</td><td>$0.928</td><td>80.8%</td><td>640</td></tr>
+<tr class="enrichment"><td>EEE1VA331P</td><td>TTI</td><td>Claude Harris</td><td>$0.193</td><td>16,500</td><td>$0.928</td><td>79.2%</td><td>640</td></tr>
+<tr class="enrichment"><td>EEE1VA331P</td><td>Verical</td><td>Claude Harris</td><td>$0.244</td><td>21,500</td><td>$0.928</td><td>73.7%</td><td>640</td></tr>
+<tr class="enrichment"><td>EEEFC1V220P</td><td>Rutronik</td><td>Claude Harris</td><td>$0.127</td><td>2,000</td><td>$0.554</td><td>77.1%</td><td>620</td></tr>
+<tr class="enrichment"><td>EEEFC1V220P</td><td>TTI</td><td>Claude Harris</td><td>$0.137</td><td>1,000</td><td>$0.554</td><td>75.3%</td><td>620</td></tr>
+<tr class="enrichment"><td>EEEFC1V220P</td><td>Verical</td><td>Claude Harris</td><td>$0.140</td><td>3,725</td><td>$0.554</td><td>74.7%</td><td>620</td></tr>
+<tr class="enrichment"><td>EEEFC1V220P</td><td>Verical</td><td>Claude Harris</td><td>$0.140</td><td>2,035</td><td>$0.554</td><td>74.7%</td><td>620</td></tr>
+<tr class="enrichment"><td>EEEFC1V220P</td><td>Arrow</td><td>Claude Harris</td><td>$0.144</td><td>30,000</td><td>$0.554</td><td>74.0%</td><td>620</td></tr>
+<tr class="enrichment"><td>EEEFC1V220P</td><td>Verical</td><td>Claude Harris</td><td>$0.145</td><td>30,000</td><td>$0.554</td><td>73.9%</td><td>620</td></tr>
+<tr class="enrichment"><td>EEEFC1V220P</td><td>Verical</td><td>Claude Harris</td><td>$0.161</td><td>8,000</td><td>$0.554</td><td>70.9%</td><td>620</td></tr>
+<tr class="enrichment"><td>IRLB4030PBF</td><td>Future Electronics</td><td>Claude Harris</td><td>$1.39</td><td>250</td><td>$5.45</td><td>74.5%</td><td>510</td></tr>
+<tr class="enrichment"><td>IRLB4030PBF</td><td>Verical</td><td>Claude Harris</td><td>$1.45</td><td>2,000</td><td>$5.45</td><td>73.5%</td><td>510</td></tr>
+<tr class="enrichment"><td>IRLB4030PBF</td><td>Rutronik</td><td>Claude Harris</td><td>$1.47</td><td>1,000</td><td>$5.45</td><td>73.0%</td><td>510</td></tr>
+<tr class="enrichment"><td>IRLB4030PBF</td><td>Verical</td><td>Claude Harris</td><td>$1.60</td><td>235</td><td>$5.45</td><td>70.6%</td><td>510</td></tr>
+<tr class="enrichment"><td>IRLB4030PBF</td><td>Verical</td><td>Claude Harris</td><td>$1.71</td><td>2,141</td><td>$5.45</td><td>68.7%</td><td>510</td></tr>
+<tr class="enrichment"><td>IRLB4030PBF</td><td>Arrow</td><td>Claude Harris</td><td>$1.72</td><td>32,560</td><td>$5.45</td><td>68.4%</td><td>510</td></tr>
+<tr class="enrichment"><td>IRLB4030PBF</td><td>Verical</td><td>Claude Harris</td><td>$1.72</td><td>32,556</td><td>$5.45</td><td>68.4%</td><td>510</td></tr>
+<tr class="enrichment"><td>IRLB4030PBF</td><td>Verical</td><td>Claude Harris</td><td>$2.53</td><td>997</td><td>$5.45</td><td>53.6%</td><td>510</td></tr>
+</table>
+
+<h3>Stephanie Hill VQs (28 VQs)</h3>
+<table>
+<tr><th>MPN</th><th>Vendor</th><th>Buyer</th><th>Cost</th><th>Qty</th><th>LAM Price</th><th>Margin</th><th>RFQ Line</th><th>Status</th></tr>
+<tr class="ok"><td>1111C101EP501X</td><td>Passive Plus, LLC</td><td>Stephanie Hill</td><td>$10.77</td><td>50</td><td>$14.77</td><td>27.1%</td><td>310</td><td>OK</td></tr>
+<tr class="ok"><td>1111C221FP501X</td><td>Passive Plus, LLC</td><td>Stephanie Hill</td><td>$4.56</td><td>50</td><td>$7.06</td><td>35.4%</td><td>300</td><td>OK</td></tr>
+<tr class="ok"><td>2225C121FW252X</td><td>Passive Plus, LLC</td><td>Stephanie Hill</td><td>$31.38</td><td>100</td><td>$39.88</td><td>21.3%</td><td>360</td><td>OK</td></tr>
+<tr class="low"><td>2225C121FW252X</td><td>Passive Plus, LLC</td><td>Stephanie Hill</td><td>$34.87</td><td>230</td><td>$39.88</td><td>12.6%</td><td>360</td><td>LOW</td></tr>
+<tr class="ok"><td>2225C241FW252X</td><td>Passive Plus, LLC</td><td>Stephanie Hill</td><td>$38.30</td><td>100</td><td>$47.88</td><td>20.0%</td><td>330</td><td>OK</td></tr>
+<tr class="low"><td>2225C241FW252X</td><td>Passive Plus, LLC</td><td>Stephanie Hill</td><td>$42.55</td><td>230</td><td>$47.88</td><td>11.1%</td><td>330</td><td>LOW</td></tr>
+<tr class="ok"><td>2225C300FW252X</td><td>Passive Plus, LLC</td><td>Stephanie Hill</td><td>$20.32</td><td>100</td><td>$25.40</td><td>20.0%</td><td>400</td><td>OK</td></tr>
+<tr class="low"><td>2225C300FW252X</td><td>Passive Plus, LLC</td><td>Stephanie Hill</td><td>$22.58</td><td>230</td><td>$25.40</td><td>11.1%</td><td>400</td><td>LOW</td></tr>
+<tr class="ok"><td>2225C620FW252X</td><td>Passive Plus, LLC</td><td>Stephanie Hill</td><td>$28.34</td><td>100</td><td>$35.43</td><td>20.0%</td><td>370</td><td>OK</td></tr>
+<tr class="low"><td>2225C620FW252X</td><td>Passive Plus, LLC</td><td>Stephanie Hill</td><td>$31.49</td><td>230</td><td>$35.43</td><td>11.1%</td><td>370</td><td>LOW</td></tr>
+<tr class="low"><td>3005W5PXX55N40X</td><td>American Conec Corp.</td><td>Stephanie Hill</td><td>$19.81</td><td>10</td><td>$18.58</td><td>-6.6%</td><td>250</td><td>LOW</td></tr>
+<tr class="low"><td>3005W5PXX55N40X</td><td>American Conec Corp.</td><td>Stephanie Hill</td><td>$16.72</td><td>100</td><td>$18.58</td><td>10.0%</td><td>250</td><td>LOW</td></tr>
+<tr class="low"><td>3007W2SCR51E40X</td><td>American Conec Corp.</td><td>Stephanie Hill</td><td>$13.93</td><td>10</td><td>$12.77</td><td>-9.1%</td><td>240</td><td>LOW</td></tr>
+<tr class="low"><td>3007W2SCR51E40X</td><td>Master Electronics</td><td>Stephanie Hill</td><td>$15.51</td><td>11</td><td>$12.77</td><td>-21.5%</td><td>240</td><td>LOW</td></tr>
+<tr class="low"><td>3007W2SCR51E40X</td><td>American Conec Corp.</td><td>Stephanie Hill</td><td>$11.77</td><td>100</td><td>$12.77</td><td>7.8%</td><td>240</td><td>LOW</td></tr>
+<tr class="ok"><td>3838C2R0AP722X</td><td>Passive Plus, LLC</td><td>Stephanie Hill</td><td>$41.59</td><td>100</td><td>$51.99</td><td>20.0%</td><td>340</td><td>OK</td></tr>
+<tr class="ok"><td>3838C2R0AP722X</td><td>Passive Plus, LLC</td><td>Stephanie Hill</td><td>$41.59</td><td>235</td><td>$51.99</td><td>20.0%</td><td>340</td><td>OK</td></tr>
+<tr class="ok"><td>3838C2R0CP722X</td><td>Passive Plus, LLC</td><td>Stephanie Hill</td><td>$18.28</td><td>30</td><td>$22.85</td><td>20.0%</td><td>410</td><td>OK</td></tr>
+<tr class="ok"><td>3838C2R0CP722X</td><td>Passive Plus, LLC</td><td>Stephanie Hill</td><td>$15.72</td><td>180</td><td>$22.85</td><td>31.2%</td><td>410</td><td>OK</td></tr>
+<tr class="ok"><td>3838C4R7BW362X</td><td>Passive Plus, LLC</td><td>Stephanie Hill</td><td>$22.76</td><td>100</td><td>$28.75</td><td>20.8%</td><td>390</td><td>OK</td></tr>
+<tr class="low"><td>3838C4R7BW362X</td><td>Passive Plus, LLC</td><td>Stephanie Hill</td><td>$25.29</td><td>230</td><td>$28.75</td><td>12.0%</td><td>390</td><td>LOW</td></tr>
+<tr class="ok"><td>3838C820JW362X</td><td>Passive Plus, LLC</td><td>Stephanie Hill</td><td>$26.19</td><td>100</td><td>$32.74</td><td>20.0%</td><td>380</td><td>OK</td></tr>
+<tr class="low"><td>3838C820JW362X</td><td>Passive Plus, LLC</td><td>Stephanie Hill</td><td>$29.10</td><td>230</td><td>$32.74</td><td>11.1%</td><td>380</td><td>LOW</td></tr>
+<tr class="ok"><td>7676C102GP502X</td><td>Passive Plus, LLC</td><td>Stephanie Hill</td><td>$193.52</td><td>20</td><td>$241.90</td><td>20.0%</td><td>350</td><td>OK</td></tr>
+<tr class="ok"><td>7676C102GP502X</td><td>Passive Plus, LLC</td><td>Stephanie Hill</td><td>$193.52</td><td>205</td><td>$241.90</td><td>20.0%</td><td>350</td><td>OK</td></tr>
+<tr class="low"><td>7676C102JW502X</td><td>Passive Plus, LLC</td><td>Stephanie Hill</td><td>$83.69</td><td>20</td><td>$90.12</td><td>7.1%</td><td>320</td><td>LOW</td></tr>
+<tr class="low"><td>7676C102JW502X</td><td>Passive Plus, LLC</td><td>Stephanie Hill</td><td>$83.69</td><td>50</td><td>$90.12</td><td>7.1%</td><td>320</td><td>LOW</td></tr>
+</table>
+
+<h3>Notes</h3>
+<ul>
+<li>The 100-qty price breaks generally meet margin; the 230-qty breaks are typically below target</li>
+<li>Connector items (3005W, 3007W) have negative margins at current pricing - need requote</li>
+<li>Enrichment resistors (CRCW series) show 95%+ margins - verify qty needed vs availability</li>
+</ul>
+
+</body>
+</html>

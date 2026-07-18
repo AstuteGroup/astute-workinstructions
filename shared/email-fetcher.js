@@ -41,6 +41,7 @@ const ACCOUNT_MAP = {
   rfqloading: 'rfqloading@orangetsunami.com',
   brokeroffers: 'brokeroffers@orangetsunami.com',
   tracking: 'tracking@orangetsunami.com',
+  lamkitting: 'lamkitting@orangetsunami.com',
 };
 
 const IMAP_HOST = process.env.IMAP_HOST || 'imap.mail.us-east-1.awsapps.com';

@@ -82,7 +82,7 @@ async function validateVQForPurchase(vqId, opts = {}) {
   const { rows } = await pool.query(`
     SELECT vl.chuboe_vq_line_id, vl.chuboe_mpn, vl.chuboe_rfq_line_id,
            vl.cost, vl.qty, vl.c_bpartner_id, bp.name AS supplier,
-           vl.chuboe_mfr_id, vl.c_country_id, vl.c_bpartner_location_id,
+           vl.chuboe_mfr_id, vl.chuboe_mfr_text, vl.c_country_id, vl.c_bpartner_location_id,
            vl.chuboe_date_code, vl.chuboe_lead_time, vl.datepromised,
            vl.chuboe_packaging_id, vl.chuboe_traceability_id,
            vl.chuboe_warehouse_id, vl.chuboe_warehouse_group_id,
@@ -111,7 +111,23 @@ async function validateVQForPurchase(vqId, opts = {}) {
   if (!vq.qty || Number(vq.qty) <= 0) violations.push(`Qty is ${vq.qty} (must be > 0)`);
 
   // MFR, COO, Partner Location — required for PO processing
-  if (!vq.chuboe_mfr_id) violations.push('Chuboe_MFR_ID is blank (required — manufacturer must be set)');
+  //
+  // MFR validation: Prefer chuboe_mfr_id (FK to chuboe_mfr table). If unavailable,
+  // chuboe_mfr_text is accepted as a LAST RESORT fallback for cases where:
+  //   - The MFR exists only as a system record (ad_client_id=0) which the API rejects
+  //   - The MFR name doesn't match any existing record
+  //
+  // ⚠️  MFR TEXT IS A LAST RESORT — NOT A SHORTCUT ⚠️
+  // Before falling back to MFR text, callers MUST:
+  //   1. Use lookupMfr() to search for an existing MFR record
+  //   2. Check if a client-specific MFR (ad_client_id=1000000) already exists
+  //   3. If no usable MFR exists, populate MFR text and flag for manual reconciliation
+  //
+  // DO NOT create new MFR records — escalate to operator for manual resolution.
+  // MFR text records should be periodically reconciled to proper MFR IDs by operator.
+  if (!vq.chuboe_mfr_id && !vq.chuboe_mfr_text) {
+    violations.push('Chuboe_MFR_ID is blank and Chuboe_MFR_Text is blank (required — manufacturer must be set via ID or text)');
+  }
   if (!vq.c_country_id) violations.push('C_Country_ID is blank (required — COO must be set, use PENDING=1000001 if unknown)');
   if (!vq.c_bpartner_location_id) violations.push('C_BPartner_Location_ID is blank (required — vendor ship-from address)');
 

@@ -50,6 +50,16 @@
       "supplier": "TTI",
       "price": 0.0015,
       "qtyNeeded": 1
+    },
+    {
+      "cpc": "668-A09548-015",
+      "fromMPN": "9552156612741",
+      "toMPN": "09 55 215 6612 741",
+      "date": "2026-07-16",
+      "reason": "Sourcing found better franchise option",
+      "supplier": "TTI",
+      "price": 5.39,
+      "qtyNeeded": 140
     }
   ],
   "switches": [

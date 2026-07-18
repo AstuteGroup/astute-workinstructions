@@ -1996,6 +1996,21 @@ function processInventoryFile(inputFile, outputDir) {
 
     console.log(`Processing: ${inputFile}`);
     console.log(`Output directory: ${outputDir}`);
+
+    // Check inventory file age - warn if stale (>14 days old)
+    const fileStats = fs.statSync(inputFile);
+    const fileAgeDays = Math.floor((Date.now() - fileStats.mtime.getTime()) / (1000 * 60 * 60 * 24));
+    if (fileAgeDays > 14) {
+        console.log('');
+        console.log('!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!');
+        console.log(`WARNING: Inventory file is ${fileAgeDays} days old!`);
+        console.log('This data may be stale. Verify you have the correct file.');
+        console.log('File:', path.basename(inputFile));
+        console.log('Modified:', fileStats.mtime.toISOString().split('T')[0]);
+        console.log('!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!');
+        console.log('');
+    }
+
     console.log('-'.repeat(60));
 
     // ==========================================================================

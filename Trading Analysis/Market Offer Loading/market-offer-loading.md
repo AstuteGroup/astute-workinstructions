@@ -89,11 +89,11 @@ Trigger Analysis (default)  ──→  passes new offerId(s) to Workflow B
 `writeOffer()` has not yet been exercised in prod. Before any full-batch write, do a one-line smoke test against the target inbox's first offer:
 
 1. Pick the smallest line from the offer (1 MPN, 1 qty, 1 price if available)
-2. Call `writeOffer({ bpartnerId, offerTypeId, description, lines: [oneLine], writeMpnRecords: true })`
+2. Call `writeOffer({ bpartnerId, offerTypeId, description, lines: [oneLine] })`
 3. Verify in OT:
    - New `chuboe_offer` row exists with the returned `searchKey`
    - One `chuboe_offer_line` exists under it
-   - If `writeMpnRecords: true` — one `chuboe_offer_line_mpn` exists
+   - One `chuboe_offer_line_mpn` exists (auto-created by iDempiere bean callout)
    - MFR text resolved correctly (canonical name, not raw)
 4. If clean → mark Step 0 satisfied for this environment, proceed to Step 1
 5. If broken → fix the writer, void the test offer, retry. Same protocol as RFQ 1132037 → 1132040 (see `MEMORY.md` and `project_test_vs_prod_idempiere.md`)
@@ -177,21 +177,22 @@ Full list of 24 types in `shared/offer-writeback.js` → `OFFER_TYPES`. Pass eit
 ```javascript
 const { writeOffer } = require('../../shared/offer-writeback');
 
+// NOTE: Do NOT set writeMpnRecords: true — the iDempiere bean callout on
+// chuboe_offer_line auto-creates the chuboe_offer_line_mpn record.
+// Writing it ourselves caused duplicates (discovered 2026-07-07).
 const result = await writeOffer({
   bpartnerId: partnerResult.search_key ? Number(partnerResult.search_key) : null,
   offerTypeId: 'Customer Excess',                      // or 1000000
   description: '04.08.2026-GE_Aerospace_RevShare_B1',  // MM.DD.YYYY-PartnerName-context
-  writeMpnRecords: true,                                // also write _line_mpn rows
   lines: extractedLines,
 });
-// → { offerId, searchKey, linesWritten, mpnsWritten, errors }
+// → { offerId, searchKey, linesWritten, errors }
 ```
 
 **Validate:**
 - `result.offerId` is non-null
 - `result.linesWritten === lines.length`
 - `result.errors.length === 0`
-- If `writeMpnRecords: true`: `result.mpnsWritten === lines.length`
 
 If any of these fail, **do not move the email to `Processed`** (Step 6). Move to `NeedsReview` instead and surface errors to the user.
 

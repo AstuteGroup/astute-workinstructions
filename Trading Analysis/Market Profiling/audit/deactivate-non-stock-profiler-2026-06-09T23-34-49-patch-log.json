@@ -1,0 +1,1457 @@
+[
+  {
+    "status": "patched",
+    "table": "chuboe_rfq_line",
+    "id": 3129969,
+    "source": "deactivate-non-stock-profiler",
+    "startedAt": "2026-06-09T23:34:49.208Z",
+    "patched": {
+      "IsActive": false
+    },
+    "skipped": {},
+    "before": null,
+    "after": {
+      "IsActive": false
+    }
+  },
+  {
+    "status": "patched",
+    "table": "chuboe_rfq_line",
+    "id": 3129970,
+    "source": "deactivate-non-stock-profiler",
+    "startedAt": "2026-06-09T23:34:49.208Z",
+    "patched": {
+      "IsActive": false
+    },
+    "skipped": {},
+    "before": null,
+    "after": {
+      "IsActive": false
+    }
+  },
+  {
+    "status": "patched",
+    "table": "chuboe_rfq_line",
+    "id": 3129971,
+    "source": "deactivate-non-stock-profiler",
+    "startedAt": "2026-06-09T23:34:49.208Z",
+    "patched": {
+      "IsActive": false
+    },
+    "skipped": {},
+    "before": null,
+    "after": {
+      "IsActive": false
+    }
+  },
+  {
+    "status": "patched",
+    "table": "chuboe_rfq_line",
+    "id": 3129972,
+    "source": "deactivate-non-stock-profiler",
+    "startedAt": "2026-06-09T23:34:49.208Z",
+    "patched": {
+      "IsActive": false
+    },
+    "skipped": {},
+    "before": null,
+    "after": {
+      "IsActive": false
+    }
+  },
+  {
+    "status": "patched",
+    "table": "chuboe_rfq_line",
+    "id": 3129973,
+    "source": "deactivate-non-stock-profiler",
+    "startedAt": "2026-06-09T23:34:49.208Z",
+    "patched": {
+      "IsActive": false
+    },
+    "skipped": {},
+    "before": null,
+    "after": {
+      "IsActive": false
+    }
+  },
+  {
+    "status": "patched",
+    "table": "chuboe_rfq_line",
+    "id": 3129974,
+    "source": "deactivate-non-stock-profiler",
+    "startedAt": "2026-06-09T23:34:49.208Z",
+    "patched": {
+      "IsActive": false
+    },
+    "skipped": {},
+    "before": null,
+    "after": {
+      "IsActive": false
+    }
+  },
+  {
+    "status": "patched",
+    "table": "chuboe_rfq_line",
+    "id": 3129975,
+    "source": "deactivate-non-stock-profiler",
+    "startedAt": "2026-06-09T23:34:49.208Z",
+    "patched": {
+      "IsActive": false
+    },
+    "skipped": {},
+    "before": null,
+    "after": {
+      "IsActive": false
+    }
+  },
+  {
+    "status": "patched",
+    "table": "chuboe_rfq_line",
+    "id": 3129976,
+    "source": "deactivate-non-stock-profiler",
+    "startedAt": "2026-06-09T23:34:49.208Z",
+    "patched": {
+      "IsActive": false
+    },
+    "skipped": {},
+    "before": null,
+    "after": {
+      "IsActive": false
+    }
+  },
+  {
+    "status": "patched",
+    "table": "chuboe_rfq_line",
+    "id": 3129977,
+    "source": "deactivate-non-stock-profiler",
+    "startedAt": "2026-06-09T23:34:49.208Z",
+    "patched": {
+      "IsActive": false
+    },
+    "skipped": {},
+    "before": null,
+    "after": {
+      "IsActive": false
+    }
+  },
+  {
+    "status": "patched",
+    "table": "chuboe_rfq_line",
+    "id": 3129978,
+    "source": "deactivate-non-stock-profiler",
+    "startedAt": "2026-06-09T23:34:49.208Z",
+    "patched": {
+      "IsActive": false
+    },
+    "skipped": {},
+    "before": null,
+    "after": {
+      "IsActive": false
+    }
+  },
+  {
+    "status": "patched",
+    "table": "chuboe_rfq_line",
+    "id": 3129979,
+    "source": "deactivate-non-stock-profiler",
+    "startedAt": "2026-06-09T23:34:49.248Z",
+    "patched": {
+      "IsActive": false
+    },
+    "skipped": {},
+    "before": null,
+    "after": {
+      "IsActive": false
+    }
+  },
+  {
+    "status": "patched",
+    "table": "chuboe_rfq_line",
+    "id": 3129980,
+    "source": "deactivate-non-stock-profiler",
+    "startedAt": "2026-06-09T23:34:49.249Z",
+    "patched": {
+      "IsActive": false
+    },
+    "skipped": {},
+    "before": null,
+    "after": {
+      "IsActive": false
+    }
+  },
+  {
+    "status": "patched",
+    "table": "chuboe_rfq_line",
+    "id": 3129981,
+    "source": "deactivate-non-stock-profiler",
+    "startedAt": "2026-06-09T23:34:49.250Z",
+    "patched": {
+      "IsActive": false
+    },
+    "skipped": {},
+    "before": null,
+    "after": {
+      "IsActive": false
+    }
+  },
+  {
+    "status": "patched",
+    "table": "chuboe_rfq_line",
+    "id": 3129982,
+    "source": "deactivate-non-stock-profiler",
+    "startedAt": "2026-06-09T23:34:49.250Z",
+    "patched": {
+      "IsActive": false
+    },
+    "skipped": {},
+    "before": null,
+    "after": {
+      "IsActive": false
+    }
+  },
+  {
+    "status": "patched",
+    "table": "chuboe_rfq_line",
+    "id": 3129983,
+    "source": "deactivate-non-stock-profiler",
+    "startedAt": "2026-06-09T23:34:49.251Z",
+    "patched": {
+      "IsActive": false
+    },
+    "skipped": {},
+    "before": null,
+    "after": {
+      "IsActive": false
+    }
+  },
+  {
+    "status": "patched",
+    "table": "chuboe_rfq_line",
+    "id": 3129984,
+    "source": "deactivate-non-stock-profiler",
+    "startedAt": "2026-06-09T23:34:49.252Z",
+    "patched": {
+      "IsActive": false
+    },
+    "skipped": {},
+    "before": null,
+    "after": {
+      "IsActive": false
+    }
+  },
+  {
+    "status": "patched",
+    "table": "chuboe_rfq_line",
+    "id": 3129985,
+    "source": "deactivate-non-stock-profiler",
+    "startedAt": "2026-06-09T23:34:49.253Z",
+    "patched": {
+      "IsActive": false
+    },
+    "skipped": {},
+    "before": null,
+    "after": {
+      "IsActive": false
+    }
+  },
+  {
+    "status": "patched",
+    "table": "chuboe_rfq_line",
+    "id": 3129986,
+    "source": "deactivate-non-stock-profiler",
+    "startedAt": "2026-06-09T23:34:49.253Z",
+    "patched": {
+      "IsActive": false
+    },
+    "skipped": {},
+    "before": null,
+    "after": {
+      "IsActive": false
+    }
+  },
+  {
+    "status": "patched",
+    "table": "chuboe_rfq_line",
+    "id": 3129987,
+    "source": "deactivate-non-stock-profiler",
+    "startedAt": "2026-06-09T23:34:49.254Z",
+    "patched": {
+      "IsActive": false
+    },
+    "skipped": {},
+    "before": null,
+    "after": {
+      "IsActive": false
+    }
+  },
+  {
+    "status": "patched",
+    "table": "chuboe_rfq_line",
+    "id": 3129988,
+    "source": "deactivate-non-stock-profiler",
+    "startedAt": "2026-06-09T23:34:49.256Z",
+    "patched": {
+      "IsActive": false
+    },
+    "skipped": {},
+    "before": null,
+    "after": {
+      "IsActive": false
+    }
+  },
+  {
+    "status": "patched",
+    "table": "chuboe_rfq_line",
+    "id": 3129989,
+    "source": "deactivate-non-stock-profiler",
+    "startedAt": "2026-06-09T23:34:49.261Z",
+    "patched": {
+      "IsActive": false
+    },
+    "skipped": {},
+    "before": null,
+    "after": {
+      "IsActive": false
+    }
+  },
+  {
+    "status": "patched",
+    "table": "chuboe_rfq_line",
+    "id": 3129990,
+    "source": "deactivate-non-stock-profiler",
+    "startedAt": "2026-06-09T23:34:49.262Z",
+    "patched": {
+      "IsActive": false
+    },
+    "skipped": {},
+    "before": null,
+    "after": {
+      "IsActive": false
+    }
+  },
+  {
+    "status": "patched",
+    "table": "chuboe_rfq_line",
+    "id": 3129991,
+    "source": "deactivate-non-stock-profiler",
+    "startedAt": "2026-06-09T23:34:49.263Z",
+    "patched": {
+      "IsActive": false
+    },
+    "skipped": {},
+    "before": null,
+    "after": {
+      "IsActive": false
+    }
+  },
+  {
+    "status": "patched",
+    "table": "chuboe_rfq_line",
+    "id": 3129992,
+    "source": "deactivate-non-stock-profiler",
+    "startedAt": "2026-06-09T23:34:49.264Z",
+    "patched": {
+      "IsActive": false
+    },
+    "skipped": {},
+    "before": null,
+    "after": {
+      "IsActive": false
+    }
+  },
+  {
+    "status": "patched",
+    "table": "chuboe_rfq_line",
+    "id": 3129993,
+    "source": "deactivate-non-stock-profiler",
+    "startedAt": "2026-06-09T23:34:49.268Z",
+    "patched": {
+      "IsActive": false
+    },
+    "skipped": {},
+    "before": null,
+    "after": {
+      "IsActive": false
+    }
+  },
+  {
+    "status": "patched",
+    "table": "chuboe_rfq_line",
+    "id": 3129994,
+    "source": "deactivate-non-stock-profiler",
+    "startedAt": "2026-06-09T23:34:49.269Z",
+    "patched": {
+      "IsActive": false
+    },
+    "skipped": {},
+    "before": null,
+    "after": {
+      "IsActive": false
+    }
+  },
+  {
+    "status": "patched",
+    "table": "chuboe_rfq_line",
+    "id": 3129995,
+    "source": "deactivate-non-stock-profiler",
+    "startedAt": "2026-06-09T23:34:49.272Z",
+    "patched": {
+      "IsActive": false
+    },
+    "skipped": {},
+    "before": null,
+    "after": {
+      "IsActive": false
+    }
+  },
+  {
+    "status": "patched",
+    "table": "chuboe_rfq_line",
+    "id": 3129996,
+    "source": "deactivate-non-stock-profiler",
+    "startedAt": "2026-06-09T23:34:49.272Z",
+    "patched": {
+      "IsActive": false
+    },
+    "skipped": {},
+    "before": null,
+    "after": {
+      "IsActive": false
+    }
+  },
+  {
+    "status": "patched",
+    "table": "chuboe_rfq_line",
+    "id": 3129997,
+    "source": "deactivate-non-stock-profiler",
+    "startedAt": "2026-06-09T23:34:49.274Z",
+    "patched": {
+      "IsActive": false
+    },
+    "skipped": {},
+    "before": null,
+    "after": {
+      "IsActive": false
+    }
+  },
+  {
+    "status": "patched",
+    "table": "chuboe_rfq_line",
+    "id": 3129998,
+    "source": "deactivate-non-stock-profiler",
+    "startedAt": "2026-06-09T23:34:49.275Z",
+    "patched": {
+      "IsActive": false
+    },
+    "skipped": {},
+    "before": null,
+    "after": {
+      "IsActive": false
+    }
+  },
+  {
+    "status": "patched",
+    "table": "chuboe_rfq_line",
+    "id": 3129999,
+    "source": "deactivate-non-stock-profiler",
+    "startedAt": "2026-06-09T23:34:49.276Z",
+    "patched": {
+      "IsActive": false
+    },
+    "skipped": {},
+    "before": null,
+    "after": {
+      "IsActive": false
+    }
+  },
+  {
+    "status": "patched",
+    "table": "chuboe_rfq_line",
+    "id": 3130000,
+    "source": "deactivate-non-stock-profiler",
+    "startedAt": "2026-06-09T23:34:49.278Z",
+    "patched": {
+      "IsActive": false
+    },
+    "skipped": {},
+    "before": null,
+    "after": {
+      "IsActive": false
+    }
+  },
+  {
+    "status": "patched",
+    "table": "chuboe_rfq_line",
+    "id": 3130001,
+    "source": "deactivate-non-stock-profiler",
+    "startedAt": "2026-06-09T23:34:49.279Z",
+    "patched": {
+      "IsActive": false
+    },
+    "skipped": {},
+    "before": null,
+    "after": {
+      "IsActive": false
+    }
+  },
+  {
+    "status": "patched",
+    "table": "chuboe_rfq_line",
+    "id": 3130002,
+    "source": "deactivate-non-stock-profiler",
+    "startedAt": "2026-06-09T23:34:49.280Z",
+    "patched": {
+      "IsActive": false
+    },
+    "skipped": {},
+    "before": null,
+    "after": {
+      "IsActive": false
+    }
+  },
+  {
+    "status": "patched",
+    "table": "chuboe_rfq_line",
+    "id": 3130003,
+    "source": "deactivate-non-stock-profiler",
+    "startedAt": "2026-06-09T23:34:49.281Z",
+    "patched": {
+      "IsActive": false
+    },
+    "skipped": {},
+    "before": null,
+    "after": {
+      "IsActive": false
+    }
+  },
+  {
+    "status": "patched",
+    "table": "chuboe_rfq_line",
+    "id": 3130006,
+    "source": "deactivate-non-stock-profiler",
+    "startedAt": "2026-06-09T23:34:49.285Z",
+    "patched": {
+      "IsActive": false
+    },
+    "skipped": {},
+    "before": null,
+    "after": {
+      "IsActive": false
+    }
+  },
+  {
+    "status": "patched",
+    "table": "chuboe_rfq_line",
+    "id": 3130007,
+    "source": "deactivate-non-stock-profiler",
+    "startedAt": "2026-06-09T23:34:49.287Z",
+    "patched": {
+      "IsActive": false
+    },
+    "skipped": {},
+    "before": null,
+    "after": {
+      "IsActive": false
+    }
+  },
+  {
+    "status": "patched",
+    "table": "chuboe_rfq_line",
+    "id": 3130008,
+    "source": "deactivate-non-stock-profiler",
+    "startedAt": "2026-06-09T23:34:49.291Z",
+    "patched": {
+      "IsActive": false
+    },
+    "skipped": {},
+    "before": null,
+    "after": {
+      "IsActive": false
+    }
+  },
+  {
+    "status": "patched",
+    "table": "chuboe_rfq_line",
+    "id": 3130009,
+    "source": "deactivate-non-stock-profiler",
+    "startedAt": "2026-06-09T23:34:49.292Z",
+    "patched": {
+      "IsActive": false
+    },
+    "skipped": {},
+    "before": null,
+    "after": {
+      "IsActive": false
+    }
+  },
+  {
+    "status": "patched",
+    "table": "chuboe_rfq_line",
+    "id": 3130010,
+    "source": "deactivate-non-stock-profiler",
+    "startedAt": "2026-06-09T23:34:49.294Z",
+    "patched": {
+      "IsActive": false
+    },
+    "skipped": {},
+    "before": null,
+    "after": {
+      "IsActive": false
+    }
+  },
+  {
+    "status": "patched",
+    "table": "chuboe_rfq_line",
+    "id": 3130011,
+    "source": "deactivate-non-stock-profiler",
+    "startedAt": "2026-06-09T23:34:49.295Z",
+    "patched": {
+      "IsActive": false
+    },
+    "skipped": {},
+    "before": null,
+    "after": {
+      "IsActive": false
+    }
+  },
+  {
+    "status": "patched",
+    "table": "chuboe_rfq_line",
+    "id": 3130012,
+    "source": "deactivate-non-stock-profiler",
+    "startedAt": "2026-06-09T23:34:49.297Z",
+    "patched": {
+      "IsActive": false
+    },
+    "skipped": {},
+    "before": null,
+    "after": {
+      "IsActive": false
+    }
+  },
+  {
+    "status": "patched",
+    "table": "chuboe_rfq_line",
+    "id": 3130013,
+    "source": "deactivate-non-stock-profiler",
+    "startedAt": "2026-06-09T23:34:49.297Z",
+    "patched": {
+      "IsActive": false
+    },
+    "skipped": {},
+    "before": null,
+    "after": {
+      "IsActive": false
+    }
+  },
+  {
+    "status": "patched",
+    "table": "chuboe_rfq_line",
+    "id": 3130014,
+    "source": "deactivate-non-stock-profiler",
+    "startedAt": "2026-06-09T23:34:49.298Z",
+    "patched": {
+      "IsActive": false
+    },
+    "skipped": {},
+    "before": null,
+    "after": {
+      "IsActive": false
+    }
+  },
+  {
+    "status": "patched",
+    "table": "chuboe_rfq_line",
+    "id": 3130015,
+    "source": "deactivate-non-stock-profiler",
+    "startedAt": "2026-06-09T23:34:49.299Z",
+    "patched": {
+      "IsActive": false
+    },
+    "skipped": {},
+    "before": null,
+    "after": {
+      "IsActive": false
+    }
+  },
+  {
+    "status": "patched",
+    "table": "chuboe_rfq_line",
+    "id": 3130016,
+    "source": "deactivate-non-stock-profiler",
+    "startedAt": "2026-06-09T23:34:49.303Z",
+    "patched": {
+      "IsActive": false
+    },
+    "skipped": {},
+    "before": null,
+    "after": {
+      "IsActive": false
+    }
+  },
+  {
+    "status": "patched",
+    "table": "chuboe_rfq_line",
+    "id": 3130017,
+    "source": "deactivate-non-stock-profiler",
+    "startedAt": "2026-06-09T23:34:49.305Z",
+    "patched": {
+      "IsActive": false
+    },
+    "skipped": {},
+    "before": null,
+    "after": {
+      "IsActive": false
+    }
+  },
+  {
+    "status": "patched",
+    "table": "chuboe_rfq_line",
+    "id": 3130018,
+    "source": "deactivate-non-stock-profiler",
+    "startedAt": "2026-06-09T23:34:49.308Z",
+    "patched": {
+      "IsActive": false
+    },
+    "skipped": {},
+    "before": null,
+    "after": {
+      "IsActive": false
+    }
+  },
+  {
+    "status": "patched",
+    "table": "chuboe_rfq_line",
+    "id": 3130035,
+    "source": "deactivate-non-stock-profiler",
+    "startedAt": "2026-06-09T23:34:49.310Z",
+    "patched": {
+      "IsActive": false
+    },
+    "skipped": {},
+    "before": null,
+    "after": {
+      "IsActive": false
+    }
+  },
+  {
+    "status": "patched",
+    "table": "chuboe_rfq_line",
+    "id": 3130036,
+    "source": "deactivate-non-stock-profiler",
+    "startedAt": "2026-06-09T23:34:49.311Z",
+    "patched": {
+      "IsActive": false
+    },
+    "skipped": {},
+    "before": null,
+    "after": {
+      "IsActive": false
+    }
+  },
+  {
+    "status": "patched",
+    "table": "chuboe_rfq_line",
+    "id": 3130037,
+    "source": "deactivate-non-stock-profiler",
+    "startedAt": "2026-06-09T23:34:49.312Z",
+    "patched": {
+      "IsActive": false
+    },
+    "skipped": {},
+    "before": null,
+    "after": {
+      "IsActive": false
+    }
+  },
+  {
+    "status": "patched",
+    "table": "chuboe_rfq_line",
+    "id": 3130038,
+    "source": "deactivate-non-stock-profiler",
+    "startedAt": "2026-06-09T23:34:49.314Z",
+    "patched": {
+      "IsActive": false
+    },
+    "skipped": {},
+    "before": null,
+    "after": {
+      "IsActive": false
+    }
+  },
+  {
+    "status": "patched",
+    "table": "chuboe_rfq_line",
+    "id": 3130039,
+    "source": "deactivate-non-stock-profiler",
+    "startedAt": "2026-06-09T23:34:49.315Z",
+    "patched": {
+      "IsActive": false
+    },
+    "skipped": {},
+    "before": null,
+    "after": {
+      "IsActive": false
+    }
+  },
+  {
+    "status": "patched",
+    "table": "chuboe_rfq_line",
+    "id": 3130040,
+    "source": "deactivate-non-stock-profiler",
+    "startedAt": "2026-06-09T23:34:49.316Z",
+    "patched": {
+      "IsActive": false
+    },
+    "skipped": {},
+    "before": null,
+    "after": {
+      "IsActive": false
+    }
+  },
+  {
+    "status": "patched",
+    "table": "chuboe_rfq_line",
+    "id": 3130041,
+    "source": "deactivate-non-stock-profiler",
+    "startedAt": "2026-06-09T23:34:49.317Z",
+    "patched": {
+      "IsActive": false
+    },
+    "skipped": {},
+    "before": null,
+    "after": {
+      "IsActive": false
+    }
+  },
+  {
+    "status": "patched",
+    "table": "chuboe_rfq_line",
+    "id": 3130042,
+    "source": "deactivate-non-stock-profiler",
+    "startedAt": "2026-06-09T23:34:49.318Z",
+    "patched": {
+      "IsActive": false
+    },
+    "skipped": {},
+    "before": null,
+    "after": {
+      "IsActive": false
+    }
+  },
+  {
+    "status": "patched",
+    "table": "chuboe_rfq_line",
+    "id": 3130043,
+    "source": "deactivate-non-stock-profiler",
+    "startedAt": "2026-06-09T23:34:49.324Z",
+    "patched": {
+      "IsActive": false
+    },
+    "skipped": {},
+    "before": null,
+    "after": {
+      "IsActive": false
+    }
+  },
+  {
+    "status": "patched",
+    "table": "chuboe_rfq_line",
+    "id": 3130044,
+    "source": "deactivate-non-stock-profiler",
+    "startedAt": "2026-06-09T23:34:49.334Z",
+    "patched": {
+      "IsActive": false
+    },
+    "skipped": {},
+    "before": null,
+    "after": {
+      "IsActive": false
+    }
+  },
+  {
+    "status": "patched",
+    "table": "chuboe_rfq_line",
+    "id": 3130045,
+    "source": "deactivate-non-stock-profiler",
+    "startedAt": "2026-06-09T23:34:49.336Z",
+    "patched": {
+      "IsActive": false
+    },
+    "skipped": {},
+    "before": null,
+    "after": {
+      "IsActive": false
+    }
+  },
+  {
+    "status": "patched",
+    "table": "chuboe_rfq_line",
+    "id": 3130046,
+    "source": "deactivate-non-stock-profiler",
+    "startedAt": "2026-06-09T23:34:49.337Z",
+    "patched": {
+      "IsActive": false
+    },
+    "skipped": {},
+    "before": null,
+    "after": {
+      "IsActive": false
+    }
+  },
+  {
+    "status": "patched",
+    "table": "chuboe_rfq_line",
+    "id": 3130047,
+    "source": "deactivate-non-stock-profiler",
+    "startedAt": "2026-06-09T23:34:49.338Z",
+    "patched": {
+      "IsActive": false
+    },
+    "skipped": {},
+    "before": null,
+    "after": {
+      "IsActive": false
+    }
+  },
+  {
+    "status": "patched",
+    "table": "chuboe_rfq_line",
+    "id": 3130048,
+    "source": "deactivate-non-stock-profiler",
+    "startedAt": "2026-06-09T23:34:49.339Z",
+    "patched": {
+      "IsActive": false
+    },
+    "skipped": {},
+    "before": null,
+    "after": {
+      "IsActive": false
+    }
+  },
+  {
+    "status": "patched",
+    "table": "chuboe_rfq_line",
+    "id": 3130049,
+    "source": "deactivate-non-stock-profiler",
+    "startedAt": "2026-06-09T23:34:49.340Z",
+    "patched": {
+      "IsActive": false
+    },
+    "skipped": {},
+    "before": null,
+    "after": {
+      "IsActive": false
+    }
+  },
+  {
+    "status": "patched",
+    "table": "chuboe_rfq_line",
+    "id": 3130050,
+    "source": "deactivate-non-stock-profiler",
+    "startedAt": "2026-06-09T23:34:49.341Z",
+    "patched": {
+      "IsActive": false
+    },
+    "skipped": {},
+    "before": null,
+    "after": {
+      "IsActive": false
+    }
+  },
+  {
+    "status": "patched",
+    "table": "chuboe_rfq_line",
+    "id": 3130051,
+    "source": "deactivate-non-stock-profiler",
+    "startedAt": "2026-06-09T23:34:49.342Z",
+    "patched": {
+      "IsActive": false
+    },
+    "skipped": {},
+    "before": null,
+    "after": {
+      "IsActive": false
+    }
+  },
+  {
+    "status": "patched",
+    "table": "chuboe_rfq_line",
+    "id": 3130052,
+    "source": "deactivate-non-stock-profiler",
+    "startedAt": "2026-06-09T23:34:49.350Z",
+    "patched": {
+      "IsActive": false
+    },
+    "skipped": {},
+    "before": null,
+    "after": {
+      "IsActive": false
+    }
+  },
+  {
+    "status": "patched",
+    "table": "chuboe_rfq_line",
+    "id": 3130053,
+    "source": "deactivate-non-stock-profiler",
+    "startedAt": "2026-06-09T23:34:49.352Z",
+    "patched": {
+      "IsActive": false
+    },
+    "skipped": {},
+    "before": null,
+    "after": {
+      "IsActive": false
+    }
+  },
+  {
+    "status": "patched",
+    "table": "chuboe_rfq_line",
+    "id": 3130054,
+    "source": "deactivate-non-stock-profiler",
+    "startedAt": "2026-06-09T23:34:49.353Z",
+    "patched": {
+      "IsActive": false
+    },
+    "skipped": {},
+    "before": null,
+    "after": {
+      "IsActive": false
+    }
+  },
+  {
+    "status": "patched",
+    "table": "chuboe_rfq_line",
+    "id": 3130055,
+    "source": "deactivate-non-stock-profiler",
+    "startedAt": "2026-06-09T23:34:49.354Z",
+    "patched": {
+      "IsActive": false
+    },
+    "skipped": {},
+    "before": null,
+    "after": {
+      "IsActive": false
+    }
+  },
+  {
+    "status": "patched",
+    "table": "chuboe_rfq_line",
+    "id": 3130056,
+    "source": "deactivate-non-stock-profiler",
+    "startedAt": "2026-06-09T23:34:49.356Z",
+    "patched": {
+      "IsActive": false
+    },
+    "skipped": {},
+    "before": null,
+    "after": {
+      "IsActive": false
+    }
+  },
+  {
+    "status": "patched",
+    "table": "chuboe_rfq_line",
+    "id": 3130057,
+    "source": "deactivate-non-stock-profiler",
+    "startedAt": "2026-06-09T23:34:49.357Z",
+    "patched": {
+      "IsActive": false
+    },
+    "skipped": {},
+    "before": null,
+    "after": {
+      "IsActive": false
+    }
+  },
+  {
+    "status": "patched",
+    "table": "chuboe_rfq_line",
+    "id": 3130058,
+    "source": "deactivate-non-stock-profiler",
+    "startedAt": "2026-06-09T23:34:49.358Z",
+    "patched": {
+      "IsActive": false
+    },
+    "skipped": {},
+    "before": null,
+    "after": {
+      "IsActive": false
+    }
+  },
+  {
+    "status": "patched",
+    "table": "chuboe_rfq_line",
+    "id": 3130059,
+    "source": "deactivate-non-stock-profiler",
+    "startedAt": "2026-06-09T23:34:49.360Z",
+    "patched": {
+      "IsActive": false
+    },
+    "skipped": {},
+    "before": null,
+    "after": {
+      "IsActive": false
+    }
+  },
+  {
+    "status": "patched",
+    "table": "chuboe_rfq_line",
+    "id": 3130060,
+    "source": "deactivate-non-stock-profiler",
+    "startedAt": "2026-06-09T23:34:49.361Z",
+    "patched": {
+      "IsActive": false
+    },
+    "skipped": {},
+    "before": null,
+    "after": {
+      "IsActive": false
+    }
+  },
+  {
+    "status": "patched",
+    "table": "chuboe_rfq_line",
+    "id": 3130061,
+    "source": "deactivate-non-stock-profiler",
+    "startedAt": "2026-06-09T23:34:49.361Z",
+    "patched": {
+      "IsActive": false
+    },
+    "skipped": {},
+    "before": null,
+    "after": {
+      "IsActive": false
+    }
+  },
+  {
+    "status": "patched",
+    "table": "chuboe_rfq_line",
+    "id": 3130062,
+    "source": "deactivate-non-stock-profiler",
+    "startedAt": "2026-06-09T23:34:49.366Z",
+    "patched": {
+      "IsActive": false
+    },
+    "skipped": {},
+    "before": null,
+    "after": {
+      "IsActive": false
+    }
+  },
+  {
+    "status": "patched",
+    "table": "chuboe_rfq_line",
+    "id": 3130063,
+    "source": "deactivate-non-stock-profiler",
+    "startedAt": "2026-06-09T23:34:49.367Z",
+    "patched": {
+      "IsActive": false
+    },
+    "skipped": {},
+    "before": null,
+    "after": {
+      "IsActive": false
+    }
+  },
+  {
+    "status": "patched",
+    "table": "chuboe_rfq_line",
+    "id": 3130064,
+    "source": "deactivate-non-stock-profiler",
+    "startedAt": "2026-06-09T23:34:49.369Z",
+    "patched": {
+      "IsActive": false
+    },
+    "skipped": {},
+    "before": null,
+    "after": {
+      "IsActive": false
+    }
+  },
+  {
+    "status": "patched",
+    "table": "chuboe_rfq_line",
+    "id": 3130065,
+    "source": "deactivate-non-stock-profiler",
+    "startedAt": "2026-06-09T23:34:49.371Z",
+    "patched": {
+      "IsActive": false
+    },
+    "skipped": {},
+    "before": null,
+    "after": {
+      "IsActive": false
+    }
+  },
+  {
+    "status": "patched",
+    "table": "chuboe_rfq_line",
+    "id": 3130066,
+    "source": "deactivate-non-stock-profiler",
+    "startedAt": "2026-06-09T23:34:49.375Z",
+    "patched": {
+      "IsActive": false
+    },
+    "skipped": {},
+    "before": null,
+    "after": {
+      "IsActive": false
+    }
+  },
+  {
+    "status": "patched",
+    "table": "chuboe_rfq_line",
+    "id": 3130067,
+    "source": "deactivate-non-stock-profiler",
+    "startedAt": "2026-06-09T23:34:49.376Z",
+    "patched": {
+      "IsActive": false
+    },
+    "skipped": {},
+    "before": null,
+    "after": {
+      "IsActive": false
+    }
+  },
+  {
+    "status": "patched",
+    "table": "chuboe_rfq_line",
+    "id": 3130068,
+    "source": "deactivate-non-stock-profiler",
+    "startedAt": "2026-06-09T23:34:49.377Z",
+    "patched": {
+      "IsActive": false
+    },
+    "skipped": {},
+    "before": null,
+    "after": {
+      "IsActive": false
+    }
+  },
+  {
+    "status": "patched",
+    "table": "chuboe_rfq_line",
+    "id": 3130069,
+    "source": "deactivate-non-stock-profiler",
+    "startedAt": "2026-06-09T23:34:49.378Z",
+    "patched": {
+      "IsActive": false
+    },
+    "skipped": {},
+    "before": null,
+    "after": {
+      "IsActive": false
+    }
+  },
+  {
+    "status": "patched",
+    "table": "chuboe_rfq_line",
+    "id": 3130070,
+    "source": "deactivate-non-stock-profiler",
+    "startedAt": "2026-06-09T23:34:49.379Z",
+    "patched": {
+      "IsActive": false
+    },
+    "skipped": {},
+    "before": null,
+    "after": {
+      "IsActive": false
+    }
+  },
+  {
+    "status": "patched",
+    "table": "chuboe_rfq_line",
+    "id": 3130072,
+    "source": "deactivate-non-stock-profiler",
+    "startedAt": "2026-06-09T23:34:49.380Z",
+    "patched": {
+      "IsActive": false
+    },
+    "skipped": {},
+    "before": null,
+    "after": {
+      "IsActive": false
+    }
+  },
+  {
+    "status": "patched",
+    "table": "chuboe_rfq_line",
+    "id": 3130073,
+    "source": "deactivate-non-stock-profiler",
+    "startedAt": "2026-06-09T23:34:49.381Z",
+    "patched": {
+      "IsActive": false
+    },
+    "skipped": {},
+    "before": null,
+    "after": {
+      "IsActive": false
+    }
+  },
+  {
+    "status": "patched",
+    "table": "chuboe_rfq_line",
+    "id": 3130074,
+    "source": "deactivate-non-stock-profiler",
+    "startedAt": "2026-06-09T23:34:49.382Z",
+    "patched": {
+      "IsActive": false
+    },
+    "skipped": {},
+    "before": null,
+    "after": {
+      "IsActive": false
+    }
+  },
+  {
+    "status": "patched",
+    "table": "chuboe_rfq_line",
+    "id": 3130075,
+    "source": "deactivate-non-stock-profiler",
+    "startedAt": "2026-06-09T23:34:49.383Z",
+    "patched": {
+      "IsActive": false
+    },
+    "skipped": {},
+    "before": null,
+    "after": {
+      "IsActive": false
+    }
+  },
+  {
+    "status": "patched",
+    "table": "chuboe_rfq_line",
+    "id": 3130076,
+    "source": "deactivate-non-stock-profiler",
+    "startedAt": "2026-06-09T23:34:49.386Z",
+    "patched": {
+      "IsActive": false
+    },
+    "skipped": {},
+    "before": null,
+    "after": {
+      "IsActive": false
+    }
+  },
+  {
+    "status": "patched",
+    "table": "chuboe_rfq_line",
+    "id": 3130077,
+    "source": "deactivate-non-stock-profiler",
+    "startedAt": "2026-06-09T23:34:49.392Z",
+    "patched": {
+      "IsActive": false
+    },
+    "skipped": {},
+    "before": null,
+    "after": {
+      "IsActive": false
+    }
+  },
+  {
+    "status": "patched",
+    "table": "chuboe_rfq_line",
+    "id": 3130078,
+    "source": "deactivate-non-stock-profiler",
+    "startedAt": "2026-06-09T23:34:49.394Z",
+    "patched": {
+      "IsActive": false
+    },
+    "skipped": {},
+    "before": null,
+    "after": {
+      "IsActive": false
+    }
+  },
+  {
+    "status": "patched",
+    "table": "chuboe_rfq_line",
+    "id": 3130079,
+    "source": "deactivate-non-stock-profiler",
+    "startedAt": "2026-06-09T23:34:49.395Z",
+    "patched": {
+      "IsActive": false
+    },
+    "skipped": {},
+    "before": null,
+    "after": {
+      "IsActive": false
+    }
+  },
+  {
+    "status": "patched",
+    "table": "chuboe_rfq_line",
+    "id": 3130080,
+    "source": "deactivate-non-stock-profiler",
+    "startedAt": "2026-06-09T23:34:49.396Z",
+    "patched": {
+      "IsActive": false
+    },
+    "skipped": {},
+    "before": null,
+    "after": {
+      "IsActive": false
+    }
+  },
+  {
+    "status": "patched",
+    "table": "chuboe_rfq_line",
+    "id": 3130081,
+    "source": "deactivate-non-stock-profiler",
+    "startedAt": "2026-06-09T23:34:49.397Z",
+    "patched": {
+      "IsActive": false
+    },
+    "skipped": {},
+    "before": null,
+    "after": {
+      "IsActive": false
+    }
+  },
+  {
+    "status": "patched",
+    "table": "chuboe_rfq_line",
+    "id": 3130082,
+    "source": "deactivate-non-stock-profiler",
+    "startedAt": "2026-06-09T23:34:49.398Z",
+    "patched": {
+      "IsActive": false
+    },
+    "skipped": {},
+    "before": null,
+    "after": {
+      "IsActive": false
+    }
+  },
+  {
+    "status": "patched",
+    "table": "chuboe_rfq_line",
+    "id": 3130083,
+    "source": "deactivate-non-stock-profiler",
+    "startedAt": "2026-06-09T23:34:49.398Z",
+    "patched": {
+      "IsActive": false
+    },
+    "skipped": {},
+    "before": null,
+    "after": {
+      "IsActive": false
+    }
+  },
+  {
+    "status": "patched",
+    "table": "chuboe_rfq_line",
+    "id": 3130084,
+    "source": "deactivate-non-stock-profiler",
+    "startedAt": "2026-06-09T23:34:49.403Z",
+    "patched": {
+      "IsActive": false
+    },
+    "skipped": {},
+    "before": null,
+    "after": {
+      "IsActive": false
+    }
+  }
+]

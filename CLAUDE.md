@@ -72,16 +72,50 @@ If you catch yourself thinking "I remember how this works" - STOP and read the f
 
 ---
 
-# North Star: VQ Purchase Approvals Use Enforced Wrappers
+# North Star: VQ Creation and Purchase Use Enforced Wrappers
 
-**NEVER bypass the enforced wrappers when approving VQ purchases.**
+**NEVER bypass the enforced wrappers when creating or approving VQs.**
+
+## Manual VQ Creation
+
+| Action | WRONG (direct API) | CORRECT (enforced wrapper) |
+|--------|-------------------|---------------------------|
+| Create manual VQ | `apiPost('chuboe_vq_line', {...})` | `createManualVQ(opts)` |
+
+```javascript
+const { createManualVQ } = require('../shared/vq-manual-writer');
+
+const vq = await createManualVQ({
+  program: 'LAM_KITTING',        // applies warehouse/shipper/incoterm defaults
+  rfqValue: '1137922',
+  rfqLineId: 3141430,
+  mpn: 'DG406EUI+',
+  mfrText: 'Maxim Integrated Products Inc',
+  vendorBpId: 1000634,
+  vendorLocationId: 1004101,
+  qty: 70,
+  cost: 19.95,
+  dateCode: '24+',               // REQUIRED at creation
+  leadTime: 'STOCK',             // REQUIRED at creation
+  notes: 'buying from franchise...',
+  isBrokerAsFranchise: true,     // for brokers acting as franchise pass-through
+});
+```
+
+**What `createManualVQ()` enforces:**
+- COO defaults to **PENDING** (not USA!) — we don't know origin until parts arrive
+- Warehouse, Warehouse Group, Shipper, Incoterm from program defaults
+- Packaging defaults to F-REEL
+- Traceability derived from vendor type
+- Date Code and Lead Time **required** (no silent nulls)
+
+## VQ Purchase Approval
 
 | Action | WRONG (direct API) | CORRECT (enforced wrapper) |
 |--------|-------------------|---------------------------|
 | Tick VQ as purchased | `patchRecord('chuboe_vq_line', id, { IsPurchased: 'Y' })` | `tickVQForPurchase(vqId, opts)` |
 | Post approval request | `apiPost('r_request', payload)` | `postApproveOrder(opts)` |
 
-**Required modules:**
 ```javascript
 const { tickVQForPurchase } = require('../shared/vq-patcher');
 const { postApproveOrder } = require('../shared/r-request-writer');
@@ -93,17 +127,14 @@ const { postApproveOrder } = require('../shared/r-request-writer');
 
 **One request per supplier per RFQ:** When buying multiple VQs from the same supplier on the same RFQ (e.g., 9 parts from Mouser on one POV), create ONE R_Request containing all VQs — not separate requests per line. Pass `vqIds: [id1, id2, ...]` to validate all.
 
-**Why this exists:** On 2026-07-07, approval request 1166798 was posted with:
-- All 9 VQs missing `IsPurchased='Y'`
-- R_Request not linked to RFQ (empty `record_id`)
-- Multiple required fields unpopulated
+**Why this exists:** On 2026-07-07, approval request 1166798 was posted with incomplete VQs. On 2026-07-09, manual VQs were created with COO=USA (wrong) and missing warehouse.
 
 **Full workflow:** Read `shared/vq-purchase-workflow.md` before ANY VQ approval.
 
-**Date Code / Lead Time defaults:** For franchise vendors, use logic in `shared/vq-writer.js`:
+**Date Code / Lead Time defaults:**
 - Stock items: Date Code = `(current year - 2)+` (e.g., "24+")
 - Lead time items: Date Code = `(current year)+` (e.g., "26+")
-- Lead Time field: "STOCK" for in-stock, or specific time (e.g., "3 WEEKS")
+- Lead Time field: "STOCK" for in-stock, or specific time (e.g., "31 WEEKS")
 
 ---
 

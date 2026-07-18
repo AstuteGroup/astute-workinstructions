@@ -1,0 +1,767 @@
+{
+  "rfqSearchKey": "1121675",
+  "buyerId": 1011012,
+  "runAt": "2026-06-11T13:59:11.850Z",
+  "sourceQuotes": "/tmp/quotes_9099_rfq1121675.json",
+  "result": {
+    "written": [
+      {
+        "vqLineId": 2193619,
+        "line": 170,
+        "mpn": "88E6185A2LKJ1C000",
+        "vendor": "Southchip Limited",
+        "cost": 14.6,
+        "qty": 500,
+        "fuzzyMatch": false,
+        "originalVendorLabel": "1006106",
+        "bpId": 1004110,
+        "noBid": false
+      }
+    ],
+    "skipped": [
+      {
+        "mpn": "XC6VLX75T-2FFG484C",
+        "mfr": "Xilinx",
+        "qty": 500,
+        "cost": 268,
+        "leadTime": "3-4 weeks",
+        "dateCode": "25+",
+        "coo": null,
+        "packaging": null,
+        "rohs": null,
+        "vendorNotes": null,
+        "vendorQuotedMpn": null,
+        "vendorSearchKey": "1002407",
+        "reason": "PRE_EXISTING_DUPLICATE",
+        "detail": "Existing chuboe_vq_line 2166806 matches natural key (rfq_line × MPN × BP × cost × currency) — no new POST.",
+        "vqLineId": 2166806
+      },
+      {
+        "mpn": "XC6VLX75T-2FFG484C",
+        "mfr": "Xilinx",
+        "qty": 500,
+        "cost": 93,
+        "leadTime": "4 weeks",
+        "dateCode": "23+",
+        "coo": null,
+        "packaging": null,
+        "rohs": null,
+        "vendorNotes": null,
+        "vendorQuotedMpn": null,
+        "vendorSearchKey": "1006032",
+        "reason": "PRE_EXISTING_DUPLICATE",
+        "detail": "Existing chuboe_vq_line 2166808 matches natural key (rfq_line × MPN × BP × cost × currency) — no new POST.",
+        "vqLineId": 2166808
+      },
+      {
+        "mpn": "XC6VLX75T-2FFG484C",
+        "mfr": "Xilinx",
+        "qty": 151,
+        "cost": 195,
+        "leadTime": "In Stock",
+        "dateCode": "10+",
+        "coo": null,
+        "packaging": null,
+        "rohs": null,
+        "vendorNotes": null,
+        "vendorQuotedMpn": null,
+        "vendorSearchKey": "1006857",
+        "reason": "PRE_EXISTING_DUPLICATE",
+        "detail": "Existing chuboe_vq_line 2166809 matches natural key (rfq_line × MPN × BP × cost × currency) — no new POST.",
+        "vqLineId": 2166809
+      },
+      {
+        "mpn": "XC4VLX40-12FFG1148C",
+        "mfr": "Xilinx",
+        "qty": 500,
+        "cost": 201.49,
+        "leadTime": "3-4 weeks",
+        "dateCode": "24+",
+        "coo": null,
+        "packaging": null,
+        "rohs": null,
+        "vendorNotes": null,
+        "vendorQuotedMpn": null,
+        "vendorSearchKey": "1002407",
+        "reason": "PRE_EXISTING_DUPLICATE",
+        "detail": "Existing chuboe_vq_line 2166810 matches natural key (rfq_line × MPN × BP × cost × currency) — no new POST.",
+        "vqLineId": 2166810
+      },
+      {
+        "mpn": "XC4VLX40-12FFG1148C",
+        "mfr": "Xilinx",
+        "qty": 500,
+        "cost": 120,
+        "leadTime": "4 weeks",
+        "dateCode": "22+",
+        "coo": null,
+        "packaging": null,
+        "rohs": null,
+        "vendorNotes": null,
+        "vendorQuotedMpn": null,
+        "vendorSearchKey": "1006032",
+        "reason": "PRE_EXISTING_DUPLICATE",
+        "detail": "Existing chuboe_vq_line 2166811 matches natural key (rfq_line × MPN × BP × cost × currency) — no new POST.",
+        "vqLineId": 2166811
+      },
+      {
+        "mpn": "XC4VFX6010FF1152C",
+        "mfr": "Xilinx",
+        "qty": 500,
+        "cost": 156,
+        "leadTime": "3-4 weeks",
+        "dateCode": "24+",
+        "coo": null,
+        "packaging": null,
+        "rohs": null,
+        "vendorNotes": null,
+        "vendorQuotedMpn": null,
+        "vendorSearchKey": "1002407",
+        "reason": "PRE_EXISTING_DUPLICATE",
+        "detail": "Existing chuboe_vq_line 2166812 matches natural key (rfq_line × MPN × BP × cost × currency) — no new POST.",
+        "vqLineId": 2166812
+      },
+      {
+        "mpn": "XC4VFX6010FF1152C",
+        "mfr": "Xilinx",
+        "qty": 500,
+        "cost": 190,
+        "leadTime": "4 weeks",
+        "dateCode": "22+",
+        "coo": null,
+        "packaging": null,
+        "rohs": null,
+        "vendorNotes": "Vendor quoted MPN: XC4VFX60-10FF1152C",
+        "vendorQuotedMpn": "XC4VFX60-10FF1152C",
+        "vendorSearchKey": "1006032",
+        "reason": "PRE_EXISTING_DUPLICATE",
+        "detail": "Existing chuboe_vq_line 2166813 matches natural key (rfq_line × MPN × BP × cost × currency) — no new POST.",
+        "vqLineId": 2166813
+      },
+      {
+        "mpn": "XC4VFX6010FF1152C",
+        "mfr": "Xilinx",
+        "qty": 154,
+        "cost": 610,
+        "leadTime": "In Stock",
+        "dateCode": "15+",
+        "coo": null,
+        "packaging": "TRAY",
+        "rohs": null,
+        "vendorNotes": "Vendor quoted MPN: XC4VFX60-10FF1152C",
+        "vendorQuotedMpn": "XC4VFX60-10FF1152C",
+        "vendorSearchKey": "1002391",
+        "reason": "PRE_EXISTING_DUPLICATE",
+        "detail": "Existing chuboe_vq_line 2166814 matches natural key (rfq_line × MPN × BP × cost × currency) — no new POST.",
+        "vqLineId": 2166814
+      },
+      {
+        "mpn": "XC4VFX6010FF1152C",
+        "mfr": "Xilinx",
+        "qty": 154,
+        "cost": 622,
+        "leadTime": "In Stock",
+        "dateCode": "15+",
+        "coo": null,
+        "packaging": null,
+        "rohs": null,
+        "vendorNotes": "No label. Vendor quoted MPN: XC4VFX60-10FF1152C",
+        "vendorQuotedMpn": "XC4VFX60-10FF1152C",
+        "vendorSearchKey": "1006857",
+        "reason": "PRE_EXISTING_DUPLICATE",
+        "detail": "Existing chuboe_vq_line 2166815 matches natural key (rfq_line × MPN × BP × cost × currency) — no new POST.",
+        "vqLineId": 2166815
+      },
+      {
+        "mpn": "MPC8270CVRMIBA",
+        "mfr": "NXP",
+        "qty": 500,
+        "cost": 295,
+        "leadTime": "In Stock",
+        "dateCode": "25+",
+        "coo": null,
+        "packaging": null,
+        "rohs": null,
+        "vendorNotes": null,
+        "vendorQuotedMpn": null,
+        "vendorSearchKey": "1006032",
+        "reason": "PRE_EXISTING_DUPLICATE",
+        "detail": "Existing chuboe_vq_line 2166816 matches natural key (rfq_line × MPN × BP × cost × currency) — no new POST.",
+        "vqLineId": 2166816
+      },
+      {
+        "mpn": "MPC8270CVRMIBA",
+        "mfr": "NXP",
+        "qty": 40,
+        "cost": 336,
+        "leadTime": "In Stock",
+        "dateCode": "24+",
+        "coo": null,
+        "packaging": "TRAY",
+        "rohs": null,
+        "vendorNotes": null,
+        "vendorQuotedMpn": null,
+        "vendorSearchKey": "1002391",
+        "reason": "PRE_EXISTING_DUPLICATE",
+        "detail": "Existing chuboe_vq_line 2166817 matches natural key (rfq_line × MPN × BP × cost × currency) — no new POST.",
+        "vqLineId": 2166817
+      },
+      {
+        "mpn": "MPC8270CVRMIBA",
+        "mfr": "NXP",
+        "qty": 40,
+        "cost": 335,
+        "leadTime": "In Stock",
+        "dateCode": "24+",
+        "coo": null,
+        "packaging": null,
+        "rohs": null,
+        "vendorNotes": null,
+        "vendorQuotedMpn": null,
+        "vendorSearchKey": "1006857",
+        "reason": "PRE_EXISTING_DUPLICATE",
+        "detail": "Existing chuboe_vq_line 2166818 matches natural key (rfq_line × MPN × BP × cost × currency) — no new POST.",
+        "vqLineId": 2166818
+      },
+      {
+        "mpn": "M82710G-14",
+        "mfr": "Mindspeed",
+        "qty": 415,
+        "cost": 233,
+        "leadTime": "In Stock",
+        "dateCode": "17+",
+        "coo": null,
+        "packaging": null,
+        "rohs": null,
+        "vendorNotes": null,
+        "vendorQuotedMpn": null,
+        "vendorSearchKey": "1006857",
+        "reason": "PRE_EXISTING_DUPLICATE",
+        "detail": "Existing chuboe_vq_line 2166819 matches natural key (rfq_line × MPN × BP × cost × currency) — no new POST.",
+        "vqLineId": 2166819
+      },
+      {
+        "mpn": "XC6SLX45T-2FGG484C",
+        "mfr": "Xilinx",
+        "qty": 500,
+        "cost": 20,
+        "leadTime": "In Stock",
+        "dateCode": "25+",
+        "coo": null,
+        "packaging": null,
+        "rohs": null,
+        "vendorNotes": null,
+        "vendorQuotedMpn": null,
+        "vendorSearchKey": "1002629",
+        "reason": "PRE_EXISTING_DUPLICATE",
+        "detail": "Existing chuboe_vq_line 2166820 matches natural key (rfq_line × MPN × BP × cost × currency) — no new POST.",
+        "vqLineId": 2166820
+      },
+      {
+        "mpn": "XC6SLX45T-2FGG484C",
+        "mfr": "Xilinx",
+        "qty": 500,
+        "cost": 19,
+        "leadTime": "In Stock",
+        "dateCode": "25+",
+        "coo": null,
+        "packaging": null,
+        "rohs": null,
+        "vendorNotes": null,
+        "vendorQuotedMpn": null,
+        "vendorSearchKey": "1006032",
+        "reason": "PRE_EXISTING_DUPLICATE",
+        "detail": "Existing chuboe_vq_line 2166821 matches natural key (rfq_line × MPN × BP × cost × currency) — no new POST.",
+        "vqLineId": 2166821
+      },
+      {
+        "mpn": "XC6SLX45T-2FGG484C",
+        "mfr": "Xilinx",
+        "qty": 500,
+        "cost": 20.068,
+        "leadTime": "HK delivery",
+        "dateCode": "25+",
+        "coo": null,
+        "packaging": null,
+        "rohs": null,
+        "vendorNotes": null,
+        "vendorQuotedMpn": null,
+        "vendorSearchKey": "1002317",
+        "reason": "PRE_EXISTING_DUPLICATE",
+        "detail": "Existing chuboe_vq_line 2166822 matches natural key (rfq_line × MPN × BP × cost × currency) — no new POST.",
+        "vqLineId": 2166822
+      },
+      {
+        "mpn": "XC6SLX45T-2FGG484C",
+        "mfr": "Xilinx",
+        "qty": 500,
+        "cost": 19.8,
+        "leadTime": "In Stock",
+        "dateCode": "25+",
+        "coo": "Malaysia",
+        "packaging": "TRAY",
+        "rohs": null,
+        "vendorNotes": null,
+        "vendorQuotedMpn": null,
+        "vendorSearchKey": "1002391",
+        "reason": "PRE_EXISTING_DUPLICATE",
+        "detail": "Existing chuboe_vq_line 2166823 matches natural key (rfq_line × MPN × BP × cost × currency) — no new POST.",
+        "vqLineId": 2166823
+      },
+      {
+        "mpn": "XC6SLX45T-2FGG484C",
+        "mfr": "Xilinx",
+        "qty": 500,
+        "cost": 20.3767,
+        "leadTime": "In Stock",
+        "dateCode": "25+",
+        "coo": null,
+        "packaging": null,
+        "rohs": null,
+        "vendorNotes": "Full top marking",
+        "vendorQuotedMpn": null,
+        "vendorSearchKey": "1005255",
+        "reason": "PRE_EXISTING_DUPLICATE",
+        "detail": "Existing chuboe_vq_line 2166824 matches natural key (rfq_line × MPN × BP × cost × currency) — no new POST.",
+        "vqLineId": 2166824
+      },
+      {
+        "mpn": "XC6SLX45T-2FGG484C",
+        "mfr": "Xilinx",
+        "qty": 500,
+        "cost": 20.58,
+        "leadTime": "In Stock",
+        "dateCode": "25+",
+        "coo": null,
+        "packaging": null,
+        "rohs": null,
+        "vendorNotes": null,
+        "vendorQuotedMpn": null,
+        "vendorSearchKey": "1006857",
+        "reason": "PRE_EXISTING_DUPLICATE",
+        "detail": "Existing chuboe_vq_line 2166825 matches natural key (rfq_line × MPN × BP × cost × currency) — no new POST.",
+        "vqLineId": 2166825
+      },
+      {
+        "mpn": "88E1240-A1-BAM1C000",
+        "mfr": "Marvell",
+        "qty": 95,
+        "cost": 18,
+        "leadTime": "In Stock",
+        "dateCode": "12+",
+        "coo": null,
+        "packaging": null,
+        "rohs": null,
+        "vendorNotes": null,
+        "vendorQuotedMpn": null,
+        "vendorSearchKey": "1006857",
+        "reason": "PRE_EXISTING_DUPLICATE",
+        "detail": "Existing chuboe_vq_line 2166826 matches natural key (rfq_line × MPN × BP × cost × currency) — no new POST.",
+        "vqLineId": 2166826
+      },
+      {
+        "mpn": "88E1240-A1-BAM1C000",
+        "mfr": "Marvell",
+        "qty": 129,
+        "cost": 19.45,
+        "leadTime": "In Stock",
+        "dateCode": "14+",
+        "coo": null,
+        "packaging": null,
+        "rohs": null,
+        "vendorNotes": null,
+        "vendorQuotedMpn": null,
+        "vendorSearchKey": "1006857",
+        "reason": "PRE_EXISTING_DUPLICATE",
+        "detail": "Existing chuboe_vq_line 2166827 matches natural key (rfq_line × MPN × BP × cost × currency) — no new POST.",
+        "vqLineId": 2166827
+      },
+      {
+        "mpn": "88E1240-A1-BAM1C000",
+        "mfr": "Marvell",
+        "qty": 149,
+        "cost": 41.85,
+        "leadTime": "In Stock",
+        "dateCode": "17+",
+        "coo": null,
+        "packaging": null,
+        "rohs": null,
+        "vendorNotes": null,
+        "vendorQuotedMpn": null,
+        "vendorSearchKey": "1006857",
+        "reason": "PRE_EXISTING_DUPLICATE",
+        "detail": "Existing chuboe_vq_line 2166828 matches natural key (rfq_line × MPN × BP × cost × currency) — no new POST.",
+        "vqLineId": 2166828
+      },
+      {
+        "mpn": "88E6185A2LKJ1C000",
+        "mfr": "Marvell",
+        "qty": 500,
+        "cost": 21.33,
+        "leadTime": "In Stock",
+        "dateCode": "20+",
+        "coo": "Taiwan",
+        "packaging": "TRAY",
+        "rohs": null,
+        "vendorNotes": null,
+        "vendorQuotedMpn": "88E6185-A2-LKJ1C000",
+        "vendorSearchKey": "1002391",
+        "reason": "PRE_EXISTING_DUPLICATE",
+        "detail": "Existing chuboe_vq_line 2166830 matches natural key (rfq_line × MPN × BP × cost × currency) — no new POST.",
+        "vqLineId": 2166830
+      },
+      {
+        "mpn": "88E6185A2LKJ1C000",
+        "mfr": "Marvell",
+        "qty": 500,
+        "cost": 22.78,
+        "leadTime": "In Stock",
+        "dateCode": "25+",
+        "coo": "Taiwan",
+        "packaging": "TRAY",
+        "rohs": null,
+        "vendorNotes": null,
+        "vendorQuotedMpn": "88E6185-A2-LKJ1C000",
+        "vendorSearchKey": "1002391",
+        "reason": "PRE_EXISTING_DUPLICATE",
+        "detail": "Existing chuboe_vq_line 2166831 matches natural key (rfq_line × MPN × BP × cost × currency) — no new POST.",
+        "vqLineId": 2166831
+      },
+      {
+        "mpn": "88E6185A2LKJ1C000",
+        "mfr": "Marvell",
+        "qty": 500,
+        "cost": 16.4425,
+        "leadTime": null,
+        "dateCode": "21+",
+        "coo": null,
+        "packaging": null,
+        "rohs": null,
+        "vendorNotes": null,
+        "vendorQuotedMpn": "88E6185-A2-LKJ1C000",
+        "vendorSearchKey": "1005255",
+        "reason": "PRE_EXISTING_DUPLICATE",
+        "detail": "Existing chuboe_vq_line 2166832 matches natural key (rfq_line × MPN × BP × cost × currency) — no new POST.",
+        "vqLineId": 2166832
+      },
+      {
+        "mpn": "88E6185A2LKJ1C000",
+        "mfr": "Marvell",
+        "qty": 500,
+        "cost": 21.49,
+        "leadTime": "In Stock",
+        "dateCode": "20+",
+        "coo": null,
+        "packaging": null,
+        "rohs": null,
+        "vendorNotes": null,
+        "vendorQuotedMpn": "88E6185-A2-LKJ1C000",
+        "vendorSearchKey": "1006857",
+        "reason": "PRE_EXISTING_DUPLICATE",
+        "detail": "Existing chuboe_vq_line 2166833 matches natural key (rfq_line × MPN × BP × cost × currency) — no new POST.",
+        "vqLineId": 2166833
+      },
+      {
+        "mpn": "88E6185A2LKJ1C000",
+        "mfr": "Marvell",
+        "qty": 500,
+        "cost": 23.19,
+        "leadTime": "In Stock",
+        "dateCode": "25+",
+        "coo": null,
+        "packaging": null,
+        "rohs": null,
+        "vendorNotes": null,
+        "vendorQuotedMpn": "88E6185-A2-LKJ1C000",
+        "vendorSearchKey": "1006857",
+        "reason": "PRE_EXISTING_DUPLICATE",
+        "detail": "Existing chuboe_vq_line 2166834 matches natural key (rfq_line × MPN × BP × cost × currency) — no new POST.",
+        "vqLineId": 2166834
+      },
+      {
+        "mpn": "88E6122B2LKJ1C000",
+        "mfr": "Marvell",
+        "qty": 500,
+        "cost": 61.096,
+        "leadTime": null,
+        "dateCode": "23+",
+        "coo": null,
+        "packaging": null,
+        "rohs": null,
+        "vendorNotes": null,
+        "vendorQuotedMpn": null,
+        "vendorSearchKey": "1002317",
+        "reason": "PRE_EXISTING_DUPLICATE",
+        "detail": "Existing chuboe_vq_line 2166835 matches natural key (rfq_line × MPN × BP × cost × currency) — no new POST.",
+        "vqLineId": 2166835
+      },
+      {
+        "mpn": "88E6122B2LKJ1C000",
+        "mfr": "Marvell",
+        "qty": 500,
+        "cost": 60.96,
+        "leadTime": "In Stock",
+        "dateCode": "23+",
+        "coo": "Taiwan",
+        "packaging": "TRAY",
+        "rohs": null,
+        "vendorNotes": null,
+        "vendorQuotedMpn": "88E6122-B2-LKJ1C000",
+        "vendorSearchKey": "1002391",
+        "reason": "PRE_EXISTING_DUPLICATE",
+        "detail": "Existing chuboe_vq_line 2166836 matches natural key (rfq_line × MPN × BP × cost × currency) — no new POST.",
+        "vqLineId": 2166836
+      },
+      {
+        "mpn": "88E6122B2LKJ1C000",
+        "mfr": "Marvell",
+        "qty": 500,
+        "cost": 71.6368,
+        "leadTime": null,
+        "dateCode": "23+",
+        "coo": null,
+        "packaging": null,
+        "rohs": null,
+        "vendorNotes": null,
+        "vendorQuotedMpn": "88E6122-B2-LKJ1C000",
+        "vendorSearchKey": "1005255",
+        "reason": "PRE_EXISTING_DUPLICATE",
+        "detail": "Existing chuboe_vq_line 2166837 matches natural key (rfq_line × MPN × BP × cost × currency) — no new POST.",
+        "vqLineId": 2166837
+      },
+      {
+        "mpn": "88E6122B2LKJ1C000",
+        "mfr": "Marvell",
+        "qty": 500,
+        "cost": 61,
+        "leadTime": "In Stock",
+        "dateCode": "23+",
+        "coo": null,
+        "packaging": null,
+        "rohs": null,
+        "vendorNotes": null,
+        "vendorQuotedMpn": "88E6122-B2-LKJ1C000",
+        "vendorSearchKey": "1006857",
+        "reason": "PRE_EXISTING_DUPLICATE",
+        "detail": "Existing chuboe_vq_line 2166838 matches natural key (rfq_line × MPN × BP × cost × currency) — no new POST.",
+        "vqLineId": 2166838
+      }
+    ],
+    "failed": [],
+    "coverage": [
+      {
+        "lineNo": 10,
+        "lineId": 2898517,
+        "rfqQty": 200,
+        "mpns": [
+          "XC7VX415T-2FFG1158C"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 20,
+        "lineId": 2898518,
+        "rfqQty": 200,
+        "mpns": [
+          "XC6VLX75T-2FFG484C"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 30,
+        "lineId": 2898519,
+        "rfqQty": 500,
+        "mpns": [
+          "BCM56842A1KFTBLG����"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 40,
+        "lineId": 2898520,
+        "rfqQty": 500,
+        "mpns": [
+          "XC4VLX40-12FFG1148C�"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 50,
+        "lineId": 2898521,
+        "rfqQty": 500,
+        "mpns": [
+          "MC7448VU1400ND� �"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 60,
+        "lineId": 2898522,
+        "rfqQty": 200,
+        "mpns": [
+          "XC4VFX6010FF1152C",
+          "XC4VFX6010FF1152CES4"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 70,
+        "lineId": 2898523,
+        "rfqQty": 200,
+        "mpns": [
+          "HCMS3902"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 80,
+        "lineId": 2898524,
+        "rfqQty": 200,
+        "mpns": [
+          "LM3526MXHNOPB"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 90,
+        "lineId": 2898525,
+        "rfqQty": 200,
+        "mpns": [
+          "MPC8270CVRMIBA"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 100,
+        "lineId": 2898526,
+        "rfqQty": 200,
+        "mpns": [
+          "M82710G14"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 110,
+        "lineId": 2898527,
+        "rfqQty": 500,
+        "mpns": [
+          "XC6SLX45T2FGG484C"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 120,
+        "lineId": 2898528,
+        "rfqQty": 200,
+        "mpns": [
+          "98DX240A3BCW1C000"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 130,
+        "lineId": 2898529,
+        "rfqQty": 200,
+        "mpns": [
+          "74LVC74APW118"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 140,
+        "lineId": 2898530,
+        "rfqQty": 200,
+        "mpns": [
+          "88E1240A1BAM1C000"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 150,
+        "lineId": 2898531,
+        "rfqQty": 200,
+        "mpns": [
+          "ZL50022GAG2"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 160,
+        "lineId": 2898532,
+        "rfqQty": 200,
+        "mpns": [
+          "M82910G13"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 170,
+        "lineId": 2898533,
+        "rfqQty": 200,
+        "mpns": [
+          "88E6185A2LKJ1C000"
+        ],
+        "vqsThisBatch": 1
+      },
+      {
+        "lineNo": 180,
+        "lineId": 2898534,
+        "rfqQty": 200,
+        "mpns": [
+          "88E6122B2LKJ1C000"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 190,
+        "lineId": 2898535,
+        "rfqQty": 200,
+        "mpns": [
+          "5P49V6965A302NLGI",
+          "5P49V6965A302NLGI8"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 200,
+        "lineId": 2898536,
+        "rfqQty": 200,
+        "mpns": [
+          "LTC1516CS8TRPBF"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 210,
+        "lineId": 2898537,
+        "rfqQty": 200,
+        "mpns": [
+          "QS32XVH245Q2G8"
+        ],
+        "vqsThisBatch": 0
+      }
+    ],
+    "gaps": [
+      10,
+      20,
+      30,
+      40,
+      50,
+      60,
+      70,
+      80,
+      90,
+      100,
+      110,
+      120,
+      130,
+      140,
+      150,
+      160,
+      180,
+      190,
+      200,
+      210
+    ]
+  }
+}

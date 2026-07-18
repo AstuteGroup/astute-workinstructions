@@ -1328,11 +1328,11 @@ const PENDING_APPROVAL_COLUMNS = [
   'CPC',
   'MPN',
   'Manufacturer',
+  'Reason',           // Moved to column D per operator request 2026-07-17
   'Description',
   'Award',
   'Current Resale',
   'Proposed Resale',
-  'Reason',
   'Submitted Date',
   'Days Pending',
   'Last Approved',
@@ -1358,16 +1358,16 @@ function writePendingApprovalsExcel(pendingApprovals, outputPath) {
   // Create worksheet
   const ws = XLSX.utils.json_to_sheet(sorted, { header: PENDING_APPROVAL_COLUMNS });
 
-  // Set column widths
+  // Set column widths (order matches PENDING_APPROVAL_COLUMNS)
   ws['!cols'] = [
     { wch: 18 },  // CPC
     { wch: 25 },  // MPN
     { wch: 25 },  // Manufacturer
+    { wch: 35 },  // Reason (moved to D)
     { wch: 35 },  // Description
     { wch: 8 },   // Award
     { wch: 14 },  // Current Resale
     { wch: 14 },  // Proposed Resale
-    { wch: 30 },  // Reason
     { wch: 14 },  // Submitted Date
     { wch: 12 },  // Days Pending
     { wch: 14 },  // Last Approved

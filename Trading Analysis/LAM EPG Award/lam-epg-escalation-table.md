@@ -2,14 +2,14 @@
 
 Parts that cannot be sourced per LAM's current agreement. Need LAM approval for MOQ, price, lead-time, or MPN variant deviations.
 
-**Last updated:** 2026-04-21
+**Last updated:** 2026-06-24
 
 ## Escalation Table
 
 | LAM CPC | MFR | MPN | LAM Qty | Contract Base | Contract LT | Supplier Price | Supplier MOQ / Stock | Supplier LT | Issue | Delta | Notes (internal) |
 |---|---|---|---|---|---|---|---|---|---|---|---|
 | 779-002694-001 | Henkel | QII-0.006-00-61 | 500 | $0.5500 | 3 wks | $0.082 | MOQ 9,217 | 29 wks | MOQ + LT | Cost far below base — MOQ overage creates huge exposure | Non-stock/factory-order; consider requoting LAM at actual cost. |
-| 630-340553-001 | Renesas | 551SCMGI | 150 | $1.6822 | 17 wks | NAC $2.29 | Stock 400 | Stock | Price + excess qty | +$0.61/unit; buying 400 (150 need + 250 excess) | NAC on preferred MPN; alt 551SCMGI8 at $3.10+ from Tracy but requires alt-MPN approval. |
+| 630-340553-001 | Renesas | 551SCMGI | 150 | $1.6822 | 17 wks | NAC $2.29 | Stock 400 | Stock | Price + excess qty | +$0.61/unit; buying 400 (150 need + 250 excess) | NAC on preferred MPN; PO809706 shipped — tracking 1Z019F050396474319. |
 | 648-004248-471 | ATC (Kyocera AVX) | 100E471GW2500X | 10 | $47.51 | 28 wks | Richardson alt pending (~$57+) | TBD | TBD | Price | ~$10+/unit uplift on alt | Preferred blocked by MFR acquisition gap; Richardson alt quote pending. |
 | 644-059699-005 | Comus Group | 500-231 | 750 | $0.3500 | 12 wks | Relays Unltd pending | TBD | TBD | No franchise source | TBD | No online purchase path. MFR acquisition gap (Computer Components → Comus Group). |
 | 630-087790-001 | Beckhoff | ET1100 | 1,750 | $0.1598 | 0 wks | Tracy APAC pending | TBD | TBD | No online source | TBD | Beckhoff direct only; sent to Tracy. |
@@ -19,7 +19,9 @@ Parts that cannot be sourced per LAM's current agreement. Need LAM approval for 
 | 630-260287-001 | Analog Devices | LTC2313CTS8-12#TRMPBF | 30 | $10.67 | 22 wks | DigiKey stock confirmed per Jake (price TBD) | Stock (Jake saw on DigiKey site) | Stock | Franchise — price pending | TBD | **Check with Amalfi** — DigiKey has stock per Jake (parser returning not-found, confirmed broken for this LT family). Amalfi to pull fresh price. |
 | 723-008848-003 | Amatom | 9724-SS-7 | 50 | $34.80 | 10 wks | Amatom direct (pending) | TBD | TBD | **Incomplete MPN** | TBD | **Waiting on LAM to confirm full MPN** — 9724-SS-7 is incomplete per Amatom nomenclature; can't source without full part number. |
 | 669-C00309-007 | Molex | 203263-0066 | 75 | $3.80 | 5 wks | Mouser $4.48 | Stock 75 | 10 wks | Price | +$0.68/unit (18% over base) | Mouser only franchise source; $4.48 vs $3.80 base. Needs LAM approval on cost deviation. |
-| 630-268428-001 | FTDI | FT234XD-R | 125 | $2.25 | 30 wks | RS Components Ltd (pending quote) | TBD | 84 wks franchise LT | LT — **HIGH RISK** | 84 wk LT vs 30 wk contractual | 🚨 HIGH RISK — 84 wk franchise lead time. RS Components quote pending. Broker alts (FT234XD-T) over base or old DC. |
+| 630-268428-001 | FTDI | FT234XD-R | 125 | $2.25 | 30 wks | Newark | Stock | Stock | ~~LT~~ RESOLVED | PO810491 shipped | ✅ Shipped — tracking 526134749325. |
+| 630-248896-001 | ISSI | IS25LP128-JBLE | 130 | $5.14 | — | Newark | Stock | Stock | RESOLVED | PO810491 shipped | ✅ Shipped — tracking 1Z97X570AT04717123. |
+| 631-099701-003 | Broadcom | HFBR-1531ETZ | 15 | $17.72 | — | Mouser | Stock | Stock | RESOLVED | PO809925 shipped | ✅ Shipped — tracking 528979457439. |
 
 | 668-096777-009 | Kycon | K85X-ED-9P-CBR | 300 | $5.62 | 5 wks | Hughes-Peters no bid | MOQ 10,024 | TBD | MOQ + contractual price | MFR no bid — LAM's contractual price prevents quoting; MOQ 10,024 per original Dec quote to Elena | Alt DLS1XP4AA35X (Conec) appears EOL — 0 stock across all distributors. Newer variant DLS1XP4AA35X**E** exists (35 stock, $1.49-$1.94) but different MPN + only 35 vs 300 needed. |
 

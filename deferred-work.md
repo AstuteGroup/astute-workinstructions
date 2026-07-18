@@ -26,6 +26,29 @@ The SessionStart greeting reads this file and surfaces all open items, sorted by
 
 ### Active workstreams (next session pickup)
 
+- [ ] 🟢 **RESUME: Broker Stock Offer Duplicate MPN Cleanup** *(opened 2026-07-10)*
+  - **Context:** iDempiere bean callout on `chuboe_offer_line` auto-creates `chuboe_offer_line_mpn` sub-records. Our `offer-writeback.js` was ALSO writing them (when `writeMpnRecords: true`), causing duplicates. Discovered 2026-07-07.
+  - **Scope:** 3 offer types had duplicates (past 9 months):
+    - ~~Customer Excess: 112,414~~ ✅ DONE (118,718 deactivated)
+    - ~~Franchise Stock Offers: 112,743~~ ✅ DONE (113,117 deactivated)
+    - **Broker Stock Offer: 639,522** ← IN PROGRESS
+  - **Progress:** Check with: `node -e "const {psqlQuery}=require('/home/analytics_user/workspace/astute-workinstructions/shared/db-helpers'); console.log(psqlQuery('SELECT COUNT(*) FROM chuboe_offer_line_mpn WHERE isactive = \\\'N\\\' AND created >= NOW() - INTERVAL \\\'9 months\\\'')); "`
+  - **Why resumable:** Script accepts `--offset=N` to skip already-processed records.
+  - **Ready when:** Every session until complete.
+  - **How to resume:**
+    1. Get current deactivated count for Broker Stock Offer:
+       ```bash
+       node -e "const {Pool}=require('pg'); const p=new Pool({host:'/var/run/postgresql',database:'idempiere_replica'}); p.query(\"SELECT COUNT(*) FROM chuboe_offer_line_mpn olm JOIN chuboe_offer_line ol ON olm.chuboe_offer_line_id=ol.chuboe_offer_line_id JOIN chuboe_offer o ON ol.chuboe_offer_id=o.chuboe_offer_id JOIN chuboe_offer_type ot ON o.chuboe_offer_type_id=ot.chuboe_offer_type_id WHERE olm.isactive='N' AND ot.name='Broker Stock Offer' AND olm.created >= NOW() - INTERVAL '9 months'\").then(r=>{console.log('Already deactivated:',r.rows[0].count); p.end()});"
+       ```
+    2. Run dedup with offset (replace OFFSET with count from step 1):
+       ```bash
+       node /home/analytics_user/workspace/astute-workinstructions/scripts/dedup-direct.js "Broker Stock Offer" --apply --offset=OFFSET
+       ```
+    3. Monitor: `grep "Processed:" <logfile> | tail -1`
+  - **Total target:** 639,522 duplicate pairs to deactivate
+  - **Script:** `astute-workinstructions/scripts/dedup-direct.js`
+  - **Root cause fix:** `offer-writeback.js` now has `writeMpnRecords: false` by default (2026-07-07)
+
 - [ ] 🟢 **PRIORITY: Inventory Cleanup Burst Fix Validation** *(opened 2026-06-21, MONDAY)*
   - **Context:** Inventory cleanup was failing 70× due to burst limit (600/5min) aborting chunked writes mid-way, creating 407 garbage partial offers since June 15. Root cause: when burst limit hit, `offer-writeback.js` returned `partialWrite: true` immediately instead of waiting for the burst window to clear.
   - **Fix applied:** Changed chunked mode to WAIT for burst window to clear (poll every 30s, max 30 min) instead of aborting. This allows large batch jobs (~5000 lines) to complete over ~45 minutes by waiting through multiple burst windows.
@@ -47,30 +70,6 @@ The SessionStart greeting reads this file and surfaces all open items, sorted by
     - Sentinel: `~/.cron-sentinels/inventory-cleanup.json`
     - Pause file: `~/.inventory-cleanup-paused`
   - **Rollback if broken:** Re-create pause file, investigate logs
-
-- [ ] 🟢 **Per-Seller VQ Digest: Mimecast blocking emails** *(opened 2026-06-17, priority)*
-  - **Context:** Per-seller VQ digest implemented and cron registered (`5 10 * * *`). Script works — sends each seller their own email with VQs for their RFQs, one Excel tab per RFQ, CC buyers + Ivy + Jake. However, emails are being blocked by Mimecast (astutegroup.com spam filter) with "DMARC Fail" error.
-  - **Puzzle:** APAC VQ digest (same `vq@orangetsunami.com` sender) arrives fine. Per-seller digest gets blocked. Differences:
-    - From Name: "APAC VQ Digest" vs "VQ Digest"
-    - TO/CC structure: APAC sends to multiple in TO; per-seller sends single TO + multiple CC
-    - Subject format slightly different
-  - **Why blocked:** Need to investigate Mimecast logs or adjust email format to match APAC digest pattern.
-  - **Ready when:** 2026-06-18 (tomorrow, operator marked priority)
-  - **How:**
-    1. Check Mimecast admin for specific block reason on `vq@orangetsunami.com` → `@astutegroup.com`
-    2. Option A: Whitelist sender in Mimecast
-    3. Option B: Change fromName to "APAC VQ Digest" to match known-good sender
-    4. Option C: Fix DMARC/SPF/DKIM for orangetsunami.com in AWS WorkMail + Route53
-    5. Test with `--limit 1` to verify fix before full deployment
-  - **Files:**
-    - Script: `Trading Analysis/RFQ Sourcing/vq_loading/per-seller-vq-digest.js`
-    - Cron: registered in `cron-jobs.js` as `per-seller-vq-digest`
-    - State: `~/.seller-vq-digest-state.json` (was advanced — first production window will be from 2026-06-17T12:33:00Z)
-  - **Test commands:**
-    - Preview: `node per-seller-vq-digest.js --since 24`
-    - Test send: `node per-seller-vq-digest.js --send --test --limit 2`
-    - Production: `node per-seller-vq-digest.js --send`
-  - **Created / source:** 2026-06-17 session, implementation complete but blocked by email delivery issue.
 
 - [ ] 🟢 **VQ Loading: Support .eml/.msg attachments for batch quote loading** *(opened 2026-06-12, operator request)*
   - **Context:** Operator has many broker quote emails to load as VQs. Current workflow requires forwarding each email individually to `vq@`. Operator asked if they could attach multiple emails (.eml or .msg files) to a single email and have them all processed. Current system does NOT support this — it processes one email = one quote entity, and attachment handling is limited to PDF/Excel/CSV within a single email.
@@ -107,82 +106,6 @@ The SessionStart greeting reads this file and surfaces all open items, sorted by
   - **Files changed:** `shared/workflow-actions/vq-loading.js` (implemented), `shared/vq-writer.js` (implemented), `shared/load-bulk-summary.js` (implemented), `Trading Analysis/RFQ Sourcing/vq_loading/agent-prompt.txt` (needs reply detection logic)
   - **Created / source:** 2026-05-26 session, git commit `599ba3c`
 
-- [ ] 🟢 **Cron resume plan + backfill strategy** *(paused 2026-05-26 22:51 UTC due to system overload concerns)*
-  - **Context:** All crons paused via `~/workspace/.cron-paused` on 2026-05-26 at 22:51 UTC. Operator concerned about overloading the system and wants a plan for resuming + handling backfill when crons turn back on. Key risks when resuming:
-    1. **Email agents** (vq-loading, excess, stockrfq, rfq-loading) will process everything in their inboxes since pause — could be 100+ emails across 4 inboxes if paused multiple days
-    2. **Weekly/daily jobs** (inventory-cleanup, lam-kitting-runner, vq-enrichment-roi-tracker) will catch up via sentinel-based logic — should be fine, but need to verify sentinel state
-    3. **Agent token budget** — 5 Claude agents running concurrently on backfill could burn through daily budget quickly
-    4. **OT API load** — mass VQ/RFQ/CQ writes during backfill could stress OT if not throttled
-  - **Why blocked:** operator wants a planned approach, not ad-hoc "turn it back on and see what happens"
-  - **Ready when:** tomorrow (2026-05-27) or when operator reviews the plan below and approves
-  - **How (phased resume):**
-
-    **Phase 1: Assess backlog (before turning anything on)**
-    1. Check inbox counts across all 4 agent inboxes:
-       ```bash
-       himalaya envelope list --account vq --folder INBOX --page-size 500 | wc -l
-       himalaya envelope list --account excess --folder INBOX --page-size 500 | wc -l
-       himalaya envelope list --account stockrfq --folder INBOX --page-size 500 | wc -l
-       himalaya envelope list --account rfqloading --folder INBOX --page-size 500 | wc -l
-       ```
-    2. Check sentinel state for weekly/daily jobs:
-       ```bash
-       cat ~/workspace/.cron-sentinels/*.json | jq '{name:.name, lastSuccess:.lastSuccess, nextDue:.nextDue}'
-       ```
-    3. Estimate token cost: ~2K tokens/email avg × total inbox count × 5 agents = rough budget needed
-
-    **Phase 2: Clear or archive old backlog (optional)**
-    - If inbox counts are >200 emails total, consider:
-      - Moving emails older than 7 days to an "Archive" folder (manual triage later)
-      - Dropping obvious spam/marketing (not-vq pattern)
-      - This reduces the burst load on resume
-
-    **Phase 3: Resume utilities first (non-agent jobs)**
-    ```bash
-    rm ~/workspace/.cron-paused
-    touch ~/workspace/.cron-agents-paused  # keeps agents off
-    ```
-    - Turns on: inventory-cleanup, lam-kitting-runner, vq-enrichment-roi-tracker, offer-breadcrumbs-prune, mfr-reconciler, vortex-poller (non-agent), etc.
-    - These are cheap/predictable — let them catch up first
-    - Watch logs for sentinel catch-up behavior (weekly jobs should auto-fire if overdue)
-
-    **Phase 4: Resume agents one at a time (staged)**
-    ```bash
-    rm ~/workspace/.cron-agents-paused  # turns on all 5 agents
-    ```
-    - **Alternative (more cautious):** Turn on agents one at a time by temporarily modifying their cron entries or creating agent-specific pause files
-    - Suggested order (least to most token-intensive):
-      1. `stockrfq` — smallest inbox, simplest extraction
-      2. `rfq-loading` — structured RFQ creation, predictable cost
-      3. `vq-loading` — higher volume, dual-phase extraction
-      4. `excess` — customer offer parsing, medium complexity
-      5. `stockrfq-cq` (if exists as separate agent)
-    - **Watch for:**
-      - Token burn rate in `~/workspace/.claude-usage.log` (if exists)
-      - OT API response times (`shared/api-client.js` logs)
-      - Load average on analytics box (`uptime`)
-
-    **Phase 5: Monitor first 24h after full resume**
-    - Check breadcrumb logs for failure rates
-    - Verify VQs/RFQs/CQs writing successfully to OT
-    - Watch for hung `himalaya` processes (see other deferred item above)
-    - Adjust agent cadences if needed (burst windows, steady intervals)
-
-  - **Decision points for operator:**
-    1. **Skip Phase 2?** If inbox backlog is manageable (<100 emails total), resume directly
-    2. **Skip Phase 4 staging?** If confident in system capacity, turn all agents on at once (faster but riskier)
-    3. **Set token budget cap?** Add a daily token counter that pauses agents when threshold hit (future enhancement)
-
-  - **Files to check after resume:**
-    - `~/workspace/.cron-sentinels/` — verify weekly/daily jobs caught up
-    - `~/workspace/.vq-loading-pending/` — any stuck sidecars?
-    - `~/workspace/.excess-pending/` — any hung clarifications?
-    - Breadcrumb logs — look for spike in `load-failed` / `escalated-*` events
-
-  - **Created / source:** 2026-05-26 session, crons paused at 22:51 UTC
-
-### Active workstreams (next session pickup)
-
 - [ ] 🟢 **Hung `himalaya` process accumulation — add a reaper and/or timeout wrapper** *(opened 2026-05-26, surfaced during a live "VQ loader killing OT" incident)*
   - **Context:** Colleague reported a VQ loader "killing OT." Investigation found OT prod was healthy (API 404 at root in 61ms), but THIS analytics box was at **load average 40.7** sustained 15+ min. Cause: **65 orphaned `himalaya attachment download` processes** across the `vq`, `rfqloading`, and `stockrfq` inboxes — abandoned email-attachment fetches from past Claude sessions that hung mid-download and were never reaped. They held **469% aggregate CPU** (≈4.7 cores). Oldest had been spinning **~82 days**; newest ~17 days. Parent shells were dead `/tmp/claude-*-cwd` interactive shells. Killed all 65 (`ps … | grep "[h]imalaya" | awk '{print $1}' | xargs -r kill -9`) → count→0, CPU freed; load decaying. Because VQ/RFQ/Stock loaders all run *through* himalaya, the symptom looked like "the VQ loader is thrashing." No actual VQ-loader node process was running.
   - **Why blocked:** operator said "save this for discussion later" (2026-05-26). Incident itself resolved; this is the *prevention*.
@@ -215,10 +138,6 @@ The SessionStart greeting reads this file and surfaces all open items, sorted by
     2. Backfill via the API: `apiPost('chuboe_rfq_line_mpn', { Chuboe_RFQ_Line_ID: 3126132, Chuboe_MPN: 'EPCS64SI16N', Chuboe_MPN_Clean: 'EPCS64SI16N' })`. Leave MFR blank — EPCS64 is Altera/Intel but the MFR Reconciler cron fills the FK overnight; don't guess it here.
     3. Verify the row landed and the dup/match LEFT JOIN now shows the MPN.
   - **Created / source:** 2026-05-26 stockrfq cron tick. The header+line carry the demand qty; only the MPN string is missing.
-
-- [x] ✅ **vq-loading: agent-prompt rule for "cited RFQ active but zero MPN overlap"** *(opened 2026-05-25, surfaced from UID 8667 Savings Ribbon bounce)* — **DONE 2026-06-04**
-  - **Context:** UID 8667 — Ivy forwarded a Savings Ribbon email citing RFQ 1128025 (Plexus/108 ADI lines). Agent verified the cite had ZERO of the email's 13 Sanmina MPNs, MPN-matched to RFQ 1121675 (Sanmina, unique complete match), then bounced because the prompt says "cited wins when both active" (`agent-prompt.txt:319`). Agent was being more cautious than the prompt actually required.
-  - **Resolution:** Added `EXCEPTION — Cited RFQ has ZERO MPN overlap` rule to agent-prompt.txt at line 321. When cited RFQ has zero overlap with extracted MPNs AND MPN matching finds a clean unique match → trust the MPN match, stamp vendorNotes with `'cited RFQ <X> overruled — zero MPN overlap; MPN-matched to <Y>'`. Also added rule (h) for missing qty → default to RFQ line qty. Triggered by UID 8761 (Wetech EPM parts).
 
 - [ ] 🟢 **vq-loading: cross-UID duplicate-email detection for same-content forwards** *(opened 2026-05-25, surfaced from UID 8667 Savings Ribbon)*
   - **Context:** Savings Ribbon was already loaded to RFQ 1121675 via UID 8661 (34 VQs). UID 8667 was a sibling forward of the same email that bounced without realizing UID 8661 had already covered it. The natural-key dedup at the writer level catches duplicate VQ writes, but the agent still spent a tick + emitted a needs_review escalation that wasn't needed.
@@ -301,159 +220,6 @@ The SessionStart greeting reads this file and surfaces all open items, sorted by
   - **Ready when:** Next session with operator at hand. Discussion + iterate pass, not autonomous.
   - **Source:** Sessions 2026-05-21 (GP column landed) and 2026-05-22 (clarity pass main iteration).
 
-- [ ] ✅ **Continuation-row vendor inference — SHIPPED 2026-05-20** *(opened + delivered same day)*
-  - Added § 3.7.0b to `agent-prompt.txt`: when a sub-quote row has price+qty but no explicit vendor name, inherit the vendor from the most recent preceding row that did. Stamps `vendorNotes: 'tier N — vendor inherited from preceding row'` for audit. Includes explicit boundary rules (new MPN block / new explicit vendor / clearly-different pricing all reset the inheritance). Concrete worked example: today's PGC tier-2 ESDLIN1524BJ.
-
-- [ ] ✅ **CT time injection via SessionStart hook — SHIPPED 2026-05-20** *(opened + delivered same day)*
-  - `~/workspace/.claude/inject-ct-time.sh` — tiny wrapper script that emits the canonical SessionStart hook JSON with `hookSpecificOutput.additionalContext` containing `"Current local time (Central): YYYY-MM-DD HH:MM CDT"`.
-  - `~/workspace/.claude/settings.local.json` hooks section added; `matcher: "startup"`, timeout 5s.
-  - Future Claude sessions in this workspace will see the operator's actual CT time at startup — no more morning/night confusion.
-
-- [ ] ✅ **resolveBP fuzzy matching v1 SHIPPED 2026-05-20** *(opened + delivered same day)*
-  - **What landed:**
-    - `shared/api-client.js` resolveBP rewritten with strict matching ladder: VendorType filter (drops dormant/non-vendor BPs and BPs that would 500 at POST), then exact normalised → literal startswith → token-prefix → normalised prefix → activity tie-break (most recent VQs in 90d via psql) → null when ambiguous.
-    - Key empirical finding: `IsVendor='Y'` is unreliable in OT — `Chuboe_VendorType_ID gt 0` is the correct gate.
-    - Verified against today's 7 failure cases: Echo / HM / Haoxin / Troson / Samwooele now resolve correctly; `roson` returns null (no Lectrosonics mismatch); 2 typo cases (HK Dethchy / Louise yen) remain Phase 2.
-  - **v2 polish (Phase 2 — typo handling):**
-    - Levenshtein-tolerant matching for character-level typos (`Dethchy`↔`Detechy`, `Louise yen`↔`Louis Yen`). Threshold likely ≤ 2 on normalised strings; pre-cast a broader candidate net via first-3-char signature.
-    - Operator alias file under `shared/data/vendor-name-aliases.json` for cases the algorithm can't catch (slang names, internal jargon).
-  - **Maintenance:**
-    - Cache is in-memory per process (5min effective lifetime via _bpCache). No cross-process invalidation; new vendor additions take effect on next process restart.
-
-- [ ] 🟢 **(historical, subsumed by v1 above) — resolveBP fuzzy matching is too loose; doesn't prefer BPs with VendorType** *(opened 2026-05-20)*
-  - **What happened:** Surfaced during Betty's "upload VQ May 13th" recovery. The vendor-name → BP fuzzy matcher in `shared/api-client.js:resolveBP` matched these incorrectly:
-    - `Echo` → `Echo Navigation` (1006032, no VendorType) — should be `ECHO COMPONENTS CO.,LTD` (1009860, Global Sourcing)
-    - `HM` → `HM Electronics, Inc` (1005003, no VendorType) — should be `HM TECH ELECTRONIC LIMITED` (1006562 Global Sourcing or 1006563 Suspended; needs disambiguation)
-    - `Haoxin` → `HAOXIN` (1005144, no VendorType) — likely a wrong / dormant BP
-    - `roson` → `Lectrosonics` (1009950) — egregious; "roson" should never match "Lectrosonics"
-    - `HK Dethchy` → NOT FOUND — typo for `HK Detechy CO., LIMITED` (which has many VQs); resolver doesn't tolerate typos
-    - `Samwooele` → NOT FOUND — likely Korean vendor with no fuzzy variant in the matcher
-    - `Louise yen` → NOT FOUND — looks like a contact-person name, not a company
-  - **Why this is a defect:** when the resolved BP has no `chuboe_vendortype_id`, the iDempiere POST returns 500 (`"Could not convert value null for Chuboe_VendorType"`). So vendor-resolution bugs surface as VendorType-null write failures. Even when a write succeeds, a wrong BP propagates downstream (wrong supplier on the VQ, wrong activity stats, etc.).
-  - **The fixes (in priority order):**
-    1. **Filter to "valid quote vendors"** — BPs with `is_vendor='Y'` AND `chuboe_vendortype_id IS NOT NULL`. Drop dormant/Navigation-style BPs that can't actually be quoted from.
-    2. **Prefer exact name matches** before partial / fuzzy.
-    3. **Use a fuzzy threshold** (e.g., levenshtein ≤ 2 on normalized strings) to handle typos like `Dethchy` ↔ `Detechy`. Pre-normalize by stripping common suffixes (`Co., Ltd`, `Inc`, `Limited`, etc.).
-    4. **Tie-break by activity** — when multiple candidates remain, prefer the BP with the most recent active VQs (most-used = most likely the real one).
-    5. **Surface ambiguity** — if no high-confidence match, return null with a structured reason (`NO_MATCH` / `MULTIPLE_CANDIDATES` / `TYPO_SUSPECTED`) so callers can route to `clarify_vendor` instead of silently mis-loading.
-  - **Adjacent issue:** when the agent extracts a quote with `vendorSearchKey: null` (as it did on all 42 from Betty's email), the writer falls through to name-only matching. Could mitigate by having the agent prompt instruct it to use the partner-lookup helper at extraction time to populate `vendorSearchKey` per quote — moves the resolution upstream where the agent has more context.
-  - **Blast radius:** ANY Type-2 bulk load where the agent emits name-only quotes is at risk. Surfaced today on 5 quotes from Betty's email; probably happening silently across other Type-2 loads.
-  - **Created / source:** 2026-05-20 — surfaced during recover-uid8519 script run; the 8 "truly missing" quotes from Betty's reprocess all hit this defect, not the writer-accounting one we initially suspected.
-
-- [ ] ✅ **Local per-VQ attribution log + precise digest reconciliation — SHIPPED 2026-05-20** *(opened + delivered same day; alternative to OT schema change since chuboe_vq_line column add was off the table)*
-  - **What landed:**
-    - `shared/workflow-actions/vq-loading.js` `action_load_vq` appends one JSONL row per successful chuboe_vq_line write to `~/workspace/.vq-batch-attribution.jsonl`: `{ts, sourceUid, messageId, vqLineId, rfqValue, rfqLineNo, vendor, mpn, cost, qty, buyerId}`. Best-effort write — log failures don't fail the load.
-    - `Trading Analysis/RFQ Sourcing/vq_loading/vq-loading-daily-digest.js` reads the log, groups by sourceUid, bulk-queries OT for `chuboe_vq_line_id IN (<batch's vqLineIds>) AND isactive='Y'`. Each batch now shows "VQs (active / written)" — precise reconciliation, regardless of other loaders hitting the same RFQs in the same window.
-    - Outstanding-detection enhanced: "Batch rolled back" (0 active despite ≥1 written), "N of M deactivated post-load" (operator patched after load), "Silent loss: agent claimed X but attribution log shows only Y" (writer logged a write but the row never persisted).
-  - **Why this works without an OT schema change:** the attribution log lives on the agent host, written by the action handler at the exact moment of POST. No iDempiere coordination. Every operator-triggered patch (`record-updater patchRecord`) is naturally visible because the digest queries OT live for current isactive state on those exact IDs.
-  - **Maintenance:**
-    - Log grows by ~150 bytes per VQ write. At today's 600-700 VQs/day cadence that's ~100KB/day → ~36MB/year. No rotation needed for years.
-    - If the log gets corrupted or deleted, the digest gracefully falls back to "0 attributed" per batch (will show as "Silent loss: claimed X / attributed 0"). Re-create with `touch ~/workspace/.vq-batch-attribution.jsonl`.
-
-- [ ] ✅ **clarify_buyer action with reply-stitching — SHIPPED 2026-05-20** *(opened + delivered same day)*
-  - **What landed:**
-    - New `action_clarify_buyer` handler in `shared/workflow-actions/vq-loading.js` — replaces the previous generic `action_needs_review` escalation when buyer-registry validation fails. Writes a `kind: 'clarify_buyer'` sidecar capturing original_uid + subject + external_sender + reason + rfq_search_key + secondary_rfq_search_keys + proposed_buyer_id + **stashed quotes array** (so the reply tick can retry without re-extracting). Emails operator (jake.harris@) only — never the external sender.
-    - `clarify_buyer` registered in the actions map with `folder: 'NeedInfo'`, `keepsPending: true`.
-    - `action_load_vq` accepts `bypassRegistryValidation: true` flag — when set (only by the clarify_buyer reply path), skips the registry check and trusts the operator's specified buyer. **Load proceeds regardless of whether the buyer is in the registry.**
-    - Post-load notice: when `bypassRegistryValidation` was used AND the resolved buyer ISN'T in the registry, the handler emits a one-off "Loaded with non-registry buyer: <Name>" email to operator so they can decide whether to add the user to the registry. Informational only — does NOT block the load.
-    - Agent prompt § 3.2 — new branch for `kind: 'clarify_buyer'`: parse the reply for buyer specification (name / email / bare line), resolve to ad_user_id via existing helpers, re-dispatch `load_vq` with the stashed quotes + new buyerId + `bypassRegistryValidation: true`. Retry-cap at 2.
-  - **Policy summary (2026-05-20):**
-    - Buyer registry is a heuristic for fresh-load buyer resolution. It is NOT a blocker.
-    - An operator reply specifying a buyer overrides the registry check. Load proceeds.
-    - Non-registry buyers get a follow-up notice so the registry stays current at the operator's discretion. No automation forces an update.
-  - **Why "skip the weekly unfamiliar-loaders surface" is fine:** team is fixed-size, low churn. The daily digest's "Untagged" red flag in the activity-by-loader table + escalation emails on direct-loader cases gives sufficient in-band signal. No need for a separate weekly sweep.
-
-- [ ] ✅ **resolveBP Phase 2 (typo/levenshtein) — SHIPPED 2026-05-20** *(opened + delivered same day, immediately after Phase 1)*
-  - **What landed:**
-    - New `_levenshtein(a, b, maxDist=3)` helper in `shared/api-client.js` with early-exit optimisation.
-    - New Phase 2 tier in `resolveBP` after the exact/startswith/token-prefix/normalised tiers fail: server query `startswith(first 4 of input)` (broader than the contains-based queries that miss space-broken matches), then score each candidate by levenshtein between normalised input and candidate's normalised-prefix-of-input-length. Accept if distance ≤ 2.
-    - Bug fix: the prior "candidates empty → return null" early-exit was firing BEFORE Phase 2 could run; removed so Phase 2 gets a fair chance.
-  - **Verified cases:**
-    - `HK Dethchy` → `HK Detechy CO., LIMITED` (distance 1, te↔th swap)
-    - `Louise yen` → `Louis Yen Singapore Pte., Ltd` (distance 1, extra 'e' on Louis)
-    - `roson`, `XYZ Notreal Vendor`, `completely garbage 12345` → null (no false positives — levenshtein threshold of 2 holds).
-    - All Phase 1 cases (Echo / HM / Haoxin / Troson / Samwooele / Fixchips / Howeher / etc.) still resolve correctly.
-
-- [ ] ✅ **Writer accounting bug (writtenDetails + duplicates-as-writes) — SHIPPED 2026-05-20** *(opened + delivered same day)*
-  - **Root cause #1 (pre-existing-as-written):** `shared/vq-writer.js` line 825-835 — when the pre-write natural-key check finds an existing chuboe_vq_line (Gopal/Edgar/etc.'s prior load that happens to share the same `(rfq_line × MPN × BP × cost × currency)` signature), the writer pushed to `result.written` with `_skippedAsDuplicate:true`. The `written` count therefore conflated "POSTed fresh" with "matched pre-existing." Today's 1134264: 22 claimed written = 9 fresh POSTs + 13 pre-existing matches → operator saw "22 written" but only 9 actually landed.
-  - **Fix:** pre-existing matches now route to `result.skipped` with reason `PRE_EXISTING_DUPLICATE`. `result.written` reflects actual POSTs only. Added `FLAG.PRE_EXISTING_DUPLICATE` to the enum.
-  - **Root cause #2 (writtenDetails missing):** `shared/workflow-actions/vq-loading.js` line 270-278 pushed `skippedDetails` + `failedDetails` to `perRfqResults` but omitted `writtenDetails`. The load-result.json snapshot consequently had no audit trail for what was written.
-  - **Fix:** added `writtenDetails: result.written` to the perRfqResults push.
-  - **Downstream effect on digest:** the daily digest can now reliably distinguish "fresh POSTs by Claude" from "matched pre-existing." Today's reconciliation gap (22 claimed vs 9 active on 1134264) goes away — future breadcrumbs will report `written: 9, skipped: 13 (PRE_EXISTING_DUPLICATE) + ...`.
-
-- [ ] ✅ **needs_review sidecar for bounce-reply re-attachment — SHIPPED 2026-05-20** *(opened + delivered same day)*
-  - **What landed:**
-    - `shared/workflow-actions/vq-loading.js` `action_needs_review` — writes a `pending.writeSidecar(workflow, anchorMessageId, { ... kind: 'needs_review_bounce' })` whenever the agent bounces. Captures: `original_uid`, `original_subject`, `external_sender` (deeper Tier-A actor — e.g., Betty), `internal_forwarder` (outer — e.g., Ivy), `reason`, `rfq_search_key` + `secondary_rfq_search_keys`, `proposed_buyer_id`, `quote_count_at_bounce`, `extracted`, `investigation_summary`.
-    - Agent prompt § 3.2 — new branch for `kind: "needs_review_bounce"`: use `pending_state.external_sender` as the senderEmail/Tier-A anchor (NOT the reply's outer From), re-extract from the reply body+HTML (NOT replay extracted), keep the same RFQ context unless redirected, apply all standard passes (§3.7.0/§3.7.0a/§3.7.0b/§3.5.1), retry-cap at 2.
-    - Stitching is automatic: the poller's `findByReferences` already walks References on each incoming email; when Ivy resends or Jake replies, the sidecar attaches and the agent treats the reply as a re-attempt with full original context — not as a fresh email that lost the chain.
-  - **Net effect on today's failure mode:** UID 8508 bounce → sidecar with kind='needs_review_bounce' → Ivy's text resend (would-have-been UID 8516) → poller hydrates pending_state → agent uses Betty as buyer anchor (from sidecar), re-extracts from the reply, applies §3.7.0 HTML filter to identify red rows, dispatches load_vq with valid buyerId per registry. No 293-row misload. No manual rollback.
-  - **v2 polish (not blocking):**
-    - Capture HTML body in `extracted.body_html` at bounce time so the original-format payload is also available to the re-attempt (in case the reply strips formatting and the original had it).
-    - Increment retry_count semantics — confirm `writeSidecar`'s auto-bump applies on bounce-reply scenarios (it should, since the poller stitches the existing sidecar by reference).
-  - **What happened:** Operator's deeper observation while debugging Betty's "upload VQ May 13th" misload — the agent treated Ivy's text-format resend (UID 8516) as a fresh email instead of a reply to a thread we had full context on. The original (UID 8508) had Betty's complete chain. We bounced; Ivy replied; the agent processed the reply as if we'd never seen the thread before, dropping all of Betty's context. Breadcrumb for UID 8516 shows `stitched_from: null` — no sidecar was found because `action_needs_review` never wrote one.
-  - **Root cause:** `vq-loading.js:742 action_needs_review` is treated as terminal. The sidecar mechanism in `shared/workflow-pending-state.js` only fires for action types like `need_info_vendor` / `clarify_vendor` / `partial_clarify` / `needs_vendor`. Bounces drop into a context black hole.
-  - **The fix (3 parts):**
-    1. **`action_needs_review` writes a sidecar** keyed on the thread anchor Message-ID, capturing: `original_message_id`, `external_sender` (deeper actor like Betty), `internal_forwarder` (outer like Ivy), `inferred_buyer_user_id`, RFQ context, `kind: 'needs_review_bounce'`.
-    2. **Existing poller stitching** picks it up automatically on any reply with References pointing back to our bounce email — `pending_state` lands in `read` output.
-    3. **Agent prompt §3.2** gets a new branch: if `pending_state.kind === 'needs_review_bounce'`, treat the reply as a re-attempt with original context. Re-derive buyer from `pending_state.external_sender`, NOT from the (possibly stripped) reply chain. Re-run extraction with the new `body_html` from the reply.
-  - **Sanity-check fallback:** even without References, if a reply lacks chain context but subject matches a recent bounce subject (`re:` / `回复:` prefix on our bounce subject like "VQ Loading — needs review: 转发: upload VQ May 13th"), look up the bounce sidecar by subject as a secondary signal. Belt-and-suspenders for forwarders that strip References.
-  - **Blast radius:** every bounce-then-resend cycle currently loses the original context. The buyer-resolution defect ([[next item]]) is one downstream symptom; there could be others (RFQ matching, vendor inference, classification all use chain context).
-  - **Created / source:** 2026-05-20 — operator caught this while reviewing the buyer-resolution defect: "this can't be a point of failure since [we] have the original context. The agent has to be able to reference the original on a reply if everyone's not in CC or do a sanity check against the original."
-
-- [ ] ✅ **VQ Loading Daily Digest — SHIPPED 2026-05-20** *(opened + delivered same day)*
-  - **What landed:**
-    - `Trading Analysis/RFQ Sourcing/vq_loading/vq-loading-daily-digest.js` — production script with auto-discovery: reads breadcrumbs, cross-refs Message-IDs against IMAP for outer-envelope-From, applies mixed counting rule, hides zero Claude buckets, surfaces escalations.
-    - `cron-jobs.js` entry: daily 12:00 UTC (8am EDT) → operator (jake.harris@). Read-only, idempotent, no OT-write health gate needed.
-    - Installed via `install-crons.js --apply`. `check-cron-drift.js` confirms registry+crontab+sentinel in sync.
-  - **v2 polish (not blocking):**
-    - Source-UID column on `chuboe_vq_line` (or breadcrumb→VQ-ID linking) so per-batch active-in-OT reconciliation is reliable. Current digest shows only agent-claimed counts; reconciliation against OT state is intentionally omitted because per-RFQ counts leak across batches.
-    - Surface "deactivated batches" (e.g., the rollback-by-`record-updater` flow) as a distinct row vs treating them as "still claimed."
-    - Color-code outstanding cells (red for hard failures, yellow for escalations).
-
-- [ ] ✅ **VQ buyer-resolution: role-registry validation — v1 SHIPPED 2026-05-20** *(opened + delivered same day)*
-  - **What landed:**
-    - `shared/data/user-role-registry.json` — 14 buyers + 3 support, operator-maintained
-    - `shared/partner-lookup.js` — new helpers: `loadUserRoleRegistry`, `isKnownBuyer`, `isKnownSupport`, `resolveBuyerFromRegistry` (5-min cache; fails open with empty lists if file missing)
-    - `shared/workflow-actions/vq-loading.js` (`action_load_vq`) — validates payload's `buyerId` against registry BEFORE dispatching to `loadBulkSummary`. If not in `buyers[]`, escalates via `action_needs_review` with structured details (proposed buyer, RFQ, sender, instructions to add to registry or specify correct buyer). Breadcrumb event `escalated-buyer-unknown`. The old `buyerId || JAKE_USER_ID` silent fallback is gone.
-    - Agent prompt § 3.5.1 — instructs the agent that the handler will validate, encourages picking the deepest internal actor, lists common buyers + support for inline reference
-  - **v2 polish (not blocking):**
-    - Dedicated `clarify_buyer` action handler with its own sidecar + reply-stitching (vs current reuse of `needs_review`). Lets operator reply with a buyer name/ID and have the load re-attempt automatically.
-    - Smart fallback: when Tier-A doesn't yield a known buyer, look up the most-recent `chuboe_buyer_id` across active VQs on the same RFQ. If that's a known buyer, use it as a hint in the escalation (or auto-assign if confidence is high).
-    - Surface "the operator just escalated this — here are likely buyer candidates based on prior RFQ activity" in the escalation email.
-    - Lookup-by-name fallback when Tier-A returns an email that doesn't resolve to an `ad_user_id` (e.g., a typo'd domain).
-  - **Maintenance:**
-    - As Asia purchasing volume ramps, new buyers will trigger escalations. Add them to `user-role-registry.json` and the next load works.
-    - Consider a weekly cron that surfaces "unfamiliar loaders in the last 7 days" so the registry stays current without operator-only updates.
-
-- [ ] 🟢 **(historical, subsumed by registry v1 above) — VQ buyer-resolution fallback ladder design** *(opened + closed 2026-05-20)*
-  - **Goal:** stop the agent from silently misattributing the buyer on chain-broken or forwarder-only emails (Ivy → Molly's batch landing as Ivy-as-buyer; Serena distributing internally with no clear single buyer; etc.).
-  - **Source of truth:** `shared/data/user-role-registry.json` — operator-maintained list of `buyers[]` (14 entries) + `support[]` (Ivy / Gopal / Lathis). Anyone in neither list → escalate.
-  - **New resolution flow** (replaces current Tier-A → sender-fallback):
-    1. Walk the chain Tier A → find candidate ad_user_id (current logic).
-    2. If candidate is in `buyers` → assign as `chuboe_buyer_id`. ✓
-    3. If candidate is in `support` → DO NOT use as buyer. Look up `chuboe_rfq.chuboe_user_id` for the cited RFQ; if set, assign that as buyer.
-    4. If neither (2) nor (3) yields a buyer, OR the candidate is in *neither* list → escalate as new action `clarify_buyer` with the chain candidates + cited RFQ + recipient list, addressed to Jake. Operator picks the right buyer in the reply.
-  - **Where to implement:**
-    - Registry loader → new helper in `shared/partner-lookup.js` (e.g., `isKnownBuyer(adUserId)`, `isKnownSupport(adUserId)`, `getRfqOwner(rfqValue)`).
-    - Buyer-resolution call site → wherever `vq-loading.js` / `load-bulk-summary.js` decides `buyerId` today.
-    - New `clarify_buyer` action handler in `shared/workflow-actions/vq-loading.js` (mirrors `clarify_vendor` pattern; sidecar + reply-stitching).
-  - **Why this is now the priority fix:** affects every Type-2 load where the agent has to infer a buyer. Combined with the `needs_review` sidecar item (sibling above), closes today's whole class of chain-broken misattribution issues.
-  - **Subsumes the old version of this deferred-work item:** the prior framing was "fallback to forwarder when chain is lost — add a known-forwarder check." The registry-based approach is the cleaner same-shape fix.
-  - **Created / source:** 2026-05-20 — interactive operator review of last-10-days loaders to tag buyer vs support vs neither.
-
-- [ ] 🟢 **(historical, now subsumed by registry) — VQ buyer-resolution falls back to sender (forwarder) when chain is lost** *(opened 2026-05-20)*
-  - **What happened:** On Ivy's text-format resend of Betty's "upload VQ May 13th" email (loaded ~04:38 CT 2026-05-20, internal UID 8516), the agent assigned buyer = **Ivy Song (1013784)** — the sender herself. Real buyer should have been Betty Song (1011159, the deeper actor in the original chain). Mechanism: `brokerMessageId: null` on the resend meant Tier A forwarder-vs-owner unwrap couldn't find Betty; the resend had no buyer CC (it was Ivy replying to our bounce email, not to her original audience); so the agent fell back to the sender Ivy as the buyer.
-  - **Why this is a defect:** When chain is lost AND no buyer CC is resolvable, the fallback to "sender = buyer" is wrong for forwarders. Ivy is a known forwarder on these batches (per [[feedback_forwarder_vs_owner_pattern]]). The fallback should recognize "the sender is a known forwarder" and either escalate to needs_review OR assign a known default that won't propagate as the legitimate buyer.
-  - **Adjacent fact (worth noting):** Ivy's pattern is to CC the actual buyer on her original emails — Molly Huang was CC'd on Ivy's "RFQ 5/18/2026" and "RFQ -5/19" emails (separate Molly batches that processed correctly). The CC-as-buyer signal works when present; the bug appears when chain + CC are both lost (e.g., on bounce-reply resends).
-  - **Where to look:** `shared/partner-lookup.js` — `resolveAstuteUserByEmail` / `resolveAstuteUserByName`. Trace the fallback chain when Tier A returns null. Possibly add a "is-known-forwarder" check that prevents Ivy/similar forwarders from being assigned as the buyer.
-  - **Blast radius:** any text-format / chain-broken email from a known forwarder gets the wrong buyer assignment, which propagates to seller assignment, activity stats, and any "whose RFQ is this" downstream logic. Yesterday's misload (since rolled back) is the surfaced case.
-  - **Created / source:** 2026-05-20 — surfaced while debugging Betty's "upload VQ May 13th" misload. Earlier draft of this item mis-named Molly Huang as the wrong-buyer; corrected after operator pointed out the agent had actually picked Ivy herself.
-
-- [ ] 🟢 **Inject current CT time into session context** *(opened 2026-05-20)*
-  - **Why:** Today's date is in the context block but the *time* is not. Operator had to correct an assumption that "we can address that next" meant end-of-day when it was actually morning.
-  - **How:** SessionStart hook in `~/.claude/settings.json` (or project `settings.json`) that runs `TZ=America/Chicago date '+%Y-%m-%d %H:%M %Z'` and emits the result as a system-reminder line. Use the `update-config` skill.
-  - **Created / source:** 2026-05-20 chat with operator.
-
 - [ ] 🟢 **VQ Loading — UID 8508 "red rows only" recovery + HTML-body fix** *(opened 2026-05-20)*
   - **What's done this session:**
     - UID footer shipped: `vq-loading.js:754-765` now appends `Operator reference (CC only): UID <n>` to sender-routed needs-review emails when operator is CC'd. One-line grey footer.
@@ -505,44 +271,6 @@ The SessionStart greeting reads this file and surfaces all open items, sorted by
     6. SO attribution refinement — exact per-PO revenue requires m_inout → sales orderline matching (current method = po_qty × wavg SO price, slightly over-attributes when non-month POs also fulfill the customer order)
   - **Ready when:** operator wants to revisit
   - **Source:** 2026-05-13 ad-hoc session
-
-- [x] ✅ **Customer Excess — agentic loader doesn't trigger router → analysis** *(RESOLVED 2026-05-12 via commit `1355362` — chose option B inline-call)*
-  - **What shipped:** `shared/workflow-actions/excess.js` `action_load_offer` now invokes `offerRouter.dispatch()` after each successful `writeOffer`. Router writes the `routed` breadcrumb and invokes the matching downstream handler (`customer-excess-analysis` for type 1000000/1000003, broker/franchise data-capture for 1000001/1000002). Wrapped in try/catch — offer is already in OT, downstream failure shouldn't fail the load action.
-  - **Backlog cleared:** ran `offerRouter.dispatch()` for all 12 un-analyzed offers (2,406 lines total — close to the 2,383 estimate) with `source: 'catch-up-2026-05-12'`. All 12 now have the full `routed → queued` breadcrumb pair. Included OSI Electronics 1026250 (2,151 lines), Celestica 1026261 (25 lines), GE Healthcare 1026246 (96), Lam Research 1026247 (103), Pegatron 1026243 (8), Advanced Energy 1026244 (12), GPV 1026248 (4), E-Mek 1026249 (1), Celestica×5 1-25 lines each.
-  - **Still pending (separate item):** `customer-excess-analysis` is a V1 stub — emits the `queued` breadcrumb and that's it. Real intent classifier (Spec Buy / Proactive Customer / Reactive RFQ-match) + scoring + renderers still need to be built. Routing visibility is restored; analysis content is not yet. See `Trading Analysis/Customer Excess Analysis/analyze-offer.js` line 34 for the stub.
-  - **Lessons learned worth surfacing:**
-    - Did NOT rename breadcrumb cog `offer-poller` → `excess-agent` despite the original suggestion — `digest-builder.js` heavily filters on `cog === 'offer-poller'` (lines 92, 99, 135, 161, 286) and the file comment at line 80 explicitly documented two writers sharing the cog name. Keeping the cog stable preserves the digest contract.
-    - Verification: catch-up loop invoked the same `offerRouter.dispatch()` code path 12 times successfully, which is equivalent-test coverage for the now-deployed inline call.
-
-- [x] ✅ **Large-RFQ approval gate (MVP)** *(SHIPPED 2026-05-13 — uncommitted)*
-  - **What shipped:** `shared/large-rfq-gate.js` + integration into `enrich-poller.js`. RFQs above `LARGE_RFQ_THRESHOLD` (default 5,000 line MPNs, env-overridable) are paused at the start of Phase 1. First-sight: poller fetches RFQ context (salesperson, RFQ type, customer, target-price summary, top 5 MFRs, first 20 sample MPNs with qty + target prices), writes sentinel to `~/workspace/.large-rfq-pending/{rfq#}.json`, and sends an approval email from `vortex@orangetsunami.com` with full context + cost framing (~total distributor calls AND DigiKey daily-quota multiple). Subsequent ticks scan `.cleared` sentinels and re-inject approved RFQs even if the watermark has moved past. `--max-lines N` cap on approval flows through to `enrichRFQ` via existing `maxLines` opt.
-  - **Operator approval interface (MVP):** CLI from the email body — `node shared/large-rfq-gate.js {approve|reject|list|status|threshold} <RFQ#> [--max-lines N] [--reason "..."]`. Sentinel survives across enrichment ticks; `.processed` flag prevents re-enrichment after first completion.
-  - **Verified end-to-end:** dry-run against current backlog caught RFQ 1134261 (25,319 lines, Astute Internal Shortage scrape) and excluded it from the 116 processable RFQs in that tick. Email rendering smoke-tested against real RFQ context. No commits yet — needs operator review of email format before crontab next picks it up.
-  - **Known scope limits — folded into follow-up entries below:**
-    - **Cache-aware enhancement** — approval email should walk `shared/data/api-pricing-cache/{MPN}_*.json` (no API calls) to show "X of Y lines already have recent enrichment data, Z lines truly need fresh API". Adds `YES --cache-only` as a third approval mode. Operator pre-approved direction; not built in this session.
-    - **Reply-parser integration** — currently the operator uses CLI; the workflow-agent pattern would route YES/NO replies through `shared/workflow-actions/rfq-loading.js` automatically. Needs new `approve_large_rfq` / `reject_large_rfq` actions + a subject-prefix recognition rule in `rfq-loading.md`.
-  - **Design principles confirmed 2026-05-13:** single threshold across all RFQ types — operator determines context, the gate doesn't try to be clever per type. Customer identity (e.g., Astute-as-its-own-customer on internal scrapes) is irrelevant to the gate; that's upstream data hygiene (sellers shouldn't be able to set Astute as customer). Revisit only if behavior actually changes.
-  - **Source:** 2026-05-13 session, branched from cross-ref-review-queue conversation. Driven by RFQ 1134261 burning 7,974 API calls in one tick.
-
-- [x] ✅ **Large-RFQ gate — cache-aware approval email + --cache-only mode** *(SHIPPED 2026-05-13, commit `1d9bf4a`)*
-  - **What shipped:**
-    - `scanCacheCoverage()` in `shared/large-rfq-gate.js` walks the local envelope cache (single readdir → Map<MPN, latest-file>, then per-line O(1) lookup). For RFQ 1134261 (25,319 lines): 38.9s scan, 8,461 lines (33.4%) with recent cache, 6,457 with stock from cache, 17× DigiKey quota burn if approved full.
-    - Approval email gains a "Cache Coverage" section: cache-hit ratio, stock-from-cache count, fresh-API estimate, $0-spend cache-only alternative, top-10 high-value cached lines (extended value $ × qty, with best supplier + age).
-    - `YES --cache-only` as a third reply directive. Threads through `approve_large_rfq` action → `markApproved` → cleared sentinel → enrich-poller → `enrichRFQ` (new `cacheOnly` opt) → `searchAllDistributors` (new `cacheOnly` opt skips live API call on cache miss, returns `{summary: {cacheOnlyMiss: true}}`).
-    - New `counters.cacheOnlyMisses` in enrich-rfq tracks lines skipped due to missing cache in cache-only mode (distinct from real apiCalls/cacheHits accounting).
-    - `cacheKey` exported from `shared/api-result-writer.js` so consumers normalize MPNs consistently with the writer.
-  - **Verified:** scan ran end-to-end against RFQ 1134261; coverage object shaped correctly; top-valued surfaced 400G QSFP optics at $16k × 500qty = $8M extended — clear "investigate manually" signal.
-  - **Source:** 2026-05-13 session, deferred from MVP.
-
-- [x] ✅ **Large-RFQ gate — reply-parser integration via rfq-loading workflow agent** *(SHIPPED 2026-05-13, commits `c68e346` + `19fda16`)*
-  - **What shipped:**
-    - `shared/workflow-actions/rfq-loading.js`: added `approve_large_rfq` and `reject_large_rfq` actions. Both invoke `largeRfqGate.markApproved/markRejected`, send a `[CONFIRMED]` ack to the operator.
-    - `shared/large-rfq-gate.js`: new `sendApprovalEmail()` helper that routes the approval email through `rfqloading@` (so replies land in the workflow agent's inbox). Env-tunable via `LARGE_RFQ_GATE_FROM`.
-    - `enrich-poller.js`: gate trigger now uses the gate's `sendApprovalEmail()` instead of the local `sendEmail()` — approval emails go from `rfqloading@`, digests still go from `vortex@`.
-    - `rfq-loading.md`: new Step 3a that the LLM agent reads FIRST — subject-prefix match `RE: [APPROVAL NEEDED] Large RFQ <N>` skips the customer-RFQ extraction stack and routes the first-non-quoted-line directive (YES/NO/LIMIT) to the appropriate action.
-    - `cron-jobs.js`: new `rfqloading-agent` entry running `*/5 * * * *` with a gate script (`scripts/should-run-rfqloading-agent.js`) that short-circuits unless either (a) a sentinel was queued in the last 10 min (BURST window — operator likely replying now) or (b) current minute ∈ [0, 30] (STEADY cadence). Net behavior: ~5m/10m burst checks after an approval send, then every 30m.
-  - **End-to-end verified:** 2026-05-13 test send from `rfqloading@` delivered cleanly (`delivered via primary`); sentinel state machine works; gate script exits 0 in burst window, 1 outside; cron drift check passes after install.
-  - **Source:** 2026-05-13 session.
 
 <!-- VQ Loading agent-pattern conversion: PRUNED 2026-05-18 — landed between 5/11 handoff and 5/18. See ## Done § "Loader-parity bundle" below. -->
 
@@ -687,31 +415,6 @@ The SessionStart greeting reads this file and surfaces all open items, sorted by
     2. With Option A live, even if Mouser flaps the alerter will only email on the FIRST failure of each outage and won't send a recovery email for outages < 30 min.
   - **Reference:** Today's chat session; `shared/auth-failure-alerts.js`, `shared/api-retry-policy.js`, `shared/franchise-api.js`, `Trading Analysis/RFQ Sourcing/franchise_check/mouser.js`.
   - **Source:** 2026-05-05 EOD operator request → 2026-05-06 build session.
-
-- [x] ✅ **RFQ 1133343 SILENT_NO_VQS investigation + auto-investigate hook** *(RESOLVED 2026-05-13 — false-positive detector bug, already fixed cc42769)*
-  - **Phase 1 finding:** The 4/30 alert was a false positive. RFQ 1133343 single line was CD40106BM with `chuboe_mfr_id=1000000` (TI, restricted). The pipeline behaved correctly: (a) `enrich-rfq.js` partitioned it to the restricted bucket via `mfrId`+`mfrName` check, (b) `vq-writer.js` restricted-MFR gate fired against the API-returned `mfrText="Texas Instruments"` and put all 8 stock entries into `skipped[]`, (c) `vqsSkippedRestricted` incremented. The bug: the SILENT_NO_VQS detector at the time did **not** include `vqsSkippedRestricted === 0` in its condition, so it fired despite the legitimate skips. **Already fixed by commit `cc42769` on 2026-05-05** ("RFQ enrichment: detector fix + auth recovery + digest cadence"), which added the missing gate. No SILENT_NO_VQS alerts have fired since.
-  - **Phase 2 pivot:** Investigation surfaced a different live signal — line-level `silentSkips` counter on the 5/12 RFQ 1134261 enrichment run reported 31 cases. Analysis showed those are NOT actually silent: every sample had `flagged > 0, skipped === 0, failed === 0`, meaning the writer flagged the rows with explicit reasons (MPN_CROSS_REF) and the `silentSkips` detector at `enrich-rfq.js:421` is over-inclusive — it checks `written === 0 && skipped === 0` but doesn't exclude `flagged > 0`. Tightening that condition is the small follow-up. See [`Cross-Ref Review Queue`](#cross-ref-review-queue) deferred entry for the larger workflow the analysis spawned.
-  - **Source:** 2026-04-30 RFQ enrichment alert; 2026-05-13 follow-up investigation.
-
-- [x] ✅ **Tighten silentSkips detector to exclude flagged/failed outcomes** *(RESOLVED 2026-05-13, commit `8305f4d`)*
-  - Added `&& flagged.length === 0 && failed.length === 0` to the silentSkips condition. After this, the counter measures only the truly-unexplained drop path (`cost > 0 && qty > 0` filter at `vq-writer.js:472-473`). The 31 false-positive silentSkips from RFQ 1134261 (all of them MPN_CROSS_REF blocks) will drop to 0 on the next enrichment tick.
-
-<a id="cross-ref-review-queue"></a>
-- [x] ✅ **Cross-Ref Review Queue Phase 1 + 2 — classifier + staging + dual-surface + reply parser** *(SHIPPED 2026-05-13)*
-  - **Phase 1 (commit `e53d523`):** four-way classifier + per-RFQ JSON staging store + vq-writer hook + enrich-rfq integration. Live on every enrichment tick.
-    - `shared/crossref-classifier.js` — pure-function decision (drop/auto-reject/auto-approve/pending) based on `mfr-equivalence.computeMfrMatch` + prefix-of MPN check.
-    - `shared/crossref-queue.js` — file-backed staging at `~/workspace/.crossref-queue/{rfq_value}.json` with stable IDs `xref-{rfq}-{rfqLineMpnId}-{supplierIdx}`. Operations: add/update/list-by-rfq/list-all/expire.
-    - `shared/vq-writer.js` — added `opts.crossRefClassifier` callback hook on the MPN_CROSS_REF path; supplierIdx added to per-row shape for stable IDs across re-enrichment.
-    - `Trading Analysis/RFQ API Enrichment/enrich-rfq.js` — threads `rfqMfrText` + `rfqLineMpnId` into writer opts, builds the classifier callback, adds counters (`crossRefAutoApproved` / `-Rejected` / `-Pending` / `-Dropped`).
-  - **Phase 2 (commit `ad73cc6`):** dual-surface visibility + reply parser.
-    - **Digest (3×/day):** new summary row + top-12 pending table + `crossref-pending-{date}.csv` attachment in the enrichment digest. `sendEmail` extended to accept attachments.
-    - **Vortex tab:** when a forwarded RFQ has cross-ref data, `vortex-matches.js` produces a `<rfq>_CrossRef.xlsx` with pending (pale blue) + auto-approved (pale green) rows; email body shows count + approve-by-reply instruction.
-    - **Reply parser:** `shared/workflow-actions/crossref-review.js` — `parseReplyBody` / `executeDecisions` / `processReplyBody`. VQ writes for approvals go through `writeVQFromAPI` with a synthetic single-row envelope + force-auto-approve classifier so all writer infra (BP/MFR/packaging/idempotency) is reused. Audit-trail note on `Chuboe_Note_User` identifies approver + queue ID. Workflow-action shape ready for Phase 3 inbox wiring.
-    - **CLI:** `Trading Analysis/RFQ API Enrichment/crossref-review-cli.js` for manual invocation (`--body` / `--stdin` / `--approve <ID>...` / `--reject <ID>...` / `--dry-run`).
-  - **What's live:** auto-approve writes VQs immediately; auto-reject + drop count silently; pending stages to queue and surfaces in next digest + Vortex; operator approval flows through CLI today, inbox-poller later (Phase 3).
-  - **V1 defaults locked:** suffix-variant rule = "RFQ MPN is exact prefix of returned MPN" (no length cap, since `stripPackaging` already handles the strict packaging cases); auto-approved still shown on the Vortex tab during trust-build phase; no trusted-customer overrides; no Vortex-tab cap.
-  - **Smoke tests:** classifier 8-case unit test; queue add/list/update/expire; parser 9 reply variants; executor dry-run preserves state; Vortex workbook builds 7.3KB xlsx from synthetic data; all 8 touched modules load clean.
-  - **Source:** 2026-05-13 RFQ 1133343 investigation cascade.
 
 - [ ] 🟢 **Cross-Ref Review Queue Phase 3 — inbox wiring + expiry cron + trust-build retirement** *(scoped 2026-05-13)*
   - **Why blocked:** Phase 2 reply parser is shaped as a standard `workflow-action` (`shared/workflow-actions/crossref-review.js` exports `inbox`/`notifierConfig`/`actions`) but isn't connected to the live email-workflow-poller yet. Operator approves via CLI in the meantime. Two adjacent gaps also worth closing in Phase 3.
@@ -987,6 +690,34 @@ The SessionStart greeting reads this file and surfaces all open items, sorted by
 ---
 
 ## Done (recent — pruned monthly)
+
+- ✅ **Per-Seller VQ Digest: Mimecast blocking emails** *(closed 2026-07-01; opened 2026-06-17)*
+  - **Resolution:** Issue self-resolved — emails now delivering successfully to all `@astutegroup.com` recipients. Likely Mimecast whitelist or DMARC propagation delay. Confirmed working: 2026-06-29 (6 sellers, 24 VQs), 2026-06-30 (12 sellers, 309 VQs), 2026-07-01 (12 sellers, 351 VQs). Cron runs daily at `5 10 * * *` (10:05 UTC / 5:05 CT).
+  - **Files:** `Trading Analysis/RFQ Sourcing/vq_loading/per-seller-vq-digest.js`, state in `~/.seller-vq-digest-state.json`
+
+- ✅ **vq-loading: agent-prompt rule for "cited RFQ active but zero MPN overlap"** *(closed 2026-06-04; opened 2026-05-25)*
+  - **Resolution:** Added `EXCEPTION — Cited RFQ has ZERO MPN overlap` rule to agent-prompt.txt. When cited RFQ has zero overlap with extracted MPNs AND MPN matching finds a clean unique match → trust the MPN match.
+
+- ✅ **Cron resume plan + backfill strategy** *(obsolete 2026-07-01; opened 2026-05-26)*
+  - **Resolution:** Crons resumed at some point after 2026-05-26. No pause files exist as of 2026-07-01. Plan was never formally executed but crons are running normally.
+
+- ✅ **2026-05-20 VQ Loading infrastructure batch** *(closed 2026-05-20)*
+  - **Items shipped (all same day):**
+    - CT time injection via SessionStart hook — `~/.claude/inject-ct-time.sh` + hooks config
+    - Continuation-row vendor inference — § 3.7.0b in agent-prompt.txt for price+qty rows inheriting vendor
+    - resolveBP fuzzy matching v1+v2 — strict matching ladder + levenshtein typo tolerance (≤2 distance)
+    - Local per-VQ attribution log — `.vq-batch-attribution.jsonl` for precise digest reconciliation
+    - clarify_buyer action with reply-stitching — sidecar + `bypassRegistryValidation` flag
+    - Writer accounting bug fix — `PRE_EXISTING_DUPLICATE` flag, `writtenDetails` in perRfqResults
+    - needs_review sidecar for bounce-reply re-attachment — `kind: 'needs_review_bounce'`
+    - VQ Loading Daily Digest — production cron at 12:00 UTC
+    - VQ buyer-resolution role-registry validation v1 — `shared/data/user-role-registry.json`
+
+- ✅ **Customer Excess — agentic loader triggers router → analysis** *(closed 2026-05-12, commit `1355362`)*
+  - **Resolution:** `action_load_offer` now invokes `offerRouter.dispatch()` after each successful `writeOffer`. Backlog cleared for 12 offers (2,406 lines).
+
+- ✅ **Large-RFQ approval gate (full suite)** *(closed 2026-05-13)*
+  - **Items shipped:** MVP gate (`shared/large-rfq-gate.js`), cache-aware approval email + `--cache-only` mode (commit `1d9bf4a`), reply-parser integration via rfq-loading workflow agent (commits `c68e346` + `19fda16`).
 
 - ✅ **Loader-parity bundle: VQ Loading agent conversion + Stock RFQ Changes 1/2a/2b + forwarder-vs-owner pattern across 3 loaders** *(closed 2026-05-18; original handoff 2026-05-11)*
   - **VQ Loading agent conversion:** `shared/workflow-actions/vq-loading.js` handler + `vq_loading/agent-prompt.txt` runtime prompt + `vq-loading-agent` cron entry (tiered 5m burst / 15m steady with gate script). Type 1 + Type 2 unified through `loadBulkSummary`; multi-RFQ fan-out via `secondaryRfqSearchKeys[]`; partial-clarify with sidecar reply-stitch. Landed sometime between 5/11 handoff and 5/18 audit.

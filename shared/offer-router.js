@@ -26,15 +26,17 @@ const TYPE_ID_TO_ROUTE = {
   1000001: { name: 'Broker Stock Offer',      route: 'broker-data-capture' },
   1000002: { name: 'Franchise Offers',        route: 'franchise-data-capture' },
   1000003: { name: 'Customer Lead Time Buy',  route: 'customer-excess-analysis' },
+  1000025: { name: 'LAM Kitting Inventory',   route: 'customer-excess-analysis' },
 };
 
-// Type name → ID (mirrors OFFER_TYPES from offer-writeback.js for the four
+// Type name → ID (mirrors OFFER_TYPES from offer-writeback.js for the five
 // inbox-fed types — keep in sync if the loader recognizes more)
 const TYPE_NAME_TO_ID = {
   'Customer Excess': 1000000,
   'Broker Stock Offer': 1000001,
   'Franchise Offers': 1000002,
   'Customer Lead Time Buy': 1000003,
+  'LAM Kitting Inventory': 1000025,
 };
 
 function resolveTypeId(offerType) {

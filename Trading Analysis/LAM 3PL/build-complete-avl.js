@@ -3,10 +3,11 @@
  * Build Complete AVL for LAM Program
  *
  * Sources:
- * 1. Astute New Part ADDs_ Working Copy.xlsx [MPNs] - 2,566 rows (Kitting AVL)
- * 2. Copy of Lam-Astute_NewParts - 02122026.xlsx [AVL] - 3,267 rows (NewParts AVL)
- * 3. EPG_AVL_Alternates_Analysis_20260409.xlsx - 68 rows (EPG alternates)
- * 4. Master Roster - to identify gaps
+ * 1. Book1.xlsx [AVL] - 2,430 rows (LAM AVL from email - PRIMARY SOURCE)
+ * 2. Astute New Part ADDs_ Working Copy.xlsx [MPNs] - 2,566 rows (Kitting AVL)
+ * 3. Copy of Lam-Astute_NewParts - 02122026.xlsx [AVL] - 3,267 rows (NewParts AVL)
+ * 4. EPG_AVL_Alternates_Analysis_20260409.xlsx - 68 rows (EPG alternates)
+ * 5. Master Roster - to identify gaps
  */
 
 const XLSX = require('xlsx');
@@ -15,6 +16,58 @@ const path = require('path');
 
 const BASE_DIR = '/home/analytics_user/workspace/astute-workinstructions/Trading Analysis';
 const FILE_DROP = '/home/analytics_user/workspace/file-drop';
+
+/**
+ * Load LAM AVL from Book1.xlsx (email attachment from LAM)
+ * This is the PRIMARY source - 2,430 rows with CPC, MPN, MFG columns
+ */
+function loadLamAVL() {
+  const filePath = path.join(FILE_DROP, 'Book1.xlsx');
+  if (!fs.existsSync(filePath)) {
+    console.log('  WARNING: LAM AVL file not found:', filePath);
+    return {};
+  }
+
+  const wb = XLSX.readFile(filePath);
+  const ws = wb.Sheets['AVL'];
+  if (!ws) {
+    console.log('  WARNING: AVL sheet not found in Book1.xlsx');
+    return {};
+  }
+
+  const data = XLSX.utils.sheet_to_json(ws, { header: 1 });
+  const avl = {};
+  let totalEntries = 0;
+
+  // Header row: CPC, MPN, Part Family, Note, MPN6, Part Description, MFG 1, MFG 2
+  for (let i = 1; i < data.length; i++) {
+    const row = data[i];
+    if (!row || !row[0]) continue;
+
+    const cpc = String(row[0]).trim();
+    const mpn = row[1] ? String(row[1]).trim() : '';
+    const mfr = row[6] ? String(row[6]).trim() : '';  // MFG 1 column
+
+    if (!cpc || !mpn) continue;
+
+    if (!avl[cpc]) avl[cpc] = [];
+
+    // Check if this MPN already exists for this CPC
+    const exists = avl[cpc].some(e => e.mpn === mpn);
+    if (!exists) {
+      avl[cpc].push({
+        mpn: mpn,
+        mfr: mfr,
+        preferred: true,  // All in LAM AVL are approved
+        source: 'LAM-AVL'
+      });
+      totalEntries++;
+    }
+  }
+
+  console.log(`  LAM AVL: ${Object.keys(avl).length} CPCs, ${totalEntries} MPN entries`);
+  return avl;
+}
 
 /**
  * Load Kitting AVL from MPNs sheet AND Astute HVM list sheet
@@ -226,49 +279,38 @@ console.log('=== Building Complete LAM AVL ===\n');
 
 // Load all sources
 console.log('Loading sources...');
+const lamAVL = loadLamAVL();  // PRIMARY SOURCE - from LAM email
 const kittingAVL = loadKittingAVL();
 const newPartsAVL = loadNewPartsAVL();
 const epgAlternates = loadEPGAlternates();
 const masterRoster = loadMasterRosterCPCs();
 console.log(`  Master Roster: ${Object.keys(masterRoster).length} CPCs`);
 
-// Merge AVLs (priority: Kitting > NewParts > EPG for same CPC)
+// Merge AVLs (priority: LAM-AVL > Kitting > NewParts > EPG for same CPC)
 console.log('\nMerging AVL sources...');
 const completeAVL = {};
 
-// Start with Kitting (original program)
-for (const [cpc, entries] of Object.entries(kittingAVL)) {
-  completeAVL[cpc] = [...entries];
-}
-
-// Add NewParts (only if CPC not already present, or add new MPNs)
-for (const [cpc, entries] of Object.entries(newPartsAVL)) {
-  if (!completeAVL[cpc]) {
-    completeAVL[cpc] = entries;
-  } else {
-    // Add any MPNs not already present
-    for (const entry of entries) {
-      const exists = completeAVL[cpc].some(e => e.mpn === entry.mpn);
-      if (!exists) {
-        completeAVL[cpc].push(entry);
+// Helper to add entries without duplicates
+function addEntries(avlSource) {
+  for (const [cpc, entries] of Object.entries(avlSource)) {
+    if (!completeAVL[cpc]) {
+      completeAVL[cpc] = [...entries];
+    } else {
+      for (const entry of entries) {
+        const exists = completeAVL[cpc].some(e => e.mpn === entry.mpn);
+        if (!exists) {
+          completeAVL[cpc].push(entry);
+        }
       }
     }
   }
 }
 
-// Add EPG alternates
-for (const [cpc, entries] of Object.entries(epgAlternates)) {
-  if (!completeAVL[cpc]) {
-    completeAVL[cpc] = entries;
-  } else {
-    for (const entry of entries) {
-      const exists = completeAVL[cpc].some(e => e.mpn === entry.mpn);
-      if (!exists) {
-        completeAVL[cpc].push(entry);
-      }
-    }
-  }
-}
+// Both AVL files are sources of truth
+addEntries(lamAVL);       // Book1.xlsx (LAM AVL from email)
+addEntries(kittingAVL);   // Working Copy [MPNs] + [Astute HVM list]
+
+// NOTE: NewParts and EPG not used - the two AVL files above are authoritative
 
 console.log(`  Complete AVL: ${Object.keys(completeAVL).length} CPCs, ${Object.values(completeAVL).flat().length} MPN entries`);
 

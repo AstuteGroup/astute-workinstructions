@@ -1,0 +1,38 @@
+{
+  "rfqSearchKey": "1136588",
+  "buyerId": 1018538,
+  "runAt": "2026-06-10T03:35:54.043Z",
+  "sourceQuotes": "/tmp/winking-fix.json",
+  "result": {
+    "written": [
+      {
+        "vqLineId": 2192420,
+        "line": 10,
+        "mpn": "BCM5221A4KPTGT",
+        "vendor": "Winking Semiconductor Co., Ltd",
+        "cost": 3,
+        "qty": 1000,
+        "fuzzyMatch": false,
+        "originalVendorLabel": "Winking Semiconductor Co., Ltd",
+        "bpId": 1000281,
+        "noBid": false
+      }
+    ],
+    "skipped": [],
+    "failed": [],
+    "coverage": [
+      {
+        "lineNo": 10,
+        "lineId": 3129725,
+        "rfqQty": 50,
+        "mpns": [
+          "BCM5221A4KPT",
+          "BCM5221A4KPTG",
+          "BCM5221A4KPTGT"
+        ],
+        "vqsThisBatch": 1
+      }
+    ],
+    "gaps": []
+  }
+}

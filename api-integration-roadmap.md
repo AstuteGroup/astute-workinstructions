@@ -1548,11 +1548,113 @@ The `<60min` RFQ→first-sold-CQ check (= "RFQ created to process an order, no r
 
 ---
 
+## Carrier Tracking APIs
+
+**Status:** Planned | **Priority:** Medium | **Use Case:** Daily incoming shipments report for logistics
+
+### Overview
+
+Track inbound PO shipments to give logistics visibility into what's arriving each day. Query OT for POs with tracking numbers, look up carrier status + ETA, report to logistics team.
+
+**Volume:** ~10-20 inbound tracking lookups/day (low — API approach preferred over scrapers for reliability)
+
+### Carriers
+
+| Carrier | Portal | Auth | Cost | Status |
+|---------|--------|------|------|--------|
+| **FedEx** | [developer.fedex.com](https://developer.fedex.com) | OAuth 2.0 | Free (100K/day) | **To register** |
+| **UPS** | [developer.ups.com](https://developer.ups.com) | OAuth 2.0 | Free | **To register** |
+| **DHL** | [developer.dhl.com](https://developer.dhl.com) | API Key | Free | **To register** |
+| **SF Express** | Unknown | Unknown | Unknown | **To investigate** |
+
+### Registration Steps
+
+**FedEx:**
+1. Go to [developer.fedex.com](https://developer.fedex.com)
+2. Click "Sign Up" → create account with email + company info
+3. Create a "Project" → select "Track API"
+4. Get Client ID + Client Secret immediately
+5. No shipping account required for tracking-only access
+
+**UPS:**
+1. Go to [developer.ups.com](https://developer.ups.com)
+2. Click "Sign Up" → create account with email + company info
+3. Request access to "Tracking API"
+4. Get credentials (may take a few hours for approval)
+5. No shipping account required for tracking-only access
+
+**DHL:**
+1. Go to [developer.dhl.com](https://developer.dhl.com)
+2. Register → get API key immediately
+3. Simplest of the three
+
+### Implementation Plan
+
+**Phase 1 — Registration (owner: TBD)**
+- [ ] Register for FedEx developer account, get Client ID + Secret
+- [ ] Register for UPS developer account, get credentials
+- [ ] Register for DHL developer account, get API key
+- [ ] Add credentials to `~/workspace/.env`
+
+**Phase 2 — Integration (owner: Claude)**
+- [ ] Create `shared/tracking-lookup.js` — unified lookup for all carriers
+- [ ] Create `shared/carrier-apis/fedex.js` — FedEx Track API integration
+- [ ] Create `shared/carrier-apis/ups.js` — UPS Track API integration
+- [ ] Create `shared/carrier-apis/dhl.js` — DHL Track API integration
+- [ ] Extend `shared/tracking-parser.js` — add carrier detection for all formats
+
+**Phase 3 — Workflow (owner: Claude)**
+- [ ] Create workflow: Daily Incoming Shipments Report
+- [ ] Query: POs with tracking where `qtyordered > qtydelivered` and no receipt exists
+- [ ] Output: Email to logistics with shipments by ETA (today / tomorrow / this week)
+- [ ] Schedule: Daily cron, 6am CT
+
+### Data Model
+
+**Source query (POs with active tracking):**
+```sql
+SELECT o.documentno, ol.chuboe_trackingnumbers, ol.qtyordered
+FROM c_orderline ol
+JOIN c_order o ON ol.c_order_id = o.c_order_id
+WHERE o.issotrx = 'N'
+  AND ol.chuboe_trackingnumbers IS NOT NULL
+  AND ol.chuboe_trackingnumbers ~ '^[0-9A-Z]{8,}'
+  AND NOT EXISTS (
+    SELECT 1 FROM m_inoutline iol
+    JOIN m_inout i ON iol.m_inout_id = i.m_inout_id
+    WHERE iol.c_orderline_id = ol.c_orderline_id
+  )
+```
+
+**Carrier detection:** Use `shared/tracking-parser.js` `detectCarrier()` to route to correct API.
+
+**Output format:**
+```
+INCOMING SHIPMENTS — Monday 2026-06-30
+
+DUE TODAY:
+  PO810839 | 00519487942370 (FedEx) | Out for Delivery | ETA 2pm
+  PO808537 | 1Z037C27A205327370 (UPS) | In Transit | ETA 4pm
+
+DUE TOMORROW:
+  PO810722 | 529527804364 (FedEx) | In Transit | ETA 10am
+```
+
+### Scraper Fallback (Not Recommended)
+
+Attempted 2026-06-30: Direct scraping of FedEx/UPS websites blocked by anti-bot measures. Both carriers return error pages or connection failures for automated requests. Official APIs are the reliable path.
+
+### Related
+
+- **Existing code:** `shared/tracking-parser.js` (carrier detection from tracking number format)
+- **Spot check (2026-06-30):** OT receipt entry appears same-day as carrier delivery (PO808537: UPS delivered March 20, OT receipt created March 20 11:01am)
+
+---
+
 ## Future Integrations
 
 Placeholder for other API integrations as needs arise:
 
-- Shipping/logistics APIs (FedEx, UPS, DHL)
 - Currency conversion APIs
 - Compliance/export control APIs
 - Customer portal integrations

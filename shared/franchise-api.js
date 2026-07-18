@@ -226,6 +226,7 @@ function synthesizeStockLtVqLines(result, mpn, qty, config) {
         manufacturer: result.vqManufacturer || '',
         description: result.vqDescription || '',
         qty: stockQty,           // surface the lot's available stock
+        stock: stockQty,         // actual stock (for cache envelope — see api-result-writer.js)
         cost: stockPrice,
         currencyId,
         moq: result.vqMoq || null,
@@ -269,6 +270,7 @@ function synthesizeStockLtVqLines(result, mpn, qty, config) {
         manufacturer: result.vqManufacturer || '',
         description: result.vqDescription || '',
         qty: ltBuyQty,            // actual commit qty (honors MOQ)
+        stock: stockQty,          // actual stock (for cache envelope — NOT ltBuyQty!)
         cost: ltPrice,
         currencyId,
         moq: result.vqMoq || null,
@@ -725,8 +727,19 @@ function envelopeToResult(envelope, mpn, qty) {
 
   const results = [...distributorsFromPricings, ...distributorsFromStatus];
   const carrying = results.filter(r => r.found);
-  const found = carrying.filter(r => r.franchiseQty > 0);
-  const totalStock = found.reduce((sum, r) => sum + (r.franchiseQty || 0), 0);
+  // Include distributors with franchiseQty > 0 OR vqLines with stock (Arrow/Verical, Newark/Farnell)
+  const found = carrying.filter(r =>
+    r.franchiseQty > 0 ||
+    (Array.isArray(r.vqLines) && r.vqLines.some(v => (v.qty || 0) > 0))
+  );
+  // Sum both franchiseQty AND vqLines qty (Verical, Farnell, etc.)
+  const totalStock = found.reduce((sum, r) => {
+    let qty = r.franchiseQty || 0;
+    if (Array.isArray(r.vqLines)) {
+      qty += r.vqLines.reduce((s, v) => s + (v.qty || 0), 0);
+    }
+    return sum + qty;
+  }, 0);
 
   const catalogPrices = carrying.map(r => r.franchiseBulkPrice).filter(p => p != null && p > 0);
   const stockedPrices = found.map(r => r.franchiseBulkPrice).filter(p => p != null && p > 0);
@@ -770,6 +783,7 @@ function envelopeToResult(envelope, mpn, qty) {
           manufacturer: sub.manufacturer,
           cost: sub.cost,
           qty: sub.qty,
+          stock: sub.stock,       // forward actual stock for cache envelope
           description: sub.description,
           vendorNotes: sub.vendorNotes,
           dateCode: sub.dateCode,
@@ -788,6 +802,7 @@ function envelopeToResult(envelope, mpn, qty) {
         manufacturer: r.vqManufacturer,
         cost: r.vqPrice,
         qty: r.franchiseQty,
+        stock: r.franchiseQty,    // actual stock for cache envelope
         currencyId: r.currencyId,
         description: r.vqDescription,
         vendorNotes: r.vqVendorNotes,
@@ -931,8 +946,19 @@ async function searchAllDistributors(mpn, qty, options = {}) {
   // scarcity" (carrying > 0, with-stock = 0) from "not in franchise universe"
   // (carrying = 0). See market-offer-analysis.md § Step 3a three-state model.
   const carrying = results.filter(r => r.found);
-  const found = carrying.filter(r => r.franchiseQty > 0);
-  const totalStock = found.reduce((sum, r) => sum + (r.franchiseQty || 0), 0);
+  // Include distributors with franchiseQty > 0 OR vqLines with stock (Arrow/Verical, Newark/Farnell)
+  const found = carrying.filter(r =>
+    r.franchiseQty > 0 ||
+    (Array.isArray(r.vqLines) && r.vqLines.some(v => (v.qty || 0) > 0))
+  );
+  // Sum both franchiseQty AND vqLines qty (Verical, Farnell, etc.)
+  const totalStock = found.reduce((sum, r) => {
+    let qty = r.franchiseQty || 0;
+    if (Array.isArray(r.vqLines)) {
+      qty += r.vqLines.reduce((s, v) => s + (v.qty || 0), 0);
+    }
+    return sum + qty;
+  }, 0);
 
   // ── Per-distributor health flag ──────────────────────────────────────────
   // Surface "this distributor seems off" signals to the caller so they can
@@ -1022,6 +1048,7 @@ async function searchAllDistributors(mpn, qty, options = {}) {
           manufacturer: sub.manufacturer,
           cost: sub.cost,
           qty: sub.qty,
+          stock: sub.stock,       // forward actual stock for cache envelope
           description: sub.description,
           vendorNotes: sub.vendorNotes,
           dateCode: sub.dateCode,
@@ -1040,6 +1067,7 @@ async function searchAllDistributors(mpn, qty, options = {}) {
         manufacturer: r.vqManufacturer,
         cost: r.vqPrice,
         qty: r.franchiseQty,
+        stock: r.franchiseQty,    // actual stock for cache envelope
         description: r.vqDescription,
         vendorNotes: r.vqVendorNotes,
         dateCode: r.vqDateCode,

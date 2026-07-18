@@ -862,29 +862,29 @@ OUTPUT_DIR=./output        # Output directory
 
 ## Downstream: Ticking a VQ as Purchased
 
-This workflow creates VQ records (Tier 1 — `IsPurchased='N'`). The downstream step — when the buyer chooses the winning vendor and flips the tick — **MUST** go through the enforced path. Do NOT `patchRecord('chuboe_vq_line', id, {IsPurchased: 'Y'})` directly from a one-off script.
+This workflow creates VQ records (Tier 1 — `IsPurchased='N'`). The downstream step — when the buyer chooses the winning vendor and flips the tick — is documented separately.
 
-**Required:**
+> **Full workflow documentation:** See [`shared/vq-purchase-workflow.md`](../../../shared/vq-purchase-workflow.md) for the complete VQ purchase process with:
+> - End-to-end numbered steps
+> - All required Tier 2 fields
+> - Program-specific defaults (LAM_KITTING, LAM_EPG)
+> - Validation error troubleshooting
+> - Complete code examples
+
+**Quick reference:**
 
 ```javascript
-const { tickVQForPurchase } = require('/home/analytics_user/workspace/astute-workinstructions/shared/vq-patcher');
-const { postApproveOrder } = require('/home/analytics_user/workspace/astute-workinstructions/shared/r-request-writer');
+const { tickVQForPurchase } = require('../shared/vq-patcher');
+const { postApproveOrder } = require('../shared/r-request-writer');
 
-// 1. Tick (runs vq-purchase-validator.js, unticks competing VQs, aborts on any violation)
-await tickVQForPurchase(vqId, {
-  program: 'LAM_KITTING',
-  extra: { Chuboe_Lead_Time: 'STOCK - 1 WEEK', DatePromised: '2026-04-24' },
-});
+// 1. Tick (validates Tier 2 fields, auto-unticks competitors)
+await tickVQForPurchase(vqId, { program: 'LAM_KITTING', extra: {...} });
 
-// 2. Post approve-order (re-validates, forces Jake routing + Submitted status)
-await postApproveOrder({
-  vqId, program: 'LAM_KITTING', rfqId,
-  summary: 'approve order — Master R-78C3.3-1.0 (LAM Kitting)',
-  approvalText: 'Line 270  R-78C3.3-1.0  5pcs @ $8.38  DC 24+  RECOM\nVendor: Master Electronics',
-});
+// 2. Post approval (re-validates, routes to Jake)
+await postApproveOrder({ vqId, program, rfqId, summary, approvalText });
 ```
 
-The validator checks date code, lead time, promise date, packaging, traceability, program-specific ship-to (warehouse + warehouse_group + shipper + incoterm), public/private note split, and competing-VQ untick. Full reference in `shared/r-requests.md` and `shared/data-model.md` § VQ Field Requirements.
+Do NOT `patchRecord('chuboe_vq_line', id, {IsPurchased: 'Y'})` directly.
 
 ---
 

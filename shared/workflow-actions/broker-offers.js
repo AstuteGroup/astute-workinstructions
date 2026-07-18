@@ -126,11 +126,13 @@ async function action_load_offer(payload, ctx) {
     }
   }
 
+  // NOTE: writeMpnRecords deliberately omitted (default false).
+  // The iDempiere bean callout on chuboe_offer_line auto-creates the
+  // chuboe_offer_line_mpn record. Writing it ourselves caused duplicates.
   const result = await writeOffer({
     bpartnerId,
     offerTypeId: offerType,
     description: description || `${new Date().toISOString().slice(0, 10).replace(/-/g, '.')}-bp${bpartnerId}-brokerAgent`,
-    writeMpnRecords: true,
     lines,
   });
 

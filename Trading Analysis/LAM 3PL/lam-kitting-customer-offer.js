@@ -9,7 +9,8 @@
  * Astute inventory offers — server assigns a fresh offer ID each Monday, the
  * prior one is deactivated.
  *
- * Master roster = Lam_Kitting_DB.xlsx INVENTORY sheet (every program part).
+ * Master roster = LAM_Master_Roster.xlsx (consolidated from Kitting DB,
+ * EPG SIPOC, and Phase 2 Adds via scripts/build-lam-master-roster.js).
  * Per part: qty = sum(W111+W115 lots) or 0 if not in this week's inventory.
  * That gives the customer full visibility on every program part with current
  * stock — including zero-stock parts (which the prior manual flow omitted).
@@ -60,7 +61,7 @@ const OFFER_TYPE_LAM_KITTING_INVENTORY = 1000025;
 const COUNTRY_US = 100;
 const CURRENCY_USD = 100;                        // c_currency_id for USD
 
-const KDB_PATTERN = /^Lam_Kitting_DB.*\.xlsx$/;
+const MASTER_ROSTER_FILE = 'LAM_Master_Roster.xlsx';
 
 // Note: Uses shared/mpn-normalization.js normalizeMPN() for cross-source
 // matching. Strips leading zeros, hyphens, spaces, case differences so
@@ -130,9 +131,9 @@ function findInventoryFolder() {
   return dirs[0] || null;
 }
 
-function findKittingDB() {
-  const files = fs.readdirSync(SCRIPT_DIR).filter(f => KDB_PATTERN.test(f)).sort().reverse();
-  return files.length > 0 ? path.join(SCRIPT_DIR, files[0]) : null;
+function findMasterRoster() {
+  const rosterPath = path.join(SCRIPT_DIR, MASTER_ROSTER_FILE);
+  return fs.existsSync(rosterPath) ? rosterPath : null;
 }
 
 function findSourcedCsv() {
@@ -148,33 +149,34 @@ function findSourcedCsv() {
   return files.length > 0 ? path.join(OUTPUT_DIR, files[0]) : null;
 }
 
-// ─── ROSTER (Kitting DB INVENTORY sheet) ──────────────────────────────────────
+// ─── ROSTER (Master Roster sheet) ──────────────────────────────────────────────
 
-function loadRoster(kdbPath) {
-  const wb = XLSX.readFile(kdbPath);
-  const sheet = wb.Sheets['INVENTORY'];
-  if (!sheet) throw new Error(`Sheet "INVENTORY" not found in ${kdbPath}`);
+function loadRoster(rosterPath) {
+  const wb = XLSX.readFile(rosterPath, { raw: true });
+  const sheet = wb.Sheets['Master Roster'];
+  if (!sheet) throw new Error(`Sheet "Master Roster" not found in ${rosterPath}`);
   // raw: true preserves numeric MPN cells at full precision (cell.v) instead
-  // of returning the scientific-notation display string (cell.w). 21 of 945
-  // MPNs in the Kitting DB are stored as numbers (e.g. 9551666816741) and
-  // would otherwise come through as "9.55167E+12".
+  // of returning the scientific-notation display string (cell.w). 21 of 945+
+  // MPNs are stored as numbers (e.g. 9551666816741) and would otherwise come
+  // through as "9.55167E+12".
   const rows = XLSX.utils.sheet_to_json(sheet, { header: 1, raw: true });
-  if (rows.length < 2) throw new Error(`No data rows in INVENTORY sheet`);
+  if (rows.length < 2) throw new Error(`No data rows in Master Roster sheet`);
 
   const header = rows[0];
-  const idx = name => header.findIndex(h => cellToString(h).toLowerCase() === name.toLowerCase());
+  const idx = name => header.findIndex(h => cellToString(h) === name);
+  // Master Roster column names (from scripts/build-lam-master-roster.js)
   const cols = {
-    cpc:  idx('Lam P/N'),
+    cpc:  idx('CPC'),
     mpn:  idx('MPN'),
     mfr:  idx('Manufacturer'),
-    desc: idx('Item Description'),
-    lt:   idx('Lead Time'),
+    desc: idx('Description'),
+    lt:   idx('Contractual Lead Time'),
     base: idx('Base Unit Price'),
     rsl:  idx('Resale Price'),
     moq:  idx('MOQ'),
   };
   for (const [k, v] of Object.entries(cols)) {
-    if (v < 0) throw new Error(`Missing required column in INVENTORY: ${k}`);
+    if (v < 0) log(`  WARNING: Missing column in Master Roster: ${k}`);
   }
 
   const roster = [];
@@ -212,7 +214,7 @@ function loadRoster(kdbPath) {
     deduped.push(r);
   }
   if (dupes.length > 0) {
-    log(`  Dropped ${dupes.length} duplicate roster row(s) (same CPC+MPN — clean these in the Kitting DB Excel):`);
+    log(`  Dropped ${dupes.length} duplicate roster row(s) (same CPC+MPN — clean in source Excel):`);
     for (const d of dupes) log(`    • ${d}`);
   }
   return deduped;
@@ -366,7 +368,7 @@ async function main() {
   const args = parseArgs(process.argv.slice(2));
 
   const inventoryFolder = args.positional[0] || findInventoryFolder();
-  const kdbPath = args.positional[1] || findKittingDB();
+  const kdbPath = args.positional[1] || findMasterRoster();
   const sourcedCsv = args.sourcedCsv || (args.noFreshLt ? null : findSourcedCsv());
   const offerTypeId = args.offerTypeId || OFFER_TYPE_LAM_KITTING_INVENTORY;
   const isStaging = offerTypeId !== OFFER_TYPE_LAM_KITTING_INVENTORY;
@@ -375,7 +377,7 @@ async function main() {
   log('LAM KITTING CUSTOMER OFFER REFRESH');
   log('============================================================');
   log(`Inventory folder: ${inventoryFolder || 'NOT FOUND'}`);
-  log(`Kitting DB:       ${kdbPath ? path.basename(kdbPath) : 'NOT FOUND'}`);
+  log(`Master Roster:    ${kdbPath ? path.basename(kdbPath) : 'NOT FOUND'}`);
   log(`Sourced CSV:      ${sourcedCsv ? path.basename(sourcedCsv) : '(none — lead times kept as-is)'}`);
   log(`Offer type:       ${offerTypeId}${isStaging ? '  [STAGING — invisible to customer dashboard]' : '  [LAM Kitting Inventory — LIVE for customer dashboard]'}`);
   log(`Mode:             ${args.dryRun ? 'DRY RUN' : 'LIVE'}`);
@@ -384,11 +386,11 @@ async function main() {
     throw new Error(`Inventory folder not found. Run inventory_cleanup.js first.`);
   }
   if (!kdbPath || !fs.existsSync(kdbPath)) {
-    throw new Error(`Lam_Kitting_DB.xlsx not found in ${SCRIPT_DIR}`);
+    throw new Error(`LAM_Master_Roster.xlsx not found in ${SCRIPT_DIR}. Run scripts/build-lam-master-roster.js first.`);
   }
 
   log('');
-  log('Step 1: Loading roster from Kitting DB INVENTORY sheet...');
+  log('Step 1: Loading roster from Master Roster...');
   const roster = loadRoster(kdbPath);
   log(`  Roster: ${roster.length} parts`);
 

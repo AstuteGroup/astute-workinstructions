@@ -717,6 +717,29 @@ async function main() {
   writeExcel(results, outputPath);
   console.log(`  Wrote: ${outputPath}`);
 
+  // Write JSON sidecar for runner integration (CPC -> pending order info)
+  const sidecarPath = outputPath.replace('.xlsx', '.json');
+  const sidecarData = {};
+  for (const r of results) {
+    if (!r.cpc) continue;
+    if (!sidecarData[r.cpc]) {
+      sidecarData[r.cpc] = [];
+    }
+    sidecarData[r.cpc].push({
+      vq_id: r.vq_id,
+      rfq_number: r.rfq_number,
+      mpn: r.mpn,
+      supplier: r.supplier,
+      buyer: r.buyer,
+      ot_po_number: r.ot_po_number,
+      promise_date: r.promise_date,
+      days_stuck: r.days_stuck,
+      status: r.ot_po_number ? 'Has OT PO - needs Infor stamp' : 'VQ ticked - needs PO'
+    });
+  }
+  fs.writeFileSync(sidecarPath, JSON.stringify(sidecarData, null, 2));
+  console.log(`  Wrote sidecar: ${sidecarPath}`);
+
   // Send email if items found
   if (!dryRun && results.length > 0) {
     console.log('');
@@ -753,7 +776,7 @@ async function queryPendingOrders(exclusions, rosterCPCs) {
       o.created AS po_created,
       ol.chuboe_po_string AS pov_stamp,
       CURRENT_DATE - vl.created::date AS days_stuck,
-      u_buyer.name AS buyer,
+      COALESCE(u_po_buyer.name, u_vq_buyer.name) AS buyer,
       rl.chuboe_cpc AS cpc
     FROM chuboe_vq_line vl
     JOIN chuboe_rfq_line rl ON rl.chuboe_rfq_line_id = vl.chuboe_rfq_line_id
@@ -762,7 +785,8 @@ async function queryPendingOrders(exclusions, rosterCPCs) {
     LEFT JOIN c_bpartner bp_vendor ON bp_vendor.c_bpartner_id = vl.c_bpartner_id
     LEFT JOIN c_orderline ol ON ol.chuboe_vq_line_id = vl.chuboe_vq_line_id
     LEFT JOIN c_order o ON o.c_order_id = ol.c_order_id
-    LEFT JOIN ad_user u_buyer ON u_buyer.ad_user_id = o.salesrep_id
+    LEFT JOIN ad_user u_po_buyer ON u_po_buyer.ad_user_id = o.salesrep_id
+    LEFT JOIN ad_user u_vq_buyer ON u_vq_buyer.ad_user_id = vl.createdby
     WHERE rfq.c_bpartner_id = ${LAM_BP_ID}
       AND rfq.isactive = 'Y'
       AND vl.isactive = 'Y'

@@ -137,7 +137,7 @@ async function postApproveOrder(opts = {}) {
     Summary:              summary,
     Chuboe_Approval_Text: approvalText,   // "Text to Approve" — non-updateable post-POST
     Result:               message || '',  // "Message to User" — one-off rationale, optional
-  });
+  }, { context: 'r-request-writer' });
 
   return { id: result.id, documentNo: result.DocumentNo, vqsValidated: normalizedVqIds.length };
 }

@@ -65,9 +65,12 @@ async function main() {
   const lock = await client.getMailboxLock('INBOX');
 
   try {
-    // Search for the message
-    const uids = await client.search({ subject: 'Working Copy' });
-    console.log('Found UIDs:', uids);
+    // Search for the message - look for both "Working Copy" and "LAM AVL"
+    const workingCopyUids = await client.search({ subject: 'Working Copy' });
+    const lamAvlUids = await client.search({ subject: 'LAM AVL' });
+    const uids = [...new Set([...workingCopyUids, ...lamAvlUids])];
+    console.log('Found UIDs (Working Copy):', workingCopyUids);
+    console.log('Found UIDs (LAM AVL):', lamAvlUids);
 
     if (uids.length === 0) {
       console.log('No matching messages');

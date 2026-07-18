@@ -120,26 +120,28 @@ const LIMITS = {
 
   // Priority tiers (higher number = higher priority)
   // When budget is constrained, higher-priority callers get preference
+  // Bumped all +1 on 2026-07-07 to make room for P0 data-cleanup below offer-writeback
   priorities: {
-    'rfq-loading-agent': 4,         // Highest - customer-facing RFQs
-    'rfq-fast-loader': 4,           // Same tier as rfq-loading
-    'operator-request': 4,          // Manual requests from terminal - top priority
-    'manual-enrichment': 4,         // Manual enrichment via Claude - top priority
-    'vq-loading-agent': 3,          // Second - vendor quotes
-    'excess-agent': 2,              // Third - market offers
-    'stockrfq-agent': 1,            // Broker data capture
-    'stockrfq-cq-agent': 1,         // Same as stockrfq
-    'enrich-poller': 2,             // Same as excess (market intel - writes chuboe_pricing_api_result)
-    'offer-writeback': 0,           // LOWEST - bulk inventory offers, throttle first (can be 15k+ lines)
-    'inventory-cleanup': 2,         // Non-urgent automation
+    'rfq-loading-agent': 5,         // Highest - customer-facing RFQs
+    'rfq-fast-loader': 5,           // Same tier as rfq-loading
+    'operator-request': 5,          // Manual requests from terminal - top priority
+    'manual-enrichment': 5,         // Manual enrichment via Claude - top priority
+    'vq-loading-agent': 4,          // Second - vendor quotes
+    'excess-agent': 3,              // Third - market offers
+    'stockrfq-agent': 2,            // Broker data capture
+    'stockrfq-cq-agent': 2,         // Same as stockrfq
+    'enrich-poller': 3,             // Same as excess (market intel - writes chuboe_pricing_api_result)
+    'offer-writeback': 1,           // Bulk inventory offers, throttle early (can be 15k+ lines)
+    'inventory-cleanup': 3,         // Non-urgent automation
+    'data-cleanup': 0,              // LOWEST - dedup, data fixes, etc. - only runs when spare capacity
   },
 
   // Reserved budget for high-priority callers
-  // Even if lower-priority agents consumed most budget, always keep this much for P4/P3
-  // ~5% of hourly for P4, ~2.5% for P3
+  // Even if lower-priority agents consumed most budget, always keep this much for P5/P4
+  // ~5% of hourly for P5, ~2.5% for P4
   reservedForPriority: {
-    4: 750,   // Always reserve 750 writes for RFQ agents
-    3: 400,   // Always reserve 400 writes for VQ agent
+    5: 750,   // Always reserve 750 writes for RFQ agents
+    4: 400,   // Always reserve 400 writes for VQ agent
   },
 
   // Backfill coordination - only ONE agent in backfill mode at a time
@@ -373,16 +375,16 @@ function checkBudget(opts = {}) {
   const counts = getWriteCounts();
 
   // CRITICAL: 5-minute burst check (prevents June 1 crash scenario)
-  // P4 callers (RFQ loading) are EXEMPT - customer-facing RFQs must always get through
+  // P5 callers (RFQ loading) are EXEMPT - customer-facing RFQs must always get through
   // Other callers subject to burst limit to prevent sustained high write rate
   const limit5Min = isBackfill ? LIMITS.backfill.maxWritesPer5Min : LIMITS.maxWritesPer5Min;
 
   if (counts.last5Min + count > limit5Min) {
-    if (priority >= 4) {
-      // P4 exempt but log for monitoring
-      console.warn(`[ot-api-budget] P4 caller ${caller} bypassing 5-min burst limit: ${counts.last5Min + count}/${limit5Min}`);
+    if (priority >= 5) {
+      // P5 exempt but log for monitoring
+      console.warn(`[ot-api-budget] P5 caller ${caller} bypassing 5-min burst limit: ${counts.last5Min + count}/${limit5Min}`);
     } else {
-      const reason = `Global 5-min burst limit: ${counts.last5Min}/${limit5Min} (prevents sustained overload, P4 exempt)${isBackfill ? ' [backfill mode]' : ''}`;
+      const reason = `Global 5-min burst limit: ${counts.last5Min}/${limit5Min} (prevents sustained overload, P5 exempt)${isBackfill ? ' [backfill mode]' : ''}`;
       logRateLimitEvent({ caller, table, requestedCount: count, reason, priority, limitType: '5min', current: counts.last5Min, limit: limit5Min });
       return { allowed: false, reason, limits: LIMITS, priority };
     }
@@ -398,9 +400,9 @@ function checkBudget(opts = {}) {
     const reason = `Global 15-min HARD limit: ${counts.last15Min}/${LIMITS.maxWritesPer15Min} (priority ${priority})`;
     logRateLimitEvent({ caller, table, requestedCount: count, reason, priority, limitType: '15min-hard', current: counts.last15Min, limit: LIMITS.maxWritesPer15Min });
     return { allowed: false, reason, limits: LIMITS, priority };
-  } else if (counts.last15Min + count > effectiveLimit15Min && priority < 3) {
-    // Soft limit - only block low-priority (< P3)
-    const reason = `Global 15-min limit: ${counts.last15Min}/${effectiveLimit15Min} (reserved for P3+ callers, you are P${priority})`;
+  } else if (counts.last15Min + count > effectiveLimit15Min && priority < 4) {
+    // Soft limit - only block low-priority (< P4)
+    const reason = `Global 15-min limit: ${counts.last15Min}/${effectiveLimit15Min} (reserved for P4+ callers, you are P${priority})`;
     logRateLimitEvent({ caller, table, requestedCount: count, reason, priority, limitType: '15min-soft', current: counts.last15Min, limit: effectiveLimit15Min });
     return { allowed: false, reason, limits: LIMITS, priority };
   }
@@ -413,17 +415,17 @@ function checkBudget(opts = {}) {
     const reason = `Global hourly HARD limit: ${counts.lastHour}/${LIMITS.maxWritesPerHour} (priority ${priority})`;
     logRateLimitEvent({ caller, table, requestedCount: count, reason, priority, limitType: 'hourly-hard', current: counts.lastHour, limit: LIMITS.maxWritesPerHour });
     return { allowed: false, reason, limits: LIMITS, priority };
-  } else if (counts.lastHour + count > effectiveLimitHourly && priority < 3) {
-    const reason = `Global hourly limit: ${counts.lastHour}/${effectiveLimitHourly} (reserved for P3+ callers, you are P${priority})`;
+  } else if (counts.lastHour + count > effectiveLimitHourly && priority < 4) {
+    const reason = `Global hourly limit: ${counts.lastHour}/${effectiveLimitHourly} (reserved for P4+ callers, you are P${priority})`;
     logRateLimitEvent({ caller, table, requestedCount: count, reason, priority, limitType: 'hourly-soft', current: counts.lastHour, limit: effectiveLimitHourly });
     return { allowed: false, reason, limits: LIMITS, priority };
   }
 
   // Check daily window
-  // P4 callers (RFQ loading) are EXEMPT from daily limit - customer-facing, always allowed
+  // P5 callers (RFQ loading) are EXEMPT from daily limit - customer-facing, always allowed
   // Other callers still subject to hard cap to prevent runaway automation
-  if (priority < 4 && counts.lastDay + count > LIMITS.maxWritesPerDay) {
-    const reason = `Global daily limit: ${counts.lastDay}/${LIMITS.maxWritesPerDay} already used (P4 exempt, you are P${priority})`;
+  if (priority < 5 && counts.lastDay + count > LIMITS.maxWritesPerDay) {
+    const reason = `Global daily limit: ${counts.lastDay}/${LIMITS.maxWritesPerDay} already used (P5 exempt, you are P${priority})`;
     logRateLimitEvent({ caller, table, requestedCount: count, reason, priority, limitType: 'daily', current: counts.lastDay, limit: LIMITS.maxWritesPerDay });
     return { allowed: false, reason, limits: LIMITS, priority };
   }
