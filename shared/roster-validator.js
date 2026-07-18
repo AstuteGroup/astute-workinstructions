@@ -185,4 +185,73 @@ if (require.main === module) {
   });
 }
 
-module.exports = { validateRoster, queryRFQ, loadRoster };
+/**
+ * Basic roster health check (no RFQ required)
+ *
+ * Checks for:
+ * - Missing required fields (CPC, MPN, Resale Price, Base Unit Price)
+ * - Duplicate CPCs
+ * - Zero/negative prices
+ *
+ * @param {Object} opts - { award } (optional filter)
+ * @returns {Object} - { healthy: boolean, warnings: string[], checked: number }
+ */
+function checkRosterHealth(opts = {}) {
+  const { award } = opts;
+
+  console.log(`Checking roster health${award ? ` (Award: ${award})` : ''}...`);
+
+  const roster = loadRoster(award);
+  const warnings = [];
+  const seenCpcs = new Set();
+  let checked = 0;
+
+  for (const row of roster) {
+    const cpc = row['CPC'];
+    if (!cpc) {
+      warnings.push(`Row with MPN '${row['MPN'] || '(unknown)'}' missing CPC`);
+      continue;
+    }
+
+    checked++;
+
+    // Check for duplicates
+    if (seenCpcs.has(cpc)) {
+      warnings.push(`${cpc}: Duplicate CPC in roster`);
+    }
+    seenCpcs.add(cpc);
+
+    // Check required fields
+    if (!row['MPN']) {
+      warnings.push(`${cpc}: Missing MPN`);
+    }
+
+    const resale = parseFloat(row['Resale Price']) || 0;
+    if (resale <= 0) {
+      warnings.push(`${cpc}: Missing or zero Resale Price`);
+    }
+
+    const base = parseFloat(row['Base Unit Price']) || 0;
+    if (base <= 0) {
+      warnings.push(`${cpc}: Missing or zero Base Unit Price`);
+    }
+
+    // Check margin sanity (Resale should be > Base)
+    if (resale > 0 && base > 0 && resale < base) {
+      warnings.push(`${cpc}: Negative margin - Resale ($${resale.toFixed(4)}) < Base ($${base.toFixed(4)})`);
+    }
+  }
+
+  const healthy = warnings.length === 0;
+
+  console.log(`  Checked ${checked} rows`);
+  if (healthy) {
+    console.log('  ✓ Roster health check PASSED');
+  } else {
+    console.log(`  ⚠ Roster health check: ${warnings.length} warnings`);
+  }
+
+  return { healthy, warnings, checked };
+}
+
+module.exports = { validateRoster, queryRFQ, loadRoster, checkRosterHealth };

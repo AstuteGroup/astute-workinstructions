@@ -111,6 +111,54 @@ All LAM workflow emails use: `lamkitting@orangetsunami.com`
 
 ---
 
+## Master Roster Validation
+
+**RULE:** Any modification to the Master Roster MUST be validated before sending output.
+
+### Validation Tools
+
+| Tool | Purpose | When to Use |
+|------|---------|-------------|
+| `shared/roster-validator.js` | Validates roster against source RFQ | When adding new parts from an RFQ |
+| `scripts/check-phase3-roster.js` | Auto-fixes Phase 3 data from RFQ 1139539 | One-time fix for Phase 3 scrambled data |
+
+### Validation Gate: New Parts (`lam-new-add.js`)
+
+When using `--send-email`, the script REQUIRES `--rfq` to validate data before sending:
+
+```bash
+# REQUIRED: Validate against source RFQ before sending
+node lam-new-add.js --award "Phase 3" --rfq 1139539 --run-sourcing --send-email
+
+# BLOCKED: This will fail — no validation
+node lam-new-add.js --award "Phase 3" --run-sourcing --send-email
+```
+
+The validator checks:
+- **MPN match** — roster MPN = RFQ MPN
+- **MFR match** — roster Manufacturer ≈ RFQ Manufacturer (normalized comparison)
+- **MOQ match** — roster MOQ = RFQ qty
+- **Resale match** — roster Resale Price = RFQ priceentered
+
+If validation fails, email is blocked and issues are listed.
+
+### Health Check: Weekly Runner (`lam-kitting-runner.js`)
+
+The weekly runner performs a basic roster health check before emailing. This catches:
+- Missing required fields (CPC, MPN, Resale Price, Base Unit Price)
+- Duplicate CPCs
+- Negative margins (Resale < Base)
+
+Warnings are included in the email but do not block delivery (since reorder alerts are time-sensitive).
+
+### Why Validation Exists
+
+On 2026-07-17, Phase 3 roster data was discovered to have scrambled CPC-to-MPN mappings — 22 of 44 parts had wrong MPN/MFR data due to a corrupted source file. The RFQ in OT was correct; the Excel file was wrong.
+
+**Lesson:** Always validate roster changes against the source of truth (usually the RFQ) before sending any output.
+
+---
+
 ## Overview
 
 | Setting | Value |
@@ -641,6 +689,7 @@ The rbash environment causes non-zero exit codes even on successful queries. The
 | `lam-kitting-reorder.js` | Reorder detection + ERP enrichment + two-file output |
 | `lam-kitting-source.js` | Franchise sourcing via shared API module (standalone, used by both reorder and new-add) |
 | `lam-new-add.js` | New Add workflow — generates reorder-alert CSV for new parts, chains to sourcing |
+| `../../shared/roster-validator.js` | Validates roster against source RFQ; health check for data quality |
 | `lam-kitting-rfq-writer.js` | Writes RFQ + VQ lines for items without on-order |
 | `lam-kitting-customer-offer.js` | Refreshes the customer-facing BI dashboard offer (type 1000025) |
 | `lam-kitting-dashboard.js` | Dashboard generator |
@@ -709,3 +758,4 @@ The rbash environment causes non-zero exit codes even on successful queries. The
 *Updated: 2026-05-05* — Priority overhaul + Escalations tab plumbing. (1) `PENDING RECEIPT` split into `PENDING ORDER PLACEMENT` (no Infor POV stamp yet) + `PENDING RECEIPT` (POV stamped). (2) `loadRecentPOVs` SQL recency filter — keep open POs only when cut ≤90d ago OR promise date still ≥ today; stale 2024–2025 POVs no longer leak (951→178 rows LAM-wide). (3) Escalations tab now sources from three places: manual entries (`lam-escalations.json`), stock-arrived synthesis (manual MPN above threshold but stock on hand → "Action with seller — new LAM resale still pending"), and auto entries for restricted-MFR margin compression (franchise <18% margin vs current LAM resale → Josh: push new resale based on franchise ref). (4) Escalations sidecar (`_escalations_context.json`) drives `persistResolvedEscalations` — manual entries only auto-resolve when off list AND zero stock; never on stock presence alone (operator removes from JSON when LAM approves new pricing).
 *Updated: 2026-07-10* — **Master Roster consolidation + two-file output.** (1) LAM_Master_Roster.xlsx replaces 3-file lookup (Lam_Kitting_DB + Lam_EPG_SIPOC + New Part ADDS) as single source of truth (~1,244 parts). (2) Two-file reorder output: `LAM_Reorder_Alerts_*.csv` (ready to order) + `LAM_Reorder_Pending_Approvals_*.xlsx` (awaiting LAM approval). Parts are mutually exclusive — appear on one file or the other. (3) Added Pending column (reason), Proposed Resale, Submitted Date, Status, Days Pending (aging) for approval tracking. (4) Email account changed to `lamkitting@orangetsunami.com`. (5) Added "Pending Approval Workflow" section documenting how to mark parts for approval and process approvals.
 *Updated: 2026-07-17* — **New Add workflow.** Added `lam-new-add.js` for onboarding new award tranches (Phase 3, etc.). Generates reorder-alert format CSV filtered by Award column, chains to existing `lam-kitting-source.js` for franchise enrichment. Same output format as weekly reorder — no separate enrichment logic.
+*Updated: 2026-07-18* — **Roster validation layer.** (1) Added `shared/roster-validator.js` — validates roster against source RFQ to catch data errors before output is sent. (2) Integrated into `lam-new-add.js`: `--send-email` now REQUIRES `--rfq` for validation. (3) Added `checkRosterHealth()` to weekly runner — checks for missing fields, duplicates, negative margins. Warnings included in email. (4) Root cause: Phase 3 source file had scrambled CPC-to-MPN mappings (22/44 parts wrong).

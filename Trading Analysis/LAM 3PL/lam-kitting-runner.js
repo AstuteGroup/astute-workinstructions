@@ -17,6 +17,7 @@ const fs = require('fs');
 const { createNotifier } = require('../../shared/notifier');
 const { readCSVFile } = require('../../shared/csv-utils');
 const restrictedMfr = require('../../shared/restricted-mfrs');
+const { checkRosterHealth } = require('../../shared/roster-validator');
 
 const SCRIPT_DIR = __dirname;
 const INVENTORY_CLEANUP_DIR = path.join(SCRIPT_DIR, '../Inventory File Cleanup');
@@ -481,16 +482,23 @@ function synthesizeRowFromContext(ctx, allHeaders) {
  * Rebuild the sourced Excel with an "RFQ Line #" column and RFQ search key.
  * Items with on-order/recent POV get blank RFQ Line (they were skipped).
  */
-async function rebuildExcelWithRfqLines(sourcedCsvPath, xlsxPath, rfqMapping) {
+async function rebuildExcelWithRfqLines(sourcedCsvPath, xlsxPath, rfqMapping, checkData = {}) {
   const ExcelJS = require('exceljs');
   const csv = readCSVFile(sourcedCsvPath);
   const mpnIdx = csv.headers.indexOf('MPN');
+  const cpcIdx = csv.headers.indexOf('Lam P/N');
+
+  // Extract check data
+  const wrongWarehouseData = checkData.wrongWarehouseData || {};
+  const pendingOrdersData = checkData.pendingOrdersData || {};
 
   // Insert "RFQ Line #" + "Request to Purchase" as columns 2 and 3 (after Lam P/N).
+  // Also add "Check: Wrong WH" and "Check: Pending Order" columns at the end.
   // Request to Purchase is populated only for auto-approved lines (in-stock margin
   // >= 18% AND stock >= LAM MOQ); blank for manual-review lines.
   const allHeaders = [...csv.headers];
   allHeaders.splice(1, 0, 'RFQ Line #', 'Request to Purchase');
+  allHeaders.push('Check: Wrong WH', 'Check: Pending Order');
   const autoRequests = (rfqMapping && rfqMapping.autoRequests) || {};
 
   // Load escalations FIRST so main-tab rendering can skip escalated MPNs.
@@ -522,10 +530,31 @@ async function rebuildExcelWithRfqLines(sourcedCsvPath, xlsxPath, rfqMapping) {
     const mpn = (row[mpnIdx] || '').trim();
     if (escalatedMPNs.has(mpn)) { skippedForEscalation++; continue; }
 
+    const cpc = (row[cpcIdx] || '').trim();
     const rfqLine = rfqMapping.lines[mpn] || '';
     const reqDocNo = autoRequests[mpn] || '';
+
+    // Check columns - lookup by CPC
+    let wrongWhFlag = '';
+    let pendingOrderFlag = '';
+    if (wrongWarehouseData[cpc]) {
+      const wwInfo = wrongWarehouseData[cpc];
+      const misplaced = wwInfo.filter(w => w.isLAMLoc);
+      if (misplaced.length > 0) {
+        wrongWhFlag = `Yes - ${misplaced.map(w => w.wh).join(', ')}`;
+      } else {
+        wrongWhFlag = `Review - ${wwInfo.map(w => w.wh).join(', ')}`;
+      }
+    }
+    if (pendingOrdersData[cpc]) {
+      const poInfo = pendingOrdersData[cpc];
+      const statuses = poInfo.map(p => p.status).join('; ');
+      pendingOrderFlag = `Yes (${poInfo.length}) - ${statuses}`;
+    }
+
     const rowData = [...row];
     rowData.splice(1, 0, rfqLine, reqDocNo);
+    rowData.push(wrongWhFlag, pendingOrderFlag);
     const excelRowData = rowData.map((v, idx) => parseCellForExcel(v, allHeaders[idx]));
     const excelRow = ws.addRow(excelRowData);
     applyRowShading(excelRow, allHeaders);
@@ -727,8 +756,45 @@ async function main() {
     // Continue — buyer email still goes out
   }
 
-  // Step 5: Rebuild the sourced Excel with RFQ line numbers, then email
-  log('Step 5: Preparing and emailing sourced report...');
+  // Step 5a: Run verification checks (non-blocking, results added to output)
+  log('');
+  log('Step 5a: Running verification checks...');
+
+  // Wrong warehouse check
+  let wrongWarehouseData = {};
+  try {
+    execSync(
+      `node "${path.join(SCRIPT_DIR, 'lam-wrong-warehouse-check.js')}" "${inventoryFolder}"`,
+      { encoding: 'utf-8', timeout: 120000 }
+    );
+    const wwcSidecar = path.join(SCRIPT_DIR, 'output', `LAM_Wrong_Warehouse_${getDateStamp()}.json`);
+    if (fs.existsSync(wwcSidecar)) {
+      wrongWarehouseData = JSON.parse(fs.readFileSync(wwcSidecar, 'utf-8'));
+      log(`  Wrong warehouse check: ${Object.keys(wrongWarehouseData).length} CPCs flagged`);
+    }
+  } catch (err) {
+    log(`  WARNING: Wrong warehouse check failed: ${err.message}`);
+  }
+
+  // Pending orders check
+  let pendingOrdersData = {};
+  try {
+    execSync(
+      `node "${path.join(SCRIPT_DIR, 'lam-pending-orders-check.js')}"`,
+      { encoding: 'utf-8', timeout: 180000 }
+    );
+    const pocSidecar = path.join(SCRIPT_DIR, 'output', `LAM_Pending_Orders_${getDateStamp()}.json`);
+    if (fs.existsSync(pocSidecar)) {
+      pendingOrdersData = JSON.parse(fs.readFileSync(pocSidecar, 'utf-8'));
+      log(`  Pending orders check: ${Object.keys(pendingOrdersData).length} CPCs with stuck orders`);
+    }
+  } catch (err) {
+    log(`  WARNING: Pending orders check failed: ${err.message}`);
+  }
+
+  // Step 5b: Rebuild the sourced Excel with RFQ line numbers and check columns, then email
+  log('');
+  log('Step 5b: Preparing and emailing sourced report...');
   const defaultSourcedXlsx = alertsFile.replace('.csv', '_sourced.xlsx');
   let sourcedXlsx = defaultSourcedXlsx;
 
@@ -739,7 +805,7 @@ async function main() {
   if (rfqMapping && rfqMapping.rfqSearchKey && fs.existsSync(sourcedCsv)) {
     sourcedXlsx = alertsFile.replace('.csv', `_RFQ${rfqMapping.rfqSearchKey}_sourced.xlsx`);
     try {
-      await rebuildExcelWithRfqLines(sourcedCsv, sourcedXlsx, rfqMapping);
+      await rebuildExcelWithRfqLines(sourcedCsv, sourcedXlsx, rfqMapping, { wrongWarehouseData, pendingOrdersData });
       log(`  Excel rebuilt with RFQ line numbers → ${path.basename(sourcedXlsx)}`);
       if (fs.existsSync(defaultSourcedXlsx) && defaultSourcedXlsx !== sourcedXlsx) {
         fs.unlinkSync(defaultSourcedXlsx);
@@ -892,32 +958,27 @@ Attached: ${attachmentLabel}
 Inventory source: Inventory ${dateStr}
 Kitting DB: ${path.basename(excelFile)}`;
 
+  // Roster health check (warns on data quality issues)
+  log('Step 7: Roster health check...');
+  const healthCheck = checkRosterHealth();
+  let healthWarning = '';
+  if (!healthCheck.healthy) {
+    log(`  ⚠ ${healthCheck.warnings.length} data quality warnings`);
+    healthWarning = `\n⚠️ ROSTER DATA QUALITY WARNINGS (${healthCheck.warnings.length}):\n` +
+      healthCheck.warnings.slice(0, 10).map(w => `  • ${w}`).join('\n') +
+      (healthCheck.warnings.length > 10 ? `\n  ... and ${healthCheck.warnings.length - 10} more` : '') +
+      '\n';
+  }
+
   await sendEmail(
     NOTIFY_EMAIL,
     emailSubject,
-    emailBody,
+    emailBody + healthWarning,
     [attachment]
   );
 
-  // Step 6: Wrong warehouse check (runs after reorder email, non-blocking)
-  // Identifies roster parts in non-LAM warehouses and emails separately if misplaced items found
-  log('');
-  log('Step 6: Running wrong warehouse check...');
-  try {
-    const wwcResult = execSync(
-      `node "${path.join(SCRIPT_DIR, 'lam-wrong-warehouse-check.js')}" "${inventoryFolder}"`,
-      { encoding: 'utf-8', timeout: 120000 }
-    );
-    console.log(wwcResult);
-    log('  Wrong warehouse check complete');
-  } catch (err) {
-    log(`  WARNING: Wrong warehouse check failed: ${err.message}`);
-    // Non-fatal - reorder already sent
-  }
-
-  // NOTE: Pending orders check (lam-pending-orders-check.js) is available but run manually
-  // until automated PO report is available from Infor. Run with:
-  //   node lam-pending-orders-check.js [--dry-run]
+  // Verification checks (wrong warehouse, pending orders) now run in Step 5a
+  // and their results are included as columns in the output Excel.
 
   log('============================================================');
   if (rfqWriteFailed) {
