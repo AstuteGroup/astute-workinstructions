@@ -6,14 +6,16 @@
  * so they can be enriched via the standard lam-kitting-source.js pipeline.
  *
  * Usage:
- *   node lam-new-add.js --award "Phase 3"
- *   node lam-new-add.js --award "Phase 3" --run-sourcing
- *   node lam-new-add.js --award "Phase 3" --run-sourcing --send-email
+ *   node lam-new-add.js --award "Phase 3" --rfq 1139539
+ *   node lam-new-add.js --award "Phase 3" --rfq 1139539 --run-sourcing
+ *   node lam-new-add.js --award "Phase 3" --rfq 1139539 --run-sourcing --send-email
  *
  * Options:
  *   --award <name>     Filter roster by Award column (required)
+ *   --rfq <value>      Source RFQ for validation (required for --send-email)
  *   --run-sourcing     Chain to lam-kitting-source.js after generating CSV
- *   --send-email       Send sourced xlsx via email (requires --run-sourcing)
+ *   --send-email       Send sourced xlsx via email (requires --run-sourcing AND --rfq)
+ *   --skip-validation  Skip roster validation (NOT RECOMMENDED)
  *   --dry-run          Show what would be done without writing files
  *
  * Output:
@@ -44,18 +46,24 @@ function parseArgs() {
   const args = process.argv.slice(2);
   const opts = {
     award: null,
+    rfq: null,
     runSourcing: false,
     sendEmail: false,
+    skipValidation: false,
     dryRun: false,
   };
 
   for (let i = 0; i < args.length; i++) {
     if (args[i] === '--award' && args[i + 1]) {
       opts.award = args[++i];
+    } else if (args[i] === '--rfq' && args[i + 1]) {
+      opts.rfq = args[++i];
     } else if (args[i] === '--run-sourcing') {
       opts.runSourcing = true;
     } else if (args[i] === '--send-email') {
       opts.sendEmail = true;
+    } else if (args[i] === '--skip-validation') {
+      opts.skipValidation = true;
     } else if (args[i] === '--dry-run') {
       opts.dryRun = true;
     }
@@ -218,6 +226,34 @@ async function main() {
 
     // Send email if requested
     if (opts.sendEmail && fs.existsSync(outputXlsx)) {
+      // VALIDATION GATE: Must validate against RFQ before sending
+      if (!opts.rfq && !opts.skipValidation) {
+        console.error('');
+        console.error('ERROR: --rfq required when using --send-email');
+        console.error('       This ensures roster data is validated against OT before sending.');
+        console.error('       Use --skip-validation to bypass (NOT RECOMMENDED)');
+        process.exit(1);
+      }
+
+      if (opts.rfq && !opts.skipValidation) {
+        console.log('');
+        console.log('Validating roster against RFQ...');
+        const { validateRoster } = require('../../shared/roster-validator');
+        const validation = await validateRoster({ award: opts.award, rfqValue: opts.rfq });
+
+        if (!validation.valid) {
+          console.error('');
+          console.error('VALIDATION FAILED - Email blocked');
+          console.error('Issues found:');
+          for (const issue of validation.issues) {
+            console.error('  - ' + issue);
+          }
+          console.error('');
+          console.error('Fix roster data before sending. Use scripts/check-phase3-roster.js to auto-fix.');
+          process.exit(1);
+        }
+      }
+
       console.log('');
       console.log('Sending email...');
 
@@ -237,7 +273,7 @@ async function main() {
       });
 
       const subject = `LAM ${opts.award} Sourced - ${parts.length} Parts (${inStock} In Stock, ${leadTime} Lead Time, ${restricted} Restricted, ${noCoverage} No Coverage)`;
-      const body = `${opts.award} new add enrichment attached.\n\nSame format as weekly reorder - review margins and create VQs for ready items.`;
+      const body = `${opts.award} new add enrichment attached.\n\nValidated against RFQ ${opts.rfq}.\nSame format as weekly reorder - review margins and create VQs for ready items.`;
 
       await notifier.sendWithAttachment(
         process.env.NOTIFY_EMAIL || 'jake.harris@astutegroup.com',
