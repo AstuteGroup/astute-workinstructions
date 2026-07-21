@@ -7,7 +7,9 @@
  *   2. Asks the sentinel: should we run? (no for weekly/daily not-yet-due jobs)
  *   3. If needsOT: probes OT health. On 503/down, exits cleanly without touching the sentinel.
  *   4. Execs the job's command. Captures exit code.
- *   5. Exit 0 → markSuccess (advances nextDue). Non-zero → markFailure (preserves nextDue).
+ *   5. Exit 0 → markSuccess (advances nextDue), UNLESS --force was used.
+ *      --force skips sentinel update so manual runs don't drift the schedule.
+ *      Non-zero → markFailure (preserves nextDue).
  *
  * Logs structured events to /tmp/cron-runner.log.
  *
@@ -213,9 +215,15 @@ async function main() {
       crumb(job.name, 'job-failure', { durationMs, killed: true, reason: killReason });
       process.exit(124); // standard timeout exit code
     } else if (exitCode === 0) {
-      markSuccess(job.name, cadenceMs);
-      logEvent(job.name, 'success', { durationMs });
-      crumb(job.name, 'job-success', { durationMs });
+      // --force runs skip sentinel update so manual runs don't drift the schedule
+      if (args.force) {
+        logEvent(job.name, 'success-force', { durationMs, note: 'sentinel not updated (--force)' });
+        crumb(job.name, 'job-success-force', { durationMs });
+      } else {
+        markSuccess(job.name, cadenceMs);
+        logEvent(job.name, 'success', { durationMs });
+        crumb(job.name, 'job-success', { durationMs });
+      }
       process.exit(0);
     } else {
       const reason = signal ? `signal ${signal}` : `exit ${exitCode}`;
