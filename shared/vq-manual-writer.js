@@ -174,18 +174,36 @@ async function createManualVQ(opts) {
     }
   }
 
-  // Resolve MFR via lookup — get canonical name (exact chuboe_mfr.name value)
-  // NEVER send Chuboe_MFR_ID — iDempiere REST API rejects system MFR IDs.
-  // Instead, send the canonical name as Chuboe_MFR_Text. Server-side bean
-  // matches exact name to chuboe_mfr record reliably. This avoids both:
-  //   1. API rejection of system MFR IDs
-  //   2. Unreliable alias matching on free-form input text
+  // Resolve MFR via lookup — get canonical name AND verify ID resolution
+  // The validator now requires chuboe_mfr_id to be populated, not just text.
+  // We send the canonical name as Chuboe_MFR_Text so the server can resolve
+  // it to an ID. But we must verify the lookup succeeded.
   let mfrCanonical = mfrText;  // default to input text (fallback)
+  let mfrLookupResult = null;
   if (!opts.skipMfrLookup) {
-    const mfrLookup = lookupMfr(mfrText);
-    // Use canonical name if matched — this is the exact chuboe_mfr.name value
-    if (mfrLookup.matched && mfrLookup.canonical) {
-      mfrCanonical = mfrLookup.canonical;
+    mfrLookupResult = lookupMfr(mfrText);
+    if (mfrLookupResult.matched && mfrLookupResult.canonical) {
+      mfrCanonical = mfrLookupResult.canonical;
+      // Warn if we didn't get a usable ID — server may not resolve it
+      if (!mfrLookupResult.id) {
+        console.warn(
+          `[vq-manual-writer] WARNING: MFR '${mfrText}' resolved to '${mfrCanonical}' but no ID found. ` +
+          `Server may not link to chuboe_mfr record. Verify after creation.`
+        );
+      } else if (mfrLookupResult.isSystem) {
+        // System MFRs (ad_client_id=0) are rejected by the API
+        console.warn(
+          `[vq-manual-writer] WARNING: MFR '${mfrCanonical}' (ID ${mfrLookupResult.id}) is a system record. ` +
+          `API may reject it. Verify after creation.`
+        );
+      }
+    } else {
+      // No match at all — this is likely to fail validation
+      console.warn(
+        `[vq-manual-writer] WARNING: MFR '${mfrText}' not found in lookup. ` +
+        `VQ will be created with MFR text only — validator will likely reject it. ` +
+        `Consider adding to mfr-aliases.json or creating the MFR record first.`
+      );
     }
   }
 

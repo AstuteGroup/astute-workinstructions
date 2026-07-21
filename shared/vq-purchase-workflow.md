@@ -84,7 +84,7 @@ Before ticking, ALL fields below must be populated. **The validator (`vq-purchas
 
 | Field | Column | Source / Default | Notes |
 |-------|--------|------------------|-------|
-| **MFR** | `chuboe_mfr_id` | **REQUIRED** | Must be a non-system MFR record. Resolve via `mfr-lookup.js`. |
+| **MFR** | `chuboe_mfr_id` | **REQUIRED** | Must be populated (not just MFR text). Resolve via `mfr-lookup.js`. MFR text alone is NOT sufficient. |
 | **COO** | `c_country_id` | **REQUIRED** | Country of origin. Use PENDING (1000001) if vendor didn't provide. |
 | **Partner Location** | `c_bpartner_location_id` | **REQUIRED** | Vendor's ship-from address. Look up via `c_bpartner_location`. |
 | **Date Code** | `chuboe_date_code` | Vendor quote | e.g., "24+", "2023", "2 years" — see defaults below |
@@ -103,7 +103,7 @@ For **franchise/authorized vendors** (Mouser, DigiKey, TTI, Master, etc.) when t
 - **Date Code** = manufacturing date stamp (e.g., "24+", "2023", "2 years")
 - **Lead Time** = availability (e.g., "STOCK", "3 WEEKS", "IN STOCK")
 | **Promise Date** | `datepromised` | Calculated | See derivation rules below |
-| **Due Date** | `duedate` | Same as promise date | |
+| **Due Date** | `duedate` | **REQUIRED** | Must match DatePromised |
 | **Packaging** | `chuboe_packaging_id` | Vendor quote | REEL, CUT TAPE, BULK, TRAY, etc. |
 | **Traceability** | `chuboe_traceability_id` | From vendor type | Franchise (1000001) or Non-Traceable (1000003) |
 | **Warehouse** | `chuboe_warehouse_id` | Deal-specific | See program defaults |
@@ -525,7 +525,22 @@ Set `ischuboedomesticshipping` when both supplier and ship-to are in the same co
 - US franchise (Master, TTI, DigiKey, Mouser, Sager, Arrow, Waldom, Future US, Newark) → `Y`
 - APAC brokers (SMARTEL, Chip Energy, HK Firsttop, Dragon Core) → `N`
 
-The validator does NOT auto-enforce this — set explicitly in auto-purchase flows.
+**The validator now enforces this for franchise/catalog vendors.** If the vendor type is franchise (1000002), catalog (1000008), or similar authorized types, domestic shipping must be `Y`.
+
+### Vendor Address Selection (V00XXXX Infor Code Required)
+
+When selecting a vendor address (`c_bpartner_location_id`), **only use addresses that have a V00XXXX Infor vendor code** in their name:
+
+- ✓ `V002991 - Master Electronics - Phoenix, AZ` — has Infor code, use this
+- ✓ `V015120 - Master Electronics, Malaysia` — has Infor code, use this
+- ✗ `Miami 3100 N.W. 36th Street FL` — no Infor code, do NOT use
+
+**The validator now rejects addresses without V00XXXX codes.**
+
+If multiple valid addresses exist for a vendor:
+1. Check order history for which address was used previously
+2. Check internet for correct ship-from location
+3. Ask operator if unclear
 
 ---
 

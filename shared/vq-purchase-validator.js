@@ -83,15 +83,19 @@ async function validateVQForPurchase(vqId, opts = {}) {
     SELECT vl.chuboe_vq_line_id, vl.chuboe_mpn, vl.chuboe_rfq_line_id,
            vl.cost, vl.qty, vl.c_bpartner_id, bp.name AS supplier,
            vl.chuboe_mfr_id, vl.chuboe_mfr_text, vl.c_country_id, vl.c_bpartner_location_id,
-           vl.chuboe_date_code, vl.chuboe_lead_time, vl.datepromised,
+           vl.chuboe_date_code, vl.chuboe_lead_time, vl.datepromised, vl.duedate,
            vl.chuboe_packaging_id, vl.chuboe_traceability_id,
            vl.chuboe_warehouse_id, vl.chuboe_warehouse_group_id,
            vl.m_shipper_id, vl.chuboe_inco_term_id,
            vl.chuboe_note_public, vl.chuboe_note_private,
            vl.ispurchased, vl.isactive,
-           vl.chuboe_buyer_id
+           vl.chuboe_buyer_id,
+           vl.ischuboedomesticshipping,
+           bp.chuboe_vendortype_id AS vendor_type_id,
+           bpl.name AS location_name
     FROM adempiere.chuboe_vq_line vl
     LEFT JOIN adempiere.c_bpartner bp ON bp.c_bpartner_id = vl.c_bpartner_id
+    LEFT JOIN adempiere.c_bpartner_location bpl ON bpl.c_bpartner_location_id = vl.c_bpartner_location_id
     WHERE vl.chuboe_vq_line_id = $1
   `, [vqId]);
 
@@ -112,21 +116,20 @@ async function validateVQForPurchase(vqId, opts = {}) {
 
   // MFR, COO, Partner Location — required for PO processing
   //
-  // MFR validation: Prefer chuboe_mfr_id (FK to chuboe_mfr table). If unavailable,
-  // chuboe_mfr_text is accepted as a LAST RESORT fallback for cases where:
-  //   - The MFR exists only as a system record (ad_client_id=0) which the API rejects
-  //   - The MFR name doesn't match any existing record
+  // MFR validation: chuboe_mfr_id (FK to chuboe_mfr table) is REQUIRED.
+  // MFR text alone is NOT sufficient — the ID must be populated for proper
+  // data integrity and reporting. If the server didn't resolve MFR text to
+  // an ID, the VQ must be fixed before purchase.
   //
-  // ⚠️  MFR TEXT IS A LAST RESORT — NOT A SHORTCUT ⚠️
-  // Before falling back to MFR text, callers MUST:
-  //   1. Use lookupMfr() to search for an existing MFR record
-  //   2. Check if a client-specific MFR (ad_client_id=1000000) already exists
-  //   3. If no usable MFR exists, populate MFR text and flag for manual reconciliation
-  //
-  // DO NOT create new MFR records — escalate to operator for manual resolution.
-  // MFR text records should be periodically reconciled to proper MFR IDs by operator.
-  if (!vq.chuboe_mfr_id && !vq.chuboe_mfr_text) {
-    violations.push('Chuboe_MFR_ID is blank and Chuboe_MFR_Text is blank (required — manufacturer must be set via ID or text)');
+  // Use lookupMfr() to resolve manufacturer names to IDs. If no match exists,
+  // escalate to operator — DO NOT proceed with MFR text only.
+  if (!vq.chuboe_mfr_id) {
+    violations.push(
+      `Chuboe_MFR_ID is blank (required). ` +
+      (vq.chuboe_mfr_text
+        ? `MFR text '${vq.chuboe_mfr_text}' was not resolved to an ID — use lookupMfr() or fix manually.`
+        : `No manufacturer set at all.`)
+    );
   }
   if (!vq.c_country_id) violations.push('C_Country_ID is blank (required — COO must be set, use PENDING=1000001 if unknown)');
   if (!vq.c_bpartner_location_id) violations.push('C_BPartner_Location_ID is blank (required — vendor ship-from address)');
@@ -135,10 +138,31 @@ async function validateVQForPurchase(vqId, opts = {}) {
   if (!vq.chuboe_date_code) violations.push('Chuboe_Date_Code is blank (required — vendor-known date stamp on the part)');
   if (!vq.chuboe_lead_time) violations.push('Chuboe_Lead_Time is blank (required — "STOCK", "3 Weeks", "STOCK - 1 WEEK", etc.)');
   if (!vq.datepromised) violations.push('DatePromised is blank (required — when the vendor commits to deliver)');
+  if (!vq.duedate) violations.push('DueDate is blank (required — should match DatePromised)');
 
   // Packaging + traceability
   if (!vq.chuboe_packaging_id) violations.push('Chuboe_Packaging_ID is blank (required — REEL, CUT TAPE, BULK, TRAY, etc.)');
   if (!vq.chuboe_traceability_id) violations.push('Chuboe_Traceability_ID is blank (Franchise=1000001 / Non-Traceable=1000003)');
+
+  // Domestic shipping — US franchise vendors should have this checked
+  // Vendor types: 1000002=Franchise, 1000008=Catalog (DigiKey, Mouser, etc.)
+  const US_FRANCHISE_TYPES = new Set([1000001, 1000002, 1000007, 1000008, 1000009]);
+  if (US_FRANCHISE_TYPES.has(vq.vendor_type_id) && vq.ischuboedomesticshipping !== 'Y') {
+    violations.push(
+      `IsChuboeDomesticShipping is '${vq.ischuboedomesticshipping || 'N'}' but vendor type is franchise/catalog. ` +
+      `For US franchises (Master, TTI, DigiKey, Mouser, Sager, Arrow, etc.), set domestic shipping = Y.`
+    );
+  }
+
+  // Vendor address validation — must have V00XXXX Infor vendor code
+  // Addresses without this code are legacy/incomplete and should not be used
+  if (vq.location_name && !/^V\d{5,}/.test(vq.location_name)) {
+    violations.push(
+      `Vendor address '${vq.location_name}' does not have a V00XXXX Infor vendor code. ` +
+      `Only use addresses with Infor codes (e.g., 'V002991 - Master Electronics - Phoenix, AZ'). ` +
+      `If multiple addresses exist, check order history or ask operator.`
+    );
+  }
 
   // Note-field sanity — catch buyer-internal content in vendor-facing fields.
   // Three note fields exist on chuboe_vq_line, in ascending internal-ness:
