@@ -789,7 +789,7 @@ async function action_add_awards(payload, ctx) {
       continue;
     }
 
-    // Check if already exists - if so, FLAG it with Award phase info
+    // Check if already exists - if so, FLAG it with Award phase info AND VALUE CHANGES
     const existing = findRosterRowByCpc(cpc);
     if (existing.found) {
       const { row, cols } = existing;
@@ -797,6 +797,68 @@ async function action_add_awards(payload, ctx) {
       const existingMpn = row[cols.MPN] || '';
       const existingMfr = row[cols.MFR] || '';
       const existingStatus = row[cols.STATUS] || '';
+
+      // Extract current roster values for comparison
+      const existingValues = {
+        basePrice: row[cols.BASE_PRICE] || 0,
+        resalePrice: row[cols.RESALE_PRICE] || 0,
+        leadTime: row[cols.LEAD_TIME] || '',
+        moq: row[cols.MOQ] || 0,
+        reorderThreshold: row[cols.REORDER_THRESHOLD] || 0,
+      };
+
+      // Compare to email values — flag differences
+      const valueChanges = [];
+      if (award.basePrice != null && parseFloat(award.basePrice) !== parseFloat(existingValues.basePrice)) {
+        valueChanges.push({ field: 'Base Price', roster: existingValues.basePrice, email: award.basePrice });
+      }
+      if (award.resalePrice != null && parseFloat(award.resalePrice) !== parseFloat(existingValues.resalePrice)) {
+        valueChanges.push({ field: 'Resale Price', roster: existingValues.resalePrice, email: award.resalePrice });
+      }
+      if (award.leadTime && award.leadTime !== existingValues.leadTime) {
+        valueChanges.push({ field: 'Lead Time', roster: existingValues.leadTime || '(empty)', email: award.leadTime });
+      }
+      if (award.moq != null && parseFloat(award.moq) !== parseFloat(existingValues.moq)) {
+        valueChanges.push({ field: 'MOQ', roster: existingValues.moq, email: award.moq });
+      }
+      if (award.reorderThreshold != null && parseFloat(award.reorderThreshold) !== parseFloat(existingValues.reorderThreshold)) {
+        valueChanges.push({ field: 'Reorder Threshold', roster: existingValues.reorderThreshold, email: award.reorderThreshold });
+      }
+
+      // Build reason string highlighting changes
+      let reason = `Already in roster from: ${existingAward || 'unknown phase'}`;
+      if (valueChanges.length > 0) {
+        reason += ` — VALUES UPDATED: ${valueChanges.map(c => c.field).join(', ')}`;
+
+        // APPLY the value changes to the Master Roster
+        const { wb, data, rowIdx } = existing;
+        const updatedRow = [...row];
+        for (const change of valueChanges) {
+          if (change.field === 'Base Price' && cols.BASE_PRICE >= 0) {
+            updatedRow[cols.BASE_PRICE] = award.basePrice;
+          } else if (change.field === 'Resale Price' && cols.RESALE_PRICE >= 0) {
+            updatedRow[cols.RESALE_PRICE] = award.resalePrice;
+          } else if (change.field === 'Lead Time' && cols.LEAD_TIME >= 0) {
+            updatedRow[cols.LEAD_TIME] = award.leadTime;
+          } else if (change.field === 'MOQ' && cols.MOQ >= 0) {
+            updatedRow[cols.MOQ] = award.moq;
+          } else if (change.field === 'Reorder Threshold' && cols.REORDER_THRESHOLD >= 0) {
+            updatedRow[cols.REORDER_THRESHOLD] = award.reorderThreshold;
+          }
+        }
+        // Update last approved date
+        if (cols.LAST_APPROVED >= 0) {
+          updatedRow[cols.LAST_APPROVED] = new Date().toISOString().slice(0, 10);
+        }
+
+        // Write updated row back to roster
+        const rosterResult = readRoster();
+        if (!rosterResult.error) {
+          rosterResult.data[rowIdx] = updatedRow;
+          writeRoster(rosterResult.wb, rosterResult.data);
+        }
+      }
+
       results.flagged.push({
         cpc,
         mpn,
@@ -805,7 +867,10 @@ async function action_add_awards(payload, ctx) {
         existingMpn,     // MPN in roster (may differ from email)
         existingMfr,
         existingStatus,
-        reason: `Already in roster from: ${existingAward || 'unknown phase'}`,
+        existingValues,  // Full roster values for display (BEFORE update)
+        valueChanges,    // Array of { field, roster, email } diffs
+        reason,
+        valuesUpdated: valueChanges.length > 0,  // Flag that roster was updated
       });
       continue;
     }
@@ -855,7 +920,6 @@ async function action_add_awards(payload, ctx) {
   }
 
   // Step 2: Resolve contact person from email sender (rfq-loading pattern)
-  // Look for LAM sender in forwarded headers or original email
   let contactPerson = null;
   const lamSenderEmail = ctx.externalSender || ctx.currentFrom || '';
   if (lamSenderEmail && lamSenderEmail.toLowerCase().includes('lamresearch')) {
@@ -867,81 +931,222 @@ async function action_add_awards(payload, ctx) {
     }
   }
 
-  // Step 3: Create RFQ for added parts (if any)
+  // Step 3-5: Use the REORDER WORKFLOW pipeline for sourcing and output
+  // - Generate reorder-alert format CSV for added parts
+  // - Run lam-kitting-source.js for franchise sourcing
+  // - Run lam-kitting-rfq-writer.js to create RFQ + VQs
+  // - Rebuild Excel with margins, escalations tab, etc.
   let rfqResult = null;
-  if (results.added.length > 0) {
-    try {
-      const { writeRFQ } = require('../rfq-writer');
-      const { lookupMfr } = require('../mfr-lookup');
-
-      const rfqLines = [];
-      for (const part of results.added) {
-        const mfrId = lookupMfr(part.manufacturer);
-        rfqLines.push({
-          mpn: part.mpn,
-          mfrId: mfrId || null,
-          mfrName: part.manufacturer,
-          qty: part.moq || 1,
-          targetPrice: part.basePrice || 0,
-          cpc: part.cpc,
-        });
-      }
-
-      rfqResult = await writeRFQ({
-        bpartnerId: LAM_RESEARCH_BP_ID,
-        type: '3PL/VMI',
-        userId: contactPerson?.userId || null,  // Contact person per rfq-loading pattern
-        description: `LAM New Awards - ${results.added.length} parts`,
-        lines: rfqLines,
-      });
-    } catch (err) {
-      console.error('Error creating RFQ:', err.message);
-      rfqResult = { error: err.message };
-    }
-  }
-
-  // Step 3: Enrich via franchise API
   let enrichResults = [];
-  if (results.added.length > 0) {
-    try {
-      const { searchAllDistributors } = require('../franchise-api');
+  let sourcedXlsx = null;
 
-      for (const part of results.added) {
-        try {
-          const franchiseData = await searchAllDistributors(part.mpn, part.moq || 1);
-          enrichResults.push({
-            cpc: part.cpc,
-            mpn: part.mpn,
-            totalStock: franchiseData.summary?.totalStock || 0,
-            lowestPrice: franchiseData.summary?.lowestPrice || null,
-            distributorCount: franchiseData.summary?.distributorCount || 0,
-            hasStock: (franchiseData.summary?.totalStock || 0) > 0,
-          });
-        } catch (err) {
-          enrichResults.push({
-            cpc: part.cpc,
-            mpn: part.mpn,
-            error: err.message,
-            hasStock: false,
-          });
-        }
-      }
+  if (results.added.length > 0) {
+    const { execSync } = require('child_process');
+    const LAM_DIR = path.join(ASTUTE, 'Trading Analysis/LAM 3PL');
+    const outputDir = path.join(LAM_DIR, 'output');
+    const today = new Date().toISOString().slice(0, 10);
+
+    // Step 3a: Generate reorder-alert format CSV
+    const alertsCsvPath = path.join(outputDir, `LAM_New_Awards_${today}.csv`);
+    const ALERT_HEADERS = [
+      'Lam P/N', 'MPN', 'Manufacturer', 'Item Description',
+      'QTY ON HAND', 'W115 Stale Inventory', 'Reorder Threshold', 'Shortfall', 'Priority',
+      'On Order Qty', 'Recent POV', 'Last Promise Date', 'Last RFQ',
+      'Base Unit Price', 'Resale Price', 'Historical Purchase Price',
+      'OT Previous Supplier', 'OT Buyer', 'Historical Buyer',
+      'Lead Time', 'LAM MOQ'
+    ];
+
+    // Reload roster to get full data for added parts
+    const roster = readRoster();
+    const addedCsvRows = results.added.map(p => {
+      // Find the part in roster to get all fields
+      const match = findRosterRowByCpc(p.cpc);
+      const rosterRow = match.found ? match.row : {};
+      const cols = match.found ? match.cols : {};
+
+      return [
+        p.cpc,
+        p.mpn,
+        p.manufacturer,
+        rosterRow[cols?.DESCRIPTION] || '',
+        0, // QTY ON HAND (new parts have 0)
+        '', // W115
+        p.reorderThreshold || p.moq || 100,
+        p.reorderThreshold || p.moq || 100, // Shortfall = threshold (100% shortfall)
+        'CRITICAL', // All new parts are critical
+        0, // On Order Qty
+        '', // Recent POV
+        '', // Last Promise Date
+        '', // Last RFQ
+        p.basePrice || '',
+        rosterRow[cols?.RESALE_PRICE] || '',
+        '', // Historical Purchase Price
+        '', // OT Previous Supplier
+        '', // OT Buyer
+        '', // Historical Buyer
+        rosterRow[cols?.LEAD_TIME] || '',
+        p.moq || '',
+      ];
+    });
+
+    const csvLines = [
+      ALERT_HEADERS.join(','),
+      ...addedCsvRows.map(row => row.map(v => {
+        const s = String(v ?? '');
+        return s.includes(',') || s.includes('"') ? `"${s.replace(/"/g, '""')}"` : s;
+      }).join(','))
+    ];
+    fs.writeFileSync(alertsCsvPath, csvLines.join('\n'));
+    console.log(`  Generated reorder-alert CSV: ${path.basename(alertsCsvPath)}`);
+
+    // Step 3b: Run lam-kitting-source.js for franchise sourcing
+    try {
+      const sourceScript = path.join(LAM_DIR, 'lam-kitting-source.js');
+      execSync(`node "${sourceScript}" "${alertsCsvPath}"`, {
+        encoding: 'utf-8',
+        timeout: 600000, // 10 minutes
+        cwd: LAM_DIR,
+      });
+      console.log('  Franchise sourcing complete');
     } catch (err) {
-      console.error('Error loading franchise-api:', err.message);
+      console.error('  WARNING: Franchise sourcing failed:', err.message);
+    }
+
+    // Step 3c: Run lam-kitting-rfq-writer.js to create RFQ + VQs
+    const sourcedCsv = alertsCsvPath.replace('.csv', '_sourced.csv');
+    const franchiseJson = alertsCsvPath.replace('.csv', '_sourced_franchise_data.json');
+    const rfqMappingFile = alertsCsvPath.replace('.csv', '_rfq_mapping.json');
+
+    if (fs.existsSync(sourcedCsv) && fs.existsSync(franchiseJson)) {
+      try {
+        const rfqWriterScript = path.join(LAM_DIR, 'lam-kitting-rfq-writer.js');
+        execSync(`node "${rfqWriterScript}" "${sourcedCsv}" "${franchiseJson}"`, {
+          encoding: 'utf-8',
+          timeout: 300000, // 5 minutes
+          cwd: LAM_DIR,
+        });
+        console.log('  RFQ + VQ writing complete');
+
+        if (fs.existsSync(rfqMappingFile)) {
+          rfqResult = JSON.parse(fs.readFileSync(rfqMappingFile, 'utf-8'));
+        }
+      } catch (err) {
+        console.error('  WARNING: RFQ writing failed:', err.message);
+      }
+    }
+
+    // Step 3d: Rebuild Excel with RFQ lines and escalations tab (same as weekly reorder)
+    const defaultSourcedXlsx = alertsCsvPath.replace('.csv', '_sourced.xlsx');
+    if (rfqResult && rfqResult.rfqSearchKey && fs.existsSync(sourcedCsv)) {
+      sourcedXlsx = alertsCsvPath.replace('.csv', `_RFQ${rfqResult.rfqSearchKey}_sourced.xlsx`);
+      try {
+        // Use the same rebuild function from lam-kitting-runner.js
+        const { rebuildExcelWithRfqLines } = require(path.join(LAM_DIR, 'lam-kitting-runner.js'));
+        await rebuildExcelWithRfqLines(sourcedCsv, sourcedXlsx, rfqResult, {});
+        console.log(`  Excel rebuilt with RFQ lines → ${path.basename(sourcedXlsx)}`);
+        // Clean up the plain _sourced.xlsx
+        if (fs.existsSync(defaultSourcedXlsx) && defaultSourcedXlsx !== sourcedXlsx) {
+          fs.unlinkSync(defaultSourcedXlsx);
+        }
+      } catch (err) {
+        console.error('  WARNING: Excel rebuild failed:', err.message);
+        sourcedXlsx = defaultSourcedXlsx;
+      }
+    } else {
+      sourcedXlsx = defaultSourcedXlsx;
+    }
+
+    // Read enriched data from the sourced CSV for the email
+    if (fs.existsSync(sourcedCsv)) {
+      const { readCSVFile } = require('../csv-utils');
+      const csv = readCSVFile(sourcedCsv);
+      const statusIdx = csv.headers.indexOf('Sourcing Status');
+      const stockSupIdx = csv.headers.indexOf('In Stock Supplier');
+      const stockPriceIdx = csv.headers.indexOf('In Stock Price');
+      const stockQtyIdx = csv.headers.indexOf('In Stock Qty');
+      const cpcIdx = csv.headers.indexOf('Lam P/N');
+      const mpnIdx = csv.headers.indexOf('MPN');
+
+      enrichResults = csv.rows.map(row => ({
+        cpc: row[cpcIdx] || '',
+        mpn: row[mpnIdx] || '',
+        hasStock: !!(row[stockSupIdx]),
+        supplier: row[stockSupIdx] || '',
+        price: row[stockPriceIdx] || '',
+        qty: row[stockQtyIdx] || '',
+        status: row[statusIdx] || '',
+      }));
+    }
+
+    // Step 3e: Add FLAGGED items sheet to the Excel (existing parts with value changes)
+    if (results.flagged.length > 0 && sourcedXlsx && fs.existsSync(sourcedXlsx)) {
+      try {
+        const wb = XLSX.readFile(sourcedXlsx);
+
+        // Build existing parts data with value change details
+        const flaggedData = results.flagged.map(f => {
+          const row = {
+            'CPC': f.cpc,
+            'MPN (Email)': f.mpn,
+            'MPN (Roster)': f.existingMpn,
+            'Manufacturer': f.manufacturer || f.existingMfr,
+            'Existing Award': f.existingAward,
+            'Existing Status': f.existingStatus,
+          };
+          if (f.existingValues) {
+            row['Previous Base Price'] = f.existingValues.basePrice || '';
+            row['Previous Resale'] = f.existingValues.resalePrice || '';
+            row['Previous Lead Time'] = f.existingValues.leadTime || '';
+            row['Previous MOQ'] = f.existingValues.moq || '';
+          }
+          const changes = (f.valueChanges || []).map(c => `${c.field}: ${c.roster} → ${c.email}`).join('; ');
+          row['Value Changes'] = changes || '(no changes)';
+          row['Status'] = f.valuesUpdated ? 'UPDATED' : 'UNCHANGED';
+          return row;
+        });
+
+        const ws = XLSX.utils.json_to_sheet(flaggedData);
+        ws['!cols'] = [
+          { wch: 18 }, { wch: 25 }, { wch: 25 }, { wch: 30 },
+          { wch: 12 }, { wch: 15 }, { wch: 14 }, { wch: 14 },
+          { wch: 16 }, { wch: 10 }, { wch: 60 },
+        ];
+
+        // Insert as second sheet (after main data, before Escalations)
+        const sheetNames = wb.SheetNames;
+        const escIdx = sheetNames.indexOf('Escalations');
+        const updatedCount = results.flagged.filter(f => f.valuesUpdated).length;
+        const sheetName = updatedCount > 0 ? 'Existing - Updated' : 'Existing - No Change';
+
+        if (escIdx > 0) {
+          // Insert before Escalations
+          sheetNames.splice(escIdx, 0, sheetName);
+        } else {
+          // Append
+          sheetNames.push(sheetName);
+        }
+        wb.Sheets[sheetName] = ws;
+        wb.SheetNames = [...new Set(sheetNames)]; // dedupe if needed
+
+        XLSX.writeFile(wb, sourcedXlsx);
+        console.log(`  Added ${sheetName} sheet with ${results.flagged.length} existing parts (${updatedCount} updated)`);
+      } catch (err) {
+        console.error('  WARNING: Failed to add FLAGGED sheet:', err.message);
+      }
     }
   }
-
-  // Step 5: Generate Excel attachment (like reorder alerts)
-  const excelPath = writeNewAwardsExcel(results, enrichResults, rfqResult);
 
   // Step 6: Build plaintext email (mirrors reorder alert format)
   const emailBody = buildNewAwardsPlaintextEmail(results, rfqResult, enrichResults, contactPerson, ctx);
 
   // Step 7: Send email with attachment
-  const attachments = excelPath ? [{ filename: path.basename(excelPath), path: excelPath }] : [];
+  const attachments = sourcedXlsx && fs.existsSync(sourcedXlsx)
+    ? [{ filename: path.basename(sourcedXlsx), path: sourcedXlsx }]
+    : [];
   await ctx.notifier.sendWithAttachment(
     ctx.jakeEmail,
-    `LAM New Awards - ${results.added.length} Added, ${results.flagged.length} Flagged`,
+    `LAM New Awards - ${results.added.length} Added, ${results.flagged.length} Flagged${rfqResult?.rfqSearchKey ? ` - RFQ ${rfqResult.rfqSearchKey}` : ''}`,
     emailBody,
     attachments,
     buildEmailOpts(ctx, { html: false }),  // Plaintext like reorder alerts
@@ -964,7 +1169,7 @@ async function action_add_awards(payload, ctx) {
     failed: results.failed.length,
     missingInfo: results.missingInfo.length,
     rfqId: rfqResult?.rfqId || null,
-    rfqValue: rfqResult?.value || null,
+    rfqValue: rfqResult?.rfqSearchKey || rfqResult?.value || null,
     enriched: enrichResults.length,
     partsWithStock: enrichResults.filter(e => e.hasStock).length,
     notified: ctx.jakeEmail,
@@ -972,6 +1177,7 @@ async function action_add_awards(payload, ctx) {
     contactResolved: contactPerson || null,
     results,
     enrichResults,
+    sourcedExcel: sourcedXlsx || null,
   };
 }
 
@@ -1008,16 +1214,31 @@ function writeNewAwardsExcel(results, enrichResults, rfqResult) {
     };
   });
 
-  // Sheet 2: Flagged (Already Exist) - PROMINENT
-  const flaggedData = results.flagged.map(f => ({
-    'CPC': f.cpc,
-    'MPN (Email)': f.mpn,
-    'MPN (Roster)': f.existingMpn,
-    'Manufacturer': f.manufacturer || f.existingMfr,
-    'Existing Award': f.existingAward,  // Shows Phase 2, EPG, etc.
-    'Existing Status': f.existingStatus,
-    'Reason': f.reason,
-  }));
+  // Sheet 2: Flagged (Already Exist) - PROMINENT - with value change details
+  const flaggedData = results.flagged.map(f => {
+    const row = {
+      'CPC': f.cpc,
+      'MPN (Email)': f.mpn,
+      'MPN (Roster)': f.existingMpn,
+      'Manufacturer': f.manufacturer || f.existingMfr,
+      'Existing Award': f.existingAward,  // Shows Phase 2, EPG, etc.
+      'Existing Status': f.existingStatus,
+    };
+
+    // Add value comparison columns
+    if (f.existingValues) {
+      row['Roster Base Price'] = f.existingValues.basePrice || '';
+      row['Roster Resale'] = f.existingValues.resalePrice || '';
+      row['Roster Lead Time'] = f.existingValues.leadTime || '';
+      row['Roster MOQ'] = f.existingValues.moq || '';
+    }
+
+    // Flag what changed
+    const changes = (f.valueChanges || []).map(c => `${c.field}: ${c.roster} → ${c.email}`).join('; ');
+    row['Value Changes'] = changes || '(no changes)';
+
+    return row;
+  });
 
   // Sheet 3: Failed
   const failedData = results.failed.map(f => ({
@@ -1043,8 +1264,17 @@ function writeNewAwardsExcel(results, enrichResults, rfqResult) {
   if (flaggedData.length > 0) {
     const ws2 = XLSX.utils.json_to_sheet(flaggedData);
     ws2['!cols'] = [
-      { wch: 18 }, { wch: 25 }, { wch: 25 }, { wch: 30 },
-      { wch: 20 }, { wch: 15 }, { wch: 40 },
+      { wch: 18 }, // CPC
+      { wch: 25 }, // MPN (Email)
+      { wch: 25 }, // MPN (Roster)
+      { wch: 30 }, // Manufacturer
+      { wch: 12 }, // Existing Award
+      { wch: 15 }, // Existing Status
+      { wch: 14 }, // Roster Base Price
+      { wch: 14 }, // Roster Resale
+      { wch: 16 }, // Roster Lead Time
+      { wch: 10 }, // Roster MOQ
+      { wch: 60 }, // Value Changes
     ];
     XLSX.utils.book_append_sheet(wb, ws2, 'FLAGGED - Already Exist');
   }
@@ -1081,21 +1311,27 @@ function buildNewAwardsPlaintextEmail(results, rfqResult, enrichResults, contact
   const partsWithStock = enrichResults.filter(e => e.hasStock).length;
   const partsNoStock = enrichResults.filter(e => !e.hasStock).length;
 
-  let body = `LAM New Awards Report - ${today}
+  // Count updated vs unchanged existing parts
+  const existingUpdated = results.flagged.filter(f => f.valuesUpdated).length;
+  const existingUnchanged = results.flagged.length - existingUpdated;
+
+  let body = `LAM New Awards Report — ${today}
 
 === SUMMARY ===
 Total parts in email: ${results.added.length + results.flagged.length + results.failed.length}
-- NEW (added to roster): ${results.added.length}
-- FLAGGED (already exist): ${results.flagged.length}
-- FAILED: ${results.failed.length}
+  NEW (added to roster): ${results.added.length}
+  EXISTING - UPDATED: ${existingUpdated}
+  EXISTING - UNCHANGED: ${existingUnchanged}
+  FAILED: ${results.failed.length}
 `;
 
-  // RFQ info
-  if (rfqResult && rfqResult.value) {
+  // RFQ info (like weekly reorder)
+  if (rfqResult && rfqResult.rfqSearchKey) {
     body += `
 === RFQ CREATED ===
-RFQ: ${rfqResult.value}
-Lines: ${results.added.length}
+RFQ: ${rfqResult.rfqSearchKey}
+RFQ Lines: ${rfqResult.rfqLinesCreated || results.added.length}
+VQ Lines: ${rfqResult.vqsCreated || 0}
 Contact: ${contactPerson ? `${contactPerson.name} (${contactPerson.email})` : 'Not resolved'}
 `;
   } else if (rfqResult && rfqResult.error) {
@@ -1105,35 +1341,121 @@ ${rfqResult.error}
 `;
   }
 
-  // Franchise availability
+  // Franchise sourcing (like weekly reorder)
   if (results.added.length > 0) {
     body += `
-=== FRANCHISE AVAILABILITY ===
-Parts with stock: ${partsWithStock}
-Parts without stock: ${partsNoStock}
-
-See attached Excel for full details including:
-- CPC, MPN, Manufacturer
-- Award Qty, MOQ, Reorder Threshold
-- Base Price
-- Franchise Stock & Lowest Price
+=== FRANCHISE SOURCING ===
+Parts sourced: ${enrichResults.length}
+With in-stock option: ${partsWithStock}
+No stock available: ${partsNoStock}
 `;
+
+    // List parts with stock (top 10)
+    const withStock = enrichResults.filter(e => e.hasStock).slice(0, 10);
+    if (withStock.length > 0) {
+      body += `\nTop in-stock options:\n`;
+      for (const e of withStock) {
+        body += `  ${e.cpc} | ${e.mpn} | ${e.supplier} @ ${e.price}\n`;
+      }
+      if (partsWithStock > 10) {
+        body += `  ... and ${partsWithStock - 10} more\n`;
+      }
+    }
   }
 
-  // FLAGGED section (prominent)
+  body += `
+See attached Excel for full details including:
+- Franchise sourcing with margin analysis
+- Escalations tab (if any)
+- RFQ Line # and check columns
+`;
+
+  // EXISTING PARTS section - with VALUE CHANGE details
   if (results.flagged.length > 0) {
+    const withChanges = results.flagged.filter(f => f.valueChanges && f.valueChanges.length > 0);
+    const noChanges = results.flagged.filter(f => !f.valueChanges || f.valueChanges.length === 0);
+
     body += `
-=== ⚠️ FLAGGED - ALREADY IN ROSTER (${results.flagged.length}) ===
-These CPCs already exist in the Master Roster. Review for duplicates:
-
+=== 📋 EXISTING PARTS (${results.flagged.length}) ===
 `;
-    for (const f of results.flagged) {
-      body += `${f.cpc} | ${f.mpn}
-  Existing Award: ${f.existingAward || 'unknown'}
-  Existing MPN: ${f.existingMpn}
-  Reason: ${f.reason}
 
+    // Parts WITH value changes - UPDATED in roster
+    if (withChanges.length > 0) {
+      body += `
+--- ${withChanges.length} PARTS UPDATED (roster values changed) ---
 `;
+      for (const f of withChanges) {
+        body += `
+${f.cpc} | ${f.mpn}
+  Award: ${f.existingAward || 'unknown'} | Status: ${f.existingStatus || '-'}
+`;
+        for (const c of f.valueChanges) {
+          body += `  ✓ ${c.field}: ${formatPlainValue(c.roster)} → ${formatPlainValue(c.email)} (UPDATED)\n`;
+        }
+      }
+    }
+
+    // Parts WITHOUT changes
+    if (noChanges.length > 0) {
+      body += `
+--- ${noChanges.length} PARTS UNCHANGED (values match roster) ---
+`;
+      for (const f of noChanges) {
+        body += `${f.cpc} | ${f.mpn} | Award: ${f.existingAward || 'unknown'}
+`;
+      }
+    }
+  }
+
+  // Check for escalations that may be resolved by these new awards
+  const escalationsPath = path.join(ASTUTE, 'Trading Analysis/LAM 3PL/lam-escalations.json');
+  if (fs.existsSync(escalationsPath)) {
+    try {
+      const escData = JSON.parse(fs.readFileSync(escalationsPath, 'utf-8'));
+      const originalCount = (escData.entries || []).length;
+
+      // Check both added and flagged parts against escalations
+      const allParts = [...results.added, ...results.flagged];
+      const allMpnsUpper = new Set(allParts.map(p => (p.mpn || '').toUpperCase()));
+      const allCpcsUpper = new Set(allParts.map(p => (p.cpc || '').toUpperCase()));
+
+      // Find escalations that match new award parts (by MPN or CPC)
+      const resolvedEscalations = (escData.entries || []).filter(e =>
+        allMpnsUpper.has((e.mpn || '').toUpperCase()) ||
+        allCpcsUpper.has((e.cpc || '').toUpperCase())
+      );
+
+      if (resolvedEscalations.length > 0) {
+        body += `
+=== ✅ ESCALATIONS RESOLVED (${resolvedEscalations.length}) ===
+These escalations were removed — new award resolves them:
+`;
+        for (const esc of resolvedEscalations) {
+          const matchedPart = allParts.find(p =>
+            (p.mpn || '').toUpperCase() === (esc.mpn || '').toUpperCase() ||
+            (p.cpc || '').toUpperCase() === (esc.cpc || '').toUpperCase()
+          );
+          body += `  ${esc.cpc || matchedPart?.cpc} | ${esc.mpn || matchedPart?.mpn}
+    Was: ${esc.reason || '(no reason)'}
+    Resolved by: ${matchedPart ? (results.added.includes(matchedPart) ? 'NEW AWARD' : 'EXISTING (value update)') : 'match'}
+`;
+        }
+
+        // Remove resolved escalations from the file
+        escData.entries = (escData.entries || []).filter(e =>
+          !allMpnsUpper.has((e.mpn || '').toUpperCase()) &&
+          !allCpcsUpper.has((e.cpc || '').toUpperCase())
+        );
+
+        // Write updated escalations file
+        fs.writeFileSync(escalationsPath, JSON.stringify(escData, null, 2));
+        body += `
+Escalations file updated: ${originalCount} → ${escData.entries.length} entries
+`;
+      }
+    } catch (err) {
+      // Ignore escalations check errors
+      console.error('  Escalations check error:', err.message);
     }
   }
 
@@ -1526,7 +1848,7 @@ function findRosterRowByCpc(cpc) {
   for (let i = 1; i < data.length; i++) {
     const row = data[i];
     if (row[cols.CPC] === cpc) {
-      return { found: true, rowIdx: i, row };
+      return { found: true, rowIdx: i, row, cols };
     }
   }
   return { found: false };
@@ -1884,6 +2206,17 @@ function formatNumber(val) {
   const num = parseFloat(val);
   if (isNaN(num)) return esc(String(val));
   return num.toLocaleString('en-US');
+}
+
+function formatPlainValue(val) {
+  if (val === null || val === undefined || val === '') return '(empty)';
+  if (typeof val === 'number') {
+    if (val < 10000 && val !== Math.floor(val)) {
+      return '$' + val.toFixed(4);
+    }
+    return String(val);
+  }
+  return String(val);
 }
 
 // ─── EXPORTS ─────────────────────────────────────────────────────────────────
