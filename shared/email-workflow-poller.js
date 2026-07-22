@@ -159,6 +159,22 @@ async function withInbox(fn) {
   }
 }
 
+// Like withInbox but for any folder (used by read/download-attachments with --folder)
+async function withFolder(folder, fn) {
+  const client = newClient();
+  await client.connect();
+  try {
+    const lock = await client.getMailboxLock(folder);
+    try {
+      return await fn(client);
+    } finally {
+      lock.release();
+    }
+  } finally {
+    await client.logout().catch(() => {});
+  }
+}
+
 /**
  * Enumerate attachments, separating documents from images.
  *
@@ -427,8 +443,9 @@ async function cmdList() {
 
 // ─── COMMAND: read ───────────────────────────────────────────────────────────
 
-async function cmdRead(uid) {
-  const result = await withInbox(async (client) => {
+async function cmdRead(uid, { folder = null } = {}) {
+  const withFn = folder ? (fn) => withFolder(folder, fn) : withInbox;
+  const result = await withFn(async (client) => {
     const msg = await client.fetchOne(String(uid), { source: true, envelope: true }, { uid: true });
     if (!msg || !msg.source) return null;
     const parsed = await simpleParser(msg.source);
@@ -487,9 +504,10 @@ async function cmdRead(uid) {
  * + `kind` in the returned list so the agent can prioritize larger images
  * (likely real content) over small signature/logo images.
  */
-async function cmdDownloadAttachments(uid, { includeImages = false } = {}) {
+async function cmdDownloadAttachments(uid, { includeImages = false, folder = null } = {}) {
   const os = require('os');
-  const result = await withInbox(async (client) => {
+  const withFn = folder ? (fn) => withFolder(folder, fn) : withInbox;
+  const result = await withFn(async (client) => {
     const msg = await client.fetchOne(String(uid), { source: true }, { uid: true });
     if (!msg || !msg.source) return null;
     const parsed = await simpleParser(msg.source);
@@ -776,15 +794,138 @@ async function cmdCheckStuck() {
   console.log(JSON.stringify(result, null, 2));
 }
 
+// ─── COMMAND: search ──────────────────────────────────────────────────────────
+//
+// Search for emails in any folder by subject, sender, or body content.
+// Useful for finding processed emails when you need to reprocess them.
+//
+// Usage: email-workflow-poller.js search --workflow <name> --folder Processed [filters]
+//
+// Filters (all optional, case-insensitive):
+//   --subject <pattern>     Subject contains pattern
+//   --from <pattern>        Sender contains pattern
+//   --body <pattern>        Body contains pattern (e.g., an MPN)
+//   --limit <N>             Max results (default 10)
+//
+// Example: Find the Phase 3 email in Processed folder
+//   node shared/email-workflow-poller.js search --workflow lam-kitting \
+//     --folder Processed --subject "PHASE 3"
+//
+// Example: Find email containing a specific MPN
+//   node shared/email-workflow-poller.js search --workflow lam-kitting \
+//     --folder Processed --body "LTC3890EFE#PBF"
+
+async function cmdSearch() {
+  const folderIdx = argv.indexOf('--folder');
+  const folder = folderIdx >= 0 ? argv[folderIdx + 1] : SOURCE_FOLDER;
+
+  const subjectIdx = argv.indexOf('--subject');
+  const subjectPattern = subjectIdx >= 0 ? argv[subjectIdx + 1]?.toLowerCase() : null;
+
+  const fromIdx = argv.indexOf('--from');
+  const fromPattern = fromIdx >= 0 ? argv[fromIdx + 1]?.toLowerCase() : null;
+
+  const bodyIdx = argv.indexOf('--body');
+  const bodyPattern = bodyIdx >= 0 ? argv[bodyIdx + 1]?.toLowerCase() : null;
+
+  const limitIdx = argv.indexOf('--limit');
+  const limit = limitIdx >= 0 ? parseInt(argv[limitIdx + 1], 10) : 10;
+
+  const client = newClient();
+  await client.connect();
+
+  try {
+    const lock = await client.getMailboxLock(folder);
+    try {
+      // Get all UIDs in the folder (both seen and unseen)
+      const allUids = (await client.search({ all: true }, { uid: true })) || [];
+      if (allUids.length === 0) {
+        console.log(JSON.stringify({
+          folder,
+          filters: { subject: subjectPattern, from: fromPattern, body: bodyPattern },
+          results: [],
+          message: `No emails in folder '${folder}'`
+        }, null, 2));
+        return;
+      }
+
+      const matches = [];
+
+      // Process in reverse order (newest first)
+      const uidsToCheck = allUids.slice().reverse();
+
+      for (const uid of uidsToCheck) {
+        if (matches.length >= limit) break;
+
+        // First pass: check envelope (subject, from) - cheaper than body
+        const needsBody = bodyPattern !== null;
+        const fetchOpts = needsBody ? { source: true, envelope: true } : { envelope: true };
+
+        const msg = await client.fetchOne(String(uid), fetchOpts, { uid: true });
+        if (!msg) continue;
+
+        const env = msg.envelope || {};
+        const subject = (env.subject || '').toLowerCase();
+        const from = env.from && env.from[0]
+          ? `${env.from[0].mailbox || ''}@${env.from[0].host || ''}`.toLowerCase()
+          : '';
+
+        // Check envelope filters first
+        if (subjectPattern && !subject.includes(subjectPattern)) continue;
+        if (fromPattern && !from.includes(fromPattern)) continue;
+
+        // Check body if needed
+        if (bodyPattern) {
+          if (!msg.source) continue;
+          const parsed = await simpleParser(msg.source);
+          const bodyText = ((parsed.text || '') + ' ' + (parsed.html || '')).toLowerCase();
+          if (!bodyText.includes(bodyPattern)) continue;
+        }
+
+        // Match found
+        matches.push({
+          uid,
+          subject: env.subject || '',
+          from: env.from && env.from[0]
+            ? `${env.from[0].mailbox || ''}@${env.from[0].host || ''}`
+            : '',
+          date: env.date ? env.date.toISOString() : '',
+        });
+      }
+
+      console.log(JSON.stringify({
+        folder,
+        filters: { subject: subjectPattern, from: fromPattern, body: bodyPattern },
+        totalInFolder: allUids.length,
+        results: matches,
+        message: matches.length > 0
+          ? `Found ${matches.length} matching email(s)`
+          : 'No matching emails found'
+      }, null, 2));
+
+    } finally {
+      lock.release();
+    }
+  } finally {
+    await client.logout().catch(() => {});
+  }
+}
+
 // ─── MAIN ────────────────────────────────────────────────────────────────────
 
 (async () => {
   try {
     if (cmd === 'list') return await cmdList();
-    if (cmd === 'read') return await cmdRead(parseInt(argv[1], 10));
+    if (cmd === 'read') {
+      const folderIdx = argv.indexOf('--folder');
+      const folder = folderIdx >= 0 ? argv[folderIdx + 1] : null;
+      return await cmdRead(parseInt(argv[1], 10), { folder });
+    }
     if (cmd === 'download-attachments') {
       const includeImages = argv.includes('--include-images');
-      return await cmdDownloadAttachments(parseInt(argv[1], 10), { includeImages });
+      const folderIdx = argv.indexOf('--folder');
+      const folder = folderIdx >= 0 ? argv[folderIdx + 1] : null;
+      return await cmdDownloadAttachments(parseInt(argv[1], 10), { includeImages, folder });
     }
     if (cmd === 'route') {
       const uid = parseInt(argv[1], 10);
@@ -800,6 +941,7 @@ async function cmdCheckStuck() {
     }
     if (cmd === 'recover-stuck') return await cmdRecoverStuck();
     if (cmd === 'check-stuck') return await cmdCheckStuck();
+    if (cmd === 'search') return await cmdSearch();
     console.error('Usage: email-workflow-poller.js <command> --workflow <name> [options]');
     console.error('');
     console.error('Commands:');
@@ -807,12 +949,18 @@ async function cmdCheckStuck() {
     console.error('  read <uid>                     Read full email as JSON');
     console.error('  download-attachments <uid>     Save attachments to temp dir');
     console.error('  route <uid> <action>           Execute routing decision');
+    console.error('  search                         Search emails by subject/from/body content');
     console.error('  check-stuck                    Check for stuck (SEEN but not routed) emails');
     console.error('  recover-stuck                  Clear SEEN flag on stuck emails for reprocessing');
     console.error('');
     console.error('Options:');
     console.error('  --workflow <name>              Required; resolves to workflow-actions/<name>.js');
     console.error('  --dry-run                      Preview without modifying state');
+    console.error('  --folder <name>                For search: folder to search (default: source folder)');
+    console.error('  --subject <pattern>            For search: filter by subject (case-insensitive)');
+    console.error('  --from <pattern>               For search: filter by sender (case-insensitive)');
+    console.error('  --body <pattern>               For search: filter by body content (e.g., MPN)');
+    console.error('  --limit <N>                    For search: max results (default 10)');
     console.error('  --threshold-mins <N>           For stuck commands: age threshold (default 60)');
     console.error('  --include-images               For download-attachments: include image files');
     console.error('  --payload <json|file>          For route: action payload');
