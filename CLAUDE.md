@@ -72,6 +72,24 @@ If you catch yourself thinking "I remember how this works" - STOP and read the f
 
 ---
 
+# North Star: Always Test After Changes
+
+**Changes without validation are incomplete. We do NOT make changes just for the sake of it.**
+
+When modifying a workflow, script, or process:
+
+1. **Identify the test case** — what input will exercise the change?
+2. **Run the test** — reprocess using the original input that exposed the issue
+3. **Verify the output** — confirm the change produces the expected result
+4. **Only then is it done** — untested changes are not complete
+
+**This is non-negotiable.** The effort spent fixing/enhancing a workflow is wasted if we don't verify it works. The original input that prompted the change IS the test case.
+
+**Anti-pattern:** Make code changes → commit → assume it works → move on.
+**Correct:** Make code changes → commit → rerun with original input → verify output → done.
+
+---
+
 # North Star: VQ Creation and Purchase Use Enforced Wrappers
 
 **NEVER bypass the enforced wrappers when creating or approving VQs.**
