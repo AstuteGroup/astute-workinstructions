@@ -162,12 +162,14 @@ const ROSTER_COLS = {
   SUBMITTED_DATE: 'Submitted Date',
 };
 
-// Pending transfers file - parts being transferred TO LAM warehouses
+// Pending transfers file - parts confirmed as LAM stock being transferred to W111
+// Human reviews wrong warehouse check output, confirms LAM stock, adds here
+// Auto-cleared when part appears in W111/W115 inventory
 const PENDING_TRANSFERS_FILE = path.join(__dirname, 'lam-wrong-warehouse-pending-transfers.json');
 
 /**
- * Load pending transfers (parts being moved to LAM warehouses)
- * Returns Map of MPN -> { qty, fromWh, notes }
+ * Load pending transfers (confirmed LAM stock being moved to W111)
+ * Returns Map of MPN -> { qty, fromWh, notes, cpc }
  */
 function loadPendingTransfers() {
   if (!fs.existsSync(PENDING_TRANSFERS_FILE)) {
@@ -192,6 +194,63 @@ function loadPendingTransfers() {
     console.log(`  WARNING: Could not parse ${PENDING_TRANSFERS_FILE}: ${e.message}`);
     return new Map();
   }
+}
+
+/**
+ * Save pending transfers back to file (used for auto-clearing completed transfers)
+ */
+function savePendingTransfers(transfers) {
+  const obj = {};
+  for (const [mpn, info] of transfers) {
+    obj[mpn] = {
+      mpn,
+      cpc: info.cpc || '',
+      qty: info.qty || 0,
+      fromWh: info.fromWh || '',
+      date: info.date || new Date().toISOString().split('T')[0],
+      notes: info.notes || ''
+    };
+  }
+  fs.writeFileSync(PENDING_TRANSFERS_FILE, JSON.stringify(obj, null, 2) + '\n');
+}
+
+/**
+ * Auto-clear pending transfers that have completed (part now in W111/W115)
+ * Matches by qty to ensure we're clearing the right transfer, not unrelated stock.
+ * Returns the cleared MPNs for logging
+ */
+function autoClearCompletedTransfers(pendingTransfers, aggregated) {
+  const cleared = [];
+
+  for (const [mpn, transfer] of pendingTransfers) {
+    const inv = aggregated[mpn];
+    if (!inv) continue;
+
+    const lamQty = (inv.W111_Qty || 0) + (inv.W115_Qty || 0);
+    const transferQty = transfer.qty || 0;
+
+    // Clear if:
+    // 1. Part now has stock in W111/W115, AND
+    // 2. The qty matches (or exceeds) the pending transfer qty
+    //    This catches the case where transfer completed and matches expected qty
+    if (lamQty > 0 && lamQty >= transferQty) {
+      cleared.push({
+        mpn,
+        cpc: transfer.cpc,
+        expectedQty: transferQty,
+        actualQty: lamQty,
+        match: lamQty === transferQty ? 'exact' : 'exceeds'
+      });
+      pendingTransfers.delete(mpn);
+    }
+  }
+
+  // Save updated file if any were cleared
+  if (cleared.length > 0) {
+    savePendingTransfers(pendingTransfers);
+  }
+
+  return cleared;
 }
 
 // -----------------------------------------------------------------------------
@@ -259,20 +318,29 @@ async function main() {
   const aggregated = aggregateInventory(w111Inventory, w115Inventory);
   console.log(`  Combined: ${Object.keys(aggregated).length} unique MPNs`);
 
-  // Step 2b: Load and apply pending transfers (parts being moved to LAM warehouses)
+  // Step 2b: Load pending transfers (confirmed LAM stock being moved to W111)
+  // Auto-clear any that have completed (part now in W111/W115)
   console.log('');
   console.log('Step 2b: Loading pending transfers...');
   const pendingTransfers = loadPendingTransfers();
   if (pendingTransfers.size > 0) {
     console.log(`  Pending transfers: ${pendingTransfers.size} MPNs`);
-    for (const [mpn, transfer] of pendingTransfers) {
-      if (!aggregated[mpn]) {
-        aggregated[mpn] = { W111_Qty: 0, W115_Qty: 0, Total_Qty: 0, Pending_Transfer: 0 };
+
+    // Auto-clear completed transfers (matches by qty)
+    const cleared = autoClearCompletedTransfers(pendingTransfers, aggregated);
+    if (cleared.length > 0) {
+      console.log(`  Auto-cleared ${cleared.length} completed transfers:`);
+      for (const c of cleared) {
+        const matchInfo = c.match === 'exact'
+          ? `${c.actualQty} pcs (exact match)`
+          : `${c.actualQty} pcs (expected ${c.expectedQty})`;
+        console.log(`    ✓ ${c.mpn} (${c.cpc}) - now has ${matchInfo} in W111/W115`);
       }
-      aggregated[mpn].Pending_Transfer = transfer.qty;
-      aggregated[mpn].Total_Qty += transfer.qty;
-      aggregated[mpn].Pending_From = transfer.fromWh;
-      console.log(`    ${mpn}: +${transfer.qty} pcs from ${transfer.fromWh} (${transfer.notes})`);
+    }
+
+    // Log remaining pending transfers
+    if (pendingTransfers.size > 0) {
+      console.log(`  Still pending: ${pendingTransfers.size} MPNs`);
     }
   } else {
     console.log('  No pending transfers');
@@ -310,7 +378,7 @@ async function main() {
   // Step 5: Join and identify reorder candidates
   console.log('');
   console.log('Step 5: Identifying reorder candidates...');
-  const reorderAlerts = identifyReorderCandidates(aggregated, excelData, historicalData, recentPOVs);
+  const reorderAlerts = identifyReorderCandidates(aggregated, excelData, historicalData, recentPOVs, pendingTransfers);
   console.log(`  Reorder candidates: ${reorderAlerts.length} items`);
 
   // Step 5b: Check other warehouses for available stock
@@ -321,23 +389,12 @@ async function main() {
   const stockMatches = Object.keys(otherStock).filter(mpn => otherStock[mpn].length > 0).length;
   console.log(`  Stock matches found: ${stockMatches} MPNs in other warehouses`);
 
-  // Enrich alerts with other warehouse stock (including pending transfers)
+  // Enrich alerts with other warehouse stock
   for (const alert of reorderAlerts) {
     const matches = otherStock[alert['MPN']] || [];
-    const warehouses = matches.map(m => m.warehouse);
-    let totalQty = matches.reduce((sum, m) => sum + m.qty, 0);
-
-    // Include pending transfer stock - it's still physically available until moved
-    if (alert['Pending Transfer']) {
-      const match = alert['Pending Transfer'].match(/(\d+) from (.+)/);
-      if (match) {
-        const [, qty, fromWh] = match;
-        warehouses.push(fromWh);
-        totalQty += parseInt(qty, 10);
-      }
-    }
-
-    if (warehouses.length > 0) {
+    if (matches.length > 0) {
+      const warehouses = matches.map(m => m.warehouse);
+      const totalQty = matches.reduce((sum, m) => sum + m.qty, 0);
       alert['Available Stock (Other WH)'] = warehouses.join(', ');
       alert['Available Qty (Other WH)'] = totalQty;
     }
@@ -395,7 +452,7 @@ async function main() {
     const lowPriority = readyToOrder.filter(r => r.Priority === 'LOW').length;
     const pendingOrder = readyToOrder.filter(r => r.Priority === 'PENDING ORDER PLACEMENT').length;
     const pendingReceipt = readyToOrder.filter(r => r.Priority === 'PENDING RECEIPT').length;
-    const pendingTransfer = readyToOrder.filter(r => r.Priority === 'PENDING WAREHOUSE TRANSFER').length;
+    const pendingTransfer = readyToOrder.filter(r => r.Priority.startsWith('PENDING WAREHOUSE TRANSFER')).length;
     console.log('');
     console.log('Ready to Order breakdown:');
     console.log(`  CRITICAL priority (zero stock, no recent PO): ${criticalPriority}`);
@@ -1035,11 +1092,10 @@ const ALERT_COLUMNS = [
   'Item Description',
   // Inventory & priority
   'QTY ON HAND',
-  'Pending Transfer',
   'W115 Stale Inventory',
   'Reorder Threshold',
   'Shortfall',
-  'Priority',
+  'Priority',  // Includes "PENDING WAREHOUSE TRANSFER - X pcs from WH" when applicable
   'On Order Qty',
   'OT PO',
   'Recent POV',
@@ -1086,7 +1142,7 @@ function formatPOVCell(pov) {
   return '';
 }
 
-function buildAlert(mpn, excel, totalQty, lamOwned, shortfall, priority, history, pov, pendingTransfer = null) {
+function buildAlert(mpn, excel, totalQty, lamOwned, shortfall, priority, history, pov) {
   // Show purchased MPN only if it differs from roster MPN (alternate sourcing)
   const purchasedMpn = pov && pov.Purchased_MPN && pov.Purchased_MPN !== mpn ? pov.Purchased_MPN : '';
   return {
@@ -1096,11 +1152,10 @@ function buildAlert(mpn, excel, totalQty, lamOwned, shortfall, priority, history
     'Manufacturer': excel.Manufacturer,
     'Item Description': excel.Description,
     'QTY ON HAND': totalQty,
-    'Pending Transfer': pendingTransfer ? `${pendingTransfer.qty} from ${pendingTransfer.fromWh}` : '',
     'W115 Stale Inventory': lamOwned,
     'Reorder Threshold': excel.MIN_QTY,
     'Shortfall': shortfall,
-    'Priority': priority,
+    'Priority': priority,  // Includes "PENDING WAREHOUSE TRANSFER - X pcs from WH" when applicable
     'On Order Qty': pov ? (pov.Qty_On_Order || '') : '',
     'OT PO': pov ? (pov.OT_PO_Number || '') : '',
     'Recent POV': formatPOVCell(pov),
@@ -1131,7 +1186,7 @@ function resolvePriority(shortfallBasedPriority, pov) {
   return 'PENDING ORDER PLACEMENT';
 }
 
-function identifyReorderCandidates(aggregated, excelData, historicalData, recentPOVs = {}) {
+function identifyReorderCandidates(aggregated, excelData, historicalData, recentPOVs = {}, pendingTransfers = new Map()) {
   const alerts = [];
   const inventoryMPNs = new Set(Object.keys(aggregated));
 
@@ -1150,8 +1205,6 @@ function identifyReorderCandidates(aggregated, excelData, historicalData, recent
     let totalQty = 0;
     let w111Qty = 0;
     let w115Qty = 0;
-    let pendingTransferQty = 0;
-    let pendingTransferFrom = '';
     const mpnsWithStock = [];
 
     for (const mpn of approvedMPNs) {
@@ -1161,16 +1214,10 @@ function identifyReorderCandidates(aggregated, excelData, historicalData, recent
         w111Qty += inv.W111_Qty || 0;
         w115Qty += inv.W115_Qty || 0;
         mpnsWithStock.push({ mpn, qty: inv.Total_Qty });
-        // Track pending transfer if any
-        if (inv.Pending_Transfer > 0) {
-          pendingTransferQty += inv.Pending_Transfer;
-          pendingTransferFrom = inv.Pending_From || '';
-        }
       }
     }
 
-    const pendingTransfer = pendingTransferQty > 0 ? { qty: pendingTransferQty, fromWh: pendingTransferFrom } : null;
-    cpcTotalInventory.set(cpc, { total: totalQty, w111: w111Qty, w115: w115Qty, mpnsWithStock, approvedMPNs, pendingTransfer });
+    cpcTotalInventory.set(cpc, { total: totalQty, w111: w111Qty, w115: w115Qty, mpnsWithStock, approvedMPNs });
   }
 
   // Log multi-MPN inventory aggregation stats
@@ -1209,7 +1256,7 @@ function identifyReorderCandidates(aggregated, excelData, historicalData, recent
       const lamOwned = cpcInv.w115 > 0 ? 'YES' : 'NO';
 
       const alert = buildAlert(rosterMpn, excel, totalQty, lamOwned, shortfall, priority,
-        historicalData[normalizeMPN(rosterMpn)] || {}, pov, cpcInv.pendingTransfer);
+        historicalData[normalizeMPN(rosterMpn)] || {}, pov);
 
       // Add note if stock is spread across multiple MPNs
       if (cpcInv.mpnsWithStock.length > 1) {
@@ -1243,24 +1290,34 @@ function identifyReorderCandidates(aggregated, excelData, historicalData, recent
       historicalData[key] || {}, pov));
   }
 
-  // Add PENDING WAREHOUSE TRANSFER items - parts with transfers in flight, even if above threshold
-  // These need visibility tracking like PENDING RECEIPT
-  for (const [rosterMpn, excel] of Object.entries(excelData)) {
-    const cpc = excel.CPC;
-    if (!cpc) continue;
+  // Add PENDING WAREHOUSE TRANSFER items - confirmed transfers from pending-transfers.json
+  // Human reviews wrong warehouse check output, confirms LAM stock, adds to pending-transfers.json
+  // Auto-clears when part appears in W111/W115 inventory
+  for (const [mpn, transfer] of pendingTransfers) {
+    const cpc = transfer.cpc;
 
-    const cpcInv = cpcTotalInventory.get(cpc);
-    if (!cpcInv || !cpcInv.pendingTransfer) continue;
+    // Check if this MPN/CPC is already on the alerts list
+    const alreadyListed = alerts.some(a => a['MPN'] === mpn || a['Lam P/N'] === cpc);
+    if (alreadyListed) {
+      // Already on list - update priority to include transfer info if not already pending
+      const existingAlert = alerts.find(a => a['MPN'] === mpn || a['Lam P/N'] === cpc);
+      if (existingAlert && !existingAlert.Priority.includes('PENDING')) {
+        existingAlert.Priority = `${existingAlert.Priority} + TRANSFER - ${transfer.qty} pcs from ${transfer.fromWh}`;
+      }
+      continue;
+    }
 
-    // Check if this CPC is already on the alerts list
-    const alreadyListed = alerts.some(a => a['Lam P/N'] === cpc);
-    if (alreadyListed) continue;  // Already on list (below threshold case)
+    // Not on list yet - find the roster entry
+    const excel = excelData[mpn];
+    if (!excel) continue;
 
-    // Above threshold but has pending transfer - add for visibility
-    const totalQty = cpcInv.total;
+    const cpcInv = cpcTotalInventory.get(cpc) || { total: 0, w111: 0, w115: 0, mpnsWithStock: [] };
 
-    const alert = buildAlert(rosterMpn, excel, totalQty, cpcInv.w115 > 0 ? 'YES' : 'NO',
-      0, 'PENDING WAREHOUSE TRANSFER', historicalData[normalizeMPN(rosterMpn)] || {}, recentPOVs[cpc], cpcInv.pendingTransfer);
+    // Format: "PENDING WAREHOUSE TRANSFER - 100 pcs from MAIN"
+    const priority = `PENDING WAREHOUSE TRANSFER - ${transfer.qty} pcs from ${transfer.fromWh}`;
+
+    const alert = buildAlert(mpn, excel, cpcInv.total, cpcInv.w115 > 0 ? 'YES' : 'NO',
+      0, priority, historicalData[normalizeMPN(mpn)] || {}, recentPOVs[cpc]);
 
     alerts.push(alert);
   }
@@ -1279,15 +1336,34 @@ function identifyReorderCandidates(aggregated, excelData, historicalData, recent
     'PENDING RECEIPT': 4,
     'PENDING WAREHOUSE TRANSFER': 5,  // Informational - tracking until transfer completes
   };
+
+  // Helper to get priority order - handles dynamic priorities like "PENDING WAREHOUSE TRANSFER - 100 pcs"
+  function getPriorityOrder(priority) {
+    if (priorityOrder[priority] !== undefined) return priorityOrder[priority];
+    // Check for prefix matches (e.g., "PENDING WAREHOUSE TRANSFER - 100 pcs from MAIN")
+    if (priority.startsWith('PENDING WAREHOUSE TRANSFER')) return 5;
+    if (priority.includes('+ TRANSFER')) return priorityOrder[priority.split(' + ')[0]] || 3;
+    return 3; // Default to LOW-ish
+  }
+
   // Within the PENDING bucket only, sub-order ORDER_PLACEMENT before RECEIPT.
-  const pendingSubOrder = { 'PENDING ORDER PLACEMENT': 0, 'PENDING RECEIPT': 1, 'PENDING WAREHOUSE TRANSFER': 2 };
+  const pendingSubOrder = { 'PENDING ORDER PLACEMENT': 0, 'PENDING RECEIPT': 1 };
+  function getPendingSubOrder(priority) {
+    if (pendingSubOrder[priority] !== undefined) return pendingSubOrder[priority];
+    if (priority.startsWith('PENDING WAREHOUSE TRANSFER')) return 2;
+    return 99;
+  }
+
   alerts.sort((a, b) => {
-    if (priorityOrder[a.Priority] !== priorityOrder[b.Priority]) {
-      return priorityOrder[a.Priority] - priorityOrder[b.Priority];
+    const orderA = getPriorityOrder(a.Priority);
+    const orderB = getPriorityOrder(b.Priority);
+    if (orderA !== orderB) {
+      return orderA - orderB;
     }
-    if (pendingSubOrder[a.Priority] !== undefined && pendingSubOrder[b.Priority] !== undefined) {
-      const sub = pendingSubOrder[a.Priority] - pendingSubOrder[b.Priority];
-      if (sub !== 0) return sub;
+    const subA = getPendingSubOrder(a.Priority);
+    const subB = getPendingSubOrder(b.Priority);
+    if (subA !== subB) {
+      return subA - subB;
     }
     return b.Shortfall - a.Shortfall;
   });
@@ -1481,10 +1557,25 @@ function getDateStamp() {
 }
 
 // -----------------------------------------------------------------------------
-// Run
+// Exports (for use by lam-kitting.js handler)
 // -----------------------------------------------------------------------------
 
-main().catch(err => {
-  console.error('Error:', err.message);
-  process.exit(1);
-});
+module.exports = {
+  loadHistoricalPurchaseData,
+  loadRecentPOVs,
+  formatPOVCell,
+  buildAlert,
+  ALERT_COLUMNS,
+  writeReorderAlerts,
+};
+
+// -----------------------------------------------------------------------------
+// Run (only when executed directly, not when required as module)
+// -----------------------------------------------------------------------------
+
+if (require.main === module) {
+  main().catch(err => {
+    console.error('Error:', err.message);
+    process.exit(1);
+  });
+}

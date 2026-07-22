@@ -307,7 +307,7 @@ function buildEscalationsTab(workbook, state, csv, allHeaders, rfqMapping, escal
     const mpn = (row[mpnIdx] || '').trim();
     if (!mpn) continue;
     const rowData = [...row];
-    rowData.splice(1, 0, rfqMapping.lines[mpn] || '', autoRequests[mpn] || '');
+    rowData.splice(1, 0, (rfqMapping && rfqMapping.lines && rfqMapping.lines[mpn]) || '', autoRequests[mpn] || '');
     byMpn[mpn] = rowData;
   }
   // Sidecar context — used to synthesize rows for above-threshold-with-stock
@@ -531,7 +531,7 @@ async function rebuildExcelWithRfqLines(sourcedCsvPath, xlsxPath, rfqMapping, ch
     if (escalatedMPNs.has(mpn)) { skippedForEscalation++; continue; }
 
     const cpc = (row[cpcIdx] || '').trim();
-    const rfqLine = rfqMapping.lines[mpn] || '';
+    const rfqLine = (rfqMapping && rfqMapping.lines && rfqMapping.lines[mpn]) || '';
     const reqDocNo = autoRequests[mpn] || '';
 
     // Check columns - lookup by CPC

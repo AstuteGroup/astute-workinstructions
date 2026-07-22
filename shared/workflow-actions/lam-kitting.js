@@ -38,6 +38,16 @@ const ASTUTE = path.join(process.env.HOME, 'workspace', 'astute-workinstructions
 const ROSTER_PATH = path.join(ASTUTE, 'Trading Analysis/LAM 3PL/LAM_Master_Roster.xlsx');
 const FLAGGED_REVIEW_PATH = path.join(ASTUTE, 'Trading Analysis/LAM 3PL/data/lam-flagged-review.json');
 
+// Import enrichment functions from the reorder script (single source of truth)
+const {
+  loadHistoricalPurchaseData,
+  loadRecentPOVs,
+  formatPOVCell,
+  buildAlert,
+  ALERT_COLUMNS,
+} = require(path.join(ASTUTE, 'Trading Analysis/LAM 3PL/lam-kitting-reorder.js'));
+const { normalizeMPN } = require(path.join(ASTUTE, 'shared/mpn-normalization'));
+
 // ─── ROSTER COLUMN MAPPING ───────────────────────────────────────────────────
 // Must match lam-kitting-reorder.js and lam-3pl.md spec
 
@@ -954,101 +964,107 @@ async function action_add_awards(payload, ctx) {
     const outputDir = path.join(LAM_DIR, 'output');
     const today = new Date().toISOString().slice(0, 10);
 
-    // Step 3a: Generate reorder-alert format CSV with Award + Updated Status columns
+    // Step 3a: Generate reorder-alert format CSV using SAME functions as reorder workflow
     const alertsCsvPath = path.join(outputDir, `LAM_New_Awards_${today}.csv`);
-    const ALERT_HEADERS = [
-      'Lam P/N', 'MPN', 'Manufacturer', 'Item Description',
-      'QTY ON HAND', 'W115 Stale Inventory', 'Reorder Threshold', 'Shortfall', 'Priority',
-      'On Order Qty', 'Recent POV', 'Last Promise Date', 'Last RFQ',
-      'Base Unit Price', 'Resale Price', 'Historical Purchase Price',
-      'OT Previous Supplier', 'OT Buyer', 'Historical Buyer',
-      'Lead Time', 'LAM MOQ',
-      'Award', 'Updated Status'  // New columns for single-sheet output
-    ];
+
+    // Use ALERT_COLUMNS from reorder script + Award/Updated Status columns
+    const ALERT_HEADERS = [...ALERT_COLUMNS, 'Award', 'Updated Status'];
 
     // Reload roster to get full data for added parts
     const roster = readRoster();
 
-    // Build rows for NEW parts (added to roster)
-    const addedCsvRows = results.added.map(p => {
+    // Load historical data from OT (same as reorder workflow)
+    console.log('  Loading historical purchase data from OT...');
+    const allMpns = [
+      ...results.added.map(p => p.mpn),
+      ...results.flagged.map(p => p.mpn || p.existingMpn),
+    ].filter(Boolean);
+    const historicalData = loadHistoricalPurchaseData(allMpns);
+    console.log(`    Historical data found for ${Object.keys(historicalData).length} MPNs`);
+
+    console.log('  Loading recent POVs from OT...');
+    const recentPOVs = loadRecentPOVs();
+    console.log(`    Recent POVs found for ${Object.keys(recentPOVs).length} MPNs`);
+
+    // Build alert rows using buildAlert() from reorder script
+    const allAlerts = [];
+
+    // NEW parts (added to roster)
+    for (const p of results.added) {
       const match = findRosterRowByCpc(p.cpc);
       const rosterRow = match.found ? match.row : {};
       const cols = match.found ? match.cols : {};
 
-      return [
-        p.cpc,
-        p.mpn,
-        p.manufacturer,
-        rosterRow[cols?.DESCRIPTION] || '',
-        0, // QTY ON HAND (new parts have 0)
-        '', // W115
-        p.reorderThreshold || p.moq || 100,
-        p.reorderThreshold || p.moq || 100, // Shortfall = threshold (100% shortfall)
-        'CRITICAL', // All new parts are critical
-        0, // On Order Qty
-        '', // Recent POV
-        '', // Last Promise Date
-        '', // Last RFQ
-        p.basePrice || '',
-        rosterRow[cols?.RESALE_PRICE] || '',
-        '', // Historical Purchase Price
-        '', // OT Previous Supplier
-        '', // OT Buyer
-        '', // Historical Buyer
-        rosterRow[cols?.LEAD_TIME] || '',
-        p.moq || '',
-        'Phase 3',  // Award - new parts
-        'New Award',  // Updated Status
-      ];
-    });
+      const mpnKey = normalizeMPN(p.mpn);
+      const history = historicalData[mpnKey] || {};
+      const pov = recentPOVs[mpnKey] || null;
 
-    // Build rows for EXISTING parts (flagged)
-    const flaggedCsvRows = results.flagged.map(p => {
+      // Build excel object matching what buildAlert expects
+      const excel = {
+        CPC: p.cpc,
+        Manufacturer: p.manufacturer,
+        Description: rosterRow[cols?.DESCRIPTION] || '',
+        MIN_QTY: p.reorderThreshold || p.moq || 100,
+        Base_Unit_Price: p.basePrice || '',
+        Resale_Price: rosterRow[cols?.RESALE_PRICE] || '',
+        Historical_Buyer: '',
+        Lead_Time: rosterRow[cols?.LEAD_TIME] || '',
+        MOQ: p.moq || '',
+      };
+
+      const alert = buildAlert(p.mpn, excel, 0, 0, excel.MIN_QTY, 'CRITICAL', history, pov);
+      alert['Award'] = 'Phase 3';
+      alert['Updated Status'] = 'New Award';
+      allAlerts.push(alert);
+    }
+
+    // EXISTING parts (flagged)
+    for (const p of results.flagged) {
       const match = findRosterRowByCpc(p.cpc);
       const rosterRow = match.found ? match.row : {};
       const cols = match.found ? match.cols : {};
 
       const updatedStatus = p.valueChanges?.length > 0
-        ? p.valueChanges.map(c => `${c.field}: ${c.old} → ${c.new}`).join('; ')
+        ? p.valueChanges.map(c => `${c.field}: ${c.roster ?? c.old} → ${c.email ?? c.new}`).join('; ')
         : '(no changes)';
 
-      return [
-        p.cpc,
-        p.mpn || p.existingMpn,
-        p.manufacturer || p.existingMfr,
-        rosterRow[cols?.DESCRIPTION] || '',
-        rosterRow[cols?.QTY_ON_HAND] || 0,
-        '', // W115
-        rosterRow[cols?.REORDER_THRESHOLD] || 100,
-        rosterRow[cols?.REORDER_THRESHOLD] || 100, // Shortfall
-        'REVIEW', // Flagged parts need review
-        0, // On Order Qty
-        '', // Recent POV
-        '', // Last Promise Date
-        '', // Last RFQ
-        rosterRow[cols?.BASE_PRICE] || '',
-        rosterRow[cols?.RESALE_PRICE] || '',
-        '', // Historical Purchase Price
-        '', // OT Previous Supplier
-        '', // OT Buyer
-        '', // Historical Buyer
-        rosterRow[cols?.LEAD_TIME] || '',
-        rosterRow[cols?.MOQ] || '',
-        p.existingAward || 'EPG',  // Award - existing parts
-        updatedStatus,  // Updated Status
-      ];
-    });
+      const mpn = p.mpn || p.existingMpn;
+      const mpnKey = normalizeMPN(mpn);
+      const history = historicalData[mpnKey] || {};
+      const pov = recentPOVs[mpnKey] || null;
 
-    // Combine: new parts first, then existing
-    const allCsvRows = [...addedCsvRows, ...flaggedCsvRows];
+      const excel = {
+        CPC: p.cpc,
+        Manufacturer: p.manufacturer || p.existingMfr,
+        Description: rosterRow[cols?.DESCRIPTION] || '',
+        MIN_QTY: rosterRow[cols?.REORDER_THRESHOLD] || 100,
+        Base_Unit_Price: rosterRow[cols?.BASE_PRICE] || '',
+        Resale_Price: rosterRow[cols?.RESALE_PRICE] || '',
+        Historical_Buyer: '',
+        Lead_Time: rosterRow[cols?.LEAD_TIME] || '',
+        MOQ: rosterRow[cols?.MOQ] || '',
+      };
 
-    const csvLines = [
-      ALERT_HEADERS.join(','),
-      ...allCsvRows.map(row => row.map(v => {
-        const s = String(v ?? '');
-        return s.includes(',') || s.includes('"') ? `"${s.replace(/"/g, '""')}"` : s;
-      }).join(','))
-    ];
+      const totalQty = rosterRow[cols?.QTY_ON_HAND] || 0;
+      const shortfall = Math.max(0, excel.MIN_QTY - totalQty);
+      const alert = buildAlert(mpn, excel, totalQty, 0, shortfall, 'REVIEW', history, pov);
+      alert['Award'] = p.existingAward || 'EPG';
+      alert['Updated Status'] = updatedStatus;
+      allAlerts.push(alert);
+    }
+
+    // Write CSV using the alert objects
+    const csvLines = [ALERT_HEADERS.join(',')];
+    for (const alert of allAlerts) {
+      const row = ALERT_HEADERS.map(h => {
+        const val = alert[h];
+        if (typeof val === 'string' && (val.includes(',') || val.includes('"') || val.includes('\n'))) {
+          return `"${val.replace(/"/g, '""')}"`;
+        }
+        return val ?? '';
+      });
+      csvLines.push(row.join(','));
+    }
     fs.writeFileSync(alertsCsvPath, csvLines.join('\n'));
     console.log(`  Generated reorder-alert CSV: ${path.basename(alertsCsvPath)}`);
 
@@ -1146,63 +1162,68 @@ async function action_add_awards(payload, ctx) {
     const outputDir = path.join(LAM_DIR, 'output');
     const today = new Date().toISOString().slice(0, 10);
 
-    // Generate reorder-alert format CSV for flagged parts
-    // Includes Award and Updated Status columns for single-sheet output
-    const alertsCsvPath = path.join(outputDir, `LAM_New_Awards_${today}.csv`);
-    const ALERT_HEADERS = [
-      'Lam P/N', 'MPN', 'Manufacturer', 'Item Description',
-      'QTY ON HAND', 'W115 Stale Inventory', 'Reorder Threshold', 'Shortfall', 'Priority',
-      'On Order Qty', 'Recent POV', 'Last Promise Date', 'Last RFQ',
-      'Base Unit Price', 'Resale Price', 'Historical Purchase Price',
-      'OT Previous Supplier', 'OT Buyer', 'Historical Buyer',
-      'Lead Time', 'LAM MOQ',
-      'Award', 'Updated Status'  // New columns for tracking
-    ];
+    // Load historical data from OT (same as reorder workflow)
+    console.log('  Loading historical purchase data from OT...');
+    const allMpns = results.flagged.map(p => p.mpn || p.existingMpn).filter(Boolean);
+    const historicalData = loadHistoricalPurchaseData(allMpns);
+    console.log(`    Historical data found for ${Object.keys(historicalData).length} MPNs`);
 
-    const flaggedCsvRows = results.flagged.map(p => {
+    console.log('  Loading recent POVs from OT...');
+    const recentPOVs = loadRecentPOVs();
+    console.log(`    Recent POVs found for ${Object.keys(recentPOVs).length} MPNs`);
+
+    // Generate reorder-alert format CSV using SAME columns as reorder workflow
+    const alertsCsvPath = path.join(outputDir, `LAM_New_Awards_${today}.csv`);
+    const ALERT_HEADERS = [...ALERT_COLUMNS, 'Award', 'Updated Status'];
+
+    // Build alert rows using buildAlert() from reorder script
+    const allAlerts = [];
+    for (const p of results.flagged) {
       const match = findRosterRowByCpc(p.cpc);
       const rosterRow = match.found ? match.row : {};
       const cols = match.found ? match.cols : {};
 
-      // Build Updated Status from value changes
       const updatedStatus = p.valueChanges?.length > 0
-        ? p.valueChanges.map(c => `${c.field}: ${c.old} → ${c.new}`).join('; ')
+        ? p.valueChanges.map(c => `${c.field}: ${c.roster ?? c.old} → ${c.email ?? c.new}`).join('; ')
         : '(no changes)';
 
-      return [
-        p.cpc,
-        p.mpn || p.existingMpn,
-        p.manufacturer || p.existingMfr,
-        rosterRow[cols?.DESCRIPTION] || '',
-        rosterRow[cols?.QTY_ON_HAND] || 0,
-        '', // W115
-        rosterRow[cols?.REORDER_THRESHOLD] || 100,
-        rosterRow[cols?.REORDER_THRESHOLD] || 100, // Shortfall
-        'REVIEW', // Flagged parts need review
-        0, // On Order Qty
-        '', // Recent POV
-        '', // Last Promise Date
-        '', // Last RFQ
-        rosterRow[cols?.BASE_PRICE] || '',
-        rosterRow[cols?.RESALE_PRICE] || '',
-        '', // Historical Purchase Price
-        '', // OT Previous Supplier
-        '', // OT Buyer
-        '', // Historical Buyer
-        rosterRow[cols?.LEAD_TIME] || '',
-        rosterRow[cols?.MOQ] || '',
-        p.existingAward || 'EPG',  // Award column
-        updatedStatus,              // Updated Status column
-      ];
-    });
+      const mpn = p.mpn || p.existingMpn;
+      const mpnKey = normalizeMPN(mpn);
+      const history = historicalData[mpnKey] || {};
+      const pov = recentPOVs[mpnKey] || null;
 
-    const csvLines = [
-      ALERT_HEADERS.join(','),
-      ...flaggedCsvRows.map(row => row.map(v => {
-        const s = String(v ?? '');
-        return s.includes(',') || s.includes('"') ? `"${s.replace(/"/g, '""')}"` : s;
-      }).join(','))
-    ];
+      const excel = {
+        CPC: p.cpc,
+        Manufacturer: p.manufacturer || p.existingMfr,
+        Description: rosterRow[cols?.DESCRIPTION] || '',
+        MIN_QTY: rosterRow[cols?.REORDER_THRESHOLD] || 100,
+        Base_Unit_Price: rosterRow[cols?.BASE_PRICE] || '',
+        Resale_Price: rosterRow[cols?.RESALE_PRICE] || '',
+        Historical_Buyer: '',
+        Lead_Time: rosterRow[cols?.LEAD_TIME] || '',
+        MOQ: rosterRow[cols?.MOQ] || '',
+      };
+
+      const totalQty = rosterRow[cols?.QTY_ON_HAND] || 0;
+      const shortfall = Math.max(0, excel.MIN_QTY - totalQty);
+      const alert = buildAlert(mpn, excel, totalQty, 0, shortfall, 'REVIEW', history, pov);
+      alert['Award'] = p.existingAward || 'EPG';
+      alert['Updated Status'] = updatedStatus;
+      allAlerts.push(alert);
+    }
+
+    // Write CSV using the alert objects
+    const csvLines = [ALERT_HEADERS.join(',')];
+    for (const alert of allAlerts) {
+      const row = ALERT_HEADERS.map(h => {
+        const val = alert[h];
+        if (typeof val === 'string' && (val.includes(',') || val.includes('"') || val.includes('\n'))) {
+          return `"${val.replace(/"/g, '""')}"`;
+        }
+        return val ?? '';
+      });
+      csvLines.push(row.join(','));
+    }
     fs.writeFileSync(alertsCsvPath, csvLines.join('\n'));
     console.log(`  Generated reorder-alert CSV: ${path.basename(alertsCsvPath)}`);
 
