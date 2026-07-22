@@ -17,12 +17,12 @@ Extracts data from FedEx customs invoices (PDF) and populates the Tariff and Ove
 | Entry Date | Customs Entry Date |
 | Duties/Taxes | Customs Duty amount |
 | MPF | Merchandise Processing Fee |
-| Oversized Charges | Transportation charges (if >$1000) |
+| Oversized Charges | Transportation charges (only if individual shipment >$1,000) |
 | Total Fees | Sum of all fees |
 | Shipper | Sender name |
 | TR#/Reference Number | Tracking ID |
 | Invoice | Invoice Number(s) - comma-separated if multiple |
-| SOURCE | POV number(s) from Cust. Ref. / PO NO. |
+| SOURCE | POV number(s) only — no descriptions or internal refs |
 | MPN | Part number from OT lookup |
 | QTY | Quantity from OT lookup |
 | COV/Job | Customer order from OT lookup |
@@ -33,14 +33,26 @@ Extracts data from FedEx customs invoices (PDF) and populates the Tariff and Ove
 
 ### 1. POV Lookup Priority
 1. **Check Cust. Ref. field** in PDF for POV number
-2. **If no POV, check tracking number** against `c_orderline.chuboe_trackingnumbers`
-3. **If still no match**, leave MPN/QTY/COV/Buyer/Salesperson blank
+2. **If no POV, search tracking number** against `c_orderline.chuboe_trackingnumbers` using wildcards:
+   - Try exact match: `ILIKE '%873974347228%'`
+   - Try with prefix: `ILIKE '%FedEx # 873974347228%'`
+   - Try partial (last 6-8 digits): `ILIKE '%4347228%'`
+3. **If COV reference** in Cust. Ref., lookup POV via allocation (see COV Lookup query below)
+4. **If still no match**, leave MPN/QTY/COV/Buyer/Salesperson blank
+
+**SOURCE column rules:**
+- Only populate with POV numbers (e.g., POV0076977)
+- Do NOT include descriptions (e.g., "quartz crystal sample")
+- Do NOT include internal references (e.g., "Ref: 232424")
+- Leave blank if no POV can be determined
 
 ### 2. Transportation Charges (Oversized)
-- Only capture transportation-only invoices if **total > $1,000**
+- Only capture **individual shipments** with transportation charges **> $1,000**
+- Invoice totals are irrelevant — evaluate each shipment individually
 - Put transportation charges in the **Oversized Charges** column
-- If same shipment has both customs and transportation invoices, **merge into one row**
+- If same shipment has both customs and transportation invoices AND transportation > $1,000, **merge into one row**
 - Record **both invoice numbers** comma-separated in Invoice field
+- **Ignore** transportation charges ≤ $1,000 (do not merge, do not add standalone rows)
 
 ### 3. Record Merging
 - If two records have **same tracking number AND same buyer AND same salesperson**, merge them
@@ -112,6 +124,28 @@ LEFT JOIN adempiere.ad_user sales ON sales.ad_user_id = cov.salesrep_id
 WHERE po.documentno = 'PO810169';
 ```
 
+### Lookup POV/MPN/Buyer/Salesperson from COV Reference
+Use when transportation invoice has COV in Cust. Ref. field:
+```sql
+SELECT DISTINCT
+  sol.order_line_infor_co_no as cov,
+  pol.order_line_infor_po_no as pov,
+  pol.order_line_mpn as mpn,
+  pol.order_line_qty_ordered as qty,
+  buyer.name as buyer,
+  sales.name as salesperson
+FROM adempiere.bi_order_line_v sol
+JOIN adempiere.c_orderline covline ON covline.c_orderline_id = sol.order_line_id
+JOIN adempiere.c_order cov ON cov.c_order_id = covline.c_order_id
+LEFT JOIN adempiere.chuboe_alloc_order_lot alloc ON alloc.c_orderline_id = covline.c_orderline_id
+LEFT JOIN adempiere.c_orderline poline ON poline.c_orderline_id = alloc.chuboe_poline_id
+LEFT JOIN adempiere.c_order po ON po.c_order_id = poline.c_order_id
+LEFT JOIN adempiere.bi_order_line_v pol ON pol.order_line_id = poline.c_orderline_id
+LEFT JOIN adempiere.ad_user buyer ON buyer.ad_user_id = po.salesrep_id
+LEFT JOIN adempiere.ad_user sales ON sales.ad_user_id = cov.salesrep_id
+WHERE sol.order_line_infor_co_no IN ('COV0022333', 'COV0022464');
+```
+
 ## Field Clarifications
 
 - **Buyer** = `salesrep_id` on the PO (the purchasing agent), NOT `createdby`
@@ -153,3 +187,4 @@ When same tracking has multiple POVs with same buyer/salesperson:
 
 *Created: 2026-06-23*
 *Updated: 2026-07-16 - Added processing rules for merging, thresholds, and transportation charges*
+*Updated: 2026-07-22 - Clarified transportation >$1,000 threshold applies per shipment (not invoice); added wildcard tracking search; added COV lookup query; SOURCE column POVs only*
