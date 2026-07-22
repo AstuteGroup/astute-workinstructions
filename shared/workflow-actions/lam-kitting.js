@@ -655,20 +655,26 @@ async function action_add_award(payload, ctx) {
     };
   }
 
-  // Check if CPC already exists (prevent duplicates)
+  // Check if CPC already exists — redirect to batch flow for proper sourcing
   const existingCheck = findRosterRowByCpc(cpc);
   if (existingCheck.found) {
-    breadcrumbs.write({
-      cog: 'lam-kitting-agent',
-      event: 'add-award-duplicate',
-      uid: ctx.uid,
-      cpc,
-      existingRow: existingCheck.rowIdx,
-    });
-    return {
-      error: `CPC ${cpc} already exists in Master Roster at row ${existingCheck.rowIdx + 1}`,
-      fallback: 'needs_review',
-    };
+    // Redirect to add_awards batch flow which handles existing parts properly
+    // (runs sourcing, generates Excel, etc.)
+    console.log(`  CPC ${cpc} already exists — redirecting to add_awards batch flow`);
+    return action_add_awards({
+      awards: [{
+        cpc,
+        mpn,
+        manufacturer,
+        awardQty,
+        basePrice,
+        resalePrice,
+        reorderThreshold,
+        moq,
+        contractualLeadTime,
+      }],
+      investigation_summary: investigation_summary || 'Single award redirected to batch flow (CPC exists)',
+    }, ctx);
   }
 
   const result = appendRosterRow({

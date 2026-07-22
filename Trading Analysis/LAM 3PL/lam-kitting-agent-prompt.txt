@@ -131,9 +131,11 @@ For every UID returned, follow this decision tree:
   - Send ONE consolidated email showing ALL parts with field comparison table
   - CC the original sender (Josh, etc.) if different from Jake
 
-3.7 FOR NEW AWARD BATCHES — USE add_awards (PREFERRED)
+3.7 FOR AWARD BATCHES — ALWAYS USE add_awards
 
-  When email contains MULTIPLE new CPCs not yet in roster, use `add_awards`:
+  When email contains MULTIPLE CPCs (2+), ALWAYS use `add_awards` — even if
+  some or all CPCs already exist in the roster. The handler detects existing
+  parts and flags them appropriately (no duplicates created).
 
   1. Parse all new parts from email (CPC, MPN, Manufacturer required; MOQ/threshold optional)
   2. Route ONCE with `add_awards`:
@@ -144,24 +146,28 @@ For every UID returned, follow this decision tree:
        ], "investigation_summary": "N new award CPCs from LAM..."}'
 
   The handler will:
-  - Add all parts to Master Roster with Status = "New Award"
-  - Create an RFQ for franchise sourcing
-  - Call franchise APIs for pricing/availability
-  - Send ONE consolidated email with:
-    - All parts added (with franchise stock/pricing)
-    - Missing info flagged (not blocking)
-    - Next steps for initial ordering
-  - Parts then enter normal reorder workflow going forward
+  - For NEW parts: Add to Master Roster with Status = "New Award"
+  - For EXISTING parts: Flag as "Already Exist", update any value deltas
+  - Run franchise sourcing for ALL parts (new + existing)
+  - Create RFQ if there are new parts
+  - Send ONE consolidated email with sourced Excel attachment:
+    - Franchise stock/pricing for all parts
+    - Value changes flagged for existing parts
+    - Next steps for ordering
 
   NOTE: Missing fields (basePrice, resalePrice, etc.) are NOT blocking — handler
   defaults to 0 and flags as "Missing Info" for later update.
 
-3.7.1 FOR SINGLE add_award — VALIDATE MFR FIRST
-  Before routing single add_award:
+3.7.1 NEVER USE add_award FOR BATCHES
+  The singular `add_award` action is DEPRECATED for batches. It does NOT run
+  franchise sourcing and does NOT generate proper Excel output.
 
+  RULE: If email contains 2+ CPCs → ALWAYS use `add_awards` (plural)
+        Only use `add_award` (singular) for exactly 1 CPC
+
+  For single add_award, validate MFR first:
   Query: psql -c "SELECT chuboe_mfr_id, name FROM chuboe_mfr WHERE LOWER(name) LIKE '%<manufacturer>%' AND isactive='Y'"
-
-  If no match → route `needs_review` with reason "MFR not found", NOT add_award
+  If no match → route `needs_review` with reason "MFR not found"
 
 3.8 BLANKET APPROVALS
   If email says "All items approved as proposed":
