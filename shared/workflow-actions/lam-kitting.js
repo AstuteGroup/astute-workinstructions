@@ -73,12 +73,14 @@ const DISCREPANCY_FIELDS = [
 /**
  * Build email options with CC to original sender (if different from Jake).
  * All summary emails go to Jake AND the original email sender.
+ *
+ * Set skipCc: true to disable CC (e.g., during testing/iteration)
  */
 function buildEmailOpts(ctx, extraOpts = {}) {
   const opts = { html: true, replyTo: ctx.inbox, ...extraOpts };
 
-  // CC the original sender if different from Jake
-  if (ctx.currentFrom && ctx.currentFrom !== ctx.jakeEmail.toLowerCase()) {
+  // CC the original sender if different from Jake (unless skipCc is set)
+  if (!extraOpts.skipCc && ctx.currentFrom && ctx.currentFrom !== ctx.jakeEmail.toLowerCase()) {
     opts.cc = ctx.currentFrom;
   }
 
@@ -952,7 +954,7 @@ async function action_add_awards(payload, ctx) {
     const outputDir = path.join(LAM_DIR, 'output');
     const today = new Date().toISOString().slice(0, 10);
 
-    // Step 3a: Generate reorder-alert format CSV
+    // Step 3a: Generate reorder-alert format CSV with Award + Updated Status columns
     const alertsCsvPath = path.join(outputDir, `LAM_New_Awards_${today}.csv`);
     const ALERT_HEADERS = [
       'Lam P/N', 'MPN', 'Manufacturer', 'Item Description',
@@ -960,13 +962,15 @@ async function action_add_awards(payload, ctx) {
       'On Order Qty', 'Recent POV', 'Last Promise Date', 'Last RFQ',
       'Base Unit Price', 'Resale Price', 'Historical Purchase Price',
       'OT Previous Supplier', 'OT Buyer', 'Historical Buyer',
-      'Lead Time', 'LAM MOQ'
+      'Lead Time', 'LAM MOQ',
+      'Award', 'Updated Status'  // New columns for single-sheet output
     ];
 
     // Reload roster to get full data for added parts
     const roster = readRoster();
+
+    // Build rows for NEW parts (added to roster)
     const addedCsvRows = results.added.map(p => {
-      // Find the part in roster to get all fields
       const match = findRosterRowByCpc(p.cpc);
       const rosterRow = match.found ? match.row : {};
       const cols = match.found ? match.cols : {};
@@ -993,12 +997,54 @@ async function action_add_awards(payload, ctx) {
         '', // Historical Buyer
         rosterRow[cols?.LEAD_TIME] || '',
         p.moq || '',
+        'Phase 3',  // Award - new parts
+        'New Award',  // Updated Status
       ];
     });
 
+    // Build rows for EXISTING parts (flagged)
+    const flaggedCsvRows = results.flagged.map(p => {
+      const match = findRosterRowByCpc(p.cpc);
+      const rosterRow = match.found ? match.row : {};
+      const cols = match.found ? match.cols : {};
+
+      const updatedStatus = p.valueChanges?.length > 0
+        ? p.valueChanges.map(c => `${c.field}: ${c.old} → ${c.new}`).join('; ')
+        : '(no changes)';
+
+      return [
+        p.cpc,
+        p.mpn || p.existingMpn,
+        p.manufacturer || p.existingMfr,
+        rosterRow[cols?.DESCRIPTION] || '',
+        rosterRow[cols?.QTY_ON_HAND] || 0,
+        '', // W115
+        rosterRow[cols?.REORDER_THRESHOLD] || 100,
+        rosterRow[cols?.REORDER_THRESHOLD] || 100, // Shortfall
+        'REVIEW', // Flagged parts need review
+        0, // On Order Qty
+        '', // Recent POV
+        '', // Last Promise Date
+        '', // Last RFQ
+        rosterRow[cols?.BASE_PRICE] || '',
+        rosterRow[cols?.RESALE_PRICE] || '',
+        '', // Historical Purchase Price
+        '', // OT Previous Supplier
+        '', // OT Buyer
+        '', // Historical Buyer
+        rosterRow[cols?.LEAD_TIME] || '',
+        rosterRow[cols?.MOQ] || '',
+        p.existingAward || 'EPG',  // Award - existing parts
+        updatedStatus,  // Updated Status
+      ];
+    });
+
+    // Combine: new parts first, then existing
+    const allCsvRows = [...addedCsvRows, ...flaggedCsvRows];
+
     const csvLines = [
       ALERT_HEADERS.join(','),
-      ...addedCsvRows.map(row => row.map(v => {
+      ...allCsvRows.map(row => row.map(v => {
         const s = String(v ?? '');
         return s.includes(',') || s.includes('"') ? `"${s.replace(/"/g, '""')}"` : s;
       }).join(','))
@@ -1085,61 +1131,10 @@ async function action_add_awards(payload, ctx) {
       }));
     }
 
-    // Step 3e: Add FLAGGED items sheet to the Excel (existing parts with value changes)
-    if (results.flagged.length > 0 && sourcedXlsx && fs.existsSync(sourcedXlsx)) {
-      try {
-        const wb = XLSX.readFile(sourcedXlsx);
-
-        // Build existing parts data with value change details
-        const flaggedData = results.flagged.map(f => {
-          const row = {
-            'CPC': f.cpc,
-            'MPN (Email)': f.mpn,
-            'MPN (Roster)': f.existingMpn,
-            'Manufacturer': f.manufacturer || f.existingMfr,
-            'Existing Award': f.existingAward,
-            'Existing Status': f.existingStatus,
-          };
-          if (f.existingValues) {
-            row['Previous Base Price'] = f.existingValues.basePrice || '';
-            row['Previous Resale'] = f.existingValues.resalePrice || '';
-            row['Previous Lead Time'] = f.existingValues.leadTime || '';
-            row['Previous MOQ'] = f.existingValues.moq || '';
-          }
-          const changes = (f.valueChanges || []).map(c => `${c.field}: ${c.roster} → ${c.email}`).join('; ');
-          row['Value Changes'] = changes || '(no changes)';
-          row['Status'] = f.valuesUpdated ? 'UPDATED' : 'UNCHANGED';
-          return row;
-        });
-
-        const ws = XLSX.utils.json_to_sheet(flaggedData);
-        ws['!cols'] = [
-          { wch: 18 }, { wch: 25 }, { wch: 25 }, { wch: 30 },
-          { wch: 12 }, { wch: 15 }, { wch: 14 }, { wch: 14 },
-          { wch: 16 }, { wch: 10 }, { wch: 60 },
-        ];
-
-        // Insert as second sheet (after main data, before Escalations)
-        const sheetNames = wb.SheetNames;
-        const escIdx = sheetNames.indexOf('Escalations');
-        const updatedCount = results.flagged.filter(f => f.valuesUpdated).length;
-        const sheetName = updatedCount > 0 ? 'Existing - Updated' : 'Existing - No Change';
-
-        if (escIdx > 0) {
-          // Insert before Escalations
-          sheetNames.splice(escIdx, 0, sheetName);
-        } else {
-          // Append
-          sheetNames.push(sheetName);
-        }
-        wb.Sheets[sheetName] = ws;
-        wb.SheetNames = [...new Set(sheetNames)]; // dedupe if needed
-
-        XLSX.writeFile(wb, sourcedXlsx);
-        console.log(`  Added ${sheetName} sheet with ${results.flagged.length} existing parts (${updatedCount} updated)`);
-      } catch (err) {
-        console.error('  WARNING: Failed to add FLAGGED sheet:', err.message);
-      }
+    // Award and Updated Status columns should be in the main CSV - no separate sheet needed
+    // TODO: Update lam-kitting-source.js to preserve Award/Updated Status columns through sourcing
+    if (results.flagged.length > 0) {
+      console.log(`  ${results.flagged.length} existing parts included in main sheet with Award/Updated Status`);
     }
   } else if (results.flagged.length > 0) {
     // Flagged-only case: all parts already exist, no net-new
@@ -1152,6 +1147,7 @@ async function action_add_awards(payload, ctx) {
     const today = new Date().toISOString().slice(0, 10);
 
     // Generate reorder-alert format CSV for flagged parts
+    // Includes Award and Updated Status columns for single-sheet output
     const alertsCsvPath = path.join(outputDir, `LAM_New_Awards_${today}.csv`);
     const ALERT_HEADERS = [
       'Lam P/N', 'MPN', 'Manufacturer', 'Item Description',
@@ -1159,13 +1155,19 @@ async function action_add_awards(payload, ctx) {
       'On Order Qty', 'Recent POV', 'Last Promise Date', 'Last RFQ',
       'Base Unit Price', 'Resale Price', 'Historical Purchase Price',
       'OT Previous Supplier', 'OT Buyer', 'Historical Buyer',
-      'Lead Time', 'LAM MOQ'
+      'Lead Time', 'LAM MOQ',
+      'Award', 'Updated Status'  // New columns for tracking
     ];
 
     const flaggedCsvRows = results.flagged.map(p => {
       const match = findRosterRowByCpc(p.cpc);
       const rosterRow = match.found ? match.row : {};
       const cols = match.found ? match.cols : {};
+
+      // Build Updated Status from value changes
+      const updatedStatus = p.valueChanges?.length > 0
+        ? p.valueChanges.map(c => `${c.field}: ${c.old} → ${c.new}`).join('; ')
+        : '(no changes)';
 
       return [
         p.cpc,
@@ -1189,6 +1191,8 @@ async function action_add_awards(payload, ctx) {
         '', // Historical Buyer
         rosterRow[cols?.LEAD_TIME] || '',
         rosterRow[cols?.MOQ] || '',
+        p.existingAward || 'EPG',  // Award column
+        updatedStatus,              // Updated Status column
       ];
     });
 
@@ -1233,57 +1237,23 @@ async function action_add_awards(payload, ctx) {
       sourcedXlsx = writeNewAwardsExcel(results, enrichResults, rfqResult);
     }
 
-    // Add FLAGGED sheet to the Excel
-    if (fs.existsSync(sourcedXlsx)) {
-      try {
-        const wb = XLSX.readFile(sourcedXlsx);
-        const updatedCount = results.flagged.filter(f => f.valuesUpdated).length;
-        const sheetName = updatedCount > 0 ? 'Existing - Updated' : 'Existing - No Change';
-
-        const flaggedData = results.flagged.map(f => ({
-          'CPC': f.cpc,
-          'MPN (Email)': f.mpn,
-          'MPN (Roster)': f.existingMpn,
-          'Manufacturer': f.manufacturer || f.existingMfr,
-          'Existing Award': f.existingAward,
-          'Existing Status': f.existingStatus || '',
-          'Roster Base Price': f.existingBasePrice,
-          'Roster Resale': f.existingResale,
-          'Roster Lead Time': f.existingLeadTime,
-          'Roster MOQ': f.existingMoq,
-          'Value Changes': f.valueChanges?.length > 0
-            ? f.valueChanges.map(c => `${c.field}: ${c.old} → ${c.new}`).join('; ')
-            : '(no changes)',
-        }));
-
-        const ws = XLSX.utils.json_to_sheet(flaggedData);
-        ws['!cols'] = [
-          { wch: 18 }, { wch: 25 }, { wch: 25 }, { wch: 30 },
-          { wch: 12 }, { wch: 15 }, { wch: 15 }, { wch: 12 },
-          { wch: 15 }, { wch: 10 }, { wch: 60 },
-        ];
-        XLSX.utils.book_append_sheet(wb, ws, sheetName);
-        XLSX.writeFile(wb, sourcedXlsx);
-        console.log(`  Added ${sheetName} sheet with ${results.flagged.length} existing parts`);
-      } catch (err) {
-        console.error('  WARNING: Failed to add flagged sheet:', err.message);
-      }
-    }
+    // Award and Updated Status columns are now in the main sheet - no separate tab needed
+    console.log(`  Single-sheet output with Award/Updated Status columns for ${results.flagged.length} parts`);
   }
 
   // Step 6: Build plaintext email (mirrors reorder alert format)
   const emailBody = buildNewAwardsPlaintextEmail(results, rfqResult, enrichResults, contactPerson, ctx);
 
-  // Step 7: Send email with attachment
+  // Step 7: Send email with attachment (skipCc until output is finalized)
   const attachments = sourcedXlsx && fs.existsSync(sourcedXlsx)
     ? [{ filename: path.basename(sourcedXlsx), path: sourcedXlsx }]
     : [];
   await ctx.notifier.sendWithAttachment(
     ctx.jakeEmail,
-    `LAM New Awards - ${results.added.length} Added, ${results.flagged.length} Flagged${rfqResult?.rfqSearchKey ? ` - RFQ ${rfqResult.rfqSearchKey}` : ''}`,
+    `LAM New Awards - ${results.added.length} Added, ${results.flagged.length} Existing${rfqResult?.rfqSearchKey ? ` - RFQ ${rfqResult.rfqSearchKey}` : ''}`,
     emailBody,
     attachments,
-    buildEmailOpts(ctx, { html: false }),  // Plaintext like reorder alerts
+    buildEmailOpts(ctx, { html: false, skipCc: true }),  // Plaintext, no CC until finalized
   );
 
   breadcrumbs.write({
