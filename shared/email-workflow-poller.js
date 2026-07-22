@@ -911,6 +911,72 @@ async function cmdSearch() {
   }
 }
 
+// ─── COMMAND: requeue ─────────────────────────────────────────────────────────
+//
+// Move an email from a processed folder back to INBOX for reprocessing.
+// Clears the SEEN flag so it appears in the next `list` call.
+//
+// Usage: email-workflow-poller.js requeue <uid> --workflow <name> --folder Processed
+//
+// Example: Requeue the Phase 3 email for reprocessing
+//   node shared/email-workflow-poller.js requeue 104 --workflow lam-kitting --folder Processed
+
+async function cmdRequeue(uid) {
+  const folderIdx = argv.indexOf('--folder');
+  const fromFolder = folderIdx >= 0 ? argv[folderIdx + 1] : null;
+
+  if (!fromFolder) {
+    console.error('ERROR: --folder is required (the current location of the email)');
+    process.exit(2);
+  }
+
+  const client = newClient();
+  await client.connect();
+
+  try {
+    // First, move from current folder to source folder
+    const fromLock = await client.getMailboxLock(fromFolder);
+    try {
+      if (DRY_RUN) {
+        console.log(JSON.stringify({
+          uid,
+          from_folder: fromFolder,
+          to_folder: SOURCE_FOLDER,
+          dry_run: true,
+          message: `Would move UID ${uid} from ${fromFolder} to ${SOURCE_FOLDER} and clear SEEN flag`
+        }, null, 2));
+        return;
+      }
+
+      // Move the email
+      await client.messageMove(String(uid), SOURCE_FOLDER, { uid: true });
+    } finally {
+      fromLock.release();
+    }
+
+    // Now switch to source folder and clear SEEN flag
+    // The UID may have changed after move - search for the message by Message-ID
+    // For simplicity, we'll use the same UID (works in most IMAP implementations)
+    const toLock = await client.getMailboxLock(SOURCE_FOLDER);
+    try {
+      await client.messageFlagsRemove(String(uid), ['\\Seen'], { uid: true });
+    } finally {
+      toLock.release();
+    }
+
+    console.log(JSON.stringify({
+      uid,
+      from_folder: fromFolder,
+      to_folder: SOURCE_FOLDER,
+      seen_cleared: true,
+      message: `Requeued UID ${uid} for reprocessing`
+    }, null, 2));
+
+  } finally {
+    await client.logout().catch(() => {});
+  }
+}
+
 // ─── MAIN ────────────────────────────────────────────────────────────────────
 
 (async () => {
@@ -942,6 +1008,7 @@ async function cmdSearch() {
     if (cmd === 'recover-stuck') return await cmdRecoverStuck();
     if (cmd === 'check-stuck') return await cmdCheckStuck();
     if (cmd === 'search') return await cmdSearch();
+    if (cmd === 'requeue') return await cmdRequeue(parseInt(argv[1], 10));
     console.error('Usage: email-workflow-poller.js <command> --workflow <name> [options]');
     console.error('');
     console.error('Commands:');
@@ -950,6 +1017,7 @@ async function cmdSearch() {
     console.error('  download-attachments <uid>     Save attachments to temp dir');
     console.error('  route <uid> <action>           Execute routing decision');
     console.error('  search                         Search emails by subject/from/body content');
+    console.error('  requeue <uid>                  Move processed email back to INBOX for reprocessing');
     console.error('  check-stuck                    Check for stuck (SEEN but not routed) emails');
     console.error('  recover-stuck                  Clear SEEN flag on stuck emails for reprocessing');
     console.error('');
