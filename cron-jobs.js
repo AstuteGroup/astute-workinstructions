@@ -609,7 +609,7 @@ module.exports = [
     // 12:00 UTC = 8am EDT (May–Nov) / 7am EST (Nov–Mar). DST drift acceptable
     // per ops convention. Mon-Fri only (weekend gate built into script).
     cadenceCron: '0 12 * * 1-5',
-    command: `node "${WORKSPACE}/reports/daily-rfq-report.js" --send`,
+    command: `node "${WORKSPACE}/astute-workinstructions/reports/daily-rfq-report.js" --send`,
     cwd: WORKSPACE,
     needsOT: false,
     logFile: '/tmp/rfq-creation-digest.log',
