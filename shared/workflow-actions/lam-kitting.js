@@ -1137,9 +1137,132 @@ async function action_add_awards(payload, ctx) {
     }
   } else if (results.flagged.length > 0) {
     // Flagged-only case: all parts already exist, no net-new
-    // Still generate an Excel with the flagged items for review
-    console.log(`  No new parts to add, but ${results.flagged.length} existing parts flagged for review`);
-    sourcedXlsx = writeNewAwardsExcel(results, enrichResults, rfqResult);
+    // Still run franchise sourcing to get current pricing/availability
+    console.log(`  No new parts to add, but ${results.flagged.length} existing parts — running sourcing pipeline`);
+
+    const { execSync } = require('child_process');
+    const LAM_DIR = path.join(ASTUTE, 'Trading Analysis/LAM 3PL');
+    const outputDir = path.join(LAM_DIR, 'output');
+    const today = new Date().toISOString().slice(0, 10);
+
+    // Generate reorder-alert format CSV for flagged parts
+    const alertsCsvPath = path.join(outputDir, `LAM_New_Awards_${today}.csv`);
+    const ALERT_HEADERS = [
+      'Lam P/N', 'MPN', 'Manufacturer', 'Item Description',
+      'QTY ON HAND', 'W115 Stale Inventory', 'Reorder Threshold', 'Shortfall', 'Priority',
+      'On Order Qty', 'Recent POV', 'Last Promise Date', 'Last RFQ',
+      'Base Unit Price', 'Resale Price', 'Historical Purchase Price',
+      'OT Previous Supplier', 'OT Buyer', 'Historical Buyer',
+      'Lead Time', 'LAM MOQ'
+    ];
+
+    const flaggedCsvRows = results.flagged.map(p => {
+      const match = findRosterRowByCpc(p.cpc);
+      const rosterRow = match.found ? match.row : {};
+      const cols = match.found ? match.cols : {};
+
+      return [
+        p.cpc,
+        p.mpn || p.existingMpn,
+        p.manufacturer || p.existingMfr,
+        rosterRow[cols?.DESCRIPTION] || '',
+        rosterRow[cols?.QTY_ON_HAND] || 0,
+        '', // W115
+        rosterRow[cols?.REORDER_THRESHOLD] || 100,
+        rosterRow[cols?.REORDER_THRESHOLD] || 100, // Shortfall
+        'REVIEW', // Flagged parts need review
+        0, // On Order Qty
+        '', // Recent POV
+        '', // Last Promise Date
+        '', // Last RFQ
+        rosterRow[cols?.BASE_PRICE] || '',
+        rosterRow[cols?.RESALE_PRICE] || '',
+        '', // Historical Purchase Price
+        '', // OT Previous Supplier
+        '', // OT Buyer
+        '', // Historical Buyer
+        rosterRow[cols?.LEAD_TIME] || '',
+        rosterRow[cols?.MOQ] || '',
+      ];
+    });
+
+    const csvLines = [
+      ALERT_HEADERS.join(','),
+      ...flaggedCsvRows.map(row => row.map(v => {
+        const s = String(v ?? '');
+        return s.includes(',') || s.includes('"') ? `"${s.replace(/"/g, '""')}"` : s;
+      }).join(','))
+    ];
+    fs.writeFileSync(alertsCsvPath, csvLines.join('\n'));
+    console.log(`  Generated reorder-alert CSV: ${path.basename(alertsCsvPath)}`);
+
+    // Run franchise sourcing
+    try {
+      const sourceScript = path.join(LAM_DIR, 'lam-kitting-source.js');
+      execSync(`node "${sourceScript}" "${alertsCsvPath}"`, {
+        encoding: 'utf-8',
+        timeout: 600000,
+        cwd: LAM_DIR,
+      });
+      console.log('  Franchise sourcing complete');
+    } catch (err) {
+      console.error('  WARNING: Franchise sourcing failed:', err.message);
+    }
+
+    // Rebuild Excel (no RFQ for flagged-only)
+    const sourcedCsv = alertsCsvPath.replace('.csv', '_sourced.csv');
+    sourcedXlsx = alertsCsvPath.replace('.csv', '_sourced.xlsx');
+
+    if (fs.existsSync(sourcedCsv)) {
+      try {
+        const { rebuildExcelWithRfqLines } = require(path.join(LAM_DIR, 'lam-kitting-runner.js'));
+        await rebuildExcelWithRfqLines(sourcedCsv, sourcedXlsx, null, {});
+        console.log(`  Excel rebuilt: ${path.basename(sourcedXlsx)}`);
+      } catch (err) {
+        console.error('  WARNING: Excel rebuild failed:', err.message);
+        // Fallback to basic Excel
+        sourcedXlsx = writeNewAwardsExcel(results, enrichResults, rfqResult);
+      }
+    } else {
+      sourcedXlsx = writeNewAwardsExcel(results, enrichResults, rfqResult);
+    }
+
+    // Add FLAGGED sheet to the Excel
+    if (fs.existsSync(sourcedXlsx)) {
+      try {
+        const wb = XLSX.readFile(sourcedXlsx);
+        const updatedCount = results.flagged.filter(f => f.valuesUpdated).length;
+        const sheetName = updatedCount > 0 ? 'Existing - Updated' : 'Existing - No Change';
+
+        const flaggedData = results.flagged.map(f => ({
+          'CPC': f.cpc,
+          'MPN (Email)': f.mpn,
+          'MPN (Roster)': f.existingMpn,
+          'Manufacturer': f.manufacturer || f.existingMfr,
+          'Existing Award': f.existingAward,
+          'Existing Status': f.existingStatus || '',
+          'Roster Base Price': f.existingBasePrice,
+          'Roster Resale': f.existingResale,
+          'Roster Lead Time': f.existingLeadTime,
+          'Roster MOQ': f.existingMoq,
+          'Value Changes': f.valueChanges?.length > 0
+            ? f.valueChanges.map(c => `${c.field}: ${c.old} → ${c.new}`).join('; ')
+            : '(no changes)',
+        }));
+
+        const ws = XLSX.utils.json_to_sheet(flaggedData);
+        ws['!cols'] = [
+          { wch: 18 }, { wch: 25 }, { wch: 25 }, { wch: 30 },
+          { wch: 12 }, { wch: 15 }, { wch: 15 }, { wch: 12 },
+          { wch: 15 }, { wch: 10 }, { wch: 60 },
+        ];
+        XLSX.utils.book_append_sheet(wb, ws, sheetName);
+        XLSX.writeFile(wb, sourcedXlsx);
+        console.log(`  Added ${sheetName} sheet with ${results.flagged.length} existing parts`);
+      } catch (err) {
+        console.error('  WARNING: Failed to add flagged sheet:', err.message);
+      }
+    }
   }
 
   // Step 6: Build plaintext email (mirrors reorder alert format)
