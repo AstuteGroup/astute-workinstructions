@@ -1135,6 +1135,11 @@ async function action_add_awards(payload, ctx) {
         console.error('  WARNING: Failed to add FLAGGED sheet:', err.message);
       }
     }
+  } else if (results.flagged.length > 0) {
+    // Flagged-only case: all parts already exist, no net-new
+    // Still generate an Excel with the flagged items for review
+    console.log(`  No new parts to add, but ${results.flagged.length} existing parts flagged for review`);
+    sourcedXlsx = writeNewAwardsExcel(results, enrichResults, rfqResult);
   }
 
   // Step 6: Build plaintext email (mirrors reorder alert format)
