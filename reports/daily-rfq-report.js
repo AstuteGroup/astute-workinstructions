@@ -23,12 +23,12 @@ const path = require('path');
 require('dotenv').config({ path: path.resolve(__dirname, '../.env') });
 
 // Weekend gate — skip Sat/Sun EST to reduce noise
-const { exitIfWeekend } = require('../astute-workinstructions/shared/weekend-gate');
+const { exitIfWeekend } = require('../shared/weekend-gate');
 exitIfWeekend();
 
 const { execSync } = require('child_process');
-const { createNotifier } = require('../astute-workinstructions/shared/notifier');
-const { isKnownBuyer, isKnownSupport } = require('../astute-workinstructions/shared/partner-lookup');
+const { createNotifier } = require('../shared/notifier');
+const { isKnownBuyer, isKnownSupport } = require('../shared/partner-lookup');
 
 const CLAUDE_USER_ID = 1049524;
 
