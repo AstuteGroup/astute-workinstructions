@@ -83,7 +83,7 @@ async function getVendorType(bpId) {
  * Create a manual VQ with all program defaults applied.
  *
  * @param {object} opts
- * @param {string} opts.program           'LAM_KITTING' | 'LAM_EPG' | null (uses program defaults)
+ * @param {string} opts.program           'LAM_KITTING' | null (uses program defaults)
  * @param {string} opts.rfqValue          RFQ search key (e.g., '1137922')
  * @param {number} opts.rfqId             RFQ ID (optional if rfqValue provided)
  * @param {number} opts.rfqLineId         RFQ Line ID (required)

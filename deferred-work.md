@@ -353,6 +353,13 @@ The SessionStart greeting reads this file and surfaces all open items, sorted by
   - **Ready when:** Operator opens the conversation with Chuck. Suggested column name: `chuboe_sales_rep_id` or `chuboe_owner_user_id` (mirror whichever convention already exists on related tables). Once shipped, update `shared/offer-writeback.js` + `shared/workflow-actions/excess.js` + `customer-excess-analysis.md` to populate it from the same Tier A/B/C/D ladder the other three loaders use (see `shared/partner-matching.md` § Astute Employee Resolution).
   - **Source:** 2026-05-18 loader-parity audit — three loaders updated to use the new forwarder-vs-owner rule; excess is the lone gap.
 
+- [ ] 🅿️ **LAM 3PL — tariff handling documentation** *(opened 2026-07-23, workflow consolidation)*
+  - **Context:** During LAM workflow consolidation (merging EPG into LAM 3PL), identified tariff tracking pattern worth preserving: add tariffs to Total Cost AND note the amount separately (e.g., "⚠ TARIFF $31.40") for margin visibility.
+  - **Why parked:** Operator needs to decide where this fits — Step 4 (Create Purchase Orders) vs separate "Cost Tracking" section vs Master Roster column.
+  - **Ready when:** Operator decides on placement.
+  - **How:** Add 2-3 sentence note to lam-3pl.md explaining tariff handling when applicable.
+  - **Source:** EPG doc (`lam-epg-order-processing.md`) — being archived, tariff pattern was the only reusable piece.
+
 - [ ] 🅿️ **Marvell carryover — should we be tracking incoming lot bids at all?** *(unaddressed business question)*
   - **Why parked:** Surfaced 2026-05-07 while debugging the 5/4 inventory-cleanup partial. The `Incoming Lot bid from Marvell` slot in `STATIC_CARRYOVER_OFFERS` was originally seeded with bootstrap offer 1024030 (created 2025-07-17, BP=Astute Electronics Inc, OfferType=Stock-Philippines). The header was **never populated** — 0 active lines, 0 inactive lines, *ever*. The weekly refresh has been silently "leaving as-is" for 10 months. Today (5/7) we removed the entry from `STATIC_CARRYOVER_OFFERS` so the script stops touching dead config, but **the underlying business question hasn't been addressed**: does Astute actually win Marvell lot bids that need carryover treatment (i.e. stock committed to but not yet in Infor)? If yes, the workflow for seeding the carryover when a bid is won has never been documented or used. If no, this whole slot was speculative and can stay deleted.
   - **Ready when:** Operator decides — needs a real conversation with whoever bids on Marvell lots (Ivy Chew is the recurring Marvell contact in OT; multiple `Contact Ivy Chew` offers exist).

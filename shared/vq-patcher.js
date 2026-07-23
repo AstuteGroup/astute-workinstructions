@@ -42,7 +42,7 @@ const JAKE_HARRIS_USER_ID = 1000004;
  *
  * @param {number} vqId                    chuboe_vq_line_id to tick
  * @param {object} opts
- * @param {string} opts.program            'LAM_KITTING' | 'LAM_EPG' | null
+ * @param {string} opts.program            'LAM_KITTING' | null
  * @param {object} [opts.extra]            additional fields to PATCH alongside
  *                                         IsPurchased='Y' (DatePromised, etc.).
  *                                         Applied in a single PATCH so the

@@ -74,7 +74,7 @@ const AD_TABLE_CHUBOE_RFQ   = 1000002;
  *                                      Validator runs against ALL VQs. For batched supplier
  *                                      orders (e.g., 9 parts from Mouser), pass all VQ IDs.
  * @param {number} [opts.vqId]          DEPRECATED — use vqIds. Single VQ for backwards compat.
- * @param {string} opts.program         'LAM_KITTING' | 'LAM_EPG' | null
+ * @param {string} opts.program         'LAM_KITTING' | null
  * @param {number} opts.rfqId           chuboe_rfq_id (Record_ID for AD_Table_ID=1000002)
  * @param {string} opts.summary         Queue-list one-liner. Must start with "approve order — ".
  * @param {string} opts.approvalText    OT Copy Text block — goes to Chuboe_Approval_Text

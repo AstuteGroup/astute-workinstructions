@@ -20,7 +20,7 @@
  *
  * The 'program' option tailors program-specific expectations (ship-to warehouse,
  * warehouse group, shipper, incoterm). Currently supported: 'LAM_KITTING',
- * 'LAM_EPG'. Pass null (or omit) to skip program-specific checks.
+ * Pass null (or omit) to skip program-specific checks.
  */
 
 const { Pool } = require('pg');
@@ -38,18 +38,11 @@ const pool = new Pool({
 //
 // Derived from empirical analysis of historical ticks:
 //   - LAM Kitting: 912 ticks on warehouse 1000015 + group 1000008 (Brownsville)
-//   - LAM EPG    : broker VQ defaults per feedback_lam_epg_broker_vq_defaults.md
 //
 // Add new programs here as they come online. Keep the list short — the goal is
 // to catch program-specific mistakes, not to encode every possible combination.
 const PROGRAM_DEFAULTS = {
   LAM_KITTING: {
-    chuboe_warehouse_id: { value: 1000015, label: 'W111: LAM KITTING' },
-    chuboe_warehouse_group_id: { value: 1000008, label: 'BROWNSVILLE' },
-    m_shipper_id: { value: 1000003, label: 'FedEx Ground' },
-    chuboe_inco_term_id: { value: 1000000, label: 'EXW' },
-  },
-  LAM_EPG: {
     chuboe_warehouse_id: { value: 1000015, label: 'W111: LAM KITTING' },
     chuboe_warehouse_group_id: { value: 1000008, label: 'BROWNSVILLE' },
     m_shipper_id: { value: 1000003, label: 'FedEx Ground' },
@@ -70,7 +63,7 @@ const INTERNAL_MARKERS = [
 /**
  * Validate a VQ line for purchase readiness.
  * @param {number} vqId  chuboe_vq_line_id
- * @param {object} opts  { program: 'LAM_KITTING' | 'LAM_EPG' | null,
+ * @param {object} opts  { program: 'LAM_KITTING' | null,
  *                         allowCompetingTicked: false (set true for legitimate
  *                           split-POV cases where multiple vendors share the
  *                           RFQ line qty, each ticked for their own POV) }

@@ -158,7 +158,7 @@ If you see these patterns in `chuboe_note_public` or `chuboe_note_private`, move
 const { tickVQForPurchase } = require('../shared/vq-patcher');
 
 await tickVQForPurchase(vqId, {
-  program: 'LAM_KITTING',  // or 'LAM_EPG', or null for non-program VQs
+  program: 'LAM_KITTING',  // or null for non-program VQs
   extra: {
     // Fill any missing required fields at tick time:
     Chuboe_Lead_Time: 'STOCK - 1 WEEK',
@@ -360,15 +360,6 @@ Need `shared/copy-text-builder.js` that queries the DB and builds properly forma
 The validator enforces program-specific ship-to requirements. All four fields must match exactly.
 
 ### LAM_KITTING
-
-| Field | Value | Label |
-|-------|-------|-------|
-| `chuboe_warehouse_id` | 1000015 | W111: LAM KITTING |
-| `chuboe_warehouse_group_id` | 1000008 | BROWNSVILLE |
-| `m_shipper_id` | 1000003 | FedEx Ground |
-| `chuboe_inco_term_id` | 1000000 | EXW |
-
-### LAM_EPG
 
 | Field | Value | Label |
 |-------|-------|-------|
