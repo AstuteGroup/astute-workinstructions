@@ -1,75 +1,83 @@
 {
-  "_comment": "Manual escalation tracker for LAM 3PL Reorder. Add entries here; each weekly run renders them on the Escalations tab of the sourced xlsx using the current week's row data. Entries whose MPN no longer appears on the reorder list are silently dropped (auto-resolved). To resolve manually, delete the entry.",
+  "_comment": "Single source of truth for all open escalations. Items ≤7 days → Escalations tab, >7 days → Pending Approval tab. Remove entry when resolved.",
   "_schema": {
     "mpn": "the MPN as it appears on the Reorder Alerts sheet",
-    "reason": "short free-text describing why this is escalated (price approval, vendor change, etc.)",
+    "reason": "standardized reason (RESTRICTED MFR, MARGIN COMPRESSION, PRICE INCREASE, etc.)",
+    "notes": "optional detailed context",
     "date": "YYYY-MM-DD of first escalation"
   },
   "entries": [
     {
-      "mpn": "65100516121",
-      "reason": "Mouser pricing: $1.17 @ 4,315 qty (vs base $1.148 — 1.9% above, effectively at-cost). Review LAM MOQ of 60 — not reflected on Mouser cut-tape availability; likely stale LAM-internal/contract setting rather than vendor minimum. Candidate to lower toward real demand.",
-      "date": "2026-04-20"
-    },
-    {
-      "mpn": "ADS8688IDBTR",
-      "reason": "New base price approval: $13.345 from TI Store (direct TI). Current base $12.806 — new base is +4.2%. Note: NO COVERAGE on this week's franchise sweep (TI Store module pending / APIs returned nothing); quote is manual from TI direct.",
-      "date": "2026-04-20"
-    },
-    {
-      "mpn": "LMZ14202TZ-ADJ/NOPB",
-      "reason": "New base price approval: $14.58. Current base $10.025 — new base is +45.4%. Franchise coverage this week: Arrow only at $11.28 lead-time. TI Store VQ written at $10.31 × 250 (VQ 2134141) — consider as procurement basis against updated base.",
-      "date": "2026-04-20"
-    },
-    {
-      "mpn": "1424241",
-      "reason": "New base price approval: $18.47. Current base $16.716 — new base is +10.5%. Matches TTI/Sager/Master consensus. DigiKey VQ written at $18.47 × 50 (VQ 2134147).",
-      "date": "2026-04-20"
-    },
-    {
-      "mpn": "PATT0603E2001BGT1",
-      "reason": "New base price approval: $0.82824. Current base $0.5235 — new base is +58.2%. Franchise coverage this week below current resale ($0.638), which implied stale base; new base realigns resale math. Confirm source before approving.",
-      "date": "2026-04-20"
-    },
-    {
-      "mpn": "101628-000",
-      "reason": "New base price approval: $4.66 from Mouser (14,643 in stock). Current base $4.40 — new base is +5.9%. Historical purchase $4.32. TTI also quoted $4.05 × 19wk lead time (24.5% margin) if a lower-cost lead-time option is preferred.",
-      "date": "2026-04-20"
-    },
-    {
-      "mpn": "LTM8074EY#PBF",
-      "reason": "Restricted MFR (ADI) — LAM Kitting franchise-only. Sent to Tracy 2026-04-28 for direct sourcing. LAM MOQ 80.",
-      "date": "2026-04-28"
-    },
-    {
-      "mpn": "MAX16029TG+",
-      "reason": "Restricted MFR (Maxim) — LAM Kitting franchise-only. Sent to Tracy 2026-04-28 for direct sourcing. LAM MOQ 75.",
-      "date": "2026-04-28"
-    },
-    {
-      "mpn": "LTM4632EV#PBF",
-      "reason": "Restricted MFR (ADI) — LAM Kitting franchise-only. Sent to Tracy 2026-04-28 for direct sourcing. LAM MOQ 80.",
-      "date": "2026-04-28"
-    },
-    {
-      "mpn": "AD9467BCPZ-250",
-      "reason": "Restricted MFR (ADI) — LAM Kitting franchise-only. Sent to Tracy 2026-04-28 for direct sourcing. LAM MOQ 100.",
-      "date": "2026-04-28"
-    },
-    {
-      "mpn": "LT1491ACS#PBF",
-      "reason": "Restricted MFR (ADI/Linear) — LAM Kitting franchise-only. Sent to Tracy 2026-04-28 for direct sourcing. LAM MOQ 60.",
-      "date": "2026-04-28"
+      "mpn": "9290-05-00",
+      "reason": "MARGIN COMPRESSION",
+      "notes": "Coto relay — historical purchase $7.62 vs resale $8.87 = 14.1% margin (target 18%)",
+      "date": "2026-07-17"
     },
     {
       "mpn": "CCHD-957X-25-49.152",
-      "reason": "VQ written: Digi-Key $37.56 × 50, ETA 09/15/26. Current base $36.42 — +3.1%. Needs LAM approval before ordering. VQ 2228128.",
-      "date": "2026-07-14"
+      "reason": "MARGIN COMPRESSION",
+      "notes": "Crystek oscillator — historical purchase $37.56 vs resale $44.41 = 15.4% margin (target 18%)",
+      "date": "2026-07-17"
     },
     {
-      "mpn": "9290-05-00",
-      "reason": "VQ written: Master $7.62 × 100 (1,228 in stock). Current base $8.87 — -14% below base. Needs LAM approval before ordering. VQ 2228136.",
-      "date": "2026-07-14"
+      "mpn": "GRF1-J-P-08-E-RA-TH1-E",
+      "reason": "MARGIN COMPRESSION",
+      "notes": "Samtec connector — historical purchase $36.27 vs resale $42.17 = 14.0% margin (target 18%)",
+      "date": "2026-07-17"
+    },
+    {
+      "mpn": "MAX14915AFM+",
+      "reason": "RESTRICTED MFR",
+      "notes": "Maxim — no API coverage, escalate to Tracy / direct supplier",
+      "date": "2026-07-23"
+    },
+    {
+      "mpn": "TPS767D301PWP",
+      "reason": "RESTRICTED MFR",
+      "notes": "Texas Instruments — no API coverage, escalate to Tracy / direct supplier",
+      "date": "2026-07-23"
+    },
+    {
+      "mpn": "LTM4632EV#PBF",
+      "reason": "RESTRICTED MFR",
+      "notes": "Analog Devices — no API coverage, escalate to Tracy / direct supplier",
+      "date": "2026-07-23"
+    },
+    {
+      "mpn": "ADS8688IDBTR",
+      "reason": "RESTRICTED MFR",
+      "notes": "Texas Instruments — no API coverage, escalate to Tracy / direct supplier",
+      "date": "2026-07-23"
+    },
+    {
+      "mpn": "SN74LVC125ARGYR",
+      "reason": "RESTRICTED MFR",
+      "notes": "Texas Instruments — no API coverage, escalate to Tracy / direct supplier",
+      "date": "2026-07-23"
+    },
+    {
+      "mpn": "LMZ14202TZ-ADJ/NOPB",
+      "reason": "RESTRICTED MFR",
+      "notes": "Texas Instruments — no API coverage, escalate to Tracy / direct supplier",
+      "date": "2026-07-23"
+    },
+    {
+      "mpn": "LT1491ACS#PBF",
+      "reason": "RESTRICTED MFR",
+      "notes": "Analog Devices — no API coverage, escalate to Tracy / direct supplier",
+      "date": "2026-07-23"
+    },
+    {
+      "mpn": "LTM8074EY#PBF",
+      "reason": "RESTRICTED MFR",
+      "notes": "Analog Devices — no API coverage, escalate to Tracy / direct supplier",
+      "date": "2026-07-23"
+    },
+    {
+      "mpn": "AD9467BCPZ-250",
+      "reason": "RESTRICTED MFR",
+      "notes": "Analog Devices — no API coverage, escalate to Tracy / direct supplier",
+      "date": "2026-07-23"
     }
   ]
 }

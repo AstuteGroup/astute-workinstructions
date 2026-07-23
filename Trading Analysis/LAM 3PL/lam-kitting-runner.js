@@ -122,71 +122,12 @@ function persistResolvedEscalations(state, csv, mpnIdx, escalationsContext) {
 //
 // Skips:
 //   - non-restricted MFRs (handled by normal margin/auto-purchase flow)
-//   - MPNs already in lam-escalations.json (manual reason takes precedence)
-//
-// Returns array of { mpn, reason, date, auto: true, kind: 'renegotiate'|'no_route' }.
+// Auto-escalation disabled (2026-07-23). All escalations are now manual.
+// Restricted MFR or no franchise coverage does not automatically warrant escalation —
+// we have other franchises without APIs we can source from.
+// To escalate a part, add it to lam-escalations.json manually.
 function computeAutoEscalations(csv, sourcedCsvPath, escalationsState, dateStamp) {
-  const franchiseDataPath = sourcedCsvPath.replace('_sourced.csv', '_sourced_franchise_data.json');
-  if (!fs.existsSync(franchiseDataPath)) {
-    log(`  WARNING: no franchise data at ${path.basename(franchiseDataPath)} — skipping auto-escalations`);
-    return [];
-  }
-  let franchiseData;
-  try { franchiseData = JSON.parse(fs.readFileSync(franchiseDataPath, 'utf-8')); }
-  catch (err) { log(`  WARNING: could not parse franchise data: ${err.message}`); return []; }
-
-  const manualMpns = new Set(((escalationsState && escalationsState.entries) || []).map(e => e.mpn));
-  const idx = h => csv.headers.indexOf(h);
-  const iMpn = idx('MPN');
-  const iMfr = idx('Manufacturer');
-  const iResale = idx('Resale Price');
-  const iMoq = idx('LAM MOQ');
-
-  const auto = [];
-  for (const row of csv.rows) {
-    const mpn = (row[iMpn] || '').trim();
-    const mfrName = (row[iMfr] || '').trim();
-    if (!mpn || !mfrName) continue;
-    if (!restrictedMfr.isRestrictedMfr({ mfrName })) continue;
-    if (manualMpns.has(mpn)) continue;  // manual entry takes precedence — no override
-
-    const resale = parseFloat(row[iResale]) || 0;
-    const moq = parseFloat(row[iMoq]) || 0;
-    if (resale <= 0) continue;  // can't compute margin without a resale
-
-    const fr = franchiseData[mpn];
-    const summary = fr && fr.summary;
-    const refPrice = summary && (summary.lowestStockedPrice || summary.lowestPrice);
-
-    if (!refPrice || refPrice <= 0) {
-      auto.push({
-        mpn, auto: true, kind: 'no_route', date: dateStamp,
-        reason: `[AUTO] Restricted MFR (${mfrName}) — no franchise route this run. ` +
-          `APIs returned no usable pricing. Escalate to direct supplier (Tracy / authorized non-franchise channel).`,
-      });
-      continue;
-    }
-
-    const margin = (resale - refPrice) / resale;
-    if (margin < 0.18) {
-      // Pull the supplier name from the matching distributor entry, falling
-      // back to whichever distributor is listed first.
-      let supplier = 'best franchise';
-      if (Array.isArray(fr.found) && fr.found.length > 0) {
-        const match = fr.found.find(d => Math.abs((d.franchisePrice || d.vqPrice || 0) - refPrice) < 1e-6);
-        supplier = (match && match.bpName) || fr.found[0].bpName || supplier;
-      }
-      auto.push({
-        mpn, auto: true, kind: 'renegotiate', date: dateStamp,
-        reason: `[AUTO] Restricted MFR (${mfrName}) — franchise ref @ LAM MOQ ${moq || 'n/a'} = ` +
-          `$${refPrice.toFixed(4)} (${supplier}) → margin ${(margin * 100).toFixed(1)}% vs current ` +
-          `LAM resale $${resale.toFixed(4)}. Push new LAM resale based on franchise ref.`,
-      });
-    }
-    // margin >= 18% on a restricted MFR → no signal; LAM contract still works,
-    // procurement happens through broker (Tracy) separately. No auto entry.
-  }
-  return auto;
+  return [];  // No auto-escalations — all manual
 }
 
 // Column classification — shared between the main tab and the Escalations tab.
@@ -327,17 +268,20 @@ function buildEscalationsTab(workbook, state, csv, allHeaders, rfqMapping, escal
   let stockArrivedCount = 0;
   // Block 1 — manual entries (with stock-arrived synthesis when off list).
   for (const entry of state.entries) {
+    // Standardized reason + optional notes (new schema: { reason, notes, date })
     const reason = entry.reason || '';
+    const notes = entry.notes || '';
     const ctx = ctxByMpn[entry.mpn];
     let rowData = byMpn[entry.mpn];
-    let renderReason = reason;
+    // Display: "REASON: notes" or just "REASON" if no notes
+    let renderReason = notes ? `${reason}: ${notes}` : reason;
 
     if (!rowData) {
       // MPN not on this week's reorder CSV. Synthesize a row from the sidecar
       // context if there's stock on hand (Josh-action-pending case).
       if (ctx && ctx.stockArrived) {
         rowData = synthesizeRowFromContext(ctx, allHeaders);
-        renderReason = (reason ? reason + '\n' : '') +
+        renderReason = (renderReason ? renderReason + '\n' : '') +
           `✓ Stock arrived (W111+W115: ${ctx.stock.total} pcs). Action with seller — new LAM resale still pending.`;
         stockArrivedCount++;
       } else {
@@ -358,83 +302,93 @@ function buildEscalationsTab(workbook, state, csv, allHeaders, rfqMapping, escal
     log(`  Escalations tab: ${stockArrivedCount} synthesized "stock arrived" row(s) for resale-pending follow-up`);
   }
 
-  // Block 2 — auto entries (restricted-MFR margin compression). Always live
-  // ABOVE main-tab MPNs in the CSV, so byMpn lookup always succeeds for these.
+  // Block 2 — auto entries (disabled 2026-07-23, all escalations now manual)
+  // Kept for backwards compatibility but computeAutoEscalations() returns [].
   const auto = Array.isArray(autoEntries) ? autoEntries : [];
-  let autoRendered = 0;
   for (const entry of auto) {
     const rowData = byMpn[entry.mpn];
-    if (!rowData) continue; // defensive
+    if (!rowData) continue;
     const excelRowData = [entry.reason || '', entry.date || '',
       ...rowData.map((v, idx) => parseCellForExcel(v, allHeaders[idx]))];
     const excelRow = ws.addRow(excelRowData);
     applyRowShading(excelRow, escHeaders);
-    // Tint the reason cell amber so auto entries are visually distinct from
-    // manual ones (manual = uncolored, stock-arrived = light blue, auto = amber).
-    excelRow.getCell(1).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFE699' } };
-    autoRendered++;
-  }
-  if (autoRendered > 0) {
-    log(`  Escalations tab: ${autoRendered} auto entry row(s) (restricted-MFR margin compression)`);
   }
 
   applyColumnFormats(ws, escHeaders);
   ws.views = [{ state: 'frozen', ySplit: 1 }];
 }
 
-// Build the Pending Approval worksheet — shows parts from the Master Roster
-// where the "Pending" column is non-empty (e.g., "Price Approval", "Removal").
-// This tab surfaces contract changes that need LAM sign-off.
-function buildPendingApprovalTab(workbook, pendingApprovalsPath) {
-  if (!fs.existsSync(pendingApprovalsPath)) return 0;
+// Split escalation entries by age: ≤7 days → "new" (Escalations tab), >7 days → "old" (Pending Approval tab)
+function splitEntriesByAge(entries) {
+  const now = new Date();
+  const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
 
-  let data;
-  try {
-    data = JSON.parse(fs.readFileSync(pendingApprovalsPath, 'utf-8'));
-  } catch (err) {
-    log(`  WARNING: Could not parse pending approvals sidecar: ${err.message}`);
-    return 0;
+  const newEntries = [];
+  const oldEntries = [];
+
+  for (const entry of entries) {
+    const entryDate = entry.date ? new Date(entry.date) : now;
+    if (entryDate >= sevenDaysAgo) {
+      newEntries.push(entry);
+    } else {
+      oldEntries.push(entry);
+    }
   }
 
-  const items = data.items || [];
-  if (items.length === 0) return 0;
+  return { newEntries, oldEntries };
+}
+
+// Build the Pending Approval worksheet — shows escalation entries >7 days old.
+// These are items that have been open for more than a week.
+function buildPendingApprovalTab(workbook, oldEntries, csv, allHeaders, rfqMapping) {
+  if (!oldEntries || oldEntries.length === 0) return 0;
 
   const ws = workbook.addWorksheet('Pending Approval');
+  const mpnIdx = csv.headers.indexOf('MPN');
+  const autoRequests = (rfqMapping && rfqMapping.autoRequests) || {};
 
-  const headers = ['MPN', 'CPC', 'Manufacturer', 'Award', 'Current Resale', 'Proposed Resale', 'Pending', 'Last Approved'];
-  ws.addRow(headers);
-  const headerRow = ws.getRow(1);
-  headerRow.font = { bold: true };
-  headerRow.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFE699' } };  // Amber for attention
-
-  for (const item of items) {
-    ws.addRow([
-      item.MPN || '',
-      item.CPC || '',
-      item.Manufacturer || '',
-      item.Award || '',
-      item['Current Resale'] || '',
-      item['Proposed Resale'] || '',
-      item['Pending'] || '',
-      item['Last Approved'] || '',
-    ]);
+  // Build lookup: MPN → CSV row data
+  const byMpn = {};
+  for (const row of csv.rows) {
+    const mpn = (row[mpnIdx] || '').trim();
+    if (!mpn) continue;
+    const rowData = [...row];
+    rowData.splice(1, 0, (rfqMapping && rfqMapping.lines && rfqMapping.lines[mpn]) || '', autoRequests[mpn] || '');
+    byMpn[mpn] = rowData;
   }
 
-  // Column widths
-  ws.getColumn(1).width = 25;  // MPN
-  ws.getColumn(2).width = 20;  // CPC
-  ws.getColumn(3).width = 25;  // Manufacturer
-  ws.getColumn(4).width = 18;  // Award
-  ws.getColumn(5).width = 14;  // Current Resale
-  ws.getColumn(5).numFmt = '$#,##0.0000';
-  ws.getColumn(6).width = 14;  // Proposed Resale
-  ws.getColumn(6).numFmt = '$#,##0.0000';
-  ws.getColumn(7).width = 18;  // Pending
-  ws.getColumn(8).width = 14;  // Last Approved
+  // Headers: Reason, Days Pending, Date, then all the reorder data columns
+  const escHeaders = ['Reason', 'Days Pending', 'Escalation Date', ...allHeaders];
+  ws.addRow(escHeaders);
+  const headerRow = ws.getRow(1);
+  headerRow.font = { bold: true };
+  headerRow.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFE699' } };  // Amber
 
+  const now = new Date();
+  for (const entry of oldEntries) {
+    const rowData = byMpn[entry.mpn];
+    if (!rowData) continue;  // MPN not on reorder list
+
+    const reason = entry.notes ? `${entry.reason}: ${entry.notes}` : entry.reason;
+    const entryDate = entry.date ? new Date(entry.date) : now;
+    const daysPending = Math.floor((now - entryDate) / (1000 * 60 * 60 * 24));
+
+    const excelRowData = [reason, daysPending, entry.date || '',
+      ...rowData.map((v, idx) => parseCellForExcel(v, allHeaders[idx]))];
+    const excelRow = ws.addRow(excelRowData);
+    applyRowShading(excelRow, escHeaders);
+
+    // Highlight rows pending > 14 days in light red (extra stale)
+    if (daysPending > 14) {
+      excelRow.getCell(1).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFCCCC' } };
+      excelRow.getCell(2).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFCCCC' } };
+    }
+  }
+
+  applyColumnFormats(ws, escHeaders);
   ws.views = [{ state: 'frozen', ySplit: 1 }];
 
-  return items.length;
+  return oldEntries.length;
 }
 
 // Build an alert-style row from a sidecar context entry — used when an
@@ -479,8 +433,65 @@ function synthesizeRowFromContext(ctx, allHeaders) {
 }
 
 /**
+ * Build the "No Reorder" tab for new awards workflows.
+ * Contains parts with only non-material changes (lead time, description) that
+ * don't require ordering. These are informational — roster was updated but no PO needed.
+ *
+ * @param {ExcelJS.Workbook} workbook - The workbook to add the sheet to
+ * @param {Array} noReorderParts - Array of part objects with non-material changes
+ * @param {Object} csv - Parsed CSV data (for reference)
+ * @param {Array} allHeaders - Column headers from main sheet
+ */
+function buildNoReorderTab(workbook, noReorderParts, csv, allHeaders) {
+  if (!noReorderParts || noReorderParts.length === 0) return;
+
+  const ws = workbook.addWorksheet('No Reorder');
+
+  // Simplified headers for this tab
+  const headers = ['CPC', 'MPN', 'Manufacturer', 'Award', 'Changes', 'Notes'];
+  ws.addRow(headers);
+  const headerRow = ws.getRow(1);
+  headerRow.font = { bold: true };
+  headerRow.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFF2CC' } };  // Light yellow
+
+  for (const part of noReorderParts) {
+    const changesStr = (part.nonMaterialChanges || part.valueChanges || [])
+      .map(c => `${c.field}: ${c.roster || c.old || ''} → ${c.email || c.new || ''}`)
+      .join('; ');
+    ws.addRow([
+      part.cpc || '',
+      part.mpn || part.existingMpn || '',
+      part.manufacturer || part.existingMfr || '',
+      part.existingAward || '',
+      changesStr,
+      'Non-material change only — no PO required',
+    ]);
+  }
+
+  // Column widths
+  ws.getColumn(1).width = 20;  // CPC
+  ws.getColumn(2).width = 25;  // MPN
+  ws.getColumn(3).width = 25;  // Manufacturer
+  ws.getColumn(4).width = 12;  // Award
+  ws.getColumn(5).width = 50;  // Changes
+  ws.getColumn(6).width = 35;  // Notes
+
+  ws.views = [{ state: 'frozen', ySplit: 1 }];
+}
+
+/**
  * Rebuild the sourced Excel with an "RFQ Line #" column and RFQ search key.
  * Items with on-order/recent POV get blank RFQ Line (they were skipped).
+ *
+ * @param {string} sourcedCsvPath - Path to the sourced CSV file
+ * @param {string} xlsxPath - Output Excel path
+ * @param {Object} rfqMapping - RFQ mapping data (lines, autoRequests, etc.)
+ * @param {Object} checkData - Additional check data and options:
+ *   - wrongWarehouseData: Parts in wrong warehouses
+ *   - pendingOrdersData: Parts with pending orders
+ *   - skipEscalations: If true, skip building the Escalations tab (for new awards)
+ *   - noReorderParts: Array of parts with only non-material changes (for No Reorder tab)
+ *   - unchangedParts: Array of parts with no changes
  */
 async function rebuildExcelWithRfqLines(sourcedCsvPath, xlsxPath, rfqMapping, checkData = {}) {
   const ExcelJS = require('exceljs');
@@ -488,9 +499,13 @@ async function rebuildExcelWithRfqLines(sourcedCsvPath, xlsxPath, rfqMapping, ch
   const mpnIdx = csv.headers.indexOf('MPN');
   const cpcIdx = csv.headers.indexOf('Lam P/N');
 
-  // Extract check data
+  // Extract check data and options
   const wrongWarehouseData = checkData.wrongWarehouseData || {};
   const pendingOrdersData = checkData.pendingOrdersData || {};
+  const skipEscalations = checkData.skipEscalations || false;
+  const noReorderParts = checkData.noReorderParts || [];
+  const unchangedParts = checkData.unchangedParts || [];
+  const mainTabName = checkData.mainTabName || 'Sourced Reorder Alerts';
 
   // Insert "RFQ Line #" + "Request to Purchase" as columns 2 and 3 (after Lam P/N).
   // Also add "Check: Wrong WH" and "Check: Pending Order" columns at the end.
@@ -504,19 +519,27 @@ async function rebuildExcelWithRfqLines(sourcedCsvPath, xlsxPath, rfqMapping, ch
   // Load escalations FIRST so main-tab rendering can skip escalated MPNs.
   // Each item lives in exactly one place — if it's flagged for escalation,
   // it moves to the Escalations tab and disappears from the main list.
-  const escalationsState = loadEscalationsState();
-  const escalationsContext = loadEscalationsContext(sourcedCsvPath);
-  // Auto-escalation pass: restricted-MFR margin compression. These rows also
-  // belong on Escalations only — pull their MPNs into the main-tab skip set.
-  const dateStamp = (path.basename(sourcedCsvPath).match(/\d{4}-\d{2}-\d{2}/) || [''])[0];
-  const autoEntries = computeAutoEscalations(csv, sourcedCsvPath, escalationsState, dateStamp);
-  const escalatedMPNs = new Set(
-    (escalationsState && escalationsState.entries) ? escalationsState.entries.map(e => e.mpn) : []
-  );
-  for (const e of autoEntries) escalatedMPNs.add(e.mpn);
+  // NOTE: Skip escalations for new awards workflows (skipEscalations flag).
+  let escalationsState = null;
+  let escalationsContext = null;
+  let autoEntries = [];
+  const escalatedMPNs = new Set();
+
+  if (!skipEscalations) {
+    escalationsState = loadEscalationsState();
+    escalationsContext = loadEscalationsContext(sourcedCsvPath);
+    // Auto-escalation pass: restricted-MFR margin compression. These rows also
+    // belong on Escalations only — pull their MPNs into the main-tab skip set.
+    const dateStamp = (path.basename(sourcedCsvPath).match(/\d{4}-\d{2}-\d{2}/) || [''])[0];
+    autoEntries = computeAutoEscalations(csv, sourcedCsvPath, escalationsState, dateStamp);
+    if (escalationsState && escalationsState.entries) {
+      for (const e of escalationsState.entries) escalatedMPNs.add(e.mpn);
+    }
+    for (const e of autoEntries) escalatedMPNs.add(e.mpn);
+  }
 
   const workbook = new ExcelJS.Workbook();
-  const ws = workbook.addWorksheet('Sourced Reorder Alerts');
+  const ws = workbook.addWorksheet(mainTabName);
 
   // Header row
   ws.addRow(allHeaders);
@@ -566,28 +589,39 @@ async function rebuildExcelWithRfqLines(sourcedCsvPath, xlsxPath, rfqMapping, ch
   applyColumnFormats(ws, allHeaders);
   ws.views = [{ state: 'frozen', ySplit: 1 }];
 
-  // Escalations tab — driven by three sources:
-  //   1. Manual entries in lam-escalations.json (buyer-curated)
-  //   2. Stock-arrived synthesis from sidecar context (resale renegotiation
-  //      still owed by Josh after PO landed)
-  //   3. Auto entries: restricted-MFR margin compression detected this run
-  // Render whenever any of those produce content.
-  const stateForRender = (escalationsState && escalationsState.entries) ? escalationsState : { entries: [] };
-  if (stateForRender.entries.length > 0 || autoEntries.length > 0) {
-    buildEscalationsTab(workbook, stateForRender, csv, allHeaders, rfqMapping, escalationsContext, autoEntries);
+  // Split escalation entries by age:
+  //   - ≤7 days → Escalations tab (new this week)
+  //   - >7 days → Pending Approval tab (older items)
+  // Each item lives in exactly one place for clarity when reviewing with customer.
+  // NOTE: Skip for new awards workflows (skipEscalations flag).
+  if (!skipEscalations) {
+    const allEntries = (escalationsState && escalationsState.entries) ? escalationsState.entries : [];
+    const { newEntries, oldEntries } = splitEntriesByAge(allEntries);
+
+    // Escalations tab — new items (≤7 days)
+    const newState = { entries: newEntries };
+    if (newEntries.length > 0) {
+      buildEscalationsTab(workbook, newState, csv, allHeaders, rfqMapping, escalationsContext, []);
+      log(`  Escalations tab: ${newEntries.length} new item(s) this week`);
+    }
+
+    // Pending Approval tab — older items (>7 days)
+    if (oldEntries.length > 0) {
+      buildPendingApprovalTab(workbook, oldEntries, csv, allHeaders, rfqMapping);
+      log(`  Pending Approval tab: ${oldEntries.length} item(s) >7 days old`);
+    }
+
     // Auto-resolve manual entries: drop only when off reorder list AND zero stock.
-    if (stateForRender.entries.length > 0) {
+    if (allEntries.length > 0) {
       persistResolvedEscalations(escalationsState, csv, mpnIdx, escalationsContext);
     }
   }
 
-  // Pending Approval tab — parts from Master Roster with non-empty "Pending"
-  // column (e.g., "Price Approval", "Removal"). Shows contract changes
-  // awaiting LAM sign-off.
-  const pendingApprovalsPath = sourcedCsvPath.replace('_sourced.csv', '_pending_approvals.json');
-  const pendingCount = buildPendingApprovalTab(workbook, pendingApprovalsPath);
-  if (pendingCount > 0) {
-    log(`  Pending Approval tab: ${pendingCount} items awaiting LAM approval`);
+  // No Reorder tab — for new awards workflows only: parts with only non-material
+  // changes (lead time updates, description changes) that don't require ordering.
+  if (noReorderParts.length > 0) {
+    buildNoReorderTab(workbook, noReorderParts, csv, allHeaders);
+    log(`  No Reorder tab: ${noReorderParts.length} parts with non-material changes only`);
   }
 
   await workbook.xlsx.writeFile(xlsxPath);
