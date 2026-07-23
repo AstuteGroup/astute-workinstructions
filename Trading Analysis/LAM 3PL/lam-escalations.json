@@ -44,12 +44,6 @@
       "date": "2026-07-23"
     },
     {
-      "mpn": "ADS8688IDBTR",
-      "reason": "RESTRICTED MFR",
-      "notes": "Texas Instruments — no API coverage, escalate to Tracy / direct supplier",
-      "date": "2026-07-23"
-    },
-    {
       "mpn": "LMZ14202TZ-ADJ/NOPB",
       "reason": "RESTRICTED MFR",
       "notes": "Texas Instruments — no API coverage, escalate to Tracy / direct supplier",
