@@ -42,7 +42,10 @@ const sinceIdx = args.indexOf('--since');
 const SINCE_HOURS = sinceIdx >= 0 ? Number(args[sinceIdx + 1]) : 24;
 
 function psqlPipe(sql) {
-  return execSync(`psql -d idempiere_replica -t -A -F'|' -c "${sql.replace(/"/g, '\\"')}"`, { encoding: 'utf8' });
+  // Explicitly use OS user to override PGUSER env var set by cron
+  // (cron sets PGUSER=analytics_user for write jobs, but this is read-only)
+  const user = require('os').userInfo().username;
+  return execSync(`psql -U ${user} -d idempiere_replica -t -A -F'|' -c "${sql.replace(/"/g, '\\"')}"`, { encoding: 'utf8' });
 }
 
 function esc(s) {
