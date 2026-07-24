@@ -256,7 +256,7 @@ module.exports = [
     name: 'vq-loading-agent',
     tier: 'agent',  // Claude-powered — paused by .cron-agents-paused
     cadence: 'every 5m',
-    cadenceCron: '2-59/5 * * * *',
+    cadenceCron: '*/5 * * * *',
     command: `if node "${ASTUTE}/scripts/should-run-vq-loading-agent.js"; then /home/analytics_user/.local/bin/claude -p --model sonnet --permission-mode bypassPermissions --max-turns 120 < "${ASTUTE}/Trading Analysis/RFQ Sourcing/vq_loading/agent-prompt.txt"; fi`,
     cwd: AGENT_CWD,
     needsOT: true,
