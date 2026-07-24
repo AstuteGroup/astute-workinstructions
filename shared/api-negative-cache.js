@@ -314,7 +314,8 @@ function check({ mpn, mfr, disty, qty, qtyTolerance = DEFAULT_QTY_TOLERANCE }) {
 
   const db = getDB();
   let sql = `
-    SELECT id, result, first_seen_at, last_seen_at, expires_at, confirm_count, requested_qty
+    SELECT id, result, first_seen_at, last_seen_at, expires_at, confirm_count, requested_qty,
+           stock_qty, cost_unit
     FROM cache_entries
     WHERE mpn_normalized = ? AND mfr_normalized = ? AND disty = ?
       AND invalidated_at IS NULL
@@ -343,6 +344,8 @@ function check({ mpn, mfr, disty, qty, qtyTolerance = DEFAULT_QTY_TOLERANCE }) {
     cached_at: row.first_seen_at,
     expires_at: row.expires_at,
     requested_qty: row.requested_qty,
+    stock_qty: row.stock_qty,
+    cost_unit: row.cost_unit,
     source: 'neg-cache',
   };
 
@@ -365,7 +368,8 @@ function peek({ mpn, mfr, disty, qty, qtyTolerance = DEFAULT_QTY_TOLERANCE }) {
   const mfrN = canonicalMfr(mfr);
   const db = getDB();
   let sql = `
-    SELECT id, result, first_seen_at, expires_at, confirm_count, requested_qty
+    SELECT id, result, first_seen_at, expires_at, confirm_count, requested_qty,
+           stock_qty, cost_unit
     FROM cache_entries
     WHERE mpn_normalized = ? AND mfr_normalized = ? AND disty = ?
       AND invalidated_at IS NULL
@@ -386,6 +390,8 @@ function peek({ mpn, mfr, disty, qty, qtyTolerance = DEFAULT_QTY_TOLERANCE }) {
     cached_at: row.first_seen_at,
     expires_at: row.expires_at,
     requested_qty: row.requested_qty,
+    stock_qty: row.stock_qty,
+    cost_unit: row.cost_unit,
     source: 'neg-cache-peek',
   };
 }
