@@ -2,10 +2,10 @@
 /**
  * NC Listing Script — NetComponents Portal Upload Generator
  *
- * Separated from inventory_cleanup.js for independent Mon/Thu scheduling.
+ * Subordinate to fetch-and-parse — loads from cache, not xlsx directly.
  *
  * What it does:
- * 1. Reads this week's saved inventory xlsx (from Monday's cleanup)
+ * 1. Loads inventory from cached parse data (from Monday's fetch-and-parse)
  * 2. Applies Active Sourcing exclusions (MPNs being price-checked)
  * 3. Generates two NC portal CSVs:
  *    - Non-authorized account #1167233 (all OT groups except Franchise_Stock + carryovers)
@@ -14,27 +14,24 @@
  * 5. Sends upload emails to Jake (and optionally to NetComponents directly)
  *
  * Schedule:
- *   Mon 12 UTC — after inventory-cleanup (11 UTC), before active-sourcing (13:30 UTC)
- *   Thu 12 UTC — reuses Monday's inventory, updated exclusions
+ *   Mon 12 UTC — after fetch-and-parse (10 UTC), before active-sourcing (13:30 UTC)
+ *   Thu 12 UTC — reuses Monday's cache, updated exclusions
  *
  * Usage:
  *   node nc-listing.js                    # Live: generate and send
  *   node nc-listing.js --dry-run          # Preview: generate but don't send
- *   node nc-listing.js <file.xlsx>        # Use specific file instead of saved
  */
 
 'use strict';
 
-const XLSX = require('xlsx');
 const fs = require('fs');
 const path = require('path');
 const { createNotifier } = require('../../shared/notifier');
+const { loadCachedInventory } = require('../../shared/inventory-fetch-and-parse');
 
 // =============================================================================
 // CONFIGURATION
 // =============================================================================
-
-const INVENTORY_STORAGE_DIR = path.join(process.env.HOME, 'workspace/.inventory-storage');
 
 const EMAIL_CONFIG = {
     account: 'excess',
@@ -50,85 +47,44 @@ const NC_UPLOAD_CONFIG = {
     fromName: 'Astute Electronics'
 };
 
-// Rows to skip at start of Infor file
-const HEADER_ROWS_TO_SKIP = 7;
+/**
+ * NC Portal Groups
+ *
+ * Each group maps to one or more warehouses and defines what goes
+ * to each NetComponents account.
+ *
+ * The cache (from inventory-fetch-and-parse.js) stores rows by warehouse code.
+ * These groups collect warehouses and apply any special filters.
+ */
+const NC_GROUPS = {
+    // Non-authorized account #1167233 groups
+    Free_Stock_Stevenage:     { warehouses: ['W102'] },
+    GE_Consignment:           { warehouses: ['W103'] },
+    Free_Stock_Austin:        { warehouses: ['W104', 'W112'], excludeMfr: ['positronic'] },
+    Taxan_Consignment:        { warehouses: ['W106'] },
+    Spartronics_Consignment:  { warehouses: ['W107'] },
+    Free_Stock_Hong_Kong:     { warehouses: ['W108', 'W113'] },
+    Free_Stock_Philippines:   { warehouses: ['W109', 'W114'] },
+    LAM_Dead_Inventory:       { warehouses: ['W115'] },
+    LAM_Consignment:          { warehouses: ['W118'] },
+    Eaton_Consignment:        { warehouses: ['W117'] },
 
-// Footer patterns to detect and remove
-const FOOTER_PATTERNS = ['Page ', 'USS,'];
-
-// Composite key fields for deduplication
-const DEDUPE_FIELDS = ['Item', 'Lot', 'Location', 'Warehouse Name', 'Site', 'Date Lot'];
-
-// Warehouse groupings
-const WAREHOUSE_GROUPS = [
-    ['Franchise_Stock', ['W104'], { column: 'Name', value: 'positronic' }],
-    ['Free_Stock_Stevenage', ['W102'], null],
-    ['GE_Consignment', ['W103'], null],
-    ['Free_Stock_Austin', ['W104', 'W112'], null],
-    ['Taxan_Consignment', ['W106'], null],
-    ['Spartronics_Consignment', ['W107'], null],
-    ['Free_Stock_Hong_Kong', ['W108', 'W113'], null],
-    ['Free_Stock_Philippines', ['W109', 'W114'], null],
-    ['LAM_Dead_Inventory', ['W115'], null],
-    ['LAM_Consignment', ['W118'], null],
-    ['Eaton_Consignment', ['W117'], null],
-    ['LAM_3PL', ['W111'], null],
-    ['Allocated_Warehouse', ['MAIN'], null],
-    ['HK_Allocated_Warehouse', ['W105'], null],
-];
-
-// Groups that get written to OT and marketed on NC
-// (mirrors WAREHOUSE_WRITEBACK from inventory_cleanup.js)
-const OT_ELIGIBLE_GROUPS = [
-    'Franchise_Stock',
-    'Free_Stock_Stevenage',
-    'GE_Consignment',
-    'Free_Stock_Austin',
-    'Taxan_Consignment',
-    'Spartronics_Consignment',
-    'Free_Stock_Hong_Kong',
-    'Free_Stock_Philippines',
-    'LAM_Dead_Inventory',
-    'LAM_Consignment',
-    'Eaton_Consignment',
-];
-
-// Portal export columns
-const PORTAL_COLUMNS = ['Item', 'ItemDescription', 'Name', 'Lot Quantity', 'Date Code'];
-const PORTAL_COLUMN_LABELS = {
-    'Item':            'MPN',
-    'ItemDescription': 'Description',
-    'Name':            'Manufacturer',
-    'Lot Quantity':    'Qty',
-    'Date Code':       'D/C',
+    // Franchised account #1126121 (separate)
+    Franchise_Stock:          { warehouses: ['W104'], includeMfrOnly: ['positronic'] },
 };
+
+// Groups for non-authorized account (all except Franchise_Stock)
+const NON_AUTH_GROUPS = Object.keys(NC_GROUPS).filter(g => g !== 'Franchise_Stock');
+
+// Portal CSV column headers
+const PORTAL_HEADERS = ['MPN', 'Description', 'Manufacturer', 'Qty', 'D/C'];
 
 // =============================================================================
 // HELPERS
 // =============================================================================
 
-function getWeekStartDate() {
-    const now = new Date();
-    const day = now.getDay();
-    const diff = now.getDate() - day + (day === 0 ? -6 : 1);
-    const monday = new Date(now.setDate(diff));
-    return monday.toISOString().split('T')[0];
-}
-
-function getThisWeekInventoryFile() {
-    const weekStart = getWeekStartDate();
-    const persistentPath = path.join(INVENTORY_STORAGE_DIR, `inventory_${weekStart}.xlsx`);
-    if (fs.existsSync(persistentPath)) {
-        return persistentPath;
-    }
-    return null;
-}
-
-function cleanNumeric(val) {
-    if (val == null) return '';
-    const str = String(val).replace(/,/g, '').trim();
-    const num = parseFloat(str);
-    return isNaN(num) ? str : String(Math.round(num));
+function log(msg) {
+    console.log(`[${new Date().toISOString()}] ${msg}`);
 }
 
 function arrayToCSV(rows, headers) {
@@ -146,80 +102,80 @@ function arrayToCSV(rows, headers) {
     return '\uFEFF' + lines.join('\n');
 }
 
-// =============================================================================
-// INVENTORY PROCESSING
-// =============================================================================
+/**
+ * Convert cache row to portal CSV format
+ */
+function toPortalRow(row) {
+    return {
+        'MPN':          row.mpn || '',
+        'Description':  row.description || '',
+        'Manufacturer': row.mfr || '',
+        'Qty':          String(row.qty || ''),
+        'D/C':          row.dateCode || '',
+    };
+}
 
-function processInventoryFile(inputFile) {
-    console.log(`Processing: ${inputFile}`);
+/**
+ * Filter rows by manufacturer (for Positronic routing)
+ */
+function filterByMfr(rows, includeMfrOnly = null, excludeMfr = null) {
+    return rows.filter(row => {
+        const mfr = (row.mfr || '').toLowerCase();
 
-    // Read file
-    const workbook = XLSX.readFile(inputFile);
-    const sheetName = workbook.SheetNames[0];
-    const sheet = workbook.Sheets[sheetName];
-    const allRows = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: '' });
-
-    // Skip header rows
-    const dataRows = allRows.slice(HEADER_ROWS_TO_SKIP);
-
-    // Get headers from row after skipped rows
-    const headers = dataRows[0].map(h => String(h).trim());
-    const bodyRows = dataRows.slice(1);
-
-    // Remove footer rows
-    const cleanRows = bodyRows.filter(row => {
-        const firstCell = String(row[0] || '');
-        return !FOOTER_PATTERNS.some(p => firstCell.includes(p));
-    });
-
-    // Convert to objects
-    const rows = cleanRows.map(row => {
-        const obj = {};
-        headers.forEach((h, i) => { obj[h] = row[i]; });
-        return obj;
-    });
-
-    // Deduplicate
-    const seen = new Set();
-    const uniqueRows = [];
-    for (const row of rows) {
-        const key = DEDUPE_FIELDS.map(f => String(row[f] || '').trim()).join('|');
-        if (!seen.has(key)) {
-            seen.add(key);
-            uniqueRows.push(row);
+        if (includeMfrOnly && includeMfrOnly.length > 0) {
+            return includeMfrOnly.some(m => mfr.includes(m.toLowerCase()));
         }
+
+        if (excludeMfr && excludeMfr.length > 0) {
+            return !excludeMfr.some(m => mfr.includes(m.toLowerCase()));
+        }
+
+        return true;
+    });
+}
+
+// =============================================================================
+// LOAD INVENTORY FROM CACHE
+// =============================================================================
+
+/**
+ * Load inventory from cache and group by NC groups
+ * Returns { cache, groupedRows } where groupedRows is keyed by NC group name
+ */
+function loadInventoryFromCache() {
+    log('Loading inventory from cache...');
+
+    const cache = loadCachedInventory({ allowStale: true });
+    if (!cache) {
+        throw new Error('No inventory cache found. Run fetch-and-parse first.');
     }
 
-    // Group by warehouse
+    log(`  Cache date: ${cache.metadata.cachedAt}`);
+    log(`  Week of: ${cache.metadata.weekOf}`);
+    if (cache.metadata.stale) {
+        log('  WARNING: Using stale cache');
+    }
+
+    // Build grouped rows from cache
     const groupedRows = {};
-    const unmatchedRows = [];
 
-    for (const row of uniqueRows) {
-        // 'Warehouse' has the code (W102, MAIN, etc.), 'Warehouse Name' has company name
-        const warehouseCode = String(row['Warehouse'] || '').trim().toUpperCase();
-        let matched = false;
+    for (const [groupName, config] of Object.entries(NC_GROUPS)) {
+        let rows = [];
 
-        for (const [groupName, codes, filter] of WAREHOUSE_GROUPS) {
-            if (!codes.map(c => c.toUpperCase()).includes(warehouseCode)) continue;
-
-            // Check special filter
-            if (filter) {
-                const filterVal = String(row[filter.column] || '').trim().toLowerCase();
-                if (!filterVal.includes(filter.value.toLowerCase())) continue;
-            }
-
-            if (!groupedRows[groupName]) groupedRows[groupName] = [];
-            groupedRows[groupName].push(row);
-            matched = true;
-            break;
+        // Collect rows from all warehouses for this group
+        for (const wh of config.warehouses) {
+            const whRows = cache.byWarehouse[wh] || [];
+            rows.push(...whRows);
         }
 
-        if (!matched) {
-            unmatchedRows.push(row);
-        }
+        // Apply manufacturer filters
+        rows = filterByMfr(rows, config.includeMfrOnly, config.excludeMfr);
+
+        groupedRows[groupName] = rows;
+        log(`  ${groupName}: ${rows.length} rows`);
     }
 
-    return { headers, uniqueRows, groupedRows, unmatchedRows };
+    return { cache, groupedRows };
 }
 
 // =============================================================================
@@ -265,13 +221,9 @@ async function loadCarryoverLines() {
 // GENERATE NC PORTAL FILES
 // =============================================================================
 
-async function generateNCFiles(groupedRows, headers, outputDir, dryRun) {
+async function generateNCFiles(groupedRows, outputDir, dryRun) {
     const today = new Date();
     const mmdd = `${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
-
-    // Determine which source columns are available
-    const portalSourceCols = PORTAL_COLUMNS.filter(col => headers.includes(col));
-    const portalOutputHeaders = portalSourceCols.map(c => PORTAL_COLUMN_LABELS[c] || c);
 
     // Load Active Sourcing exclusions
     let sourcingExclusions = new Set();
@@ -285,7 +237,7 @@ async function generateNCFiles(groupedRows, headers, outputDir, dryRun) {
                 .map(e => e.mpn.toUpperCase());
             sourcingExclusions = new Set(activeExclusions);
             if (sourcingExclusions.size > 0) {
-                console.log(`  Active Sourcing: ${sourcingExclusions.size} MPNs excluded from NC upload`);
+                log(`  Active Sourcing: ${sourcingExclusions.size} MPNs excluded from NC upload`);
             }
         } catch (e) {
             console.warn(`  Warning: Could not load sourcing exclusions: ${e.message}`);
@@ -293,9 +245,6 @@ async function generateNCFiles(groupedRows, headers, outputDir, dryRun) {
     }
 
     // Collect rows for each account
-    const FRANCHISE_GROUP = 'Franchise_Stock';
-    const nonAuthGroupNames = OT_ELIGIBLE_GROUPS.filter(g => g !== FRANCHISE_GROUP);
-
     const collectRows = (groupNames) => {
         const out = [];
         for (const g of groupNames) out.push(...(groupedRows[g] || []));
@@ -305,40 +254,30 @@ async function generateNCFiles(groupedRows, headers, outputDir, dryRun) {
     const filterExcludedMpns = (rows) => {
         if (sourcingExclusions.size === 0) return rows;
         return rows.filter(row => {
-            const mpn = String(row['Item'] || '').trim().toUpperCase();
+            const mpn = (row.mpn || '').toUpperCase();
             return !sourcingExclusions.has(mpn);
         });
     };
 
-    const nonAuthSourceRows = filterExcludedMpns(collectRows(nonAuthGroupNames));
-    const franchiseSourceRows = filterExcludedMpns(collectRows([FRANCHISE_GROUP]));
+    const nonAuthSourceRows = filterExcludedMpns(collectRows(NON_AUTH_GROUPS));
+    const franchiseSourceRows = filterExcludedMpns(groupedRows['Franchise_Stock'] || []);
 
-    const toPortalRows = (sourceRows) => sourceRows.map(row => {
-        const out = {};
-        for (const col of portalSourceCols) {
-            let val = String(row[col] || '').trim();
-            if (col === 'Lot Quantity') val = cleanNumeric(val);
-            out[PORTAL_COLUMN_LABELS[col] || col] = val;
-        }
-        return out;
-    });
+    // Convert to portal format
+    const nonAuthPortalRows = nonAuthSourceRows.map(toPortalRow);
+    const franchisePortalRows = franchiseSourceRows.map(toPortalRow);
 
-    // Generate non-auth CSV
-    const portalFile = path.join(outputDir, `Netcomponents 1167233 ${mmdd}.csv`);
-    const nonAuthRows = toPortalRows(nonAuthSourceRows);
-
-    // Load and append carryover lines
-    console.log('\n  Loading carryover lines...');
+    // Load and append carryover lines to non-auth
+    log('Loading carryover lines...');
     const carryoverLines = await loadCarryoverLines();
     if (carryoverLines.length > 0) {
-        console.log(`  Appending ${carryoverLines.length} carryover lines to non-auth CSV`);
+        log(`  Appending ${carryoverLines.length} carryover lines to non-auth CSV`);
         // Filter carryovers by exclusions too
         const filteredCarryovers = carryoverLines.filter(line => {
-            const mpn = String(line.MPN || '').trim().toUpperCase();
+            const mpn = (line.MPN || '').toUpperCase();
             return !sourcingExclusions.has(mpn);
         });
         for (const line of filteredCarryovers) {
-            nonAuthRows.push({
+            nonAuthPortalRows.push({
                 'MPN':          line.MPN,
                 'Description':  line.Description,
                 'Manufacturer': line.Manufacturer,
@@ -348,16 +287,22 @@ async function generateNCFiles(groupedRows, headers, outputDir, dryRun) {
         }
     }
 
-    fs.writeFileSync(portalFile, arrayToCSV(nonAuthRows, portalOutputHeaders));
-    console.log(`  Saved: ${path.basename(portalFile)} (${nonAuthRows.length} rows)`);
+    // Write non-auth CSV
+    const portalFile = path.join(outputDir, `Netcomponents 1167233 ${mmdd}.csv`);
+    fs.writeFileSync(portalFile, arrayToCSV(nonAuthPortalRows, PORTAL_HEADERS));
+    log(`  Saved: ${path.basename(portalFile)} (${nonAuthPortalRows.length} rows)`);
 
-    // Generate franchise CSV
+    // Write franchise CSV
     const franchisePortalFile = path.join(outputDir, `Netcomponents 1126121 ${mmdd}.csv`);
-    const franchiseRows = toPortalRows(franchiseSourceRows);
-    fs.writeFileSync(franchisePortalFile, arrayToCSV(franchiseRows, portalOutputHeaders));
-    console.log(`  Saved: ${path.basename(franchisePortalFile)} (${franchiseRows.length} rows)`);
+    fs.writeFileSync(franchisePortalFile, arrayToCSV(franchisePortalRows, PORTAL_HEADERS));
+    log(`  Saved: ${path.basename(franchisePortalFile)} (${franchisePortalRows.length} rows)`);
 
-    return { portalFile, franchisePortalFile, nonAuthRows, franchiseRows };
+    return {
+        portalFile,
+        franchisePortalFile,
+        nonAuthRows: nonAuthPortalRows,
+        franchiseRows: franchisePortalRows
+    };
 }
 
 // =============================================================================
@@ -367,12 +312,12 @@ async function generateNCFiles(groupedRows, headers, outputDir, dryRun) {
 async function sendNCEmails(portalFile, franchisePortalFile, dryRun) {
     // Send directly to NetComponents (CC to jake for visibility)
     if (!NC_UPLOAD_CONFIG.enabled) {
-        console.log('  NC_UPLOAD_ENABLED=false — skipping NetComponents emails');
+        log('  NC_UPLOAD_ENABLED=false — skipping NetComponents emails');
         return true;
     }
 
     if (dryRun) {
-        console.log('  [dry-run] Would send to NetComponents');
+        log('  [dry-run] Would send to NetComponents');
         return true;
     }
 
@@ -382,7 +327,7 @@ async function sendNCEmails(portalFile, franchisePortalFile, dryRun) {
         smtpPass: process.env.WORKMAIL_PASS || process.env.SMTP_PASS
     });
 
-    console.log(`  Sending non-auth CSV to NetComponents: ${NC_UPLOAD_CONFIG.ncEmail} (CC: ${NC_UPLOAD_CONFIG.ccEmail})`);
+    log(`  Sending non-auth CSV to NetComponents: ${NC_UPLOAD_CONFIG.ncEmail} (CC: ${NC_UPLOAD_CONFIG.ccEmail})`);
     await ncNotifier.sendWithAttachment(
         NC_UPLOAD_CONFIG.ncEmail,
         'Data Upload - Non-Authorized Account # 1167233',
@@ -391,7 +336,7 @@ async function sendNCEmails(portalFile, franchisePortalFile, dryRun) {
         { cc: NC_UPLOAD_CONFIG.ccEmail }
     );
 
-    console.log(`  Sending franchise CSV to NetComponents: ${NC_UPLOAD_CONFIG.ncEmail} (CC: ${NC_UPLOAD_CONFIG.ccEmail})`);
+    log(`  Sending franchise CSV to NetComponents: ${NC_UPLOAD_CONFIG.ncEmail} (CC: ${NC_UPLOAD_CONFIG.ccEmail})`);
     await ncNotifier.sendWithAttachment(
         NC_UPLOAD_CONFIG.ncEmail,
         'Data upload - Franchised account # 1126121',
@@ -407,25 +352,25 @@ async function sendNCEmails(portalFile, franchisePortalFile, dryRun) {
 // MAIN
 // =============================================================================
 
-async function main(inputFile, opts = {}) {
+async function main(opts = {}) {
     const dryRun = !!opts.dryRun;
     const today = new Date();
     const dateStr = today.toISOString().split('T')[0];
 
-    console.log('='.repeat(60));
-    console.log('NC LISTING — NetComponents Portal Upload');
-    console.log('='.repeat(60));
-    console.log(`Time: ${today.toISOString()}`);
-    console.log(`Mode: ${dryRun ? 'DRY-RUN (no emails sent)' : 'LIVE'}`);
-    console.log(`Input: ${inputFile}`);
-    console.log('-'.repeat(60));
+    log('='.repeat(60));
+    log('NC LISTING — NetComponents Portal Upload');
+    log('='.repeat(60));
+    log(`Mode: ${dryRun ? 'DRY-RUN (no emails sent)' : 'LIVE'}`);
+    log('-'.repeat(60));
 
     try {
-        // Step 1: Process inventory file
-        console.log('\nStep 1: Processing inventory file...');
-        const { headers, uniqueRows, groupedRows, unmatchedRows } = processInventoryFile(inputFile);
-        console.log(`  Total unique rows: ${uniqueRows.length}`);
-        console.log(`  Warehouse groups: ${Object.keys(groupedRows).length}`);
+        // Step 1: Load inventory from cache
+        log('\nStep 1: Loading inventory from cache...');
+        const { cache, groupedRows } = loadInventoryFromCache();
+
+        const totalRows = Object.values(groupedRows).reduce((sum, arr) => sum + arr.length, 0);
+        log(`  Total rows: ${totalRows}`);
+        log(`  NC groups: ${Object.keys(groupedRows).length}`);
 
         // Step 2: Create output directory
         const outputDir = path.join('/tmp', `NC-Listing-${dateStr}`);
@@ -434,33 +379,34 @@ async function main(inputFile, opts = {}) {
         }
 
         // Step 3: Generate NC portal files
-        console.log('\nStep 2: Generating NetComponents portal files...');
+        log('\nStep 2: Generating NetComponents portal files...');
         const { portalFile, franchisePortalFile, nonAuthRows, franchiseRows } =
-            await generateNCFiles(groupedRows, headers, outputDir, dryRun);
+            await generateNCFiles(groupedRows, outputDir, dryRun);
 
         // Step 4: Send emails
-        console.log('\nStep 3: Sending notification emails...');
+        log('\nStep 3: Sending notification emails...');
         if (dryRun) {
-            console.log('  [DRY-RUN] Skipping email send');
+            log('  [DRY-RUN] Skipping email send');
         } else {
             await sendNCEmails(portalFile, franchisePortalFile, dryRun);
         }
 
         // Summary
-        console.log('\n' + '='.repeat(60));
-        console.log('NC LISTING COMPLETE');
-        console.log('='.repeat(60));
-        console.log(`Non-auth CSV: ${portalFile} (${nonAuthRows.length} rows)`);
-        console.log(`Franchise CSV: ${franchisePortalFile} (${franchiseRows.length} rows)`);
-        console.log(`Emails sent: ${dryRun ? 'No (dry-run)' : 'Yes'}`);
+        log('\n' + '='.repeat(60));
+        log('NC LISTING COMPLETE');
+        log('='.repeat(60));
+        log(`Cache date: ${cache.metadata.cachedAt}`);
+        log(`Non-auth CSV: ${portalFile} (${nonAuthRows.length} rows)`);
+        log(`Franchise CSV: ${franchisePortalFile} (${franchiseRows.length} rows)`);
+        log(`Emails sent: ${dryRun ? 'No (dry-run)' : 'Yes'}`);
 
         return { success: true, portalFile, franchisePortalFile };
 
     } catch (err) {
-        console.error('\n' + '='.repeat(60));
-        console.error('NC LISTING FAILED');
-        console.error('='.repeat(60));
-        console.error(`Error: ${err.message}`);
+        log('='.repeat(60));
+        log('NC LISTING FAILED');
+        log('='.repeat(60));
+        log(`Error: ${err.message}`);
         console.error(err.stack);
         return { success: false, error: err.message };
     }
@@ -472,27 +418,28 @@ async function main(inputFile, opts = {}) {
 
 if (require.main === module) {
     const argv = process.argv.slice(2);
-    const flags = new Set(argv.filter(a => a.startsWith('--')));
-    const args = argv.filter(a => !a.startsWith('--'));
-    const dryRun = flags.has('--dry-run');
+    const dryRun = argv.includes('--dry-run');
 
-    let inputFile;
+    if (argv.includes('--help')) {
+        console.log(`
+NC Listing — NetComponents Portal Upload
 
-    if (args.length > 0 && fs.existsSync(args[0])) {
-        // Explicit file provided
-        inputFile = args[0];
-    } else {
-        // Use this week's saved file
-        inputFile = getThisWeekInventoryFile();
-        if (!inputFile) {
-            console.error('ERROR: No inventory file found for this week.');
-            console.error(`Expected: ${INVENTORY_STORAGE_DIR}/inventory_${getWeekStartDate()}.xlsx`);
-            console.error('\nRun inventory_cleanup.js fetch first to process Monday\'s Infor export.');
-            process.exit(1);
-        }
+Usage:
+  node nc-listing.js             Generate and send NC CSVs
+  node nc-listing.js --dry-run   Preview without sending emails
+  node nc-listing.js --help      Show this help
+
+Requires:
+  Inventory cache from fetch-and-parse (runs Monday 5 AM CT)
+
+Output:
+  - Netcomponents 1167233 MM-DD.csv (non-authorized account)
+  - Netcomponents 1126121 MM-DD.csv (franchised account)
+`);
+        process.exit(0);
     }
 
-    main(inputFile, { dryRun })
+    main({ dryRun })
         .then(result => {
             process.exit(result.success ? 0 : 1);
         })

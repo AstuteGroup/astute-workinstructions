@@ -6,7 +6,8 @@
  *
  * DATA SOURCES (in order of preference):
  * 1. OT offers (getLAMInventory) — query chuboe_offer for LAM Kitting Inventory
- * 2. Infor CSVs — fallback when OT data is stale or unavailable
+ * 2. Infor xlsx (inventory-parser) — parse fresh xlsx directly, no cleanup needed
+ * 3. Infor CSVs — legacy fallback from inventory cleanup output
  *
  * This module is DECOUPLED from inventory_cleanup.js — it can run independently
  * at any time without waiting for the weekly inventory cleanup.
@@ -15,10 +16,13 @@
  *   # Query OT for inventory (preferred)
  *   node lam-threshold-check.js --source=ot
  *
- *   # Use Infor CSVs (fallback)
- *   node lam-threshold-check.js --source=infor --inventory-folder="/path/to/Inventory 2026-07-09"
+ *   # Parse Infor xlsx directly (recommended when OT is stale)
+ *   node lam-threshold-check.js --source=xlsx --xlsx-path="/path/to/ASTItemLotsReport.xlsx"
  *
- *   # Auto-select best source
+ *   # Use pre-parsed CSVs (legacy)
+ *   node lam-threshold-check.js --source=csv --inventory-folder="/path/to/Inventory 2026-07-09"
+ *
+ *   # Auto-select best source (OT if fresh, else xlsx if available, else CSV)
  *   node lam-threshold-check.js
  *
  * Output: JSON with reorder candidates, can be piped to sourcing/RFQ writer
@@ -29,6 +33,7 @@ const fs = require('fs');
 const XLSX = require('xlsx');
 const { getLAMInventoryByMPN, checkInventoryFreshness } = require('./ot-inventory-reader');
 const { readCSVFile } = require('./csv-utils');
+const { parseInventoryFile, getWarehouseRows } = require('./inventory-parser');
 
 const LAM_3PL_DIR = path.join(__dirname, '../Trading Analysis/LAM 3PL');
 
@@ -126,6 +131,86 @@ function loadInventoryFromCSVs(inventoryFolder) {
 }
 
 /**
+ * Load inventory from Infor xlsx using the inventory parser
+ *
+ * @param {string} xlsxPath - Path to ASTItemLotsReport xlsx file
+ * @returns {Map<string, { qty: number }>}
+ */
+function loadInventoryFromXlsx(xlsxPath) {
+  console.log(`  Parsing: ${path.basename(xlsxPath)}`);
+  const result = parseInventoryFile(xlsxPath);
+
+  console.log(`  Total rows: ${result.metadata.uniqueRows}`);
+  console.log(`  Warehouses: ${Object.keys(result.byWarehouse).join(', ')}`);
+
+  // Get LAM warehouses (W111 + W115 for threshold check)
+  // Note: W118 (consignment) typically not included in threshold check
+  const lamRows = getWarehouseRows(result, ['W111', 'W115']);
+  console.log(`  LAM rows (W111+W115): ${lamRows.length}`);
+
+  // Aggregate by MPN
+  const byMPN = new Map();
+
+  for (const row of lamRows) {
+    const mpn = (row.mpn || '').trim();
+    if (!mpn) continue;
+
+    const mpnKey = mpn.toUpperCase();
+    const qty = row.qty || 0;
+
+    if (byMPN.has(mpnKey)) {
+      byMPN.get(mpnKey).qty += qty;
+    } else {
+      byMPN.set(mpnKey, { mpn, qty });
+    }
+  }
+
+  return {
+    byMPN,
+    metadata: {
+      source: 'xlsx',
+      file: path.basename(xlsxPath),
+      totalRows: result.metadata.uniqueRows,
+      lamRows: lamRows.length,
+      uniqueMPNs: byMPN.size,
+      parsedAt: result.metadata.parsedAt,
+    },
+  };
+}
+
+/**
+ * Find the most recent Infor xlsx in common locations
+ *
+ * @returns {string|null} Path to xlsx or null if not found
+ */
+function findLatestInforXlsx() {
+  const searchPaths = [
+    '/home/analytics_user/workspace/file-drop',
+    '/home/analytics_user/workspace',
+    '/tmp',
+  ];
+
+  for (const dir of searchPaths) {
+    if (!fs.existsSync(dir)) continue;
+
+    const files = fs.readdirSync(dir)
+      .filter(f => f.match(/^ASTItemLotsReport.*\.xlsx$/i))
+      .map(f => ({
+        name: f,
+        path: path.join(dir, f),
+        mtime: fs.statSync(path.join(dir, f)).mtime,
+      }))
+      .sort((a, b) => b.mtime - a.mtime);
+
+    if (files.length > 0) {
+      return files[0].path;
+    }
+  }
+
+  return null;
+}
+
+/**
  * Compare inventory against thresholds
  *
  * @param {Map} inventory - MPN -> { qty, ... }
@@ -189,14 +274,16 @@ function compareThresholds(inventory, thresholds) {
  * Run threshold check
  *
  * @param {Object} options
- * @param {string} options.source - 'ot', 'infor', or 'auto'
- * @param {string} options.inventoryFolder - Required if source='infor'
+ * @param {string} options.source - 'ot', 'xlsx', 'csv', or 'auto'
+ * @param {string} options.xlsxPath - Path to Infor xlsx (required if source='xlsx')
+ * @param {string} options.inventoryFolder - Path to CSV folder (required if source='csv')
  * @param {string} options.excelPath - Path to Kitting DB (optional, auto-finds latest)
  * @param {number} options.maxStaleAgeDays - Max age for OT data to be considered fresh (default: 7)
  */
 async function runThresholdCheck(options = {}) {
   const {
     source = 'auto',
+    xlsxPath = null,
     inventoryFolder = null,
     excelPath = null,
     maxStaleAgeDays = 7,
@@ -215,7 +302,42 @@ async function runThresholdCheck(options = {}) {
   let inventory;
   let metadata = {};
 
-  if (source === 'ot' || source === 'auto') {
+  // Source: xlsx — parse Infor xlsx directly
+  if (source === 'xlsx') {
+    if (!xlsxPath) {
+      throw new Error('--xlsx-path required when source=xlsx');
+    }
+    console.log(`\nUsing Infor xlsx...`);
+    const result = loadInventoryFromXlsx(xlsxPath);
+    inventory = result.byMPN;
+    metadata = result.metadata;
+    console.log(`  ${inventory.size} unique MPNs from xlsx`);
+  }
+  // Source: csv — use pre-parsed CSVs (legacy)
+  else if (source === 'csv') {
+    if (!inventoryFolder) {
+      throw new Error('--inventory-folder required when source=csv');
+    }
+    console.log(`\nUsing Infor CSVs from: ${inventoryFolder}`);
+    inventory = loadInventoryFromCSVs(inventoryFolder);
+    metadata = { source: 'csv', folder: inventoryFolder };
+    console.log(`  ${inventory.size} unique MPNs from CSVs`);
+  }
+  // Source: ot — query OT directly
+  else if (source === 'ot') {
+    console.log('\nUsing OT inventory data...');
+    const result = await getLAMInventoryByMPN();
+    inventory = result.byMPN;
+    metadata = {
+      source: 'ot',
+      offerKey: result.metadata.offerKey,
+      offerCreated: result.metadata.created,
+      ageInDays: result.metadata.ageInDays,
+    };
+    console.log(`  ${inventory.size} unique MPNs from OT`);
+  }
+  // Source: auto — try OT first, then xlsx, then csv
+  else if (source === 'auto') {
     console.log('\nChecking OT inventory...');
     const freshness = await checkInventoryFreshness(maxStaleAgeDays);
     console.log(`  Offer: ${freshness.offerKey}`);
@@ -223,7 +345,7 @@ async function runThresholdCheck(options = {}) {
     console.log(`  Age: ${freshness.ageInDays} days`);
     console.log(`  Fresh: ${freshness.fresh}`);
 
-    if (freshness.fresh || source === 'ot') {
+    if (freshness.fresh) {
       console.log('\nUsing OT inventory data...');
       const result = await getLAMInventoryByMPN();
       inventory = result.byMPN;
@@ -234,33 +356,37 @@ async function runThresholdCheck(options = {}) {
         ageInDays: result.metadata.ageInDays,
       };
       console.log(`  ${inventory.size} unique MPNs from OT`);
-    } else if (source === 'auto' && inventoryFolder) {
-      console.log(`\nOT data is stale (${freshness.ageInDays} days old), falling back to Infor CSVs...`);
-      inventory = loadInventoryFromCSVs(inventoryFolder);
-      metadata = { source: 'infor', folder: inventoryFolder };
-      console.log(`  ${inventory.size} unique MPNs from CSVs`);
-    } else if (source === 'auto') {
-      console.log(`\nWARNING: OT data is stale and no inventory folder provided.`);
-      console.log(`  Using stale OT data anyway...`);
-      const result = await getLAMInventoryByMPN();
-      inventory = result.byMPN;
-      metadata = {
-        source: 'ot',
-        offerKey: result.metadata.offerKey,
-        offerCreated: result.metadata.created,
-        ageInDays: result.metadata.ageInDays,
-        stale: true,
-      };
-      console.log(`  ${inventory.size} unique MPNs from OT (STALE)`);
+    } else {
+      // OT stale — try xlsx first
+      const autoXlsx = xlsxPath || findLatestInforXlsx();
+      if (autoXlsx && fs.existsSync(autoXlsx)) {
+        console.log(`\nOT data is stale (${freshness.ageInDays} days old), falling back to Infor xlsx...`);
+        const result = loadInventoryFromXlsx(autoXlsx);
+        inventory = result.byMPN;
+        metadata = result.metadata;
+        console.log(`  ${inventory.size} unique MPNs from xlsx`);
+      } else if (inventoryFolder && fs.existsSync(inventoryFolder)) {
+        // No xlsx, try CSV
+        console.log(`\nOT data is stale, no xlsx found, falling back to CSVs...`);
+        inventory = loadInventoryFromCSVs(inventoryFolder);
+        metadata = { source: 'csv', folder: inventoryFolder };
+        console.log(`  ${inventory.size} unique MPNs from CSVs`);
+      } else {
+        // No fallback available — use stale OT data
+        console.log(`\nWARNING: OT data is stale and no fallback available.`);
+        console.log(`  Using stale OT data anyway...`);
+        const result = await getLAMInventoryByMPN();
+        inventory = result.byMPN;
+        metadata = {
+          source: 'ot',
+          offerKey: result.metadata.offerKey,
+          offerCreated: result.metadata.created,
+          ageInDays: result.metadata.ageInDays,
+          stale: true,
+        };
+        console.log(`  ${inventory.size} unique MPNs from OT (STALE)`);
+      }
     }
-  } else if (source === 'infor') {
-    if (!inventoryFolder) {
-      throw new Error('--inventory-folder required when source=infor');
-    }
-    console.log(`\nUsing Infor CSVs from: ${inventoryFolder}`);
-    inventory = loadInventoryFromCSVs(inventoryFolder);
-    metadata = { source: 'infor', folder: inventoryFolder };
-    console.log(`  ${inventory.size} unique MPNs from CSVs`);
   }
 
   // Compare thresholds
@@ -298,6 +424,7 @@ if (require.main === module) {
   const args = process.argv.slice(2);
 
   let source = 'auto';
+  let xlsxPath = null;
   let inventoryFolder = null;
   let excelPath = null;
   let outputJson = false;
@@ -305,16 +432,47 @@ if (require.main === module) {
   for (const arg of args) {
     if (arg.startsWith('--source=')) {
       source = arg.split('=')[1];
+    } else if (arg.startsWith('--xlsx-path=')) {
+      xlsxPath = arg.split('=')[1];
     } else if (arg.startsWith('--inventory-folder=')) {
       inventoryFolder = arg.split('=')[1];
     } else if (arg.startsWith('--excel=')) {
       excelPath = arg.split('=')[1];
     } else if (arg === '--json') {
       outputJson = true;
+    } else if (arg === '--help' || arg === '-h') {
+      console.log(`
+LAM Threshold Check
+
+Usage:
+  node lam-threshold-check.js [options]
+
+Options:
+  --source=TYPE      Data source: ot, xlsx, csv, auto (default: auto)
+  --xlsx-path=PATH   Path to Infor xlsx (required if source=xlsx)
+  --inventory-folder=PATH  Path to CSV folder (required if source=csv)
+  --excel=PATH       Path to Kitting DB xlsx (default: auto-find latest)
+  --json             Output results as JSON
+  --help             Show this help
+
+Examples:
+  # Auto-select best source (OT if fresh, else xlsx, else CSV)
+  node lam-threshold-check.js
+
+  # Use OT data
+  node lam-threshold-check.js --source=ot
+
+  # Parse Infor xlsx directly
+  node lam-threshold-check.js --source=xlsx --xlsx-path=/path/to/ASTItemLotsReport.xlsx
+
+  # Use pre-parsed CSVs (legacy)
+  node lam-threshold-check.js --source=csv --inventory-folder=/path/to/Inventory-2026-07-09
+`);
+      process.exit(0);
     }
   }
 
-  runThresholdCheck({ source, inventoryFolder, excelPath })
+  runThresholdCheck({ source, xlsxPath, inventoryFolder, excelPath })
     .then(result => {
       if (outputJson) {
         console.log(JSON.stringify(result, null, 2));
@@ -339,6 +497,8 @@ module.exports = {
   runThresholdCheck,
   loadThresholds,
   loadInventoryFromCSVs,
+  loadInventoryFromXlsx,
   compareThresholds,
   findLatestKittingDB,
+  findLatestInforXlsx,
 };

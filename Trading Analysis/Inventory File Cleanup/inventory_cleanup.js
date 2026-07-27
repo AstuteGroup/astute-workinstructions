@@ -1,9 +1,31 @@
 #!/usr/bin/env node
 /**
+ * @deprecated This monolithic script has been replaced by a decoupled architecture:
+ *
+ *   FOUNDATIONAL:
+ *     shared/inventory-fetch-and-parse.js — fetches Infor xlsx, parses ALL warehouses, caches JSON
+ *
+ *   SUBORDINATE WORKFLOWS (each pulls what it needs from cache):
+ *     workflows/lam-inventory.js          — W115, W118 → OT offers + threshold check
+ *     workflows/free-stock-inventory.js   — W102, W104, W108, W109, etc. → OT offers
+ *     workflows/consignment-inventory.js  — W103, W106, W107, W117 → OT offers
+ *
+ *   NC PORTAL UPLOAD:
+ *     Trading Analysis/Inventory File Cleanup/nc-listing.js — uses cache, generates NC CSVs
+ *
+ *   CRON: See cron-jobs.js for the new entries replacing inventory-cleanup
+ *
+ * This file is kept for reference and backward compatibility until the new
+ * architecture is fully validated. Do not add new features here.
+ *
+ * ============================================================================
+ *
+ * ORIGINAL DOC (for reference):
+ *
  * Inventory File Cleanup Script (Node.js version)
  * Processes Infor ERP inventory exports for Astute Electronics
  *
- * Schedule: Monday 11 UTC (6 AM CT) — weekly cron
+ * Schedule: Monday 11 UTC (6 AM CT) — weekly cron (NOW DEPRECATED)
  *
  * Workflow:
  * 1. Fetch Infor xlsx from email (Task finished: [success] AST Item Lots Report)

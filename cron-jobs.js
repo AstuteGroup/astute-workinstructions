@@ -41,17 +41,77 @@ const ASTUTE = `${WORKSPACE}/astute-workinstructions`;
 const AGENT_CWD = `${HOME}/agent-runtime`;
 
 module.exports = [
+  // =========================================================================
+  // FOUNDATIONAL: Inventory Fetch & Parse (runs FIRST, all workflows depend on it)
+  // =========================================================================
   {
-    name: 'inventory-cleanup',
+    name: 'inventory-fetch-and-parse',
     cadence: 'weekly',
-    cadenceCron: '0 11 * * 1',
-    command: `node "${ASTUTE}/Trading Analysis/Inventory File Cleanup/inventory_cleanup.js" fetch`,
+    cadenceCron: '0 10 * * 1',
+    command: `node "${ASTUTE}/shared/inventory-fetch-and-parse.js"`,
+    cwd: ASTUTE,
+    needsOT: false,
+    logFile: '/tmp/inventory-fetch-and-parse.log',
+    description: 'Mon 10 UTC (5 AM CT) — fetch Infor xlsx, parse all warehouses, cache for workflows',
+  },
+
+  // =========================================================================
+  // SUBORDINATE WORKFLOWS: Each pulls from fetch-and-parse cache
+  // =========================================================================
+  {
+    name: 'lam-inventory',
+    cadence: 'weekly',
+    cadenceCron: '15 11 * * 1',
+    command: `node "${ASTUTE}/workflows/lam-inventory.js"`,
     cwd: ASTUTE,
     needsOT: true,
-    logFile: '/tmp/inventory-cleanup.log',
-    description: 'Mon 11 UTC — pull Infor xlsx, clean, write offers via OT API',
+    logFile: '/tmp/lam-inventory.log',
+    description: 'Mon 11:15 UTC — LAM inventory (W115, W118) → OT offers + threshold check',
   },
+  {
+    name: 'free-stock-inventory',
+    cadence: 'weekly',
+    cadenceCron: '30 11 * * 1',
+    command: `node "${ASTUTE}/workflows/free-stock-inventory.js"`,
+    cwd: ASTUTE,
+    needsOT: true,
+    logFile: '/tmp/free-stock-inventory.log',
+    description: 'Mon 11:30 UTC — Free Stock inventory (W102, W104, W108, W109, etc.) → OT offers',
+  },
+  {
+    name: 'consignment-inventory',
+    cadence: 'weekly',
+    cadenceCron: '45 11 * * 1',
+    command: `node "${ASTUTE}/workflows/consignment-inventory.js"`,
+    cwd: ASTUTE,
+    needsOT: true,
+    logFile: '/tmp/consignment-inventory.log',
+    description: 'Mon 11:45 UTC — Consignment inventory (W103, W106, W107, W117) → OT offers',
+  },
+
+  // =========================================================================
+  // DEPRECATED: Legacy inventory-cleanup (replaced by subordinate workflows above)
+  // =========================================================================
+  // The monolithic inventory_cleanup.js has been replaced by:
+  //   - shared/inventory-fetch-and-parse.js (foundational: fetch + parse + cache)
+  //   - workflows/lam-inventory.js (LAM warehouses)
+  //   - workflows/free-stock-inventory.js (free stock warehouses)
+  //   - workflows/consignment-inventory.js (consignment warehouses)
+  // Keeping this entry commented for reference; will be removed after
+  // verification that the new workflows are working correctly.
+  // {
+  //   name: 'inventory-cleanup',
+  //   cadence: 'weekly',
+  //   cadenceCron: '0 11 * * 1',
+  //   command: `node "${ASTUTE}/Trading Analysis/Inventory File Cleanup/inventory_cleanup.js" fetch`,
+  //   cwd: ASTUTE,
+  //   needsOT: true,
+  //   logFile: '/tmp/inventory-cleanup.log',
+  //   description: 'Mon 11 UTC — pull Infor xlsx, clean, write offers via OT API',
+  // },
   // PAUSED 2026-06-18 by operator — inventory sourcing paused
+  // Note: nc-listing.js has been refactored to use the fetch-and-parse cache
+  // instead of parsing the xlsx directly. Re-enable when ready.
   // {
   //   name: 'nc-listing',
   //   cadence: 'twice-weekly',
@@ -60,7 +120,7 @@ module.exports = [
   //   cwd: ASTUTE,
   //   needsOT: false,
   //   logFile: '/tmp/nc-listing.log',
-  //   description: 'Mon/Thu 12 UTC — generate NC portal CSVs with exclusions, send upload emails',
+  //   description: 'Mon/Thu 12 UTC — generate NC portal CSVs from cache, apply exclusions, send upload emails',
   // },
   {
     name: 'lam-kitting-runner',

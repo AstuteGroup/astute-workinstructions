@@ -18,6 +18,7 @@ const fs = require('fs');
 const path = require('path');
 const XLSX = require('xlsx');
 const { execSync } = require('child_process');
+const { parseInventoryFile } = require('../../shared/inventory-parser');
 
 // === CONFIGURATION ===
 
@@ -27,6 +28,11 @@ const OUTPUT_DIR = path.join(SCRIPT_DIR, 'output');
 const KNOWN_NON_LAM_PATH = path.join(SCRIPT_DIR, 'lam-wrong-warehouse-exclusions.json');
 const PENDING_TRANSFERS_PATH = path.join(SCRIPT_DIR, 'lam-wrong-warehouse-pending-transfers.json');
 
+// Note: Pending transfers are tracked in lam-wrong-warehouse-pending-transfers.json
+// Human reviews wrong warehouse check output, confirms LAM stock, adds to pending-transfers
+// Reorder script shows these as "PENDING WAREHOUSE TRANSFER - X pcs from WH" in Priority column
+// Auto-clears when part appears in W111/W115 inventory (qty match)
+
 // LAM warehouses - exclude from check (stock here is correct)
 const LAM_WAREHOUSES = ['W111', 'W115', 'W118'];
 
@@ -35,7 +41,7 @@ const EXCLUDE_WAREHOUSES = ['W111', 'W115', 'W118', 'W112', 'W117', 'W106'];
 
 // Email config
 const EMAIL_ACCOUNT = 'lamkitting';
-const EMAIL_TO = 'jake.harris@astutegroup.com';
+const EMAIL_TO = 'jake.harris@astutegroup.com,josh.syre@astutegroup.com';
 
 // === EXCLUSION PERSISTENCE ===
 // Items confirmed as "not LAM" are stored by MPN+Lot so they don't repeat
@@ -80,6 +86,7 @@ function addExclusion(exclusions, mpn, lot, wh, reason) {
 
 // === PENDING TRANSFERS ===
 // Items confirmed as LAM stock with transfer submitted - tracked until they move to W111
+// Auto-cleared by reorder script when part appears in W111/W115 inventory
 
 function loadPendingTransfers() {
   if (!fs.existsSync(PENDING_TRANSFERS_PATH)) {
@@ -87,7 +94,6 @@ function loadPendingTransfers() {
   }
   try {
     const data = JSON.parse(fs.readFileSync(PENDING_TRANSFERS_PATH, 'utf8'));
-    // Format: { "MPN": { mpn, cpc, qty, fromWh, date, notes } }
     return new Map(Object.entries(data));
   } catch (err) {
     console.warn('Warning: Could not load pending transfers file:', err.message);
@@ -97,7 +103,7 @@ function loadPendingTransfers() {
 
 function savePendingTransfers(transfers) {
   const obj = Object.fromEntries(transfers);
-  fs.writeFileSync(PENDING_TRANSFERS_PATH, JSON.stringify(obj, null, 2));
+  fs.writeFileSync(PENDING_TRANSFERS_PATH, JSON.stringify(obj, null, 2) + '\n');
 }
 
 function getPendingTransfer(transfers, mpn) {
@@ -126,20 +132,30 @@ async function main() {
   const args = process.argv.slice(2);
   const dryRun = args.includes('--dry-run');
   const markNonLam = args.includes('--mark-non-lam');
-  const inventoryFolder = args.find(a => !a.startsWith('--'));
-
   const listExclusions = args.includes('--list-exclusions');
   const clearExclusion = args.includes('--clear-exclusion');
 
-  if (!inventoryFolder && !markNonLam && !listExclusions && !clearExclusion) {
+  // Parse --xlsx option
+  let xlsxPath = null;
+  for (const arg of args) {
+    if (arg.startsWith('--xlsx=')) {
+      xlsxPath = arg.split('=')[1];
+    }
+  }
+
+  const inventoryFolder = xlsxPath ? null : args.find(a => !a.startsWith('--'));
+
+  if (!inventoryFolder && !xlsxPath && !markNonLam && !listExclusions && !clearExclusion) {
     console.error('Usage:');
     console.error('  node lam-wrong-warehouse-check.js <inventory-folder> [--dry-run]');
+    console.error('  node lam-wrong-warehouse-check.js --xlsx="<infor.xlsx>" [--dry-run]');
     console.error('  node lam-wrong-warehouse-check.js --mark-non-lam <mpn> <lot> [reason]');
     console.error('  node lam-wrong-warehouse-check.js --clear-exclusion <mpn> <lot>');
     console.error('  node lam-wrong-warehouse-check.js --list-exclusions');
     console.error('');
     console.error('Options:');
     console.error('  --dry-run          Run without sending email');
+    console.error('  --xlsx=<path>      Use Infor xlsx directly instead of inventory folder');
     console.error('  --mark-non-lam     Mark an MPN+Lot as not LAM (excludes from future checks)');
     console.error('  --clear-exclusion  Remove an MPN+Lot from exclusions');
     console.error('  --list-exclusions  Show all current exclusions');
@@ -205,7 +221,7 @@ async function main() {
   }
 
   console.log('=== LAM Wrong Warehouse Check ===');
-  console.log('Inventory folder:', inventoryFolder);
+  console.log('Inventory source:', xlsxPath ? `xlsx (${path.basename(xlsxPath)})` : inventoryFolder);
   console.log('Dry run:', dryRun);
   console.log('');
 
@@ -224,32 +240,73 @@ async function main() {
   const pendingTransfers = loadPendingTransfers();
   console.log(`  Loaded ${pendingTransfers.size} pending transfers`);
 
-  // Step 2: Find main inventory file
-  console.log('Step 2: Finding inventory file...');
-  const invFile = findInventoryFile(inventoryFolder);
-  if (!invFile) {
-    console.error('  ERROR: No inventory file found in', inventoryFolder);
-    process.exit(1);
-  }
-  console.log(`  Found: ${path.basename(invFile)}`);
+  // Step 2: Load inventory
+  let invFile = null;
+  let invData = null;
+  let fileAgeDays = 0;
 
-  // Step 2b: Check inventory file age - warn if stale (>14 days old)
-  const fileStats = fs.statSync(invFile);
-  const fileAgeDays = Math.floor((Date.now() - fileStats.mtime.getTime()) / (1000 * 60 * 60 * 24));
+  if (xlsxPath) {
+    // xlsx mode — use parser
+    console.log('Step 2: Parsing Infor xlsx...');
+    if (!fs.existsSync(xlsxPath)) {
+      console.error('  ERROR: xlsx file not found:', xlsxPath);
+      process.exit(1);
+    }
+    console.log(`  Parsing: ${path.basename(xlsxPath)}`);
+
+    const parsed = parseInventoryFile(xlsxPath);
+    console.log(`  Total warehouses: ${Object.keys(parsed.byWarehouse).length}`);
+
+    // Convert parsed data to invData format (array of { mpn, lot, qty, wh, mfr })
+    invData = [];
+    for (const [wh, rows] of Object.entries(parsed.byWarehouse)) {
+      for (const row of rows) {
+        invData.push({
+          mpn: row.mpn || '',
+          lot: row.lot || '',
+          qty: row.qty || 0,
+          wh: wh,
+          mfr: row.mfr || '',
+        });
+      }
+    }
+    console.log(`  Total inventory rows: ${invData.length}`);
+
+    // Check xlsx age
+    const fileStats = fs.statSync(xlsxPath);
+    fileAgeDays = Math.floor((Date.now() - fileStats.mtime.getTime()) / (1000 * 60 * 60 * 24));
+    invFile = xlsxPath;
+  } else {
+    // CSV mode — find and load inventory file
+    console.log('Step 2: Finding inventory file...');
+    invFile = findInventoryFile(inventoryFolder);
+    if (!invFile) {
+      console.error('  ERROR: No inventory file found in', inventoryFolder);
+      process.exit(1);
+    }
+    console.log(`  Found: ${path.basename(invFile)}`);
+
+    const fileStats = fs.statSync(invFile);
+    fileAgeDays = Math.floor((Date.now() - fileStats.mtime.getTime()) / (1000 * 60 * 60 * 24));
+
+    // Step 3: Load inventory
+    console.log('Step 3: Loading inventory...');
+    invData = loadInventory(invFile);
+  }
+
+  // Check file age
   if (fileAgeDays > 14) {
     console.log('');
     console.log('  !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!');
     console.log(`  WARNING: Inventory file is ${fileAgeDays} days old!`);
     console.log('  This data may be stale. Check if inventory cleanup cron is running.');
     console.log('  File:', path.basename(invFile));
-    console.log('  Modified:', fileStats.mtime.toISOString().split('T')[0]);
     console.log('  !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!');
     console.log('');
   }
 
-  // Step 3: Load inventory and analyze
-  console.log('Step 3: Loading inventory and analyzing...');
-  const invData = loadInventory(invFile);
+  // Continue with analysis (invData is now loaded)
+  console.log(xlsxPath ? 'Step 3: Analyzing inventory...' : 'Step 4: Analyzing inventory...');
   console.log(`  Loaded ${invData.length} inventory rows`);
 
   // Step 4: Find roster MPNs in LAM warehouses (for cross-reference)
