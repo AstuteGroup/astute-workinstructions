@@ -19,6 +19,7 @@ const path = require('path');
 const XLSX = require('xlsx');
 const { execSync } = require('child_process');
 const { parseInventoryFile } = require('../../shared/inventory-parser');
+const { loadCachedInventory } = require('../../shared/inventory-fetch-and-parse');
 
 // === CONFIGURATION ===
 
@@ -145,21 +146,23 @@ async function main() {
 
   const inventoryFolder = xlsxPath ? null : args.find(a => !a.startsWith('--'));
 
-  if (!inventoryFolder && !xlsxPath && !markNonLam && !listExclusions && !clearExclusion) {
-    console.error('Usage:');
-    console.error('  node lam-wrong-warehouse-check.js <inventory-folder> [--dry-run]');
-    console.error('  node lam-wrong-warehouse-check.js --xlsx="<infor.xlsx>" [--dry-run]');
-    console.error('  node lam-wrong-warehouse-check.js --mark-non-lam <mpn> <lot> [reason]');
-    console.error('  node lam-wrong-warehouse-check.js --clear-exclusion <mpn> <lot>');
-    console.error('  node lam-wrong-warehouse-check.js --list-exclusions');
-    console.error('');
-    console.error('Options:');
-    console.error('  --dry-run          Run without sending email');
-    console.error('  --xlsx=<path>      Use Infor xlsx directly instead of inventory folder');
-    console.error('  --mark-non-lam     Mark an MPN+Lot as not LAM (excludes from future checks)');
-    console.error('  --clear-exclusion  Remove an MPN+Lot from exclusions');
-    console.error('  --list-exclusions  Show all current exclusions');
-    process.exit(1);
+  // Show help if requested
+  if (args.includes('--help')) {
+    console.log('Usage:');
+    console.log('  node lam-wrong-warehouse-check.js [--dry-run]              # Use cache (default)');
+    console.log('  node lam-wrong-warehouse-check.js --xlsx="<infor.xlsx>"    # Use xlsx directly');
+    console.log('  node lam-wrong-warehouse-check.js <inventory-folder>       # Use legacy CSVs');
+    console.log('  node lam-wrong-warehouse-check.js --mark-non-lam <mpn> <lot> [reason]');
+    console.log('  node lam-wrong-warehouse-check.js --clear-exclusion <mpn> <lot>');
+    console.log('  node lam-wrong-warehouse-check.js --list-exclusions');
+    console.log('');
+    console.log('Options:');
+    console.log('  --dry-run          Run without sending email');
+    console.log('  --xlsx=<path>      Use Infor xlsx directly instead of cache');
+    console.log('  --mark-non-lam     Mark an MPN+Lot as not LAM (excludes from future checks)');
+    console.log('  --clear-exclusion  Remove an MPN+Lot from exclusions');
+    console.log('  --list-exclusions  Show all current exclusions');
+    process.exit(0);
   }
 
   // Handle listing exclusions
@@ -220,8 +223,14 @@ async function main() {
     return { marked: true, mpn, lot };
   }
 
+  // Determine source mode
+  const useCache = !xlsxPath && !inventoryFolder;
+  const sourceLabel = xlsxPath ? `xlsx (${path.basename(xlsxPath)})`
+                    : inventoryFolder ? `folder (${inventoryFolder})`
+                    : 'cache';
+
   console.log('=== LAM Wrong Warehouse Check ===');
-  console.log('Inventory source:', xlsxPath ? `xlsx (${path.basename(xlsxPath)})` : inventoryFolder);
+  console.log('Inventory source:', sourceLabel);
   console.log('Dry run:', dryRun);
   console.log('');
 
@@ -245,8 +254,44 @@ async function main() {
   let invData = null;
   let fileAgeDays = 0;
 
-  if (xlsxPath) {
-    // xlsx mode — use parser
+  if (useCache) {
+    // Cache mode (default) — use fetch-and-parse cache
+    console.log('Step 2: Loading inventory from cache...');
+    const cache = loadCachedInventory({ allowStale: true });
+    if (!cache) {
+      console.error('  ERROR: No inventory cache found. Run fetch-and-parse first.');
+      process.exit(1);
+    }
+    console.log(`  Cache date: ${cache.metadata.cachedAt}`);
+    console.log(`  Week of: ${cache.metadata.weekOf}`);
+    if (cache.metadata.stale) {
+      console.log('  WARNING: Using stale cache');
+    }
+    console.log(`  Total warehouses: ${Object.keys(cache.byWarehouse).length}`);
+
+    // Convert cache data to invData format (array of { mpn, lot, qty, wh, mfr })
+    invData = [];
+    for (const [wh, rows] of Object.entries(cache.byWarehouse)) {
+      for (const row of rows) {
+        invData.push({
+          mpn: row.mpn || '',
+          lot: row.lot || '',
+          qty: row.qty || 0,
+          wh: wh,
+          mfr: row.mfr || '',
+          location: row.location || '',
+        });
+      }
+    }
+    console.log(`  Total inventory rows: ${invData.length}`);
+
+    // Calculate cache age
+    const cachedAt = new Date(cache.metadata.cachedAt);
+    fileAgeDays = Math.floor((Date.now() - cachedAt.getTime()) / (1000 * 60 * 60 * 24));
+    invFile = `cache (${cache.metadata.weekOf})`;
+
+  } else if (xlsxPath) {
+    // xlsx mode — use parser directly
     console.log('Step 2: Parsing Infor xlsx...');
     if (!fs.existsSync(xlsxPath)) {
       console.error('  ERROR: xlsx file not found:', xlsxPath);
@@ -267,6 +312,7 @@ async function main() {
           qty: row.qty || 0,
           wh: wh,
           mfr: row.mfr || '',
+          location: row.location || '',
         });
       }
     }
@@ -276,8 +322,9 @@ async function main() {
     const fileStats = fs.statSync(xlsxPath);
     fileAgeDays = Math.floor((Date.now() - fileStats.mtime.getTime()) / (1000 * 60 * 60 * 24));
     invFile = xlsxPath;
+
   } else {
-    // CSV mode — find and load inventory file
+    // CSV mode (legacy) — find and load inventory file
     console.log('Step 2: Finding inventory file...');
     invFile = findInventoryFile(inventoryFolder);
     if (!invFile) {
@@ -306,14 +353,13 @@ async function main() {
   }
 
   // Continue with analysis (invData is now loaded)
-  console.log(xlsxPath ? 'Step 3: Analyzing inventory...' : 'Step 4: Analyzing inventory...');
-  console.log(`  Loaded ${invData.length} inventory rows`);
+  console.log('Step 3: Analyzing inventory...');
 
   // Step 4: Find roster MPNs in LAM warehouses (for cross-reference)
   const inLAMWarehouses = buildLAMWarehouseMap(invData);
   console.log(`  Found ${inLAMWarehouses.size} roster MPNs in LAM warehouses`);
 
-  // Step 5: Find roster MPNs in wrong warehouses
+  // Step 4: Find roster MPNs in wrong warehouses
   console.log('Step 4: Finding roster parts in wrong warehouses...');
   const { results, excludedCount } = findWrongWarehouseStock(invData, rosterMPNs, inLAMWarehouses, exclusions);
   console.log(`  Found ${results.length} inventory rows to review`);

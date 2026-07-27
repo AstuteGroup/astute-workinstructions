@@ -25,6 +25,7 @@ const { loadCachedInventory, getWarehouseRowsFromCache } = require('../shared/in
 const { writeOffer } = require('../shared/offer-writeback');
 const { runThresholdCheck } = require('../shared/lam-threshold-check');
 const { createNotifier } = require('../shared/notifier');
+const { execSync } = require('child_process');
 
 // =============================================================================
 // CONFIGURATION
@@ -197,6 +198,27 @@ async function runLAMInventory(options = {}) {
     log(`    LOW: ${thresholdResult.counts.LOW}`);
   } catch (err) {
     log(`  Threshold check failed: ${err.message}`);
+  }
+
+  // -------------------------------------------------------------------------
+  // Step 4: Run wrong warehouse check (uses cache for all warehouses)
+  // -------------------------------------------------------------------------
+  log('\nStep 4: Running wrong warehouse check...');
+
+  try {
+    const wrongWhScript = path.join(__dirname, '../Trading Analysis/LAM 3PL/lam-wrong-warehouse-check.js');
+    const wrongWhArgs = dryRun ? '--dry-run' : '';
+    const wrongWhCmd = `node "${wrongWhScript}" ${wrongWhArgs}`.trim();
+
+    log(`  Running: ${wrongWhCmd}`);
+    execSync(wrongWhCmd, {
+      stdio: ['ignore', 'pipe', 'pipe'],
+      timeout: 120000,  // 2 minute timeout
+    });
+    log('  Wrong warehouse check complete');
+  } catch (err) {
+    // Non-fatal - log but continue
+    log(`  Wrong warehouse check failed: ${err.message}`);
   }
 
   // -------------------------------------------------------------------------
