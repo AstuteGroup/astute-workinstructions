@@ -38,6 +38,7 @@ const { readCSVFile } = require('../../shared/csv-utils');
 const { createNotifier } = require('../../shared/notifier');
 const { normalizeMPN } = require('../../shared/mpn-normalization');
 const { parseInventoryFile, getWarehouseRows } = require('../../shared/inventory-parser');
+const { loadCachedInventory } = require('../../shared/inventory-fetch-and-parse');
 
 // LAM Kitting handler - for Additional Review visibility
 let _lamKittingHandler = null;
@@ -277,9 +278,10 @@ async function main() {
   }
 
   // Determine inventory source and roster file
+  // Priority: --xlsx > folder arg > cache (default)
   let inventoryFolder = null;
   let excelFile = null;
-  let inventorySource = 'csv'; // 'csv' or 'xlsx'
+  let inventorySource = 'cache'; // 'cache', 'xlsx', or 'csv'
 
   if (xlsxPath) {
     // --xlsx mode: xlsx path + roster file
@@ -289,19 +291,21 @@ async function main() {
       process.exit(1);
     }
     excelFile = positionalArgs[0];
-  } else {
-    // Legacy mode: inventory folder + roster file
-    if (positionalArgs.length < 2) {
-      console.error('Usage: node lam-kitting-reorder.js <inventory-folder> <master-roster-file> [output-file] [--no-email]');
-      console.error('       node lam-kitting-reorder.js --xlsx="<infor.xlsx>" <master-roster-file> [output-file] [--no-email]');
-      console.error('');
-      console.error('Examples:');
-      console.error('  node lam-kitting-reorder.js "./Inventory 2026-03-11" "./LAM_Master_Roster.xlsx"');
-      console.error('  node lam-kitting-reorder.js --xlsx="/path/to/ASTItemLotsReport.xlsx" "./LAM_Master_Roster.xlsx"');
-      process.exit(1);
-    }
+  } else if (positionalArgs.length >= 2 && fs.existsSync(positionalArgs[0]) && fs.statSync(positionalArgs[0]).isDirectory()) {
+    // Legacy CSV mode: inventory folder + roster file
+    inventorySource = 'csv';
     inventoryFolder = positionalArgs[0];
     excelFile = positionalArgs[1];
+  } else if (positionalArgs.length >= 1) {
+    // Cache mode (default): just roster file
+    inventorySource = 'cache';
+    excelFile = positionalArgs[0];
+  } else {
+    console.error('Usage:');
+    console.error('  node lam-kitting-reorder.js <master-roster-file> [output-file] [--no-email]     # Uses cache (default)');
+    console.error('  node lam-kitting-reorder.js --xlsx="<infor.xlsx>" <master-roster-file>          # Uses xlsx');
+    console.error('  node lam-kitting-reorder.js <inventory-folder> <master-roster-file>             # Legacy CSV mode');
+    process.exit(1);
   }
 
   const scriptDir = path.dirname(__filename);
@@ -309,14 +313,25 @@ async function main() {
   if (!fs.existsSync(outputDir)) {
     fs.mkdirSync(outputDir, { recursive: true });
   }
-  const outputFile = (xlsxPath ? positionalArgs[1] : positionalArgs[2]) || path.join(outputDir, `LAM_Reorder_Alerts_${getDateStamp()}.csv`);
+
+  // Determine output file position based on mode
+  let outputFile;
+  if (inventorySource === 'xlsx') {
+    outputFile = positionalArgs[1] || path.join(outputDir, `LAM_Reorder_Alerts_${getDateStamp()}.csv`);
+  } else if (inventorySource === 'csv') {
+    outputFile = positionalArgs[2] || path.join(outputDir, `LAM_Reorder_Alerts_${getDateStamp()}.csv`);
+  } else {
+    outputFile = positionalArgs[1] || path.join(outputDir, `LAM_Reorder_Alerts_${getDateStamp()}.csv`);
+  }
 
   console.log('LAM 3PL Reorder');
   console.log('===============');
-  if (xlsxPath) {
+  if (inventorySource === 'xlsx') {
     console.log(`Inventory source: xlsx (${path.basename(xlsxPath)})`);
+  } else if (inventorySource === 'csv') {
+    console.log(`Inventory source: csv (${inventoryFolder})`);
   } else {
-    console.log(`Inventory folder: ${inventoryFolder}`);
+    console.log('Inventory source: cache');
   }
   console.log(`Master Roster: ${excelFile}`);
   console.log(`Output file: ${outputFile}`);
@@ -327,6 +342,7 @@ async function main() {
 
   let w111Inventory, w115Inventory;
   let inventoryFileInfo = null;
+  let cacheData = null;  // For cache mode - used by other warehouse check
 
   if (inventorySource === 'xlsx') {
     // Parse xlsx directly
@@ -343,7 +359,7 @@ async function main() {
         ageDays: Math.floor((Date.now() - fileStats.mtime.getTime()) / (1000 * 60 * 60 * 24)),
       };
     }
-  } else {
+  } else if (inventorySource === 'csv') {
     // Load from pre-parsed CSVs
     const w111Path = path.join(inventoryFolder, W111_FILENAME);
     const w115Path = path.join(inventoryFolder, W115_FILENAME);
@@ -360,6 +376,32 @@ async function main() {
         ageDays: Math.floor((Date.now() - fileStats.mtime.getTime()) / (1000 * 60 * 60 * 24)),
       };
     }
+  } else {
+    // Cache mode (default)
+    console.log('  Loading from cache...');
+    cacheData = loadCachedInventory({ allowStale: true });
+    if (!cacheData) {
+      console.error('  ERROR: No inventory cache found. Run inventory-fetch-and-parse first.');
+      process.exit(1);
+    }
+
+    console.log(`  Cache date: ${cacheData.metadata.cachedAt}`);
+    console.log(`  Week of: ${cacheData.metadata.weekOf}`);
+    if (cacheData.metadata.stale) {
+      console.log('  WARNING: Using stale cache');
+    }
+
+    // Extract W111 and W115 from cache
+    w111Inventory = loadInventoryFromCache(cacheData, 'W111');
+    w115Inventory = loadInventoryFromCache(cacheData, 'W115');
+
+    // Set file info for staleness check
+    const cachedAt = new Date(cacheData.metadata.cachedAt);
+    inventoryFileInfo = {
+      path: `cache (${cacheData.metadata.weekOf})`,
+      mtime: cachedAt,
+      ageDays: Math.floor((Date.now() - cachedAt.getTime()) / (1000 * 60 * 60 * 24)),
+    };
   }
 
   console.log(`  W111 (LAM 3PL): ${Object.keys(w111Inventory).length} unique MPNs`);
@@ -450,7 +492,7 @@ async function main() {
   console.log('');
   console.log('Step 5b: Checking other warehouse stock...');
   const reorderMPNs = reorderAlerts.map(a => a['MPN']);
-  const otherStock = loadOtherWarehouseStock(inventoryFolder, reorderMPNs, xlsxPath);
+  const otherStock = loadOtherWarehouseStock(inventoryFolder, reorderMPNs, xlsxPath, cacheData);
   const stockMatches = Object.keys(otherStock).filter(mpn => otherStock[mpn].length > 0).length;
   console.log(`  Stock matches found: ${stockMatches} MPNs in other warehouses`);
 
@@ -720,6 +762,36 @@ function loadInventoryFromXlsx(xlsxPath, warehouseCode) {
     inventory[mpn].qty += qty;
   }
 
+  return inventory;
+}
+
+/**
+ * Load inventory from cache data
+ * Returns same format as loadChuboeInventory for compatibility
+ *
+ * @param {object} cacheData - Cache data from loadCachedInventory
+ * @param {string} warehouseCode - e.g., 'W111' or 'W115'
+ * @returns {object} { mpn: { qty, warehouse }, ... }
+ */
+function loadInventoryFromCache(cacheData, warehouseCode) {
+  const rows = cacheData.byWarehouse[warehouseCode] || [];
+
+  const inventory = {};
+
+  for (const row of rows) {
+    const mpn = (row.mpn || '').trim();
+    const qty = row.qty || 0;
+
+    if (!mpn) continue;
+
+    // Aggregate by MPN (handles multiple lots)
+    if (!inventory[mpn]) {
+      inventory[mpn] = { qty: 0, warehouse: warehouseCode };
+    }
+    inventory[mpn].qty += qty;
+  }
+
+  console.log(`  ${warehouseCode}: ${Object.keys(inventory).length} unique MPNs`);
   return inventory;
 }
 
@@ -1015,8 +1087,9 @@ function loadRecentPOVs() {
   const sql = `
     WITH all_activity AS (
       -- Open POs (with or without Infor POV stamp)
+      -- Key by CPC if available, otherwise fall back to MPN (for LAM RFQs missing CPC)
       SELECT
-        TRIM(rl.chuboe_cpc) AS cpc,
+        COALESCE(NULLIF(TRIM(rl.chuboe_cpc), ''), UPPER(TRIM(ol.chuboe_mpn))) AS cpc,
         TRIM(ol.chuboe_mpn) AS mpn,
         CASE WHEN ol.chuboe_po_string LIKE 'POV%' THEN ol.chuboe_po_string ELSE '' END AS pov_number,
         o.documentno AS ot_po_number,
@@ -1041,22 +1114,20 @@ function loadRecentPOVs() {
         AND o.isactive = 'Y'
         AND o.docstatus IN ('CO', 'IP', 'DR')
         AND ol.qtyordered > ol.qtydelivered
-        AND rl.chuboe_cpc IS NOT NULL
-        AND rl.chuboe_cpc != ''
         AND rfq.c_bpartner_id = 1000730
-        -- Keep if: has Infor POV stamp (committed order), OR recent, OR promise not passed
-        -- Only filter out stale orphans that lack POV stamp (drafts, stuck POs)
+        -- Keep if: recent OR promise not yet passed
+        -- Filter out stale orders (>90 days old with past promise date)
         AND (
-          ol.chuboe_po_string LIKE 'POV%'                       -- Infor-stamped = always keep
-          OR o.created::date >= CURRENT_DATE - INTERVAL '120 days' -- Recent = keep (extended from 90d while catching up)
+          o.created::date >= CURRENT_DATE - INTERVAL '90 days'  -- Recent = keep
           OR ol.datepromised::date >= CURRENT_DATE              -- Not yet due = keep
         )
 
       UNION ALL
 
       -- VQs ticked (ispurchased='Y') but no PO cut yet → buyer committed, procurement catching up
+      -- Key by CPC if available, otherwise fall back to MPN
       SELECT
-        TRIM(rl.chuboe_cpc) AS cpc,
+        COALESCE(NULLIF(TRIM(rl.chuboe_cpc), ''), UPPER(TRIM(vl.chuboe_mpn))) AS cpc,
         TRIM(vl.chuboe_mpn) AS mpn,
         '' AS pov_number,
         '' AS ot_po_number,
@@ -1082,11 +1153,9 @@ function loadRecentPOVs() {
         AND rfq.c_bpartner_id = 1000730
         AND rfq.isactive = 'Y'
         AND ol2.c_orderline_id IS NULL
-        AND rl.chuboe_cpc IS NOT NULL
-        AND rl.chuboe_cpc != ''
         -- Same recency rule: keep iff RFQ created recently OR VQ promise date still ≥ today
         AND (
-          rfq.created::date >= CURRENT_DATE - INTERVAL '120 days'
+          rfq.created::date >= CURRENT_DATE - INTERVAL '90 days'
           OR vl.datepromised::date >= CURRENT_DATE
         )
     ),
@@ -1159,12 +1228,31 @@ const OTHER_WAREHOUSE_CODES = [
   { code: 'W118', label: 'W118 LAM Consignment' },
 ];
 
-function loadOtherWarehouseStock(inventoryFolder, targetMPNs, xlsxPath = null) {
+function loadOtherWarehouseStock(inventoryFolder, targetMPNs, xlsxPath = null, cacheData = null) {
   const targetSet = new Set(targetMPNs);
   const results = {}; // mpn → [{ warehouse, qty }]
   for (const mpn of targetMPNs) results[mpn] = [];
 
-  if (xlsxPath) {
+  if (cacheData) {
+    // Cache mode — use cache data directly
+    for (const wh of OTHER_WAREHOUSE_CODES) {
+      const rows = cacheData.byWarehouse[wh.code] || [];
+
+      // Aggregate by MPN within this warehouse
+      const whStock = {};
+      for (const row of rows) {
+        const mpn = (row.mpn || '').trim();
+        if (!mpn || !targetSet.has(mpn)) continue;
+        whStock[mpn] = (whStock[mpn] || 0) + (row.qty || 0);
+      }
+
+      for (const [mpn, qty] of Object.entries(whStock)) {
+        if (qty > 0) {
+          results[mpn].push({ warehouse: wh.label, qty });
+        }
+      }
+    }
+  } else if (xlsxPath) {
     // xlsx mode — use parser
     const parsed = parseInventoryFile(xlsxPath);
 
@@ -1185,7 +1273,7 @@ function loadOtherWarehouseStock(inventoryFolder, targetMPNs, xlsxPath = null) {
         }
       }
     }
-  } else {
+  } else if (inventoryFolder) {
     // CSV mode — use pre-parsed files
     for (const wh of OTHER_WAREHOUSE_FILES) {
       const filePath = path.join(inventoryFolder, wh.file);

@@ -23,8 +23,9 @@ const SCRIPT_DIR = __dirname;
 const INVENTORY_CLEANUP_DIR = path.join(SCRIPT_DIR, '../Inventory File Cleanup');
 const MASTER_ROSTER_FILE = 'LAM_Master_Roster.xlsx';
 
-// Import inventory parser for xlsx mode
+// Import inventory utilities
 const { findLatestInforXlsx } = require('../../shared/lam-threshold-check');
+const { getCacheStatus } = require('../../shared/inventory-fetch-and-parse');
 
 const EMAIL_ACCOUNT = 'lamkitting';
 const NOTIFY_EMAIL = process.env.NOTIFY_EMAIL || 'jake.harris@astutegroup.com,josh.syre@astutegroup.com';
@@ -638,6 +639,7 @@ async function main() {
   // Parse arguments
   let xlsxPath = null;
   let useXlsx = false;
+  let useLegacyCsv = false;
 
   for (const arg of process.argv.slice(2)) {
     if (arg.startsWith('--xlsx-path=')) {
@@ -646,6 +648,9 @@ async function main() {
     } else if (arg === '--xlsx') {
       // Auto-find latest xlsx
       useXlsx = true;
+    } else if (arg === '--legacy-csv') {
+      // Force legacy CSV mode (for testing only)
+      useLegacyCsv = true;
     }
   }
 
@@ -655,6 +660,7 @@ async function main() {
   let inventorySource = null;
 
   // Step 1: Determine inventory source
+  // Priority: --xlsx > --legacy-csv > cache (default)
   if (useXlsx) {
     // xlsx mode — find or use provided xlsx
     log('Step 1: Finding Infor xlsx file...');
@@ -677,38 +683,38 @@ async function main() {
     if (xlsxAge > 7) {
       log(`  WARNING: xlsx is ${xlsxAge} days old`);
     }
-  } else {
-    // Legacy mode — use inventory folder
+  } else if (useLegacyCsv) {
+    // Legacy CSV mode — only for testing/fallback
     log(`Step 1: Looking for inventory folder: ${inventoryFolder}`);
 
     if (!fs.existsSync(inventoryFolder)) {
-      // Inventory cleanup hasn't run yet today — run it
-      log('  Inventory folder not found. Running Inventory Cleanup first...');
-      try {
-        const result = execSync(
-          `node "${path.join(INVENTORY_CLEANUP_DIR, 'inventory_cleanup.js')}" fetch`,
-          { encoding: 'utf-8', timeout: 300000 }
-        );
-        console.log(result);
-      } catch (err) {
-        log(`  ERROR: Inventory Cleanup failed: ${err.message}`);
-        process.exit(1);
-      }
-    }
-
-    // Verify inventory folder exists now
-    if (!fs.existsSync(inventoryFolder)) {
-      log('  ERROR: Inventory folder still not found after cleanup. Exiting.');
+      log('  ERROR: Inventory folder not found. Use cache mode (default) or --xlsx instead.');
       process.exit(1);
     }
 
-    // Verify required files exist
     w111File = path.join(inventoryFolder, 'W111_LAM_3PL.csv');
     if (!fs.existsSync(w111File)) {
       log(`  WARNING: ${w111File} not found — W111 may have been named differently`);
     }
     log(`  Inventory folder found: ${inventoryFolder}`);
     inventorySource = 'csv';
+  } else {
+    // Cache mode (default) — use inventory-fetch-and-parse cache
+    log('Step 1: Checking inventory cache...');
+
+    const cacheStatus = getCacheStatus();
+    if (!cacheStatus.hasFreshCache && !cacheStatus.hasStaleCache) {
+      log('  ERROR: No inventory cache found. Run inventory-fetch-and-parse first.');
+      process.exit(1);
+    }
+
+    if (cacheStatus.hasFreshCache) {
+      log(`  Cache found: ${cacheStatus.weekOf} (${cacheStatus.cacheAge} days old)`);
+    } else {
+      log(`  WARNING: Using stale cache: ${cacheStatus.weekOf} (${cacheStatus.cacheAge} days old)`);
+    }
+
+    inventorySource = 'cache';
   }
 
   // Step 2: Verify Master Roster exists
@@ -729,8 +735,11 @@ async function main() {
     let reorderCmd;
     if (inventorySource === 'xlsx') {
       reorderCmd = `node "${path.join(SCRIPT_DIR, 'lam-kitting-reorder.js')}" --xlsx="${xlsxPath}" "${excelFile}" --no-email`;
-    } else {
+    } else if (inventorySource === 'csv') {
       reorderCmd = `node "${path.join(SCRIPT_DIR, 'lam-kitting-reorder.js')}" "${inventoryFolder}" "${excelFile}" --no-email`;
+    } else {
+      // cache mode — no xlsx or folder arg, reorder script will use cache
+      reorderCmd = `node "${path.join(SCRIPT_DIR, 'lam-kitting-reorder.js')}" "${excelFile}" --no-email`;
     }
     const result = execSync(reorderCmd, { encoding: 'utf-8', timeout: 120000 });
     console.log(result);
@@ -848,8 +857,11 @@ async function main() {
     let wwcCmd;
     if (inventorySource === 'xlsx') {
       wwcCmd = `node "${path.join(SCRIPT_DIR, 'lam-wrong-warehouse-check.js')}" --xlsx="${xlsxPath}"`;
-    } else {
+    } else if (inventorySource === 'csv') {
       wwcCmd = `node "${path.join(SCRIPT_DIR, 'lam-wrong-warehouse-check.js')}" "${inventoryFolder}"`;
+    } else {
+      // cache mode — no args, script will use cache
+      wwcCmd = `node "${path.join(SCRIPT_DIR, 'lam-wrong-warehouse-check.js')}"`;
     }
     execSync(wwcCmd, { encoding: 'utf-8', timeout: 120000 });
     const wwcSidecar = path.join(SCRIPT_DIR, 'output', `LAM_Wrong_Warehouse_${getDateStamp()}.json`);
