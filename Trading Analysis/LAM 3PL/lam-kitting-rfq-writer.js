@@ -16,11 +16,88 @@
 
 const fs = require('fs');
 const path = require('path');
+const XLSX = require('xlsx');
 const { readCSVFile } = require('../../shared/csv-utils');
 const { writeRFQ } = require('../../shared/rfq-writer');
 const { writeVQBatch } = require('../../shared/vq-writer');
 const { tickVQForPurchase } = require('../../shared/vq-patcher');
 const { postApproveOrder } = require('../../shared/r-request-writer');
+
+// ─── Roster Lookup (MPN → CPC fallback) ─────────────────────────────────────
+
+const ROSTER_PATH = path.join(__dirname, 'LAM_Master_Roster.xlsx');
+let _rosterCache = null;
+
+/**
+ * Load roster and build MPN → CPC lookup.
+ * Includes both primary MPN and AVL alternates.
+ */
+function loadRosterMpnToCpc() {
+  if (_rosterCache) return _rosterCache;
+
+  _rosterCache = new Map();
+
+  if (!fs.existsSync(ROSTER_PATH)) {
+    console.warn('  WARNING: Roster not found for CPC fallback lookup');
+    return _rosterCache;
+  }
+
+  const wb = XLSX.readFile(ROSTER_PATH);
+
+  // Load from Master Roster sheet
+  const ws = wb.Sheets['Master Roster'];
+  if (ws) {
+    const data = XLSX.utils.sheet_to_json(ws);
+    for (const row of data) {
+      const mpn = String(row.MPN || '').toUpperCase().trim();
+      const cpc = String(row.CPC || '').trim();
+      if (mpn && cpc) {
+        _rosterCache.set(mpn, cpc);
+      }
+    }
+  }
+
+  // Also load from AVL sheet if exists (alternate MPNs)
+  const avlWs = wb.Sheets['AVL'] || wb.Sheets['Complete AVL'];
+  if (avlWs) {
+    const avlData = XLSX.utils.sheet_to_json(avlWs);
+    for (const row of avlData) {
+      const mpn = String(row.MPN || row['Approved MPN'] || '').toUpperCase().trim();
+      const cpc = String(row.CPC || row['LAM P/N'] || '').trim();
+      if (mpn && cpc && !_rosterCache.has(mpn)) {
+        _rosterCache.set(mpn, cpc);
+      }
+    }
+  }
+
+  // Also load from separate LAM_Complete_AVL.xlsx if exists
+  const completeAvlPath = path.join(__dirname, 'LAM_Complete_AVL.xlsx');
+  if (fs.existsSync(completeAvlPath)) {
+    const avlWb = XLSX.readFile(completeAvlPath);
+    const avlSheet = avlWb.Sheets[avlWb.SheetNames[0]];
+    if (avlSheet) {
+      const avlData = XLSX.utils.sheet_to_json(avlSheet);
+      for (const row of avlData) {
+        const mpn = String(row.MPN || row['Approved MPN'] || '').toUpperCase().trim();
+        const cpc = String(row.CPC || row['LAM P/N'] || '').trim();
+        if (mpn && cpc && !_rosterCache.has(mpn)) {
+          _rosterCache.set(mpn, cpc);
+        }
+      }
+    }
+  }
+
+  console.log(`  Loaded roster CPC lookup: ${_rosterCache.size} MPNs`);
+  return _rosterCache;
+}
+
+/**
+ * Look up CPC for an MPN from the roster.
+ */
+function lookupCpcByMpn(mpn) {
+  const roster = loadRosterMpnToCpc();
+  return roster.get(String(mpn).toUpperCase().trim()) || '';
+}
 
 // ─── Constants ──────────────────────────────────────────────────────────────
 
@@ -111,9 +188,18 @@ async function main() {
       continue;
     }
 
+    // CPC from CSV, with fallback to roster lookup by MPN
+    let cpc = (row[cpcIdx] || '').trim();
+    if (!cpc) {
+      cpc = lookupCpcByMpn(row[mpnIdx]);
+      if (cpc) {
+        console.log(`  CPC fallback: ${row[mpnIdx]} → ${cpc}`);
+      }
+    }
+
     rfqCandidates.push({
       mpn: row[mpnIdx],
-      cpc: row[cpcIdx] || '',
+      cpc,
       shortfall: parseInt(row[shortfallIdx]) || 0,
       mfrText: row[mfrIdx] || '',
       description: row[descIdx] || '',

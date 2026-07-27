@@ -276,7 +276,7 @@ async function main() {
       const body = `${opts.award} new add enrichment attached.\n\nValidated against RFQ ${opts.rfq}.\nSame format as weekly reorder - review margins and create VQs for ready items.`;
 
       await notifier.sendWithAttachment(
-        process.env.NOTIFY_EMAIL || 'jake.harris@astutegroup.com',
+        process.env.NOTIFY_EMAIL || 'jake.harris@astutegroup.com,josh.syre@astutegroup.com',
         subject,
         body,
         [{ filename: path.basename(outputXlsx), path: outputXlsx }]
