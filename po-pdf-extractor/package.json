@@ -1,0 +1,24 @@
+{
+  "name": "po-pdf-extractor",
+  "version": "1.0.0",
+  "description": "Extracts structured data from Astute Electronics Purchase Order PDFs",
+  "main": "extractor.js",
+  "scripts": {
+    "extract": "node extractor.js"
+  },
+  "keywords": [
+    "pdf",
+    "extractor",
+    "purchase-order",
+    "astute"
+  ],
+  "author": "Astute Electronics",
+  "license": "UNLICENSED",
+  "private": true,
+  "dependencies": {
+    "pdfjs-dist": "^4.0.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}
