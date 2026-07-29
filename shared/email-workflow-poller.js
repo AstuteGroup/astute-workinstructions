@@ -653,17 +653,22 @@ async function cmdRoute(uid, actionName, payload) {
     return; // Exit without moving email or clearing sidecar
   }
 
-  // Move email
+  // Move email and mark as SEEN (so it won't be re-processed if moved back)
   if (folder) {
     if (DRY_RUN) {
       result.would_move_to = folder;
       result.dry_run = true;
     } else {
       await withInbox(async (client) => {
+        // Mark as SEEN before moving — this prevents re-processing if the email
+        // is ever moved back to INBOX (manually or via requeue). The SEEN flag
+        // travels with the message to the destination folder.
+        await client.messageFlagsAdd(String(uid), ['\\Seen'], { uid: true });
         try { await client.mailboxCreate(folder); } catch { /* exists */ }
         await client.messageMove(String(uid), folder, { uid: true });
       });
       result.moved_to = folder;
+      result.marked_seen = true;
     }
   }
 

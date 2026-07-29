@@ -40,6 +40,18 @@ function esc(s) {
     c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 }
 
+/**
+ * Send email via notifier, throwing if it fails.
+ * Ensures routing stops if notification can't be sent.
+ */
+async function sendEmailOrThrow(notifier, to, subject, body, opts = {}) {
+  const sent = await notifier.sendEmail(to, subject, body, opts);
+  if (!sent) {
+    throw new Error(`Failed to send notification email to ${to}: ${subject}`);
+  }
+  return sent;
+}
+
 function makeApprovalActions(gate, {
   workflow,
   payloadKey,
@@ -122,7 +134,8 @@ ${cacheLine}
 <p style="color:#888;font-size:11px">Sentinel: <code>${esc(gate.clearedPath(id))}</code></p>
 </body></html>`;
 
-    await ctx.notifier.sendEmail(
+    await sendEmailOrThrow(
+      ctx.notifier,
       ctx.jakeEmail,
       `[CONFIRMED] ${recordLabel} ${id} approved${tagLine}`,
       ackHtml,
@@ -168,7 +181,8 @@ ${reasonLine}
 <p style="color:#888;font-size:11px">Sentinel: <code>${esc(gate.rejectedPath(id))}</code> — delete this file to un-reject if needed.</p>
 </body></html>`;
 
-    await ctx.notifier.sendEmail(
+    await sendEmailOrThrow(
+      ctx.notifier,
       ctx.jakeEmail,
       `[CONFIRMED] ${recordLabel} ${id} rejected`,
       ackHtml,

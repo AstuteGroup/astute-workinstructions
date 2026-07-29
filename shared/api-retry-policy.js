@@ -103,7 +103,9 @@ const RULES = [
   // (thundering herd, 2026-05-21). Dynamic via blockedHoursFn — classify()
   // invokes it at call time so each item gets its own random slot.
   { pattern: /MaxCallPerDay|daily quota/i,                                       category: 'RATE_LIMIT', retry: true, blockedHoursFn: () => hoursUntilNextChicagoMidnight(8), reason: 'Daily quota exhausted (resets midnight America/Chicago, 0-8h jittered)' },
-  { pattern: /\b429\b|Rate limit|too many requests/i,                            category: 'RATE_LIMIT', retry: true, blockedHours: 1, reason: 'Rate limit (429)' },
+  // 429 Rate Limit: base 1h + up to 1h jitter to prevent thundering herd.
+  // Without jitter, 46K+ items all wake up simultaneously and re-429.
+  { pattern: /\b429\b|Rate limit|too many requests/i,                            category: 'RATE_LIMIT', retry: true, blockedHoursFn: () => 1 + Math.random(), reason: 'Rate limit (429) — jittered 1-2h' },
   { pattern: /\bquota\b|call limit exceeded/i,                                   category: 'RATE_LIMIT', retry: true, blockedHours: 1, reason: 'Quota exhausted' },
   { pattern: /\b403\b|HTTP 403|Forbidden/i,                                      category: 'RATE_LIMIT', retry: true, blockedHours: 1, reason: '403 Forbidden (generic — could be quota or perms)' },
 

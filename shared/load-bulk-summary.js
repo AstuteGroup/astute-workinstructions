@@ -341,11 +341,31 @@ async function loadBulkSummary({ rfqSearchKey, buyerId, quotes, dryRun = false, 
     }
 
     // e. Write VQ via the canonical writer
+    //
+    // rfqQty: pass the VENDOR'S OWN quoted qty (q.qty), NOT the RFQ line's
+    // full requested qty. writeVQFromAPI's synthesizeStockLtVqLines (shared
+    // with the franchise-API enrichment path) treats "stockQty < qty" as a
+    // signal to synthesize a SECOND "lead-time" VQ row covering the gap
+    // between what's in stock now and the full RFQ demand — a legitimate
+    // dual-tier signal for real franchise-distributor API responses (stock
+    // qty + backorder qty from the SAME source). A single manual broker
+    // quote is not that: the broker quoted ONE qty at ONE price, and
+    // `vqLeadTime` defaults to 'stock' (always truthy) in the stub above, so
+    // hasLeadTime was always true — meaning ANY quote where q.qty < the
+    // RFQ's full line qty (the overwhelmingly common case: partial-fill
+    // broker responses) silently fabricated a second VQ row with an invented
+    // qty (RFQ qty − quoted qty) at the same price, never stated by the
+    // vendor. Passing q.qty here makes stockQty === qty by construction, so
+    // the LT-tier branch never fires for this (broker/manual) caller.
+    // Discovered + fixed 2026-07-23 via UID 11025 (RFQ 1140117, Archermind /
+    // KST Micron quotes) — 2 fabricated duplicate rows deactivated post-hoc.
+    // Scoped to this call site only; franchise-API callers of
+    // writeVQFromAPI (enrich-rfq, LAM Kitting, etc.) are untouched.
     try {
       const result = await writeVQFromAPI(rfqSearchKey, '', { distributors: [stub] }, {
         searchedMpn: q.mpn,
         buyerId,
-        rfqQty: lineMatch.rfqQty,
+        rfqQty: q.qty,
         _rfqLineIdOverride: lineMatch.lineId,
         unknownVendorPlaceholderBpId,  // allow loading without BP when vendor doesn't exist
       });

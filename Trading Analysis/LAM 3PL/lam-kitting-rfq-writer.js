@@ -5,7 +5,7 @@
  * Reads the sourced reorder alerts + franchise data JSON.
  * For items WITHOUT an on-order qty / recent POV, creates:
  *   1. One 3PL/VMI RFQ header (LAM Research, Rob Johnson contact, Josh Syre salesrep)
- *   2. One RFQ line per reorder item (qty = shortfall)
+ *   2. One RFQ line per reorder item (qty = LAM MOQ, not shortfall)
  *   3. VQ lines for ALL franchise API results (stock and lead time clearly separated)
  *
  * Outputs a JSON mapping of MPN → RFQ line number for the email step.
@@ -153,6 +153,7 @@ async function main() {
   const mpnIdx = headers.indexOf('MPN');
   const cpcIdx = headers.indexOf('Lam P/N');
   const shortfallIdx = headers.indexOf('Shortfall');
+  const moqIdx = headers.indexOf('LAM MOQ');
   const mfrIdx = headers.indexOf('Manufacturer');
   const descIdx = headers.indexOf('Item Description');
   const priorityIdx = headers.indexOf('Priority');
@@ -197,13 +198,20 @@ async function main() {
       }
     }
 
+    // Franchise data JSON has structure: franchiseData[MPN][MPN].distributors
+    // Unwrap the extra nesting level to get the actual data object.
+    const mpn = row[mpnIdx];
+    const franchiseEntry = franchiseData[mpn];
+    const franchiseResults = (franchiseEntry && franchiseEntry[mpn]) || null;
+
     rfqCandidates.push({
-      mpn: row[mpnIdx],
+      mpn,
       cpc,
       shortfall: parseInt(row[shortfallIdx]) || 0,
+      lamMoq: parseInt(row[moqIdx]) || 0,
       mfrText: row[mfrIdx] || '',
       description: row[descIdx] || '',
-      franchiseResults: franchiseData[row[mpnIdx]] || null,
+      franchiseResults,
     });
   }
 
@@ -221,10 +229,13 @@ async function main() {
   // ── Step 1: Create RFQ ──
   console.log('Step 1: Creating RFQ...');
 
+  // Use LAM MOQ for RFQ line qty — this is the order qty we'll actually buy,
+  // not the shortfall (which is just how far below threshold we are).
+  // If LAM MOQ is missing/zero, fall back to shortfall.
   const rfqLines = rfqCandidates.map(c => ({
     mpn: c.mpn,
     mfrText: c.mfrText,
-    qty: c.shortfall,
+    qty: c.lamMoq > 0 ? c.lamMoq : c.shortfall,
     targetPrice: 0,
     cpc: c.cpc,
     description: c.description,
@@ -366,6 +377,10 @@ async function main() {
         `Auto-approved via lam-kitting-rfq-writer — in-stock margin ${margin.toFixed(1)}% ≥ ${AUTO_PURCHASE_MARGIN_PCT}%, ` +
         `vendor stock ${stockQty} ≥ LAM MOQ ${lamMoq}.`;
 
+      // Auto-purchase: tick VQ + create R_Request atomically (rollback on failure).
+      // CRITICAL: If R_Request creation fails after tick succeeds, we must untick
+      // the VQ to prevent orphaned "purchased" VQs with no approval request.
+      let tickSucceeded = false;
       try {
         await tickVQForPurchase(matchVQ.vqLineId, {
           program: 'LAM_KITTING',
@@ -380,12 +395,15 @@ async function main() {
             IsChuboeDomesticShipping:  'Y',  // LAM Kitting ships to Brownsville from franchise distributors = domestic
             Chuboe_Lead_Time:          'STOCK',
             DatePromised:              promiseDate,
+            DueDate:                   promiseDate,  // DueDate must match DatePromised per validator
             Chuboe_Warehouse_ID:       1000015,   // W111 LAM KITTING
             Chuboe_Warehouse_Group_ID: 1000008,   // BROWNSVILLE
             M_Shipper_ID:              1000003,   // FedEx Ground
             Chuboe_Inco_Term_ID:       1000000,   // EXW
           },
         });
+        tickSucceeded = true;
+
         const r = await postApproveOrder({
           vqId:         matchVQ.vqLineId,
           program:      'LAM_KITTING',
@@ -399,6 +417,18 @@ async function main() {
       } catch (err) {
         console.log(`  ✗ ${mpn} — auto-purchase failed: ${err.message}`);
         if (err.violations) err.violations.forEach(v => console.log(`      - ${v}`));
+
+        // ROLLBACK: If tick succeeded but R_Request failed, untick the VQ
+        // to prevent orphaned "purchased" state with no approval request.
+        if (tickSucceeded) {
+          try {
+            const { patchRecord } = require('../../shared/record-updater');
+            await patchRecord('chuboe_vq_line', matchVQ.vqLineId, { IsPurchased: 'N' });
+            console.log(`      [rollback] VQ ${matchVQ.vqLineId} unticked — R_Request creation failed`);
+          } catch (rollbackErr) {
+            console.log(`      [rollback FAILED] VQ ${matchVQ.vqLineId} may be orphaned: ${rollbackErr.message}`);
+          }
+        }
       }
     }
 

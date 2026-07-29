@@ -23,6 +23,24 @@ const pool = new Pool({
   user: process.env.PGUSER || process.env.USER || 'analytics_user',
 });
 
+/**
+ * Send email via notifier, throwing on failure.
+ * @param {object} notifier - The notifier instance
+ * @param {string} to - Recipient email address
+ * @param {string} subject - Email subject
+ * @param {string} body - Email body
+ * @param {object} opts - Optional email options
+ * @returns {Promise<boolean>}
+ * @throws {Error} if email fails to send
+ */
+async function sendEmailOrThrow(notifier, to, subject, body, opts = {}) {
+  const sent = await notifier.sendEmail(to, subject, body, opts);
+  if (!sent) {
+    throw new Error(`Failed to send notification email to ${to}: ${subject}`);
+  }
+  return sent;
+}
+
 // ─── HELPERS ─────────────────────────────────────────────────────────────────
 
 function esc(s) {
@@ -292,7 +310,7 @@ async function handleMultiPOV(povs, tracking, carrier, ctx) {
 <p style="color:#666;font-size:11px">UID: ${ctx.uid} | Multi-POV batch | Same-vendor verified</p>
 </body></html>`;
 
-  await ctx.notifier.sendEmail(
+  await sendEmailOrThrow(ctx.notifier,
     'jake.harris@astutegroup.com',
     `Tracking loaded: ${pos.map(p => p.documentno).join(', ')}`,
     html,
@@ -492,7 +510,7 @@ async function action_patch_tracking(payload, ctx) {
 <p style="color:#666;font-size:11px">UID: ${ctx.uid} | Lookup: ${lookupType} | Target: ${patchTarget}</p>
 </body></html>`;
 
-  await ctx.notifier.sendEmail(
+  await sendEmailOrThrow(ctx.notifier,
     'jake.harris@astutegroup.com',
     `Tracking loaded: ${po.documentno}`,
     html,
@@ -540,7 +558,7 @@ async function action_needs_review(payload, ctx) {
     return { dry_run: true, would_notify: { reason, extracted_po, extracted_tracking } };
   }
 
-  await ctx.notifier.sendEmail(
+  await sendEmailOrThrow(ctx.notifier,
     'jake.harris@astutegroup.com',
     `Tracking Loading — needs review: ${subject || '(no subject)'}`,
     html,

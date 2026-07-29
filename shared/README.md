@@ -34,6 +34,7 @@
 | `auth-failure-alerts.js` | Detects auth-style errors (`401`, `403`, `Unauthorized`, `invalid_client`, etc.) from any disty, emails operator with 24h debounce per disty. State file: `shared/data/auth-failure-state.json`. | Automatic — called from franchise-api.js::searchPart on any thrown or result.error. No per-cog changes needed. | franchise-api.js |
 | `linecards/` | Per-disty franchise MFR list fetchers. `digikey.js` + `mouser.js` (API-based), orchestrator at `scripts/linecard-refresh.js` diffs month-over-month and cascade-invalidates negative-cache entries on adds/drops. Snapshots in `shared/data/linecards/`. | Monthly via cron (1st of month) to catch franchise portfolio changes | scripts/linecard-refresh.js |
 | `hts-api.js` | USITC Harmonized Tariff Schedule client. Lookup duty rates (general/special/Col-2), units, and Section 301/232/AD footnote references by HTS code. Walks the hierarchy so 10-digit statistical suffixes inherit duty from their 8-digit tariff line. Lazy chapter-level cache at `shared/data/hts-cache.json` (30d TTL). No auth, free public endpoint. | Validating HTS codes from DigiKey/Mouser, surfacing tariff implications (Section 301 on China origin is the real value-add — neither franchise API returns this), descriptions for disagreement resolution. NOT a classification engine — cannot map MPN → HTS. | (planned) HTS / ECCN Backfill enrichment, Quick Quote landed-cost view |
+| `inventory-parser.js` | Pure Infor xlsx parser. Parses AST Item Lots Report: skip headers/footers, deduplicate, split by warehouse code, normalize columns. No OT writes, no carryover merge. | Parsing Infor inventory export for any workflow (free stock, consignment, LAM) | free-stock-inventory.js, consignment-inventory.js, lam-inventory.js, lam-threshold-check.js |
 
 ---
 
@@ -735,3 +736,86 @@ const { psqlQuery, psqlExec, getNextId, sqlStr, sqlNum, cleanMpn, tableExists } 
 | `sqlNum(val)` | Coerce to number for SQL (or NULL) |
 | `cleanMpn(mpn)` | Strip non-alphanumeric, uppercase |
 | `tableExists(name)` | Check if ai_writeback table exists |
+
+---
+
+## inventory-parser.js
+
+Pure Infor xlsx parser — single source, single purpose. Parses AST Item Lots Report into structured data. **No side effects** — no OT writes, no carryover merge, no file outputs.
+
+### Usage
+
+```javascript
+const { parseInventoryFile, getWarehouseRows, filterByMfr } = require('../shared/inventory-parser');
+
+// Parse the Infor xlsx file
+const result = parseInventoryFile('/path/to/ASTItemLotsReport.xlsx');
+
+// result.metadata
+// { sourceFile, parsedAt, totalRows, uniqueRows, duplicatesRemoved, warehouseSummary }
+
+// result.byWarehouse
+// { 'W102': [...], 'W104': [...], 'W111': [...], ... }
+
+// Get combined rows for specific warehouses (e.g., LAM)
+const lamRows = getWarehouseRows(result, ['W111', 'W115', 'W118']);
+
+// Filter by manufacturer
+const positronic = filterByMfr(result.byWarehouse['W104'], 'positronic');
+const notPositronic = filterByMfr(result.byWarehouse['W104'], 'positronic', true);
+```
+
+### Output Row Format
+
+Each row in `byWarehouse[code]` has normalized column names:
+
+| Field | Source Column | Type |
+|-------|---------------|------|
+| `mpn` | Item | string |
+| `description` | ItemDescription | string |
+| `mfr` | Name | string |
+| `lot` | Lot | string |
+| `qty` | Lot Quantity | number |
+| `unitCost` | Lot Unit Cost | number or null |
+| `dateCode` | Date Code | string |
+| `location` | Location | string |
+| `warehouse` | Warehouse | string |
+| `warehouseName` | Warehouse Name | string |
+| `site` | Site | string |
+| `dateLot` | Date Lot | string |
+| `currency` | Currency | string |
+
+Extra Infor columns are preserved with `_` prefix (e.g., `_Lot Cost`, `_Manufacturer`).
+
+### What It Does
+
+1. **Read xlsx** using XLSX library
+2. **Skip header rows 1-7** (Infor report header)
+3. **Detect footer** and stop (patterns: "Page ", "USS,")
+4. **Deduplicate** on composite key: Item|Lot|Location|Warehouse Name|Site|Date Lot
+5. **Split by warehouse code** (raw `Warehouse` column)
+6. **Normalize columns** to standard names
+
+### What It Does NOT Do
+
+- Merge carryovers (each workflow handles its own)
+- Write to OT
+- Write CSVs
+- Send emails
+- Apply warehouse group logic (that's consumer responsibility)
+
+### CLI
+
+```bash
+# Summary output
+node shared/inventory-parser.js /path/to/file.xlsx
+
+# Full JSON output
+node shared/inventory-parser.js /path/to/file.xlsx --json
+```
+
+### Tests
+
+```bash
+node shared/inventory-parser.test.js
+```

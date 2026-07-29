@@ -834,6 +834,20 @@ function cellToString(v) {
   return String(v).trim();
 }
 
+/**
+ * Parse threshold value, preserving the distinction between:
+ * - Empty/missing → null (needs threshold from LAM)
+ * - Zero → 0 (intentionally set to zero)
+ * - Number → that number
+ */
+function parseThreshold(v) {
+  if (v == null || v === '') return null;
+  const str = String(v).trim();
+  if (str === '') return null;
+  const num = parseFloat(str);
+  return isNaN(num) ? null : num;
+}
+
 function loadExcelData(excelPath) {
   if (!fs.existsSync(excelPath)) {
     console.error(`  ERROR: Master Roster not found: ${excelPath}`);
@@ -890,7 +904,7 @@ function loadExcelData(excelPath) {
       Lead_Time: cellToString(row[colIdx.LEAD_TIME]),
       Base_Unit_Price: colIdx.BASE_PRICE >= 0 ? (parseFloat(row[colIdx.BASE_PRICE]) || 0) : 0,
       Resale_Price: colIdx.RESALE_PRICE >= 0 ? (parseFloat(row[colIdx.RESALE_PRICE]) || 0) : 0,
-      MIN_QTY: colIdx.THRESHOLD >= 0 ? (parseFloat(row[colIdx.THRESHOLD]) || 0) : 0,
+      MIN_QTY: colIdx.THRESHOLD >= 0 ? parseThreshold(row[colIdx.THRESHOLD]) : null,
       MOQ: colIdx.MOQ >= 0 ? (parseFloat(row[colIdx.MOQ]) || 0) : 0,
       Historical_Buyer: cellToString(row[colIdx.BUYER]),
       // Pending approval workflow fields
@@ -1456,13 +1470,18 @@ function identifyReorderCandidates(aggregated, excelData, historicalData, recent
     processedCPCs.add(cpc);
 
     const minQty = excel.MIN_QTY;
+    const hasThreshold = minQty !== undefined && minQty !== null && minQty !== '';
     const cpcInv = cpcTotalInventory.get(cpc) || { total: 0, w111: 0, w115: 0, mpnsWithStock: [] };
     const totalQty = cpcInv.total;
 
-    // Check if below threshold
-    if (totalQty < minQty) {
-      const shortfall = minQty - totalQty;
-      const shortfallPct = minQty > 0 ? (shortfall / minQty) * 100 : 0;
+    // Check if below threshold OR zero stock with no threshold
+    // Zero stock = CRITICAL regardless of threshold setting
+    const belowThreshold = hasThreshold && totalQty < minQty;
+    const zeroStockNoThreshold = !hasThreshold && totalQty === 0;
+
+    if (belowThreshold || zeroStockNoThreshold) {
+      const shortfall = hasThreshold ? (minQty - totalQty) : 0;
+      const shortfallPct = hasThreshold && minQty > 0 ? (shortfall / minQty) * 100 : 0;
 
       // CRITICAL if zero stock across ALL approved MPNs
       let basePriority;
@@ -1484,6 +1503,11 @@ function identifyReorderCandidates(aggregated, excelData, historicalData, recent
       if (cpcInv.mpnsWithStock.length > 1) {
         const stockDetail = cpcInv.mpnsWithStock.map(m => `${m.mpn}:${m.qty}`).join(', ');
         alert['Stock Detail'] = stockDetail;
+      }
+
+      // Flag if no threshold is set (needs threshold from LAM)
+      if (!hasThreshold) {
+        alert['Needs Threshold'] = 'YES';
       }
 
       alerts.push(alert);

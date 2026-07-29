@@ -1013,7 +1013,10 @@ async function resolveMFR(mfrName) {
   const cacheKey = mfrName.toUpperCase();
   if (_mfrCache.has(cacheKey)) return _mfrCache.get(cacheKey);
 
-  const escaped = mfrName.replace(/'/g, "''");
+  // Strip parenthetical suffixes like "(FCI)" that break OData filters
+  // and normalize to base company name for matching
+  let cleanName = mfrName.replace(/\s*\([^)]+\)\s*$/, '').trim();
+  const escaped = cleanName.replace(/'/g, "''");
 
   // Try exact match first
   let result = await apiGet('Chuboe_MFR', { filter: `Name eq '${escaped}'`, top: 1 });

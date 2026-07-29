@@ -28,6 +28,15 @@ const writerAttribution = require('../writer-attribution');
 const breadcrumbs = require('../breadcrumbs');
 const pending = require('../workflow-pending-state');
 
+// ─── EMAIL HELPER ────────────────────────────────────────────────────────────
+async function sendEmailOrThrow(notifier, to, subject, body, opts = {}) {
+  const sent = await notifier.sendEmail(to, subject, body, opts);
+  if (!sent) {
+    throw new Error(`Failed to send notification email to ${to}: ${subject}`);
+  }
+  return sent;
+}
+
 // ─── PARTNER NAME LOOKUP ──────────────────────────────────────────────────────
 // Look up partner name from bpartnerId if not provided in payload.
 // Fallback for when agent doesn't pass partnerName. Matches excess.js + rfq-loader-daemon.js.
@@ -262,7 +271,7 @@ This offer is now in Orange Tsunami.
           threadingOpts.inReplyTo = threadId;
           threadingOpts.references = threadId;
         }
-        await ctx.notifier.sendEmail(toEmail, confirmSubject, confirmBody, threadingOpts);
+        await sendEmailOrThrow(ctx.notifier, toEmail, confirmSubject, confirmBody, threadingOpts);
 
         breadcrumbs.write({
           cog: 'broker-offers',
@@ -339,7 +348,8 @@ ${extractedLinesHtml}
     if (refs.length > 0) opts.references = refs;
   }
 
-  await ctx.notifier.sendEmail(
+  await sendEmailOrThrow(
+    ctx.notifier,
     ctx.jakeEmail,
     `Broker Offers — NeedsPartner: ${subject || '(no subject)'}`,
     html,
@@ -434,7 +444,8 @@ ${extractedLinesHtml}
     if (refs.length > 0) opts.references = refs;
   }
 
-  await ctx.notifier.sendEmail(
+  await sendEmailOrThrow(
+    ctx.notifier,
     ctx.jakeEmail,
     `Broker Offers — clarify partner: ${subject || '(no subject)'}`,
     html,
@@ -500,7 +511,8 @@ ${details ? `<pre style="background:#f5f5f5;padding:8px;white-space:pre-wrap;fon
     if (refs.length > 0) opts.references = refs;
   }
 
-  await ctx.notifier.sendEmail(
+  await sendEmailOrThrow(
+    ctx.notifier,
     ctx.jakeEmail,
     `Broker Offers — needs review: ${subject || '(no subject)'}`,
     html,

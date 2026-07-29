@@ -339,6 +339,70 @@ async function searchPart(distributor, mpn, qty, opts = {}) {
         };
       }
 
+      // Carried cache hit — we already have pricing data for this (MPN, distributor).
+      // Return cached data instead of making a fresh API call. This is the key fix
+      // for the 215K wasted API calls (July 2026): previously we only cached
+      // 'not_carried' results, so successful pricing was re-queried every time.
+      if (hit && hit.result === 'carried') {
+        const cachedQty = hit.stock_qty || 0;
+        const cachedPrice = hit.cost_unit || null;
+        return {
+          distributor,
+          name: config.name,
+          bpValue: config.bpValue,
+          bpName: config.bpName,
+          bpId: config.bpId,
+          found: true,
+          cached: true,
+          cachedAt: hit.cached_at,
+          cacheExpires: hit.expires_at,
+          cacheResult: 'carried',
+          matchType: 'exact',  // Assume exact since we matched before
+          franchiseQty: cachedQty,
+          franchisePrice: cachedPrice,
+          franchiseBulkPrice: cachedPrice,  // Best we have from cache
+          franchiseRfqPrice: cachedPrice,
+          vqPrice: cachedPrice,
+          vqMpn: mpn,
+          vqManufacturer: hit.mfr || '',
+          priceBreaks: cachedPrice ? [{ qty: 1, unitPrice: cachedPrice }] : [],
+          vqLines: cachedQty > 0 && cachedPrice ? [{
+            vendorBP: config.bpValue,
+            vendorName: config.bpName,
+            channel: config.name,
+            mpn: mpn,
+            manufacturer: hit.mfr || '',
+            qty: cachedQty,
+            stock: cachedQty,
+            cost: cachedPrice,
+          }] : null,
+        };
+      }
+
+      // Matched but no price — distributor has the part but no pricing available.
+      // Return cached result so we don't re-call the API. Part of July 2026 fix.
+      if (hit && hit.result === 'matched_no_price') {
+        return {
+          distributor,
+          name: config.name,
+          bpValue: config.bpValue,
+          bpName: config.bpName,
+          bpId: config.bpId,
+          found: true,
+          cached: true,
+          cachedAt: hit.cached_at,
+          cacheExpires: hit.expires_at,
+          cacheResult: 'matched_no_price',
+          matchType: 'exact',
+          franchiseQty: hit.stock_qty || 0,
+          franchisePrice: null,  // No pricing available
+          franchiseBulkPrice: null,
+          franchiseRfqPrice: null,
+          priceBreaks: [],
+          vqLines: null,  // Can't write VQ without pricing
+        };
+      }
+
       // Stock-RFQ MPN-level short-circuit (operator policy 2026-05-21):
       // For Stock + Unqualified Spot RFQs only, if ANY other franchise has
       // already returned 'carried, stockQty > 0' within its TTL, we don't
@@ -408,11 +472,12 @@ async function searchPart(distributor, mpn, qty, opts = {}) {
     // Per-disty throttle — blocks until a token is available so we never
     // exceed the supplier's per-minute window. Distys without a configured
     // limit pass through unchanged. See shared/api-throttle.js.
+    const throttle = require('./api-throttle');
     try {
-      await require('./api-throttle').acquire(distributor);
+      await throttle.acquire(distributor);
     } catch (throttleErr) {
-      // Throttle gave up after max wait — treat as a rate-limit so the
-      // wrapper's catch enqueues for retry instead of just dropping the call.
+      // Throttle gave up after max wait OR circuit breaker is open — treat as
+      // a rate-limit so the wrapper's catch enqueues for retry.
       throw throttleErr;
     }
 
@@ -420,6 +485,9 @@ async function searchPart(distributor, mpn, qty, opts = {}) {
     // candidates whose MFR is MISMATCH per shared/mfr-equivalence). Optional;
     // existing call sites that don't pass it get the old behavior (no veto).
     const result = await mod.searchPart(mpn, qty, opts);
+
+    // Record successful call — resets circuit breaker state
+    try { throttle.recordSuccess(distributor); } catch { /* best-effort */ }
 
     // Auth-failure alerting — if the cog returned result.error and it matches
     // auth patterns, fire the debounced alerter. Non-blocking, swallows its
@@ -460,6 +528,17 @@ async function searchPart(distributor, mpn, qty, opts = {}) {
             priceBreaksN: result.priceBreaks.length,
             stockQty: result.franchiseQty || result.inventoryQty || null,
             costUnit: result.franchisePrice || result.franchiseRfqPrice || null,
+          });
+        } else if (result?.found === true && !hasPriceBreaks) {
+          // Found but no pricing — cache as 'matched_no_price' so we don't
+          // re-call the API next time. This was a gap that caused unnecessary
+          // API calls (July 2026 audit). TTL is 60 days per negative-cache rules.
+          _negCache.record({
+            mpn,
+            mfr: opts.mfr,
+            disty: distributor,
+            result: 'matched_no_price',
+            stockQty: result.franchiseQty || result.inventoryQty || null,
           });
         } else if (result?.found === false) {
           // Clean 200-empty. Envelope / context flow through for per-disty gates.
@@ -562,6 +641,19 @@ async function searchPart(distributor, mpn, qty, opts = {}) {
       const { classify } = require('./api-retry-policy');
       _verdict = classify(err);
     } catch { /* policy module load failure → fall through with null verdict */ }
+
+    // Circuit breaker: record 429s so repeated failures trigger cooldown
+    // Daily ceiling: mark at ceiling so NO more calls until midnight Chicago
+    if (_verdict?.category === 'RATE_LIMIT' && /429|Rate limit/i.test(err.message || '')) {
+      try {
+        require('./api-throttle').record429(distributor);
+      } catch { /* circuit breaker is best-effort */ }
+      try {
+        // Key fix for the 215K DigiKey doom loop: immediately block all calls
+        // until midnight instead of retrying every hour and wasting capacity
+        require('./api-daily-counter').markAtCeiling(distributor);
+      } catch { /* daily counter is best-effort */ }
+    }
 
     // Cache MaxCallPerDay outcomes so we don't re-fire the same (mpn, disty)
     // for the rest of the day. TTL lands at the next Chicago midnight; the

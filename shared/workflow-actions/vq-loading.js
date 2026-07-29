@@ -39,6 +39,26 @@ const { learnVendorAlias } = require('../vendor-aliases');
 const JAKE_USER_ID = 1000004;
 
 /**
+ * Send email via notifier, throwing if it fails.
+ * This ensures routing stops if notification can't be sent — email stays in
+ * INBOX for retry on next poll cycle instead of being silently routed.
+ *
+ * @param {object} notifier - ctx.notifier from the poller
+ * @param {string} to - recipient email
+ * @param {string} subject - email subject
+ * @param {string} body - email body (text or HTML based on opts.html)
+ * @param {object} opts - options passed to sendEmail (html, cc, inReplyTo, etc.)
+ * @throws {Error} if email fails to send
+ */
+async function sendEmailOrThrow(notifier, to, subject, body, opts = {}) {
+  const sent = await notifier.sendEmail(to, subject, body, opts);
+  if (!sent) {
+    throw new Error(`Failed to send notification email to ${to}: ${subject}`);
+  }
+  return sent;
+}
+
+/**
  * Look up customer name from RFQ search key.
  * Returns the BP name for the customer on the RFQ.
  */
@@ -641,19 +661,29 @@ These quotes are now in Orange Tsunami.
           threadingOpts.references = msgId;
         }
 
-        await ctx.notifier.sendEmail(toEmail, confirmSubject, confirmBody, threadingOpts);
+        const confirmSent = await ctx.notifier.sendEmail(toEmail, confirmSubject, confirmBody, threadingOpts);
 
-        breadcrumbs.write({
-          cog: 'vq-loading-agent',
-          event: 'confirmation-sent',
-          uid: ctx.uid,
-          rfq: rfqSearchKey,
-          customer: customerName,
-          buyer: buyerName,
-          vqs_written: totals.vqsWritten,
-          to: toEmail,
-          cc: ccList,
-        });
+        if (confirmSent) {
+          breadcrumbs.write({
+            cog: 'vq-loading-agent',
+            event: 'confirmation-sent',
+            uid: ctx.uid,
+            rfq: rfqSearchKey,
+            customer: customerName,
+            buyer: buyerName,
+            vqs_written: totals.vqsWritten,
+            to: toEmail,
+            cc: ccList,
+          });
+        } else {
+          // Confirmation failure is not load-fatal — log and move on.
+          breadcrumbs.write({
+            cog: 'vq-loading-agent',
+            event: 'confirmation-failed',
+            uid: ctx.uid,
+            error: 'sendEmail returned false (SMTP failure or no recipients)',
+          });
+        }
       }
     } catch (e) {
       // Confirmation failure is not load-fatal — log and move on.
@@ -688,21 +718,30 @@ These quotes are now in Orange Tsunami.
 <p>If they'll be loading or owning RFQs ongoing, add them to the registry so future loads don't re-trigger a clarify. If this was a one-off, no action needed.</p>
 <p style="color:#666;font-size:11px">Subject: ${esc(subject || '(no subject)')}<br/>UID: ${ctx.uid}<br/>Primary RFQ: ${esc(rfqSearchKey || '?')}</p>
 </body></html>`;
-      await ctx.notifier.sendEmail(
+      const noticeSent = await ctx.notifier.sendEmail(
         ctx.jakeEmail,
         `VQ Loading — Loaded with non-registry buyer: ${buyerName}`,
         noticeHtml,
         { html: true },
       );
-      breadcrumbs.write({
-        cog: 'vq-loading-agent',
-        event: 'non-registry-buyer-notice',
-        uid: ctx.uid,
-        buyer_id: validatedBuyerId,
-        buyer_name: buyerName,
-        rfq: rfqSearchKey,
-        vqs_written: totals.vqsWritten,
-      });
+      if (noticeSent) {
+        breadcrumbs.write({
+          cog: 'vq-loading-agent',
+          event: 'non-registry-buyer-notice',
+          uid: ctx.uid,
+          buyer_id: validatedBuyerId,
+          buyer_name: buyerName,
+          rfq: rfqSearchKey,
+          vqs_written: totals.vqsWritten,
+        });
+      } else {
+        breadcrumbs.write({
+          cog: 'vq-loading-agent',
+          event: 'non-registry-buyer-notice-failed',
+          uid: ctx.uid,
+          error: 'sendEmail returned false',
+        });
+      }
     } catch (e) {
       // Notice failure is not load-fatal — log and move on.
       breadcrumbs.write({
@@ -1488,7 +1527,8 @@ ${details ? `<pre style="background:#fff8e0;padding:8px;white-space:pre-wrap;fon
     if (refs.length > 0) opts.references = refs;
   }
 
-  await ctx.notifier.sendEmail(
+  await sendEmailOrThrow(
+    ctx.notifier,
     ctx.jakeEmail,
     `VQ Loading — Clarify buyer: ${subject || '(no subject)'}`,
     operatorHtml,
@@ -1742,7 +1782,8 @@ ${originalBodySnippet ? `<hr style="margin-top:16px"/>
 <pre style="background:#f5f5f5;padding:8px;white-space:pre-wrap;font-size:11px">${esc(originalBodySnippet.slice(0, 4000))}</pre>` : ''}
 </body></html>`;
 
-  await ctx.notifier.sendEmail(
+  await sendEmailOrThrow(
+    ctx.notifier,
     'rfqloading@orangetsunami.com',
     `[VQ→RFQ] New RFQ needed: ${customer} / ${type} / ${(lines || []).length} lines`,
     body,
@@ -1916,7 +1957,7 @@ async function sendSplitRecipientEmail(ctx, {
     }
   }
 
-  return ctx.notifier.sendEmail(envelope.to, subject, operatorHtml, opts);
+  return sendEmailOrThrow(ctx.notifier, envelope.to, subject, operatorHtml, opts);
 }
 
 /**

@@ -32,12 +32,6 @@
       "date": "2026-07-23"
     },
     {
-      "mpn": "TPS767D301PWP",
-      "reason": "RESTRICTED MFR",
-      "notes": "Texas Instruments — no API coverage, escalate to Tracy / direct supplier",
-      "date": "2026-07-23"
-    },
-    {
       "mpn": "LTM4632EV#PBF",
       "reason": "RESTRICTED MFR",
       "notes": "Analog Devices — no API coverage, escalate to Tracy / direct supplier",
@@ -66,6 +60,12 @@
       "reason": "RESTRICTED MFR",
       "notes": "Analog Devices — no API coverage, escalate to Tracy / direct supplier",
       "date": "2026-07-23"
+    },
+    {
+      "mpn": "1424241",
+      "reason": "MARGIN COMPRESSION",
+      "notes": "Phoenix Contact connector — historical purchase $18.47 vs resale $20.39 = 9.4% margin (target 18%)",
+      "date": "2026-07-29"
     }
   ]
 }

@@ -53,6 +53,26 @@ const pending = require('../workflow-pending-state');
 // Structured event log for digest + drift visibility (recommended).
 const breadcrumbs = require('../breadcrumbs');
 
+// ─── EMAIL HELPER ────────────────────────────────────────────────────────────
+
+/**
+ * Send email via notifier, throwing on failure.
+ * @param {object} notifier - The notifier instance
+ * @param {string} to - Recipient email address
+ * @param {string} subject - Email subject
+ * @param {string} body - Email body
+ * @param {object} opts - Optional email options
+ * @returns {Promise<boolean>}
+ * @throws {Error} if email fails to send
+ */
+async function sendEmailOrThrow(notifier, to, subject, body, opts = {}) {
+  const sent = await notifier.sendEmail(to, subject, body, opts);
+  if (!sent) {
+    throw new Error(`Failed to send notification email to ${to}: ${subject}`);
+  }
+  return sent;
+}
+
 // ─── HANDLERS ────────────────────────────────────────────────────────────────
 
 /**
@@ -138,7 +158,7 @@ async function action_need_info(payload, ctx) {
   // CRITICAL: replyTo MUST be the workflow inbox (ctx.inbox), NOT jakeEmail.
   // Otherwise the sender's reply lands in Jake's inbox and the agent never
   // sees it, breaking the stitch round-trip.
-  await ctx.notifier.sendEmail(
+  await sendEmailOrThrow(ctx.notifier,
     recipient,
     `RE: ${subject || 'Your message'} — details needed`,
     body,
@@ -174,7 +194,7 @@ ${details ? `<pre style="background:#f5f5f5;padding:8px;white-space:pre-wrap;fon
   if (ctx.dryRun) {
     return { dry_run: true, would_notify_jake: { reason } };
   }
-  await ctx.notifier.sendEmail(
+  await sendEmailOrThrow(ctx.notifier,
     ctx.jakeEmail,
     `${ctx.workflow} — needs review: ${subject || '(no subject)'}`,
     html,

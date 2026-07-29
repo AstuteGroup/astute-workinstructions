@@ -54,18 +54,144 @@ const path = require('path');
 const STATE_FILE = path.resolve(__dirname, 'data/api-throttle-state.json');
 const LOCK_FILE = STATE_FILE + '.lock';
 
-// Per-distributor limits. Only distys present here are throttled — others
-// pass through unrestricted.
+// Per-distributor limits. ALL active distributors should be throttled to
+// prevent rate-limit cascades like the July 2026 DigiKey incident (46,533
+// 429 errors from unthrottled requests creating a thundering-herd retry loop).
 //
 // `perMinute` should leave headroom under the supplier's actual limit:
 // clock skew + overlapping windows mean we can't push right to the edge.
-// Mouser's actual per-minute limit appears to be ~30 (per error message
-// "Maximum calls per minute exceeded" + cog comment). Cap at 25 for margin.
+//
+// Rationale for each limit (updated 2026-07-20):
+//   mouser:   ~30/min actual limit (confirmed via MaxCallPerMinute errors)
+//   digikey:  Strict daily quota + per-minute burst limit; conservative
+//   arrow:    Generally permissive; OAuth-based
+//   future:   Similar to Arrow architecture
+//   tti:      OAuth-based, moderate limits
+//   newark:   Element14/Farnell API; moderate limits
+//   rutronik: EU-based, observed timeouts under load
+//   master:   Seen 503s under load; conservative
+//   sager:    Generally permissive
+//   waldom:   Generally permissive
 const LIMITS = {
-  mouser: { perMinute: 25 },
+  mouser:   { perMinute: 25 },
+  digikey:  { perMinute: 10 },
+  arrow:    { perMinute: 20 },
+  future:   { perMinute: 20 },
+  tti:      { perMinute: 15 },
+  newark:   { perMinute: 15 },
+  rutronik: { perMinute: 10 },
+  master:   { perMinute: 15 },
+  sager:    { perMinute: 20 },
+  waldom:   { perMinute: 20 },
 };
 
 const ACQUIRE_MAX_WAIT_MS = 5 * 60 * 1000;  // 5 min — beyond this, throw
+
+// ─── Circuit Breaker ─────────────────────────────────────────────────────────
+// When a distributor returns too many consecutive 429s, stop trying for a
+// cooldown period. This prevents the thundering-herd retry loop where 46K+
+// items all wake up after 1 hour and immediately re-429.
+//
+// State is per-distributor in the same state file:
+//   {
+//     "digikey": {
+//       "tokens": 5.2,
+//       "lastRefillAt": 1721500000000,
+//       "circuitOpen": true,
+//       "circuitOpenUntil": 1721503600000,
+//       "consecutive429s": 15
+//     }
+//   }
+const CIRCUIT_BREAKER = {
+  threshold: 10,            // consecutive 429s before circuit opens
+  cooldownMs: 30 * 60 * 1000, // 30 min cooldown when open
+};
+
+/**
+ * Record a 429 from a distributor. If threshold is exceeded, open the circuit.
+ * Called from franchise-api.js catch block when a 429 is detected.
+ *
+ * @param {string} distributor
+ */
+function record429(distributor) {
+  if (!acquireLock()) return;
+  try {
+    const state = readState();
+    const now = Date.now();
+    const prior = state[distributor] || {};
+    const consecutive = (prior.consecutive429s || 0) + 1;
+
+    state[distributor] = {
+      ...prior,
+      consecutive429s: consecutive,
+      last429At: now,
+    };
+
+    if (consecutive >= CIRCUIT_BREAKER.threshold && !prior.circuitOpen) {
+      state[distributor].circuitOpen = true;
+      state[distributor].circuitOpenUntil = now + CIRCUIT_BREAKER.cooldownMs;
+      // eslint-disable-next-line no-console
+      console.error(`[api-throttle] Circuit breaker OPEN for ${distributor} after ${consecutive} consecutive 429s. Cooldown until ${new Date(state[distributor].circuitOpenUntil).toISOString()}`);
+    }
+
+    writeState(state);
+  } finally {
+    releaseLock();
+  }
+}
+
+/**
+ * Record a successful API call. Resets the consecutive 429 counter and closes
+ * the circuit if it was open.
+ *
+ * @param {string} distributor
+ */
+function recordSuccess(distributor) {
+  if (!acquireLock()) return;
+  try {
+    const state = readState();
+    const prior = state[distributor] || {};
+
+    if (prior.consecutive429s > 0 || prior.circuitOpen) {
+      state[distributor] = {
+        ...prior,
+        consecutive429s: 0,
+        circuitOpen: false,
+        circuitOpenUntil: null,
+      };
+      writeState(state);
+    }
+  } finally {
+    releaseLock();
+  }
+}
+
+/**
+ * Check if circuit breaker is open for a distributor.
+ *
+ * @param {string} distributor
+ * @returns {{ open: boolean, until?: Date, consecutive429s?: number }}
+ */
+function checkCircuitBreaker(distributor) {
+  const state = readState();
+  const prior = state[distributor] || {};
+
+  if (!prior.circuitOpen) {
+    return { open: false };
+  }
+
+  const now = Date.now();
+  if (prior.circuitOpenUntil && now >= prior.circuitOpenUntil) {
+    // Cooldown expired — circuit auto-closes on next acquire()
+    return { open: false, expired: true };
+  }
+
+  return {
+    open: true,
+    until: new Date(prior.circuitOpenUntil),
+    consecutive429s: prior.consecutive429s,
+  };
+}
 
 // Lock helpers — identical pattern to shared/auth-failure-alerts.js
 function acquireLock() {
@@ -121,6 +247,13 @@ async function acquire(distributor) {
   const limit = LIMITS[distributor];
   if (!limit) return;  // not throttled
 
+  // Circuit breaker check — if open, refuse the call immediately
+  const circuit = checkCircuitBreaker(distributor);
+  if (circuit.open) {
+    const minLeft = Math.ceil((circuit.until - Date.now()) / 60000);
+    throw new Error(`${distributor} circuit breaker OPEN (${circuit.consecutive429s} consecutive 429s, ${minLeft}min cooldown remaining)`);
+  }
+
   const capacity = limit.perMinute;
   const refillPerSec = capacity / 60;
   const start = Date.now();
@@ -164,6 +297,10 @@ async function acquire(distributor) {
 
 module.exports = {
   acquire,
+  record429,
+  recordSuccess,
+  checkCircuitBreaker,
   _LIMITS: LIMITS,
   _STATE_FILE: STATE_FILE,
+  _CIRCUIT_BREAKER: CIRCUIT_BREAKER,
 };

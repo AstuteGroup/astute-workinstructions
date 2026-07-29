@@ -45,8 +45,30 @@ const {
   formatPOVCell,
   buildAlert,
   ALERT_COLUMNS,
+  // Inventory loading for threshold checks
+  loadChuboeInventory,
+  aggregateInventory,
+  W111_FILENAME,
+  W115_FILENAME,
+  loadAVL,
 } = require(path.join(ASTUTE, 'Trading Analysis/LAM 3PL/lam-kitting-reorder.js'));
 const { normalizeMPN } = require(path.join(ASTUTE, 'shared/mpn-normalization'));
+
+// ─── EMAIL HELPER ───────────────────────────────────────────────────────────────
+
+async function sendEmailOrThrow(notifier, to, subject, body, opts = {}) {
+  const sent = await notifier.sendEmail(to, subject, body, opts);
+  if (!sent) {
+    throw new Error(`Failed to send notification email to ${to}: ${subject}`);
+  }
+  return sent;
+}
+
+// ─── NEW AWARDS: Material vs Non-Material Changes ──────────────────────────────
+// Material changes = require ordering (price, qty thresholds)
+// Non-material changes = informational only (lead time, description)
+const MATERIAL_CHANGE_FIELDS = new Set(['Base Price', 'Resale Price', 'MOQ', 'Reorder Threshold']);
+const NON_MATERIAL_CHANGE_FIELDS = new Set(['Lead Time', 'Description']);
 
 // ─── ROSTER COLUMN MAPPING ───────────────────────────────────────────────────
 // Must match lam-kitting-reorder.js and lam-3pl.md spec
@@ -268,7 +290,8 @@ async function action_approve_price(payload, ctx) {
     notes,
   }, ctx);
 
-  await ctx.notifier.sendEmail(
+  await sendEmailOrThrow(
+    ctx.notifier,
     ctx.jakeEmail,
     discrepancies.length > 0
       ? `LAM Approval Applied + Review Needed: ${cpc}`
@@ -401,7 +424,8 @@ async function action_approve_prices(payload, ctx) {
       ? `LAM Price Approvals Applied (${successfulUpdates.length}) + Review Needed`
       : `LAM Price Approvals Applied (${successfulUpdates.length})`;
 
-    await ctx.notifier.sendEmail(
+    await sendEmailOrThrow(
+      ctx.notifier,
       ctx.jakeEmail,
       subject,
       html,
@@ -508,7 +532,8 @@ async function action_approve_leadtime(payload, ctx) {
     currentState,
   }, ctx);
 
-  await ctx.notifier.sendEmail(
+  await sendEmailOrThrow(
+    ctx.notifier,
     ctx.jakeEmail,
     discrepancies.length > 0
       ? `LAM Approval Applied + Review Needed: ${cpc}`
@@ -741,7 +766,8 @@ async function action_add_award(payload, ctx) {
 <p style="color:#666;font-size:11px">Added to Master Roster. Will appear in next reorder cycle.</p>
 </body></html>`;
 
-  await ctx.notifier.sendEmail(
+  await sendEmailOrThrow(
+    ctx.notifier,
     ctx.jakeEmail,
     `LAM New Award Added: ${cpc}`,
     html,
@@ -849,6 +875,10 @@ async function action_add_awards(payload, ctx) {
         reason += ` — VALUES UPDATED: ${valueChanges.map(c => c.field).join(', ')}`;
 
         // APPLY the value changes to the Master Roster
+        // NOTE: We only update the specific fields that changed. The Award column
+        // is NEVER updated here — it preserves the original award phase from when
+        // the part was first added (e.g., "EPG", "Phase 3"). Revisions update
+        // prices/quantities but don't change the award classification.
         const { wb, data, rowIdx } = existing;
         const updatedRow = [...row];
         for (const change of valueChanges) {
@@ -877,6 +907,11 @@ async function action_add_awards(payload, ctx) {
         }
       }
 
+      // Categorize changes as material (needs ordering) vs non-material (informational)
+      const materialChanges = valueChanges.filter(c => MATERIAL_CHANGE_FIELDS.has(c.field));
+      const nonMaterialChanges = valueChanges.filter(c => NON_MATERIAL_CHANGE_FIELDS.has(c.field));
+      const needsOrdering = materialChanges.length > 0;
+
       results.flagged.push({
         cpc,
         mpn,
@@ -887,8 +922,11 @@ async function action_add_awards(payload, ctx) {
         existingStatus,
         existingValues,  // Full roster values for display (BEFORE update)
         valueChanges,    // Array of { field, roster, email } diffs
+        materialChanges,
+        nonMaterialChanges,
         reason,
         valuesUpdated: valueChanges.length > 0,  // Flag that roster was updated
+        needsOrdering,   // True if material changes require a PO
       });
       continue;
     }
@@ -950,25 +988,104 @@ async function action_add_awards(payload, ctx) {
   }
 
   // Step 3-5: Use the REORDER WORKFLOW pipeline for sourcing and output
-  // - Generate reorder-alert format CSV for added parts
+  // - Generate reorder-alert format CSV for parts that need ordering
   // - Run lam-kitting-source.js for franchise sourcing
   // - Run lam-kitting-rfq-writer.js to create RFQ + VQs
-  // - Rebuild Excel with margins, escalations tab, etc.
+  // - Rebuild Excel WITHOUT escalations tab (new awards don't use escalations)
   let rfqResult = null;
   let enrichResults = [];
   let sourcedXlsx = null;
 
-  if (results.added.length > 0) {
-    const { execSync } = require('child_process');
-    const LAM_DIR = path.join(ASTUTE, 'Trading Analysis/LAM 3PL');
-    const outputDir = path.join(LAM_DIR, 'output');
-    const today = new Date().toISOString().slice(0, 10);
+  // For add_awards: Check inventory vs threshold to determine ordering needs
+  // - NEW parts: Always need ordering (0 inventory)
+  // - EXISTING parts: Need ordering if inventory < threshold
+  //
+  // The value changes categorization is for REPORTING only, not ordering decisions.
+  // Ordering is driven by inventory levels.
+  //
+  // Step 3a: Load inventory to determine which parts need ordering
+  const { execSync } = require('child_process');
+  const LAM_DIR = path.join(ASTUTE, 'Trading Analysis/LAM 3PL');
+  const outputDir = path.join(LAM_DIR, 'output');
+  const today = new Date().toISOString().slice(0, 10);
 
-    // Step 3a: Generate reorder-alert format CSV using SAME functions as reorder workflow
+  // Find the latest inventory folder (same logic as lam-kitting-runner.js)
+  let inventoryFolder = path.join('/tmp', `Inventory ${today}`);
+  if (!fs.existsSync(inventoryFolder)) {
+    // Try yesterday
+    const yesterday = new Date(Date.now() - 86400000).toISOString().slice(0, 10);
+    inventoryFolder = path.join('/tmp', `Inventory ${yesterday}`);
+  }
+
+  // Load inventory data
+  let aggregatedInventory = {};
+  let avlByCpc = new Map();
+  if (fs.existsSync(inventoryFolder)) {
+    console.log(`  Loading inventory from ${inventoryFolder}...`);
+    const w111Path = path.join(inventoryFolder, W111_FILENAME);
+    const w115Path = path.join(inventoryFolder, W115_FILENAME);
+
+    if (fs.existsSync(w111Path) || fs.existsSync(w115Path)) {
+      const w111Inventory = fs.existsSync(w111Path) ? loadChuboeInventory(w111Path, 'W111') : {};
+      const w115Inventory = fs.existsSync(w115Path) ? loadChuboeInventory(w115Path, 'W115') : {};
+      aggregatedInventory = aggregateInventory(w111Inventory, w115Inventory);
+      console.log(`    Loaded ${Object.keys(aggregatedInventory).length} MPNs from inventory`);
+
+      // Load AVL for multi-MPN aggregation
+      avlByCpc = loadAVL();
+      console.log(`    Loaded AVL with ${avlByCpc.size} CPCs`);
+    }
+  } else {
+    console.log('  WARNING: No inventory folder found - assuming all parts need ordering');
+  }
+
+  // Helper: Get total inventory for a CPC (aggregates across all AVL MPNs)
+  const getInventoryForCpc = (cpc, primaryMpn) => {
+    const avlMpns = avlByCpc.get(cpc) || [primaryMpn];
+    let total = 0;
+    for (const mpn of avlMpns) {
+      const key = normalizeMPN(mpn);
+      const inv = aggregatedInventory[mpn] || aggregatedInventory[key] || {};
+      total += (inv.Total_Qty || 0);
+    }
+    return total;
+  };
+
+  // Categorize parts based on INVENTORY levels
+  const allParts = [...results.added, ...results.flagged];
+  const partsNeedingOrder = [];
+  const partsAboveThreshold = [];
+
+  for (const part of allParts) {
+    const cpc = part.cpc;
+    const mpn = part.mpn || part.existingMpn;
+    const threshold = part.reorderThreshold || part.existingValues?.reorderThreshold || 0;
+    const inventory = getInventoryForCpc(cpc, mpn);
+
+    // Add inventory info to part for reporting
+    part.currentInventory = inventory;
+    part.threshold = threshold;
+
+    if (inventory < threshold) {
+      partsNeedingOrder.push(part);
+    } else {
+      partsAboveThreshold.push(part);
+    }
+  }
+
+  console.log(`  Inventory check: ${partsNeedingOrder.length} below threshold, ${partsAboveThreshold.length} above threshold`);
+
+  // Categorize for reporting purposes:
+  const existingNeedsOrdering = results.flagged.filter(p => p.currentInventory < p.threshold);
+  const existingNoReorder = results.flagged.filter(p => p.currentInventory >= p.threshold);
+  const existingUnchanged = results.flagged.filter(p => !p.valueChanges?.length);
+
+  if (partsNeedingOrder.length > 0) {
+    // Step 3b: Generate reorder-alert format CSV using SAME functions as reorder workflow
     const alertsCsvPath = path.join(outputDir, `LAM_New_Awards_${today}.csv`);
 
-    // Use ALERT_COLUMNS from reorder script + Award/Updated Status columns
-    const ALERT_HEADERS = [...ALERT_COLUMNS, 'Award', 'Updated Status'];
+    // Use ALERT_COLUMNS from reorder script + Award/Status/Changes columns
+    const ALERT_HEADERS = [...ALERT_COLUMNS, 'Award', 'Status', 'Changes'];
 
     // Reload roster to get full data for added parts
     const roster = readRoster();
@@ -988,6 +1105,12 @@ async function action_add_awards(payload, ctx) {
 
     // Build alert rows using buildAlert() from reorder script
     const allAlerts = [];
+
+    // Helper to format changes for display
+    const formatChanges = (changes) => {
+      if (!changes || changes.length === 0) return '';
+      return changes.map(c => `${c.field}: ${c.roster ?? c.old} → ${c.email ?? c.new}`).join('; ');
+    };
 
     // NEW parts (added to roster)
     for (const p of results.added) {
@@ -1013,20 +1136,17 @@ async function action_add_awards(payload, ctx) {
       };
 
       const alert = buildAlert(p.mpn, excel, 0, 0, excel.MIN_QTY, 'CRITICAL', history, pov);
-      alert['Award'] = 'Phase 3';
-      alert['Updated Status'] = 'New Award';
+      alert['Award'] = p.awardPhase || 'New';  // Award phase from input or default
+      alert['Status'] = 'New';
+      alert['Changes'] = '';  // New parts don't have changes
       allAlerts.push(alert);
     }
 
-    // EXISTING parts (flagged)
-    for (const p of results.flagged) {
+    // EXISTING parts that NEED ORDERING (material changes)
+    for (const p of existingNeedsOrdering) {
       const match = findRosterRowByCpc(p.cpc);
       const rosterRow = match.found ? match.row : {};
       const cols = match.found ? match.cols : {};
-
-      const updatedStatus = p.valueChanges?.length > 0
-        ? p.valueChanges.map(c => `${c.field}: ${c.roster ?? c.old} → ${c.email ?? c.new}`).join('; ')
-        : '(no changes)';
 
       const mpn = p.mpn || p.existingMpn;
       const mpnKey = normalizeMPN(mpn);
@@ -1048,8 +1168,9 @@ async function action_add_awards(payload, ctx) {
       const totalQty = rosterRow[cols?.QTY_ON_HAND] || 0;
       const shortfall = Math.max(0, excel.MIN_QTY - totalQty);
       const alert = buildAlert(mpn, excel, totalQty, 0, shortfall, 'REVIEW', history, pov);
-      alert['Award'] = p.existingAward || 'EPG';
-      alert['Updated Status'] = updatedStatus;
+      alert['Award'] = p.existingAward || '';
+      alert['Status'] = 'Existing';
+      alert['Changes'] = formatChanges(p.valueChanges);
       allAlerts.push(alert);
     }
 
@@ -1104,14 +1225,20 @@ async function action_add_awards(payload, ctx) {
       }
     }
 
-    // Step 3d: Rebuild Excel with RFQ lines and escalations tab (same as weekly reorder)
+    // Step 3d: Rebuild Excel with RFQ lines - NO escalations tab (new awards don't use escalations)
     const defaultSourcedXlsx = alertsCsvPath.replace('.csv', '_sourced.xlsx');
     if (rfqResult && rfqResult.rfqSearchKey && fs.existsSync(sourcedCsv)) {
       sourcedXlsx = alertsCsvPath.replace('.csv', `_RFQ${rfqResult.rfqSearchKey}_sourced.xlsx`);
       try {
         // Use the same rebuild function from lam-kitting-runner.js
+        // Pass skipEscalations: true since new awards don't use the escalations workflow
         const { rebuildExcelWithRfqLines } = require(path.join(LAM_DIR, 'lam-kitting-runner.js'));
-        await rebuildExcelWithRfqLines(sourcedCsv, sourcedXlsx, rfqResult, {});
+        await rebuildExcelWithRfqLines(sourcedCsv, sourcedXlsx, rfqResult, {
+          skipEscalations: true,  // New awards don't use escalations
+          noReorderParts: existingNoReorder,  // Parts with only non-material changes
+          unchangedParts: existingUnchanged,  // Parts with no changes
+          mainTabName: 'Sourced New Awards',  // Use appropriate tab name for new awards
+        });
         console.log(`  Excel rebuilt with RFQ lines → ${path.basename(sourcedXlsx)}`);
         // Clean up the plain _sourced.xlsx
         if (fs.existsSync(defaultSourcedXlsx) && defaultSourcedXlsx !== sourcedXlsx) {
@@ -1147,20 +1274,22 @@ async function action_add_awards(payload, ctx) {
       }));
     }
 
-    // Award and Updated Status columns should be in the main CSV - no separate sheet needed
-    // TODO: Update lam-kitting-source.js to preserve Award/Updated Status columns through sourcing
-    if (results.flagged.length > 0) {
-      console.log(`  ${results.flagged.length} existing parts included in main sheet with Award/Updated Status`);
-    }
+    // Log categorization
+    console.log(`  Parts breakdown: ${results.added.length} new, ${existingNeedsOrdering.length} existing (ordering), ${existingNoReorder.length} no-reorder, ${existingUnchanged.length} unchanged`);
   } else if (results.flagged.length > 0) {
-    // Flagged-only case: all parts already exist, no net-new
-    // Still run franchise sourcing to get current pricing/availability
-    console.log(`  No new parts to add, but ${results.flagged.length} existing parts — running sourcing pipeline`);
+    // All existing parts are above threshold - no ordering needed
+    console.log(`  No parts need ordering. ${partsAboveThreshold.length} above threshold (have sufficient inventory)`);
 
     const { execSync } = require('child_process');
     const LAM_DIR = path.join(ASTUTE, 'Trading Analysis/LAM 3PL');
     const outputDir = path.join(LAM_DIR, 'output');
     const today = new Date().toISOString().slice(0, 10);
+
+    // Helper to format changes for display
+    const formatChanges = (changes) => {
+      if (!changes || changes.length === 0) return '';
+      return changes.map(c => `${c.field}: ${c.roster ?? c.old} → ${c.email ?? c.new}`).join('; ');
+    };
 
     // Load historical data from OT (same as reorder workflow)
     console.log('  Loading historical purchase data from OT...');
@@ -1174,7 +1303,7 @@ async function action_add_awards(payload, ctx) {
 
     // Generate reorder-alert format CSV using SAME columns as reorder workflow
     const alertsCsvPath = path.join(outputDir, `LAM_New_Awards_${today}.csv`);
-    const ALERT_HEADERS = [...ALERT_COLUMNS, 'Award', 'Updated Status'];
+    const ALERT_HEADERS = [...ALERT_COLUMNS, 'Award', 'Status', 'Changes'];
 
     // Build alert rows using buildAlert() from reorder script
     const allAlerts = [];
@@ -1182,10 +1311,6 @@ async function action_add_awards(payload, ctx) {
       const match = findRosterRowByCpc(p.cpc);
       const rosterRow = match.found ? match.row : {};
       const cols = match.found ? match.cols : {};
-
-      const updatedStatus = p.valueChanges?.length > 0
-        ? p.valueChanges.map(c => `${c.field}: ${c.roster ?? c.old} → ${c.email ?? c.new}`).join('; ')
-        : '(no changes)';
 
       const mpn = p.mpn || p.existingMpn;
       const mpnKey = normalizeMPN(mpn);
@@ -1207,8 +1332,9 @@ async function action_add_awards(payload, ctx) {
       const totalQty = rosterRow[cols?.QTY_ON_HAND] || 0;
       const shortfall = Math.max(0, excel.MIN_QTY - totalQty);
       const alert = buildAlert(mpn, excel, totalQty, 0, shortfall, 'REVIEW', history, pov);
-      alert['Award'] = p.existingAward || 'EPG';
-      alert['Updated Status'] = updatedStatus;
+      alert['Award'] = p.existingAward || '';
+      alert['Status'] = 'Existing';
+      alert['Changes'] = formatChanges(p.valueChanges);
       allAlerts.push(alert);
     }
 
@@ -1227,7 +1353,7 @@ async function action_add_awards(payload, ctx) {
     fs.writeFileSync(alertsCsvPath, csvLines.join('\n'));
     console.log(`  Generated reorder-alert CSV: ${path.basename(alertsCsvPath)}`);
 
-    // Run franchise sourcing
+    // Run franchise sourcing (for pricing visibility even if not ordering)
     try {
       const sourceScript = path.join(LAM_DIR, 'lam-kitting-source.js');
       execSync(`node "${sourceScript}" "${alertsCsvPath}"`, {
@@ -1240,14 +1366,19 @@ async function action_add_awards(payload, ctx) {
       console.error('  WARNING: Franchise sourcing failed:', err.message);
     }
 
-    // Rebuild Excel (no RFQ for flagged-only)
+    // Rebuild Excel (no RFQ - these parts don't need ordering)
     const sourcedCsv = alertsCsvPath.replace('.csv', '_sourced.csv');
     sourcedXlsx = alertsCsvPath.replace('.csv', '_sourced.xlsx');
 
     if (fs.existsSync(sourcedCsv)) {
       try {
         const { rebuildExcelWithRfqLines } = require(path.join(LAM_DIR, 'lam-kitting-runner.js'));
-        await rebuildExcelWithRfqLines(sourcedCsv, sourcedXlsx, null, {});
+        await rebuildExcelWithRfqLines(sourcedCsv, sourcedXlsx, null, {
+          skipEscalations: true,
+          noReorderParts: existingNoReorder,
+          unchangedParts: existingUnchanged,
+          mainTabName: 'Sourced New Awards',
+        });
         console.log(`  Excel rebuilt: ${path.basename(sourcedXlsx)}`);
       } catch (err) {
         console.error('  WARNING: Excel rebuild failed:', err.message);
@@ -1258,20 +1389,34 @@ async function action_add_awards(payload, ctx) {
       sourcedXlsx = writeNewAwardsExcel(results, enrichResults, rfqResult);
     }
 
-    // Award and Updated Status columns are now in the main sheet - no separate tab needed
-    console.log(`  Single-sheet output with Award/Updated Status columns for ${results.flagged.length} parts`);
+    console.log(`  No-reorder output for ${results.flagged.length} parts`);
   }
 
   // Step 6: Build plaintext email (mirrors reorder alert format)
-  const emailBody = buildNewAwardsPlaintextEmail(results, rfqResult, enrichResults, contactPerson, ctx);
+  const categorization = {
+    newParts: results.added.length,
+    existingOrdering: existingNeedsOrdering.length,
+    existingNoReorder: existingNoReorder.length,
+    existingUnchanged: existingUnchanged.length,
+  };
+  const emailBody = buildNewAwardsPlaintextEmail(results, rfqResult, enrichResults, contactPerson, ctx, categorization);
 
-  // Step 7: Send email with attachment (skipCc until output is finalized)
+  // Step 7: Build email subject with clear categorization
+  // Format: "LAM New Awards - X New, Y Reorder, Z In Stock - RFQ 1140xxx"
+  const subjectParts = [];
+  if (results.added.length > 0) subjectParts.push(`${results.added.length} New`);
+  if (existingNeedsOrdering.length > 0) subjectParts.push(`${existingNeedsOrdering.length} Reorder`);
+  if (existingNoReorder.length > 0) subjectParts.push(`${existingNoReorder.length} In Stock`);
+  const subjectCounts = subjectParts.join(', ') || 'No parts';
+  const rfqSuffix = rfqResult?.rfqSearchKey ? ` - RFQ ${rfqResult.rfqSearchKey}` : '';
+  const emailSubject = `LAM New Awards - ${subjectCounts}${rfqSuffix}`;
+
   const attachments = sourcedXlsx && fs.existsSync(sourcedXlsx)
     ? [{ filename: path.basename(sourcedXlsx), path: sourcedXlsx }]
     : [];
   await ctx.notifier.sendWithAttachment(
     ctx.jakeEmail,
-    `LAM New Awards - ${results.added.length} Added, ${results.flagged.length} Existing${rfqResult?.rfqSearchKey ? ` - RFQ ${rfqResult.rfqSearchKey}` : ''}`,
+    emailSubject,
     emailBody,
     attachments,
     buildEmailOpts(ctx, { html: false, skipCc: true }),  // Plaintext, no CC until finalized
@@ -1282,7 +1427,9 @@ async function action_add_awards(payload, ctx) {
     event: 'awards-batch-added',
     uid: ctx.uid,
     added: results.added.length,
-    flagged: results.flagged.length,
+    existingOrdering: existingNeedsOrdering.length,
+    existingNoReorder: existingNoReorder.length,
+    existingUnchanged: existingUnchanged.length,
     failed: results.failed.length,
     rfqId: rfqResult?.rfqId || null,
     contactResolved: contactPerson?.name || null,
@@ -1290,6 +1437,9 @@ async function action_add_awards(payload, ctx) {
 
   return {
     added: results.added.length,
+    existingOrdering: existingNeedsOrdering.length,
+    existingNoReorder: existingNoReorder.length,
+    existingUnchanged: existingUnchanged.length,
     flagged: results.flagged.length,
     failed: results.failed.length,
     missingInfo: results.missingInfo.length,
@@ -1430,24 +1580,39 @@ function writeNewAwardsExcel(results, enrichResults, rfqResult) {
 
 /**
  * Build plaintext email for new awards (mirrors reorder alerts format).
+ *
+ * @param {Object} results - Processing results (added, flagged, failed arrays)
+ * @param {Object} rfqResult - RFQ creation result (if any)
+ * @param {Array} enrichResults - Franchise sourcing results
+ * @param {Object} contactPerson - Resolved contact (if any)
+ * @param {Object} ctx - Context object
+ * @param {Object} categorization - Part counts by category
  */
-function buildNewAwardsPlaintextEmail(results, rfqResult, enrichResults, contactPerson, ctx) {
+function buildNewAwardsPlaintextEmail(results, rfqResult, enrichResults, contactPerson, ctx, categorization = {}) {
   const today = new Date().toISOString().slice(0, 10);
   const partsWithStock = enrichResults.filter(e => e.hasStock).length;
   const partsNoStock = enrichResults.filter(e => !e.hasStock).length;
 
-  // Count updated vs unchanged existing parts
-  const existingUpdated = results.flagged.filter(f => f.valuesUpdated).length;
-  const existingUnchanged = results.flagged.length - existingUpdated;
+  // Use passed categorization or compute from results
+  const newParts = categorization.newParts ?? results.added.length;
+  const existingOrdering = categorization.existingOrdering ?? results.flagged.filter(f => f.needsOrdering).length;
+  const existingNoReorder = categorization.existingNoReorder ?? results.flagged.filter(f => !f.needsOrdering && f.valueChanges?.length > 0).length;
+  const existingUnchanged = categorization.existingUnchanged ?? results.flagged.filter(f => !f.valueChanges?.length).length;
+
+  const totalParts = newParts + existingOrdering + existingNoReorder + existingUnchanged + results.failed.length;
+  const partsNeedingOrder = newParts + existingOrdering;
 
   let body = `LAM New Awards Report — ${today}
 
 === SUMMARY ===
-Total parts in email: ${results.added.length + results.flagged.length + results.failed.length}
-  NEW (added to roster): ${results.added.length}
-  EXISTING - UPDATED: ${existingUpdated}
+Total parts: ${totalParts}
+  NEW (added to roster): ${newParts}
+  EXISTING - UPDATED (needs ordering): ${existingOrdering}
+  EXISTING - NO REORDER (lead time/info only): ${existingNoReorder}
   EXISTING - UNCHANGED: ${existingUnchanged}
   FAILED: ${results.failed.length}
+
+Parts needing PO: ${partsNeedingOrder}
 `;
 
   // RFQ info (like weekly reorder)
@@ -1455,19 +1620,24 @@ Total parts in email: ${results.added.length + results.flagged.length + results.
     body += `
 === RFQ CREATED ===
 RFQ: ${rfqResult.rfqSearchKey}
-RFQ Lines: ${rfqResult.rfqLinesCreated || results.added.length}
+RFQ Lines: ${rfqResult.rfqLinesCreated || partsNeedingOrder}
 VQ Lines: ${rfqResult.vqsCreated || 0}
 Contact: ${contactPerson ? `${contactPerson.name} (${contactPerson.email})` : 'Not resolved'}
 `;
-  } else if (rfqResult && rfqResult.error) {
+  } else if (partsNeedingOrder > 0) {
     body += `
-=== RFQ ERROR ===
-${rfqResult.error}
+=== RFQ ===
+${rfqResult?.error ? `Error: ${rfqResult.error}` : 'Not created (check logs)'}
+`;
+  } else {
+    body += `
+=== RFQ ===
+Not needed — no parts require ordering
 `;
   }
 
   // Franchise sourcing (like weekly reorder)
-  if (results.added.length > 0) {
+  if (enrichResults.length > 0) {
     body += `
 === FRANCHISE SOURCING ===
 Parts sourced: ${enrichResults.length}
@@ -1490,44 +1660,76 @@ No stock available: ${partsNoStock}
 
   body += `
 See attached Excel for full details including:
+- Award/Status/Changes columns
 - Franchise sourcing with margin analysis
-- Escalations tab (if any)
-- RFQ Line # and check columns
+- RFQ Line # (for parts needing ordering)
+${existingNoReorder > 0 ? '- No Reorder tab (parts with only lead time/info changes)\n' : ''}`;
+
+  // NEW PARTS section
+  if (results.added.length > 0) {
+    body += `
+=== NEW PARTS (${results.added.length}) ===
 `;
+    for (const p of results.added.slice(0, 15)) {
+      body += `  ${p.cpc} | ${p.mpn} | ${p.manufacturer || ''}\n`;
+    }
+    if (results.added.length > 15) {
+      body += `  ... and ${results.added.length - 15} more (see Excel)\n`;
+    }
+  }
 
   // EXISTING PARTS section - with VALUE CHANGE details
   if (results.flagged.length > 0) {
-    const withChanges = results.flagged.filter(f => f.valueChanges && f.valueChanges.length > 0);
-    const noChanges = results.flagged.filter(f => !f.valueChanges || f.valueChanges.length === 0);
+    const withMaterialChanges = results.flagged.filter(f => f.needsOrdering);
+    const withNonMaterialChanges = results.flagged.filter(f => !f.needsOrdering && f.valueChanges?.length > 0);
+    const noChanges = results.flagged.filter(f => !f.valueChanges?.length);
 
     body += `
-=== 📋 EXISTING PARTS (${results.flagged.length}) ===
+=== EXISTING PARTS (${results.flagged.length}) ===
 `;
 
-    // Parts WITH value changes - UPDATED in roster
-    if (withChanges.length > 0) {
+    // Parts WITH material changes - need ordering
+    if (withMaterialChanges.length > 0) {
       body += `
---- ${withChanges.length} PARTS UPDATED (roster values changed) ---
+--- ${withMaterialChanges.length} UPDATED (price/qty changes - needs PO) ---
 `;
-      for (const f of withChanges) {
-        body += `
-${f.cpc} | ${f.mpn}
-  Award: ${f.existingAward || 'unknown'} | Status: ${f.existingStatus || '-'}
-`;
-        for (const c of f.valueChanges) {
-          body += `  ✓ ${c.field}: ${formatPlainValue(c.roster)} → ${formatPlainValue(c.email)} (UPDATED)\n`;
+      for (const f of withMaterialChanges.slice(0, 10)) {
+        body += `${f.cpc} | ${f.mpn} | Award: ${f.existingAward || ''}\n`;
+        for (const c of (f.materialChanges || f.valueChanges || [])) {
+          body += `  ✓ ${c.field}: ${formatPlainValue(c.roster)} → ${formatPlainValue(c.email)}\n`;
         }
+      }
+      if (withMaterialChanges.length > 10) {
+        body += `  ... and ${withMaterialChanges.length - 10} more (see Excel)\n`;
+      }
+    }
+
+    // Parts WITH non-material changes only - no ordering needed
+    if (withNonMaterialChanges.length > 0) {
+      body += `
+--- ${withNonMaterialChanges.length} NO REORDER (lead time/info only) ---
+`;
+      for (const f of withNonMaterialChanges.slice(0, 10)) {
+        body += `${f.cpc} | ${f.mpn} | Award: ${f.existingAward || ''}\n`;
+        for (const c of (f.nonMaterialChanges || f.valueChanges || [])) {
+          body += `  ✓ ${c.field}: ${formatPlainValue(c.roster)} → ${formatPlainValue(c.email)}\n`;
+        }
+      }
+      if (withNonMaterialChanges.length > 10) {
+        body += `  ... and ${withNonMaterialChanges.length - 10} more (see No Reorder tab)\n`;
       }
     }
 
     // Parts WITHOUT changes
     if (noChanges.length > 0) {
       body += `
---- ${noChanges.length} PARTS UNCHANGED (values match roster) ---
+--- ${noChanges.length} UNCHANGED (values match roster) ---
 `;
-      for (const f of noChanges) {
-        body += `${f.cpc} | ${f.mpn} | Award: ${f.existingAward || 'unknown'}
-`;
+      for (const f of noChanges.slice(0, 5)) {
+        body += `  ${f.cpc} | ${f.mpn} | Award: ${f.existingAward || ''}\n`;
+      }
+      if (noChanges.length > 5) {
+        body += `  ... and ${noChanges.length - 5} more\n`;
       }
     }
   }
@@ -1641,7 +1843,8 @@ async function action_reject(payload, ctx) {
 
   // Notify operator
   const html = buildRejectionEmail(payload, ctx);
-  await ctx.notifier.sendEmail(
+  await sendEmailOrThrow(
+    ctx.notifier,
     ctx.jakeEmail,
     `LAM Rejection: ${cpc}`,
     html,
@@ -1703,7 +1906,8 @@ ${investigationBlock}
     };
   }
 
-  await ctx.notifier.sendEmail(
+  await sendEmailOrThrow(
+    ctx.notifier,
     ctx.jakeEmail,
     `LAM Kitting — needs info: ${subject || '(no subject)'}`,
     html,
@@ -1750,7 +1954,8 @@ ${details ? `<pre style="background:#f5f5f5;padding:8px;white-space:pre-wrap;fon
     return { dry_run: true, would_notify: { to: ctx.jakeEmail, reason } };
   }
 
-  await ctx.notifier.sendEmail(
+  await sendEmailOrThrow(
+    ctx.notifier,
     ctx.jakeEmail,
     `LAM Kitting — needs review: ${subject || '(no subject)'}`,
     html,

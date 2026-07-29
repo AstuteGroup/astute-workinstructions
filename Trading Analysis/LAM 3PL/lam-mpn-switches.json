@@ -60,6 +60,176 @@
       "supplier": "TTI",
       "price": 5.39,
       "qtyNeeded": 140
+    },
+    {
+      "cpc": "670-006780-038",
+      "fromMPN": "#ABC-12",
+      "toMPN": "314012",
+      "date": "2026-07-29",
+      "reason": "Sourcing found better franchise option",
+      "supplier": "Waldom",
+      "price": 249.41,
+      "qtyNeeded": 105
+    },
+    {
+      "cpc": "630-340553-001",
+      "fromMPN": "551SCMGI",
+      "toMPN": "551SCMGI8",
+      "date": "2026-07-29",
+      "reason": "Sourcing found better franchise option",
+      "supplier": "Future",
+      "price": 1,
+      "qtyNeeded": 150
+    },
+    {
+      "cpc": "621-092237-102",
+      "fromMPN": "67F5846",
+      "toMPN": "3296Y-1-102",
+      "date": "2026-07-29",
+      "reason": "Sourcing found better franchise option",
+      "supplier": "TTI",
+      "price": 1.8,
+      "qtyNeeded": 10
+    },
+    {
+      "cpc": "630-173321-001",
+      "fromMPN": "AS7C34098A-10TCN",
+      "toMPN": "IS61WV25616BLL-10TL",
+      "date": "2026-07-29",
+      "reason": "Sourcing found better franchise option",
+      "supplier": "DigiKey",
+      "price": 7.2684,
+      "qtyNeeded": 40
+    },
+    {
+      "cpc": "648-051878-333",
+      "fromMPN": "C0603T333K5RACTU",
+      "toMPN": "CC0603KRX7R9BB333",
+      "date": "2026-07-29",
+      "reason": "Sourcing found better franchise option",
+      "supplier": "Rutronik",
+      "price": 0.0029,
+      "qtyNeeded": 550
+    },
+    {
+      "cpc": "648-A42164-224",
+      "fromMPN": "C1812C224J1RACTU",
+      "toMPN": "18121C224JAT2A",
+      "date": "2026-07-29",
+      "reason": "Sourcing found better franchise option",
+      "supplier": "DigiKey",
+      "price": 0.4861,
+      "qtyNeeded": 300
+    },
+    {
+      "cpc": "645-347340-001",
+      "fromMPN": "E101J3AV2QE3",
+      "toMPN": "E101J3AV2BE2",
+      "date": "2026-07-29",
+      "reason": "Sourcing found better franchise option",
+      "supplier": "Waldom",
+      "price": 9.4,
+      "qtyNeeded": 105
+    },
+    {
+      "cpc": "615-041833-203",
+      "fromMPN": "ERJ-12SF2002U",
+      "toMPN": "CRCW201020K0FKTF",
+      "date": "2026-07-29",
+      "reason": "Sourcing found better franchise option",
+      "supplier": "Mouser",
+      "price": 0.166,
+      "qtyNeeded": 800
+    },
+    {
+      "cpc": "668-096776-009",
+      "fromMPN": "K85X-ED-9S-CBR",
+      "toMPN": "DLS1XS4AA35X",
+      "date": "2026-07-29",
+      "reason": "Sourcing found better franchise option",
+      "supplier": "Master",
+      "price": 1.36,
+      "qtyNeeded": 2000
+    },
+    {
+      "cpc": "668-014495-026",
+      "fromMPN": "K86X-AD-26S-CBR",
+      "toMPN": "K86X-AD-26S-BR",
+      "date": "2026-07-29",
+      "reason": "Sourcing found better franchise option",
+      "supplier": "Sager",
+      "price": 6.6,
+      "qtyNeeded": 200
+    },
+    {
+      "cpc": "630-A92150-002",
+      "fromMPN": "MTFC64GBCAQTC-WT",
+      "toMPN": "MTFC64GBCAQTC-IT",
+      "date": "2026-07-29",
+      "reason": "Sourcing found better franchise option",
+      "supplier": "Newark/Farnell",
+      "price": 152.277684,
+      "qtyNeeded": 30
+    },
+    {
+      "cpc": "615-064170-107",
+      "fromMPN": "RG2012P-1071-B-T5",
+      "toMPN": "RT0805BRD071K07L",
+      "date": "2026-07-29",
+      "reason": "Sourcing found better franchise option",
+      "supplier": "Mouser",
+      "price": 0.05,
+      "qtyNeeded": 3000
+    },
+    {
+      "cpc": "615-064170-196",
+      "fromMPN": "RG2012P-1961-B-T5",
+      "toMPN": "RT0805BRD071K96L",
+      "date": "2026-07-29",
+      "reason": "Sourcing found better franchise option",
+      "supplier": "Mouser",
+      "price": 0.056,
+      "qtyNeeded": 1400
+    },
+    {
+      "cpc": "615-064170-210",
+      "fromMPN": "RG2012P-2101-B-T5",
+      "toMPN": "RT0805BRD072K1L",
+      "date": "2026-07-29",
+      "reason": "Sourcing found better franchise option",
+      "supplier": "Future",
+      "price": 0.0382,
+      "qtyNeeded": 3000
+    },
+    {
+      "cpc": "615-122309-200",
+      "fromMPN": "RNCF0805TTT20K0",
+      "toMPN": "RNCF0805TKT20K0",
+      "date": "2026-07-29",
+      "reason": "Sourcing found better franchise option",
+      "supplier": "Mouser",
+      "price": 0.667,
+      "qtyNeeded": 530
+    },
+    {
+      "cpc": "615-080145-047",
+      "fromMPN": "TNPW1206174KBETA",
+      "toMPN": "ERA-8AEB1743V",
+      "date": "2026-07-29",
+      "reason": "Sourcing found better franchise option",
+      "supplier": "DigiKey",
+      "price": 0.16368,
+      "qtyNeeded": 900
+    },
+    {
+      "cpc": "615-A40653-909",
+      "fromMPN": "TNPW120690K9BEEA",
+      "toMPN": "RQ73C2B90K9BTD",
+      "date": "2026-07-29",
+      "reason": "Sourcing found better franchise option",
+      "supplier": "DigiKey",
+      "price": 0.77,
+      "qtyNeeded": 650
     }
   ],
   "switches": [

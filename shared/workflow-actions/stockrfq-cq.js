@@ -25,6 +25,14 @@ const { notifyHighFailureRate } = require('../failure-rate-gate');
 const { patchRecord } = require('../record-updater');
 const breadcrumbs = require('../breadcrumbs');
 
+async function sendEmailOrThrow(notifier, to, subject, body, opts = {}) {
+  const sent = await notifier.sendEmail(to, subject, body, opts);
+  if (!sent) {
+    throw new Error(`Failed to send notification email to ${to}: ${subject}`);
+  }
+  return sent;
+}
+
 const UNQUALIFIED_BROKER_ID = 1006505;
 const UNQUALIFIED_BROKER_KEY = '1008499';
 const JAKE_USER_ID = 1000004;
@@ -406,7 +414,7 @@ ${details ? `<pre style="background:#f5f5f5;padding:8px;white-space:pre-wrap;fon
     return { dry_run: true, would_notify_jake: { reason } };
   }
 
-  await ctx.notifier.sendEmail(
+  await sendEmailOrThrow(ctx.notifier,
     ctx.jakeEmail,
     `Stock RFQ CQ — needs review: ${subject || '(no subject)'}`,
     html,

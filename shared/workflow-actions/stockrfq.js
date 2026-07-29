@@ -34,6 +34,18 @@ const { notifyOtUnreachable } = require('../failure-rate-gate');
 const otBudget = require('../ot-api-budget');
 const { resolveOutreachRecipients, recipientsFooter, externalSenderLabel } = require('../outreach-recipients');
 
+/**
+ * Send email via notifier, throwing if it fails.
+ * Ensures routing stops if notification can't be sent.
+ */
+async function sendEmailOrThrow(notifier, to, subject, body, opts = {}) {
+  const sent = await notifier.sendEmail(to, subject, body, opts);
+  if (!sent) {
+    throw new Error(`Failed to send notification email to ${to}: ${subject}`);
+  }
+  return sent;
+}
+
 // Park a resume sidecar for an RFQ that couldn't be written because OT was
 // unreachable. The vq-loading-resumer (extended) replays `ot_unreachable_retry`
 // sidecars once OT recovers: stockrfq ones re-run writeRFQ — fresh when
@@ -538,7 +550,8 @@ ${recipientsFooter(envelope)}
     if (refs.length > 0) opts.references = refs;
   }
 
-  await ctx.notifier.sendEmail(
+  await sendEmailOrThrow(
+    ctx.notifier,
     envelope.to,
     `Stock RFQ — needs review: ${subject || '(no subject)'}`,
     html,

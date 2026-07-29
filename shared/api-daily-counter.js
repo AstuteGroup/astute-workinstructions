@@ -34,36 +34,64 @@ const path = require('path');
 
 const COUNTER_FILE = path.join(process.env.HOME || '/home/analytics_user', 'workspace', '.api-daily-counter.json');
 
-// Per-cog daily ceilings. Default 0 = no enforcement; explicit env var unlocks.
-// Mouser default 900 (free tier is 1,000 — leaves 10% headroom for legitimate
-// fresh traffic post-reset and any clock drift between local + supplier).
+// Per-cog daily ceilings. Env var overrides the default.
+//
+// Updated 2026-07-20: ALL distributors now have default ceilings to prevent
+// the thundering-herd doom loop (22K MPNs × 10 retries = 215K wasted calls).
+// When ANY 429 is received, the distributor is marked "at ceiling" via
+// markAtCeiling() so no more calls are attempted until the reset time.
+//
+// Defaults are conservative (below typical supplier limits) to leave headroom
+// for legitimate fresh traffic after quota reset.
 const CEILINGS = {
-  mouser:     Number(process.env.MOUSER_DAILY_CEILING)     || 900,
-  digikey:    Number(process.env.DIGIKEY_DAILY_CEILING)    || 0,
-  arrow:      Number(process.env.ARROW_DAILY_CEILING)      || 0,
-  tti:        Number(process.env.TTI_DAILY_CEILING)        || 0,
-  future:     Number(process.env.FUTURE_DAILY_CEILING)     || 0,
-  newark:     Number(process.env.NEWARK_DAILY_CEILING)     || 0,
-  master:     Number(process.env.MASTER_DAILY_CEILING)     || 0,
-  rutronik:   Number(process.env.RUTRONIK_DAILY_CEILING)   || 0,
-  waldom:     Number(process.env.WALDOM_DAILY_CEILING)     || 0,
-  sager:      Number(process.env.SAGER_DAILY_CEILING)      || 0,
-  oemsecrets: Number(process.env.OEMSECRETS_DAILY_CEILING) || 0,
+  mouser:     Number(process.env.MOUSER_DAILY_CEILING)     || 900,    // Confirmed ~1000/day limit
+  digikey:    Number(process.env.DIGIKEY_DAILY_CEILING)    || 900,    // Confirmed ~1000/day limit
+  arrow:      Number(process.env.ARROW_DAILY_CEILING)      || 20000,  // No known limit; high ceiling for markAtCeiling()
+  tti:        Number(process.env.TTI_DAILY_CEILING)        || 20000,
+  future:     Number(process.env.FUTURE_DAILY_CEILING)     || 20000,
+  newark:     Number(process.env.NEWARK_DAILY_CEILING)     || 20000,
+  master:     Number(process.env.MASTER_DAILY_CEILING)     || 20000,
+  rutronik:   Number(process.env.RUTRONIK_DAILY_CEILING)   || 20000,
+  waldom:     Number(process.env.WALDOM_DAILY_CEILING)     || 20000,
+  sager:      Number(process.env.SAGER_DAILY_CEILING)      || 20000,
+  oemsecrets: Number(process.env.OEMSECRETS_DAILY_CEILING) || 20000,
+};
+
+// Per-distributor reset timezone. Quota resets at midnight in this timezone.
+// Env var overrides: MOUSER_RESET_TZ=America/Chicago, DIGIKEY_RESET_TZ=UTC, etc.
+//
+// Confirmed:
+//   - Mouser: midnight America/Chicago (observed 2026-05 via failure pattern analysis)
+//   - DigiKey: likely midnight America/Chicago (Minnesota HQ), but not confirmed
+//
+// Others default to America/Chicago since we have no data and it's a reasonable
+// guess for US-based distributors. European distys (Rutronik) might be different.
+const RESET_TIMEZONES = {
+  mouser:     process.env.MOUSER_RESET_TZ     || 'America/Chicago',  // Confirmed
+  digikey:   process.env.DIGIKEY_RESET_TZ    || 'America/Chicago',  // Likely (MN HQ)
+  arrow:      process.env.ARROW_RESET_TZ      || 'America/Chicago',
+  tti:        process.env.TTI_RESET_TZ        || 'America/Chicago',
+  future:     process.env.FUTURE_RESET_TZ     || 'America/Chicago',
+  newark:     process.env.NEWARK_RESET_TZ     || 'America/Chicago',
+  master:     process.env.MASTER_RESET_TZ     || 'America/Chicago',
+  rutronik:   process.env.RUTRONIK_RESET_TZ   || 'Europe/Berlin',    // German company
+  waldom:     process.env.WALDOM_RESET_TZ     || 'America/Chicago',
+  sager:      process.env.SAGER_RESET_TZ      || 'America/Chicago',
+  oemsecrets: process.env.OEMSECRETS_RESET_TZ || 'UTC',              // Aggregator, unclear
 };
 
 /**
- * Compute the most-recent midnight America/Chicago as a UTC ISO string.
+ * Compute the most-recent midnight in the given timezone as a UTC ISO string.
  *
- * Used to detect when the daily counter should reset. If state.lastReset is
- * older than this, the counter for every cog is zeroed out.
+ * Used to detect when a distributor's daily counter should reset.
  *
- * Implementation: get current wall-clock in CT, compute elapsed seconds since
- * local midnight, subtract from "now" → UTC moment of today's CT midnight.
+ * @param {string} timezone - IANA timezone (e.g., 'America/Chicago', 'UTC', 'Europe/Berlin')
+ * @returns {string} ISO string of most recent midnight in that timezone
  */
-function todaysChicagoMidnightIso() {
+function todaysMidnightIso(timezone = 'America/Chicago') {
   const now = new Date();
   const parts = new Intl.DateTimeFormat('en-CA', {
-    timeZone: 'America/Chicago',
+    timeZone: timezone,
     hour: '2-digit', minute: '2-digit', second: '2-digit',
     hour12: false,
   }).formatToParts(now);
@@ -80,11 +108,16 @@ function todaysChicagoMidnightIso() {
   return new Date(Math.floor(midnightMs / 1000) * 1000).toISOString();
 }
 
+// Legacy alias for backwards compatibility
+function todaysChicagoMidnightIso() {
+  return todaysMidnightIso('America/Chicago');
+}
+
 function readState() {
   try {
     return JSON.parse(fs.readFileSync(COUNTER_FILE, 'utf-8'));
   } catch {
-    return { lastReset: null, counts: {} };
+    return { counts: {} };
   }
 }
 
@@ -97,17 +130,53 @@ function writeState(state) {
   } catch { /* swallow — counter errors must never block real calls */ }
 }
 
-function maybeReset(state) {
-  const todayIso = todaysChicagoMidnightIso();
-  if (!state.lastReset || new Date(state.lastReset) < new Date(todayIso)) {
-    state.lastReset = todayIso;
-    state.counts = {};
+/**
+ * Check if a specific distributor's counter should reset based on its timezone.
+ * Each distributor tracks its own lastReset in the state.
+ *
+ * State structure (v2 - per-distributor reset times):
+ * {
+ *   "counts": {
+ *     "mouser": { "count": 50, "lastReset": "2026-07-20T05:00:00.000Z" },
+ *     "digikey": { "count": 100, "lastReset": "2026-07-20T05:00:00.000Z" }
+ *   }
+ * }
+ *
+ * Migration: old state with top-level lastReset is auto-migrated on first write.
+ */
+function maybeResetCog(state, cog) {
+  const timezone = RESET_TIMEZONES[cog] || 'America/Chicago';
+  const todayIso = todaysMidnightIso(timezone);
+
+  if (!state.counts) state.counts = {};
+
+  // Initialize or migrate cog entry
+  if (!state.counts[cog] || typeof state.counts[cog] === 'number') {
+    // Migration from old format (counts[cog] was just a number)
+    const oldCount = typeof state.counts[cog] === 'number' ? state.counts[cog] : 0;
+    state.counts[cog] = { count: oldCount, lastReset: state.lastReset || todayIso };
   }
+
+  const cogState = state.counts[cog];
+
+  // Reset if we've passed midnight in this cog's timezone
+  if (!cogState.lastReset || new Date(cogState.lastReset) < new Date(todayIso)) {
+    cogState.count = 0;
+    cogState.lastReset = todayIso;
+  }
+
+  return cogState;
+}
+
+// Legacy function for backwards compatibility with old callers
+function maybeReset(state) {
+  // Just ensure state structure exists - per-cog reset happens in maybeResetCog
+  if (!state.counts) state.counts = {};
   return state;
 }
 
 /**
- * Atomic check + increment. Returns `{ allowed, count, ceiling }`.
+ * Atomic check + increment. Returns `{ allowed, count, ceiling, resetTimezone }`.
  *
  * - allowed=true  → caller may proceed; count was incremented.
  * - allowed=false → caller is at/over ceiling; count was NOT incremented.
@@ -116,51 +185,109 @@ function maybeReset(state) {
  *
  * If ceiling for this cog is 0/unset, allowed is always true and no count
  * is recorded (preserves behavior for cogs without explicit limits).
+ *
+ * Each distributor resets at midnight in its configured timezone (RESET_TIMEZONES).
  */
 function checkAndIncrement(cog) {
   const ceiling = CEILINGS[cog] || 0;
-  if (ceiling <= 0) return { allowed: true, count: 0, ceiling: null };
+  const timezone = RESET_TIMEZONES[cog] || 'America/Chicago';
 
-  const state = maybeReset(readState());
-  const current = state.counts[cog] || 0;
-  if (current >= ceiling) {
-    return { allowed: false, count: current, ceiling };
+  if (ceiling <= 0) return { allowed: true, count: 0, ceiling: null, resetTimezone: timezone };
+
+  const state = readState();
+  const cogState = maybeResetCog(state, cog);
+
+  if (cogState.count >= ceiling) {
+    return { allowed: false, count: cogState.count, ceiling, resetTimezone: timezone };
   }
-  state.counts[cog] = current + 1;
+
+  cogState.count += 1;
   writeState(state);
-  return { allowed: true, count: current + 1, ceiling };
+  return { allowed: true, count: cogState.count, ceiling, resetTimezone: timezone };
+}
+
+/**
+ * Mark a distributor as "at ceiling" immediately.
+ *
+ * Called when a 429 is received — instead of retrying every hour and wasting
+ * capacity, we immediately block all further calls until midnight in the
+ * distributor's configured timezone.
+ *
+ * This is the key fix for the 215K DigiKey failure doom loop (July 2026).
+ *
+ * The retry queue will still schedule retries, but checkAndIncrement() will
+ * return allowed=false until the counter resets at midnight.
+ */
+function markAtCeiling(cog) {
+  const ceiling = CEILINGS[cog];
+  if (!ceiling) return; // No ceiling configured for this cog
+
+  const timezone = RESET_TIMEZONES[cog] || 'America/Chicago';
+  const state = readState();
+  const cogState = maybeResetCog(state, cog);
+
+  // Only mark if not already at/over ceiling
+  if (cogState.count < ceiling) {
+    cogState.count = ceiling;
+    writeState(state);
+    // eslint-disable-next-line no-console
+    console.log(`[api-daily-counter] ${cog} marked at ceiling (${ceiling}) after 429 — no calls until midnight ${timezone}`);
+  }
+}
+
+/**
+ * Check if a distributor is at ceiling (read-only, doesn't increment).
+ */
+function isAtCeiling(cog) {
+  const ceiling = CEILINGS[cog];
+  if (!ceiling) return false;
+
+  const state = readState();
+  const cogState = maybeResetCog(state, cog);
+  return cogState.count >= ceiling;
 }
 
 /**
  * Read-only inspection. Useful for digests / drift checks / debugging.
  */
 function getCount(cog) {
-  const state = maybeReset(readState());
+  const timezone = RESET_TIMEZONES[cog] || 'America/Chicago';
+  const state = readState();
+  const cogState = maybeResetCog(state, cog);
   return {
-    count: state.counts[cog] || 0,
+    count: cogState.count,
     ceiling: CEILINGS[cog] || null,
-    lastReset: state.lastReset,
+    lastReset: cogState.lastReset,
+    resetTimezone: timezone,
   };
 }
 
 function getAllCounts() {
-  const state = maybeReset(readState());
+  const state = readState();
   const out = {};
   for (const cog of Object.keys(CEILINGS)) {
     if (!CEILINGS[cog]) continue;
+    const cogState = maybeResetCog(state, cog);
+    const timezone = RESET_TIMEZONES[cog] || 'America/Chicago';
     out[cog] = {
-      count: state.counts[cog] || 0,
+      count: cogState.count,
       ceiling: CEILINGS[cog],
-      atCeiling: (state.counts[cog] || 0) >= CEILINGS[cog],
+      atCeiling: cogState.count >= CEILINGS[cog],
+      lastReset: cogState.lastReset,
+      resetTimezone: timezone,
     };
   }
-  return { lastReset: state.lastReset, cogs: out };
+  return { cogs: out };
 }
 
 module.exports = {
   checkAndIncrement,
+  markAtCeiling,
+  isAtCeiling,
   getCount,
   getAllCounts,
+  todaysMidnightIso,
   _CEILINGS: CEILINGS,
+  _RESET_TIMEZONES: RESET_TIMEZONES,
   _COUNTER_FILE: COUNTER_FILE,
 };

@@ -246,6 +246,29 @@ async function getBPVendorType(bpId) {
   return vtId;
 }
 
+// ─── BP Location Cache ──────────────────────────────────────────────────────
+const _bpLocationCache = new Map();
+
+/**
+ * Get the primary location ID for a business partner (vendor).
+ * Prefers remit-to locations, then ship-to, then any active location.
+ * This is required at VQ write time for purchase validation to pass.
+ */
+async function getBPLocationId(bpId) {
+  if (!bpId) return null;
+  if (_bpLocationCache.has(bpId)) return _bpLocationCache.get(bpId);
+
+  const result = await apiGet('C_BPartner_Location', {
+    filter: `C_BPartner_ID eq ${bpId} and IsActive eq true`,
+    top: 10,
+    orderby: 'IsRemitTo desc, IsShipTo desc',
+  });
+
+  const locId = result.records?.[0]?.id || null;
+  _bpLocationCache.set(bpId, locId);
+  return locId;
+}
+
 /**
  * Derive traceability from vendor type.
  * Franchise (1000002) → Auth Dist Certs; all others → Non-Traceable.
@@ -797,6 +820,10 @@ async function writeVQFromAPI(rfqSearchKey, cpc, franchiseResults, opts = {}) {
     const vendorTypeId = await getBPVendorType(bp.id);
     const traceabilityId = deriveTraceability(vendorTypeId);
 
+    // Resolve vendor location — required for purchase validation (TIER2).
+    // Look this up at VQ write time so auto-purchase doesn't have to patch it.
+    const vendorLocationId = await getBPLocationId(bp.id);
+
     // Resolve packaging — distributor data wins, then opts fallback.
     // Accepts either an explicit ID (vqPackagingId) or a string (vqPackaging)
     // that we normalize via the shared packaging-lookup cog.
@@ -808,14 +835,20 @@ async function writeVQFromAPI(rfqSearchKey, cpc, franchiseResults, opts = {}) {
     //
     // Caller-side context: the qty + spq + isAuthorized signals are already
     // available in scope from the franchise API result.
+    // Default packaging to F-REEL (1000001) for authorized vendors when not
+    // resolved from API data. This ensures TIER2 validation passes at purchase
+    // time without manual patching. Non-authorized vendors (brokers) stay null
+    // since packaging there is genuinely unknown.
+    const F_REEL_PACKAGING_ID = 1000001;
+    const isAuthorizedVendor = MFR_DIRECT_OR_FRANCHISE.has(vendorTypeId);
     const packagingId = d.vqPackagingId
       || normalizePackaging(d.vqPackaging, {
         qty,
         spq: spq || (d.vqSpq ? Number(d.vqSpq) : null),
-        isAuthorized: MFR_DIRECT_OR_FRANCHISE.has(vendorTypeId),
+        isAuthorized: isAuthorizedVendor,
       })
       || opts.packagingId
-      || null;
+      || (isAuthorizedVendor ? F_REEL_PACKAGING_ID : null);
 
     // Resolve date code — per-row first (multi-source split), then distributor-level,
     // then default. If empty AND vendor is mfr-direct/franchise, pick the right
@@ -886,6 +919,7 @@ async function writeVQFromAPI(rfqSearchKey, cpc, franchiseResults, opts = {}) {
       // explicitly as null returns 500 "Could not convert value null for X".
       // Omit when we don't have a resolved ID; the bean callout / DB default
       // handles the column. Same pattern as Chuboe_MFR_ID above.
+      ...(vendorLocationId ? { C_BPartner_Location_ID: vendorLocationId } : {}),
       ...(packagingId ? { Chuboe_Packaging_ID: packagingId } : {}),
       ...(opts.buyerId ? { Chuboe_Buyer_ID: opts.buyerId } : {}),
 
@@ -964,7 +998,7 @@ async function writeVQFromAPI(rfqSearchKey, cpc, franchiseResults, opts = {}) {
         // deferred-work § writer accounting bug.)
         skipped.push({
           vqLineId: existingId, mpn, vendor: vendorDisplay, bpId: bp.id,
-          mfrId: resolvedMfrId, mfr: mfrCanonical, price, qty,
+          mfrId: mfrResult.id, mfr: mfrCanonical, price, qty,
           channel: row.channel || null,
           reason: FLAG.PRE_EXISTING_DUPLICATE || 'PRE_EXISTING_DUPLICATE',
           detail: `Existing chuboe_vq_line ${existingId} matches natural key (rfq_line × MPN × BP × cost × currency) — no new POST.`,
@@ -985,7 +1019,7 @@ async function writeVQFromAPI(rfqSearchKey, cpc, franchiseResults, opts = {}) {
       });
       written.push({
         vqLineId: result.id, mpn, vendor: vendorDisplay, bpId: bp.id,
-        mfrId: resolvedMfrId, mfr: mfrCanonical, price, qty,
+        mfrId: mfrResult.id, mfr: mfrCanonical, price, qty,
         channel: row.channel || null,
       });
     } catch (e) {
@@ -1040,10 +1074,12 @@ async function writeVQBatch(rfqSearchKey, items, opts = {}) {
   const isBackfill = unseenEmailCount >= 20;
 
   // ── CHUNKED MODE for large batches ──
-  // Large API enrichment batches (500+ items) would fail the budget check.
+  // Large API enrichment batches would fail the budget check.
   // Instead of rejecting, we allow them through and rely on inter-item delays.
-  const LARGE_BATCH_THRESHOLD = 200;  // items (each item ≈ 10 VQs)
-  const useChunkedMode = items.length > LARGE_BATCH_THRESHOLD;
+  // Threshold: 50 items OR estimated VQs > 500 (whichever triggers first)
+  const LARGE_BATCH_THRESHOLD = 50;  // items
+  const LARGE_VQ_THRESHOLD = 500;    // estimated VQs
+  const useChunkedMode = items.length > LARGE_BATCH_THRESHOLD || estimatedVQs > LARGE_VQ_THRESHOLD || opts.forceChunkedMode;
 
   if (!useChunkedMode) {
     // TIER 1: Global budget check for smaller batches

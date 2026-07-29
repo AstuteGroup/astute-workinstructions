@@ -142,4 +142,48 @@ async function postApproveOrder(opts = {}) {
   return { id: result.id, documentNo: result.DocumentNo, vqsValidated: normalizedVqIds.length };
 }
 
-module.exports = { postApproveOrder };
+/**
+ * Post a general R_Request (non-approval).
+ *
+ * Use this for cancellation requests, queries, or other general messages
+ * that don't require VQ validation.
+ *
+ * @param {object} opts
+ * @param {number} opts.tableId       AD_Table_ID (259=C_Order, 1000002=Chuboe_RFQ, etc.)
+ * @param {number} opts.recordId      Record_ID (the PK of the linked record)
+ * @param {string} opts.summary       Queue-list one-liner
+ * @param {string} [opts.message]     Detailed message — goes to Result ("Message to User")
+ * @param {number} [opts.bpartnerId]  C_BPartner_ID (optional)
+ * @param {string} [opts.priority='5'] '1' (High) | '5' (Medium) | '9' (Low)
+ * @param {number} [opts.requestTypeId=1000001] R_RequestType_ID (default: General Message)
+ * @returns {object} { id, documentNo }
+ */
+async function postGeneralRequest(opts = {}) {
+  const { tableId, recordId, summary, message = '', bpartnerId,
+          priority = '5', requestTypeId = 1000001 } = opts;
+
+  if (!tableId)   throw new Error('postGeneralRequest: tableId is required');
+  if (!recordId)  throw new Error('postGeneralRequest: recordId is required');
+  if (!summary)   throw new Error('postGeneralRequest: summary is required');
+
+  const payload = {
+    AD_Table_ID:      tableId,
+    Record_ID:        recordId,
+    R_RequestType_ID: requestTypeId,
+    R_Status_ID:      SUBMITTED_STATUS_ID,
+    AD_User_ID:       JAKE_USER_ID,
+    SalesRep_ID:      JAKE_USER_ID,
+    Priority:         priority,
+    Summary:          summary,
+    Result:           message,
+  };
+
+  if (bpartnerId) {
+    payload.C_BPartner_ID = bpartnerId;
+  }
+
+  const result = await apiPost('r_request', payload, { context: 'r-request-writer' });
+  return { id: result.id, documentNo: result.DocumentNo };
+}
+
+module.exports = { postApproveOrder, postGeneralRequest };

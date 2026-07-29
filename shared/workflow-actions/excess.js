@@ -29,6 +29,17 @@ const pending = require('../workflow-pending-state');
 const { createGate } = require('../large-payload-gate');
 const { makeApprovalActions } = require('./_approval');
 
+/**
+ * Wrapper that throws if email send fails, ensuring failures don't silently pass.
+ */
+async function sendEmailOrThrow(notifier, to, subject, body, opts = {}) {
+  const sent = await notifier.sendEmail(to, subject, body, opts);
+  if (!sent) {
+    throw new Error(`Failed to send notification email to ${to}: ${subject}`);
+  }
+  return sent;
+}
+
 // ─── LAM KITTING INVENTORY DEACTIVATION ───────────────────────────────────────
 // LAM Kitting Inventory is a snapshot of current consignment stock. Each new
 // load supersedes all prior active offers of the same type. Deactivate old
@@ -304,7 +315,7 @@ ${result.errors.length > 5 ? `  ... +${result.errors.length - 5} more` : ''}
 
 — Excess Offer System (automated alert)`;
 
-      await ctx.notifier.sendEmail(ctx.jakeEmail, alertSubject, alertBody);
+      await sendEmailOrThrow(ctx.notifier, ctx.jakeEmail, alertSubject, alertBody);
     }
   } catch (e) {
     console.error(`[excess.load_offer] Failure rate evaluation error: ${e.message}`);
@@ -473,7 +484,7 @@ This offer is now in Orange Tsunami and available for matching against open RFQs
           threadingOpts.inReplyTo = threadId;
           threadingOpts.references = threadId;
         }
-        await ctx.notifier.sendEmail(toEmail, confirmSubject, confirmBody, threadingOpts);
+        await sendEmailOrThrow(ctx.notifier, toEmail, confirmSubject, confirmBody, threadingOpts);
 
         breadcrumbs.write({
           cog: 'offer-poller',
@@ -560,7 +571,8 @@ ${extractedLinesHtml}
     if (refs.length > 0) opts.references = refs;
   }
 
-  await ctx.notifier.sendEmail(
+  await sendEmailOrThrow(
+    ctx.notifier,
     ctx.jakeEmail,
     `Customer Excess — NeedsPartner: ${subject || '(no subject)'}`,
     html,
@@ -680,7 +692,8 @@ ${extractedLinesHtml}
     if (refs.length > 0) opts.references = refs;
   }
 
-  await ctx.notifier.sendEmail(
+  await sendEmailOrThrow(
+    ctx.notifier,
     ctx.jakeEmail,
     `Customer Excess — clarify partner: ${subject || '(no subject)'}`,
     html,
@@ -749,7 +762,8 @@ ${details ? `<pre style="background:#f5f5f5;padding:8px;white-space:pre-wrap;fon
     if (refs.length > 0) opts.references = refs;
   }
 
-  await ctx.notifier.sendEmail(
+  await sendEmailOrThrow(
+    ctx.notifier,
     ctx.jakeEmail,
     `Customer Excess — needs review: ${subject || '(no subject)'}`,
     html,

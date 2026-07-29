@@ -6,6 +6,30 @@ Operational home for Astute's LAM 3PL program: W111 (LAM 3PL) + W115 (LAM Dead I
 
 ---
 
+## CRITICAL: Source of Truth Hierarchy
+
+**RFQs in OT are DERIVED from source files — NOT the other way around.**
+
+| Level | Source | Use For |
+|-------|--------|---------|
+| 1 (Primary) | **Source files** (Excel workbooks sent by LAM/operator) | Award data, pricing, MOQ, contract terms |
+| 2 (Derived) | **Master Roster** (`LAM_Master_Roster.xlsx`) | Consolidated reference — populated FROM source files |
+| 3 (Downstream) | **RFQs in OT** | Created BY us from source files for purchasing workflow |
+
+**NEVER use RFQs as source of truth for:**
+- Award membership (what's on the program)
+- Contract pricing (Base Unit Price, Resale Price)
+- MOQ, lead time, or other contract terms
+
+**To audit a part's origin:**
+1. Check the `Source File` and `Source Tab` columns in the Master Roster
+2. Open that source file and verify the data
+3. Do NOT reference the RFQ — it was created from the source file
+
+**Why:** RFQs are created by Claude or operators based on source files. If the RFQ has wrong data, the source file is still correct. If the source file has wrong data, the RFQ will also be wrong. Always trace back to the source file.
+
+---
+
 ## Contract Purchase Price — Where to Look
 
 **RULE:** The **LAM Master Roster** (`LAM_Master_Roster.xlsx`) is the single source of truth for all LAM contract pricing. It consolidates data from all three legacy sources.
@@ -386,7 +410,7 @@ Review the color-coded Excel. Priority levels:
 
 PENDING ORDER PLACEMENT and PENDING RECEIPT share `priorityOrder` value 4 — they sort together at the bottom of the main tab, with PENDING ORDER PLACEMENT first inside the bucket (more actionable: chase the PO vs wait for vendor). PENDING WAREHOUSE TRANSFER sorts last (value 5) — these are internal transfers, not external orders.
 
-**Recency filter (loadRecentPOVs SQL):** open POs are dropped entirely when `c_order.created < CURRENT_DATE − 90 days` AND `datepromised < CURRENT_DATE`. Same rule for VQ_TICKED (using `rfq.created` and `vl.datepromised`). Stuck/orphan 2024–2025 POs no longer leak into the Recent POV cell or trigger PENDING priorities.
+**Recency filter (loadRecentPOVs SQL):** Infor-stamped POs (POVnnnnnnn) are **always shown** regardless of age — a POV stamp means it's a committed vendor order. Non-stamped orders (drafts, VQ_TICKED) are dropped when older than 120 days AND promise date has passed. This prevents stuck/orphan 2024–2025 drafts from leaking into the Recent POV cell while ensuring real committed orders always surface.
 
 **Sourcing Status values:**
 

@@ -19,6 +19,18 @@ const pending = require('../workflow-pending-state');
 const { makeApprovalActions } = require('./_approval');
 const { resolveOutreachRecipients, recipientsFooter, externalSenderLabel } = require('../outreach-recipients');
 
+/**
+ * Send email via notifier, throwing if it fails.
+ * Ensures routing stops if notification can't be sent.
+ */
+async function sendEmailOrThrow(notifier, to, subject, body, opts = {}) {
+  const sent = await notifier.sendEmail(to, subject, body, opts);
+  if (!sent) {
+    throw new Error(`Failed to send notification email to ${to}: ${subject}`);
+  }
+  return sent;
+}
+
 // On rejection: invoke cancel-rfq-queue-items.js so any items already in the
 // api retry queue for this RFQ's MPNs stop immediately. Without this hook,
 // rejecting only blocks NEW enrichment — items enqueued before the rejection
@@ -257,7 +269,8 @@ ${recipientsFooter(envelope)}
     if (refs.length > 0) opts.references = refs;
   }
 
-  await ctx.notifier.sendEmail(
+  await sendEmailOrThrow(
+    ctx.notifier,
     envelope.to,
     `RFQ Loading — needs info: ${subject || '(no subject)'}`,
     html,
@@ -399,7 +412,8 @@ ${recipientsFooter(envelope)}
     if (refs.length > 0) opts.references = refs;
   }
 
-  await ctx.notifier.sendEmail(
+  await sendEmailOrThrow(
+    ctx.notifier,
     envelope.to,
     `RFQ Loading — needs review: ${subject || '(no subject)'}`,
     html,
