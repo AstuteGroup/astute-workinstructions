@@ -1433,6 +1433,35 @@ function resolvePriority(shortfallBasedPriority, pov) {
   return 'PENDING ORDER PLACEMENT';
 }
 
+// When looking up recent POVs by both CPC and MPN, we may get different results.
+// Prefer the one that represents a more committed state:
+//   1. PO with POV stamp (PENDING RECEIPT) > PO without stamp (PENDING ORDER PLACEMENT)
+//   2. PO (either) > VQ_TICKED (no PO cut yet)
+// This handles cases where the PO's RFQ line had no CPC (keyed by MPN) but a newer
+// VQ has CPC. We want to surface the committed PO, not the pending VQ.
+function selectBetterPOV(pov1, pov2) {
+  if (!pov1) return pov2;
+  if (!pov2) return pov1;
+
+  // Score: higher = more committed
+  function score(pov) {
+    if (pov.POV_Number) return 3;  // PO with POV stamp
+    if (pov.State === 'PO') return 2;  // PO without stamp
+    if (pov.State === 'VQ_TICKED') return 1;  // VQ only
+    return 0;
+  }
+
+  const s1 = score(pov1);
+  const s2 = score(pov2);
+
+  if (s1 > s2) return pov1;
+  if (s2 > s1) return pov2;
+
+  // Same score - prefer the one with more qty on order
+  if ((pov1.Qty_On_Order || 0) >= (pov2.Qty_On_Order || 0)) return pov1;
+  return pov2;
+}
+
 function identifyReorderCandidates(aggregated, excelData, historicalData, recentPOVs = {}, pendingTransfers = new Map()) {
   const alerts = [];
   const inventoryMPNs = new Set(Object.keys(aggregated));
@@ -1502,9 +1531,12 @@ function identifyReorderCandidates(aggregated, excelData, historicalData, recent
         basePriority = shortfallPct >= 75 ? 'HIGH' : shortfallPct >= 50 ? 'MEDIUM' : 'LOW';
       }
 
-      // Look up POV by CPC first - we may have ordered an alternate MPN
-      // Fall back to MPN for LAM RFQs where CPC might be missing on the RFQ line
-      const pov = recentPOVs[cpc] || recentPOVs[normalizeMPN(rosterMpn)];
+      // Look up POV by BOTH CPC and MPN, then prefer the better match.
+      // Sometimes the PO's RFQ line has no CPC (keyed by MPN), while a newer
+      // VQ has CPC. We want to prefer PO over VQ regardless of which key finds it.
+      const povByCpc = recentPOVs[cpc];
+      const povByMpn = recentPOVs[normalizeMPN(rosterMpn)];
+      const pov = selectBetterPOV(povByCpc, povByMpn);
       const priority = resolvePriority(basePriority, pov);
       const lamOwned = cpcInv.w115 > 0 ? 'YES' : 'NO';
 
@@ -1574,8 +1606,9 @@ function identifyReorderCandidates(aggregated, excelData, historicalData, recent
     // Format: "PENDING WAREHOUSE TRANSFER - 100 pcs from MAIN"
     const priority = `PENDING WAREHOUSE TRANSFER - ${transfer.qty} pcs from ${transfer.fromWh}`;
 
+    const povForTransfer = selectBetterPOV(recentPOVs[cpc], recentPOVs[normalizeMPN(mpn)]);
     const alert = buildAlert(mpn, excel, cpcInv.total, cpcInv.w115 > 0 ? 'YES' : 'NO',
-      0, priority, historicalData[normalizeMPN(mpn)] || {}, recentPOVs[cpc] || recentPOVs[normalizeMPN(mpn)]);
+      0, priority, historicalData[normalizeMPN(mpn)] || {}, povForTransfer);
 
     alerts.push(alert);
   }
