@@ -1,0 +1,55 @@
+{
+  "workflowKey": "rfq-loading",
+  "workflowName": "RFQ Loading",
+  "inboxEmail": "rfqloading@orangetsunami.com",
+  "scheduleDesc": "a tiered cron schedule (5-min burst window after an approval email is sent, dropping to every 30m steady)",
+
+  "docPath": "/home/analytics_user/workspace/astute-workinstructions/Trading Analysis/RFQ Loading/rfq-loading.md",
+  "docSection": "End-to-End Workflow",
+  "docExtraInstructions": "Pay particular attention to \"Step 3a: Large-RFQ Approval Replies\" — that path skips the customer-RFQ extraction stack entirely",
+
+  "outputPath": "Trading Analysis/RFQ Loading/agent-prompt.txt",
+
+  "capabilities": [
+    "image-processing",
+    "pending-state",
+    "approval-reply"
+  ],
+
+  "capabilityConfig": {
+    "image-processing": {
+      "IMAGE_CONTEXT_DESC": "screenshot RFQs",
+      "IMAGE_EXTRACT_TARGETS": "MPN, qty, customer info",
+      "IMAGE_EXTRA_NOTES": "This handles cases like screenshots of Excel/portal data pasted into emails."
+    },
+    "pending-state": {
+      "PENDING_STATE_ACTIONS": "need_info",
+      "PENDING_STATE_RECIPIENT": "Jake",
+      "PENDING_RETRY_CAP_ACTION": "needs_review",
+      "PENDING_RETRY_CAP_REASON": "stitch retry cap reached"
+    },
+    "approval-reply": {
+      "APPROVAL_DOC_TYPE": "Large RFQ",
+      "APPROVAL_ID_FIELD": "RFQ#",
+      "APPROVAL_ID_EXTRACTION_HINT": "regex: `Large RFQ\\s+(\\d+)`",
+      "APPROVAL_ID_JSON_FIELD": "rfq_number",
+      "APPROVAL_APPROVE_ACTION": "approve_large_rfq",
+      "APPROVAL_REJECT_ACTION": "reject_large_rfq",
+      "APPROVAL_MAX_LINES_SUPPORT": true,
+      "APPROVAL_CACHE_ONLY_SUPPORT": true,
+      "APPROVAL_SKIP_FIELDS": "customer/contact/MFR resolution",
+      "APPROVAL_SKIP_REMAINING": false
+    }
+  },
+
+  "step3Source": "shared/agent-step3/rfq-loading.md",
+  "step3Title": "Process each message",
+
+  "summaryPrefix": "RFQLOADING-AGENT",
+  "summaryCounters": "processed=<N> enqueue=<N> approve_large_rfq=<N> reject_large_rfq=<N> need_info=<N> needs_review=<N> not_rfq=<N> errors=<N>",
+
+  "transientErrorExamples": "loadBulkSummary throws, attachment unreadable, vendor lookup 5xx",
+
+  "decorators": false,
+  "introText": null
+}

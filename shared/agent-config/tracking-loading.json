@@ -1,0 +1,36 @@
+{
+  "workflowKey": "tracking-loading",
+  "workflowName": "Tracking Loading",
+  "inboxEmail": "tracking@orangetsunami.com",
+  "scheduleDesc": "a regular cron schedule",
+
+  "docPath": null,
+  "docSection": null,
+
+  "outputPath": "Trading Analysis/Tracking Loading/agent-prompt.txt",
+
+  "introText": "Your job is to process forwarded supplier shipping confirmations and update OT purchase orders with tracking numbers.",
+
+  "capabilities": [
+    "image-processing"
+  ],
+
+  "capabilityConfig": {
+    "image-processing": {
+      "IMAGE_CONTEXT_DESC": "screenshot shipping confirmations",
+      "IMAGE_EXTRACT_TARGETS": "tracking numbers, carrier, ship date, and MPNs",
+      "IMAGE_EXTRA_CONDITIONS": "- You find a PO/POV reference but NO tracking numbers in the text",
+      "IMAGE_EXTRA_NOTES": "**Important:** Screenshots often contain MPN-to-tracking mappings (e.g., TI shows which parts shipped with which tracking). For multi-line orders, extract BOTH the tracking numbers AND the MPNs from the image to populate the `mpn` field correctly.\n\nThis handles cases like TI, Mouser, DigiKey portal screenshots."
+    }
+  },
+
+  "step3Source": "shared/agent-step3/tracking-loading.md",
+  "step3Title": "Per-message decision tree",
+
+  "summaryPrefix": "TRACKING-AGENT",
+  "summaryCounters": "processed=<N> patch_tracking=<N> needs_review=<N> not_tracking=<N> errors=<N>",
+
+  "transientErrorExamples": "API 5xx, attachment unreadable",
+
+  "decorators": false
+}

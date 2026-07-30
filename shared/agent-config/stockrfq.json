@@ -1,0 +1,50 @@
+{
+  "workflowKey": "stockrfq",
+  "workflowName": "Stock RFQ Loading",
+  "inboxEmail": "stockRFQ@orangetsunami.com",
+  "scheduleDesc": "a 30-minute cron schedule",
+
+  "docPath": "/home/analytics_user/workspace/astute-workinstructions/Trading Analysis/Stock RFQ Loading/stock-rfq-loading.md",
+  "docSection": "Agent operating instructions",
+
+  "outputPath": "Trading Analysis/Stock RFQ Loading/agent-prompt.txt",
+
+  "capabilities": [
+    "image-processing",
+    "approval-reply",
+    "rate-limiting"
+  ],
+
+  "capabilityConfig": {
+    "image-processing": {
+      "IMAGE_CONTEXT_DESC": "screenshot RFQ requests",
+      "IMAGE_EXTRACT_TARGETS": "MPN, qty, MFR, target price"
+    },
+    "approval-reply": {
+      "APPROVAL_DOC_TYPE": "Large Stock RFQ",
+      "APPROVAL_ID_FIELD": "gate_id",
+      "APPROVAL_ID_EXTRACTION_HINT": "the token right after \"Large Stock RFQ \", before the line-count / customer suffix — looks like `m-a3b4c5d6e7` or `h-a3b4c5d6e7`",
+      "APPROVAL_ID_JSON_FIELD": "gate_id",
+      "APPROVAL_APPROVE_ACTION": "approve_large_stock_rfq",
+      "APPROVAL_REJECT_ACTION": "reject_large_stock_rfq",
+      "APPROVAL_MAX_LINES_SUPPORT": false,
+      "APPROVAL_CACHE_ONLY_SUPPORT": false,
+      "APPROVAL_SKIP_FIELDS": "MPN extraction or partner resolution",
+      "APPROVAL_SKIP_REMAINING": true,
+      "APPROVAL_EXTRA_NOTE": "The factory's onApprove will read the sentinel and call writeRFQ — operator does NOT need to re-extract or pass lines."
+    },
+    "rate-limiting": {
+      "RATE_LIMIT_ACTION": "load_rfq"
+    }
+  },
+
+  "step3Source": "shared/agent-step3/stockrfq.md",
+  "step3Title": "Process each message",
+
+  "summaryPrefix": "STOCKRFQ-AGENT",
+  "summaryCounters": "processed=<N> load_rfq=<N> dup_skip=<N> approve_large_stock_rfq=<N> reject_large_stock_rfq=<N> outbound_pending=<N> needs_review=<N> not_rfq=<N> errors=<N>",
+
+  "transientErrorExamples": "writeRFQ 5xx, partner-lookup throws, attachment unreadable",
+
+  "decorators": false
+}

@@ -1,0 +1,45 @@
+{
+  "workflowKey": "broker-offers",
+  "workflowName": "Broker Offers",
+  "inboxEmail": "brokeroffers@orangetsunami.com",
+  "scheduleDesc": "a regular cron schedule",
+
+  "docPath": "/home/analytics_user/workspace/astute-workinstructions/Trading Analysis/Broker Offers/broker-offers.md",
+  "docSection": "Agent Operating Instructions",
+
+  "outputPath": "Trading Analysis/Broker Offers/agent-prompt.txt",
+
+  "capabilities": [
+    "image-processing",
+    "pending-state",
+    "rate-limiting"
+  ],
+
+  "capabilityConfig": {
+    "image-processing": {
+      "IMAGE_CONTEXT_DESC": "screenshot offer sheets",
+      "IMAGE_EXTRACT_TARGETS": "MPN, qty, price, MFR, date code, COO"
+    },
+    "pending-state": {
+      "PENDING_STATE_ACTIONS": "clarify_partner",
+      "PENDING_STATE_RECIPIENT": "Jake",
+      "PENDING_RETRY_CAP_ACTION": "needs_partner",
+      "PENDING_RETRY_CAP_REASON": "clarify_partner round-tripped 2x; operator replies haven't resolved the partner — manual triage needed"
+    },
+    "rate-limiting": {
+      "RATE_LIMIT_ACTION": "load_offer"
+    }
+  },
+
+  "step3Source": "shared/agent-step3/broker-offers.md",
+  "step3Title": "Per-message decision tree",
+
+  "summaryPrefix": "BROKEROFFERS-AGENT",
+  "summaryCounters": "processed=<N> load_offer=<N> clarify_partner=<N> needs_partner=<N> needs_review=<N> not_offer=<N> dup_skip=<N> drop_pending=<N> errors=<N>",
+
+  "transientErrorExamples": "writeOffer 5xx, partner lookup throws",
+
+  "decorators": false,
+
+  "notificationPolicy": "All notifications go to Jake (jake.harris@Astutegroup.com) + internal Astute CC'd parties. NEVER send notifications to external brokers/franchises. clarify_partner → emails Jake only (Reply-To: brokeroffers@ for sidecar round-trip). load_offer confirmation → internal parties only; excludes external sender."
+}

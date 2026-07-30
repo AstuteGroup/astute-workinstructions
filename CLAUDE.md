@@ -317,6 +317,7 @@ See `shared/data-model.md` § Time-Zone Convention for the full rationale.
 7. **Cron drift check** — run `scripts/check-cron-drift.js`
 8. **Hung job check** — run `scripts/check-hung-jobs.js --quiet` (added 2026-07-07)
 9. **Workflow parity check** — run `scripts/check-workflow-parity.js --quiet`
+10. **Agent prompt parity check** — run `scripts/check-agent-prompt-parity.js --quiet`
 
 ---
 

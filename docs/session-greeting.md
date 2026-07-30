@@ -139,6 +139,27 @@ Full report any time via `node ~/workspace/astute-workinstructions/scripts/check
 
 ---
 
+## 10. Agent Prompt Parity Check
+
+Run `node ~/workspace/astute-workinstructions/scripts/check-agent-prompt-parity.js --quiet`. If it exits non-zero (drift between the template/config sources and the generated `agent-prompt.txt` files), surface the output at the top of the greeting under **Agent prompt drift detected:** — this means a template, capability, or step3 file was edited but the prompts weren't regenerated.
+
+If exit 0 (all prompts in sync), do not mention it.
+
+To fix drift:
+```bash
+node ~/workspace/astute-workinstructions/scripts/generate-agent-prompts.js --apply
+```
+
+The agent prompts are generated from:
+- `shared/agent-prompt-template.md` — base structure (STEPs 0, 1, 2, 4)
+- `shared/agent-config/<workflow>.json` — per-workflow configuration
+- `shared/agent-capabilities/*.md` — reusable capability fragments (image-processing, pending-state, etc.)
+- `shared/agent-step3/<workflow>.md` — workflow-specific STEP 3 decision logic
+
+See the generated header in any `agent-prompt.txt` for modification instructions.
+
+---
+
 ## Bucket A Note
 
 Rate-limited API retries live separately in `~/workspace/.deferred-api-queue.json` and run via the worker `~/workspace/scripts/process-api-queue.js` on cron (`*/30 * * * *`, installed 2026-04-08).

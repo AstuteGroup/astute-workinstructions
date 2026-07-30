@@ -1,0 +1,56 @@
+{
+  "workflowKey": "excess",
+  "workflowName": "Customer Excess Analysis",
+  "inboxEmail": "excess@orangetsunami.com",
+  "scheduleDesc": "a 30-minute cron schedule",
+
+  "docPath": "/home/analytics_user/workspace/astute-workinstructions/Trading Analysis/Customer Excess Analysis/customer-excess-analysis.md",
+  "docSection": "Agent operating instructions",
+
+  "outputPath": "Trading Analysis/Customer Excess Analysis/agent-prompt.txt",
+
+  "capabilities": [
+    "image-processing",
+    "pending-state",
+    "approval-reply",
+    "rate-limiting"
+  ],
+
+  "capabilityConfig": {
+    "image-processing": {
+      "IMAGE_CONTEXT_DESC": "screenshot excess lists",
+      "IMAGE_EXTRACT_TARGETS": "MPN, qty, price, MFR, date code"
+    },
+    "pending-state": {
+      "PENDING_STATE_ACTIONS": "clarify_partner / needs_partner",
+      "PENDING_STATE_RECIPIENT": "Jake",
+      "PENDING_RETRY_CAP_ACTION": "needs_partner",
+      "PENDING_RETRY_CAP_REASON": "clarify_partner round-tripped 2x; operator replies haven't resolved the partner — manual triage needed"
+    },
+    "approval-reply": {
+      "APPROVAL_DOC_TYPE": "Large Offer",
+      "APPROVAL_ID_FIELD": "searchKey",
+      "APPROVAL_ID_EXTRACTION_HINT": "the token right after \"Large Offer \"",
+      "APPROVAL_ID_JSON_FIELD": "offer_search_key",
+      "APPROVAL_APPROVE_ACTION": "approve_large_offer",
+      "APPROVAL_REJECT_ACTION": "reject_large_offer",
+      "APPROVAL_MAX_LINES_SUPPORT": true,
+      "APPROVAL_CACHE_ONLY_SUPPORT": false,
+      "APPROVAL_SKIP_FIELDS": "partner resolution or line extraction",
+      "APPROVAL_SKIP_REMAINING": true
+    },
+    "rate-limiting": {
+      "RATE_LIMIT_ACTION": "load_offer"
+    }
+  },
+
+  "step3Source": "shared/agent-step3/excess.md",
+  "step3Title": "Process each message",
+
+  "summaryPrefix": "EXCESS-AGENT",
+  "summaryCounters": "processed=<N> load_offer=<N> clarify_partner=<N> approve_large_offer=<N> reject_large_offer=<N> needs_partner=<N> needs_review=<N> not_offer=<N> dup_skip=<N> errors=<N>",
+
+  "transientErrorExamples": "writeOffer 5xx, partner-lookup throws, attachment unreadable",
+
+  "decorators": false
+}

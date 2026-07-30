@@ -1,0 +1,63 @@
+{
+  "workflowKey": "vq-loading",
+  "workflowName": "VQ Loading",
+  "inboxEmail": "vq@orangetsunami.com",
+  "scheduleDesc": "a tiered cron schedule (5m burst / 15m steady)",
+
+  "docPath": "/home/analytics_user/workspace/astute-workinstructions/Trading Analysis/RFQ Sourcing/vq_loading/vq-loading.md",
+  "docSection": "End-to-End Workflow",
+
+  "outputPath": "Trading Analysis/RFQ Sourcing/vq_loading/agent-prompt.txt",
+
+  "introText": "Your job is to read each unseen supplier-quote email, extract the quote data with the same care a senior operator would in a terminal session, and load the resulting VQs to OT — or route to the right folder when you can't.\n\nThe quality bar is the terminal Claude session that loaded RFQ 1132932 (vq@/Processed UID 8372 — 73 VQs from a 7-image APAC bulk summary). Match it.",
+
+  "sectionsToKnow": [
+    "**Email Types** (Type 1 single-vendor vs Type 2 bulk-summary — different Buyer field rules)",
+    "**Field Reference (VQ Mass Upload Template)** — required vs optional fields",
+    "**Packaging Field Values** (UPPERCASE lookup — `REEL` not `Reel`, `F-TUBE` not `TUBE`, `BULK` not `EACH`)",
+    "**RoHS Field Values** (`Yes` / `No` / `Not Applicable` / blank — not `Y`/`N`)",
+    "**COO vs Shipping Terms** (`EXW Israel` is NOT a COO — it's a pickup location)",
+    "**Alternate MPN handling** (vendor's MPN goes in `vendorNotes` first; the `mpn` field carries the customer's RFQ MPN — iDempiere will reject the line otherwise)",
+    "**Vendor Matching Strategy** (domain-based, not exact email; active vendors only)"
+  ],
+
+  "capabilities": [
+    "image-processing",
+    "pending-state",
+    "rate-limiting"
+  ],
+
+  "capabilityConfig": {
+    "image-processing": {
+      "IMAGE_CONTEXT_DESC": "screenshot quotes from APAC brokers",
+      "IMAGE_EXTRACT_TARGETS": "MPN, qty, price, date code, COO, vendor info",
+      "IMAGE_EXTRA_NOTES": "The `--include-images` flag is REQUIRED for VQ — APAC brokers paste quote screenshots inline as PNGs. Prioritize images larger than ~10KB — small ones (1-6KB) are usually signature/logo noise. The 1132932 calibration email had image006.png (127KB) and image007.png (131KB) as the actual quote tables."
+    },
+    "pending-state": {
+      "PENDING_STATE_ACTIONS": "need_info_vendor / clarify_vendor / needs_vendor / partial_clarify / needs_review_bounce",
+      "PENDING_STATE_RECIPIENT": "Jake",
+      "PENDING_DROP_EXTRA_WORDS": "CANCEL / \"not a quote\"",
+      "PENDING_DROP_SUFFIX": "pending",
+      "PENDING_RETRY_CAP_ACTION": "needs_review",
+      "PENDING_RETRY_CAP_REASON": "stitch retry cap reached"
+    },
+    "rate-limiting": {
+      "RATE_LIMIT_ACTION": "load_vq"
+    }
+  },
+
+  "step3Source": "shared/agent-step3/vq-loading.md",
+  "step3Title": "Per-message decision tree",
+
+  "summaryPrefix": "VQ-LOADING-AGENT",
+  "summaryCounters": "processed=<N> load_vq=<N> rfqs_written=<N> vqs_written=<N> vqs_skipped=<N> vqs_failed=<N> forward_to_rfq_loading=<N> need_info_vendor=<N> clarify_vendor=<N> needs_vendor=<N> needs_review=<N> no_bid=<N> not_vq=<N> dup_skip=<N> outbound_pending=<N> errors=<N>",
+
+  "transientErrorExamples": "loadBulkSummary throws, attachment unreadable, vendor lookup 5xx",
+
+  "decorators": true,
+
+  "knownLimitations": [
+    "**no_bid currently breadcrumb-only.** shared/vq-writer.js filters `cost > 0 && qty > 0` so a 0/0 VQ row would be silently dropped. The no_bid action records the decision in the breadcrumb but does NOT write a \"we asked, declined\" VQ row. Deferred: writer needs a `noBid: true` opt that bypasses the cost/qty filter.",
+    "**Type 1 template engine NOT wired into the agent.** vq-parser/templates/*.js (velocity, chip1, j2-sourcing, semitech, akira-global, atlantic-semi) do template-based extraction for known vendor formats. Today the agent does LLM extraction for every Type 1 email. Templates would be faster for the 5-10% high-volume vendors — deferred to a follow-up where templates become a tool the agent calls by sender domain."
+  ]
+}
