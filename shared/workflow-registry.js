@@ -448,8 +448,9 @@ module.exports = {
     sourceFolder: 'INBOX',
     cron: { name: 'lam-kitting-agent' },
     actions: [
-      'approve_price', 'approve_leadtime', 'approve_flagged', 'skip_flagged',
-      'add_award', 'reject', 'need_info', 'needs_review', 'not_approval',
+      'request_report',
+      'approve_prices', 'approve_price', 'approve_leadtime', 'approve_flagged', 'skip_flagged',
+      'add_awards', 'add_award', 'reject', 'need_info', 'needs_review', 'not_approval',
     ],
     capabilities: {
       replyStitching: true,

@@ -211,6 +211,37 @@ function applyRowShading(excelRow, headers) {
       cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFF2CC' } };
     }
   }
+
+  // Last Updated column: color-code based on recency
+  //   - Green:  updated within 10 days
+  //   - Yellow: updated 11-29 days ago
+  //   - Red:    30+ days ago OR blank
+  const lastUpdatedCol = headers.indexOf('Last Updated') + 1;
+  if (lastUpdatedCol > 0) {
+    const cell = excelRow.getCell(lastUpdatedCol);
+    const dateVal = cell.value;
+    let daysSince = null;
+
+    if (dateVal) {
+      // Parse the date — could be string like '2026-07-30' or Date object
+      const d = typeof dateVal === 'string' ? new Date(dateVal) : dateVal;
+      if (!isNaN(d.getTime())) {
+        const now = new Date();
+        daysSince = Math.floor((now - d) / (1000 * 60 * 60 * 24));
+      }
+    }
+
+    if (daysSince !== null && daysSince <= 10) {
+      // Green — recent
+      cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFC6EFCE' } };
+    } else if (daysSince !== null && daysSince <= 29) {
+      // Yellow — moderate staleness
+      cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFEB9C' } };
+    } else {
+      // Red — stale (30+ days) or blank/unparseable
+      cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFCCCC' } };
+    }
+  }
 }
 
 // Apply column widths + number formats to a worksheet given its headers array.

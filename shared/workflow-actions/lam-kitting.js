@@ -2011,6 +2011,128 @@ async function action_not_approval(payload, ctx) {
   return { reason: payload.reason || 'not-approval-email' };
 }
 
+/**
+ * Request Report — run the LAM reorder pipeline on-demand and email back the report.
+ *
+ * Triggered when someone emails lamkitting@ requesting the reorder report.
+ * Runs the full lam-kitting-runner.js pipeline and sends the sourced xlsx.
+ *
+ * Optional payload: { sendTo } - override recipient (defaults to requester + Jake)
+ */
+async function action_request_report(payload, ctx) {
+  const { execSync } = require('child_process');
+  const requester = ctx.currentFrom || ctx.jakeEmail;
+  const sendTo = payload.sendTo || requester;
+
+  if (ctx.dryRun) {
+    return { dry_run: true, would_send_to: sendTo };
+  }
+
+  ctx.log(`Running LAM reorder pipeline on-demand for ${requester}...`);
+
+  // Run the runner script
+  const runnerPath = path.join(ASTUTE, 'Trading Analysis/LAM 3PL/lam-kitting-runner.js');
+  const dateStr = new Date().toISOString().split('T')[0];
+
+  let runnerOutput = '';
+  let runnerError = null;
+  try {
+    runnerOutput = execSync(`node "${runnerPath}"`, {
+      encoding: 'utf-8',
+      timeout: 1800000,  // 30 minutes max
+      cwd: path.dirname(runnerPath),
+    });
+    ctx.log('  Runner completed successfully');
+  } catch (err) {
+    runnerError = err.message;
+    runnerOutput = (err.stdout || '') + '\n' + (err.stderr || '');
+    ctx.log(`  Runner failed: ${err.message}`);
+  }
+
+  // Find the output file (sourced xlsx with RFQ in name, or fallback to plain sourced)
+  const outputDir = path.join(ASTUTE, 'Trading Analysis/LAM 3PL/output');
+  let attachmentPath = null;
+  let attachmentName = null;
+
+  if (fs.existsSync(outputDir)) {
+    const files = fs.readdirSync(outputDir);
+    // Prefer today's sourced xlsx with RFQ number
+    const todayRfqXlsx = files.find(f => f.includes(dateStr) && f.includes('_RFQ') && f.endsWith('_sourced.xlsx'));
+    const todayXlsx = files.find(f => f.includes(dateStr) && f.endsWith('_sourced.xlsx'));
+    const todayCsv = files.find(f => f.includes(dateStr) && f.endsWith('_sourced.csv'));
+    const todayAlerts = files.find(f => f.includes(dateStr) && f.startsWith('LAM_Reorder_Alerts') && f.endsWith('.csv'));
+
+    if (todayRfqXlsx) {
+      attachmentPath = path.join(outputDir, todayRfqXlsx);
+      attachmentName = todayRfqXlsx;
+    } else if (todayXlsx) {
+      attachmentPath = path.join(outputDir, todayXlsx);
+      attachmentName = todayXlsx;
+    } else if (todayCsv) {
+      attachmentPath = path.join(outputDir, todayCsv);
+      attachmentName = todayCsv;
+    } else if (todayAlerts) {
+      attachmentPath = path.join(outputDir, todayAlerts);
+      attachmentName = todayAlerts;
+    }
+  }
+
+  // Build email
+  const subject = runnerError
+    ? `❌ LAM 3PL Reorder Report - FAILED ${dateStr}`
+    : `LAM 3PL Reorder Report (On-Demand) ${dateStr}`;
+
+  let body = `LAM 3PL Reorder Report - On-Demand Request\n`;
+  body += `Requested by: ${requester}\n`;
+  body += `Generated: ${new Date().toLocaleString('en-US', { timeZone: 'America/Chicago' })} CT\n\n`;
+
+  if (runnerError) {
+    body += `❌ The runner encountered an error:\n${runnerError}\n\n`;
+    body += `Check the logs for details.\n`;
+  } else {
+    body += `✅ Report generated successfully.\n\n`;
+    if (attachmentPath) {
+      body += `Attached: ${attachmentName}\n`;
+    } else {
+      body += `⚠️ No output file found for today. Check the runner logs.\n`;
+    }
+  }
+
+  // Send to requester (and CC Jake if different)
+  const recipients = sendTo;
+  const ccList = sendTo.toLowerCase() !== ctx.jakeEmail.toLowerCase() ? ctx.jakeEmail : null;
+
+  if (attachmentPath && fs.existsSync(attachmentPath)) {
+    await ctx.notifier.sendWithAttachment(
+      recipients,
+      subject,
+      body,
+      [{ filename: attachmentName, path: attachmentPath }],
+      { cc: ccList, replyTo: ctx.inbox }
+    );
+  } else {
+    await sendEmailOrThrow(ctx.notifier, recipients, subject, body, { cc: ccList, replyTo: ctx.inbox });
+  }
+
+  // Breadcrumb
+  breadcrumbs.write({
+    cog: 'lam-kitting-agent',
+    event: 'request-report',
+    uid: ctx.uid,
+    requester,
+    success: !runnerError,
+    attachment: attachmentName || null,
+  });
+
+  return {
+    success: !runnerError,
+    sentTo: recipients,
+    cc: ccList,
+    attachment: attachmentName,
+    error: runnerError,
+  };
+}
+
 // ─── DISCREPANCY DETECTION ───────────────────────────────────────────────────
 
 /**
@@ -2631,6 +2753,11 @@ module.exports = {
       folder: 'NotApproval',
       requires: ['reason'],
       handler: action_not_approval,
+    },
+    request_report: {
+      folder: 'Processed',
+      requires: [],
+      handler: action_request_report,
     },
   },
   // Export for reorder workflow visibility

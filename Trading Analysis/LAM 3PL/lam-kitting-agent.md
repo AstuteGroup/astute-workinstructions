@@ -46,6 +46,7 @@ This workflow uses a hybrid approval pattern:
 
 | Type | Description | Action | Auto-Apply? |
 |------|-------------|--------|-------------|
+| **Report request** | Request the reorder report on-demand | `request_report` | Yes (runs pipeline, emails report) |
 | **Price approvals (batch)** | LAM approves multiple CPCs | `approve_prices` | Yes (ONE email) |
 | **Price approval** | LAM approves proposed resale price | `approve_price` | Yes |
 | **Lead time approval** | LAM approves contractual lead time | `approve_leadtime` | Yes |
@@ -54,6 +55,29 @@ This workflow uses a hybrid approval pattern:
 | **New award** | LAM adds new CPC to contract | `add_award` | Yes (after MFR validation) |
 | **Rejection** | LAM rejects proposal | `reject` | N/A |
 | **Flagged item reply** | Operator approves/skips flagged item | `approve_flagged` / `skip_flagged` | Per operator |
+
+---
+
+## Report Request
+
+**Trigger phrases** — route to `request_report` when the email contains:
+- "send report", "send the report", "send me the report"
+- "reorder report", "reorder alerts"
+- "run the report", "generate report"
+- "LAM report", "kitting report"
+- Subject contains "report" and is clearly a request (not forwarding an existing report)
+
+**What happens:**
+1. Runs the full `lam-kitting-runner.js` pipeline (reorder detection → franchise sourcing → RFQ/VQ write)
+2. Finds today's sourced xlsx output
+3. Emails it back to the requester (CC's Jake if requester is different)
+
+**Payload:** `{}` (no required fields)
+
+**Example routing:**
+```bash
+node shared/email-workflow-poller.js route <uid> request_report --workflow lam-kitting --payload '{}'
+```
 
 ---
 
