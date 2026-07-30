@@ -53,6 +53,7 @@ const {
   loadAVL,
 } = require(path.join(ASTUTE, 'Trading Analysis/LAM 3PL/lam-kitting-reorder.js'));
 const { normalizeMPN } = require(path.join(ASTUTE, 'shared/mpn-normalization'));
+const { loadCachedInventory, getCacheStatus } = require(path.join(ASTUTE, 'shared/inventory-fetch-and-parse'));
 
 // ─── EMAIL HELPER ───────────────────────────────────────────────────────────────
 
@@ -1009,34 +1010,51 @@ async function action_add_awards(payload, ctx) {
   const outputDir = path.join(LAM_DIR, 'output');
   const today = new Date().toISOString().slice(0, 10);
 
-  // Find the latest inventory folder (same logic as lam-kitting-runner.js)
-  let inventoryFolder = path.join('/tmp', `Inventory ${today}`);
-  if (!fs.existsSync(inventoryFolder)) {
-    // Try yesterday
-    const yesterday = new Date(Date.now() - 86400000).toISOString().slice(0, 10);
-    inventoryFolder = path.join('/tmp', `Inventory ${yesterday}`);
-  }
-
-  // Load inventory data
+  // Load inventory from cache (decoupled architecture - see inventory-fetch-and-parse.js)
   let aggregatedInventory = {};
   let avlByCpc = new Map();
-  if (fs.existsSync(inventoryFolder)) {
-    console.log(`  Loading inventory from ${inventoryFolder}...`);
-    const w111Path = path.join(inventoryFolder, W111_FILENAME);
-    const w115Path = path.join(inventoryFolder, W115_FILENAME);
 
-    if (fs.existsSync(w111Path) || fs.existsSync(w115Path)) {
-      const w111Inventory = fs.existsSync(w111Path) ? loadChuboeInventory(w111Path, 'W111') : {};
-      const w115Inventory = fs.existsSync(w115Path) ? loadChuboeInventory(w115Path, 'W115') : {};
-      aggregatedInventory = aggregateInventory(w111Inventory, w115Inventory);
-      console.log(`    Loaded ${Object.keys(aggregatedInventory).length} MPNs from inventory`);
+  const cacheStatus = getCacheStatus();
+  const cacheData = loadCachedInventory({ allowStale: true });
 
-      // Load AVL for multi-MPN aggregation
-      avlByCpc = loadAVL();
-      console.log(`    Loaded AVL with ${avlByCpc.size} CPCs`);
+  if (cacheData && cacheData.byWarehouse) {
+    const weekOf = cacheData.metadata?.weekOf || 'unknown';
+    const cacheAge = cacheStatus.cacheAge || 'unknown';
+    console.log(`  Loading inventory from cache (week of ${weekOf}, ${cacheAge} days old)...`);
+
+    // Extract W111 and W115 data from cache
+    const w111Rows = cacheData.byWarehouse['W111'] || [];
+    const w115Rows = cacheData.byWarehouse['W115'] || [];
+
+    // Convert cache rows to the aggregatedInventory format expected by downstream code
+    // Cache rows have: { mpn, mfr, qty, lot, location, dateCode, unitCost, warehouse, ... }
+    for (const row of w111Rows) {
+      const mpn = row.mpn || '';
+      const key = normalizeMPN(mpn);
+      if (!aggregatedInventory[mpn]) {
+        aggregatedInventory[mpn] = { W111_Qty: 0, W115_Qty: 0, Total_Qty: 0 };
+      }
+      aggregatedInventory[mpn].W111_Qty += (row.qty || 0);
+      aggregatedInventory[mpn].Total_Qty += (row.qty || 0);
     }
+    for (const row of w115Rows) {
+      const mpn = row.mpn || '';
+      const key = normalizeMPN(mpn);
+      if (!aggregatedInventory[mpn]) {
+        aggregatedInventory[mpn] = { W111_Qty: 0, W115_Qty: 0, Total_Qty: 0 };
+      }
+      aggregatedInventory[mpn].W115_Qty += (row.qty || 0);
+      aggregatedInventory[mpn].Total_Qty += (row.qty || 0);
+    }
+
+    console.log(`    Loaded ${Object.keys(aggregatedInventory).length} MPNs from inventory (W111: ${w111Rows.length} rows, W115: ${w115Rows.length} rows)`);
+
+    // Load AVL for multi-MPN aggregation
+    avlByCpc = loadAVL();
+    console.log(`    Loaded AVL with ${avlByCpc.size} CPCs`);
   } else {
-    console.log('  WARNING: No inventory folder found - assuming all parts need ordering');
+    console.log('  WARNING: No inventory cache found - assuming all parts need ordering');
+    console.log('    Run inventory-fetch-and-parse.js to populate the cache');
   }
 
   // Helper: Get total inventory for a CPC (aggregates across all AVL MPNs)

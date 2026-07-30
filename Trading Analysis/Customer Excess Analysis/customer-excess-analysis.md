@@ -44,6 +44,9 @@ node shared/email-workflow-poller.js route <uid> <action> --workflow excess --pa
 
 For each unseen message, the agent decides **one** routing action. Order of checks:
 
+0. **Other-workflow emails** → **skip entirely (do not process, leave unseen)**
+   - Subject matches `Task finished: [success] * AST Item Lots Report` (Infor inventory report — belongs to `inventory-fetch-and-parse` workflow, not excess). Leave in INBOX for that workflow to pick up on Monday.
+
 1. **Junk / automation noise** → `not_offer`
    - Subject matches `Upload MO_*` (sender confirmation, no offer data)
    - Subject matches OOO / auto-reply / undeliverable / bounce / read-receipt / newsletter

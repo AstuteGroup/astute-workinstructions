@@ -715,6 +715,8 @@ async function main() {
     }
 
     inventorySource = 'cache';
+    // Store cache info for email reporting
+    inventoryFolder = `cache (week of ${cacheStatus.weekOf}, ${cacheStatus.cacheAge} days old)`;
   }
 
   // Step 2: Verify Master Roster exists
@@ -1052,9 +1054,9 @@ ${totalAlerts} items below threshold:
 - PENDING RECEIPT (POV stamped, waiting on vendor): ${pendingReceiptCount}
 
 Attached: ${attachmentLabel}
-Inventory source: ${inventorySource === 'xlsx' ? path.basename(xlsxPath) : inventoryFolder}
-  ${inventorySource === 'xlsx' ? `xlsx modified: ${fs.existsSync(xlsxPath) ? new Date(fs.statSync(xlsxPath).mtime).toISOString() : 'NOT FOUND'}` : `W111 file: ${w111File && fs.existsSync(w111File) ? new Date(fs.statSync(w111File).mtime).toISOString() : 'NOT FOUND'}`}
-  ${inventorySource === 'xlsx' ? '' : `W115 file: ${fs.existsSync(path.join(inventoryFolder, 'W115_LAM_Dead_Inventory.csv')) ? new Date(fs.statSync(path.join(inventoryFolder, 'W115_LAM_Dead_Inventory.csv')).mtime).toISOString() : 'NOT FOUND'}`}
+Inventory source: ${inventorySource === 'xlsx' ? path.basename(xlsxPath) : inventorySource === 'cache' ? inventoryFolder : inventoryFolder}
+  ${inventorySource === 'xlsx' ? `xlsx modified: ${fs.existsSync(xlsxPath) ? new Date(fs.statSync(xlsxPath).mtime).toISOString() : 'NOT FOUND'}` : inventorySource === 'cache' ? '' : `W111 file: ${w111File && fs.existsSync(w111File) ? new Date(fs.statSync(w111File).mtime).toISOString() : 'NOT FOUND'}`}
+  ${inventorySource === 'xlsx' || inventorySource === 'cache' ? '' : `W115 file: ${fs.existsSync(path.join(inventoryFolder, 'W115_LAM_Dead_Inventory.csv')) ? new Date(fs.statSync(path.join(inventoryFolder, 'W115_LAM_Dead_Inventory.csv')).mtime).toISOString() : 'NOT FOUND'}`}
 Kitting DB: ${path.basename(excelFile)}`;
 
   // Roster health check (warns on data quality issues)

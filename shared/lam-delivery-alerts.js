@@ -31,6 +31,8 @@ const fs = require('fs');
 const XLSX = require('xlsx');
 const { Pool } = require('pg');
 
+const { loadCachedInventory, getCacheStatus } = require('./inventory-fetch-and-parse');
+
 const pool = new Pool({
   host: '/var/run/postgresql',
   database: process.env.PGDATABASE || 'idempiere_replica',
@@ -45,7 +47,42 @@ const INVENTORY_STORAGE = '/home/analytics_user/workspace/.inventory-storage';
 const LAM_RESEARCH_BP_ID = 1000730;
 
 /**
- * Find the latest inventory folder
+ * Load inventory from cache (primary) or fall back to CSVs
+ * NOTE: Main flow uses ot-inventory-reader; this is for fallback/legacy use
+ */
+function loadInventoryFromCache() {
+  const cacheData = loadCachedInventory({ allowStale: true });
+  if (cacheData && cacheData.byWarehouse) {
+    const cacheStatus = getCacheStatus();
+    const weekOf = cacheData.metadata?.weekOf || 'unknown';
+    console.log(`  Using inventory cache (week of ${weekOf}, ${cacheStatus.cacheAge || 0} days old)`);
+
+    const byMPN = new Map();
+    const w111Rows = cacheData.byWarehouse['W111'] || [];
+    const w115Rows = cacheData.byWarehouse['W115'] || [];
+
+    for (const row of [...w111Rows, ...w115Rows]) {
+      const mpn = (row.mpn || '').toString().trim();
+      if (!mpn) continue;
+
+      const mpnKey = mpn.toUpperCase();
+      const qty = parseFloat(row.qty || 0);
+      const warehouse = row.warehouse || 'W111';
+
+      if (byMPN.has(mpnKey)) {
+        byMPN.get(mpnKey).qty += qty;
+      } else {
+        byMPN.set(mpnKey, { mpn, qty, warehouse });
+      }
+    }
+
+    return byMPN;
+  }
+  return null;
+}
+
+/**
+ * Find the latest inventory folder (legacy fallback)
  */
 function findLatestInventoryFolder() {
   if (fs.existsSync(INVENTORY_STORAGE)) {
@@ -61,9 +98,15 @@ function findLatestInventoryFolder() {
 }
 
 /**
- * Load inventory from W111/W115 CSVs to check receipt status
+ * Load inventory from W111/W115 CSVs (legacy fallback)
+ * Primary: Use loadInventoryFromCache() instead
  */
 function loadInventoryData(inventoryFolder) {
+  // Try cache first
+  const cacheResult = loadInventoryFromCache();
+  if (cacheResult) return cacheResult;
+
+  // Fall back to CSV folder
   if (!inventoryFolder) return null;
 
   let readCSVFile;

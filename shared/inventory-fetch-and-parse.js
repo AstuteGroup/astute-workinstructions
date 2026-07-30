@@ -153,8 +153,8 @@ async function fetchFromEmail() {
     console.log(`Looking for: ${EMAIL_SUBJECT_PATTERN}`);
     console.log('-'.repeat(60));
 
-    // Step 1: Sort inbox - move inventory emails to Inventory Reports folder
-    console.log('\nStep 1: Sorting inbox...');
+    // Step 1a: Sort inbox - move inventory emails to Inventory Reports folder
+    console.log('\nStep 1a: Sorting inbox...');
     const inboxEmails = await listEmails('INBOX');
     const inventoryInInbox = inboxEmails.filter(e => EMAIL_SUBJECT_PATTERN.test(e.subject));
     if (inventoryInInbox.length > 0) {
@@ -165,6 +165,24 @@ async function fetchFromEmail() {
         console.log('  Moved to Inventory Reports folder');
     } else {
         console.log('  No new inventory emails in INBOX');
+    }
+
+    // Step 1b: Recover any inventory emails misrouted to NotOffer by the offer-poller
+    console.log('\nStep 1b: Checking NotOffer for misrouted inventory emails...');
+    try {
+        const notOfferEmails = await listEmails('NotOffer');
+        const inventoryInNotOffer = notOfferEmails.filter(e => EMAIL_SUBJECT_PATTERN.test(e.subject));
+        if (inventoryInNotOffer.length > 0) {
+            console.log(`  Found ${inventoryInNotOffer.length} inventory email(s) in NotOffer — recovering`);
+            for (const e of inventoryInNotOffer) {
+                await moveEmail(e.id, 'Inventory Reports', 'NotOffer');
+            }
+            console.log('  Moved to Inventory Reports folder');
+        } else {
+            console.log('  No inventory emails in NotOffer');
+        }
+    } catch (err) {
+        console.log(`  Warning: Could not check NotOffer: ${err.message}`);
     }
 
     // Step 2: Check Inventory Reports folder

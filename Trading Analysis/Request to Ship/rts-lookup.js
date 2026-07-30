@@ -32,6 +32,7 @@ const { execSync } = require('child_process');
 const fs = require('fs');
 const path = require('path');
 const { readCSVFile } = require('../../shared/csv-utils');
+const { loadCachedInventory, getCacheStatus } = require('../../shared/inventory-fetch-and-parse');
 
 // ─── helpers ───────────────────────────────────────────────────────────────────
 
@@ -320,8 +321,32 @@ function findRequestByMPN(mpn) {
 
 // ─── Step 6: Find lots in inventory file ───────────────────────────────────────
 
+// Cache the loaded inventory data to avoid re-reading on each call
+let _cachedInventoryData = null;
+let _cachedInventorySource = null;
+
+function loadInventoryCache() {
+  if (_cachedInventoryData) return _cachedInventoryData;
+
+  const cacheData = loadCachedInventory({ allowStale: true });
+  if (cacheData && cacheData.allRows) {
+    const cacheStatus = getCacheStatus();
+    const weekOf = cacheData.metadata?.weekOf || 'unknown';
+    console.log(`  [inventory] Using cache (week of ${weekOf}, ${cacheStatus.cacheAge || 0} days old)`);
+    _cachedInventoryData = cacheData;
+    _cachedInventorySource = 'cache';
+    return cacheData;
+  }
+  return null;
+}
+
 function findLatestInventoryFile() {
-  // Look for /tmp/Inventory YYYY-MM-DD/ directories, pick newest
+  // Try cache first
+  if (loadInventoryCache()) {
+    return 'CACHE';  // Marker to use cache in findLotsForMPN
+  }
+
+  // Fall back to /tmp/Inventory YYYY-MM-DD/ directories
   const tmpFiles = execSync('ls -d /tmp/Inventory\\ 20* 2>/dev/null || true', {
     encoding: 'utf8',
   }).trim();
@@ -337,11 +362,37 @@ function findLatestInventoryFile() {
   }).trim();
 
   if (!files) return null;
+  _cachedInventorySource = 'csv';
   return files.split('\n')[0];
 }
 
 function findLotsForMPN(inventoryFile, mpn) {
-  if (!inventoryFile || !mpn) return [];
+  if (!mpn) return [];
+
+  const mpnClean = mpn.trim().toUpperCase();
+
+  // Use cache if available
+  if (inventoryFile === 'CACHE' || _cachedInventorySource === 'cache') {
+    const cacheData = loadInventoryCache();
+    if (cacheData && cacheData.allRows) {
+      return cacheData.allRows
+        .filter(row => (row.mpn || '').trim().toUpperCase() === mpnClean)
+        .map(row => ({
+          item: row.mpn,
+          lot: row.lot,
+          location: row.location,
+          lotQty: row.qty,
+          warehouse: row.warehouse,
+          warehouseName: row.warehouseName || row.warehouse,
+          dateCode: row.dateCode,
+          lotCost: row.lotCost,
+          lotUnitCost: row.unitCost,
+        }));
+    }
+  }
+
+  // Fall back to CSV file
+  if (!inventoryFile || inventoryFile === 'CACHE') return [];
 
   const csv = readCSVFile(inventoryFile);
   const itemIdx = csv.headers.indexOf('Item');
@@ -353,8 +404,6 @@ function findLotsForMPN(inventoryFile, mpn) {
   const dateCodeIdx = csv.headers.indexOf('Date Code');
   const lotCostIdx = csv.headers.indexOf('Lot Cost');
   const lotUnitCostIdx = csv.headers.indexOf('Lot Unit Cost');
-
-  const mpnClean = mpn.trim().toUpperCase();
 
   return csv.rows
     .filter(row => {

@@ -40,6 +40,7 @@ For every UID returned, follow the per-message decision tree:
 
   - Otherwise (no pending_state, not an approval reply — normal offer flow):
       * If has_attachment is true, run `download-attachments <uid> --workflow excess` and Read the xlsx/csv/pdf attachments. Prefer xlsx > csv > pdf.
+      * **SKIP inventory emails entirely:** If subject matches `Task finished: [success] * AST Item Lots Report`, do NOT process this message — skip to the next UID. Leave it unseen in INBOX for the `inventory-fetch-and-parse` workflow.
       * Apply junk filter (Upload MO_*, OOO, bounces, signature-only) → not_offer.
       * Apply partner resolution (subject hint > body hint > forward chain > external sender), excluding IsEmployee BPs.
       * Extract lines from attachment + body. Filter URL-fragment "MPNs".

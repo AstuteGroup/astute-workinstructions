@@ -23,6 +23,7 @@ const fs = require('fs');
 const XLSX = require('xlsx');
 const { Pool } = require('pg');
 const { readCSVFile } = require('./csv-utils');
+const { loadCachedInventory, getCacheStatus } = require('./inventory-fetch-and-parse');
 
 const pool = new Pool({
   host: '/var/run/postgresql',
@@ -106,7 +107,57 @@ function loadMasterRoster() {
 }
 
 /**
- * Load inventory from weekly Infor CSVs
+ * Load inventory from cache (preferred) or fall back to CSVs
+ */
+function loadInventoryData() {
+  // Try cache first (decoupled architecture)
+  const cacheData = loadCachedInventory({ allowStale: true });
+  if (cacheData && cacheData.byWarehouse) {
+    const cacheStatus = getCacheStatus();
+    const weekOf = cacheData.metadata?.weekOf || 'unknown';
+    console.log(`  Using inventory cache (week of ${weekOf}, ${cacheStatus.cacheAge || 0} days old)`);
+
+    const byMPN = new Map();
+    const w111Rows = cacheData.byWarehouse['W111'] || [];
+    const w115Rows = cacheData.byWarehouse['W115'] || [];
+
+    for (const row of [...w111Rows, ...w115Rows]) {
+      const mpn = (row.mpn || '').toString().trim();
+      if (!mpn) continue;
+
+      const mpnKey = mpn.toUpperCase();
+      const qty = parseFloat(row.qty || 0);
+      const warehouse = row.warehouse || 'W111';
+
+      if (byMPN.has(mpnKey)) {
+        const existing = byMPN.get(mpnKey);
+        existing.totalQty += qty;
+        existing.lots.push({ warehouse, qty, lot: row.lot || '' });
+      } else {
+        byMPN.set(mpnKey, {
+          mpn,
+          totalQty: qty,
+          lots: [{ warehouse, qty, lot: row.lot || '' }]
+        });
+      }
+    }
+
+    return byMPN;
+  }
+
+  // Fall back to folder-based CSVs
+  const invFolder = findLatestInventoryFolder();
+  if (invFolder) {
+    console.log(`  Using CSV folder: ${invFolder}`);
+    return loadInventoryFromCSVs(invFolder);
+  }
+
+  console.log('  WARNING: No inventory data found');
+  return new Map();
+}
+
+/**
+ * Load inventory from weekly Infor CSVs (fallback)
  */
 function loadInventoryFromCSVs(inventoryFolder) {
   const byMPN = new Map();
@@ -233,8 +284,9 @@ async function lookupLAMStatus(identifiers, options = {}) {
 
   // Load data sources
   const roster = loadMasterRoster();
-  const invFolder = inventoryFolder || findLatestInventoryFolder();
-  const inventory = invFolder ? loadInventoryFromCSVs(invFolder) : new Map();
+  const inventory = inventoryFolder
+    ? loadInventoryFromCSVs(inventoryFolder)  // Explicit override
+    : loadInventoryData();  // Cache-first, CSV fallback
 
   // Resolve identifiers to MPNs
   const lookupMap = byCPC ? roster.byCPC : roster.byMPN;
