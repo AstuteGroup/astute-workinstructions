@@ -223,7 +223,8 @@ function mergeRefreshIntoSourced(freshCsvPath, sourcedCsvPath) {
     const otColumns = [
       'QTY ON HAND', 'W115 Stale Inventory', 'Shortfall', 'Priority',
       'On Order Qty', 'OT PO', 'Recent POV', 'Tracking',
-      'Last Promise Date', 'PO Created Date', 'Last Updated'
+      'Last Promise Date', 'PO Created Date', 'Last Updated',
+      'Purchased MPN', 'MPN Flag'  // MPN validation from POV data
     ];
 
     // Get column indices in both files

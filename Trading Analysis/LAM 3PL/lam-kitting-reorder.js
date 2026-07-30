@@ -131,6 +131,39 @@ function getAllApprovedMPNs(cpc, rosterMpn) {
   return mpns;
 }
 
+/**
+ * Validate that Purchased MPN is on the AVL for this CPC
+ * @param {string} cpc - The CPC
+ * @param {string} rosterMpn - The MPN from the Master Roster
+ * @param {string} purchasedMpn - The MPN actually purchased (from POV)
+ * @returns {object} { valid: boolean, flag: string }
+ *   - valid: true if purchasedMpn is on AVL or matches rosterMpn
+ *   - flag: '' if OK, 'AVL' if on AVL but different, 'NOT ON AVL' if not approved
+ */
+function validatePurchasedMPN(cpc, rosterMpn, purchasedMpn) {
+  // No purchased MPN or same as roster = OK
+  if (!purchasedMpn || purchasedMpn === rosterMpn) {
+    return { valid: true, flag: '' };
+  }
+
+  // Different MPN - check if it's on AVL
+  const approvedMpns = getAllApprovedMPNs(cpc, rosterMpn);
+
+  // Normalize for comparison (case-insensitive, trim whitespace)
+  const normalizedPurchased = purchasedMpn.trim().toUpperCase();
+  const isOnAvl = approvedMpns.some(mpn =>
+    mpn && mpn.trim().toUpperCase() === normalizedPurchased
+  );
+
+  if (isOnAvl) {
+    // On AVL but different from roster - note but OK
+    return { valid: true, flag: 'AVL' };
+  } else {
+    // NOT on AVL - escalate
+    return { valid: false, flag: 'NOT ON AVL' };
+  }
+}
+
 // -----------------------------------------------------------------------------
 // Configuration
 // -----------------------------------------------------------------------------
@@ -407,8 +440,8 @@ async function main() {
   console.log(`  W111 (LAM 3PL): ${Object.keys(w111Inventory).length} unique MPNs`);
   console.log(`  W115 (Dead Inventory): ${Object.keys(w115Inventory).length} unique MPNs`);
 
-  // Step 1b: Check inventory file age - warn if stale (>14 days old)
-  if (inventoryFileInfo && inventoryFileInfo.ageDays > 14) {
+  // Step 1b: Check inventory file age - warn if stale (>7 days old per spec)
+  if (inventoryFileInfo && inventoryFileInfo.ageDays > 7) {
     console.log('');
     console.log('  !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!');
     console.log(`  WARNING: Inventory file is ${inventoryFileInfo.ageDays} days old!`);
@@ -1387,6 +1420,7 @@ const ALERT_COLUMNS = [
   'Lam P/N',
   'MPN',
   'Purchased MPN',  // Shows alternate MPN if sourced differently from roster
+  'MPN Flag',       // '' = OK, 'AVL' = alt MPN on AVL, 'NOT ON AVL' = escalate
   'Manufacturer',
   'Item Description',
   // Inventory & priority
@@ -1446,10 +1480,15 @@ function formatPOVCell(pov) {
 function buildAlert(mpn, excel, totalQty, lamOwned, shortfall, priority, history, pov) {
   // Show purchased MPN only if it differs from roster MPN (alternate sourcing)
   const purchasedMpn = pov && pov.Purchased_MPN && pov.Purchased_MPN !== mpn ? pov.Purchased_MPN : '';
+
+  // Validate purchased MPN is on AVL for this CPC (spec requirement)
+  const mpnValidation = validatePurchasedMPN(excel.CPC, mpn, pov && pov.Purchased_MPN);
+
   return {
     'Lam P/N': excel.CPC,
     'MPN': mpn,
     'Purchased MPN': purchasedMpn,  // Shows alternate MPN if sourced differently
+    'MPN Flag': mpnValidation.flag,  // '' = OK, 'AVL' = on AVL but different, 'NOT ON AVL' = escalate
     'Manufacturer': excel.Manufacturer,
     'Item Description': excel.Description,
     'QTY ON HAND': totalQty,
