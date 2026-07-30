@@ -153,8 +153,13 @@ async function stepRefresh(dateStamp) {
 }
 
 // Send removal notification to Jake + Josh (required before removing CPCs)
+// Also adds CPCs to pending removals list so responses can be tracked
 async function sendRemovalNotification(removedCpcs, dateStamp) {
   const { sendLamEmail } = require('./lam-email-templates');
+  const { addPendingRemovals } = require('../../shared/workflow-actions/lam-kitting');
+
+  log('  Adding CPCs to pending removals list...');
+  addPendingRemovals(removedCpcs, null);
 
   log('  Sending removal notification to Jake + Josh...');
 
@@ -164,7 +169,7 @@ async function sendRemovalNotification(removedCpcs, dateStamp) {
     date: dateStamp,
     to: 'jake.harris@astutegroup.com,josh.syre@astutegroup.com',
     stats: { removed: removedCpcs.length },
-    notes: `The following CPCs were in the previous output but are no longer in the roster:\n\n${cpcList}\n\nThese parts will be removed from future outputs. Please acknowledge.`
+    notes: `The following CPCs were in the previous output but are no longer in the roster:\n\n${cpcList}\n\nTo acknowledge removal, reply with: ACKNOWLEDGE REMOVAL\nTo reject removal (keep parts), reply with: REJECT REMOVAL\n\nIf no response within 7 days, removal will proceed automatically.`
   });
 
   log('  Removal notification sent');

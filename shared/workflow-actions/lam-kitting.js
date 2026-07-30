@@ -37,6 +37,7 @@ const { psqlQuery } = require('../db-helpers');
 const ASTUTE = path.join(process.env.HOME, 'workspace', 'astute-workinstructions');
 const ROSTER_PATH = path.join(ASTUTE, 'Trading Analysis/LAM 3PL/LAM_Master_Roster.xlsx');
 const FLAGGED_REVIEW_PATH = path.join(ASTUTE, 'Trading Analysis/LAM 3PL/data/lam-flagged-review.json');
+const PENDING_REMOVALS_PATH = path.join(ASTUTE, 'Trading Analysis/LAM 3PL/data/lam-pending-removals.json');
 
 // Import enrichment functions from the reorder script (single source of truth)
 const {
@@ -2133,6 +2134,141 @@ async function action_request_report(payload, ctx) {
   };
 }
 
+// ─── ROSTER REMOVAL HANDLING ─────────────────────────────────────────────────
+
+/**
+ * Load pending removals from state file.
+ * Returns array of { cpc, detectedDate, notificationMessageId }
+ */
+function loadPendingRemovals() {
+  if (!fs.existsSync(PENDING_REMOVALS_PATH)) return [];
+  try {
+    return JSON.parse(fs.readFileSync(PENDING_REMOVALS_PATH, 'utf-8'));
+  } catch (e) {
+    return [];
+  }
+}
+
+/**
+ * Save pending removals to state file.
+ */
+function savePendingRemovals(removals) {
+  const dir = path.dirname(PENDING_REMOVALS_PATH);
+  if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+  fs.writeFileSync(PENDING_REMOVALS_PATH, JSON.stringify(removals, null, 2));
+}
+
+/**
+ * Add CPCs to pending removals list (called when removal detected).
+ */
+function addPendingRemovals(cpcs, messageId) {
+  const existing = loadPendingRemovals();
+  const existingCpcs = new Set(existing.map(r => r.cpc));
+  const today = new Date().toISOString().split('T')[0];
+
+  for (const cpc of cpcs) {
+    if (!existingCpcs.has(cpc)) {
+      existing.push({
+        cpc,
+        detectedDate: today,
+        notificationMessageId: messageId || null,
+      });
+    }
+  }
+
+  savePendingRemovals(existing);
+  return existing;
+}
+
+/**
+ * Acknowledge Removal — user confirms removal is OK.
+ * Removes the CPCs from the pending list (they'll drop off next refresh).
+ */
+async function action_acknowledge_removal(payload, ctx) {
+  const { cpcs } = payload;
+
+  if (!cpcs || cpcs.length === 0) {
+    return { error: 'No CPCs specified for acknowledgment' };
+  }
+
+  if (ctx.dryRun) {
+    return { dry_run: true, would_acknowledge: cpcs };
+  }
+
+  const pending = loadPendingRemovals();
+  const cpcSet = new Set(cpcs.map(c => c.toUpperCase().trim()));
+  const remaining = pending.filter(r => !cpcSet.has(r.cpc.toUpperCase().trim()));
+  const acknowledged = pending.filter(r => cpcSet.has(r.cpc.toUpperCase().trim()));
+
+  savePendingRemovals(remaining);
+
+  breadcrumbs.write({
+    cog: 'lam-kitting-agent',
+    event: 'removal-acknowledged',
+    uid: ctx.uid,
+    cpcs: acknowledged.map(r => r.cpc),
+  });
+
+  ctx.log(`Acknowledged removal of ${acknowledged.length} CPC(s): ${acknowledged.map(r => r.cpc).join(', ')}`);
+
+  return {
+    acknowledged: acknowledged.map(r => r.cpc),
+    remaining: remaining.length,
+  };
+}
+
+/**
+ * Reject Removal — user says CPCs should NOT be removed.
+ * Removes from pending list and adds them back to the roster output.
+ */
+async function action_reject_removal(payload, ctx) {
+  const { cpcs, reason } = payload;
+
+  if (!cpcs || cpcs.length === 0) {
+    return { error: 'No CPCs specified for rejection' };
+  }
+
+  if (ctx.dryRun) {
+    return { dry_run: true, would_reject: cpcs, reason };
+  }
+
+  const pending = loadPendingRemovals();
+  const cpcSet = new Set(cpcs.map(c => c.toUpperCase().trim()));
+  const remaining = pending.filter(r => !cpcSet.has(r.cpc.toUpperCase().trim()));
+  const rejected = pending.filter(r => cpcSet.has(r.cpc.toUpperCase().trim()));
+
+  savePendingRemovals(remaining);
+
+  // Note: The CPCs will reappear in output because they're still in the sourced file
+  // (removals are only applied after acknowledgment, which didn't happen)
+
+  breadcrumbs.write({
+    cog: 'lam-kitting-agent',
+    event: 'removal-rejected',
+    uid: ctx.uid,
+    cpcs: rejected.map(r => r.cpc),
+    reason: reason || 'User rejected removal',
+  });
+
+  ctx.log(`Rejected removal of ${rejected.length} CPC(s): ${rejected.map(r => r.cpc).join(', ')}`);
+
+  // Send confirmation email
+  const subject = `LAM 3PL: Removal Rejection Confirmed`;
+  const body = `The following CPCs will NOT be removed from the LAM 3PL roster:\n\n${rejected.map(r => `  - ${r.cpc}`).join('\n')}\n\nReason: ${reason || 'User rejected removal'}\n\nThese parts will continue to appear in reorder reports.`;
+
+  await sendEmailOrThrow(ctx.notifier, ctx.jakeEmail, subject, body, { replyTo: ctx.inbox });
+
+  return {
+    rejected: rejected.map(r => r.cpc),
+    remaining: remaining.length,
+    reason: reason || 'User rejected removal',
+  };
+}
+
+// Export for use by lam-kitting.js CLI
+module.exports.addPendingRemovals = addPendingRemovals;
+module.exports.loadPendingRemovals = loadPendingRemovals;
+
 // ─── DISCREPANCY DETECTION ───────────────────────────────────────────────────
 
 /**
@@ -2758,6 +2894,16 @@ module.exports = {
       folder: 'Processed',
       requires: [],
       handler: action_request_report,
+    },
+    acknowledge_removal: {
+      folder: 'Processed',
+      requires: ['cpcs'],
+      handler: action_acknowledge_removal,
+    },
+    reject_removal: {
+      folder: 'Processed',
+      requires: ['cpcs'],
+      handler: action_reject_removal,
     },
   },
   // Export for reorder workflow visibility
