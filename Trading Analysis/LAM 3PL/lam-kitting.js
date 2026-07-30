@@ -94,6 +94,20 @@ async function stepRefresh(dateStamp) {
   const reorderScript = path.join(SCRIPT_DIR, 'lam-kitting-reorder.js');
   const csvPath = path.join(OUTPUT_DIR, `LAM_Reorder_Alerts_${dateStamp}.csv`);
 
+  // Clean up stale _sourced files from previous runs
+  // After refresh, old sourced data is outdated
+  const staleFiles = [
+    path.join(OUTPUT_DIR, `LAM_Reorder_Alerts_${dateStamp}_sourced.csv`),
+    path.join(OUTPUT_DIR, `LAM_Reorder_Alerts_${dateStamp}_sourced.xlsx`),
+    path.join(OUTPUT_DIR, `LAM_Reorder_Alerts_${dateStamp}_sourced_merged.csv`)
+  ];
+  for (const f of staleFiles) {
+    if (fs.existsSync(f)) {
+      fs.unlinkSync(f);
+      log(`  Removed stale: ${path.basename(f)}`);
+    }
+  }
+
   // Run reorder script
   const success = runScript(reorderScript, [ROSTER_PATH, '--no-email']);
   if (!success) {
@@ -241,13 +255,32 @@ Options:
 
       case 'excel':
         // Just rebuild xlsx from existing CSV
+        // Prefer _sourced.csv if it exists AND is newer than base CSV
         const sourcedPath = path.join(OUTPUT_DIR, `LAM_Reorder_Alerts_${dateStamp}_sourced.csv`);
-        if (fs.existsSync(sourcedPath)) {
-          csvPath = sourcedPath;
-        } else if (!fs.existsSync(csvPath)) {
+        const baseExists = fs.existsSync(csvPath);
+        const sourcedExists = fs.existsSync(sourcedPath);
+
+        if (!baseExists && !sourcedExists) {
           log(`ERROR: No CSV found for ${dateStamp}. Run 'refresh' first.`);
           process.exit(1);
         }
+
+        if (sourcedExists && baseExists) {
+          // Both exist - use whichever is newer
+          const baseTime = fs.statSync(csvPath).mtime.getTime();
+          const sourcedTime = fs.statSync(sourcedPath).mtime.getTime();
+          if (sourcedTime > baseTime) {
+            csvPath = sourcedPath;
+            log(`Using sourced CSV (newer than base)`);
+          } else {
+            log(`Using base CSV (newer than sourced)`);
+          }
+        } else if (sourcedExists) {
+          csvPath = sourcedPath;
+          log(`Using sourced CSV`);
+        }
+        // else: use base csvPath (already set)
+
         xlsxPath = await stepExcel(csvPath, dateStamp);
         break;
 
