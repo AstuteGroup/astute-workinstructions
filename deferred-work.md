@@ -58,6 +58,24 @@ The SessionStart greeting reads this file and surfaces all open items, sorted by
   - The burst fix in `offer-writeback.js` is still in place and benefits the new subordinate workflows.
   - The old inventory-cleanup cron entry is commented out in `cron-jobs.js`.
 
+- [ ] 🟡 **DEFERRED: Carryover Reconciler — extract from deprecated inventory_cleanup.js** *(opened 2026-07-30)*
+  - **What it does:** Compares static carryover offers (Eaton, GM, Philippines, LAM Consignment) against Infor inventory data. When parts arrive in the paired warehouse (e.g., W117 for Eaton), it retires them from the carryover offer so they're not double-counted.
+  - **Why blocked:** When `inventory_cleanup.js` was deprecated (2026-07-27), the `reconcileCarryover()` function was NOT extracted into a standalone workflow. It still lives in the deprecated script.
+  - **What's missing:**
+    1. A standalone `workflows/carryover-reconciler.js` that:
+       - Loads carryover offers from OT (using existing `manage-carryover.js` / `carryover-ops.js`)
+       - Loads this week's Infor data from the cache (`loadCachedInventory()`)
+       - Compares MPN+qty and retires lines that have arrived
+       - Emails summary of retired lines
+    2. Cron entry in `cron-jobs.js` (run after fetch-and-parse, before subordinate workflows)
+  - **Ready when:** Operator notices carryover lines not being retired, or proactively when cleaning up the decoupling work.
+  - **Reference code:** `Trading Analysis/Inventory File Cleanup/inventory_cleanup.js` lines 1036-1130 (`reconcileCarryover()` function), lines 2398-2443 (where it's called with `pendingMpnDetails`)
+  - **Related files:**
+    - `Trading Analysis/Inventory File Cleanup/lib/carryover-ops.js` — primitives for carryover lifecycle
+    - `Trading Analysis/Inventory File Cleanup/manage-carryover.js` — CLI for bootstrap/add/retire
+    - `docs/inventory-decoupling-proposal.md` — original design (see § 7 `carryover-manager.js`)
+  - **Created / source:** 2026-07-30 inventory decoupling audit session.
+
 - [ ] 🟢 **VQ Loading: Support .eml/.msg attachments for batch quote loading** *(opened 2026-06-12, operator request)*
   - **Context:** Operator has many broker quote emails to load as VQs. Current workflow requires forwarding each email individually to `vq@`. Operator asked if they could attach multiple emails (.eml or .msg files) to a single email and have them all processed. Current system does NOT support this — it processes one email = one quote entity, and attachment handling is limited to PDF/Excel/CSV within a single email.
   - **Why blocked:** Feature doesn't exist. Operator flagged as "priority for next week" (2026-06-12).
