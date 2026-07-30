@@ -51,6 +51,7 @@ const XLSX = require('xlsx');
 const { writeOffer, deactivatePriorOffers } = require('../../shared/offer-writeback');
 const { readCSVFile } = require('../../shared/csv-utils');
 const { normalizeMPN } = require('../../shared/mpn-normalization');
+const { loadCachedInventory, getCacheStatus } = require('../../shared/inventory-fetch-and-parse');
 
 const SCRIPT_DIR = __dirname;
 const INVENTORY_CLEANUP_DIR = path.join(SCRIPT_DIR, '../Inventory File Cleanup');
@@ -119,6 +120,13 @@ function parseArgs(argv) {
 }
 
 function findInventoryFolder() {
+  // Try cache first (new decoupled architecture)
+  const cacheStatus = getCacheStatus();
+  if (cacheStatus.hasFreshCache || cacheStatus.hasStaleCache) {
+    return `cache (week of ${cacheStatus.weekOf}, ${cacheStatus.cacheAge} days old)`;
+  }
+
+  // Fall back to folder-based approach
   const dateStr = getDateStamp();
   const candidate = path.join('/tmp', `Inventory ${dateStr}`);
   if (fs.existsSync(candidate)) return candidate;
@@ -228,6 +236,37 @@ function loadRoster(rosterPath) {
 // both sides ensures these match. Mirrors lam-kitting-reorder.js.
 function loadInventoryQty(inventoryFolder) {
   const qtyByCanonical = {};
+
+  // Check if using cache (new decoupled architecture)
+  if (inventoryFolder && inventoryFolder.startsWith('cache')) {
+    const cacheData = loadCachedInventory({ allowStale: true });
+    if (!cacheData || !cacheData.byWarehouse) {
+      log(`  WARNING: Cache indicated but no data found`);
+      return qtyByCanonical;
+    }
+
+    const weekOf = cacheData.metadata?.weekOf || 'unknown';
+    log(`  Loading from cache (week of ${weekOf})...`);
+
+    // W111 (LAM 3PL) and W115 (Dead Inventory)
+    for (const wh of ['W111', 'W115']) {
+      const rows = cacheData.byWarehouse[wh] || [];
+      let lots = 0;
+      for (const row of rows) {
+        const mpnRaw = (row.mpn || '').trim();
+        if (!mpnRaw) continue;
+        const key = normalizeMPN(mpnRaw);
+        const qty = parseFloat(row.qty) || 0;
+        qtyByCanonical[key] = (qtyByCanonical[key] || 0) + qty;
+        lots++;
+      }
+      const label = wh === 'W111' ? 'W111 (LAM 3PL)' : 'W115 (Dead Inventory)';
+      log(`  ${label}: ${lots} lot rows`);
+    }
+    return qtyByCanonical;
+  }
+
+  // Fall back to folder-based CSV loading
   const w111 = path.join(inventoryFolder, 'W111_LAM_3PL.csv');
   const w115 = path.join(inventoryFolder, 'W115_LAM_Dead_Inventory.csv');
 
@@ -382,8 +421,10 @@ async function main() {
   log(`Offer type:       ${offerTypeId}${isStaging ? '  [STAGING — invisible to customer dashboard]' : '  [LAM Kitting Inventory — LIVE for customer dashboard]'}`);
   log(`Mode:             ${args.dryRun ? 'DRY RUN' : 'LIVE'}`);
 
-  if (!inventoryFolder || !fs.existsSync(inventoryFolder)) {
-    throw new Error(`Inventory folder not found. Run inventory_cleanup.js first.`);
+  // Validate inventory source - either cache reference or actual folder
+  const isCache = inventoryFolder && inventoryFolder.startsWith('cache');
+  if (!inventoryFolder || (!isCache && !fs.existsSync(inventoryFolder))) {
+    throw new Error(`Inventory source not found. Ensure inventory cache exists or run inventory_cleanup.js.`);
   }
   if (!kdbPath || !fs.existsSync(kdbPath)) {
     throw new Error(`LAM_Master_Roster.xlsx not found in ${SCRIPT_DIR}. Run scripts/build-lam-master-roster.js first.`);
