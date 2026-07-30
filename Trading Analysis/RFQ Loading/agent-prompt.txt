@@ -11,7 +11,7 @@
 #   4. Edit shared/agent-config/<workflow>.json for configuration
 #   5. Run the generator
 #
-# Generated: 2026-07-30T17:09:31.537Z
+# Generated: 2026-07-30T20:46:17.462Z
 # ═══════════════════════════════════════════════════════════════════════════════
 
 You are processing the rfqloading@orangetsunami.com inbox on a tiered cron schedule (5-min burst window after an approval email is sent, dropping to every 30m steady).
@@ -61,12 +61,18 @@ For every UID returned, follow the per-message decision tree from the .md:
           - Unclear / ambiguous → `needs_review` with `{reason: "approval reply directive unclear: <body excerpt>"}`.
       * Dispatch with `route <uid> <action> --workflow rfq-loading --payload '<json>'`. Approval/rejection emails do NOT need customer/contact/MFR resolution.
   - Otherwise (no `pending_state`, subject is NOT an approval reply): apply the normal customer-RFQ flow per the .md (Steps 4-9), routing to enqueue / need_info / needs_review / not_rfq.
-      * **IMAGE ATTACHMENTS (screenshot RFQs):** The `read` JSON includes an `images` array. If any image has `isLikelyContent: true` (>= 20KB, not inline signature), AND the body text is sparse (< 50 chars of actual content after stripping signatures), the RFQ data is likely in the image:
+      * **ATTACHMENTS (XLSX, CSV, PDF, images):** The `read` JSON includes `documents` and `images` arrays. If any attachment exists, OR the body text is sparse (< 50 chars of actual content after stripping signatures), the RFQ data is likely in an attachment:
           1. Run: `node /home/analytics_user/workspace/astute-workinstructions/shared/email-workflow-poller.js download-attachments <uid> --workflow rfq-loading --include-images`
-          2. Use the Read tool on each downloaded image path (Claude has vision — you CAN read PNG/JPG files)
-          3. Extract MPN, qty, customer info from the image just as you would from text
+          2. Parse each attachment by type:
+             - **XLSX/CSV:** Use the Read tool or parse with node:
+               ```javascript
+               node -e "const XLSX=require('xlsx'); const wb=XLSX.readFile('/path/to/file.xlsx'); const data=XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]]); console.log(JSON.stringify(data,null,2));"
+               ```
+               Look for columns: MPN/Part Number, Qty/Quantity, Mfr/Manufacturer, Description, CPC/Customer Part
+             - **PDF:** Use the Read tool — Claude can extract text from PDFs
+             - **Images (PNG/JPG):** Use the Read tool — Claude has vision
+          3. Extract MPN, qty, customer info from the parsed data just as you would from text
           4. Proceed with the normal flow using the extracted data
-        This handles cases like screenshots of Excel/portal data pasted into emails.
       * When routing to `need_info` on an INITIAL message (first round, no prior sidecar), include `{missing: [...], subject, outerFrom: <external_sender_email>, extracted: {lines, bpartnerId-guess, ...whatever you parsed}}`. The handler emails Jake (NOT the external customer — POLICY 2026-05-14, info-requests never go to the external sender) and writes the sidecar. Jake's reply round-trips when he answers.
 
 If a single message hits a transient error (loadBulkSummary throws, attachment unreadable, vendor lookup 5xx), log the error in your output and continue with the next message. Do not abort the batch on per-message failure.

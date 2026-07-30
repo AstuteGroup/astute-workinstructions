@@ -11,7 +11,7 @@
 #   4. Edit shared/agent-config/<workflow>.json for configuration
 #   5. Run the generator
 #
-# Generated: 2026-07-30T17:09:31.540Z
+# Generated: 2026-07-30T20:45:50.482Z
 # ═══════════════════════════════════════════════════════════════════════════════
 
 You are processing the tracking@orangetsunami.com inbox on a regular cron schedule.
@@ -67,21 +67,42 @@ Parse the email body (prefer plain text, fall back to HTML):
 1. Extract tracking numbers using `extractTrackingNumbers(bodyText)`
 2. Extract PO references using `extractPOReferences(bodyText)`
 
-**IMAGE ATTACHMENTS (screenshot shipping confirmations):**
+**ATTACHMENTS (XLSX, CSV, PDF, images):**
 
-The `read` JSON includes an `images` array. If:
-- Any image has `isLikelyContent: true` (≥20KB, not inline signature), OR
+The `read` JSON includes `documents` and `images` arrays. If:
+- Any attachment exists (xlsx, csv, pdf, or image with `isLikelyContent: true`), OR
 - Body text is sparse (<50 chars of actual content after stripping signatures), OR
 - You find a PO/POV reference but NO tracking numbers in the text
 
-Then the tracking data may be in an image (common for TI, Mouser, DigiKey portal screenshots):
+Then the tracking data is likely in an attachment. Download and parse:
 
 1. Run: `node /home/analytics_user/workspace/astute-workinstructions/shared/email-workflow-poller.js download-attachments <uid> --workflow tracking-loading --include-images`
-2. Use the **Read tool** on each downloaded image path (Claude has vision — you CAN read PNG/JPG files)
-3. Extract tracking numbers, carrier, ship date, and MPNs from the image
+2. Parse each attachment by type:
+
+**XLSX/CSV files (Arrow, Avnet, Mouser exports):**
+```javascript
+node -e "
+const XLSX = require('xlsx');
+const wb = XLSX.readFile('/path/to/file.xlsx');
+const sheet = wb.Sheets[wb.SheetNames[0]];
+const data = XLSX.utils.sheet_to_json(sheet);
+data.forEach(row => {
+  // Look for tracking column (synonyms: Tracking Number, Tracking, Tracking #, Ship Tracking)
+  const tracking = row['Tracking Number'] || row['Tracking'] || row['Tracking #'] || row['Ship Tracking'];
+  const mpn = row['Manufacturer Part Number'] || row['Part Number'] || row['MPN'];
+  if (tracking) console.log(JSON.stringify({ mpn, tracking }));
+});
+"
+```
+
+**PDF files:** Use the Read tool — Claude can extract text from PDFs. Look for tracking number patterns.
+
+**Image files (PNG/JPG):** Use the Read tool — Claude has vision. Extract tracking numbers, carrier, ship date, and MPNs from screenshots.
+
+3. Extract tracking numbers and MPNs from the parsed data
 4. Proceed with the normal routing flow using the extracted data
 
-**Important:** Screenshots often contain MPN-to-tracking mappings (e.g., TI shows which parts shipped with which tracking). For multi-line orders, extract BOTH the tracking numbers AND the MPNs from the image to populate the `mpn` field correctly.
+**Important:** Attachments often contain MPN-to-tracking mappings (e.g., Arrow XLSX shows which parts shipped with which tracking). For multi-line orders, extract BOTH the tracking numbers AND the MPNs to populate the `mpn` field correctly.
 
 
 | Tracking | PO Ref | Action |
