@@ -1,36 +1,50 @@
 #!/usr/bin/env node
 /**
- * LAM New Add Workflow
+ * LAM New Lines / Approvals Workflow
  *
- * Generates reorder-alert format CSV for newly added parts (Phase 3, etc.)
- * so they can be enriched via the standard lam-kitting-source.js pipeline.
+ * Processes newly added parts from roster (Phase 3, approvals, etc.) and
+ * categorizes them into actionable buckets:
+ *   - ORDER: Ready to place PO (all required data present)
+ *   - REVIEW: Needs verification (missing data or unusual values)
+ *   - NO_ACTION: Informational only (stock OK or POV pending)
+ *
+ * Also generates reorder-alert format CSV for sourcing pipeline compatibility.
  *
  * Usage:
- *   node lam-new-add.js --award "Phase 3" --rfq 1139539
- *   node lam-new-add.js --award "Phase 3" --rfq 1139539 --run-sourcing
+ *   node lam-new-add.js --award "Phase 3"
+ *   node lam-new-add.js --award "Phase 3" --run-sourcing
  *   node lam-new-add.js --award "Phase 3" --rfq 1139539 --run-sourcing --send-email
  *
  * Options:
  *   --award <name>     Filter roster by Award column (required)
  *   --rfq <value>      Source RFQ for validation (required for --send-email)
  *   --run-sourcing     Chain to lam-kitting-source.js after generating CSV
- *   --send-email       Send sourced xlsx via email (requires --run-sourcing AND --rfq)
+ *   --send-email       Send bucketed xlsx via email (requires --rfq)
  *   --skip-validation  Skip roster validation (NOT RECOMMENDED)
  *   --dry-run          Show what would be done without writing files
  *
  * Output:
- *   output/LAM_NewAdd_<award>_<date>.csv           - Reorder-alert format
- *   output/LAM_NewAdd_<award>_<date>_sourced.xlsx  - After sourcing (if --run-sourcing)
+ *   output/LAM_NewLinesApprovals_<award>_<date>.xlsx  - Bucketed Excel (Order/Review/No Action tabs)
+ *   output/LAM_NewAdd_<award>_<date>.csv              - Reorder-alert format for sourcing
+ *   output/LAM_NewAdd_<award>_<date>_sourced.xlsx     - After sourcing (if --run-sourcing)
  */
 
 const fs = require('fs');
 const path = require('path');
 const XLSX = require('xlsx');
 const { execSync } = require('child_process');
+const ExcelJS = require('exceljs');
 
 const SCRIPT_DIR = __dirname;
 const ROSTER_PATH = path.join(SCRIPT_DIR, 'LAM_Master_Roster.xlsx');
 const OUTPUT_DIR = path.join(SCRIPT_DIR, 'output');
+
+// Bucketing categories
+const BUCKET = {
+  ORDER: 'Order',         // New lines or approved changes, no stock → place PO
+  REVIEW: 'Review',       // Needs verification before ordering
+  NO_ACTION: 'No Action'  // Have stock or notification-only
+};
 
 // Reorder alert columns - must match what lam-kitting-source.js expects
 const ALERT_HEADERS = [
@@ -123,6 +137,154 @@ function writeCSV(rows, outputPath) {
   return csvContent;
 }
 
+// For new parts being added, inventory is assumed to be 0 (they're new)
+// Future enhancement: could check Infor inventory via shared/inventory-fetch-and-parse
+function getInventoryLevels(cpcs) {
+  // New parts have no inventory
+  return {};
+}
+
+// For new parts being added, POVs don't exist yet (they're new)
+// Future enhancement: could check OT for any historical orders
+function getExistingPOVs(cpcs) {
+  // New parts have no POVs
+  return {};
+}
+
+// Determine bucket for a new part
+// For NEW parts, the decision is based on data completeness:
+//   ORDER: All required data present → ready to place PO
+//   REVIEW: Missing data or requires verification
+//   NO_ACTION: Informational only (rare for new parts)
+function determineBucket(part, inventory, existingPOV, opts = {}) {
+  const cpc = part['CPC'];
+  const mpn = part['MPN'];
+  const moq = parseInt(part['MOQ']) || 100;
+  const basePrice = part['Base Unit Price'];
+  const resalePrice = part['Resale Price'];
+  const leadTime = parseInt(part['Contractual Lead Time']) || 0;
+
+  const reviewReasons = [];
+
+  // Missing CPC or MPN → definitely needs review
+  if (!cpc) reviewReasons.push('Missing CPC');
+  if (!mpn) reviewReasons.push('Missing MPN');
+
+  // Missing pricing data → needs review
+  if (!basePrice) reviewReasons.push('Missing Base Price');
+
+  // Note: Resale Price often populated later, don't block on it
+  // but flag it for awareness
+  const hasResaleWarning = !resalePrice;
+
+  // Very high MOQ → review (unusual, may need approval)
+  if (moq > 1000) {
+    reviewReasons.push(`High MOQ (${moq})`);
+  }
+
+  // Very long lead time → review
+  if (leadTime > 30) {
+    reviewReasons.push(`Long lead (${leadTime} wks)`);
+  }
+
+  // If critical data is missing, route to Review
+  if (reviewReasons.length > 0) {
+    return {
+      bucket: BUCKET.REVIEW,
+      reason: reviewReasons.join('; ')
+    };
+  }
+
+  // All required data present → ready to ORDER
+  let orderReason = `New part, MOQ ${moq}`;
+  if (leadTime > 0) {
+    orderReason += `, ${leadTime} wk lead`;
+  }
+  if (hasResaleWarning) {
+    orderReason += ' (resale price TBD)';
+  }
+
+  return {
+    bucket: BUCKET.ORDER,
+    reason: orderReason
+  };
+}
+
+// Write multi-sheet Excel with bucketed data
+async function writeBucketedExcel(bucketedParts, outputPath, opts = {}) {
+  const workbook = new ExcelJS.Workbook();
+
+  const headers = [
+    'CPC', 'MPN', 'Manufacturer', 'Description',
+    'QTY On Hand', 'Threshold', 'Shortfall',
+    'MOQ', 'Base Price', 'Resale Price', 'Lead Time (Wks)',
+    'Bucket Reason'
+  ];
+
+  for (const bucketName of [BUCKET.ORDER, BUCKET.REVIEW, BUCKET.NO_ACTION]) {
+    const parts = bucketedParts[bucketName] || [];
+    const sheet = workbook.addWorksheet(bucketName);
+
+    // Add headers
+    sheet.addRow(headers);
+    const headerRow = sheet.getRow(1);
+    headerRow.font = { bold: true };
+    headerRow.fill = {
+      type: 'pattern',
+      pattern: 'solid',
+      fgColor: { argb: 'FFD9E1F2' }
+    };
+
+    // Add data rows
+    for (const item of parts) {
+      const part = item.part;
+      const threshold = parseInt(part['Reorder Threshold']) || parseInt(part['MOQ']) || 100;
+      const qtyOnHand = item.qtyOnHand || 0;
+
+      sheet.addRow([
+        part['CPC'] || '',
+        part['MPN'] || '',
+        part['Manufacturer'] || '',
+        part['Description'] || '',
+        qtyOnHand,
+        threshold,
+        Math.max(0, threshold - qtyOnHand),
+        part['MOQ'] || '',
+        part['Base Unit Price'] || '',
+        part['Resale Price'] || '',
+        part['Contractual Lead Time'] || '',
+        item.reason || ''
+      ]);
+    }
+
+    // Auto-fit columns
+    sheet.columns.forEach(col => {
+      col.width = 15;
+    });
+    sheet.getColumn(4).width = 40; // Description
+    sheet.getColumn(12).width = 30; // Reason
+
+    // Color code by bucket
+    const bucketColors = {
+      [BUCKET.ORDER]: 'FFFFCCCC',    // Light red - action needed
+      [BUCKET.REVIEW]: 'FFFFEB9C',   // Light yellow - review
+      [BUCKET.NO_ACTION]: 'FFC6EFCE' // Light green - ok
+    };
+
+    for (let i = 2; i <= parts.length + 1; i++) {
+      const row = sheet.getRow(i);
+      row.fill = {
+        type: 'pattern',
+        pattern: 'solid',
+        fgColor: { argb: bucketColors[bucketName] }
+      };
+    }
+  }
+
+  await workbook.xlsx.writeFile(outputPath);
+  return outputPath;
+}
+
 function validateParts(parts, award) {
   const issues = [];
 
@@ -155,11 +317,12 @@ async function main() {
   const awardSlug = opts.award.replace(/\s+/g, '_');
   const outputCsv = path.join(OUTPUT_DIR, `LAM_NewAdd_${awardSlug}_${today}.csv`);
   const outputXlsx = outputCsv.replace('.csv', '_sourced.xlsx');
+  const bucketedXlsx = path.join(OUTPUT_DIR, `LAM_NewLinesApprovals_${awardSlug}_${today}.xlsx`);
 
-  console.log('LAM New Add Workflow');
-  console.log('====================');
+  console.log('LAM New Lines / Approvals Workflow');
+  console.log('===================================');
   console.log(`Award filter: ${opts.award}`);
-  console.log(`Output: ${outputCsv}`);
+  console.log(`Output: ${bucketedXlsx}`);
   console.log('');
 
   // Load and filter roster
@@ -183,14 +346,38 @@ async function main() {
     console.log('');
   }
 
-  // Build alert rows
+  // For new parts, inventory and POV data will be empty (they're new)
+  // Bucketing is based on data completeness
+  const cpcs = parts.map(p => p['CPC']).filter(Boolean);
+  const inventory = getInventoryLevels(cpcs);
+  const existingPOVs = getExistingPOVs(cpcs);
+
+  // Bucket each part
   console.log('');
-  console.log('Building reorder-alert CSV...');
-  const rows = parts.map(buildAlertRow);
+  console.log('Categorizing parts...');
+  const bucketedParts = {
+    [BUCKET.ORDER]: [],
+    [BUCKET.REVIEW]: [],
+    [BUCKET.NO_ACTION]: []
+  };
+
+  for (const part of parts) {
+    const cpc = part['CPC'];
+    const { bucket, reason } = determineBucket(part, inventory, existingPOVs, opts);
+    bucketedParts[bucket].push({
+      part,
+      qtyOnHand: inventory[cpc] || 0,
+      reason
+    });
+  }
+
+  console.log(`  ${BUCKET.ORDER}: ${bucketedParts[BUCKET.ORDER].length} parts (need PO)`);
+  console.log(`  ${BUCKET.REVIEW}: ${bucketedParts[BUCKET.REVIEW].length} parts (verify before ordering)`);
+  console.log(`  ${BUCKET.NO_ACTION}: ${bucketedParts[BUCKET.NO_ACTION].length} parts (stock OK or POV pending)`);
 
   if (opts.dryRun) {
-    console.log('  [DRY RUN] Would write:', outputCsv);
-    console.log(`  [DRY RUN] ${rows.length} rows`);
+    console.log('');
+    console.log('  [DRY RUN] Would write:', bucketedXlsx);
     return;
   }
 
@@ -199,7 +386,16 @@ async function main() {
     fs.mkdirSync(OUTPUT_DIR, { recursive: true });
   }
 
-  // Write CSV
+  // Write bucketed Excel
+  console.log('');
+  console.log('Writing bucketed Excel...');
+  await writeBucketedExcel(bucketedParts, bucketedXlsx);
+  console.log(`  Written: ${bucketedXlsx}`);
+
+  // Also write CSV for sourcing pipeline compatibility
+  console.log('');
+  console.log('Building reorder-alert CSV (for sourcing)...');
+  const rows = parts.map(buildAlertRow);
   writeCSV(rows, outputCsv);
   console.log(`  Written: ${outputCsv}`);
   console.log(`  ${rows.length} parts ready for sourcing`);
@@ -225,7 +421,8 @@ async function main() {
     console.log(`Sourced output: ${outputXlsx}`);
 
     // Send email if requested
-    if (opts.sendEmail && fs.existsSync(outputXlsx)) {
+    const finalXlsx = fs.existsSync(outputXlsx) ? outputXlsx : bucketedXlsx;
+    if (opts.sendEmail && fs.existsSync(finalXlsx)) {
       // VALIDATION GATE: Must validate against RFQ before sending
       if (!opts.rfq && !opts.skipValidation) {
         console.error('');
@@ -257,30 +454,33 @@ async function main() {
       console.log('');
       console.log('Sending email...');
 
-      // Load sourced data for summary
-      const wb = XLSX.readFile(outputXlsx);
-      const data = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]]);
+      const { sendLamEmail } = require('./lam-email-templates');
 
-      const inStock = data.filter(r => r['In Stock Supplier']).length;
-      const leadTime = data.filter(r => !r['In Stock Supplier'] && r['Lead Time Supplier']).length;
-      const restricted = data.filter(r => String(r['Sourcing Status'] || '').startsWith('RESTRICTED')).length;
-      const noCoverage = data.filter(r => r['Sourcing Status'] === 'NO COVERAGE').length;
+      // Determine mode based on award name
+      const isApproval = opts.award.toLowerCase().includes('approval');
+      const mode = isApproval ? 'approval' : 'newParts';
 
-      const { createNotifier } = require('../../shared/notifier');
-      const notifier = createNotifier({
-        fromEmail: 'vortex@orangetsunami.com',
-        fromName: 'LAM 3PL'
+      const emailDate = new Date().toISOString().split('T')[0];
+
+      // Build attachments list
+      const attachments = [{ filename: path.basename(bucketedXlsx), path: bucketedXlsx }];
+      if (fs.existsSync(outputXlsx) && outputXlsx !== bucketedXlsx) {
+        attachments.push({ filename: path.basename(outputXlsx), path: outputXlsx });
+      }
+
+      await sendLamEmail('newLinesApprovals', {
+        date: emailDate,
+        mode: mode,
+        to: 'jake.harris@astutegroup.com',  // Manual runs → Jake only
+        stats: {
+          total: parts.length,
+          order: bucketedParts[BUCKET.ORDER].length,
+          review: bucketedParts[BUCKET.REVIEW].length,
+          noAction: bucketedParts[BUCKET.NO_ACTION].length
+        },
+        notes: `Award: ${opts.award}\nValidated against RFQ ${opts.rfq}`,
+        attachments: attachments
       });
-
-      const subject = `LAM ${opts.award} Sourced - ${parts.length} Parts (${inStock} In Stock, ${leadTime} Lead Time, ${restricted} Restricted, ${noCoverage} No Coverage)`;
-      const body = `${opts.award} new add enrichment attached.\n\nValidated against RFQ ${opts.rfq}.\nSame format as weekly reorder - review margins and create VQs for ready items.`;
-
-      await notifier.sendWithAttachment(
-        process.env.NOTIFY_EMAIL || 'jake.harris@astutegroup.com,josh.syre@astutegroup.com',
-        subject,
-        body,
-        [{ filename: path.basename(outputXlsx), path: outputXlsx }]
-      );
 
       console.log('  Email sent');
     }
