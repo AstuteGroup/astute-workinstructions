@@ -1491,8 +1491,9 @@ function identifyReorderCandidates(aggregated, excelData, historicalData, recent
         basePriority = shortfallPct >= 75 ? 'HIGH' : shortfallPct >= 50 ? 'MEDIUM' : 'LOW';
       }
 
-      // Look up POV by CPC - we may have ordered an alternate MPN
-      const pov = recentPOVs[cpc];
+      // Look up POV by CPC first - we may have ordered an alternate MPN
+      // Fall back to MPN for LAM RFQs where CPC might be missing on the RFQ line
+      const pov = recentPOVs[cpc] || recentPOVs[normalizeMPN(rosterMpn)];
       const priority = resolvePriority(basePriority, pov);
       const lamOwned = cpcInv.w115 > 0 ? 'YES' : 'NO';
 
@@ -1563,7 +1564,7 @@ function identifyReorderCandidates(aggregated, excelData, historicalData, recent
     const priority = `PENDING WAREHOUSE TRANSFER - ${transfer.qty} pcs from ${transfer.fromWh}`;
 
     const alert = buildAlert(mpn, excel, cpcInv.total, cpcInv.w115 > 0 ? 'YES' : 'NO',
-      0, priority, historicalData[normalizeMPN(mpn)] || {}, recentPOVs[cpc]);
+      0, priority, historicalData[normalizeMPN(mpn)] || {}, recentPOVs[cpc] || recentPOVs[normalizeMPN(mpn)]);
 
     alerts.push(alert);
   }

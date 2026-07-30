@@ -22,6 +22,7 @@ const { writeRFQ } = require('../../shared/rfq-writer');
 const { writeVQBatch } = require('../../shared/vq-writer');
 const { tickVQForPurchase } = require('../../shared/vq-patcher');
 const { postApproveOrder } = require('../../shared/r-request-writer');
+const { buildCopyTextVQOnly } = require('../../shared/copy-text-builder');
 
 // ─── Roster Lookup (MPN → CPC fallback) ─────────────────────────────────────
 
@@ -276,11 +277,13 @@ async function main() {
   console.log('\nStep 2: Writing VQ lines from franchise API data...');
 
   // Build items array for writeVQBatch — only items with franchise data
+  // Include mfrText from RFQ/roster as fallback when API doesn't return manufacturer
   const vqItems = rfqCandidates
     .filter(c => c.franchiseResults && c.franchiseResults.distributors)
     .map(c => ({
       mpn: c.mpn,
       cpc: c.cpc,
+      mfrText: c.mfrText,  // Fallback MFR from roster when API data is missing
       franchiseResults: c.franchiseResults,
     }));
 
@@ -366,13 +369,33 @@ async function main() {
       }
 
       const rfqLineNo = lineMappingForAuto(rfqCandidates, mpn);
-      // approvalText = OT Copy Text block (fallback shorthand since we can't
-      // synthesize the full block from DB — the buyer can edit if needed).
+
+      // Build proper OT Copy Text format (Format B: VQ-Only)
+      // Per vq-purchase-workflow.md, approval text must match OT's Copy Text button output exactly.
+      const mfrText = row[mfrIdxAuto] || matchVQ.mfr || '';
+      const lineCost = Number(stockPrice) * Number(lamMoq);
+      const approvalText = buildCopyTextVQOnly({
+        customer: 'Lam Research',
+        totalCost: lineCost,
+        rfqLineNo,
+        purchaseQty: lamMoq,
+        soldQty: 0,              // VQ-only, no CQ
+        mpn,
+        mfr: mfrText,
+        salesRep: 'Jake Harris',
+        vendor: stockSupplier,
+        vendorType: 'Franchise',
+        traceability: 'Authorized Distribution Certs',
+        contact: '',
+        qty: lamMoq,
+        cost: stockPrice,
+        dateCode: '24+',         // Stock default per workflow doc
+        coo: 'PENDING',
+        leadTime: 'STOCK',
+      });
+
       // message = one-off auto-approval disclosure (goes to Result / "Message
       // to User"), keeps the approval panel clean.
-      const approvalText =
-        `Line ${rfqLineNo}  ${mpn}  ${lamMoq}pcs @ $${stockPrice}  DC 24+  ${row[mfrIdxAuto] || ''}\n` +
-        `Vendor: ${stockSupplier}`;
       const autoApprovalMessage =
         `Auto-approved via lam-kitting-rfq-writer — in-stock margin ${margin.toFixed(1)}% ≥ ${AUTO_PURCHASE_MARGIN_PCT}%, ` +
         `vendor stock ${stockQty} ≥ LAM MOQ ${lamMoq}.`;

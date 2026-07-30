@@ -399,6 +399,8 @@ async function searchPart(distributor, mpn, qty, opts = {}) {
           franchiseBulkPrice: null,
           franchiseRfqPrice: null,
           priceBreaks: [],
+          vqMpn: mpn,
+          vqManufacturer: hit.mfr || '',  // Include MFR from cache
           vqLines: null,  // Can't write VQ without pricing
         };
       }
@@ -522,7 +524,7 @@ async function searchPart(distributor, mpn, qty, opts = {}) {
         if (result?.found === true && hasPriceBreaks) {
           _negCache.record({
             mpn,
-            mfr: opts.mfr,
+            mfr: result.vqManufacturer || opts.mfr || '',  // Store RETURNED mfr, fallback to searched
             disty: distributor,
             result: 'carried',
             priceBreaksN: result.priceBreaks.length,
@@ -535,7 +537,7 @@ async function searchPart(distributor, mpn, qty, opts = {}) {
           // API calls (July 2026 audit). TTL is 60 days per negative-cache rules.
           _negCache.record({
             mpn,
-            mfr: opts.mfr,
+            mfr: result.vqManufacturer || opts.mfr || '',  // Store RETURNED mfr
             disty: distributor,
             result: 'matched_no_price',
             stockQty: result.franchiseQty || result.inventoryQty || null,

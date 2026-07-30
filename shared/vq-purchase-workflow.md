@@ -349,9 +349,39 @@ Vendor Quote
 | Wrong number formatting | `1234.56` instead of `$1,234.56` |
 | Skipping Vendor Quote section | Incomplete — vendor info is required |
 
-### TODO: Helper Function
+### Helper Function
 
-Need `shared/copy-text-builder.js` that queries the DB and builds properly formatted copy text. Until then, build manually following the format above.
+**`shared/copy-text-builder.js`** provides functions to build properly formatted Copy Text:
+
+```javascript
+const { buildCopyTextVQOnly, buildCopyTextBatchVQOnly, buildCopyTextWithCQ } = require('./copy-text-builder');
+
+// Single VQ, no CQ (Format B)
+const text = buildCopyTextVQOnly({
+  customer: 'Lam Research',
+  totalCost: 1729.22,
+  rfqLineNo: 890,
+  purchaseQty: 50,
+  mpn: 'SCT3022ALGC11',
+  mfr: 'Rohm Co Ltd',
+  vendor: 'Arrow Electronics',
+  vendorType: 'Franchise',
+  traceability: 'Authorized Distribution Certs',
+  cost: 34.58,
+  dateCode: '24+',
+  coo: 'PENDING',
+  leadTime: 'STOCK',
+});
+
+// Batch VQs, same vendor (single RFQ header + multiple RFQ Line/VQ sections)
+const batchText = buildCopyTextBatchVQOnly(
+  { customer: 'Lam Research', totalCost: 2500.00 },
+  [lineData1, lineData2, lineData3]
+);
+
+// With Customer Quote (Format A)
+const cqText = buildCopyTextWithCQ({ ...fullData });
+```
 
 ---
 

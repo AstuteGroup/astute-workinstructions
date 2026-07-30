@@ -634,7 +634,8 @@ async function writeVQFromAPI(rfqSearchKey, cpc, franchiseResults, opts = {}) {
         ((sub.cost > 0 && sub.qty > 0) || (sub.cost === 0 && sub.qty === 0)))
       .map(sub => ({
         mpn: sub.mpn || opts.searchedMpn || '',
-        mfrText: sub.manufacturer || d.vqManufacturer || '',
+        // MFR fallback chain: API response → distributor-level → caller-provided RFQ/roster MFR
+        mfrText: sub.manufacturer || d.vqManufacturer || opts.rfqMfrText || '',
         price: sub.cost,
         qty: sub.qty,
         leadTime: sub.leadTime || '',
@@ -1181,6 +1182,9 @@ async function writeVQBatch(rfqSearchKey, items, opts = {}) {
   const vendorSet = new Map();
   const mfrSet = new Set();
   for (const item of items) {
+    // Include fallback MFR from caller (RFQ/roster) in pre-warm set
+    if (item.mfrText) mfrSet.add(item.mfrText);
+
     for (const d of (item.franchiseResults?.distributors || [])) {
       if (!d.found) continue;
       if (Array.isArray(d.vqLines) && d.vqLines.length > 0) {
@@ -1232,6 +1236,7 @@ async function writeVQBatch(rfqSearchKey, items, opts = {}) {
     const result = await writeVQFromAPI(rfqSearchKey, item.cpc, item.franchiseResults, {
       ...opts, // forward batch-level defaults: packagingId, buyerId, dateCode, etc.
       searchedMpn: item.mpn,
+      rfqMfrText: item.mfrText || '',  // Fallback MFR from RFQ/roster when API data is missing
       _rfqLineIdOverride: rfqLineId, // skip internal resolution, we already matched
     });
 
@@ -1268,6 +1273,7 @@ async function writeVQBatch(rfqSearchKey, items, opts = {}) {
         const result = await writeVQFromAPI(rfqSearchKey, item.cpc, item.franchiseResults, {
           ...opts, // forward batch-level defaults
           searchedMpn: item.mpn,
+          rfqMfrText: item.mfrText || '',  // Fallback MFR from RFQ/roster when API data is missing
           _rfqLineIdOverride: rfqLineId,
         });
         allWritten.push(...result.written);
