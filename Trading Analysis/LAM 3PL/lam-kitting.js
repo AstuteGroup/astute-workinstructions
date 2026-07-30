@@ -219,12 +219,16 @@ function mergeRefreshIntoSourced(freshCsvPath, sourcedCsvPath) {
       if (cpc) sourcedCpcs.add(cpc);
     }
 
-    // Columns to update from fresh data (OT-sourced columns)
+    // Columns to update from fresh data (OT-sourced + roster-sourced)
     const otColumns = [
+      // OT-sourced (live from database)
       'QTY ON HAND', 'W115 Stale Inventory', 'Shortfall', 'Priority',
       'On Order Qty', 'OT PO', 'Recent POV', 'Tracking',
       'Last Promise Date', 'PO Created Date', 'Last Updated',
-      'Purchased MPN', 'MPN Flag'  // MPN validation from POV data
+      'Purchased MPN', 'MPN Flag',
+      // Roster-sourced (from Master Roster - may change between runs)
+      'Reorder Threshold', 'LAM MOQ', 'Lead Time',
+      'Base Unit Price', 'Resale Price', 'Manufacturer'
     ];
 
     // Get column indices in both files
