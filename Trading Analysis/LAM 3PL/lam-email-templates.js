@@ -49,6 +49,18 @@ const REPORT_TYPES = {
     modes: {
       default: 'Parts requiring customer approval'
     }
+  },
+  removal: {
+    name: 'Roster Removal Notice',
+    modes: {
+      default: 'Parts removed from roster - acknowledgement required'
+    }
+  },
+  otUnavailable: {
+    name: 'OT Database Unavailable',
+    modes: {
+      default: 'LAM Kitting refresh failed - OT database could not be reached'
+    }
   }
 };
 
@@ -96,11 +108,51 @@ function formatStats(stats) {
     if (stats.restricted !== undefined) lines.push(`  Restricted MFR: ${stats.restricted}`);
   }
 
+  // Removal stats
+  if (stats.removed !== undefined) {
+    lines.push('');
+    lines.push(`Parts removed from roster: ${stats.removed}`);
+    lines.push('');
+    lines.push('ACTION REQUIRED: Please review and acknowledge this removal.');
+  }
+
+  // Addition stats
+  if (stats.added !== undefined) {
+    lines.push('');
+    lines.push(`New parts added: ${stats.added}`);
+  }
+
+  return lines.join('\n');
+}
+
+function formatAuditTrail(auditTrail) {
+  if (!auditTrail) return '';
+
+  const lines = ['', 'Data Sources:'];
+
+  if (auditTrail.inventoryDate) {
+    lines.push(`  Inventory: ${auditTrail.inventoryDate} (weekly cache)`);
+  }
+
+  if (auditTrail.apiCacheDate) {
+    lines.push(`  API Pricing: ${auditTrail.apiCacheDate} (cached)`);
+  }
+
+  if (auditTrail.otPullTimestamp) {
+    lines.push(`  OT Data: ${auditTrail.otPullTimestamp} (live)`);
+  }
+
+  // Add staleness warnings
+  if (auditTrail.inventoryAgeDays && auditTrail.inventoryAgeDays > 7) {
+    lines.push('');
+    lines.push(`  WARNING: Inventory cache is ${auditTrail.inventoryAgeDays} days old`);
+  }
+
   return lines.join('\n');
 }
 
 function formatEmail(reportType, opts = {}) {
-  const { date, mode = 'default', stats, notes } = opts;
+  const { date, mode = 'default', stats, notes, auditTrail } = opts;
 
   const report = REPORT_TYPES[reportType];
   if (!report) {
@@ -119,6 +171,12 @@ function formatEmail(reportType, opts = {}) {
     '',
     modeDesc
   ];
+
+  // Audit trail (data sources) - always include first for visibility
+  const auditTrailText = formatAuditTrail(auditTrail);
+  if (auditTrailText) {
+    bodyParts.push(auditTrailText);
+  }
 
   const statsText = formatStats(stats);
   if (statsText) {
@@ -145,9 +203,9 @@ function capitalize(str) {
 // ─── SEND HELPER ─────────────────────────────────────────────────────────────
 
 async function sendLamEmail(reportType, opts = {}) {
-  const { date, mode, stats, notes, attachments = [], to } = opts;
+  const { date, mode, stats, notes, attachments = [], to, auditTrail } = opts;
 
-  const { subject, body } = formatEmail(reportType, { date, mode, stats, notes });
+  const { subject, body } = formatEmail(reportType, { date, mode, stats, notes, auditTrail });
 
   const notifier = createNotifier({
     fromEmail: EMAIL_CONFIG.from,
@@ -172,5 +230,6 @@ module.exports = {
   REPORT_TYPES,
   formatEmail,
   formatStats,
+  formatAuditTrail,
   sendLamEmail
 };

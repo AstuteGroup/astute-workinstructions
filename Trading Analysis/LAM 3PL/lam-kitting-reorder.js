@@ -678,7 +678,7 @@ CPCs pending review: ${flaggedCPCs.join(', ')}`;
 
     emailBody += `
 
-Inventory source: ${path.basename(inventoryFolder)}`;
+Inventory source: ${inventoryFolder ? path.basename(inventoryFolder) : inventorySource}`;
 
     // Attach both files
     const attachments = [outputFile];
@@ -957,7 +957,36 @@ function loadExcelData(excelPath) {
 // "ECPU1C104MA5" normalize to the same key. Applied on BOTH write and lookup
 // sides of the enrichment maps so either form finds the data.
 
-// Run a psql query via temp file; return stdout as string. Errors are logged, not swallowed.
+// Track OT availability status across queries
+let _otAvailable = true;
+let _otErrorMessage = null;
+
+function isOtAvailable() {
+  return _otAvailable;
+}
+
+function getOtErrorMessage() {
+  return _otErrorMessage;
+}
+
+// Detect infrastructure errors (connection refused, auth failed, etc.)
+function isInfrastructureError(errorMessage) {
+  const infraPatterns = [
+    'connection refused',
+    'could not connect',
+    'fe_sendauth',
+    'no password supplied',
+    'authentication failed',
+    'FATAL:',
+    'timeout expired',
+    'network is unreachable'
+  ];
+  const msg = (errorMessage || '').toLowerCase();
+  return infraPatterns.some(p => msg.includes(p.toLowerCase()));
+}
+
+// Run a psql query via temp file; return stdout as string.
+// Detects infrastructure errors and sets _otAvailable = false
 function runPsql(sql, label) {
   const tmpSql = `/tmp/lam_kitting_${label}.sql`;
   const tmpOut = `/tmp/lam_kitting_${label}.out`;
@@ -966,6 +995,16 @@ function runPsql(sql, label) {
     execSync(`psql -U analytics_user -d idempiere_replica -t -A -F '|' -f ${tmpSql} -o ${tmpOut}`,
       { encoding: 'utf8', maxBuffer: 50 * 1024 * 1024 });
   } catch (e) {
+    const errorMsg = (e.message || '') + (e.stderr ? e.stderr.toString() : '');
+
+    // Check for infrastructure errors (OT unavailable)
+    if (isInfrastructureError(errorMsg)) {
+      _otAvailable = false;
+      _otErrorMessage = `OT database unavailable: ${errorMsg.slice(0, 200)}`;
+      console.error(`  ERROR: ${_otErrorMessage}`);
+      return '';
+    }
+
     // rbash often returns non-zero even on success; only treat as a real failure if no output file
     if (!fs.existsSync(tmpOut) || fs.statSync(tmpOut).size === 0) {
       console.error(`  WARNING: psql ${label} failed: ${(e.message || '').slice(0, 300)}`);
@@ -1116,7 +1155,8 @@ function loadRecentPOVs() {
         1 AS preference,
         COALESCE(ol.datepromised, o.created) AS sort_date,
         COALESCE(ol.chuboe_trackingnumbers, '') AS tracking,
-        u_buyer.name AS buyer
+        u_buyer.name AS buyer,
+        ol.updated::date AS last_updated
       FROM adempiere.c_orderline ol
       JOIN adempiere.c_order o ON ol.c_order_id = o.c_order_id
       JOIN adempiere.c_bpartner bp ON o.c_bpartner_id = bp.c_bpartner_id
@@ -1129,11 +1169,12 @@ function loadRecentPOVs() {
         AND o.docstatus IN ('CO', 'IP', 'DR')
         AND ol.qtyordered > ol.qtydelivered
         AND rfq.c_bpartner_id = 1000730
-        -- Keep if: recent OR promise not yet passed
-        -- Filter out stale orders (>90 days old with past promise date)
+        -- Keep if: POV-stamped (committed in Infor) OR recent PO OR promise within 30 days
+        -- POV stamp = committed vendor order, always relevant even if old
         AND (
-          o.created::date >= CURRENT_DATE - INTERVAL '90 days'  -- Recent = keep
-          OR ol.datepromised::date >= CURRENT_DATE              -- Not yet due = keep
+          ol.chuboe_po_string LIKE 'POV%'                       -- POV stamped = always keep
+          OR o.created::date >= CURRENT_DATE - INTERVAL '90 days'  -- Recent PO = keep
+          OR ol.datepromised::date >= CURRENT_DATE - INTERVAL '30 days'  -- Promise within 30 days = keep
         )
 
       UNION ALL
@@ -1154,7 +1195,8 @@ function loadRecentPOVs() {
         2 AS preference,
         rfq.created AS sort_date,
         '' AS tracking,
-        u_vq_buyer.name AS buyer
+        u_vq_buyer.name AS buyer,
+        vl.updated::date AS last_updated
       FROM adempiere.chuboe_vq_line vl
       JOIN adempiere.chuboe_rfq rfq ON vl.chuboe_rfq_id = rfq.chuboe_rfq_id
       JOIN adempiere.chuboe_rfq_line rl ON vl.chuboe_rfq_line_id = rl.chuboe_rfq_line_id
@@ -1180,7 +1222,7 @@ function loadRecentPOVs() {
       FROM all_activity
     )
     SELECT cpc, mpn, pov_number, ot_po_number, qty, total_qty, promise_date, po_created_date,
-           supplier, rfq_number, state, tracking, buyer
+           supplier, rfq_number, state, tracking, buyer, last_updated
     FROM ranked
     WHERE rn = 1;
   `;
@@ -1188,7 +1230,7 @@ function loadRecentPOVs() {
   const result = runPsql(sql, 'povs');
   const povData = {};
   for (const line of result.trim().split('\n').filter(l => l.trim() && l.includes('|'))) {
-    const [cpc, mpn, pov, otPo, qty, totalQty, promiseDate, poCreated, supplier, rfqNum, state, tracking, buyer] = line.split('|');
+    const [cpc, mpn, pov, otPo, qty, totalQty, promiseDate, poCreated, supplier, rfqNum, state, tracking, buyer, lastUpdated] = line.split('|');
     const key = (cpc || '').trim();  // Key by CPC, not MPN
     if (key) {
       // Recency is enforced in SQL — anything returned here is by definition still relevant.
@@ -1205,6 +1247,7 @@ function loadRecentPOVs() {
         Qty_On_Order: parseFloat(totalQty) || 0,        // total across all RECENT open activity for the CPC
         Tracking: (tracking || '').trim(),              // tracking number or notes
         Buyer: (buyer || '').trim(),                    // OT buyer (salesrep on PO, or VQ creator)
+        Last_Updated: (lastUpdated || '').trim(),       // when order line was last modified
       };
       povData[key] = record;
 
@@ -1216,6 +1259,15 @@ function loadRecentPOVs() {
       const normalizedKey = normalizeMPN(key);
       if (normalizedKey !== key && !povData[normalizedKey]) {
         povData[normalizedKey] = record;
+      }
+
+      // ALSO store under normalized MPN for CPC mismatch scenarios.
+      // When multiple CPCs exist for the same MPN (common in LAM), the PO may be
+      // keyed by one CPC while the roster uses another. The MPN fallback in
+      // selectBetterPOV() ensures we still find the POV data even when CPCs differ.
+      const mpnKey = normalizeMPN((mpn || '').trim());
+      if (mpnKey && !povData[mpnKey]) {
+        povData[mpnKey] = record;
       }
     }
   }
@@ -1348,6 +1400,8 @@ const ALERT_COLUMNS = [
   'Recent POV',
   'Tracking',
   'Last Promise Date',
+  'PO Created Date',
+  'Last Updated',
   'Last RFQ',
   // Pricing
   'Base Unit Price',
@@ -1414,6 +1468,8 @@ function buildAlert(mpn, excel, totalQty, lamOwned, shortfall, priority, history
     'OT Buyer': pov && pov.Buyer ? pov.Buyer : (history.OT_Buyer || ''),
     'Historical Buyer': excel.Historical_Buyer || '',
     'Last Promise Date': pov && pov.POV_Date ? pov.POV_Date : (history.Last_Purchase_Date || ''),
+    'PO Created Date': pov && pov.PO_Created_Date ? pov.PO_Created_Date : '',
+    'Last Updated': pov && pov.Last_Updated ? pov.Last_Updated : '',
     'Last RFQ': history.RFQ_Number ? `${history.RFQ_Number} (${history.RFQ_Customer || ''})` : '',
     'Lead Time': excel.Lead_Time,
     'LAM MOQ': excel.MOQ,
@@ -1864,6 +1920,9 @@ module.exports = {
   W111_FILENAME,
   W115_FILENAME,
   loadAVL,
+  // OT availability checking
+  isOtAvailable,
+  getOtErrorMessage,
 };
 
 // -----------------------------------------------------------------------------
