@@ -915,6 +915,25 @@ function loadExcelData(excelPath) {
   const excelData = {};
   const pendingApprovals = [];
 
+  // Placeholder MPNs that aren't real part numbers - key by CPC instead to avoid collisions
+  const PLACEHOLDER_MPNS = [
+    'ORDER TO SPECIFICATION',
+    'BUILD TO PRINT',
+    'BUILT TO PRINT',
+    'CUSTOM',
+    'SPECIAL ORDER',
+    'TBD',
+    'N/A',
+    'NA',
+    'NONE',
+  ];
+
+  function isPlaceholderMPN(mpn) {
+    if (!mpn) return false;
+    const upper = mpn.toUpperCase().trim();
+    return PLACEHOLDER_MPNS.some(p => upper === p || upper.includes(p));
+  }
+
   // Process data rows (skip header)
   for (let i = 1; i < rows.length; i++) {
     const row = rows[i];
@@ -948,7 +967,10 @@ function loadExcelData(excelPath) {
       Submitted_Date: submittedDate,
     };
 
-    excelData[mpn] = record;
+    // Use CPC as key for placeholder MPNs to avoid collisions (multiple CPCs can have same placeholder)
+    const excelKey = isPlaceholderMPN(mpn) ? record.CPC : mpn;
+    if (!excelKey) continue;  // Skip if no valid key
+    excelData[excelKey] = record;
 
     // Track parts with pending approval for the Pending Approvals file
     if (pending || status === 'Pending Approval') {
