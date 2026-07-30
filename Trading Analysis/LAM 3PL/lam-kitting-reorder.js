@@ -1101,9 +1101,9 @@ function loadRecentPOVs() {
   const sql = `
     WITH all_activity AS (
       -- Open POs (with or without Infor POV stamp)
-      -- Key by CPC if available, otherwise fall back to MPN (for LAM RFQs missing CPC)
+      -- Key by CPC if available, otherwise fall back to clean MPN (for LAM RFQs missing CPC)
       SELECT
-        COALESCE(NULLIF(TRIM(rl.chuboe_cpc), ''), UPPER(TRIM(ol.chuboe_mpn))) AS cpc,
+        COALESCE(NULLIF(TRIM(rl.chuboe_cpc), ''), ol.chuboe_mpn_clean) AS cpc,
         TRIM(ol.chuboe_mpn) AS mpn,
         CASE WHEN ol.chuboe_po_string LIKE 'POV%' THEN ol.chuboe_po_string ELSE '' END AS pov_number,
         o.documentno AS ot_po_number,
@@ -1139,9 +1139,9 @@ function loadRecentPOVs() {
       UNION ALL
 
       -- VQs ticked (ispurchased='Y') but no PO cut yet → buyer committed, procurement catching up
-      -- Key by CPC if available, otherwise fall back to MPN
+      -- Key by CPC if available, otherwise fall back to clean MPN
       SELECT
-        COALESCE(NULLIF(TRIM(rl.chuboe_cpc), ''), UPPER(TRIM(vl.chuboe_mpn))) AS cpc,
+        COALESCE(NULLIF(TRIM(rl.chuboe_cpc), ''), vl.chuboe_mpn_clean) AS cpc,
         TRIM(vl.chuboe_mpn) AS mpn,
         '' AS pov_number,
         '' AS ot_po_number,
@@ -1192,7 +1192,7 @@ function loadRecentPOVs() {
     const key = (cpc || '').trim();  // Key by CPC, not MPN
     if (key) {
       // Recency is enforced in SQL — anything returned here is by definition still relevant.
-      povData[key] = {
+      const record = {
         State: (state || '').trim(),                    // 'PO' or 'VQ_TICKED'
         POV_Number: (pov || '').trim(),                 // populated once Infor stamps
         OT_PO_Number: (otPo || '').trim(),              // OT PO# (pre-Infor-stamp fallback)
@@ -1206,6 +1206,17 @@ function loadRecentPOVs() {
         Tracking: (tracking || '').trim(),              // tracking number or notes
         Buyer: (buyer || '').trim(),                    // OT buyer (salesrep on PO, or VQ creator)
       };
+      povData[key] = record;
+
+      // When CPC is null, SQL falls back to MPN as the key. Store under BOTH
+      // the raw MPN (with hyphens) AND the normalized MPN (without hyphens) to
+      // ensure lookup matches regardless of normalization. The lookup in
+      // identifyReorderCandidates uses normalizeMPN() which strips hyphens,
+      // so we need the normalized key to match.
+      const normalizedKey = normalizeMPN(key);
+      if (normalizedKey !== key && !povData[normalizedKey]) {
+        povData[normalizedKey] = record;
+      }
     }
   }
   return povData;
