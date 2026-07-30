@@ -228,7 +228,9 @@ function mergeRefreshIntoSourced(freshCsvPath, sourcedCsvPath) {
       'Purchased MPN', 'MPN Flag',
       // Roster-sourced (from Master Roster - may change between runs)
       'Reorder Threshold', 'LAM MOQ', 'Lead Time',
-      'Base Unit Price', 'Resale Price', 'Manufacturer'
+      'Base Unit Price', 'Resale Price', 'Manufacturer',
+      // Recent VQ pricing (from OT - refreshes with each run)
+      'Recent VQ Supplier', 'Recent VQ Price', 'Recent VQ Date'
     ];
 
     // Get column indices in both files

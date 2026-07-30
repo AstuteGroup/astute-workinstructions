@@ -515,10 +515,16 @@ async function main() {
   const recentPOVs = loadRecentPOVs();
   console.log(`  Recent POVs found: ${Object.keys(recentPOVs).length} MPNs`);
 
+  // Step 4c: Load recent VQ pricing (from Monday's full run)
+  console.log('');
+  console.log('Step 4c: Loading recent VQ pricing (past 7 days)...');
+  const recentVQPricing = loadRecentVQPricing();
+  console.log(`  Recent VQ pricing found: ${Object.keys(recentVQPricing.byCpc).length} CPCs, ${Object.keys(recentVQPricing.byMpn).length} MPNs`);
+
   // Step 5: Join and identify reorder candidates
   console.log('');
   console.log('Step 5: Identifying reorder candidates...');
-  const reorderAlerts = identifyReorderCandidates(aggregated, excelData, historicalData, recentPOVs, pendingTransfers);
+  const reorderAlerts = identifyReorderCandidates(aggregated, excelData, historicalData, recentPOVs, pendingTransfers, recentVQPricing);
   console.log(`  Reorder candidates: ${reorderAlerts.length} items`);
 
   // Step 5b: Check other warehouses for available stock
@@ -1167,6 +1173,83 @@ function loadHistoricalPurchaseData(mpns) {
 }
 
 // -----------------------------------------------------------------------------
+// Step 4c: Load Recent VQ Pricing (past 7 days - from Monday's full run)
+// -----------------------------------------------------------------------------
+
+/**
+ * Load recent VQ pricing data for LAM parts.
+ * This provides reference pricing from Monday's full API run for use in
+ * mid-week refreshes (no API calls needed).
+ *
+ * Returns TWO maps for flexible lookup:
+ *   - byCpc: CPC -> { supplier, cost, date, qty, mpn }
+ *   - byMpn: normalized MPN -> { supplier, cost, date, qty, cpc }
+ *
+ * Caller should check BOTH and reconcile (CPC is source of truth, MPN for verification).
+ */
+function loadRecentVQPricing() {
+  // Get VQs from LAM RFQs created in the past 7 days
+  // This captures Monday's full run and any ad-hoc VQs written during the week
+  // Include CPC from RFQ line for cross-reference
+  const sql = `
+    SELECT
+      TRIM(rl.chuboe_cpc) AS cpc,
+      TRIM(vl.chuboe_mpn) AS mpn,
+      bp.name AS supplier_name,
+      vl.cost AS vq_cost,
+      vl.created::date AS vq_date,
+      vl.qty AS vq_qty
+    FROM adempiere.chuboe_vq_line vl
+    JOIN adempiere.chuboe_rfq rfq ON vl.chuboe_rfq_id = rfq.chuboe_rfq_id
+    JOIN adempiere.chuboe_rfq_line rl ON vl.chuboe_rfq_line_id = rl.chuboe_rfq_line_id
+    JOIN adempiere.c_bpartner bp ON vl.c_bpartner_id = bp.c_bpartner_id
+    WHERE rfq.c_bpartner_id = 1000730  -- LAM Research only
+      AND vl.isactive = 'Y'
+      AND vl.cost IS NOT NULL
+      AND vl.cost > 0
+      AND vl.created >= CURRENT_DATE - INTERVAL '7 days'
+      AND vl.chuboe_mpn IS NOT NULL
+      AND vl.chuboe_mpn != ''
+    ORDER BY vl.created DESC;
+  `;
+
+  const byCpc = {};
+  const byMpn = {};
+
+  try {
+    const result = runPsql(sql, 'vq_pricing');
+    for (const line of result.trim().split('\n').filter(l => l.trim() && l.includes('|'))) {
+      const [cpc, mpn, supplier, cost, date, qty] = line.split('|');
+      const cpcKey = (cpc || '').trim();
+      const mpnKey = normalizeMPN(mpn);
+
+      const data = {
+        VQ_Supplier: (supplier || '').trim(),
+        VQ_Cost: parseFloat(cost) || 0,
+        VQ_Date: (date || '').trim(),
+        VQ_Qty: parseFloat(qty) || 0,
+        VQ_MPN: (mpn || '').trim(),
+        VQ_CPC: cpcKey
+      };
+
+      // Index by CPC (most recent wins - query ordered by created DESC)
+      if (cpcKey && !byCpc[cpcKey]) {
+        byCpc[cpcKey] = data;
+      }
+
+      // Index by MPN (most recent wins)
+      if (mpnKey && !byMpn[mpnKey]) {
+        byMpn[mpnKey] = data;
+      }
+    }
+  } catch (e) {
+    console.log(`  WARNING: Could not load recent VQ pricing: ${e.message}`);
+  }
+
+  return { byCpc, byMpn };
+}
+
+// -----------------------------------------------------------------------------
 // Step 4b: Load Recent POVs (vendor receipts in last 4 months)
 // -----------------------------------------------------------------------------
 
@@ -1475,6 +1558,10 @@ const ALERT_COLUMNS = [
   'Available Qty (Other WH)',
   // Multi-MPN aggregation (when stock spread across original + alt MPNs)
   'Stock Detail',
+  // Recent VQ pricing (from Monday's full run - reference pricing for mid-week refreshes)
+  'Recent VQ Supplier',
+  'Recent VQ Price',
+  'Recent VQ Date',
 ];
 
 // Render the "Recent POV" cell based on the activity state reported by loadRecentPOVs.
@@ -1579,7 +1666,7 @@ function selectBetterPOV(pov1, pov2) {
   return pov2;
 }
 
-function identifyReorderCandidates(aggregated, excelData, historicalData, recentPOVs = {}, pendingTransfers = new Map()) {
+function identifyReorderCandidates(aggregated, excelData, historicalData, recentPOVs = {}, pendingTransfers = new Map(), recentVQPricing = {}) {
   const alerts = [];
   const inventoryMPNs = new Set(Object.keys(aggregated));
 
@@ -1669,6 +1756,24 @@ function identifyReorderCandidates(aggregated, excelData, historicalData, recent
       // Flag if no threshold is set (needs threshold from LAM)
       if (!hasThreshold) {
         alert['Needs Threshold'] = 'YES';
+      }
+
+      // Add recent VQ pricing (from Monday's full run)
+      // Look up by CPC first (source of truth), then verify with MPN
+      const vqByCpc = recentVQPricing.byCpc[cpc];
+      const vqByMpn = recentVQPricing.byMpn[normalizeMPN(rosterMpn)];
+
+      // Prefer CPC match; fall back to MPN match
+      const vqPricing = vqByCpc || vqByMpn;
+      if (vqPricing) {
+        alert['Recent VQ Supplier'] = vqPricing.VQ_Supplier || '';
+        alert['Recent VQ Price'] = vqPricing.VQ_Cost || '';
+        alert['Recent VQ Date'] = vqPricing.VQ_Date || '';
+
+        // Flag if CPC and MPN lookups disagree (data quality check)
+        if (vqByCpc && vqByMpn && vqByCpc.VQ_MPN !== vqByMpn.VQ_MPN) {
+          alert['VQ MPN Mismatch'] = `CPC→${vqByCpc.VQ_MPN}, MPN→${vqByMpn.VQ_MPN}`;
+        }
       }
 
       alerts.push(alert);
