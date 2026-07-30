@@ -13,7 +13,8 @@
   "capabilities": [
     "image-processing",
     "pending-state",
-    "approval-reply"
+    "approval-reply",
+    "rate-limiting"
   ],
 
   "capabilityConfig": {
@@ -39,6 +40,9 @@
       "APPROVAL_CACHE_ONLY_SUPPORT": true,
       "APPROVAL_SKIP_FIELDS": "customer/contact/MFR resolution",
       "APPROVAL_SKIP_REMAINING": false
+    },
+    "rate-limiting": {
+      "RATE_LIMIT_ACTION": "enqueue"
     }
   },
 

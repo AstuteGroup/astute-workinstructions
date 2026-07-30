@@ -12,7 +12,9 @@
   "introText": "Your job is to process forwarded supplier shipping confirmations and update OT purchase orders with tracking numbers.",
 
   "capabilities": [
-    "image-processing"
+    "image-processing",
+    "pending-state",
+    "rate-limiting"
   ],
 
   "capabilityConfig": {
@@ -21,6 +23,15 @@
       "IMAGE_EXTRACT_TARGETS": "tracking numbers, carrier, ship date, and MPNs",
       "IMAGE_EXTRA_CONDITIONS": "- You find a PO/POV reference but NO tracking numbers in the text",
       "IMAGE_EXTRA_NOTES": "**Important:** Screenshots often contain MPN-to-tracking mappings (e.g., TI shows which parts shipped with which tracking). For multi-line orders, extract BOTH the tracking numbers AND the MPNs from the image to populate the `mpn` field correctly.\n\nThis handles cases like TI, Mouser, DigiKey portal screenshots."
+    },
+    "pending-state": {
+      "PENDING_STATE_ACTIONS": "needs_review",
+      "PENDING_STATE_RECIPIENT": "Jake",
+      "PENDING_RETRY_CAP_ACTION": "needs_review",
+      "PENDING_RETRY_CAP_REASON": "tracking email requires manual review"
+    },
+    "rate-limiting": {
+      "RATE_LIMIT_ACTION": "patch_tracking"
     }
   },
 

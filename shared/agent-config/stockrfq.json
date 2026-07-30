@@ -11,6 +11,7 @@
 
   "capabilities": [
     "image-processing",
+    "pending-state",
     "approval-reply",
     "rate-limiting"
   ],
@@ -19,6 +20,12 @@
     "image-processing": {
       "IMAGE_CONTEXT_DESC": "screenshot RFQ requests",
       "IMAGE_EXTRACT_TARGETS": "MPN, qty, MFR, target price"
+    },
+    "pending-state": {
+      "PENDING_STATE_ACTIONS": "needs_review",
+      "PENDING_STATE_RECIPIENT": "Jake",
+      "PENDING_RETRY_CAP_ACTION": "needs_review",
+      "PENDING_RETRY_CAP_REASON": "stock RFQ requires manual review"
     },
     "approval-reply": {
       "APPROVAL_DOC_TYPE": "Large Stock RFQ",
