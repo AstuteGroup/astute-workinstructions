@@ -263,12 +263,26 @@ function mergeRefreshIntoSourced(freshCsvPath, sourcedCsvPath) {
       'Recent VQ Supplier', 'Recent VQ Price', 'Recent VQ Date'
     ];
 
+    // Old API columns to CLEAR during refresh - they're stale and often wrong.
+    // Recent VQ columns from OT are the source of truth for mid-week sourcing.
+    const staleApiColumns = [
+      'In Stock Supplier', 'In Stock Price', 'In Stock Qty', 'In Stock Margin %',
+      'Lead Time Supplier', 'Lead Time Price', 'Lead Time (Weeks)', 'Lead Time Margin %',
+      'Sourcing Status', 'Selected MPN'
+    ];
+
     // Get column indices in both files
     const freshColIdx = {};
     const sourcedColIdx = {};
     for (const col of otColumns) {
       freshColIdx[col] = fresh.headers.indexOf(col);
       sourcedColIdx[col] = sourced.headers.indexOf(col);
+    }
+
+    // Get indices for stale API columns to clear
+    const staleColIdx = {};
+    for (const col of staleApiColumns) {
+      staleColIdx[col] = sourced.headers.indexOf(col);
     }
 
     let updated = 0;
@@ -280,9 +294,17 @@ function mergeRefreshIntoSourced(freshCsvPath, sourcedCsvPath) {
       const cpc = row[sourcedCpcIdx];
       const freshRow = freshByCpc[cpc];
       if (freshRow) {
+        // Update OT columns from fresh data
         for (const col of otColumns) {
           if (freshColIdx[col] >= 0 && sourcedColIdx[col] >= 0) {
             row[sourcedColIdx[col]] = freshRow[freshColIdx[col]];
+          }
+        }
+        // Clear stale API columns - they're unreliable cached data.
+        // Recent VQ columns (from OT) are the source of truth for mid-week.
+        for (const col of staleApiColumns) {
+          if (staleColIdx[col] >= 0) {
+            row[staleColIdx[col]] = '';
           }
         }
         updated++;
