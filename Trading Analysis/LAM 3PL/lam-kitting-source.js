@@ -677,7 +677,7 @@ async function writeEnrichedOutput(results, originalHeaders, outputPath) {
   const resaleIdx = originalHeaders.indexOf('Resale Price');
 
   // Simplified columns: In Stock option + Lead Time option + Margins + Status + AVL info
-  const newHeaders = [
+  const apiHeaders = [
     'In Stock Supplier',
     'In Stock Price',
     'In Stock Qty',
@@ -691,7 +691,20 @@ async function writeEnrichedOutput(results, originalHeaders, outputPath) {
     'AVL Count',       // Number of approved MPNs for this CPC
   ];
 
-  const allHeaders = [...originalHeaders, ...newHeaders];
+  // Check if API columns already exist (from previous sourcing run)
+  const firstApiCol = originalHeaders.indexOf('In Stock Supplier');
+  const apiColsExist = firstApiCol !== -1;
+
+  // If columns exist, we'll update in place. Otherwise append.
+  const allHeaders = apiColsExist
+    ? originalHeaders  // Keep existing structure
+    : [...originalHeaders, ...apiHeaders];
+
+  // Map API header to index for writing
+  const apiColIndices = {};
+  for (const h of apiHeaders) {
+    apiColIndices[h] = allHeaders.indexOf(h);
+  }
   const rows = [];
 
   // Track margin column indices (1-based for ExcelJS)
@@ -728,21 +741,30 @@ async function writeEnrichedOutput(results, originalHeaders, outputPath) {
       ? (resalePrice - leadTimePrice) / resalePrice * 100
       : null;
 
-    const franchiseValues = [
-      result.franchise.inStockSupplier || '',
-      result.franchise.inStockPrice ? parseFloat(result.franchise.inStockPrice) : '',
-      result.franchise.inStockQty ? parseInt(result.franchise.inStockQty) : '',
-      inStockMarginNum,  // Store as number for coloring
-      result.franchise.leadTimeSupplier || '',
-      result.franchise.leadTimePrice ? parseFloat(result.franchise.leadTimePrice) : '',
-      result.franchise.leadTimeWeeks || '',
-      leadTimeMarginNum,  // Store as number for coloring
-      result.sourcingStatus || 'SOURCED',
-      result.selectedMpn || '',           // MPN used if alternate was better
-      result.avlCount || 1,               // Number of approved MPNs
-    ];
+    // Build franchise data map
+    const franchiseData = {
+      'In Stock Supplier': result.franchise.inStockSupplier || '',
+      'In Stock Price': result.franchise.inStockPrice ? parseFloat(result.franchise.inStockPrice) : '',
+      'In Stock Qty': result.franchise.inStockQty ? parseInt(result.franchise.inStockQty) : '',
+      'In Stock Margin %': inStockMarginNum,
+      'Lead Time Supplier': result.franchise.leadTimeSupplier || '',
+      'Lead Time Price': result.franchise.leadTimePrice ? parseFloat(result.franchise.leadTimePrice) : '',
+      'Lead Time (Weeks)': result.franchise.leadTimeWeeks || '',
+      'Lead Time Margin %': leadTimeMarginNum,
+      'Sourcing Status': result.sourcingStatus || 'SOURCED',
+      'Selected MPN': result.selectedMpn || '',
+      'AVL Count': result.avlCount || 1,
+    };
 
-    rows.push([...originalValues, ...franchiseValues]);
+    // Build row: start with original values, then set API columns at correct indices
+    const row = new Array(allHeaders.length).fill('');
+    originalValues.forEach((v, i) => { row[i] = v; });
+    for (const [header, value] of Object.entries(franchiseData)) {
+      const idx = apiColIndices[header];
+      if (idx !== -1) row[idx] = value;
+    }
+
+    rows.push(row);
   }
 
   // Create workbook with ExcelJS
