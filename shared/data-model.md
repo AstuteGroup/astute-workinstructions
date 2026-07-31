@@ -298,7 +298,8 @@ Both wrappers run the validator internally and abort on any violation.
 - `chuboe_cq_line_id` → `chuboe_cq_line`
 - `chuboe_rfq_line_id` → `chuboe_rfq_line`
 - Also has its own `chuboe_mpn`, `chuboe_cpc`, `chuboe_mfr_id`, `chuboe_date_code`
-- `chuboe_po_string` = Infor POV number (filter: `LIKE 'POV%'`)
+- `chuboe_po_string` = Infor POV number (Purchase Orders)
+- `chuboe_co_string` = Infor COV number (Sales Orders)
 
 **Where key fields live on `c_orderline`:**
 
@@ -318,6 +319,56 @@ When searching for orders by MPN:
 - **WRONG:** `WHERE ol.description LIKE '%DG406%'` — this is the text description, not the MPN
 
 The `description` field contains human-readable text (e.g., "CAP,SMD,NPO,1.1NF,5%,10KV"). The `chuboe_mpn` field contains the actual part number (e.g., "6560N112J103P").
+
+---
+
+### OT ↔ Infor Mapping (POV / COV / Tracking)
+
+**Key insight:** OT uses `PO` prefix (e.g., `PO811472`), Infor uses `POV` prefix (e.g., `POV0077381`). The mapping lives on `c_orderline`:
+
+| Field | Table | Purpose | Example |
+|-------|-------|---------|---------|
+| `chuboe_po_string` | `c_orderline` | Infor POV number (Purchase Orders) | `POV0077381` |
+| `chuboe_co_string` | `c_orderline` | Infor COV number (Sales Orders) | `COV0022850` |
+| `chuboe_trackingnumbers` | `c_orderline` | Tracking number(s) | `382847451320` |
+
+**The full chain: VQ → OT PO → Infor POV → Tracking**
+
+```sql
+-- From VQ ID, get OT PO, Infor POV, and tracking:
+SELECT v.chuboe_vq_line_id, v.chuboe_mpn,
+       o.documentno AS ot_po,
+       ol.chuboe_po_string AS infor_pov,
+       ol.chuboe_trackingnumbers AS tracking
+FROM adempiere.chuboe_vq_line v
+JOIN adempiere.c_orderline ol ON ol.chuboe_vq_line_id = v.chuboe_vq_line_id
+JOIN adempiere.c_order o ON ol.c_order_id = o.c_order_id
+WHERE v.chuboe_vq_line_id = <vq_id>;
+
+-- From Infor POV, get OT PO and tracking:
+SELECT o.documentno AS ot_po, ol.chuboe_po_string AS infor_pov,
+       ol.chuboe_mpn, ol.chuboe_trackingnumbers AS tracking
+FROM adempiere.c_orderline ol
+JOIN adempiere.c_order o ON ol.c_order_id = o.c_order_id
+WHERE ol.chuboe_po_string = 'POV0077381';
+
+-- From MPN + vendor, find tracking:
+SELECT v.chuboe_mpn, o.documentno AS ot_po,
+       ol.chuboe_po_string AS infor_pov,
+       ol.chuboe_trackingnumbers AS tracking,
+       bp.name AS vendor
+FROM adempiere.chuboe_vq_line v
+JOIN adempiere.c_orderline ol ON ol.chuboe_vq_line_id = v.chuboe_vq_line_id
+JOIN adempiere.c_order o ON ol.c_order_id = o.c_order_id
+JOIN adempiere.c_bpartner bp ON o.c_bpartner_id = bp.c_bpartner_id
+WHERE v.chuboe_mpn = 'TPS767D301PWP'
+  AND bp.name ILIKE '%texas instru%';
+```
+
+**Notes:**
+- Tracking is also stored on `chuboe_vq_line.chuboe_trackingnumbers` (same data, different location)
+- The `chuboe_infor_order` table exists but is typically stale — use `c_orderline.chuboe_po_string` instead
+- One OT PO can have multiple Infor POVs (rarely), and one POV spans multiple order lines
 
 ---
 
