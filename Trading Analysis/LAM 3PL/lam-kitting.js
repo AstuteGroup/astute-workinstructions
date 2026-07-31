@@ -226,6 +226,8 @@ function mergeRefreshIntoSourced(freshCsvPath, sourcedCsvPath) {
 
     // Columns to update from fresh data (OT-sourced + roster-sourced)
     const otColumns = [
+      // Identity columns (MPN can change if roster is corrected)
+      'MPN', 'Manufacturer',
       // OT-sourced (live from database)
       'QTY ON HAND', 'W115 Stale Inventory', 'Shortfall', 'Priority',
       'On Order Qty', 'OT PO', 'Recent POV', 'Tracking',
@@ -233,7 +235,7 @@ function mergeRefreshIntoSourced(freshCsvPath, sourcedCsvPath) {
       'Purchased MPN', 'MPN Flag',
       // Roster-sourced (from Master Roster - may change between runs)
       'Reorder Threshold', 'LAM MOQ', 'Lead Time',
-      'Base Unit Price', 'Resale Price', 'Manufacturer',
+      'Base Unit Price', 'Resale Price',
       // Recent VQ pricing (from OT - refreshes with each run)
       'Recent VQ Supplier', 'Recent VQ Price', 'Recent VQ Date'
     ];
