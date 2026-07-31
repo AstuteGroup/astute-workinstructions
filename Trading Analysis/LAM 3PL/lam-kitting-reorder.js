@@ -164,6 +164,104 @@ function validatePurchasedMPN(cpc, rosterMpn, purchasedMpn) {
   }
 }
 
+/**
+ * Validate data integrity before output generation
+ * Catches row-offset corruption, MPN/CPC mismatches, and manufacturer inconsistencies
+ *
+ * @param {Array} alerts - Reorder alerts to validate
+ * @param {Object} excelData - Master Roster data indexed by MPN
+ * @returns {Array} - Array of { type, cpc, mpn, message } for each issue found
+ */
+function validateDataIntegrity(alerts, excelData) {
+  const issues = [];
+  const seenCPCs = new Map();  // CPC -> first MPN seen (detect duplicates with different MPNs)
+
+  for (const alert of alerts) {
+    const cpc = alert['CPC'] || '';
+    const mpn = alert['MPN'] || '';
+    const mfr = alert['Manufacturer'] || '';
+
+    // Skip if no CPC (shouldn't happen but defensive)
+    if (!cpc) continue;
+
+    // Check 1: CPC uniqueness - same CPC should always have same MPN
+    if (seenCPCs.has(cpc)) {
+      const firstMpn = seenCPCs.get(cpc);
+      if (firstMpn !== mpn) {
+        issues.push({
+          type: 'DUPLICATE_CPC_DIFF_MPN',
+          cpc,
+          mpn,
+          message: `CPC appears twice with different MPNs: "${firstMpn}" vs "${mpn}"`
+        });
+      }
+    } else {
+      seenCPCs.set(cpc, mpn);
+    }
+
+    // Check 2: MPN/CPC consistency against Master Roster
+    // Look up by CPC in excelData values to find the roster entry
+    let rosterEntry = null;
+    for (const [key, val] of Object.entries(excelData)) {
+      if (val.CPC === cpc) {
+        rosterEntry = val;
+        break;
+      }
+    }
+
+    if (rosterEntry) {
+      // Find the roster MPN by looking up what key maps to this CPC's entry
+      // The key in excelData is the MPN (or CPC for placeholders)
+      let rosterMpn = null;
+      for (const [key, val] of Object.entries(excelData)) {
+        if (val === rosterEntry) {
+          // If the key looks like a CPC (starts with digits followed by dash), it's a placeholder
+          // Otherwise the key IS the MPN
+          if (!/^\d+-\d+-\d+/.test(key)) {
+            rosterMpn = key;
+          }
+          break;
+        }
+      }
+
+      // If we found a roster MPN and it doesn't match the alert MPN, flag it
+      if (rosterMpn && normalizeMPN(rosterMpn) !== normalizeMPN(mpn)) {
+        // Check if it's an approved alternate via AVL
+        const approvedMpns = getAllApprovedMPNs(cpc, rosterMpn);
+        const isApprovedAlt = approvedMpns.some(m => normalizeMPN(m) === normalizeMPN(mpn));
+
+        if (!isApprovedAlt) {
+          issues.push({
+            type: 'MPN_MISMATCH',
+            cpc,
+            mpn,
+            message: `Alert MPN "${mpn}" does not match roster MPN "${rosterMpn}" and is not on AVL`
+          });
+        }
+      }
+
+      // Check 3: Manufacturer plausibility
+      // Flag if manufacturer in alert doesn't match roster (could indicate row offset)
+      const rosterMfr = rosterEntry.Manufacturer || '';
+      if (mfr && rosterMfr && mfr.toUpperCase() !== rosterMfr.toUpperCase()) {
+        // Allow minor variations (e.g., "TEXAS INSTRUMENTS" vs "TEXAS INSTRUMENTS (P)")
+        const normAlert = mfr.toUpperCase().replace(/\s*\([^)]*\)\s*/g, '').trim();
+        const normRoster = rosterMfr.toUpperCase().replace(/\s*\([^)]*\)\s*/g, '').trim();
+        if (normAlert !== normRoster) {
+          issues.push({
+            type: 'MFR_MISMATCH',
+            cpc,
+            mpn,
+            message: `Manufacturer "${mfr}" does not match roster "${rosterMfr}"`
+          });
+        }
+      }
+    }
+  }
+
+  return issues;
+}
+
 // -----------------------------------------------------------------------------
 // Configuration
 // -----------------------------------------------------------------------------
@@ -544,6 +642,22 @@ async function main() {
       alert['Available Stock (Other WH)'] = warehouses.join(', ');
       alert['Available Qty (Other WH)'] = totalQty;
     }
+  }
+
+  // Step 5c: Data integrity validation (catch row-offset corruption before output)
+  console.log('');
+  console.log('Step 5c: Validating data integrity...');
+  const validationIssues = validateDataIntegrity(reorderAlerts, excelData);
+  if (validationIssues.length > 0) {
+    console.log(`  WARNING: ${validationIssues.length} data integrity issue(s) detected:`);
+    for (const issue of validationIssues.slice(0, 10)) {
+      console.log(`    - ${issue.type}: CPC ${issue.cpc} - ${issue.message}`);
+    }
+    if (validationIssues.length > 10) {
+      console.log(`    ... and ${validationIssues.length - 10} more`);
+    }
+  } else {
+    console.log('  All records passed validation.');
   }
 
   // Step 6: Generate output files
