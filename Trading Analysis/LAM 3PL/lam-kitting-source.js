@@ -871,7 +871,8 @@ async function writeEnrichedOutput(results, originalHeaders, outputPath) {
   const csvRows = [allHeaders, ...rows.map(row => row.map((v, idx) => {
     // Format margin columns for CSV
     if (idx === inStockMarginCol - 1 || idx === leadTimeMarginCol - 1) {
-      return v !== null && v !== undefined ? v.toFixed(1) + '%' : '';
+      const num = parseFloat(v);
+      return !isNaN(num) ? num.toFixed(1) + '%' : '';
     }
     return v;
   }))];

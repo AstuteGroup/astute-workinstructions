@@ -62,6 +62,14 @@ For each email:
 3. Extract tracking numbers using carrier detection
 4. Auto-detect carrier from tracking format
 
+**Screenshot Handling (2026-07 enhancement):**
+
+If the email body is sparse but contains images (common for TI, Mouser, DigiKey portal screenshots):
+1. Download images with `--include-images` flag
+2. Use Read tool on downloaded PNG/JPG files (Claude Vision)
+3. Extract tracking numbers, carrier, MPNs from the screenshot
+4. For multi-line orders, screenshots often show MPN-to-tracking mappings
+
 ### Step 3: Validate PO Exists
 
 ```sql
