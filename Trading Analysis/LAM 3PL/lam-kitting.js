@@ -86,6 +86,19 @@ function extractStats(csvPath) {
   }
 }
 
+// Find the most recent sourced CSV file (for mid-week refreshes)
+function findMostRecentSourcedCsv() {
+  const files = fs.readdirSync(OUTPUT_DIR)
+    .filter(f => f.match(/^LAM_Reorder_Alerts_\d{4}-\d{2}-\d{2}_sourced\.csv$/))
+    .sort()
+    .reverse();  // Most recent first
+
+  if (files.length > 0) {
+    return path.join(OUTPUT_DIR, files[0]);
+  }
+  return null;
+}
+
 // Step: Refresh - Re-pull OT data, generate CSV + xlsx (no APIs)
 // If _sourced.csv exists, merge fresh OT data INTO it (preserving API pricing)
 // Returns: { csvPath, additions: [], removals: [] }
@@ -96,6 +109,16 @@ async function stepRefresh(dateStamp) {
   const reorderScript = path.join(SCRIPT_DIR, 'lam-kitting-reorder.js');
   const csvPath = path.join(OUTPUT_DIR, `LAM_Reorder_Alerts_${dateStamp}.csv`);
   const sourcedPath = path.join(OUTPUT_DIR, `LAM_Reorder_Alerts_${dateStamp}_sourced.csv`);
+
+  // For mid-week refreshes: if today's sourced file doesn't exist, copy from most recent
+  if (!fs.existsSync(sourcedPath)) {
+    const mostRecent = findMostRecentSourcedCsv();
+    if (mostRecent) {
+      const recentDate = path.basename(mostRecent).match(/(\d{4}-\d{2}-\d{2})/)?.[1];
+      log(`  No sourced file for ${dateStamp} - copying from ${recentDate} as base`);
+      fs.copyFileSync(mostRecent, sourcedPath);
+    }
+  }
 
   // Run reorder script to get fresh OT data
   const success = runScript(reorderScript, [ROSTER_PATH, '--no-email']);
