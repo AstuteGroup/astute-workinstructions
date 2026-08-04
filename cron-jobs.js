@@ -713,6 +713,7 @@ module.exports = [
   // ─── CURRENCY CONVERSION ─────────────────────────────────────────────────────
   {
     name: 'currency-conversion-poller',
+    owner: 'justin.oberhofer',
     cadence: 'every 30m',
     cadenceCron: '10,40 * * * *',  // offset from MFR jobs
     command: `python3 "${ASTUTE}/tsk-currency-conversion-upload/currency-poller.py"`,
