@@ -353,8 +353,14 @@ def fuzzy_match_manufacturer(name: str, threshold: float = 0.3) -> list:
                     'normalizedDb': normalized_db,
                 })
 
-        # Sort by exact match first, then score
-        matches.sort(key=lambda m: (0 if m['quality'] == 'EXACT' else 1, -m['score']))
+        # Sort by: exact match first, then score, then prefer name matches over alias
+        # Tiebreaker: name matches are more relevant than alias/description matches
+        def sort_key(m):
+            exact_priority = 0 if m['quality'] == 'EXACT' else 1
+            field_priority = 0 if 'name' in m['matchField'] else 1  # prefer name matches
+            return (exact_priority, -m['score'], field_priority)
+
+        matches.sort(key=sort_key)
 
         return matches[:5]
 
@@ -524,12 +530,26 @@ def format_html_email(results: dict) -> str:
         html += f'    <p><strong>Action:</strong> <span class="{action_class}">{action}</span></p>\n'
 
         if best:
-            quality_class = best['quality'].lower()
-            html += f"""
-    <p>Best match: <span class="{quality_class}">{best['quality']}</span> ({best['score']*100:.0f}%) - {best['name']} (ID: {best['id']}, Code: {best['code']})</p>
-"""
-            if best.get('url'):
-                html += f'    <p>OT URL: <a href="{best["url"]}">{best["url"]}</a></p>\n'
+            # Show top 3 matches over 30% threshold
+            top_matches = [m for m in mfr.get('allMatches', [])[:3] if m.get('score', 0) >= 0.3]
+            if top_matches:
+                html += '    <p><strong>Potential matches in OT:</strong></p>\n'
+                html += '    <table style="width:100%; margin: 5px 0;">\n'
+                html += '      <tr><th>Match</th><th>Score</th><th>Code</th><th>URL</th></tr>\n'
+                for i, match in enumerate(top_matches):
+                    quality_class = match['quality'].lower()
+                    row_style = 'background: #e8f5e9;' if i == 0 else ''
+                    score_pct = match['score'] * 100
+                    match_url = match.get('url') or '-'
+                    if match_url != '-':
+                        match_url = f'<a href="{match_url}">{match_url[:30]}...</a>' if len(match_url) > 30 else f'<a href="{match_url}">{match_url}</a>'
+                    html += f'      <tr style="{row_style}"><td>{match["name"]}</td><td><span class="{quality_class}">{match["quality"]}</span> ({score_pct:.0f}%)</td><td>{match["code"]}</td><td>{match_url}</td></tr>\n'
+                html += '    </table>\n'
+            else:
+                quality_class = best['quality'].lower()
+                html += f'    <p>Best match: <span class="{quality_class}">{best["quality"]}</span> ({best["score"]*100:.0f}%) - {best["name"]} (ID: {best["id"]}, Code: {best["code"]})</p>\n'
+                if best.get('url'):
+                    html += f'    <p>OT URL: <a href="{best["url"]}">{best["url"]}</a></p>\n'
         else:
             html += '    <p class="no-match">No matches found in OT</p>\n'
 

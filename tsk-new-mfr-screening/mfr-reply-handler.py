@@ -230,19 +230,26 @@ def fetch_mfr_replies(mailbox: str, folder: str = 'INBOX'):
             if not subject.lower().startswith('re:'):
                 continue
 
-            # Get body
+            # Get body - combine text/plain and text/html for better extraction
             body = ''
+            html_body = ''
             if msg.is_multipart():
                 for part in msg.walk():
-                    if part.get_content_type() == 'text/plain':
-                        payload = part.get_payload(decode=True)
-                        if payload:
-                            body = payload.decode('utf-8', errors='ignore')
-                            break
+                    content_type = part.get_content_type()
+                    payload = part.get_payload(decode=True)
+                    if payload:
+                        decoded = payload.decode('utf-8', errors='ignore')
+                        if content_type == 'text/plain' and not body:
+                            body = decoded
+                        elif content_type == 'text/html' and not html_body:
+                            html_body = decoded
             else:
                 payload = msg.get_payload(decode=True)
                 if payload:
                     body = payload.decode('utf-8', errors='ignore')
+
+            # Combine plain text and HTML for extraction (HTML often has quoted content)
+            combined_body = body + '\n' + html_body if html_body else body
 
             from_addr = msg['From'] or ''
             message_id = msg['Message-ID'] or f"no-id-{eid}"
@@ -253,7 +260,7 @@ def fetch_mfr_replies(mailbox: str, folder: str = 'INBOX'):
                 'subject': subject,
                 'from': from_addr,
                 'date': msg['Date'],
-                'body': body,
+                'body': combined_body,
                 'raw': msg,
             })
 
@@ -507,21 +514,25 @@ def extract_mfr_from_email(body: str) -> list:
             })
 
     # Look for HTML email format (quoted in reply)
-    # Pattern: <div class="mfr-name">Name</div> followed by URL
+    # Pattern: <div class="mfr-name">Name</div> or <div class="x_mfr-name">Name</div>
+    # Note: Outlook adds "x_" prefix to CSS class names in quoted content
     if not manufacturers:
-        # Try HTML div pattern
-        html_name_match = re.search(r'class="mfr-name"[^>]*>([^<]+)<', body)
+        # Try HTML div pattern (with optional x_ prefix for Outlook)
+        html_name_match = re.search(r'class="(?:x_)?mfr-name"[^>]*>([^<]+)<', body)
         if html_name_match:
             name = html_name_match.group(1).strip()
             # Look for URL in nearby content
             html_url_match = re.search(r'URL:\s*<a[^>]*href="([^"]+)"', body)
             if not html_url_match:
                 html_url_match = re.search(r'URL:\s*(https?://[^\s<>"]+)', body)
+            # Also check for alias in the x_mfr-url div
+            html_alias_match = re.search(r'class="(?:x_)?mfr-url"[^>]*>Alias:\s*([^<]+)<', body)
             raw_url = html_url_match.group(1) if html_url_match else None
+            alias = html_alias_match.group(1).strip() if html_alias_match else None
             manufacturers.append({
                 'name': name,
                 'url': clean_outlook_url(raw_url) if raw_url else None,
-                'alias': None,
+                'alias': alias,
             })
 
     # Fallback: look for plain text patterns from email thread
@@ -652,6 +663,48 @@ Please reply with the M code to add to the description/alias field.
 Example reply: M12345
 
 Or reply "skip" if no M code is needed.
+"""
+
+    try:
+        msg = MIMEText(body)
+        msg['Subject'] = subject
+        msg['From'] = f'"MFR Check" <bizops@orangetsunami.com>'
+        msg['To'] = to
+
+        with smtplib.SMTP_SSL(SMTP_HOST, SMTP_PORT) as server:
+            server.login('bizops@orangetsunami.com', SMTP_PASS)
+            server.send_message(msg)
+
+        return True
+    except Exception as e:
+        print(f"Failed to send email: {e}", file=sys.stderr)
+        return False
+
+
+def send_manual_mfr_request_email(to: str, mfr: dict):
+    """Send email requesting manual MFR creation (when CLI not available)."""
+    if not SMTP_PASS:
+        print("Warning: No SMTP password, skipping email", file=sys.stderr)
+        return False
+
+    mfr_name = mfr.get('name', 'Unknown')
+    mfr_url = mfr.get('url') or 'N/A'
+    mfr_alias = mfr.get('alias') or 'N/A'
+
+    subject = f"Manual MFR Creation Request: {mfr_name}"
+
+    body = f"""A new manufacturer needs to be created manually in OT.
+
+Manufacturer Details:
+- Name: {mfr_name}
+- URL: {mfr_url}
+- Alias: {mfr_alias}
+
+The automated CLI is not yet configured for MFR creation.
+Please create this manufacturer in OT and reply with the M code.
+
+---
+This request was approved via email reply.
 """
 
     try:
@@ -862,8 +915,16 @@ def process_replies(mailbox: str, dry_run: bool = False, folder: str = 'INBOX'):
                         print(f"  Already exists: {mfr_result.get('name')}", file=sys.stderr)
 
                 except Exception as e:
-                    print(f"  Error creating MFR: {e}", file=sys.stderr)
-                    results['errors'] += 1
+                    error_msg = str(e)
+                    # Check if CLI subcommand not available yet
+                    if 'Unknown subcommand: mfr' in error_msg:
+                        print(f"  CLI not ready - sending manual request email", file=sys.stderr)
+                        # Send email to operator for manual creation
+                        send_manual_mfr_request_email(sender, mfr)
+                        results['created'] += 1  # Count as handled
+                    else:
+                        print(f"  Error creating MFR: {e}", file=sys.stderr)
+                        results['errors'] += 1
                     continue
 
             mark_email_processed(message_id)
