@@ -66,6 +66,8 @@ The proxy exposes exactly these writer entry points:
 | `mark-cq-sold` | `markCQSold(cqId, opts?)` | `cqId` | `shared/cq-patcher.js` |
 | `validate-vq-purchase` | `validateVQForPurchase(vqId, opts?)` | `vqId` | `shared/vq-purchase-validator.js` |
 | `validate-cq-sold` | `validateCQForSold(cqId, opts?)` | `cqId` | `shared/cq-sold-validator.js` |
+| `mfr` | `writeMfr(opts)` | `opts` | `shared/mfr-writer.js` |
+| `mfr-alias` | `updateMfrAlias(opts)` | `opts` | `shared/mfr-writer.js` |
 
 The two `validate-*` subcommands are read-mostly (they hit `apiGet`) and are exposed so non-credentialed sessions can run dry-run diagnostics before asking the user to approve a write.
 

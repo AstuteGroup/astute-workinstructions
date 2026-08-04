@@ -16,7 +16,7 @@
  * USAGE:
  *   const { writeRFQ, writeOffer, writeCQ, writeCQBatch, writeVQBatch,
  *           writeReviewedItems, writePricingResult, tickVQForPurchase,
- *           postApproveOrder, markCQSold,
+ *           postApproveOrder, markCQSold, writeMfr, updateMfrAlias,
  *           validateVQForPurchase, validateCQForSold } =
  *     require('../shared/writeback-proxy-client');
  *
@@ -72,6 +72,8 @@ const DISPATCH = {
   markCQSold:            { subcommand: 'mark-cq-sold',         args: ['cqId', 'opts'] },
   validateVQForPurchase: { subcommand: 'validate-vq-purchase', args: ['vqId', 'opts'] },
   validateCQForSold:     { subcommand: 'validate-cq-sold',     args: ['cqId', 'opts'] },
+  writeMfr:              { subcommand: 'mfr',                  args: ['opts'] },
+  updateMfrAlias:        { subcommand: 'mfr-alias',            args: ['opts'] },
 };
 
 // Map writer name -> source module so direct-mode (analytics_user) can
@@ -90,6 +92,8 @@ const DIRECT_MODULE = {
   markCQSold:            './cq-patcher',
   validateVQForPurchase: './vq-purchase-validator',
   validateCQForSold:     './cq-sold-validator',
+  writeMfr:              './mfr-writer',
+  updateMfrAlias:        './mfr-writer',
 };
 
 // The effective process user — i.e. who this Node process is running as

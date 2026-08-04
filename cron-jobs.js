@@ -687,6 +687,28 @@ module.exports = [
     logFile: '/tmp/bos-metrics.log',
     description: '1st of month 12pm EST (17:00 UTC) — BOS Metrics report (CSE queue activity: claims, answered, closed) to justin.oberhofer@ and leah.griffin@.',
   },
+
+  // ─── NEW MANUFACTURER SCREENING ────────────────────────────────────────────
+  {
+    name: 'mfr-screening-requests',
+    cadence: 'every 30m',
+    cadenceCron: '*/30 * * * *',
+    command: `python3 "${WORKSPACE}/wi-new-manufacturer-screening/mfr-reply-handler.py" --requests --mailbox bizops`,
+    cwd: WORKSPACE,
+    needsOT: false,  // CLI writeback not yet enabled
+    logFile: '/tmp/mfr-screening-requests.log',
+    description: 'Every 30m — scrape bizops@ for new MFR requests, run fuzzy match + website check, email results to reviewer',
+  },
+  {
+    name: 'mfr-screening-replies',
+    cadence: 'every 30m',
+    cadenceCron: '15,45 * * * *',  // offset from requests job
+    command: `python3 "${WORKSPACE}/wi-new-manufacturer-screening/mfr-reply-handler.py" --mailbox bizops`,
+    cwd: WORKSPACE,
+    needsOT: true,  // creates MFRs via CLI (once enabled)
+    logFile: '/tmp/mfr-screening-replies.log',
+    description: 'Every 30m (offset) — process add/skip replies, create MFRs in OT',
+  },
 ];
 
 // Helper: convert cadence string to milliseconds (used by sentinel + runner).
