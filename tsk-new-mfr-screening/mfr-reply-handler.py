@@ -331,6 +331,7 @@ def fetch_mfr_requests(mailbox: str, folder: str = 'INBOX'):
                     body = payload.decode('utf-8', errors='ignore')
 
             from_addr = msg['From'] or ''
+            cc_addr = msg['Cc'] or ''
             message_id = msg['Message-ID'] or f"no-id-{eid}"
 
             results.append({
@@ -338,6 +339,7 @@ def fetch_mfr_requests(mailbox: str, folder: str = 'INBOX'):
                 'message_id': message_id,
                 'subject': subject,
                 'from': from_addr,
+                'cc': cc_addr,
                 'date': msg['Date'],
                 'body': body,
                 'raw': msg,
@@ -1021,6 +1023,8 @@ def process_mfr_requests(mailbox: str, reviewer: str, dry_run: bool = False, fol
 
         print(f"\nProcessing: {req['subject']}", file=sys.stderr)
         print(f"  From: {req['from']}", file=sys.stderr)
+        if req.get('cc'):
+            print(f"  CC: {req['cc']}", file=sys.stderr)
 
         # Parse MFR info from email body
         mfrs = parse_mfr_input(req['body'])
@@ -1049,6 +1053,11 @@ def process_mfr_requests(mailbox: str, reviewer: str, dry_run: bool = False, fol
             batch_check = os.path.join(script_dir, 'mfr-batch-check.py')
 
             cmd = ['python3', batch_check, temp_file, '--to', reviewer]
+            # Pass CC recipients and original sender
+            if req.get('cc'):
+                cmd.extend(['--cc', req['cc']])
+            if req.get('from'):
+                cmd.extend(['--requested-by', req['from']])
             if dry_run:
                 cmd.append('--dry-run')
 

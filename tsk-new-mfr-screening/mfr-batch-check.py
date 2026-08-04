@@ -443,7 +443,7 @@ def process_manufacturers(requests: list, threshold: float = 0.3) -> dict:
     return results
 
 
-def format_html_email(results: dict) -> str:
+def format_html_email(results: dict, requested_by: str = '', cc_recipients: str = '') -> str:
     """Format results as HTML email body."""
     timestamp = datetime.fromisoformat(results['timestamp']).strftime('%Y-%m-%d %H:%M:%S CT')
     summary = results['summary']
@@ -477,7 +477,18 @@ def format_html_email(results: dict) -> str:
   <h1>Manufacturer Check Results</h1>
   <p>Generated: {timestamp}</p>
   <p>Checked {results['totalChecked']} manufacturer(s)</p>
+"""
 
+    # Add requester and CC info if provided
+    if requested_by or cc_recipients:
+        html += '  <div style="background: #f5f5f5; padding: 10px; border-radius: 4px; margin: 10px 0; font-size: 13px;">\n'
+        if requested_by:
+            html += f'    <p style="margin: 3px 0;"><strong>Requested by:</strong> {requested_by}</p>\n'
+        if cc_recipients:
+            html += f'    <p style="margin: 3px 0;"><strong>Also copied:</strong> {cc_recipients}</p>\n'
+        html += '  </div>\n'
+
+    html += """
   <div class="summary">
     <strong>Summary:</strong>
     <ul>
@@ -608,6 +619,10 @@ def main():
     parser.add_argument('input_file', help='Text file with one manufacturer name per line')
     parser.add_argument('--to', default='bizops@orangetsunami.com',
                         help='Recipient email address')
+    parser.add_argument('--cc', default='',
+                        help='CC recipients from original request (for display only)')
+    parser.add_argument('--requested-by', default='',
+                        help='Original requester email (for display only)')
     parser.add_argument('--threshold', type=float, default=0.3,
                         help='Similarity threshold 0-1 (default: 0.3)')
     parser.add_argument('--dry-run', action='store_true',
@@ -654,7 +669,7 @@ def main():
 
         today = datetime.now().strftime('%Y-%m-%d')
         subject = f"MFR Check Results - {len(requests)} manufacturer(s) - {today}"
-        html_body = format_html_email(results)
+        html_body = format_html_email(results, args.requested_by, args.cc)
 
         success = send_email(args.to, subject, html_body, json_output)
 
