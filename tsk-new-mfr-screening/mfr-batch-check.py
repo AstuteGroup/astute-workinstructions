@@ -522,7 +522,7 @@ def format_html_email(results: dict, requested_by: str = '', cc_recipients: str 
             html += f'    <p style="margin: 3px 0;"><strong>Also copied:</strong> {cc_linked}</p>\n'
         html += '  </div>\n'
 
-    html += """
+    html += f"""
   <div class="summary">
     <strong>Summary:</strong>
     <ul>
