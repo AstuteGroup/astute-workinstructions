@@ -865,8 +865,9 @@ def process_replies(mailbox: str, dry_run: bool = False, folder: str = 'INBOX'):
                 results['errors'] += 1
             continue
 
-        # Handle skip command (step 2 - skip M code)
+        # Handle skip command
         if cmd['type'] == 'skip':
+            # Check if this is step 2 (skip M code for pending MFR)
             mfr_code = extract_mfr_code_from_subject(reply['subject'])
             if mfr_code:
                 pending = find_pending_by_code(mfr_code)
@@ -878,6 +879,15 @@ def process_replies(mailbox: str, dry_run: bool = False, folder: str = 'INBOX'):
                         move_to_processed(mailbox, reply['id'], folder)
                     results['skipped'] += 1
                     results['processed'] += 1
+                    continue
+
+            # Otherwise this is step 1 skip (user doesn't want to add the MFR)
+            print(f"  Skipping MFR creation (user declined)", file=sys.stderr)
+            mark_email_processed(message_id)
+            if not dry_run:
+                move_to_processed(mailbox, reply['id'], folder)
+            results['skipped'] += 1
+            results['processed'] += 1
             continue
 
         # Handle add command (step 1)
