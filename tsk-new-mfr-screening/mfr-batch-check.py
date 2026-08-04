@@ -63,6 +63,38 @@ def is_internal_email(email: str) -> bool:
     return any(domain == d or domain.endswith('.' + d) for d in ALLOWED_DOMAINS)
 
 
+def format_email_links(email_string: str) -> str:
+    """
+    Convert email addresses in a string to mailto: hyperlinks.
+
+    Handles formats like:
+    - "Name <email@example.com>"
+    - "email@example.com"
+    - Multiple addresses separated by commas
+    """
+    if not email_string:
+        return ''
+
+    # Pattern to match "Name <email>" or just "email"
+    email_pattern = re.compile(r'([^<,]+?)\s*<([^>]+)>|([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})')
+
+    result = email_string
+
+    # Find all email patterns and replace with links
+    for match in email_pattern.finditer(email_string):
+        if match.group(2):  # "Name <email>" format
+            name = match.group(1).strip().strip('"')
+            email = match.group(2).strip()
+            original = match.group(0)
+            linked = f'{name} &lt;<a href="mailto:{email}">{email}</a>&gt;'
+            result = result.replace(original, linked)
+        elif match.group(3):  # Plain email format
+            email = match.group(3)
+            result = result.replace(email, f'<a href="mailto:{email}">{email}</a>')
+
+    return result
+
+
 # Company suffix normalization patterns
 # Maps various forms to a canonical form for comparison
 SUFFIX_NORMALIZATIONS = [
@@ -483,9 +515,11 @@ def format_html_email(results: dict, requested_by: str = '', cc_recipients: str 
     if requested_by or cc_recipients:
         html += '  <div style="background: #f5f5f5; padding: 10px; border-radius: 4px; margin: 10px 0; font-size: 13px;">\n'
         if requested_by:
-            html += f'    <p style="margin: 3px 0;"><strong>Requested by:</strong> {requested_by}</p>\n'
+            requester_linked = format_email_links(requested_by)
+            html += f'    <p style="margin: 3px 0;"><strong>Requested by:</strong> {requester_linked}</p>\n'
         if cc_recipients:
-            html += f'    <p style="margin: 3px 0;"><strong>Also copied:</strong> {cc_recipients}</p>\n'
+            cc_linked = format_email_links(cc_recipients)
+            html += f'    <p style="margin: 3px 0;"><strong>Also copied:</strong> {cc_linked}</p>\n'
         html += '  </div>\n'
 
     html += """
