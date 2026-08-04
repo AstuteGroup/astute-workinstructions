@@ -344,6 +344,7 @@ def parse_mfr_input(content: str) -> list:
 
     Supports two formats:
     1. Structured form with "MFR Name:", "Website URL:", "Alias:" fields
+       - Value can be on same line OR next line
     2. Simple list with one manufacturer name per line
     """
     requests = []
@@ -357,17 +358,21 @@ def parse_mfr_input(content: str) -> list:
             if not block.strip():
                 continue
 
-            # Extract fields using regex
-            name_match = re.search(r'MFR Name:\s*(.+?)(?:\n|$)', block)
-            url_match = re.search(r'Website URL:\s*(.+?)(?:\n|$)', block)
-            alias_match = re.search(r'Alias:\s*(.+?)(?:\n|$)', block)
+            # Extract fields using regex - handle value on same line OR next line
+            # Pattern: "MFR Name:" followed by optional whitespace, then either:
+            #   - content on same line, OR
+            #   - newline + content on next line (before next field or blank line)
+            name_match = re.search(r'MFR Name:\s*\n?\s*([^\n]+?)(?:\n|$)', block)
+            url_match = re.search(r'Website URL:\s*\n?\s*(https?://[^\s\n]+)', block)
+            alias_match = re.search(r'Alias:\s*\n?\s*([^\n]+?)(?:\n|$)', block)
 
             if name_match:
                 name = name_match.group(1).strip()
-                if name:
+                # Skip if name looks like another field label
+                if name and not name.startswith('Website') and not name.startswith('Alias'):
                     requests.append({
                         'name': name,
-                        'url': url_match.group(1).strip() if url_match and url_match.group(1).strip() else None,
+                        'url': url_match.group(1).strip() if url_match else None,
                         'alias': alias_match.group(1).strip() if alias_match and alias_match.group(1).strip() else None
                     })
     else:
@@ -952,10 +957,15 @@ def process_mfr_requests(mailbox: str, reviewer: str, dry_run: bool = False, fol
 
         print(f"  Found {len(mfrs)} manufacturer(s): {', '.join(m['name'] for m in mfrs)}", file=sys.stderr)
 
-        # Create temp file with MFR names
+        # Create temp file with MFR info in structured format
         with tempfile.NamedTemporaryFile(mode='w', suffix='.txt', delete=False) as f:
             for mfr in mfrs:
-                f.write(f"{mfr['name']}\n")
+                f.write(f"MFR Name: {mfr['name']}\n")
+                if mfr.get('url'):
+                    f.write(f"Website URL: {mfr['url']}\n")
+                if mfr.get('alias'):
+                    f.write(f"Alias: {mfr['alias']}\n")
+                f.write("\n")  # Blank line separator
             temp_file = f.name
 
         try:

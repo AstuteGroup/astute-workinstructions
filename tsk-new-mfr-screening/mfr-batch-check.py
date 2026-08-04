@@ -63,12 +63,79 @@ def is_internal_email(email: str) -> bool:
     return any(domain == d or domain.endswith('.' + d) for d in ALLOWED_DOMAINS)
 
 
+# Company suffix normalization patterns
+# Maps various forms to a canonical form for comparison
+SUFFIX_NORMALIZATIONS = [
+    # Italian - Società per Azioni
+    (r'\bS\.?p\.?A\.?\b', 'SPA'),
+    (r'\bSocieta per Azioni\b', 'SPA'),
+    # Italian - Società a responsabilità limitata
+    (r'\bS\.?r\.?l\.?\b', 'SRL'),
+    # German - Gesellschaft mit beschränkter Haftung
+    (r'\bG\.?m\.?b\.?H\.?\b', 'GMBH'),
+    (r'\bGesellschaft mit beschrankter Haftung\b', 'GMBH'),
+    # German - Aktiengesellschaft
+    (r'\bA\.?G\.?\b', 'AG'),
+    # US/UK - Incorporated
+    (r'\bInc\.?\b', 'INC'),
+    (r'\bIncorporated\b', 'INC'),
+    # US/UK - Corporation
+    (r'\bCorp\.?\b', 'CORP'),
+    (r'\bCorporation\b', 'CORP'),
+    # US/UK - Limited
+    (r'\bLtd\.?\b', 'LTD'),
+    (r'\bLimited\b', 'LTD'),
+    # US - Limited Liability Company
+    (r'\bL\.?L\.?C\.?\b', 'LLC'),
+    # US - Limited Partnership
+    (r'\bL\.?P\.?\b', 'LP'),
+    # France - Société Anonyme
+    (r'\bS\.?A\.?\b', 'SA'),
+    # Netherlands - Besloten Vennootschap
+    (r'\bB\.?V\.?\b', 'BV'),
+    # Netherlands - Naamloze Vennootschap
+    (r'\bN\.?V\.?\b', 'NV'),
+    # Japan - Kabushiki Kaisha
+    (r'\bK\.?K\.?\b', 'KK'),
+    # Korea - Co., Ltd.
+    (r'\bCo\.?,?\s*Ltd\.?\b', 'CO LTD'),
+    # General - Company
+    (r'\bCo\.?\b', 'CO'),
+    # General - And / &
+    (r'\s+&\s+', ' AND '),
+]
+
+
+def normalize_company_name(name: str) -> str:
+    """
+    Normalize company name for better fuzzy matching.
+
+    - Standardizes company suffixes (Spa -> SPA, Inc. -> INC, etc.)
+    - Removes extra whitespace
+    - Converts to uppercase for comparison
+    """
+    if not name:
+        return ''
+
+    normalized = name.upper().strip()
+
+    # Apply suffix normalizations
+    for pattern, replacement in SUFFIX_NORMALIZATIONS:
+        normalized = re.sub(pattern, replacement, normalized, flags=re.IGNORECASE)
+
+    # Clean up whitespace
+    normalized = re.sub(r'\s+', ' ', normalized).strip()
+
+    return normalized
+
+
 def parse_mfr_request(content: str) -> list:
     """
     Parse manufacturer request from email content.
 
     Supports two formats:
     1. Structured form with "MFR Name:", "Website URL:", "Alias:" fields
+       - Value can be on same line OR next line
     2. Simple list with one manufacturer name per line
 
     Returns list of dicts: [{'name': str, 'url': str|None, 'alias': str|None}]
@@ -87,17 +154,21 @@ def parse_mfr_request(content: str) -> list:
             if not block.strip():
                 continue
 
-            # Extract fields using regex
-            name_match = re.search(r'MFR Name:\s*(.+?)(?:\n|$)', block)
-            url_match = re.search(r'Website URL:\s*(.+?)(?:\n|$)', block)
-            alias_match = re.search(r'Alias:\s*(.+?)(?:\n|$)', block)
+            # Extract fields using regex - handle value on same line OR next line
+            # Pattern: "MFR Name:" followed by optional whitespace, then either:
+            #   - content on same line, OR
+            #   - newline + content on next line (before next field or blank line)
+            name_match = re.search(r'MFR Name:\s*\n?\s*([^\n]+?)(?:\n|$)', block)
+            url_match = re.search(r'Website URL:\s*\n?\s*(https?://[^\s\n]+)', block)
+            alias_match = re.search(r'Alias:\s*\n?\s*([^\n]+?)(?:\n|$)', block)
 
             if name_match:
                 name = name_match.group(1).strip()
-                if name:  # Only add if name is not empty
+                # Skip if name looks like another field label
+                if name and not name.startswith('Website') and not name.startswith('Alias'):
                     requests.append({
                         'name': name,
-                        'url': url_match.group(1).strip() if url_match and url_match.group(1).strip() else None,
+                        'url': url_match.group(1).strip() if url_match else None,
                         'alias': alias_match.group(1).strip() if alias_match and alias_match.group(1).strip() else None
                     })
     else:
@@ -177,9 +248,16 @@ def fuzzy_match_manufacturer(name: str, threshold: float = 0.3) -> list:
     """
     Run fuzzy match query against OT manufacturers.
     Returns list of matches with score, quality, etc.
+
+    Uses company name normalization to improve matching of equivalent
+    suffixes like "Spa" vs "S.p.A", "Inc" vs "Inc.", etc.
     """
     escaped_name = name.replace("'", "''")
+    normalized_search = normalize_company_name(name)
+    escaped_normalized = normalized_search.replace("'", "''")
 
+    # Query with both raw and normalized matching
+    # Use lower threshold initially, then re-score with normalization
     query = f"""
     WITH scored AS (
       SELECT
@@ -188,12 +266,8 @@ def fuzzy_match_manufacturer(name: str, threshold: float = 0.3) -> list:
         value as code,
         url,
         description,
-        similarity(LOWER(name), LOWER('{escaped_name}')) as name_score,
-        COALESCE(word_similarity(LOWER('{escaped_name}'), LOWER(description)), 0) as desc_score,
-        GREATEST(
-          similarity(LOWER(name), LOWER('{escaped_name}')),
-          COALESCE(word_similarity(LOWER('{escaped_name}'), LOWER(description)), 0)
-        ) as best_score
+        similarity(LOWER(name), LOWER('{escaped_name}')) as raw_name_score,
+        COALESCE(word_similarity(LOWER('{escaped_name}'), LOWER(description)), 0) as desc_score
       FROM adempiere.chuboe_mfr
       WHERE isactive = 'Y'
     )
@@ -203,23 +277,13 @@ def fuzzy_match_manufacturer(name: str, threshold: float = 0.3) -> list:
       code,
       url,
       description,
-      best_score as sim_score,
-      CASE
-        WHEN LOWER(name) = LOWER('{escaped_name}') THEN 'EXACT'
-        WHEN best_score >= 0.6 THEN 'HIGH'
-        WHEN best_score >= 0.4 THEN 'MEDIUM'
-        ELSE 'LOW'
-      END as match_quality,
-      CASE
-        WHEN name_score >= desc_score THEN 'name'
-        ELSE 'alias'
-      END as match_field
+      raw_name_score,
+      desc_score
     FROM scored
-    WHERE best_score >= {threshold}
-    ORDER BY
-      CASE WHEN LOWER(name) = LOWER('{escaped_name}') THEN 0 ELSE 1 END,
-      best_score DESC
-    LIMIT 5;
+    WHERE raw_name_score >= 0.2
+       OR desc_score >= 0.2
+    ORDER BY GREATEST(raw_name_score, desc_score) DESC
+    LIMIT 20;
     """
 
     try:
@@ -230,24 +294,73 @@ def fuzzy_match_manufacturer(name: str, threshold: float = 0.3) -> list:
             check=True
         )
 
-        matches = []
+        candidates = []
         for row in result.stdout.strip().split('\n'):
             if not row:
                 continue
             parts = row.split('|')
-            if len(parts) >= 8:
-                matches.append({
+            if len(parts) >= 7:
+                candidates.append({
                     'id': int(parts[0]) if parts[0] else None,
                     'name': parts[1].strip() if parts[1] else None,
                     'code': parts[2].strip() if parts[2] else None,
                     'url': parts[3].strip() if parts[3] else None,
                     'alias': parts[4].strip() if parts[4] else None,
-                    'score': float(parts[5]) if parts[5] else 0,
-                    'quality': parts[6],
-                    'matchField': parts[7]
+                    'raw_name_score': float(parts[5]) if parts[5] else 0,
+                    'desc_score': float(parts[6]) if parts[6] else 0,
                 })
 
-        return matches
+        # Re-score candidates with normalized names
+        matches = []
+        for c in candidates:
+            normalized_db = normalize_company_name(c['name'] or '')
+
+            # Compute normalized similarity using SequenceMatcher
+            from difflib import SequenceMatcher
+            norm_score = SequenceMatcher(None, normalized_search, normalized_db).ratio()
+
+            # Use the best of: normalized score, raw name score, or description score
+            best_score = max(norm_score, c['raw_name_score'], c['desc_score'])
+
+            # Check for exact match (normalized)
+            is_exact = normalized_search == normalized_db
+
+            # Determine quality
+            if is_exact:
+                quality = 'EXACT'
+            elif best_score >= 0.6:
+                quality = 'HIGH'
+            elif best_score >= 0.4:
+                quality = 'MEDIUM'
+            else:
+                quality = 'LOW'
+
+            # Determine which field matched best
+            if norm_score >= c['raw_name_score'] and norm_score >= c['desc_score']:
+                match_field = 'name (normalized)'
+            elif c['raw_name_score'] >= c['desc_score']:
+                match_field = 'name'
+            else:
+                match_field = 'alias'
+
+            if best_score >= threshold:
+                matches.append({
+                    'id': c['id'],
+                    'name': c['name'],
+                    'code': c['code'],
+                    'url': c['url'],
+                    'alias': c['alias'],
+                    'score': best_score,
+                    'quality': quality,
+                    'matchField': match_field,
+                    'normalizedSearch': normalized_search,
+                    'normalizedDb': normalized_db,
+                })
+
+        # Sort by exact match first, then score
+        matches.sort(key=lambda m: (0 if m['quality'] == 'EXACT' else 1, -m['score']))
+
+        return matches[:5]
 
     except subprocess.CalledProcessError as e:
         print(f"Query error for '{name}': {e.stderr}", file=sys.stderr)
