@@ -1,13 +1,17 @@
 # Currency Conversion Upload Workflow
 
-**Status:** In Development
+**Status:** Active
 **Trigger:** Email with Exchange Rate Matrix attachment to `bizops@orangetsunami.com`
+**Cron:** `currency-conversion-poller` runs every 30m (at :10 and :40)
 
 ---
 
 ## Overview
 
-Creates currency conversion rate CSV files for iDempiere import from Exchange Rate Matrix Excel files.
+Two-step workflow for loading currency conversion rates into iDempiere:
+
+1. **Process & Review**: Email arrives → Extract xlsx → Generate CSV → Reply for review
+2. **Load to OT**: User replies "add" → Push 21 currency pairs to `C_Conversion_Rate` table
 
 ---
 
@@ -141,9 +145,28 @@ Email sender with confirmation that rates have been processed.
 
 | File | Description |
 |------|-------------|
-| `currency-processor.js` | Main processing script |
-| `currency-conversion-upload.md` | This workflow documentation |
-| `shared/workflow-actions/currency-conversion.js` | Email handler module |
+| `currency-processor.js` | Extracts rates from xlsx, generates CSV |
+| `currency-poller.py` | Email poller (cron job), handles new emails + "add" replies |
+| `shared/currency-rate-writer.js` | POSTs rates to OT `C_Conversion_Rate` table |
+| `shared/workflow-actions/currency-conversion.js` | Workflow handler (for future agent use) |
+
+---
+
+## OT Table: C_Conversion_Rate
+
+| Field | Value |
+|-------|-------|
+| `AD_Client_ID` | 1000000 (Astute) |
+| `AD_Org_ID` | 0 (all orgs) |
+| `C_ConversionType_ID` | 114 (Spot) |
+| `C_Currency_ID` | From currency |
+| `C_Currency_ID_To` | To currency |
+| `MultiplyRate` | Conversion rate |
+| `DivideRate` | 1/MultiplyRate |
+| `ValidFrom` | Start date |
+| `ValidTo` | End date |
+
+**Currency IDs:** EUR=102, USD=100, GBP=114, CAD=116, INR=304, JPY=113, SGD=307
 
 ---
 

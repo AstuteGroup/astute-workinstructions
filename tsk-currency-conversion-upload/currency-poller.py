@@ -5,10 +5,15 @@ Currency Conversion Poller
 Polls bizops@orangetsunami.com for Exchange Rate Matrix emails,
 processes the attachment, and replies with the generated CSV.
 
+Two-step workflow:
+  1. New email with xlsx → Process → Reply with CSV for review
+  2. User replies "add" → Push rates to OT C_Conversion_Rate table
+
 Usage:
-    python currency-poller.py                 # Poll once
+    python currency-poller.py                 # Poll once (new emails + replies)
     python currency-poller.py --dry-run       # Parse but don't process
     python currency-poller.py --watch         # Poll continuously
+    python currency-poller.py --pending       # Show pending rate batches
 
 Subject patterns matched:
     - "Exchange Rate Matrix" or "Currency Rate Matrix"
@@ -37,6 +42,13 @@ import smtplib
 
 # State file for tracking processed emails
 STATE_FILE = Path.home() / '.currency-poller-processed.json'
+
+# Pending rates file (rates awaiting "add" approval)
+PENDING_FILE = Path.home() / '.currency-pending-rates.json'
+
+# Currency rate writer path
+SCRIPT_DIR = Path(__file__).parent
+CURRENCY_WRITER = SCRIPT_DIR.parent / 'shared' / 'currency-rate-writer.js'
 
 # Load environment variables
 def load_env():
@@ -119,6 +131,69 @@ def mark_processed(message_id: str):
 def is_processed(message_id: str) -> bool:
     """Check if message was already processed."""
     return message_id in load_processed_state()
+
+
+# ─── PENDING RATES STATE ──────────────────────────────────────────────────────
+
+def load_pending_rates() -> dict:
+    """Load pending rate batches awaiting approval."""
+    if PENDING_FILE.exists():
+        try:
+            with open(PENDING_FILE) as f:
+                return json.load(f)
+        except (json.JSONDecodeError, IOError):
+            return {}
+    return {}
+
+
+def save_pending_rates(pending: dict):
+    """Save pending rate batches."""
+    with open(PENDING_FILE, 'w') as f:
+        json.dump(pending, f, indent=2)
+
+
+def add_pending_batch(batch_id: str, rates: list, start_date: str, end_date: str, sender: str):
+    """Add a batch of rates awaiting approval."""
+    pending = load_pending_rates()
+    pending[batch_id] = {
+        'rates': rates,
+        'startDate': start_date,
+        'endDate': end_date,
+        'sender': sender,
+        'created': datetime.now().isoformat(),
+    }
+    save_pending_rates(pending)
+
+
+def get_pending_batch(batch_id: str) -> dict:
+    """Get a pending batch by ID."""
+    pending = load_pending_rates()
+    return pending.get(batch_id)
+
+
+def remove_pending_batch(batch_id: str):
+    """Remove a pending batch after processing."""
+    pending = load_pending_rates()
+    pending.pop(batch_id, None)
+    save_pending_rates(pending)
+
+
+def parse_csv_for_rates(csv_path: str) -> list:
+    """Parse the generated CSV to extract rates for OT upload."""
+    rates = []
+    with open(csv_path, 'r') as f:
+        for line in f:
+            line = line.strip()
+            if not line or line.startswith('AD_Org_ID'):
+                continue  # Skip header
+            parts = line.split(',')
+            if len(parts) >= 4:
+                rates.append({
+                    'from': parts[1],
+                    'to': parts[2],
+                    'rate': float(parts[3]),
+                })
+    return rates
 
 
 def get_imap_client():
@@ -368,6 +443,282 @@ Please check the file format and try again, or contact support.
         return False
 
 
+def send_confirmation_reply(to: str, subject: str, result: dict):
+    """Send confirmation after pushing rates to OT."""
+    if not SMTP_PASS:
+        return False
+
+    body = f"""Currency rates have been pushed to Orange Tsunami.
+
+Date Range: {result.get('validFrom')} to {result.get('validTo')}
+Records Created: {result.get('created', 0)}
+Records Skipped: {result.get('skipped', 0)} (already exist)
+
+The rates are now active in the system.
+"""
+
+    if result.get('errors'):
+        body += f"\nErrors ({len(result['errors'])}):\n"
+        for err in result['errors'][:5]:  # Show first 5 errors
+            body += f"  - {err['from']}→{err['to']}: {err['error']}\n"
+
+    msg = MIMEText(body)
+    msg['Subject'] = f"RE: {subject} - Rates Loaded to OT"
+    msg['From'] = f'"Currency Conversion" <{INBOX_EMAIL}>'
+    msg['To'] = to
+
+    try:
+        with smtplib.SMTP_SSL(SMTP_HOST, SMTP_PORT) as server:
+            server.login(INBOX_EMAIL, SMTP_PASS)
+            server.send_message(msg)
+        return True
+    except Exception as e:
+        print(f"Failed to send confirmation email: {e}", file=sys.stderr)
+        return False
+
+
+# ─── REPLY HANDLING ───────────────────────────────────────────────────────────
+
+ADD_PATTERNS = [
+    r'\badd\b',
+    r'\bapprove\b',
+    r'\bconfirm\b',
+    r'\bload\b',
+    r'\bpush\b',
+    r'\byes\b',
+]
+ADD_RE = re.compile('|'.join(ADD_PATTERNS), re.IGNORECASE)
+
+
+def fetch_currency_replies(folder: str = 'INBOX'):
+    """Fetch reply emails to currency rate emails."""
+    client = get_imap_client()
+
+    try:
+        client.select(folder)
+
+        # Search for replies to currency emails
+        status, messages = client.search(None, '(OR (SUBJECT "RE: Currency") (SUBJECT "RE: Exchange Rate"))')
+
+        if status != 'OK':
+            return []
+
+        email_ids = messages[0].split()
+        results = []
+
+        for eid in email_ids[-20:]:
+            status, msg_data = client.fetch(eid, '(RFC822)')
+            if status != 'OK':
+                continue
+
+            raw_email = msg_data[0][1]
+            msg = email.message_from_bytes(raw_email)
+
+            subject = msg['Subject'] or ''
+            if subject.startswith('=?'):
+                decoded = decode_header(subject)
+                subject = ''.join(
+                    part.decode(enc or 'utf-8') if isinstance(part, bytes) else part
+                    for part, enc in decoded
+                )
+
+            # Must be a reply
+            if not subject.lower().startswith('re:'):
+                continue
+
+            # Must match currency pattern in original subject
+            if not CURRENCY_RE.search(subject):
+                continue
+
+            message_id = msg['Message-ID'] or f"no-id-{eid}"
+            from_addr = msg['From'] or ''
+
+            # Get body
+            body = ''
+            if msg.is_multipart():
+                for part in msg.walk():
+                    if part.get_content_type() == 'text/plain':
+                        payload = part.get_payload(decode=True)
+                        if payload:
+                            body = payload.decode('utf-8', errors='ignore')
+                            break
+            else:
+                payload = msg.get_payload(decode=True)
+                if payload:
+                    body = payload.decode('utf-8', errors='ignore')
+
+            results.append({
+                'id': eid.decode() if isinstance(eid, bytes) else eid,
+                'message_id': message_id,
+                'subject': subject,
+                'from': from_addr,
+                'body': body,
+            })
+
+        return results
+
+    finally:
+        client.logout()
+
+
+def get_reply_text(body: str) -> str:
+    """Extract just the new reply content (before quoted text)."""
+    lines = body.split('\n')
+    reply_lines = []
+
+    for line in lines:
+        if line.strip().startswith('>'):
+            break
+        if re.match(r'^On .+ wrote:', line):
+            break
+        if line.strip().startswith('From:') and '@' in line:
+            break
+        if '-----Original Message-----' in line:
+            break
+        reply_lines.append(line)
+
+    return '\n'.join(reply_lines).strip()
+
+
+def extract_batch_id_from_subject(subject: str) -> str:
+    """Extract batch ID from subject like 'RE: Currency Rate Matrix - August 2026'."""
+    # Extract month and year to form batch ID
+    month, year = parse_month_year(subject)
+    if month and year:
+        return f"{year}-{month:02d}"
+    return None
+
+
+def call_currency_writer(rates: list, start_date: str, end_date: str, dry_run: bool = False) -> dict:
+    """Call the currency rate writer via Node.js."""
+    payload = {
+        'rates': rates,
+        'validFrom': start_date,
+        'validTo': end_date,
+        'dryRun': dry_run,
+    }
+
+    # Use the writeback proxy pattern
+    cmd = [
+        'node', '-e',
+        f'''
+const {{ writeCurrencyRates }} = require("{CURRENCY_WRITER}");
+const payload = {json.dumps(payload)};
+writeCurrencyRates(payload).then(r => console.log(JSON.stringify(r))).catch(e => {{
+  console.error(JSON.stringify({{ error: e.message }}));
+  process.exit(1);
+}});
+'''
+    ]
+
+    try:
+        result = subprocess.run(cmd, capture_output=True, text=True, timeout=120)
+
+        if result.returncode != 0:
+            error_out = result.stderr or result.stdout
+            try:
+                err = json.loads(error_out)
+                return {'success': False, 'error': err.get('error', error_out)}
+            except:
+                return {'success': False, 'error': error_out}
+
+        return json.loads(result.stdout)
+
+    except subprocess.TimeoutExpired:
+        return {'success': False, 'error': 'Timeout after 120s'}
+    except json.JSONDecodeError as e:
+        return {'success': False, 'error': f'Invalid JSON response: {e}'}
+    except Exception as e:
+        return {'success': False, 'error': str(e)}
+
+
+def process_add_replies(dry_run: bool = False):
+    """Process reply emails with 'add' command."""
+    print(f"Fetching currency reply emails...", file=sys.stderr)
+
+    results = {
+        'found': 0,
+        'processed': 0,
+        'errors': 0,
+    }
+
+    try:
+        replies = fetch_currency_replies()
+    except Exception as e:
+        print(f"Error fetching replies: {e}", file=sys.stderr)
+        return results
+
+    if not replies:
+        print("No currency reply emails found", file=sys.stderr)
+        return results
+
+    print(f"Found {len(replies)} reply email(s)", file=sys.stderr)
+    results['found'] = len(replies)
+
+    for reply in replies:
+        message_id = reply['message_id']
+
+        # Skip already processed
+        if is_processed(message_id):
+            continue
+
+        print(f"\nChecking reply: {reply['subject'][:60]}...", file=sys.stderr)
+
+        # Extract reply text and check for add command
+        reply_text = get_reply_text(reply['body'])
+        if not ADD_RE.search(reply_text):
+            print(f"  No 'add' command found, skipping", file=sys.stderr)
+            continue
+
+        print(f"  'add' command detected", file=sys.stderr)
+
+        # Extract batch ID from subject
+        batch_id = extract_batch_id_from_subject(reply['subject'])
+        if not batch_id:
+            print(f"  Could not determine batch ID from subject", file=sys.stderr)
+            continue
+
+        # Look up pending batch
+        batch = get_pending_batch(batch_id)
+        if not batch:
+            print(f"  No pending batch found for {batch_id}", file=sys.stderr)
+            # Mark as processed to avoid re-checking
+            mark_processed(message_id)
+            continue
+
+        print(f"  Found pending batch: {batch_id}", file=sys.stderr)
+        print(f"  Rates: {len(batch['rates'])}, Date range: {batch['startDate']} to {batch['endDate']}", file=sys.stderr)
+
+        sender = extract_email_address(reply['from'])
+
+        if dry_run:
+            print(f"  [DRY RUN] Would push {len(batch['rates'])} rates to OT", file=sys.stderr)
+            results['processed'] += 1
+            continue
+
+        # Call the writer
+        print(f"  Pushing rates to OT...", file=sys.stderr)
+        write_result = call_currency_writer(
+            batch['rates'],
+            batch['startDate'],
+            batch['endDate'],
+        )
+
+        if write_result.get('success'):
+            print(f"  Success: {write_result.get('created', 0)} created, {write_result.get('skipped', 0)} skipped", file=sys.stderr)
+            send_confirmation_reply(sender, reply['subject'], write_result)
+            remove_pending_batch(batch_id)
+            mark_processed(message_id)
+            move_to_processed(reply['id'])
+            results['processed'] += 1
+        else:
+            print(f"  Error: {write_result.get('error')}", file=sys.stderr)
+            send_error_reply(sender, reply['subject'], write_result.get('error', 'Unknown error'))
+            results['errors'] += 1
+
+    return results
+
+
 def process_currency_emails(dry_run: bool = False):
     """Main processing loop."""
     print(f"Fetching currency emails from {INBOX_EMAIL}...", file=sys.stderr)
@@ -459,13 +810,31 @@ def process_currency_emails(dry_run: bool = False):
                 results['errors'] += 1
                 continue
 
-            # Send reply with attachment
+            # Parse CSV to get rates for pending storage
+            rates = parse_csv_for_rates(output_path)
+            batch_id = f"{year}-{month:02d}"
+
+            # Save to pending for approval
+            add_pending_batch(batch_id, rates, start_date, end_date, sender)
+            print(f"  Saved {len(rates)} rates to pending batch {batch_id}", file=sys.stderr)
+
+            # Send reply with attachment and instructions
             body = f"""Currency conversion rates processed successfully.
 
 Date Range: {start_date} to {end_date}
 Source: {attachment['filename']}
+Currency Pairs: {len(rates)}
 
-The attached CSV file is ready for iDempiere import.
+The attached CSV file is ready for review.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+TO LOAD RATES INTO ORANGE TSUNAMI:
+
+Reply to this email with "add" to push all {len(rates)} currency
+pairs directly to the C_Conversion_Rate table.
+
+Or import the CSV manually if you prefer.
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 ---
 Processed automatically by Currency Conversion Workflow
@@ -500,6 +869,24 @@ Processed automatically by Currency Conversion Workflow
     return results
 
 
+def show_pending():
+    """Show pending rate batches awaiting approval."""
+    pending = load_pending_rates()
+
+    if not pending:
+        print("No pending rate batches")
+        return
+
+    print(f"Pending rate batches ({len(pending)}):\n")
+    for batch_id, data in pending.items():
+        print(f"  {batch_id}")
+        print(f"    Rates: {len(data['rates'])}")
+        print(f"    Date Range: {data['startDate']} to {data['endDate']}")
+        print(f"    Sender: {data['sender']}")
+        print(f"    Created: {data['created']}")
+        print()
+
+
 def main():
     parser = argparse.ArgumentParser(description='Poll for Exchange Rate Matrix emails and process them')
     parser.add_argument('--dry-run', action='store_true',
@@ -510,12 +897,20 @@ def main():
                         help='Poll interval in seconds (default: 300)')
     parser.add_argument('--clear', action='store_true',
                         help='Clear processed message IDs and exit')
+    parser.add_argument('--pending', action='store_true',
+                        help='Show pending rate batches and exit')
+    parser.add_argument('--replies-only', action='store_true',
+                        help='Only process reply emails (skip new emails)')
 
     args = parser.parse_args()
 
     if args.clear:
         save_processed_state(set())
         print("Cleared processed message IDs")
+        return
+
+    if args.pending:
+        show_pending()
         return
 
     if not SMTP_PASS:
@@ -527,9 +922,17 @@ def main():
 
         while True:
             try:
-                results = process_currency_emails(args.dry_run)
+                # Process new emails
+                if not args.replies_only:
+                    results = process_currency_emails(args.dry_run)
+                    ts = datetime.now().strftime('%H:%M:%S')
+                    print(f"\n[{ts}] New: Found={results['found']}, Processed={results['processed']}, Errors={results['errors']}", file=sys.stderr)
+
+                # Process add replies
+                reply_results = process_add_replies(args.dry_run)
                 ts = datetime.now().strftime('%H:%M:%S')
-                print(f"\n[{ts}] Found: {results['found']}, Processed: {results['processed']}, Errors: {results['errors']}", file=sys.stderr)
+                print(f"[{ts}] Replies: Found={reply_results['found']}, Processed={reply_results['processed']}, Errors={reply_results['errors']}", file=sys.stderr)
+
                 time.sleep(args.interval)
             except KeyboardInterrupt:
                 print("\nStopped", file=sys.stderr)
@@ -538,8 +941,14 @@ def main():
                 print(f"Error: {e}", file=sys.stderr)
                 time.sleep(args.interval)
     else:
-        results = process_currency_emails(args.dry_run)
-        print(f"\nResults: {json.dumps(results)}")
+        # Process new emails
+        if not args.replies_only:
+            results = process_currency_emails(args.dry_run)
+            print(f"\nNew emails: {json.dumps(results)}")
+
+        # Process add replies
+        reply_results = process_add_replies(args.dry_run)
+        print(f"Replies: {json.dumps(reply_results)}")
 
 
 if __name__ == '__main__':
