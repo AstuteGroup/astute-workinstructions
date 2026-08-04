@@ -693,7 +693,7 @@ module.exports = [
     name: 'mfr-screening-requests',
     cadence: 'every 30m',
     cadenceCron: '*/30 * * * *',
-    command: `python3 "${WORKSPACE}/wi-new-manufacturer-screening/mfr-reply-handler.py" --requests --mailbox bizops`,
+    command: `python3 "${WORKSPACE}/tsk-new-mfr-screening/mfr-reply-handler.py" --requests --mailbox bizops`,
     cwd: WORKSPACE,
     needsOT: false,  // CLI writeback not yet enabled
     logFile: '/tmp/mfr-screening-requests.log',
@@ -703,7 +703,7 @@ module.exports = [
     name: 'mfr-screening-replies',
     cadence: 'every 30m',
     cadenceCron: '15,45 * * * *',  // offset from requests job
-    command: `python3 "${WORKSPACE}/wi-new-manufacturer-screening/mfr-reply-handler.py" --mailbox bizops`,
+    command: `python3 "${WORKSPACE}/tsk-new-mfr-screening/mfr-reply-handler.py" --mailbox bizops`,
     cwd: WORKSPACE,
     needsOT: true,  // creates MFRs via CLI (once enabled)
     logFile: '/tmp/mfr-screening-replies.log',
