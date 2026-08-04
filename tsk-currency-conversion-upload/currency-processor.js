@@ -25,22 +25,28 @@ const XLSX = require('xlsx');
 const TARGET_CURRENCIES = ['EUR', 'USD', 'SGD', 'INR', 'JPY', 'CAD', 'GBP'];
 
 // Column indices in UKS tab (0-indexed) for each currency
-// Row 5 is headers: Buy Rates:, GBP, EUR, USD, AUD, CAD, CHF, INR, ...
+// Row 6 (index 5) is headers: From Currency, Buy Rates:, GBP, EUR, USD, AUD, CAD, CHF, INR, ILS, NOK, NZD, JPY, SEK, SGD, ...
 const COLUMN_INDICES = {
   GBP: 2,
   EUR: 3,
   USD: 4,
+  AUD: 5,
   CAD: 6,
+  CHF: 7,
   INR: 8,
+  ILS: 9,
+  NOK: 10,
+  NZD: 11,
   JPY: 12,
+  SEK: 13,
   SGD: 14,
 };
 
-// Row index for USD rates (0-indexed, so row 8 in Excel = index 7)
-const USD_ROW_INDEX = 7;
+// Row index for USD rates (0-indexed, USD is row 9 in Excel = index 8)
+const USD_ROW_INDEX = 8;
 
 // Header row index (0-indexed)
-const HEADER_ROW_INDEX = 4;
+const HEADER_ROW_INDEX = 5;
 
 // ─── MAIN PROCESSING ─────────────────────────────────────────────────────────
 
@@ -74,17 +80,16 @@ function processExchangeRateMatrix(excelPath, startDate, endDate) {
   const usdRow = data[USD_ROW_INDEX];
 
   // Build a map of currency → rate (USD→currency)
-  const usdToX = {};
+  // USD→USD is always 1 (skip it in the loop since it's null in the source)
+  const usdToX = { USD: 1 };
   for (const [currency, colIndex] of Object.entries(COLUMN_INDICES)) {
+    if (currency === 'USD') continue;  // Skip - USD→USD is always 1
     const rate = usdRow[colIndex];
     if (typeof rate !== 'number' || isNaN(rate) || rate <= 0) {
       throw new Error(`Invalid rate for USD→${currency} at column ${colIndex}: ${rate}`);
     }
     usdToX[currency] = rate;
   }
-
-  // USD→USD is 1
-  usdToX.USD = 1;
 
   // Calculate X→USD rates (invert USD→X)
   const xToUSD = {};
