@@ -315,15 +315,19 @@ def fuzzy_match_manufacturer(name: str, threshold: float = 0.3) -> list:
         for c in candidates:
             normalized_db = normalize_company_name(c['name'] or '')
 
-            # Compute normalized similarity using SequenceMatcher
-            from difflib import SequenceMatcher
-            norm_score = SequenceMatcher(None, normalized_search, normalized_db).ratio()
-
-            # Use the best of: normalized score, raw name score, or description score
-            best_score = max(norm_score, c['raw_name_score'], c['desc_score'])
-
-            # Check for exact match (normalized)
+            # Check for exact match after normalization (e.g., "DMG Spa" == "DMG S.p.A")
             is_exact = normalized_search == normalized_db
+
+            if is_exact:
+                # Exact normalized match - this is what we want normalization for
+                best_score = 1.0
+                match_field = 'name (normalized)'
+            else:
+                # Not exact - use original trigram scores only
+                # Don't use SequenceMatcher as it inflates scores for shared suffixes
+                # e.g., "ACME CORP" vs "COMPEX CORP" would get 80% just from "CORP"
+                best_score = max(c['raw_name_score'], c['desc_score'])
+                match_field = 'name' if c['raw_name_score'] >= c['desc_score'] else 'alias'
 
             # Determine quality
             if is_exact:
@@ -334,14 +338,6 @@ def fuzzy_match_manufacturer(name: str, threshold: float = 0.3) -> list:
                 quality = 'MEDIUM'
             else:
                 quality = 'LOW'
-
-            # Determine which field matched best
-            if norm_score >= c['raw_name_score'] and norm_score >= c['desc_score']:
-                match_field = 'name (normalized)'
-            elif c['raw_name_score'] >= c['desc_score']:
-                match_field = 'name'
-            else:
-                match_field = 'alias'
 
             if best_score >= threshold:
                 matches.append({

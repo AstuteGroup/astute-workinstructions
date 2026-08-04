@@ -274,8 +274,8 @@ def fetch_mfr_requests(mailbox: str, folder: str = 'INBOX'):
     try:
         client.select(folder)
 
-        # Search for MFR request emails
-        status, messages = client.search(None, '(SUBJECT "MFR Request")')
+        # Search for MFR request emails (flexible: any subject containing "MFR")
+        status, messages = client.search(None, '(SUBJECT "MFR")')
 
         if status != 'OK':
             print(f"Search failed: {status}", file=sys.stderr)
@@ -303,6 +303,10 @@ def fetch_mfr_requests(mailbox: str, folder: str = 'INBOX'):
 
             # Skip replies - we want NEW requests only
             if subject.lower().startswith('re:'):
+                continue
+
+            # Skip our own outbound emails (check results, created notifications)
+            if 'MFR Check Results' in subject or 'MFR Created' in subject or 'MFR Updated' in subject:
                 continue
 
             # Get body
