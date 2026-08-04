@@ -709,6 +709,18 @@ module.exports = [
     logFile: '/tmp/mfr-screening-replies.log',
     description: 'Every 30m (offset) — process add/skip replies, create MFRs in OT',
   },
+
+  // ─── CURRENCY CONVERSION ─────────────────────────────────────────────────────
+  {
+    name: 'currency-conversion-poller',
+    cadence: 'every 30m',
+    cadenceCron: '10,40 * * * *',  // offset from MFR jobs
+    command: `python3 "${ASTUTE}/tsk-currency-conversion-upload/currency-poller.py"`,
+    cwd: WORKSPACE,
+    needsOT: false,  // generates CSV, no OT writes
+    logFile: '/tmp/currency-conversion-poller.log',
+    description: 'Every 30m — scrape bizops@ for Exchange Rate Matrix emails, process xlsx, reply with CSV attachment',
+  },
 ];
 
 // Helper: convert cadence string to milliseconds (used by sentinel + runner).
