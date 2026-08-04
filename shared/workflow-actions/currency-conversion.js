@@ -5,7 +5,7 @@
  * iDempiere-compatible currency conversion CSV files.
  *
  * Inbox: bizops@orangetsunami.com
- * Doc:   Trading Analysis/tsk-currency-conversion-upload/currency-conversion-upload.md
+ * Doc:   tsk-currency-conversion-upload/currency-conversion-upload.md
  */
 
 'use strict';
@@ -17,7 +17,7 @@ const breadcrumbs = require('../breadcrumbs');
 // Import the currency processor
 const currencyProcessorPath = path.join(
   __dirname,
-  '../../Trading Analysis/tsk-currency-conversion-upload/currency-processor.js'
+  '../../tsk-currency-conversion-upload/currency-processor.js'
 );
 let currencyProcessor;
 try {
