@@ -590,39 +590,42 @@ def extract_batch_id_from_subject(subject: str) -> str:
 
 
 def call_currency_writer(rates: list, start_date: str, end_date: str, dry_run: bool = False) -> dict:
-    """Call the currency rate writer via Node.js."""
+    """Call the currency rate writer via writeback proxy (sudo to analytics_user)."""
     payload = {
-        'rates': rates,
-        'validFrom': start_date,
-        'validTo': end_date,
-        'dryRun': dry_run,
+        'opts': {
+            'rates': rates,
+            'validFrom': start_date,
+            'validTo': end_date,
+            'dryRun': dry_run,
+        }
     }
 
-    # Use the writeback proxy pattern
-    cmd = [
-        'node', '-e',
-        f'''
-const {{ writeCurrencyRates }} = require("{CURRENCY_WRITER}");
-const payload = {json.dumps(payload)};
-writeCurrencyRates(payload).then(r => console.log(JSON.stringify(r))).catch(e => {{
-  console.error(JSON.stringify({{ error: e.message }}));
-  process.exit(1);
-}});
-'''
-    ]
-
+    # Use the writeback proxy CLI (runs as analytics_user via sudo)
     try:
-        result = subprocess.run(cmd, capture_output=True, text=True, timeout=120)
+        result = subprocess.run(
+            ['sudo', '-n', '-u', 'analytics_user', '/opt/writeback/cli', 'currency-rates'],
+            input=json.dumps(payload),
+            capture_output=True,
+            text=True,
+            timeout=120
+        )
 
         if result.returncode != 0:
-            error_out = result.stderr or result.stdout
+            error_out = result.stderr.strip() or result.stdout.strip()
+            # Check for subcommand not found
+            if 'Unknown subcommand' in error_out:
+                return {
+                    'success': False,
+                    'error': 'currency-rates subcommand not yet added to /opt/writeback/cli. Please add it.',
+                }
             try:
                 err = json.loads(error_out)
                 return {'success': False, 'error': err.get('error', error_out)}
             except:
                 return {'success': False, 'error': error_out}
 
-        return json.loads(result.stdout)
+        response = json.loads(result.stdout)
+        return response.get('result', response)
 
     except subprocess.TimeoutExpired:
         return {'success': False, 'error': 'Timeout after 120s'}

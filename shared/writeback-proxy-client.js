@@ -74,6 +74,7 @@ const DISPATCH = {
   validateCQForSold:     { subcommand: 'validate-cq-sold',     args: ['cqId', 'opts'] },
   writeMfr:              { subcommand: 'mfr',                  args: ['opts'] },
   updateMfrAlias:        { subcommand: 'mfr-alias',            args: ['opts'] },
+  writeCurrencyRates:    { subcommand: 'currency-rates',       args: ['opts'] },
 };
 
 // Map writer name -> source module so direct-mode (analytics_user) can
@@ -94,6 +95,7 @@ const DIRECT_MODULE = {
   validateCQForSold:     './cq-sold-validator',
   writeMfr:              './mfr-writer',
   updateMfrAlias:        './mfr-writer',
+  writeCurrencyRates:    './currency-rate-writer',
 };
 
 // The effective process user — i.e. who this Node process is running as
