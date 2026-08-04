@@ -127,10 +127,14 @@ IMAP_PORT=993
 | Quality | Score | Action |
 |---------|-------|--------|
 | EXACT | 100% | EXISTS - Already in OT |
-| HIGH | 80-99% | REVIEW - Likely duplicate |
-| MEDIUM | 50-79% | REVIEW - Possible match |
-| LOW | 30-49% | ADD - Weak match |
+| HIGH | ≥60% | REVIEW - Likely duplicate |
+| MEDIUM | ≥40% | REVIEW - Possible match |
+| LOW | ≥30% | ADD - Weak match |
 | NO MATCH | <30% | ADD - New manufacturer |
+
+**Company Suffix Normalization:** The fuzzy matcher normalizes company suffixes before comparison:
+- "DMG Spa" = "DMG S.p.A" = "DMG S.p.A." → EXACT match
+- Handles: Spa/S.p.A, Inc/Incorporated, Ltd/Limited, GmbH/G.m.b.H, Corp/Corporation, LLC, LP, SA, BV, NV, KK, Co. Ltd
 
 ## State Files
 
@@ -144,6 +148,13 @@ IMAP_PORT=993
 - Playwright with Chromium
 - Access to `/opt/writeback/cli` (runs as analytics_user via sudo)
 
+## Cron Schedule
+
+| Job | Schedule | Purpose |
+|-----|----------|---------|
+| `mfr-screening-requests` | `*/30 * * * *` | Scrape bizops@ for new MFR requests |
+| `mfr-screening-replies` | `15,45 * * * *` | Process add/skip replies |
+
 ## CLI Commands Required
 
 **Status: PENDING** - analytics_user must add these to `/opt/writeback/cli.js`:
@@ -151,4 +162,4 @@ IMAP_PORT=993
 - `mfr` - Create new manufacturer
 - `mfr-alias` - Update manufacturer description (for M code)
 
-See `CLI_UPDATE_REQUIRED.md` for implementation details.
+See `HANDOFF.md` for implementation details.
