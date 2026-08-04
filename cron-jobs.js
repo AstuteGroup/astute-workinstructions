@@ -124,7 +124,7 @@ module.exports = [
   // },
   {
     name: 'lam-kitting-runner',
-    cadence: 'weekly',
+    cadence: 'fixed',
     cadenceCron: '0 12 * * 1',
     command: `node "${ASTUTE}/Trading Analysis/LAM 3PL/lam-kitting-runner.js"`,
     cwd: ASTUTE,
