@@ -1,0 +1,140 @@
+   value    |                 name                 |                         description                         
+------------+--------------------------------------+-------------------------------------------------------------
+ MFR1000001 | Nippon Chemical Screw Co., Ltd.      | M12893 - CHEMIS, CHEMIS Net Shopping
+ MFR1000002 | American Beryllia Inc                | M12892 - ABI Advanced Materials; ABI
+ MFR1000004 | Elmos Semiconductor SE               | M12996 - Elmos
+ MFR1000005 | OPSCO Optoelectronics                | M13011 - OPSCO
+ MFR1000006 | Boyd Corporation                     | M13043
+ MFR1000007 | Mulberry Metal Products              | M13091 - Mulberry
+ MFR1000008 | Amperite Co.                         | M13092 - Division of Olympic Controls Corp (M08821)
+ MFR1000009 | Kawasaki Robotics                    | M13269 - Kawasaki, Kawasaki Heavy Industries
+ MFR1000010 | CET-MOS Technology Corp              | M13275 - CET, Chino-Excel Technology
+ MFR1000011 | Wieson Technologies                  | M13307
+ MFR1000012 | Chiplus Semiconductor                | M13306
+ MFR1000013 | BOXCO                                | M13324
+ MFR1000015 | Durafast Label                       | M13336
+ MFR1000016 | Octavo Systems                       | M13335
+ MFR1000017 | CODACA                               | M13344 - SHENZHEN CODACA ELECTRONIC CO., LTD
+ MFR1000018 | CAPXON                               | M13390 - Capxon Electronic Technology Co., Ltd
+ MFR1000019 | FARATRONIC                           | M13391 - XIAMEN FARATRONIC CO., LTD
+ MFR1000020 | TID                                  | M13398
+ MFR1000021 | Menics                               | M13423
+ MFR1000022 | CZH-LABS                             | M13271 - Shenzhen Chunzehui Electronic Technology Co., Ltd.
+ MFR1000023 | Insignia                             | M13460 - Insignia
+ MFR1000024 | Best Buy Essentials                  | M13459 - Best Buy
+ MFR1000025 | Same Sky                             | M13512 - formerly CUI Devices
+ MFR1000026 | SAGAMI ELEC CO., LTD.                | M13511
+ MFR1000027 | LIGHTHORSE TECHNOLOGIES INC.         | M13510 - LTI
+ MFR1000028 | Merten                               | M13551
+ MFR1000029 | Teufel                               | M13550
+ MFR1000030 | Fremont Micro Devices                | M13558 - FMD
+ MFR1000031 | Haines Enterprises                   | M13572
+ MFR1000032 | PT. SKY ENERGY                       | M13573 - PT. SKY ENERGY INDONESIA TBK
+ MFR1000033 | RFBeam                               | M13591 - RFBeam Microwave
+ MFR1000034 | Hatchbox                             | M13610
+ MFR1000035 | SimplyNUC                            | M13630
+ MFR1000037 | Shallcross                           | M13647 - RCL, RCL Shallcross
+ MFR1000038 | Atkore                               | M13615
+ MFR1000039 | Ortech                               | M13642
+ MFR1000040 | ILSCO                                | M13684 - ILSCO nVent
+ MFR1000041 | Salom                                | M13688
+ MFR1000042 | VINATech Co LTD                      | M13711 - Vina Tech
+ MFR1000044 | Dataprobe                            | M13773
+ MFR1000045 | Zentel Japan Group                   | M13778
+ MFR1000046 | Extreme Bolt & Fastener              | M13793
+ MFR1000047 | Point Nine Technologies              | M13803
+ MFR1000048 | Inductor Supply Inc                  | M13840
+ MFR1000049 | Richwave                             | M13871
+ MFR1000050 | TechNexion                           | M13886
+ MFR1000051 | Associated Research                  | M13844 - Ikonix
+ MFR1000052 | MESAMOLL                             | M13921 - Lanxess brand
+ MFR1000053 | Warner Electric                      | M13945
+ MFR1000054 | Tempil                               | M13944 - Markal brand
+ MFR1000055 | Bestcreate Technology Limited        | M13946
+ MFR1000056 | Stockcap                             | M13954
+ MFR1000057 | Cable Ties Plus                      | M13962
+ MFR1000058 | Linovision                           | M14014 - Hinovision
+ MFR1000059 | Ideal Tridon                         | M14017
+ MFR1000060 | Air Filters, Inc                     | M14046
+ MFR1000061 | KWI Technology Inc.                  | M14047 - Kingwin
+ MFR1000062 | Ocean State Stainless                | M14054
+ MFR1000063 | ASB Inc                              | M14073
+ MFR1000064 | Miromar, LLC.                        | M14089
+ MFR1000065 | Thermatron Engineering, Inc.         | M14119
+ MFR1000066 | Longsys Foresee                      | M14128
+ MFR1000067 | Shenzhen ZDT Technology              | M14145
+ MFR1000068 | PROCET                               | M14200
+ MFR1000069 | Morad Antenna Company                | M14245
+ MFR1000070 | Basler                               | M13959
+ MFR1000071 | S&W Manufacturing                    | M14299
+ MFR1000073 | Parker Meggitt                       | M14310 - Meggitt Defense
+ MFR1000074 | Fumex                                | M14324
+ MFR1000075 | Grape Solar                          | M14326
+ MFR1000076 | LOCTAI                               | M14327
+ MFR1000077 | Magnolia Advanced Materials          | M14333
+ MFR1000079 | QLogic                               | M14361 - Qlogic, Cavium, Marvell
+ MFR1000080 | Citrogene                            | M14370
+ MFR1000081 | Send Cut Send                        | M14360
+ MFR1000082 | DB Unlimited                         | M13755
+ MFR1000083 | Monoprice                            | M14421
+ MFR1000084 | Seacomp                              | M14427
+ MFR1000085 | BOE Technology                       | M14454
+ MFR1000086 | Wattstopper                          | M14462
+ MFR1000087 | Jinpao Precision Industry            | M14466
+ MFR1000088 | Coiltron, Inc.                       | M14472
+ MFR1000089 | US Converters                        | M14478
+ MFR1000090 | Chogori                              | M14505
+ MFR1000091 | Konus                                | M14535
+ MFR1000092 | Pacific Monolithics                  | M14546 - Division of Richardson RFPD
+ MFR1000093 | Poppelmann GmbH & Co KG              | M14543
+ MFR1000094 | Cradlepoint                          | M14554 - Subsidiary of Ericsson
+ MFR1000095 | Stonewall Cable, Inc.                | M14555
+ MFR1000096 | CHIP TECHNOLOGIES INC                | M14558
+ MFR1000097 | Front Panel Express, LLC             | M14565
+ MFR1000098 | Deltamas Solusindo                   | M14591 - Deltamas Solar
+ MFR1000099 | PSP Injection Plastique              | M14507
+ MFR1000101 | GRE Manufacturing                    | M14635
+ MFR1000102 | Phantom Cables                       | M14646
+ MFR1000103 | Shenzhen Esocoo Industrial Co., Ltd  | M14648 - Esocoo
+ MFR1000105 | Wiley                                | M14660
+ MFR1000106 | HMI Frequency Technology             | M14657
+ MFR1000107 | Sechan Electronics Inc               | M14708
+ MFR1000108 | Richelieu                            | M14713
+ MFR1000109 | Advanced Energy                      | M14739
+ MFR1000110 | CHK ELECTRONICS                      | M14740
+ MFR1000111 | Amerway Inc.                         | M14745
+ MFR1000112 | EFINEA                               |  M14765 - EFI
+ MFR1000113 | Solidigm                             | M14785
+ MFR1000114 | Falconer Electronics                 | M14825
+ MFR1000115 | Rosnol                               | M14826
+ MFR1000116 | TurboChef                            | M14842
+ MFR1000117 | Aerolux                              | M14843
+ MFR1000118 | Edgecore                             | M14844
+ MFR1000119 | Flexaust                             | M14881
+ MFR1000120 | Condat                               | M14886
+ MFR1000121 | Alif Semiconductor                   | M13881
+ MFR1000122 | Fitipower Integrated Technology Inc. | M14928
+ MFR1000123 | Will Semiconductor                   | M13170
+ MFR1000124 | Xinsheng Electronics Co., Ltd        | M14939
+ MFR1000125 | Quantum Dice                         | M14477 - QD
+ MFR1000126 | Larson Electronics                   | M14963
+ MFR1000127 | INRCORE                              | M07719
+ MFR1000128 | Dot Vision                           | M14972
+ MFR1000129 | NLD Electronic GMBH                  | M14987
+ MFR1000130 | Ancorp                               | M15067
+ MFR1000131 | Actuonix Motion Devices, Inc         | M15064
+ MFR1000132 | Albion Inc.                          | M15127 - Albion Casters
+ MFR1000133 | Control Instruments Corporation      | M15135
+ MFR1000134 | Simolex Rubber Corporation           | M15167
+ MFR1000135 | Arista Networks, Inc.                | M15224
+ MFR1000136 | John Evans' Sons LLC                 | M14098
+ MFR1000137 | OPTO PLUS LED                        | M15263
+ MFR1000138 | Eberhard                             | M15279
+ MFR1000139 | Unicast                              | M15284
+ MFR1000140 | Optifuse                             | M14495
+ MFR1000141 | Contactal EPMF                       | M15303 - Contactal, EPMF
+ MFR1000142 | Imada                                | M15366
+ MFR1000143 | Martin International Enclosures      | M15342
+ MFR1000144 | Ikeuchi                              | M15418
+(136 rows)
+

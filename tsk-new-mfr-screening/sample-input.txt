@@ -1,0 +1,8 @@
+# Sample manufacturer names to check
+# One per line, lines starting with # are ignored
+
+Texas Instruments
+Analog Devices
+Acme Corp
+CET
+Maxim

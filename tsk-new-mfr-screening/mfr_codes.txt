@@ -1,0 +1,104 @@
+ value  |                  name                  
+--------+----------------------------------------
+ M02304 | (Gaurdian) Electric
+ M07382 | 02 Optics
+ M00003 | 02 UK
+ M00006 | 1 Deal Brass
+ M09606 | 10Gtek
+ M06851 | 123 Bearing
+ M00004 | 12Voltplanet.co.uk
+ M00005 | 177 Cannon
+ M10952 | 19 Computing
+ M11676 | 2 Pure
+ M11271 | 2-Pure
+ M09659 | 24-7 Boardsports
+ M00007 | 247GT
+ M11382 | 2542386 Ontario Ltd. (Ceramic Knife)
+ M11316 | 2582400
+ M12011 | 2DOBOARD
+ M00008 | 2E Mechatronic
+ M00009 | 2J Antennae
+ M00020 | 3 TRPD
+ M11780 | 3-IN-ONE
+ M00010 | 333Test
+ M00011 | 3A Manufacturing Ltd
+ M09414 | 3A Technology
+ M00012 | 3D Cases Ltd
+ M10363 | 3D Fila Print
+ M00014 | 3D Fury
+ M12044 | 3D Jake
+ M06683 | 3D Lockers
+ M00015 | 3D Plus
+ M00017 | 3D Systems
+ M10611 | 3DConnexion
+ M00013 | 3DDC
+ M10304 | 3DGBIRE Ltd
+ M00016 | 3DR
+ M11015 | 3DXR
+ M07465 | 3Gmetalworx Inc
+ M00018 | 3M
+ M11782 | 3M
+ M10184 | 3M INTERCONNECT SOLUTIONS
+ M00019 | 3M Peltor
+ M11876 | 3S Fire
+ M09911 | 3T
+ M10208 | 3T AM Polymers
+ M00021 | 3V Fasteners
+ M06799 | 3iC
+ M00024 | 4 Imprint
+ M11567 | 45 Gallon Drums
+ M00022 | 4DSP
+ M00023 | 4GON
+ M09168 | 4Secure
+ M11112 | ?Applied Weighing International Ltd
+ M10431 | ?Axis Precision Engineering Components
+ M10963 | ?Cleveland containers Ltd
+ M11292 | ?IX Blue
+ M11247 | ?Jabra
+ M09950 | ?Perfection Chain Products Inc
+ M10353 | ?SG Micro (HK) Limited
+ M10642 | ?Yueqing Aidun Electric Co.,Ltd.
+ M12750 | ?hybsk
+ M08606 | A & E Squire Ltd
+ M00362 | A And I Industries
+ M07550 | A J Cope & Son Ltd
+ M12488 | A J P Automotive
+ M00229 | A Konics
+ M08846 | A O Smith Corporation
+ M11967 | A R Banks ltd
+ M07880 | A S Catering Supplies Ltd
+ M07556 | A S Scientific Products Ltd
+ M08758 | A Seal Plastics
+ M00033 | A and D Fasteners
+ M08260 | A&G Precision & Sons Ltd
+ M00025 | A&M Defence & Marine
+ M00026 | A-GAS
+ M07035 | A-INFO Inc
+ M09098 | A-Tech Memory
+ M07134 | A.A Lab-Systems Ltd
+ M08261 | A.E Petsche Company Inc
+ M10623 | A.H. Systems, Inc.
+ M10702 | A.S.P Electro-Technology Ltd
+ M00609 | A.W.Carrington
+ M10601 | A1 Hydraulics Ltd
+ M00028 | A1 Microwave
+ M12021 | A1 Route
+ M00027 | A1-Cbiss
+ M00029 | A3M Designs
+ M07398 | AA Med-Holon Machining Ltd
+ M11286 | AAA
+ M00030 | AAC Inc
+ M09295 | AAF International
+ M00031 | AAI
+ M00043 | AB Connectors
+ M00044 | AB Electronik
+ M11396 | AB Multimask
+ M00055 | AB Precision
+ M11532 | AB TECHNOLOGY GROUP
+ M12373 | ABB - THOMAS & BETTS
+ M00038 | ABB Ltd
+ M00049 | ABL
+ M00052 | ABL Sursum
+ M11433 | ABLIC Inc.
+(100 rows)
+
