@@ -403,6 +403,42 @@ module.exports = {
     },
   },
 
+  // ─── EXCESS INSPECTION FILE BUILDOUT ───────────────────────────────────────
+  'excess-inspection': {
+    status: 'active',
+    handler: 'excess-inspection',
+    doc: 'Business Ops/tsk-excess-file-buildout/excess-inspection-file-buildout.md',
+    inbox: 'bizops@orangetsunami.com',
+    sourceFolder: 'INBOX',
+    cron: null,  // Manual invocation only — no cron scheduled
+    actions: ['process', 'need_info', 'needs_review', 'skip'],
+    capabilities: {
+      replyStitching: true,
+      needInfoClarifications: true,
+      largePayloadGate: false,
+      approvalReplyAction: false,
+      preWriteIdempotency: true,
+      writeQueue: false,
+      breadcrumbWrites: true,
+      operatorDigest: false,
+      activityDigest: false,
+      replyParserGrammar: false,
+      tieredCron: false,
+    },
+    deviations: {
+      largePayloadGate: 'Excess inspection files are bounded (single PO per file); no gate needed',
+      approvalReplyAction: 'No payload gate → no approval needed. Clarification uses reply-stitching via need_info.',
+      writeQueue: 'Direct xlsx generation; no OT API writes, no staging queue needed',
+      operatorDigest: 'Low-volume workflow; per-email confirmation is sufficient visibility',
+      activityDigest: 'Low-volume workflow; breadcrumbs provide audit trail',
+      replyParserGrammar: 'Reply parsing handled via sidecar round-trip, not shared grammar',
+      tieredCron: 'Manual invocation only — no cron scheduled',
+    },
+    // POLICY: All notifications go to operator (jake.harris@) — not to external senders.
+    // need_info emails operator for PO number or site clarification.
+    // Writes output xlsx to ~/workspace/excess-inspection-output/
+  },
+
   // ─── LAM KITTING (LAM approval emails → Master Roster updates) ─────────────
   'lam-kitting': {
     status: 'active',

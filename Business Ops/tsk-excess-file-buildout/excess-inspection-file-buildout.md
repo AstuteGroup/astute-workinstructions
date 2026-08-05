@@ -2,17 +2,88 @@
 
 ## Overview
 
-This document describes the process for building out excess inspection log entries from a Purchase Order PDF. The workflow extracts part data from a PO document and populates the Excel inspection log with all required fields.
+This document describes the process for building out excess inspection log entries from Purchase Order files (xlsx or pdf). The workflow extracts part data, applies MFR code resolution, product code classification, and generates inspection log format output.
+
+**Inbox:** `bizops@orangetsunami.com`
+**Handler:** `shared/workflow-actions/excess-inspection.js`
+**Processor:** `Business Ops/tsk-excess-file-buildout/excess-processor.js`
 
 ## Source Files
 
-- **Input:** Purchase Order PDF (e.g., `POV0069002.pdf`)
-- **Reference:** `Excess Inspection Log.xlsx` → "Excess POs" tab (for Site lookup)
-- **Output:** `excess-inspection-buildout-<POV>.xlsx`
+- **Input:** Purchase Order file (xlsx, xls, or pdf) — e.g., `POV0069002.pdf`, `Marvell_Excess.xlsx`
+- **Reference:** `Excess Inspection Log.xlsx` → "Excess POs" tab (for Site lookup, if present in file)
+- **Output:** `excess-inspection-buildout-<POV>-<timestamp>.xlsx` in `~/workspace/excess-inspection-output/`
 
 ---
 
-## End-to-End Workflow
+## Manual Execution
+
+This workflow is manually triggered when a file is received. **No cron automation.**
+
+### Quick Start
+
+```bash
+# Process a single file directly
+node "Business Ops/tsk-excess-file-buildout/excess-processor.js" \
+  --file "/path/to/POV0069002.xlsx" \
+  --po "POV0069002"
+
+# Or use the poller to process emails from bizops@ inbox
+node "Business Ops/tsk-excess-file-buildout/excess-inspection-poller.js"
+```
+
+### CLI Usage
+
+```bash
+# List unseen emails in bizops@ inbox
+node shared/email-workflow-poller.js list --workflow excess-inspection
+
+# Read a specific email
+node shared/email-workflow-poller.js read <uid> --workflow excess-inspection
+
+# Download attachments
+node shared/email-workflow-poller.js download-attachments <uid> --workflow excess-inspection
+
+# Process file (provide attachment path and PO number)
+node shared/email-workflow-poller.js route <uid> process --workflow excess-inspection \
+  --payload '{"attachmentPath": "/tmp/file.xlsx", "poNumber": "POV0069002"}'
+```
+
+### Processing Steps
+
+1. **Parse file** — Extracts line items (MPN, qty, mfr, date code) from xlsx/xls/pdf
+2. **Lookup Site** — From "Excess POs" tab if present in workbook
+3. **Detect Partner** — Auto-detects consignment partner from filename/content
+4. **Resolve MFR codes** — Database lookup + pattern matching
+5. **Classify product codes** — PA, SC, CO, EM, LED, BTP
+6. **Generate output** — Creates inspection log xlsx in `~/workspace/excess-inspection-output/`
+
+### Actions
+
+| Scenario | Action | Destination Folder |
+|----------|--------|-------------------|
+| Processed successfully | `process` | `Excess-Processed` |
+| PO number not detected | `need_info` | `Excess-NeedInfo` |
+| Parse error / writer error | `needs_review` | `Excess-NeedsReview` |
+| No xlsx/xls/pdf attachment | `skip` | `NotExcess` |
+
+### Output
+
+On successful processing, operator receives email with:
+- PO number, site, consignment partner
+- Line count and product code breakdown
+- MFR coverage stats (known vs unknown)
+- Output xlsx attached
+
+---
+
+## Processing Logic Reference
+
+The detailed processing rules are documented below.
+
+---
+
+## End-to-End Workflow (Manual)
 
 ### Step 1: Parse PDF for Line Items
 
