@@ -665,6 +665,7 @@ module.exports = [
 
   {
     name: 'rfq-creation-digest',
+    owner: 'justin.oberhofer',
     cadence: 'fixed',
     // 12:00 UTC = 8am EDT (May–Nov) / 7am EST (Nov–Mar). DST drift acceptable
     // per ops convention. Mon-Fri only (weekend gate built into script).
@@ -693,7 +694,7 @@ module.exports = [
     name: 'mfr-screening-requests',
     cadence: 'every 30m',
     cadenceCron: '*/30 * * * *',
-    command: `python3 "${ASTUTE}/tsk-new-mfr-screening/mfr-reply-handler.py" --requests --mailbox bizops`,
+    command: `python3 "${ASTUTE}/Business Ops/tsk-new-mfr-screening/mfr-reply-handler.py" --requests --mailbox bizops`,
     cwd: WORKSPACE,
     needsOT: false,  // CLI writeback not yet enabled
     logFile: '/tmp/mfr-screening-requests.log',
@@ -703,7 +704,7 @@ module.exports = [
     name: 'mfr-screening-replies',
     cadence: 'every 30m',
     cadenceCron: '15,45 * * * *',  // offset from requests job
-    command: `python3 "${ASTUTE}/tsk-new-mfr-screening/mfr-reply-handler.py" --mailbox bizops`,
+    command: `python3 "${ASTUTE}/Business Ops/tsk-new-mfr-screening/mfr-reply-handler.py" --mailbox bizops`,
     cwd: WORKSPACE,
     needsOT: true,  // creates MFRs via CLI (once enabled)
     logFile: '/tmp/mfr-screening-replies.log',
@@ -716,7 +717,7 @@ module.exports = [
     owner: 'justin.oberhofer',
     cadence: 'every 30m',
     cadenceCron: '10,40 * * * *',  // offset from MFR jobs
-    command: `python3 "${ASTUTE}/tsk-currency-conversion-upload/currency-poller.py"`,
+    command: `python3 "${ASTUTE}/Business Ops/tsk-currency-conversion-upload/currency-poller.py"`,
     cwd: WORKSPACE,
     needsOT: false,  // generates CSV, no OT writes
     logFile: '/tmp/currency-conversion-poller.log',
