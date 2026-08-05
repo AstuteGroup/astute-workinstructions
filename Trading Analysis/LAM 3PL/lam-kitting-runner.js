@@ -944,12 +944,26 @@ async function main() {
   // isactive='Y'). Roster-driven from Kitting DB INVENTORY sheet — every
   // program part appears with current qty (zero-stock parts included for
   // full visibility). See lam-kitting-customer-offer.js header for details.
+  //
+  // IMPORTANT: Only run on Monday's automated cron OR when explicitly requested
+  // with --refresh-customer-offer flag. Manual/test runs should NOT update the
+  // customer-facing offer — customers see the churn and lose confidence.
+  //
   // Isolated try/catch — a failure here logs + surfaces in the email body
   // but does NOT block the buyer email or fail the runner.
   let customerOfferResult = null;
   let customerOfferError = null;
-  log('Step 4c: Refreshing customer-facing LAM Kitting Inventory offer...');
-  try {
+  const isMonday = new Date().getDay() === 1;
+  const forceCustomerOffer = process.argv.includes('--refresh-customer-offer');
+  const skipCustomerOffer = !isMonday && !forceCustomerOffer;
+
+  if (skipCustomerOffer) {
+    log('Step 4c: Skipping customer offer refresh (not Monday, use --refresh-customer-offer to force)');
+  } else {
+    log(`Step 4c: Refreshing customer-facing LAM Kitting Inventory offer...${forceCustomerOffer ? ' (forced)' : ''}`);
+  }
+
+  if (!skipCustomerOffer) try {
     const customerOfferArgs = [
       `"${path.join(SCRIPT_DIR, 'lam-kitting-customer-offer.js')}"`,
       `"${inventoryFolder}"`,

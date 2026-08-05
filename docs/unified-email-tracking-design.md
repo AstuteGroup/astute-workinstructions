@@ -1,6 +1,6 @@
 # Unified Email Tracking & Reply Handling
 
-**Status:** Draft
+**Status:** Phase 2 Implemented (2026-08-05)
 **Created:** 2026-07-31
 **Problem:** `needs_review` notifications across all workflows don't write sidecars, so operator replies go nowhere. Additionally, UIDs are per-inbox and per-folder, making email references painful.
 
@@ -278,11 +278,11 @@ When a reply arrives:
 3. Update agent prompts to handle needs_review replies
 4. Test with the stuck RFQ-1234 case
 
-### Phase 2: Tracking ID Registry
-1. Create `shared/tracking-id.js` with assign/lookup/update
-2. Create `~/.email-tracking-registry.jsonl`
-3. Integrate into `email-workflow-poller.js`
-4. Create `scripts/lookup-email.js` CLI
+### Phase 2: Tracking ID Registry ✅ DONE (2026-08-05)
+1. ✅ Create `shared/tracking-id.js` with assign/lookup/update
+2. ✅ Create `~/.email-tracking-registry.jsonl`
+3. ✅ Integrate into `email-workflow-poller.js` (cmdRead assigns, cmdRoute updates)
+4. ✅ Create `scripts/lookup-email.js` CLI
 
 ### Phase 3: Update Notifications
 1. Replace UID references with Tracking ID in notification emails

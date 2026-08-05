@@ -76,6 +76,7 @@ const { simpleParser } = require('mailparser');
 
 const { createNotifier } = require('./notifier');
 const pending = require('./workflow-pending-state');
+const trackingId = require('./tracking-id');
 
 // ─── ARGS ────────────────────────────────────────────────────────────────────
 
@@ -488,6 +489,23 @@ async function cmdRead(uid, { folder = null } = {}) {
   const sidecar = pending.findByReferences(WORKFLOW_NAME, stitchRefs);
   if (sidecar) result.pending_state = sidecar;
 
+  // Assign unified tracking ID (idempotent — returns existing if already assigned)
+  if (WORKFLOW_MODULE && WORKFLOW_MODULE.inbox && result.message_id) {
+    try {
+      result.tracking_id = trackingId.assignTrackingId({
+        inbox: WORKFLOW_MODULE.inbox,
+        uid: result.uid,
+        messageId: result.message_id,
+        subject: result.subject,
+        from: result.from,
+        folder: folder || 'INBOX',
+      });
+    } catch (e) {
+      // Non-fatal — tracking ID is a nice-to-have
+      console.error(`[tracking-id] Warning: ${e.message}`);
+    }
+  }
+
   console.log(JSON.stringify(result, null, 2));
 }
 
@@ -669,6 +687,33 @@ async function cmdRoute(uid, actionName, payload) {
       });
       result.moved_to = folder;
       result.marked_seen = true;
+    }
+  }
+
+  // Update unified tracking ID status
+  if (!DRY_RUN && currentMessageId && WORKFLOW_MODULE && WORKFLOW_MODULE.inbox) {
+    try {
+      const existingTracking = trackingId.lookupByMessageId(currentMessageId);
+      if (existingTracking) {
+        // Determine status from action name
+        const statusMap = {
+          load_vq: 'loaded', load_rfq: 'loaded', correct_vq: 'corrected',
+          needs_review: 'pending_review', need_info_vendor: 'pending_info',
+          clarify_vendor: 'pending_clarify', needs_vendor: 'pending_vendor',
+          no_bid: 'no_bid', not_vq: 'not_applicable', not_rfq: 'not_applicable',
+          dup_skip: 'duplicate',
+        };
+        const status = statusMap[actionName] || actionName;
+        trackingId.updateStatus(existingTracking.trackingId, {
+          currentFolder: folder,
+          status,
+          ...(payload.rfqSearchKey && { rfqSearchKey: payload.rfqSearchKey }),
+        });
+        result.tracking_id = existingTracking.trackingId;
+      }
+    } catch (e) {
+      // Non-fatal — tracking is supplementary
+      console.error(`[tracking-id] Warning: ${e.message}`);
     }
   }
 
