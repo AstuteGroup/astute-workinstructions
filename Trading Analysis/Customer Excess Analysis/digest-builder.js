@@ -43,6 +43,9 @@ exitIfWeekend({ stateFile: STATE_FILE, stateKey: 'lastSent' });
 // Import cron-jobs registry to get job names for per-job pause detection
 const CRON_REGISTRY = require('../../cron-jobs');
 
+// Import hung job detection for daemon PID files and cron locks
+const { detectHungJobs, formatDuration: formatHungDuration } = require('../../scripts/check-hung-jobs');
+
 const SENDER = 'excess@orangetsunami.com';
 const FALLBACK = process.env.EXCESS_FALLBACK_SENDER || 'stockRFQ@orangetsunami.com';
 const RECIPIENT = process.env.OPERATOR_EMAIL || 'jake.harris@astutegroup.com';
@@ -238,6 +241,97 @@ function buildStuckEmailWarningSection(stuckResults) {
   html += '</div>';
 
   return { html, count: totalStuck, autoRecoverCount, manualReviewCount };
+}
+
+// ── Hung job detection ────────────────────────────────────────────────────
+//
+// Checks for hung processes: cron locks AND daemon PID files that have been
+// running too long. Uses check-hung-jobs.js for detection logic.
+//
+// Added 2026-08-04 after rfq-loader-daemon hung for 29 days undetected.
+
+function checkHungJobs() {
+  try {
+    return detectHungJobs();
+  } catch (err) {
+    console.error(`[hung-job-check] Error: ${err.message}`);
+    return { issues: [], warnings: [] };
+  }
+}
+
+function buildHungJobWarningSection(hungResults) {
+  const { issues, warnings } = hungResults;
+
+  if (issues.length === 0 && warnings.length === 0) {
+    return { html: '', issueCount: 0, warningCount: 0 };
+  }
+
+  let html = '';
+
+  // Critical issues (hung processes, stale PID files)
+  if (issues.length > 0) {
+    html += '<div style="background:#f8d7da;border:2px solid #dc3545;padding:12px;margin-bottom:16px;border-radius:4px">';
+    html += `<h3 style="margin:0 0 8px 0;color:#721c24">🔥 ${issues.length} Hung Process${issues.length === 1 ? '' : 'es'} Detected</h3>`;
+
+    // Group by type for clearer display
+    const hungDaemons = issues.filter(i => i.type === 'hung-daemon');
+    const hungJobs = issues.filter(i => i.type === 'hung');
+    const stalePids = issues.filter(i => i.type === 'stale-pid-file' || i.type === 'dead-pid');
+    const corrupt = issues.filter(i => i.type === 'corrupt' || i.type === 'corrupt-pid-file');
+
+    if (hungDaemons.length > 0) {
+      html += '<p style="margin:4px 0;color:#721c24"><b>Hung daemons (require manual kill):</b></p>';
+      html += '<ul style="margin:0;padding-left:20px;color:#721c24">';
+      for (const d of hungDaemons) {
+        html += `<li><b>${escapeHtml(d.name)}</b> (PID ${d.pid}) — running ${d.age}, exceeds ${d.timeout} timeout</li>`;
+      }
+      html += '</ul>';
+    }
+
+    if (hungJobs.length > 0) {
+      html += '<p style="margin:4px 0;color:#721c24"><b>Hung cron jobs:</b></p>';
+      html += '<ul style="margin:0;padding-left:20px;color:#721c24">';
+      for (const j of hungJobs) {
+        html += `<li><b>${escapeHtml(j.name)}</b> (PID ${j.pid}) — running ${j.age}, exceeds ${j.timeout} timeout</li>`;
+      }
+      html += '</ul>';
+    }
+
+    if (stalePids.length > 0) {
+      html += '<p style="margin:4px 0;color:#721c24"><b>Stale PID/lock files (dead processes):</b></p>';
+      html += '<ul style="margin:0;padding-left:20px;color:#721c24">';
+      for (const s of stalePids) {
+        html += `<li><b>${escapeHtml(s.name)}</b> — PID ${s.pid} is dead, file ${s.age} old</li>`;
+      }
+      html += '</ul>';
+    }
+
+    if (corrupt.length > 0) {
+      html += '<p style="margin:4px 0;color:#721c24"><b>Corrupt files:</b></p>';
+      html += '<ul style="margin:0;padding-left:20px;color:#721c24">';
+      for (const c of corrupt) {
+        html += `<li>${escapeHtml(c.message)}</li>`;
+      }
+      html += '</ul>';
+    }
+
+    html += '<p style="margin:8px 0 0 0;font-size:10px;color:#721c24">To fix: <code>node scripts/check-hung-jobs.js --fix</code></p>';
+    html += '</div>';
+  }
+
+  // Warnings (approaching timeout)
+  if (warnings.length > 0) {
+    html += '<div style="background:#fff3cd;border:2px solid #ffc107;padding:12px;margin-bottom:16px;border-radius:4px">';
+    html += `<h3 style="margin:0 0 8px 0;color:#856404">⚡ ${warnings.length} Job${warnings.length === 1 ? '' : 's'} Approaching Timeout</h3>`;
+    html += '<ul style="margin:0;padding-left:20px;color:#856404">';
+    for (const w of warnings) {
+      html += `<li><b>${escapeHtml(w.name)}</b> (PID ${w.pid}) — running ${w.age}, approaching ${w.timeout} timeout</li>`;
+    }
+    html += '</ul>';
+    html += '</div>';
+  }
+
+  return { html, issueCount: issues.length, warningCount: warnings.length };
 }
 
 // ── State tracking (last digest send time) ────────────────────────────────
@@ -855,6 +949,12 @@ async function buildDigestEmail({ since, until, crumbs }) {
   const stuckWarning = buildStuckEmailWarningSection(stuckResults);
   const stuckCount = stuckWarning.count;
 
+  // Check for hung jobs (cron locks and daemon PID files)
+  const hungResults = checkHungJobs();
+  const hungWarning = buildHungJobWarningSection(hungResults);
+  const hungIssueCount = hungWarning.issueCount;
+  const hungWarningCount = hungWarning.warningCount;
+
   // Activity is window-scoped (sections 1-3, 5-7); the open queue is current state.
   const windowActivity = s1.count + s2.count + s3.count + s5.count + s6.count;
   const openQueue = s4.count;
@@ -862,7 +962,13 @@ async function buildDigestEmail({ since, until, crumbs }) {
   const flaggedWrites = s6.flaggedCount || 0;
 
   const headlines = [];
-  // Stuck emails and paused jobs warnings take priority (shown first in red/orange)
+  // Hung jobs, stuck emails and paused jobs warnings take priority (shown first in red/orange)
+  if (hungIssueCount > 0) {
+    headlines.push(`<span style="color:#c0392b"><b>🔥 ${hungIssueCount} hung process${hungIssueCount === 1 ? '' : 'es'}</b></span>`);
+  }
+  if (hungWarningCount > 0) {
+    headlines.push(`<span style="color:#e67e22"><b>⚡ ${hungWarningCount} approaching timeout</b></span>`);
+  }
   if (stuckCount > 0) {
     headlines.push(`<span style="color:#c0392b"><b>📧 ${stuckCount} stuck email${stuckCount === 1 ? '' : 's'}</b></span>`);
   }
@@ -894,6 +1000,7 @@ async function buildDigestEmail({ since, until, crumbs }) {
     <h2 style="margin:0 0 6px 0">Operations Digest</h2>
     ${summaryLine}
 
+    ${hungWarning.html}
     ${stuckWarning.html}
     ${pauseWarning.html}
 
@@ -925,7 +1032,10 @@ async function buildDigestEmail({ since, until, crumbs }) {
   </body></html>`;
 
   const subjBits = [];
-  // Stuck emails, flagged writes, and paused jobs warnings take priority in subject line
+  // Hung jobs, stuck emails, flagged writes, and paused jobs warnings take priority in subject line
+  if (hungIssueCount > 0) {
+    subjBits.push(`🔥 ${hungIssueCount} HUNG`);
+  }
   if (stuckCount > 0) {
     subjBits.push(`📧 ${stuckCount} stuck`);
   }
@@ -955,7 +1065,7 @@ async function buildDigestEmail({ since, until, crumbs }) {
     ? `Ops Digest — quiet window (${fmtTime(until)})`
     : `Ops Digest — ${subjBits.join(', ')} (${fmtTime(until)})`;
 
-  return { subject, html, totalActivity: windowActivity + openQueue + cronFailures + pausedCount + stuckCount + flaggedWrites };
+  return { subject, html, totalActivity: windowActivity + openQueue + cronFailures + pausedCount + stuckCount + flaggedWrites + hungIssueCount };
 }
 
 async function main() {
