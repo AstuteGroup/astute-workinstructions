@@ -334,14 +334,28 @@ function updateLastInventoryDates(inventoryByCpc) {
 }
 
 /**
- * Check if a POV should be filtered out based on last inventory date
- * Returns true if the POV is stale (created before the CPC last had inventory)
+ * Check if a POV should be filtered out based on inventory receipt dates
+ * Returns true if the POV is stale - meaning parts have been received after the PO was created.
+ *
+ * Two checks:
+ * 1. lastInventoryDate - generic "CPC had inventory on this date" tracking
+ * 2. latestReceiptDate - actual receipt date from Infor inventory file (more accurate)
+ *
+ * If EITHER shows a date after the PO creation, the PO is likely fulfilled.
  *
  * @param {string} cpc - The CPC
  * @param {string} povCreatedDate - POV creation date (YYYY-MM-DD)
+ * @param {string} [receiptDate] - Latest receipt date from inventory file (optional)
  * @returns {boolean} True if POV should be filtered out
  */
-function isPovStale(cpc, povCreatedDate) {
+function isPovStale(cpc, povCreatedDate, receiptDate = null) {
+  // Check 1: Receipt date from inventory file (most accurate)
+  // If parts were received after the PO was created, PO is fulfilled
+  if (receiptDate && receiptDate > povCreatedDate) {
+    return true;
+  }
+
+  // Check 2: Generic "last seen with inventory" date (fallback)
   const dates = loadLastInventoryDates();
   const lastInvDate = dates[cpc];
 
@@ -351,7 +365,6 @@ function isPovStale(cpc, povCreatedDate) {
   }
 
   // If POV was created before the last inventory date, it's stale
-  // (parts were received after the order was placed)
   return povCreatedDate < lastInvDate;
 }
 
@@ -838,26 +851,36 @@ async function main() {
   const historicalData = loadHistoricalPurchaseData(mpnsToQuery);
   console.log(`  Historical data found: ${Object.keys(historicalData).length} MPNs`);
 
-  // Step 4b: Filter stale POVs (created before the CPC last had inventory)
-  // This prevents old fulfilled orders from resurfacing when inventory is consumed.
+  // Step 4b: Filter stale POVs (received after PO was created)
+  // Uses receipt date from Infor inventory file for accuracy.
+  // This prevents fulfilled orders from showing as PENDING RECEIPT.
   console.log('');
   console.log('Step 4b: Filtering stale POVs...');
   const recentPOVs = {};
   let staleFiltered = 0;
   for (const [key, pov] of Object.entries(recentPOVsRaw)) {
     const poCreated = pov.PO_Created_Date;
-    if (poCreated && isPovStale(key, poCreated)) {
+    // Get receipt date from inventory for this MPN
+    // Try Purchased MPN first, then the POV's MPN
+    const mpnToCheck = pov.Purchased_MPN || pov.MPN || key;
+    const inv = aggregated[mpnToCheck] || aggregated[normalizeMPN(mpnToCheck)];
+    const receiptDate = inv?.latestReceiptDate || null;
+
+    if (poCreated && isPovStale(key, poCreated, receiptDate)) {
       staleFiltered++;
       // Log for visibility (only first few)
       if (staleFiltered <= 3) {
-        console.log(`    Filtered stale POV: ${key} (PO created ${poCreated})`);
+        const reason = receiptDate && receiptDate > poCreated
+          ? `received ${receiptDate}`
+          : `PO created ${poCreated}`;
+        console.log(`    Filtered stale POV: ${key} (${reason})`);
       }
     } else {
       recentPOVs[key] = pov;
     }
   }
   if (staleFiltered > 0) {
-    console.log(`  Filtered ${staleFiltered} stale POVs (created before last inventory)`);
+    console.log(`  Filtered ${staleFiltered} stale POVs (received after PO created)`);
   }
 
   // Step 4c: Load recent VQ pricing (from Monday's full run)
@@ -1169,7 +1192,7 @@ function loadChuboeInventory(filePath, warehouseLabel) {
  *
  * @param {string} xlsxPath - Path to ASTItemLotsReport xlsx
  * @param {string} warehouseCode - e.g., 'W111' or 'W115'
- * @returns {object} { mpn: { qty, warehouse }, ... }
+ * @returns {object} { mpn: { qty, warehouse, latestReceiptDate }, ... }
  */
 function loadInventoryFromXlsx(xlsxPath, warehouseCode) {
   const parsed = parseInventoryFile(xlsxPath);
@@ -1180,14 +1203,21 @@ function loadInventoryFromXlsx(xlsxPath, warehouseCode) {
   for (const row of rows) {
     const mpn = (row.mpn || '').trim();
     const qty = row.qty || 0;
+    // dateLot is the receipt date from Infor (when the lot was received)
+    const dateLot = row.dateLot || '';
 
     if (!mpn) continue;
 
     // Aggregate by MPN (handles multiple lots)
     if (!inventory[mpn]) {
-      inventory[mpn] = { qty: 0, warehouse: warehouseCode };
+      inventory[mpn] = { qty: 0, warehouse: warehouseCode, latestReceiptDate: '' };
     }
     inventory[mpn].qty += qty;
+
+    // Track the latest receipt date across all lots for this MPN
+    if (dateLot && dateLot > (inventory[mpn].latestReceiptDate || '')) {
+      inventory[mpn].latestReceiptDate = dateLot;
+    }
   }
 
   return inventory;
@@ -1199,7 +1229,7 @@ function loadInventoryFromXlsx(xlsxPath, warehouseCode) {
  *
  * @param {object} cacheData - Cache data from loadCachedInventory
  * @param {string} warehouseCode - e.g., 'W111' or 'W115'
- * @returns {object} { mpn: { qty, warehouse }, ... }
+ * @returns {object} { mpn: { qty, warehouse, latestReceiptDate }, ... }
  */
 function loadInventoryFromCache(cacheData, warehouseCode) {
   const rows = cacheData.byWarehouse[warehouseCode] || [];
@@ -1209,14 +1239,21 @@ function loadInventoryFromCache(cacheData, warehouseCode) {
   for (const row of rows) {
     const mpn = (row.mpn || '').trim();
     const qty = row.qty || 0;
+    // dateLot is the receipt date from Infor (when the lot was received)
+    const dateLot = row.dateLot || '';
 
     if (!mpn) continue;
 
     // Aggregate by MPN (handles multiple lots)
     if (!inventory[mpn]) {
-      inventory[mpn] = { qty: 0, warehouse: warehouseCode };
+      inventory[mpn] = { qty: 0, warehouse: warehouseCode, latestReceiptDate: '' };
     }
     inventory[mpn].qty += qty;
+
+    // Track the latest receipt date across all lots for this MPN
+    if (dateLot && dateLot > (inventory[mpn].latestReceiptDate || '')) {
+      inventory[mpn].latestReceiptDate = dateLot;
+    }
   }
 
   console.log(`  ${warehouseCode}: ${Object.keys(inventory).length} unique MPNs`);
