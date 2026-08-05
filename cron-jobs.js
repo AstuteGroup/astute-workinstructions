@@ -679,7 +679,8 @@ module.exports = [
 
   {
     name: 'bos-metrics-report',
-    cadence: 'monthly',
+    owner: 'justin.oberhofer',
+    cadence: 'fixed',
     // 17:00 UTC = 12pm EST (Nov–Mar) / 1pm EDT (Mar–Nov). 1st of month.
     cadenceCron: '0 17 1 * *',
     command: `node "${WORKSPACE}/scripts/generate-bos-metrics.js"`,
