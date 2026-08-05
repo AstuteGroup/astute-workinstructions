@@ -1952,7 +1952,22 @@ ${investigationBlock}
  * Needs review — cannot parse or match, requires operator triage.
  */
 async function action_needs_review(payload, ctx) {
-  const { reason, details, subject, from, investigation_summary } = payload;
+  const { reason, details, subject, from, investigation_summary, extracted } = payload;
+
+  // Write sidecar so operator replies can be stitched back to this escalation
+  let sidecarRecord = null;
+  if (!ctx.dryRun && ctx.anchorMessageId) {
+    sidecarRecord = pending.writeSidecar(ctx.workflow, ctx.anchorMessageId, {
+      original_uid: ctx.uid,
+      original_subject: subject || null,
+      original_recipient: ctx.jakeEmail,
+      external_sender: from || null,
+      escalation_type: 'needs_review',
+      blocking_reason: reason,
+      extracted: extracted || {},
+      investigation_summary: investigation_summary || null,
+    });
+  }
 
   const investigationBlock = investigation_summary
     ? `<p><b>Agent investigation:</b></p><pre style="background:#eef6ff;padding:8px;white-space:pre-wrap;font-size:12px;border-left:3px solid #369">${esc(investigation_summary)}</pre>`
@@ -2883,6 +2898,7 @@ module.exports = {
     needs_review: {
       folder: 'NeedsReview',
       requires: ['reason'],
+      keepsPending: true,  // Enable reply-stitching for operator responses
       handler: action_needs_review,
     },
     not_approval: {

@@ -63,6 +63,38 @@ If you catch yourself thinking "I remember how this works" - STOP and read the f
 
 ---
 
+# North Star: Run the Workflow Runner — No Custom Scripts
+
+**If a workflow has a runner script, RUN IT. Do not write custom scripts to piece things together.**
+
+Runners exist because they:
+- Handle all the steps in the correct order
+- Apply proper formatting (colors, column widths, tabs)
+- Include all required output tabs (escalations, pending approval, etc.)
+- Send to correct recipients
+- Write proper sidecars and audit trails
+
+**Anti-pattern (WRONG):**
+```javascript
+// "I'll just write a quick script to rebuild the Excel"
+node -e "const XLSX = require('xlsx'); ..."
+
+// "I'll manually call the exported function"
+runner.rebuildExcelWithRfqLines(...)
+```
+
+**Correct pattern:**
+```bash
+# Just run the workflow
+node lam-kitting-runner.js
+```
+
+**Why this exists:** On 2026-08-05, multiple attempts to "just send the LAM reorder file" resulted in missing tabs, missing color coding, wrong email recipients, and hours of wasted time — all because custom scripts were written instead of running `node lam-kitting-runner.js`.
+
+**The runner is the workflow. Run it.**
+
+---
+
 # North Star: Email-Driven Workflows Use the Agent Pattern
 
 **ALL email-driven workflows in this codebase use the same architecture:** thin CLI primitives (`shared/email-workflow-poller.js list / read / route`) + per-workflow handlers (`shared/workflow-actions/<name>.js`) + a workflow `.md` as the agent's instructions, executed via a `/schedule` routine. **Read [`email-workflow-architecture.md`](astute-workinstructions/email-workflow-architecture.md) before adding or modifying any email-driven workflow.**

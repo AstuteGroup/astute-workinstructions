@@ -513,10 +513,25 @@ async function doWriteRFQ(payload, ctx) {
  * Optional: { details }
  */
 async function action_needs_review(payload, ctx) {
-  const { reason, subject, outerFrom, details, investigation_summary } = payload;
+  const { reason, subject, outerFrom, details, investigation_summary, extracted } = payload;
 
   // Resolve internal recipients (operator + internal forwarders)
   const envelope = resolveOutreachRecipients(payload, ctx);
+
+  // Write sidecar so operator replies can be stitched back to this escalation
+  let sidecarRecord = null;
+  if (!ctx.dryRun && ctx.anchorMessageId) {
+    sidecarRecord = pending.writeSidecar(ctx.workflow, ctx.anchorMessageId, {
+      original_uid: ctx.uid,
+      original_subject: subject || null,
+      original_recipient: envelope.to,
+      external_sender: envelope.externalSender || outerFrom || null,
+      escalation_type: 'needs_review',
+      blocking_reason: reason,
+      extracted: extracted || {},
+      investigation_summary: investigation_summary || null,
+    });
+  }
 
   // Investigation summary block — shows agent reasoning. Parity with VQ UID 10064 fix.
   const investigationBlock = investigation_summary
@@ -798,6 +813,7 @@ module.exports = {
     needs_review: {
       folder: 'NeedsReview',
       requires: ['reason'],
+      keepsPending: true,  // Enable reply-stitching for operator responses
       handler: action_needs_review,
     },
     not_rfq: {

@@ -377,10 +377,26 @@ ${truncateNote}`;
  * Optional: { details, subject, from }
  */
 async function action_needs_review(payload, ctx) {
-  const { reason, details, subject, from, investigation_summary } = payload;
+  const { reason, details, subject, from, investigation_summary, extracted } = payload;
 
   // Resolve internal recipients (operator + internal forwarders + salesrep)
   const envelope = resolveOutreachRecipients(payload, ctx);
+
+  // Write sidecar so operator replies can be stitched back to this escalation.
+  // Without this, replies to needs_review emails go nowhere.
+  let sidecarRecord = null;
+  if (!ctx.dryRun && ctx.anchorMessageId) {
+    sidecarRecord = pending.writeSidecar(ctx.workflow, ctx.anchorMessageId, {
+      original_uid: ctx.uid,
+      original_subject: subject || null,
+      original_recipient: envelope.to,
+      external_sender: envelope.externalSender || from || null,
+      escalation_type: 'needs_review',
+      blocking_reason: reason,
+      extracted: extracted || (ctx.pendingSidecar && ctx.pendingSidecar.extracted) || {},
+      investigation_summary: investigation_summary || null,
+    });
+  }
 
   // Investigation summary block — shows the agent's reasoning.
   const investigationBlock = investigation_summary
@@ -395,6 +411,9 @@ async function action_needs_review(payload, ctx) {
 <p><b>Reason:</b> ${esc(reason)}</p>
 ${investigationBlock}
 ${details ? `<pre style="background:#f5f5f5;padding:8px;white-space:pre-wrap;font-size:11px">${esc(details)}</pre>` : ''}
+<p style="background:#f5f5f5;padding:10px;border-left:3px solid #b00">
+   <b>Reply to ${esc(ctx.inbox)} with clarifications</b> — e.g., "Use Search Key 1010187 for the customer". The next agent tick will merge your answer and continue processing.
+</p>
 <p style="color:#666;font-size:11px">Message moved to NeedsReview in ${ctx.inbox} inbox.</p>
 ${recipientsFooter(envelope)}
 </body></html>`;
@@ -423,15 +442,20 @@ ${recipientsFooter(envelope)}
     cog: 'rfq-loading-agent',
     event: 'escalated-needs_review',
     uid: ctx.uid,
+    messageId: ctx.currentMessageId || null,
+    anchorMessageId: ctx.anchorMessageId || null,
     reason,
     investigation_summary: investigation_summary || null,
     recipients: envelope.recipientList,
     external_sender_not_emailed: envelope.externalSender || null,
+    sidecar_written: !!sidecarRecord,
   });
   return {
     notified: envelope.to,
     recipients: envelope.recipientList,
     external_sender_not_emailed: envelope.externalSender || null,
+    sidecar_written: !!sidecarRecord,
+    sidecar_anchor: sidecarRecord ? ctx.anchorMessageId : null,
   };
 }
 
@@ -497,6 +521,7 @@ module.exports = {
     needs_review: {
       folder: 'NeedsReview',
       requires: ['reason'],
+      keepsPending: true,  // Enable reply-stitching for operator responses
       handler: action_needs_review,
     },
     not_rfq: {

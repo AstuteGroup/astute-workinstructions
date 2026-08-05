@@ -6,27 +6,89 @@ Operational home for Astute's LAM 3PL program: W111 (LAM 3PL) + W115 (LAM Dead I
 
 ---
 
-## CRITICAL: Source of Truth Hierarchy
+## CRITICAL: Always Run the Workflow — NO CUSTOM SCRIPTS
 
-**RFQs in OT are DERIVED from source files — NOT the other way around.**
+> **ALWAYS RUN `node lam-kitting-runner.js` — NEVER PIECE TOGETHER CUSTOM SCRIPTS.**
 
-| Level | Source | Use For |
-|-------|--------|---------|
-| 1 (Primary) | **Source files** (Excel workbooks sent by LAM/operator) | Award data, pricing, MOQ, contract terms |
-| 2 (Derived) | **Master Roster** (`LAM_Master_Roster.xlsx`) | Consolidated reference — populated FROM source files |
-| 3 (Downstream) | **RFQs in OT** | Created BY us from source files for purchasing workflow |
+The runner exists for a reason. It handles:
+- Proper multi-tab Excel output (Sourced Reorder Alerts, Escalations, Pending Approval, NOT ON AVL)
+- Color coding and margin formatting
+- RFQ line number insertion
+- Escalation tab building and aging logic
+- Correct email recipients (Jake for manual, Jake+Josh for cron)
 
-**NEVER use RFQs as source of truth for:**
-- Award membership (what's on the program)
-- Contract pricing (Base Unit Price, Resale Price)
-- MOQ, lead time, or other contract terms
+**Anti-pattern (WRONG):**
+```javascript
+// Writing custom node -e scripts to "just rebuild the Excel"
+// Manually calling individual functions
+// Piecing together data from JSON sidecars
+```
 
-**To audit a part's origin:**
-1. Check the `Source File` and `Source Tab` columns in the Master Roster
-2. Open that source file and verify the data
-3. Do NOT reference the RFQ — it was created from the source file
+**Correct pattern:**
+```bash
+# Just run the workflow
+node lam-kitting-runner.js
+```
 
-**Why:** RFQs are created by Claude or operators based on source files. If the RFQ has wrong data, the source file is still correct. If the source file has wrong data, the RFQ will also be wrong. Always trace back to the source file.
+If you need to skip certain steps (e.g., sourcing because data already exists), modify the runner to support that flag — don't write throwaway scripts.
+
+**Why this exists:** On 2026-08-05, multiple attempts to "just send the file" resulted in missing tabs, missing formatting, wrong recipients, and wasted time — all because custom scripts were written instead of running the workflow.
+
+---
+
+## CRITICAL: Source of Truth — THE MASTER ROSTER
+
+> **THE MASTER ROSTER IS THE SINGLE SOURCE OF TRUTH FOR ALL LAM KITTING DATA.**
+> **EVERYTHING IN OT (RFQs, VQs, RFQ Line MPNs) IS DERIVED FROM THE ROSTER.**
+> **IF THERE IS A DISCREPANCY, THE ROSTER IS CORRECT AND OT IS WRONG.**
+
+### Data Flow Hierarchy
+
+```
+Source Files (Excel from LAM) ──► Master Roster ──► OT (RFQs, VQs)
+       PRIMARY                    SOURCE OF TRUTH    DERIVED (downstream)
+```
+
+| Level | Source | Purpose | Authority |
+|-------|--------|---------|-----------|
+| 1 (Primary) | **Source files** (Excel from LAM/operator) | Raw award data | Authoritative for original award |
+| 2 (**SOURCE OF TRUTH**) | **Master Roster** (`LAM_Master_Roster.xlsx`) | Consolidated reference | **AUTHORITATIVE for all decisions** |
+| 3 (Downstream) | **OT data** (RFQs, VQs, chuboe_rfq_line_mpn) | Created FROM roster | **NEVER authoritative** — always verify against roster |
+
+### Rules
+
+1. **Never use OT to "fix" the roster.** If OT says MPN X and roster says MPN Y, the roster is correct.
+2. **Never copy OT data back to the roster.** Data flows one way: Roster → OT.
+3. **Never trust RFQ line MPNs without roster verification.** RFQs are populated from roster; corruption can occur in the pipeline.
+4. **If OT and roster disagree:** Correct OT to match roster. Do NOT correct roster to match OT.
+
+### Why This Matters
+
+On 2026-07-29, scripts that copied data FROM OT back TO the roster propagated row-mismatch corruption to 16 Phase 3 CPCs. The root cause was treating OT as authoritative when it had already been corrupted.
+
+**Anti-pattern (WRONG):**
+```javascript
+// In check-phase3-roster.js - DANGER: copies FROM RFQ TO roster
+if (row[mpnCol] !== rfq.mpn) {
+  row[mpnCol] = rfq.mpn;  // THIS IS BACKWARDS
+}
+```
+
+**Correct pattern:**
+```javascript
+// OT should match roster, not vice versa
+if (rfq.mpn !== rosterMpn) {
+  // Fix OT to match roster
+  await apiPut('chuboe_rfq_line_mpn', rfqLineMpnId, { MPN: rosterMpn });
+}
+```
+
+### To Audit/Fix a Part
+
+1. Check the **Master Roster** for the correct CPC → MPN mapping
+2. Query OT to see what's currently there
+3. If OT differs from roster → **fix OT**, not the roster
+4. If roster is wrong → check the **source file** (see Source File column)
 
 ---
 
@@ -144,7 +206,7 @@ All LAM workflow emails use: `lamkitting@orangetsunami.com`
 | Tool | Purpose | When to Use |
 |------|---------|-------------|
 | `shared/roster-validator.js` | Validates roster against source RFQ | When adding new parts from an RFQ |
-| `scripts/check-phase3-roster.js` | Auto-fixes Phase 3 data from RFQ 1139539 | One-time fix for Phase 3 scrambled data |
+| `scripts/check-phase3-roster.js` | **COMPARISON ONLY** — reports discrepancies between roster and OT | After Phase 3 changes to verify data integrity |
 
 ### Validation Gate: New Parts (`lam-new-add.js`)
 
@@ -410,7 +472,27 @@ Review the color-coded Excel. Priority levels:
 
 PENDING ORDER PLACEMENT and PENDING RECEIPT share `priorityOrder` value 4 — they sort together at the bottom of the main tab, with PENDING ORDER PLACEMENT first inside the bucket (more actionable: chase the PO vs wait for vendor). PENDING WAREHOUSE TRANSFER sorts last (value 5) — these are internal transfers, not external orders.
 
-**Recency filter (loadRecentPOVs SQL):** Infor-stamped POs (POVnnnnnnn) are **always shown** regardless of age — a POV stamp means it's a committed vendor order. Non-stamped orders (drafts, VQ_TICKED) are dropped when older than 120 days AND promise date has passed. This prevents stuck/orphan 2024–2025 drafts from leaking into the Recent POV cell while ensuring real committed orders always surface.
+**Recency filter (loadRecentPOVs SQL):**
+- **POV-stamped + Completed/In Progress (`CO`/`IP`)** — always shown regardless of age. A POV stamp + completed status means it's a committed vendor order.
+- **POV-stamped + Draft (`DR`)** — only shown if recent (created ≤90 days OR promise ≤30 days). Old Draft POs with POV stamps are likely abandoned orders that were never finalized.
+- **Non-stamped orders** — only shown if recent (same recency rules).
+
+**IMPORTANT:** OT does NOT track receipts — Infor does. The `qtydelivered` field in OT is not reliable. Use inventory files from Infor as the source of truth for receipt status.
+
+**Last Inventory Date Tracking (POV staleness prevention):**
+
+Sidecar file: `lam-last-inventory-date.json`
+
+When a CPC has inventory, we record the date. POVs created before the last inventory date are considered "stale" (parts were received) and are filtered out. This prevents old POVs from resurfacing when inventory is later consumed.
+
+Example scenario:
+1. POV0067005 created 2024-07-02 for CPC 662-094083-001
+2. Parts received, inventory appears → record `lastInventoryDate: "2024-09-15"`
+3. Inventory consumed, CPC goes below threshold → reappears on reorder list
+4. POV0067005 is filtered (created 2024-07-02 < lastInventoryDate 2024-09-15)
+5. CPC shows as CRITICAL, not PENDING RECEIPT with stale POV
+
+The tracking is updated weekly during the reorder run (Step 3c). Only CPCs with inventory > 0 are updated.
 
 **Sourcing Status values:**
 
@@ -783,3 +865,22 @@ The rbash environment causes non-zero exit codes even on successful queries. The
 *Updated: 2026-07-10* — **Master Roster consolidation + two-file output.** (1) LAM_Master_Roster.xlsx replaces 3-file lookup (Lam_Kitting_DB + Lam_EPG_SIPOC + New Part ADDS) as single source of truth (~1,244 parts). (2) Two-file reorder output: `LAM_Reorder_Alerts_*.csv` (ready to order) + `LAM_Reorder_Pending_Approvals_*.xlsx` (awaiting LAM approval). Parts are mutually exclusive — appear on one file or the other. (3) Added Pending column (reason), Proposed Resale, Submitted Date, Status, Days Pending (aging) for approval tracking. (4) Email account changed to `lamkitting@orangetsunami.com`. (5) Added "Pending Approval Workflow" section documenting how to mark parts for approval and process approvals.
 *Updated: 2026-07-17* — **New Add workflow.** Added `lam-new-add.js` for onboarding new award tranches (Phase 3, etc.). Generates reorder-alert format CSV filtered by Award column, chains to existing `lam-kitting-source.js` for franchise enrichment. Same output format as weekly reorder — no separate enrichment logic.
 *Updated: 2026-07-18* — **Roster validation layer.** (1) Added `shared/roster-validator.js` — validates roster against source RFQ to catch data errors before output is sent. (2) Integrated into `lam-new-add.js`: `--send-email` now REQUIRES `--rfq` for validation. (3) Added `checkRosterHealth()` to weekly runner — checks for missing fields, duplicates, negative margins. Warnings included in email. (4) Root cause: Phase 3 source file had scrambled CPC-to-MPN mappings (22/44 parts wrong).
+*Updated: 2026-08-05* — **Draft PO recency fix.** POV-stamped orders in Draft status (`DR`) are now excluded if older than 90 days. Previously, all POV-stamped orders were kept regardless of age, which caused abandoned 2024 Draft POs (e.g., POV0067332) to show as PENDING RECEIPT and block reorders. Now only Completed/In Progress (`CO`/`IP`) orders with POV stamps are kept indefinitely. Also documented that OT does NOT track receipts (Infor does) in `shared/data-model.md`.
+*Updated: 2026-08-05* — **Last inventory date tracking.** Added `lam-last-inventory-date.json` sidecar to track when each CPC last had inventory. POVs created before the last inventory date are filtered out (parts were received). Prevents old POVs from resurfacing as PENDING RECEIPT when inventory is consumed. Step 3c updates the tracking weekly; filtering happens in Step 4b after loading POVs.
+*Updated: 2026-08-05* — **Purchased MPN inventory recognition.** Inventory under Purchased MPNs (from POVs) is now recognized even if the Purchased MPN differs from the roster/AVL MPNs. Previously, if a part was bought under a non-AVL MPN and arrived in inventory, it wouldn't be counted for that CPC. Now the inventory aggregation in Step 5 includes Purchased MPNs from raw POVs (including stale POVs) when summing stock. Also fixed Step 3d to include Purchased MPNs when tracking last inventory dates.
+*Updated: 2026-08-05* — **NOT ON AVL reconciliation workflow.** Items where the Purchased MPN doesn't match the AVL are now separated into a "NOT ON AVL - Reconcile" tab in the Excel output. Key features:
+- **Comprehensive scan**: Checks ALL items with POVs, not just reorder candidates. Items with stock are flagged as "HAS STOCK - RECONCILE AVL".
+- **Strict matching**: Flags ANY difference, including formatting (dashes, spaces, leading zeros) - to be safe and review all discrepancies.
+- **Clearing mechanism**: Once reconciled, items can be cleared via `clearNotOnAvlItem(cpc, purchasedMpn, opts)` so they don't reappear. Tracked in `lam-not-on-avl-cleared.json`.
+- **Doesn't affect reorder**: Items remain on main reorder list if needed; the NOT ON AVL tab is separate for reconciliation tracking.
+
+**To clear a NOT ON AVL item (terminal):**
+```javascript
+const reorder = require('./lam-kitting-reorder.js');
+reorder.clearNotOnAvlItem('630-232484-001', 'LM5069MMX-2/NOPB', {
+  clearedBy: 'Jake',
+  notes: 'Added to AVL per LAM approval'
+});
+```
+*Updated: 2026-08-05* — **CRITICAL: Phase 3 corruption root cause fix.** The `scripts/check-phase3-roster.js` script was copying data FROM OT BACK TO the roster — exactly backwards. This caused corrupted OT data (row mismatches) to propagate to the roster, which then caused reorder workflows to create more corrupted RFQs. The script has been rewritten to ONLY compare and report discrepancies (never modify the roster). Additionally, strengthened the "Source of Truth" documentation at the top of this file to emphasize that the Master Roster is authoritative and OT is derived. **If discrepancies exist, fix OT to match roster — never the reverse.**
+

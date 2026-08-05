@@ -55,8 +55,10 @@ function getFlaggedCPCsFromHandler() {
 }
 
 // Email configuration - LAM Kitting dedicated account
+// NOTE: Manual runs (direct script invocation) go to Jake only.
+//       Cron runs go through lam-kitting-runner.js which has its own email logic.
 const EMAIL_ACCOUNT = 'lamkitting';
-const NOTIFY_EMAIL = process.env.NOTIFY_EMAIL || 'jake.harris@astutegroup.com,josh.syre@astutegroup.com';
+const NOTIFY_EMAIL = process.env.NOTIFY_EMAIL || 'jake.harris@astutegroup.com';  // Manual runs → Jake only
 const notifier = createNotifier({
   fromEmail: `${EMAIL_ACCOUNT}@orangetsunami.com`,
   fromName: 'LAM 3PL'
@@ -141,27 +143,216 @@ function getAllApprovedMPNs(cpc, rosterMpn) {
  *   - flag: '' if OK, 'AVL' if on AVL but different, 'NOT ON AVL' if not approved
  */
 function validatePurchasedMPN(cpc, rosterMpn, purchasedMpn) {
-  // No purchased MPN or same as roster = OK
+  // No purchased MPN or same as roster (exact match) = OK
   if (!purchasedMpn || purchasedMpn === rosterMpn) {
     return { valid: true, flag: '' };
   }
 
-  // Different MPN - check if it's on AVL
+  // Check if this CPC+Purchased MPN pair has been cleared
+  if (isNotOnAvlCleared(cpc, purchasedMpn)) {
+    return { valid: true, flag: '' };
+  }
+
+  // Different MPN - check if it's on AVL using EXACT string comparison first
+  // Then fall back to normalized comparison for functional equivalence
   const approvedMpns = getAllApprovedMPNs(cpc, rosterMpn);
 
-  // Normalize for comparison (case-insensitive, trim whitespace)
-  const normalizedPurchased = purchasedMpn.trim().toUpperCase();
-  const isOnAvl = approvedMpns.some(mpn =>
-    mpn && mpn.trim().toUpperCase() === normalizedPurchased
+  // Check for exact match on AVL
+  const exactMatchOnAvl = approvedMpns.some(mpn => mpn === purchasedMpn);
+  if (exactMatchOnAvl) {
+    return { valid: true, flag: 'AVL' };
+  }
+
+  // Check for normalized match on AVL (functionally equivalent)
+  const normalizedPurchased = normalizeMPN(purchasedMpn);
+  const normalizedMatchOnAvl = approvedMpns.some(mpn =>
+    mpn && normalizeMPN(mpn) === normalizedPurchased
   );
 
-  if (isOnAvl) {
-    // On AVL but different from roster - note but OK
-    return { valid: true, flag: 'AVL' };
-  } else {
-    // NOT on AVL - escalate
+  if (normalizedMatchOnAvl) {
+    // Functionally same but different formatting - still flag for reconciliation
+    // User wants to be safe and reconcile any differences
     return { valid: false, flag: 'NOT ON AVL' };
   }
+
+  // Not on AVL at all - escalate
+  return { valid: false, flag: 'NOT ON AVL' };
+}
+
+// -----------------------------------------------------------------------------
+// NOT ON AVL Clearing Mechanism
+// -----------------------------------------------------------------------------
+// Tracks CPC+Purchased MPN pairs that have been reviewed and cleared.
+// Once cleared, they won't appear on the "NOT ON AVL" tab again.
+// Sidecar file: lam-not-on-avl-cleared.json
+// Format: { "CPC|PurchasedMPN": { clearedDate, clearedBy, notes }, ... }
+
+const NOT_ON_AVL_CLEARED_FILE = path.join(__dirname, 'lam-not-on-avl-cleared.json');
+
+let _notOnAvlClearedCache = null;
+
+/**
+ * Load the NOT ON AVL cleared tracking file
+ */
+function loadNotOnAvlCleared() {
+  if (_notOnAvlClearedCache) return _notOnAvlClearedCache;
+
+  if (fs.existsSync(NOT_ON_AVL_CLEARED_FILE)) {
+    try {
+      _notOnAvlClearedCache = JSON.parse(fs.readFileSync(NOT_ON_AVL_CLEARED_FILE, 'utf8'));
+    } catch (e) {
+      console.log('  WARNING: Could not parse lam-not-on-avl-cleared.json, starting fresh');
+      _notOnAvlClearedCache = {};
+    }
+  } else {
+    _notOnAvlClearedCache = {};
+  }
+
+  return _notOnAvlClearedCache;
+}
+
+/**
+ * Check if a CPC+Purchased MPN pair has been cleared
+ */
+function isNotOnAvlCleared(cpc, purchasedMpn) {
+  const cleared = loadNotOnAvlCleared();
+  const key = `${cpc}|${purchasedMpn}`;
+  return !!cleared[key];
+}
+
+/**
+ * Clear a NOT ON AVL item (mark as reviewed/reconciled)
+ * Call this from terminal or email workflow when item is cleared.
+ *
+ * @param {string} cpc - The CPC
+ * @param {string} purchasedMpn - The Purchased MPN that was flagged
+ * @param {object} opts - { clearedBy, notes }
+ */
+function clearNotOnAvlItem(cpc, purchasedMpn, opts = {}) {
+  const cleared = loadNotOnAvlCleared();
+  const key = `${cpc}|${purchasedMpn}`;
+
+  cleared[key] = {
+    cpc,
+    purchasedMpn,
+    clearedDate: new Date().toISOString().split('T')[0],
+    clearedBy: opts.clearedBy || 'operator',
+    notes: opts.notes || '',
+  };
+
+  fs.writeFileSync(NOT_ON_AVL_CLEARED_FILE, JSON.stringify(cleared, null, 2) + '\n');
+  _notOnAvlClearedCache = cleared;
+
+  console.log(`Cleared NOT ON AVL: ${cpc} | ${purchasedMpn}`);
+  return true;
+}
+
+/**
+ * List all cleared NOT ON AVL items
+ */
+function listClearedNotOnAvl() {
+  const cleared = loadNotOnAvlCleared();
+  return Object.values(cleared);
+}
+
+// -----------------------------------------------------------------------------
+// Last Inventory Date Tracking
+// -----------------------------------------------------------------------------
+// Tracks when each CPC last had inventory. Used to filter out stale POVs:
+// If a CPC had inventory after a POV was created, that POV is considered
+// fulfilled and should not resurface as "PENDING RECEIPT" when inventory
+// is later consumed.
+//
+// Sidecar file: lam-last-inventory-date.json
+// Format: { "CPC": "YYYY-MM-DD", ... }
+
+const LAST_INVENTORY_DATE_FILE = path.join(__dirname, 'lam-last-inventory-date.json');
+
+let _lastInventoryDateCache = null;
+
+/**
+ * Load the last inventory date tracking file
+ * @returns {Object} Map of CPC -> date string (YYYY-MM-DD)
+ */
+function loadLastInventoryDates() {
+  if (_lastInventoryDateCache) return _lastInventoryDateCache;
+
+  if (fs.existsSync(LAST_INVENTORY_DATE_FILE)) {
+    try {
+      _lastInventoryDateCache = JSON.parse(fs.readFileSync(LAST_INVENTORY_DATE_FILE, 'utf8'));
+    } catch (e) {
+      console.log('  WARNING: Could not parse lam-last-inventory-date.json, starting fresh');
+      _lastInventoryDateCache = {};
+    }
+  } else {
+    _lastInventoryDateCache = {};
+  }
+
+  return _lastInventoryDateCache;
+}
+
+/**
+ * Save the last inventory date tracking file
+ */
+function saveLastInventoryDates() {
+  if (!_lastInventoryDateCache) return;
+
+  fs.writeFileSync(
+    LAST_INVENTORY_DATE_FILE,
+    JSON.stringify(_lastInventoryDateCache, null, 2)
+  );
+}
+
+/**
+ * Update last inventory dates based on current inventory levels
+ * Call this after loading inventory data for the week.
+ *
+ * @param {Object} inventoryByCpc - Map of CPC -> qty (from W111 + W115)
+ * @returns {number} Number of CPCs updated
+ */
+function updateLastInventoryDates(inventoryByCpc) {
+  const dates = loadLastInventoryDates();
+  const today = new Date().toISOString().split('T')[0];
+  let updatedCount = 0;
+
+  for (const [cpc, qty] of Object.entries(inventoryByCpc)) {
+    if (qty > 0) {
+      // CPC has inventory today - record the date
+      if (dates[cpc] !== today) {
+        dates[cpc] = today;
+        updatedCount++;
+      }
+    }
+  }
+
+  if (updatedCount > 0) {
+    saveLastInventoryDates();
+    console.log(`  Last inventory dates updated: ${updatedCount} CPCs`);
+  }
+
+  return updatedCount;
+}
+
+/**
+ * Check if a POV should be filtered out based on last inventory date
+ * Returns true if the POV is stale (created before the CPC last had inventory)
+ *
+ * @param {string} cpc - The CPC
+ * @param {string} povCreatedDate - POV creation date (YYYY-MM-DD)
+ * @returns {boolean} True if POV should be filtered out
+ */
+function isPovStale(cpc, povCreatedDate) {
+  const dates = loadLastInventoryDates();
+  const lastInvDate = dates[cpc];
+
+  if (!lastInvDate) {
+    // No record of inventory for this CPC - keep the POV
+    return false;
+  }
+
+  // If POV was created before the last inventory date, it's stale
+  // (parts were received after the order was placed)
+  return povCreatedDate < lastInvDate;
 }
 
 /**
@@ -600,6 +791,46 @@ async function main() {
   const multiMpnCPCs = [...avl.entries()].filter(([_, mpns]) => mpns.length > 1).length;
   console.log(`  AVL loaded: ${avl.size} CPCs (${multiMpnCPCs} with multiple approved MPNs)`);
 
+  // Step 3c: Load recent POVs (needed for Purchased MPN lookup in inventory tracking)
+  // Load POVs BEFORE updating inventory dates so we can include Purchased MPNs
+  console.log('');
+  console.log('Step 3c: Loading recent POVs (for Purchased MPN lookup)...');
+  const recentPOVsRaw = loadRecentPOVs();
+  console.log(`  Recent POVs found: ${Object.keys(recentPOVsRaw).length} CPCs/MPNs`);
+
+  // Step 3d: Update last inventory dates for POV staleness tracking
+  // For each CPC with inventory, record today as the "last seen with inventory" date.
+  // This prevents stale POVs from resurfacing when inventory is later consumed.
+  // IMPORTANT: Include Purchased MPNs from POVs, not just AVL MPNs (fix 2026-08-05)
+  console.log('');
+  console.log('Step 3d: Updating last inventory dates...');
+  const inventoryByCpc = {};
+  for (const [mpn, excel] of Object.entries(excelData)) {
+    const cpc = excel.CPC;
+    if (!cpc) continue;
+    // Get inventory for this MPN (and any AVL alternates)
+    const allMpns = getAllApprovedMPNs(cpc, mpn);
+
+    // Also include Purchased MPN from POV if different from AVL
+    // This handles cases where inventory arrives under a non-AVL MPN
+    const pov = recentPOVsRaw[cpc] || recentPOVsRaw[normalizeMPN(mpn)];
+    const purchasedMpn = pov?.Purchased_MPN;
+    const mpnsToCheck = [...allMpns];
+    if (purchasedMpn && !allMpns.some(m => normalizeMPN(m) === normalizeMPN(purchasedMpn))) {
+      mpnsToCheck.push(purchasedMpn);
+    }
+
+    let totalQty = 0;
+    for (const m of mpnsToCheck) {
+      const inv = aggregated[m] || aggregated[normalizeMPN(m)];
+      if (inv) totalQty += inv.Total_Qty || 0;
+    }
+    if (totalQty > 0) {
+      inventoryByCpc[cpc] = (inventoryByCpc[cpc] || 0) + totalQty;
+    }
+  }
+  updateLastInventoryDates(inventoryByCpc);
+
   // Step 4: Load historical purchase data from ERP
   console.log('');
   console.log('Step 4: Loading historical purchase data from ERP...');
@@ -607,11 +838,27 @@ async function main() {
   const historicalData = loadHistoricalPurchaseData(mpnsToQuery);
   console.log(`  Historical data found: ${Object.keys(historicalData).length} MPNs`);
 
-  // Step 4b: Load recent POVs (open orders)
+  // Step 4b: Filter stale POVs (created before the CPC last had inventory)
+  // This prevents old fulfilled orders from resurfacing when inventory is consumed.
   console.log('');
-  console.log('Step 4b: Loading recent POVs (open orders)...');
-  const recentPOVs = loadRecentPOVs();
-  console.log(`  Recent POVs found: ${Object.keys(recentPOVs).length} MPNs`);
+  console.log('Step 4b: Filtering stale POVs...');
+  const recentPOVs = {};
+  let staleFiltered = 0;
+  for (const [key, pov] of Object.entries(recentPOVsRaw)) {
+    const poCreated = pov.PO_Created_Date;
+    if (poCreated && isPovStale(key, poCreated)) {
+      staleFiltered++;
+      // Log for visibility (only first few)
+      if (staleFiltered <= 3) {
+        console.log(`    Filtered stale POV: ${key} (PO created ${poCreated})`);
+      }
+    } else {
+      recentPOVs[key] = pov;
+    }
+  }
+  if (staleFiltered > 0) {
+    console.log(`  Filtered ${staleFiltered} stale POVs (created before last inventory)`);
+  }
 
   // Step 4c: Load recent VQ pricing (from Monday's full run)
   console.log('');
@@ -620,9 +867,11 @@ async function main() {
   console.log(`  Recent VQ pricing found: ${Object.keys(recentVQPricing.byCpc).length} CPCs, ${Object.keys(recentVQPricing.byMpn).length} MPNs`);
 
   // Step 5: Join and identify reorder candidates
+  // Pass both raw POVs (for Purchased MPN lookup) and filtered POVs (for priority)
+  // This ensures inventory under Purchased MPNs is counted even when the POV is stale
   console.log('');
   console.log('Step 5: Identifying reorder candidates...');
-  const reorderAlerts = identifyReorderCandidates(aggregated, excelData, historicalData, recentPOVs, pendingTransfers, recentVQPricing);
+  const reorderAlerts = identifyReorderCandidates(aggregated, excelData, historicalData, recentPOVs, pendingTransfers, recentVQPricing, recentPOVsRaw);
   console.log(`  Reorder candidates: ${reorderAlerts.length} items`);
 
   // Step 5b: Check other warehouses for available stock
@@ -660,6 +909,17 @@ async function main() {
     console.log('  All records passed validation.');
   }
 
+  // Step 5d: Scan ALL POVs for NOT ON AVL items (regardless of reorder status)
+  // This catches items with stock that have Purchased MPNs needing reconciliation
+  console.log('');
+  console.log('Step 5d: Scanning for NOT ON AVL items (all POVs)...');
+  const additionalNotOnAvl = findAllNotOnAvlItems(excelData, recentPOVsRaw, aggregated, reorderAlerts);
+  if (additionalNotOnAvl.length > 0) {
+    console.log(`  Additional NOT ON AVL items found: ${additionalNotOnAvl.length} (items with stock, not on reorder list)`);
+  } else {
+    console.log('  No additional NOT ON AVL items beyond reorder list.');
+  }
+
   // Step 6: Generate output files
   console.log('');
   console.log('Step 6: Generating output files...');
@@ -674,8 +934,8 @@ async function main() {
     }
     return true;
   });
-  writeReorderAlerts(readyToOrder, outputFile);
-  console.log(`  Reorder alerts (ready to order): ${outputFile} (${readyToOrder.length} items)`);
+  const actualOutputFile = writeReorderAlerts(readyToOrder, outputFile, additionalNotOnAvl);
+  // writeReorderAlerts logs its own output details (CSV vs Excel with tabs)
 
   // 6b: Pending Approvals Excel (cumulative - from roster)
   const pendingApprovalsFile = outputFile.replace('.csv', '').replace('_Alerts', '_Pending_Approvals') + '.xlsx';
@@ -696,6 +956,20 @@ async function main() {
   // "stock arrived — resale renegotiation still pending" surface in the runner.
   const escalationsContextFile = outputFile.replace('.csv', '_escalations_context.json');
   writeEscalationsContext(escalationsContextFile, aggregated, excelData, recentPOVs, historicalData, reorderAlerts);
+
+  // Step 6c: NOT ON AVL sidecar - items needing reconciliation
+  // The runner will load this and add a "NOT ON AVL - Reconcile" tab to the final output
+  const notOnAvlFromReorder = readyToOrder.filter(a => a['MPN Flag'] === 'NOT ON AVL');
+  const allNotOnAvlItems = [...notOnAvlFromReorder, ...additionalNotOnAvl];
+  if (allNotOnAvlItems.length > 0) {
+    const notOnAvlFile = outputFile.replace('.csv', '_not_on_avl.json');
+    fs.writeFileSync(notOnAvlFile, JSON.stringify({
+      generated: new Date().toISOString(),
+      count: allNotOnAvlItems.length,
+      items: allNotOnAvlItems,
+    }, null, 2) + '\n');
+    console.log(`  NOT ON AVL sidecar written: ${allNotOnAvlItems.length} items`);
+  }
 
   // Summary
   console.log('');
@@ -834,7 +1108,8 @@ CPCs pending review: ${flaggedCPCs.join(', ')}`;
 Inventory source: ${inventoryFolder ? path.basename(inventoryFolder) : inventorySource}`;
 
     // Attach both files
-    const attachments = [outputFile];
+    // IMPORTANT: Use actualOutputFile (returned from writeReorderAlerts) - it's .xlsx if NOT ON AVL items exist
+    const attachments = [actualOutputFile];
     if (pendingFile) attachments.push(pendingFile);
 
     const sent = await sendEmail(
@@ -1369,13 +1644,19 @@ function loadRecentVQPricing() {
 
 function loadRecentPOVs() {
   // Surface open LAM purchase activity per CPC. Inclusion rules:
-  //   1. Infor-stamped POs (chuboe_po_string LIKE 'POV%') — ALWAYS included regardless
-  //      of age. A POV stamp means it's a committed vendor order; we're just waiting
-  //      on shipment (even if delayed).
-  //   2. Non-stamped activity (OT drafts, VQ_TICKED) — included if:
+  //   1. Infor-stamped POs (chuboe_po_string LIKE 'POV%') with Completed/In Progress status
+  //      — included regardless of age. A POV stamp + CO/IP status means it's a committed
+  //      vendor order; we're just waiting on shipment (even if delayed).
+  //   2. Draft POs (docstatus = 'DR') — even with POV stamp, only included if recent
+  //      (created within 120 days OR promise within 30 days). Old Draft POs with POV
+  //      stamps are likely abandoned orders that were never finalized.
+  //   3. Non-stamped activity (OT drafts without POV, VQ_TICKED) — included if:
   //      - PO/RFQ created within last 120 days, OR
   //      - promise date is today or future
   //      Otherwise dropped as stuck/orphan activity needing cleanup.
+  //
+  // IMPORTANT: OT does NOT track receipts — Infor does. We cannot use qtydelivered
+  // to determine if parts were received. Use inventory files as source of truth.
   //
   // VQ_TICKED branch (ispurchased='Y' with no PO cut yet) uses rfq.created and
   // vl.datepromised for recency checks.
@@ -1421,12 +1702,15 @@ function loadRecentPOVs() {
         AND o.docstatus IN ('CO', 'IP', 'DR')
         AND ol.qtyordered > ol.qtydelivered
         AND rfq.c_bpartner_id = 1000730
-        -- Keep if: POV-stamped (committed in Infor) OR recent PO OR promise within 30 days
-        -- POV stamp = committed vendor order, always relevant even if old
+        -- Inclusion rules:
+        -- 1. POV stamped + Completed/In Progress = committed vendor order, always keep
+        -- 2. Draft orders (even with POV) = only keep if recent (abandoned drafts excluded)
+        -- 3. Non-stamped = only keep if recent
+        -- NOTE: OT does NOT track receipts (Infor does), so we cannot rely on qtydelivered
         AND (
-          ol.chuboe_po_string LIKE 'POV%'                       -- POV stamped = always keep
-          OR o.created::date >= CURRENT_DATE - INTERVAL '90 days'  -- Recent PO = keep
-          OR ol.datepromised::date >= CURRENT_DATE - INTERVAL '30 days'  -- Promise within 30 days = keep
+          (ol.chuboe_po_string LIKE 'POV%' AND o.docstatus IN ('CO', 'IP'))  -- POV + completed = always keep
+          OR o.created::date >= CURRENT_DATE - INTERVAL '90 days'             -- Recent PO = keep
+          OR ol.datepromised::date >= CURRENT_DATE - INTERVAL '30 days'       -- Promise within 30 days = keep
         )
 
       UNION ALL
@@ -1675,6 +1959,7 @@ const ALERT_COLUMNS = [
   // Recent VQ pricing (from Monday's full run - reference pricing for mid-week refreshes)
   'Recent VQ Supplier',
   'Recent VQ Price',
+  'Recent VQ Margin %',
   'Recent VQ Date',
 ];
 
@@ -1780,38 +2065,61 @@ function selectBetterPOV(pov1, pov2) {
   return pov2;
 }
 
-function identifyReorderCandidates(aggregated, excelData, historicalData, recentPOVs = {}, pendingTransfers = new Map(), recentVQPricing = {}) {
+function identifyReorderCandidates(aggregated, excelData, historicalData, recentPOVs = {}, pendingTransfers = new Map(), recentVQPricing = {}, recentPOVsRaw = null) {
   const alerts = [];
   const inventoryMPNs = new Set(Object.keys(aggregated));
+
+  // Use raw POVs for Purchased MPN lookup (includes stale POVs that still have inventory)
+  // Use filtered POVs for priority determination (stale POVs shouldn't show as PENDING RECEIPT)
+  const povForMpnLookup = recentPOVsRaw || recentPOVs;
 
   // Build CPC -> total inventory by summing ALL approved MPNs from AVL
   // This handles cases where we have both original MPN and alternate(s) in stock
   const cpcTotalInventory = new Map();  // CPC -> { total, w111, w115, mpnsWithStock }
   const processedCPCs = new Set();
 
-  // First pass: aggregate inventory by CPC using AVL
+  // First pass: aggregate inventory by CPC using AVL + Purchased MPNs from POVs
+  // We need to include Purchased MPNs because:
+  // 1. A part may have been bought under a non-AVL MPN
+  // 2. When that MPN arrives in inventory, it should still count for the CPC
+  // IMPORTANT: Use RAW POVs (povForMpnLookup) here, not filtered POVs
+  // This ensures inventory is counted even when the POV is stale (fix 2026-08-05)
   for (const [rosterMpn, excel] of Object.entries(excelData)) {
     const cpc = excel.CPC;
     if (!cpc || processedCPCs.has(cpc)) continue;
     processedCPCs.add(cpc);
 
     const approvedMPNs = getAllApprovedMPNs(cpc, rosterMpn);
+
+    // Also include Purchased MPN from POV if different from roster/AVL
+    // This handles cases where we bought a non-AVL MPN and it's now in inventory
+    // Use raw POVs so stale POVs still contribute their Purchased MPN for inventory lookup
+    const pov = povForMpnLookup[cpc] || povForMpnLookup[normalizeMPN(rosterMpn)];
+    const purchasedMpn = pov?.Purchased_MPN;
+    const mpnsToCheck = [...approvedMPNs];
+    if (purchasedMpn && !approvedMPNs.some(m => normalizeMPN(m) === normalizeMPN(purchasedMpn))) {
+      mpnsToCheck.push(purchasedMpn);
+    }
+
     let totalQty = 0;
     let w111Qty = 0;
     let w115Qty = 0;
     const mpnsWithStock = [];
 
-    for (const mpn of approvedMPNs) {
-      const inv = aggregated[mpn];
+    for (const mpn of mpnsToCheck) {
+      // Try both exact match and normalized match
+      const inv = aggregated[mpn] || aggregated[normalizeMPN(mpn)];
       if (inv && inv.Total_Qty > 0) {
         totalQty += inv.Total_Qty;
         w111Qty += inv.W111_Qty || 0;
         w115Qty += inv.W115_Qty || 0;
-        mpnsWithStock.push({ mpn, qty: inv.Total_Qty });
+        const isFromPurchase = purchasedMpn && normalizeMPN(mpn) === normalizeMPN(purchasedMpn) &&
+                               !approvedMPNs.some(m => normalizeMPN(m) === normalizeMPN(purchasedMpn));
+        mpnsWithStock.push({ mpn, qty: inv.Total_Qty, fromPurchase: isFromPurchase });
       }
     }
 
-    cpcTotalInventory.set(cpc, { total: totalQty, w111: w111Qty, w115: w115Qty, mpnsWithStock, approvedMPNs });
+    cpcTotalInventory.set(cpc, { total: totalQty, w111: w111Qty, w115: w115Qty, mpnsWithStock, approvedMPNs, purchasedMpn });
   }
 
   // Log multi-MPN inventory aggregation stats
@@ -1852,14 +2160,23 @@ function identifyReorderCandidates(aggregated, excelData, historicalData, recent
       // Look up POV by BOTH CPC and MPN, then prefer the better match.
       // Sometimes the PO's RFQ line has no CPC (keyed by MPN), while a newer
       // VQ has CPC. We want to prefer PO over VQ regardless of which key finds it.
+      //
+      // IMPORTANT: Use filtered POVs for priority (stale POVs shouldn't show PENDING RECEIPT)
+      // but use raw POVs for Purchased MPN lookup (inventory may exist under Purchased MPN)
       const povByCpc = recentPOVs[cpc];
       const povByMpn = recentPOVs[normalizeMPN(rosterMpn)];
       const pov = selectBetterPOV(povByCpc, povByMpn);
       const priority = resolvePriority(basePriority, pov);
       const lamOwned = cpcInv.w115 > 0 ? 'YES' : 'NO';
 
+      // For Purchased MPN validation, use raw POVs (includes stale POVs)
+      // This ensures we can flag NOT ON AVL even when the POV is stale
+      const rawPovByCpc = povForMpnLookup[cpc];
+      const rawPovByMpn = povForMpnLookup[normalizeMPN(rosterMpn)];
+      const povForMpnValidation = selectBetterPOV(rawPovByCpc, rawPovByMpn);
+
       const alert = buildAlert(rosterMpn, excel, totalQty, lamOwned, shortfall, priority,
-        historicalData[normalizeMPN(rosterMpn)] || {}, pov);
+        historicalData[normalizeMPN(rosterMpn)] || {}, povForMpnValidation);
 
       // Add note if stock is spread across multiple MPNs
       if (cpcInv.mpnsWithStock.length > 1) {
@@ -1881,8 +2198,18 @@ function identifyReorderCandidates(aggregated, excelData, historicalData, recent
       const vqPricing = vqByCpc || vqByMpn;
       if (vqPricing) {
         alert['Recent VQ Supplier'] = vqPricing.VQ_Supplier || '';
-        alert['Recent VQ Price'] = vqPricing.VQ_Cost || '';
+        const vqCost = parseFloat(vqPricing.VQ_Cost);
+        alert['Recent VQ Price'] = isNaN(vqCost) ? '' : vqCost;
         alert['Recent VQ Date'] = vqPricing.VQ_Date || '';
+
+        // Calculate VQ margin: (Resale - VQ Cost) / Resale * 100
+        const resale = parseFloat(alert['Resale Price']);
+        if (!isNaN(vqCost) && !isNaN(resale) && resale > 0) {
+          const margin = ((resale - vqCost) / resale) * 100;
+          alert['Recent VQ Margin %'] = margin.toFixed(1) + '%';
+        } else {
+          alert['Recent VQ Margin %'] = '';
+        }
 
         // Flag if CPC and MPN lookups disagree (data quality check)
         if (vqByCpc && vqByMpn && vqByCpc.VQ_MPN !== vqByMpn.VQ_MPN) {
@@ -1901,19 +2228,21 @@ function identifyReorderCandidates(aggregated, excelData, historicalData, recent
 
     const key = normalizeMPN(mpn);
     const pov = recentPOVs[key];
+    // Use raw POV for MPN validation (includes stale POVs)
+    const rawPov = povForMpnLookup[key];
 
     // Parts with no threshold: still include but flag appropriately
     if (excel.MIN_QTY <= 0) {
       // Zero stock + no threshold = flag as NO THRESHOLD unless there's recent activity
       const priority = pov ? resolvePriority('NO THRESHOLD', pov) : 'NO THRESHOLD';
       alerts.push(buildAlert(mpn, excel, 0, 'NO', 0, priority,
-        historicalData[key] || {}, pov));
+        historicalData[key] || {}, rawPov));
       continue;
     }
 
     const priority = resolvePriority('CRITICAL', pov);
     alerts.push(buildAlert(mpn, excel, 0, 'NO', excel.MIN_QTY, priority,
-      historicalData[key] || {}, pov));
+      historicalData[key] || {}, rawPov));
   }
 
   // Add PENDING WAREHOUSE TRANSFER items - confirmed transfers from pending-transfers.json
@@ -1942,9 +2271,10 @@ function identifyReorderCandidates(aggregated, excelData, historicalData, recent
     // Format: "PENDING WAREHOUSE TRANSFER - 100 pcs from MAIN"
     const priority = `PENDING WAREHOUSE TRANSFER - ${transfer.qty} pcs from ${transfer.fromWh}`;
 
-    const povForTransfer = selectBetterPOV(recentPOVs[cpc], recentPOVs[normalizeMPN(mpn)]);
+    // Use raw POV for MPN validation (includes stale POVs)
+    const rawPovForTransfer = selectBetterPOV(povForMpnLookup[cpc], povForMpnLookup[normalizeMPN(mpn)]);
     const alert = buildAlert(mpn, excel, cpcInv.total, cpcInv.w115 > 0 ? 'YES' : 'NO',
-      0, priority, historicalData[normalizeMPN(mpn)] || {}, povForTransfer);
+      0, priority, historicalData[normalizeMPN(mpn)] || {}, rawPovForTransfer);
 
     alerts.push(alert);
   }
@@ -1999,12 +2329,86 @@ function identifyReorderCandidates(aggregated, excelData, historicalData, recent
 }
 
 // -----------------------------------------------------------------------------
+// Find ALL NOT ON AVL items (regardless of reorder status)
+// -----------------------------------------------------------------------------
+// Scans all POVs with Purchased MPNs and checks if they're on the AVL.
+// Returns items that need reconciliation - even if they have sufficient stock.
+// These items won't appear on the reorder list but still need AVL reconciliation.
+
+function findAllNotOnAvlItems(excelData, recentPOVsRaw, aggregated, existingAlerts) {
+  const notOnAvlItems = [];
+  const existingCPCs = new Set(existingAlerts.map(a => a['Lam P/N']));
+
+  // Scan all roster items
+  for (const [rosterMpn, excel] of Object.entries(excelData)) {
+    const cpc = excel.CPC;
+    if (!cpc) continue;
+
+    // Skip if already on the reorder list (already checked)
+    if (existingCPCs.has(cpc)) continue;
+
+    // Look up POV for this CPC/MPN
+    const pov = recentPOVsRaw[cpc] || recentPOVsRaw[normalizeMPN(rosterMpn)];
+    if (!pov || !pov.Purchased_MPN) continue;
+
+    // Check if Purchased MPN is NOT ON AVL
+    const validation = validatePurchasedMPN(cpc, rosterMpn, pov.Purchased_MPN);
+    if (validation.flag !== 'NOT ON AVL') continue;
+
+    // Get current inventory for this CPC
+    const approvedMpns = getAllApprovedMPNs(cpc, rosterMpn);
+    let totalQty = 0;
+    for (const mpn of approvedMpns) {
+      const inv = aggregated[mpn] || aggregated[normalizeMPN(mpn)];
+      if (inv) totalQty += inv.Total_Qty || 0;
+    }
+    // Also check Purchased MPN inventory
+    const purchasedInv = aggregated[pov.Purchased_MPN] || aggregated[normalizeMPN(pov.Purchased_MPN)];
+    if (purchasedInv) totalQty += purchasedInv.Total_Qty || 0;
+
+    // Create a reconciliation entry
+    notOnAvlItems.push({
+      'Lam P/N': cpc,
+      'MPN': rosterMpn,
+      'Purchased MPN': pov.Purchased_MPN,
+      'MPN Flag': 'NOT ON AVL',
+      'Manufacturer': excel.Manufacturer || '',
+      'Item Description': excel.Description || '',
+      'QTY ON HAND': totalQty,
+      'W115 Stale Inventory': '',
+      'Reorder Threshold': excel.MIN_QTY || '',
+      'Priority': totalQty > 0 ? 'HAS STOCK - RECONCILE AVL' : 'NO STOCK - RECONCILE AVL',
+      'Shortfall': '',
+      'POV Number': pov.POV_Number || '',
+      'PO Status': pov.State || '',
+      'Qty On Order': pov.Qty_On_Order || '',
+      'Notes': `Purchased MPN "${pov.Purchased_MPN}" not on AVL for CPC ${cpc}. Roster MPN: ${rosterMpn}. Need to either add to AVL or reconcile with customer.`,
+    });
+  }
+
+  return notOnAvlItems;
+}
+
+// -----------------------------------------------------------------------------
 // Step 6: Write Output
 // -----------------------------------------------------------------------------
 
-function writeReorderAlerts(alerts, outputPath) {
+function writeReorderAlerts(alerts, outputPath, additionalNotOnAvl = []) {
   // Uses ALERT_COLUMNS defined at module level — single source of truth
   const headers = ALERT_COLUMNS;
+
+  // Count NOT ON AVL items for logging (they're handled via JSON sidecar, not separate tab here)
+  // The runner builds the multi-tab Excel with all tabs including NOT ON AVL
+  const notOnAvlFromReorder = alerts.filter(a => a['MPN Flag'] === 'NOT ON AVL');
+  const notOnAvlCount = notOnAvlFromReorder.length + additionalNotOnAvl.length;
+
+  // Always output CSV for runner/sourcing compatibility
+  // NOT ON AVL items are written to JSON sidecar; runner builds the full multi-tab Excel
+  console.log(`  Writing reorder alerts to CSV: ${path.basename(outputPath)}`);
+  console.log(`    Total alerts: ${alerts.length} items`);
+  if (notOnAvlCount > 0) {
+    console.log(`    NOT ON AVL items: ${notOnAvlCount} (in JSON sidecar for runner)`);
+  }
 
   const lines = [headers.join(',')];
 
@@ -2021,6 +2425,7 @@ function writeReorderAlerts(alerts, outputPath) {
   }
 
   fs.writeFileSync(outputPath, lines.join('\n'));
+  return outputPath;
 }
 
 // -----------------------------------------------------------------------------
@@ -2203,6 +2608,18 @@ module.exports = {
   // OT availability checking
   isOtAvailable,
   getOtErrorMessage,
+  // Last inventory date tracking (POV staleness)
+  loadLastInventoryDates,
+  saveLastInventoryDates,
+  updateLastInventoryDates,
+  isPovStale,
+  LAST_INVENTORY_DATE_FILE,
+  // NOT ON AVL clearing mechanism
+  clearNotOnAvlItem,
+  isNotOnAvlCleared,
+  listClearedNotOnAvl,
+  loadNotOnAvlCleared,
+  NOT_ON_AVL_CLEARED_FILE,
 };
 
 // -----------------------------------------------------------------------------

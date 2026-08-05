@@ -14,6 +14,7 @@
 const { Pool } = require('pg');
 const { patchRecord } = require('../record-updater');
 const breadcrumbs = require('../breadcrumbs');
+const pending = require('../workflow-pending-state');
 
 // DB pool for PO lookups (read-only replica)
 // Uses Unix socket peer auth — no password needed
@@ -538,6 +539,21 @@ async function action_patch_tracking(payload, ctx) {
 async function action_needs_review(payload, ctx) {
   const { reason, extracted_po, extracted_tracking, subject, from } = payload;
 
+  // Write sidecar so operator replies can be stitched back to this escalation
+  let sidecarRecord = null;
+  if (!ctx.dryRun && ctx.anchorMessageId) {
+    sidecarRecord = pending.writeSidecar(ctx.workflow, ctx.anchorMessageId, {
+      original_uid: ctx.uid,
+      original_subject: subject || null,
+      original_recipient: 'jake.harris@astutegroup.com',
+      external_sender: from || null,
+      escalation_type: 'needs_review',
+      blocking_reason: reason,
+      extracted_po: extracted_po || null,
+      extracted_tracking: extracted_tracking || [],
+    });
+  }
+
   const trackingList = Array.isArray(extracted_tracking) && extracted_tracking.length > 0
     ? extracted_tracking.map(t => `<li>${esc(typeof t === 'object' ? t.token : t)}</li>`).join('')
     : '<li>(none extracted)</li>';
@@ -594,6 +610,7 @@ module.exports = {
     needs_review: {
       folder: 'NeedsReview',
       requires: ['reason'],
+      keepsPending: true,  // Enable reply-stitching for operator responses
       handler: action_needs_review,
     },
     not_tracking: {

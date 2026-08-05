@@ -83,6 +83,21 @@ function loadEscalationsContext(sourcedCsvPath) {
   }
 }
 
+// Load NOT ON AVL sidecar — items where Purchased MPN doesn't match AVL
+// These need reconciliation: either add to AVL or confirm with customer
+function loadNotOnAvlItems(sourcedCsvPath) {
+  const notOnAvlPath = sourcedCsvPath.replace('_sourced.csv', '.csv').replace('.csv', '_not_on_avl.json');
+  if (!fs.existsSync(notOnAvlPath)) {
+    return { items: [] };
+  }
+  try {
+    return JSON.parse(fs.readFileSync(notOnAvlPath, 'utf-8'));
+  } catch (err) {
+    log(`  WARNING: could not parse ${notOnAvlPath}: ${err.message}`);
+    return { items: [] };
+  }
+}
+
 // Resolve manual entries — drop only when BOTH conditions hold:
 //   1. MPN is no longer on the weekly reorder list (above threshold), AND
 //   2. There's no W111+W115 stock currently on hand
@@ -135,9 +150,9 @@ function computeAutoEscalations(csv, sourcedCsvPath, escalationsState, dateStamp
 }
 
 // Column classification — shared between the main tab and the Escalations tab.
-const CURRENCY_COLS = ['Base Unit Price', 'Resale Price', 'Historical Purchase Price', 'In Stock Price', 'Lead Time Price'];
+const CURRENCY_COLS = ['Base Unit Price', 'Resale Price', 'Historical Purchase Price', 'In Stock Price', 'Lead Time Price', 'Recent VQ Price'];
 const INT_COLS = ['Reorder Threshold', 'LAM MOQ', 'QTY ON HAND', 'Shortfall', 'In Stock Qty', 'On Order Qty', 'Available Qty (Other WH)', 'RFQ Line #'];
-const PCT_COLS = ['In Stock Margin %', 'Lead Time Margin %'];
+const PCT_COLS = ['In Stock Margin %', 'Lead Time Margin %', 'Recent VQ Margin %'];
 
 function getMarginColor(margin) {
   if (margin > 18) return 'FF90EE90';
@@ -167,6 +182,7 @@ function parseCellForExcel(v, header) {
 function applyRowShading(excelRow, headers) {
   const inStockMarginCol = headers.indexOf('In Stock Margin %') + 1;
   const leadTimeMarginCol = headers.indexOf('Lead Time Margin %') + 1;
+  const vqMarginCol = headers.indexOf('Recent VQ Margin %') + 1;
   const statusCol = headers.indexOf('Sourcing Status') + 1;
   const priorityCol = headers.indexOf('Priority') + 1;
 
@@ -178,6 +194,12 @@ function applyRowShading(excelRow, headers) {
   }
   if (leadTimeMarginCol > 0) {
     const cell = excelRow.getCell(leadTimeMarginCol);
+    if (typeof cell.value === 'number') {
+      cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: getMarginColor(cell.value * 100) } };
+    }
+  }
+  if (vqMarginCol > 0) {
+    const cell = excelRow.getCell(vqMarginCol);
     if (typeof cell.value === 'number') {
       cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: getMarginColor(cell.value * 100) } };
     }
@@ -515,6 +537,62 @@ function buildNoReorderTab(workbook, noReorderParts, csv, allHeaders) {
 }
 
 /**
+ * Build the "NOT ON AVL - Reconcile" tab for items needing MPN reconciliation.
+ * These are items where the Purchased MPN doesn't match the AVL for the CPC.
+ * Action: Either add the Purchased MPN to the AVL or reconcile with customer.
+ *
+ * ALWAYS creates the tab (even if empty) so there's no question whether it's working.
+ *
+ * @param {ExcelJS.Workbook} workbook - The workbook to add the sheet to
+ * @param {Array} notOnAvlItems - Array of NOT ON AVL item objects from reorder script
+ */
+function buildNotOnAvlTab(workbook, notOnAvlItems) {
+  // Always create the tab — even if empty — so it's clear the check ran
+  const ws = workbook.addWorksheet('NOT ON AVL - Reconcile');
+
+  // Headers for this tab
+  const headers = [
+    'Lam P/N', 'MPN', 'Purchased MPN', 'Manufacturer', 'Item Description',
+    'QTY ON HAND', 'Reorder Threshold', 'Priority', 'POV Number', 'Notes'
+  ];
+  ws.addRow(headers);
+  const headerRow = ws.getRow(1);
+  headerRow.font = { bold: true };
+  headerRow.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFCCCC' } };  // Light red - needs attention
+
+  // Add data rows (may be empty if all MPNs match AVL)
+  const items = notOnAvlItems || [];
+  for (const item of items) {
+    ws.addRow([
+      item['Lam P/N'] || '',
+      item['MPN'] || '',
+      item['Purchased MPN'] || '',
+      item['Manufacturer'] || '',
+      item['Item Description'] || '',
+      item['QTY ON HAND'] || 0,
+      item['Reorder Threshold'] || '',
+      item['Priority'] || '',
+      item['POV Number'] || item['Recent POV'] || '',
+      item['Notes'] || `Purchased MPN not on AVL. Review and either add to AVL or reconcile with customer.`,
+    ]);
+  }
+
+  // Column widths
+  ws.getColumn(1).width = 18;   // Lam P/N
+  ws.getColumn(2).width = 25;   // MPN
+  ws.getColumn(3).width = 25;   // Purchased MPN
+  ws.getColumn(4).width = 25;   // Manufacturer
+  ws.getColumn(5).width = 40;   // Description
+  ws.getColumn(6).width = 12;   // QTY ON HAND
+  ws.getColumn(7).width = 14;   // Threshold
+  ws.getColumn(8).width = 25;   // Priority
+  ws.getColumn(9).width = 30;   // POV Number
+  ws.getColumn(10).width = 50;  // Notes
+
+  ws.views = [{ state: 'frozen', ySplit: 1 }];
+}
+
+/**
  * Rebuild the sourced Excel with an "RFQ Line #" column and RFQ search key.
  * Items with on-order/recent POV get blank RFQ Line (they were skipped).
  *
@@ -540,6 +618,7 @@ async function rebuildExcelWithRfqLines(sourcedCsvPath, xlsxPath, rfqMapping, ch
   const skipEscalations = checkData.skipEscalations || false;
   const noReorderParts = checkData.noReorderParts || [];
   const unchangedParts = checkData.unchangedParts || [];
+  const notOnAvlItems = checkData.notOnAvlItems || [];
   const mainTabName = checkData.mainTabName || 'Sourced Reorder Alerts';
 
   // Insert "RFQ Line #" + "Request to Purchase" as columns 2 and 3 (after Lam P/N).
@@ -657,6 +736,16 @@ async function rebuildExcelWithRfqLines(sourcedCsvPath, xlsxPath, rfqMapping, ch
   if (noReorderParts.length > 0) {
     buildNoReorderTab(workbook, noReorderParts, csv, allHeaders);
     log(`  No Reorder tab: ${noReorderParts.length} parts with non-material changes only`);
+  }
+
+  // NOT ON AVL - Reconcile tab — items where Purchased MPN doesn't match AVL
+  // These need reconciliation: either add to AVL or confirm with customer
+  // ALWAYS create the tab (even if empty) so it's clear the check ran
+  buildNotOnAvlTab(workbook, notOnAvlItems);
+  if (notOnAvlItems.length > 0) {
+    log(`  NOT ON AVL tab: ${notOnAvlItems.length} items need MPN reconciliation`);
+  } else {
+    log(`  NOT ON AVL tab: 0 items (all MPNs match AVL)`);
   }
 
   await workbook.xlsx.writeFile(xlsxPath);
@@ -928,6 +1017,13 @@ async function main() {
   const defaultSourcedXlsx = alertsFile.replace('.csv', '_sourced.xlsx');
   let sourcedXlsx = defaultSourcedXlsx;
 
+  // Load NOT ON AVL items for reconciliation tab
+  const notOnAvlData = loadNotOnAvlItems(sourcedCsv);
+  const notOnAvlItems = notOnAvlData.items || [];
+  if (notOnAvlItems.length > 0) {
+    log(`  NOT ON AVL items found: ${notOnAvlItems.length} (will add reconciliation tab)`);
+  }
+
   // If we have an RFQ mapping, rebuild the Excel with the RFQ Line # column AND
   // bake the RFQ number into the filename so the buyer can grep their inbox /
   // Downloads folder by RFQ. Also clean up the plain _sourced.xlsx that
@@ -935,7 +1031,7 @@ async function main() {
   if (rfqMapping && rfqMapping.rfqSearchKey && fs.existsSync(sourcedCsv)) {
     sourcedXlsx = alertsFile.replace('.csv', `_RFQ${rfqMapping.rfqSearchKey}_sourced.xlsx`);
     try {
-      await rebuildExcelWithRfqLines(sourcedCsv, sourcedXlsx, rfqMapping, { wrongWarehouseData, pendingOrdersData });
+      await rebuildExcelWithRfqLines(sourcedCsv, sourcedXlsx, rfqMapping, { wrongWarehouseData, pendingOrdersData, notOnAvlItems });
       log(`  Excel rebuilt with RFQ line numbers → ${path.basename(sourcedXlsx)}`);
       if (fs.existsSync(defaultSourcedXlsx) && defaultSourcedXlsx !== sourcedXlsx) {
         fs.unlinkSync(defaultSourcedXlsx);

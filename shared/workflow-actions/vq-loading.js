@@ -2037,6 +2037,7 @@ module.exports = {
     needs_review: {
       folder: 'NeedsReview',
       requires: ['reason'],
+      keepsPending: true,  // Enable reply-stitching for operator responses
       handler: action_needs_review,
     },
     clarify_buyer: {

@@ -24,6 +24,7 @@ const writerAttribution = require('../writer-attribution');
 const { notifyHighFailureRate } = require('../failure-rate-gate');
 const { patchRecord } = require('../record-updater');
 const breadcrumbs = require('../breadcrumbs');
+const pending = require('../workflow-pending-state');
 
 async function sendEmailOrThrow(notifier, to, subject, body, opts = {}) {
   const sent = await notifier.sendEmail(to, subject, body, opts);
@@ -393,7 +394,22 @@ async function action_skip(payload, ctx) {
  * Optional: { subject, candidates, details }
  */
 async function action_needs_review(payload, ctx) {
-  const { reason, subject, candidates, details } = payload;
+  const { reason, subject, candidates, details, extracted } = payload;
+
+  // Write sidecar so operator replies can be stitched back to this escalation
+  let sidecarRecord = null;
+  if (!ctx.dryRun && ctx.anchorMessageId) {
+    sidecarRecord = pending.writeSidecar(ctx.workflow, ctx.anchorMessageId, {
+      original_uid: ctx.uid,
+      original_subject: subject || null,
+      original_recipient: ctx.jakeEmail,
+      escalation_type: 'needs_review',
+      blocking_reason: reason,
+      candidates: candidates || [],
+      extracted: extracted || {},
+    });
+  }
+
   const candidatesBlock = Array.isArray(candidates) && candidates.length
     ? `<p><b>Candidate RFQs:</b></p><ul>${candidates.map(c =>
         `<li>${esc(c.searchKey || c.rfqId)} — ${esc(c.customer || '')} — ${esc(c.mpn || '')} qty ${esc(c.qty || '')}</li>`
@@ -474,6 +490,7 @@ module.exports = {
     needs_review: {
       folder: 'CQ-NeedsReview',
       requires: ['reason'],
+      keepsPending: true,  // Enable reply-stitching for operator responses
       handler: action_needs_review,
     },
   },

@@ -531,6 +531,21 @@ async function action_needs_partner(payload, ctx) {
   const { subject, outerFrom, hints, extracted, investigation_summary } = payload;
   const linesCount = Array.isArray(extracted && extracted.lines) ? extracted.lines.length : 0;
 
+  // Write sidecar so operator replies can be stitched back to this escalation
+  let sidecarRecord = null;
+  if (!ctx.dryRun && ctx.anchorMessageId) {
+    sidecarRecord = pending.writeSidecar(ctx.workflow, ctx.anchorMessageId, {
+      original_uid: ctx.uid,
+      original_subject: subject || null,
+      original_recipient: ctx.jakeEmail,
+      external_sender: outerFrom || null,
+      escalation_type: 'needs_partner',
+      hints: hints || null,
+      extracted: extracted || {},
+      investigation_summary: investigation_summary || null,
+    });
+  }
+
   // Build extracted-lines table so operator can see what data is waiting
   const extractedLinesHtml = formatExtractedLinesTable(extracted);
 
@@ -729,7 +744,22 @@ ${extractedLinesHtml}
  * Optional: { details }
  */
 async function action_needs_review(payload, ctx) {
-  const { reason, subject, outerFrom, details, investigation_summary } = payload;
+  const { reason, subject, outerFrom, details, investigation_summary, extracted } = payload;
+
+  // Write sidecar so operator replies can be stitched back to this escalation
+  let sidecarRecord = null;
+  if (!ctx.dryRun && ctx.anchorMessageId) {
+    sidecarRecord = pending.writeSidecar(ctx.workflow, ctx.anchorMessageId, {
+      original_uid: ctx.uid,
+      original_subject: subject || null,
+      original_recipient: ctx.jakeEmail,
+      external_sender: outerFrom || null,
+      escalation_type: 'needs_review',
+      blocking_reason: reason,
+      extracted: extracted || {},
+      investigation_summary: investigation_summary || null,
+    });
+  }
 
   // Investigation summary block — shows agent reasoning. Parity with VQ UID 10064 fix.
   const investigationBlock = investigation_summary
@@ -1040,6 +1070,7 @@ module.exports = {
     needs_partner: {
       folder: 'NeedsPartner',
       requires: ['subject', 'outerFrom'],
+      keepsPending: true,  // Enable reply-stitching for operator responses
       handler: action_needs_partner,
     },
     clarify_partner: {
@@ -1051,6 +1082,7 @@ module.exports = {
     needs_review: {
       folder: 'NeedsReview',
       requires: ['reason'],
+      keepsPending: true,  // Enable reply-stitching for operator responses
       handler: action_needs_review,
     },
     not_offer: {

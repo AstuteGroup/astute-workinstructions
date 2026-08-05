@@ -370,6 +370,24 @@ WHERE v.chuboe_mpn = 'TPS767D301PWP'
 - The `chuboe_infor_order` table exists but is typically stale — use `c_orderline.chuboe_po_string` instead
 - One OT PO can have multiple Infor POVs (rarely), and one POV spans multiple order lines
 
+**⚠️ CRITICAL: OT Does NOT Track Receipts**
+
+OT (iDempiere) is the **ordering system**, not the **receiving system**. Receipts are tracked in **Infor**, not OT.
+
+| What OT Tracks | What Infor Tracks |
+|----------------|-------------------|
+| VQ → PO creation | Receipts / goods received |
+| POV stamp (order sent to vendor) | Inventory levels |
+| `qtyordered` (what we ordered) | Actual receipt dates |
+| `docstatus` (order status in OT) | Warehouse inventory |
+
+**Do NOT use `c_orderline.qtydelivered` to determine if parts were received.** This field is not reliably synced from Infor. To check actual receipt status:
+1. Check Infor directly, OR
+2. Check inventory files (Infor Item Lots Report), OR
+3. Ask the warehouse team
+
+**Implication for workflows:** When determining "pending receipt" vs "needs reorder", you cannot rely on OT's `qtydelivered`. A PO with `qtydelivered = 0` in OT may have been fully received in Infor. Use inventory presence as the source of truth for receipt status.
+
 ---
 
 ## Key Join Patterns
