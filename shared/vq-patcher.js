@@ -1,5 +1,9 @@
 /**
- * VQ Patcher — enforced wrapper around IsPurchased='Y' PATCH.
+ * VQ Patcher — enforced wrappers for VQ modifications.
+ *
+ * EXPORTS:
+ *   - tickVQForPurchase(vqId, opts) — tick IsPurchased='Y' with validation
+ *   - correctVQ(vqId, corrections)  — correct vendor/buyer/other fields on existing VQ
  *
  * WHY IT EXISTS:
  *   `shared/vq-purchase-validator.js` turns the approval checklist into an
@@ -9,11 +13,20 @@
  *   — they call `tickVQForPurchase()` which runs the validator first and
  *   aborts loudly on any violation.
  *
- * USAGE:
+ * USAGE (tick for purchase):
  *   const { tickVQForPurchase } = require('../shared/vq-patcher');
  *   await tickVQForPurchase(vqId, {
  *     program: 'LAM_KITTING',
  *     extra: { Chuboe_Lead_Time: 'STOCK - 1 WEEK', DatePromised: '2026-04-24' },
+ *   });
+ *
+ * USAGE (correct vendor/buyer):
+ *   const { correctVQ } = require('../shared/vq-patcher');
+ *   await correctVQ(vqId, {
+ *     vendorBpId: 1011486,           // new vendor
+ *     vendorLocationId: 1016091,     // new vendor location
+ *     buyerId: 1042105,              // new buyer
+ *     reason: 'Wrong vendor loaded — Ezkey should be E-KEY Components GmbH',
  *   });
  *
  * The `extra` object lets callers fill gaps the validator flagged (common
@@ -128,4 +141,153 @@ async function tickVQForPurchase(vqId, opts = {}) {
   return { vqId, ticked: true, untickedCompeting, buyerCorrected };
 }
 
-module.exports = { tickVQForPurchase };
+// ─── CORRECT VQ ─────────────────────────────────────────────────────────────
+
+/**
+ * Correct fields on an existing VQ line (vendor, buyer, mfr, etc.).
+ *
+ * Use this when a VQ was loaded with incorrect data and needs post-load correction.
+ * This is cleaner than deactivate+rewrite because it preserves the VQ line ID.
+ *
+ * @param {number} vqId                    chuboe_vq_line_id to correct
+ * @param {object} corrections
+ * @param {number} [corrections.vendorBpId]       New vendor C_BPartner_ID
+ * @param {number} [corrections.vendorLocationId] New vendor C_BPartner_Location_ID
+ * @param {number} [corrections.buyerId]          New buyer AD_User_ID (Chuboe_Buyer_ID)
+ * @param {number} [corrections.mfrId]            New manufacturer Chuboe_Mfr_ID
+ * @param {string} [corrections.mfrText]          New manufacturer text (Chuboe_Mfr_Text)
+ * @param {string} [corrections.mpn]              New MPN (Chuboe_MPN)
+ * @param {number} [corrections.qty]              New quantity
+ * @param {number} [corrections.cost]             New cost/price
+ * @param {string} [corrections.dateCode]         New date code (Chuboe_Date_Code)
+ * @param {string} [corrections.leadTime]         New lead time (Chuboe_Lead_Time)
+ * @param {string} [corrections.reason]           Reason for correction (for audit)
+ * @returns {object} { vqId, corrected: true, fields: [...], before: {...}, after: {...} }
+ * @throws {Error} if VQ not found or PATCH fails
+ */
+async function correctVQ(vqId, corrections = {}) {
+  const {
+    vendorBpId,
+    vendorLocationId,
+    buyerId,
+    mfrId,
+    mfrText,
+    mpn,
+    qty,
+    cost,
+    dateCode,
+    leadTime,
+    reason = 'Correction applied',
+  } = corrections;
+
+  // Build the PATCH payload — only include fields that were specified
+  const payload = {};
+  const fieldMap = {
+    vendorBpId: 'C_BPartner_ID',
+    vendorLocationId: 'C_BPartner_Location_ID',
+    buyerId: 'Chuboe_Buyer_ID',
+    mfrId: 'Chuboe_Mfr_ID',
+    mfrText: 'Chuboe_Mfr_Text',
+    mpn: 'Chuboe_MPN',
+    qty: 'Qty',
+    cost: 'Cost',
+    dateCode: 'Chuboe_Date_Code',
+    leadTime: 'Chuboe_Lead_Time',
+  };
+
+  const correctedFields = [];
+  for (const [optKey, dbField] of Object.entries(fieldMap)) {
+    const value = corrections[optKey];
+    if (value !== undefined && value !== null) {
+      payload[dbField] = value;
+      correctedFields.push(optKey);
+    }
+  }
+
+  if (Object.keys(payload).length === 0) {
+    throw new Error('correctVQ: No corrections specified');
+  }
+
+  // Fetch current state for audit trail
+  const { apiGet } = require('./api-client');
+  let currentVQ;
+  try {
+    currentVQ = await apiGet(`chuboe_vq_line/${vqId}`);
+  } catch (err) {
+    throw new Error(`correctVQ: VQ ${vqId} not found — ${err.message}`);
+  }
+
+  // Capture before values
+  const before = {};
+  for (const dbField of Object.values(fieldMap)) {
+    if (payload[dbField] !== undefined) {
+      // Handle FK objects (e.g., C_BPartner_ID returns { id: 123, identifier: 'Name' })
+      const val = currentVQ[dbField];
+      before[dbField] = val && typeof val === 'object' ? val.id : val;
+    }
+  }
+
+  // Apply the PATCH
+  const result = await patchRecord('chuboe_vq_line', vqId, payload, {
+    source: 'vq-correction',
+  });
+
+  if (result.status === 'error') {
+    throw new Error(`correctVQ: PATCH failed — ${result.error}`);
+  }
+
+  // Log the correction
+  const breadcrumbs = require('./breadcrumbs');
+  breadcrumbs.write({
+    cog: 'vq-patcher',
+    event: 'vq-corrected',
+    vqId,
+    reason,
+    fields: correctedFields,
+    before,
+    after: payload,
+  });
+
+  return {
+    vqId,
+    corrected: true,
+    fields: correctedFields,
+    reason,
+    before,
+    after: payload,
+  };
+}
+
+/**
+ * Correct multiple VQ lines with the same corrections.
+ * Useful when a batch was loaded with the wrong vendor/buyer.
+ *
+ * @param {number[]} vqIds                 Array of chuboe_vq_line_id to correct
+ * @param {object} corrections             Same as correctVQ
+ * @returns {object} { total, corrected, errors, results: [...] }
+ */
+async function correctVQBatch(vqIds, corrections = {}) {
+  const results = [];
+  let corrected = 0;
+  let errors = 0;
+
+  for (const vqId of vqIds) {
+    try {
+      const result = await correctVQ(vqId, corrections);
+      results.push({ vqId, status: 'corrected', ...result });
+      corrected++;
+    } catch (err) {
+      results.push({ vqId, status: 'error', error: err.message });
+      errors++;
+    }
+  }
+
+  return {
+    total: vqIds.length,
+    corrected,
+    errors,
+    results,
+  };
+}
+
+module.exports = { tickVQForPurchase, correctVQ, correctVQBatch };

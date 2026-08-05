@@ -153,6 +153,7 @@ function computeAutoEscalations(csv, sourcedCsvPath, escalationsState, dateStamp
 const CURRENCY_COLS = ['Base Unit Price', 'Resale Price', 'Historical Purchase Price', 'In Stock Price', 'Lead Time Price', 'Recent VQ Price'];
 const INT_COLS = ['Reorder Threshold', 'LAM MOQ', 'QTY ON HAND', 'Shortfall', 'In Stock Qty', 'On Order Qty', 'Available Qty (Other WH)', 'RFQ Line #'];
 const PCT_COLS = ['In Stock Margin %', 'Lead Time Margin %', 'Recent VQ Margin %'];
+const DATE_COLS = ['Last Promise Date', 'PO Created Date', 'Last Updated', 'Recent VQ Date', 'Escalation Date'];
 
 function getMarginColor(margin) {
   if (margin > 18) return 'FF90EE90';
@@ -162,7 +163,8 @@ function getMarginColor(margin) {
 
 // Coerce a CSV value to the Excel-ready type for its column. Numeric columns
 // parse to numbers; percentage columns strip the '%' and divide by 100 so Excel's
-// '0.0%' format renders correctly. Non-numeric cells pass through as strings.
+// '0.0%' format renders correctly. Date columns parse to Date objects for proper
+// Excel date handling (sortable, filterable). Non-numeric cells pass through as strings.
 function parseCellForExcel(v, header) {
   if (CURRENCY_COLS.includes(header) || INT_COLS.includes(header)) {
     const n = parseFloat(v); return isNaN(n) ? v : n;
@@ -170,6 +172,12 @@ function parseCellForExcel(v, header) {
   if (PCT_COLS.includes(header)) {
     const n = parseFloat(String(v).replace('%', ''));
     return isNaN(n) ? v : n / 100;
+  }
+  if (DATE_COLS.includes(header)) {
+    if (!v || v === '') return '';
+    // Parse date string (e.g., '2026-08-05' or '2026-08-05T00:00:00')
+    const d = new Date(v);
+    return isNaN(d.getTime()) ? v : d;
   }
   return v;
 }
@@ -286,6 +294,7 @@ function applyColumnFormats(sheet, headers) {
     if (CURRENCY_COLS.includes(h)) col.numFmt = '$#,##0.0000';
     else if (INT_COLS.includes(h)) col.numFmt = '#,##0';
     else if (PCT_COLS.includes(h)) col.numFmt = '0.0%';
+    else if (DATE_COLS.includes(h)) col.numFmt = 'yyyy-mm-dd';
   });
 }
 

@@ -2014,7 +2014,8 @@ function buildAlert(mpn, excel, totalQty, lamOwned, shortfall, priority, history
     'OT Previous Supplier': history.OT_Previous_Supplier || '',
     'OT Buyer': pov && pov.Buyer ? pov.Buyer : (history.OT_Buyer || ''),
     'Historical Buyer': excel.Historical_Buyer || '',
-    'Last Promise Date': pov && pov.POV_Date ? pov.POV_Date : (history.Last_Purchase_Date || ''),
+    // Last Promise Date: only show for OPEN orders (from pov), not historical completed orders
+    'Last Promise Date': pov && pov.POV_Date ? pov.POV_Date : '',
     'PO Created Date': pov && pov.PO_Created_Date ? pov.PO_Created_Date : '',
     'Last Updated': pov && pov.Last_Updated ? pov.Last_Updated : '',
     'Last RFQ': history.RFQ_Number ? `${history.RFQ_Number} (${history.RFQ_Customer || ''})` : '',

@@ -63,6 +63,14 @@ Use this matrix to quickly determine which changes apply across loaders.
 
 ---
 
+## 2026-08-05
+
+| Date | Loader(s) | Change | Cross-applies? | Commit |
+|---|---|---|---|---|
+| 2026-08-05 | vq-loading | **Added `correct_vq` action for post-load corrections.** New capability to PATCH existing VQ lines (vendor, buyer, MFR, etc.) instead of deactivating and rewriting. Cleaner audit trail, preserves VQ line IDs. Uses new `correctVQ()` and `correctVQBatch()` functions in `shared/vq-patcher.js`. Agent prompt updated with "POST-LOAD CORRECTIONS" section. Trigger: UID 11948 bump on UID 11768 — agent was escalating as "capability gap" when it could have just corrected the data. | **VQ-only for now.** CQ/Offer loaders could adopt if correction requests become common. The `shared/record-updater.js` pattern is generic; `vq-patcher.js` is the VQ-specific wrapper. | _(uncommitted)_ |
+
+---
+
 ## 2026-06-25
 
 | Date | Loader(s) | Change | Cross-applies? | Commit |

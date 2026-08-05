@@ -1998,6 +1998,97 @@ function missingLabelForSender(item) {
   }
 }
 
+// ─── CORRECT VQ ──────────────────────────────────────────────────────────────
+
+/**
+ * Correct existing VQ lines — vendor, buyer, or other fields.
+ *
+ * Use case: Operator or agent discovers VQ was loaded with wrong vendor/buyer
+ * and asks for correction. Instead of deactivating + rewriting, we PATCH the
+ * existing VQ lines, preserving their IDs and audit trail.
+ *
+ * Required payload:
+ *   vqLineIds[]        Array of chuboe_vq_line_id to correct
+ *   corrections        Object with one or more of:
+ *     - vendorBpId       New vendor C_BPartner_ID
+ *     - vendorLocationId New vendor C_BPartner_Location_ID
+ *     - buyerId          New buyer AD_User_ID
+ *     - mfrId            New manufacturer Chuboe_Mfr_ID
+ *     - mfrText          New manufacturer text
+ *     - (other fields supported by vq-patcher.correctVQ)
+ *   reason             Reason for correction (for audit/email)
+ *
+ * Optional:
+ *   rfqSearchKey       RFQ reference (for context in notification)
+ */
+async function action_correct_vq(payload, ctx) {
+  const { vqLineIds, corrections, reason, rfqSearchKey } = payload;
+
+  if (!Array.isArray(vqLineIds) || vqLineIds.length === 0) {
+    throw new Error('correct_vq requires vqLineIds[] array with at least one ID');
+  }
+  if (!corrections || Object.keys(corrections).length === 0) {
+    throw new Error('correct_vq requires corrections object with at least one field');
+  }
+
+  const { correctVQBatch } = require('../vq-patcher');
+
+  // Apply corrections to all VQ lines
+  const result = await correctVQBatch(vqLineIds, {
+    ...corrections,
+    reason: reason || 'Correction applied via VQ Loading workflow',
+  });
+
+  // Log breadcrumb
+  breadcrumbs.write({
+    cog: 'vq-loading-agent',
+    event: 'vq-corrected',
+    uid: ctx.uid,
+    messageId: ctx.currentMessageId,
+    vqLineIds,
+    corrections: Object.keys(corrections),
+    rfqSearchKey: rfqSearchKey || null,
+    result: {
+      total: result.total,
+      corrected: result.corrected,
+      errors: result.errors,
+    },
+  });
+
+  // Send confirmation email to operator
+  const customerName = rfqSearchKey ? lookupCustomerFromRfq(rfqSearchKey) : null;
+  const correctedFieldsList = Object.keys(corrections).join(', ');
+
+  const confirmationHtml = `
+<p><strong>VQ Correction Applied</strong></p>
+<ul>
+  <li><strong>RFQ:</strong> ${rfqSearchKey || '(not specified)'}</li>
+  <li><strong>Customer:</strong> ${customerName || '(unknown)'}</li>
+  <li><strong>VQ Lines Corrected:</strong> ${result.corrected} of ${result.total}</li>
+  <li><strong>Fields Changed:</strong> ${correctedFieldsList}</li>
+  <li><strong>Reason:</strong> ${reason || 'Not specified'}</li>
+</ul>
+${result.errors > 0 ? `<p style="color: red;"><strong>Errors:</strong> ${result.errors} lines failed to update</p>` : ''}
+<hr>
+<p><small>Source email UID: ${ctx.uid}</small></p>
+`;
+
+  // Send to Jake (operator)
+  await ctx.notifier.sendEmail(
+    'jake.harris@astutegroup.com',
+    `VQ Correction Applied — ${result.corrected} lines updated${rfqSearchKey ? ` (RFQ ${rfqSearchKey})` : ''}`,
+    confirmationHtml,
+    { html: true }
+  );
+
+  return {
+    corrected: result.corrected,
+    errors: result.errors,
+    total: result.total,
+    vqLineIds,
+  };
+}
+
 // ─── EXPORTS ─────────────────────────────────────────────────────────────────
 
 module.exports = {
@@ -2079,6 +2170,13 @@ module.exports = {
       requires: ['customer', 'salesRep', 'type', 'lines', 'pendingQuotes'],
       keepsPending: true, // sidecar holds the parked state
       handler: action_forward_to_rfq_loading,
+    },
+    correct_vq: {
+      // Correct existing VQ lines (vendor, buyer, etc.) without deactivating.
+      // Cleaner than deactivate+rewrite — preserves VQ line IDs.
+      folder: 'Processed',
+      requires: ['vqLineIds', 'corrections'],
+      handler: action_correct_vq,
     },
   },
   constants: {
