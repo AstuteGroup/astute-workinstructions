@@ -417,6 +417,7 @@ async function writeDb(mpn, envelope, rfqId) {
     // pre-POST, so check-before-retry has a perfect identity match.
     const result = await apiPost(DB_TABLE, payload, {
       naturalKeyFields: ['Chuboe_Pricing_API_Result_UU'],
+      context: 'enrichment',
     });
     const assignedId = result.id;
     if (assignedId) {
