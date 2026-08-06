@@ -896,7 +896,7 @@ async function writeVQFromAPI(rfqSearchKey, cpc, franchiseResults, opts = {}) {
       Cost: price,
       Qty: qty,
       C_Currency_ID: row.currencyId || 100, // default USD; Farnell = 114 (GBP)
-      Chuboe_Lead_Time: leadTime || null,
+      Chuboe_Lead_Time: leadTime || (opts.defaultLeadTimeToStock ? 'stock' : null),
       Chuboe_MOQ: moq ? String(moq) : null,
       Chuboe_SPQ: spq ? String(spq) : null,
       // Note routing — three distinct fields on chuboe_vq_line:

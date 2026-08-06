@@ -157,6 +157,7 @@ These fields speed up PO processing by filling in predictable values at write ti
 
 | Field | Column | Default | Override When |
 |-------|--------|---------|---------------|
+| **Lead Time** | `chuboe_lead_time` | stock (email-loaded VQs) | Vendor specifies lead time (e.g., "4 weeks", "31 days") |
 | **UOM** | `c_uom_id` | Each (100) | Vendor specifies different unit |
 | **COO** | `c_country_id` | PENDING (1000001) | Vendor provides manufacturing origin |
 | **RoHS** | `chuboe_rohs` | Y (Yes) | Vendor says Non-RoHS or unknown |
@@ -906,6 +907,7 @@ Maintained as part of the cross-loader changelog discipline — see [`shared/loa
 
 | Date | Change | Commit |
 |---|---|---|
+| 2026-08-06 | **Lead Time defaults to "stock" for email-loaded VQs.** Added `defaultLeadTimeToStock` flag to `vq-writer.js`. `load-bulk-summary.js` now passes this flag so all VQs loaded via vq@ email (broker and franchise quotes alike) default to "stock" lead time when not provided. Previously, these VQs were written with null lead time because `synthesizeStockLtVqLines` explicitly sets `leadTime: null` on stock rows. Automated franchise API enrichment unchanged (no flag passed). Reported via RFQ 1141060 / BAW56-7-F. | _(uncommitted)_ |
 | 2026-06-15 | **RFQ selection: retired 30-day multi-write fan-out.** VQs now load to exactly ONE RFQ per email. New 7-day window + match-count heuristic: (1) explicit RFQ # in subject/body → use it directly; (2) single MPN match → use it regardless of age; (3) multiple matches within 7 days → auto-select if one RFQ has ≥70% MPN overlap, else ask for clarity with match counts; (4) no matches within 7 days → reply with candidate RFQs and ask operator. Triggered by incident where VQs loaded to both 06/04 RFQ and stale 05/20 RFQ. | _(uncommitted)_ |
 | 2026-06-12 | **Tier A-0 known-buyer short-circuit.** If the outer From is a known buyer (in registry's `buyers[]` list), use them immediately — do NOT walk deeper. Fixes false escalations on sales-rep → sourcer chains (e.g., Alex asks Serena to source; Serena replies to vq@ — Serena is the buyer, not Alex). Triggered by UID 9168 (ESP-WROOM-02-N2 / RFQ 1131857). | _(uncommitted)_ |
 | 2026-05-26 | **Escalations internal-only.** Retired broker-outreach + the two-email split (`41b6362`). `resolveOutreachRecipients` now returns ONE internal recipient list (operator + internal forwarder + buyer via `resolveAstuteUserById(buyerId)` + internal Cc); external broker recorded but never emailed. `sendSplitRecipientEmail` collapsed to one email; new `recipientsFooter`/`externalSenderLabel` show the operator exactly who got it. Breadcrumb logs `recipients` + `external_sender_not_emailed`. Triggered by UID 8684 (forwarder Ivy's separate copy was invisible to operator → read as "skipped"). Test: `oneoffs/test-vq-internal-only-recipients-2026-05-26.js`. | _(uncommitted)_ |

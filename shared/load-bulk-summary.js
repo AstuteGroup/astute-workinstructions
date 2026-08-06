@@ -368,6 +368,7 @@ async function loadBulkSummary({ rfqSearchKey, buyerId, quotes, dryRun = false, 
         rfqQty: q.qty,
         _rfqLineIdOverride: lineMatch.lineId,
         unknownVendorPlaceholderBpId,  // allow loading without BP when vendor doesn't exist
+        defaultLeadTimeToStock: true,  // email-loaded VQs default to "stock" lead time
       });
 
       if (result.written.length > 0) {

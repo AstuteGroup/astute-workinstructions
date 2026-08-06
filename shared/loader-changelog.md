@@ -63,6 +63,14 @@ Use this matrix to quickly determine which changes apply across loaders.
 
 ---
 
+## 2026-08-06
+
+| Date | Loader(s) | Change | Cross-applies? | Commit |
+|---|---|---|---|---|
+| 2026-08-06 | vq-loading | **Lead Time defaults to "stock" for email-loaded VQs.** Added `opts.defaultLeadTimeToStock` flag to `vq-writer.js`. `load-bulk-summary.js` passes this flag so all VQs loaded via vq@ email (broker + franchise quotes) default to "stock" lead time. Previously had null lead time because `synthesizeStockLtVqLines` sets `leadTime: null` on stock rows. Reported by buyers via RFQ 1141060 / BAW56-7-F. | **vq@ email path only** (`load-bulk-summary.js`). Automated franchise API enrichment unchanged (flag not passed). Other VQ writers can opt-in by passing `defaultLeadTimeToStock: true`. | _(uncommitted)_ |
+
+---
+
 ## 2026-08-05
 
 | Date | Loader(s) | Change | Cross-applies? | Commit |
