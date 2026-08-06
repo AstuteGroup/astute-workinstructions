@@ -284,6 +284,7 @@ async function handleMultiPOV(povs, tracking, carrier, ctx) {
     cog: 'tracking-loading-agent',
     event: 'tracking-loaded-multi',
     uid: ctx.uid,
+    trackingId: ctx.trackingId,
     messageId: ctx.currentMessageId,
     pos: results.map(r => ({ documentno: r.documentno, pov: r.pov })),
     vendor: vendorName,
@@ -454,6 +455,7 @@ async function action_patch_tracking(payload, ctx) {
       cog: 'tracking-loading-agent',
       event: 'tracking-already-present',
       uid: ctx.uid,
+      trackingId: ctx.trackingId,
       messageId: ctx.currentMessageId,
       documentno: po.documentno,
       patchTarget,
@@ -483,6 +485,7 @@ async function action_patch_tracking(payload, ctx) {
     cog: 'tracking-loading-agent',
     event: 'tracking-loaded',
     uid: ctx.uid,
+    trackingId: ctx.trackingId,
     messageId: ctx.currentMessageId,
     orderId: po.c_order_id,
     documentno: po.documentno,
@@ -562,7 +565,7 @@ async function action_needs_review(payload, ctx) {
 <h2 style="color:#b00">Tracking Loading — needs review</h2>
 <p><b>Subject:</b> ${esc(subject)}<br/>
    <b>From:</b> ${esc(from)}<br/>
-   <b>UID:</b> ${ctx.uid}</p>
+   <b>Tracking ID:</b> ${ctx.trackingId || `(UID ${ctx.uid})`}</p>
 <p><b>Reason:</b> ${esc(reason)}</p>
 <p><b>Extracted PO reference:</b> ${esc(extracted_po || '(none)')}</p>
 <p><b>Extracted tracking:</b></p>
@@ -585,6 +588,7 @@ async function action_needs_review(payload, ctx) {
     cog: 'tracking-loading-agent',
     event: 'escalated-needs_review',
     uid: ctx.uid,
+    trackingId: ctx.trackingId,
     reason,
     extracted_po,
     extracted_tracking,

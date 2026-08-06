@@ -1,6 +1,6 @@
 # Unified Email Tracking & Reply Handling
 
-**Status:** Phase 2 Implemented (2026-08-05)
+**Status:** Phase 3 Implemented (2026-08-06)
 **Created:** 2026-07-31
 **Problem:** `needs_review` notifications across all workflows don't write sidecars, so operator replies go nowhere. Additionally, UIDs are per-inbox and per-folder, making email references painful.
 
@@ -284,10 +284,10 @@ When a reply arrives:
 3. ✅ Integrate into `email-workflow-poller.js` (cmdRead assigns, cmdRoute updates)
 4. ✅ Create `scripts/lookup-email.js` CLI
 
-### Phase 3: Update Notifications
-1. Replace UID references with Tracking ID in notification emails
-2. Update breadcrumb writes to include tracking ID
-3. Backfill existing sidecars with tracking IDs (optional)
+### Phase 3: Update Notifications ✅ DONE (2026-08-06)
+1. ✅ Replace UID references with Tracking ID in notification emails
+2. ✅ Update breadcrumb writes to include tracking ID
+3. Backfill existing sidecars with tracking IDs (optional — skipped)
 
 ### Phase 4: Reply Threading
 1. Add parent lookup on reply detection

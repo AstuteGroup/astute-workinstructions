@@ -626,8 +626,22 @@ async function cmdRoute(uid, actionName, payload) {
     || currentMessageId;
 
   // Build context for the handler
+  // Lookup tracking ID from the registry (assigned during cmdRead)
+  let currentTrackingId = null;
+  if (currentMessageId) {
+    try {
+      const trackingRecord = trackingId.lookupByMessageId(currentMessageId);
+      if (trackingRecord) {
+        currentTrackingId = trackingRecord.trackingId;
+      }
+    } catch (e) {
+      console.error(`[tracking-id] Warning: lookup failed: ${e.message}`);
+    }
+  }
+
   const ctx = {
     uid,
+    trackingId: currentTrackingId,  // Phase 3: unified tracking ID (e.g., 'RFQ-00317')
     dryRun: DRY_RUN,
     jakeEmail: JAKE_EMAIL,
     notifier,

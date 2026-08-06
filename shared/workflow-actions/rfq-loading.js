@@ -127,6 +127,7 @@ async function action_enqueue(payload, ctx) {
         cog: 'rfq-loading-agent',
         event: 'already-loaded-skip',
         uid: ctx.uid,
+        trackingId: ctx.trackingId,
         messageId: dedupMessageId,
         prior_uid: dupCheck.breadcrumb.uid,
         prior_rfq_id: dupCheck.breadcrumb.rfqId,
@@ -210,6 +211,7 @@ async function action_need_info(payload, ctx) {
       cog: 'rfq-loading-agent',
       event: 'escalated-need_info',
       uid: ctx.uid,
+      trackingId: ctx.trackingId,
       missing: missingList,
       investigation_summary: investigation_summary || null,
       recipients: envelope.recipientList,
@@ -234,7 +236,7 @@ async function action_need_info(payload, ctx) {
 <h2 style="color:#b00">RFQ Loading — info needed</h2>
 <p><b>Subject:</b> ${esc(subject)}<br/>
    <b>External sender:</b> ${esc(externalSenderLabel(envelope, outerFrom))}<br/>
-   <b>UID:</b> ${ctx.uid}<br/>
+   <b>Tracking ID:</b> ${ctx.trackingId || `(UID ${ctx.uid})`}<br/>
    <b>Inbox:</b> ${esc(ctx.inbox)}<br/>
    ${retryCount ? `<b>Retry:</b> ${retryCount}/2<br/>` : ''}
    <b>Lines parsed so far:</b> ${linesCount}</p>
@@ -407,7 +409,7 @@ async function action_needs_review(payload, ctx) {
 <h2 style="color:#b00">RFQ Loading — needs manual review</h2>
 <p><b>Subject:</b> ${esc(subject)}<br/>
    <b>From:</b> ${esc(externalSenderLabel(envelope, from))}<br/>
-   <b>UID:</b> ${ctx.uid}</p>
+   <b>Tracking ID:</b> ${ctx.trackingId || `(UID ${ctx.uid})`}</p>
 <p><b>Reason:</b> ${esc(reason)}</p>
 ${investigationBlock}
 ${details ? `<pre style="background:#f5f5f5;padding:8px;white-space:pre-wrap;font-size:11px">${esc(details)}</pre>` : ''}
@@ -442,6 +444,7 @@ ${recipientsFooter(envelope)}
     cog: 'rfq-loading-agent',
     event: 'escalated-needs_review',
     uid: ctx.uid,
+    trackingId: ctx.trackingId,
     messageId: ctx.currentMessageId || null,
     anchorMessageId: ctx.anchorMessageId || null,
     reason,
@@ -486,6 +489,7 @@ async function action_drop_pending(payload, ctx) {
     cog: 'rfq-loading-agent',
     event: 'operator-dropped',
     uid: ctx.uid,
+    trackingId: ctx.trackingId,
     reason: payload.reason || 'operator-dropped',
     pending_kind: ctx.pendingSidecar && ctx.pendingSidecar.kind || null,
   });

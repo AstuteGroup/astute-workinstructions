@@ -256,6 +256,7 @@ async function action_load_vq(payload, ctx) {
       cog: 'vq-loading-agent',
       event: 'escalated-buyer-unknown',
       uid: ctx.uid,
+      trackingId: ctx.trackingId,
       subject,
       outerFrom: outerFrom || senderEmail,
       proposed_buyer_id: buyerId,
@@ -321,6 +322,7 @@ async function action_load_vq(payload, ctx) {
         cog: 'vq-loading-agent',
         event: 'load-failed',
         uid: ctx.uid,
+        trackingId: ctx.trackingId,
         rfqSearchKey: targetKey,
         quoteCount: (quotes || []).length,
         error: err.message,
@@ -338,6 +340,7 @@ async function action_load_vq(payload, ctx) {
       cog: 'vq-loading-agent',
       event: 'loaded',
       uid: ctx.uid,
+      trackingId: ctx.trackingId,
       sourceUid: sourceUid || ctx.uid,
       messageId: messageId || null,
       brokerMessageId: brokerMessageId || null,
@@ -419,6 +422,7 @@ async function action_load_vq(payload, ctx) {
               cog: 'vq-loading-agent',
               event: 'vendor-alias-learned',
               uid: ctx.uid,
+              trackingId: ctx.trackingId,
               label: originalLabel,
               searchKey: String(resolvedSearchKey),
               name: resolvedName || null,
@@ -485,7 +489,7 @@ async function action_load_vq(payload, ctx) {
       } catch (e) {
         breadcrumbs.write({
           cog: 'vq-loading-agent', event: 'ot-resume-sidecar-failed',
-          uid: ctx.uid, rfqSearchKey: targetKey, error: e.message,
+          uid: ctx.uid, trackingId: ctx.trackingId, rfqSearchKey: targetKey, error: e.message,
         });
       }
     }
@@ -573,6 +577,7 @@ async function action_load_vq(payload, ctx) {
         cog: 'vq-loading-agent',
         event: 'clarify-suppressed-already-loaded',
         uid: ctx.uid,
+        trackingId: ctx.trackingId,
         sourceUid: sourceUid || ctx.uid,
         messageId: messageId || null,
         primary_rfq: rfqSearchKey,
@@ -668,6 +673,7 @@ These quotes are now in Orange Tsunami.
             cog: 'vq-loading-agent',
             event: 'confirmation-sent',
             uid: ctx.uid,
+            trackingId: ctx.trackingId,
             rfq: rfqSearchKey,
             customer: customerName,
             buyer: buyerName,
@@ -681,6 +687,7 @@ These quotes are now in Orange Tsunami.
             cog: 'vq-loading-agent',
             event: 'confirmation-failed',
             uid: ctx.uid,
+            trackingId: ctx.trackingId,
             error: 'sendEmail returned false (SMTP failure or no recipients)',
           });
         }
@@ -691,6 +698,7 @@ These quotes are now in Orange Tsunami.
         cog: 'vq-loading-agent',
         event: 'confirmation-failed',
         uid: ctx.uid,
+        trackingId: ctx.trackingId,
         error: e.message,
       });
     }
@@ -729,6 +737,7 @@ These quotes are now in Orange Tsunami.
           cog: 'vq-loading-agent',
           event: 'non-registry-buyer-notice',
           uid: ctx.uid,
+          trackingId: ctx.trackingId,
           buyer_id: validatedBuyerId,
           buyer_name: buyerName,
           rfq: rfqSearchKey,
@@ -739,6 +748,7 @@ These quotes are now in Orange Tsunami.
           cog: 'vq-loading-agent',
           event: 'non-registry-buyer-notice-failed',
           uid: ctx.uid,
+          trackingId: ctx.trackingId,
           error: 'sendEmail returned false',
         });
       }
@@ -748,6 +758,7 @@ These quotes are now in Orange Tsunami.
         cog: 'vq-loading-agent',
         event: 'non-registry-buyer-notice-failed',
         uid: ctx.uid,
+        trackingId: ctx.trackingId,
         error: e.message,
       });
     }
@@ -828,7 +839,7 @@ ${sections}
 <h2 style="color:#b58900">VQ Loading — partial load + clarifications</h2>
 <p><b>Subject:</b> ${esc(subject)}<br/>
    <b>Original sender:</b> ${esc(externalSenderLabel(envelope, outerFrom))}<br/>
-   <b>UID:</b> ${ctx.uid}<br/>
+   <b>Tracking ID:</b> ${ctx.trackingId || `(UID ${ctx.uid})`}<br/>
    <b>VQs written (this email):</b> ${vqsWritten || 0}<br/>
    <b>Outstanding vendor sections:</b> ${clarifications.length}</p>
 ${sections}
@@ -867,6 +878,7 @@ ${recipientsFooter(envelope)}
     cog: 'vq-loading-agent',
     event: 'escalated-partial_clarify',
     uid: ctx.uid,
+    trackingId: ctx.trackingId,
     sectionCount: clarifications.length,
     recipients: envelope.to,
     external_sender_not_emailed: envelope.externalSender || null,
@@ -923,6 +935,7 @@ async function action_need_info_vendor(payload, ctx) {
       cog: 'vq-loading-agent',
       event: 'escalated-need_info_vendor',
       uid: ctx.uid,
+      trackingId: ctx.trackingId,
       missing: missingList,
       investigation_summary: investigation_summary || null,
       recipients: envelope.to,
@@ -960,7 +973,7 @@ async function action_need_info_vendor(payload, ctx) {
 <h2 style="color:#b00">VQ Loading — info needed</h2>
 <p><b>Subject:</b> ${esc(subject)}<br/>
    <b>Original sender:</b> ${esc(externalSenderLabel(envelope, outerFrom))}<br/>
-   <b>UID:</b> ${ctx.uid}<br/>
+   <b>Tracking ID:</b> ${ctx.trackingId || `(UID ${ctx.uid})`}<br/>
    <b>Inbox:</b> ${esc(ctx.inbox)}<br/>
    ${retryCount ? `<b>Retry:</b> ${retryCount}/2<br/>` : ''}
    <b>Quotes parsed so far:</b> ${quotesParsed}</p>
@@ -1131,6 +1144,7 @@ async function action_clarify_vendor(payload, ctx) {
       cog: 'vq-loading-agent',
       event: 'escalated-clarify_vendor',
       uid: ctx.uid,
+      trackingId: ctx.trackingId,
       candidateCount: candidateList.length,
       vendorName: vendorName || null,
       investigation_summary: investigation_summary || null,
@@ -1180,7 +1194,7 @@ async function action_clarify_vendor(payload, ctx) {
 <p><b>Subject:</b> ${esc(subject)}<br/>
    <b>Vendor in email:</b> ${esc(vendorName || '(name not given)')} ${vendorEmail ? `&lt;${esc(vendorEmail)}&gt;` : ''}<br/>
    <b>Original sender:</b> ${esc(externalSenderLabel(envelope, outerFrom))}<br/>
-   <b>UID:</b> ${ctx.uid}<br/>
+   <b>Tracking ID:</b> ${ctx.trackingId || `(UID ${ctx.uid})`}<br/>
    ${retryCount ? `<b>Retry:</b> ${retryCount}/2<br/>` : ''}
 </p>
 <p>Found ${candidateList.length} active BP candidate${candidateList.length === 1 ? '' : 's'}. Which one is this quote for?</p>
@@ -1257,6 +1271,7 @@ async function action_needs_vendor(payload, ctx) {
       cog: 'vq-loading-agent',
       event: 'escalated-needs_vendor',
       uid: ctx.uid,
+      trackingId: ctx.trackingId,
       vendorName: vendorName || null,
       investigation_summary: investigation_summary || null,
       recipients: envelope.to,
@@ -1293,7 +1308,7 @@ async function action_needs_vendor(payload, ctx) {
 <p><b>Subject:</b> ${esc(subject)}<br/>
    <b>Vendor (from email):</b> ${esc(vendorName || '(name not given)')} ${vendorEmail ? `&lt;${esc(vendorEmail)}&gt;` : ''}<br/>
    <b>Original sender:</b> ${esc(externalSenderLabel(envelope, outerFrom))}<br/>
-   <b>UID:</b> ${ctx.uid}<br/>
+   <b>Tracking ID:</b> ${ctx.trackingId || `(UID ${ctx.uid})`}<br/>
    ${retryCount ? `<b>Retry:</b> ${retryCount}/2<br/>` : ''}
    <b>Quotes parsed (waiting to load):</b> ${quotesParsed}</p>
 <p style="background:#f5f5f5;padding:10px;border-left:3px solid #b00">
@@ -1405,7 +1420,7 @@ ${operatorFooter}
 <h2 style="color:#b00">VQ Loading — needs manual review</h2>
 <p><b>Subject:</b> ${esc(subject)}<br/>
    <b>Original sender:</b> ${esc(externalSenderLabel(envelope, outerFrom))}<br/>
-   <b>UID:</b> ${ctx.uid}</p>
+   <b>Tracking ID:</b> ${ctx.trackingId || `(UID ${ctx.uid})`}</p>
 <p><b>Reason:</b> ${esc(reason)}</p>
 ${details ? `<pre style="background:#f5f5f5;padding:8px;white-space:pre-wrap;font-size:11px">${esc(details)}</pre>` : ''}
 ${investigationBlock}
@@ -1430,6 +1445,7 @@ ${recipientsFooter(envelope)}
     cog: 'vq-loading-agent',
     event: 'escalated-needs_review',
     uid: ctx.uid,
+    trackingId: ctx.trackingId,
     subject,
     outerFrom: envelope.senderUsed || outerFrom,
     reason,
@@ -1494,7 +1510,7 @@ async function action_clarify_buyer(payload, ctx) {
 <h2 style="color:#b80">VQ Loading — Clarify buyer</h2>
 <p><b>Subject:</b> ${esc(subject)}<br/>
    <b>From:</b> ${esc(outerFrom || '(unknown)')}<br/>
-   <b>UID:</b> ${ctx.uid}</p>
+   <b>Tracking ID:</b> ${ctx.trackingId || `(UID ${ctx.uid})`}</p>
 <p><b>Reason:</b> ${esc(reason || '')}</p>
 ${investigationBlock}
 ${details ? `<pre style="background:#fff8e0;padding:8px;white-space:pre-wrap;font-size:11px">${esc(details)}</pre>` : ''}
@@ -1538,6 +1554,7 @@ ${details ? `<pre style="background:#fff8e0;padding:8px;white-space:pre-wrap;fon
     cog: 'vq-loading-agent',
     event: 'escalated-clarify_buyer',
     uid: ctx.uid,
+    trackingId: ctx.trackingId,
     subject,
     outerFrom: outerFrom || null,
     proposed_buyer_id: proposedBuyerId || null,
@@ -1580,6 +1597,7 @@ async function action_no_bid(payload, ctx) {
     cog: 'vq-loading-agent',
     event: 'no-bid',
     uid: ctx.uid,
+    trackingId: ctx.trackingId,
     reason: payload.reason || 'no-bid',
     vendorBpartnerId: payload.vendorBpartnerId || null,
     vendorName: payload.vendorName || null,
@@ -1602,6 +1620,7 @@ async function action_not_vq(payload, ctx) {
     cog: 'vq-loading-agent',
     event: 'not-vq',
     uid: ctx.uid,
+    trackingId: ctx.trackingId,
     reason: payload.reason || 'unspecified',
   });
   return { reason: payload.reason || 'unspecified' };
@@ -1623,6 +1642,7 @@ async function action_dup_skip(payload, ctx) {
     cog: 'vq-loading-agent',
     event: 'dup-skipped',
     uid: ctx.uid,
+    trackingId: ctx.trackingId,
     existingVqId: payload.existingVqId,
     reason: payload.reason || 'duplicate',
   });
@@ -1653,6 +1673,7 @@ async function action_drop_pending(payload, ctx) {
     cog: 'vq-loading-agent',
     event: 'operator-dropped',
     uid: ctx.uid,
+    trackingId: ctx.trackingId,
     reason: payload.reason || 'operator-dropped',
     pending_kind: ctx.pendingSidecar && ctx.pendingSidecar.kind || null,
   });
@@ -1675,6 +1696,7 @@ async function action_outbound_pending(payload, ctx) {
     cog: 'vq-loading-agent',
     event: 'outbound-pending',
     uid: ctx.uid,
+    trackingId: ctx.trackingId,
     reason: payload.reason || 'outbound reply',
   });
   return { reason: payload.reason || 'outbound reply' };

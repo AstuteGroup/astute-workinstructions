@@ -116,6 +116,7 @@ async function action_load_offer(payload, ctx) {
         cog: 'broker-offers',
         event: 'already-loaded-skip',
         uid: ctx.uid,
+        trackingId: ctx.trackingId,
         messageId: dedupMessageId,
         prior_uid: dupCheck.breadcrumb.uid,
         prior_offer_id: dupCheck.breadcrumb.offerId,
@@ -165,6 +166,7 @@ async function action_load_offer(payload, ctx) {
         cog: 'broker-offers',
         event: 'load-deferred-budget',
         uid: ctx.uid,
+        trackingId: ctx.trackingId,
         sourceUid: sourceUid || ctx.uid,
         messageId: ctx.currentMessageId || null,
         bpartnerId,
@@ -190,6 +192,7 @@ async function action_load_offer(payload, ctx) {
     cog: 'broker-offers',
     event: 'loaded',
     uid: ctx.uid,
+    trackingId: ctx.trackingId,
     sourceUid: sourceUid || ctx.uid,
     messageId: ctx.currentMessageId || null,
     bpartnerId,
@@ -277,6 +280,7 @@ This offer is now in Orange Tsunami.
           cog: 'broker-offers',
           event: 'confirmation-sent',
           uid: ctx.uid,
+          trackingId: ctx.trackingId,
           offerId: result.offerId,
           searchKey: result.searchKey,
           partner: partnerName,
@@ -335,7 +339,7 @@ async function action_needs_partner(payload, ctx) {
 <h2 style="color:#b00">Broker Offers — partner unresolved</h2>
 <p><b>Subject:</b> ${esc(subject)}<br/>
    <b>From:</b> ${esc(outerFrom)}<br/>
-   <b>UID:</b> ${ctx.uid}<br/>
+   <b>Tracking ID:</b> ${ctx.trackingId || `(UID ${ctx.uid})`}<br/>
    <b>Inbox:</b> ${esc(ctx.inbox)}<br/>
    <b>Lines parsed:</b> ${fmt(linesCount)}</p>
 <p><b>What was tried:</b><br/>${esc(hints || '(no hints provided)')}</p>
@@ -375,6 +379,7 @@ ${extractedLinesHtml}
     cog: 'broker-offers',
     event: 'escalated-needs_partner',
     uid: ctx.uid,
+    trackingId: ctx.trackingId,
     subject,
     outerFrom,
     investigation_summary: investigation_summary || null,
@@ -424,7 +429,7 @@ async function action_clarify_partner(payload, ctx) {
 <h2 style="color:#b00">Broker Offers — partner clarification needed</h2>
 <p><b>Subject:</b> ${esc(subject)}<br/>
    <b>External sender:</b> ${esc(outerFrom || '(unknown)')}<br/>
-   <b>UID:</b> ${ctx.uid}<br/>
+   <b>Tracking ID:</b> ${ctx.trackingId || `(UID ${ctx.uid})`}<br/>
    <b>Inbox:</b> ${esc(ctx.inbox)}<br/>
    ${retryCount ? `<b>Retry:</b> ${retryCount}/2<br/>` : ''}
    <b>Offer type:</b> ${esc(offerType || '(to be determined)')}<br/>
@@ -471,6 +476,7 @@ ${extractedLinesHtml}
     cog: 'broker-offers',
     event: 'escalated-clarify_partner',
     uid: ctx.uid,
+    trackingId: ctx.trackingId,
     notified: ctx.jakeEmail,
     external_sender: outerFrom || null,
     subject,
@@ -519,7 +525,7 @@ async function action_needs_review(payload, ctx) {
 <h2 style="color:#b00">Broker Offers — needs manual review</h2>
 <p><b>Subject:</b> ${esc(subject)}<br/>
    <b>From:</b> ${esc(outerFrom)}<br/>
-   <b>UID:</b> ${ctx.uid}</p>
+   <b>Tracking ID:</b> ${ctx.trackingId || `(UID ${ctx.uid})`}</p>
 <p><b>Reason:</b> ${esc(reason)}</p>
 ${investigationBlock}
 ${details ? `<pre style="background:#f5f5f5;padding:8px;white-space:pre-wrap;font-size:11px">${esc(details)}</pre>` : ''}
@@ -553,6 +559,7 @@ ${details ? `<pre style="background:#f5f5f5;padding:8px;white-space:pre-wrap;fon
     cog: 'broker-offers',
     event: 'escalated-needs_review',
     uid: ctx.uid,
+    trackingId: ctx.trackingId,
     subject,
     outerFrom,
     reason,
@@ -575,6 +582,7 @@ async function action_not_offer(payload, ctx) {
     cog: 'broker-offers',
     event: 'not-offer',
     uid: ctx.uid,
+    trackingId: ctx.trackingId,
     reason: payload.reason || 'unspecified',
   });
   return { reason: payload.reason || 'unspecified' };
@@ -594,6 +602,7 @@ async function action_drop_pending(payload, ctx) {
     cog: 'broker-offers',
     event: 'operator-dropped',
     uid: ctx.uid,
+    trackingId: ctx.trackingId,
     reason: payload.reason || 'operator-dropped',
     pending_kind: ctx.pendingSidecar && ctx.pendingSidecar.kind || null,
   });
@@ -613,6 +622,7 @@ async function action_dup_skip(payload, ctx) {
     cog: 'broker-offers',
     event: 'dup-skipped',
     uid: ctx.uid,
+    trackingId: ctx.trackingId,
     existingOfferSearchKey: payload.existingSearchKey,
   });
   return { existingSearchKey: payload.existingSearchKey };

@@ -221,6 +221,7 @@ async function action_approve_price(payload, ctx) {
       cog: 'lam-kitting-agent',
       event: 'approve-price-failed',
       uid: ctx.uid,
+      trackingId: ctx.trackingId,
       cpc,
       mpn,
       error: 'Part not found',
@@ -249,6 +250,7 @@ async function action_approve_price(payload, ctx) {
       cog: 'lam-kitting-agent',
       event: 'approve-price-failed',
       uid: ctx.uid,
+      trackingId: ctx.trackingId,
       cpc,
       mpn,
       error: result.error,
@@ -272,6 +274,7 @@ async function action_approve_price(payload, ctx) {
     cog: 'lam-kitting-agent',
     event: 'price-approved',
     uid: ctx.uid,
+    trackingId: ctx.trackingId,
     cpc,
     mpn: result.mpn || mpn,
     previousResale,
@@ -470,6 +473,7 @@ async function action_approve_leadtime(payload, ctx) {
       cog: 'lam-kitting-agent',
       event: 'approve-leadtime-failed',
       uid: ctx.uid,
+      trackingId: ctx.trackingId,
       cpc,
       error: 'Part not found',
     });
@@ -496,6 +500,7 @@ async function action_approve_leadtime(payload, ctx) {
       cog: 'lam-kitting-agent',
       event: 'approve-leadtime-failed',
       uid: ctx.uid,
+      trackingId: ctx.trackingId,
       cpc,
       error: result.error,
     });
@@ -518,6 +523,7 @@ async function action_approve_leadtime(payload, ctx) {
     cog: 'lam-kitting-agent',
     event: 'leadtime-approved',
     uid: ctx.uid,
+    trackingId: ctx.trackingId,
     cpc,
     previousLeadTime,
     newLeadTime,
@@ -604,6 +610,7 @@ async function action_approve_flagged(payload, ctx) {
     cog: 'lam-kitting-agent',
     event: 'flagged-approved',
     uid: ctx.uid,
+    trackingId: ctx.trackingId,
     cpc,
     field: fieldConfig.label,
     previousValue,
@@ -657,6 +664,7 @@ async function action_skip_flagged(payload, ctx) {
     cog: 'lam-kitting-agent',
     event: 'flagged-skipped',
     uid: ctx.uid,
+    trackingId: ctx.trackingId,
     cpc,
     field: fieldLabel,
     remainingFlagged: remaining,
@@ -735,6 +743,7 @@ async function action_add_award(payload, ctx) {
       cog: 'lam-kitting-agent',
       event: 'add-award-failed',
       uid: ctx.uid,
+      trackingId: ctx.trackingId,
       cpc,
       error: result.error,
     });
@@ -745,6 +754,7 @@ async function action_add_award(payload, ctx) {
     cog: 'lam-kitting-agent',
     event: 'award-added',
     uid: ctx.uid,
+    trackingId: ctx.trackingId,
     cpc,
     mpn,
     manufacturer,
@@ -1445,6 +1455,7 @@ async function action_add_awards(payload, ctx) {
     cog: 'lam-kitting-agent',
     event: 'awards-batch-added',
     uid: ctx.uid,
+    trackingId: ctx.trackingId,
     added: results.added.length,
     existingOrdering: existingNeedsOrdering.length,
     existingNoReorder: existingNoReorder.length,
@@ -1854,6 +1865,7 @@ async function action_reject(payload, ctx) {
     cog: 'lam-kitting-agent',
     event: 'rejection-recorded',
     uid: ctx.uid,
+    trackingId: ctx.trackingId,
     cpc,
     mpn: mpn || null,
     reason,
@@ -1907,7 +1919,7 @@ async function action_need_info(payload, ctx) {
   const html = `<html><body style="font-family:Arial,sans-serif;font-size:13px">
 <h2 style="color:#b00">LAM Kitting — info needed</h2>
 <p><b>Subject:</b> ${esc(subject)}<br/>
-   <b>UID:</b> ${ctx.uid}<br/>
+   <b>Tracking ID:</b> ${ctx.trackingId || `(UID ${ctx.uid})`}<br/>
    ${retryCount ? `<b>Retry:</b> ${retryCount}/2<br/>` : ''}</p>
 <p><b>Missing fields:</b></p>
 <ul>${missingItems || '<li>(none specified)</li>'}</ul>
@@ -1937,6 +1949,7 @@ ${investigationBlock}
     cog: 'lam-kitting-agent',
     event: 'escalated-need_info',
     uid: ctx.uid,
+    trackingId: ctx.trackingId,
     missing: missingList,
   });
 
@@ -1977,7 +1990,7 @@ async function action_needs_review(payload, ctx) {
 <h2 style="color:#b00">LAM Kitting — needs manual review</h2>
 <p><b>Subject:</b> ${esc(subject)}<br/>
    <b>From:</b> ${esc(from)}<br/>
-   <b>UID:</b> ${ctx.uid}</p>
+   <b>Tracking ID:</b> ${ctx.trackingId || `(UID ${ctx.uid})`}</p>
 <p><b>Reason:</b> ${esc(reason)}</p>
 ${investigationBlock}
 ${details ? `<pre style="background:#f5f5f5;padding:8px;white-space:pre-wrap;font-size:11px">${esc(details)}</pre>` : ''}
@@ -2000,6 +2013,7 @@ ${details ? `<pre style="background:#f5f5f5;padding:8px;white-space:pre-wrap;fon
     cog: 'lam-kitting-agent',
     event: 'escalated-needs_review',
     uid: ctx.uid,
+    trackingId: ctx.trackingId,
     reason,
   });
 
@@ -2021,6 +2035,7 @@ async function action_not_approval(payload, ctx) {
     cog: 'lam-kitting-agent',
     event: 'not-approval',
     uid: ctx.uid,
+    trackingId: ctx.trackingId,
     reason: payload.reason || 'not-approval-email',
   });
 
@@ -2135,6 +2150,7 @@ async function action_request_report(payload, ctx) {
     cog: 'lam-kitting-agent',
     event: 'request-report',
     uid: ctx.uid,
+    trackingId: ctx.trackingId,
     requester,
     success: !runnerError,
     attachment: attachmentName || null,
@@ -2221,6 +2237,7 @@ async function action_acknowledge_removal(payload, ctx) {
     cog: 'lam-kitting-agent',
     event: 'removal-acknowledged',
     uid: ctx.uid,
+    trackingId: ctx.trackingId,
     cpcs: acknowledged.map(r => r.cpc),
   });
 
@@ -2261,6 +2278,7 @@ async function action_reject_removal(payload, ctx) {
     cog: 'lam-kitting-agent',
     event: 'removal-rejected',
     uid: ctx.uid,
+    trackingId: ctx.trackingId,
     cpcs: rejected.map(r => r.cpc),
     reason: reason || 'User rejected removal',
   });
@@ -2645,7 +2663,7 @@ function buildApprovalSummaryEmail(opts, ctx) {
 <h2 style="color:#2e7d32">LAM Approval Applied</h2>
 <p><b>CPC:</b> ${esc(cpc)}<br/>
    <b>MPN:</b> ${esc(mpn)}<br/>
-   <b>UID:</b> ${ctx.uid}</p>
+   <b>Tracking ID:</b> ${ctx.trackingId || `(UID ${ctx.uid})`}</p>
 
 <h3 style="color:#2e7d32">&#10004; Applied Changes</h3>
 <table style="border-collapse:collapse;font-size:13px">
@@ -2738,7 +2756,7 @@ function buildBatchApprovalEmail(opts, ctx) {
 
   return `<html><body style="font-family:Arial,sans-serif;font-size:13px">
 <h2 style="color:#2e7d32">LAM Price Approvals Applied</h2>
-<p><b>Date:</b> ${esc(approvalDate)} | <b>UID:</b> ${ctx.uid} | <b>Total:</b> ${updates.length} updated${failures.length ? `, ${failures.length} failed` : ''}</p>
+<p><b>Date:</b> ${esc(approvalDate)} | <b>Tracking ID:</b> ${ctx.trackingId || `(UID ${ctx.uid})`} | <b>Total:</b> ${updates.length} updated${failures.length ? `, ${failures.length} failed` : ''}</p>
 
 <table style="border-collapse:collapse;font-size:12px;width:100%">
   <tr style="background:#f0f0f0">
@@ -2788,7 +2806,7 @@ function buildRejectionEmail(payload, ctx) {
 <p><b>CPC:</b> ${esc(cpc)}<br/>
    ${mpn ? `<b>MPN:</b> ${esc(mpn)}<br/>` : ''}
    <b>Rejected by:</b> ${esc(rejectedBy || 'LAM Procurement')}<br/>
-   <b>UID:</b> ${ctx.uid}</p>
+   <b>Tracking ID:</b> ${ctx.trackingId || `(UID ${ctx.uid})`}</p>
 <p><b>Reason:</b></p>
 <pre style="background:#f5f5f5;padding:8px;white-space:pre-wrap">${esc(reason)}</pre>
 ${investigationBlock}

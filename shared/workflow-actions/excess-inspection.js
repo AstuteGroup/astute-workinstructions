@@ -130,6 +130,7 @@ async function action_process(payload, ctx) {
     cog: 'excess-inspection-agent',
     event: 'excess-processed',
     uid: ctx.uid,
+    trackingId: ctx.trackingId,
     messageId: ctx.currentMessageId,
     poNumber: result.poNumber,
     site: result.site,
@@ -259,7 +260,7 @@ async function action_needs_review(payload, ctx) {
 <h2 style="color:#b00">Excess Inspection — needs review</h2>
 <p><b>Subject:</b> ${esc(subject)}<br/>
    <b>From:</b> ${esc(from)}<br/>
-   <b>UID:</b> ${ctx.uid}</p>
+   <b>Tracking ID:</b> ${ctx.trackingId || `(UID ${ctx.uid})`}</p>
 <p><b>Reason:</b> ${esc(reason)}</p>
 ${details ? `<pre style="background:#f5f5f5;padding:8px;white-space:pre-wrap;font-size:11px">${esc(details)}</pre>` : ''}
 <p style="color:#666;font-size:11px">Message moved to Excess-NeedsReview in ${ctx.inbox} inbox.</p>
@@ -280,6 +281,7 @@ ${details ? `<pre style="background:#f5f5f5;padding:8px;white-space:pre-wrap;fon
     cog: 'excess-inspection-agent',
     event: 'escalated-needs_review',
     uid: ctx.uid,
+    trackingId: ctx.trackingId,
     reason,
   });
 
@@ -298,6 +300,7 @@ async function action_skip(payload, ctx) {
     cog: 'excess-inspection-agent',
     event: 'skip',
     uid: ctx.uid,
+    trackingId: ctx.trackingId,
     reason: payload.reason || 'not excess inspection',
   });
 

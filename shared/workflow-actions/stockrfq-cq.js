@@ -122,6 +122,7 @@ async function action_add_cq(payload, ctx) {
         cog: 'stockrfq-cq-agent',
         event: 'cq-load-deferred-budget',
         uid: ctx.uid,
+        trackingId: ctx.trackingId,
         sourceUid: sourceUid || ctx.uid,
         sourceMessageId: sourceMessageId || null,
         rfqSearchKey,
@@ -144,6 +145,7 @@ async function action_add_cq(payload, ctx) {
     cog: 'stockrfq-cq-agent',
     event: 'cq-loaded',
     uid: ctx.uid,
+    trackingId: ctx.trackingId,
     sourceUid: sourceUid || ctx.uid,
     sourceMessageId: sourceMessageId || null,
     matchPath: matchPath || 'unknown',
@@ -267,6 +269,7 @@ async function action_add_cq_with_rfq(payload, ctx) {
     cog: 'stockrfq-cq-agent',
     event: 'cq-loaded-with-rfq',
     uid: ctx.uid,
+    trackingId: ctx.trackingId,
     sourceUid: sourceUid || ctx.uid,
     sourceMessageId: sourceMessageId || null,
     bpartnerId,
@@ -348,6 +351,7 @@ async function action_update_cq(payload, ctx) {
     cog: 'stockrfq-cq-agent',
     event: 'cq-updated',
     uid: ctx.uid,
+    trackingId: ctx.trackingId,
     sourceUid: sourceUid || ctx.uid,
     sourceMessageId: sourceMessageId || null,
     cqLineId,
@@ -382,6 +386,7 @@ async function action_skip(payload, ctx) {
     cog: 'stockrfq-cq-agent',
     event: 'cq-skip',
     uid: ctx.uid,
+    trackingId: ctx.trackingId,
     reason: payload.reason || 'unspecified',
   });
   return { reason: payload.reason || 'unspecified' };
@@ -419,7 +424,7 @@ async function action_needs_review(payload, ctx) {
   const html = `<html><body style="font-family:Arial,sans-serif;font-size:13px">
 <h2 style="color:#b00">Stock RFQ CQ — needs manual review</h2>
 <p><b>Subject:</b> ${esc(subject)}<br/>
-   <b>UID:</b> ${ctx.uid}</p>
+   <b>Tracking ID:</b> ${ctx.trackingId || `(UID ${ctx.uid})`}</p>
 <p><b>Reason:</b> ${esc(reason)}</p>
 ${candidatesBlock}
 ${details ? `<pre style="background:#f5f5f5;padding:8px;white-space:pre-wrap;font-size:11px">${esc(details)}</pre>` : ''}
@@ -441,6 +446,7 @@ ${details ? `<pre style="background:#f5f5f5;padding:8px;white-space:pre-wrap;fon
     cog: 'stockrfq-cq-agent',
     event: 'cq-needs-review',
     uid: ctx.uid,
+    trackingId: ctx.trackingId,
     subject,
     reason,
     candidateCount: Array.isArray(candidates) ? candidates.length : 0,

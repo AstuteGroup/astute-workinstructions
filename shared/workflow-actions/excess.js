@@ -164,6 +164,7 @@ async function action_load_offer(payload, ctx) {
         cog: 'offer-poller',
         event: 'already-loaded-skip',
         uid: ctx.uid,
+        trackingId: ctx.trackingId,
         messageId: dedupMessageId,
         prior_uid: dupCheck.breadcrumb.uid,
         prior_offer_id: dupCheck.breadcrumb.offerId,
@@ -196,6 +197,7 @@ async function action_load_offer(payload, ctx) {
         cog: 'offer-poller',
         event: 'lam-kitting-prior-deactivated',
         uid: ctx.uid,
+        trackingId: ctx.trackingId,
         offersDeactivated: priorDeactivation.offersDeactivated,
         linesDeactivated: priorDeactivation.linesDeactivated,
         deactivatedOffers: priorDeactivation.deactivatedOffers.map(o => o.value),
@@ -232,6 +234,7 @@ async function action_load_offer(payload, ctx) {
         cog: 'offer-poller',
         event: 'load-deferred-budget',
         uid: ctx.uid,
+        trackingId: ctx.trackingId,
         sourceUid: sourceUid || ctx.uid,
         messageId: ctx.currentMessageId || null,
         bpartnerId,
@@ -254,6 +257,7 @@ async function action_load_offer(payload, ctx) {
     cog: 'offer-poller',
     event: 'loaded',
     uid: ctx.uid,
+    trackingId: ctx.trackingId,
     sourceUid: sourceUid || ctx.uid,
     // messageId persisted so the next tick's hasMessageIdAlreadyLoaded() can
     // detect replays. Was missing pre-2026-05-22.
@@ -285,6 +289,7 @@ async function action_load_offer(payload, ctx) {
         cog: 'offer-poller',
         event: 'high-failure-rate',
         uid: ctx.uid,
+        trackingId: ctx.trackingId,
         offerId: result.offerId,
         searchKey: result.searchKey,
         severity: gateEval.severity,
@@ -355,13 +360,13 @@ ${result.errors.length > 5 ? `  ... +${result.errors.length - 5} more` : ''}
   if (gateEligible && offerGate.isRejected(gateId)) {
     gateStatus = 'rejected';
     breadcrumbs.write({
-      cog: 'offer-poller', event: 'gate-rejected', uid: ctx.uid,
+      cog: 'offer-poller', event: 'gate-rejected', uid: ctx.uid, trackingId: ctx.trackingId,
       offerId: result.offerId, searchKey: gateId,
     });
   } else if (gateEligible && offerGate.isPending(gateId)) {
     gateStatus = 'pending';
     breadcrumbs.write({
-      cog: 'offer-poller', event: 'gate-pending', uid: ctx.uid,
+      cog: 'offer-poller', event: 'gate-pending', uid: ctx.uid, trackingId: ctx.trackingId,
       offerId: result.offerId, searchKey: gateId,
     });
   } else if (gateEligible && offerGate.isCleared(gateId) && !offerGate.isProcessed(gateId)) {
@@ -395,7 +400,7 @@ ${result.errors.length > 5 ? `  ... +${result.errors.length - 5} more` : ''}
       route: 'customer-excess-analysis',
     });
     breadcrumbs.write({
-      cog: 'offer-poller', event: 'gate-queued', uid: ctx.uid,
+      cog: 'offer-poller', event: 'gate-queued', uid: ctx.uid, trackingId: ctx.trackingId,
       offerId: result.offerId, searchKey: gateId,
       lineCount: result.linesWritten, threshold: offerGate.threshold(),
     });
@@ -490,6 +495,7 @@ This offer is now in Orange Tsunami and available for matching against open RFQs
           cog: 'offer-poller',
           event: 'confirmation-sent',
           uid: ctx.uid,
+          trackingId: ctx.trackingId,
           offerId: result.offerId,
           searchKey: result.searchKey,
           partner: partnerName,
@@ -558,7 +564,7 @@ async function action_needs_partner(payload, ctx) {
 <h2 style="color:#b00">Customer Excess — partner unresolved</h2>
 <p><b>Subject:</b> ${esc(subject)}<br/>
    <b>From:</b> ${esc(outerFrom)}<br/>
-   <b>UID:</b> ${ctx.uid}<br/>
+   <b>Tracking ID:</b> ${ctx.trackingId || `(UID ${ctx.uid})`}<br/>
    <b>Inbox:</b> ${esc(ctx.inbox)}<br/>
    <b>Lines parsed:</b> ${fmt(linesCount)}</p>
 <p><b>What was tried:</b><br/>${esc(hints || '(no hints provided)')}</p>
@@ -598,6 +604,7 @@ ${extractedLinesHtml}
     cog: 'offer-poller',
     event: 'escalated-needs_partner',
     uid: ctx.uid,
+    trackingId: ctx.trackingId,
     subject,
     outerFrom,
     investigation_summary: investigation_summary || null,
@@ -671,7 +678,7 @@ async function action_clarify_partner(payload, ctx) {
 <h2 style="color:#b00">Customer Excess — partner clarification needed</h2>
 <p><b>Subject:</b> ${esc(subject)}<br/>
    <b>External sender:</b> ${esc(outerFrom || '(unknown)')}<br/>
-   <b>UID:</b> ${ctx.uid}<br/>
+   <b>Tracking ID:</b> ${ctx.trackingId || `(UID ${ctx.uid})`}<br/>
    <b>Inbox:</b> ${esc(ctx.inbox)}<br/>
    ${retryCount ? `<b>Retry:</b> ${retryCount}/2<br/>` : ''}
    <b>Offer type:</b> ${esc(offerType || '(default)')}<br/>
@@ -719,6 +726,7 @@ ${extractedLinesHtml}
     cog: 'offer-poller',
     event: 'escalated-clarify_partner',
     uid: ctx.uid,
+    trackingId: ctx.trackingId,
     notified: ctx.jakeEmail,
     external_sender: outerFrom || null,
     subject,
@@ -770,7 +778,7 @@ async function action_needs_review(payload, ctx) {
 <h2 style="color:#b00">Customer Excess — needs manual review</h2>
 <p><b>Subject:</b> ${esc(subject)}<br/>
    <b>From:</b> ${esc(outerFrom)}<br/>
-   <b>UID:</b> ${ctx.uid}</p>
+   <b>Tracking ID:</b> ${ctx.trackingId || `(UID ${ctx.uid})`}</p>
 <p><b>Reason:</b> ${esc(reason)}</p>
 ${investigationBlock}
 ${details ? `<pre style="background:#f5f5f5;padding:8px;white-space:pre-wrap;font-size:11px">${esc(details)}</pre>` : ''}
@@ -804,6 +812,7 @@ ${details ? `<pre style="background:#f5f5f5;padding:8px;white-space:pre-wrap;fon
     cog: 'offer-poller',
     event: 'escalated-needs_review',
     uid: ctx.uid,
+    trackingId: ctx.trackingId,
     subject,
     outerFrom,
     reason,
@@ -827,6 +836,7 @@ async function action_not_offer(payload, ctx) {
     cog: 'offer-poller',
     event: 'not-offer',
     uid: ctx.uid,
+    trackingId: ctx.trackingId,
     reason: payload.reason || 'unspecified',
   });
   return { reason: payload.reason || 'unspecified' };
@@ -854,6 +864,7 @@ async function action_drop_pending(payload, ctx) {
     cog: 'offer-poller',
     event: 'operator-dropped',
     uid: ctx.uid,
+    trackingId: ctx.trackingId,
     reason: payload.reason || 'operator-dropped',
     pending_kind: ctx.pendingSidecar && ctx.pendingSidecar.kind || null,
   });
@@ -875,6 +886,7 @@ async function action_dup_skip(payload, ctx) {
     cog: 'offer-poller',
     event: 'dup-skipped',
     uid: ctx.uid,
+    trackingId: ctx.trackingId,
     existingOfferSearchKey: payload.existingSearchKey,
   });
   return { existingSearchKey: payload.existingSearchKey };

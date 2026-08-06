@@ -200,6 +200,7 @@ async function action_load_rfq(payload, ctx) {
         cog: 'stockrfq-agent',
         event: 'already-loaded-skip',
         uid: ctx.uid,
+        trackingId: ctx.trackingId,
         messageId: dedupMessageId,
         prior_uid: dupCheck.breadcrumb.uid,
         prior_rfq_id: dupCheck.breadcrumb.rfqId,
@@ -231,14 +232,14 @@ async function action_load_rfq(payload, ctx) {
   if (stockRfqGate.isRejected(gateId)) {
     breadcrumbs.write({
       cog: 'stockrfq-agent', event: 'gate-rejected',
-      uid: ctx.uid, gateId, lineCount: lines.length,
+      uid: ctx.uid, trackingId: ctx.trackingId, gateId, lineCount: lines.length,
     });
     return { gated: 'rejected', gateId };
   }
   if (stockRfqGate.isPending(gateId)) {
     breadcrumbs.write({
       cog: 'stockrfq-agent', event: 'gate-pending',
-      uid: ctx.uid, gateId, lineCount: lines.length,
+      uid: ctx.uid, trackingId: ctx.trackingId, gateId, lineCount: lines.length,
     });
     return { gated: 'pending', gateId };
   }
@@ -260,7 +261,7 @@ async function action_load_rfq(payload, ctx) {
     });
     breadcrumbs.write({
       cog: 'stockrfq-agent', event: 'gate-queued',
-      uid: ctx.uid, gateId,
+      uid: ctx.uid, trackingId: ctx.trackingId, gateId,
       lineCount: lines.length, threshold: stockRfqGate.threshold(),
       customer: payload.customerName || null,
     });
@@ -340,7 +341,7 @@ async function doWriteRFQ(payload, ctx) {
       parkStockRfqResumeSidecar(ctx, payload, { rfqId: null, searchKey: null });
       breadcrumbs.write({
         cog: 'stockrfq-agent', event: 'load-deferred-ot-down',
-        uid: ctx.uid, sourceUid: sourceUid || ctx.uid, messageId: messageId || null,
+        uid: ctx.uid, trackingId: ctx.trackingId, sourceUid: sourceUid || ctx.uid, messageId: messageId || null,
         bpartnerId, customerName: customerName || null,
         lineCount: normalizedLines.length, reason: health.reason,
       });
@@ -384,6 +385,7 @@ async function doWriteRFQ(payload, ctx) {
           cog: 'stockrfq-agent',
           event: 'load-deferred-budget',
           uid: ctx.uid,
+          trackingId: ctx.trackingId,
           sourceUid: sourceUid || ctx.uid,
           messageId: messageId || null,
           bpartnerId,
@@ -455,6 +457,7 @@ async function doWriteRFQ(payload, ctx) {
     cog: 'stockrfq-agent',
     event: otDown ? 'load-failed-ot-down' : (writeFailed ? 'load-failed' : 'loaded'),
     uid: ctx.uid,
+    trackingId: ctx.trackingId,
     sourceUid: sourceUid || ctx.uid,
     messageId: messageId || null,
     brokerMessageId: brokerMessageId || null,
@@ -542,7 +545,7 @@ async function action_needs_review(payload, ctx) {
 <h2 style="color:#b00">Stock RFQ — needs manual review</h2>
 <p><b>Subject:</b> ${esc(subject)}<br/>
    <b>From:</b> ${esc(externalSenderLabel(envelope, outerFrom))}<br/>
-   <b>UID:</b> ${ctx.uid}</p>
+   <b>Tracking ID:</b> ${ctx.trackingId || `(UID ${ctx.uid})`}</p>
 <p><b>Reason:</b> ${esc(reason)}</p>
 ${investigationBlock}
 ${details ? `<pre style="background:#f5f5f5;padding:8px;white-space:pre-wrap;font-size:11px">${esc(details)}</pre>` : ''}
@@ -577,6 +580,7 @@ ${recipientsFooter(envelope)}
     cog: 'stockrfq-agent',
     event: 'needs-review',
     uid: ctx.uid,
+    trackingId: ctx.trackingId,
     subject,
     outerFrom,
     reason,
@@ -606,6 +610,7 @@ async function action_not_rfq(payload, ctx) {
     cog: 'stockrfq-agent',
     event: 'not-rfq',
     uid: ctx.uid,
+    trackingId: ctx.trackingId,
     reason: payload.reason || 'unspecified',
   });
   return { reason: payload.reason || 'unspecified' };
@@ -630,6 +635,7 @@ async function action_dup_skip(payload, ctx) {
     cog: 'stockrfq-agent',
     event: 'dup-skipped',
     uid: ctx.uid,
+    trackingId: ctx.trackingId,
     existingSearchKey: payload.existingSearchKey,
   });
   return { existingSearchKey: payload.existingSearchKey };
@@ -655,6 +661,7 @@ async function action_outbound_pending(payload, ctx) {
     cog: 'stockrfq-agent',
     event: 'outbound-pending',
     uid: ctx.uid,
+    trackingId: ctx.trackingId,
     reason: payload.reason || 'outbound reply',
   });
   return { reason: payload.reason || 'outbound reply' };
