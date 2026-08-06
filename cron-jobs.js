@@ -693,6 +693,7 @@ module.exports = [
   // ─── NEW MANUFACTURER SCREENING ────────────────────────────────────────────
   {
     name: 'mfr-screening-requests',
+    owner: 'justin.oberhofer',
     cadence: 'every 30m',
     cadenceCron: '*/30 * * * *',
     command: `python3 "${ASTUTE}/Business Ops/tsk-new-mfr-screening/mfr-reply-handler.py" --requests --mailbox bizops`,
@@ -703,11 +704,12 @@ module.exports = [
   },
   {
     name: 'mfr-screening-replies',
+    owner: 'justin.oberhofer',
     cadence: 'every 30m',
     cadenceCron: '15,45 * * * *',  // offset from requests job
     command: `python3 "${ASTUTE}/Business Ops/tsk-new-mfr-screening/mfr-reply-handler.py" --mailbox bizops`,
     cwd: WORKSPACE,
-    needsOT: true,  // creates MFRs via CLI (once enabled)
+    needsOT: false,  // writes go through sudo to analytics_user, not direct OT access
     logFile: '/tmp/mfr-screening-replies.log',
     description: 'Every 30m (offset) — process add/skip replies, create MFRs in OT',
   },

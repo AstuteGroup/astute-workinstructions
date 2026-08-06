@@ -102,6 +102,40 @@ OUTLOOK_URL_PATTERN = re.compile(r'([^<>\s]+)<([^<>]+)>')
 ADD_RE = re.compile('|'.join(ADD_PATTERNS), re.IGNORECASE)
 SKIP_RE = re.compile('|'.join(SKIP_PATTERNS), re.IGNORECASE)
 
+# Common disclaimer/noise words that indicate garbage alias extraction
+DISCLAIMER_WORDS = [
+    'disclaimer', 'confidential', 'privileged', 'intended', 'recipient',
+    'prohibited', 'unauthorized', 'dissemination', 'distribution',
+    'liability', 'virus', 'attachment', 'sender', 'notify', 'delete',
+    'error', 'transmission', 'legal', 'binding', 'obligat', 'notice',
+]
+
+
+def sanitize_alias(alias: str) -> str:
+    """
+    Sanitize alias value - return None if it looks like disclaimer garbage.
+    """
+    if not alias:
+        return None
+
+    alias = alias.strip()
+
+    # Skip if too long (real aliases are short company name variants)
+    if len(alias) > 100:
+        return None
+
+    # Skip if contains disclaimer words
+    alias_lower = alias.lower()
+    for word in DISCLAIMER_WORDS:
+        if word in alias_lower:
+            return None
+
+    # Skip if it's just "N/A" or similar
+    if alias_lower in ('n/a', 'na', 'none', 'null', '-', ''):
+        return None
+
+    return alias
+
 
 def load_pending_state() -> dict:
     """Load pending M code assignments from state file."""
@@ -481,7 +515,7 @@ def extract_mfr_from_email(body: str) -> list:
                         manufacturers.append({
                             'name': mfr.get('searchName'),
                             'url': clean_outlook_url(mfr.get('providedUrl')),
-                            'alias': mfr.get('providedAlias'),
+                            'alias': sanitize_alias(mfr.get('providedAlias')),
                         })
             return manufacturers
         except json.JSONDecodeError:
@@ -494,10 +528,11 @@ def extract_mfr_from_email(body: str) -> list:
 
     if name_match:
         raw_url = url_match.group(1) if url_match and url_match.group(1) != 'null' else None
+        raw_alias = alias_match.group(1) if alias_match and alias_match.group(1) != 'null' else None
         manufacturers.append({
             'name': name_match.group(1),
             'url': clean_outlook_url(raw_url) if raw_url else None,
-            'alias': alias_match.group(1) if alias_match and alias_match.group(1) != 'null' else None,
+            'alias': sanitize_alias(raw_alias),
         })
 
     # Look for MFR Name: pattern
@@ -509,10 +544,11 @@ def extract_mfr_from_email(body: str) -> list:
         name = mfr_name_match.group(1).strip()
         if name:
             raw_url = url_field_match.group(1).strip() if url_field_match else None
+            raw_alias = alias_field_match.group(1).strip() if alias_field_match else None
             manufacturers.append({
                 'name': name,
                 'url': clean_outlook_url(raw_url) if raw_url else None,
-                'alias': alias_field_match.group(1).strip() if alias_field_match else None,
+                'alias': sanitize_alias(raw_alias),
             })
 
     # Look for HTML email format (quoted in reply)
@@ -530,11 +566,11 @@ def extract_mfr_from_email(body: str) -> list:
             # Also check for alias in the x_mfr-url div
             html_alias_match = re.search(r'class="(?:x_)?mfr-url"[^>]*>Alias:\s*([^<]+)<', body)
             raw_url = html_url_match.group(1) if html_url_match else None
-            alias = html_alias_match.group(1).strip() if html_alias_match else None
+            raw_alias = html_alias_match.group(1).strip() if html_alias_match else None
             manufacturers.append({
                 'name': name,
                 'url': clean_outlook_url(raw_url) if raw_url else None,
-                'alias': alias,
+                'alias': sanitize_alias(raw_alias),
             })
 
     # Fallback: look for plain text patterns from email thread
