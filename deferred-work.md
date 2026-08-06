@@ -26,19 +26,8 @@ The SessionStart greeting reads this file and surfaces all open items, sorted by
 
 ### Active workstreams (next session pickup)
 
-- [ ] 🟢 **PRIORITY: Unified Email Tracking — Phase 3** *(opened 2026-08-05)*
-  - **Context:** Phase 2 complete (tracking ID registry + CLI). Phase 3 updates notification emails to use tracking IDs instead of raw UIDs.
-  - **What Phase 3 does:**
-    1. Replace `UID: 11948` with `Tracking ID: VQ-11948` in escalation emails
-    2. Update breadcrumb writes to include tracking ID
-    3. (Optional) Backfill existing sidecars with tracking IDs
-  - **Why this matters:** Universal tracking IDs (`VQ-11948`) work across all workflows, folders, and systems. When you get an escalation email with `VQ-11948`, you can look it up regardless of what folder it moved to.
-  - **Files to modify:**
-    - All `action_needs_review` handlers in `shared/workflow-actions/*.js`
-    - Possibly `shared/breadcrumbs.js`
-  - **Design doc:** `docs/unified-email-tracking-design.md`
-  - **Ready when:** Tomorrow (2026-08-06)
-  - **How:** Read the design doc Phase 3 section, update each workflow's escalation email template
+- [x] ~~**PRIORITY: Unified Email Tracking — Phase 3**~~ *(opened 2026-08-05, DONE 2026-08-06)*
+  - **Resolution:** Implemented in commit `3986395`. All 10 workflow handlers now show `Tracking ID: VQ-12345` instead of `UID: 12345` in escalation emails, with fallback to `(UID 12345)` if tracking ID not available. Breadcrumb writes include `trackingId` field. Design doc updated to mark Phase 3 complete.
 
 - [ ] 🟢 **RESUME: Broker Stock Offer Duplicate MPN Cleanup** *(opened 2026-07-10)*
   - **Context:** iDempiere bean callout on `chuboe_offer_line` auto-creates `chuboe_offer_line_mpn` sub-records. Our `offer-writeback.js` was ALSO writing them (when `writeMpnRecords: true`), causing duplicates. Discovered 2026-07-07.
