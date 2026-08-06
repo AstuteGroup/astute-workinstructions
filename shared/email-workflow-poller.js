@@ -490,10 +490,10 @@ async function cmdRead(uid, { folder = null } = {}) {
   if (sidecar) result.pending_state = sidecar;
 
   // Assign unified tracking ID (idempotent — returns existing if already assigned)
-  if (WORKFLOW_MODULE && WORKFLOW_MODULE.inbox && result.message_id) {
+  if (workflow && workflow.inbox && result.message_id) {
     try {
       result.tracking_id = trackingId.assignTrackingId({
-        inbox: WORKFLOW_MODULE.inbox,
+        inbox: workflow.inbox,
         uid: result.uid,
         messageId: result.message_id,
         subject: result.subject,
@@ -691,7 +691,7 @@ async function cmdRoute(uid, actionName, payload) {
   }
 
   // Update unified tracking ID status
-  if (!DRY_RUN && currentMessageId && WORKFLOW_MODULE && WORKFLOW_MODULE.inbox) {
+  if (!DRY_RUN && currentMessageId && workflow && workflow.inbox) {
     try {
       const existingTracking = trackingId.lookupByMessageId(currentMessageId);
       if (existingTracking) {
