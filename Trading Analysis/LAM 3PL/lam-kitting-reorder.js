@@ -40,6 +40,22 @@ const { normalizeMPN } = require('../../shared/mpn-normalization');
 const { parseInventoryFile, getWarehouseRows } = require('../../shared/inventory-parser');
 const { loadCachedInventory } = require('../../shared/inventory-fetch-and-parse');
 
+// Convert Excel serial date (if present) to YYYY-MM-DD for consistent date comparison
+function toDateString(value) {
+  if (!value) return '';
+  // Already YYYY-MM-DD format
+  if (typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value)) return value;
+  // Excel serial date (days since 1900-01-01, with leap year bug)
+  const serial = parseFloat(value);
+  if (isNaN(serial) || serial < 1) return String(value);
+  const utcDays = serial - 25569; // Days since 1970-01-01
+  const date = new Date(utcDays * 86400000);
+  const yyyy = date.getUTCFullYear();
+  const mm = String(date.getUTCMonth() + 1).padStart(2, '0');
+  const dd = String(date.getUTCDate()).padStart(2, '0');
+  return `${yyyy}-${mm}-${dd}`;
+}
+
 // LAM Kitting handler - for Additional Review visibility
 let _lamKittingHandler = null;
 function getFlaggedCPCsFromHandler() {
@@ -566,7 +582,7 @@ function autoClearCompletedTransfers(pendingTransfers, aggregated) {
     const inv = aggregated[mpn];
     if (!inv) continue;
 
-    const lamQty = (inv.W111_Qty || 0) + (inv.W115_Qty || 0);
+    const lamQty = (inv.W111_Qty || 0) + (inv.W115_Qty || 0) + (inv.W118_Qty || 0);
     const transferQty = transfer.qty || 0;
 
     // Clear if:
@@ -675,7 +691,7 @@ async function main() {
   // Step 1: Load inventory files
   console.log('Step 1: Loading inventory files...');
 
-  let w111Inventory, w115Inventory;
+  let w111Inventory, w115Inventory, w118Inventory;
   let inventoryFileInfo = null;
   let cacheData = null;  // For cache mode - used by other warehouse check
 
@@ -684,6 +700,7 @@ async function main() {
     console.log(`  Parsing: ${path.basename(xlsxPath)}`);
     w111Inventory = loadInventoryFromXlsx(xlsxPath, 'W111');
     w115Inventory = loadInventoryFromXlsx(xlsxPath, 'W115');
+    w118Inventory = loadInventoryFromXlsx(xlsxPath, 'W118');
 
     // Get file age for staleness check
     if (fs.existsSync(xlsxPath)) {
@@ -698,9 +715,11 @@ async function main() {
     // Load from pre-parsed CSVs
     const w111Path = path.join(inventoryFolder, W111_FILENAME);
     const w115Path = path.join(inventoryFolder, W115_FILENAME);
+    const w118Path = path.join(inventoryFolder, 'W118_LAM_Consignment.csv');
 
     w111Inventory = loadChuboeInventory(w111Path, 'W111');
     w115Inventory = loadChuboeInventory(w115Path, 'W115');
+    w118Inventory = loadChuboeInventory(w118Path, 'W118');
 
     // Get file age for staleness check
     if (fs.existsSync(w111Path)) {
@@ -726,9 +745,10 @@ async function main() {
       console.log('  WARNING: Using stale cache');
     }
 
-    // Extract W111 and W115 from cache
+    // Extract W111, W115, and W118 from cache
     w111Inventory = loadInventoryFromCache(cacheData, 'W111');
     w115Inventory = loadInventoryFromCache(cacheData, 'W115');
+    w118Inventory = loadInventoryFromCache(cacheData, 'W118');
 
     // Set file info for staleness check
     const cachedAt = new Date(cacheData.metadata.cachedAt);
@@ -741,6 +761,7 @@ async function main() {
 
   console.log(`  W111 (LAM 3PL): ${Object.keys(w111Inventory).length} unique MPNs`);
   console.log(`  W115 (Dead Inventory): ${Object.keys(w115Inventory).length} unique MPNs`);
+  console.log(`  W118 (LAM Consignment): ${Object.keys(w118Inventory || {}).length} unique MPNs`);
 
   // Step 1b: Check inventory file age - warn if stale (>7 days old per spec)
   if (inventoryFileInfo && inventoryFileInfo.ageDays > 7) {
@@ -757,7 +778,7 @@ async function main() {
   // Step 2: Aggregate by MPN
   console.log('');
   console.log('Step 2: Aggregating inventory by MPN...');
-  const aggregated = aggregateInventory(w111Inventory, w115Inventory);
+  const aggregated = aggregateInventory(w111Inventory, w115Inventory, w118Inventory);
   console.log(`  Combined: ${Object.keys(aggregated).length} unique MPNs`);
 
   // Step 2b: Load pending transfers (confirmed LAM stock being moved to W111)
@@ -943,6 +964,26 @@ async function main() {
     console.log('  No additional NOT ON AVL items beyond reorder list.');
   }
 
+  // Step 5e: Warehouse Inventory vs AVL Audit
+  // Find inventory MPNs that don't match the roster — excluding items already on NOT ON AVL
+  // (those have known CPC associations from POV data)
+  console.log('');
+  console.log('Step 5e: Auditing warehouse inventory MPNs vs AVL...');
+
+  // Build set of MPNs already covered by NOT ON AVL (they have known CPC associations)
+  const notOnAvlForAudit = reorderAlerts.filter(a => a['MPN Flag'] === 'NOT ON AVL');
+  const knownPurchasedMpns = new Set();
+  for (const item of [...notOnAvlForAudit, ...additionalNotOnAvl]) {
+    const purchasedMpn = (item['Purchased MPN'] || '').toUpperCase().trim();
+    if (purchasedMpn) knownPurchasedMpns.add(purchasedMpn);
+  }
+
+  const warehouseAudit = auditWarehouseInventoryVsAvl(w111Inventory, w115Inventory, w118Inventory, excelData, knownPurchasedMpns);
+  console.log(`  Matched: ${warehouseAudit.matched.length} (inventory MPN exactly matches AVL)`);
+  console.log(`  Candidate matches: ${warehouseAudit.candidateMatches.length} (likely packaging variants)`);
+  console.log(`  Skipped: ${warehouseAudit.skippedKnown} (already on NOT ON AVL — known CPC)`);
+  console.log(`  Unmatched: ${warehouseAudit.unmatched.length} (no match found — needs investigation)`);
+
   // Step 6: Generate output files
   console.log('');
   console.log('Step 6: Generating output files...');
@@ -992,6 +1033,13 @@ async function main() {
       items: allNotOnAvlItems,
     }, null, 2) + '\n');
     console.log(`  NOT ON AVL sidecar written: ${allNotOnAvlItems.length} items`);
+  }
+
+  // Step 6d: Warehouse Inventory Audit sidecar
+  // Items where warehouse MPN doesn't match AVL — includes packaging variants and unmatched
+  if (warehouseAudit.candidateMatches.length > 0 || warehouseAudit.unmatched.length > 0) {
+    const auditFile = writeWarehouseAuditResults(warehouseAudit, outputFile);
+    console.log(`  Warehouse audit sidecar written: ${warehouseAudit.candidateMatches.length} candidates, ${warehouseAudit.unmatched.length} unmatched`);
   }
 
   // Summary
@@ -1240,7 +1288,8 @@ function loadInventoryFromCache(cacheData, warehouseCode) {
     const mpn = (row.mpn || '').trim();
     const qty = row.qty || 0;
     // dateLot is the receipt date from Infor (when the lot was received)
-    const dateLot = row.dateLot || '';
+    // Convert from Excel serial date if needed (cached data may have old format)
+    const dateLot = toDateString(row.dateLot || '');
 
     if (!mpn) continue;
 
@@ -1264,25 +1313,46 @@ function loadInventoryFromCache(cacheData, warehouseCode) {
 // Step 2: Aggregate Inventory
 // -----------------------------------------------------------------------------
 
-function aggregateInventory(w111, w115) {
+function aggregateInventory(w111, w115, w118 = {}) {
   const aggregated = {};
 
   // Add W111 inventory
   for (const [mpn, data] of Object.entries(w111)) {
     if (!aggregated[mpn]) {
-      aggregated[mpn] = { W111_Qty: 0, W115_Qty: 0, Total_Qty: 0 };
+      aggregated[mpn] = { W111_Qty: 0, W115_Qty: 0, W118_Qty: 0, Total_Qty: 0, latestReceiptDate: '' };
     }
     aggregated[mpn].W111_Qty = data.qty;
     aggregated[mpn].Total_Qty += data.qty;
+    // Track latest receipt date (used for POV staleness filtering)
+    if (data.latestReceiptDate && data.latestReceiptDate > (aggregated[mpn].latestReceiptDate || '')) {
+      aggregated[mpn].latestReceiptDate = data.latestReceiptDate;
+    }
   }
 
   // Add W115 inventory
   for (const [mpn, data] of Object.entries(w115)) {
     if (!aggregated[mpn]) {
-      aggregated[mpn] = { W111_Qty: 0, W115_Qty: 0, Total_Qty: 0 };
+      aggregated[mpn] = { W111_Qty: 0, W115_Qty: 0, W118_Qty: 0, Total_Qty: 0, latestReceiptDate: '' };
     }
     aggregated[mpn].W115_Qty = data.qty;
     aggregated[mpn].Total_Qty += data.qty;
+    // Track latest receipt date (used for POV staleness filtering)
+    if (data.latestReceiptDate && data.latestReceiptDate > (aggregated[mpn].latestReceiptDate || '')) {
+      aggregated[mpn].latestReceiptDate = data.latestReceiptDate;
+    }
+  }
+
+  // Add W118 inventory (LAM Consignment - counts toward total, needs monthly enrichment)
+  for (const [mpn, data] of Object.entries(w118)) {
+    if (!aggregated[mpn]) {
+      aggregated[mpn] = { W111_Qty: 0, W115_Qty: 0, W118_Qty: 0, Total_Qty: 0, latestReceiptDate: '' };
+    }
+    aggregated[mpn].W118_Qty = data.qty;
+    aggregated[mpn].Total_Qty += data.qty;
+    // Track latest receipt date (used for POV staleness filtering)
+    if (data.latestReceiptDate && data.latestReceiptDate > (aggregated[mpn].latestReceiptDate || '')) {
+      aggregated[mpn].latestReceiptDate = data.latestReceiptDate;
+    }
   }
 
   return aggregated;
@@ -1363,7 +1433,9 @@ function loadExcelData(excelPath) {
   function isPlaceholderMPN(mpn) {
     if (!mpn) return false;
     const upper = mpn.toUpperCase().trim();
-    return PLACEHOLDER_MPNS.some(p => upper === p || upper.includes(p));
+    // IMPORTANT: Use exact match only to avoid false positives
+    // e.g., "INA188IDR" contains "NA" but is NOT a placeholder
+    return PLACEHOLDER_MPNS.some(p => upper === p);
   }
 
   // Process data rows (skip header)
@@ -1966,6 +2038,7 @@ const ALERT_COLUMNS = [
   // Inventory & priority
   'QTY ON HAND',
   'W115 Stale Inventory',
+  'W118 Consignment',  // LAM consignment stock - counts toward inventory, needs monthly enrichment
   'Reorder Threshold',
   'Shortfall',
   'Priority',  // Includes "PENDING WAREHOUSE TRANSFER - X pcs from WH" when applicable
@@ -2022,12 +2095,15 @@ function formatPOVCell(pov) {
   return '';
 }
 
-function buildAlert(mpn, excel, totalQty, lamOwned, shortfall, priority, history, pov) {
+function buildAlert(mpn, excel, totalQty, lamOwned, w118Qty, shortfall, priority, history, pov, rawPurchasedMpn) {
   // Show purchased MPN only if it differs from roster MPN (alternate sourcing)
-  const purchasedMpn = pov && pov.Purchased_MPN && pov.Purchased_MPN !== mpn ? pov.Purchased_MPN : '';
+  // Use rawPurchasedMpn (from raw POVs) for validation - this persists even when POV is filtered as stale
+  const effectivePurchasedMpn = rawPurchasedMpn || (pov && pov.Purchased_MPN);
+  const purchasedMpn = effectivePurchasedMpn && effectivePurchasedMpn !== mpn ? effectivePurchasedMpn : '';
 
   // Validate purchased MPN is on AVL for this CPC (spec requirement)
-  const mpnValidation = validatePurchasedMPN(excel.CPC, mpn, pov && pov.Purchased_MPN);
+  // Use rawPurchasedMpn so we can still flag NOT ON AVL even when POV was filtered as stale
+  const mpnValidation = validatePurchasedMPN(excel.CPC, mpn, effectivePurchasedMpn);
 
   return {
     'Lam P/N': excel.CPC,
@@ -2038,6 +2114,7 @@ function buildAlert(mpn, excel, totalQty, lamOwned, shortfall, priority, history
     'Item Description': excel.Description,
     'QTY ON HAND': totalQty,
     'W115 Stale Inventory': lamOwned,
+    'W118 Consignment': w118Qty > 0 ? w118Qty : '',
     'Reorder Threshold': excel.MIN_QTY,
     'Shortfall': shortfall,
     'Priority': priority,  // Includes "PENDING WAREHOUSE TRANSFER - X pcs from WH" when applicable
@@ -2142,6 +2219,7 @@ function identifyReorderCandidates(aggregated, excelData, historicalData, recent
     let totalQty = 0;
     let w111Qty = 0;
     let w115Qty = 0;
+    let w118Qty = 0;
     const mpnsWithStock = [];
 
     for (const mpn of mpnsToCheck) {
@@ -2151,13 +2229,14 @@ function identifyReorderCandidates(aggregated, excelData, historicalData, recent
         totalQty += inv.Total_Qty;
         w111Qty += inv.W111_Qty || 0;
         w115Qty += inv.W115_Qty || 0;
+        w118Qty += inv.W118_Qty || 0;
         const isFromPurchase = purchasedMpn && normalizeMPN(mpn) === normalizeMPN(purchasedMpn) &&
                                !approvedMPNs.some(m => normalizeMPN(m) === normalizeMPN(purchasedMpn));
         mpnsWithStock.push({ mpn, qty: inv.Total_Qty, fromPurchase: isFromPurchase });
       }
     }
 
-    cpcTotalInventory.set(cpc, { total: totalQty, w111: w111Qty, w115: w115Qty, mpnsWithStock, approvedMPNs, purchasedMpn });
+    cpcTotalInventory.set(cpc, { total: totalQty, w111: w111Qty, w115: w115Qty, w118: w118Qty, mpnsWithStock, approvedMPNs, purchasedMpn });
   }
 
   // Log multi-MPN inventory aggregation stats
@@ -2175,7 +2254,7 @@ function identifyReorderCandidates(aggregated, excelData, historicalData, recent
 
     const minQty = excel.MIN_QTY;
     const hasThreshold = minQty !== undefined && minQty !== null && minQty !== '';
-    const cpcInv = cpcTotalInventory.get(cpc) || { total: 0, w111: 0, w115: 0, mpnsWithStock: [] };
+    const cpcInv = cpcTotalInventory.get(cpc) || { total: 0, w111: 0, w115: 0, w118: 0, mpnsWithStock: [] };
     const totalQty = cpcInv.total;
 
     // Check if below threshold OR zero stock with no threshold
@@ -2213,8 +2292,10 @@ function identifyReorderCandidates(aggregated, excelData, historicalData, recent
       const rawPovByMpn = povForMpnLookup[normalizeMPN(rosterMpn)];
       const povForMpnValidation = selectBetterPOV(rawPovByCpc, rawPovByMpn);
 
-      const alert = buildAlert(rosterMpn, excel, totalQty, lamOwned, shortfall, priority,
-        historicalData[normalizeMPN(rosterMpn)] || {}, povForMpnValidation);
+      // Pass FILTERED pov for display (stale POVs shouldn't show their data)
+      // but pass raw Purchased MPN for NOT ON AVL validation
+      const alert = buildAlert(rosterMpn, excel, totalQty, lamOwned, cpcInv.w118, shortfall, priority,
+        historicalData[normalizeMPN(rosterMpn)] || {}, pov, povForMpnValidation?.Purchased_MPN);
 
       // Add note if stock is spread across multiple MPNs
       if (cpcInv.mpnsWithStock.length > 1) {
@@ -2273,14 +2354,14 @@ function identifyReorderCandidates(aggregated, excelData, historicalData, recent
     if (excel.MIN_QTY <= 0) {
       // Zero stock + no threshold = flag as NO THRESHOLD unless there's recent activity
       const priority = pov ? resolvePriority('NO THRESHOLD', pov) : 'NO THRESHOLD';
-      alerts.push(buildAlert(mpn, excel, 0, 'NO', 0, priority,
-        historicalData[key] || {}, rawPov));
+      alerts.push(buildAlert(mpn, excel, 0, 'NO', 0, 0, priority,
+        historicalData[key] || {}, pov, rawPov?.Purchased_MPN));
       continue;
     }
 
     const priority = resolvePriority('CRITICAL', pov);
-    alerts.push(buildAlert(mpn, excel, 0, 'NO', excel.MIN_QTY, priority,
-      historicalData[key] || {}, rawPov));
+    alerts.push(buildAlert(mpn, excel, 0, 'NO', 0, excel.MIN_QTY, priority,
+      historicalData[key] || {}, pov, rawPov?.Purchased_MPN));
   }
 
   // Add PENDING WAREHOUSE TRANSFER items - confirmed transfers from pending-transfers.json
@@ -2304,15 +2385,16 @@ function identifyReorderCandidates(aggregated, excelData, historicalData, recent
     const excel = excelData[mpn];
     if (!excel) continue;
 
-    const cpcInv = cpcTotalInventory.get(cpc) || { total: 0, w111: 0, w115: 0, mpnsWithStock: [] };
+    const cpcInv = cpcTotalInventory.get(cpc) || { total: 0, w111: 0, w115: 0, w118: 0, mpnsWithStock: [] };
 
     // Format: "PENDING WAREHOUSE TRANSFER - 100 pcs from MAIN"
     const priority = `PENDING WAREHOUSE TRANSFER - ${transfer.qty} pcs from ${transfer.fromWh}`;
 
-    // Use raw POV for MPN validation (includes stale POVs)
+    // Use filtered POV for display, raw POV for MPN validation
+    const filteredPovForTransfer = selectBetterPOV(recentPOVs[cpc], recentPOVs[normalizeMPN(mpn)]);
     const rawPovForTransfer = selectBetterPOV(povForMpnLookup[cpc], povForMpnLookup[normalizeMPN(mpn)]);
-    const alert = buildAlert(mpn, excel, cpcInv.total, cpcInv.w115 > 0 ? 'YES' : 'NO',
-      0, priority, historicalData[normalizeMPN(mpn)] || {}, rawPovForTransfer);
+    const alert = buildAlert(mpn, excel, cpcInv.total, cpcInv.w115 > 0 ? 'YES' : 'NO', cpcInv.w118,
+      0, priority, historicalData[normalizeMPN(mpn)] || {}, filteredPovForTransfer, rawPovForTransfer?.Purchased_MPN);
 
     alerts.push(alert);
   }
@@ -2414,6 +2496,7 @@ function findAllNotOnAvlItems(excelData, recentPOVsRaw, aggregated, existingAler
       'Item Description': excel.Description || '',
       'QTY ON HAND': totalQty,
       'W115 Stale Inventory': '',
+      'W118 Consignment': '',
       'Reorder Threshold': excel.MIN_QTY || '',
       'Priority': totalQty > 0 ? 'HAS STOCK - RECONCILE AVL' : 'NO STOCK - RECONCILE AVL',
       'Shortfall': '',
@@ -2425,6 +2508,210 @@ function findAllNotOnAvlItems(excelData, recentPOVsRaw, aggregated, existingAler
   }
 
   return notOnAvlItems;
+}
+
+// -----------------------------------------------------------------------------
+// Warehouse Inventory vs AVL Audit
+// Find inventory MPNs that don't match any AVL entry — including packaging variants
+// -----------------------------------------------------------------------------
+
+/**
+ * Normalize MPN by stripping common packaging/variant suffixes for fuzzy matching.
+ * e.g., BK-ABC-12-R → ABC-12, ABC-12/R → ABC-12, ABC-12-TR → ABC-12
+ */
+function normalizeForPackagingMatch(mpn) {
+  if (!mpn) return '';
+  let normalized = mpn.toUpperCase().trim();
+
+  // Remove common packaging prefixes/suffixes
+  // Tape & Reel: -TR, /TR, -T&R, -T/R, -REEL, /REEL, -R, /R
+  // Bulk: BK-, -BK, /BK, BULK-
+  // Cut Tape: -CT, /CT
+  // Tray: -TRAY, /TRAY
+  // Digi-Reel: -ND, -DKR
+  normalized = normalized
+    .replace(/^#/i, '')                // Leading # (LAM CPC prefix)
+    .replace(/^BK-|^BULK-/i, '')       // Leading BK- or BULK-
+    .replace(/-BK$|\/BK$/i, '')        // Trailing -BK or /BK
+    .replace(/-TR$|\/TR$|-T&R$|-T\/R$/i, '')  // Tape & Reel
+    .replace(/-REEL$|\/REEL$/i, '')    // -REEL suffix
+    .replace(/-R$|\/R$/i, '')          // Simple -R or /R
+    .replace(/-CT$|\/CT$/i, '')        // Cut tape
+    .replace(/-TRAY$|\/TRAY$/i, '')    // Tray
+    .replace(/-ND$|-DKR$/i, '')        // Digi-Reel variants
+    .replace(/-E$|-E3$/i, '')          // ROHS variants
+    .replace(/#$/i, '');               // Trailing #
+
+  return normalized;
+}
+
+/**
+ * Audit warehouse inventory MPNs against the complete AVL.
+ * Finds MPNs in inventory that don't match any AVL entry.
+ *
+ * NOTE: Only audits W111 + W115 (our managed stock). W118 is excluded because
+ * it's LAM consignment stock that may contain parts from other programs.
+ *
+ * @param {Object} w111Inventory - W111 inventory { mpn: { qty, ... } }
+ * @param {Object} w115Inventory - W115 inventory
+ * @param {Object} w118Inventory - W118 inventory (IGNORED - consignment)
+ * @param {Object} excelData - Roster data (MPN → { CPC, ... })
+ * @param {Set} knownPurchasedMpns - MPNs already on NOT ON AVL (have known CPC associations)
+ * @returns {Object} { matched: [], candidateMatches: [], unmatched: [], skippedKnown: number }
+ */
+function auditWarehouseInventoryVsAvl(w111Inventory, w115Inventory, w118Inventory, excelData, knownPurchasedMpns = new Set()) {
+  // W118 is intentionally NOT audited — it's LAM consignment stock from other programs
+  const results = {
+    matched: [],         // Inventory MPN exactly matches AVL
+    candidateMatches: [], // Inventory MPN appears to be packaging variant
+    unmatched: [],       // No match found - needs investigation
+    skippedKnown: 0,     // Skipped because already on NOT ON AVL (known CPC association)
+  };
+
+  // Build AVL lookup: MPN (uppercase) → CPC
+  // Also build normalized lookup for fuzzy matching
+  const avlMpnToCpc = {};
+  const normalizedAvlMpnToCpc = {};  // normalizedMPN → [ { cpc, originalMpn } ]
+
+  // First, load from Master Roster (excelData)
+  for (const [mpn, data] of Object.entries(excelData)) {
+    const cpc = data.CPC;
+    if (!cpc || !mpn) continue;
+
+    const mpnUpper = mpn.toUpperCase().trim();
+    avlMpnToCpc[mpnUpper] = cpc;
+
+    // Also index normalized version for fuzzy matching
+    const normalized = normalizeForPackagingMatch(mpn);
+    if (!normalizedAvlMpnToCpc[normalized]) {
+      normalizedAvlMpnToCpc[normalized] = [];
+    }
+    normalizedAvlMpnToCpc[normalized].push({ cpc, originalMpn: mpn });
+  }
+
+  // ALSO load from Complete AVL (has alternate MPNs not in roster)
+  const completeAvl = loadAVL();  // Map of CPC → [MPN, MPN, ...]
+  for (const [cpc, mpns] of completeAvl.entries()) {
+    for (const mpn of mpns) {
+      if (!mpn) continue;
+      const mpnUpper = mpn.toUpperCase().trim();
+      if (!avlMpnToCpc[mpnUpper]) {
+        avlMpnToCpc[mpnUpper] = cpc;
+      }
+      // Also index normalized version
+      const normalized = normalizeForPackagingMatch(mpn);
+      if (!normalizedAvlMpnToCpc[normalized]) {
+        normalizedAvlMpnToCpc[normalized] = [];
+      }
+      // Avoid duplicates
+      if (!normalizedAvlMpnToCpc[normalized].some(x => x.originalMpn === mpn)) {
+        normalizedAvlMpnToCpc[normalized].push({ cpc, originalMpn: mpn });
+      }
+    }
+  }
+
+  // Collect all warehouse inventory MPNs with their quantities
+  const allInventoryMpns = new Map(); // mpn → { w111Qty, w115Qty, w118Qty, totalQty }
+
+  for (const [mpn, data] of Object.entries(w111Inventory || {})) {
+    const mpnUpper = mpn.toUpperCase().trim();
+    if (!allInventoryMpns.has(mpnUpper)) {
+      allInventoryMpns.set(mpnUpper, { originalMpn: mpn, w111Qty: 0, w115Qty: 0 });
+    }
+    allInventoryMpns.get(mpnUpper).w111Qty += data.qty || 0;
+  }
+
+  for (const [mpn, data] of Object.entries(w115Inventory || {})) {
+    const mpnUpper = mpn.toUpperCase().trim();
+    if (!allInventoryMpns.has(mpnUpper)) {
+      allInventoryMpns.set(mpnUpper, { originalMpn: mpn, w111Qty: 0, w115Qty: 0 });
+    }
+    allInventoryMpns.get(mpnUpper).w115Qty += data.qty || 0;
+  }
+
+  // NOTE: W118 (consignment) is intentionally NOT processed — it's LAM-owned
+  // stock from other programs, not part of our kitting roster
+
+  // Check each inventory MPN against the AVL
+  for (const [mpnUpper, invData] of allInventoryMpns.entries()) {
+    const totalQty = invData.w111Qty + invData.w115Qty;  // W118 excluded
+    if (totalQty <= 0) continue;  // Skip zero qty
+
+    // Check for exact match
+    if (avlMpnToCpc[mpnUpper]) {
+      results.matched.push({
+        inventoryMpn: invData.originalMpn,
+        avlMpn: invData.originalMpn,
+        cpc: avlMpnToCpc[mpnUpper],
+        w111Qty: invData.w111Qty,
+        w115Qty: invData.w115Qty,
+        totalQty,
+        matchType: 'EXACT',
+      });
+      continue;
+    }
+
+    // Try fuzzy match (normalized packaging variant)
+    const normalized = normalizeForPackagingMatch(invData.originalMpn);
+    const candidates = normalizedAvlMpnToCpc[normalized];
+
+    if (candidates && candidates.length > 0) {
+      // Found candidate match(es) - packaging variant
+      results.candidateMatches.push({
+        inventoryMpn: invData.originalMpn,
+        normalizedMpn: normalized,
+        avlCandidates: candidates.map(c => ({ cpc: c.cpc, avlMpn: c.originalMpn })),
+        w111Qty: invData.w111Qty,
+        w115Qty: invData.w115Qty,
+        totalQty,
+        matchType: 'PACKAGING_VARIANT',
+        notes: `Inventory MPN "${invData.originalMpn}" appears to be packaging variant of AVL MPN(s): ${candidates.map(c => c.originalMpn).join(', ')}`,
+      });
+      continue;
+    }
+
+    // No AVL match found - but check if it's already on NOT ON AVL (known CPC from POV)
+    if (knownPurchasedMpns.has(mpnUpper)) {
+      // Skip — this MPN is already on NOT ON AVL tab with its known CPC association
+      results.skippedKnown++;
+      continue;
+    }
+
+    // Truly unmatched — no AVL match AND no POV association
+    results.unmatched.push({
+      inventoryMpn: invData.originalMpn,
+      normalizedMpn: normalized,
+      w111Qty: invData.w111Qty,
+      w115Qty: invData.w115Qty,
+      totalQty,
+      matchType: 'UNMATCHED',
+      notes: `No AVL match for "${invData.originalMpn}". Needs investigation.`,
+    });
+  }
+
+  return results;
+}
+
+/**
+ * Write warehouse inventory audit results to JSON sidecar
+ */
+function writeWarehouseAuditResults(auditResults, outputPath) {
+  const auditFile = outputPath.replace('.csv', '_warehouse_audit.json');
+
+  fs.writeFileSync(auditFile, JSON.stringify({
+    generated: new Date().toISOString(),
+    summary: {
+      totalInventoryMpns: auditResults.matched.length + auditResults.candidateMatches.length + auditResults.unmatched.length,
+      matched: auditResults.matched.length,
+      candidateMatches: auditResults.candidateMatches.length,
+      unmatched: auditResults.unmatched.length,
+    },
+    candidateMatches: auditResults.candidateMatches,  // These need review
+    unmatched: auditResults.unmatched,                // These need investigation
+    // Don't include matched (too many) - just summary count
+  }, null, 2) + '\n');
+
+  return auditFile;
 }
 
 // -----------------------------------------------------------------------------
@@ -2566,7 +2853,7 @@ function writeEscalationsContext(outputPath, aggregated, excelData, recentPOVs, 
   const ctx = entries.map(e => {
     const raw = e.mpn;
     const key = normalizeMPN(raw);
-    const inv = aggregated[raw] || aggregated[key] || { Total_Qty: 0, W111_Qty: 0, W115_Qty: 0 };
+    const inv = aggregated[raw] || aggregated[key] || { Total_Qty: 0, W111_Qty: 0, W115_Qty: 0, W118_Qty: 0 };
     const excel = excelData[raw] || excelData[key] || {};
     const pov = recentPOVs[key] || null;
     const hist = historicalData[key] || {};
@@ -2576,7 +2863,7 @@ function writeEscalationsContext(outputPath, aggregated, excelData, recentPOVs, 
       mpn: raw,
       onReorderList,
       stockArrived,
-      stock: { total: inv.Total_Qty, w111: inv.W111_Qty || 0, w115: inv.W115_Qty || 0 },
+      stock: { total: inv.Total_Qty, w111: inv.W111_Qty || 0, w115: inv.W115_Qty || 0, w118: inv.W118_Qty || 0 },
       threshold: excel.MIN_QTY ?? null,
       lamMoq: excel.MOQ ?? null,
       resalePrice: excel.Resale_Price ?? null,
