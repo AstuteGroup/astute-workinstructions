@@ -31,8 +31,9 @@ const path = require('path');
 const { execSync } = require('child_process');
 
 const REPO = path.resolve(__dirname, '..');
-const { searchAllDistributors } = require(path.join(REPO, 'shared/franchise-api'));
-const { writePricingResult, extractPriceAtQty } = require(path.join(REPO, 'shared/api-result-writer'));
+// Use unified API enrichment module for franchise API calls
+const { profileMpn } = require(path.join(REPO, 'shared/api-enrichment'));
+const { extractPriceAtQty } = require(path.join(REPO, 'shared/api-result-writer'));
 const { getBulkMarketData } = require(path.join(REPO, 'shared/market-data'));
 const { classifyMpnNonFranchise } = require(path.join(REPO, 'shared/mpn-classifier'));
 
@@ -143,27 +144,29 @@ async function enrichMpnsParallel(uniqueMpns, qtyByMpn, options) {
     const batchResults = await Promise.all(batch.map(async (mpn) => {
       const qty = qtyByMpn.get(mpn) || 1;
 
-      // Cache-first: try extractPriceAtQty before calling live APIs.
-      // Cache freshness window is configurable (default 14 days). This makes
-      // back-to-back runs against the same offer return identical results,
-      // and avoids hammering franchise APIs unnecessarily.
       try {
-        const cached = extractPriceAtQty(mpn, qty, { maxAgeDays: cacheMaxAgeDays });
-        if (cached && cached.length > 0) {
-          return { mpn, summary: summaryFromCache(mpn, qty, cached), source: 'cache' };
-        }
-      } catch (_) { /* fall through to live API */ }
-
-      try {
-        const result = await searchAllDistributors(mpn, qty);
-        // Fire-and-forget cache write so the next run benefits
-        writePricingResult({
-          searchResult: result,
-          mpn,
-          qty,
+        // Use unified profileMpn() which handles:
+        // - Cache checking (via cacheTTL)
+        // - API calls to all distributors
+        // - Writing to pricing cache automatically
+        const enrichment = await profileMpn(mpn, qty, {
           source: 'shared-offer-analyzer',
-        }).catch(() => { /* cache writes are non-blocking */ });
-        return { mpn, summary: result.summary, source: 'api' };
+          writePricing: true,
+          cacheTTL: cacheMaxAgeDays,
+        });
+
+        // Extract summary from raw result
+        const summary = enrichment.raw?.summary || {
+          mpn, qty, totalStock: 0,
+          distributorsCarrying: 0, distributorsWithStock: 0,
+          lowestPrice: null, coverage: 'NONE', coveragePct: 0,
+        };
+
+        return {
+          mpn,
+          summary,
+          source: enrichment.fromCache ? 'cache' : 'api',
+        };
       } catch (err) {
         return {
           mpn,

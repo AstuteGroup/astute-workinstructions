@@ -16,9 +16,12 @@ const fs = require('fs');
 const path = require('path');
 const XLSX = require('xlsx');
 
-// Use shared franchise API module (single source of truth for all distributor APIs)
-const { searchAllDistributors } = require('../../shared/franchise-api');
-const { writePricingResult } = require('../../shared/api-result-writer');
+// Use unified API enrichment module (single source of truth for all enrichment)
+const {
+  profileMpn,
+  findBestInStock,
+  findBestLeadTime,
+} = require('../../shared/api-enrichment');
 const { isRestrictedMfr } = require('../../shared/restricted-mfrs');
 
 // Use shared CSV utility
@@ -208,12 +211,16 @@ async function flushOutput() {
   const noCoverage = results.filter(r => r.sourcingStatus === 'NO COVERAGE').length;
   const notSourced = results.filter(r => r.sourcingStatus === 'SKIPPED - TIMEOUT/ERROR').length;
   const onOrder = results.filter(r => r.sourcingStatus.startsWith('SKIPPED - PENDING')).length;
+  const restricted = results.filter(r => r.sourcingStatus.startsWith('RESTRICTED')).length;
   const usedAlternate = results.filter(r => r.selectedMpn).length;
   const multiMpnCpcs = results.filter(r => r.avlCount > 1).length;
 
   console.log(`  In Stock: ${inStock}`);
   console.log(`  Lead Time Only: ${leadTimeOnly}`);
   console.log(`  NO COVERAGE (APIs returned no match): ${noCoverage}`);
+  if (restricted > 0) {
+    console.log(`  RESTRICTED (franchise hidden, OT VQ preserved): ${restricted}`);
+  }
   if (onOrder > 0) {
     console.log(`  Skipped (on order): ${onOrder}`);
   }
@@ -330,6 +337,8 @@ async function main() {
   const shortfallIdx = headers.indexOf('Shortfall');
   const mfrIdx = headers.indexOf('Manufacturer');
   const priorityIdx = headers.indexOf('Priority');
+  const w118Idx = headers.indexOf('W118 Consignment');
+  const resaleIdx = headers.indexOf('Resale Price');
 
   if (mpnIdx === -1) {
     console.error('ERROR: MPN column not found');
@@ -342,15 +351,39 @@ async function main() {
   }
 
   // Skip PENDING RECEIPT and PENDING ORDER PLACEMENT items — already on order, no need to source
+  // EXCEPTION: Escalated items are always enriched (pending order may have issues)
   const SKIP_PRIORITIES = ['PENDING RECEIPT', 'PENDING ORDER PLACEMENT'];
+
+  // Load escalations to check which MPNs should be enriched despite PENDING status
+  const escalationsPath = path.join(__dirname, 'lam-escalations.json');
+  let escalatedMPNs = new Set();
+  if (fs.existsSync(escalationsPath)) {
+    try {
+      const escState = JSON.parse(fs.readFileSync(escalationsPath, 'utf-8'));
+      for (const entry of (escState.entries || [])) {
+        if (entry.mpn) escalatedMPNs.add(entry.mpn);
+      }
+      if (escalatedMPNs.size > 0) {
+        console.log(`  Escalations loaded: ${escalatedMPNs.size} MPNs (will enrich even if PENDING)`);
+      }
+    } catch (e) {
+      console.log(`  WARNING: Could not load escalations: ${e.message}`);
+    }
+  }
+
+  // Count items to skip (PENDING and not escalated)
   const toSkip = priorityIdx >= 0
-    ? csv.rows.filter(r => SKIP_PRIORITIES.includes(r[priorityIdx])).length
+    ? csv.rows.filter(r => {
+        const pri = r[priorityIdx];
+        const mpn = r[mpnIdx];
+        return SKIP_PRIORITIES.includes(pri) && !escalatedMPNs.has(mpn);
+      }).length
     : 0;
   const toSource = csv.rows.length - toSkip;
 
   console.log(`  ${csv.rows.length} total items`);
   if (toSkip > 0) {
-    console.log(`  ${toSkip} items skipped (PENDING RECEIPT/ORDER PLACEMENT — already on order)`);
+    console.log(`  ${toSkip} items skipped (PENDING + not escalated — already on order)`);
   }
   console.log(`  ${toSource} items to source`);
   console.log(`  Querying at MAX(MOQ, Shortfall) for accurate pricing`);
@@ -386,6 +419,7 @@ async function main() {
     selectedMpn: '',      // MPN that was selected (if different from roster)
     avlCount: 1,          // Number of approved MPNs for this CPC
     mpnsQueried: 0,       // Number of MPNs actually queried
+    w118MarginCompression: '', // Flag for W118 consignment parts with <18% margin
   }));
 
   // Register shared state so signal handlers can flush
@@ -403,7 +437,8 @@ async function main() {
     const priority = priorityIdx >= 0 ? row[priorityIdx] : '';
 
     // Skip items already on order — no need to source
-    if (SKIP_PRIORITIES.includes(priority)) {
+    // EXCEPTION: Escalated items are always enriched (pending order may have issues)
+    if (SKIP_PRIORITIES.includes(priority) && !escalatedMPNs.has(rosterMpn)) {
       results[i].sourcingStatus = `SKIPPED - ${priority}`;
       console.log(`[${i + 1}/${csv.rows.length}] ${rosterMpn} — skipped (${priority})`);
       continue;
@@ -500,6 +535,8 @@ async function main() {
       const foundAny = !!(bestInStock || bestLeadTime);
 
       // If ALL MPNs are restricted, mark as restricted
+      // NOTE: VQ data from OT (Recent VQ columns) is preserved in originalRow —
+      // only franchise API columns are cleared. Restricted MFRs still show system VQ data.
       if (anyRestricted && !foundAny && approvedMpns.length === 1) {
         results[i].sourcingStatus = `RESTRICTED - ${restrictedCanonical}`;
         results[i].franchise = {
@@ -522,6 +559,20 @@ async function main() {
         if (selectedMpn && selectedMpn !== rosterMpn) {
           results[i].selectedMpn = selectedMpn;
         }
+
+        // Check for W118 margin compression: W118 consignment stock + <18% margin
+        const w118Qty = w118Idx >= 0 ? (parseInt(row[w118Idx]) || 0) : 0;
+        if (w118Qty > 0 && foundAny) {
+          const resalePrice = resaleIdx >= 0 ? (parseFloat(row[resaleIdx]) || 0) : 0;
+          const bestPrice = bestInStock?.price || bestLeadTime?.price || 0;
+          if (resalePrice > 0 && bestPrice > 0) {
+            const margin = (resalePrice - bestPrice) / resalePrice * 100;
+            if (margin < 18) {
+              results[i].w118MarginCompression = 'YES';
+              console.log(`    ⚠ W118 MARGIN COMPRESSION: ${margin.toFixed(1)}% margin (need LAM price approval)`);
+            }
+          }
+        }
       }
 
       // Save raw franchise results for all queried MPNs
@@ -531,7 +582,7 @@ async function main() {
       if (approvedMpns.length === 1) {
         // Single MPN - show standard output
         if (results[i].sourcingStatus.startsWith('RESTRICTED')) {
-          console.log(`    ⊘ RESTRICTED (${restrictedCanonical}) — franchise pricing hidden`);
+          console.log(`    ⊘ RESTRICTED (${restrictedCanonical}) — franchise pricing hidden, OT VQ data preserved`);
         } else if (bestInStock) {
           console.log(`    ✓ In Stock: ${bestInStock.supplier} - $${bestInStock.price} x ${bestInStock.qty}`);
         } else if (bestLeadTime) {
@@ -576,95 +627,31 @@ async function main() {
 }
 
 // -----------------------------------------------------------------------------
-// Franchise API Queries
+// Franchise API Queries (via unified api-enrichment module)
 // -----------------------------------------------------------------------------
 
 async function queryFranchiseAPIs(mpn, qty) {
-  const aggregated = await searchAllDistributors(mpn, qty);
+  // Use unified profileMpn() which handles:
+  // - searchAllDistributors() call
+  // - writePricingResult() for cache
+  // - Consistent error handling
+  const result = await profileMpn(mpn, qty, {
+    source: 'lam-kitting',
+    writePricing: true,
+  });
 
-  // Capture full API pricing data (all price breaks) for market intelligence
-  writePricingResult({ searchResult: aggregated, mpn, qty, source: 'lam-kitting' })
-    .catch(err => console.error(`  API result capture failed: ${err.message}`));
+  // Build trimmed format for findBestInStock/findBestLeadTime
+  // (these functions from api-enrichment accept this shape)
+  const trimmed = result.allDistributors || {};
 
-  const trimmed = {};
-
-  for (const r of aggregated.distributors) {
-    if (r.found && (r.franchiseQty > 0 || r.franchiseRfqPrice || r.franchiseBulkPrice)) {
-      trimmed[r.name] = {
-        qty: r.franchiseQty || 0,
-        price: r.franchiseRfqPrice || r.franchiseBulkPrice || null,
-        leadTime: r.vqLeadTime || '',
-        supplier: r.bpName || r.name,
-      };
-    }
-  }
-
-  return { trimmed, raw: aggregated };
+  return { trimmed, raw: result.raw };
 }
 
 // -----------------------------------------------------------------------------
-// Find Best Options
+// Find Best Options — imported from shared/api-enrichment.js
+// The findBestInStock() and findBestLeadTime() functions are now consolidated
+// in the unified module so all consumers use the same logic.
 // -----------------------------------------------------------------------------
-
-/**
- * Find best in-stock option (has enough qty to cover needed quantity)
- * Returns supplier with lowest price among those with sufficient stock
- */
-function findBestInStock(franchiseResults, neededQty) {
-  let best = null;
-  let bestPartial = null;
-
-  for (const [name, data] of Object.entries(franchiseResults)) {
-    if (!data || data.qty <= 0) continue;
-
-    if (data.qty >= neededQty) {
-      // Full coverage — pick lowest price
-      if (!best || (data.price && data.price < best.price)) {
-        best = { ...data, supplier: name };
-      }
-    } else {
-      // Partial stock — track as fallback
-      if (!bestPartial || (data.price && data.price < bestPartial.price)) {
-        bestPartial = { ...data, supplier: name };
-      }
-    }
-  }
-
-  // Return full coverage winner; if none, return partial with note
-  if (best) return best;
-  if (bestPartial) {
-    bestPartial.partialStock = true;
-    return bestPartial;
-  }
-  return null;
-}
-
-/**
- * Find best lead time option (for items without immediate stock)
- * Returns supplier with pricing but no/insufficient stock (lowest price)
- */
-function findBestLeadTime(franchiseResults) {
-  let best = null;
-
-  for (const [name, data] of Object.entries(franchiseResults)) {
-    if (!data || !data.price) continue;
-
-    // Only consider items without stock (lead time orders)
-    if (data.qty > 0) continue;
-
-    if (!best) {
-      best = { ...data, supplier: name };
-      continue;
-    }
-
-    // Pick lowest price
-    if (data.price < best.price) {
-      best = { ...data, supplier: name };
-    }
-  }
-
-  return best;
-}
 
 // -----------------------------------------------------------------------------
 // Write Output
@@ -687,8 +674,9 @@ async function writeEnrichedOutput(results, originalHeaders, outputPath) {
     'Lead Time (Weeks)',
     'Lead Time Margin %',
     'Sourcing Status',
-    'Selected MPN',    // MPN used (if different from roster - alternate was better)
-    'AVL Count',       // Number of approved MPNs for this CPC
+    'Selected MPN',            // MPN used (if different from roster - alternate was better)
+    'AVL Count',               // Number of approved MPNs for this CPC
+    'W118 Margin Compression', // Flag when W118 consignment stock has <18% margin
   ];
 
   // Check if API columns already exist (from previous sourcing run)
@@ -754,6 +742,7 @@ async function writeEnrichedOutput(results, originalHeaders, outputPath) {
       'Sourcing Status': result.sourcingStatus || 'SOURCED',
       'Selected MPN': result.selectedMpn || '',
       'AVL Count': result.avlCount || 1,
+      'W118 Margin Compression': result.w118MarginCompression || '',
     };
 
     // Build row: start with original values, then set API columns at correct indices
@@ -850,6 +839,17 @@ async function writeEnrichedOutput(results, originalHeaders, outputPath) {
       if (selectedMpnVal) {
         const cell = excelRow.getCell(selectedMpnCol);
         cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF87CEEB' } };  // Light blue
+        cell.font = { bold: true };
+      }
+    }
+
+    // W118 Margin Compression cell — red highlight when YES (needs LAM price approval)
+    const marginCompCol = allHeaders.indexOf('W118 Margin Compression') + 1;
+    if (marginCompCol > 0) {
+      const marginCompVal = row[marginCompCol - 1];
+      if (marginCompVal === 'YES') {
+        const cell = excelRow.getCell(marginCompCol);
+        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFF9999' } };  // Light red
         cell.font = { bold: true };
       }
     }

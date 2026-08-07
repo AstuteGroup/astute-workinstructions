@@ -44,8 +44,8 @@ const fs = require('fs');
 const { spawnSync } = require('child_process');
 
 const SHARED = path.resolve(__dirname, '../../shared');
-const { searchAllDistributors } = require(path.join(SHARED, 'franchise-api'));
-const { writePricingResult } = require(path.join(SHARED, 'api-result-writer'));
+// Use unified api-enrichment for franchise API calls (handles cache + result writing)
+const { profileMpn } = require(path.join(SHARED, 'api-enrichment'));
 const { patchBatch } = require(path.join(SHARED, 'record-updater'));
 const { ECCN_REGEX } = require(path.join(SHARED, 'validators'));
 const logger = require(path.join(SHARED, 'logger')).createLogger('HTS-ECCN');
@@ -339,18 +339,12 @@ async function main() {
     const errors = [];
 
     try {
-      const search = await searchAllDistributors(group.mpn, 1, {
+      // Use unified api-enrichment — handles cache + result writing automatically
+      // Only query DigiKey + Mouser for HTS/ECCN (others don't return classification data)
+      const search = await profileMpn(group.mpn, 1, {
         exclude: ['arrow', 'rutronik', 'future', 'newark', 'tti', 'master', 'waldom', 'sager'],
+        source: SOURCE_TAG,  // Tags the pricing result for audit
       });
-
-      // Fire-and-forget capture so the cache stays warm and OT gets a thin-pointer
-      // row showing this MPN was queried as part of the backfill workflow.
-      writePricingResult({
-        searchResult: search,
-        mpn: group.mpn,
-        qty: 1,
-        source: SOURCE_TAG,
-      }).catch(err => { /* swallow — capture is best-effort */ });
 
       for (const d of search.distributors) {
         if (d.distributor === 'digikey') {

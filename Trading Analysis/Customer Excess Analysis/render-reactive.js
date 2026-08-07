@@ -28,11 +28,12 @@
 require('dotenv').config({ path: '/home/analytics_user/workspace/.env' });
 
 const { Pool } = require('pg');
-const { searchAllDistributors } = require('../../shared/franchise-api');
+// Use unified API enrichment module for franchise API calls
+const { profileMpn, getTTLForRfqType } = require('../../shared/api-enrichment');
 const { getBulkMarketData, cleanMpn } = require('../../shared/market-data');
 const { classifyMpnNonFranchise } = require('../../shared/mpn-classifier');
 
-const FRANCHISE_CACHE_TTL_DAYS = 14;
+const FRANCHISE_CACHE_TTL_DAYS = getTTLForRfqType('Customer Excess'); // 14 days
 
 // ─── DATA LOAD ───────────────────────────────────────────────────────────────
 
@@ -76,8 +77,10 @@ async function enrichSupply(offer) {
   let fresh = 0, cached = 0, errors = 0;
   for (const line of offer.lines) {
     try {
-      const result = await searchAllDistributors(line.mpn, line.qty || 1, {
-        cacheTTL: FRANCHISE_CACHE_TTL_DAYS,
+      // Use unified api-enrichment module — handles cache + API + result writing
+      const result = await profileMpn(line.mpn, line.qty || 1, {
+        cacheTTLDays: FRANCHISE_CACHE_TTL_DAYS,
+        skipDbWrite: true, // Customer Excess doesn't write pricing results per-line
       });
       const s = result.summary || {};
       if (s.fromCache) cached++; else fresh++;

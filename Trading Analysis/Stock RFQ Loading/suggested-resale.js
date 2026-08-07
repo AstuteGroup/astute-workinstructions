@@ -18,8 +18,9 @@ const path = require('path');
 const { execSync } = require('child_process');
 
 // --- Config ---
-const { searchAllDistributors, writeVQCapture } = require('../../shared/franchise-api');
-const { writePricingResult } = require('../../shared/api-result-writer');
+// Use unified API enrichment module for franchise API calls
+const { profileMpn } = require('../../shared/api-enrichment');
+const { writeVQCapture } = require('../../shared/franchise-api');
 const FINDCHIPS_SCRIPT = path.resolve(__dirname, '../RFQ Sourcing/franchise_check/main.js');
 
 // Franchise pricing rule: our price ≈ 20% of franchise best price
@@ -531,29 +532,35 @@ async function main() {
 
     console.log(`[${mpn}] Collecting data...`);
 
-    // 1. Franchise APIs (ALL 7 distributors via shared/franchise-api.js)
-    console.log(`  → Franchise APIs (7 distributors)...`);
-    const franchise = await searchAllDistributors(mpn, line.qty, {
-      onResult: (r) => {
+    // 1. Franchise APIs (ALL distributors via unified api-enrichment module)
+    console.log(`  → Franchise APIs...`);
+    const enrichment = await profileMpn(mpn, line.qty, {
+      source: 'suggested-resale',
+      writePricing: true, // Automatically writes to pricing cache
+    });
+    const franchise = enrichment.raw; // Raw searchAllDistributors result
+
+    // Log results per distributor
+    if (franchise && franchise.distributors) {
+      for (const r of franchise.distributors) {
         if (r.found) {
           console.log(`    ✓ ${r.name}: ${r.franchiseQty} pcs @ $${r.franchiseBulkPrice?.toFixed(4)}/ea`);
         } else if (r.error) {
           console.log(`    ✗ ${r.name}: ${r.error}`);
-        } else {
-          console.log(`    - ${r.name}: not available`);
         }
       }
-    });
-    console.log(`    TOTAL: ${franchise.summary.totalStock} pcs from ${franchise.summary.distributorsWithStock} distributors`);
-
-    // Capture full API pricing data (all price breaks) for market intelligence
-    writePricingResult({ searchResult: franchise, mpn, qty: line.qty, source: 'suggested-resale' })
-      .catch(err => console.error(`    API result capture failed: ${err.message}`));
+    }
+    const summary = franchise?.summary || {};
+    console.log(`    TOTAL: ${summary.totalStock || 0} pcs from ${summary.distributorsWithStock || 0} distributors`);
+    if (enrichment.fromCache) {
+      console.log(`    (from cache)`);
+    }
 
     // Collect VQ lines from API results (confirmed pricing → log as VQ)
-    if (franchise.vqLines.length > 0) {
-      allVqLines.push(...franchise.vqLines);
-      console.log(`    VQ capture: ${franchise.vqLines.length} lines from API data`);
+    const vqLines = enrichment.vqLines || [];
+    if (vqLines.length > 0) {
+      allVqLines.push(...vqLines);
+      console.log(`    VQ capture: ${vqLines.length} lines from API data`);
     }
 
     // 2. VQ History

@@ -36,27 +36,13 @@ const { classifyCrossRef } = require('../../shared/crossref-classifier');
 const { addCandidate: addCrossRefCandidate } = require('../../shared/crossref-queue');
 
 // ─── TTL TABLE ───────────────────────────────────────────────────────────────
-// Source of truth: api-integration-roadmap.md § API Response Caching.
-// Mirror here so lookups are explicit and self-documenting.
-// Stock = 14d (2026-05-11): catches tightening within ~2 broker quotes while
-// avoiding the 7d quota burn on parts that haven't moved in deep distribution.
-// Hot parts refresh naturally via inbound activity, so the TTL is really only
-// the upper bound for quiet MPNs. Tighten later if a part-class shows volatility.
-const TTL_BY_RFQ_TYPE = {
-  'PPV': 30,
-  'Astute Franchised': 30,
-  'Shortage': 7,
-  'Stock': 14,
-  'EOL/LTB': 7,
-  '3PL/VMI': 7,
-  'Hot Parts': 7,
-  'Proactive Offer': 7,
-};
-const DEFAULT_TTL = 7;
-
-function ttlForRfqType(rfqType) {
-  return TTL_BY_RFQ_TYPE[rfqType] ?? DEFAULT_TTL;
-}
+// TTL rules are now consolidated in shared/api-enrichment.js (single source of truth).
+// Import from there so all consumers use the same values.
+const {
+  TTL_BY_RFQ_TYPE,
+  DEFAULT_TTL,
+  getTTLForRfqType: ttlForRfqType,
+} = require('../../shared/api-enrichment');
 
 // Broker-driven RFQ types where cache-hit enrichments must NOT fan VQs out
 // onto each new RFQ line. Pricing still lands in chuboe_pricing_api_result

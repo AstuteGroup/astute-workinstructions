@@ -26,7 +26,9 @@ const path = require('path');
 const XLSX = require('/home/analytics_user/workspace/node_modules/xlsx');
 
 const REPO = '/home/analytics_user/workspace/astute-workinstructions';
-const { searchAllDistributors, priceAtQty, extractStockAndLtRows } = require(`${REPO}/shared/franchise-api`);
+// Use unified api-enrichment for franchise API calls; keep helpers from franchise-api
+const { profileMpn } = require(`${REPO}/shared/api-enrichment`);
+const { priceAtQty, extractStockAndLtRows } = require(`${REPO}/shared/franchise-api`);
 const { createNotifier } = require(`${REPO}/shared/notifier`);
 const { execSync } = require('child_process');
 
@@ -174,7 +176,12 @@ function aggregateResult(result, ourQty) {
 
 async function runOne(line) {
   try {
-    const result = await searchAllDistributors(line.mpn, line.qty || 1, { mfr: line.mfr });
+    // Use unified api-enrichment module — handles cache + API
+    // skipDbWrite: true — this is one-off analysis, no need to persist pricing results
+    const result = await profileMpn(line.mpn, line.qty || 1, {
+      mfr: line.mfr,
+      skipDbWrite: true,
+    });
     const agg = aggregateResult(result, line.qty || 1);
     const bucket = bucketize(line.cost, agg.bestPrice, agg.totalStock);
     const spread = (agg.bestPrice && line.cost > 0) ? (agg.bestPrice / line.cost) : null;

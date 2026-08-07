@@ -36,8 +36,9 @@ const fs = require('fs');
 const { Client } = require('pg');
 const config = require('./config');
 const { searchPart: findChipsSearch } = require('./search');
-const { searchAllDistributors, getActiveDistributors, extractStockAndLtRows } = require('../../../shared/franchise-api');
-const { writePricingResult } = require('../../../shared/api-result-writer');
+const { getActiveDistributors, extractStockAndLtRows } = require('../../../shared/franchise-api');
+// Use unified API enrichment module for franchise API calls
+const { profileMpn } = require('../../../shared/api-enrichment');
 
 // =============================================================================
 // Database Functions
@@ -448,20 +449,19 @@ Options:
       }
 
       // 2. All franchise APIs in parallel (for VQ capture)
+      // Uses unified api-enrichment module which handles pricing cache automatically
       if (useApis) {
         try {
-          const apiResults = await searchAllDistributors(part.mpn, part.qty, {
-            parallel: true,
-            onResult: (r) => {
-              if (debug && r.error) {
-                console.log(`    [DEBUG] ${r.name} error: ${r.error}`);
-              }
-            },
+          const enrichment = await profileMpn(part.mpn, part.qty, {
+            source: 'franchise-screening',
+            writePricing: true, // Automatically writes to pricing cache
           });
+          const apiResults = enrichment.raw; // Raw searchAllDistributors result
 
-          // Capture full API pricing data (all price breaks) for market intelligence
-          writePricingResult({ searchResult: apiResults, mpn: part.mpn, qty: part.qty, source: 'franchise-screening' })
-            .catch(err => console.error(`  API result capture failed: ${err.message}`));
+          // Log cache status
+          if (debug && enrichment.fromCache) {
+            console.log(`    [DEBUG] Using cached API data`);
+          }
 
           // Log each distributor with stock
           for (const d of apiResults.distributors) {
