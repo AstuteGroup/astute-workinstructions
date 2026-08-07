@@ -99,6 +99,7 @@ const HOME = process.env.HOME || '/home/analytics_user';
 const PID_FILE = path.resolve(HOME, 'workspace/.rfq-loader-daemon.pid');
 const LOG_FILE = '/tmp/rfq-loader-daemon.log';
 const IDLE_POLL_MS = 10_000;       // 10s poll when queue empty
+const IDLE_EXIT_MS = 30 * 60_000;  // exit after 30m idle (cron restarts us)
 const WORKER_CONCURRENCY = 10;     // concurrent API workers per job
 const PREEMPT_CHECK_INTERVAL = 50; // check for preemption every N completions
 
@@ -462,6 +463,8 @@ async function main() {
   const pruned = queue.pruneCompleted(7);
   if (pruned > 0) log(`Pruned ${pruned} old completed job(s)`);
 
+  let idleSince = Date.now();  // track when we last had work
+
   while (!shutdownRequested) {
     const item = queue.dequeue();
 
@@ -470,9 +473,18 @@ async function main() {
         log('--once mode: no jobs, exiting.');
         break;
       }
+      // Check idle timeout — exit if no work for IDLE_EXIT_MS
+      const idleMs = Date.now() - idleSince;
+      if (idleMs >= IDLE_EXIT_MS) {
+        log(`Idle for ${Math.round(idleMs / 60000)}m, exiting. Cron will restart if needed.`);
+        break;
+      }
       await sleep(IDLE_POLL_MS);
       continue;
     }
+
+    // Reset idle timer when we have work
+    idleSince = Date.now();
 
     log(`Dispatching job ${item.id} (${item.lineCount} lines, priority=${item.priority}, checkpoint=${item.checkpoint})`);
     queue.updateItem(item.id, { status: 'loading', startedAt: item.startedAt || new Date().toISOString() });
