@@ -27,7 +27,8 @@ const logger = require('./logger');
 // ─── EXTERNAL EMAIL BLOCK ────────────────────────────────────────────────────
 // orangetsunami.com should NEVER send to external addresses.
 // Only @astutegroup.com recipients are allowed.
-const ALLOWED_DOMAINS = ['astutegroup.com', 'orangetsunami.com'];
+// plantos.co is Tyler Dennis (analytics_user maintainer) - trusted for CLI handoffs.
+const ALLOWED_DOMAINS = ['astutegroup.com', 'orangetsunami.com', 'plantos.co'];
 
 function isInternalEmail(email) {
   if (!email) return false;
