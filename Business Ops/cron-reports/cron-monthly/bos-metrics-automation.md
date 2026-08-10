@@ -16,7 +16,7 @@ Three key metrics for CSE queue management:
 2. **Answered** - How many times requests are set to "Answered" status (R_Status_ID = 1000003)
 3. **Closed** - How many times requests are set to "Closed" status (R_Status_ID IN 1000002, 1000025, 1000026, 1000030, 102)
 
-**Filtered to 7 CSE users:**
+**Filtered to 8 CSE users:**
 - Bhuvan
 - Vimal
 - Mohan
@@ -24,6 +24,7 @@ Three key metrics for CSE queue management:
 - Haritharan
 - Ricky Atajar
 - Rosalyn Cana
+- Gopalakrishnan
 
 ## Report Structure
 
