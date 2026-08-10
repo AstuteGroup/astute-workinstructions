@@ -732,12 +732,12 @@ module.exports = [
     name: 'inspection-queue-maintenance',
     owner: 'justin.oberhofer',
     cadence: 'daily',
-    cadenceCron: '0 8 * * *',  // 8 UTC = 3 AM CT
+    cadenceCron: '0 20 * * *',  // 20 UTC = 3 PM CT
     command: `node "${ASTUTE}/Business Ops/cron-inspection-queue-maintenance/inspection-queue-maintenance.js"`,
     cwd: ASTUTE,
     needsOT: true,  // writes allocation links via API
     logFile: '/tmp/inspection-queue-maintenance.log',
-    description: 'Daily 8 UTC (3am CT) — auto-fix inspection queue allocations with missing SO Line links, escalate ambiguous cases',
+    description: 'Daily 20 UTC (3pm CT) — auto-fix inspection queue allocations with missing SO Line links, escalate ambiguous cases',
   },
 ];
 
