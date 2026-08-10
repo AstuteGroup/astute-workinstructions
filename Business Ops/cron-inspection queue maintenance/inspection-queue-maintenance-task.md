@@ -122,6 +122,20 @@ The relationship between PO Lines and SO Lines is **many-to-many**:
 
 Check if unallocated quantities sum correctly in either direction. If the math balances, allocate the appropriate SO Line(s).
 
+**When to escalate (not self-service)**
+
+Escalate to a supervisor or operations lead when:
+- **No SO Line has sufficient remaining qty** — the best candidate doesn't cover the lot qty
+- **Partial allocations don't sum** — available SO Lines can't combine to match the lot qty
+- **Over-allocated SO Lines** — existing allocations exceed SO qty and need cleanup first
+- **Ambiguous candidates** — multiple options exist and you can't determine the correct one
+
+**Example escalation (Inspection 1,634,179):**
+- Lot needs: 455 qty (MPN HMAG78EXNRA)
+- Best candidate: SO505565 Line 10 has only 305 remaining
+- Other candidates don't fill the gap
+- **Result:** Escalate — qty mismatch requires intervention
+
 ### Alternative Path: Link from SO Line
 
 Use this path when the Lot Allocation pop-up shows no candidates or you need to search more broadly.
