@@ -733,7 +733,7 @@ module.exports = [
     owner: 'justin.oberhofer',
     cadence: 'daily',
     cadenceCron: '0 20 * * *',  // 20 UTC = 3 PM CT
-    command: `node "${ASTUTE}/Business Ops/cron-inspection-queue-maintenance/inspection-queue-maintenance.js"`,
+    command: `node "${ASTUTE}/Business Ops/tsk-inspection-queue-maintenance/inspection-queue-maintenance.js"`,
     cwd: ASTUTE,
     needsOT: true,  // writes allocation links via API
     logFile: '/tmp/inspection-queue-maintenance.log',
