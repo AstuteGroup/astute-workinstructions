@@ -4,6 +4,7 @@
 
 - [Summary](#summary)
 - [Problem Statement](#problem-statement)
+- [Skip List](#skip-list)
 - [Diagnosis Workflow](#diagnosis-workflow)
   - [Step 1: Access the Inspection Queue](#step-1-access-the-inspection-queue)
   - [Step 2: Identify Problem Records](#step-2-identify-problem-records)
@@ -34,6 +35,32 @@ This is important because the Weighted Priority determines inspection urgency. R
 | BLANK / NULL | ✗ Problem — no score calculated, incorrect sort order |
 
 **Root cause:** Almost always because the allocation between PO Line and SO Line is missing.
+
+## Skip List
+
+Some records in the inspection queue should be **skipped** — they don't need allocation fixes because they follow a different workflow or have already been processed.
+
+### Test House Returns
+
+Parts sent to external test houses for additional testing/certification return on a new PO. These lots have **already been through inspection** before being sent out. Skip them.
+
+| Vendor | Type | Notes |
+|--------|------|-------|
+| White Horse Laboratories Ltd | Test house | Parts already inspected before send-out |
+
+**How to identify:** Check the vendor on the VQ/PO. If it's a test house, skip the record.
+
+### Consignment Programs (Lam/Flock)
+
+Lam kitting and Flock consignment lots follow a separate workflow and don't require SO Line allocation in the standard queue.
+
+**How to identify:** Customer is Lam Research or vendor notes indicate Flock/consignment program.
+
+### Spec Buys / Stock Purchases
+
+Lots purchased for stock (no customer order behind them) will have no SO Line candidates. This is expected — nothing to fix.
+
+**How to identify:** Lot Allocation pop-up shows 0 candidates and no RFQ/CQ trail exists.
 
 ## Diagnosis Workflow
 
@@ -261,6 +288,7 @@ WHERE so.issotrx = 'Y'
 - [x] Alternative path documented (link from SO Line)
 - [x] Worked example added (PO810781)
 - [x] Database reference queries added
+- [x] Skip list added (test houses, consignment programs, spec buys)
 
 **Screenshots reference:**
 1. Advanced search filter criteria

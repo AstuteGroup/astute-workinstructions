@@ -3,27 +3,24 @@
 /**
  * Inspection Queue Maintenance
  *
- * Auto-fixes inspection queue records with missing SO Line allocations.
- * Auto-fixes straightforward cases (exact qty match, single candidate),
- * reports escalations for ambiguous cases.
+ * Auto-fixes inspection queue LOTS with missing SO Line allocations.
+ * Processes what the user sees in the MI QUEUE - lots with NULL weighted priority.
  *
  * Usage:
  *   node inspection-queue-maintenance.js [options]
  *
  * Options:
  *   --dry-run       Report only, no writes
- *   --limit N       Process max N records (default: no limit)
- *   --verbose       Print each allocation being processed
+ *   --limit N       Process max N lots (default: no limit)
+ *   --verbose       Print each lot being processed
  *   --output-dir    Directory for escalation report (default: ./output)
  *
  * What it does:
- *   1. Finds allocations (chuboe_alloc_order_lot) with NULL c_orderline_id
- *   2. For each allocation, finds candidate SO Lines via CQ chain
- *   3. Classifies: AUTO_FIX / ESCALATE_MULTIPLE / ESCALATE_QTY_MISMATCH / NO_CANDIDATES
+ *   1. Finds LOTS in MI QUEUE with NULL weighted priority
+ *   2. Skips Lam Research and Flock Safety (intentionally unallocated)
+ *   3. For each lot, finds candidate SO Lines by MPN match
  *   4. Auto-fixes single exact-qty matches
  *   5. Generates escalation report for ambiguous cases
- *
- * See: Business Ops/cron-inspection queue maintenance/inspection-queue-maintenance-task.md
  */
 
 const fs = require('fs');
@@ -45,6 +42,14 @@ const CLASSIFICATION = {
   ESCALATE_QTY_MISMATCH: 'ESCALATE_QTY_MISMATCH',
   NO_CANDIDATES: 'NO_CANDIDATES'
 };
+
+// Customers to skip (no escalation needed - they often have unallocated orders intentionally)
+// BP IDs: Lam Research = 1000730, Flock Safety = 1006460
+const SKIP_CUSTOMER_IDS = [1000730, 1006460];
+
+// Vendors to skip (test houses - parts already went through inspection before send-out)
+// BP IDs: White Horse Laboratories Ltd = 1002731
+const SKIP_VENDOR_IDS = [1002731];
 
 // ─── CLI ARGS ────────────────────────────────────────────────────────────────
 
@@ -120,51 +125,82 @@ function parseRow(row, columns) {
 // ─── CORE QUERIES ────────────────────────────────────────────────────────────
 
 /**
- * Find allocations with NULL c_orderline_id (missing SO Line link).
+ * Find LOTS in MI QUEUE with NULL weighted priority.
+ * This is what the user sees in the inspection queue.
+ *
+ * Uses warehouse_group to determine location (AUSTIN vs HONG KONG),
+ * not just the shelf name (both locations have "MI QUEUE" shelf).
  */
-function findMissingAllocations(limit) {
+function findProblemLots(limit) {
   const limitClause = limit ? `LIMIT ${limit}` : '';
   const sql = `
-    SELECT aol.chuboe_alloc_order_lot_id,
-           aol.chuboe_insp_lot_id,
-           aol.qty,
-           lv.chuboe_mpnlot_mpn AS mpn,
-           lv.chuboe_rfq_id,
-           lv.chuboe_vq_line_id,
-           rfq.value AS rfq_value
-    FROM adempiere.chuboe_alloc_order_lot aol
-    JOIN adempiere.chuboe_insp_mpnlot_v lv
-      ON lv.chuboe_insp_lot_id = aol.chuboe_insp_lot_id
-    LEFT JOIN adempiere.chuboe_rfq rfq
-      ON rfq.chuboe_rfq_id = lv.chuboe_rfq_id
-    WHERE aol.isactive = 'Y'
-      AND aol.c_orderline_id IS NULL
-    ORDER BY aol.chuboe_alloc_order_lot_id DESC
+    SELECT
+      q.m_attributesetinstance_id AS lot_id,
+      q.chuboe_mpnlot_mpn AS mpn,
+      q.chuboe_mpnlot_qty AS lot_qty,
+      q.chuboe_mpnlot_lot AS lot_number,
+      q.chuboe_rfq_id,
+      rfq.value AS rfq_value,
+      rfq.c_bpartner_id AS customer_id,
+      bp.name AS customer_name,
+      ws.name AS shelf_name,
+      wg.chuboe_warehouse_group_id AS warehouse_group_id,
+      wg.name AS warehouse_group_name,
+      vq.c_bpartner_id AS vendor_id,
+      vendor.name AS vendor_name
+    FROM adempiere.chuboe_insp_mpnlotqueue_v q
+    LEFT JOIN adempiere.chuboe_rfq rfq ON rfq.chuboe_rfq_id = q.chuboe_rfq_id
+    LEFT JOIN adempiere.c_bpartner bp ON bp.c_bpartner_id = rfq.c_bpartner_id
+    LEFT JOIN adempiere.chuboe_warehouse_shelf ws ON ws.chuboe_warehouse_shelf_id = q.chuboe_warehouse_shelf_id
+    LEFT JOIN adempiere.chuboe_warehouse_group wg ON wg.chuboe_warehouse_group_id = q.chuboe_warehouse_group_id
+    LEFT JOIN adempiere.chuboe_vq_line vq ON vq.chuboe_vq_line_id = q.chuboe_vq_line_id
+    LEFT JOIN adempiere.c_bpartner vendor ON vendor.c_bpartner_id = vq.c_bpartner_id
+    WHERE q.isactive = 'Y'
+      AND ws.name = 'MI QUEUE'
+      AND q.chuboe_po_pickeduser_id IS NULL
+      AND COALESCE(q.isvalidate, 'N') = 'N'
+      AND COALESCE(q.processed, 'N') = 'N'
+      AND q.chuboe_weightedpriority IS NULL
+    ORDER BY wg.name, q.m_attributesetinstance_id DESC
     ${limitClause}
   `;
 
   const rows = runQuery(sql);
   const columns = [
-    'chuboe_alloc_order_lot_id', 'chuboe_insp_lot_id', 'qty',
-    'mpn', 'chuboe_rfq_id', 'chuboe_vq_line_id', 'rfq_value'
+    'lot_id', 'mpn', 'lot_qty', 'lot_number', 'chuboe_rfq_id',
+    'rfq_value', 'customer_id', 'customer_name', 'shelf_name',
+    'warehouse_group_id', 'warehouse_group_name', 'vendor_id', 'vendor_name'
   ];
 
   return rows.map(row => parseRow(row, columns));
 }
 
 /**
- * Find candidate SO Lines for an allocation.
- *
- * Strategy: RFQ → CQ Lines (IsSold='Y') → c_orderline (via chuboe_cq_line_id)
- *
- * A CQ Line that is marked IsSold='Y' should be linked to a c_orderline record
- * via the chuboe_cq_line_id foreign key on the SO Line.
+ * Find allocations for a lot that need SO Line linking.
  */
-function findCandidateSOLines(rfqId, mpn) {
-  if (!rfqId || !mpn) return [];
+function findAllocationsForLot(lotId) {
+  const sql = `
+    SELECT chuboe_alloc_order_lot_id, qty
+    FROM adempiere.chuboe_alloc_order_lot
+    WHERE chuboe_insp_lot_id = ${lotId}
+      AND c_orderline_id IS NULL
+      AND isactive = 'Y'
+  `;
 
-  // Ensure mpn is a string
-  const mpnStr = String(mpn);
+  const rows = runQuery(sql);
+  return rows.map(row => {
+    const [allocId, qty] = row.split('|');
+    return { allocId: parseInt(allocId, 10), qty: parseInt(qty, 10) };
+  });
+}
+
+/**
+ * Find candidate SO Lines by MPN match.
+ */
+function findCandidateSOLines(mpn) {
+  if (!mpn) return [];
+
+  const mpnStr = String(mpn).trim();
   const escapedMpn = mpnStr.replace(/'/g, "''");
 
   const sql = `
@@ -172,31 +208,21 @@ function findCandidateSOLines(rfqId, mpn) {
            so.documentno AS so_documentno,
            sol.qtyentered,
            sol.line AS so_line_no,
-           bp.name AS customer_name,
-           cq.chuboe_cq_line_id,
-           cq.qty AS cq_qty
-    FROM adempiere.chuboe_cq_line cq
-    JOIN adempiere.c_orderline sol
-      ON sol.chuboe_cq_line_id = cq.chuboe_cq_line_id
+           bp.name AS customer_name
+    FROM adempiere.c_orderline sol
     JOIN adempiere.c_order so
       ON so.c_order_id = sol.c_order_id
+      AND so.issotrx = 'Y'
     JOIN adempiere.c_bpartner bp
       ON bp.c_bpartner_id = so.c_bpartner_id
-    WHERE cq.chuboe_rfq_id = ${rfqId}
-      AND UPPER(REPLACE(REPLACE(cq.chuboe_mpn, '-', ''), ' ', ''))
-        = UPPER(REPLACE(REPLACE('${escapedMpn}', '-', ''), ' ', ''))
-      AND cq.issold = 'Y'
-      AND cq.isactive = 'Y'
+    WHERE UPPER(TRIM(sol.chuboe_mpn)) = UPPER('${escapedMpn}')
       AND sol.isactive = 'Y'
       AND so.isactive = 'Y'
     ORDER BY sol.qtyentered DESC
   `;
 
   const rows = runQuery(sql);
-  const columns = [
-    'c_orderline_id', 'so_documentno', 'qtyentered', 'so_line_no',
-    'customer_name', 'chuboe_cq_line_id', 'cq_qty'
-  ];
+  const columns = ['c_orderline_id', 'so_documentno', 'qtyentered', 'so_line_no', 'customer_name'];
 
   return rows.map(row => parseRow(row, columns));
 }
@@ -219,18 +245,15 @@ function getAllocatedQty(soLineId) {
 // ─── CLASSIFICATION ──────────────────────────────────────────────────────────
 
 /**
- * Classify an allocation based on candidate SO Lines.
- *
- * Returns: { classification, candidates, recommendation, reason }
+ * Classify a lot based on candidate SO Lines.
  */
-function classifyAllocation(alloc, candidates) {
-  // No candidates = spec buy or no CQ sold
+function classifyLot(lot, candidates) {
   if (candidates.length === 0) {
     return {
       classification: CLASSIFICATION.NO_CANDIDATES,
       candidates: [],
       recommendation: null,
-      reason: 'No CQ Line marked IsSold=Y found for this RFQ/MPN'
+      reason: 'No Sales Order Line found matching this MPN'
     };
   }
 
@@ -242,10 +265,10 @@ function classifyAllocation(alloc, candidates) {
   });
 
   // Filter to candidates with sufficient qty
-  const sufficient = candidatesWithAvailable.filter(c => c.available >= alloc.qty);
+  const sufficient = candidatesWithAvailable.filter(c => c.available >= lot.lot_qty);
 
   // Exact match (qty equals exactly)
-  const exactMatch = sufficient.filter(c => c.available === alloc.qty);
+  const exactMatch = sufficient.filter(c => c.available === lot.lot_qty);
 
   // Single exact match = AUTO_FIX
   if (exactMatch.length === 1) {
@@ -257,13 +280,13 @@ function classifyAllocation(alloc, candidates) {
     };
   }
 
-  // Single candidate with sufficient qty (not exact) = AUTO_FIX
+  // Single candidate with sufficient qty = AUTO_FIX
   if (sufficient.length === 1) {
     return {
       classification: CLASSIFICATION.AUTO_FIX,
       candidates: sufficient,
       recommendation: sufficient[0],
-      reason: `Single candidate with sufficient qty: ${sufficient[0].so_documentno} Line ${sufficient[0].so_line_no} (available: ${sufficient[0].available}, need: ${alloc.qty})`
+      reason: `Single candidate with sufficient qty: ${sufficient[0].so_documentno} Line ${sufficient[0].so_line_no}`
     };
   }
 
@@ -288,126 +311,111 @@ function classifyAllocation(alloc, candidates) {
   }
 
   // No candidate has sufficient qty = ESCALATE
+  const best = candidatesWithAvailable[0];
   return {
     classification: CLASSIFICATION.ESCALATE_QTY_MISMATCH,
     candidates: candidatesWithAvailable,
-    recommendation: candidatesWithAvailable[0] || null,  // Best attempt
-    reason: `No candidate has sufficient qty. Best: ${
-      candidatesWithAvailable[0]
-        ? `${candidatesWithAvailable[0].so_documentno} Line ${candidatesWithAvailable[0].so_line_no} (available: ${candidatesWithAvailable[0].available}, need: ${alloc.qty})`
-        : 'none'
-    }`
+    recommendation: best,
+    reason: best
+      ? `No candidate has sufficient qty. Best: ${best.so_documentno} Line ${best.so_line_no} (available: ${best.available}, need: ${lot.lot_qty})`
+      : 'No candidates available'
   };
 }
 
 // ─── MAIN PROCESSING ─────────────────────────────────────────────────────────
 
-/**
- * Process all allocations.
- */
-async function processAllocations(opts) {
+async function processLots(opts) {
   const { dryRun, limit, verbose, outputDir } = opts;
 
   console.log('=== Inspection Queue Maintenance ===\n');
   console.log(`Mode: ${dryRun ? 'DRY-RUN (no writes)' : 'LIVE'}`);
-  if (limit) console.log(`Limit: ${limit} records`);
+  if (limit) console.log(`Limit: ${limit} lots`);
   console.log('');
 
-  // Find missing allocations
-  const allocations = findMissingAllocations(limit);
-  console.log(`Found ${allocations.length} allocations with missing SO Line\n`);
+  // Find problem lots
+  const lots = findProblemLots(limit);
+  console.log(`Found ${lots.length} lots with missing weighted priority\n`);
 
-  if (allocations.length === 0) {
+  if (lots.length === 0) {
     console.log('Nothing to process.');
     return { autoFixed: 0, escalations: 0, skipped: 0 };
   }
 
-  // Process each allocation
   const results = {
     autoFixed: [],
     escalations: [],
     skipped: []
   };
 
-  for (const alloc of allocations) {
-    const rfqDisplay = alloc.rfq_value || `ID:${alloc.chuboe_rfq_id}` || 'N/A';
-
+  for (const lot of lots) {
+    const location = lot.warehouse_group_name || 'Unknown';
     if (verbose) {
-      console.log(`Processing Alloc ${alloc.chuboe_alloc_order_lot_id}: MPN=${alloc.mpn}, RFQ=${rfqDisplay}, Qty=${alloc.qty}`);
+      console.log(`Processing Lot ${lot.lot_id} [${location}]: MPN=${lot.mpn}, Qty=${lot.lot_qty}, Customer=${lot.customer_name || 'N/A'}`);
     }
 
-    // Skip if no RFQ (spec buy)
-    if (!alloc.chuboe_rfq_id) {
-      if (verbose) console.log(`  → SKIP: No RFQ (spec buy)`);
-      results.skipped.push({
-        ...alloc,
-        reason: 'No RFQ (spec buy)',
-        classification: CLASSIFICATION.NO_CANDIDATES
-      });
+    // Skip customers that often have unallocated orders intentionally
+    if (lot.customer_id && SKIP_CUSTOMER_IDS.includes(lot.customer_id)) {
+      if (verbose) console.log(`  → SKIP: ${lot.customer_name} (intentionally unallocated)`);
+      results.skipped.push({ ...lot, reason: `${lot.customer_name} - intentionally unallocated` });
       continue;
     }
 
-    // Skip if no MPN (data issue)
-    if (!alloc.mpn) {
+    // Skip test house vendors (parts already went through inspection before send-out)
+    if (lot.vendor_id && SKIP_VENDOR_IDS.includes(lot.vendor_id)) {
+      if (verbose) console.log(`  → SKIP: ${lot.vendor_name} (test house return)`);
+      results.skipped.push({ ...lot, reason: `${lot.vendor_name} - test house return` });
+      continue;
+    }
+
+    // Skip if no MPN
+    if (!lot.mpn) {
       if (verbose) console.log(`  → SKIP: No MPN on lot`);
-      results.skipped.push({
-        ...alloc,
-        reason: 'No MPN on lot',
-        classification: CLASSIFICATION.NO_CANDIDATES
-      });
+      results.skipped.push({ ...lot, reason: 'No MPN on lot' });
       continue;
     }
 
-    // Find candidates
-    const candidates = findCandidateSOLines(alloc.chuboe_rfq_id, alloc.mpn);
-
-    // Classify
-    const { classification, candidates: classifiedCandidates, recommendation, reason } = classifyAllocation(alloc, candidates);
+    // Find candidate SO Lines
+    const candidates = findCandidateSOLines(lot.mpn);
+    const { classification, recommendation, reason } = classifyLot(lot, candidates);
 
     if (classification === CLASSIFICATION.AUTO_FIX && recommendation) {
-      // Auto-fix
+      // Get allocations for this lot
+      const allocations = findAllocationsForLot(lot.lot_id);
+
+      if (allocations.length === 0) {
+        if (verbose) console.log(`  → SKIP: No unlinked allocations for this lot`);
+        results.skipped.push({ ...lot, reason: 'No unlinked allocations' });
+        continue;
+      }
+
+      // Link all allocations to the recommended SO Line
       if (dryRun) {
-        console.log(`AUTO-FIX (dry-run): Alloc ${alloc.chuboe_alloc_order_lot_id} → SO Line ${recommendation.c_orderline_id} (qty: ${alloc.qty})`);
+        console.log(`AUTO-FIX (dry-run): Lot ${lot.lot_id} (${lot.mpn}) → ${recommendation.so_documentno} Line ${recommendation.so_line_no} (${allocations.length} allocation(s))`);
       } else {
         try {
-          await linkAllocSOLine(alloc.chuboe_alloc_order_lot_id, recommendation.c_orderline_id, {
-            skipQtyCheck: false,
-            dryRun: false
-          });
-          console.log(`AUTO-FIX: Alloc ${alloc.chuboe_alloc_order_lot_id} → SO Line ${recommendation.c_orderline_id} (qty: ${alloc.qty})`);
+          for (const alloc of allocations) {
+            await linkAllocSOLine(alloc.allocId, recommendation.c_orderline_id, {
+              skipQtyCheck: false,
+              dryRun: false
+            });
+          }
+          console.log(`AUTO-FIX: Lot ${lot.lot_id} (${lot.mpn}) → ${recommendation.so_documentno} Line ${recommendation.so_line_no} (${allocations.length} allocation(s))`);
         } catch (err) {
-          console.error(`ERROR: Alloc ${alloc.chuboe_alloc_order_lot_id} → ${err.message}`);
-          results.escalations.push({
-            ...alloc,
-            classification: 'ERROR',
-            reason: err.message,
-            candidates: classifiedCandidates
-          });
+          console.error(`ERROR: Lot ${lot.lot_id} → ${err.message}`);
+          results.escalations.push({ ...lot, classification: 'ERROR', reason: err.message });
           continue;
         }
       }
-      results.autoFixed.push({
-        ...alloc,
-        classification,
-        recommendation,
-        reason
-      });
+      results.autoFixed.push({ ...lot, recommendation, reason });
+
     } else if (classification === CLASSIFICATION.NO_CANDIDATES) {
       if (verbose) console.log(`  → SKIP: ${reason}`);
-      results.skipped.push({
-        ...alloc,
-        classification,
-        reason
-      });
+      results.skipped.push({ ...lot, reason });
+
     } else {
       // Escalate
-      console.log(`ESCALATE: Alloc ${alloc.chuboe_alloc_order_lot_id} → ${reason}`);
-      results.escalations.push({
-        ...alloc,
-        classification,
-        reason,
-        candidates: classifiedCandidates
-      });
+      console.log(`ESCALATE: Lot ${lot.lot_id} (${lot.mpn}) → ${reason}`);
+      results.escalations.push({ ...lot, classification, reason, candidates });
     }
   }
 
@@ -415,7 +423,7 @@ async function processAllocations(opts) {
   console.log('\n--- Summary ---');
   console.log(`Auto-fixed: ${results.autoFixed.length}`);
   console.log(`Escalations: ${results.escalations.length}`);
-  console.log(`Skipped (spec buys): ${results.skipped.length}`);
+  console.log(`Skipped: ${results.skipped.length}`);
 
   // Write escalation report if any
   if (results.escalations.length > 0) {
@@ -441,11 +449,7 @@ async function processAllocations(opts) {
 
 // ─── ESCALATION REPORT ───────────────────────────────────────────────────────
 
-/**
- * Write escalation CSV report.
- */
 function writeEscalationReport(escalations, outputDir, dryRun) {
-  // Ensure output dir exists
   if (!fs.existsSync(outputDir)) {
     fs.mkdirSync(outputDir, { recursive: true });
   }
@@ -454,23 +458,15 @@ function writeEscalationReport(escalations, outputDir, dryRun) {
   const filename = `escalations-${timestamp}${dryRun ? '-dryrun' : ''}.csv`;
   const filepath = path.join(outputDir, filename);
 
-  // CSV header
-  const header = 'AllocID,LotID,MPN,LotQty,RFQ,Type,CandidateCount,Recommendation';
+  const header = 'LotID,MPN,LotQty,Customer,Classification,Reason';
   const rows = escalations.map(e => {
-    const candidateCount = e.candidates ? e.candidates.length : 0;
-    const rec = e.candidates && e.candidates[0]
-      ? `${e.candidates[0].so_documentno} Line ${e.candidates[0].so_line_no} (avail: ${e.candidates[0].available})`
-      : 'N/A';
-
     return [
-      e.chuboe_alloc_order_lot_id,
-      e.chuboe_insp_lot_id,
+      e.lot_id,
       `"${(e.mpn || '').replace(/"/g, '""')}"`,
-      e.qty,
-      e.rfq_value || e.chuboe_rfq_id || 'N/A',
+      e.lot_qty,
+      `"${(e.customer_name || '').replace(/"/g, '""')}"`,
       e.classification,
-      candidateCount,
-      `"${rec.replace(/"/g, '""')}"`
+      `"${(e.reason || '').replace(/"/g, '""')}"`
     ].join(',');
   });
 
@@ -486,7 +482,7 @@ async function main() {
   const opts = parseArgs();
 
   try {
-    await processAllocations(opts);
+    await processLots(opts);
   } catch (err) {
     console.error('Fatal error:', err.message);
     process.exit(1);
