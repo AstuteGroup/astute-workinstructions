@@ -9,6 +9,10 @@
   - [Step 2: Identify Problem Records](#step-2-identify-problem-records)
   - [Step 3: Diagnose Missing Allocation](#step-3-diagnose-missing-allocation)
 - [Fix Workflow](#fix-workflow)
+  - [Step 1: Navigate to Lot Allocation](#step-1-navigate-to-lot-allocation)
+  - [Step 2: Link the SO Line](#step-2-link-the-so-line)
+  - [Step 3: Save and Verify](#step-3-save-and-verify)
+  - [Edge Cases](#edge-cases)
 - [Status](#status)
 
 ## Summary
@@ -67,22 +71,63 @@ This is important because the Weighted Priority determines inspection urgency. R
 
 ## Fix Workflow
 
-> **📝 Note** - This section is incomplete. Next session: document how to allocate an SO Line to an inspection queue record.
+The purpose of this workflow is to link missing SO Line allocations to PO Lines so that Weighted Priority can be calculated.
 
-TODO:
-- [ ] Document the steps to link/allocate an SO Line
-- [ ] Document edge cases (missing PO Line, both missing)
-- [ ] Document when escalation is needed vs. self-service fix
+### Step 1: Navigate to Lot Allocation
+
+1. From the problem Inspection Queue record, zoom to the linked **PO Line**
+2. In the Purchase Order window, go to the **PO Line** tab
+3. In the bottom panel, select the **Lot Allocation** subtab
+4. Confirm the **Sales Order Line** field is blank — this is the missing link
+
+### Step 2: Link the SO Line
+
+1. Click the blank **Sales Order Line** field
+2. A pop-up displays available SO Line candidates
+3. Select the correct SO Line using these criteria:
+   - **Exact quantity match** — preferred; select the SO Line with matching quantity
+   - **Multiple candidates with same quantity** — use elimination logic (see Edge Cases)
+   - **No exact match** — check if partial allocations sum correctly (see Edge Cases)
+
+### Step 3: Save and Verify
+
+1. **Save** the Lot Allocation record manually
+2. Weighted Priority calculates immediately upon save
+3. Return to Inspection Queue and refresh — the record should now show a Weighted Priority value
+
+### Edge Cases
+
+**No candidates (0 options in pop-up)**
+
+No SO Line exists to allocate. This may be a spec buy or stock purchase with no customer order behind it. Skip this record — nothing to fix.
+
+**Multiple candidates with same quantity**
+
+Use process of elimination:
+1. Check which candidates are already allocated to other Lot records — the **unlinked** candidate is likely correct
+2. Use date proximity as a secondary indicator (closer dates = more likely match)
+3. If still ambiguous, escalate — do not guess
+
+**No exact quantity match (partial allocation)**
+
+The relationship between PO Lines and SO Lines is **many-to-many**:
+
+| Scenario | Example |
+|----------|---------|
+| 1 PO Line → Multiple SO Lines | PO 300 pcs fulfills SO lines of 50 + 100 + 150 |
+| Multiple PO Lines → 1 SO Line | SO 500 pcs fulfilled by PO lines of 200 + 300 |
+
+Check if unallocated quantities sum correctly in either direction. If the math balances, allocate the appropriate SO Line(s).
 
 ## Status
 
-**Last updated:** 2026-08-06
+**Last updated:** 2026-08-10
 
 **Progress:**
 - [x] Problem statement documented
 - [x] Diagnosis workflow documented
-- [x] Screenshots captured (5 total in uploaded files)
-- [ ] Fix workflow — pending next session
+- [x] Screenshots captured (6 total in uploaded files)
+- [x] Fix workflow documented
 
 **Screenshots reference:**
 1. Advanced search filter criteria
@@ -90,3 +135,4 @@ TODO:
 3. PO Line tab (healthy record example)
 4. SO Line tab (healthy record example)
 5. SO Line tab showing "0 Records" (problem state)
+6. Lot Allocation subtab showing blank Sales Order Line field
