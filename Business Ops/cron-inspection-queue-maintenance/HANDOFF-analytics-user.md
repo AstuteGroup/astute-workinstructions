@@ -1,81 +1,94 @@
-# Handoff: Inspection Queue Maintenance Setup
+# Inspection Queue Maintenance CLI Handoff
 
-## TL;DR
-
-**The cron job works out of the box** — no CLI update needed. The cron runs as `analytics_user`, so it uses the direct path (no proxy).
-
-The proxy CLI update below is **only needed if you want to run manual fixes from a restricted user session** (e.g., justin.oberhofer).
+**Date:** 2026-08-10
+**From:** justin.oberhofer
+**To:** analytics_user
 
 ---
 
-## Cron Installation (Required)
+## Summary
 
-Install the cron job:
+The inspection queue maintenance automation is complete except for one step that requires analytics_user access: adding the `link-alloc-so` subcommand to `/opt/writeback/cli.js`.
 
-```bash
-node astute-workinstructions/scripts/install-crons.js          # preview
-node astute-workinstructions/scripts/install-crons.js --apply  # apply
-```
-
-Verify:
-
-```bash
-crontab -l | grep inspection-queue
-```
-
-Test (dry-run):
-
-```bash
-node astute-workinstructions/scripts/cron-runner.js --job=inspection-queue-maintenance --dry-run --force
-```
+Without this subcommand, the script can **detect** auto-fixable allocations but cannot **write** the fix. All such cases currently error with "Unknown subcommand: link-alloc-so".
 
 ---
 
-## Proxy CLI Update (Optional — for manual runs only)
+## What's Done
 
-**Skip this section** if you only need the automated daily cron.
-
-If you want restricted users to run `linkAllocSOLine()` manually from their sessions, add this subcommand to `/opt/writeback/cli.js`:
-
-```javascript
-'link-alloc-so': async (payload) => {
-  const { linkAllocSOLine } = require('/home/analytics_user/workspace/astute-workinstructions/shared/alloc-patcher');
-  const { allocId, soLineId, opts = {} } = payload;
-  if (!allocId || !soLineId) {
-    throw new Error('link-alloc-so: allocId and soLineId are required');
-  }
-  return linkAllocSOLine(allocId, soLineId, opts);
-},
-```
-
-Add it to the `SUBCOMMANDS` object after the existing entries.
-
-### Testing the Proxy (after CLI update)
-
-```bash
-# As restricted user, test proxy call
-node -e "
-const { linkAllocSOLine } = require('./astute-workinstructions/shared/writeback-proxy-client');
-(async () => {
-  try {
-    const result = await linkAllocSOLine(1, 1, { dryRun: true });
-    console.log('Result:', result);
-  } catch (e) {
-    console.log('Expected validation error:', e.message);
-  }
-})();
-"
-```
+- [x] Inspection queue maintenance script (`inspection-queue-maintenance.js`)
+- [x] Alloc patcher module (`shared/alloc-patcher.js`) with `linkAllocSOLine()`
+- [x] Writeback proxy client updated with `linkAllocSOLine` entry
+- [x] Skip list (Lam Research, Flock Safety, White Horse test house)
+- [x] Email notifications to justin.oberhofer@astutegroup.com
+- [x] Cron job installed (`inspection-queue-maintenance`, daily 3pm CT)
+- [x] Installer script (`scripts/add-link-alloc-so-to-cli.js`)
 
 ---
 
-## Why This Works Without the CLI Update
+## What You Need To Do
 
-The `writeback-proxy-client.js` has two execution paths:
+### Step 1: Install the CLI subcommand
 
-1. **Direct path** (when running as `analytics_user`): Requires the module directly, no proxy needed
-2. **Proxy path** (when running as other users): Spawns `sudo -u analytics_user /opt/writeback/cli`
+```bash
+# Preview first
+node /home/justin.oberhofer/workspace/astute-workinstructions/scripts/add-link-alloc-so-to-cli.js
 
-Since the cron runs under `analytics_user`'s crontab, it takes the direct path. The `alloc-patcher.js` module loads API credentials from `~/workspace/.env` (which exists for analytics_user) and works directly.
+# Then apply
+node /home/justin.oberhofer/workspace/astute-workinstructions/scripts/add-link-alloc-so-to-cli.js --apply
+```
 
-The proxy CLI subcommand is only needed when a *different* user wants to call the function.
+This will:
+1. Add `link-alloc-so` subcommand to `/opt/writeback/cli.js`
+2. Copy `alloc-patcher.js` to `/opt/writeback/`
+3. Copy dependencies (`record-updater.js`, `breadcrumbs.js`) if not already present
+4. Create a backup at `/opt/writeback/cli.js.bak`
+
+### Step 2: Test the CLI
+
+```bash
+# Dry-run test (won't write anything)
+echo '{"allocId":12345,"soLineId":67890,"opts":{"dryRun":true}}' | /opt/writeback/cli link-alloc-so
+```
+
+Expected output: JSON with validation result or error (the IDs above are fake, so expect "not found" errors — that's fine, it proves the subcommand is wired up).
+
+### Step 3: Verify the automation works
+
+```bash
+# Run the maintenance script as justin.oberhofer
+sudo -u justin.oberhofer node "/home/justin.oberhofer/workspace/astute-workinstructions/Business Ops/cron-inspection-queue-maintenance/inspection-queue-maintenance.js" --dry-run --verbose
+```
+
+If any lots are classified as AUTO_FIX, they should now show the proper dry-run message instead of "Unknown subcommand".
+
+---
+
+## What the Subcommand Does
+
+`link-alloc-so` PATCHes `chuboe_alloc_order_lot.C_OrderLine_ID` to link a lot allocation to a Sales Order Line.
+
+**Validation performed:**
+1. Allocation exists and is active
+2. Allocation is not already linked to an SO Line
+3. SO Line exists and is active
+4. SO Line has sufficient remaining qty (unless `skipQtyCheck: true`)
+
+**API call:** `PATCH /api/v1/models/chuboe_alloc_order_lot/{id}` with `{ C_OrderLine_ID: <soLineId> }`
+
+---
+
+## Files
+
+| File | Purpose |
+|------|---------|
+| `shared/alloc-patcher.js` | Writer module with `linkAllocSOLine()` |
+| `scripts/add-link-alloc-so-to-cli.js` | CLI installer |
+| `Business Ops/cron-inspection-queue-maintenance/inspection-queue-maintenance.js` | Automation script |
+| `Business Ops/cron-inspection queue maintenance/inspection-queue-maintenance-task.md` | Workflow documentation |
+
+---
+
+## Contact
+
+Questions: justin.oberhofer@astutegroup.com
