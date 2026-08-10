@@ -13,6 +13,7 @@
   - [Step 2: Link the SO Line](#step-2-link-the-so-line)
   - [Step 3: Save and Verify](#step-3-save-and-verify)
   - [Edge Cases](#edge-cases)
+  - [Alternative Path: Link from SO Line](#alternative-path-link-from-so-line)
   - [Worked Example](#worked-example)
 - [Database Reference](#database-reference)
 - [Status](#status)
@@ -121,6 +122,58 @@ The relationship between PO Lines and SO Lines is **many-to-many**:
 
 Check if unallocated quantities sum correctly in either direction. If the math balances, allocate the appropriate SO Line(s).
 
+### Alternative Path: Link from SO Line
+
+Use this path when the Lot Allocation pop-up shows no candidates or you need to search more broadly.
+
+**Step 1: Search for SO Lines by MPN**
+
+1. Navigate to **Sales Order Line Advanced Search** window
+2. Search by MPN (the part number from the problem record)
+3. Results show all SO Lines with that MPN
+
+**Step 2: Evaluate candidates**
+
+Review the results using these columns:
+
+| Column | What to check |
+|--------|---------------|
+| Quantity | Should match or sum to the Lot qty |
+| Physical Warehouse | AUSTIN vs DROP-SHIP — match the PO warehouse |
+| Sales Order | Note the SO number for reference |
+| Date | More recent = more likely match |
+
+**Step 3: Zoom to the correct SO Line**
+
+1. Select the candidate SO Line that matches
+2. Zoom to the Sales Order window
+
+**Step 4: Link from the SO Allocation tab**
+
+1. In the Sales Order window, go to the SO Line
+2. In the bottom panel, select the **Lot Allocation** tab
+3. Link the PO Line from this side
+4. **Update the Allocated Quantity** — it defaults to 0, so enter the correct qty
+5. **Save** manually
+
+**Step 5: Add the Lot ID (required for received POs)**
+
+When linking from the SO side, the system creates a new Lot Allocation record **without the Lot ID**. Since the PO is already received (it's in the inspection queue), you must manually add the Lot ID:
+
+1. Go back to the **PO Line** → **Lot Allocation** subtab
+2. You will see two records:
+   - Original record: has Lot ID, no Sales Order Line
+   - New record: has Sales Order Line, **no Lot ID**
+3. Copy the **Lot ID** from the original record to the new record
+4. **Save** manually
+
+> ⚠️ **Warning** - Without the Lot ID, the allocation won't link to the inspection queue record and Weighted Priority won't calculate.
+
+**When to use this path:**
+- Lot Allocation pop-up shows 0 candidates but you know an SO exists
+- Multiple candidates require deeper investigation
+- You want to verify allocation status across all SO Lines for an MPN
+
 ### Worked Example
 
 **Problem record:** PO810781, Lot 1777832
@@ -189,8 +242,9 @@ WHERE so.issotrx = 'Y'
 **Progress:**
 - [x] Problem statement documented
 - [x] Diagnosis workflow documented
-- [x] Screenshots captured (6 total in uploaded files)
+- [x] Screenshots captured (10 total in uploaded files)
 - [x] Fix workflow documented
+- [x] Alternative path documented (link from SO Line)
 - [x] Worked example added (PO810781)
 - [x] Database reference queries added
 
@@ -201,3 +255,7 @@ WHERE so.issotrx = 'Y'
 4. SO Line tab (healthy record example)
 5. SO Line tab showing "0 Records" (problem state)
 6. Lot Allocation subtab showing blank Sales Order Line field
+7. Sales Order Line Advanced Search showing MPN candidates
+8. SO Line Lot Allocation tab showing completed allocation (qty 420, PO Line linked)
+9. PO Line Lot Allocation showing new record without Lot ID (before fix)
+10. PO Line Lot Allocation showing Lot ID added to new record (after fix)
