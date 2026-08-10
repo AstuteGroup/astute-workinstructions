@@ -13,6 +13,8 @@
   - [Step 2: Link the SO Line](#step-2-link-the-so-line)
   - [Step 3: Save and Verify](#step-3-save-and-verify)
   - [Edge Cases](#edge-cases)
+  - [Worked Example](#worked-example)
+- [Database Reference](#database-reference)
 - [Status](#status)
 
 ## Summary
@@ -119,6 +121,67 @@ The relationship between PO Lines and SO Lines is **many-to-many**:
 
 Check if unallocated quantities sum correctly in either direction. If the math balances, allocate the appropriate SO Line(s).
 
+### Worked Example
+
+**Problem record:** PO810781, Lot 1777832
+
+| Field | Value |
+|-------|-------|
+| MPN | XE232-1024-FB374-C40 |
+| Lot Qty | 420 |
+| PO | POV0076703 |
+| RFQ | 1137235 (Adamson Systems Engineering INC) |
+
+**Diagnosis:**
+1. Lot Allocation subtab shows Sales Order Line = blank
+2. CQ Line 1266612 exists (420 pcs) linked to RFQ
+
+**Fix:**
+1. Click blank Sales Order Line field
+2. Pop-up shows: **SO507486 Line 10** (420 pcs, Adamson Systems Engineering)
+3. Quantity matches (420 = 420) — select it
+4. Save
+
+**Result:** Weighted Priority calculates immediately.
+
+## Database Reference
+
+Use these queries to diagnose allocation issues via SQL.
+
+**Find lot allocation record:**
+```sql
+SELECT chuboe_alloc_order_lot_id, chuboe_insp_lot_id,
+       c_orderline_id AS so_line_id, qty
+FROM chuboe_alloc_order_lot
+WHERE chuboe_insp_lot_id = :lot_id AND isactive = 'Y';
+```
+
+**Find lot details (MPN, PO, RFQ):**
+```sql
+SELECT chuboe_insp_lot_id, chuboe_mpnlot_mpn AS mpn,
+       chuboe_mpnlot_qty AS qty, chuboe_mpnlot_po AS po,
+       chuboe_rfq_id, chuboe_vq_line_id
+FROM chuboe_insp_mpnlot_v
+WHERE chuboe_insp_lot_id = :lot_id;
+```
+
+**Find candidate SO Lines (unallocated):**
+```sql
+SELECT so.documentno, sol.c_orderline_id, sol.line,
+       sol.qtyentered, bp.name AS customer
+FROM c_orderline sol
+JOIN c_order so ON sol.c_order_id = so.c_order_id
+JOIN c_bpartner bp ON so.c_bpartner_id = bp.c_bpartner_id
+LEFT JOIN chuboe_alloc_order_lot aol
+  ON sol.c_orderline_id = aol.c_orderline_id AND aol.isactive = 'Y'
+WHERE so.issotrx = 'Y'
+  AND sol.isactive = 'Y'
+  AND aol.c_orderline_id IS NULL  -- Not allocated
+  AND sol.qtyentered = :qty;
+```
+
+> ⚠️ **Warning** - Use `qtyentered` (what the UI displays), not `qtyordered`. These can differ — `qtyordered` may be 0 while `qtyentered` shows the actual quantity.
+
 ## Status
 
 **Last updated:** 2026-08-10
@@ -128,6 +191,8 @@ Check if unallocated quantities sum correctly in either direction. If the math b
 - [x] Diagnosis workflow documented
 - [x] Screenshots captured (6 total in uploaded files)
 - [x] Fix workflow documented
+- [x] Worked example added (PO810781)
+- [x] Database reference queries added
 
 **Screenshots reference:**
 1. Advanced search filter criteria
