@@ -683,7 +683,7 @@ module.exports = [
     cadence: 'fixed',
     // 17:00 UTC = 12pm EST (Nov–Mar) / 1pm EDT (Mar–Nov). 1st of month.
     cadenceCron: '0 17 1 * *',
-    command: `node "${WORKSPACE}/scripts/generate-bos-metrics.js"`,
+    command: `node "${ASTUTE}/Business Ops/cron-reports/cron-monthly/generate-bos-metrics.js"`,
     cwd: WORKSPACE,
     needsOT: false,
     logFile: '/tmp/bos-metrics.log',

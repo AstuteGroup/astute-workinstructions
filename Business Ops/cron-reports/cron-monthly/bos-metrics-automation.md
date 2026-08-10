@@ -50,9 +50,9 @@ Three key metrics for CSE queue management:
 ```javascript
 {
   name: 'bos-metrics-report',
-  cadence: 'monthly',
+  cadence: 'fixed',
   cadenceCron: '0 17 1 * *',  // 1st of month at 17:00 UTC (12pm EST)
-  command: `node "${WORKSPACE}/scripts/generate-bos-metrics.js"`,
+  command: `node "${ASTUTE}/Business Ops/cron-reports/cron-monthly/generate-bos-metrics.js"`,
   ...
 }
 ```
@@ -77,10 +77,10 @@ SMTP_PASS=A$tuteu$a
 
 | File | Location | Purpose |
 |------|----------|---------|
-| Script | `~/workspace/scripts/generate-bos-metrics.js` | Main generation script |
-| Docs | `~/workspace/bos-metrics-report.md` | Full technical documentation |
+| Script | `Business Ops/cron-reports/cron-monthly/generate-bos-metrics.js` | Main generation script |
+| Docs | `Business Ops/cron-reports/cron-monthly/bos-metrics-automation.md` | This file |
 | Config | `~/workspace/.env` | SMTP credentials |
-| Log | `~/workspace/logs/bos-metrics.log` | Cron execution log |
+| Log | `/tmp/bos-metrics.log` | Cron execution log |
 | Output | `~/workspace/BOS Metrics - {Month}.xlsx` | Generated reports |
 
 ## Data Source
@@ -106,25 +106,25 @@ SMTP_PASS=A$tuteu$a
 
 To generate report manually:
 ```bash
-node ~/workspace/scripts/generate-bos-metrics.js --email justin.oberhofer@astutegroup.com
+node ~/workspace/astute-workinstructions/"Business Ops/cron-reports/cron-monthly/generate-bos-metrics.js" --email justin.oberhofer@astutegroup.com
 ```
 
 To test without email:
 ```bash
-node ~/workspace/scripts/generate-bos-metrics.js
+node ~/workspace/astute-workinstructions/"Business Ops/cron-reports/cron-monthly/generate-bos-metrics.js"
 # Report saved to ~/workspace/BOS Metrics - {Month}.xlsx
 ```
 
 ## Maintenance
 
 ### To change recipients
-Edit `scripts/generate-bos-metrics.js`:
+Edit `generate-bos-metrics.js` (same folder as this doc):
 ```javascript
 const DEFAULT_EMAIL = 'justin.oberhofer@astutegroup.com,leah.griffin@astutegroup.com';
 ```
 
 ### To change CSE user list
-Edit `scripts/generate-bos-metrics.js`:
+Edit `generate-bos-metrics.js` (same folder as this doc):
 ```javascript
 const CSE_USERS = ['Bhuvan', 'Vimal', 'Mohan', ...];
 ```
