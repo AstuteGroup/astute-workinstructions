@@ -75,6 +75,7 @@ const DISPATCH = {
   writeMfr:              { subcommand: 'mfr',                  args: ['opts'] },
   updateMfrAlias:        { subcommand: 'mfr-alias',            args: ['opts'] },
   writeCurrencyRates:    { subcommand: 'currency-rates',       args: ['opts'] },
+  linkAllocSOLine:       { subcommand: 'link-alloc-so',        args: ['allocId', 'soLineId', 'opts'] },
 };
 
 // Map writer name -> source module so direct-mode (analytics_user) can
@@ -96,6 +97,7 @@ const DIRECT_MODULE = {
   writeMfr:              './mfr-writer',
   updateMfrAlias:        './mfr-writer',
   writeCurrencyRates:    './currency-rate-writer',
+  linkAllocSOLine:       './alloc-patcher',
 };
 
 // The effective process user — i.e. who this Node process is running as

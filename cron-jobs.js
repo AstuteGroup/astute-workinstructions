@@ -726,6 +726,19 @@ module.exports = [
     logFile: '/tmp/currency-conversion-poller.log',
     description: 'Every 30m — scrape bizops@ for Exchange Rate Matrix emails, process xlsx, reply with CSV attachment',
   },
+
+  // ─── INSPECTION QUEUE MAINTENANCE ──────────────────────────────────────────────
+  {
+    name: 'inspection-queue-maintenance',
+    owner: 'justin.oberhofer',
+    cadence: 'daily',
+    cadenceCron: '0 8 * * *',  // 8 UTC = 3 AM CT
+    command: `node "${ASTUTE}/Business Ops/cron-inspection-queue-maintenance/inspection-queue-maintenance.js"`,
+    cwd: ASTUTE,
+    needsOT: true,  // writes allocation links via API
+    logFile: '/tmp/inspection-queue-maintenance.log',
+    description: 'Daily 8 UTC (3am CT) — auto-fix inspection queue allocations with missing SO Line links, escalate ambiguous cases',
+  },
 ];
 
 // Helper: convert cadence string to milliseconds (used by sentinel + runner).
