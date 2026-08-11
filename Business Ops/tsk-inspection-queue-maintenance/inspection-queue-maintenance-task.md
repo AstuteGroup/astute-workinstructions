@@ -5,25 +5,34 @@
 - [Summary](#summary)
 - [Problem Statement](#problem-statement)
 - [Skip List](#skip-list)
-- [Diagnosis Workflow](#diagnosis-workflow)
+- [Automated Maintenance](#automated-maintenance)
+  - [Quick Start](#quick-start)
+  - [CLI Options](#cli-options)
+  - [How It Works](#how-it-works)
+  - [Cron Schedule](#cron-schedule)
+- [Manual Workflow](#manual-workflow)
   - [Step 1: Access the Inspection Queue](#step-1-access-the-inspection-queue)
   - [Step 2: Identify Problem Records](#step-2-identify-problem-records)
   - [Step 3: Diagnose Missing Allocation](#step-3-diagnose-missing-allocation)
-- [Fix Workflow](#fix-workflow)
-  - [Step 1: Navigate to Lot Allocation](#step-1-navigate-to-lot-allocation)
-  - [Step 2: Link the SO Line](#step-2-link-the-so-line)
-  - [Step 3: Save and Verify](#step-3-save-and-verify)
+  - [Step 4: Navigate to Lot Allocation](#step-4-navigate-to-lot-allocation)
+  - [Step 5: Link the SO Line](#step-5-link-the-so-line)
+  - [Step 6: Save and Verify](#step-6-save-and-verify)
   - [Edge Cases](#edge-cases)
   - [Alternative Path: Link from SO Line](#alternative-path-link-from-so-line)
   - [Worked Example](#worked-example)
 - [Database Reference](#database-reference)
-- [Status](#status)
+- [Files](#files)
+- [Setup](#setup)
 
 ## Summary
 
 The purpose of this task is to maintain the Inspection Queue by fixing records that have a blank Weighted Priority score.
 
-This is important because the Weighted Priority determines inspection urgency. Records without a score do not appear in the correct priority order, which can delay critical inspections.
+This is important because Weighted Priority determines inspection urgency. Records without a score do not appear in the correct priority order, which can delay critical inspections.
+
+**Two approaches:**
+- **Automated** — runs daily at 3am CT, auto-fixes straightforward cases, escalates ambiguous ones
+- **Manual** — UI workflow for handling escalations or ad-hoc fixes
 
 ## Problem Statement
 
@@ -38,19 +47,19 @@ This is important because the Weighted Priority determines inspection urgency. R
 
 ## Skip List
 
-Some records in the inspection queue should be **skipped** — they don't need allocation fixes because they follow a different workflow or have already been processed.
+Some records should be **skipped** — they don't need allocation fixes because they follow a different workflow.
 
 ### Test House Returns
 
-Parts sent to external test houses for additional testing/certification return on a new PO. These lots have **already been through inspection** before being sent out. Skip them.
+Parts sent to external test houses for additional testing return on a new PO. These lots have **already been through inspection** before being sent out.
 
-| Vendor | Type | Notes |
-|--------|------|-------|
-| White Horse Laboratories Ltd | Test house | Parts already inspected before send-out |
+| Vendor | Type |
+|--------|------|
+| White Horse Laboratories Ltd | Test house |
 
 **How to identify:** Check the vendor on the VQ/PO. If it's a test house, skip the record.
 
-### Consignment Programs (Lam/Flock)
+### Consignment Programs
 
 Lam kitting and Flock consignment lots follow a separate workflow and don't require SO Line allocation in the standard queue.
 
@@ -62,7 +71,107 @@ Lots purchased for stock (no customer order behind them) will have no SO Line ca
 
 **How to identify:** Lot Allocation pop-up shows 0 candidates and no RFQ/CQ trail exists.
 
-## Diagnosis Workflow
+## Automated Maintenance
+
+Auto-fix inspection queue records with missing SO Line allocations.
+
+- **Auto-fixes** straightforward cases: exact qty match, single candidate
+- **Escalates** ambiguous cases: multiple candidates, qty mismatch
+- **Skips** spec buys (no RFQ associated)
+
+### Quick Start
+
+```bash
+# Dry-run (report only, no writes)
+node inspection-queue-maintenance.js --dry-run --limit 50
+
+# Live run (applies fixes)
+node inspection-queue-maintenance.js --limit 100
+
+# Full run (no limit)
+node inspection-queue-maintenance.js
+```
+
+### CLI Options
+
+| Option | Description |
+|--------|-------------|
+| `--dry-run` | Report only, no writes |
+| `--limit N` | Process max N records (default: no limit) |
+| `--verbose` | Print each allocation being processed |
+| `--output-dir DIR` | Directory for escalation report (default: `./output`) |
+
+### How It Works
+
+**1. Find Missing Allocations**
+
+Finds `chuboe_alloc_order_lot` records where `c_orderline_id` IS NULL.
+
+**2. Find Candidate SO Lines**
+
+For each allocation, finds candidate SO Lines via the CQ chain:
+RFQ → CQ Lines (IsSold='Y') → c_orderline (via chuboe_cq_line_id)
+
+**3. Classify**
+
+| Scenario | Classification | Action |
+|----------|----------------|--------|
+| 1 candidate, exact qty, not allocated | AUTO_FIX | Link automatically |
+| Multiple candidates, same qty | ESCALATE_MULTIPLE | Report with candidates |
+| Qty mismatch (lot > available) | ESCALATE_QTY_MISMATCH | Report with recommendation |
+| 0 candidates | NO_CANDIDATES | Skip (spec buy) |
+
+**4. Auto-Fix**
+
+For AUTO_FIX cases, PATCHes `chuboe_alloc_order_lot.C_OrderLine_ID` via `alloc-patcher.js`.
+
+**5. Escalation Report**
+
+Generates CSV report for manual review:
+
+```
+AllocID,LotID,MPN,LotQty,RFQ,Type,CandidateCount,Recommendation
+2130858,1777832,"XE232-1024-FB374-C40",420,1137235,ESCALATE_QTY_MISMATCH,1,"SO507486 Line 10 (avail: 0)"
+```
+
+**Output Example:**
+
+```
+=== Inspection Queue Maintenance ===
+
+Mode: LIVE
+Limit: 200 records
+
+Found 200 allocations with missing SO Line
+
+AUTO-FIX: Alloc 2130635 → SO Line 1020870 (qty: 11)
+AUTO-FIX: Alloc 2130634 → SO Line 1026869 (qty: 1)
+ESCALATE: Alloc 2130858 → No candidate has sufficient qty. Best: SO507486 Line 10 (available: 0, need: 420)
+ESCALATE: Alloc 2130637 → Multiple candidates with sufficient qty (2 options)
+
+--- Summary ---
+Auto-fixed: 6
+Escalations: 48
+Skipped (spec buys): 146
+
+Escalation report written to: ./output/escalations-2026-08-10T17-02-25.csv
+```
+
+### Cron Schedule
+
+Runs daily at 3am CT (8 UTC) as `analytics_user`.
+
+```bash
+# Verify cron is installed
+crontab -l | grep inspection-queue
+
+# Install if needed
+node scripts/install-crons.js --apply
+```
+
+## Manual Workflow
+
+Use this workflow for handling escalations or when automation is unavailable.
 
 ### Step 1: Access the Inspection Queue
 
@@ -91,35 +200,23 @@ Lots purchased for stock (no customer order behind them) will have no SO Line ca
    - **Problem state:** Shows "0 Records" / "No Records found"
    - **Healthy state:** Shows "1 Records" with SO details
 
-**Example of healthy record (W7, Inspection 1,768,362):**
-- PO Line: ✓ POV0076108, NPI Solutions, Inc.
-- SO Line: ✓ COV0021952, SO507085, Applied Materials
-
-**Example of problem record (E4, Inspection 1,634,179):**
-- PO Line: ✓ POV0073868 (has PO data)
-- SO Line: ✗ 0 Records (missing allocation)
-
-## Fix Workflow
-
-The purpose of this workflow is to link missing SO Line allocations to PO Lines so that Weighted Priority can be calculated.
-
-### Step 1: Navigate to Lot Allocation
+### Step 4: Navigate to Lot Allocation
 
 1. From the problem Inspection Queue record, zoom to the linked **PO Line**
 2. In the Purchase Order window, go to the **PO Line** tab
 3. In the bottom panel, select the **Lot Allocation** subtab
 4. Confirm the **Sales Order Line** field is blank — this is the missing link
 
-### Step 2: Link the SO Line
+### Step 5: Link the SO Line
 
 1. Click the blank **Sales Order Line** field
 2. A pop-up displays available SO Line candidates
 3. Select the correct SO Line using these criteria:
-   - **Exact quantity match** — preferred; select the SO Line with matching quantity
+   - **Exact quantity match** — preferred
    - **Multiple candidates with same quantity** — use elimination logic (see Edge Cases)
-   - **No exact match** — check if partial allocations sum correctly (see Edge Cases)
+   - **No exact match** — check if partial allocations sum correctly
 
-### Step 3: Save and Verify
+### Step 6: Save and Verify
 
 1. **Save** the Lot Allocation record manually
 2. Weighted Priority calculates immediately upon save
@@ -129,13 +226,13 @@ The purpose of this workflow is to link missing SO Line allocations to PO Lines 
 
 **No candidates (0 options in pop-up)**
 
-No SO Line exists to allocate. This may be a spec buy or stock purchase with no customer order behind it. Skip this record — nothing to fix.
+No SO Line exists to allocate. This may be a spec buy or stock purchase. Skip this record.
 
 **Multiple candidates with same quantity**
 
 Use process of elimination:
 1. Check which candidates are already allocated to other Lot records — the **unlinked** candidate is likely correct
-2. Use date proximity as a secondary indicator (closer dates = more likely match)
+2. Use date proximity as a secondary indicator
 3. If still ambiguous, escalate — do not guess
 
 **No exact quantity match (partial allocation)**
@@ -147,73 +244,30 @@ The relationship between PO Lines and SO Lines is **many-to-many**:
 | 1 PO Line → Multiple SO Lines | PO 300 pcs fulfills SO lines of 50 + 100 + 150 |
 | Multiple PO Lines → 1 SO Line | SO 500 pcs fulfilled by PO lines of 200 + 300 |
 
-Check if unallocated quantities sum correctly in either direction. If the math balances, allocate the appropriate SO Line(s).
+Check if unallocated quantities sum correctly. If the math balances, allocate the appropriate SO Line(s).
 
-**When to escalate (not self-service)**
+**When to escalate**
 
-Escalate to a supervisor or operations lead when:
-- **No SO Line has sufficient remaining qty** — the best candidate doesn't cover the lot qty
-- **Partial allocations don't sum** — available SO Lines can't combine to match the lot qty
-- **Over-allocated SO Lines** — existing allocations exceed SO qty and need cleanup first
-- **Ambiguous candidates** — multiple options exist and you can't determine the correct one
-
-**Example escalation (Inspection 1,634,179):**
-- Lot needs: 455 qty (MPN HMAG78EXNRA)
-- Best candidate: SO505565 Line 10 has only 305 remaining
-- Other candidates don't fill the gap
-- **Result:** Escalate — qty mismatch requires intervention
+- No SO Line has sufficient remaining qty
+- Partial allocations don't sum
+- Over-allocated SO Lines need cleanup first
+- Ambiguous candidates
 
 ### Alternative Path: Link from SO Line
 
-Use this path when the Lot Allocation pop-up shows no candidates or you need to search more broadly.
+Use when the Lot Allocation pop-up shows no candidates or you need to search more broadly.
 
-**Step 1: Search for SO Lines by MPN**
+**Step 1:** Navigate to **Sales Order Line Advanced Search** window and search by MPN.
 
-1. Navigate to **Sales Order Line Advanced Search** window
-2. Search by MPN (the part number from the problem record)
-3. Results show all SO Lines with that MPN
+**Step 2:** Evaluate candidates by Quantity, Physical Warehouse, Sales Order, and Date.
 
-**Step 2: Evaluate candidates**
+**Step 3:** Zoom to the correct SO Line.
 
-Review the results using these columns:
+**Step 4:** In the Sales Order window, go to SO Line → **Lot Allocation** tab. Link the PO Line and **update the Allocated Quantity** (defaults to 0).
 
-| Column | What to check |
-|--------|---------------|
-| Quantity | Should match or sum to the Lot qty |
-| Physical Warehouse | AUSTIN vs DROP-SHIP — match the PO warehouse |
-| Sales Order | Note the SO number for reference |
-| Date | More recent = more likely match |
-
-**Step 3: Zoom to the correct SO Line**
-
-1. Select the candidate SO Line that matches
-2. Zoom to the Sales Order window
-
-**Step 4: Link from the SO Allocation tab**
-
-1. In the Sales Order window, go to the SO Line
-2. In the bottom panel, select the **Lot Allocation** tab
-3. Link the PO Line from this side
-4. **Update the Allocated Quantity** — it defaults to 0, so enter the correct qty
-5. **Save** manually
-
-**Step 5: Add the Lot ID (required for received POs)**
-
-When linking from the SO side, the system creates a new Lot Allocation record **without the Lot ID**. Since the PO is already received (it's in the inspection queue), you must manually add the Lot ID:
-
-1. Go back to the **PO Line** → **Lot Allocation** subtab
-2. You will see two records:
-   - Original record: has Lot ID, no Sales Order Line
-   - New record: has Sales Order Line, **no Lot ID**
-3. Copy the **Lot ID** from the original record to the new record
-4. **Save** manually
+**Step 5:** Go back to **PO Line** → **Lot Allocation** subtab. Copy the **Lot ID** from the original record to the new record.
 
 > ⚠️ **Warning** - Without the Lot ID, the allocation won't link to the inspection queue record and Weighted Priority won't calculate.
-
-**When to use this path:**
-- Lot Allocation pop-up shows 0 candidates but you know an SO exists
-- Multiple candidates require deeper investigation
-- You want to verify allocation status across all SO Lines for an MPN
 
 ### Worked Example
 
@@ -239,8 +293,6 @@ When linking from the SO side, the system creates a new Lot Allocation record **
 **Result:** Weighted Priority calculates immediately.
 
 ## Database Reference
-
-Use these queries to diagnose allocation issues via SQL.
 
 **Find lot allocation record:**
 ```sql
@@ -270,34 +322,38 @@ LEFT JOIN chuboe_alloc_order_lot aol
   ON sol.c_orderline_id = aol.c_orderline_id AND aol.isactive = 'Y'
 WHERE so.issotrx = 'Y'
   AND sol.isactive = 'Y'
-  AND aol.c_orderline_id IS NULL  -- Not allocated
+  AND aol.c_orderline_id IS NULL
   AND sol.qtyentered = :qty;
 ```
 
-> ⚠️ **Warning** - Use `qtyentered` (what the UI displays), not `qtyordered`. These can differ — `qtyordered` may be 0 while `qtyentered` shows the actual quantity.
+> ⚠️ **Warning** - Use `qtyentered` (what the UI displays), not `qtyordered`. These can differ.
 
-## Status
+## Files
 
-**Last updated:** 2026-08-10
+| File | Purpose |
+|------|---------|
+| `inspection-queue-maintenance.js` | Automation runner script |
+| `inspection-queue-maintenance-task.md` | This documentation |
+| `output/` | Escalation reports |
 
-**Progress:**
-- [x] Problem statement documented
-- [x] Diagnosis workflow documented
-- [x] Screenshots captured (10 total in uploaded files)
-- [x] Fix workflow documented
-- [x] Alternative path documented (link from SO Line)
-- [x] Worked example added (PO810781)
-- [x] Database reference queries added
-- [x] Skip list added (test houses, consignment programs, spec buys)
+**Dependencies:**
+- `shared/alloc-patcher.js` — Validation + PATCH wrapper
+- `shared/writeback-proxy-client.js` — Proxy for non-analytics_user execution
+- `shared/breadcrumbs.js` — Audit trail
 
-**Screenshots reference:**
-1. Advanced search filter criteria
-2. Inspection Queue results showing Weighted Priority column
-3. PO Line tab (healthy record example)
-4. SO Line tab (healthy record example)
-5. SO Line tab showing "0 Records" (problem state)
-6. Lot Allocation subtab showing blank Sales Order Line field
-7. Sales Order Line Advanced Search showing MPN candidates
-8. SO Line Lot Allocation tab showing completed allocation (qty 420, PO Line linked)
-9. PO Line Lot Allocation showing new record without Lot ID (before fix)
-10. PO Line Lot Allocation showing Lot ID added to new record (after fix)
+## Setup
+
+**Install the cron:**
+
+```bash
+node scripts/install-crons.js --apply
+crontab -l | grep inspection-queue
+```
+
+The cron runs as `analytics_user` with direct API access.
+
+**Verify:**
+
+```bash
+node scripts/cron-runner.js --job=inspection-queue-maintenance --dry-run --force
+```
