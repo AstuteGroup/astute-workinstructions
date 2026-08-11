@@ -126,7 +126,7 @@ module.exports = [
     name: 'lam-kitting-runner',
     cadence: 'fixed',
     cadenceCron: '0 12 * * 1',
-    command: `node "${ASTUTE}/Trading Analysis/LAM 3PL/lam-kitting-runner.js"`,
+    command: `NOTIFY_EMAIL="jake.harris@astutegroup.com,josh.syre@astutegroup.com" node "${ASTUTE}/Trading Analysis/LAM 3PL/lam-kitting-runner.js"`,
     cwd: ASTUTE,
     needsOT: true,
     logFile: `${ASTUTE}/Trading Analysis/LAM 3PL/data/cron.log`,
@@ -177,6 +177,9 @@ module.exports = [
     needsOT: true,
     logFile: '/tmp/enrich-poller.log',
     description: 'Every 15m — run franchise APIs on unenriched RFQ lines, write VQ enrichment',
+    // Large RFQs (500+ MPNs) can take 3-4+ hours due to per-MPN API calls.
+    // Extended timeout prevents premature kills; PID file guard prevents stacking.
+    timeoutMs: 4 * 60 * 60 * 1000,  // 4 hours
   },
   {
     name: 'rfq-loader-daemon',
@@ -288,7 +291,7 @@ module.exports = [
     // polling for ~10m after an approval email goes out, then drops to
     // every-30m. Tunable via RFQLOADING_BURST_WINDOW_MIN env.
     cadence: 'every 5m',
-    cadenceCron: '1-59/5 * * * *',
+    cadenceCron: '*/5 * * * *',
     command: `if node "${ASTUTE}/scripts/should-run-rfqloading-agent.js"; then /home/analytics_user/.local/bin/claude -p --model sonnet --permission-mode bypassPermissions --max-turns 80 < "${ASTUTE}/Trading Analysis/RFQ Loading/agent-prompt.txt"; fi`,
     cwd: AGENT_CWD,
     needsOT: true,
