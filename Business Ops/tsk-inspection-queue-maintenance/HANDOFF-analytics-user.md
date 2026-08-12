@@ -1,8 +1,23 @@
 # Inspection Queue Maintenance CLI Handoff
 
-**Date:** 2026-08-10
+**Date:** 2026-08-12
 **From:** justin.oberhofer
-**To:** analytics_user
+**To:** analytics_user (Tyler Dennis)
+
+---
+
+## Current State
+
+| Component | Status |
+|-----------|--------|
+| Cron job | ✅ Working — runs daily at 3 PM CT from justin.oberhofer's crontab |
+| Email notifications | ✅ Working — HTML email with Queue, Rcvd, Customer, Vendor columns |
+| Auto-fix writes | ❌ Blocked — `link-alloc-so` subcommand not in `/opt/writeback/cli.js` |
+
+**Error when auto-fix is attempted:**
+```
+ERROR: Lot 1781396 → Unknown subcommand: link-alloc-so
+```
 
 ---
 
@@ -73,6 +88,25 @@ If any lots are classified as AUTO_FIX, they should now show the proper dry-run 
 | `scripts/add-link-alloc-so-to-cli.js` | CLI installer |
 | `Business Ops/tsk-inspection-queue-maintenance/inspection-queue-maintenance.js` | Automation script |
 | `Business Ops/tsk-inspection-queue-maintenance/inspection-queue-maintenance-task.md` | Workflow documentation |
+
+---
+
+## How to Run as analytics_user
+
+**Option 1: SSH directly**
+```bash
+ssh analytics_user@<server>
+node /home/justin.oberhofer/workspace/astute-workinstructions/scripts/add-link-alloc-so-to-cli.js --apply
+```
+
+**Option 2: Contact Tyler Dennis** (analytics_user maintainer)
+- Email: tyler.dennis@plantos.co
+- Ask him to run the script above
+
+**Option 3: From justin.oberhofer's session** (if passwordless sudo is configured later)
+```bash
+sudo -u analytics_user node ~/workspace/astute-workinstructions/scripts/add-link-alloc-so-to-cli.js --apply
+```
 
 ---
 
