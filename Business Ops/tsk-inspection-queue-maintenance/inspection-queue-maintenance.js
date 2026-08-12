@@ -156,7 +156,8 @@ function findProblemLots(limit) {
       wg.chuboe_warehouse_group_id AS warehouse_group_id,
       wg.name AS warehouse_group_name,
       vq.c_bpartner_id AS vendor_id,
-      vendor.name AS vendor_name
+      vendor.name AS vendor_name,
+      TO_CHAR(q.created AT TIME ZONE 'UTC' AT TIME ZONE 'America/Chicago', 'MM/DD') AS received_date
     FROM adempiere.chuboe_insp_mpnlotqueue_v q
     LEFT JOIN adempiere.chuboe_rfq rfq ON rfq.chuboe_rfq_id = q.chuboe_rfq_id
     LEFT JOIN adempiere.c_bpartner bp ON bp.c_bpartner_id = rfq.c_bpartner_id
@@ -178,7 +179,8 @@ function findProblemLots(limit) {
   const columns = [
     'lot_id', 'mpn', 'lot_qty', 'lot_number', 'chuboe_rfq_id',
     'rfq_value', 'customer_id', 'customer_name', 'shelf_name',
-    'warehouse_group_id', 'warehouse_group_name', 'vendor_id', 'vendor_name'
+    'warehouse_group_id', 'warehouse_group_name', 'vendor_id', 'vendor_name',
+    'received_date'
   ];
 
   return rows.map(row => parseRow(row, columns));
@@ -493,7 +495,7 @@ function writeEscalationReport(escalations, outputDir, dryRun) {
 // ─── NOTIFICATION ─────────────────────────────────────────────────────────────
 
 /**
- * Send email notification for auto-fixes, escalations, or skip-only runs.
+ * Send HTML email notification for auto-fixes, escalations, or skip-only runs.
  */
 async function sendNotification(results) {
   const { autoFixed, escalations, skipped } = results;
@@ -501,46 +503,167 @@ async function sendNotification(results) {
   // Determine subject based on results
   let subject;
   if (autoFixed.length > 0 || escalations.length > 0) {
-    subject = `Inspection Queue Maintenance: ${autoFixed.length} fixed, ${escalations.length} escalations`;
+    subject = `Inspection Queue: ${autoFixed.length} fixed, ${escalations.length} escalations`;
   } else {
-    subject = `Inspection Queue Maintenance: ${skipped.length} skipped (no action needed)`;
+    subject = `Inspection Queue: ${skipped.length} skipped (no action needed)`;
   }
 
-  let body = '=== Inspection Queue Maintenance Report ===\n\n';
+  // Build HTML email
+  let html = `
+<div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 700px; margin: 0 auto;">
+  <h2 style="color: #333; border-bottom: 2px solid #ddd; padding-bottom: 8px; margin-bottom: 16px;">
+    Inspection Queue Maintenance
+  </h2>
+
+  <!-- Summary -->
+  <div style="background: #f5f5f5; padding: 12px 16px; border-radius: 6px; margin-bottom: 20px;">
+    <strong>Summary:</strong> ${autoFixed.length} auto-fixed, ${escalations.length} escalations, ${skipped.length} skipped
+  </div>
+`;
 
   // Auto-fixes section
   if (autoFixed.length > 0) {
-    body += `✅ AUTO-FIXED (${autoFixed.length}):\n`;
-    body += '─'.repeat(50) + '\n';
+    html += `
+  <h3 style="color: #2e7d32; margin-top: 24px;">✓ Auto-Fixed (${autoFixed.length})</h3>
+  <table style="width: 100%; border-collapse: collapse; font-size: 14px;">
+    <thead>
+      <tr style="background: #e8f5e9;">
+        <th style="text-align: left; padding: 8px; border: 1px solid #c8e6c9;">Queue</th>
+        <th style="text-align: left; padding: 8px; border: 1px solid #c8e6c9;">Rcvd</th>
+        <th style="text-align: left; padding: 8px; border: 1px solid #c8e6c9;">Lot ID</th>
+        <th style="text-align: left; padding: 8px; border: 1px solid #c8e6c9;">MPN</th>
+        <th style="text-align: right; padding: 8px; border: 1px solid #c8e6c9;">Qty</th>
+        <th style="text-align: left; padding: 8px; border: 1px solid #c8e6c9;">Customer</th>
+        <th style="text-align: left; padding: 8px; border: 1px solid #c8e6c9;">Vendor</th>
+        <th style="text-align: left; padding: 8px; border: 1px solid #c8e6c9;">Linked To</th>
+      </tr>
+    </thead>
+    <tbody>`;
     for (const lot of autoFixed) {
-      body += `  • Lot ${lot.lot_id}: ${lot.mpn} (${lot.lot_qty} pcs)\n`;
-      body += `    Customer: ${lot.customer_name || 'N/A'}\n`;
-      body += `    Linked to: ${lot.recommendation.so_documentno} Line ${lot.recommendation.so_line_no}\n\n`;
+      html += `
+      <tr>
+        <td style="padding: 8px; border: 1px solid #ddd;">${lot.warehouse_group_name || 'N/A'}</td>
+        <td style="padding: 8px; border: 1px solid #ddd;">${lot.received_date || 'N/A'}</td>
+        <td style="padding: 8px; border: 1px solid #ddd;">${lot.lot_id}</td>
+        <td style="padding: 8px; border: 1px solid #ddd; font-family: monospace;">${lot.mpn || 'N/A'}</td>
+        <td style="padding: 8px; border: 1px solid #ddd; text-align: right;">${lot.lot_qty?.toLocaleString() || 'N/A'}</td>
+        <td style="padding: 8px; border: 1px solid #ddd;">${lot.customer_name || 'N/A'}</td>
+        <td style="padding: 8px; border: 1px solid #ddd;">${lot.vendor_name || 'N/A'}</td>
+        <td style="padding: 8px; border: 1px solid #ddd;">${lot.recommendation?.so_documentno || 'N/A'} Line ${lot.recommendation?.so_line_no || 'N/A'}</td>
+      </tr>`;
     }
+    html += `
+    </tbody>
+  </table>`;
   }
 
   // Escalations section
   if (escalations.length > 0) {
-    body += `\n⚠️ ESCALATIONS (${escalations.length}) - Manual action required:\n`;
-    body += '─'.repeat(50) + '\n';
+    html += `
+  <h3 style="color: #e65100; margin-top: 24px;">⚠ Escalations (${escalations.length}) — Manual Action Required</h3>
+  <table style="width: 100%; border-collapse: collapse; font-size: 14px;">
+    <thead>
+      <tr style="background: #fff3e0;">
+        <th style="text-align: left; padding: 8px; border: 1px solid #ffe0b2;">Queue</th>
+        <th style="text-align: left; padding: 8px; border: 1px solid #ffe0b2;">Rcvd</th>
+        <th style="text-align: left; padding: 8px; border: 1px solid #ffe0b2;">Lot ID</th>
+        <th style="text-align: left; padding: 8px; border: 1px solid #ffe0b2;">MPN</th>
+        <th style="text-align: right; padding: 8px; border: 1px solid #ffe0b2;">Qty</th>
+        <th style="text-align: left; padding: 8px; border: 1px solid #ffe0b2;">Customer</th>
+        <th style="text-align: left; padding: 8px; border: 1px solid #ffe0b2;">Vendor</th>
+        <th style="text-align: left; padding: 8px; border: 1px solid #ffe0b2;">Issue</th>
+        <th style="text-align: left; padding: 8px; border: 1px solid #ffe0b2;">Recommended Fix</th>
+      </tr>
+    </thead>
+    <tbody>`;
     for (const lot of escalations) {
-      body += `  • Lot ${lot.lot_id}: ${lot.mpn} (${lot.lot_qty} pcs)\n`;
-      body += `    Customer: ${lot.customer_name || 'N/A'}\n`;
-      body += `    Reason: ${lot.reason}\n\n`;
+      // Build recommendation text from candidates or recommendation
+      let recText = '—';
+      if (lot.recommendation) {
+        const rec = lot.recommendation;
+        recText = `${rec.so_documentno} Line ${rec.so_line_no} (avail: ${rec.available ?? 'N/A'})`;
+      } else if (lot.candidates && lot.candidates.length > 0) {
+        // Multiple candidates — show first few
+        recText = lot.candidates.slice(0, 3).map(c =>
+          `${c.so_documentno} L${c.so_line_no} (${c.available ?? c.qtyentered})`
+        ).join(', ');
+        if (lot.candidates.length > 3) recText += ` +${lot.candidates.length - 3} more`;
+      }
+
+      // Simplify the reason for the Issue column
+      let issue = lot.classification || 'Unknown';
+      if (issue === 'ESCALATE_MULTIPLE') issue = 'Multiple candidates';
+      if (issue === 'ESCALATE_QTY_MISMATCH') issue = 'Qty mismatch';
+      if (issue === 'NO_CANDIDATES') issue = 'No SO Line found';
+      if (issue === 'ERROR') issue = 'Error';
+
+      html += `
+      <tr>
+        <td style="padding: 8px; border: 1px solid #ddd;">${lot.warehouse_group_name || 'N/A'}</td>
+        <td style="padding: 8px; border: 1px solid #ddd;">${lot.received_date || 'N/A'}</td>
+        <td style="padding: 8px; border: 1px solid #ddd;">${lot.lot_id}</td>
+        <td style="padding: 8px; border: 1px solid #ddd; font-family: monospace;">${lot.mpn || 'N/A'}</td>
+        <td style="padding: 8px; border: 1px solid #ddd; text-align: right;">${lot.lot_qty?.toLocaleString() || 'N/A'}</td>
+        <td style="padding: 8px; border: 1px solid #ddd;">${lot.customer_name || 'N/A'}</td>
+        <td style="padding: 8px; border: 1px solid #ddd;">${lot.vendor_name || 'N/A'}</td>
+        <td style="padding: 8px; border: 1px solid #ddd;">${issue}</td>
+        <td style="padding: 8px; border: 1px solid #ddd; font-size: 13px;">${recText}</td>
+      </tr>`;
     }
-    body += '\nSee inspection-queue-maintenance-task.md for fix workflow.\n';
+    html += `
+    </tbody>
+  </table>
+  <p style="color: #666; font-size: 13px; margin-top: 12px;">
+    See <code>inspection-queue-maintenance-task.md</code> for manual fix workflow.
+  </p>`;
   }
 
-  // Skip-only summary
-  if (autoFixed.length === 0 && escalations.length === 0) {
-    body += `✓ No action required — all ${skipped.length} lots were skipped.\n\n`;
-    body += 'Skip reasons: Lam Research, Flock Safety, test house returns, no SO Line match.\n';
+  // Skipped section
+  if (skipped.length > 0) {
+    html += `
+  <h3 style="color: #757575; margin-top: 24px;">Skipped (${skipped.length})</h3>
+  <table style="width: 100%; border-collapse: collapse; font-size: 14px;">
+    <thead>
+      <tr style="background: #f5f5f5;">
+        <th style="text-align: left; padding: 8px; border: 1px solid #e0e0e0;">Queue</th>
+        <th style="text-align: left; padding: 8px; border: 1px solid #e0e0e0;">Rcvd</th>
+        <th style="text-align: left; padding: 8px; border: 1px solid #e0e0e0;">Lot ID</th>
+        <th style="text-align: left; padding: 8px; border: 1px solid #e0e0e0;">MPN</th>
+        <th style="text-align: right; padding: 8px; border: 1px solid #e0e0e0;">Qty</th>
+        <th style="text-align: left; padding: 8px; border: 1px solid #e0e0e0;">Customer</th>
+        <th style="text-align: left; padding: 8px; border: 1px solid #e0e0e0;">Vendor</th>
+        <th style="text-align: left; padding: 8px; border: 1px solid #e0e0e0;">Reason</th>
+      </tr>
+    </thead>
+    <tbody>`;
+    for (const lot of skipped) {
+      html += `
+      <tr>
+        <td style="padding: 8px; border: 1px solid #ddd;">${lot.warehouse_group_name || 'N/A'}</td>
+        <td style="padding: 8px; border: 1px solid #ddd;">${lot.received_date || 'N/A'}</td>
+        <td style="padding: 8px; border: 1px solid #ddd;">${lot.lot_id}</td>
+        <td style="padding: 8px; border: 1px solid #ddd; font-family: monospace;">${lot.mpn || 'N/A'}</td>
+        <td style="padding: 8px; border: 1px solid #ddd; text-align: right;">${lot.lot_qty?.toLocaleString() || 'N/A'}</td>
+        <td style="padding: 8px; border: 1px solid #ddd;">${lot.customer_name || 'N/A'}</td>
+        <td style="padding: 8px; border: 1px solid #ddd;">${lot.vendor_name || 'N/A'}</td>
+        <td style="padding: 8px; border: 1px solid #ddd; color: #757575;">${lot.reason || 'N/A'}</td>
+      </tr>`;
+    }
+    html += `
+    </tbody>
+  </table>`;
   }
 
-  body += '\n---\nGenerated by inspection-queue-maintenance.js';
+  // Footer
+  html += `
+  <hr style="border: none; border-top: 1px solid #ddd; margin: 24px 0 12px;">
+  <p style="color: #999; font-size: 12px;">
+    Generated by inspection-queue-maintenance.js
+  </p>
+</div>`;
 
   try {
-    await notifier.sendEmail(NOTIFICATION_RECIPIENT, subject, body);
+    await notifier.sendEmail(NOTIFICATION_RECIPIENT, subject, html, { html: true });
     console.log(`\nNotification sent to ${NOTIFICATION_RECIPIENT}`);
   } catch (err) {
     console.error(`Failed to send notification: ${err.message}`);
