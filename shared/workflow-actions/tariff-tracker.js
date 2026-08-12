@@ -16,6 +16,8 @@ const breadcrumbs = require('../breadcrumbs');
 
 const OUTPUT_RECIPIENT = 'justin.oberhofer@astutegroup.com';
 
+const path = require('path');
+
 // ─── EMAIL HELPER ─────────────────────────────────────────────────────────────
 
 /**
@@ -25,6 +27,17 @@ async function sendEmailOrThrow(notifier, to, subject, body, opts = {}) {
   const sent = await notifier.sendEmail(to, subject, body, opts);
   if (!sent) {
     throw new Error(`Failed to send notification email to ${to}: ${subject}`);
+  }
+  return sent;
+}
+
+/**
+ * Send email with attachment via notifier, throwing on failure.
+ */
+async function sendWithAttachmentOrThrow(notifier, to, subject, body, attachments, opts = {}) {
+  const sent = await notifier.sendWithAttachment(to, subject, body, attachments, opts);
+  if (!sent) {
+    throw new Error(`Failed to send email with attachment to ${to}: ${subject}`);
   }
   return sent;
 }
@@ -70,15 +83,17 @@ ${reviewNote ? `<p style="color:#b00">${esc(reviewNote)}</p>` : ''}
 </body></html>`;
 
   // Send with attachment
-  await sendEmailOrThrow(
+  const attachments = outputPath
+    ? [{ filename: path.basename(outputPath), path: outputPath }]
+    : [];
+
+  await sendWithAttachmentOrThrow(
     ctx.notifier,
     OUTPUT_RECIPIENT,
     `Tariff Tracker Complete: ${subject || '(no subject)'}`,
     html,
-    {
-      html: true,
-      attachments: outputPath ? [{ path: outputPath }] : [],
-    },
+    attachments,
+    { html: true },
   );
 
   breadcrumbs.write({
