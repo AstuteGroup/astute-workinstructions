@@ -1,8 +1,48 @@
 # Tariff & Oversized Shipment Tracker - PDF Extraction Workflow
 
-## Overview
+## Purpose
 
-Extracts data from FedEx customs invoices (PDF) and populates the Tariff and Oversized Shipment Tracker Excel template.
+The purpose of this workflow is to extract data from FedEx customs invoices (PDF) and populate the Tariff and Oversized Shipment Tracker Excel template.
+
+This is important because it automates the manual process of reading customs invoices, performing OT lookups for POV/MPN/Buyer/Salesperson data, and compiling the tracker — reducing processing time and ensuring consistent data capture.
+
+## Email-Driven Automation
+
+This workflow uses the agent pattern (see `email-workflow-architecture.md`).
+
+### Inbox & Routing
+
+| Field | Value |
+|-------|-------|
+| **Inbox** | `bizops@orangetsunami.com` |
+| **Handler** | `shared/workflow-actions/tariff-tracker.js` |
+| **Cron** | Daily at 19:30 UTC (2:30 PM EST) |
+| **Output recipient** | `justin.oberhofer@astutegroup.com` |
+
+### How It Works
+
+1. **User sends email** to `bizops@orangetsunami.com` with FedEx customs invoice PDFs attached
+2. **Agent extracts** data from all PDFs in a single email → batches into one tracker
+3. **Agent performs OT lookups** (POV → MPN/Buyer/Salesperson) per the Processing Rules below
+4. **Agent populates tracker** using the template, marking rows for manual review where lookups fail
+5. **Agent emails result** to the sender with the completed `.xlsx` attached
+
+### Actions
+
+| Action | Folder | Description |
+|--------|--------|-------------|
+| `process` | Processed | PDFs extracted successfully; tracker attached to confirmation email |
+| `needs_review` | NeedsReview | Extraction failed or PDFs unreadable; operator notified |
+| `skip` | Skipped | Email not relevant (no PDFs, wrong document type) |
+
+### Manual Review Flags
+
+When a row cannot be fully populated, the agent:
+- **Populates all available fields** from the PDF (Entry No., Entry Date, Duties, MPF, Shipper, Tracking, Invoice)
+- **Leaves blank** fields that require failed lookups (MPN, QTY, COV, Buyer, Salesperson)
+- **Adds a comment** to the SOURCE column: `[REVIEW: tracking lookup failed]` or `[REVIEW: no POV found]`
+
+The operator can then manually resolve the flagged rows in the output file.
 
 ## Source Files
 
@@ -185,6 +225,22 @@ When same tracking has multiple POVs with same buyer/salesperson:
 
 ---
 
+## CLI Commands
+
+```bash
+# List unseen emails in bizops@ inbox
+node shared/email-workflow-poller.js list --workflow tariff-tracker
+
+# Read a specific email
+node shared/email-workflow-poller.js read <uid> --workflow tariff-tracker
+
+# Process and route
+node shared/email-workflow-poller.js route <uid> process --workflow tariff-tracker --payload '{"invoices": [...]}'
+```
+
+---
+
 *Created: 2026-06-23*
 *Updated: 2026-07-16 - Added processing rules for merging, thresholds, and transportation charges*
 *Updated: 2026-07-22 - Clarified transportation >$1,000 threshold applies per shipment (not invoice); added wildcard tracking search; added COV lookup query; SOURCE column POVs only*
+*Updated: 2026-08-12 - Added email-driven automation via agent pattern (bizops@ inbox, batch PDFs per email, email results to justin.oberhofer); daily cron at 9 AM CT*

@@ -735,9 +735,24 @@ module.exports = [
     cadenceCron: '0 20 * * *',  // 20 UTC = 3 PM CT
     command: `node "${ASTUTE}/Business Ops/tsk-inspection-queue-maintenance/inspection-queue-maintenance.js"`,
     cwd: ASTUTE,
-    needsOT: true,  // writes allocation links via API
+    needsOT: false,  // uses writeback-proxy (spawns analytics_user), not direct API access
     logFile: '/tmp/inspection-queue-maintenance.log',
     description: 'Daily 20 UTC (3pm CT) — auto-fix inspection queue allocations with missing SO Line links, escalate ambiguous cases',
+  },
+
+  // ─── TARIFF TRACKER (FedEx customs invoice PDF extraction) ───────────────────
+  {
+    name: 'tariff-tracker-agent',
+    tier: 'agent',  // Claude-powered — paused by .cron-agents-paused
+    owner: 'justin.oberhofer',
+    cadence: 'daily',
+    cadenceCron: '30 19 * * *',  // 19:30 UTC = 2:30 PM EST
+    command: `/home/analytics_user/.local/bin/claude -p --model sonnet --permission-mode bypassPermissions --max-turns 60 < "${ASTUTE}/Business Ops/tsk-tariff-tracker-extraction/agent-prompt.txt"`,
+    cwd: AGENT_CWD,  // ~/agent-runtime (lean CLAUDE.md)
+    needsOT: false,  // generates xlsx, no OT API writes
+    logFile: '/tmp/tariff-tracker-agent.log',
+    timeoutMs: 30 * 60 * 1000,  // 30 min (agent default)
+    description: 'Daily 19:30 UTC (2:30pm EST) — scrape bizops@ for FedEx customs invoice PDFs, extract tariff data, perform OT lookups, email completed tracker to justin.oberhofer@',
   },
 ];
 

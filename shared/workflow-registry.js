@@ -478,4 +478,42 @@ module.exports = {
     // need_info emails Jake (Reply-To: lamkitting@ for sidecar round-trip).
     // Writes update LAM_Master_Roster.xlsx directly (not OT API).
   },
+
+  // ─── TARIFF TRACKER (FedEx customs invoice PDF extraction) ─────────────────
+  'tariff-tracker': {
+    status: 'active',
+    handler: 'tariff-tracker',
+    doc: 'Business Ops/tsk-tariff-tracker-extraction/tariff-tracker-extraction.md',
+    inbox: 'bizops@orangetsunami.com',
+    sourceFolder: 'INBOX',
+    cron: { name: 'tariff-tracker-agent' },
+    actions: ['process', 'needs_review', 'skip'],
+    capabilities: {
+      replyStitching: false,
+      needInfoClarifications: false,
+      largePayloadGate: false,
+      approvalReplyAction: false,
+      preWriteIdempotency: true,
+      writeQueue: false,
+      breadcrumbWrites: true,
+      operatorDigest: false,
+      activityDigest: false,
+      replyParserGrammar: false,
+      tieredCron: false,
+    },
+    deviations: {
+      replyStitching: 'One-shot PDF extraction — no clarification round-trip with external parties',
+      needInfoClarifications: 'Ambiguous cases flag rows for manual review in output; no external sender to clarify with',
+      largePayloadGate: 'PDF batches are bounded by email attachment limits; no gate needed',
+      approvalReplyAction: 'No payload gate → no approval needed',
+      writeQueue: 'Direct xlsx generation; no OT API writes, no staging queue needed',
+      operatorDigest: 'Low-volume workflow; per-email confirmation is sufficient visibility',
+      activityDigest: 'Low-volume workflow; breadcrumbs provide audit trail',
+      replyParserGrammar: 'No operator-override grammar needed — escalations go to needs_review',
+      tieredCron: 'Daily fixed cadence (2:30pm EST) — no burst trigger needed for batch PDF processing',
+    },
+    // POLICY: Output emails go to justin.oberhofer@.
+    // Generates xlsx tracker from FedEx customs invoice PDFs.
+    // Performs OT lookups for POV → MPN/Buyer/Salesperson enrichment.
+  },
 };
