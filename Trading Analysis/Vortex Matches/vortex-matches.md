@@ -21,6 +21,57 @@ Inbox-driven automation that matches customer RFQs against VQs, market offers, a
 >
 > **Domain restrictions:** Only `@astutegroup.com` and `@orangetsunami.com` addresses can send requests or receive results.
 
+## Enrichment Gate (added 2026-08-12)
+
+Vortex Matches and Sourcing Recap are **gated on RFQ API enrichment completion**. This ensures franchise pricing data is available before generating results.
+
+**Franchise Cross-Ref bypasses this gate** — it runs immediately regardless of enrichment status.
+
+### How it works
+
+When a request comes in for Vortex Matches or Sourcing Recap:
+
+1. **Check enrichment status** — compare the RFQ's `MAX(line_mpn.created)` against the enrichment watermark (`~/.last-rfq-enrich`) and backfill tracker (`~/.enrich-backfill-tracker.json`)
+
+2. **If enrichment is complete** → process normally
+
+3. **If enrichment is pending** (RFQ created recently, not yet processed by `enrich-poller.js`):
+   - Run the analysis with **existing data** (market offers, prior VQs, cached API envelopes)
+   - Send **PRELIMINARY** results immediately (subject includes `— PRELIMINARY`)
+   - Add request to the **pending queue** (`~/.vortex-pending-queue.json`)
+   - On each subsequent poller tick:
+     - If enrichment completes → send **COMPLETE** results (subject includes `— COMPLETE`)
+     - If waiting > 1 hour → send **status update** with backlog info
+     - If waiting > 4 hours → send **timeout notice** and remove from queue
+
+### Email subject labels
+
+| Scenario | Subject suffix | Notes |
+|----------|----------------|-------|
+| Enrichment complete | _(none)_ | Normal flow |
+| Preliminary results | `— PRELIMINARY` | Yellow banner: "Complete report to follow" |
+| Complete follow-up | `— COMPLETE` | Green banner: "Franchise enrichment finished" |
+| Status update | `— Status Update` | Blue banner: backlog position info |
+| Timeout (4h) | `— Timeout` | Red banner: investigate enrichment |
+
+### Pending queue file
+
+Location: `~/.vortex-pending-queue.json`
+
+Schema:
+```json
+{
+  "id": "uuid",
+  "rfqNumber": "1138194",
+  "customer": "Lam Research",
+  "senderEmail": "user@astutegroup.com",
+  "flavor": "vortex",
+  "queuedAt": "2026-08-12T...",
+  "lastStatusUpdateAt": null,
+  "attempts": 0
+}
+```
+
 ## Files
 
 | File | Purpose |
@@ -134,6 +185,8 @@ The shared module `shared/email-fetcher.js` exposes `vortex` as an account in it
 
 ## Status
 
-**Implemented & tested** — refactored 2026-04-08 from manual `node vortex-matches.js <rfq>` (file output) to inbox-driven (email output).
+**Live** — running on 20-minute cron schedule since 2026-04 provisioning of `vortex@orangetsunami.com`.
 
-**Blocked on:** `vortex@orangetsunami.com` mailbox provisioning in AWS WorkMail. Once provisioned with the shared OT password, no code changes needed — the poller will start working immediately.
+**Change log:**
+- 2026-04-08: Refactored from manual CLI (file output) to inbox-driven (email output)
+- 2026-08-12: Added enrichment gate — Vortex/Recap requests now wait for RFQ API enrichment to complete before sending final results. Preliminary results sent immediately; complete results follow when enrichment finishes.

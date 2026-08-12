@@ -25,10 +25,13 @@
  */
 
 const path = require('path');
+const fs = require('fs');
+const crypto = require('crypto');
 require('dotenv').config({ path: path.resolve(__dirname, '../../../.env') });
 
 const { ImapFlow } = require('imapflow');
 const { simpleParser } = require('mailparser');
+const { Pool } = require('pg');
 
 const { runVortexForRFQ, buildSummaryHtml } = require('./vortex-matches');
 const {
@@ -42,6 +45,28 @@ const {
   matchKeywordToFranchise
 } = require('../Franchise Catalog Cross-Reference/franchise-xref');
 const { sendWithFallback } = require('../../shared/verified-send');
+
+// ─── ENRICHMENT GATE ─────────────────────────────────────────────────────────
+// Vortex Matches and Sourcing Recap are gated on RFQ enrichment completion.
+// If enrichment hasn't finished, we send PRELIMINARY results immediately and
+// queue for COMPLETE results once enrichment finishes.
+// Franchise Cross-Ref bypasses this gate (per operator 2026-08-12).
+
+const WATERMARK_FILE = path.resolve(process.env.HOME || '/home/analytics_user', 'workspace/.last-rfq-enrich');
+const BACKFILL_TRACKER_FILE = path.resolve(process.env.HOME || '/home/analytics_user', 'workspace/.enrich-backfill-tracker.json');
+const PENDING_QUEUE_FILE = path.resolve(process.env.HOME || '/home/analytics_user', 'workspace/.vortex-pending-queue.json');
+const ENRICHMENT_BACKLOG_FILE = path.resolve(process.env.HOME || '/home/analytics_user', 'workspace/astute-workinstructions/.enrich-poller-backlog.json');
+
+// Timeouts for pending queue
+const STATUS_UPDATE_THRESHOLD_MS = 60 * 60 * 1000;  // 1 hour - send status update
+const TIMEOUT_THRESHOLD_MS = 4 * 60 * 60 * 1000;    // 4 hours - give up
+
+// Database pool for enrichment status checks
+const pool = new Pool({
+  host: '/var/run/postgresql',
+  database: process.env.PGDATABASE || 'idempiere_replica',
+  user: process.env.PGUSER || process.env.USER || 'analytics_user'
+});
 
 const VORTEX_EMAIL = 'vortex@orangetsunami.com';
 const FALLBACK_EMAIL = process.env.VORTEX_FALLBACK_SENDER || 'excess@orangetsunami.com';
@@ -79,6 +104,215 @@ const UID_ARG = (() => {
 
 function log(...args) {
   console.log(new Date().toISOString(), '-', ...args);
+}
+
+// ─── ENRICHMENT STATUS HELPERS ───────────────────────────────────────────────
+
+/**
+ * Read the enrichment watermark (ISO timestamp of last processed line_mpn.created).
+ */
+function readEnrichmentWatermark() {
+  try {
+    if (!fs.existsSync(WATERMARK_FILE)) return null;
+    return fs.readFileSync(WATERMARK_FILE, 'utf-8').trim() || null;
+  } catch { return null; }
+}
+
+/**
+ * Read the backfill tracker (set of RFQ numbers processed during backfill mode).
+ */
+function readBackfillTracker() {
+  try {
+    if (!fs.existsSync(BACKFILL_TRACKER_FILE)) return new Set();
+    const obj = JSON.parse(fs.readFileSync(BACKFILL_TRACKER_FILE, 'utf-8'));
+    return new Set(obj.processed || []);
+  } catch { return new Set(); }
+}
+
+/**
+ * Check if an RFQ has been enriched.
+ *
+ * An RFQ is considered enriched if:
+ *   1. It appears in the backfill tracker (processed during backfill mode), OR
+ *   2. Its MAX(line_mpn.created) <= the enrichment watermark
+ *
+ * Returns: { status: 'enriched' | 'pending' | 'not-found', rfqId?, customer?, ageMinutes? }
+ */
+async function checkEnrichmentStatus(rfqNumber) {
+  // Check backfill tracker first (fast, no DB)
+  const tracker = readBackfillTracker();
+  if (tracker.has(rfqNumber)) {
+    return { status: 'enriched', method: 'backfill-tracker' };
+  }
+
+  // Query the RFQ's max line_mpn.created
+  const { rows } = await pool.query(`
+    SELECT r.chuboe_rfq_id,
+           bp.name AS customer,
+           r.created AT TIME ZONE 'America/Chicago' AT TIME ZONE 'UTC' AS rfq_created,
+           MAX(rlm.created AT TIME ZONE 'America/Chicago' AT TIME ZONE 'UTC') AS max_line_mpn_created
+    FROM adempiere.chuboe_rfq r
+    LEFT JOIN adempiere.c_bpartner bp ON r.c_bpartner_id = bp.c_bpartner_id
+    LEFT JOIN adempiere.chuboe_rfq_line rl ON rl.chuboe_rfq_id = r.chuboe_rfq_id AND rl.isactive='Y'
+    LEFT JOIN adempiere.chuboe_rfq_line_mpn rlm ON rlm.chuboe_rfq_line_id = rl.chuboe_rfq_line_id AND rlm.isactive='Y'
+    WHERE r.value = $1 AND r.isactive='Y'
+    GROUP BY r.chuboe_rfq_id, bp.name, r.created
+  `, [rfqNumber]);
+
+  if (rows.length === 0) {
+    return { status: 'not-found' };
+  }
+
+  const { chuboe_rfq_id, customer, rfq_created, max_line_mpn_created } = rows[0];
+  const ageMinutes = Math.round((Date.now() - new Date(rfq_created).getTime()) / (1000 * 60));
+
+  // Compare against watermark
+  const watermark = readEnrichmentWatermark();
+  if (watermark && max_line_mpn_created && new Date(max_line_mpn_created) <= new Date(watermark)) {
+    return { status: 'enriched', rfqId: chuboe_rfq_id, customer, method: 'watermark' };
+  }
+
+  // Not enriched yet
+  return { status: 'pending', rfqId: chuboe_rfq_id, customer, ageMinutes };
+}
+
+// ─── PENDING QUEUE HELPERS ───────────────────────────────────────────────────
+
+/**
+ * Read the pending Vortex requests queue.
+ */
+function readPendingQueue() {
+  try {
+    if (!fs.existsSync(PENDING_QUEUE_FILE)) return [];
+    return JSON.parse(fs.readFileSync(PENDING_QUEUE_FILE, 'utf-8'));
+  } catch { return []; }
+}
+
+/**
+ * Write the pending Vortex requests queue.
+ */
+function writePendingQueue(queue) {
+  fs.writeFileSync(PENDING_QUEUE_FILE, JSON.stringify(queue, null, 2), 'utf-8');
+}
+
+/**
+ * Add a request to the pending queue.
+ */
+function addToPendingQueue(item) {
+  const queue = readPendingQueue();
+  // Avoid duplicates by RFQ + sender
+  const exists = queue.find(q => q.rfqNumber === item.rfqNumber && q.senderEmail === item.senderEmail);
+  if (exists) {
+    log(`  pending queue: ${item.rfqNumber} already queued for ${item.senderEmail}, skipping`);
+    return;
+  }
+  queue.push({
+    id: crypto.randomUUID(),
+    ...item,
+    queuedAt: new Date().toISOString(),
+    lastStatusUpdateAt: null,
+    attempts: 0
+  });
+  writePendingQueue(queue);
+  log(`  pending queue: added ${item.rfqNumber} (${item.flavor}) for ${item.senderEmail}`);
+}
+
+/**
+ * Remove a request from the pending queue by ID.
+ */
+function removeFromPendingQueue(id) {
+  const queue = readPendingQueue();
+  const filtered = queue.filter(q => q.id !== id);
+  writePendingQueue(filtered);
+}
+
+/**
+ * Get enrichment backlog info for status updates.
+ */
+function getEnrichmentBacklogInfo() {
+  try {
+    if (!fs.existsSync(ENRICHMENT_BACKLOG_FILE)) return { pending: 0, totalLineMpns: 0 };
+    const backlog = JSON.parse(fs.readFileSync(ENRICHMENT_BACKLOG_FILE, 'utf-8'));
+    const pending = (backlog.items || []).filter(i => i.status === 'pending');
+    const totalLineMpns = pending.reduce((sum, i) => sum + (i.line_mpns || 0), 0);
+    return { pending: pending.length, totalLineMpns };
+  } catch { return { pending: 0, totalLineMpns: 0 }; }
+}
+
+// ─── EMAIL HELPERS FOR ENRICHMENT GATE ───────────────────────────────────────
+
+/**
+ * Build HTML for PRELIMINARY results email.
+ */
+function buildPreliminaryHtml(result, flavor) {
+  const baseHtml = flavor === 'recap' ? buildRecapSummaryHtml(result) : buildSummaryHtml(result);
+
+  const notice = `
+    <div style="background:#fff3cd;border:1px solid #ffc107;border-radius:4px;padding:12px 16px;margin-bottom:16px;font-size:13px">
+      <b style="color:#856404">⏳ PRELIMINARY RESULTS</b><br/>
+      Franchise pricing data is currently being collected for this RFQ.
+      A <b>complete report</b> with fresh franchise quotes will be sent automatically when enrichment finishes.
+    </div>
+  `;
+
+  // Insert notice after opening body tag
+  return baseHtml.replace(/<body[^>]*>/, match => match + notice);
+}
+
+/**
+ * Build HTML for COMPLETE results email (follow-up after enrichment).
+ */
+function buildCompleteHtml(result, flavor) {
+  const baseHtml = flavor === 'recap' ? buildRecapSummaryHtml(result) : buildSummaryHtml(result);
+
+  const notice = `
+    <div style="background:#d4edda;border:1px solid #28a745;border-radius:4px;padding:12px 16px;margin-bottom:16px;font-size:13px">
+      <b style="color:#155724">✓ COMPLETE RESULTS</b><br/>
+      Franchise enrichment has finished. This report includes all available data including fresh franchise pricing.
+    </div>
+  `;
+
+  return baseHtml.replace(/<body[^>]*>/, match => match + notice);
+}
+
+/**
+ * Build HTML for status update email.
+ */
+function buildStatusUpdateHtml(item, backlogInfo, waitMinutes) {
+  return `<html><body style="font-family:Arial,sans-serif;font-size:13px;color:#222">
+    <div style="background:#cce5ff;border:1px solid #004085;border-radius:4px;padding:12px 16px;margin-bottom:16px">
+      <b style="color:#004085">⏳ Status Update — RFQ ${item.rfqNumber}</b>
+    </div>
+    <p>Your ${item.flavor === 'recap' ? 'Sourcing Recap' : 'Vortex Matches'} request is still waiting for franchise enrichment to complete.</p>
+    <table cellpadding="6" cellspacing="0" border="0" style="border-collapse:collapse;border:1px solid #ddd;margin:12px 0">
+      <tr><td><b>RFQ</b></td><td>${item.rfqNumber}</td></tr>
+      <tr><td><b>Customer</b></td><td>${item.customer || '?'}</td></tr>
+      <tr><td><b>Waiting</b></td><td>${waitMinutes} minutes</td></tr>
+      <tr><td><b>Enrichment backlog</b></td><td>${backlogInfo.pending} RFQs (${backlogInfo.totalLineMpns.toLocaleString()} line-MPNs)</td></tr>
+    </table>
+    <p style="color:#666">You already received preliminary results. Complete results will be sent when enrichment finishes.</p>
+    <p style="color:#888;font-size:11px">This is an automated status update from the Vortex Matches system.</p>
+  </body></html>`;
+}
+
+/**
+ * Build HTML for timeout error email.
+ */
+function buildTimeoutHtml(item, waitMinutes) {
+  return `<html><body style="font-family:Arial,sans-serif;font-size:13px;color:#222">
+    <div style="background:#f8d7da;border:1px solid #721c24;border-radius:4px;padding:12px 16px;margin-bottom:16px">
+      <b style="color:#721c24">⚠ Timeout — RFQ ${item.rfqNumber}</b>
+    </div>
+    <p>Your ${item.flavor === 'recap' ? 'Sourcing Recap' : 'Vortex Matches'} request has been waiting for enrichment for <b>${waitMinutes} minutes</b> without completion.</p>
+    <p>This usually indicates:</p>
+    <ul>
+      <li>A large enrichment backlog</li>
+      <li>The enrichment poller may be paused or experiencing issues</li>
+      <li>This RFQ may have been skipped (large-RFQ gate, rejected, etc.)</li>
+    </ul>
+    <p>Your preliminary results (sent earlier) contain all data that was available at the time. Please investigate the enrichment status if complete results are needed.</p>
+    <p style="color:#888;font-size:11px">This request has been removed from the pending queue.</p>
+  </body></html>`;
 }
 
 /**
@@ -383,6 +617,28 @@ async function processMessage(client, uid) {
 
   log(`  UID ${uid}: RFQ=${rfqNumber}  flavor=${flavor}${franchiseReq.isFranchise ? ` (${franchiseReq.franchises.join(',')})` : ''}  originalFrom=${originalFrom || '(none)'}  ccCount=${originalCc.length}`);
 
+  // ─── ENRICHMENT GATE (Vortex + Recap only, not Franchise) ─────────────────
+  // If the RFQ hasn't been enriched yet, send PRELIMINARY results immediately
+  // and queue for COMPLETE results once enrichment finishes.
+  let enrichmentPending = false;
+  let enrichmentStatus = null;
+  if (flavor !== 'franchise') {
+    try {
+      enrichmentStatus = await checkEnrichmentStatus(rfqNumber);
+      if (enrichmentStatus.status === 'pending') {
+        enrichmentPending = true;
+        log(`  UID ${uid}: enrichment pending (age: ${enrichmentStatus.ageMinutes}min) — will send PRELIMINARY + queue for COMPLETE`);
+      } else if (enrichmentStatus.status === 'enriched') {
+        log(`  UID ${uid}: enrichment complete (${enrichmentStatus.method}) — proceeding normally`);
+      } else if (enrichmentStatus.status === 'not-found') {
+        log(`  UID ${uid}: RFQ not found in enrichment check — proceeding anyway`);
+      }
+    } catch (err) {
+      // Enrichment check failed (DB issue?) — proceed without gating
+      log(`  UID ${uid}: enrichment check failed: ${err.message} — proceeding without gate`);
+    }
+  }
+
   // Run the chosen analysis. All share the same { customer, attachments[] }
   // contract on success — the email path below treats them uniformly.
   let result;
@@ -452,15 +708,25 @@ async function processMessage(client, uid) {
     const franchiseNames = result.results.map(r => r.displayName).join(', ');
     emailSubject = `Franchise Cross-Ref — RFQ ${rfqNumber} (${result.customer}) — ${franchiseNames}`;
   } else if (isRecap) {
-    html = buildRecapSummaryHtml(result);
-    emailSubject = `Sourcing Recap — RFQ ${rfqNumber} (${result.customer})`;
+    // Use PRELIMINARY template if enrichment is pending
+    html = enrichmentPending
+      ? buildPreliminaryHtml(result, 'recap')
+      : buildRecapSummaryHtml(result);
+    emailSubject = enrichmentPending
+      ? `Sourcing Recap — RFQ ${rfqNumber} (${result.customer}) — PRELIMINARY`
+      : `Sourcing Recap — RFQ ${rfqNumber} (${result.customer})`;
   } else {
-    html = buildSummaryHtml(result);
-    emailSubject = `Vortex Matches — RFQ ${rfqNumber} (${result.customer})`;
+    // Use PRELIMINARY template if enrichment is pending
+    html = enrichmentPending
+      ? buildPreliminaryHtml(result, 'vortex')
+      : buildSummaryHtml(result);
+    emailSubject = enrichmentPending
+      ? `Vortex Matches — RFQ ${rfqNumber} (${result.customer}) — PRELIMINARY`
+      : `Vortex Matches — RFQ ${rfqNumber} (${result.customer})`;
   }
 
   if (DRY_RUN) {
-    log(`  [dry-run] would send (${flavor}) to=${to.join(',')} cc=${cc.join(',')} attachments=${result.attachments.length}`);
+    log(`  [dry-run] would send (${flavor}) to=${to.join(',')} cc=${cc.join(',')} attachments=${result.attachments.length}${enrichmentPending ? ' (PRELIMINARY)' : ''}`);
     return { uid, status: 'dry-run', rfqNumber, flavor };
   }
 
@@ -470,9 +736,161 @@ async function processMessage(client, uid) {
   });
 
   await client.messageFlagsAdd(String(uid), ['\\Seen'], { uid: true });
+
+  // If enrichment is pending, add to the pending queue for COMPLETE follow-up
+  if (enrichmentPending) {
+    addToPendingQueue({
+      rfqNumber,
+      rfqId: enrichmentStatus?.rfqId,
+      customer: result.customer || enrichmentStatus?.customer || '',
+      senderEmail: senderAddr,
+      toEmails: to,
+      ccEmails: cc,
+      originalFrom,
+      originalCc,
+      inboundCc,
+      flavor,
+      sourceSubject: subject,
+      sourceUid: uid
+    });
+    log(`  UID ${uid}: sent PRELIMINARY (${flavor}) via ${sendResult.delivered} sender, queued for COMPLETE`);
+    return { uid, status: 'sent-preliminary', rfqNumber, flavor, attachments: result.attachments.length };
+  }
+
   log(`  UID ${uid}: sent (${flavor}) via ${sendResult.delivered} sender and marked Seen` +
       (sendResult.bounceDetected ? ' (primary bounced, fallback used)' : ''));
   return { uid, status: 'sent', rfqNumber, flavor, attachments: result.attachments.length, delivered: sendResult.delivered };
+}
+
+/**
+ * Process the pending queue — check each queued request for enrichment completion.
+ *
+ * Called at the end of each vortex-poller tick. For each pending item:
+ *   - If enriched: run analysis, send COMPLETE results, remove from queue
+ *   - If > 1 hour waiting: send status update
+ *   - If > 4 hours: send timeout notice, remove from queue
+ */
+async function processPendingQueue() {
+  const queue = readPendingQueue();
+  if (queue.length === 0) return;
+
+  log(`pending queue: ${queue.length} item(s) to check`);
+  const backlogInfo = getEnrichmentBacklogInfo();
+  const now = Date.now();
+  const updatedQueue = [];
+
+  for (const item of queue) {
+    const queuedAt = new Date(item.queuedAt).getTime();
+    const waitMs = now - queuedAt;
+    const waitMinutes = Math.round(waitMs / (1000 * 60));
+
+    // Check enrichment status
+    let enrichmentStatus;
+    try {
+      enrichmentStatus = await checkEnrichmentStatus(item.rfqNumber);
+    } catch (err) {
+      log(`  pending ${item.rfqNumber}: enrichment check failed: ${err.message} — keeping in queue`);
+      updatedQueue.push(item);
+      continue;
+    }
+
+    // Case 1: Enrichment complete — send COMPLETE results
+    if (enrichmentStatus.status === 'enriched') {
+      log(`  pending ${item.rfqNumber}: enrichment complete — sending COMPLETE results`);
+      try {
+        // Run the analysis again with fresh data
+        let result;
+        if (item.flavor === 'recap') {
+          result = await runSourcingRecapForRFQ(item.rfqNumber, { log: m => log('   ', m) });
+        } else {
+          result = await runVortexForRFQ(item.rfqNumber, { log: m => log('   ', m) });
+        }
+
+        // Build COMPLETE email
+        const html = buildCompleteHtml(result, item.flavor);
+        const flavorLabel = item.flavor === 'recap' ? 'Sourcing Recap' : 'Vortex Matches';
+        const emailSubject = `${flavorLabel} — RFQ ${item.rfqNumber} (${result.customer || item.customer}) — COMPLETE`;
+
+        if (!DRY_RUN) {
+          await sendVortexResult({
+            to: item.toEmails,
+            cc: item.ccEmails,
+            subject: emailSubject,
+            html,
+            attachments: result.attachments || []
+          });
+        }
+        log(`  pending ${item.rfqNumber}: COMPLETE results sent (waited ${waitMinutes}min)`);
+        // Don't add to updatedQueue — effectively removes from queue
+      } catch (err) {
+        log(`  pending ${item.rfqNumber}: failed to send COMPLETE: ${err.message} — keeping in queue`);
+        updatedQueue.push(item);
+      }
+      continue;
+    }
+
+    // Case 2: Timeout — send error and remove from queue
+    if (waitMs >= TIMEOUT_THRESHOLD_MS) {
+      log(`  pending ${item.rfqNumber}: TIMEOUT after ${waitMinutes}min — sending timeout notice`);
+      try {
+        const html = buildTimeoutHtml(item, waitMinutes);
+        const flavorLabel = item.flavor === 'recap' ? 'Sourcing Recap' : 'Vortex Matches';
+        const emailSubject = `${flavorLabel} — RFQ ${item.rfqNumber} — Timeout`;
+
+        if (!DRY_RUN) {
+          await sendVortexResult({
+            to: item.toEmails,
+            cc: item.ccEmails,
+            subject: emailSubject,
+            html,
+            attachments: []
+          });
+        }
+        log(`  pending ${item.rfqNumber}: timeout notice sent, removed from queue`);
+      } catch (err) {
+        log(`  pending ${item.rfqNumber}: failed to send timeout notice: ${err.message}`);
+      }
+      // Don't add to updatedQueue — remove from queue regardless
+      continue;
+    }
+
+    // Case 3: Status update (> 1 hour, not yet sent this hour)
+    const lastUpdateAt = item.lastStatusUpdateAt ? new Date(item.lastStatusUpdateAt).getTime() : 0;
+    const timeSinceLastUpdate = now - lastUpdateAt;
+    if (waitMs >= STATUS_UPDATE_THRESHOLD_MS && timeSinceLastUpdate >= STATUS_UPDATE_THRESHOLD_MS) {
+      log(`  pending ${item.rfqNumber}: sending status update (waited ${waitMinutes}min)`);
+      try {
+        const html = buildStatusUpdateHtml(item, backlogInfo, waitMinutes);
+        const flavorLabel = item.flavor === 'recap' ? 'Sourcing Recap' : 'Vortex Matches';
+        const emailSubject = `${flavorLabel} — RFQ ${item.rfqNumber} — Status Update`;
+
+        if (!DRY_RUN) {
+          await sendVortexResult({
+            to: item.toEmails,
+            cc: item.ccEmails,
+            subject: emailSubject,
+            html,
+            attachments: []
+          });
+        }
+        item.lastStatusUpdateAt = new Date().toISOString();
+        log(`  pending ${item.rfqNumber}: status update sent`);
+      } catch (err) {
+        log(`  pending ${item.rfqNumber}: failed to send status update: ${err.message}`);
+      }
+    }
+
+    // Keep in queue
+    item.attempts = (item.attempts || 0) + 1;
+    updatedQueue.push(item);
+  }
+
+  // Write updated queue
+  writePendingQueue(updatedQueue);
+  const removed = queue.length - updatedQueue.length;
+  if (removed > 0) {
+    log(`pending queue: ${removed} item(s) completed/removed, ${updatedQueue.length} remaining`);
+  }
 }
 
 /**
@@ -537,7 +955,7 @@ async function main() {
         processed++;
         try {
           const r = await processMessage(client, uid);
-          if (r.status === 'sent' || r.status === 'dry-run') succeeded++;
+          if (r.status === 'sent' || r.status === 'sent-preliminary' || r.status === 'dry-run') succeeded++;
           else if (r.status === 'error') errored++;
         } catch (err) {
           errored++;
@@ -551,8 +969,20 @@ async function main() {
     await client.logout().catch(() => {});
   }
 
-  log(`done. processed=${processed} succeeded=${succeeded} errored=${errored}`);
-  // Force exit so the lingering pg pool doesn't hold the process
+  log(`inbox done. processed=${processed} succeeded=${succeeded} errored=${errored}`);
+
+  // Process pending queue (requests waiting for enrichment to complete)
+  try {
+    await processPendingQueue();
+  } catch (err) {
+    log(`pending queue processing failed: ${err.message}`);
+  }
+
+  // Clean up database pool
+  await pool.end().catch(() => {});
+
+  log('vortex-poller complete');
+  // Force exit so any lingering resources don't hold the process
   process.exit(0);
 }
 
