@@ -752,7 +752,7 @@ module.exports = [
     needsOT: false,  // generates xlsx, no OT API writes
     logFile: '/tmp/tariff-tracker-agent.log',
     timeoutMs: 30 * 60 * 1000,  // 30 min (agent default)
-    description: 'Daily 19:30 UTC (2:30pm EST) — scrape bizops@ for FedEx customs invoice PDFs, extract tariff data, perform OT lookups, email completed tracker to justin.oberhofer@',
+    description: 'Daily 19:30 UTC (2:30pm EST) — scrape bizops@ for FedEx/UPS customs invoice PDFs, extract tariff data, perform OT lookups, email completed tracker to justin.oberhofer@',
   },
 ];
 

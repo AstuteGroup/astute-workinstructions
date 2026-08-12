@@ -479,7 +479,7 @@ module.exports = {
     // Writes update LAM_Master_Roster.xlsx directly (not OT API).
   },
 
-  // ─── TARIFF TRACKER (FedEx customs invoice PDF extraction) ─────────────────
+  // ─── TARIFF TRACKER (FedEx/UPS customs invoice PDF extraction) ─────────────
   'tariff-tracker': {
     status: 'active',
     handler: 'tariff-tracker',
@@ -513,7 +513,7 @@ module.exports = {
       tieredCron: 'Daily fixed cadence (2:30pm EST) — no burst trigger needed for batch PDF processing',
     },
     // POLICY: Output emails go to justin.oberhofer@.
-    // Generates xlsx tracker from FedEx customs invoice PDFs.
+    // Generates xlsx tracker from FedEx/UPS customs invoice PDFs.
     // Performs OT lookups for POV → MPN/Buyer/Salesperson enrichment.
   },
 };

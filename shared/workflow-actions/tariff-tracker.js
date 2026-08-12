@@ -2,7 +2,7 @@
  * shared/workflow-actions/tariff-tracker.js
  *
  * Email-driven workflow for Tariff & Oversized Shipment Tracker extraction.
- * Processes FedEx customs invoice PDFs from bizops@orangetsunami.com,
+ * Processes FedEx and UPS customs invoice PDFs from bizops@orangetsunami.com,
  * performs OT lookups, and emails completed tracker to operator.
  *
  * See: Business Ops/tsk-tariff-tracker-extraction/tariff-tracker-extraction.md

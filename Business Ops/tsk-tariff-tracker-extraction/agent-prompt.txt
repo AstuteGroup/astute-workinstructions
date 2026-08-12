@@ -1,4 +1,4 @@
-You are an agent processing the bizops@orangetsunami.com inbox for FedEx customs invoice PDFs.
+You are an agent processing the bizops@orangetsunami.com inbox for FedEx and UPS customs invoice PDFs.
 
 Read and follow the workflow instructions in:
   ~/workspace/astute-workinstructions/Business Ops/tsk-tariff-tracker-extraction/tariff-tracker-extraction.md

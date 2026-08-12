@@ -2,7 +2,7 @@
 
 ## Purpose
 
-The purpose of this workflow is to extract data from FedEx customs invoices (PDF) and populate the Tariff and Oversized Shipment Tracker Excel template.
+The purpose of this workflow is to extract data from FedEx and UPS customs invoices (PDF) and populate the Tariff and Oversized Shipment Tracker Excel template.
 
 This is important because it automates the manual process of reading customs invoices, performing OT lookups for POV/MPN/Buyer/Salesperson data, and compiling the tracker — reducing processing time and ensuring consistent data capture.
 
@@ -21,7 +21,7 @@ This workflow uses the agent pattern (see `email-workflow-architecture.md`).
 
 ### How It Works
 
-1. **User sends email** to `bizops@orangetsunami.com` with FedEx customs invoice PDFs attached
+1. **User sends email** to `bizops@orangetsunami.com` with FedEx or UPS customs invoice PDFs attached
 2. **Agent extracts** data from all PDFs in a single email → batches into one tracker
 3. **Agent performs OT lookups** (POV → MPN/Buyer/Salesperson) per the Processing Rules below
 4. **Agent populates tracker** using the template, marking rows for manual review where lookups fail
@@ -33,7 +33,7 @@ This workflow uses the agent pattern (see `email-workflow-architecture.md`).
 |--------|--------|-------------|
 | `process` | Processed | PDFs extracted successfully; tracker attached to confirmation email |
 | `needs_review` | NeedsReview | Extraction failed or PDFs unreadable; operator notified |
-| `skip` | Skipped | Email not relevant (no PDFs, wrong document type) |
+| `skip` | Skipped | Email not relevant (no PDFs, not a customs invoice) |
 
 ### Manual Review Flags
 
