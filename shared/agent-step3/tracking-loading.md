@@ -135,12 +135,12 @@ When you have exactly one PO reference and at least one tracking number:
 
 ## Single-Line vs Multi-Line Orders
 
-The handler automatically detects if the order has one line or multiple lines:
+The handler always writes tracking at the **line level** for consistency with manual entry by buyers:
 
 | Order Lines | MPN Required? | Tracking Applied To |
 |-------------|---------------|---------------------|
-| 1 line | No | Order header (`c_order.Chuboe_TrackingNumbers`) |
-| 2+ lines | **Yes** | Specific line (`c_orderline.Chuboe_TrackingNumbers`) |
+| 1 line | No | `c_orderline.Chuboe_TrackingNumbers` (auto-selects only line) |
+| 2+ lines | **Yes** | `c_orderline.Chuboe_TrackingNumbers` (specific line by MPN) |
 
 If the order has multiple lines and you don't provide `mpn`, the handler returns an error listing the available MPNs on the order. Extract the MPN from the shipping email and include it in the payload.
 

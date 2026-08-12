@@ -162,8 +162,10 @@ are detected, the handler returns an error and escalates to needs_review.
 **Single-line vs Multi-line:**
 | Order Lines | MPN Required? | Tracking Applied To |
 |-------------|---------------|---------------------|
-| 1 line | No | `c_order.Chuboe_TrackingNumbers` (order header) |
-| 2+ lines | **Yes** | `c_orderline.Chuboe_TrackingNumbers` (specific line) |
+| 1 line | No | `c_orderline.Chuboe_TrackingNumbers` (auto-selects only line) |
+| 2+ lines | **Yes** | `c_orderline.Chuboe_TrackingNumbers` (specific line by MPN) |
+
+**Note:** As of 2026-08-11, tracking is always written at the line level for consistency with manual entry by buyers. This avoids duplicate tracking appearing at both header and line levels.
 
 **Side effects:**
 - PATCH tracking field (order or line level)

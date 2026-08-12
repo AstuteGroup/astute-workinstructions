@@ -373,9 +373,18 @@ async function action_patch_tracking(payload, ctx) {
     };
   }
 
-  // Get order lines to determine single vs multi-line
+  // Get order lines — always write to line level for consistency with manual entry
   const lines = await getOrderLines(po.c_order_id);
   const lineCount = lines.length;
+
+  if (lineCount === 0) {
+    return {
+      error: 'Order has no lines',
+      documentno: po.documentno,
+      pov: pov || null,
+      tracking,
+    };
+  }
 
   // Multi-line order requires MPN to identify which line
   if (lineCount > 1 && !mpn) {
@@ -389,9 +398,13 @@ async function action_patch_tracking(payload, ctx) {
     };
   }
 
-  // For multi-line with MPN, find the matching line
+  // Determine target line:
+  // - Single-line: use the only line (no MPN needed)
+  // - Multi-line: find by MPN
   let targetLine = null;
-  if (lineCount > 1 && mpn) {
+  if (lineCount === 1) {
+    targetLine = lines[0];
+  } else if (mpn) {
     targetLine = findLineByMPN(lines, mpn);
     if (!targetLine) {
       return {
@@ -419,9 +432,9 @@ async function action_patch_tracking(payload, ctx) {
     }
   }
 
-  // Determine what we're patching: order header for single-line, line for multi-line
-  const patchTarget = targetLine ? 'line' : 'order';
-  const existingTracking = targetLine ? targetLine.existing_tracking : po.existing_tracking;
+  // Always patch at line level for consistency with manual entry
+  const patchTarget = 'line';
+  const existingTracking = targetLine.existing_tracking;
 
   // Merge tracking numbers
   const merged = mergeTracking(existingTracking, tracking);
@@ -439,8 +452,8 @@ async function action_patch_tracking(payload, ctx) {
         target: patchTarget,
         orderId: po.c_order_id,
         documentno: po.documentno,
-        lineId: targetLine ? targetLine.c_orderline_id : null,
-        mpn: targetLine ? targetLine.chuboe_mpn : null,
+        lineId: targetLine.c_orderline_id,
+        mpn: targetLine.chuboe_mpn,
         vendor: po.vendor_name,
         existing: existingTracking,
         merged,
@@ -469,16 +482,10 @@ async function action_patch_tracking(payload, ctx) {
     };
   }
 
-  // PATCH either order header or specific line
-  if (patchTarget === 'line') {
-    await patchRecord('c_orderline', targetLine.c_orderline_id, {
-      Chuboe_TrackingNumbers: merged,
-    });
-  } else {
-    await patchRecord('c_order', po.c_order_id, {
-      Chuboe_TrackingNumbers: merged,
-    });
-  }
+  // Always PATCH at line level for consistency with manual entry
+  await patchRecord('c_orderline', targetLine.c_orderline_id, {
+    Chuboe_TrackingNumbers: merged,
+  });
 
   // Write breadcrumb
   breadcrumbs.write({
@@ -492,8 +499,8 @@ async function action_patch_tracking(payload, ctx) {
     pov: po.pov || pov || null,
     lookupType,
     patchTarget,
-    lineId: targetLine ? targetLine.c_orderline_id : null,
-    mpn: targetLine ? targetLine.chuboe_mpn : null,
+    lineId: targetLine.c_orderline_id,
+    mpn: targetLine.chuboe_mpn,
     vendor: po.vendor_name,
     tracking_added: newAdded,
     carrier: carrier || null,
@@ -502,8 +509,8 @@ async function action_patch_tracking(payload, ctx) {
   // Send confirmation email
   const trackingList = newAdded.map(t => `<li>${esc(t)}${carrier ? ` (${esc(carrier)})` : ''}</li>`).join('');
   const povLine = (po.pov || pov) ? `<b>POV:</b> ${esc(po.pov || pov)}<br/>` : '';
-  const mpnLine = targetLine ? `<b>MPN:</b> ${esc(targetLine.chuboe_mpn)}<br/>` : '';
-  const targetNote = patchTarget === 'line' ? ' (line-level)' : ' (order-level)';
+  const mpnLine = `<b>MPN:</b> ${esc(targetLine.chuboe_mpn)}<br/>`;
+  const targetNote = ' (line-level)';
   const html = `<html><body style="font-family:Arial,sans-serif;font-size:13px">
 <h2 style="color:#080">Tracking loaded: ${esc(po.documentno)}${targetNote}</h2>
 <p><b>Vendor:</b> ${esc(po.vendor_name)}<br/>
@@ -526,8 +533,8 @@ async function action_patch_tracking(payload, ctx) {
     patchTarget,
     orderId: po.c_order_id,
     documentno: po.documentno,
-    lineId: targetLine ? targetLine.c_orderline_id : null,
-    mpn: targetLine ? targetLine.chuboe_mpn : null,
+    lineId: targetLine.c_orderline_id,
+    mpn: targetLine.chuboe_mpn,
     vendor: po.vendor_name,
     tracking_added: newAdded,
   };
