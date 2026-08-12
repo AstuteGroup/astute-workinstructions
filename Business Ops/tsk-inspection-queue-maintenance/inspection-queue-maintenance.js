@@ -412,8 +412,15 @@ async function processLots(opts) {
           }
           console.log(`AUTO-FIX: Lot ${lot.lot_id} (${lot.mpn}) → ${recommendation.so_documentno} Line ${recommendation.so_line_no} (${allocations.length} allocation(s))`);
         } catch (err) {
-          console.error(`ERROR: Lot ${lot.lot_id} → ${err.message}`);
-          results.escalations.push({ ...lot, classification: 'ERROR', reason: err.message });
+          // Auto-fix failed (likely missing CLI subcommand) — escalate with recommendation so user can manually fix
+          console.error(`AUTO-FIX FAILED: Lot ${lot.lot_id} → ${err.message}`);
+          results.escalations.push({
+            ...lot,
+            classification: 'AUTO_FIX_FAILED',
+            reason: `Link to ${recommendation.so_documentno} Line ${recommendation.so_line_no}`,
+            recommendation,
+            candidates: [recommendation]
+          });
           continue;
         }
       }
@@ -596,6 +603,7 @@ async function sendNotification(results) {
       if (issue === 'ESCALATE_QTY_MISMATCH') issue = 'Qty mismatch';
       if (issue === 'NO_CANDIDATES') issue = 'No SO Line found';
       if (issue === 'ERROR') issue = 'Error';
+      if (issue === 'AUTO_FIX_FAILED') issue = 'Manual fix needed';
 
       html += `
       <tr>

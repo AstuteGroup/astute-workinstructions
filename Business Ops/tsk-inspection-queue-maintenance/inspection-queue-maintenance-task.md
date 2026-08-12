@@ -117,6 +117,7 @@ RFQ → CQ Lines (IsSold='Y') → c_orderline (via chuboe_cq_line_id)
 | Scenario | Classification | Action |
 |----------|----------------|--------|
 | 1 candidate, exact qty, not allocated | AUTO_FIX | Link automatically |
+| AUTO_FIX attempted but write failed | AUTO_FIX_FAILED | Report with recommended SO Line for manual fix |
 | Multiple candidates, same qty | ESCALATE_MULTIPLE | Report with candidates |
 | Qty mismatch (lot > available) | ESCALATE_QTY_MISMATCH | Report with recommendation |
 | 0 candidates | NO_CANDIDATES | Skip (spec buy) |
