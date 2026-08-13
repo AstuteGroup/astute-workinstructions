@@ -185,7 +185,7 @@ All fields required by the VQ Mass Upload Template (see `vq-loading.md`). These 
 | Field | Column | Required | Default |
 |-------|--------|----------|---------|
 | RFQ | `chuboe_rfq_id`, `chuboe_rfq_line_id` | Yes | From MPN→RFQ lookup |
-| Vendor | `c_bpartner_id` | Yes | From domain-based lookup |
+| Vendor | `c_bpartner_id` | **Nullable** | From domain-based lookup; see note below |
 | MPN | `chuboe_mpn` | Yes | — |
 | MFR | `chuboe_mfr_id`, `chuboe_mfr_text` | Yes (ID required, not just text) | Resolved via `shared/mfr-lookup.js` |
 | Qty | `qty` | Yes | — |
@@ -200,6 +200,10 @@ All fields required by the VQ Mass Upload Template (see `vq-loading.md`). These 
 | RoHS | `chuboe_rohs` | No | — |
 | Vendor Notes | `chuboe_note_public` | No | — |
 | Buyer | `chuboe_buyer_id` | Yes | Astute employee who sourced |
+
+**Unknown vendor handling:** When a vendor doesn't exist in OT, `c_bpartner_id` can be `null` with the vendor name captured in `chuboe_note_user` (buyer internal notes), prefixed with `VENDOR: <name>`. This allows loading quotes without blocking on BP creation.
+- **VQ loading workflow:** Validate with buyer first before writing with null BP
+- **Market profiling:** OK to write directly with null BP
 
 **Fields that CAN be defaulted at VQ load time** (reduces PO prep work):
 
@@ -240,6 +244,34 @@ ALL Tier 1 fields PLUS the following. A VQ **MUST NOT** be marked `IsPurchased =
 | POST approve-order R_Request | `shared/r-request-writer.js` → `postApproveOrder({vqId, program, rfqId, summary, approvalText})` | `apiPost('r_request', {...})` directly |
 
 Both wrappers run the validator internally and abort on any violation.
+
+#### VQ Query Conventions
+
+##### Inactive Lead Time Offers (Shortage RFQs)
+
+For **Shortage RFQs**, API enrichment writes:
+- **Top 2-3 LT VQs by price** → `IsActive='Y'` with `LEAD TIME OFFER` in `Chuboe_Note_User`
+- **Additional LT VQs** → `IsActive='N'` with `LEAD TIME OFFER` in `Chuboe_Note_User`
+- **Stock VQs** → `IsActive='Y'` (no marker)
+
+This reduces seller confusion from excessive LT offers while preserving full pricing data for analytics.
+
+**Query patterns:**
+
+| Use Case | Query Pattern |
+|----------|---------------|
+| **Seller-facing views** (clean UX) | `WHERE isactive = 'Y'` |
+| **Analytics / Vortex / Internal tools** | `WHERE isactive = 'Y' OR (isactive = 'N' AND chuboe_note_user LIKE '%LEAD TIME OFFER%')` |
+
+**Convention for new VQ consumers:**
+
+> **Default to the inclusive query** (analytics pattern) unless building a seller-facing view.
+>
+> Any VQ query in a new workflow, tool, or report MUST explicitly consider whether to include inactive LT offers. Document the choice in the code.
+
+**How to identify "secondary LT offer" vs "legitimately inactive":**
+- `IsActive='N'` + `Chuboe_Note_User LIKE '%LEAD TIME OFFER%'` → Secondary LT offer (data preserved, filtered from seller view)
+- `IsActive='N'` + no `LEAD TIME OFFER` marker → Legitimately inactive (deactivated, cancelled, duplicate cleanup, etc.)
 
 ---
 

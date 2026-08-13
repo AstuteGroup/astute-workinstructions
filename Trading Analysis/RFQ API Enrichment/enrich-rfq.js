@@ -485,6 +485,7 @@ async function enrichRFQ(rfqDocNumber, opts = {}) {
             rfqMfrText: line.mfr || '',
             rfqLineMpnId: line.chuboe_rfq_line_mpn_id,
             crossRefClassifier,
+            rfqType,  // for LEAD TIME OFFER marker + top-N filtering on Shortage RFQs
           }
         );
         counters.vqsWritten += written.length;

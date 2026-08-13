@@ -171,6 +171,13 @@ const FLAG = {
   PRE_EXISTING_DUPLICATE: 'PRE_EXISTING_DUPLICATE',
 };
 
+// ─── Shortage RFQ Lead Time VQ Limiting ─────────────────────────────────────
+// For Shortage RFQs, limit lead time VQs to top N by price. Additional LT VQs
+// are written as IsActive='N' with LEAD TIME OFFER marker so they remain
+// queryable for analytics (Vortex, pricing analysis) while reducing seller
+// confusion. See shared/data-model.md § VQ Query Conventions.
+const MAX_LT_VQS_SHORTAGE = 3;
+
 // ─── Tier 1 Defaults (set at VQ load time) ─────────────────────────────────
 // See shared/data-model.md § VQ Field Requirements by Stage
 
@@ -579,6 +586,11 @@ async function writeVQFromAPI(rfqSearchKey, cpc, franchiseResults, opts = {}) {
   const failed = [];
   const skipped = [];
 
+  // Shortage RFQ LT filtering: collect LT rows, sort by price, write top N as
+  // active, rest as inactive. See shared/data-model.md § VQ Query Conventions.
+  const isShortageRfq = opts.rfqType === 'Shortage';
+  const pendingLtWrites = [];  // { payload, metadata } for deferred LT writes
+
   // Resolve RFQ and line
   const rfq = await resolveRFQ(rfqSearchKey);
   const rfqLineId = opts._rfqLineIdOverride || resolveRFQLine(rfq, opts.searchedMpn || '', cpc);
@@ -814,8 +826,16 @@ async function writeVQFromAPI(rfqSearchKey, cpc, franchiseResults, opts = {}) {
     // preserve the original vendor identity in the notes (since the BP field
     // now points to a generic placeholder). Prepended to the notes list so it
     // always appears first.
+    //
+    // Lead time detection (early): needed for LEAD TIME OFFER marker in notes
+    // AND for date code default selection later. Computed once, reused.
+    const isLeadTimeRow = !!(row.leadTime && String(row.leadTime).trim());
     const baseNotes = row.vendorNotes || d.vqVendorNotes || '';
-    const internalNotes = [vendorNamePrefix, baseNotes, packagingNote].filter(Boolean).join(' | ');
+    // Add LEAD TIME OFFER marker for Shortage RFQs — sellers flagged that LT VQs
+    // are confusing when mixed with stock; this makes them visually distinct.
+    // See shared/data-model.md § VQ Query Conventions.
+    const leadTimeMarker = (isLeadTimeRow && opts.rfqType === 'Shortage') ? 'LEAD TIME OFFER' : '';
+    const internalNotes = [vendorNamePrefix, leadTimeMarker, baseNotes, packagingNote].filter(Boolean).join(' | ');
 
     // Resolve vendor type and traceability from BP
     const vendorTypeId = await getBPVendorType(bp.id);
@@ -860,8 +880,8 @@ async function writeVQFromAPI(rfqSearchKey, cpc, franchiseResults, opts = {}) {
     //     have a current-year date code at minimum.
     // Brokers (and other vendor types) get no default — must come from
     // caller or stay null.
+    // Note: isLeadTimeRow computed earlier (before notes) for LEAD TIME OFFER marker.
     const dateCodeFromApi = row.dateCode || d.vqDateCode || (d.raw && d.raw.vqDateCode) || null;
-    const isLeadTimeRow = !!(row.leadTime && String(row.leadTime).trim());
     const authorizedDefault = isLeadTimeRow
       ? DEFAULT_DATE_CODE_LEAD_TIME
       : DEFAULT_DATE_CODE_STOCK;
@@ -1012,27 +1032,95 @@ async function writeVQFromAPI(rfqSearchKey, cpc, franchiseResults, opts = {}) {
       // apiPost's naturalKeyFields retry guard is still active below.
     }
 
-    // Write
-    try {
-      const result = await apiPost('Chuboe_VQ_Line', payload, {
-        naturalKeyFields: NATURAL_KEY_FIELDS,
-        context: 'vq-loading',
+    // Write — for Shortage RFQs with LT rows, defer to post-loop sorting.
+    // All other cases write immediately.
+    if (isShortageRfq && isLeadTimeRow) {
+      // Collect LT VQs for sorting by price — top N will be active, rest inactive
+      pendingLtWrites.push({
+        payload,
+        metadata: { mpn, vendorDisplay, bpId: bp.id, mfrId: mfrResult.id, mfr: mfrCanonical, price, qty, channel: row.channel || null },
+        NATURAL_KEY_FIELDS,
       });
-      written.push({
-        vqLineId: result.id, mpn, vendor: vendorDisplay, bpId: bp.id,
-        mfrId: mfrResult.id, mfr: mfrCanonical, price, qty,
-        channel: row.channel || null,
-      });
-    } catch (e) {
-      const { reason, network } = classifyWriteError(e, FLAG.API_WRITE_ERROR);
-      failed.push({
-        mpn, vendor: vendorDisplay, bpId: bp.id, price, qty,
-        reason,
-        network: network || undefined,
-        detail: e.message.substring(0, 200)
-      });
+    } else {
+      // Immediate write (stock rows, or non-Shortage RFQs)
+      try {
+        const result = await apiPost('Chuboe_VQ_Line', payload, {
+          naturalKeyFields: NATURAL_KEY_FIELDS,
+          context: 'vq-loading',
+        });
+        written.push({
+          vqLineId: result.id, mpn, vendor: vendorDisplay, bpId: bp.id,
+          mfrId: mfrResult.id, mfr: mfrCanonical, price, qty,
+          channel: row.channel || null,
+        });
+      } catch (e) {
+        const { reason, network } = classifyWriteError(e, FLAG.API_WRITE_ERROR);
+        failed.push({
+          mpn, vendor: vendorDisplay, bpId: bp.id, price, qty,
+          reason,
+          network: network || undefined,
+          detail: e.message.substring(0, 200)
+        });
+      }
     }
     } // end row loop
+  }
+
+  // ── Shortage RFQ: Sort LT VQs by price, write top N as active, rest as inactive ──
+  // This reduces seller confusion from excessive LT offers while preserving all
+  // pricing data for analytics (Vortex, price intelligence). Inactive LT VQs are
+  // identifiable by: IsActive='N' + Chuboe_Note_User contains 'LEAD TIME OFFER'.
+  // See shared/data-model.md § VQ Query Conventions.
+  if (pendingLtWrites.length > 0) {
+    // Sort by price (lowest first)
+    pendingLtWrites.sort((a, b) => (a.metadata.price || 0) - (b.metadata.price || 0));
+
+    for (let i = 0; i < pendingLtWrites.length; i++) {
+      const { payload, metadata, NATURAL_KEY_FIELDS: natKeys } = pendingLtWrites[i];
+      const isTopLt = i < MAX_LT_VQS_SHORTAGE;
+
+      // Set IsActive based on ranking
+      if (!isTopLt) {
+        payload.IsActive = false;
+      }
+
+      try {
+        const result = await apiPost('Chuboe_VQ_Line', payload, {
+          naturalKeyFields: natKeys,
+          context: 'vq-loading',
+        });
+        written.push({
+          vqLineId: result.id,
+          mpn: metadata.mpn,
+          vendor: metadata.vendorDisplay,
+          bpId: metadata.bpId,
+          mfrId: metadata.mfrId,
+          mfr: metadata.mfr,
+          price: metadata.price,
+          qty: metadata.qty,
+          channel: metadata.channel,
+          _isSecondaryLt: !isTopLt,  // flag for caller visibility
+        });
+      } catch (e) {
+        const { reason, network } = classifyWriteError(e, FLAG.API_WRITE_ERROR);
+        failed.push({
+          mpn: metadata.mpn,
+          vendor: metadata.vendorDisplay,
+          bpId: metadata.bpId,
+          price: metadata.price,
+          qty: metadata.qty,
+          reason,
+          network: network || undefined,
+          detail: e.message.substring(0, 200),
+        });
+      }
+    }
+
+    const activeCount = Math.min(pendingLtWrites.length, MAX_LT_VQS_SHORTAGE);
+    const inactiveCount = pendingLtWrites.length - activeCount;
+    if (inactiveCount > 0) {
+      logger.info(`[vq-writer] Shortage RFQ: wrote ${activeCount} active + ${inactiveCount} inactive LT VQs (sorted by price)`);
+    }
   }
 
   return { written, flagged, failed, skipped };
