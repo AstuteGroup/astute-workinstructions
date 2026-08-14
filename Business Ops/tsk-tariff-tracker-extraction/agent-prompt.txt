@@ -31,7 +31,7 @@ Read and follow the workflow instructions in:
 - Merge records with same tracking + same buyer + same salesperson
 - For total fees < $250, only populate through SOURCE column (leave MPN/QTY/COV/Buyer/Salesperson blank)
 - Only use MPN from OT database lookups, never from PDF commodity descriptions
-- Flag rows where lookups fail with [REVIEW: ...] comments in SOURCE column
+- Leave fields blank when lookups fail (no [REVIEW: ...] comments needed)
 
 ## Output
 

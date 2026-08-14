@@ -35,14 +35,13 @@ This workflow uses the agent pattern (see `email-workflow-architecture.md`).
 | `needs_review` | NeedsReview | Extraction failed or PDFs unreadable; operator notified |
 | `skip` | Skipped | Email not relevant (no PDFs, not a customs invoice) |
 
-### Manual Review Flags
+### Failed Lookups
 
 When a row cannot be fully populated, the agent:
 - **Populates all available fields** from the PDF (Entry No., Entry Date, Duties, MPF, Shipper, Tracking, Invoice)
-- **Leaves blank** fields that require failed lookups (MPN, QTY, COV, Buyer, Salesperson)
-- **Adds a comment** to the SOURCE column: `[REVIEW: tracking lookup failed]` or `[REVIEW: no POV found]`
+- **Leaves blank** fields that require failed lookups (MPN, QTY, COV, Buyer, Salesperson, SOURCE)
 
-The operator can then manually resolve the flagged rows in the output file.
+Blank fields indicate manual lookup is needed — no `[REVIEW: ...]` comments.
 
 ## Source Files
 
