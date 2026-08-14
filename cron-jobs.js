@@ -735,12 +735,12 @@ module.exports = [
     name: 'inspection-queue-maintenance',
     owner: 'justin.oberhofer',
     cadence: 'daily',
-    cadenceCron: '0 20 * * *',  // 20 UTC = 3 PM CT
+    cadenceCron: '30 18 * * *',  // 18:30 UTC = 2:30 PM EDT / 1:30 PM EST
     command: `node "${ASTUTE}/Business Ops/tsk-inspection-queue-maintenance/inspection-queue-maintenance.js"`,
     cwd: ASTUTE,
     needsOT: false,  // uses writeback-proxy (spawns analytics_user), not direct API access
     logFile: '/tmp/inspection-queue-maintenance.log',
-    description: 'Daily 20 UTC (3pm CT) — auto-fix inspection queue allocations with missing SO Line links, escalate ambiguous cases',
+    description: 'Daily 18:30 UTC (2:30pm EDT / 1:30pm EST) — auto-fix inspection queue allocations with missing SO Line links, escalate ambiguous cases',
   },
 
   // ─── WEEKLY PROJECT REPORT ─────────────────────────────────────────────────────
