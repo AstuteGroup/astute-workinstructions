@@ -11,7 +11,7 @@
 #   4. Edit shared/agent-config/<workflow>.json for configuration
 #   5. Run the generator
 #
-# Generated: 2026-07-30T22:06:05.242Z
+# Generated: 2026-08-11T22:15:22.748Z
 # ═══════════════════════════════════════════════════════════════════════════════
 
 You are processing the vq@orangetsunami.com inbox on a tiered cron schedule (5m burst / 15m steady).
@@ -788,7 +788,7 @@ STEP 4 — Summary.
 ═══════════════════════════════════════════════════════════════════════════════
 
 At the end, print a single-line summary in this exact shape:
-  VQ-LOADING-AGENT SUMMARY: processed=<N> load_vq=<N> correct_vq=<N> rfqs_written=<N> vqs_written=<N> vqs_skipped=<N> vqs_failed=<N> vqs_corrected=<N> forward_to_rfq_loading=<N> need_info_vendor=<N> clarify_vendor=<N> needs_vendor=<N> needs_review=<N> no_bid=<N> not_vq=<N> dup_skip=<N> outbound_pending=<N> errors=<N>
+  VQ-LOADING-AGENT SUMMARY: processed=<N> load_vq=<N> rfqs_written=<N> vqs_written=<N> vqs_skipped=<N> vqs_failed=<N> forward_to_rfq_loading=<N> need_info_vendor=<N> clarify_vendor=<N> needs_vendor=<N> needs_review=<N> no_bid=<N> not_vq=<N> dup_skip=<N> outbound_pending=<N> errors=<N>
 
 If 0 unseen messages, print "VQ-LOADING-AGENT SUMMARY: no unseen messages" and exit.
 
@@ -801,65 +801,3 @@ KNOWN LIMITATIONS (flag these in summary if hit; deferred to a follow-up).
   - **no_bid currently breadcrumb-only.** shared/vq-writer.js filters `cost > 0 && qty > 0` so a 0/0 VQ row would be silently dropped. The no_bid action records the decision in the breadcrumb but does NOT write a "we asked, declined" VQ row. Deferred: writer needs a `noBid: true` opt that bypasses the cost/qty filter.
 
   - **Type 1 template engine NOT wired into the agent.** vq-parser/templates/*.js (velocity, chip1, j2-sourcing, semitech, akira-global, atlantic-semi) do template-based extraction for known vendor formats. Today the agent does LLM extraction for every Type 1 email. Templates would be faster for the 5-10% high-volume vendors — deferred to a follow-up where templates become a tool the agent calls by sender domain.
-
-═══════════════════════════════════════════════════════════════════════════════
-POST-LOAD CORRECTIONS (correct_vq action)
-═══════════════════════════════════════════════════════════════════════════════
-
-When an operator (or earlier agent pass) loaded VQs with incorrect data and requests a correction, use `correct_vq` instead of deactivating and rewriting. This PATCHes the existing VQ lines directly, preserving their IDs and audit trail.
-
-**When to use `correct_vq`:**
-  - Operator replies to a prior escalation requesting vendor/buyer/field correction on EXISTING VQ lines
-  - Email subject/body contains phrases like "correct the vendor", "change buyer", "wrong vendor on VQ", "reassign to <user>", etc.
-  - The correction is for VQs that were already written (have chuboe_vq_line_id), NOT new quotes to load
-
-**How to identify correction requests (patterns in email body):**
-  - "correct vendor on RFQ <X> from <wrong> to <right>"
-  - "reassign buyer to <name>"
-  - "wrong vendor — should be <correct vendor>"
-  - "change the VQ vendor/buyer/mfr"
-  - References to specific VQ line IDs that need updating
-
-**Payload for `correct_vq`:**
-  {
-    "vqLineIds": [<chuboe_vq_line_id>, ...],  // REQUIRED — which VQ lines to correct
-    "corrections": {                           // REQUIRED — at least one field
-      "vendorBpId": <C_BPartner_ID>,           // New vendor
-      "vendorLocationId": <C_BPartner_Location_ID>, // New vendor location
-      "buyerId": <AD_User_ID>,                 // New buyer (Chuboe_Buyer_ID)
-      "mfrId": <Chuboe_Mfr_ID>,               // New manufacturer
-      "mfrText": "<string>",                   // New mfr text
-      // ... other fields as needed
-    },
-    "reason": "<why this correction is needed>",
-    "rfqSearchKey": "<RFQ value for context>"  // Optional
-  }
-
-**How to find the VQ line IDs:**
-  Query by RFQ + vendor + MPN to identify the affected lines:
-
-  SELECT v.chuboe_vq_line_id, v.chuboe_mpn, v.c_bpartner_id, bp.name as vendor_name
-  FROM adempiere.chuboe_vq_line v
-  JOIN adempiere.c_bpartner bp ON v.c_bpartner_id = bp.c_bpartner_id
-  JOIN adempiere.chuboe_rfq r ON v.chuboe_rfq_id = r.chuboe_rfq_id
-  WHERE r.value = '<rfqSearchKey>'
-    AND bp.name ILIKE '%<wrong vendor>%'
-    AND v.isactive = 'Y';
-
-**How to find the correct vendor/buyer IDs:**
-  - Vendor: Query c_bpartner by name to get c_bpartner_id + c_bpartner_location_id
-  - Buyer: Query ad_user by name to get ad_user_id
-
-**Dispatch:**
-  node /home/analytics_user/workspace/astute-workinstructions/shared/email-workflow-poller.js route <uid> correct_vq --workflow vq-loading --payload '<json>'
-
-**Handler behavior:**
-  - Applies PATCH to each VQ line using shared/vq-patcher.correctVQ()
-  - Logs a breadcrumb with before/after values
-  - Sends confirmation email to operator (Jake)
-  - Moves email to Processed folder
-
-**DO NOT route needs_review for correction requests.** If you have enough information to identify:
-  1. Which VQ lines need correction
-  2. What the correct values should be
-...then execute the correction via `correct_vq`. Only escalate if the request is ambiguous (e.g., "fix the vendor issue" without specifying which vendor or which RFQ).

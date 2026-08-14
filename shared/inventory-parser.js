@@ -67,6 +67,29 @@ function cleanNumeric(value) {
 }
 
 /**
+ * Convert Excel serial date to YYYY-MM-DD string
+ * Excel dates are stored as days since 1900-01-01 (with a leap year bug for 1900)
+ */
+function excelDateToYMD(value) {
+    if (value == null || value === '') return '';
+    // If already a string in YYYY-MM-DD format, return as-is
+    if (typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value)) {
+        return value;
+    }
+    // If it's a number (Excel serial date), convert
+    const serial = parseFloat(value);
+    if (isNaN(serial) || serial < 1) return String(value);
+    // Excel serial date: days since 1900-01-01 (but Excel wrongly thinks 1900 was a leap year)
+    // Subtract 2 to account for Excel's epoch (1900-01-01 = day 1) and the 1900 leap year bug
+    const utcDays = serial - 25569; // Days since 1970-01-01
+    const date = new Date(utcDays * 86400000);
+    const yyyy = date.getUTCFullYear();
+    const mm = String(date.getUTCMonth() + 1).padStart(2, '0');
+    const dd = String(date.getUTCDate()).padStart(2, '0');
+    return `${yyyy}-${mm}-${dd}`;
+}
+
+/**
  * Check if row is a footer row (contains "Page " or "USS,")
  */
 function isFooterRow(row) {
@@ -100,6 +123,9 @@ function normalizeRow(rawRow) {
         // Clean numeric fields
         if (outputField === 'qty' || outputField === 'unitCost') {
             normalized[outputField] = cleanNumeric(value);
+        } else if (outputField === 'dateLot') {
+            // Convert Excel serial date to YYYY-MM-DD for consistent comparison
+            normalized[outputField] = excelDateToYMD(value);
         } else {
             // String fields — trim and preserve
             normalized[outputField] = value != null ? String(value).trim() : '';

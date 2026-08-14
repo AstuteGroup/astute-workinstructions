@@ -114,6 +114,28 @@ The SessionStart greeting reads this file and surfaces all open items, sorted by
   - **Files changed:** `shared/workflow-actions/vq-loading.js` (implemented), `shared/vq-writer.js` (implemented), `shared/load-bulk-summary.js` (implemented), `Trading Analysis/RFQ Sourcing/vq_loading/agent-prompt.txt` (needs reply detection logic)
   - **Created / source:** 2026-05-26 session, git commit `599ba3c`
 
+- [ ] 🟢 **Franchise API Enrichment: Consolidate duplicated API+VQ patterns into single module** *(opened 2026-08-06)*
+  - **Context:** Discovered during UK excess stock profiling (offer 1027459). A one-off enrichment script was written incorrectly — it expected `writeVQs: true` to automatically persist VQs, but that option doesn't exist. The correct pattern requires calling `searchAllDistributors()` then separately calling `writeVQBatch()`. This pattern is duplicated across multiple workflows.
+  - **The problem:**
+    1. `searchAllDistributors()` returns data but doesn't persist
+    2. Caller must separately wire up `writeVQBatch()`
+    3. If batch write fails or process dies before it runs, all API data is lost
+    4. Easy to implement incorrectly (as happened today)
+  - **Current duplicated implementations:**
+    - `scripts/amat-rfq-enrichment.js`
+    - Various ad-hoc enrichment scripts
+    - Each implements their own collect→batch→write logic
+  - **Proposed solution:** Add `enrichMpnWithVQs()` or similar that:
+    1. Calls franchise APIs
+    2. Writes VQs immediately (atomically per MPN)
+    3. VQ becomes the checkpoint for resume capability
+    4. Callers just invoke one function, don't implement their own batching
+  - **Ready when:** Next refactoring session or when another enrichment task comes up.
+  - **Files to modify:**
+    - `shared/franchise-api.js` — add the consolidated function
+    - Update existing scripts to use the new pattern
+  - **Created / source:** 2026-08-06 session, UK excess stock profiling for offer 1027459.
+
 - [ ] 🟢 **Hung `himalaya` process accumulation — add a reaper and/or timeout wrapper** *(opened 2026-05-26, surfaced during a live "VQ loader killing OT" incident)*
   - **Context:** Colleague reported a VQ loader "killing OT." Investigation found OT prod was healthy (API 404 at root in 61ms), but THIS analytics box was at **load average 40.7** sustained 15+ min. Cause: **65 orphaned `himalaya attachment download` processes** across the `vq`, `rfqloading`, and `stockrfq` inboxes — abandoned email-attachment fetches from past Claude sessions that hung mid-download and were never reaped. They held **469% aggregate CPU** (≈4.7 cores). Oldest had been spinning **~82 days**; newest ~17 days. Parent shells were dead `/tmp/claude-*-cwd` interactive shells. Killed all 65 (`ps … | grep "[h]imalaya" | awk '{print $1}' | xargs -r kill -9`) → count→0, CPU freed; load decaying. Because VQ/RFQ/Stock loaders all run *through* himalaya, the symptom looked like "the VQ loader is thrashing." No actual VQ-loader node process was running.
   - **Why blocked:** operator said "save this for discussion later" (2026-05-26). Incident itself resolved; this is the *prevention*.
@@ -705,6 +727,16 @@ The SessionStart greeting reads this file and surfaces all open items, sorted by
 ---
 
 ## Done (recent — pruned monthly)
+
+- ✅ **Enrich-poller timeout fix for large RFQs** *(closed 2026-08-07)*
+  - **Problem:** Large RFQs (500+ MPNs) require thousands of API calls and can take 3-4+ hours to process. The default 2h cron-runner timeout was killing jobs mid-process, causing repeated 120m timeout failures (19 failures observed).
+  - **Resolution:** Extended hard timeout to 4 hours in `cron-jobs.js`, added graceful soft timeout at 3.5 hours in `enrich-poller.js`. The soft timeout checks before each RFQ, logs "SOFT TIMEOUT", and exits gracefully, allowing the backfill tracker to save progress.
+  - **Files:** `cron-jobs.js` (timeoutMs: 4h), `Trading Analysis/RFQ API Enrichment/enrich-poller.js` (SOFT_TIMEOUT_MS, isTimedOut(), softTimeoutHit checks in processing loops)
+
+- ✅ **rfq-loader-daemon timeout fix (idle-exit pattern)** *(closed 2026-08-07)*
+  - **Problem:** The daemon was designed to run forever polling the RFQ load queue, but the 2h cron-runner timeout would kill it even when idle. This caused 19 timeout failures.
+  - **Resolution:** Added idle-exit feature: daemon now exits after 30 minutes of no work (`IDLE_EXIT_MS`). Cron will restart it if needed. This matches the pattern used by other daemons.
+  - **File:** `scripts/rfq-loader-daemon.js` (IDLE_EXIT_MS, idleSince tracking in main loop)
 
 - ✅ **Per-Seller VQ Digest: Mimecast blocking emails** *(closed 2026-07-01; opened 2026-06-17)*
   - **Resolution:** Issue self-resolved — emails now delivering successfully to all `@astutegroup.com` recipients. Likely Mimecast whitelist or DMARC propagation delay. Confirmed working: 2026-06-29 (6 sellers, 24 VQs), 2026-06-30 (12 sellers, 309 VQs), 2026-07-01 (12 sellers, 351 VQs). Cron runs daily at `5 10 * * *` (10:05 UTC / 5:05 CT).

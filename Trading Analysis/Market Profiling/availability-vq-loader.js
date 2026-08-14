@@ -31,8 +31,8 @@ const logger = require(path.join(sharedPath, 'logger')).createLogger('Availabili
 
 // ─── Configuration ─────────────────────────────────────────────────────────
 
-// Placeholder BP ID for unknown vendors - same as VQ loader uses
-const UNKNOWN_VENDOR_PLACEHOLDER_BP_ID = 1000003;
+// Unknown vendors: write VQ with C_BPartner_ID = null, vendor name in Chuboe_Note_User
+// For profiling: OK to write directly. For VQ loading workflow: validate with buyer first.
 
 // How long to consider existing VQs when checking for duplicates
 const DUPLICATE_CHECK_DAYS = 14;
@@ -76,10 +76,12 @@ async function resolveVendorBP(supplierName) {
     logger.debug(`Historical BP fallback failed for '${supplierName}': ${e.message}`);
   }
 
-  // Unknown vendor - use placeholder (same pattern as VQ loader)
+  // Unknown vendor - return null BP, vendor name goes in buyer notes
+  // For profiling: OK to write directly with null BP
+  // For VQ loading workflow: should validate with buyer first
   return {
-    id: UNKNOWN_VENDOR_PLACEHOLDER_BP_ID,
-    source: 'placeholder',
+    id: null,
+    source: 'unknown',
     vendorName: supplierName
   };
 }
@@ -307,20 +309,20 @@ async function writeAvailabilityVQ(rfq, row, dryRun = false) {
   const mfrId = mfrResult.id || null;
 
   // Build notes
-  const vendorDisplay = bpResult.source === 'placeholder' ? bpResult.vendorName : supplierName;
+  const vendorDisplay = bpResult.source === 'unknown' ? bpResult.vendorName : supplierName;
   const availabilityNote = buildAvailabilityNote(row, vendorDisplay);
 
-  // Prepend vendor name to notes if using placeholder BP
+  // Prepend vendor name to notes if BP is unknown (null)
   let finalNote = availabilityNote;
-  if (bpResult.source === 'placeholder') {
-    finalNote = `Vendor: ${supplierName} | ${availabilityNote}`;
+  if (bpResult.source === 'unknown') {
+    finalNote = `VENDOR: ${supplierName} | ${availabilityNote}`;
   }
 
-  // Build payload
+  // Build payload - omit C_BPartner_ID if unknown (null)
   const payload = {
     Chuboe_RFQ_ID: rfq.id,
     Chuboe_RFQ_Line_ID: rfqLineId,
-    C_BPartner_ID: bpResult.id,
+    ...(bpResult.id ? { C_BPartner_ID: bpResult.id } : {}),
     Chuboe_MPN: offeredMpn || mpn,
     Chuboe_MFR_Text: mfrText,
     ...(mfrId ? { Chuboe_MFR_ID: mfrId } : {}),
@@ -344,9 +346,9 @@ async function writeAvailabilityVQ(rfq, row, dryRun = false) {
     };
   }
 
-  // Write VQ
+  // Write VQ (context: vq-loading bypasses protected table check)
   try {
-    const result = await apiPost('Chuboe_VQ_Line', payload);
+    const result = await apiPost('Chuboe_VQ_Line', payload, { context: 'vq-loading' });
     return {
       status: 'written',
       vqLineId: result.id,

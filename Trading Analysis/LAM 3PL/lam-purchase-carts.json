@@ -1,0 +1,20 @@
+{
+  "description": "LAM Kitting purchase carts - accumulate parts by supplier before bulk submission",
+  "created": "2026-08-06",
+  "carts": {
+    "Future": [
+      {
+        "mpn": "550-2205F",
+        "cpc": "662-094083-001",
+        "manufacturer": "DIALIGHT",
+        "description": "LED,PCB,RA,5MM,HIGH,EFF GRN ROHS",
+        "qty": 100,
+        "cost": 0.395,
+        "resale": 0.6651,
+        "margin": 0.406,
+        "dateAdded": "2026-08-06"
+      }
+    ]
+  },
+  "submitted": []
+}

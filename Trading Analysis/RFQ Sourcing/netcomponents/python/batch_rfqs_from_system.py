@@ -1149,7 +1149,8 @@ async def main():
             print(f'Cooldown (recently RFQ\'d): {cooldown_count}')
         print(f'No suppliers found: {no_suppliers}')
         print(f'Total time: {total_time:.1f}s ({total_time/60:.1f} min)')
-        print(f'Avg time per part: {total_time/len(parts):.1f}s')
+        if len(parts) > 0:
+            print(f'Avg time per part: {total_time/len(parts):.1f}s')
         print(f'Results saved to: {output_file}')
         print('-' * 60)
         print('SUPPLIER DISTRIBUTION')

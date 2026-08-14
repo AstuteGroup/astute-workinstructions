@@ -28,7 +28,10 @@ const { findLatestInforXlsx } = require('../../shared/lam-threshold-check');
 const { getCacheStatus } = require('../../shared/inventory-fetch-and-parse');
 
 const EMAIL_ACCOUNT = 'lamkitting';
-const NOTIFY_EMAIL = process.env.NOTIFY_EMAIL || 'jake.harris@astutegroup.com,josh.syre@astutegroup.com';
+// Manual runs → Jake only. Cron runs → Jake + Josh (set via NOTIFY_EMAIL env var in cron-jobs.js)
+const NOTIFY_EMAIL_MANUAL = 'jake.harris@astutegroup.com';
+const NOTIFY_EMAIL_CRON = 'jake.harris@astutegroup.com,josh.syre@astutegroup.com';
+const NOTIFY_EMAIL = process.env.NOTIFY_EMAIL || NOTIFY_EMAIL_MANUAL;
 const notifier = createNotifier({
   fromEmail: `${EMAIL_ACCOUNT}@orangetsunami.com`,
   fromName: 'LAM 3PL'
@@ -95,6 +98,21 @@ function loadNotOnAvlItems(sourcedCsvPath) {
   } catch (err) {
     log(`  WARNING: could not parse ${notOnAvlPath}: ${err.message}`);
     return { items: [] };
+  }
+}
+
+// Load Warehouse Inventory Audit sidecar — inventory MPNs that don't match AVL
+// Includes packaging variants and completely unmatched items
+function loadWarehouseAudit(sourcedCsvPath) {
+  const auditPath = sourcedCsvPath.replace('_sourced.csv', '.csv').replace('.csv', '_warehouse_audit.json');
+  if (!fs.existsSync(auditPath)) {
+    return { candidateMatches: [], unmatched: [] };
+  }
+  try {
+    return JSON.parse(fs.readFileSync(auditPath, 'utf-8'));
+  } catch (err) {
+    log(`  WARNING: could not parse ${auditPath}: ${err.message}`);
+    return { candidateMatches: [], unmatched: [] };
   }
 }
 
@@ -602,6 +620,85 @@ function buildNotOnAvlTab(workbook, notOnAvlItems) {
 }
 
 /**
+ * Build the "Warehouse MPN Audit" tab for inventory MPNs that don't match AVL.
+ * Includes packaging variants (likely matches) and completely unmatched items.
+ * NOTE: W118 (consignment) is excluded from this audit — only W111 + W115.
+ *
+ * @param {ExcelJS.Workbook} workbook - The workbook to add the sheet to
+ * @param {Object} auditData - Audit data with candidateMatches and unmatched arrays
+ */
+function buildWarehouseAuditTab(workbook, auditData) {
+  // Always create the tab — even if empty — so it's clear the check ran
+  const ws = workbook.addWorksheet('Warehouse MPN Audit');
+
+  // Headers for this tab (W118 excluded — consignment stock from other programs)
+  const headers = [
+    'Inventory MPN', 'W111 Qty', 'W115 Qty', 'Total Qty',
+    'Match Type', 'Likely CPC', 'AVL MPN', 'Notes'
+  ];
+  ws.addRow(headers);
+  const headerRow = ws.getRow(1);
+  headerRow.font = { bold: true };
+  headerRow.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFD580' } };  // Amber - needs review
+
+  // Add candidate matches (packaging variants) first
+  const candidates = auditData.candidateMatches || [];
+  for (const item of candidates) {
+    const firstCandidate = item.avlCandidates?.[0] || {};
+    const row = ws.addRow([
+      item.inventoryMpn || '',
+      item.w111Qty || 0,
+      item.w115Qty || 0,
+      item.totalQty || 0,
+      'PACKAGING VARIANT',
+      firstCandidate.cpc || '',
+      firstCandidate.avlMpn || '',
+      item.notes || `Likely packaging variant. Confirm with warehouse.`,
+    ]);
+    // Light yellow for candidates
+    row.eachCell(cell => {
+      cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFFF99' } };
+    });
+  }
+
+  // Add unmatched items (need investigation)
+  const unmatched = auditData.unmatched || [];
+  for (const item of unmatched) {
+    const row = ws.addRow([
+      item.inventoryMpn || '',
+      item.w111Qty || 0,
+      item.w115Qty || 0,
+      item.totalQty || 0,
+      'UNMATCHED',
+      '', // No CPC match
+      '', // No AVL MPN match
+      item.notes || `No AVL match found. Investigate: mislabel? wrong warehouse? obsolete stock?`,
+    ]);
+    // Light red for unmatched
+    row.eachCell(cell => {
+      cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFF9999' } };
+    });
+  }
+
+  // Column widths
+  ws.getColumn(1).width = 30;   // Inventory MPN
+  ws.getColumn(2).width = 10;   // W111 Qty
+  ws.getColumn(3).width = 10;   // W115 Qty
+  ws.getColumn(4).width = 10;   // Total Qty
+  ws.getColumn(5).width = 20;   // Match Type
+  ws.getColumn(6).width = 18;   // Likely CPC
+  ws.getColumn(7).width = 30;   // AVL MPN
+  ws.getColumn(8).width = 60;   // Notes
+
+  // Number format for qty columns
+  [2, 3, 4].forEach(col => {
+    ws.getColumn(col).numFmt = '#,##0';
+  });
+
+  ws.views = [{ state: 'frozen', ySplit: 1 }];
+}
+
+/**
  * Rebuild the sourced Excel with an "RFQ Line #" column and RFQ search key.
  * Items with on-order/recent POV get blank RFQ Line (they were skipped).
  *
@@ -722,10 +819,13 @@ async function rebuildExcelWithRfqLines(sourcedCsvPath, xlsxPath, rfqMapping, ch
     const { newEntries, oldEntries } = splitEntriesByAge(allEntries);
 
     // Escalations tab — new items (≤7 days)
+    // Always create the tab even when empty (per operator request 2026-08-06)
     const newState = { entries: newEntries };
+    buildEscalationsTab(workbook, newState, csv, allHeaders, rfqMapping, escalationsContext, []);
     if (newEntries.length > 0) {
-      buildEscalationsTab(workbook, newState, csv, allHeaders, rfqMapping, escalationsContext, []);
       log(`  Escalations tab: ${newEntries.length} new item(s) this week`);
+    } else {
+      log(`  Escalations tab: empty (no new escalations this week)`);
     }
 
     // Pending Approval tab — older items (>7 days)
@@ -757,6 +857,15 @@ async function rebuildExcelWithRfqLines(sourcedCsvPath, xlsxPath, rfqMapping, ch
     log(`  NOT ON AVL tab: 0 items (all MPNs match AVL)`);
   }
 
+  // Warehouse MPN Audit tab — inventory MPNs that don't match AVL
+  // Includes packaging variants and unmatched items for investigation
+  const warehouseAuditData = checkData.warehouseAuditData || { candidateMatches: [], unmatched: [] };
+  const auditCount = (warehouseAuditData.candidateMatches?.length || 0) + (warehouseAuditData.unmatched?.length || 0);
+  if (auditCount > 0) {
+    buildWarehouseAuditTab(workbook, warehouseAuditData);
+    log(`  Warehouse MPN Audit tab: ${warehouseAuditData.candidateMatches?.length || 0} candidates, ${warehouseAuditData.unmatched?.length || 0} unmatched`);
+  }
+
   await workbook.xlsx.writeFile(xlsxPath);
 }
 
@@ -770,6 +879,8 @@ async function main() {
   let useXlsx = false;
   let useLegacyCsv = false;
 
+  let skipSourcing = false;
+
   for (const arg of process.argv.slice(2)) {
     if (arg.startsWith('--xlsx-path=')) {
       xlsxPath = arg.split('=')[1];
@@ -780,6 +891,9 @@ async function main() {
     } else if (arg === '--legacy-csv') {
       // Force legacy CSV mode (for testing only)
       useLegacyCsv = true;
+    } else if (arg === '--skip-sourcing') {
+      // Skip franchise API sourcing — use existing _sourced.csv if available
+      skipSourcing = true;
     }
   }
 
@@ -889,20 +1003,31 @@ async function main() {
     return;
   }
 
-  log('Step 4: Running franchise sourcing...');
   let sourcingFailed = false;
-  try {
-    const result = execSync(
-      `node "${path.join(SCRIPT_DIR, 'lam-kitting-source.js')}" "${alertsFile}"`,
-      { encoding: 'utf-8', timeout: 1200000 }  // 20 minutes
-    );
-    console.log(result);
-  } catch (err) {
-    log(`  ERROR: Sourcing failed: ${err.message}`);
-    if (err.stdout) console.log(err.stdout);
-    if (err.stderr) console.error(err.stderr);
-    sourcingFailed = true;
-    // Fall through — the source script writes partial results on SIGTERM
+  if (skipSourcing) {
+    log('Step 4: Skipping franchise sourcing (--skip-sourcing flag)');
+    const existingSourced = alertsFile.replace('.csv', '_sourced.csv');
+    if (!fs.existsSync(existingSourced)) {
+      log(`  WARNING: No existing sourced file found at ${existingSourced}`);
+      log(`  Proceeding without sourcing data — output will lack franchise pricing`);
+    } else {
+      log(`  Using existing sourced data: ${path.basename(existingSourced)}`);
+    }
+  } else {
+    log('Step 4: Running franchise sourcing...');
+    try {
+      const result = execSync(
+        `node "${path.join(SCRIPT_DIR, 'lam-kitting-source.js')}" "${alertsFile}"`,
+        { encoding: 'utf-8', timeout: 1200000 }  // 20 minutes
+      );
+      console.log(result);
+    } catch (err) {
+      log(`  ERROR: Sourcing failed: ${err.message}`);
+      if (err.stdout) console.log(err.stdout);
+      if (err.stderr) console.error(err.stderr);
+      sourcingFailed = true;
+      // Fall through — the source script writes partial results on SIGTERM
+    }
   }
 
   // Step 4b: Write RFQ + VQ lines for items without on-order
@@ -1047,6 +1172,13 @@ async function main() {
     log(`  NOT ON AVL items found: ${notOnAvlItems.length} (will add reconciliation tab)`);
   }
 
+  // Load Warehouse MPN Audit data
+  const warehouseAuditData = loadWarehouseAudit(sourcedCsv);
+  const auditCount = (warehouseAuditData.candidateMatches?.length || 0) + (warehouseAuditData.unmatched?.length || 0);
+  if (auditCount > 0) {
+    log(`  Warehouse audit items found: ${warehouseAuditData.candidateMatches?.length || 0} candidates, ${warehouseAuditData.unmatched?.length || 0} unmatched`);
+  }
+
   // If we have an RFQ mapping, rebuild the Excel with the RFQ Line # column AND
   // bake the RFQ number into the filename so the buyer can grep their inbox /
   // Downloads folder by RFQ. Also clean up the plain _sourced.xlsx that
@@ -1054,7 +1186,7 @@ async function main() {
   if (rfqMapping && rfqMapping.rfqSearchKey && fs.existsSync(sourcedCsv)) {
     sourcedXlsx = alertsFile.replace('.csv', `_RFQ${rfqMapping.rfqSearchKey}_sourced.xlsx`);
     try {
-      await rebuildExcelWithRfqLines(sourcedCsv, sourcedXlsx, rfqMapping, { wrongWarehouseData, pendingOrdersData, notOnAvlItems });
+      await rebuildExcelWithRfqLines(sourcedCsv, sourcedXlsx, rfqMapping, { wrongWarehouseData, pendingOrdersData, notOnAvlItems, warehouseAuditData });
       log(`  Excel rebuilt with RFQ line numbers → ${path.basename(sourcedXlsx)}`);
       if (fs.existsSync(defaultSourcedXlsx) && defaultSourcedXlsx !== sourcedXlsx) {
         fs.unlinkSync(defaultSourcedXlsx);

@@ -61,6 +61,11 @@ const BACKLOG_BATCH_SIZE = 10;
 // Stop draining backlog when DigiKey remaining calls drops below this.
 const QUOTA_FLOOR = 50;
 
+// Graceful timeout — exit cleanly before cron-runner kills us.
+// Hard timeout (cron-jobs.js) is 4h; soft timeout is 3.5h.
+// This allows the job to save progress and exit gracefully.
+const SOFT_TIMEOUT_MS = 3.5 * 60 * 60 * 1000;  // 3.5 hours
+
 const pool = new Pool({
   host: '/var/run/postgresql',
   database: process.env.PGDATABASE || 'idempiere_replica',
@@ -753,6 +758,10 @@ async function main() {
     process.on('SIGTERM', () => { releasePid(); process.exit(143); });
   }
 
+  // Track job start time for graceful timeout
+  const jobStartTime = Date.now();
+  const isTimedOut = () => (Date.now() - jobStartTime) >= SOFT_TIMEOUT_MS;
+
   // Phase 0: Prune backlog (drop items >7 days old and completed items)
   const pruned = pruneBacklog();
   if (pruned > 0) log(`Pruned ${pruned} stale/completed backlog items`);
@@ -998,7 +1007,15 @@ async function main() {
   // Phase 3: Process Tier 1-3 immediately (capped to immediateThisTick)
   const batchResults = [];
   let lastProcessedLineMpnCreated = null; // Track for watermark advancement
+  let softTimeoutHit = false;
   for (let idx = 0; idx < immediateThisTick.length; idx++) {
+    // Graceful timeout check — exit before cron-runner kills us
+    if (isTimedOut()) {
+      const elapsedMin = Math.round((Date.now() - jobStartTime) / 60000);
+      log(`SOFT TIMEOUT: ${elapsedMin}m elapsed, stopping gracefully. ${immediateThisTick.length - idx} RFQs deferred to next tick.`);
+      softTimeoutHit = true;
+      break;
+    }
     const r = immediateThisTick[idx];
     log(`Enriching ${r.rfq_number} (${r.rfq_type} ${r.priority}, ${r.line_mpns} MPNs)${r._gateApproved ? ' [gate-approved]' : ''}...`);
     try {
@@ -1070,7 +1087,8 @@ async function main() {
   const dkQuota = readQuotaState();
   const dkRemaining = dkQuota?.remainingCalls ?? '?';
 
-  const candidates = nextBatch(maxBacklogToProcess);
+  // Skip backlog drain if we already hit soft timeout
+  const candidates = softTimeoutHit ? [] : nextBatch(maxBacklogToProcess);
 
   if (candidates.length > 0) {
     const dkNote = dkBlocked
@@ -1082,6 +1100,13 @@ async function main() {
   const candidatesToProcess = candidates;
 
   for (let idx = 0; idx < candidatesToProcess.length; idx++) {
+    // Graceful timeout check — exit before cron-runner kills us
+    if (isTimedOut()) {
+      const elapsedMin = Math.round((Date.now() - jobStartTime) / 60000);
+      log(`SOFT TIMEOUT: ${elapsedMin}m elapsed, stopping backlog drain. ${candidatesToProcess.length - idx} items deferred.`);
+      softTimeoutHit = true;
+      break;
+    }
     const item = candidatesToProcess[idx];
     log(`  Backlog: enriching ${item.rfq_number} (${item.customer}, ${item.line_mpns} MPNs, queued ${item.queuedAt})...`);
     try {

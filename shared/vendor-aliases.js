@@ -61,7 +61,13 @@ function load() {
 }
 
 function normalizeKey(s) {
-  return String(s || '').toUpperCase().replace(/\s+/g, ' ').trim();
+  // Normalize curly apostrophes/quotes to straight, collapse whitespace
+  return String(s || '')
+    .replace(/[\u2018\u2019\u201B]/g, "'")  // curly single quotes to straight
+    .replace(/[\u201C\u201D]/g, '"')         // curly double quotes to straight
+    .toUpperCase()
+    .replace(/\s+/g, ' ')
+    .trim();
 }
 
 /**

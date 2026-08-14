@@ -690,7 +690,11 @@ const _bpCache = new Map(); // searchKey -> { id, name }
  * appear after the discriminating tokens.
  */
 function _normalizeBPName(s) {
-  return String(s || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
+  // Strip common corporate suffixes before normalizing
+  // This handles "Semi Source Inc." matching "Semi Source"
+  const suffixPattern = /\b(INC\.?|LLC\.?|LTD\.?|LIMITED|CORP\.?|CORPORATION|CO\.?|COMPANY|GMBH|S\.?R\.?L\.?|PTE\.?|PVT\.?|PTY\.?|S\.?A\.?|AG|BV|NV|KG|OY|AS|AB|SRL|EURL|SARL|SP\.?\s*Z\.?\s*O\.?\s*O\.?)\s*$|,\s*(INC|LLC|LTD)\.?\s*$/gi;
+  let clean = String(s || '').replace(suffixPattern, '').trim();
+  return clean.toUpperCase().replace(/[^A-Z0-9]/g, '');
 }
 
 /**
@@ -893,11 +897,13 @@ async function resolveBP(searchKey, vendorName) {
     const literalStart = candidates.filter(r => r.Name.toUpperCase().startsWith(inputUpper));
     const tokenStart = candidates.filter(r => tokenizeBP(r.Name).some(t => t.startsWith(inputUpper.replace(/[^A-Z0-9]+/g, ''))));
     const normStart = candidates.filter(r => _normalizeBPName(r.Name).startsWith(inputNorm));
+    // Also check reverse: input starts with candidate (handles input having extra suffixes)
+    const normStartReverse = candidates.filter(r => inputNorm.startsWith(_normalizeBPName(r.Name)));
 
     // Build pool in priority order, dedup by id.
     const seen = new Set();
     const pool = [];
-    for (const tier of [literalStart, tokenStart, normStart]) {
+    for (const tier of [literalStart, tokenStart, normStart, normStartReverse]) {
       for (const r of tier) {
         if (!seen.has(r.id)) { seen.add(r.id); pool.push(r); }
       }
