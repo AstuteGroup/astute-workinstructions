@@ -743,6 +743,19 @@ module.exports = [
     description: 'Daily 20 UTC (3pm CT) — auto-fix inspection queue allocations with missing SO Line links, escalate ambiguous cases',
   },
 
+  // ─── WEEKLY PROJECT REPORT ─────────────────────────────────────────────────────
+  {
+    name: 'weekly-project-report',
+    owner: 'justin.oberhofer',
+    cadence: 'weekly',
+    cadenceCron: '0 14 * * 1',  // 14:00 UTC = 9am CT on Mondays
+    command: `node "${ASTUTE}/Business Ops/cron-reports/cron-weekly/weekly-project-report.js" --send`,
+    cwd: ASTUTE,
+    needsOT: false,
+    logFile: '/tmp/weekly-project-report.log',
+    description: 'Mon 14:00 UTC (9am CT) — Weekly project report summarizing commits by project from the previous week',
+  },
+
   // ─── TARIFF TRACKER (FedEx customs invoice PDF extraction) ───────────────────
   {
     name: 'tariff-tracker-agent',
