@@ -1,8 +1,8 @@
-# Tariff & Oversized Shipment Tracker - PDF Extraction Workflow
+# Tariff & Oversized Shipment Tracker - Extraction Workflow
 
 ## Purpose
 
-The purpose of this workflow is to extract data from FedEx and UPS customs invoices (PDF) and populate the Tariff and Oversized Shipment Tracker Excel template.
+The purpose of this workflow is to extract data from FedEx/UPS customs invoices (PDF) and UPS duty alert emails, then populate the Tariff and Oversized Shipment Tracker Excel template.
 
 This is important because it automates the manual process of reading customs invoices, performing OT lookups for POV/MPN/Buyer/Salesperson data, and compiling the tracker — reducing processing time and ensuring consistent data capture.
 
@@ -21,8 +21,8 @@ This workflow uses the agent pattern (see `email-workflow-architecture.md`).
 
 ### How It Works
 
-1. **User sends email** to `bizops@orangetsunami.com` with FedEx or UPS customs invoice PDFs attached
-2. **Agent extracts** data from all PDFs in a single email → batches into one tracker
+1. **User sends email** to `bizops@orangetsunami.com` with FedEx/UPS customs invoice PDFs attached, OR forwards a UPS Duties Alert email
+2. **Agent extracts** data from PDFs or email body (for UPS Duties Alert) → batches into one tracker
 3. **Agent performs OT lookups** (POV → MPN/Buyer/Salesperson) per the Processing Rules below
 4. **Agent populates tracker** using the template, marking rows for manual review where lookups fail
 5. **Agent emails result** to the sender with the completed `.xlsx` attached
@@ -67,6 +67,56 @@ Blank fields indicate manual lookup is needed — no `[REVIEW: ...]` comments.
 | COV/Job | Customer order from OT lookup |
 | Buyer | PO salesrep from OT lookup |
 | Salesperson | SO salesrep from OT lookup |
+
+## Input Formats
+
+### 1. FedEx/UPS Customs Invoice PDFs
+
+Standard customs invoices attached to forwarded emails. Fields extracted per the Template Columns above.
+
+### 2. UPS Duties Alert Emails (Quantum View Manage)
+
+Email notifications from `pkginfo@ups.com` with subject "UPS Duties Alert". No PDF attachment — data is in the email body.
+
+**Identification:** Subject contains "UPS Duties Alert" AND `external_sender` = `pkginfo@ups.com`
+
+**Field Mapping:**
+
+| Email Field | Template Column |
+|-------------|-----------------|
+| `Customs Control Number: SCS51282703` | Customs Control Number |
+| `Total for Entry*: 22.3 USD` | Duties/Taxes |
+| `Lead Tracking Number: 1ZA8E5860412768471` | TR#/Reference Number |
+| `Shipper Information: ORMISTON WIRE LTD` | Shipper |
+
+**Fields NOT available in UPS Duties Alert:**
+- Entry Date (use email date as proxy)
+- MPF (included in Total for Entry — cannot separate)
+- Invoice Number (not provided)
+
+**Notes:**
+- "Total for Entry" includes duties, taxes, and government fees combined — cannot separate MPF
+- The $250 threshold rule still applies (if Total for Entry < $250, only populate through SOURCE)
+
+**Example Raw Email Body:**
+```
+Lead Tracking Number:   1ZA8E5860412768471
+UPS Importer Account Number, Country/Territory: 00006X5419/US
+Customs Control Number: SCS51282703
+Number of Packages:     1
+Shipment Total Weight:  0.5 KG
+UPS Service:    WORLDWIDE EXPRESS SAVER
+Total for Entry*:       22.3 USD
+Ship To Information:
+ASTUTE ELECTRONICS INC
+AUSTIN
+TX
+US
+Shipper Information:
+ORMISTON WIRE LTD
+ISLEWORTH
+GB
+```
 
 ## Processing Rules
 
@@ -243,3 +293,4 @@ node shared/email-workflow-poller.js route <uid> process --workflow tariff-track
 *Updated: 2026-07-16 - Added processing rules for merging, thresholds, and transportation charges*
 *Updated: 2026-07-22 - Clarified transportation >$1,000 threshold applies per shipment (not invoice); added wildcard tracking search; added COV lookup query; SOURCE column POVs only*
 *Updated: 2026-08-12 - Added email-driven automation via agent pattern (bizops@ inbox, batch PDFs per email, email results to justin.oberhofer); daily cron at 9 AM CT*
+*Updated: 2026-08-17 - Added UPS Duties Alert email format (Quantum View Manage notifications from pkginfo@ups.com)*
