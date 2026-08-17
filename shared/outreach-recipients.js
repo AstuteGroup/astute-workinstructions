@@ -115,9 +115,55 @@ function externalSenderLabel(envelope, fallback) {
   return fallback || '(unknown)';
 }
 
+/**
+ * Extract the external sender email from payload/context.
+ *
+ * Used by external-notifier to determine where to send customer-facing
+ * notifications. Returns the first non-internal email found in the
+ * resolution chain.
+ *
+ * @param {object} payload - Action payload (may contain outerFrom, senderEmail, externalSender)
+ * @param {object} ctx - Workflow context (currentFrom, parsedExternalSender)
+ * @returns {string|null} External sender email or null if none found
+ */
+function extractExternalSender(payload, ctx) {
+  // 1. Explicit external sender from payload (set by poller parsing)
+  if (payload && payload.externalSender) {
+    return payload.externalSender.toLowerCase().trim();
+  }
+
+  // 2. Context-level external sender (set by read command parsing)
+  if (ctx && ctx.parsedExternalSender) {
+    return ctx.parsedExternalSender.toLowerCase().trim();
+  }
+
+  // 3. Check outerFrom/senderEmail — only if external
+  const candidates = [
+    payload && payload.outerFrom,
+    payload && payload.senderEmail,
+    ctx && ctx.currentFrom,
+  ];
+
+  for (const addr of candidates) {
+    if (!addr) continue;
+    const email = String(addr).toLowerCase().trim();
+    // Extract email from "Name <email>" format
+    const match = email.match(ADDR_RE);
+    if (match) {
+      const extracted = match[0];
+      if (!extracted.endsWith(ASTUTE_DOMAIN)) {
+        return extracted;
+      }
+    }
+  }
+
+  return null;
+}
+
 module.exports = {
   resolveOutreachRecipients,
   recipientsFooter,
   externalSenderLabel,
+  extractExternalSender,
   ASTUTE_DOMAIN,
 };

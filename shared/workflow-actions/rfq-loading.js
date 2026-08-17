@@ -17,7 +17,8 @@ const { enqueue } = require('../rfq-load-queue');
 const largeRfqGate = require('../large-rfq-gate');
 const pending = require('../workflow-pending-state');
 const { makeApprovalActions } = require('./_approval');
-const { resolveOutreachRecipients, recipientsFooter, externalSenderLabel } = require('../outreach-recipients');
+const { resolveOutreachRecipients, recipientsFooter, externalSenderLabel, extractExternalSender } = require('../outreach-recipients');
+const { sendExternalNeedInfo, hasCustomerAnswerableFields, filterCustomerAnswerableFields } = require('../external-notifier');
 
 /**
  * Send email via notifier, throwing if it fails.
@@ -278,10 +279,46 @@ ${recipientsFooter(envelope)}
     html,
     opts,
   );
+
+  // ── External sender notification (need-info) ────────────────────────────────
+  // After internal escalation, notify the external sender IF:
+  //   1. We have an external sender email
+  //   2. Missing fields are customer-answerable (mpn, qty, contact, company)
+  // Skip internal-only fields like rfq_type (Astute classification).
+  let externalNeedInfoSent = false;
+  const externalSender = extractExternalSender(payload, ctx);
+  if (externalSender && hasCustomerAnswerableFields(missingList)) {
+    try {
+      const customerFields = filterCustomerAnswerableFields(missingList);
+      const extResult = await sendExternalNeedInfo({
+        to: externalSender,
+        missing: customerFields,
+        originalSubject: subject,
+        messageId: ctx.currentMessageId || ctx.anchorMessageId,
+        replyTo: ctx.inbox,
+        fromEmail: ctx.inbox,
+      });
+      externalNeedInfoSent = extResult.sent;
+      if (extResult.sent) {
+        breadcrumbs.write({
+          cog: 'rfq-loading-agent',
+          event: 'external-need-info-sent',
+          uid: ctx.uid,
+          trackingId: ctx.trackingId,
+          to: externalSender,
+          missing: customerFields.map(m => typeof m === 'object' ? m.field : m),
+        });
+      }
+    } catch (extErr) {
+      // External notification is best-effort; never fail the action
+    }
+  }
+
   return {
     notified: envelope.to,
     recipients: envelope.recipientList,
-    external_sender_not_emailed: envelope.externalSender || null,
+    external_sender_not_emailed: externalNeedInfoSent ? null : (envelope.externalSender || null),
+    external_need_info_sent: externalNeedInfoSent ? externalSender : null,
     sidecar_anchor: ctx.anchorMessageId,
     retry_count: retryCount,
   };

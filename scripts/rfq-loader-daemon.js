@@ -27,7 +27,8 @@ const queue = require('../shared/rfq-load-queue');
 const { logout } = require('../shared/api-client');
 const breadcrumbs = require('../shared/breadcrumbs');
 const { createNotifier } = require('../shared/notifier');
-const { resolveOutreachRecipients } = require('../shared/outreach-recipients');
+const { resolveOutreachRecipients, extractExternalSender } = require('../shared/outreach-recipients');
+const { sendExternalConfirmation } = require('../shared/external-notifier');
 const { execSync } = require('child_process');
 const { evaluateFailureRate } = require('../shared/failure-rate-gate');
 const writerAttribution = require('../shared/writer-attribution');
@@ -411,6 +412,36 @@ This RFQ is now in Orange Tsunami.
         cc: ccList,
       });
       log(`  Confirmation sent to ${envelope.recipientList.join(', ')}`);
+
+      // ── External sender notification ────────────────────────────────────────
+      // After internal confirmation, notify the external sender (customer/broker)
+      // that their RFQ was received. Separate from internal flow for safety.
+      const externalSender = extractExternalSender(payload, {
+        currentFrom: payload.originalSender,
+      });
+      if (externalSender) {
+        try {
+          const extResult = await sendExternalConfirmation({
+            to: externalSender,
+            searchKey: result.searchKey,
+            partnerName: customerName,
+            lineCount: totalWritten,
+            originalSubject: payload.originalSubject,
+            messageId: payload.messageId,
+            replyTo: 'rfqloading@orangetsunami.com',
+            fromEmail: 'rfqloading@orangetsunami.com',
+          });
+          if (extResult.sent) {
+            log(`  External confirmation sent to ${externalSender}`);
+          } else if (extResult.reason === 'already-sent') {
+            log(`  External confirmation already sent for this message`);
+          } else {
+            log(`  External confirmation skipped: ${extResult.reason}`);
+          }
+        } catch (extErr) {
+          log(`  External confirmation failed: ${extErr.message}`);
+        }
+      }
     }
   } catch (e) {
     log(`  Confirmation email failed: ${e.message}`);

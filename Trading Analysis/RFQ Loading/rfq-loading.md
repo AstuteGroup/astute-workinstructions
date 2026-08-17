@@ -141,13 +141,28 @@ There are TWO contacts to resolve, and they're often different people:
 
 Support staff (assistants, ops people) increasingly forward customer RFQs on behalf of the sales rep who owns the account. The outer `From:` is the support person; the real operator is one hop deeper in the quoted chain. Resolve in this order, first match wins:
 
-- **Tier A — Internal forward chain (primary signal).** If the **outer `From:`** is `@astutegroup.com` AND there is a **deeper `@astutegroup.com` `From:`** in the quoted block, the **outer is the forwarder** and the **deeper one is the operator-on-record**. Resolve the deeper email via `resolveAstuteUserByEmail(deeperEmail)` from `shared/partner-lookup.js` and pass the result as `salesrepId`. This is the dead giveaway pattern; it does not require any explicit text hint.
+- **Tier A-0 — RFQ Support Staff Check (FIRST).** If the **outer `From:`** is `@astutegroup.com`:
+  - Resolve the outer email via `resolveAstuteUserByEmail(outerEmail)` to get their `userId`.
+  - Check `isKnownRfqSupport(userId)` from `shared/partner-lookup.js`.
+  - **If in `rfq_support[]`** → DO NOT use as salesrep. Continue to Tier A (walk deeper in the chain).
+  - **If NOT in `rfq_support[]`** → USE THEM as salesrep (short-circuit). They are the operator-on-record.
+
+  This is the "simple direct-from-seller" case: Tim Premo emails rfqloading@ → Tim is the salesrep (no chain walk needed). The registry ensures support staff like Maya Gomez or Will Robinson don't get incorrectly assigned.
+
+- **Tier A — Internal forward chain (fires when Tier A-0 identified support staff).** If we got here, the outer sender is support staff. Look for a **deeper `@astutegroup.com` `From:`** in the quoted block. If found, the **deeper one is the operator-on-record**. Resolve the deeper email via `resolveAstuteUserByEmail(deeperEmail)` from `shared/partner-lookup.js` and pass the result as `salesrepId`. This is the dead giveaway pattern; it does not require any explicit text hint.
 - **Tier B — Explicit text hint (fallback).** If Tier A doesn't fire, scan the forwarder's note + signature block + subject for explicit owner hints like `on behalf of <Name>`, `for <Name>`, `assigned to <Name>`, `salesrep: <Name>`. If found, call `resolveAstuteUserByName(name)`:
   - `unambiguous: true` → pass that `userId` as `salesrepId`.
   - `ambiguous: true` → escalate via `need_info` with the candidate list rather than guessing.
   - `null` → fall through to Tier C.
 - **Tier C — Outer forwarder.** If the outer `From:` is `@astutegroup.com` and Tier A didn't fire (no deeper internal sender), resolve the outer via `resolveAstuteUserByEmail(outerEmail)`. This is the standard direct-from-rep pattern.
 - **Tier D — Default (last resort).** No internal sender anywhere → omit `salesrepId` from the payload. The handler defaults to Jake (1000004).
+
+**Example flows:**
+- `From: Maya Gomez → Tim Premo → rfqloading@` → Maya is in rfq_support, walk deeper → salesrep = Tim (Tier A)
+- `From: Tim Premo → rfqloading@` → Tim not in rfq_support → salesrep = Tim (Tier A-0 short-circuit)
+- `From: customer@acme.com → Maya Gomez → rfqloading@` → outer is external → Maya is support, walk deeper → no internal sender → Tier D default to Jake
+
+**Registry:** See `shared/data/user-role-registry.json` `rfq_support[]` array. Use `isKnownRfqSupport()` from `shared/partner-lookup.js`.
 
 **Don't conflate the two ladders.** `userId` is on the CUSTOMER side (their contact); `salesrepId` is on the ASTUTE side (our operator). A typical forwarded RFQ has the customer contact buried in the quoted block AND a separate Astute forward chain on top of it — both need separate resolution.
 

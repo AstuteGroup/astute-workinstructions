@@ -684,7 +684,7 @@ function loadUserRoleRegistry() {
   const file = path.join(__dirname, 'data', 'user-role-registry.json');
   if (!fs.existsSync(file)) {
     // Fail open with empty lists rather than crashing — operator gets escalated for everyone
-    _roleRegistryCache = { buyers: [], support: [], _missing: true };
+    _roleRegistryCache = { buyers: [], support: [], rfq_support: [], _missing: true };
     _roleRegistryLoadedAt = now;
     return _roleRegistryCache;
   }
@@ -693,11 +693,12 @@ function loadUserRoleRegistry() {
     _roleRegistryCache = {
       buyers: Array.isArray(raw.buyers) ? raw.buyers : [],
       support: Array.isArray(raw.support) ? raw.support : [],
+      rfq_support: Array.isArray(raw.rfq_support) ? raw.rfq_support : [],
     };
     _roleRegistryLoadedAt = now;
     return _roleRegistryCache;
   } catch (e) {
-    _roleRegistryCache = { buyers: [], support: [], _parseError: e.message };
+    _roleRegistryCache = { buyers: [], support: [], rfq_support: [], _parseError: e.message };
     _roleRegistryLoadedAt = now;
     return _roleRegistryCache;
   }
@@ -713,6 +714,24 @@ function isKnownSupport(adUserId) {
   if (adUserId == null) return false;
   const reg = loadUserRoleRegistry();
   return reg.support.some(s => Number(s.id) === Number(adUserId));
+}
+
+/**
+ * Check if user is in the RFQ support registry (forwards RFQs on behalf of sellers).
+ *
+ * Used by the Tier A-0 pattern in RFQ loading: when the outer From: is
+ * @astutegroup.com and in rfq_support, they should NOT be used as salesrep —
+ * instead walk deeper in the chain to find the actual seller they're
+ * forwarding for. Anyone @astutegroup.com NOT in rfq_support is treated as
+ * the salesrep and short-circuits the chain walk.
+ *
+ * @param {number|string|null} adUserId - ad_user_id to check
+ * @returns {boolean} true if user is in rfq_support array
+ */
+function isKnownRfqSupport(adUserId) {
+  if (adUserId == null) return false;
+  const reg = loadUserRoleRegistry();
+  return reg.rfq_support.some(s => Number(s.id) === Number(adUserId));
 }
 
 /**
@@ -873,6 +892,7 @@ module.exports = {
   loadUserRoleRegistry,
   isKnownBuyer,
   isKnownSupport,
+  isKnownRfqSupport,
   resolveBuyerFromRegistry,
 
   // Utilities
