@@ -770,6 +770,19 @@ module.exports = [
     timeoutMs: 30 * 60 * 1000,  // 30 min (agent default)
     description: 'Daily 19:30 UTC (2:30pm EST) — scrape bizops@ for FedEx/UPS customs invoice PDFs, extract tariff data, perform OT lookups, email completed tracker to justin.oberhofer@',
   },
+
+  // ─── BROWNSVILLE INSPECTION VALIDATION ────────────────────────────────────
+  {
+    name: 'brownsville-inspection-report',
+    owner: 'justin.oberhofer',
+    cadence: 'fixed',
+    cadenceCron: '0 12 * * 1-5',  // 12:00 UTC = 8am EDT, Mon-Fri
+    command: `node "${ASTUTE}/reports/brownsville-inspection-report.js" --send`,
+    cwd: ASTUTE,
+    needsOT: false,  // reads replica only, no OT writes
+    logFile: '/tmp/brownsville-inspection-report.log',
+    description: 'Mon-Fri 8am EDT (12:00 UTC) — Brownsville inspection validation daily digest to justin.oberhofer@',
+  },
 ];
 
 // Helper: convert cadence string to milliseconds (used by sentinel + runner).
