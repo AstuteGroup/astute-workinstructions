@@ -220,7 +220,7 @@ async function main() {
         logEvent(job.name, 'success-force', { durationMs, note: 'sentinel not updated (--force)' });
         crumb(job.name, 'job-success-force', { durationMs });
       } else {
-        markSuccess(job.name, cadenceMs);
+        markSuccess(job.name, cadenceMs, job.cadenceCron);
         logEvent(job.name, 'success', { durationMs });
         crumb(job.name, 'job-success', { durationMs });
       }

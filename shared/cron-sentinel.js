@@ -105,17 +105,70 @@ function shouldRun(jobName, cadence) {
 }
 
 /**
- * Record a successful run. Advances nextDue by `cadenceMs` from now.
+ * Parse a cron expression and return the next occurrence after `after`.
+ * Supports: minute hour * * dayOfWeek (for weekly) or minute hour * * * (for daily).
+ * Returns null if the expression can't be parsed.
  */
-function markSuccess(jobName, cadenceMs) {
+function nextCronOccurrence(cronExpr, after = new Date()) {
+  if (!cronExpr) return null;
+
+  const parts = cronExpr.trim().split(/\s+/);
+  if (parts.length !== 5) return null;
+
+  const [minute, hour, , , dayOfWeek] = parts;
+  const targetMinute = parseInt(minute, 10);
+  const targetHour = parseInt(hour, 10);
+
+  if (isNaN(targetMinute) || isNaN(targetHour)) return null;
+
+  const result = new Date(after);
+  result.setUTCSeconds(0, 0);
+  result.setUTCMinutes(targetMinute);
+  result.setUTCHours(targetHour);
+
+  // If dayOfWeek is specified (0-6 or 7 for Sunday), align to that day
+  if (dayOfWeek !== '*') {
+    const targetDay = parseInt(dayOfWeek, 10) % 7; // 7 -> 0 (Sunday)
+    const currentDay = result.getUTCDay();
+    let daysUntil = targetDay - currentDay;
+
+    // If we're past the target time today, or it's not the right day, advance
+    if (daysUntil < 0 || (daysUntil === 0 && result <= after)) {
+      daysUntil += 7;
+    }
+    result.setUTCDate(result.getUTCDate() + daysUntil);
+  } else {
+    // Daily: if we're past the target time today, advance to tomorrow
+    if (result <= after) {
+      result.setUTCDate(result.getUTCDate() + 1);
+    }
+  }
+
+  return result;
+}
+
+/**
+ * Record a successful run. Advances nextDue based on cadenceCron (if provided)
+ * or falls back to adding cadenceMs from now.
+ *
+ * @param {string} jobName
+ * @param {number} cadenceMs - Fallback interval in milliseconds
+ * @param {string} [cadenceCron] - Cron expression for aligned scheduling
+ */
+function markSuccess(jobName, cadenceMs, cadenceCron) {
   const prev = readSentinel(jobName) || {};
   const now = new Date();
+
+  // Try to align to cron schedule; fall back to naive interval
+  const alignedNext = nextCronOccurrence(cadenceCron, now);
+  const nextDue = alignedNext || new Date(now.getTime() + cadenceMs);
+
   writeSentinel(jobName, {
     jobName,
     lastSuccess: now.toISOString(),
     lastAttempt: now.toISOString(),
     lastFailureReason: null,
-    nextDue: new Date(now.getTime() + cadenceMs).toISOString(),
+    nextDue: nextDue.toISOString(),
     successCount: (prev.successCount || 0) + 1,
     failureCount: prev.failureCount || 0,
   });
@@ -155,5 +208,6 @@ module.exports = {
   markFailure,
   readSentinel,
   listSentinels,
+  nextCronOccurrence,
   SENTINEL_DIR,
 };
