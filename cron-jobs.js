@@ -441,6 +441,19 @@ module.exports = [
   },
 
   {
+    name: 'rfq-loading-daily-digest',
+    cadence: 'fixed',
+    // 12:05 UTC = 8:05am EDT — runs 5 min after VQ Loading digest.
+    // 24h window. Mirrors VQ Loading digest structure for RFQ Loading workflow.
+    cadenceCron: '5 12 * * *',
+    command: `node "${ASTUTE}/Trading Analysis/RFQ Loading/rfq-loading-daily-digest.js" --send`,
+    cwd: ASTUTE,
+    needsOT: false,
+    logFile: '/tmp/rfq-loading-daily-digest.log',
+    description: 'Daily 8:05am EDT (12:05 UTC) — RFQ Loading digest to operator (jake.harris@). 24h window. RFQs loaded, lines written, activity by route (enqueue/need_info/needs_review), customer breakdown, pending sidecars.',
+  },
+
+  {
     name: 'apac-vq-digest',
     cadence: 'fixed',
     // 6 PM Shenzhen local (UTC+8, no DST) = 10:00 UTC. APAC team VQ digest.
