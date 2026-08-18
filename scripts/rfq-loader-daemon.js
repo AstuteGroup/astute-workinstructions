@@ -329,13 +329,20 @@ ${result.errors.length > 5 ? `  ... +${result.errors.length - 5} more` : ''}
 
 — RFQ Loader Daemon (automated alert)`;
 
-      // Include workflow support CCs (e.g., Will Robinson) on alerts
-      await notifier.sendEmail(
-        'jake.harris@astutegroup.com',
-        alertSubject,
-        alertBody,
-        { cc: 'william.robinson@astutegroup.com' }
-      );
+      // Only CC Will Robinson if the RFQ involves support staff
+      const rfqSupportEmails = new Set([
+        'william.robinson@astutegroup.com',
+        'maya.gomez@astutegroup.com',
+        'gabriela.bernal@astutegroup.com',
+        'gustavo.orozco@astutegroup.com',
+        'ivy.song@astutegroup.com',
+        'vicky.ma01@astutegroup.com',
+      ]);
+      const senderEmail = (payload.originalSender || '').toLowerCase();
+      const involvesSupport = rfqSupportEmails.has(senderEmail);
+
+      const emailOpts = involvesSupport ? { cc: 'william.robinson@astutegroup.com' } : {};
+      await notifier.sendEmail('jake.harris@astutegroup.com', alertSubject, alertBody, emailOpts);
     }
   } catch (e) {
     log(`  Failure rate evaluation error: ${e.message}`);

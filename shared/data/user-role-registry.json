@@ -38,9 +38,9 @@
     "candidate_in_rfq_support": "DO NOT use as salesrep; walk deeper in the forward chain to find the actual seller"
   },
   "workflow_cc": {
-    "_doc": "Workflow-specific support CC lists. These addresses receive ALL emails (issues AND successes) for the workflow.",
+    "_doc": "Workflow-specific support CC lists. For rfq-loading, these addresses are CC'd only when the email involves rfq_support staff (Maya, Gabriela, etc.) — not on every RFQ.",
     "rfq-loading": [
-      { "email": "william.robinson@astutegroup.com", "name": "William Robinson", "_note": "CC on all RFQ loading responses per operator request 2026-08-18" }
+      { "email": "william.robinson@astutegroup.com", "name": "William Robinson", "_note": "CC when rfq_support staff involved, per operator request 2026-08-18" }
     ]
   }
 }

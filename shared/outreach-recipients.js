@@ -19,20 +19,45 @@ const path = require('path');
 const ASTUTE_DOMAIN = '@astutegroup.com';
 const ADDR_RE = /[A-Za-z0-9._+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}/g;
 
-// Load workflow-specific CC configuration from user-role-registry.json
-function loadWorkflowCc(workflow) {
-  if (!workflow) return [];
+// Load registry data (cached for performance)
+let _registryCache = null;
+function loadRegistry() {
+  if (_registryCache) return _registryCache;
   try {
     const registryPath = path.join(__dirname, 'data', 'user-role-registry.json');
-    const registry = JSON.parse(fs.readFileSync(registryPath, 'utf-8'));
-    const workflowCc = registry.workflow_cc && registry.workflow_cc[workflow];
-    if (Array.isArray(workflowCc)) {
-      return workflowCc.map(entry => entry.email).filter(Boolean);
-    }
+    _registryCache = JSON.parse(fs.readFileSync(registryPath, 'utf-8'));
   } catch (_) {
-    // Best-effort — registry read failure shouldn't block email sends
+    _registryCache = {};
+  }
+  return _registryCache;
+}
+
+// Get workflow-specific CC list from registry
+function getWorkflowCcList(workflow) {
+  if (!workflow) return [];
+  const registry = loadRegistry();
+  const workflowCc = registry.workflow_cc && registry.workflow_cc[workflow];
+  if (Array.isArray(workflowCc)) {
+    return workflowCc.map(entry => entry.email?.toLowerCase()).filter(Boolean);
   }
   return [];
+}
+
+// Get rfq_support emails from registry (for conditional CC logic)
+function getRfqSupportEmails() {
+  const registry = loadRegistry();
+  if (!Array.isArray(registry.rfq_support)) return new Set();
+  // We need to look up emails for these users - for now use name-based email pattern
+  // These are: William Robinson, Maya Gomez, Gabriela Bernal, Gustavo Orozco, Ivy Song, Vicky Ma01
+  const supportEmails = new Set([
+    'william.robinson@astutegroup.com',
+    'maya.gomez@astutegroup.com',
+    'gabriela.bernal@astutegroup.com',
+    'gustavo.orozco@astutegroup.com',
+    'ivy.song@astutegroup.com',
+    'vicky.ma01@astutegroup.com',
+  ]);
+  return supportEmails;
 }
 
 /**
@@ -103,11 +128,17 @@ function resolveOutreachRecipients(payload, ctx, opts = {}) {
   }
 
   // 5. Workflow-specific support CCs — from user-role-registry.json workflow_cc section.
-  //    These addresses receive ALL emails (issues AND successes) for the workflow.
-  if (workflow) {
-    const workflowCcList = loadWorkflowCc(workflow);
-    for (const email of workflowCcList) {
-      add(email);
+  //    Only added when the email involves support staff (rfq_support members).
+  //    e.g., Will Robinson gets CC'd when Maya/Gabriela/etc. forward an RFQ, but NOT
+  //    when a regular salesrep handles their own RFQ directly.
+  if (workflow === 'rfq-loading') {
+    const rfqSupportEmails = getRfqSupportEmails();
+    const involvesSupport = internal.some(email => rfqSupportEmails.has(email));
+    if (involvesSupport) {
+      const workflowCcList = getWorkflowCcList(workflow);
+      for (const email of workflowCcList) {
+        add(email);
+      }
     }
   }
 
