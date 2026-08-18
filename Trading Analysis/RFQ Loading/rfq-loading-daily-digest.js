@@ -91,7 +91,7 @@ function pullRfqMetadataBySearchKeys(searchKeys) {
     `LEFT JOIN adempiere.c_bpartner bp ON bp.c_bpartner_id = r.c_bpartner_id ` +
     `LEFT JOIN adempiere.ad_user u ON u.ad_user_id = r.salesrep_id ` +
     `LEFT JOIN adempiere.chuboe_rfq_type rt ON rt.chuboe_rfq_type_id = r.chuboe_rfq_type_id ` +
-    `WHERE r.value IN (${escaped}) AND r.isactive='Y';`;
+    `WHERE r.value IN (${escaped});`;  // Include deactivated for historical accuracy
   const out = psqlPipe(sql);
   const result = new Map();
   for (const line of out.trim().split('\n').filter(Boolean)) {
