@@ -88,6 +88,39 @@ function lookupContactName(userId) {
   }
 }
 
+/**
+ * Look up RFQ metadata from OT after write — authoritative source.
+ * Returns { customerName, salesrepName, rfqTypeName } from the actual RFQ record.
+ */
+function lookupRfqMetadataFromOT(rfqId) {
+  if (!rfqId) return { customerName: null, salesrepName: null, rfqTypeName: null };
+  try {
+    const sql = `
+      SELECT bp.name AS customer, u.name AS salesrep, rt.name AS rfq_type
+      FROM adempiere.chuboe_rfq r
+      LEFT JOIN adempiere.c_bpartner bp ON bp.c_bpartner_id = r.c_bpartner_id
+      LEFT JOIN adempiere.ad_user u ON u.ad_user_id = r.salesrep_id
+      LEFT JOIN adempiere.chuboe_rfq_type rt ON rt.chuboe_rfq_type_id = r.chuboe_rfq_type_id
+      WHERE r.chuboe_rfq_id = ${parseInt(rfqId, 10)}
+      LIMIT 1
+    `.replace(/\n/g, ' ');
+    const result = execSync(`psql -t -A -F'|' -c "${sql}"`, {
+      encoding: 'utf-8',
+      timeout: 5000,
+      env: { ...process.env, PGUSER: 'analytics_user', PGDATABASE: 'idempiere_replica' },
+    }).trim();
+    if (!result) return { customerName: null, salesrepName: null, rfqTypeName: null };
+    const [customer, salesrep, rfqType] = result.split('|');
+    return {
+      customerName: customer || null,
+      salesrepName: salesrep || null,
+      rfqTypeName: rfqType || null,
+    };
+  } catch (e) {
+    return { customerName: null, salesrepName: null, rfqTypeName: null };
+  }
+}
+
 // Notifier for confirmation emails
 const notifier = createNotifier({
   fromEmail: 'rfqloading@orangetsunami.com',
@@ -374,10 +407,12 @@ ${result.errors.length > 5 ? `  ... +${result.errors.length - 5} more` : ''}
       const toEmail = envelope.recipientList[0];
       const ccList = envelope.recipientList.slice(1);
 
-      // Look up metadata if not provided in payload
-      const customerName = payload.partnerName || lookupPartnerName(payload.bpartnerId) || '(unknown)';
-      const rfqTypeName = lookupRfqTypeName(payload.type) || '(unknown)';
-      const sellerName = lookupContactName(payload.salesrepId) || '(unknown)';
+      // Look up metadata from OT after write — authoritative source
+      // Don't trust payload values which may be stale/incorrect from parsing
+      const otMetadata = lookupRfqMetadataFromOT(result.rfqId);
+      const customerName = otMetadata.customerName || '(unknown)';
+      const rfqTypeName = otMetadata.rfqTypeName || '(unknown)';
+      const sellerName = otMetadata.salesrepName || '(unknown)';
       const description = payload.description || '';
 
       // Include tracking ID in subject when available for traceability
