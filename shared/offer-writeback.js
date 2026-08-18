@@ -71,6 +71,7 @@ const { isOtUnreachableError } = require('./ot-error');
 const { psqlQuery, cleanMpn } = require('./db-helpers');
 const { lookupMfr } = require('./mfr-lookup');
 const { resolveMfrForRow } = require('./mfr-resolver');
+const { validateUserIsActive } = require('./partner-lookup');
 const otBudget = require('./ot-api-budget');
 const { retryLine } = require('./loader-patterns');
 
@@ -238,6 +239,20 @@ async function writeOffer(opts) {
   if (!bpartnerId) throw new Error('offer-writeback: bpartnerId is required');
   if (!rawOfferType) throw new Error('offer-writeback: offerTypeId is required');
   if (!lines || lines.length === 0) throw new Error('offer-writeback: at least one line is required');
+
+  // Validate userId and buyerId are active if provided (bug fix 2026-08-18: reject inactive users)
+  if (userId) {
+    const userCheck = validateUserIsActive(userId);
+    if (!userCheck.valid) {
+      throw new Error(`offer-writeback: userId validation failed — ${userCheck.reason}`);
+    }
+  }
+  if (buyerId) {
+    const buyerCheck = validateUserIsActive(buyerId);
+    if (!buyerCheck.valid) {
+      throw new Error(`offer-writeback: buyerId validation failed — ${buyerCheck.reason}`);
+    }
+  }
 
   // ── Deprecation warning ──
   if (writeMpnRecords) {

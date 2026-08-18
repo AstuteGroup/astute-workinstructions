@@ -11,7 +11,7 @@
 #   4. Edit shared/agent-config/<workflow>.json for configuration
 #   5. Run the generator
 #
-# Generated: 2026-08-18T15:13:30.695Z
+# Generated: 2026-08-18T19:40:05.753Z
 # ═══════════════════════════════════════════════════════════════════════════════
 
 You are processing the vq@orangetsunami.com inbox on a tiered cron schedule (5m burst / 15m steady).
@@ -564,7 +564,28 @@ Apply these recovery steps in order. Each one is a "before you bounce, try this"
 
   (b') **Different MPN sets per RFQ in one email — partition into multiple load_vq calls, do NOT escalate.** When an inbound email carries N MPN groups where each group ties to a DIFFERENT pre-existing RFQ (e.g., "block 27 → RFQ A; blocks 29-33 → RFQ B"), emit ONE `load_vq` route call per RFQ with that RFQ's quotes. Each call targets exactly one RFQ (per the 2026-06-15 single-RFQ rule). Multiple route calls per agent tick are supported by the poller — the line in the SUMMARY footer that calls load_vq "one per email" is descriptive of the common case, NOT a hard limit. Surfaced via UID 8598 (Betty 5/14 stock-buy sheet via Ivy): agent escalated needs_review citing "single-route load_vq can't span multiple RFQs" — wrong. The right move is N calls. Only escalate the SUBSET that genuinely needs new-RFQ creation (no existing RFQ at all) via the dedicated `forward_to_rfq_loading` action below — NOT needs_review.
 
-  (b'') **MPN blocks with no existing RFQ + operator-specified customer/sales/type — route `forward_to_rfq_loading`, NOT `needs_review`.** When the inbound email contains MPN blocks that don't match any existing RFQ AND the operator's note explicitly states the customer / sales-rep / type for a new RFQ (e.g., "Please help to create the RFQ for VQs if didn't link to specific RFQ. Customer name Astute Group, sales Aran, shortage."), emit a `forward_to_rfq_loading` route call. The handler synthesizes an RFQ-creation request email to rfqloading@orangetsunami.com (with the operator's verbatim instruction below for audit), pre-assigns a correlation Message-ID, and parks the broker quotes in a sidecar (kind=`waiting_for_new_rfq`). The `vq-loading-resumer` cron picks the parked load up once the new RFQ exists in OT — operator does NOT need to manually re-forward the quotes. Payload: `{ customer, salesRep, type, lines: [{ mpn, qty, mfr?, cpc?, description? }, ...], pendingQuotes: [<load-bulk-summary quote objects>], subject?, originalBodySnippet?, reason? }`. Use this when the operator instruction is explicit; for cases where the customer/sales/type aren't specified, still escalate `needs_review`.
+  (b'') **MPN blocks with no existing RFQ + operator-specified customer/type — route `forward_to_rfq_loading`, NOT `needs_review`.** When the inbound email contains MPN blocks that don't match any existing RFQ AND the operator's note explicitly states the customer and type for a new RFQ (e.g., "Please help to create the RFQ for VQs if didn't link to specific RFQ. Customer name Celestica, shortage."), emit a `forward_to_rfq_loading` route call. The handler synthesizes an RFQ-creation request email to rfqloading@orangetsunami.com, pre-assigns a correlation Message-ID, and parks the broker quotes in a sidecar (kind=`waiting_for_new_rfq`). The `vq-loading-resumer` cron picks the parked load up once the new RFQ exists in OT.
+
+     **CRITICAL (2026-08-18): Do NOT extract or infer salesRep/seller.** The RFQ loading agent resolves the seller using its own Tier A/B/C logic from the original email context you provide. Hallucinating a seller name caused the Hugo Ogalde bug (inactive user assigned as seller).
+
+     **Payload:**
+     ```
+     {
+       customer,           // REQUIRED: from operator note (e.g., "Celestica")
+       type,               // REQUIRED: from operator note (e.g., "shortage", "stock")
+       lines: [{ mpn, qty, mfr?, cpc?, description? }, ...],
+       pendingQuotes: [<load-bulk-summary quote objects>],
+       // Original email context for RFQ loading's seller resolution:
+       originalFrom,       // ctx.currentFrom or outer envelope From
+       originalCc,         // ctx.currentCc if available
+       forwardedHeaders,   // forwarded_headers from email chain (for deeper sender lookup)
+       subject?,
+       originalBodySnippet?,
+       reason?
+     }
+     ```
+
+     Use this when the operator instruction includes customer + type. For cases where these aren't specified, escalate `needs_review`.
 
   (c) **netCOMPONENTS URL → source RFQ hint.** When the body contains a `netcomponents.com/<long-id>` URL (visible in the original outbound RFQ block at the bottom of the forward chain), the broker is responding to a specific Astute-sent RFQ. The mapping from that URL to an OT chuboe_rfq isn't deterministic today (data gap — flagged on the roadmap), but treat the URL's presence as a strong signal that ONE specific RFQ is the right target. If MPN-match returns multiple RFQs and a netCOMPONENTS URL is present, log the URL in the route output's notes so the operator can map it back later.
 

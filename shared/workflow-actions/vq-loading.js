@@ -1728,8 +1728,6 @@ async function action_outbound_pending(payload, ctx) {
  *   customer        e.g., "Astute Group" — the customer name to give the
  *                    new RFQ. The rfq-loading agent's partner-lookup resolves
  *                    it; we don't need the BP ID here.
- *   salesRep        e.g., "Aran" — Astute internal sales rep name. The
- *                    rfq-loading agent's resolveAstuteUserByName picks it up.
  *   type            'Stock' | 'Shortage' | 'PPV' | ...
  *   lines           Array of { mpn, qty, mfr?, cpc?, description? } — what
  *                    the new RFQ should contain. The rfq-loading agent
@@ -1745,11 +1743,21 @@ async function action_outbound_pending(payload, ctx) {
  *                         in the forwarded body)
  *   reason               One-liner explaining why this is going to
  *                         rfq-loading instead of escalating
+ *   originalFrom         Original email From: address (for seller resolution)
+ *   originalCc           Original email Cc: addresses (for seller resolution)
+ *   forwardedHeaders     Forwarded headers from email chain (for seller resolution)
+ *
+ * NOTE (2026-08-18): salesRep is NO LONGER extracted by VQ loading agent.
+ * The RFQ loading agent resolves the seller using its standard Tier A/B/C
+ * logic from the original email context. This prevents hallucination of
+ * seller names that aren't in the email (bug: Hugo Ogalde incident).
  */
 async function action_forward_to_rfq_loading(payload, ctx) {
   const {
-    customer, salesRep, type, lines, pendingQuotes,
+    customer, type, lines, pendingQuotes,
     subject, originalBodySnippet, reason,
+    // Original email context for RFQ loading agent's seller resolution
+    originalFrom, originalCc, forwardedHeaders,
   } = payload;
 
   if (ctx.dryRun) {
@@ -1757,9 +1765,10 @@ async function action_forward_to_rfq_loading(payload, ctx) {
       dry_run: true,
       would_forward: {
         to: 'rfqloading@orangetsunami.com',
-        customer, salesRep, type,
+        customer, type,
         lineCount: Array.isArray(lines) ? lines.length : 0,
         pendingQuoteCount: Array.isArray(pendingQuotes) ? pendingQuotes.length : 0,
+        hasOriginalContext: !!(originalFrom || forwardedHeaders),
       },
     };
   }
@@ -1775,15 +1784,42 @@ async function action_forward_to_rfq_loading(payload, ctx) {
     `<tr><td>${esc(l.mpn || '')}</td><td align="right">${esc(String(l.qty || ''))}</td><td>${esc(l.mfr || '')}</td><td>${esc(l.cpc || '')}</td><td>${esc(l.description || '')}</td></tr>`
   ).join('\n');
 
+  // Build original context section for seller resolution
+  // The RFQ loading agent uses this to resolve the seller via its standard
+  // Tier A/B/C logic, NOT from vq@ as the envelope sender
+  const originalContextRows = [];
+  if (originalFrom) {
+    originalContextRows.push(`<tr><td>Original From</td><td><code>${esc(originalFrom)}</code></td></tr>`);
+  }
+  if (originalCc) {
+    const ccList = Array.isArray(originalCc) ? originalCc.join(', ') : originalCc;
+    originalContextRows.push(`<tr><td>Original Cc</td><td><code>${esc(ccList)}</code></td></tr>`);
+  }
+  if (forwardedHeaders) {
+    // forwardedHeaders may contain nested From: lines from the forward chain
+    const fwdSnippet = typeof forwardedHeaders === 'string'
+      ? forwardedHeaders.slice(0, 500)
+      : JSON.stringify(forwardedHeaders).slice(0, 500);
+    originalContextRows.push(`<tr><td>Forwarded Headers</td><td><pre style="margin:0;font-size:10px">${esc(fwdSnippet)}</pre></td></tr>`);
+  }
+
   const body = `<html><body style="font-family:Arial,sans-serif;font-size:13px">
-<h3 style="color:#246">RFQ creation request from VQ Loading workflow</h3>
-<p>The VQ loading workflow received an email containing offers for parts that don't have an existing RFQ. Per the operator instruction in that email, please create the RFQ as follows:</p>
+<h3 style="color:#246">[VQ→RFQ Forward] RFQ creation request</h3>
+<p><b>⚠️ This is a VQ→RFQ forward.</b> The VQ loading workflow received broker quotes for parts without an existing RFQ. Use the <b>Original Email Context</b> below for seller resolution — do NOT use vq@orangetsunami.com as the sender.</p>
+
 <table border="1" cellpadding="4" cellspacing="0" style="border-collapse:collapse;margin-bottom:12px">
-  <tr><th align="left">Field</th><th align="left">Value</th></tr>
+  <tr><th align="left" colspan="2" style="background:#f0f0f0">RFQ Details (from operator instruction)</th></tr>
   <tr><td>Customer</td><td><b>${esc(customer)}</b></td></tr>
-  <tr><td>Sales rep (Astute operator-on-record)</td><td><b>${esc(salesRep)}</b></td></tr>
   <tr><td>Type</td><td><b>${esc(type)}</b></td></tr>
+  <tr><td>Seller</td><td><i>Resolve from original context below</i></td></tr>
 </table>
+
+${originalContextRows.length > 0 ? `
+<table border="1" cellpadding="4" cellspacing="0" style="border-collapse:collapse;margin-bottom:12px">
+  <tr><th align="left" colspan="2" style="background:#e8f4e8">Original Email Context (for seller resolution)</th></tr>
+  ${originalContextRows.join('\n')}
+</table>
+` : '<p style="color:#c00"><b>Warning:</b> No original email context provided — seller resolution may default to Jake Harris.</p>'}
 
 <p><b>Lines to add (${(lines || []).length}):</b></p>
 <table border="1" cellpadding="4" cellspacing="0" style="border-collapse:collapse">
@@ -1800,7 +1836,7 @@ Correlation Message-ID: <code>${esc(assignedMessageId)}</code><br/>
 Reason: ${esc(reason || 'new-RFQ-creation needed for parts without an existing RFQ match')}</i></p>
 
 ${originalBodySnippet ? `<hr style="margin-top:16px"/>
-<p style="color:#666;font-size:11px"><i>Original email context for audit:</i></p>
+<p style="color:#666;font-size:11px"><i>Original email body (for context/audit):</i></p>
 <pre style="background:#f5f5f5;padding:8px;white-space:pre-wrap;font-size:11px">${esc(originalBodySnippet.slice(0, 4000))}</pre>` : ''}
 </body></html>`;
 
@@ -1826,7 +1862,14 @@ ${originalBodySnippet ? `<hr style="margin-top:16px"/>
     forwarded_to: 'rfqloading@orangetsunami.com',
     forwarded_message_id: assignedMessageId,
     forwarded_at: new Date().toISOString(),
-    correlation: { customer, salesRep, type },
+    // NOTE: salesRep intentionally NOT included — RFQ loading agent resolves
+    // seller from originalFrom/forwardedHeaders using its Tier A/B/C logic
+    correlation: { customer, type },
+    original_context: {
+      from: originalFrom || null,
+      cc: originalCc || null,
+      forwarded_headers: forwardedHeaders || null,
+    },
     expected_line_count: Array.isArray(lines) ? lines.length : 0,
     pending_quotes: Array.isArray(pendingQuotes) ? pendingQuotes : [],
     // 7-day expiry — if the RFQ hasn't been created by then, surface to
@@ -1843,8 +1886,9 @@ ${originalBodySnippet ? `<hr style="margin-top:16px"/>
     messageId: ctx.currentMessageId || ctx.anchorMessageId || null,
     forwarded_message_id: assignedMessageId,
     customer,
-    salesRep,
     type,
+    // salesRep intentionally omitted — resolved by RFQ loading agent
+    original_from: originalFrom || null,
     line_count: Array.isArray(lines) ? lines.length : 0,
     pending_quote_count: Array.isArray(pendingQuotes) ? pendingQuotes.length : 0,
     sidecar_anchor: sidecarRecord && sidecarRecord.original_message_id,

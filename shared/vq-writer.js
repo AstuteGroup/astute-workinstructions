@@ -28,6 +28,7 @@ const { extractStockAndLtRows } = require('./franchise-api');
 const { lookupMfr, sanitizeMfrText } = require('./mfr-lookup');
 const { resolveMfrForRow } = require('./mfr-resolver');
 const { normalizePackaging, PACKAGING_MAP } = require('./packaging-lookup');
+const { validateUserIsActive } = require('./partner-lookup');
 const { isValidEccn } = require('./validators');
 const { isRestrictedMfrName, isRestrictedMfrId } = require('./restricted-mfrs');
 const { patchRecord } = require('./record-updater');
@@ -585,6 +586,14 @@ async function writeVQFromAPI(rfqSearchKey, cpc, franchiseResults, opts = {}) {
   const flagged = [];
   const failed = [];
   const skipped = [];
+
+  // Validate buyerId is active if provided (bug fix 2026-08-18: reject inactive users)
+  if (opts.buyerId) {
+    const buyerCheck = validateUserIsActive(opts.buyerId);
+    if (!buyerCheck.valid) {
+      throw new Error(`vq-writer: buyerId validation failed — ${buyerCheck.reason}`);
+    }
+  }
 
   // Shortage RFQ LT filtering: collect LT rows, sort by price, write top N as
   // active, rest as inactive. See shared/data-model.md § VQ Query Conventions.
@@ -1157,6 +1166,14 @@ function resolveRFQLineExact(rfq, mpn, cpc) {
  * @returns {{ written: Array, flagged: Array, failed: Array, needsReview: Array, summary: Object }}
  */
 async function writeVQBatch(rfqSearchKey, items, opts = {}) {
+  // Validate buyerId is active if provided (bug fix 2026-08-18: reject inactive users)
+  if (opts.buyerId) {
+    const buyerCheck = validateUserIsActive(opts.buyerId);
+    if (!buyerCheck.valid) {
+      throw new Error(`vq-writer: buyerId validation failed — ${buyerCheck.reason}`);
+    }
+  }
+
   const unseenEmailCount = opts.unseenEmailCount || 0;
   const caller = opts.caller || 'vq-loading-agent';
   const estimatedVQs = items.length * 10; // rough estimate: 10 VQs per item on average

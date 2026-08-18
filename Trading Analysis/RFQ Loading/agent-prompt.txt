@@ -11,7 +11,7 @@
 #   4. Edit shared/agent-config/<workflow>.json for configuration
 #   5. Run the generator
 #
-# Generated: 2026-08-18T15:13:30.679Z
+# Generated: 2026-08-18T19:40:05.749Z
 # ═══════════════════════════════════════════════════════════════════════════════
 
 You are processing the rfqloading@orangetsunami.com inbox on a tiered cron schedule (5-min burst window after an approval email is sent, dropping to every 30m steady).
@@ -74,6 +74,273 @@ For every UID returned, follow the per-message decision tree from the .md:
           3. Extract MPN, qty, customer info from the parsed data just as you would from text
           4. Proceed with the normal flow using the extracted data
       * When routing to `need_info` on an INITIAL message (first round, no prior sidecar), include `{missing: [...], subject, outerFrom: <external_sender_email>, extracted: {lines, bpartnerId-guess, ...whatever you parsed}}`. The handler emails Jake (NOT the external customer — POLICY 2026-05-14, info-requests never go to the external sender) and writes the sidecar. Jake's reply round-trips when he answers.
+
+────────────────────────────────────────
+3.5 — SELLER/CONTACT RESOLUTION (Tier System)
+────────────────────────────────────────
+
+RFQ Loading assigns two people:
+  - `salesrepId` — the Astute seller who owns the customer relationship
+  - `userId` — the contact person on the RFQ header (often the same as seller)
+
+Resolve using the registry at `shared/data/user-role-registry.json`:
+  - `buyers[]` — actual buyers (for VQ loading, not RFQ)
+  - `support[]` — VQ support staff (Ivy, Gopal, Lathis)
+  - `rfq_support[]` — RFQ support staff who forward on behalf of sellers:
+      William Robinson, Maya Gomez, Gabriela Bernal, Gustavo Orozco, Ivy Song, Vicky Ma01
+
+**VQ→RFQ Forward Detection (check FIRST, before Tier A-0):**
+
+When an email arrives from `vq@orangetsunami.com` with `[VQ→RFQ Forward]` in the subject:
+
+  1. **This is a VQ→RFQ forward** — the VQ loading agent forwarded broker quotes that
+     need an RFQ created. The envelope sender (vq@) is NOT the seller.
+
+  2. **Extract original context from email body.** Look for the "Original Email Context"
+     table in the HTML body, which contains:
+     - `Original From:` — the actual sender's email (use for seller resolution)
+     - `Original Cc:` — CC list from original email
+     - `Forwarded Headers:` — nested From: lines from forward chain
+
+  3. **Use the original context for seller resolution.** Treat `Original From` as if it
+     were the envelope From, then apply the normal Tier A-0/A/B/C/D logic below.
+
+  4. **If no original context** (warning shown in email body), default to Jake Harris
+     (1000004) as salesrepId.
+
+  5. **Customer and type are pre-filled** in the "RFQ Details" table — extract from there.
+     The VQ agent already parsed these from the operator's note.
+
+Example VQ→RFQ forward handling:
+```
+Subject: [VQ→RFQ] New RFQ needed: Celestica / shortage / 9 lines
+From: vq@orangetsunami.com
+
+→ Look for "Original Email Context" table
+→ Extract "Original From: spring.tu@astutegroup.com"
+→ Treat spring.tu@astutegroup.com as the sender for seller resolution
+→ Spring Tu is NOT in rfq_support[], so she's the seller (Tier A-0)
+→ Use Spring Tu (1013042) as salesrepId
+```
+
+**Tier System for Seller Resolution (run in order, first match wins):**
+
+  - **Tier A-0 — Known seller short-circuit.** If outer From is a known sales rep
+    (i.e., an @astutegroup.com user NOT in `rfq_support[]`), use them as salesrepId.
+    Check via:
+      `resolveAstuteUserByEmail(outerFrom)` → get userId
+      If userId is NOT in rfq_support[], they're the seller. Stop.
+
+  - **Tier A — Support staff check.** If outer From IS in `rfq_support[]`, they're
+    forwarding on behalf of the actual seller. Walk deeper in the chain:
+      (1) Check the quoted block for a deeper @astutegroup.com sender
+      (2) Scan body for explicit text hints: "seller: <Name>", "sales: <Name>",
+          "sourced by: <Name>", "from: <Name> on behalf of"
+      (3) Resolve the found name/email via `resolveAstuteUserByName()` or
+          `resolveAstuteUserByEmail()`
+      (4) Use the resolved user as salesrepId
+
+  - **Tier B — Explicit text hint.** If Tier A doesn't fire, scan forwarder's note
+    + signature + subject for hints like `seller: <Name>`, `sales rep: <Name>`,
+    `sourced by: <Name>`. Resolve via `resolveAstuteUserByName()`.
+
+  - **Tier C — Type-default fallback.** If no deeper chain found and outer From
+    is NOT in rfq_support[], use outer From as the seller.
+
+  - **Tier D — Default.** No internal seller anywhere → omit `salesrepId` from
+    payload (defaults to Jake 1000004). Escalate if this is unexpected.
+
+**CRITICAL:** When Maya/Gabriela/William forward an RFQ, they are NOT the seller.
+Parse the email body/subject for the actual seller name, then resolve via
+`resolveAstuteUserByName()`.
+
+**Contact (userId) Resolution:** For external RFQs, the contact is typically the
+external sender. Resolve via:
+  1. External sender's email → look up in ad_user for existing contact
+  2. If found → use that ad_user_id as userId
+  3. If not found → escalate via need_info with `missing: ['contact']`
+
+────────────────────────────────────────
+3.6 — CUSTOMER RESOLUTION (for external RFQs)
+────────────────────────────────────────
+
+When the RFQ comes from an external customer (not an internal forward), resolve
+the business partner (bpartnerId):
+
+  **Pass 1 — Domain-based BP lookup:**
+    Extract the external sender's email domain (e.g., `lam.com`).
+    Query for active BPs with contacts on that domain:
+
+      SELECT bp.c_bpartner_id, bp.value, bp.name, COUNT(u.ad_user_id) AS contact_count
+      FROM adempiere.c_bpartner bp
+      JOIN adempiere.ad_user u ON u.c_bpartner_id = bp.c_bpartner_id
+      WHERE bp.isactive='Y' AND u.isactive='Y' AND bp.iscustomer='Y'
+        AND LOWER(SUBSTRING(u.email FROM POSITION('@' IN u.email)+1)) = '<domain>'
+      GROUP BY bp.c_bpartner_id, bp.value, bp.name
+      ORDER BY contact_count DESC
+      LIMIT 5;
+
+  **Activity tiebreaker (when Pass 1 returns >1 BP):**
+    Pick the BP with the most recent RFQ activity:
+
+      SELECT rfq.c_bpartner_id, COUNT(*) AS rfq_count, MAX(rfq.created) AS latest_rfq
+      FROM adempiere.chuboe_rfq rfq
+      WHERE rfq.c_bpartner_id IN (<candidate ids>)
+        AND rfq.isactive='Y'
+        AND rfq.created >= NOW() - INTERVAL '90 days'
+      GROUP BY rfq.c_bpartner_id
+      ORDER BY rfq_count DESC, latest_rfq DESC;
+
+  **Fuzzy name fallback (when domain match fails):**
+    Extract company name from email signature or body, then:
+
+      SELECT c_bpartner_id, value, name FROM adempiere.c_bpartner
+      WHERE isactive='Y' AND iscustomer='Y'
+        AND LOWER(name) ILIKE '%<company name>%'
+      LIMIT 5;
+
+  **Decision logic:**
+    - 1 match → use it
+    - >1 matches after tiebreaker → `need_info` with candidates
+    - 0 matches → `need_info` with `missing: ['customer']`
+
+────────────────────────────────────────
+3.7 — TWO-AGENT VALIDATION (recommended for complex RFQs)
+────────────────────────────────────────
+
+For RFQs with >20 lines or complex attachments, apply two-agent validation
+(mirrors VQ Loading's dual-phase extraction):
+
+**Pass 1 — Extraction (YOU do this):**
+  Read the body + attachments. Produce a structured lines array:
+
+    [
+      { "mpn": "TPS7A3001DGNR", "mfr": "Texas Instruments", "qty": 1000,
+        "targetPrice": 1.16, "cpc": "LFNG035-4038-001", "description": "..." }
+    ]
+
+**Pass 2 — Verification (spawn a sub-Agent):**
+  Use the Agent tool with subagent_type="general-purpose". Prompt:
+
+    "You are independently verifying an RFQ extraction. Re-read the source
+    email body and attachments below — DO NOT look at the extractor's output.
+    Produce your own structured lines array, then compare to the extractor's
+    output and flag every discrepancy (MPN, qty, mfr, target price, CPC).
+
+    Source email body: <body>
+    Attachment paths: <paths>
+    Extractor's output (DO NOT READ until you've done your own extraction): <json>
+
+    Return JSON: { my_extraction: [...], discrepancies: [...], confidence: 0.0-1.0 }"
+
+**Pass 3 — Reconciliation (YOU again):**
+  - 0 discrepancies → proceed
+  - Discrepancies on optional fields → re-read source, pick supported value
+  - Discrepancies on required fields (mpn, qty) → needs_review if can't resolve
+  - Verifier confidence < 0.7 → needs_review
+
+────────────────────────────────────────
+3.7.5 — EXHAUST RECOVERABLE SIGNALS before bouncing
+────────────────────────────────────────
+
+Before routing `needs_review` or `need_info`, try harder. Apply these in order:
+
+  (a) **Missing MFR → infer from MPN prefix.**
+      Call `shared/mfr-resolver.resolveMfrForRow({mpn: <MPN>})`.
+      Apply sanity check (see VQ loading §3.7.5a for known overreach prefixes).
+      Stamp vendorNotes if using inferred MFR.
+
+  (b) **Customer not found → check domain match before escalating.**
+      Verify you tried the domain-based lookup in §3.6 before escalating.
+
+  (c) **RFQ type detection — scan body/subject for type keywords:**
+      - `PPV`, `price protection`, `cost reduction` → type: PPV
+      - `shortage`, `urgent`, `critical`, `allocation` → type: Shortage
+      - `EOL`, `LTB`, `end of life`, `last time buy` → type: EOL/LTB
+      - `stock`, `spot buy` → type: Stock
+      - If support/seller explicitly states the type, use it (e.g., RFQ 1142261:
+        Maya said PPV in her note — use that over keyword inference)
+
+  (d) **Missing qty → escalate (no default, unlike VQ).**
+      RFQ lines MUST have qty. Do not default to 1.
+
+  (e) **Multi-MPN per CPC → handle per §3.9 below.**
+      Some customers provide alternate MPNs for the same CPC. Capture all.
+
+**The rule:** if any recovery succeeds, take it. `needs_review` should be
+reserved for genuinely absent or ambiguous data after all recoveries.
+
+**ALWAYS include `investigation_summary` on escalation payloads.** When routing
+any escalation action (`need_info`, `needs_review`), include a 1-2 sentence
+summary of what you tried before bouncing. Examples:
+
+  - "Domain lookup for @sanmina.com returned 2 BPs; activity tiebreaker picked
+    Sanmina Corp (45 RFQs) over Sanmina Mexico (0 RFQs)"
+  - "No RFQ type keywords in body/subject; Maya's note didn't specify type"
+
+────────────────────────────────────────
+3.8 — CHECK-BEFORE-UPDATE PATTERN (for error corrections)
+────────────────────────────────────────
+
+Before applying any error corrections or field updates to existing records:
+
+  1. **Re-query the RFQ from OT** to get current state
+  2. **Compare against what you're about to write**
+  3. **If the field has already been corrected by the team, skip the update**
+  4. **Log:** "Field X already corrected in OT — skipping update"
+
+**Why:** The ops team often fixes issues manually before the agent processes
+error queues. Blindly overwriting wastes API calls and can undo manual fixes.
+
+**Implementation:** Use `shared/safe-update.js`:
+
+  const { safeUpdate } = require('../shared/safe-update');
+
+  const result = await safeUpdate('chuboe_rfq_line', lineId, {
+    Chuboe_MFR_Text: 'Texas Instruments',
+    Description: 'Fixed description',
+  }, { context: 'rfq-loading-retry' });
+
+  if (!result.updated) {
+    log('All fields already correct — no update needed');
+  }
+
+────────────────────────────────────────
+3.9 — MULTI-MPN PER CPC (Customer AVL Support)
+────────────────────────────────────────
+
+Some customers (especially Sanmina, Plexus) provide AVLs where one Customer Part
+Code (CPC) has multiple approved MPNs. The schema supports this:
+
+  chuboe_rfq_line (CPC level — ONE per customer part code)
+      └── chuboe_rfq_line_mpn (MPN level — MULTIPLE allowed per CPC)
+
+**When extracting lines with multiple MPNs per CPC:**
+
+  Format the extraction as:
+    {
+      cpc: 'LFNG035-4038-001',
+      qty: 1000,
+      targetPrice: 1.16,
+      mpns: [
+        { mpn: 'TPS7A3001DGNR', mfr: 'Texas Instruments' },
+        { mpn: 'TPS7A3001DCNR', mfr: 'Texas Instruments' }  // alternate
+      ]
+    }
+
+  The rfq-writer will create:
+    - ONE chuboe_rfq_line for the CPC
+    - MULTIPLE chuboe_rfq_line_mpn records for each MPN
+
+**Backward compatibility:** If the customer provides a simple flat list (one
+MPN per line), the existing format still works:
+
+    { mpn: 'TPS7A3001DGNR', mfr: 'Texas Instruments', qty: 1000 }
+
+**Detection signals for AVL format:**
+  - Column headers like "Alternate MPN", "AVL", "Approved Vendors"
+  - Multiple rows with same CPC but different MPNs
+  - Explicit "Primary MPN" / "Secondary MPN" designations
 
 If a single message hits a transient error (loadBulkSummary throws, attachment unreadable, vendor lookup 5xx), log the error in your output and continue with the next message. Do not abort the batch on per-message failure.
 

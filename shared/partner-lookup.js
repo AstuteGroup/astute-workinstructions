@@ -661,6 +661,50 @@ function resolveAstuteUserById(userId) {
   return { userId: Number(r.userId), name: r.name, email: r.email };
 }
 
+/**
+ * Validate that a user ID exists and is active. Used by writers to reject
+ * inactive users for salesrep, contact, buyer fields before writing to OT.
+ *
+ * Unlike resolveAstuteUserById, this does NOT require IsEmployee — it works
+ * for any ad_user (internal or external contact).
+ *
+ * @param {number|string} userId - ad_user_id to validate
+ * @returns {{ valid: boolean, userId?: number, name?: string, isactive?: string, reason?: string }}
+ */
+function validateUserIsActive(userId) {
+  if (userId == null || userId === '') {
+    return { valid: false, reason: 'userId is null/empty' };
+  }
+  const id = Number(userId);
+  if (!Number.isFinite(id)) {
+    return { valid: false, reason: `userId '${userId}' is not a valid number` };
+  }
+
+  const sql = `
+    SELECT u.ad_user_id, u.name, u.isactive
+    FROM adempiere.ad_user u
+    WHERE u.ad_user_id = ${id}
+    LIMIT 1
+  `;
+  const rows = parseResults(psqlQuery(sql), ['userId', 'name', 'isactive']);
+  if (rows.length === 0) {
+    return { valid: false, userId: id, reason: `ad_user_id ${id} not found` };
+  }
+
+  const r = rows[0];
+  if (r.isactive !== 'Y') {
+    return {
+      valid: false,
+      userId: id,
+      name: r.name,
+      isactive: r.isactive,
+      reason: `User '${r.name}' (${id}) is inactive (isactive='${r.isactive}')`
+    };
+  }
+
+  return { valid: true, userId: id, name: r.name, isactive: 'Y' };
+}
+
 // ─── USER ROLE REGISTRY ─────────────────────────────────────────────────────
 //
 // Operator-maintained list of confirmed buyers + support. Drives the buyer-
@@ -887,6 +931,9 @@ module.exports = {
   resolveAstuteUserByEmail,
   resolveAstuteUserByName,
   resolveAstuteUserById,
+
+  // User validation (active check for writers)
+  validateUserIsActive,
 
   // User role registry (buyer/support classification + ladder)
   loadUserRoleRegistry,
