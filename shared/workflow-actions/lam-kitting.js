@@ -1081,17 +1081,30 @@ async function action_add_awards(payload, ctx) {
   };
 
   // Categorize parts based on INVENTORY levels
-  const allParts = [...results.added, ...results.flagged];
+  // NEW parts (results.added) ALWAYS need ordering — they have 0 inventory by definition
+  // EXISTING parts (results.flagged) use inventory threshold check
   const partsNeedingOrder = [];
   const partsAboveThreshold = [];
 
-  for (const part of allParts) {
+  // NEW parts always need ordering (sourcing, RFQ creation, etc.)
+  for (const part of results.added) {
+    const cpc = part.cpc;
+    const mpn = part.mpn;
+    const threshold = part.reorderThreshold || 0;
+    const inventory = getInventoryForCpc(cpc, mpn);
+
+    part.currentInventory = inventory;
+    part.threshold = threshold;
+    partsNeedingOrder.push(part);  // Always — new parts need initial ordering
+  }
+
+  // EXISTING parts use inventory check
+  for (const part of results.flagged) {
     const cpc = part.cpc;
     const mpn = part.mpn || part.existingMpn;
     const threshold = part.reorderThreshold || part.existingValues?.reorderThreshold || 0;
     const inventory = getInventoryForCpc(cpc, mpn);
 
-    // Add inventory info to part for reporting
     part.currentInventory = inventory;
     part.threshold = threshold;
 
@@ -1102,7 +1115,7 @@ async function action_add_awards(payload, ctx) {
     }
   }
 
-  console.log(`  Inventory check: ${partsNeedingOrder.length} below threshold, ${partsAboveThreshold.length} above threshold`);
+  console.log(`  Inventory check: ${results.added.length} new (always order), ${partsNeedingOrder.length - results.added.length} existing below threshold, ${partsAboveThreshold.length} above threshold`);
 
   // Categorize for reporting purposes:
   const existingNeedsOrdering = results.flagged.filter(p => p.currentInventory < p.threshold);
