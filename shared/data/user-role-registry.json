@@ -36,5 +36,11 @@
     "candidate_in_support": "DO NOT use as buyer; fall through to RFQ owner (chuboe_rfq.chuboe_user_id), else escalate clarify_buyer",
     "candidate_in_neither": "escalate clarify_buyer to operator (Jake Harris) with chain candidates listed",
     "candidate_in_rfq_support": "DO NOT use as salesrep; walk deeper in the forward chain to find the actual seller"
+  },
+  "workflow_cc": {
+    "_doc": "Workflow-specific support CC lists. These addresses receive ALL emails (issues AND successes) for the workflow.",
+    "rfq-loading": [
+      { "email": "william.robinson@astutegroup.com", "name": "William Robinson", "_note": "CC on all RFQ loading responses per operator request 2026-08-18" }
+    ]
   }
 }

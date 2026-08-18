@@ -4,7 +4,7 @@
  * Handles all RFQ types (Stock, Shortage, PPV, etc.). Creates records across
  * three tables: chuboe_rfq (header), chuboe_rfq_line, chuboe_rfq_line_mpn.
  *
- * USAGE:
+ * USAGE (Legacy — one MPN per line):
  *   const { writeRFQ } = require('../shared/rfq-writer');
  *
  *   const result = await writeRFQ({
@@ -17,6 +17,25 @@
  *     ]
  *   });
  *   // result: { rfqId: 9000001, linesWritten: 1, mpnsWritten: 1 }
+ *
+ * USAGE (Multi-MPN per CPC — for customer AVLs):
+ *   const result = await writeRFQ({
+ *     bpartnerId: 1000287, // Sanmina
+ *     type: 'PPV',
+ *     lines: [
+ *       {
+ *         cpc: 'LFNG035-4038-001',           // Customer Part Code
+ *         qty: 1000,
+ *         targetPrice: 1.16,
+ *         mpns: [                             // Multiple approved MPNs per CPC
+ *           { mpn: 'TPS7A3001DGNR', mfr: 'Texas Instruments' },
+ *           { mpn: 'TPS7A3001DCNR', mfr: 'Texas Instruments' }  // alternate
+ *         ]
+ *       }
+ *     ]
+ *   });
+ *   // result: { rfqId: 9000001, linesWritten: 1, mpnsWritten: 2,
+ *   //           multiMpnFormat: true, mpnDetails: {...} }
  *
  * CONSUMERS:
  *   - Stock RFQ Loading
@@ -50,6 +69,7 @@ const { apiPost } = require('./api-client');
 const { psqlQuery, cleanMpn } = require('./db-helpers');
 const { lookupMfr } = require('./mfr-lookup');
 const { resolveMfrForRow } = require('./mfr-resolver');
+const { validateUserIsActive } = require('./partner-lookup');
 const otBudget = require('./ot-api-budget');
 
 // ─── CONSTANTS ───────────────────────────────────────────────────────────────
@@ -151,6 +171,17 @@ async function writeRFQ(opts) {
   if (!userId) throw new Error('rfq-writer: userId (contact person) is required. Resolve from email sender/CC via ad_user lookup, or prompt the user.');
   if (!lines || lines.length === 0) throw new Error('rfq-writer: at least one line is required');
 
+  // Validate salesrep and contact are active users (bug fix 2026-08-18: agent
+  // assigned inactive Hugo Ogalde as seller; inactive users must be rejected)
+  const salesrepCheck = validateUserIsActive(salesrepId);
+  if (!salesrepCheck.valid) {
+    throw new Error(`rfq-writer: salesrepId validation failed — ${salesrepCheck.reason}`);
+  }
+  const userCheck = validateUserIsActive(userId);
+  if (!userCheck.valid) {
+    throw new Error(`rfq-writer: userId (contact) validation failed — ${userCheck.reason}`);
+  }
+
   const typeId = RFQ_TYPES[type];
   if (!typeId) throw new Error(`rfq-writer: unknown RFQ type '${type}'. Valid: ${Object.keys(RFQ_TYPES).join(', ')}`);
 
@@ -248,7 +279,13 @@ async function writeRFQ(opts) {
   const CHUNK_DELAY_MS = 2000;      // 2s between chunks
   const useChunkedMode = lines.length > LARGE_RFQ_THRESHOLD;
 
-  const estimatedWrites = lines.length * 2; // line + line_mpn per input
+  // Estimate API writes: 1 line per input + N mpns per line
+  // For multi-MPN format, count actual MPNs; for legacy, assume 1 MPN per line
+  const estimatedMpns = lines.reduce((acc, l) => {
+    if (Array.isArray(l.mpns)) return acc + l.mpns.length;
+    return acc + 1;
+  }, 0);
+  const estimatedWrites = lines.length + estimatedMpns;
 
   if (useChunkedMode) {
     // Chunked mode: still check daily limit (skip burst checks - we self-pace)
@@ -298,8 +335,48 @@ async function writeRFQ(opts) {
   // Helper for chunked delay
   const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 
+  // ── Detect multi-MPN format and normalize ──
+  // Multi-MPN format: lines have `mpns[]` array with multiple MPN records per CPC
+  // Legacy format: lines have a single `mpn` field
+  const isMultiMpnFormat = lines.some(l => Array.isArray(l.mpns) && l.mpns.length > 0);
+
+  // Normalize lines to internal format: each entry has cpc (optional), qty, targetPrice,
+  // and mpns[] array (even if just one MPN)
+  const normalizedLines = isMultiMpnFormat
+    ? lines.map(l => ({
+        cpc: l.cpc || null,
+        qty: l.qty || 0,
+        targetPrice: l.targetPrice || 0,
+        description: l.description || null,
+        mpns: (l.mpns || []).map(m => ({
+          mpn: m.mpn || '',
+          mpnClean: m.mpnClean || cleanMpn(m.mpn || ''),
+          mfr: m.mfr || null,
+          mfrText: m.mfrText || m.mfr || null,
+          dateCode: m.dateCode || l.dateCode || null,
+          description: m.description || l.description || null,
+        })),
+      }))
+    : lines.map(l => ({
+        cpc: l.cpc || null,
+        qty: l.qty || 0,
+        targetPrice: l.targetPrice || 0,
+        description: l.description || null,
+        mpns: [{
+          mpn: l.mpn || '',
+          mpnClean: l.mpnClean || cleanMpn(l.mpn || ''),
+          mfr: l.mfr || null,
+          mfrText: l.mfrText || l.mfr || null,
+          dateCode: l.dateCode || null,
+          description: l.description || null,
+        }],
+      }));
+
+  // Track per-CPC MPN details for return value
+  const mpnDetails = {};
+
   // ── Insert Lines + Line MPNs ──
-  for (let i = 0; i < lines.length; i++) {
+  for (let i = 0; i < normalizedLines.length; i++) {
     // Chunked mode: pause between chunks to stay under rate limits
     if (useChunkedMode && i > 0 && i % CHUNK_SIZE === 0) {
       const chunkNum = Math.floor(i / CHUNK_SIZE);
@@ -308,35 +385,15 @@ async function writeRFQ(opts) {
       await sleep(CHUNK_DELAY_MS);
     }
 
-    const line = lines[i];
+    const normLine = normalizedLines[i];
     const lineNum = (i + 1) * 10; // Line 10, 20, 30...
 
-    const mpnRaw = line.mpn || '';
-    const mpnCleanVal = line.mpnClean || cleanMpn(mpnRaw);
-    const qty = line.qty || 0;
-    const targetPrice = line.targetPrice || 0;
-    const dateCode = line.dateCode || null;
+    const qty = normLine.qty;
+    const targetPrice = normLine.targetPrice;
+    const cpc = normLine.cpc;
 
-    // ── Description enrichment ──
-    let mpnDescription = line.description || null;
-    if (!mpnDescription) {
-      // Try system lookup (past 120 days)
-      mpnDescription = lookupMpnDescription(mpnCleanVal);
-      if (mpnDescription) {
-        logger.debug(`Enriched ${mpnRaw} description from system: "${mpnDescription}"`);
-      }
-    }
-    if (!mpnDescription && enrichDescription) {
-      // Future: API enrichment callback
-      try {
-        mpnDescription = await enrichDescription(mpnRaw, mpnCleanVal);
-        if (mpnDescription) {
-          logger.debug(`Enriched ${mpnRaw} description from API: "${mpnDescription}"`);
-        }
-      } catch (e) {
-        logger.warn(`Description enrichment failed for ${mpnRaw}: ${e.message}`);
-      }
-    }
+    // For display and error messages, use first MPN
+    const firstMpn = normLine.mpns[0]?.mpn || '(no MPN)';
 
     // ── Insert chuboe_rfq_line via API ──
     let lineId;
@@ -352,7 +409,7 @@ async function writeRFQ(opts) {
           Qty: qty,
           PriceEntered: targetPrice,
         };
-        if (line.cpc) linePayload.Chuboe_CPC = line.cpc;
+        if (cpc) linePayload.Chuboe_CPC = cpc;
         const lineResponse = await apiPost('chuboe_rfq_line', linePayload, {
           naturalKeyFields: ['Chuboe_RFQ_ID', 'Line'],
           context: 'rfq-loading',
@@ -362,63 +419,98 @@ async function writeRFQ(opts) {
       } catch (e) {
         const net = isOtUnreachableError(e);
         if (net) otUnreachable = true;
-        errors.push(`${net ? '[OT_UNREACHABLE] ' : ''}Failed to insert line ${i + 1} (${mpnRaw}): ${e.message}`);
+        errors.push(`${net ? '[OT_UNREACHABLE] ' : ''}Failed to insert line ${i + 1} (${firstMpn}): ${e.message}`);
         continue;
       }
       linesWritten++;
     }
 
-    // ── Insert chuboe_rfq_line_mpn via API ──
-    // Backfill: skip if this line already has this MPN (e.g. 1135619 — line
-    // wrote but its line_mpn POST timed out; only the missing sub-row is added).
-    if (existingMpnsByLine.has(lineId) && existingMpnsByLine.get(lineId).has((mpnCleanVal || '').toUpperCase())) {
-      continue;
-    }
-    try {
-      const mpnPayload = {
-        Chuboe_RFQ_Line_ID: lineId,
-        Chuboe_RFQ_ID: rfqId,
-        Chuboe_MPN: mpnRaw,
-        Chuboe_MPN_Clean: mpnCleanVal,
-        Qty: qty,
-        PriceEntered: targetPrice,
-        // Omit button fields — API rejects string 'N' on button columns
-      };
-      // MFR resolution via the unified resolver: text path (Policy D #1) when
-      // line.mfrText is provided; OT-history path (consultOTHistory: true)
-      // when we have a >=70% weighted majority MFR across CQ/VQ/offer history
-      // for this MPN — operator-vetted ground truth beats prefix guess for
-      // MPNs we have actually traded, and survives the prefix-resolver's known
-      // overreach (CY7C, ISO*, ISL*, XC*, BCM*); falls back to MPN-prefix +
-      // acquisition map when neither hits.
-      // Never send Chuboe_MFR_ID — server resolves from canonical name.
-      if (line.mfrText || mpnRaw) {
-        const mfrResult = resolveMfrForRow({
-          mfrText: line.mfrText,
-          mpn: mpnRaw,
-          consultOTHistory: true,
-        });
-        if (mfrResult.canonical) {
-          mpnPayload.Chuboe_MFR_Text = mfrResult.canonical;  // exact chuboe_mfr.name
+    // Track MPN details for this CPC (for return value)
+    const cpcKey = cpc || `line_${lineNum}`;
+    mpnDetails[cpcKey] = { lineId, mpns: [] };
+
+    // ── Insert chuboe_rfq_line_mpn via API (one per MPN in mpns array) ──
+    for (const mpnEntry of normLine.mpns) {
+      const mpnRaw = mpnEntry.mpn || '';
+      const mpnCleanVal = mpnEntry.mpnClean || cleanMpn(mpnRaw);
+      const dateCode = mpnEntry.dateCode || null;
+
+      // ── Description enrichment ──
+      let mpnDescription = mpnEntry.description || null;
+      if (!mpnDescription) {
+        // Try system lookup (past 120 days)
+        mpnDescription = lookupMpnDescription(mpnCleanVal);
+        if (mpnDescription) {
+          logger.debug(`Enriched ${mpnRaw} description from system: "${mpnDescription}"`);
         }
       }
-      if (mpnDescription) mpnPayload.Description = mpnDescription;
-      if (dateCode) mpnPayload.Chuboe_Date_Code = dateCode;
+      if (!mpnDescription && enrichDescription) {
+        // Future: API enrichment callback
+        try {
+          mpnDescription = await enrichDescription(mpnRaw, mpnCleanVal);
+          if (mpnDescription) {
+            logger.debug(`Enriched ${mpnRaw} description from API: "${mpnDescription}"`);
+          }
+        } catch (e) {
+          logger.warn(`Description enrichment failed for ${mpnRaw}: ${e.message}`);
+        }
+      }
 
-      // Natural key: MFR resolved server-side from text, so use text field here.
-      // If MFR text is unset, verify path is skipped — apiPost will throw on
-      // transient errors instead of risking a dup retry.
-      await apiPost('chuboe_rfq_line_mpn', mpnPayload, {
-        naturalKeyFields: ['Chuboe_RFQ_Line_ID', 'Chuboe_MPN_Clean', 'Chuboe_MFR_Text'],
-        context: 'rfq-loading',
-      });
-    } catch (e) {
-      const net = isOtUnreachableError(e);
-      if (net) otUnreachable = true;
-      errors.push(`${net ? '[OT_UNREACHABLE] ' : ''}Failed to insert line_mpn ${i + 1} (${mpnRaw}): ${e.message}`);
-      continue;
+      // Backfill: skip if this line already has this MPN (e.g. 1135619 — line
+      // wrote but its line_mpn POST timed out; only the missing sub-row is added).
+      if (existingMpnsByLine.has(lineId) && existingMpnsByLine.get(lineId).has((mpnCleanVal || '').toUpperCase())) {
+        mpnDetails[cpcKey].mpns.push({ mpn: mpnRaw, status: 'already_exists' });
+        continue;
+      }
+
+      try {
+        const mpnPayload = {
+          Chuboe_RFQ_Line_ID: lineId,
+          Chuboe_RFQ_ID: rfqId,
+          Chuboe_MPN: mpnRaw,
+          Chuboe_MPN_Clean: mpnCleanVal,
+          Qty: qty,
+          PriceEntered: targetPrice,
+          // Omit button fields — API rejects string 'N' on button columns
+        };
+        // MFR resolution via the unified resolver: text path (Policy D #1) when
+        // mfrText is provided; OT-history path (consultOTHistory: true)
+        // when we have a >=70% weighted majority MFR across CQ/VQ/offer history
+        // for this MPN — operator-vetted ground truth beats prefix guess for
+        // MPNs we have actually traded, and survives the prefix-resolver's known
+        // overreach (CY7C, ISO*, ISL*, XC*, BCM*); falls back to MPN-prefix +
+        // acquisition map when neither hits.
+        // Never send Chuboe_MFR_ID — server resolves from canonical name.
+        if (mpnEntry.mfrText || mpnRaw) {
+          const mfrResult = resolveMfrForRow({
+            mfrText: mpnEntry.mfrText,
+            mpn: mpnRaw,
+            consultOTHistory: true,
+          });
+          if (mfrResult.canonical) {
+            mpnPayload.Chuboe_MFR_Text = mfrResult.canonical;  // exact chuboe_mfr.name
+          }
+        }
+        if (mpnDescription) mpnPayload.Description = mpnDescription;
+        if (dateCode) mpnPayload.Chuboe_Date_Code = dateCode;
+
+        // Natural key: MFR resolved server-side from text, so use text field here.
+        // If MFR text is unset, verify path is skipped — apiPost will throw on
+        // transient errors instead of risking a dup retry.
+        await apiPost('chuboe_rfq_line_mpn', mpnPayload, {
+          naturalKeyFields: ['Chuboe_RFQ_Line_ID', 'Chuboe_MPN_Clean', 'Chuboe_MFR_Text'],
+          context: 'rfq-loading',
+        });
+        mpnDetails[cpcKey].mpns.push({ mpn: mpnRaw, status: 'written' });
+      } catch (e) {
+        const net = isOtUnreachableError(e);
+        if (net) otUnreachable = true;
+        errors.push(`${net ? '[OT_UNREACHABLE] ' : ''}Failed to insert line_mpn ${i + 1} (${mpnRaw}): ${e.message}`);
+        mpnDetails[cpcKey].mpns.push({ mpn: mpnRaw, status: 'error', error: e.message });
+        continue;
+      }
+      mpnsWritten++;
     }
-    mpnsWritten++;
   }
 
   const chunkedNote = useChunkedMode ? ` [chunked: ${Math.ceil(lines.length / CHUNK_SIZE)} chunks]` : '';
@@ -427,6 +519,9 @@ async function writeRFQ(opts) {
   return {
     rfqId, searchKey, linesWritten, mpnsWritten, errors,
     otUnreachable, chunkedMode: useChunkedMode,
+    // Multi-MPN format: include per-CPC tracking for audit
+    multiMpnFormat: isMultiMpnFormat,
+    mpnDetails: isMultiMpnFormat ? mpnDetails : undefined,
     // Header wrote but some lines/line_mpns may not have (OT died mid-RFQ).
     // Resume backfills the gaps against this existing rfqId — never re-POSTs
     // the header (its natural key BP+type+salesrep is not unique → would dup).

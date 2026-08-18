@@ -157,6 +157,8 @@ async function action_enqueue(payload, ctx) {
     // same Message-ID, so future replays catch this load via path (1) above.
     messageId: dedupMessageId || null,
     sourceUid: ctx.uid,
+    // Tracking ID for traceability (e.g., "RFQ-00041")
+    trackingId: ctx.trackingId || null,
     // Email context for confirmation email after load completes
     originalSubject: originalSubject || ctx.currentSubject || null,
     originalSender: originalSender || ctx.currentFrom || null,
@@ -192,8 +194,8 @@ async function action_need_info(payload, ctx) {
   const missingList = Array.isArray(missing) ? missing : [];
   const linesCount = Array.isArray(extracted && extracted.lines) ? extracted.lines.length : 0;
 
-  // Resolve internal recipients (operator + internal forwarders + salesrep)
-  const envelope = resolveOutreachRecipients(payload, ctx);
+  // Resolve internal recipients (operator + internal forwarders + salesrep + workflow support CCs)
+  const envelope = resolveOutreachRecipients(payload, ctx, { workflow: 'rfq-loading' });
 
   let sidecarRecord = null;
   if (!ctx.dryRun && ctx.anchorMessageId) {
@@ -418,8 +420,8 @@ ${truncateNote}`;
 async function action_needs_review(payload, ctx) {
   const { reason, details, subject, from, investigation_summary, extracted } = payload;
 
-  // Resolve internal recipients (operator + internal forwarders + salesrep)
-  const envelope = resolveOutreachRecipients(payload, ctx);
+  // Resolve internal recipients (operator + internal forwarders + salesrep + workflow support CCs)
+  const envelope = resolveOutreachRecipients(payload, ctx, { workflow: 'rfq-loading' });
 
   // Write sidecar so operator replies can be stitched back to this escalation.
   // Without this, replies to needs_review emails go nowhere.

@@ -113,6 +113,8 @@ function enqueue(payload) {
     errors: [],
     lastError: null,
     lastProgressAt: null,
+    // Tracking ID for traceability (e.g., "RFQ-00041") — passed from agent
+    trackingId: payload.trackingId || null,
     payload,
   };
 

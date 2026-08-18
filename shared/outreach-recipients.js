@@ -13,16 +13,36 @@
 
 'use strict';
 
+const fs = require('fs');
+const path = require('path');
+
 const ASTUTE_DOMAIN = '@astutegroup.com';
 const ADDR_RE = /[A-Za-z0-9._+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}/g;
+
+// Load workflow-specific CC configuration from user-role-registry.json
+function loadWorkflowCc(workflow) {
+  if (!workflow) return [];
+  try {
+    const registryPath = path.join(__dirname, 'data', 'user-role-registry.json');
+    const registry = JSON.parse(fs.readFileSync(registryPath, 'utf-8'));
+    const workflowCc = registry.workflow_cc && registry.workflow_cc[workflow];
+    if (Array.isArray(workflowCc)) {
+      return workflowCc.map(entry => entry.email).filter(Boolean);
+    }
+  } catch (_) {
+    // Best-effort — registry read failure shouldn't block email sends
+  }
+  return [];
+}
 
 /**
  * Resolve internal Astute recipients for an escalation/confirmation email.
  *
  * @param {object} payload - Action payload (may contain outerFrom, senderEmail, salesrepId, buyerId)
- * @param {object} ctx - Workflow context (jakeEmail, inbox, currentFrom, currentCc)
+ * @param {object} ctx - Workflow context (jakeEmail, inbox, currentFrom, currentCc, workflow)
  * @param {object} [opts] - Options
  * @param {function} [opts.resolveUserById] - Function to resolve userId → {email, name}
+ * @param {string} [opts.workflow] - Workflow name for workflow-specific CCs (e.g., 'rfq-loading')
  * @returns {object} { to, cc, externalSender, recipientList }
  *   - to: comma-separated list of internal recipients
  *   - cc: null (reserved for future use)
@@ -33,6 +53,7 @@ function resolveOutreachRecipients(payload, ctx, opts = {}) {
   const seen = new Set();
   const internal = [];
   const inbox = (ctx && ctx.inbox) ? ctx.inbox.toLowerCase() : '';
+  const workflow = opts.workflow || (ctx && ctx.workflow) || null;
 
   const add = (addr) => {
     const a = String(addr == null ? '' : addr).toLowerCase().trim();
@@ -78,6 +99,15 @@ function resolveOutreachRecipients(payload, ctx, opts = {}) {
       if (u && u.email) add(u.email);
     } catch (_) {
       // Enrichment is best-effort; never fail the send
+    }
+  }
+
+  // 5. Workflow-specific support CCs — from user-role-registry.json workflow_cc section.
+  //    These addresses receive ALL emails (issues AND successes) for the workflow.
+  if (workflow) {
+    const workflowCcList = loadWorkflowCc(workflow);
+    for (const email of workflowCcList) {
+      add(email);
     }
   }
 

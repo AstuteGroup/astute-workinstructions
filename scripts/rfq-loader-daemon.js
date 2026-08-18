@@ -250,6 +250,7 @@ async function runJob(item) {
       jobId: item.id,
       uid: item.payload && item.payload.sourceUid ? item.payload.sourceUid : null,
       messageId: item.payload && item.payload.messageId ? item.payload.messageId : null,
+      trackingId: item.trackingId || (item.payload && item.payload.trackingId) || null,
       rfqId: result.rfqId,
       searchKey: result.searchKey,
       linesWritten: totalWritten,
@@ -328,7 +329,13 @@ ${result.errors.length > 5 ? `  ... +${result.errors.length - 5} more` : ''}
 
 — RFQ Loader Daemon (automated alert)`;
 
-      await notifier.sendEmail('jake.harris@astutegroup.com', alertSubject, alertBody);
+      // Include workflow support CCs (e.g., Will Robinson) on alerts
+      await notifier.sendEmail(
+        'jake.harris@astutegroup.com',
+        alertSubject,
+        alertBody,
+        { cc: 'william.robinson@astutegroup.com' }
+      );
     }
   } catch (e) {
     log(`  Failure rate evaluation error: ${e.message}`);
@@ -354,7 +361,7 @@ ${result.errors.length > 5 ? `  ... +${result.errors.length - 5} more` : ''}
       inbox: 'rfqloading@orangetsunami.com',
       currentFrom: payload.originalSender,
       currentCc: payload.originalCc,
-    });
+    }, { workflow: 'rfq-loading' });
 
     if (envelope.recipientList.length > 0) {
       const toEmail = envelope.recipientList[0];
@@ -366,15 +373,18 @@ ${result.errors.length > 5 ? `  ... +${result.errors.length - 5} more` : ''}
       const sellerName = lookupContactName(payload.salesrepId) || '(unknown)';
       const description = payload.description || '';
 
+      // Include tracking ID in subject when available for traceability
+      const trackingId = item.trackingId || payload.trackingId || null;
+      const trackingPrefix = trackingId ? `[${trackingId}] ` : '';
       const confirmSubject = payload.originalSubject
         ? `Re: ${payload.originalSubject}`
-        : `RFQ ${result.searchKey} loaded`;
+        : `${trackingPrefix}RFQ ${result.searchKey} loaded`;
 
       // Build confirmation body with all metadata
       let confirmBody = `RFQ loaded.
 
 Customer: ${customerName}
-RFQ #: ${result.searchKey}
+RFQ #: ${result.searchKey}${trackingId ? `\nTracking ID: ${trackingId}` : ''}
 Type: ${rfqTypeName}
 Seller: ${sellerName}
 Lines loaded: ${totalWritten}`;
@@ -402,6 +412,7 @@ This RFQ is now in Orange Tsunami.
         cog: 'rfq-loader-daemon',
         event: 'confirmation-sent',
         jobId: item.id,
+        trackingId: trackingId,
         rfqId: result.rfqId,
         searchKey: result.searchKey,
         customer: customerName,
