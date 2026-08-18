@@ -32,13 +32,12 @@ exitIfWeekend();
 const fs = require('fs');
 const { execSync } = require('child_process');
 const { createNotifier } = require('../../shared/notifier');
-const { isKnownBuyer, isKnownSupport } = require('../../shared/partner-lookup');
+const { isKnownBuyer, isKnownSupport, isKnownRfqSupport } = require('../../shared/partner-lookup');
 
 const BREADCRUMBS = path.join(process.env.HOME, 'workspace', '.offer-pipeline', 'breadcrumbs.jsonl');
 const PENDING_DIR = path.join(process.env.HOME, 'workspace', '.rfq-loading-pending');
 const RECIPIENTS = [
   'jake.harris@astutegroup.com',
-  'justin.oberhofer@astutegroup.com',
 ];
 const CLAUDE_USER_ID = 1049524;
 
@@ -123,7 +122,8 @@ function pullActivityByLoader(sinceTs, untilTs) {
 // Classify loader role
 function roleFor(userId, name) {
   if (userId === CLAUDE_USER_ID) return 'Claude';
-  if (isKnownSupport(userId)) return 'Support';
+  // Check both VQ support AND RFQ support registries
+  if (isKnownSupport(userId) || isKnownRfqSupport(userId)) return 'Support';
   if (isKnownBuyer(userId)) return 'Buyer';
   // Assume salesreps are everyone else who's not Claude/Support/Buyer
   return 'Salesrep';
