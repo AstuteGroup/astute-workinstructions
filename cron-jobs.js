@@ -734,7 +734,10 @@ module.exports = [
   {
     name: 'inspection-queue-maintenance',
     owner: 'justin.oberhofer',
-    cadence: 'daily',
+    // Changed from 'daily' to 'fixed' on 2026-08-18 to prevent sentinel drift.
+    // 'daily' cadence uses hourly ticks + sentinel gating, which causes ~1hr/day
+    // drift as nextDue advances from actual run time, not cron anchor.
+    cadence: 'fixed',
     cadenceCron: '30 18 * * *',  // 18:30 UTC = 2:30 PM EDT / 1:30 PM EST
     command: `node "${ASTUTE}/Business Ops/tsk-inspection-queue-maintenance/inspection-queue-maintenance.js"`,
     cwd: ASTUTE,
