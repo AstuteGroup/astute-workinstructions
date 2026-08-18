@@ -3,13 +3,21 @@
  *
  * To add a new scheduled activity:
  *   1. Add an entry below.
- *   2. Run `node scripts/install-crons.js` to regenerate crontab.
- *   3. The Resilience Checklist will be printed for your new entry.
+ *   2. Run `node scripts/install-crons.js --apply` to regenerate crontab.
+ *   3. Run `node scripts/check-cron-drift.js` to verify no drift.
+ *   4. The Resilience Checklist will be printed for your new entry.
  *
  * NEVER hand-edit `crontab -e`. The drift check at session start will surface it.
  *
  * Field reference:
  *   name         — unique identifier; also used for the sentinel filename and log tag
+ *   owner        — (optional) UNIX account whose crontab this job belongs in.
+ *                  Defaults to 'analytics_user'. If set to another user (e.g.,
+ *                  'justin.oberhofer'), the job will ONLY be installed in that user's
+ *                  crontab when install-crons.js runs AS that user.
+ *                  IMPORTANT: Do NOT set owner if the job needs analytics_user's
+ *                  DB access, mailbox credentials, or environment. Use a comment
+ *                  like "// Logical owner: justin.oberhofer" instead.
  *   cadence      — 'weekly' | 'daily' | 'every Nm' (where N is minutes < 60)
  *   cadenceCron  — cron expression for *when to first attempt*. For weekly/daily,
  *                  the runner additionally checks hourly so a missed window catches up.
@@ -284,19 +292,15 @@ module.exports = [
   {
     name: 'rfqloading-agent',
     tier: 'agent',  // Claude-powered — paused by .cron-agents-paused
-    // Cron fires every 5m. The gate script exits 1 (skip) unless either
-    // (a) a large-RFQ sentinel was queued within the last 10m (BURST —
-    // operator might be replying right now), or (b) the current minute
-    // is on the 30-min steady boundary (0 or 30). Net effect: every-5m
-    // polling for ~10m after an approval email goes out, then drops to
-    // every-30m. Tunable via RFQLOADING_BURST_WINDOW_MIN env.
+    // Every 5m, content-gated: only launches LLM if unseen emails exist.
+    // Changed from burst/steady TIME gate to CONTENT gate on 2026-08-18.
     cadence: 'every 5m',
     cadenceCron: '*/5 * * * *',
     command: `if node "${ASTUTE}/scripts/should-run-rfqloading-agent.js"; then /home/analytics_user/.local/bin/claude -p --model sonnet --permission-mode bypassPermissions --max-turns 80 < "${ASTUTE}/Trading Analysis/RFQ Loading/agent-prompt.txt"; fi`,
     cwd: AGENT_CWD,
     needsOT: true,
     logFile: '/tmp/rfqloading-agent.log',
-    description: 'Tiered (5m burst / 30m steady) — agent reads rfqloading@ per rfq-loading.md, routes customer RFQs (enqueue / need_info / needs_review / not_rfq) AND large-RFQ approval replies (approve_large_rfq / reject_large_rfq). Burst window triggered by recently-queued large-RFQ sentinels for fast approval pickup.',
+    description: 'Every 5m, content-gated — agent reads rfqloading@ per rfq-loading.md, routes customer RFQs (enqueue / need_info / needs_review / not_rfq) AND large-RFQ approval replies. Skips LLM launch when inbox is empty.',
   },
 
   // PLACEHOLDER for second inbox (broker / franchise) — disabled until the
@@ -696,7 +700,7 @@ module.exports = [
   // ─── NEW MANUFACTURER SCREENING ────────────────────────────────────────────
   {
     name: 'mfr-screening-requests',
-    owner: 'justin.oberhofer',
+    // Logical owner: justin.oberhofer (runs as analytics_user for mailbox/DB access)
     cadence: 'every 30m',
     cadenceCron: '*/30 * * * *',
     command: `python3 "${ASTUTE}/Business Ops/tsk-new-mfr-screening/mfr-reply-handler.py" --requests --mailbox bizops`,
@@ -707,7 +711,7 @@ module.exports = [
   },
   {
     name: 'mfr-screening-replies',
-    owner: 'justin.oberhofer',
+    // Logical owner: justin.oberhofer (runs as analytics_user for mailbox/DB access)
     cadence: 'every 30m',
     cadenceCron: '15,45 * * * *',  // offset from requests job
     command: `python3 "${ASTUTE}/Business Ops/tsk-new-mfr-screening/mfr-reply-handler.py" --mailbox bizops`,

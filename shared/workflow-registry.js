@@ -125,13 +125,14 @@ module.exports = {
       operatorDigest: false,
       activityDigest: false,
       replyParserGrammar: false,
-      tieredCron: true,
+      tieredCron: false,
     },
     deviations: {
       breadcrumbWrites: 'rfq-load-queue job state is the audit trail; each job tracks status/error/retry per job_id',
       operatorDigest: 'transactional flow — large-RFQ approvals surface inline via approval email, not a queue digest',
       activityDigest: 'transactional flow — per-RFQ visibility via OT, no aggregate sourcing intel needed',
       replyParserGrammar: 'approval replies use a subject-line directive parsed inside action_approve_large_rfq; no key:value grammar needed',
+      tieredCron: 'Simplified to fixed 5m polling (2026-08-18) — tiered burst/steady removed per operator request; customer RFQs are low-volume and don\'t need burst response',
     },
     // POLICY 2026-05-14: need_info emails Jake, NOT the external customer. Sidecar +
     // reply-stitching still active — Jake's reply to rfqloading@ with the missing
@@ -296,7 +297,7 @@ module.exports = {
     actions: [
       'load_vq', 'need_info_vendor', 'clarify_vendor', 'needs_vendor',
       'needs_review', 'clarify_buyer', 'no_bid', 'not_vq', 'dup_skip', 'drop_pending',
-      'outbound_pending', 'forward_to_rfq_loading',
+      'outbound_pending', 'forward_to_rfq_loading', 'correct_vq',
     ],
     capabilities: {
       replyStitching: true,
@@ -451,6 +452,7 @@ module.exports = {
       'request_report',
       'approve_prices', 'approve_price', 'approve_leadtime', 'approve_flagged', 'skip_flagged',
       'add_awards', 'add_award', 'reject', 'need_info', 'needs_review', 'not_approval',
+      'acknowledge_removal', 'reject_removal',
     ],
     capabilities: {
       replyStitching: true,

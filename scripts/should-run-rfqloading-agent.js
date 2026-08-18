@@ -1,69 +1,64 @@
 #!/usr/bin/env node
 /**
- * Gate for rfqloading-agent — decides whether this 5-min tick should
+ * Content gate for rfqloading-agent — decides whether this 5-min tick should
  * actually invoke the LLM agent or skip silently.
  *
- * RULE:
- *   - BURST window: if any large-RFQ pending sentinel was queued in the
- *     last 10 minutes, run the agent every 5m so an operator reply gets
- *     picked up fast (test confirmed turnaround at +5 / +10 min).
- *   - STEADY cadence: every 30 minutes (current minute === 0 or 30) the
- *     agent always runs, so customer RFQs that arrive at any time get
- *     processed within ~30m.
- *   - Otherwise: skip this tick (exit 1) — the cron `&&` short-circuit
- *     prevents `claude -p` from being invoked, saving LLM cost.
+ * This is a CONTENT gate: it runs the email-workflow-poller to check for
+ * unseen messages in the rfqloading@ inbox:
+ *   - unseen messages present  → exit 0 (run the agent)
+ *   - zero unseen messages     → exit 1 (skip this tick)
  *
- * Exit 0 → tick should run (caller invokes claude).
- * Exit 1 → tick should skip (caller short-circuits).
+ * FAIL-OPEN: on ANY gate error (spawn failure, IMAP error, unparseable
+ * output) we exit 0 and let the agent run. Missing RFQ work is worse than an
+ * occasional wasted launch; the agent's own list step will surface the same
+ * error properly.
  *
- * Inputs:
- *   ~/workspace/.large-rfq-pending/{rfq#}.json — sentinel files with
- *   `queued_at` ISO timestamp. Cleared/rejected sentinels don't trigger
- *   burst (no reply expected). Already-processed sentinels don't either.
+ * Exit 0 → tick should run.   Exit 1 → tick should skip.
+ *
+ * History:
+ *   2026-08-18 — Converted from burst/steady TIME gate to CONTENT gate.
+ *                Agent now fires every 5m; gate skips when inbox is empty.
  */
 
 'use strict';
 
-const fs = require('fs');
 const path = require('path');
+const { execFileSync } = require('child_process');
 
-const PENDING_DIR = path.resolve(
-  process.env.HOME || '/home/analytics_user',
-  'workspace/.large-rfq-pending'
-);
-const BURST_WINDOW_MIN = parseInt(process.env.RFQLOADING_BURST_WINDOW_MIN, 10) || 10;
-const STEADY_BOUNDARY_MIN = [0, 30];
+const POLLER = path.resolve(__dirname, '../shared/email-workflow-poller.js');
 
-function inBurstWindow() {
-  if (!fs.existsSync(PENDING_DIR)) return false;
-  const now = Date.now();
-  const cutoffMs = BURST_WINDOW_MIN * 60 * 1000;
-  for (const f of fs.readdirSync(PENDING_DIR)) {
-    if (!f.endsWith('.json')) continue;
-    const rfqNumber = f.slice(0, -'.json'.length);
-    // Skip cleared / rejected / already-processed — no reply expected.
-    if (fs.existsSync(path.join(PENDING_DIR, `${rfqNumber}.cleared`))) continue;
-    if (fs.existsSync(path.join(PENDING_DIR, `${rfqNumber}.rejected`))) continue;
-    if (fs.existsSync(path.join(PENDING_DIR, `${rfqNumber}.processed`))) continue;
-    try {
-      const sentinel = JSON.parse(fs.readFileSync(path.join(PENDING_DIR, f), 'utf-8'));
-      const queuedMs = new Date(sentinel.queued_at).getTime();
-      if (Number.isFinite(queuedMs) && (now - queuedMs) <= cutoffMs) return true;
-    } catch { /* malformed sentinel, ignore */ }
+function unseenCount() {
+  const out = execFileSync('node', [POLLER, 'list', '--workflow', 'rfq-loading'], {
+    encoding: 'utf-8',
+    timeout: 60000,
+    stdio: ['ignore', 'pipe', 'inherit'], // let poller's stderr pass through
+    env: { ...process.env, DOTENV_CONFIG_QUIET: 'true' },
+  });
+  // The poller prints a JSON array of unseen envelopes on stdout, but dotenv
+  // also writes a `[dotenv@17...] injecting env ...` banner there whose leading
+  // '[' would fool a naive array match. Strip dotenv banner lines first, then
+  // extract the JSON array from what remains.
+  const clean = out
+    .split('\n')
+    .filter((line) => !line.trimStart().startsWith('[dotenv@'))
+    .join('\n');
+  const m = clean.match(/\[[\s\S]*\]/);
+  if (!m) throw new Error('no JSON array in poller output');
+  const arr = JSON.parse(m[0]);
+  if (!Array.isArray(arr)) throw new Error('poller output is not an array');
+  return arr.length;
+}
+
+try {
+  const n = unseenCount();
+  if (n > 0) {
+    console.error(`rfqloading-agent: running (${n} unseen)`);
+    process.exit(0);
   }
-  return false;
-}
-
-function onSteadyBoundary() {
-  return STEADY_BOUNDARY_MIN.includes(new Date().getMinutes());
-}
-
-const burst = inBurstWindow();
-const steady = onSteadyBoundary();
-if (burst || steady) {
-  console.error(`rfqloading-agent: running (burst=${burst}, steady=${steady})`);
-  process.exit(0);
-} else {
-  console.error(`rfqloading-agent: skip (no burst window, not on 30m boundary)`);
+  console.error('rfqloading-agent: skip (0 unseen)');
   process.exit(1);
+} catch (err) {
+  // Fail open — never drop RFQ work because the gate stumbled.
+  console.error(`rfqloading-agent: gate error, failing open (running): ${err.message}`);
+  process.exit(0);
 }

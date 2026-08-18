@@ -355,9 +355,19 @@ See `shared/data-model.md` § Time-Zone Convention for the full rationale.
 
 ## Scheduling New Activities (REQUIRED workflow)
 
-**Whenever the user asks to schedule a recurring activity, you MUST follow this flow — do NOT hand-edit `crontab -e`:**
+**NEVER run `crontab -e` directly.** All cron jobs MUST go through the registry.
 
-### 1. Print the Resilience Checklist FIRST
+### Quick Path: Use the Interactive Helper
+
+```bash
+node ~/workspace/astute-workinstructions/scripts/add-cron-job.js
+```
+
+This walks you through all required fields, adds to `cron-jobs.js`, runs `install-crons.js`, and verifies no drift.
+
+### Manual Path (if you need more control)
+
+#### 1. Print the Resilience Checklist FIRST
 
 ```
 Scheduling new activity: {name}
@@ -371,24 +381,32 @@ Resilience checklist:
   • Visibility:        {drift check at session greeting; log → /path/to/log}
 ```
 
-### 2. Add entry to `cron-jobs.js`
+#### 2. Add entry to `cron-jobs.js`
 
 Required fields: `name`, `cadence`, `cadenceCron`, `command`, `cwd`, `needsOT`, `logFile`, `description`.
 
-### 3. Run installer
+**Do NOT set `owner` unless the job must run under a different unix account.** Most jobs run as `analytics_user`.
+
+#### 3. Run installer
 
 ```bash
 node ~/workspace/astute-workinstructions/scripts/install-crons.js          # preview
 node ~/workspace/astute-workinstructions/scripts/install-crons.js --apply  # apply
 ```
 
-### 4. Verify
+#### 4. Verify
 
 ```bash
 crontab -l
 node ~/workspace/astute-workinstructions/scripts/check-cron-drift.js
 node ~/workspace/astute-workinstructions/scripts/cron-runner.js --job=NAME --dry-run --force
 ```
+
+### Enforcement
+
+- **Pre-commit hook** blocks commits if `cron-jobs.js` changes create drift
+- **Session greeting** runs drift check and surfaces issues immediately
+- **Commits that bypass** (`--no-verify`) will be caught at next session start
 
 ---
 
