@@ -1,14 +1,15 @@
 #!/usr/bin/env node
 //
-// Brownsville Inspection Validation — Daily Report
+// Brownsville OTINs Created — Daily Report
 //
-// Scheduled daily to surface the previous 24 hours of inspections
-// validated at Brownsville (W111).
+// Scheduled daily to surface the previous 24 hours of OTINs
+// created at Brownsville (W111).
 //
 // What the report contains:
-//   1. Summary metrics — total validations, total qty, unique inspectors
-//   2. By inspector breakdown — count and qty per inspector
-//   3. Detail listing — MPN Received, MFR Received, Qty Received, OTIN, POV#, Line, Inspector, Validated At
+//   1. Summary — total OTINs created count
+//   2. Detail listing — OTIN, Created, Physical Warehouse, Inv Group, POV#, Line, MPN Received, MFR Received, Qty Received, Bin, Inspector
+//
+// Purpose: Surface created OTINs for transcription to another system.
 //
 // Usage:
 //   node brownsville-inspection-report.js               # preview to stdout (no send)
@@ -28,7 +29,7 @@ exitIfWeekend();
 const { execSync } = require('child_process');
 const { createNotifier } = require('../shared/notifier');
 
-const W111_WAREHOUSE_ID = 1000015;
+const BROWNSVILLE_WAREHOUSE_GROUP_ID = 1000008;
 
 const RECIPIENTS = [
   'justin.oberhofer@astutegroup.com',
@@ -88,145 +89,96 @@ function utcToCTNaive(d) {
     )
     SELECT
       COALESCE(v.chuboe_otin_search, '') AS otin,
+      TO_CHAR(v.created, 'YYYY-MM-DD HH24:MI:SS') AS created_at,
+      COALESCE(wg.name, '') AS warehouse_group,
+      COALESCE(w.name, '') AS warehouse,
       COALESCE(v.chuboe_mpnlot_po, '') AS pov,
       COALESCE(rl.line, 0) AS line_no,
       COALESCE(ia.mpn_received, v.chuboe_mpnlot_mpn) AS mpn_received,
       COALESCE(ia.mfr_received, '') AS mfr_received,
       COALESCE(ia.qty_received, v.chuboe_mpnlot_qty) AS qty_received,
+      COALESCE(s.name, '') AS bin_location,
       u.name AS inspector_name,
-      TO_CHAR(v.updated, 'YYYY-MM-DD HH24:MI:SS') AS validated_at
+      CASE WHEN v.isvalidate = 'Y' THEN TO_CHAR(v.updated, 'YYYY-MM-DD HH24:MI:SS') ELSE '' END AS validated_at
     FROM adempiere.chuboe_insp_mpnlotqueue_v v
     LEFT JOIN adempiere.ad_user u ON v.updatedby = u.ad_user_id
     LEFT JOIN adempiere.chuboe_vq_line vq ON v.chuboe_vq_line_id = vq.chuboe_vq_line_id
     LEFT JOIN adempiere.chuboe_rfq_line rl ON vq.chuboe_rfq_line_id = rl.chuboe_rfq_line_id
     LEFT JOIN insp_attrs ia ON v.m_attributesetinstance_id = ia.chuboe_insp_lot_id
-    WHERE v.isvalidate = 'Y'
-      AND v.chuboe_warehouse_id = ${W111_WAREHOUSE_ID}
-      AND v.updated >= '${sinceTs}'::timestamp
-      AND v.updated < '${untilTs}'::timestamp
-    ORDER BY v.updated DESC
+    LEFT JOIN adempiere.chuboe_warehouse w ON v.chuboe_warehouse_id = w.chuboe_warehouse_id
+    LEFT JOIN adempiere.chuboe_warehouse_group wg ON v.chuboe_warehouse_group_id = wg.chuboe_warehouse_group_id
+    LEFT JOIN adempiere.chuboe_warehouse_shelf s ON v.chuboe_warehouse_shelf_id = s.chuboe_warehouse_shelf_id
+    WHERE v.chuboe_warehouse_group_id = ${BROWNSVILLE_WAREHOUSE_GROUP_ID}
+      AND v.created >= '${sinceTs}'::timestamp
+      AND v.created < '${untilTs}'::timestamp
+    ORDER BY v.created DESC
   `;
 
-  // By inspector summary query
-  const byInspectorQuery = `
-    SELECT
-      COALESCE(u.name, 'Unknown') AS inspector_name,
-      COUNT(*) AS validation_count,
-      SUM(CAST(v.chuboe_mpnlot_qty AS INTEGER)) AS total_qty
-    FROM adempiere.chuboe_insp_mpnlotqueue_v v
-    LEFT JOIN adempiere.ad_user u ON v.updatedby = u.ad_user_id
-    WHERE v.isvalidate = 'Y'
-      AND v.chuboe_warehouse_id = ${W111_WAREHOUSE_ID}
-      AND v.updated >= '${sinceTs}'::timestamp
-      AND v.updated < '${untilTs}'::timestamp
-    GROUP BY u.name
-    ORDER BY validation_count DESC
-  `;
-
-  // Execute queries
+  // Execute query
   // Filter out "SET" line from SET client_min_messages command output
   const detailOut = psqlPipe(detailQuery).trim().split('\n').filter(line => line && line !== 'SET');
   const details = detailOut.map(line => {
-    const [otin, pov, line_no, mpn_received, mfr_received, qty_received, inspector, validated_at] = line.split('|');
-    return { otin: otin || '', pov: pov || '', line_no: line_no || '', mpn_received, mfr_received: mfr_received || '', qty_received, inspector: inspector || 'Unknown', validated_at };
+    const [otin, created_at, warehouse_group, warehouse, pov, line_no, mpn_received, mfr_received, qty_received, bin_location, inspector, validated_at] = line.split('|');
+    return { otin: otin || '', created_at, warehouse_group: warehouse_group || '', warehouse: warehouse || '', pov: pov || '', line_no: line_no || '', mpn_received, mfr_received: mfr_received || '', qty_received, bin_location: bin_location || '', inspector: inspector || 'Unknown', validated_at: validated_at || '' };
   });
 
-  // Filter out "SET" line from SET client_min_messages command output
-  const byInspectorOut = psqlPipe(byInspectorQuery).trim().split('\n').filter(line => line && line !== 'SET');
-  const byInspector = byInspectorOut.map(line => {
-    const [inspector_name, validation_count, total_qty] = line.split('|');
-    return {
-      inspector_name,
-      validation_count: Number(validation_count) || 0,
-      total_qty: Number(total_qty) || 0
-    };
-  });
-
-  const totalValidations = byInspector.reduce((sum, row) => sum + row.validation_count, 0);
-  const totalQty = byInspector.reduce((sum, row) => sum + row.total_qty, 0);
-  const uniqueInspectors = byInspector.length;
+  const totalOTINs = details.length;
 
   // ─── Render HTML ─────────────────────────────────────────────────────────
   const dispWindow = `${sinceTs} CT → ${untilTs} CT (${SINCE_HOURS}h)`;
   let html = `<html><body style="font-family:Arial,sans-serif;font-size:13px;color:#222">
-<h2 style="color:#2a5;margin-bottom:4px">Brownsville Inspection Validation — Daily Report</h2>
+<h2 style="color:#2a5;margin-bottom:4px">Brownsville OTINs Created — Daily Report</h2>
 <p style="margin-top:0;color:#666">${esc(dispWindow)}</p>
 
 <h3 style="margin-bottom:4px">Summary</h3>
 <table border="1" cellpadding="6" cellspacing="0" style="border-collapse:collapse;font-size:12px">
-<tr><td><b>Total Validations</b></td><td>${totalValidations}</td></tr>
-<tr><td><b>Total Qty</b></td><td>${formatQty(totalQty)}</td></tr>
-<tr><td><b>Inspectors</b></td><td>${uniqueInspectors}</td></tr>
+<tr><td><b>Total OTINs Created</b></td><td>${totalOTINs}</td></tr>
 </table>
 `;
-
-  if (byInspector.length > 0) {
-    html += `
-<h3 style="margin-bottom:4px;margin-top:16px">By Inspector</h3>
-<table border="1" cellpadding="6" cellspacing="0" style="border-collapse:collapse;font-size:12px;min-width:500px">
-<thead style="background:#eef"><tr><th align="left">Inspector</th><th align="right">Validations</th><th align="right">Total Qty</th><th align="left">% of Total</th></tr></thead>
-<tbody>
-${byInspector.map(row => {
-  const pct = totalValidations > 0 ? Math.round(100 * row.validation_count / totalValidations) : 0;
-  const barWidth = 100;
-  const barFill = Math.round(barWidth * row.validation_count / totalValidations);
-  const bar = `<span style="display:inline-block;width:${barWidth}px;height:12px;background:#eee;border-radius:2px;overflow:hidden">` +
-    `<span style="display:inline-block;width:${barFill}px;height:100%;background:#48c"></span>` +
-    `</span> ${pct}%`;
-  return `<tr><td>${esc(row.inspector_name)}</td><td style="text-align:right">${row.validation_count}</td><td style="text-align:right">${formatQty(row.total_qty)}</td><td>${bar}</td></tr>`;
-}).join('\n')}
-<tr style="background:#eee"><td><b>Total</b></td><td style="text-align:right"><b>${totalValidations}</b></td><td style="text-align:right"><b>${formatQty(totalQty)}</b></td><td></td></tr>
-</tbody>
-</table>
-`;
-  }
 
   if (details.length > 0) {
     html += `
 <h3 style="margin-bottom:4px;margin-top:16px">Detail</h3>
-<table border="1" cellpadding="6" cellspacing="0" style="border-collapse:collapse;font-size:12px;min-width:900px">
-<thead style="background:#eef"><tr><th align="left">OTIN</th><th align="left">POV#</th><th align="right">Line</th><th align="left">MPN Received</th><th align="left">MFR Received</th><th align="right">Qty Received</th><th align="left">Inspector</th><th align="left">Validated At</th></tr></thead>
+<table border="1" cellpadding="6" cellspacing="0" style="border-collapse:collapse;font-size:12px;min-width:1100px">
+<thead style="background:#eef"><tr><th align="left">OTIN</th><th align="left">Created</th><th align="left">Physical Warehouse</th><th align="left">Inv Group</th><th align="left">POV#</th><th align="right">Line</th><th align="left">MPN Received</th><th align="left">MFR Received</th><th align="right">Qty Received</th><th align="left">Bin</th><th align="left">Inspector</th><th align="left">Validated At</th></tr></thead>
 <tbody>
 ${details.map(row => {
-  return `<tr><td>${esc(row.otin)}</td><td>${esc(row.pov)}</td><td style="text-align:right">${esc(row.line_no)}</td><td style="font-family:monospace">${esc(row.mpn_received)}</td><td>${esc(row.mfr_received)}</td><td style="text-align:right">${formatQty(row.qty_received)}</td><td>${esc(row.inspector)}</td><td>${esc(row.validated_at)}</td></tr>`;
+  return `<tr><td>${esc(row.otin)}</td><td>${esc(row.created_at)}</td><td>${esc(row.warehouse_group)}</td><td>${esc(row.warehouse)}</td><td>${esc(row.pov)}</td><td style="text-align:right">${esc(row.line_no)}</td><td style="font-family:monospace">${esc(row.mpn_received)}</td><td>${esc(row.mfr_received)}</td><td style="text-align:right">${formatQty(row.qty_received)}</td><td>${esc(row.bin_location)}</td><td>${esc(row.inspector)}</td><td>${esc(row.validated_at)}</td></tr>`;
 }).join('\n')}
 </tbody>
 </table>
 `;
   } else {
-    html += `<p style="color:#888;font-style:italic">No validations found in this window.</p>`;
+    html += `<p style="color:#888;font-style:italic">No OTINs created in this window.</p>`;
   }
 
   html += `
 <p style="color:#999;font-size:11px;margin-top:16px;border-top:1px solid #eee;padding-top:8px">
 Generated by brownsville-inspection-report.js · Scheduled daily 8am EST.<br/>
-Window: ${esc(dispWindow)} (CT-naive per chuboe_*.updated convention).<br/>
-Warehouse: W111 (Brownsville LAM Kitting, chuboe_warehouse_id = ${W111_WAREHOUSE_ID}).<br/>
-Only validated inspections (isvalidate='Y') are included.
+Window: ${esc(dispWindow)} (CT-naive per chuboe_*.created convention).<br/>
+Physical Warehouse: BROWNSVILLE (chuboe_warehouse_group_id = ${BROWNSVILLE_WAREHOUSE_GROUP_ID}).<br/>
+Shows all OTINs created in window; Validated At shown for validated lines.
 </p></body></html>`;
 
   if (!SEND) {
     console.log('--- HTML preview ---');
     console.log(html);
     console.log('\n--- Summary ---');
-    console.log(`Total Validations: ${totalValidations}`);
-    console.log(`Total Qty: ${formatQty(totalQty)}`);
-    console.log(`Inspectors: ${uniqueInspectors}`);
+    console.log(`Total OTINs Created: ${totalOTINs}`);
     console.log('(Preview only — pass --send to email)');
     return;
   }
 
   const notifier = createNotifier({
     fromEmail: 'vq@orangetsunami.com',
-    fromName: 'Brownsville Inspection Report',
+    fromName: 'Brownsville OTIN Report',
   });
   const today = new Date().toISOString().slice(0, 10);
   await notifier.sendEmail(
     RECIPIENTS,
-    `Brownsville Inspection Validation — Daily Report (${today})`,
+    `Brownsville OTINs Created — Daily Report (${today})`,
     html,
     { html: true },
   );
-  console.log(`Sent to ${RECIPIENTS.join(', ')}`);
-  console.log(`Summary: ${totalValidations} validations, ${formatQty(totalQty)} qty, ${uniqueInspectors} inspectors`);
+  console.log(`Sent to ${RECIPIENTS.join(', ')} (${totalOTINs} OTINs)`);
 })().catch(err => { console.error('FATAL:', err); process.exit(1); });
