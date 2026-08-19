@@ -784,7 +784,7 @@ module.exports = [
     owner: 'justin.oberhofer',
     cadence: 'fixed',
     cadenceCron: '0 12 * * 1-5',  // 12:00 UTC = 8am EDT, Mon-Fri
-    command: `node "${ASTUTE}/reports/brownsville-inspection-report.js" --send`,
+    command: `node "${ASTUTE}/Business Ops/tsk-validated-inspections/brownsville-inspection-report.js" --send`,
     cwd: ASTUTE,
     needsOT: false,  // reads replica only, no OT writes
     logFile: '/tmp/brownsville-inspection-report.log',

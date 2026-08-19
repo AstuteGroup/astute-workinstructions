@@ -1,6 +1,6 @@
 # Brownsville Inspection Validation — Daily Report
 
-**Location:** `reports/brownsville-inspection-report.js`
+**Location:** `Business Ops/tsk-validated-inspections/brownsville-inspection-report.js`
 
 Automated daily report showing inspections validated at Brownsville (W111) the previous day, for transcription to another system.
 
@@ -33,18 +33,18 @@ Automated daily report showing inspections validated at Brownsville (W111) the p
 
 ### Manual Run (Preview)
 ```bash
-node reports/brownsville-inspection-report.js
+node Business Ops/tsk-validated-inspections/brownsville-inspection-report.js
 ```
 
 ### Manual Run (Send Email)
 ```bash
-node reports/brownsville-inspection-report.js --send
+node Business Ops/tsk-validated-inspections/brownsville-inspection-report.js --send
 ```
 
 ### Custom Time Window
 ```bash
-node reports/brownsville-inspection-report.js --since 48    # Last 48 hours
-node reports/brownsville-inspection-report.js --since 48 --send
+node Business Ops/tsk-validated-inspections/brownsville-inspection-report.js --since 48    # Last 48 hours
+node Business Ops/tsk-validated-inspections/brownsville-inspection-report.js --since 48 --send
 ```
 
 ## Technical Details
@@ -85,7 +85,7 @@ Timestamps are CT-naive per OT convention.
   owner: 'justin.oberhofer',
   cadence: 'fixed',
   cadenceCron: '0 12 * * 1-5',  // 12:00 UTC = 8am EDT, Mon-Fri
-  command: `node "${ASTUTE}/reports/brownsville-inspection-report.js" --send`,
+  command: `node "${ASTUTE}/Business Ops/tsk-validated-inspections/brownsville-inspection-report.js" --send`,
   cwd: ASTUTE,
   needsOT: false,  // reads replica only, no OT writes
   logFile: '/tmp/brownsville-inspection-report.log',
