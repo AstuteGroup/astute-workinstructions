@@ -2,7 +2,7 @@
 
 **Location:** `reports/brownsville-inspection-report.js`
 
-Automated daily report showing inspections validated at Brownsville (W111) the previous day, delivered via email.
+Automated daily report showing inspections validated at Brownsville (W111) the previous day, for transcription to another system.
 
 ## Schedule
 
@@ -13,33 +13,19 @@ Automated daily report showing inspections validated at Brownsville (W111) the p
 
 ## Report Contents
 
-### Summary Section
-
-| Metric | Description |
-|--------|-------------|
-| **Total Validations** | Count of inspections validated in the window |
-| **Total Qty** | Sum of all quantities validated |
-| **Inspectors** | Count of unique inspectors who validated |
-
-### By Inspector Breakdown
-
-| Column | Description |
-|--------|-------------|
-| **Inspector** | Name of the person who validated |
-| **Validations** | Number of MPN/lot combos validated |
-| **Total Qty** | Sum of quantities validated by this inspector |
-| **% of Total** | Percentage of total validations (visual bar) |
-
 ### Detail Listing
 
 | Column | Description |
 |--------|-------------|
 | **OTIN** | OT Internal Number (inventory tracking ID) |
+| **Physical Warehouse** | Warehouse group name (e.g., BROWNSVILLE) |
+| **Inv Group** | Inventory group / warehouse name |
 | **POV#** | Purchase Order Vendor number |
 | **Line** | RFQ line number |
 | **MPN Received** | Part number as recorded on inspection form |
 | **MFR Received** | Manufacturer as recorded on inspection form |
 | **Qty Received** | Quantity as recorded on inspection form |
+| **Bin** | Shelf/bin location |
 | **Inspector** | Person who validated |
 | **Validated At** | Timestamp of validation (CT-naive) |
 
@@ -68,7 +54,8 @@ node reports/brownsville-inspection-report.js --since 48 --send
 - **View:** `adempiere.chuboe_insp_mpnlotqueue_v`
 - **Filters:**
   - `isvalidate = 'Y'` — only validated inspections
-  - `chuboe_warehouse_id = 1000015` — W111 Brownsville only
+  - `chuboe_warehouse_group_id = 1000008` — Brownsville warehouse group
+  - `updated` in window — validation timestamp
 
 ### Key Fields
 - `chuboe_otin_search` — OTIN (OT Internal Number)
@@ -79,10 +66,14 @@ node reports/brownsville-inspection-report.js --since 48 --send
   - `Manufacturer Received` — Manufacturer recorded by inspector
   - `Total QTY Received` — Quantity recorded by inspector
 - `updatedby` → `ad_user.name` — Inspector name
+- `created` — When OTIN was created (CT-naive timestamp)
 - `updated` — When validation occurred (CT-naive timestamp)
 
+### Time Window Filter
+The report filters by **validation timestamp** (`updated` field). An OTIN created last week but validated yesterday will appear in yesterday's report.
+
 ### Time Zone
-Timestamps are CT-naive per OT convention. The `updated` field reflects when the validation occurred.
+Timestamps are CT-naive per OT convention.
 
 ## Cron Configuration
 
@@ -93,12 +84,12 @@ Timestamps are CT-naive per OT convention. The `updated` field reflects when the
   name: 'brownsville-inspection-report',
   owner: 'justin.oberhofer',
   cadence: 'fixed',
-  cadenceCron: '0 12 * * 1-5',
+  cadenceCron: '0 12 * * 1-5',  // 12:00 UTC = 8am EDT, Mon-Fri
   command: `node "${ASTUTE}/reports/brownsville-inspection-report.js" --send`,
   cwd: ASTUTE,
-  needsOT: false,
+  needsOT: false,  // reads replica only, no OT writes
   logFile: '/tmp/brownsville-inspection-report.log',
-  description: 'Mon-Fri 8am EDT — Brownsville inspection validation daily digest',
+  description: 'Mon-Fri 8am EDT (12:00 UTC) — Brownsville inspection validation daily digest to justin.oberhofer@',
 }
 ```
 
@@ -111,7 +102,10 @@ Timestamps are CT-naive per OT convention. The `updated` field reflects when the
 
 ## History
 
+- **2026-08-19** — Simplified to detail table only
+  - Removed Summary and By Inspector sections
+  - Shows only validated inspections (no pending)
+  - For transcription to another system
 - **2026-08-17** — Initial implementation
-  - Summary + inspector breakdown + detail listing
   - Scheduled Mon-Fri 8am Eastern
   - Recipient: justin.oberhofer@astutegroup.com
