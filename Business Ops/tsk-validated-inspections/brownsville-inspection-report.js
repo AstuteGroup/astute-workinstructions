@@ -159,7 +159,7 @@ Shows inspections validated in the window.
   }
 
   const notifier = createNotifier({
-    fromEmail: 'vq@orangetsunami.com',
+    fromEmail: 'bizops@orangetsunami.com',
     fromName: 'Brownsville Inspection Report',
   });
   const today = new Date().toISOString().slice(0, 10);
