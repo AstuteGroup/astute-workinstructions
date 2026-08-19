@@ -6,10 +6,9 @@ Automated daily report showing inspections validated at Brownsville (W111) the p
 
 ## Schedule
 
-- **When:** Mon-Fri at 8am Eastern (12:00 UTC)
+- **When:** Daily at 8am Eastern (12:00 UTC)
 - **Recipients:** justin.oberhofer@astutegroup.com
 - **Delivery:** HTML email
-- **Weekend gate:** Built-in (automatically skips Sat/Sun)
 
 ## Report Contents
 
@@ -84,12 +83,12 @@ Timestamps are CT-naive per OT convention.
   name: 'brownsville-inspection-report',
   owner: 'justin.oberhofer',
   cadence: 'fixed',
-  cadenceCron: '0 12 * * 1-5',  // 12:00 UTC = 8am EDT, Mon-Fri
+  cadenceCron: '0 12 * * *',  // 12:00 UTC = 8am EDT, daily
   command: `node "${ASTUTE}/Business Ops/tsk-validated-inspections/brownsville-inspection-report.js" --send`,
   cwd: ASTUTE,
   needsOT: false,  // reads replica only, no OT writes
   logFile: '/tmp/brownsville-inspection-report.log',
-  description: 'Mon-Fri 8am EDT (12:00 UTC) — Brownsville inspection validation daily digest to justin.oberhofer@',
+  description: 'Daily 8am EDT (12:00 UTC) — Brownsville inspection validation daily digest to justin.oberhofer@',
 }
 ```
 
@@ -97,7 +96,6 @@ Timestamps are CT-naive per OT convention.
 
 ## Dependencies
 
-- `shared/weekend-gate.js` — Skips Sat/Sun
 - `shared/notifier.js` — Email delivery
 
 ## History
@@ -107,5 +105,5 @@ Timestamps are CT-naive per OT convention.
   - Shows only validated inspections (no pending)
   - For transcription to another system
 - **2026-08-17** — Initial implementation
-  - Scheduled Mon-Fri 8am Eastern
+  - Scheduled daily 8am Eastern
   - Recipient: justin.oberhofer@astutegroup.com

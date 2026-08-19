@@ -20,14 +20,10 @@
 'use strict';
 
 const path = require('path');
-require('dotenv').config({ path: path.resolve(__dirname, '../.env') });
-
-// Weekend gate — skip Sat/Sun EST to reduce noise
-const { exitIfWeekend } = require('../shared/weekend-gate');
-exitIfWeekend();
+require('dotenv').config({ path: path.resolve(__dirname, '../../.env') });
 
 const { execSync } = require('child_process');
-const { createNotifier } = require('../shared/notifier');
+const { createNotifier } = require('../../shared/notifier');
 
 const BROWNSVILLE_WAREHOUSE_GROUP_ID = 1000008;
 

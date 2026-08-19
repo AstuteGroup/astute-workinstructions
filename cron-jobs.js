@@ -783,12 +783,12 @@ module.exports = [
     name: 'brownsville-inspection-report',
     owner: 'justin.oberhofer',
     cadence: 'fixed',
-    cadenceCron: '0 12 * * 1-5',  // 12:00 UTC = 8am EDT, Mon-Fri
+    cadenceCron: '0 12 * * *',  // 12:00 UTC = 8am EDT, daily
     command: `node "${ASTUTE}/Business Ops/tsk-validated-inspections/brownsville-inspection-report.js" --send`,
     cwd: ASTUTE,
     needsOT: false,  // reads replica only, no OT writes
     logFile: '/tmp/brownsville-inspection-report.log',
-    description: 'Mon-Fri 8am EDT (12:00 UTC) — Brownsville inspection validation daily digest to justin.oberhofer@',
+    description: 'Daily 8am EDT (12:00 UTC) — Brownsville inspection validation daily digest to justin.oberhofer@',
   },
 ];
 
