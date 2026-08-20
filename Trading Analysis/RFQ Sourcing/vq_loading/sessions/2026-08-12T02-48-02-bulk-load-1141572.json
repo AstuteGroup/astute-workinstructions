@@ -1,0 +1,485 @@
+{
+  "rfqSearchKey": "1141572",
+  "buyerId": 1011159,
+  "runAt": "2026-08-12T02:48:02.739Z",
+  "sourceQuotes": "/tmp/vq_load_1141572_chunk2.json",
+  "result": {
+    "written": [
+      {
+        "vqLineId": 2308021,
+        "line": 70,
+        "mpn": "ADA4896-2ACPZ-R7",
+        "vendor": "ECHO COMPONENTS CO.,LTD",
+        "cost": 4.82,
+        "qty": 105,
+        "fuzzyMatch": false,
+        "originalVendorLabel": "Echo",
+        "bpId": 1009860,
+        "noBid": false
+      },
+      {
+        "vqLineId": 2308024,
+        "line": 70,
+        "mpn": "ADA4896-2ACPZ-R7",
+        "vendor": "CHIP ENERGY INTERNATIONAL CO.,LIMITED",
+        "cost": 7.761,
+        "qty": 105,
+        "fuzzyMatch": false,
+        "originalVendorLabel": "Chip Energy",
+        "bpId": 1010640,
+        "noBid": false
+      },
+      {
+        "vqLineId": 2308027,
+        "line": 70,
+        "mpn": "ADA4896-2ACPZ-R7",
+        "vendor": "Valley Electronics(HK) Limited",
+        "cost": 4.6,
+        "qty": 105,
+        "fuzzyMatch": false,
+        "originalVendorLabel": "Valley",
+        "bpId": 1009499,
+        "noBid": false
+      },
+      {
+        "vqLineId": 2308033,
+        "line": 70,
+        "mpn": "ADA4896-2ACPZ-R7",
+        "vendor": "PGC-IC Ltd",
+        "cost": 7.42,
+        "qty": 105,
+        "fuzzyMatch": false,
+        "originalVendorLabel": "PGC",
+        "bpId": 1001639,
+        "noBid": false
+      },
+      {
+        "vqLineId": 2308037,
+        "line": 70,
+        "mpn": "ADA4896-2ACPZ-R7",
+        "vendor": "PGC-IC Ltd",
+        "cost": 4.59,
+        "qty": 105,
+        "fuzzyMatch": false,
+        "originalVendorLabel": "PGC",
+        "bpId": 1001639,
+        "noBid": false
+      },
+      {
+        "vqLineId": 2308043,
+        "line": 70,
+        "mpn": "ADA4896-2ACPZ-R7",
+        "vendor": "Keming Electronics Development Co., Ltd",
+        "cost": 7.93,
+        "qty": 105,
+        "fuzzyMatch": false,
+        "originalVendorLabel": "Keming",
+        "bpId": 1000313,
+        "noBid": false
+      },
+      {
+        "vqLineId": 2308048,
+        "line": 70,
+        "mpn": "ADA4896-2ACPZ-R7",
+        "vendor": "HK Firsttop Technology Ltd",
+        "cost": 4.91,
+        "qty": 105,
+        "fuzzyMatch": false,
+        "originalVendorLabel": "Firsttop",
+        "bpId": 1003256,
+        "noBid": false
+      },
+      {
+        "vqLineId": 2308054,
+        "line": 70,
+        "mpn": "ADA4896-2ACPZ-R7",
+        "vendor": "Xinshop Electronics Co., Ltd ",
+        "cost": 7.78,
+        "qty": 105,
+        "fuzzyMatch": false,
+        "originalVendorLabel": "XINSHOP",
+        "bpId": 1002647,
+        "noBid": false
+      },
+      {
+        "vqLineId": 2308059,
+        "line": 70,
+        "mpn": "ADA4896-2ACPZ-R7",
+        "vendor": "3A Components Limited",
+        "cost": 7.45,
+        "qty": 105,
+        "fuzzyMatch": false,
+        "originalVendorLabel": "3A",
+        "bpId": 1000605,
+        "noBid": false
+      },
+      {
+        "vqLineId": 2308064,
+        "line": 70,
+        "mpn": "ADA4896-2ACPZ-R7",
+        "vendor": "Action (HK) Technology Ltd",
+        "cost": 4.97,
+        "qty": 105,
+        "fuzzyMatch": false,
+        "originalVendorLabel": "ACTION",
+        "bpId": 1001460,
+        "noBid": false
+      },
+      {
+        "vqLineId": 2308070,
+        "line": 70,
+        "mpn": "ADA4896-2ACPZ-R7",
+        "vendor": "Link Technologies Ltd",
+        "cost": 4.68,
+        "qty": 105,
+        "fuzzyMatch": false,
+        "originalVendorLabel": "Link",
+        "bpId": 1000321,
+        "noBid": false
+      },
+      {
+        "vqLineId": 2308077,
+        "line": 120,
+        "mpn": "STM32L476VGT6",
+        "vendor": "Wonderful Semiconductor (HK) Co., Ltd",
+        "cost": 6,
+        "qty": 3780,
+        "fuzzyMatch": false,
+        "originalVendorLabel": "Wonderful",
+        "bpId": 1003589,
+        "noBid": false
+      },
+      {
+        "vqLineId": 2308082,
+        "line": 120,
+        "mpn": "STM32L476VGT6",
+        "vendor": "Fixchips Global Limited",
+        "cost": 7.42,
+        "qty": 2000,
+        "fuzzyMatch": false,
+        "originalVendorLabel": "Fixchips",
+        "bpId": 1000387,
+        "noBid": false
+      },
+      {
+        "vqLineId": 2308087,
+        "line": 120,
+        "mpn": "STM32L476VGT6",
+        "vendor": "Fixchips Global Limited",
+        "cost": 8.41,
+        "qty": 1000,
+        "fuzzyMatch": false,
+        "originalVendorLabel": "Fixchips",
+        "bpId": 1000387,
+        "noBid": false
+      },
+      {
+        "vqLineId": 2308091,
+        "line": 120,
+        "mpn": "STM32L476VGT6",
+        "vendor": "Valley Electronics(HK) Limited",
+        "cost": 6.45,
+        "qty": 1000,
+        "fuzzyMatch": false,
+        "originalVendorLabel": "Valley",
+        "bpId": 1009499,
+        "noBid": false
+      },
+      {
+        "vqLineId": 2308096,
+        "line": 120,
+        "mpn": "STM32L476VGT6",
+        "vendor": "Valley Electronics(HK) Limited",
+        "cost": 9.2,
+        "qty": 5000,
+        "fuzzyMatch": false,
+        "originalVendorLabel": "Valley",
+        "bpId": 1009499,
+        "noBid": false
+      },
+      {
+        "vqLineId": 2308099,
+        "line": 120,
+        "mpn": "STM32L476VGT6",
+        "vendor": "PGC-IC Ltd",
+        "cost": 7.12,
+        "qty": 2000,
+        "fuzzyMatch": false,
+        "originalVendorLabel": "PGC",
+        "bpId": 1001639,
+        "noBid": false
+      },
+      {
+        "vqLineId": 2308101,
+        "line": 120,
+        "mpn": "STM32L476VGT6",
+        "vendor": "PGC-IC Ltd",
+        "cost": 6.36,
+        "qty": 1000,
+        "fuzzyMatch": false,
+        "originalVendorLabel": "PGC",
+        "bpId": 1001639,
+        "noBid": false
+      }
+    ],
+    "skipped": [
+      {
+        "vendorName": "ACTION",
+        "mpn": "BGA125N6E6327XTSA1",
+        "vendorQuotedMpn": "BGA125N6E6327",
+        "mfr": "INFINEON",
+        "qty": 14500,
+        "cost": 0.47,
+        "leadTime": null,
+        "dateCode": "21+",
+        "coo": null,
+        "packaging": null,
+        "rohs": null,
+        "vendorNotes": null,
+        "reason": "PRE_EXISTING_DUPLICATE",
+        "detail": "Existing chuboe_vq_line 2307977 matches natural key (rfq_line × MPN × BP × cost × currency) — no new POST.",
+        "vqLineId": 2307977
+      },
+      {
+        "vendorName": "Echo",
+        "mpn": "ADA4896-2ACPZ-R7",
+        "vendorQuotedMpn": null,
+        "mfr": "ADI",
+        "qty": 105,
+        "cost": 8.02,
+        "leadTime": "stock",
+        "dateCode": "21+",
+        "coo": null,
+        "packaging": null,
+        "rohs": null,
+        "vendorNotes": "package LFCSP8",
+        "reason": "PRE_EXISTING_DUPLICATE",
+        "detail": "Existing chuboe_vq_line 2307982 matches natural key (rfq_line × MPN × BP × cost × currency) — no new POST.",
+        "vqLineId": 2307982
+      }
+    ],
+    "failed": [],
+    "coverage": [
+      {
+        "lineNo": 10,
+        "lineId": 3166564,
+        "rfqQty": 979,
+        "mpns": [
+          "766145191AP"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 20,
+        "lineId": 3166566,
+        "rfqQty": 200,
+        "mpns": [
+          "XC9572XL-7VQG64I"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 30,
+        "lineId": 3166565,
+        "rfqQty": 200,
+        "mpns": [
+          "XC9572XL-15VQ64Q"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 40,
+        "lineId": 3166567,
+        "rfqQty": 200,
+        "mpns": [
+          "XA9536XL-15VQG44Q"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 50,
+        "lineId": 3166568,
+        "rfqQty": 1000,
+        "mpns": [
+          "ADXL362BCCZ-RL7"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 60,
+        "lineId": 3166572,
+        "rfqQty": 15000,
+        "mpns": [
+          "BGA125N6E6327XTSA1"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 70,
+        "lineId": 3166571,
+        "rfqQty": 105,
+        "mpns": [
+          "ADA4896-2ACPZ-R7"
+        ],
+        "vqsThisBatch": 11
+      },
+      {
+        "lineNo": 80,
+        "lineId": 3166569,
+        "rfqQty": 21000,
+        "mpns": [
+          "STM32U083CCT6"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 90,
+        "lineId": 3166570,
+        "rfqQty": 21000,
+        "mpns": [
+          "STM32U083CCT3"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 100,
+        "lineId": 3166573,
+        "rfqQty": 21000,
+        "mpns": [
+          "STM32U083CCT6TR"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 110,
+        "lineId": 3166574,
+        "rfqQty": 21000,
+        "mpns": [
+          "STM32U083CCT3TR"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 120,
+        "lineId": 3166575,
+        "rfqQty": 36000,
+        "mpns": [
+          "STM32L476VGT6"
+        ],
+        "vqsThisBatch": 7
+      },
+      {
+        "lineNo": 130,
+        "lineId": 3166576,
+        "rfqQty": 2500,
+        "mpns": [
+          "MC34063ABD"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 140,
+        "lineId": 3166577,
+        "rfqQty": 2000,
+        "mpns": [
+          "ABM3B-8.000MHZ-10-1-U-T 5032"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 150,
+        "lineId": 3166578,
+        "rfqQty": 500,
+        "mpns": [
+          "522.719"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 160,
+        "lineId": 3166579,
+        "rfqQty": 5000,
+        "mpns": [
+          "STM32H573MIY3QTR"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 170,
+        "lineId": 3166580,
+        "rfqQty": 200000,
+        "mpns": [
+          "TPS2400DBVR"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 180,
+        "lineId": 3166581,
+        "rfqQty": 200000,
+        "mpns": [
+          "TPS2400DBVT"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 190,
+        "lineId": 3166582,
+        "rfqQty": 500,
+        "mpns": [
+          "PC95ER18/5/12-Z"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 200,
+        "lineId": 3166583,
+        "rfqQty": 500,
+        "mpns": [
+          "SG-210STF 29.4912ML3"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 210,
+        "lineId": 3166584,
+        "rfqQty": 1000,
+        "mpns": [
+          "STM32L151CBU6A"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 220,
+        "lineId": 3166585,
+        "rfqQty": 3600,
+        "mpns": [
+          "SN74AXC8T245RHLR"
+        ],
+        "vqsThisBatch": 0
+      }
+    ],
+    "gaps": [
+      10,
+      20,
+      30,
+      40,
+      50,
+      60,
+      80,
+      90,
+      100,
+      110,
+      130,
+      140,
+      150,
+      160,
+      170,
+      180,
+      190,
+      200,
+      210,
+      220
+    ]
+  }
+}

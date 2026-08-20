@@ -1,0 +1,4691 @@
+{
+  "rfqSearchKey": "1141785",
+  "buyerId": 1005190,
+  "runAt": "2026-08-13T09:39:43.746Z",
+  "sourceQuotes": "/tmp/quotes_with_mfr.json",
+  "result": {
+    "written": [
+      {
+        "vqLineId": 2311511,
+        "line": 30,
+        "mpn": "PI3PCIE3212ZBEX",
+        "vendor": "Fixchips Global Limited",
+        "cost": 0.472,
+        "qty": 12000,
+        "fuzzyMatch": false,
+        "originalVendorLabel": "Fixchips Global Limited",
+        "bpId": 1000387,
+        "noBid": false
+      },
+      {
+        "vqLineId": 2311512,
+        "line": 30,
+        "mpn": "PI3PCIE3212ZBEX",
+        "vendor": "SMARTEL ELECTRONICS (ASIA) CO LTD",
+        "cost": 0.471,
+        "qty": 12000,
+        "fuzzyMatch": false,
+        "originalVendorLabel": "SMARTEL ELECTRONICS (ASIA) CO LTD",
+        "bpId": 1004861,
+        "noBid": false
+      },
+      {
+        "vqLineId": 2311513,
+        "line": 30,
+        "mpn": "PI3PCIE3212ZBEX",
+        "vendor": "Xinshop Electronics Co., Ltd ",
+        "cost": 0.4667,
+        "qty": 12000,
+        "fuzzyMatch": false,
+        "originalVendorLabel": "Xinshop Electronics Co., Ltd",
+        "bpId": 1002647,
+        "noBid": false
+      },
+      {
+        "vqLineId": 2311514,
+        "line": 40,
+        "mpn": "HD3SS3212IRKSR",
+        "vendor": "Fixchips Global Limited",
+        "cost": 0.55,
+        "qty": 12000,
+        "fuzzyMatch": false,
+        "originalVendorLabel": "Fixchips Global Limited",
+        "bpId": 1000387,
+        "noBid": false
+      },
+      {
+        "vqLineId": 2311515,
+        "line": 40,
+        "mpn": "HD3SS3212IRKSR",
+        "vendor": "SMARTEL ELECTRONICS (ASIA) CO LTD",
+        "cost": 0.548,
+        "qty": 12000,
+        "fuzzyMatch": false,
+        "originalVendorLabel": "SMARTEL ELECTRONICS (ASIA) CO LTD",
+        "bpId": 1004861,
+        "noBid": false
+      },
+      {
+        "vqLineId": 2311516,
+        "line": 40,
+        "mpn": "HD3SS3212IRKSR",
+        "vendor": "Xinshop Electronics Co., Ltd ",
+        "cost": 0.5496,
+        "qty": 12000,
+        "fuzzyMatch": false,
+        "originalVendorLabel": "Xinshop Electronics Co., Ltd",
+        "bpId": 1002647,
+        "noBid": false
+      },
+      {
+        "vqLineId": 2311517,
+        "line": 40,
+        "mpn": "HD3SS3212IRKSR",
+        "vendor": "Action (HK) Technology Ltd",
+        "cost": 0.545,
+        "qty": 9000,
+        "fuzzyMatch": false,
+        "originalVendorLabel": "Action (HK) Technology Ltd",
+        "bpId": 1001460,
+        "noBid": false
+      },
+      {
+        "vqLineId": 2311518,
+        "line": 40,
+        "mpn": "HD3SS3212IRKSR",
+        "vendor": "Skyeast International Group Ltd",
+        "cost": 0.55,
+        "qty": 12000,
+        "fuzzyMatch": false,
+        "originalVendorLabel": "Skyeast International Group Ltd",
+        "bpId": 1001659,
+        "noBid": false
+      },
+      {
+        "vqLineId": 2311519,
+        "line": 50,
+        "mpn": "PDS1040L-13",
+        "vendor": "Fixchips Global Limited",
+        "cost": 0.281,
+        "qty": 20000,
+        "fuzzyMatch": false,
+        "originalVendorLabel": "Fixchips Global Limited",
+        "bpId": 1000387,
+        "noBid": false
+      },
+      {
+        "vqLineId": 2311520,
+        "line": 50,
+        "mpn": "PDS1040L-13",
+        "vendor": "Xinshop Electronics Co., Ltd ",
+        "cost": 0.293,
+        "qty": 20000,
+        "fuzzyMatch": false,
+        "originalVendorLabel": "Xinshop Electronics Co., Ltd",
+        "bpId": 1002647,
+        "noBid": false
+      },
+      {
+        "vqLineId": 2311521,
+        "line": 60,
+        "mpn": "DMN2004K-7",
+        "vendor": "Fixchips Global Limited",
+        "cost": 0.786,
+        "qty": 6000,
+        "fuzzyMatch": false,
+        "originalVendorLabel": "Fixchips Global Limited",
+        "bpId": 1000387,
+        "noBid": false
+      },
+      {
+        "vqLineId": 2311522,
+        "line": 60,
+        "mpn": "DMN2004K-7",
+        "vendor": "Fixchips Global Limited",
+        "cost": 0.884,
+        "qty": 21000,
+        "fuzzyMatch": false,
+        "originalVendorLabel": "Fixchips Global Limited",
+        "bpId": 1000387,
+        "noBid": false
+      },
+      {
+        "vqLineId": 2311523,
+        "line": 60,
+        "mpn": "DMN2004K-7",
+        "vendor": "Fixchips Global Limited",
+        "cost": 0.874,
+        "qty": 15000,
+        "fuzzyMatch": false,
+        "originalVendorLabel": "Fixchips Global Limited",
+        "bpId": 1000387,
+        "noBid": false
+      },
+      {
+        "vqLineId": 2311524,
+        "line": 90,
+        "mpn": "RUC002N05T116",
+        "vendor": "Fixchips Global Limited",
+        "cost": 0.024,
+        "qty": 12000,
+        "fuzzyMatch": false,
+        "originalVendorLabel": "Fixchips Global Limited",
+        "bpId": 1000387,
+        "noBid": false
+      },
+      {
+        "vqLineId": 2311525,
+        "line": 90,
+        "mpn": "RUC002N05T116",
+        "vendor": "Fixchips Global Limited",
+        "cost": 0.025,
+        "qty": 6000,
+        "fuzzyMatch": false,
+        "originalVendorLabel": "Fixchips Global Limited",
+        "bpId": 1000387,
+        "noBid": false
+      },
+      {
+        "vqLineId": 2311526,
+        "line": 90,
+        "mpn": "RUC002N05T116",
+        "vendor": "Fixchips Global Limited",
+        "cost": 0.029,
+        "qty": 102000,
+        "fuzzyMatch": false,
+        "originalVendorLabel": "Fixchips Global Limited",
+        "bpId": 1000387,
+        "noBid": false
+      },
+      {
+        "vqLineId": 2311527,
+        "line": 90,
+        "mpn": "RUC002N05T116",
+        "vendor": "Xinshop Electronics Co., Ltd ",
+        "cost": 0.0234,
+        "qty": 33000,
+        "fuzzyMatch": false,
+        "originalVendorLabel": "Xinshop Electronics Co., Ltd",
+        "bpId": 1002647,
+        "noBid": false
+      },
+      {
+        "vqLineId": 2311528,
+        "line": 90,
+        "mpn": "RUC002N05T116",
+        "vendor": "Xinshop Electronics Co., Ltd ",
+        "cost": 0.0343,
+        "qty": 102000,
+        "fuzzyMatch": false,
+        "originalVendorLabel": "Xinshop Electronics Co., Ltd",
+        "bpId": 1002647,
+        "noBid": false
+      },
+      {
+        "vqLineId": 2311529,
+        "line": 90,
+        "mpn": "RUC002N05T116",
+        "vendor": "Xinshop Electronics Co., Ltd ",
+        "cost": 0.022,
+        "qty": 12000,
+        "fuzzyMatch": false,
+        "originalVendorLabel": "Xinshop Electronics Co., Ltd",
+        "bpId": 1002647,
+        "noBid": false
+      },
+      {
+        "vqLineId": 2311530,
+        "line": 90,
+        "mpn": "RUC002N05T116",
+        "vendor": "Xinshop Electronics Co., Ltd ",
+        "cost": 0.0234,
+        "qty": 64950,
+        "fuzzyMatch": false,
+        "originalVendorLabel": "Xinshop Electronics Co., Ltd",
+        "bpId": 1002647,
+        "noBid": false
+      },
+      {
+        "vqLineId": 2311531,
+        "line": 90,
+        "mpn": "RUC002N05T116",
+        "vendor": "SMARTEL ELECTRONICS (ASIA) CO LTD",
+        "cost": 0.03,
+        "qty": 102000,
+        "fuzzyMatch": false,
+        "originalVendorLabel": "SMARTEL ELECTRONICS (ASIA) CO LTD",
+        "bpId": 1004861,
+        "noBid": false
+      },
+      {
+        "vqLineId": 2311532,
+        "line": 90,
+        "mpn": "RUC002N05T116",
+        "vendor": "SMARTEL ELECTRONICS (ASIA) CO LTD",
+        "cost": 0.023,
+        "qty": 12000,
+        "fuzzyMatch": false,
+        "originalVendorLabel": "SMARTEL ELECTRONICS (ASIA) CO LTD",
+        "bpId": 1004861,
+        "noBid": false
+      },
+      {
+        "vqLineId": 2311533,
+        "line": 90,
+        "mpn": "RUC002N05T116",
+        "vendor": "SMARTEL ELECTRONICS (ASIA) CO LTD",
+        "cost": 0.025,
+        "qty": 6000,
+        "fuzzyMatch": false,
+        "originalVendorLabel": "SMARTEL ELECTRONICS (ASIA) CO LTD",
+        "bpId": 1004861,
+        "noBid": false
+      },
+      {
+        "vqLineId": 2311534,
+        "line": 150,
+        "mpn": "TLA2024IRUGR",
+        "vendor": "Original Chip Source Electronics Co., Limited",
+        "cost": 0.71,
+        "qty": 3000,
+        "fuzzyMatch": false,
+        "originalVendorLabel": "Original Chip Source Electronics Co., Limited",
+        "bpId": 1009652,
+        "noBid": false
+      },
+      {
+        "vqLineId": 2311535,
+        "line": 150,
+        "mpn": "TLA2024IRUGR",
+        "vendor": "Momntech Limited",
+        "cost": 0.9,
+        "qty": 9000,
+        "fuzzyMatch": false,
+        "originalVendorLabel": "Momntech Limited",
+        "bpId": 1004122,
+        "noBid": false
+      },
+      {
+        "vqLineId": 2311536,
+        "line": 150,
+        "mpn": "TLA2024IRUGR",
+        "vendor": "HJC Electronic (HK) Ltd",
+        "cost": 0.68,
+        "qty": 9000,
+        "fuzzyMatch": false,
+        "originalVendorLabel": "HJC Electronic (HK) Ltd",
+        "bpId": 1001613,
+        "noBid": false
+      },
+      {
+        "vqLineId": 2311537,
+        "line": 150,
+        "mpn": "TLA2024IRUGR",
+        "vendor": "Valley Electronics(HK) Limited",
+        "cost": 0.74,
+        "qty": 1413,
+        "fuzzyMatch": false,
+        "originalVendorLabel": "Valley Electronics(HK) Limited",
+        "bpId": 1009499,
+        "noBid": false
+      },
+      {
+        "vqLineId": 2311538,
+        "line": 150,
+        "mpn": "TLA2024IRUGR",
+        "vendor": "Xinshop Electronics Co., Ltd ",
+        "cost": 0.7467,
+        "qty": 12000,
+        "fuzzyMatch": false,
+        "originalVendorLabel": "Xinshop Electronics Co., Ltd",
+        "bpId": 1002647,
+        "noBid": false
+      },
+      {
+        "vqLineId": 2311539,
+        "line": 150,
+        "mpn": "TLA2024IRUGR",
+        "vendor": "SMARTEL ELECTRONICS (ASIA) CO LTD",
+        "cost": 0.789,
+        "qty": 12000,
+        "fuzzyMatch": false,
+        "originalVendorLabel": "SMARTEL ELECTRONICS (ASIA) CO LTD",
+        "bpId": 1004861,
+        "noBid": false
+      },
+      {
+        "vqLineId": 2311540,
+        "line": 150,
+        "mpn": "TLA2024IRUGR",
+        "vendor": "Fixchips Global Limited",
+        "cost": 0.786,
+        "qty": 12000,
+        "fuzzyMatch": false,
+        "originalVendorLabel": "Fixchips Global Limited",
+        "bpId": 1000387,
+        "noBid": false
+      },
+      {
+        "vqLineId": 2311541,
+        "line": 150,
+        "mpn": "TLA2024IRUGR",
+        "vendor": "Action (HK) Technology Ltd",
+        "cost": 0.871,
+        "qty": 12000,
+        "fuzzyMatch": false,
+        "originalVendorLabel": "Action (HK) Technology Ltd",
+        "bpId": 1001460,
+        "noBid": false
+      },
+      {
+        "vqLineId": 2311542,
+        "line": 150,
+        "mpn": "TLA2024IRUGR",
+        "vendor": "Skyeast International Group Ltd",
+        "cost": 0.74,
+        "qty": 12000,
+        "fuzzyMatch": false,
+        "originalVendorLabel": "Skyeast International Group Ltd",
+        "bpId": 1001659,
+        "noBid": false
+      },
+      {
+        "vqLineId": 2311543,
+        "line": 200,
+        "mpn": "DRV5032FBDBZR",
+        "vendor": "PGC-IC Ltd",
+        "cost": 0.279,
+        "qty": 39000,
+        "fuzzyMatch": false,
+        "originalVendorLabel": "PGC-IC Ltd",
+        "bpId": 1001639,
+        "noBid": false
+      },
+      {
+        "vqLineId": 2311544,
+        "line": 200,
+        "mpn": "DRV5032FBDBZR",
+        "vendor": "PGC-IC Ltd",
+        "cost": 0.3035,
+        "qty": 27000,
+        "fuzzyMatch": false,
+        "originalVendorLabel": "PGC-IC Ltd",
+        "bpId": 1001639,
+        "noBid": false
+      },
+      {
+        "vqLineId": 2311545,
+        "line": 200,
+        "mpn": "DRV5032FBDBZR",
+        "vendor": "PGC-IC Ltd",
+        "cost": 0.4464,
+        "qty": 50000,
+        "fuzzyMatch": false,
+        "originalVendorLabel": "PGC-IC Ltd",
+        "bpId": 1001639,
+        "noBid": false
+      },
+      {
+        "vqLineId": 2311546,
+        "line": 200,
+        "mpn": "DRV5032FBDBZR",
+        "vendor": "PGC-IC Ltd",
+        "cost": 0.4464,
+        "qty": 32000,
+        "fuzzyMatch": false,
+        "originalVendorLabel": "PGC-IC Ltd",
+        "bpId": 1001639,
+        "noBid": false
+      },
+      {
+        "vqLineId": 2311547,
+        "line": 200,
+        "mpn": "DRV5032FBDBZR",
+        "vendor": "PGC-IC Ltd",
+        "cost": 0.6696,
+        "qty": 50000,
+        "fuzzyMatch": false,
+        "originalVendorLabel": "PGC-IC Ltd",
+        "bpId": 1001639,
+        "noBid": false
+      },
+      {
+        "vqLineId": 2311548,
+        "line": 200,
+        "mpn": "DRV5032FBDBZR",
+        "vendor": "Keming Electronics Development Co., Ltd",
+        "cost": 0.463,
+        "qty": 9000,
+        "fuzzyMatch": false,
+        "originalVendorLabel": "Keming Electronics Development Co., Ltd",
+        "bpId": 1000313,
+        "noBid": false
+      },
+      {
+        "vqLineId": 2311549,
+        "line": 200,
+        "mpn": "DRV5032FBDBZR",
+        "vendor": "Guiyu Electronics Group (HK) Ltd",
+        "cost": 0.38,
+        "qty": 36000,
+        "fuzzyMatch": false,
+        "originalVendorLabel": "Guiyu Electronics Group (HK) Ltd",
+        "bpId": 1001865,
+        "noBid": false
+      },
+      {
+        "vqLineId": 2311550,
+        "line": 200,
+        "mpn": "DRV5032FBDBZR",
+        "vendor": "Action (HK) Technology Ltd",
+        "cost": 0.389,
+        "qty": 30000,
+        "fuzzyMatch": false,
+        "originalVendorLabel": "Action (HK) Technology Ltd",
+        "bpId": 1001460,
+        "noBid": false
+      },
+      {
+        "vqLineId": 2311551,
+        "line": 200,
+        "mpn": "DRV5032FBDBZR",
+        "vendor": "Action (HK) Technology Ltd",
+        "cost": 0.467,
+        "qty": 20000,
+        "fuzzyMatch": false,
+        "originalVendorLabel": "Action (HK) Technology Ltd",
+        "bpId": 1001460,
+        "noBid": false
+      },
+      {
+        "vqLineId": 2311552,
+        "line": 200,
+        "mpn": "DRV5032FBDBZR",
+        "vendor": "Action (HK) Technology Ltd",
+        "cost": 0.234,
+        "qty": 15000,
+        "fuzzyMatch": false,
+        "originalVendorLabel": "Action (HK) Technology Ltd",
+        "bpId": 1001460,
+        "noBid": false
+      },
+      {
+        "vqLineId": 2311553,
+        "line": 200,
+        "mpn": "DRV5032FBDBZR",
+        "vendor": "Skyeast International Group Ltd",
+        "cost": 0.315,
+        "qty": 30000,
+        "fuzzyMatch": false,
+        "originalVendorLabel": "Skyeast International Group Ltd",
+        "bpId": 1001659,
+        "noBid": false
+      },
+      {
+        "vqLineId": 2311554,
+        "line": 200,
+        "mpn": "DRV5032FBDBZR",
+        "vendor": "Skyeast International Group Ltd",
+        "cost": 0.475,
+        "qty": 9000,
+        "fuzzyMatch": false,
+        "originalVendorLabel": "Skyeast International Group Ltd",
+        "bpId": 1001659,
+        "noBid": false
+      },
+      {
+        "vqLineId": 2311555,
+        "line": 200,
+        "mpn": "DRV5032FBDBZR",
+        "vendor": "Skyeast International Group Ltd",
+        "cost": 0.475,
+        "qty": 90000,
+        "fuzzyMatch": false,
+        "originalVendorLabel": "Skyeast International Group Ltd",
+        "bpId": 1001659,
+        "noBid": false
+      },
+      {
+        "vqLineId": 2311556,
+        "line": 340,
+        "mpn": "LAN9500A-ABZJ-TR",
+        "vendor": "Ontech Electronics International Ltd",
+        "cost": 2.23,
+        "qty": 9000,
+        "fuzzyMatch": false,
+        "originalVendorLabel": "Ontech Electronics International Ltd",
+        "bpId": 1002523,
+        "noBid": false
+      },
+      {
+        "vqLineId": 2311557,
+        "line": 340,
+        "mpn": "LAN9500A-ABZJ-TR",
+        "vendor": "HD-KJ Group Electronic Co., Ltd",
+        "cost": 1.77,
+        "qty": 9000,
+        "fuzzyMatch": false,
+        "originalVendorLabel": "HD-KJ Group Electronic Co., Ltd",
+        "bpId": 1001810,
+        "noBid": false
+      },
+      {
+        "vqLineId": 2311558,
+        "line": 340,
+        "mpn": "LAN9500A-ABZJ-TR",
+        "vendor": "HD-KJ Group Electronic Co., Ltd",
+        "cost": 2.74,
+        "qty": 9000,
+        "fuzzyMatch": false,
+        "originalVendorLabel": "HD-KJ Group Electronic Co., Ltd",
+        "bpId": 1001810,
+        "noBid": false
+      },
+      {
+        "vqLineId": 2311559,
+        "line": 340,
+        "mpn": "LAN9500A-ABZJ-TR",
+        "vendor": "PGC-IC Ltd",
+        "cost": 1.762,
+        "qty": 9000,
+        "fuzzyMatch": false,
+        "originalVendorLabel": "PGC-IC Ltd",
+        "bpId": 1001639,
+        "noBid": false
+      },
+      {
+        "vqLineId": 2311560,
+        "line": 390,
+        "mpn": "DRV8837CDSGR",
+        "vendor": "HJC Electronic (HK) Ltd",
+        "cost": 0.04,
+        "qty": 27000,
+        "fuzzyMatch": false,
+        "originalVendorLabel": "HJC Electronic (HK) Ltd",
+        "bpId": 1001613,
+        "noBid": false
+      },
+      {
+        "vqLineId": 2311561,
+        "line": 390,
+        "mpn": "DRV8837CDSGR",
+        "vendor": "Keming Electronics Development Co., Ltd",
+        "cost": 0.103,
+        "qty": 60000,
+        "fuzzyMatch": false,
+        "originalVendorLabel": "Keming Electronics Development Co., Ltd",
+        "bpId": 1000313,
+        "noBid": false
+      },
+      {
+        "vqLineId": 2311562,
+        "line": 390,
+        "mpn": "DRV8837CDSGR",
+        "vendor": "PGC-IC Ltd",
+        "cost": 0.078,
+        "qty": 30000,
+        "fuzzyMatch": false,
+        "originalVendorLabel": "PGC-IC Ltd",
+        "bpId": 1001639,
+        "noBid": false
+      },
+      {
+        "vqLineId": 2311563,
+        "line": 390,
+        "mpn": "DRV8837CDSGR",
+        "vendor": "PGC-IC Ltd",
+        "cost": 0.0869,
+        "qty": 60000,
+        "fuzzyMatch": false,
+        "originalVendorLabel": "PGC-IC Ltd",
+        "bpId": 1001639,
+        "noBid": false
+      },
+      {
+        "vqLineId": 2311564,
+        "line": 390,
+        "mpn": "DRV8837CDSGR",
+        "vendor": "Action (HK) Technology Ltd",
+        "cost": 0.077,
+        "qty": 25000,
+        "fuzzyMatch": false,
+        "originalVendorLabel": "Action (HK) Technology Ltd",
+        "bpId": 1001460,
+        "noBid": false
+      },
+      {
+        "vqLineId": 2311565,
+        "line": 390,
+        "mpn": "DRV8837CDSGR",
+        "vendor": "Action (HK) Technology Ltd",
+        "cost": 0.093,
+        "qty": 35000,
+        "fuzzyMatch": false,
+        "originalVendorLabel": "Action (HK) Technology Ltd",
+        "bpId": 1001460,
+        "noBid": false
+      },
+      {
+        "vqLineId": 2311566,
+        "line": 390,
+        "mpn": "DRV8837CDSGR",
+        "vendor": "Skyeast International Group Ltd",
+        "cost": 0.085,
+        "qty": 60000,
+        "fuzzyMatch": false,
+        "originalVendorLabel": "Skyeast International Group Ltd",
+        "bpId": 1001659,
+        "noBid": false
+      },
+      {
+        "vqLineId": 2311567,
+        "line": 450,
+        "mpn": "TMP468AIRGTR",
+        "vendor": "Valley Electronics(HK) Limited",
+        "cost": 1.04,
+        "qty": 3000,
+        "fuzzyMatch": false,
+        "originalVendorLabel": "Valley Electronics(HK) Limited",
+        "bpId": 1009499,
+        "noBid": false
+      },
+      {
+        "vqLineId": 2311568,
+        "line": 450,
+        "mpn": "TMP468AIRGTR",
+        "vendor": "Keming Electronics Development Co., Ltd",
+        "cost": 0.54,
+        "qty": 12000,
+        "fuzzyMatch": false,
+        "originalVendorLabel": "Keming Electronics Development Co., Ltd",
+        "bpId": 1000313,
+        "noBid": false
+      },
+      {
+        "vqLineId": 2311569,
+        "line": 450,
+        "mpn": "TMP468AIRGTR",
+        "vendor": "PGC-IC Ltd",
+        "cost": 0.62,
+        "qty": 12000,
+        "fuzzyMatch": false,
+        "originalVendorLabel": "PGC-IC Ltd",
+        "bpId": 1001639,
+        "noBid": false
+      },
+      {
+        "vqLineId": 2311570,
+        "line": 450,
+        "mpn": "TMP468AIRGTR",
+        "vendor": "PGC-IC Ltd",
+        "cost": 0.8348,
+        "qty": 12000,
+        "fuzzyMatch": false,
+        "originalVendorLabel": "PGC-IC Ltd",
+        "bpId": 1001639,
+        "noBid": false
+      },
+      {
+        "vqLineId": 2311571,
+        "line": 450,
+        "mpn": "TMP468AIRGTR",
+        "vendor": "Action (HK) Technology Ltd",
+        "cost": 1.233,
+        "qty": 12000,
+        "fuzzyMatch": false,
+        "originalVendorLabel": "Action (HK) Technology Ltd",
+        "bpId": 1001460,
+        "noBid": false
+      },
+      {
+        "vqLineId": 2311572,
+        "line": 450,
+        "mpn": "TMP468AIRGTR",
+        "vendor": "Skyeast International Group Ltd",
+        "cost": 0.6,
+        "qty": 12000,
+        "fuzzyMatch": false,
+        "originalVendorLabel": "Skyeast International Group Ltd",
+        "bpId": 1001659,
+        "noBid": false
+      },
+      {
+        "vqLineId": 2311573,
+        "line": 470,
+        "mpn": "ST3243ECTR-E",
+        "vendor": "Hong Kong Reily Technology Ltd",
+        "cost": 2.8,
+        "qty": 30000,
+        "fuzzyMatch": false,
+        "originalVendorLabel": "Hong Kong Reily Technology Ltd",
+        "bpId": 1003696,
+        "noBid": false
+      },
+      {
+        "vqLineId": 2311574,
+        "line": 470,
+        "mpn": "ST3243ECTR-E",
+        "vendor": "Guiyu Electronics Group (HK) Ltd",
+        "cost": 3.36,
+        "qty": 10000,
+        "fuzzyMatch": false,
+        "originalVendorLabel": "Guiyu Electronics Group (HK) Ltd",
+        "bpId": 1001865,
+        "noBid": false
+      },
+      {
+        "vqLineId": 2311575,
+        "line": 470,
+        "mpn": "ST3243ECTR-E",
+        "vendor": "PGC-IC Ltd",
+        "cost": 2.734,
+        "qty": 30000,
+        "fuzzyMatch": false,
+        "originalVendorLabel": "PGC-IC Ltd",
+        "bpId": 1001639,
+        "noBid": false
+      },
+      {
+        "vqLineId": 2311576,
+        "line": 500,
+        "mpn": "CC1125RHBR",
+        "vendor": "Keming Electronics Development Co., Ltd",
+        "cost": 1.543,
+        "qty": 9000,
+        "fuzzyMatch": false,
+        "originalVendorLabel": "Keming Electronics Development Co., Ltd",
+        "bpId": 1000313,
+        "noBid": false
+      },
+      {
+        "vqLineId": 2311577,
+        "line": 500,
+        "mpn": "CC1125RHBR",
+        "vendor": "PGC-IC Ltd",
+        "cost": 1.442,
+        "qty": 9000,
+        "fuzzyMatch": false,
+        "originalVendorLabel": "PGC-IC Ltd",
+        "bpId": 1001639,
+        "noBid": false
+      },
+      {
+        "vqLineId": 2311578,
+        "line": 500,
+        "mpn": "CC1125RHBR",
+        "vendor": "PGC-IC Ltd",
+        "cost": 1.458,
+        "qty": 9000,
+        "fuzzyMatch": false,
+        "originalVendorLabel": "PGC-IC Ltd",
+        "bpId": 1001639,
+        "noBid": false
+      },
+      {
+        "vqLineId": 2311579,
+        "line": 500,
+        "mpn": "CC1125RHBR",
+        "vendor": "Action (HK) Technology Ltd",
+        "cost": 1.542,
+        "qty": 9000,
+        "fuzzyMatch": false,
+        "originalVendorLabel": "Action (HK) Technology Ltd",
+        "bpId": 1001460,
+        "noBid": false
+      },
+      {
+        "vqLineId": 2311580,
+        "line": 500,
+        "mpn": "CC1125RHBR",
+        "vendor": "Skyeast International Group Ltd",
+        "cost": 1.5,
+        "qty": 9000,
+        "fuzzyMatch": false,
+        "originalVendorLabel": "Skyeast International Group Ltd",
+        "bpId": 1001659,
+        "noBid": false
+      },
+      {
+        "vqLineId": 2311581,
+        "line": 520,
+        "mpn": "PXE1211CPM-G003",
+        "vendor": "Fixchips Global Limited",
+        "cost": 2.57,
+        "qty": 6244,
+        "fuzzyMatch": false,
+        "originalVendorLabel": "Fixchips Global Limited",
+        "bpId": 1000387,
+        "noBid": false
+      },
+      {
+        "vqLineId": 2311582,
+        "line": 520,
+        "mpn": "PXE1211CPM-G003",
+        "vendor": "Fixchips Global Limited",
+        "cost": 2.82,
+        "qty": 3550,
+        "fuzzyMatch": false,
+        "originalVendorLabel": "Fixchips Global Limited",
+        "bpId": 1000387,
+        "noBid": false
+      },
+      {
+        "vqLineId": 2311583,
+        "line": 520,
+        "mpn": "PXE1211CPM-G003",
+        "vendor": "SMARTEL ELECTRONICS (ASIA) CO LTD",
+        "cost": 2.49,
+        "qty": 6244,
+        "fuzzyMatch": false,
+        "originalVendorLabel": "SMARTEL ELECTRONICS (ASIA) CO LTD",
+        "bpId": 1004861,
+        "noBid": false
+      },
+      {
+        "vqLineId": 2311584,
+        "line": 520,
+        "mpn": "PXE1211CPM-G003",
+        "vendor": "SMARTEL ELECTRONICS (ASIA) CO LTD",
+        "cost": 2.82,
+        "qty": 3550,
+        "fuzzyMatch": false,
+        "originalVendorLabel": "SMARTEL ELECTRONICS (ASIA) CO LTD",
+        "bpId": 1004861,
+        "noBid": false
+      },
+      {
+        "vqLineId": 2311585,
+        "line": 520,
+        "mpn": "PXE1211CPM-G003",
+        "vendor": "SMARTEL ELECTRONICS (ASIA) CO LTD",
+        "cost": 3.15,
+        "qty": 2910,
+        "fuzzyMatch": false,
+        "originalVendorLabel": "SMARTEL ELECTRONICS (ASIA) CO LTD",
+        "bpId": 1004861,
+        "noBid": false
+      },
+      {
+        "vqLineId": 2311586,
+        "line": 520,
+        "mpn": "PXE1211CPM-G003",
+        "vendor": "Xinshop Electronics Co., Ltd ",
+        "cost": 2.8,
+        "qty": 3550,
+        "fuzzyMatch": false,
+        "originalVendorLabel": "Xinshop Electronics Co., Ltd",
+        "bpId": 1002647,
+        "noBid": false
+      },
+      {
+        "vqLineId": 2311587,
+        "line": 520,
+        "mpn": "PXE1211CPM-G003",
+        "vendor": "Xinshop Electronics Co., Ltd ",
+        "cost": 3.111,
+        "qty": 3160,
+        "fuzzyMatch": false,
+        "originalVendorLabel": "Xinshop Electronics Co., Ltd",
+        "bpId": 1002647,
+        "noBid": false
+      },
+      {
+        "vqLineId": 2311588,
+        "line": 520,
+        "mpn": "PXE1211CPM-G003",
+        "vendor": "Xinshop Electronics Co., Ltd ",
+        "cost": 3.267,
+        "qty": 4000,
+        "fuzzyMatch": false,
+        "originalVendorLabel": "Xinshop Electronics Co., Ltd",
+        "bpId": 1002647,
+        "noBid": false
+      },
+      {
+        "vqLineId": 2311589,
+        "line": 520,
+        "mpn": "PXE1211CPM-G003",
+        "vendor": "Keming Electronics Development Co., Ltd",
+        "cost": 3.169,
+        "qty": 8000,
+        "fuzzyMatch": false,
+        "originalVendorLabel": "Keming Electronics Development Co., Ltd",
+        "bpId": 1000313,
+        "noBid": false
+      },
+      {
+        "vqLineId": 2311590,
+        "line": 520,
+        "mpn": "PXE1211CPM-G003",
+        "vendor": "PGC-IC Ltd",
+        "cost": 2.976,
+        "qty": 4000,
+        "fuzzyMatch": false,
+        "originalVendorLabel": "PGC-IC Ltd",
+        "bpId": 1001639,
+        "noBid": false
+      },
+      {
+        "vqLineId": 2311591,
+        "line": 530,
+        "mpn": "DRV5023FAQDBZR",
+        "vendor": "Keming Electronics Development Co., Ltd",
+        "cost": 1.851,
+        "qty": 6000,
+        "fuzzyMatch": false,
+        "originalVendorLabel": "Keming Electronics Development Co., Ltd",
+        "bpId": 1000313,
+        "noBid": false
+      },
+      {
+        "vqLineId": 2311592,
+        "line": 530,
+        "mpn": "DRV5023FAQDBZR",
+        "vendor": "Keming Electronics Development Co., Ltd",
+        "cost": 1.543,
+        "qty": 15000,
+        "fuzzyMatch": false,
+        "originalVendorLabel": "Keming Electronics Development Co., Ltd",
+        "bpId": 1000313,
+        "noBid": false
+      },
+      {
+        "vqLineId": 2311593,
+        "line": 530,
+        "mpn": "DRV5023FAQDBZR",
+        "vendor": "Skyeast International Group Ltd",
+        "cost": 1.58,
+        "qty": 6000,
+        "fuzzyMatch": false,
+        "originalVendorLabel": "Skyeast International Group Ltd",
+        "bpId": 1001659,
+        "noBid": false
+      },
+      {
+        "vqLineId": 2311594,
+        "line": 670,
+        "mpn": "MX25R8035FM1IH1",
+        "vendor": "Fixchips Global Limited",
+        "cost": 1.12,
+        "qty": 1163,
+        "fuzzyMatch": false,
+        "originalVendorLabel": "Fixchips Global Limited",
+        "bpId": 1000387,
+        "noBid": false
+      },
+      {
+        "vqLineId": 2311595,
+        "line": 690,
+        "mpn": "MX25V8035FM1ITR",
+        "vendor": "KST Components Ltd.",
+        "cost": 0.48,
+        "qty": 30000,
+        "fuzzyMatch": false,
+        "originalVendorLabel": "KST Components Ltd.",
+        "bpId": 1004328,
+        "noBid": false
+      },
+      {
+        "vqLineId": 2311596,
+        "line": 690,
+        "mpn": "MX25V8035FM1ITR",
+        "vendor": "KST Components Ltd.",
+        "cost": 0.65,
+        "qty": 55000,
+        "fuzzyMatch": false,
+        "originalVendorLabel": "KST Components Ltd.",
+        "bpId": 1004328,
+        "noBid": false
+      },
+      {
+        "vqLineId": 2311597,
+        "line": 690,
+        "mpn": "MX25V8035FM1ITR",
+        "vendor": "KST Components Ltd.",
+        "cost": 0.44,
+        "qty": 60000,
+        "fuzzyMatch": false,
+        "originalVendorLabel": "KST Components Ltd.",
+        "bpId": 1004328,
+        "noBid": false
+      },
+      {
+        "vqLineId": 2311598,
+        "line": 690,
+        "mpn": "MX25V8035FM1ITR",
+        "vendor": "KST Components Ltd.",
+        "cost": 0.41,
+        "qty": 50000,
+        "fuzzyMatch": false,
+        "originalVendorLabel": "KST Components Ltd.",
+        "bpId": 1004328,
+        "noBid": false
+      },
+      {
+        "vqLineId": 2311599,
+        "line": 690,
+        "mpn": "MX25V8035FM1ITR",
+        "vendor": "Fixchips Global Limited",
+        "cost": 0.425,
+        "qty": 60000,
+        "fuzzyMatch": false,
+        "originalVendorLabel": "Fixchips Global Limited",
+        "bpId": 1000387,
+        "noBid": false
+      },
+      {
+        "vqLineId": 2311600,
+        "line": 690,
+        "mpn": "MX25V8035FM1ITR",
+        "vendor": "Fixchips Global Limited",
+        "cost": 0.48,
+        "qty": 84500,
+        "fuzzyMatch": false,
+        "originalVendorLabel": "Fixchips Global Limited",
+        "bpId": 1000387,
+        "noBid": false
+      },
+      {
+        "vqLineId": 2311601,
+        "line": 690,
+        "mpn": "MX25V8035FM1ITR",
+        "vendor": "Fixchips Global Limited",
+        "cost": 0.58,
+        "qty": 15000,
+        "fuzzyMatch": false,
+        "originalVendorLabel": "Fixchips Global Limited",
+        "bpId": 1000387,
+        "noBid": false
+      },
+      {
+        "vqLineId": 2311602,
+        "line": 880,
+        "mpn": "FXOS8700CQR1",
+        "vendor": "SMARTEL ELECTRONICS (ASIA) CO LTD",
+        "cost": 4.682,
+        "qty": 2600,
+        "fuzzyMatch": false,
+        "originalVendorLabel": "SMARTEL ELECTRONICS (ASIA) CO LTD",
+        "bpId": 1004861,
+        "noBid": false
+      },
+      {
+        "vqLineId": 2311603,
+        "line": 1030,
+        "mpn": "LCMXO3D-9400HC-5BG256C",
+        "vendor": "Fixchips Global Limited",
+        "cost": 41,
+        "qty": 1350,
+        "fuzzyMatch": false,
+        "originalVendorLabel": "Fixchips Global Limited",
+        "bpId": 1000387,
+        "noBid": false
+      },
+      {
+        "vqLineId": 2311604,
+        "line": 1040,
+        "mpn": "LCMXO3LF-4300C-5BG256C",
+        "vendor": "Winlink industry HK Co Limited",
+        "cost": 74.3,
+        "qty": 10000,
+        "fuzzyMatch": false,
+        "originalVendorLabel": "Winlink industry HK Co Limited",
+        "bpId": 1001494,
+        "noBid": false
+      },
+      {
+        "vqLineId": 2311605,
+        "line": 1040,
+        "mpn": "LCMXO3LF-4300C-5BG256C",
+        "vendor": "Fixchips Global Limited",
+        "cost": 63.08,
+        "qty": 1190,
+        "fuzzyMatch": false,
+        "originalVendorLabel": "Fixchips Global Limited",
+        "bpId": 1000387,
+        "noBid": false
+      },
+      {
+        "vqLineId": 2311606,
+        "line": 1040,
+        "mpn": "LCMXO3LF-4300C-5BG256C",
+        "vendor": "Fixchips Global Limited",
+        "cost": 99.07,
+        "qty": 9125,
+        "fuzzyMatch": false,
+        "originalVendorLabel": "Fixchips Global Limited",
+        "bpId": 1000387,
+        "noBid": false
+      },
+      {
+        "vqLineId": 2311607,
+        "line": 1050,
+        "mpn": "LCMXO3LF-9400C-5BG400C",
+        "vendor": "SMARTEL ELECTRONICS (ASIA) CO LTD",
+        "cost": 194,
+        "qty": 190,
+        "fuzzyMatch": false,
+        "originalVendorLabel": "SMARTEL ELECTRONICS (ASIA) CO LTD",
+        "bpId": 1004861,
+        "noBid": false
+      },
+      {
+        "vqLineId": 2311608,
+        "line": 1060,
+        "mpn": "MX25V2006EM1I-13G",
+        "vendor": "Fixchips Global Limited",
+        "cost": 2.41,
+        "qty": 10000,
+        "fuzzyMatch": false,
+        "originalVendorLabel": "Fixchips Global Limited",
+        "bpId": 1000387,
+        "noBid": false
+      },
+      {
+        "vqLineId": 2311609,
+        "line": 1060,
+        "mpn": "MX25V2006EM1I-13G",
+        "vendor": "SMARTEL ELECTRONICS (ASIA) CO LTD",
+        "cost": 2.298,
+        "qty": 10000,
+        "fuzzyMatch": false,
+        "originalVendorLabel": "SMARTEL ELECTRONICS (ASIA) CO LTD",
+        "bpId": 1004861,
+        "noBid": false
+      }
+    ],
+    "skipped": [
+      {
+        "vendorName": "Fixchips Global Limited",
+        "vendorSearchKey": "1002391",
+        "mpn": "MAX3232IPWR",
+        "qty": 28000,
+        "cost": 0.188,
+        "leadTime": "stock",
+        "dateCode": "25+",
+        "packaging": "REEL",
+        "mfr": "Texas Instruments",
+        "reason": "PRE_EXISTING_DUPLICATE",
+        "detail": "Existing chuboe_vq_line 2311334 matches natural key (rfq_line × MPN × BP × cost × currency) — no new POST.",
+        "vqLineId": 2311334
+      },
+      {
+        "vendorName": "Original Chip Source Electronics Co., Limited",
+        "vendorSearchKey": "1011520",
+        "mpn": "MAX3232IPWR",
+        "qty": 10000,
+        "cost": 0.19,
+        "leadTime": "stock",
+        "dateCode": "26+",
+        "mfr": "Texas Instruments",
+        "reason": "PRE_EXISTING_DUPLICATE",
+        "detail": "Existing chuboe_vq_line 2311335 matches natural key (rfq_line × MPN × BP × cost × currency) — no new POST.",
+        "vqLineId": 2311335
+      },
+      {
+        "vendorName": "SMARTEL ELECTRONICS (ASIA) CO LTD",
+        "vendorSearchKey": "1006857",
+        "mpn": "MAX3232IPWR",
+        "qty": 28000,
+        "cost": 0.188,
+        "leadTime": "stock",
+        "dateCode": "25+",
+        "mfr": "Texas Instruments",
+        "reason": "PRE_EXISTING_DUPLICATE",
+        "detail": "Existing chuboe_vq_line 2311336 matches natural key (rfq_line × MPN × BP × cost × currency) — no new POST.",
+        "vqLineId": 2311336
+      },
+      {
+        "vendorName": "Xinshop Electronics Co., Ltd",
+        "vendorSearchKey": "1004647",
+        "mpn": "MAX3232IPWR",
+        "qty": 28000,
+        "cost": 0.1885,
+        "leadTime": "stock",
+        "dateCode": "25+",
+        "mfr": "Texas Instruments",
+        "reason": "PRE_EXISTING_DUPLICATE",
+        "detail": "Existing chuboe_vq_line 2311337 matches natural key (rfq_line × MPN × BP × cost × currency) — no new POST.",
+        "vqLineId": 2311337
+      },
+      {
+        "vendorName": "Action (HK) Technology Ltd",
+        "vendorSearchKey": "1003464",
+        "mpn": "MAX3232IPWR",
+        "qty": 28000,
+        "cost": 0.187,
+        "leadTime": "stock",
+        "dateCode": "25+",
+        "mfr": "Texas Instruments",
+        "reason": "PRE_EXISTING_DUPLICATE",
+        "detail": "Existing chuboe_vq_line 2311338 matches natural key (rfq_line × MPN × BP × cost × currency) — no new POST.",
+        "vqLineId": 2311338
+      },
+      {
+        "vendorName": "Fixchips Global Limited",
+        "vendorSearchKey": "1002391",
+        "mpn": "TPS630242YFFR",
+        "qty": 9000,
+        "cost": 0.944,
+        "leadTime": "stock",
+        "dateCode": "20+",
+        "packaging": "REEL",
+        "vendorNotes": "Old date code — vendor flagged appearance to be confirmed",
+        "mfr": "Texas Instruments",
+        "reason": "PRE_EXISTING_DUPLICATE",
+        "detail": "Existing chuboe_vq_line 2311339 matches natural key (rfq_line × MPN × BP × cost × currency) — no new POST.",
+        "vqLineId": 2311339
+      },
+      {
+        "vendorName": "Fixchips Global Limited",
+        "vendorSearchKey": "1002391",
+        "mpn": "TPS630242YFFR",
+        "qty": 8455,
+        "cost": 0.944,
+        "leadTime": "stock",
+        "dateCode": "22+",
+        "packaging": "REEL",
+        "mfr": "Texas Instruments",
+        "reason": "PRE_EXISTING_DUPLICATE",
+        "detail": "Existing chuboe_vq_line 2311340 matches natural key (rfq_line × MPN × BP × cost × currency) — no new POST.",
+        "vqLineId": 2311340
+      },
+      {
+        "vendorName": "SMARTEL ELECTRONICS (ASIA) CO LTD",
+        "vendorSearchKey": "1006857",
+        "mpn": "TPS630242YFFR",
+        "qty": 8455,
+        "cost": 0.949,
+        "leadTime": "stock",
+        "dateCode": "22+",
+        "mfr": "Texas Instruments",
+        "reason": "PRE_EXISTING_DUPLICATE",
+        "detail": "Existing chuboe_vq_line 2311341 matches natural key (rfq_line × MPN × BP × cost × currency) — no new POST.",
+        "vqLineId": 2311341
+      },
+      {
+        "vendorName": "SMARTEL ELECTRONICS (ASIA) CO LTD",
+        "vendorSearchKey": "1006857",
+        "mpn": "TPS630242YFFR",
+        "qty": 9000,
+        "cost": 0.949,
+        "leadTime": "stock",
+        "dateCode": "20+",
+        "mfr": "Texas Instruments",
+        "reason": "PRE_EXISTING_DUPLICATE",
+        "detail": "Existing chuboe_vq_line 2311342 matches natural key (rfq_line × MPN × BP × cost × currency) — no new POST.",
+        "vqLineId": 2311342
+      },
+      {
+        "vendorName": "Fixchips Global Limited",
+        "vendorSearchKey": "1002391",
+        "mpn": "TPS630242YFFR",
+        "qty": 9000,
+        "cost": 0.911,
+        "leadTime": "stock",
+        "dateCode": "22+",
+        "packaging": "REEL",
+        "mfr": "Texas Instruments",
+        "reason": "PRE_EXISTING_DUPLICATE",
+        "detail": "Existing chuboe_vq_line 2311343 matches natural key (rfq_line × MPN × BP × cost × currency) — no new POST.",
+        "vqLineId": 2311343
+      },
+      {
+        "vendorName": "Xinshop Electronics Co., Ltd",
+        "vendorSearchKey": "1004647",
+        "mpn": "TPS630242YFFR",
+        "qty": 8455,
+        "cost": 0.9333,
+        "leadTime": "stock",
+        "dateCode": "22+",
+        "mfr": "Texas Instruments",
+        "reason": "PRE_EXISTING_DUPLICATE",
+        "detail": "Existing chuboe_vq_line 2311344 matches natural key (rfq_line × MPN × BP × cost × currency) — no new POST.",
+        "vqLineId": 2311344
+      },
+      {
+        "vendorName": "Xinshop Electronics Co., Ltd",
+        "vendorSearchKey": "1004647",
+        "mpn": "TPS630242YFFR",
+        "qty": 9000,
+        "cost": 0.9333,
+        "leadTime": "stock",
+        "dateCode": "20+",
+        "mfr": "Texas Instruments",
+        "reason": "PRE_EXISTING_DUPLICATE",
+        "detail": "Existing chuboe_vq_line 2311345 matches natural key (rfq_line × MPN × BP × cost × currency) — no new POST.",
+        "vqLineId": 2311345
+      },
+      {
+        "vendorName": "Xinshop Electronics Co., Ltd",
+        "vendorSearchKey": "1004647",
+        "mpn": "TPS630242YFFR",
+        "qty": 8345,
+        "cost": 0.7778,
+        "leadTime": "stock",
+        "dateCode": "22+",
+        "mfr": "Texas Instruments",
+        "reason": "PRE_EXISTING_DUPLICATE",
+        "detail": "Existing chuboe_vq_line 2311346 matches natural key (rfq_line × MPN × BP × cost × currency) — no new POST.",
+        "vqLineId": 2311346
+      },
+      {
+        "vendorName": "SMARTEL ELECTRONICS (ASIA) CO LTD",
+        "vendorSearchKey": "1006857",
+        "mpn": "TPS630242YFFR",
+        "qty": 9000,
+        "cost": 0.911,
+        "leadTime": "stock",
+        "dateCode": "22+",
+        "mfr": "Texas Instruments",
+        "reason": "PRE_EXISTING_DUPLICATE",
+        "detail": "Existing chuboe_vq_line 2311347 matches natural key (rfq_line × MPN × BP × cost × currency) — no new POST.",
+        "vqLineId": 2311347
+      },
+      {
+        "vendorName": "Action (HK) Technology Ltd",
+        "vendorSearchKey": "1003464",
+        "mpn": "TPS630242YFFR",
+        "qty": 9000,
+        "cost": 0.934,
+        "leadTime": "stock",
+        "dateCode": "21+",
+        "mfr": "Texas Instruments",
+        "reason": "PRE_EXISTING_DUPLICATE",
+        "detail": "Existing chuboe_vq_line 2311348 matches natural key (rfq_line × MPN × BP × cost × currency) — no new POST.",
+        "vqLineId": 2311348
+      },
+      {
+        "vendorName": "Skyeast International Group Ltd",
+        "vendorSearchKey": "1003665",
+        "mpn": "TPS630242YFFR",
+        "qty": 9000,
+        "cost": 1.1,
+        "leadTime": "stock",
+        "dateCode": "21+",
+        "mfr": "Texas Instruments",
+        "reason": "PRE_EXISTING_DUPLICATE",
+        "detail": "Existing chuboe_vq_line 2311349 matches natural key (rfq_line × MPN × BP × cost × currency) — no new POST.",
+        "vqLineId": 2311349
+      },
+      {
+        "vendorName": "Fixchips Global Limited",
+        "vendorSearchKey": "1002391",
+        "mpn": "UCC21732DWR",
+        "qty": 528,
+        "cost": 1.73,
+        "leadTime": "stock",
+        "dateCode": "22+",
+        "packaging": "REEL",
+        "mfr": "Texas Instruments",
+        "reason": "PRE_EXISTING_DUPLICATE",
+        "detail": "Existing chuboe_vq_line 2311350 matches natural key (rfq_line × MPN × BP × cost × currency) — no new POST.",
+        "vqLineId": 2311350
+      },
+      {
+        "vendorName": "Fixchips Global Limited",
+        "vendorSearchKey": "1002391",
+        "mpn": "UCC21732DWR",
+        "qty": 1176,
+        "cost": 1.73,
+        "leadTime": "stock",
+        "dateCode": "22+",
+        "packaging": "F-TUBE",
+        "vendorQuotedMpn": "UCC21732DW",
+        "vendorNotes": "Quoted MPN: UCC21732DW",
+        "mfr": "Texas Instruments",
+        "reason": "PRE_EXISTING_DUPLICATE",
+        "detail": "Existing chuboe_vq_line 2311350 matches natural key (rfq_line × MPN × BP × cost × currency) — no new POST.",
+        "vqLineId": 2311350
+      },
+      {
+        "vendorName": "SMARTEL ELECTRONICS (ASIA) CO LTD",
+        "vendorSearchKey": "1006857",
+        "mpn": "UCC21732DWR",
+        "qty": 1176,
+        "cost": 1.725,
+        "leadTime": "stock",
+        "dateCode": "22+",
+        "vendorQuotedMpn": "UCC21732DW",
+        "vendorNotes": "Quoted MPN: UCC21732DW",
+        "mfr": "Texas Instruments",
+        "reason": "PRE_EXISTING_DUPLICATE",
+        "detail": "Existing chuboe_vq_line 2311351 matches natural key (rfq_line × MPN × BP × cost × currency) — no new POST.",
+        "vqLineId": 2311351
+      },
+      {
+        "vendorName": "SMARTEL ELECTRONICS (ASIA) CO LTD",
+        "vendorSearchKey": "1006857",
+        "mpn": "UCC21732DWR",
+        "qty": 528,
+        "cost": 1.725,
+        "leadTime": "stock",
+        "dateCode": "22+",
+        "mfr": "Texas Instruments",
+        "reason": "PRE_EXISTING_DUPLICATE",
+        "detail": "Existing chuboe_vq_line 2311351 matches natural key (rfq_line × MPN × BP × cost × currency) — no new POST.",
+        "vqLineId": 2311351
+      },
+      {
+        "vendorName": "Xinshop Electronics Co., Ltd",
+        "vendorSearchKey": "1004647",
+        "mpn": "UCC21732DWR",
+        "qty": 1176,
+        "cost": 1.7111,
+        "leadTime": "stock",
+        "dateCode": "22+",
+        "vendorQuotedMpn": "UCC21732DW",
+        "vendorNotes": "Quoted MPN: UCC21732DW",
+        "mfr": "Texas Instruments",
+        "reason": "PRE_EXISTING_DUPLICATE",
+        "detail": "Existing chuboe_vq_line 2311352 matches natural key (rfq_line × MPN × BP × cost × currency) — no new POST.",
+        "vqLineId": 2311352
+      },
+      {
+        "vendorName": "Xinshop Electronics Co., Ltd",
+        "vendorSearchKey": "1004647",
+        "mpn": "UCC21732DWR",
+        "qty": 528,
+        "cost": 1.7111,
+        "leadTime": "stock",
+        "dateCode": "22+",
+        "mfr": "Texas Instruments",
+        "reason": "PRE_EXISTING_DUPLICATE",
+        "detail": "Existing chuboe_vq_line 2311352 matches natural key (rfq_line × MPN × BP × cost × currency) — no new POST.",
+        "vqLineId": 2311352
+      },
+      {
+        "vendorName": "Xinshop Electronics Co., Ltd",
+        "vendorSearchKey": "1004647",
+        "mpn": "UCC21732DWR",
+        "qty": 2250,
+        "cost": 3.1111,
+        "leadTime": "stock",
+        "dateCode": "22+",
+        "vendorQuotedMpn": "UCC21732DW",
+        "vendorNotes": "Quoted MPN: UCC21732DW",
+        "mfr": "Texas Instruments",
+        "reason": "PRE_EXISTING_DUPLICATE",
+        "detail": "Existing chuboe_vq_line 2311353 matches natural key (rfq_line × MPN × BP × cost × currency) — no new POST.",
+        "vqLineId": 2311353
+      },
+      {
+        "vendorName": "Skyeast International Group Ltd",
+        "vendorSearchKey": "1003665",
+        "mpn": "UCC21732DWR",
+        "qty": 4000,
+        "cost": 2.46,
+        "leadTime": "stock",
+        "dateCode": "23/24+",
+        "mfr": "Texas Instruments",
+        "reason": "PRE_EXISTING_DUPLICATE",
+        "detail": "Existing chuboe_vq_line 2311354 matches natural key (rfq_line × MPN × BP × cost × currency) — no new POST.",
+        "vqLineId": 2311354
+      },
+      {
+        "vendorName": "Xinshop Electronics Co., Ltd",
+        "vendorSearchKey": "1004647",
+        "mpn": "TPS3103K33DBVR",
+        "qty": 3000,
+        "cost": 0.576,
+        "leadTime": "stock",
+        "dateCode": "25+",
+        "mfr": "Texas Instruments",
+        "reason": "PRE_EXISTING_DUPLICATE",
+        "detail": "Existing chuboe_vq_line 2311355 matches natural key (rfq_line × MPN × BP × cost × currency) — no new POST.",
+        "vqLineId": 2311355
+      },
+      {
+        "vendorName": "Xinshop Electronics Co., Ltd",
+        "vendorSearchKey": "1004647",
+        "mpn": "TPS3103K33DBVR",
+        "qty": 2200,
+        "cost": 0.6222,
+        "leadTime": "stock",
+        "dateCode": "25+",
+        "mfr": "Texas Instruments",
+        "reason": "PRE_EXISTING_DUPLICATE",
+        "detail": "Existing chuboe_vq_line 2311356 matches natural key (rfq_line × MPN × BP × cost × currency) — no new POST.",
+        "vqLineId": 2311356
+      },
+      {
+        "vendorName": "Xinshop Electronics Co., Ltd",
+        "vendorSearchKey": "1004647",
+        "mpn": "TPS3103K33DBVR",
+        "qty": 9000,
+        "cost": 0.9333,
+        "leadTime": "stock",
+        "dateCode": "25+",
+        "mfr": "Texas Instruments",
+        "reason": "PRE_EXISTING_DUPLICATE",
+        "detail": "Existing chuboe_vq_line 2311357 matches natural key (rfq_line × MPN × BP × cost × currency) — no new POST.",
+        "vqLineId": 2311357
+      },
+      {
+        "vendorName": "Fixchips Global Limited",
+        "vendorSearchKey": "1002391",
+        "mpn": "TPS3103K33DBVR",
+        "qty": 11289,
+        "cost": 0.63,
+        "leadTime": "stock",
+        "dateCode": "25+",
+        "packaging": "REEL",
+        "mfr": "Texas Instruments",
+        "reason": "PRE_EXISTING_DUPLICATE",
+        "detail": "Existing chuboe_vq_line 2311358 matches natural key (rfq_line × MPN × BP × cost × currency) — no new POST.",
+        "vqLineId": 2311358
+      },
+      {
+        "vendorName": "Fixchips Global Limited",
+        "vendorSearchKey": "1002391",
+        "mpn": "TPS3103K33DBVR",
+        "qty": 12000,
+        "cost": 1.09,
+        "leadTime": "stock",
+        "dateCode": "25+",
+        "packaging": "REEL",
+        "mfr": "Texas Instruments",
+        "reason": "PRE_EXISTING_DUPLICATE",
+        "detail": "Existing chuboe_vq_line 2311359 matches natural key (rfq_line × MPN × BP × cost × currency) — no new POST.",
+        "vqLineId": 2311359
+      },
+      {
+        "vendorName": "Action (HK) Technology Ltd",
+        "vendorSearchKey": "1003464",
+        "mpn": "TPS3103K33DBVR",
+        "qty": 9000,
+        "cost": 0.641,
+        "leadTime": "stock",
+        "dateCode": "25+",
+        "mfr": "Texas Instruments",
+        "reason": "PRE_EXISTING_DUPLICATE",
+        "detail": "Existing chuboe_vq_line 2311360 matches natural key (rfq_line × MPN × BP × cost × currency) — no new POST.",
+        "vqLineId": 2311360
+      },
+      {
+        "vendorName": "Skyeast International Group Ltd",
+        "vendorSearchKey": "1003665",
+        "mpn": "TPS3103K33DBVR",
+        "qty": 12000,
+        "cost": 1.1,
+        "leadTime": "stock",
+        "dateCode": "26+",
+        "mfr": "Texas Instruments",
+        "reason": "PRE_EXISTING_DUPLICATE",
+        "detail": "Existing chuboe_vq_line 2311361 matches natural key (rfq_line × MPN × BP × cost × currency) — no new POST.",
+        "vqLineId": 2311361
+      },
+      {
+        "vendorName": "Xin Jun Hong (HK) Industry Co., Ltd",
+        "vendorSearchKey": "1003910",
+        "mpn": "ADG633YRUZ-REEL7",
+        "qty": 2000,
+        "cost": 5.2,
+        "leadTime": "stock",
+        "dateCode": "26+",
+        "mfr": "Analog Devices",
+        "reason": "PRE_EXISTING_DUPLICATE",
+        "detail": "Existing chuboe_vq_line 2311362 matches natural key (rfq_line × MPN × BP × cost × currency) — no new POST.",
+        "vqLineId": 2311362
+      },
+      {
+        "vendorName": "PGC-IC Ltd",
+        "vendorSearchKey": "1003648",
+        "mpn": "ADG633YRUZ-REEL7",
+        "qty": 1000,
+        "cost": 4.29,
+        "leadTime": "stock",
+        "dateCode": "25+",
+        "mfr": "Analog Devices",
+        "reason": "PRE_EXISTING_DUPLICATE",
+        "detail": "Existing chuboe_vq_line 2311363 matches natural key (rfq_line × MPN × BP × cost × currency) — no new POST.",
+        "vqLineId": 2311363
+      },
+      {
+        "vendorName": "PGC-IC Ltd",
+        "vendorSearchKey": "1003648",
+        "mpn": "ADG633YRUZ-REEL7",
+        "qty": 1000,
+        "cost": 4.828,
+        "leadTime": "stock",
+        "dateCode": "26+",
+        "mfr": "Analog Devices",
+        "reason": "PRE_EXISTING_DUPLICATE",
+        "detail": "Existing chuboe_vq_line 2311364 matches natural key (rfq_line × MPN × BP × cost × currency) — no new POST.",
+        "vqLineId": 2311364
+      },
+      {
+        "vendorName": "PGC-IC Ltd",
+        "vendorSearchKey": "1003648",
+        "mpn": "ADG633YRUZ-REEL7",
+        "qty": 1500,
+        "cost": 5.208,
+        "leadTime": "stock",
+        "dateCode": "25+",
+        "mfr": "Analog Devices",
+        "reason": "PRE_EXISTING_DUPLICATE",
+        "detail": "Existing chuboe_vq_line 2311365 matches natural key (rfq_line × MPN × BP × cost × currency) — no new POST.",
+        "vqLineId": 2311365
+      },
+      {
+        "vendorName": "Keming Electronics Development Co., Ltd",
+        "vendorSearchKey": "1002317",
+        "mpn": "ADG633YRUZ-REEL7",
+        "qty": 2000,
+        "cost": 4.319,
+        "leadTime": "stock",
+        "dateCode": "26+",
+        "mfr": "Analog Devices",
+        "reason": "PRE_EXISTING_DUPLICATE",
+        "detail": "Existing chuboe_vq_line 2311366 matches natural key (rfq_line × MPN × BP × cost × currency) — no new POST.",
+        "vqLineId": 2311366
+      },
+      {
+        "vendorName": "HJC Electronic (HK) Ltd",
+        "vendorSearchKey": "1003613",
+        "mpn": "TPS7A2501DRVR",
+        "qty": 3000,
+        "cost": 0.23,
+        "leadTime": "stock",
+        "dateCode": "23+",
+        "mfr": "Texas Instruments",
+        "reason": "PRE_EXISTING_DUPLICATE",
+        "detail": "Existing chuboe_vq_line 2311367 matches natural key (rfq_line × MPN × BP × cost × currency) — no new POST.",
+        "vqLineId": 2311367
+      },
+      {
+        "vendorName": "PGC-IC Ltd",
+        "vendorSearchKey": "1003648",
+        "mpn": "TPS7A2501DRVR",
+        "qty": 30000,
+        "cost": 0.266,
+        "leadTime": "stock",
+        "dateCode": "24+",
+        "mfr": "Texas Instruments",
+        "reason": "PRE_EXISTING_DUPLICATE",
+        "detail": "Existing chuboe_vq_line 2311368 matches natural key (rfq_line × MPN × BP × cost × currency) — no new POST.",
+        "vqLineId": 2311368
+      },
+      {
+        "vendorName": "Keming Electronics Development Co., Ltd",
+        "vendorSearchKey": "1002317",
+        "mpn": "TPS7A2501DRVR",
+        "qty": 30000,
+        "cost": 0.275,
+        "leadTime": "stock",
+        "dateCode": "24+",
+        "vendorNotes": "source 1",
+        "mfr": "Texas Instruments",
+        "reason": "PRE_EXISTING_DUPLICATE",
+        "detail": "Existing chuboe_vq_line 2311369 matches natural key (rfq_line × MPN × BP × cost × currency) — no new POST.",
+        "vqLineId": 2311369
+      },
+      {
+        "vendorName": "Keming Electronics Development Co., Ltd",
+        "vendorSearchKey": "1002317",
+        "mpn": "TPS7A2501DRVR",
+        "qty": 18000,
+        "cost": 0.27,
+        "leadTime": "stock",
+        "dateCode": "25+",
+        "vendorNotes": "source 2",
+        "mfr": "Texas Instruments",
+        "reason": "PRE_EXISTING_DUPLICATE",
+        "detail": "Existing chuboe_vq_line 2311370 matches natural key (rfq_line × MPN × BP × cost × currency) — no new POST.",
+        "vqLineId": 2311370
+      },
+      {
+        "vendorName": "Skyeast International Group Ltd",
+        "vendorSearchKey": "1003665",
+        "mpn": "TPS7A2501DRVR",
+        "qty": 30000,
+        "cost": 0.28,
+        "leadTime": "stock",
+        "dateCode": "24+",
+        "mfr": "Texas Instruments",
+        "reason": "PRE_EXISTING_DUPLICATE",
+        "detail": "Existing chuboe_vq_line 2311371 matches natural key (rfq_line × MPN × BP × cost × currency) — no new POST.",
+        "vqLineId": 2311371
+      },
+      {
+        "vendorName": "Sing Sun Electronics Ltd",
+        "vendorSearchKey": "1003788",
+        "mpn": "LT6015HS5#TRPBF",
+        "qty": 5000,
+        "cost": 3.2,
+        "leadTime": "stock",
+        "dateCode": "22+",
+        "vendorQuotedMpn": "LT6015HS5#TRMPBF",
+        "vendorNotes": "Quoted MPN: LT6015HS5#TRMPBF",
+        "mfr": "Analog Devices",
+        "reason": "PRE_EXISTING_DUPLICATE",
+        "detail": "Existing chuboe_vq_line 2311372 matches natural key (rfq_line × MPN × BP × cost × currency) — no new POST.",
+        "vqLineId": 2311372
+      },
+      {
+        "vendorName": "PGC-IC Ltd",
+        "vendorSearchKey": "1003648",
+        "mpn": "LT6015HS5#TRPBF",
+        "qty": 5000,
+        "cost": 6.622,
+        "leadTime": "stock",
+        "dateCode": "23+",
+        "vendorQuotedMpn": "LT6015HS5#TRMPBF",
+        "vendorNotes": "Quoted MPN: LT6015HS5#TRMPBF",
+        "mfr": "Analog Devices",
+        "reason": "PRE_EXISTING_DUPLICATE",
+        "detail": "Existing chuboe_vq_line 2311373 matches natural key (rfq_line × MPN × BP × cost × currency) — no new POST.",
+        "vqLineId": 2311373
+      },
+      {
+        "vendorName": "Hada Technology Co., Ltd",
+        "vendorSearchKey": "1003608",
+        "mpn": "LT6015HS5#TRPBF",
+        "qty": 2500,
+        "cost": 3.284,
+        "leadTime": "stock",
+        "dateCode": "20+",
+        "mfr": "Analog Devices",
+        "reason": "PRE_EXISTING_DUPLICATE",
+        "detail": "Existing chuboe_vq_line 2311374 matches natural key (rfq_line × MPN × BP × cost × currency) — no new POST.",
+        "vqLineId": 2311374
+      },
+      {
+        "vendorName": "Haoxin Hk Electronic Technology Co., Limited",
+        "vendorSearchKey": "1006032",
+        "mpn": "LT6015HS5#TRPBF",
+        "qty": 5000,
+        "cost": 3.15,
+        "leadTime": "3-5days",
+        "dateCode": "25+",
+        "vendorQuotedMpn": "LT6015HS5#TRMPBF",
+        "vendorNotes": "Quoted MPN: LT6015HS5#TRMPBF",
+        "mfr": "Analog Devices",
+        "reason": "PRE_EXISTING_DUPLICATE",
+        "detail": "Existing chuboe_vq_line 2311375 matches natural key (rfq_line × MPN × BP × cost × currency) — no new POST.",
+        "vqLineId": 2311375
+      },
+      {
+        "vendorName": "Keming Electronics Development Co., Ltd",
+        "vendorSearchKey": "1002317",
+        "mpn": "LT6015HS5#TRPBF",
+        "qty": 5000,
+        "cost": 7.713,
+        "leadTime": "stock",
+        "dateCode": "22+",
+        "mfr": "Analog Devices",
+        "reason": "PRE_EXISTING_DUPLICATE",
+        "detail": "Existing chuboe_vq_line 2311376 matches natural key (rfq_line × MPN × BP × cost × currency) — no new POST.",
+        "vqLineId": 2311376
+      },
+      {
+        "vendorName": "Presemis Technology Co., Ltd",
+        "vendorSearchKey": "1003700",
+        "mpn": "LTC4040EUFDTRPBF",
+        "qty": 2500,
+        "cost": 5,
+        "leadTime": "stock",
+        "dateCode": "25+",
+        "mfr": "Analog Devices",
+        "reason": "PRE_EXISTING_DUPLICATE",
+        "detail": "Existing chuboe_vq_line 2311377 matches natural key (rfq_line × MPN × BP × cost × currency) — no new POST.",
+        "vqLineId": 2311377
+      },
+      {
+        "vendorName": "PGC-IC Ltd",
+        "vendorSearchKey": "1003648",
+        "mpn": "LTC4040EUFDTRPBF",
+        "qty": 5000,
+        "cost": 5.422,
+        "leadTime": "stock",
+        "dateCode": "25+",
+        "mfr": "Analog Devices",
+        "reason": "PRE_EXISTING_DUPLICATE",
+        "detail": "Existing chuboe_vq_line 2311378 matches natural key (rfq_line × MPN × BP × cost × currency) — no new POST.",
+        "vqLineId": 2311378
+      },
+      {
+        "vendorName": "Hada Technology Co., Ltd",
+        "vendorSearchKey": "1003608",
+        "mpn": "LTC4040EUFDTRPBF",
+        "qty": 2500,
+        "cost": 6.269,
+        "leadTime": "stock",
+        "dateCode": "25+",
+        "mfr": "Analog Devices",
+        "reason": "PRE_EXISTING_DUPLICATE",
+        "detail": "Existing chuboe_vq_line 2311379 matches natural key (rfq_line × MPN × BP × cost × currency) — no new POST.",
+        "vqLineId": 2311379
+      },
+      {
+        "vendorName": "Keming Electronics Development Co., Ltd",
+        "vendorSearchKey": "1002317",
+        "mpn": "LTC4040EUFDTRPBF",
+        "qty": 5000,
+        "cost": 5.862,
+        "leadTime": "stock",
+        "dateCode": "25+",
+        "vendorNotes": "source 1",
+        "mfr": "Analog Devices",
+        "reason": "PRE_EXISTING_DUPLICATE",
+        "detail": "Existing chuboe_vq_line 2311380 matches natural key (rfq_line × MPN × BP × cost × currency) — no new POST.",
+        "vqLineId": 2311380
+      },
+      {
+        "vendorName": "Keming Electronics Development Co., Ltd",
+        "vendorSearchKey": "1002317",
+        "mpn": "LTC4040EUFDTRPBF",
+        "qty": 2500,
+        "cost": 5.399,
+        "leadTime": "stock",
+        "dateCode": "25+",
+        "vendorNotes": "source 2",
+        "mfr": "Analog Devices",
+        "reason": "PRE_EXISTING_DUPLICATE",
+        "detail": "Existing chuboe_vq_line 2311381 matches natural key (rfq_line × MPN × BP × cost × currency) — no new POST.",
+        "vqLineId": 2311381
+      },
+      {
+        "vendorName": "PGC-IC Ltd",
+        "vendorSearchKey": "1003648",
+        "mpn": "LT3090EDD#TRPBF",
+        "qty": 3000,
+        "cost": 3.682,
+        "leadTime": "stock",
+        "dateCode": "22+",
+        "mfr": "Analog Devices",
+        "reason": "PRE_EXISTING_DUPLICATE",
+        "detail": "Existing chuboe_vq_line 2311382 matches natural key (rfq_line × MPN × BP × cost × currency) — no new POST.",
+        "vqLineId": 2311382
+      },
+      {
+        "vendorName": "PGC-IC Ltd",
+        "vendorSearchKey": "1003648",
+        "mpn": "LT3090EDD#TRPBF",
+        "qty": 5000,
+        "cost": 3.72,
+        "leadTime": "stock",
+        "dateCode": "25+",
+        "mfr": "Analog Devices",
+        "reason": "PRE_EXISTING_DUPLICATE",
+        "detail": "Existing chuboe_vq_line 2311383 matches natural key (rfq_line × MPN × BP × cost × currency) — no new POST.",
+        "vqLineId": 2311383
+      },
+      {
+        "vendorName": "Hada Technology Co., Ltd",
+        "vendorSearchKey": "1003608",
+        "mpn": "LT3090EDD#TRPBF",
+        "qty": 5000,
+        "cost": 4.148,
+        "leadTime": "stock",
+        "dateCode": "25+",
+        "mfr": "Analog Devices",
+        "reason": "PRE_EXISTING_DUPLICATE",
+        "detail": "Existing chuboe_vq_line 2311384 matches natural key (rfq_line × MPN × BP × cost × currency) — no new POST.",
+        "vqLineId": 2311384
+      },
+      {
+        "vendorName": "Keming Electronics Development Co., Ltd",
+        "vendorSearchKey": "1002317",
+        "mpn": "LT3090EDD#TRPBF",
+        "qty": 5000,
+        "cost": 4.628,
+        "leadTime": "stock",
+        "dateCode": "25+",
+        "mfr": "Analog Devices",
+        "reason": "PRE_EXISTING_DUPLICATE",
+        "detail": "Existing chuboe_vq_line 2311385 matches natural key (rfq_line × MPN × BP × cost × currency) — no new POST.",
+        "vqLineId": 2311385
+      },
+      {
+        "vendorName": "Guiyu Electronics Group (HK) Ltd",
+        "vendorSearchKey": "1003866",
+        "mpn": "LT3090EDD#TRPBF",
+        "qty": 3000,
+        "cost": 3.63,
+        "leadTime": "stock",
+        "dateCode": "22+",
+        "mfr": "Analog Devices",
+        "reason": "PRE_EXISTING_DUPLICATE",
+        "detail": "Existing chuboe_vq_line 2311386 matches natural key (rfq_line × MPN × BP × cost × currency) — no new POST.",
+        "vqLineId": 2311386
+      },
+      {
+        "vendorName": "PGC-IC Ltd",
+        "vendorSearchKey": "1003648",
+        "mpn": "LT3090HDD#TRPBF",
+        "qty": 1700,
+        "cost": 3.408,
+        "leadTime": "stock",
+        "dateCode": "20+",
+        "mfr": "Analog Devices",
+        "reason": "PRE_EXISTING_DUPLICATE",
+        "detail": "Existing chuboe_vq_line 2311387 matches natural key (rfq_line × MPN × BP × cost × currency) — no new POST.",
+        "vqLineId": 2311387
+      },
+      {
+        "vendorName": "PGC-IC Ltd",
+        "vendorSearchKey": "1003648",
+        "mpn": "LT3090HDD#TRPBF",
+        "qty": 1400,
+        "cost": 4.01,
+        "leadTime": "stock",
+        "dateCode": "22+",
+        "mfr": "Analog Devices",
+        "reason": "PRE_EXISTING_DUPLICATE",
+        "detail": "Existing chuboe_vq_line 2311388 matches natural key (rfq_line × MPN × BP × cost × currency) — no new POST.",
+        "vqLineId": 2311388
+      },
+      {
+        "vendorName": "PGC-IC Ltd",
+        "vendorSearchKey": "1003648",
+        "mpn": "LT3090IDD#TRPBF",
+        "qty": 3000,
+        "cost": 7.597,
+        "leadTime": "stock",
+        "dateCode": "22+",
+        "vendorQuotedMpn": "LT3090IDD#PBF",
+        "vendorNotes": "Quoted MPN: LT3090IDD#PBF",
+        "mfr": "Analog Devices",
+        "reason": "PRE_EXISTING_DUPLICATE",
+        "detail": "Existing chuboe_vq_line 2311389 matches natural key (rfq_line × MPN × BP × cost × currency) — no new POST.",
+        "vqLineId": 2311389
+      },
+      {
+        "vendorName": "Keming Electronics Development Co., Ltd",
+        "vendorSearchKey": "1002317",
+        "mpn": "LT3090IDD#TRPBF",
+        "qty": 1000,
+        "cost": 3.857,
+        "leadTime": "stock",
+        "dateCode": "22+",
+        "mfr": "Analog Devices",
+        "reason": "PRE_EXISTING_DUPLICATE",
+        "detail": "Existing chuboe_vq_line 2311390 matches natural key (rfq_line × MPN × BP × cost × currency) — no new POST.",
+        "vqLineId": 2311390
+      },
+      {
+        "vendorName": "PGC-IC Ltd",
+        "vendorSearchKey": "1003648",
+        "mpn": "LT3090MPDD#TRPBF",
+        "qty": 3000,
+        "cost": 8.63,
+        "leadTime": "stock",
+        "dateCode": "22+",
+        "mfr": "Analog Devices",
+        "reason": "PRE_EXISTING_DUPLICATE",
+        "detail": "Existing chuboe_vq_line 2311391 matches natural key (rfq_line × MPN × BP × cost × currency) — no new POST.",
+        "vqLineId": 2311391
+      },
+      {
+        "vendorName": "PGC-IC Ltd",
+        "vendorSearchKey": "1003648",
+        "mpn": "LT3090MPDD#TRPBF",
+        "qty": 1000,
+        "cost": 4.558,
+        "leadTime": "stock",
+        "dateCode": "22+",
+        "mfr": "Analog Devices",
+        "reason": "PRE_EXISTING_DUPLICATE",
+        "detail": "Existing chuboe_vq_line 2311392 matches natural key (rfq_line × MPN × BP × cost × currency) — no new POST.",
+        "vqLineId": 2311392
+      },
+      {
+        "vendorName": "Keming Electronics Development Co., Ltd",
+        "vendorSearchKey": "1002317",
+        "mpn": "LT3090MPDD#TRPBF",
+        "qty": 1000,
+        "cost": 4.628,
+        "leadTime": "stock",
+        "dateCode": "22+",
+        "mfr": "Analog Devices",
+        "reason": "PRE_EXISTING_DUPLICATE",
+        "detail": "Existing chuboe_vq_line 2311393 matches natural key (rfq_line × MPN × BP × cost × currency) — no new POST.",
+        "vqLineId": 2311393
+      },
+      {
+        "vendorName": "Keming Electronics Development Co., Ltd",
+        "vendorSearchKey": "1002317",
+        "mpn": "LM4132BMFX-3.3/NOPB",
+        "qty": 3000,
+        "cost": 1.258,
+        "leadTime": "stock",
+        "dateCode": "22+",
+        "mfr": "Texas Instruments",
+        "reason": "PRE_EXISTING_DUPLICATE",
+        "detail": "Existing chuboe_vq_line 2311394 matches natural key (rfq_line × MPN × BP × cost × currency) — no new POST.",
+        "vqLineId": 2311394
+      },
+      {
+        "vendorName": "Keming Electronics Development Co., Ltd",
+        "vendorSearchKey": "1002317",
+        "mpn": "LM4132BMFX-3.3/NOPB",
+        "qty": 6900,
+        "cost": 1.49,
+        "leadTime": "stock",
+        "dateCode": "22+",
+        "vendorQuotedMpn": "LM4132BMF-3.3/NOPB",
+        "vendorNotes": "Quoted MPN: LM4132BMF-3.3/NOPB",
+        "mfr": "Texas Instruments",
+        "reason": "PRE_EXISTING_DUPLICATE",
+        "detail": "Existing chuboe_vq_line 2311395 matches natural key (rfq_line × MPN × BP × cost × currency) — no new POST.",
+        "vqLineId": 2311395
+      },
+      {
+        "vendorName": "PGC-IC Ltd",
+        "vendorSearchKey": "1003648",
+        "mpn": "LM4132BMFX-3.3/NOPB",
+        "qty": 3000,
+        "cost": 1.258,
+        "leadTime": "stock",
+        "dateCode": "22+",
+        "mfr": "Texas Instruments",
+        "reason": "PRE_EXISTING_DUPLICATE",
+        "detail": "Existing chuboe_vq_line 2311396 matches natural key (rfq_line × MPN × BP × cost × currency) — no new POST.",
+        "vqLineId": 2311396
+      },
+      {
+        "vendorName": "PGC-IC Ltd",
+        "vendorSearchKey": "1003648",
+        "mpn": "LM4132BMFX-3.3/NOPB",
+        "qty": 6900,
+        "cost": 1.49,
+        "leadTime": "stock",
+        "dateCode": "22+",
+        "vendorQuotedMpn": "LM4132BMF-3.3/NOPB",
+        "vendorNotes": "Quoted MPN: LM4132BMF-3.3/NOPB",
+        "mfr": "Texas Instruments",
+        "reason": "PRE_EXISTING_DUPLICATE",
+        "detail": "Existing chuboe_vq_line 2311397 matches natural key (rfq_line × MPN × BP × cost × currency) — no new POST.",
+        "vqLineId": 2311397
+      },
+      {
+        "vendorName": "Skyeast International Group Ltd",
+        "vendorSearchKey": "1003665",
+        "mpn": "LM4132BMFX-3.3/NOPB",
+        "qty": 15000,
+        "cost": 1.33,
+        "leadTime": "stock",
+        "dateCode": "23/24+",
+        "mfr": "Texas Instruments",
+        "reason": "PRE_EXISTING_DUPLICATE",
+        "detail": "Existing chuboe_vq_line 2311398 matches natural key (rfq_line × MPN × BP × cost × currency) — no new POST.",
+        "vqLineId": 2311398
+      },
+      {
+        "vendorName": "Skyeast International Group Ltd",
+        "vendorSearchKey": "1003665",
+        "mpn": "LM4132BMFX-3.3/NOPB",
+        "qty": 3000,
+        "cost": 1.58,
+        "leadTime": "stock",
+        "dateCode": "21+",
+        "mfr": "Texas Instruments",
+        "reason": "PRE_EXISTING_DUPLICATE",
+        "detail": "Existing chuboe_vq_line 2311399 matches natural key (rfq_line × MPN × BP × cost × currency) — no new POST.",
+        "vqLineId": 2311399
+      },
+      {
+        "vendorName": "Skyeast International Group Ltd",
+        "vendorSearchKey": "1003665",
+        "mpn": "TPS3850H01DRCR",
+        "qty": 6000,
+        "cost": 1.05,
+        "leadTime": "stock",
+        "dateCode": "19+",
+        "mfr": "Texas Instruments",
+        "reason": "PRE_EXISTING_DUPLICATE",
+        "detail": "Existing chuboe_vq_line 2311400 matches natural key (rfq_line × MPN × BP × cost × currency) — no new POST.",
+        "vqLineId": 2311400
+      },
+      {
+        "vendorName": "PGC-IC Ltd",
+        "vendorSearchKey": "1003648",
+        "mpn": "MC13892CJVLR2",
+        "qty": 1000,
+        "cost": 14.136,
+        "leadTime": "stock",
+        "dateCode": "22+",
+        "mfr": "NXP Semiconductors",
+        "reason": "PRE_EXISTING_DUPLICATE",
+        "detail": "Existing chuboe_vq_line 2311401 matches natural key (rfq_line × MPN × BP × cost × currency) — no new POST.",
+        "vqLineId": 2311401
+      },
+      {
+        "vendorName": "Original Chip Source Electronics Co., Limited",
+        "vendorSearchKey": "1011520",
+        "mpn": "LMC6484AIMX/NOPB",
+        "qty": 5000,
+        "cost": 1.13,
+        "leadTime": "stock",
+        "dateCode": "26+",
+        "mfr": "Texas Instruments",
+        "reason": "PRE_EXISTING_DUPLICATE",
+        "detail": "Existing chuboe_vq_line 2311402 matches natural key (rfq_line × MPN × BP × cost × currency) — no new POST.",
+        "vqLineId": 2311402
+      },
+      {
+        "vendorName": "PGC-IC Ltd",
+        "vendorSearchKey": "1003648",
+        "mpn": "LMC6484AIMX/NOPB",
+        "qty": 10000,
+        "cost": 1.19,
+        "leadTime": "stock",
+        "dateCode": "26+",
+        "mfr": "Texas Instruments",
+        "reason": "PRE_EXISTING_DUPLICATE",
+        "detail": "Existing chuboe_vq_line 2311403 matches natural key (rfq_line × MPN × BP × cost × currency) — no new POST.",
+        "vqLineId": 2311403
+      },
+      {
+        "vendorName": "Guiyu Electronics Group (HK) Ltd",
+        "vendorSearchKey": "1003866",
+        "mpn": "LMC6484AIMX/NOPB",
+        "qty": 10000,
+        "cost": 0.92,
+        "leadTime": "stock",
+        "dateCode": "24+",
+        "mfr": "Texas Instruments",
+        "reason": "PRE_EXISTING_DUPLICATE",
+        "detail": "Existing chuboe_vq_line 2311404 matches natural key (rfq_line × MPN × BP × cost × currency) — no new POST.",
+        "vqLineId": 2311404
+      },
+      {
+        "vendorName": "A-Power Electronic Asia Ltd",
+        "vendorSearchKey": "1003829",
+        "mpn": "LT1763CS8#TRPBF",
+        "qty": 2400,
+        "cost": 2.3,
+        "leadTime": "stock",
+        "dateCode": "20+",
+        "mfr": "Analog Devices",
+        "reason": "PRE_EXISTING_DUPLICATE",
+        "detail": "Existing chuboe_vq_line 2311405 matches natural key (rfq_line × MPN × BP × cost × currency) — no new POST.",
+        "vqLineId": 2311405
+      },
+      {
+        "vendorName": "Haoxin Hk Electronic Technology Co., Limited",
+        "vendorSearchKey": "1006032",
+        "mpn": "LT1763CS8#TRPBF",
+        "qty": 5000,
+        "cost": 2.3,
+        "leadTime": "stock",
+        "dateCode": "25+",
+        "mfr": "Analog Devices",
+        "reason": "PRE_EXISTING_DUPLICATE",
+        "detail": "Existing chuboe_vq_line 2311406 matches natural key (rfq_line × MPN × BP × cost × currency) — no new POST.",
+        "vqLineId": 2311406
+      },
+      {
+        "vendorName": "PGC-IC Ltd",
+        "vendorSearchKey": "1003648",
+        "mpn": "LT1763CS8#TRPBF",
+        "qty": 5000,
+        "cost": 2.428,
+        "leadTime": "stock",
+        "dateCode": "26+",
+        "mfr": "Analog Devices",
+        "reason": "PRE_EXISTING_DUPLICATE",
+        "detail": "Existing chuboe_vq_line 2311407 matches natural key (rfq_line × MPN × BP × cost × currency) — no new POST.",
+        "vqLineId": 2311407
+      },
+      {
+        "vendorName": "PGC-IC Ltd",
+        "vendorSearchKey": "1003648",
+        "mpn": "LMK03806BISQX/NOPB",
+        "qty": 4000,
+        "cost": 8.439,
+        "leadTime": "stock",
+        "dateCode": "22+",
+        "vendorQuotedMpn": "LMK03806BISQE/NOPB",
+        "vendorNotes": "Quoted MPN: LMK03806BISQE/NOPB",
+        "mfr": "Texas Instruments",
+        "reason": "PRE_EXISTING_DUPLICATE",
+        "detail": "Existing chuboe_vq_line 2311408 matches natural key (rfq_line × MPN × BP × cost × currency) — no new POST.",
+        "vqLineId": 2311408
+      },
+      {
+        "vendorName": "Action (HK) Technology Ltd",
+        "vendorSearchKey": "1003464",
+        "mpn": "LMK03806BISQX/NOPB",
+        "qty": 4000,
+        "cost": 8.479,
+        "leadTime": "stock",
+        "dateCode": "22+",
+        "vendorQuotedMpn": "LMK03806BISQE/NOPB",
+        "vendorNotes": "Quoted MPN: LMK03806BISQE/NOPB",
+        "mfr": "Texas Instruments",
+        "reason": "PRE_EXISTING_DUPLICATE",
+        "detail": "Existing chuboe_vq_line 2311409 matches natural key (rfq_line × MPN × BP × cost × currency) — no new POST.",
+        "vqLineId": 2311409
+      },
+      {
+        "vendorName": "Hada Technology Co., Ltd",
+        "vendorSearchKey": "1003608",
+        "mpn": "ADR1581BRTZ-REEL7",
+        "qty": 6000,
+        "cost": 2.963,
+        "leadTime": "stock",
+        "dateCode": "23+",
+        "mfr": "Analog Devices",
+        "reason": "PRE_EXISTING_DUPLICATE",
+        "detail": "Existing chuboe_vq_line 2311410 matches natural key (rfq_line × MPN × BP × cost × currency) — no new POST.",
+        "vqLineId": 2311410
+      },
+      {
+        "vendorName": "Haoxin Hk Electronic Technology Co., Limited",
+        "vendorSearchKey": "1006032",
+        "mpn": "ADR1581BRTZ-REEL7",
+        "qty": 6000,
+        "cost": 2.75,
+        "leadTime": "stock",
+        "dateCode": "23+",
+        "mfr": "Analog Devices",
+        "reason": "PRE_EXISTING_DUPLICATE",
+        "detail": "Existing chuboe_vq_line 2311411 matches natural key (rfq_line × MPN × BP × cost × currency) — no new POST.",
+        "vqLineId": 2311411
+      },
+      {
+        "vendorName": "PGC-IC Ltd",
+        "vendorSearchKey": "1003648",
+        "mpn": "ADR1581BRTZ-REEL7",
+        "qty": 6000,
+        "cost": 2.762,
+        "leadTime": "stock",
+        "dateCode": "23+",
+        "mfr": "Analog Devices",
+        "reason": "PRE_EXISTING_DUPLICATE",
+        "detail": "Existing chuboe_vq_line 2311412 matches natural key (rfq_line × MPN × BP × cost × currency) — no new POST.",
+        "vqLineId": 2311412
+      },
+      {
+        "vendorName": "Keming Electronics Development Co., Ltd",
+        "vendorSearchKey": "1002317",
+        "mpn": "LM4051AIM3-1.2/NOPB",
+        "qty": 3000,
+        "cost": 1.312,
+        "leadTime": "stock",
+        "dateCode": "26+",
+        "vendorNotes": "source 1, stock",
+        "mfr": "Texas Instruments",
+        "reason": "PRE_EXISTING_DUPLICATE",
+        "detail": "Existing chuboe_vq_line 2311413 matches natural key (rfq_line × MPN × BP × cost × currency) — no new POST.",
+        "vqLineId": 2311413
+      },
+      {
+        "vendorName": "Keming Electronics Development Co., Ltd",
+        "vendorSearchKey": "1002317",
+        "mpn": "LM4051AIM3-1.2/NOPB",
+        "qty": 3000,
+        "cost": 1.901,
+        "leadTime": "stock",
+        "dateCode": "21+",
+        "vendorNotes": "source 2, stock",
+        "mfr": "Texas Instruments",
+        "reason": "PRE_EXISTING_DUPLICATE",
+        "detail": "Existing chuboe_vq_line 2311414 matches natural key (rfq_line × MPN × BP × cost × currency) — no new POST.",
+        "vqLineId": 2311414
+      },
+      {
+        "vendorName": "PGC-IC Ltd",
+        "vendorSearchKey": "1003648",
+        "mpn": "LM4051AIM3X-1.2/NOPB",
+        "qty": 3000,
+        "cost": 1.456,
+        "leadTime": "stock",
+        "dateCode": "26+",
+        "mfr": "Texas Instruments",
+        "reason": "PRE_EXISTING_DUPLICATE",
+        "detail": "Existing chuboe_vq_line 2311415 matches natural key (rfq_line × MPN × BP × cost × currency) — no new POST.",
+        "vqLineId": 2311415
+      },
+      {
+        "vendorName": "PGC-IC Ltd",
+        "vendorSearchKey": "1003648",
+        "mpn": "LM4051AIM3X-1.2/NOPB",
+        "qty": 3000,
+        "cost": 1.637,
+        "leadTime": "stock",
+        "dateCode": "22+",
+        "mfr": "Texas Instruments",
+        "reason": "PRE_EXISTING_DUPLICATE",
+        "detail": "Existing chuboe_vq_line 2311416 matches natural key (rfq_line × MPN × BP × cost × currency) — no new POST.",
+        "vqLineId": 2311416
+      },
+      {
+        "vendorName": "PGC-IC Ltd",
+        "vendorSearchKey": "1003648",
+        "mpn": "LM4051AIM3X-1.2/NOPB",
+        "qty": 3000,
+        "cost": 1.711,
+        "leadTime": "stock",
+        "dateCode": "21+",
+        "mfr": "Texas Instruments",
+        "reason": "PRE_EXISTING_DUPLICATE",
+        "detail": "Existing chuboe_vq_line 2311417 matches natural key (rfq_line × MPN × BP × cost × currency) — no new POST.",
+        "vqLineId": 2311417
+      },
+      {
+        "vendorName": "Original Chip Source Electronics Co., Limited",
+        "vendorSearchKey": "1011520",
+        "mpn": "LM4051AIM3X-1.2/NOPB",
+        "qty": 3000,
+        "cost": 1.25,
+        "leadTime": "stock",
+        "dateCode": "26+",
+        "mfr": "Texas Instruments",
+        "reason": "PRE_EXISTING_DUPLICATE",
+        "detail": "Existing chuboe_vq_line 2311418 matches natural key (rfq_line × MPN × BP × cost × currency) — no new POST.",
+        "vqLineId": 2311418
+      },
+      {
+        "vendorName": "Skyeast International Group Ltd",
+        "vendorSearchKey": "1003665",
+        "mpn": "LM4051AIM3-1.2/NOPB",
+        "qty": 15000,
+        "cost": 1.63,
+        "leadTime": "stock",
+        "dateCode": "23/24+",
+        "mfr": "Texas Instruments",
+        "reason": "PRE_EXISTING_DUPLICATE",
+        "detail": "Existing chuboe_vq_line 2311419 matches natural key (rfq_line × MPN × BP × cost × currency) — no new POST.",
+        "vqLineId": 2311419
+      },
+      {
+        "vendorName": "Skyeast International Group Ltd",
+        "vendorSearchKey": "1003665",
+        "mpn": "LM4051AIM3X-1.2/NOPB",
+        "qty": 3000,
+        "cost": 1.58,
+        "leadTime": "stock",
+        "dateCode": "22+",
+        "mfr": "Texas Instruments",
+        "reason": "PRE_EXISTING_DUPLICATE",
+        "detail": "Existing chuboe_vq_line 2311420 matches natural key (rfq_line × MPN × BP × cost × currency) — no new POST.",
+        "vqLineId": 2311420
+      },
+      {
+        "vendorName": "Skyeast International Group Ltd",
+        "vendorSearchKey": "1003665",
+        "mpn": "LM4051AIM3X-1.2/NOPB",
+        "qty": 3000,
+        "cost": 1.58,
+        "leadTime": "stock",
+        "dateCode": "26+",
+        "mfr": "Texas Instruments",
+        "reason": "PRE_EXISTING_DUPLICATE",
+        "detail": "Existing chuboe_vq_line 2311421 matches natural key (rfq_line × MPN × BP × cost × currency) — no new POST.",
+        "vqLineId": 2311421
+      },
+      {
+        "vendorName": "Skyeast International Group Ltd",
+        "vendorSearchKey": "1003665",
+        "mpn": "LM4051AIM3X-1.2/NOPB",
+        "qty": 3000,
+        "cost": 1.9,
+        "leadTime": "stock",
+        "dateCode": "21+",
+        "mfr": "Texas Instruments",
+        "reason": "PRE_EXISTING_DUPLICATE",
+        "detail": "Existing chuboe_vq_line 2311422 matches natural key (rfq_line × MPN × BP × cost × currency) — no new POST.",
+        "vqLineId": 2311422
+      },
+      {
+        "vendorName": "Hong Kong Reily Technology Ltd",
+        "vendorSearchKey": "1005694",
+        "mpn": "STM32F103C6T6A",
+        "qty": 1500,
+        "cost": 2.5,
+        "leadTime": "stock",
+        "dateCode": "26+",
+        "mfr": "STMicroelectronics",
+        "reason": "PRE_EXISTING_DUPLICATE",
+        "detail": "Existing chuboe_vq_line 2311423 matches natural key (rfq_line × MPN × BP × cost × currency) — no new POST.",
+        "vqLineId": 2311423
+      },
+      {
+        "vendorName": "Hong Kong Reily Technology Ltd",
+        "vendorSearchKey": "1005694",
+        "mpn": "STM32F103C6T6ATR",
+        "qty": 2400,
+        "cost": 2.5,
+        "leadTime": "stock",
+        "dateCode": "26+",
+        "mfr": "STMicroelectronics",
+        "reason": "PRE_EXISTING_DUPLICATE",
+        "detail": "Existing chuboe_vq_line 2311424 matches natural key (rfq_line × MPN × BP × cost × currency) — no new POST.",
+        "vqLineId": 2311424
+      },
+      {
+        "vendorName": "Keming Electronics Development Co., Ltd",
+        "vendorSearchKey": "1002317",
+        "mpn": "STM32F103C6T6A",
+        "qty": 2400,
+        "cost": 2.777,
+        "leadTime": "stock",
+        "dateCode": "25+",
+        "mfr": "STMicroelectronics",
+        "reason": "PRE_EXISTING_DUPLICATE",
+        "detail": "Existing chuboe_vq_line 2311425 matches natural key (rfq_line × MPN × BP × cost × currency) — no new POST.",
+        "vqLineId": 2311425
+      },
+      {
+        "vendorName": "PGC-IC Ltd",
+        "vendorSearchKey": "1003648",
+        "mpn": "STM32F103C6T6A",
+        "qty": 2700,
+        "cost": 2.53,
+        "leadTime": "stock",
+        "dateCode": "25+",
+        "mfr": "STMicroelectronics",
+        "reason": "PRE_EXISTING_DUPLICATE",
+        "detail": "Existing chuboe_vq_line 2311426 matches natural key (rfq_line × MPN × BP × cost × currency) — no new POST.",
+        "vqLineId": 2311426
+      },
+      {
+        "vendorName": "PGC-IC Ltd",
+        "vendorSearchKey": "1003648",
+        "mpn": "STM32F103C6T6A",
+        "qty": 3000,
+        "cost": 2.976,
+        "leadTime": "stock",
+        "dateCode": "22+",
+        "mfr": "STMicroelectronics",
+        "reason": "PRE_EXISTING_DUPLICATE",
+        "detail": "Existing chuboe_vq_line 2311427 matches natural key (rfq_line × MPN × BP × cost × currency) — no new POST.",
+        "vqLineId": 2311427
+      },
+      {
+        "vendorName": "PGC-IC Ltd",
+        "vendorSearchKey": "1003648",
+        "mpn": "STM32F103C6T6A",
+        "qty": 1500,
+        "cost": 3.57,
+        "leadTime": "stock",
+        "dateCode": "25+",
+        "vendorNotes": "Vendor caution: ST price changes intraday, reconfirm before order",
+        "mfr": "STMicroelectronics",
+        "reason": "PRE_EXISTING_DUPLICATE",
+        "detail": "Existing chuboe_vq_line 2311428 matches natural key (rfq_line × MPN × BP × cost × currency) — no new POST.",
+        "vqLineId": 2311428
+      },
+      {
+        "vendorName": "Keming Electronics Development Co., Ltd",
+        "vendorSearchKey": "1002317",
+        "mpn": "MAX3243ECPWR",
+        "qty": 20000,
+        "cost": 0.371,
+        "leadTime": "stock",
+        "dateCode": "23+",
+        "vendorNotes": "source 1",
+        "mfr": "Texas Instruments",
+        "reason": "PRE_EXISTING_DUPLICATE",
+        "detail": "Existing chuboe_vq_line 2311429 matches natural key (rfq_line × MPN × BP × cost × currency) — no new POST.",
+        "vqLineId": 2311429
+      },
+      {
+        "vendorName": "Keming Electronics Development Co., Ltd",
+        "vendorSearchKey": "1002317",
+        "mpn": "MAX3243ECPWR",
+        "qty": 40000,
+        "cost": 0.432,
+        "leadTime": "stock",
+        "dateCode": "24+",
+        "vendorNotes": "source 2, ships 2-3 days",
+        "mfr": "Texas Instruments",
+        "reason": "PRE_EXISTING_DUPLICATE",
+        "detail": "Existing chuboe_vq_line 2311430 matches natural key (rfq_line × MPN × BP × cost × currency) — no new POST.",
+        "vqLineId": 2311430
+      },
+      {
+        "vendorName": "PGC-IC Ltd",
+        "vendorSearchKey": "1003648",
+        "mpn": "MAX3243ECPWR",
+        "qty": 40000,
+        "cost": 0.368,
+        "leadTime": "stock",
+        "dateCode": "23+",
+        "mfr": "Texas Instruments",
+        "reason": "PRE_EXISTING_DUPLICATE",
+        "detail": "Existing chuboe_vq_line 2311431 matches natural key (rfq_line × MPN × BP × cost × currency) — no new POST.",
+        "vqLineId": 2311431
+      },
+      {
+        "vendorName": "Guiyu Electronics Group (HK) Ltd",
+        "vendorSearchKey": "1003866",
+        "mpn": "MAX3243ECPWR",
+        "qty": 40000,
+        "cost": 0.7,
+        "leadTime": "stock",
+        "dateCode": "26+",
+        "mfr": "Texas Instruments",
+        "reason": "PRE_EXISTING_DUPLICATE",
+        "detail": "Existing chuboe_vq_line 2311432 matches natural key (rfq_line × MPN × BP × cost × currency) — no new POST.",
+        "vqLineId": 2311432
+      },
+      {
+        "vendorName": "Action (HK) Technology Ltd",
+        "vendorSearchKey": "1003464",
+        "mpn": "MAX3243ECPWR",
+        "qty": 4000,
+        "cost": 0.524,
+        "leadTime": "stock",
+        "dateCode": "22+",
+        "mfr": "Texas Instruments",
+        "reason": "PRE_EXISTING_DUPLICATE",
+        "detail": "Existing chuboe_vq_line 2311433 matches natural key (rfq_line × MPN × BP × cost × currency) — no new POST.",
+        "vqLineId": 2311433
+      },
+      {
+        "vendorName": "Action (HK) Technology Ltd",
+        "vendorSearchKey": "1003464",
+        "mpn": "MAX3243ECPWR",
+        "qty": 4000,
+        "cost": 0.694,
+        "leadTime": "stock",
+        "dateCode": "25+",
+        "mfr": "Texas Instruments",
+        "reason": "PRE_EXISTING_DUPLICATE",
+        "detail": "Existing chuboe_vq_line 2311434 matches natural key (rfq_line × MPN × BP × cost × currency) — no new POST.",
+        "vqLineId": 2311434
+      },
+      {
+        "vendorName": "Skyeast International Group Ltd",
+        "vendorSearchKey": "1003665",
+        "mpn": "MAX3243ECPWR",
+        "qty": 20000,
+        "cost": 0.38,
+        "leadTime": "stock",
+        "dateCode": "23+",
+        "mfr": "Texas Instruments",
+        "reason": "PRE_EXISTING_DUPLICATE",
+        "detail": "Existing chuboe_vq_line 2311435 matches natural key (rfq_line × MPN × BP × cost × currency) — no new POST.",
+        "vqLineId": 2311435
+      },
+      {
+        "vendorName": "Skyeast International Group Ltd",
+        "vendorSearchKey": "1003665",
+        "mpn": "MAX3243ECPWR",
+        "qty": 10000,
+        "cost": 0.725,
+        "leadTime": "stock",
+        "dateCode": "26+",
+        "mfr": "Texas Instruments",
+        "reason": "PRE_EXISTING_DUPLICATE",
+        "detail": "Existing chuboe_vq_line 2311436 matches natural key (rfq_line × MPN × BP × cost × currency) — no new POST.",
+        "vqLineId": 2311436
+      },
+      {
+        "vendorName": "Skyeast International Group Ltd",
+        "vendorSearchKey": "1003665",
+        "mpn": "MAX3243ECPWR",
+        "qty": 10000,
+        "cost": 0.755,
+        "leadTime": "stock",
+        "dateCode": "26+",
+        "mfr": "Texas Instruments",
+        "reason": "PRE_EXISTING_DUPLICATE",
+        "detail": "Existing chuboe_vq_line 2311437 matches natural key (rfq_line × MPN × BP × cost × currency) — no new POST.",
+        "vqLineId": 2311437
+      },
+      {
+        "vendorName": "Keming Electronics Development Co., Ltd",
+        "vendorSearchKey": "1002317",
+        "mpn": "DS100MB203SQE/NOPB",
+        "qty": 2000,
+        "cost": 11.569,
+        "leadTime": "stock",
+        "dateCode": "25+",
+        "vendorQuotedMpn": "DS100MB203SQ/NOPB",
+        "vendorNotes": "Quoted MPN: DS100MB203SQ/NOPB",
+        "mfr": "Texas Instruments",
+        "reason": "PRE_EXISTING_DUPLICATE",
+        "detail": "Existing chuboe_vq_line 2311438 matches natural key (rfq_line × MPN × BP × cost × currency) — no new POST.",
+        "vqLineId": 2311438
+      },
+      {
+        "vendorName": "PGC-IC Ltd",
+        "vendorSearchKey": "1003648",
+        "mpn": "DS100MB203SQE/NOPB",
+        "qty": 2000,
+        "cost": 13.09,
+        "leadTime": "stock",
+        "dateCode": "25+",
+        "vendorQuotedMpn": "DS100MB203SQ/NOPB",
+        "vendorNotes": "Quoted MPN: DS100MB203SQ/NOPB",
+        "mfr": "Texas Instruments",
+        "reason": "PRE_EXISTING_DUPLICATE",
+        "detail": "Existing chuboe_vq_line 2311439 matches natural key (rfq_line × MPN × BP × cost × currency) — no new POST.",
+        "vqLineId": 2311439
+      },
+      {
+        "vendorName": "Skyeast International Group Ltd",
+        "vendorSearchKey": "1003665",
+        "mpn": "DS100MB203SQE/NOPB",
+        "qty": 2000,
+        "cost": 13.3,
+        "leadTime": "stock",
+        "dateCode": "23/24+",
+        "vendorQuotedMpn": "DS100MB203SQ/NOPB",
+        "vendorNotes": "Quoted MPN: DS100MB203SQ/NOPB",
+        "mfr": "Texas Instruments",
+        "reason": "PRE_EXISTING_DUPLICATE",
+        "detail": "Existing chuboe_vq_line 2311440 matches natural key (rfq_line × MPN × BP × cost × currency) — no new POST.",
+        "vqLineId": 2311440
+      },
+      {
+        "vendorName": "Keming Electronics Development Co., Ltd",
+        "vendorSearchKey": "1002317",
+        "mpn": "TPS259474ARPWR",
+        "qty": 21000,
+        "cost": 1.543,
+        "leadTime": "stock",
+        "dateCode": "25+",
+        "mfr": "Texas Instruments",
+        "reason": "PRE_EXISTING_DUPLICATE",
+        "detail": "Existing chuboe_vq_line 2311441 matches natural key (rfq_line × MPN × BP × cost × currency) — no new POST.",
+        "vqLineId": 2311441
+      },
+      {
+        "vendorName": "PGC-IC Ltd",
+        "vendorSearchKey": "1003648",
+        "mpn": "TPS259474ARPWR",
+        "qty": 12000,
+        "cost": 1.064,
+        "leadTime": "stock",
+        "dateCode": "22+",
+        "mfr": "Texas Instruments",
+        "reason": "PRE_EXISTING_DUPLICATE",
+        "detail": "Existing chuboe_vq_line 2311442 matches natural key (rfq_line × MPN × BP × cost × currency) — no new POST.",
+        "vqLineId": 2311442
+      },
+      {
+        "vendorName": "PGC-IC Ltd",
+        "vendorSearchKey": "1003648",
+        "mpn": "TPS259474ARPWR",
+        "qty": 21000,
+        "cost": 1.488,
+        "leadTime": "stock",
+        "dateCode": "25+",
+        "mfr": "Texas Instruments",
+        "reason": "PRE_EXISTING_DUPLICATE",
+        "detail": "Existing chuboe_vq_line 2311443 matches natural key (rfq_line × MPN × BP × cost × currency) — no new POST.",
+        "vqLineId": 2311443
+      },
+      {
+        "vendorName": "Action (HK) Technology Ltd",
+        "vendorSearchKey": "1003464",
+        "mpn": "TPS259474ARPWR",
+        "qty": 21000,
+        "cost": 1.542,
+        "leadTime": "stock",
+        "dateCode": "25+",
+        "mfr": "Texas Instruments",
+        "reason": "PRE_EXISTING_DUPLICATE",
+        "detail": "Existing chuboe_vq_line 2311444 matches natural key (rfq_line × MPN × BP × cost × currency) — no new POST.",
+        "vqLineId": 2311444
+      },
+      {
+        "vendorName": "Skyeast International Group Ltd",
+        "vendorSearchKey": "1003665",
+        "mpn": "TPS259474ARPWR",
+        "qty": 21000,
+        "cost": 1.58,
+        "leadTime": "stock",
+        "dateCode": "25+",
+        "mfr": "Texas Instruments",
+        "reason": "PRE_EXISTING_DUPLICATE",
+        "detail": "Existing chuboe_vq_line 2311445 matches natural key (rfq_line × MPN × BP × cost × currency) — no new POST.",
+        "vqLineId": 2311445
+      },
+      {
+        "vendorName": "Skyeast International Group Ltd",
+        "vendorSearchKey": "1003665",
+        "mpn": "DRV5023FAQDBZR",
+        "qty": 15000,
+        "cost": 1.58,
+        "leadTime": "stock",
+        "dateCode": "24+",
+        "mfr": "Texas Instruments",
+        "reason": "PRE_EXISTING_DUPLICATE",
+        "detail": "Existing chuboe_vq_line 2311593 matches natural key (rfq_line × MPN × BP × cost × currency) — no new POST.",
+        "vqLineId": 2311593
+      },
+      {
+        "vendorName": "Yuguang International (HK) Co., Ltd",
+        "vendorSearchKey": "1002745",
+        "mpn": "LTC2875HDDTRPBF",
+        "qty": 2588,
+        "cost": 7.1,
+        "leadTime": "stock",
+        "dateCode": "22+",
+        "vendorQuotedMpn": "LTC2875HDD#PBF",
+        "vendorNotes": "Quoted MPN: LTC2875HDD#PBF",
+        "mfr": "Analog Devices",
+        "reason": "PRE_EXISTING_DUPLICATE",
+        "detail": "Existing chuboe_vq_line 2311446 matches natural key (rfq_line × MPN × BP × cost × currency) — no new POST.",
+        "vqLineId": 2311446
+      },
+      {
+        "vendorName": "Yuguang International (HK) Co., Ltd",
+        "vendorSearchKey": "1002745",
+        "mpn": "LTC2875HDDTRPBF",
+        "qty": 2718,
+        "cost": 9.5,
+        "leadTime": "stock",
+        "dateCode": "22+",
+        "mfr": "Analog Devices",
+        "reason": "PRE_EXISTING_DUPLICATE",
+        "detail": "Existing chuboe_vq_line 2311447 matches natural key (rfq_line × MPN × BP × cost × currency) — no new POST.",
+        "vqLineId": 2311447
+      },
+      {
+        "vendorName": "Keming Electronics Development Co., Ltd",
+        "vendorSearchKey": "1002317",
+        "mpn": "LTC2875HDDTRPBF",
+        "qty": 2500,
+        "cost": 15.425,
+        "leadTime": "stock",
+        "dateCode": "22+",
+        "mfr": "Analog Devices",
+        "reason": "PRE_EXISTING_DUPLICATE",
+        "detail": "Existing chuboe_vq_line 2311448 matches natural key (rfq_line × MPN × BP × cost × currency) — no new POST.",
+        "vqLineId": 2311448
+      },
+      {
+        "vendorName": "PGC-IC Ltd",
+        "vendorSearchKey": "1003648",
+        "mpn": "LTC2875HDDTRPBF",
+        "qty": 2580,
+        "cost": 7.589,
+        "leadTime": "stock",
+        "dateCode": "22+",
+        "vendorQuotedMpn": "LTC2875HDD#PBF",
+        "vendorNotes": "Quoted MPN: LTC2875HDD#PBF",
+        "mfr": "Analog Devices",
+        "reason": "PRE_EXISTING_DUPLICATE",
+        "detail": "Existing chuboe_vq_line 2311449 matches natural key (rfq_line × MPN × BP × cost × currency) — no new POST.",
+        "vqLineId": 2311449
+      },
+      {
+        "vendorName": "PGC-IC Ltd",
+        "vendorSearchKey": "1003648",
+        "mpn": "LTC2875HDDTRPBF",
+        "qty": 2500,
+        "cost": 8.63,
+        "leadTime": "stock",
+        "dateCode": "22+",
+        "mfr": "Analog Devices",
+        "reason": "PRE_EXISTING_DUPLICATE",
+        "detail": "Existing chuboe_vq_line 2311450 matches natural key (rfq_line × MPN × BP × cost × currency) — no new POST.",
+        "vqLineId": 2311450
+      },
+      {
+        "vendorName": "PGC-IC Ltd",
+        "vendorSearchKey": "1003648",
+        "mpn": "LTC2875HDDTRPBF",
+        "qty": 2500,
+        "cost": 14.13,
+        "leadTime": "stock",
+        "dateCode": "22+",
+        "vendorNotes": "Price notably higher than this vendor's other quote for same qty/DC tier — verify before ordering",
+        "mfr": "Analog Devices",
+        "reason": "PRE_EXISTING_DUPLICATE",
+        "detail": "Existing chuboe_vq_line 2311451 matches natural key (rfq_line × MPN × BP × cost × currency) — no new POST.",
+        "vqLineId": 2311451
+      },
+      {
+        "vendorName": "Sing Sun Electronics Ltd",
+        "vendorSearchKey": "1003788",
+        "mpn": "LTC2875IDDTRPBF",
+        "qty": 5000,
+        "cost": 5,
+        "leadTime": "stock",
+        "dateCode": "26+",
+        "mfr": "Analog Devices",
+        "reason": "PRE_EXISTING_DUPLICATE",
+        "detail": "Existing chuboe_vq_line 2311452 matches natural key (rfq_line × MPN × BP × cost × currency) — no new POST.",
+        "vqLineId": 2311452
+      },
+      {
+        "vendorName": "Presemis Technology Co., Ltd",
+        "vendorSearchKey": "1003700",
+        "mpn": "LTC2875IDDTRPBF",
+        "qty": 2500,
+        "cost": 3.5,
+        "leadTime": "stock",
+        "dateCode": "26+",
+        "mfr": "Analog Devices",
+        "reason": "PRE_EXISTING_DUPLICATE",
+        "detail": "Existing chuboe_vq_line 2311453 matches natural key (rfq_line × MPN × BP × cost × currency) — no new POST.",
+        "vqLineId": 2311453
+      },
+      {
+        "vendorName": "Keming Electronics Development Co., Ltd",
+        "vendorSearchKey": "1002317",
+        "mpn": "LTC2875IDDTRPBF",
+        "qty": 5000,
+        "cost": 4.011,
+        "leadTime": "stock",
+        "dateCode": "26+",
+        "mfr": "Analog Devices",
+        "reason": "PRE_EXISTING_DUPLICATE",
+        "detail": "Existing chuboe_vq_line 2311454 matches natural key (rfq_line × MPN × BP × cost × currency) — no new POST.",
+        "vqLineId": 2311454
+      },
+      {
+        "vendorName": "Haoxin Hk Electronic Technology Co., Limited",
+        "vendorSearchKey": "1006032",
+        "mpn": "LTC2875IDDTRPBF",
+        "qty": 5000,
+        "cost": 4.1,
+        "leadTime": "stock",
+        "dateCode": "26+",
+        "mfr": "Analog Devices",
+        "reason": "PRE_EXISTING_DUPLICATE",
+        "detail": "Existing chuboe_vq_line 2311455 matches natural key (rfq_line × MPN × BP × cost × currency) — no new POST.",
+        "vqLineId": 2311455
+      },
+      {
+        "vendorName": "Keming Electronics Development Co., Ltd",
+        "vendorSearchKey": "1002317",
+        "mpn": "LTC2875MPDDTRPBF",
+        "qty": 2000,
+        "cost": 7.713,
+        "leadTime": "stock",
+        "dateCode": "25+",
+        "mfr": "Analog Devices",
+        "reason": "PRE_EXISTING_DUPLICATE",
+        "detail": "Existing chuboe_vq_line 2311456 matches natural key (rfq_line × MPN × BP × cost × currency) — no new POST.",
+        "vqLineId": 2311456
+      },
+      {
+        "vendorName": "PGC-IC Ltd",
+        "vendorSearchKey": "1003648",
+        "mpn": "LTC2875MPDDTRPBF",
+        "qty": 2000,
+        "cost": 7.589,
+        "leadTime": "stock",
+        "dateCode": "26+",
+        "mfr": "Analog Devices",
+        "reason": "PRE_EXISTING_DUPLICATE",
+        "detail": "Existing chuboe_vq_line 2311457 matches natural key (rfq_line × MPN × BP × cost × currency) — no new POST.",
+        "vqLineId": 2311457
+      },
+      {
+        "vendorName": "Original Chip Source Electronics Co., Limited",
+        "vendorSearchKey": "1011520",
+        "mpn": "TLV9061IDCKR",
+        "qty": 15000,
+        "cost": 0.09,
+        "leadTime": "stock",
+        "dateCode": "26+",
+        "mfr": "Texas Instruments",
+        "reason": "PRE_EXISTING_DUPLICATE",
+        "detail": "Existing chuboe_vq_line 2311458 matches natural key (rfq_line × MPN × BP × cost × currency) — no new POST.",
+        "vqLineId": 2311458
+      },
+      {
+        "vendorName": "Momntech Limited",
+        "vendorSearchKey": "1006118",
+        "mpn": "TLV9061IDCKR",
+        "qty": 60000,
+        "cost": 0.1,
+        "leadTime": "stock",
+        "dateCode": "25+",
+        "mfr": "Texas Instruments",
+        "reason": "PRE_EXISTING_DUPLICATE",
+        "detail": "Existing chuboe_vq_line 2311459 matches natural key (rfq_line × MPN × BP × cost × currency) — no new POST.",
+        "vqLineId": 2311459
+      },
+      {
+        "vendorName": "Keming Electronics Development Co., Ltd",
+        "vendorSearchKey": "1002317",
+        "mpn": "TLV9061IDCKR",
+        "qty": 60000,
+        "cost": 0.093,
+        "leadTime": "stock",
+        "dateCode": "25+",
+        "mfr": "Texas Instruments",
+        "reason": "PRE_EXISTING_DUPLICATE",
+        "detail": "Existing chuboe_vq_line 2311460 matches natural key (rfq_line × MPN × BP × cost × currency) — no new POST.",
+        "vqLineId": 2311460
+      },
+      {
+        "vendorName": "PGC-IC Ltd",
+        "vendorSearchKey": "1003648",
+        "mpn": "TLV9061IDCKR",
+        "qty": 60000,
+        "cost": 0.097,
+        "leadTime": "stock",
+        "dateCode": "25+",
+        "mfr": "Texas Instruments",
+        "reason": "PRE_EXISTING_DUPLICATE",
+        "detail": "Existing chuboe_vq_line 2311461 matches natural key (rfq_line × MPN × BP × cost × currency) — no new POST.",
+        "vqLineId": 2311461
+      },
+      {
+        "vendorName": "Skyeast International Group Ltd",
+        "vendorSearchKey": "1003665",
+        "mpn": "TLV9061IDCKR",
+        "qty": 60000,
+        "cost": 0.095,
+        "leadTime": "stock",
+        "dateCode": "26+",
+        "mfr": "Texas Instruments",
+        "reason": "PRE_EXISTING_DUPLICATE",
+        "detail": "Existing chuboe_vq_line 2311462 matches natural key (rfq_line × MPN × BP × cost × currency) — no new POST.",
+        "vqLineId": 2311462
+      },
+      {
+        "vendorName": "Presemis Technology Co., Ltd",
+        "vendorSearchKey": "1003700",
+        "mpn": "ADG708CRUZ-REEL7",
+        "qty": 3000,
+        "cost": 2.5,
+        "leadTime": "stock",
+        "dateCode": "25+",
+        "mfr": "Analog Devices",
+        "reason": "PRE_EXISTING_DUPLICATE",
+        "detail": "Existing chuboe_vq_line 2311463 matches natural key (rfq_line × MPN × BP × cost × currency) — no new POST.",
+        "vqLineId": 2311463
+      },
+      {
+        "vendorName": "Yuguang International (HK) Co., Ltd",
+        "vendorSearchKey": "1002745",
+        "mpn": "ADG708CRUZ-REEL7",
+        "qty": 9000,
+        "cost": 2.6,
+        "leadTime": "stock",
+        "dateCode": "25+",
+        "mfr": "Analog Devices",
+        "reason": "PRE_EXISTING_DUPLICATE",
+        "detail": "Existing chuboe_vq_line 2311464 matches natural key (rfq_line × MPN × BP × cost × currency) — no new POST.",
+        "vqLineId": 2311464
+      },
+      {
+        "vendorName": "Haoxin Hk Electronic Technology Co., Limited",
+        "vendorSearchKey": "1006032",
+        "mpn": "ADG708CRUZ-REEL7",
+        "qty": 9000,
+        "cost": 2.6,
+        "leadTime": "stock",
+        "dateCode": "25+",
+        "mfr": "Analog Devices",
+        "reason": "PRE_EXISTING_DUPLICATE",
+        "detail": "Existing chuboe_vq_line 2311465 matches natural key (rfq_line × MPN × BP × cost × currency) — no new POST.",
+        "vqLineId": 2311465
+      },
+      {
+        "vendorName": "Keming Electronics Development Co., Ltd",
+        "vendorSearchKey": "1002317",
+        "mpn": "ADG708CRUZ-REEL7",
+        "qty": 9000,
+        "cost": 2.623,
+        "leadTime": "stock",
+        "dateCode": "25+",
+        "mfr": "Analog Devices",
+        "reason": "PRE_EXISTING_DUPLICATE",
+        "detail": "Existing chuboe_vq_line 2311466 matches natural key (rfq_line × MPN × BP × cost × currency) — no new POST.",
+        "vqLineId": 2311466
+      },
+      {
+        "vendorName": "PGC-IC Ltd",
+        "vendorSearchKey": "1003648",
+        "mpn": "ADG708CRUZ-REEL7",
+        "qty": 5000,
+        "cost": 2.605,
+        "leadTime": "stock",
+        "dateCode": "25+",
+        "mfr": "Analog Devices",
+        "reason": "PRE_EXISTING_DUPLICATE",
+        "detail": "Existing chuboe_vq_line 2311467 matches natural key (rfq_line × MPN × BP × cost × currency) — no new POST.",
+        "vqLineId": 2311467
+      },
+      {
+        "vendorName": "PGC-IC Ltd",
+        "vendorSearchKey": "1003648",
+        "mpn": "ADG708CRUZ-REEL7",
+        "qty": 5000,
+        "cost": 2.9,
+        "leadTime": "stock",
+        "dateCode": "25+",
+        "mfr": "Analog Devices",
+        "reason": "PRE_EXISTING_DUPLICATE",
+        "detail": "Existing chuboe_vq_line 2311468 matches natural key (rfq_line × MPN × BP × cost × currency) — no new POST.",
+        "vqLineId": 2311468
+      },
+      {
+        "vendorName": "Keming Electronics Development Co., Ltd",
+        "vendorSearchKey": "1002317",
+        "mpn": "LTC4079EDD#TRPBF",
+        "qty": 2500,
+        "cost": 4.319,
+        "leadTime": "stock",
+        "dateCode": "25+",
+        "vendorNotes": "source 1",
+        "mfr": "Analog Devices",
+        "reason": "PRE_EXISTING_DUPLICATE",
+        "detail": "Existing chuboe_vq_line 2311469 matches natural key (rfq_line × MPN × BP × cost × currency) — no new POST.",
+        "vqLineId": 2311469
+      },
+      {
+        "vendorName": "Keming Electronics Development Co., Ltd",
+        "vendorSearchKey": "1002317",
+        "mpn": "LTC4079EDD#TRPBF",
+        "qty": 2500,
+        "cost": 6.17,
+        "leadTime": "stock",
+        "dateCode": "26+",
+        "vendorNotes": "source 2",
+        "mfr": "Analog Devices",
+        "reason": "PRE_EXISTING_DUPLICATE",
+        "detail": "Existing chuboe_vq_line 2311470 matches natural key (rfq_line × MPN × BP × cost × currency) — no new POST.",
+        "vqLineId": 2311470
+      },
+      {
+        "vendorName": "Haoxin Hk Electronic Technology Co., Limited",
+        "vendorSearchKey": "1006032",
+        "mpn": "LTC4079EDD#TRPBF",
+        "qty": 5000,
+        "cost": 4.3,
+        "leadTime": "stock",
+        "dateCode": "22+/24+",
+        "mfr": "Analog Devices",
+        "reason": "PRE_EXISTING_DUPLICATE",
+        "detail": "Existing chuboe_vq_line 2311471 matches natural key (rfq_line × MPN × BP × cost × currency) — no new POST.",
+        "vqLineId": 2311471
+      },
+      {
+        "vendorName": "PGC-IC Ltd",
+        "vendorSearchKey": "1003648",
+        "mpn": "LTC4079EDD#TRPBF",
+        "qty": 5000,
+        "cost": 3.525,
+        "leadTime": "stock",
+        "dateCode": "19+",
+        "mfr": "Analog Devices",
+        "reason": "PRE_EXISTING_DUPLICATE",
+        "detail": "Existing chuboe_vq_line 2311472 matches natural key (rfq_line × MPN × BP × cost × currency) — no new POST.",
+        "vqLineId": 2311472
+      },
+      {
+        "vendorName": "PGC-IC Ltd",
+        "vendorSearchKey": "1003648",
+        "mpn": "LTC4079EDD#TRPBF",
+        "qty": 2500,
+        "cost": 7.142,
+        "leadTime": "stock",
+        "dateCode": "26+",
+        "mfr": "Analog Devices",
+        "reason": "PRE_EXISTING_DUPLICATE",
+        "detail": "Existing chuboe_vq_line 2311473 matches natural key (rfq_line × MPN × BP × cost × currency) — no new POST.",
+        "vqLineId": 2311473
+      },
+      {
+        "vendorName": "Guiyu Electronics Group (HK) Ltd",
+        "vendorSearchKey": "1003866",
+        "mpn": "LTC4079EDD#TRPBF",
+        "qty": 2500,
+        "cost": 5.18,
+        "leadTime": "stock",
+        "dateCode": "25+",
+        "mfr": "Analog Devices",
+        "reason": "PRE_EXISTING_DUPLICATE",
+        "detail": "Existing chuboe_vq_line 2311474 matches natural key (rfq_line × MPN × BP × cost × currency) — no new POST.",
+        "vqLineId": 2311474
+      },
+      {
+        "vendorName": "HD-KJ Group Electronic Co., Ltd",
+        "vendorSearchKey": "1003811",
+        "mpn": "BCV26,215",
+        "qty": 27000,
+        "cost": 0.23,
+        "leadTime": "stock",
+        "dateCode": "25+",
+        "vendorNotes": "Vendor DC text garbled ('2540+之前'); using nearest legible date code 25+ — reconfirm with vendor",
+        "mfr": "Nexperia",
+        "reason": "PRE_EXISTING_DUPLICATE",
+        "detail": "Existing chuboe_vq_line 2311475 matches natural key (rfq_line × MPN × BP × cost × currency) — no new POST.",
+        "vqLineId": 2311475
+      },
+      {
+        "vendorName": "Fixchips Global Limited",
+        "vendorSearchKey": "1002391",
+        "mpn": "BCV26,215",
+        "qty": 18000,
+        "cost": 0.236,
+        "leadTime": "stock",
+        "dateCode": "25+",
+        "packaging": "REEL",
+        "vendorNotes": "Vendor note: DC before 2540+",
+        "mfr": "Nexperia",
+        "reason": "PRE_EXISTING_DUPLICATE",
+        "detail": "Existing chuboe_vq_line 2311476 matches natural key (rfq_line × MPN × BP × cost × currency) — no new POST.",
+        "vqLineId": 2311476
+      },
+      {
+        "vendorName": "HD-KJ Group Electronic Co., Ltd",
+        "vendorSearchKey": "1003811",
+        "mpn": "MMBTA63LT1G",
+        "qty": 3000,
+        "cost": 0.16,
+        "leadTime": "stock",
+        "dateCode": "24+",
+        "mfr": "ON Semiconductor",
+        "reason": "PRE_EXISTING_DUPLICATE",
+        "detail": "Existing chuboe_vq_line 2311477 matches natural key (rfq_line × MPN × BP × cost × currency) — no new POST.",
+        "vqLineId": 2311477
+      },
+      {
+        "vendorName": "SMARTEL ELECTRONICS (ASIA) CO LTD",
+        "vendorSearchKey": "1006857",
+        "mpn": "MMBTA63LT1G",
+        "qty": 2808,
+        "cost": 0.05,
+        "leadTime": "stock",
+        "dateCode": "21+",
+        "mfr": "ON Semiconductor",
+        "reason": "PRE_EXISTING_DUPLICATE",
+        "detail": "Existing chuboe_vq_line 2311478 matches natural key (rfq_line × MPN × BP × cost × currency) — no new POST.",
+        "vqLineId": 2311478
+      },
+      {
+        "vendorName": "SMARTEL ELECTRONICS (ASIA) CO LTD",
+        "vendorSearchKey": "1006857",
+        "mpn": "MMBTA63LT1G",
+        "qty": 3000,
+        "cost": 0.082,
+        "leadTime": "stock",
+        "dateCode": "23+",
+        "mfr": "ON Semiconductor",
+        "reason": "PRE_EXISTING_DUPLICATE",
+        "detail": "Existing chuboe_vq_line 2311479 matches natural key (rfq_line × MPN × BP × cost × currency) — no new POST.",
+        "vqLineId": 2311479
+      },
+      {
+        "vendorName": "SMARTEL ELECTRONICS (ASIA) CO LTD",
+        "vendorSearchKey": "1006857",
+        "mpn": "MMBTA63LT1G",
+        "qty": 3000,
+        "cost": 0.132,
+        "leadTime": "stock",
+        "dateCode": "23+",
+        "mfr": "ON Semiconductor",
+        "reason": "PRE_EXISTING_DUPLICATE",
+        "detail": "Existing chuboe_vq_line 2311480 matches natural key (rfq_line × MPN × BP × cost × currency) — no new POST.",
+        "vqLineId": 2311480
+      },
+      {
+        "vendorName": "Southchip Limited",
+        "vendorSearchKey": "1006106",
+        "mpn": "TLV07IDR",
+        "qty": 4904,
+        "cost": 0.429,
+        "leadTime": "stock",
+        "dateCode": "26+",
+        "mfr": "Texas Instruments",
+        "reason": "PRE_EXISTING_DUPLICATE",
+        "detail": "Existing chuboe_vq_line 2311481 matches natural key (rfq_line × MPN × BP × cost × currency) — no new POST.",
+        "vqLineId": 2311481
+      },
+      {
+        "vendorName": "Fixchips Global Limited",
+        "vendorSearchKey": "1002391",
+        "mpn": "TLV07IDR",
+        "qty": 30000,
+        "cost": 0.377,
+        "leadTime": "stock",
+        "dateCode": "26+",
+        "packaging": "REEL",
+        "mfr": "Texas Instruments",
+        "reason": "PRE_EXISTING_DUPLICATE",
+        "detail": "Existing chuboe_vq_line 2311482 matches natural key (rfq_line × MPN × BP × cost × currency) — no new POST.",
+        "vqLineId": 2311482
+      },
+      {
+        "vendorName": "Fixchips Global Limited",
+        "vendorSearchKey": "1002391",
+        "mpn": "TLV07IDR",
+        "qty": 29000,
+        "cost": 0.407,
+        "leadTime": "stock",
+        "dateCode": "23+",
+        "packaging": "REEL",
+        "mfr": "Texas Instruments",
+        "reason": "PRE_EXISTING_DUPLICATE",
+        "detail": "Existing chuboe_vq_line 2311483 matches natural key (rfq_line × MPN × BP × cost × currency) — no new POST.",
+        "vqLineId": 2311483
+      },
+      {
+        "vendorName": "SMARTEL ELECTRONICS (ASIA) CO LTD",
+        "vendorSearchKey": "1006857",
+        "mpn": "TLV07IDR",
+        "qty": 30000,
+        "cost": 0.376,
+        "leadTime": "stock",
+        "dateCode": "26+",
+        "mfr": "Texas Instruments",
+        "reason": "PRE_EXISTING_DUPLICATE",
+        "detail": "Existing chuboe_vq_line 2311484 matches natural key (rfq_line × MPN × BP × cost × currency) — no new POST.",
+        "vqLineId": 2311484
+      },
+      {
+        "vendorName": "SMARTEL ELECTRONICS (ASIA) CO LTD",
+        "vendorSearchKey": "1006857",
+        "mpn": "TLV07IDR",
+        "qty": 29000,
+        "cost": 0.4,
+        "leadTime": "stock",
+        "dateCode": "23+",
+        "mfr": "Texas Instruments",
+        "reason": "PRE_EXISTING_DUPLICATE",
+        "detail": "Existing chuboe_vq_line 2311485 matches natural key (rfq_line × MPN × BP × cost × currency) — no new POST.",
+        "vqLineId": 2311485
+      },
+      {
+        "vendorName": "Action (HK) Technology Ltd",
+        "vendorSearchKey": "1003464",
+        "mpn": "TLV07IDR",
+        "qty": 10000,
+        "cost": 0.385,
+        "leadTime": "stock",
+        "dateCode": "26+",
+        "mfr": "Texas Instruments",
+        "reason": "PRE_EXISTING_DUPLICATE",
+        "detail": "Existing chuboe_vq_line 2311486 matches natural key (rfq_line × MPN × BP × cost × currency) — no new POST.",
+        "vqLineId": 2311486
+      },
+      {
+        "vendorName": "Excellence Time Electronics Co., Ltd",
+        "vendorSearchKey": "1003602",
+        "mpn": "LM5164DDAR",
+        "qty": 1500,
+        "cost": 0.85,
+        "leadTime": "stock",
+        "dateCode": "26+",
+        "vendorNotes": "Qty defaulted to RFQ line qty (1500) — vendor stated only MOQ 2500, no available qty",
+        "mfr": "Texas Instruments",
+        "reason": "PRE_EXISTING_DUPLICATE",
+        "detail": "Existing chuboe_vq_line 2311487 matches natural key (rfq_line × MPN × BP × cost × currency) — no new POST.",
+        "vqLineId": 2311487
+      },
+      {
+        "vendorName": "Fixchips Global Limited",
+        "vendorSearchKey": "1002391",
+        "mpn": "LM5164DDAR",
+        "qty": 1000,
+        "cost": 0.884,
+        "leadTime": "stock",
+        "dateCode": "22+",
+        "packaging": "REEL",
+        "mfr": "Texas Instruments",
+        "reason": "PRE_EXISTING_DUPLICATE",
+        "detail": "Existing chuboe_vq_line 2311488 matches natural key (rfq_line × MPN × BP × cost × currency) — no new POST.",
+        "vqLineId": 2311488
+      },
+      {
+        "vendorName": "Action (HK) Technology Ltd",
+        "vendorSearchKey": "1003464",
+        "mpn": "LM5164DDAR",
+        "qty": 1500,
+        "cost": 1.17,
+        "leadTime": "stock",
+        "dateCode": "25+",
+        "mfr": "Texas Instruments",
+        "reason": "PRE_EXISTING_DUPLICATE",
+        "detail": "Existing chuboe_vq_line 2311489 matches natural key (rfq_line × MPN × BP × cost × currency) — no new POST.",
+        "vqLineId": 2311489
+      },
+      {
+        "vendorName": "SMARTEL ELECTRONICS (ASIA) CO LTD",
+        "vendorSearchKey": "1006857",
+        "mpn": "LM5164DDAR",
+        "qty": 1500,
+        "cost": 0.855,
+        "leadTime": "stock",
+        "dateCode": "22+",
+        "mfr": "Texas Instruments",
+        "reason": "PRE_EXISTING_DUPLICATE",
+        "detail": "Existing chuboe_vq_line 2311490 matches natural key (rfq_line × MPN × BP × cost × currency) — no new POST.",
+        "vqLineId": 2311490
+      },
+      {
+        "vendorName": "Southchip Limited",
+        "vendorSearchKey": "1006106",
+        "mpn": "ISO7710DR",
+        "qty": 2252,
+        "cost": 0.74,
+        "leadTime": "stock",
+        "dateCode": "24+",
+        "mfr": "Texas Instruments",
+        "reason": "PRE_EXISTING_DUPLICATE",
+        "detail": "Existing chuboe_vq_line 2311491 matches natural key (rfq_line × MPN × BP × cost × currency) — no new POST.",
+        "vqLineId": 2311491
+      },
+      {
+        "vendorName": "Najie International Ltd",
+        "vendorSearchKey": "1003728",
+        "mpn": "ISO7710DR",
+        "qty": 2500,
+        "cost": 0.5,
+        "leadTime": "stock",
+        "dateCode": "24+",
+        "mfr": "Texas Instruments",
+        "reason": "PRE_EXISTING_DUPLICATE",
+        "detail": "Existing chuboe_vq_line 2311492 matches natural key (rfq_line × MPN × BP × cost × currency) — no new POST.",
+        "vqLineId": 2311492
+      },
+      {
+        "vendorName": "Fixchips Global Limited",
+        "vendorSearchKey": "1002391",
+        "mpn": "ISO7710DR",
+        "qty": 12500,
+        "cost": 0.598,
+        "leadTime": "stock",
+        "dateCode": "24+",
+        "packaging": "REEL",
+        "mfr": "Texas Instruments",
+        "reason": "PRE_EXISTING_DUPLICATE",
+        "detail": "Existing chuboe_vq_line 2311493 matches natural key (rfq_line × MPN × BP × cost × currency) — no new POST.",
+        "vqLineId": 2311493
+      },
+      {
+        "vendorName": "SMARTEL ELECTRONICS (ASIA) CO LTD",
+        "vendorSearchKey": "1006857",
+        "mpn": "ISO7710DR",
+        "qty": 12500,
+        "cost": 0.595,
+        "leadTime": "stock",
+        "dateCode": "24+",
+        "mfr": "Texas Instruments",
+        "reason": "PRE_EXISTING_DUPLICATE",
+        "detail": "Existing chuboe_vq_line 2311494 matches natural key (rfq_line × MPN × BP × cost × currency) — no new POST.",
+        "vqLineId": 2311494
+      },
+      {
+        "vendorName": "SMARTEL ELECTRONICS (ASIA) CO LTD",
+        "vendorSearchKey": "1006857",
+        "mpn": "ISO7710DR",
+        "qty": 5000,
+        "cost": 0.704,
+        "leadTime": "stock",
+        "dateCode": "25+",
+        "mfr": "Texas Instruments",
+        "reason": "PRE_EXISTING_DUPLICATE",
+        "detail": "Existing chuboe_vq_line 2311495 matches natural key (rfq_line × MPN × BP × cost × currency) — no new POST.",
+        "vqLineId": 2311495
+      },
+      {
+        "vendorName": "Action (HK) Technology Ltd",
+        "vendorSearchKey": "1003464",
+        "mpn": "ISO7710DR",
+        "qty": 15000,
+        "cost": 0.59,
+        "leadTime": "stock",
+        "dateCode": "24+",
+        "mfr": "Texas Instruments",
+        "reason": "PRE_EXISTING_DUPLICATE",
+        "detail": "Existing chuboe_vq_line 2311496 matches natural key (rfq_line × MPN × BP × cost × currency) — no new POST.",
+        "vqLineId": 2311496
+      },
+      {
+        "vendorName": "Southchip Limited",
+        "vendorSearchKey": "1006106",
+        "mpn": "MAX3232EIPWR",
+        "qty": 5500,
+        "cost": 0.197,
+        "leadTime": "stock",
+        "dateCode": "26+",
+        "mfr": "Texas Instruments",
+        "reason": "PRE_EXISTING_DUPLICATE",
+        "detail": "Existing chuboe_vq_line 2311497 matches natural key (rfq_line × MPN × BP × cost × currency) — no new POST.",
+        "vqLineId": 2311497
+      },
+      {
+        "vendorName": "Semgoal Electronics Ltd",
+        "vendorSearchKey": "1003453",
+        "mpn": "MAX3232EIPWR",
+        "qty": 6000,
+        "cost": 0.165,
+        "leadTime": "1-3days",
+        "dateCode": "26+",
+        "mfr": "Texas Instruments",
+        "reason": "PRE_EXISTING_DUPLICATE",
+        "detail": "Existing chuboe_vq_line 2311498 matches natural key (rfq_line × MPN × BP × cost × currency) — no new POST.",
+        "vqLineId": 2311498
+      },
+      {
+        "vendorName": "Excellence Time Electronics Co., Ltd",
+        "vendorSearchKey": "1003602",
+        "mpn": "MAX3232EIPWR",
+        "qty": 5500,
+        "cost": 0.17,
+        "leadTime": "stock",
+        "dateCode": "26+",
+        "vendorNotes": "Qty defaulted to RFQ line qty (5500) — vendor stated only SPQ 2000 ('can't cut'), no available qty",
+        "mfr": "Texas Instruments",
+        "reason": "PRE_EXISTING_DUPLICATE",
+        "detail": "Existing chuboe_vq_line 2311499 matches natural key (rfq_line × MPN × BP × cost × currency) — no new POST.",
+        "vqLineId": 2311499
+      },
+      {
+        "vendorName": "Keming Electronics Development Co., Ltd",
+        "vendorSearchKey": "1002317",
+        "mpn": "MAX3232EIPWR",
+        "qty": 6000,
+        "cost": 0.17,
+        "leadTime": "stock",
+        "dateCode": "25+/26+",
+        "mfr": "Texas Instruments",
+        "reason": "PRE_EXISTING_DUPLICATE",
+        "detail": "Existing chuboe_vq_line 2311500 matches natural key (rfq_line × MPN × BP × cost × currency) — no new POST.",
+        "vqLineId": 2311500
+      },
+      {
+        "vendorName": "SMARTEL ELECTRONICS (ASIA) CO LTD",
+        "vendorSearchKey": "1006857",
+        "mpn": "MAX3232EIPWR",
+        "qty": 5500,
+        "cost": 0.202,
+        "leadTime": "stock",
+        "dateCode": "25+",
+        "mfr": "Texas Instruments",
+        "reason": "PRE_EXISTING_DUPLICATE",
+        "detail": "Existing chuboe_vq_line 2311501 matches natural key (rfq_line × MPN × BP × cost × currency) — no new POST.",
+        "vqLineId": 2311501
+      },
+      {
+        "vendorName": "Fixchips Global Limited",
+        "vendorSearchKey": "1002391",
+        "mpn": "MAX3232EIPWR",
+        "qty": 5500,
+        "cost": 0.192,
+        "leadTime": "stock",
+        "dateCode": "25+",
+        "packaging": "REEL",
+        "mfr": "Texas Instruments",
+        "reason": "PRE_EXISTING_DUPLICATE",
+        "detail": "Existing chuboe_vq_line 2311502 matches natural key (rfq_line × MPN × BP × cost × currency) — no new POST.",
+        "vqLineId": 2311502
+      },
+      {
+        "vendorName": "Action (HK) Technology Ltd",
+        "vendorSearchKey": "1003464",
+        "mpn": "MAX3232EIPWR",
+        "qty": 5500,
+        "cost": 0.172,
+        "leadTime": "stock",
+        "dateCode": "25+",
+        "mfr": "Texas Instruments",
+        "reason": "PRE_EXISTING_DUPLICATE",
+        "detail": "Existing chuboe_vq_line 2311503 matches natural key (rfq_line × MPN × BP × cost × currency) — no new POST.",
+        "vqLineId": 2311503
+      },
+      {
+        "vendorName": "Deno international limited",
+        "vendorSearchKey": "1012376",
+        "mpn": "W25X20CLSNIG-T",
+        "qty": 10000,
+        "cost": 0.5,
+        "leadTime": "stock",
+        "dateCode": "26+",
+        "packaging": "REEL",
+        "vendorQuotedMpn": "W25X20CLSNIG TR",
+        "vendorNotes": "Quoted MPN: W25X20CLSNIG TR; Vendor flagged: HK stock",
+        "mfr": "Winbond",
+        "reason": "PRE_EXISTING_DUPLICATE",
+        "detail": "Existing chuboe_vq_line 2311504 matches natural key (rfq_line × MPN × BP × cost × currency) — no new POST.",
+        "vqLineId": 2311504
+      },
+      {
+        "vendorName": "Southchip Limited",
+        "vendorSearchKey": "1006106",
+        "mpn": "W25X20CLSNIG",
+        "qty": 4398,
+        "cost": 0.59,
+        "leadTime": "stock",
+        "dateCode": "25+",
+        "mfr": "Winbond",
+        "reason": "PRE_EXISTING_DUPLICATE",
+        "detail": "Existing chuboe_vq_line 2311505 matches natural key (rfq_line × MPN × BP × cost × currency) — no new POST.",
+        "vqLineId": 2311505
+      },
+      {
+        "vendorName": "SSF GROUP (ASIA) LIMITED",
+        "vendorSearchKey": "1007351",
+        "mpn": "W25X20CLSNIG",
+        "qty": 10000,
+        "cost": 0.55,
+        "leadTime": "1-2DAYS",
+        "dateCode": "26+",
+        "vendorNotes": "Vendor flagged: relabeled parts, reconfirm before ordering",
+        "mfr": "Winbond",
+        "reason": "PRE_EXISTING_DUPLICATE",
+        "detail": "Existing chuboe_vq_line 2311506 matches natural key (rfq_line × MPN × BP × cost × currency) — no new POST.",
+        "vqLineId": 2311506
+      },
+      {
+        "vendorName": "KST Components Ltd.",
+        "vendorSearchKey": "1006324",
+        "mpn": "W25X20CLSNIG",
+        "qty": 10000,
+        "cost": 0.57,
+        "leadTime": "stock",
+        "dateCode": "25+",
+        "packaging": "REEL",
+        "mfr": "Winbond",
+        "reason": "PRE_EXISTING_DUPLICATE",
+        "detail": "Existing chuboe_vq_line 2311507 matches natural key (rfq_line × MPN × BP × cost × currency) — no new POST.",
+        "vqLineId": 2311507
+      },
+      {
+        "vendorName": "Fixchips Global Limited",
+        "vendorSearchKey": "1002391",
+        "mpn": "W25X20CLSNIG",
+        "qty": 10000,
+        "cost": 0.535,
+        "leadTime": "stock",
+        "dateCode": "25+",
+        "packaging": "REEL",
+        "vendorNotes": "Vendor flagged: discontinued",
+        "mfr": "Winbond",
+        "reason": "PRE_EXISTING_DUPLICATE",
+        "detail": "Existing chuboe_vq_line 2311508 matches natural key (rfq_line × MPN × BP × cost × currency) — no new POST.",
+        "vqLineId": 2311508
+      },
+      {
+        "vendorName": "SMARTEL ELECTRONICS (ASIA) CO LTD",
+        "vendorSearchKey": "1006857",
+        "mpn": "W25X20CLSNIG",
+        "qty": 10000,
+        "cost": 0.531,
+        "leadTime": "stock",
+        "dateCode": "25+",
+        "mfr": "Winbond",
+        "reason": "PRE_EXISTING_DUPLICATE",
+        "detail": "Existing chuboe_vq_line 2311509 matches natural key (rfq_line × MPN × BP × cost × currency) — no new POST.",
+        "vqLineId": 2311509
+      },
+      {
+        "vendorName": "ALLWINMETA CO., LIMITED",
+        "vendorSearchKey": "1013387",
+        "mpn": "W25X20CLSNIG",
+        "qty": 10000,
+        "cost": 0.49,
+        "leadTime": "stock",
+        "dateCode": "26+",
+        "packaging": "REEL",
+        "mfr": "Winbond",
+        "reason": "PRE_EXISTING_DUPLICATE",
+        "detail": "Existing chuboe_vq_line 2311510 matches natural key (rfq_line × MPN × BP × cost × currency) — no new POST.",
+        "vqLineId": 2311510
+      }
+    ],
+    "failed": [],
+    "coverage": [
+      {
+        "lineNo": 10,
+        "lineId": 3167620,
+        "rfqQty": 255000,
+        "mpns": [
+          "BKPE002012101R0MA2"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 20,
+        "lineId": 3167621,
+        "rfqQty": 255000,
+        "mpns": [
+          "LQM21PN1R0MGHL"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 30,
+        "lineId": 3167622,
+        "rfqQty": 12000,
+        "mpns": [
+          "PI3PCIE3212ZBEX"
+        ],
+        "vqsThisBatch": 3
+      },
+      {
+        "lineNo": 40,
+        "lineId": 3167623,
+        "rfqQty": 12000,
+        "mpns": [
+          "HD3SS3212IRKSR"
+        ],
+        "vqsThisBatch": 5
+      },
+      {
+        "lineNo": 50,
+        "lineId": 3167624,
+        "rfqQty": 20000,
+        "mpns": [
+          "PDS1040L-13"
+        ],
+        "vqsThisBatch": 2
+      },
+      {
+        "lineNo": 60,
+        "lineId": 3167625,
+        "rfqQty": 207000,
+        "mpns": [
+          "DMN2004K-7"
+        ],
+        "vqsThisBatch": 3
+      },
+      {
+        "lineNo": 70,
+        "lineId": 3167626,
+        "rfqQty": 207000,
+        "mpns": [
+          "ZXMN2B01FTA"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 80,
+        "lineId": 3167627,
+        "rfqQty": 207000,
+        "mpns": [
+          "RUC002N05"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 90,
+        "lineId": 3167628,
+        "rfqQty": 207000,
+        "mpns": [
+          "RUC002N05T116"
+        ],
+        "vqsThisBatch": 10
+      },
+      {
+        "lineNo": 100,
+        "lineId": 3167629,
+        "rfqQty": 28000,
+        "mpns": [
+          "MAX3232IPWR"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 110,
+        "lineId": 3167630,
+        "rfqQty": 40000,
+        "mpns": [
+          "ERA2VRW6801X"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 120,
+        "lineId": 3167631,
+        "rfqQty": 9000,
+        "mpns": [
+          "TPS630242YFFR"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 130,
+        "lineId": 3167632,
+        "rfqQty": 4000,
+        "mpns": [
+          "UCC21732DWR"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 140,
+        "lineId": 3167633,
+        "rfqQty": 12000,
+        "mpns": [
+          "TPS3103K33DBVR"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 150,
+        "lineId": 3167634,
+        "rfqQty": 12000,
+        "mpns": [
+          "TLA2024IRUGR"
+        ],
+        "vqsThisBatch": 9
+      },
+      {
+        "lineNo": 160,
+        "lineId": 3167635,
+        "rfqQty": 40000,
+        "mpns": [
+          "PA2607.231AHLT"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 170,
+        "lineId": 3167636,
+        "rfqQty": 15000,
+        "mpns": [
+          "ADG633YRUZ-REEL7"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 180,
+        "lineId": 3167637,
+        "rfqQty": 15000,
+        "mpns": [
+          "MAX4583CUE+T"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 190,
+        "lineId": 3167638,
+        "rfqQty": 30000,
+        "mpns": [
+          "TPS7A2501DRVR"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 200,
+        "lineId": 3167639,
+        "rfqQty": 90000,
+        "mpns": [
+          "DRV5032FBDBZR"
+        ],
+        "vqsThisBatch": 13
+      },
+      {
+        "lineNo": 210,
+        "lineId": 3167640,
+        "rfqQty": 5000,
+        "mpns": [
+          "LT6015HS5#TRPBF"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 220,
+        "lineId": 3167641,
+        "rfqQty": 21000,
+        "mpns": [
+          "WSHM2818R0400FEA"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 230,
+        "lineId": 3167642,
+        "rfqQty": 5000,
+        "mpns": [
+          "LTC4040EUFDTRPBF"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 240,
+        "lineId": 3167643,
+        "rfqQty": 5000,
+        "mpns": [
+          "LT3090EDD#TRPBF"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 250,
+        "lineId": 3167644,
+        "rfqQty": 5000,
+        "mpns": [
+          "LT3090HDD#TRPBF"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 260,
+        "lineId": 3167645,
+        "rfqQty": 5000,
+        "mpns": [
+          "LT3090IDD#TRPBF"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 270,
+        "lineId": 3167646,
+        "rfqQty": 5000,
+        "mpns": [
+          "LT3090MPDD#TRPBF"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 280,
+        "lineId": 3167647,
+        "rfqQty": 21000,
+        "mpns": [
+          "LM4132BMFX-3.3/NOPB"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 290,
+        "lineId": 3167648,
+        "rfqQty": 21000,
+        "mpns": [
+          "TPS3850H01DRCR"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 300,
+        "lineId": 3167649,
+        "rfqQty": 3000,
+        "mpns": [
+          "MC13892CJVL"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 310,
+        "lineId": 3167650,
+        "rfqQty": 3000,
+        "mpns": [
+          "MC13892CJVLR2"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 320,
+        "lineId": 3167651,
+        "rfqQty": 10000,
+        "mpns": [
+          "LMC6484AIMX/NOPB"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 330,
+        "lineId": 3167652,
+        "rfqQty": 5000,
+        "mpns": [
+          "LT1763CS8#TRPBF"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 340,
+        "lineId": 3167653,
+        "rfqQty": 9000,
+        "mpns": [
+          "LAN9500A-ABZJ-TR"
+        ],
+        "vqsThisBatch": 4
+      },
+      {
+        "lineNo": 350,
+        "lineId": 3167654,
+        "rfqQty": 4000,
+        "mpns": [
+          "LMK03806BISQX/NOPB"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 360,
+        "lineId": 3167655,
+        "rfqQty": 15000,
+        "mpns": [
+          "ADR1581BRTZ-REEL7"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 370,
+        "lineId": 3167656,
+        "rfqQty": 15000,
+        "mpns": [
+          "LM4051AIM3-1.2/NOPB"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 380,
+        "lineId": 3167657,
+        "rfqQty": 15000,
+        "mpns": [
+          "LM4051AIM3X-1.2/NOPB"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 390,
+        "lineId": 3167658,
+        "rfqQty": 60000,
+        "mpns": [
+          "DRV8837CDSGR"
+        ],
+        "vqsThisBatch": 7
+      },
+      {
+        "lineNo": 400,
+        "lineId": 3167659,
+        "rfqQty": 4800,
+        "mpns": [
+          "STM32F103C6T6A"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 410,
+        "lineId": 3167660,
+        "rfqQty": 4800,
+        "mpns": [
+          "STM32F103C6T6ATR"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 420,
+        "lineId": 3167661,
+        "rfqQty": 5000,
+        "mpns": [
+          "MAX16002BTC+T"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 430,
+        "lineId": 3167662,
+        "rfqQty": 1000,
+        "mpns": [
+          "AR0135AT2M00XUEA0-DPBR"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 440,
+        "lineId": 3167663,
+        "rfqQty": 1000,
+        "mpns": [
+          "AR0135AT2M00XUEA0- DPBR1"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 450,
+        "lineId": 3167664,
+        "rfqQty": 12000,
+        "mpns": [
+          "TMP468AIRGTR"
+        ],
+        "vqsThisBatch": 6
+      },
+      {
+        "lineNo": 460,
+        "lineId": 3167665,
+        "rfqQty": 40000,
+        "mpns": [
+          "ICL3243ECVZ-T"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 470,
+        "lineId": 3167666,
+        "rfqQty": 40000,
+        "mpns": [
+          "ST3243ECTR-E"
+        ],
+        "vqsThisBatch": 3
+      },
+      {
+        "lineNo": 480,
+        "lineId": 3167667,
+        "rfqQty": 40000,
+        "mpns": [
+          "MAX3243ECPWR"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 490,
+        "lineId": 3167668,
+        "rfqQty": 2000,
+        "mpns": [
+          "DS100MB203SQE/NOPB"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 500,
+        "lineId": 3167669,
+        "rfqQty": 9000,
+        "mpns": [
+          "CC1125RHBR"
+        ],
+        "vqsThisBatch": 5
+      },
+      {
+        "lineNo": 510,
+        "lineId": 3167670,
+        "rfqQty": 21000,
+        "mpns": [
+          "TPS259474ARPWR"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 520,
+        "lineId": 3167671,
+        "rfqQty": 8000,
+        "mpns": [
+          "PXE1211CPM-G003"
+        ],
+        "vqsThisBatch": 10
+      },
+      {
+        "lineNo": 530,
+        "lineId": 3167672,
+        "rfqQty": 102000,
+        "mpns": [
+          "DRV5023FAQDBZR"
+        ],
+        "vqsThisBatch": 3
+      },
+      {
+        "lineNo": 540,
+        "lineId": 3167673,
+        "rfqQty": 5000,
+        "mpns": [
+          "LTC2875HDDTRPBF"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 550,
+        "lineId": 3167674,
+        "rfqQty": 5000,
+        "mpns": [
+          "LTC2875IDDTRPBF"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 560,
+        "lineId": 3167675,
+        "rfqQty": 5000,
+        "mpns": [
+          "LTC2875MPDDTRPBF"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 570,
+        "lineId": 3167676,
+        "rfqQty": 9000,
+        "mpns": [
+          "LMK3H0102V33RERR"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 580,
+        "lineId": 3167677,
+        "rfqQty": 60000,
+        "mpns": [
+          "TLV9061IDCKR"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 590,
+        "lineId": 3167678,
+        "rfqQty": 9000,
+        "mpns": [
+          "ADG708CRUZ-REEL7"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 600,
+        "lineId": 3167679,
+        "rfqQty": 5000,
+        "mpns": [
+          "LTC4079EDD#TRPBF"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 610,
+        "lineId": 3167680,
+        "rfqQty": 72500,
+        "mpns": [
+          "CSD95565PVBRR"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 620,
+        "lineId": 3167681,
+        "rfqQty": 200000,
+        "mpns": [
+          "PT7C4339WEX"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 630,
+        "lineId": 3167682,
+        "rfqQty": 200000,
+        "mpns": [
+          "1339-31DCGI8"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 640,
+        "lineId": 3167683,
+        "rfqQty": 15000,
+        "mpns": [
+          "TPS53689TRSBR"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 650,
+        "lineId": 3167684,
+        "rfqQty": 100000,
+        "mpns": [
+          "LM57TPWR"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 660,
+        "lineId": 3167685,
+        "rfqQty": 125000,
+        "mpns": [
+          "AT25SF081-SSHF-T"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 670,
+        "lineId": 3167686,
+        "rfqQty": 125000,
+        "mpns": [
+          "MX25R8035FM1IH1"
+        ],
+        "vqsThisBatch": 1
+      },
+      {
+        "lineNo": 680,
+        "lineId": 3167687,
+        "rfqQty": 125000,
+        "mpns": [
+          "MX25R8035FM1IH1TR"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 690,
+        "lineId": 3167688,
+        "rfqQty": 125000,
+        "mpns": [
+          "MX25V8035FM1I-TR"
+        ],
+        "vqsThisBatch": 7
+      },
+      {
+        "lineNo": 700,
+        "lineId": 3167689,
+        "rfqQty": 125000,
+        "mpns": [
+          "MX25V8035FM1ITR"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 710,
+        "lineId": 3167690,
+        "rfqQty": 45000,
+        "mpns": [
+          "MMBTA63-7-F"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 720,
+        "lineId": 3167691,
+        "rfqQty": 45000,
+        "mpns": [
+          "MMBTA64-7-F"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 730,
+        "lineId": 3167692,
+        "rfqQty": 45000,
+        "mpns": [
+          "MMBTA63-TP"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 740,
+        "lineId": 3167693,
+        "rfqQty": 45000,
+        "mpns": [
+          "BCV26,215"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 750,
+        "lineId": 3167694,
+        "rfqQty": 45000,
+        "mpns": [
+          "MMBTA63LT1G"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 760,
+        "lineId": 3167695,
+        "rfqQty": 200,
+        "mpns": [
+          "LT1010CT#PBF"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 770,
+        "lineId": 3167696,
+        "rfqQty": 200,
+        "mpns": [
+          "LT1010CT#TRPBF"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 780,
+        "lineId": 3167697,
+        "rfqQty": 41500,
+        "mpns": [
+          "NTE00100229"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 790,
+        "lineId": 3167698,
+        "rfqQty": 41500,
+        "mpns": [
+          "TLV07IDR"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 800,
+        "lineId": 3167699,
+        "rfqQty": 1500,
+        "mpns": [
+          "LM5164DDAR"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 810,
+        "lineId": 3167700,
+        "rfqQty": 1500,
+        "mpns": [
+          "LM5164DDAT"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 820,
+        "lineId": 3167701,
+        "rfqQty": 17000,
+        "mpns": [
+          "ISO7710DR"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 830,
+        "lineId": 3167702,
+        "rfqQty": 5500,
+        "mpns": [
+          "MAX3232EIPWR"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 840,
+        "lineId": 3167703,
+        "rfqQty": 400000,
+        "mpns": [
+          "EKK-902-005"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 850,
+        "lineId": 3167704,
+        "rfqQty": 400000,
+        "mpns": [
+          "SEN-LT09BM4811C"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 860,
+        "lineId": 3167705,
+        "rfqQty": 400000,
+        "mpns": [
+          "EKK-902-006"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 870,
+        "lineId": 3167706,
+        "rfqQty": 400000,
+        "mpns": [
+          "SEN-LT09BM4811F"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 880,
+        "lineId": 3167707,
+        "rfqQty": 2600,
+        "mpns": [
+          "FXOS8700CQR1",
+          "FXOS8700CQR1"
+        ],
+        "vqsThisBatch": 1
+      },
+      {
+        "lineNo": 890,
+        "lineId": 3167708,
+        "rfqQty": 2600,
+        "mpns": [
+          "CONSIGNED-NTE00100006"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 900,
+        "lineId": 3167709,
+        "rfqQty": 2600,
+        "mpns": [
+          "NTE00100006"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 910,
+        "lineId": 3167710,
+        "rfqQty": 3400000,
+        "mpns": [
+          "SMM02040C9102FB000"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 920,
+        "lineId": 3167711,
+        "rfqQty": 3400000,
+        "mpns": [
+          "SMM02040C9102FB300"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 930,
+        "lineId": 3167712,
+        "rfqQty": 2400000,
+        "mpns": [
+          "SMM02040C1204FB300"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 940,
+        "lineId": 3167713,
+        "rfqQty": 2400000,
+        "mpns": [
+          "MMA02040C1204FB000"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 950,
+        "lineId": 3167714,
+        "rfqQty": 2400000,
+        "mpns": [
+          "SMM02040C1204FB000"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 960,
+        "lineId": 3167715,
+        "rfqQty": 2400000,
+        "mpns": [
+          "MMA02040C1204FB300"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 970,
+        "lineId": 3167716,
+        "rfqQty": 3000,
+        "mpns": [
+          "C324C102J1G5TA"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 980,
+        "lineId": 3167717,
+        "rfqQty": 3000,
+        "mpns": [
+          "C324C102J1G5TA 7334"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 990,
+        "lineId": 3167718,
+        "rfqQty": 10000,
+        "mpns": [
+          "RT0402BRE076K8L"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 1000,
+        "lineId": 3167719,
+        "rfqQty": 10000,
+        "mpns": [
+          "RT0402BRE071K65L"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 1010,
+        "lineId": 3167720,
+        "rfqQty": 10000,
+        "mpns": [
+          "RT0402BRE0721K5L"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 1020,
+        "lineId": 3167721,
+        "rfqQty": 10000,
+        "mpns": [
+          "RT0402BRE0732K4L"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 1030,
+        "lineId": 3167722,
+        "rfqQty": 0,
+        "mpns": [
+          "LCMXO3D-9400HC-5BG256C"
+        ],
+        "vqsThisBatch": 1
+      },
+      {
+        "lineNo": 1040,
+        "lineId": 3167723,
+        "rfqQty": 0,
+        "mpns": [
+          "LCMXO3LF-4300C-5BG256C"
+        ],
+        "vqsThisBatch": 3
+      },
+      {
+        "lineNo": 1050,
+        "lineId": 3167724,
+        "rfqQty": 0,
+        "mpns": [
+          "LCMXO3LF-9400C-5BG400C"
+        ],
+        "vqsThisBatch": 1
+      },
+      {
+        "lineNo": 1060,
+        "lineId": 3167725,
+        "rfqQty": 10000,
+        "mpns": [
+          "MX25V2006EM1I-13G"
+        ],
+        "vqsThisBatch": 2
+      },
+      {
+        "lineNo": 1070,
+        "lineId": 3167726,
+        "rfqQty": 10000,
+        "mpns": [
+          "W25X20CLSNIG"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 1080,
+        "lineId": 3167727,
+        "rfqQty": 10000,
+        "mpns": [
+          "W25X20CLSNIG-T"
+        ],
+        "vqsThisBatch": 0
+      }
+    ],
+    "gaps": [
+      10,
+      20,
+      70,
+      80,
+      100,
+      110,
+      120,
+      130,
+      140,
+      160,
+      170,
+      180,
+      190,
+      210,
+      220,
+      230,
+      240,
+      250,
+      260,
+      270,
+      280,
+      290,
+      300,
+      310,
+      320,
+      330,
+      350,
+      360,
+      370,
+      380,
+      400,
+      410,
+      420,
+      430,
+      440,
+      460,
+      480,
+      490,
+      510,
+      540,
+      550,
+      560,
+      570,
+      580,
+      590,
+      600,
+      610,
+      620,
+      630,
+      640,
+      650,
+      660,
+      680,
+      700,
+      710,
+      720,
+      730,
+      740,
+      750,
+      760,
+      770,
+      780,
+      790,
+      800,
+      810,
+      820,
+      830,
+      840,
+      850,
+      860,
+      870,
+      890,
+      900,
+      910,
+      920,
+      930,
+      940,
+      950,
+      960,
+      970,
+      980,
+      990,
+      1000,
+      1010,
+      1020,
+      1070,
+      1080
+    ]
+  }
+}

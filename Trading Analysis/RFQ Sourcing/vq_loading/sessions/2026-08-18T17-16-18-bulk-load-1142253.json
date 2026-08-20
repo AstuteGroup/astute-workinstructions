@@ -1,0 +1,36 @@
+{
+  "rfqSearchKey": "1142253",
+  "buyerId": 1017258,
+  "runAt": "2026-08-18T17:16:18.611Z",
+  "sourceQuotes": "/tmp/vq-13140.json",
+  "result": {
+    "written": [
+      {
+        "vqLineId": 2317304,
+        "line": 10,
+        "mpn": "L3GD20HTR",
+        "vendor": "SIE Connect, Inc",
+        "cost": 4.5,
+        "qty": 43,
+        "fuzzyMatch": false,
+        "originalVendorLabel": "SIE Connect, Inc",
+        "bpId": 1001090,
+        "noBid": false
+      }
+    ],
+    "skipped": [],
+    "failed": [],
+    "coverage": [
+      {
+        "lineNo": 10,
+        "lineId": 3169271,
+        "rfqQty": 6300,
+        "mpns": [
+          "L3GD20HTR"
+        ],
+        "vqsThisBatch": 1
+      }
+    ],
+    "gaps": []
+  }
+}

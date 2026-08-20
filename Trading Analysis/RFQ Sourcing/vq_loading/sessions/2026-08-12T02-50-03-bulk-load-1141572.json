@@ -1,0 +1,485 @@
+{
+  "rfqSearchKey": "1141572",
+  "buyerId": 1011159,
+  "runAt": "2026-08-12T02:50:03.580Z",
+  "sourceQuotes": "/tmp/vq_load_1141572_chunk4.json",
+  "result": {
+    "written": [
+      {
+        "vqLineId": 2308241,
+        "line": 170,
+        "mpn": "TPS2400DBVR",
+        "vendor": "Fixchips Global Limited",
+        "cost": 1.54,
+        "qty": 2244,
+        "fuzzyMatch": false,
+        "originalVendorLabel": "Fixchips",
+        "bpId": 1000387,
+        "noBid": false
+      },
+      {
+        "vqLineId": 2308245,
+        "line": 170,
+        "mpn": "TPS2400DBVR",
+        "vendor": "Fixchips Global Limited",
+        "cost": 2.32,
+        "qty": 3000,
+        "fuzzyMatch": false,
+        "originalVendorLabel": "Fixchips",
+        "bpId": 1000387,
+        "noBid": false
+      },
+      {
+        "vqLineId": 2308249,
+        "line": 170,
+        "mpn": "TPS2400DBVR",
+        "vendor": "Keming Electronics Development Co., Ltd",
+        "cost": 2.3,
+        "qty": 3000,
+        "fuzzyMatch": false,
+        "originalVendorLabel": "Keming",
+        "bpId": 1000313,
+        "noBid": false
+      },
+      {
+        "vqLineId": 2308253,
+        "line": 170,
+        "mpn": "TPS2400DBVR",
+        "vendor": "Shenzhen Gennyue Electronic Technology Co., Ltd",
+        "cost": 2.42,
+        "qty": 3000,
+        "fuzzyMatch": false,
+        "originalVendorLabel": "Gennyue",
+        "bpId": 1011225,
+        "noBid": false
+      },
+      {
+        "vqLineId": 2308254,
+        "line": 170,
+        "mpn": "TPS2400DBVR",
+        "vendor": "Guiyu Electronics Group (HK) Ltd",
+        "cost": 2.33,
+        "qty": 3000,
+        "fuzzyMatch": false,
+        "originalVendorLabel": "GUIYU",
+        "bpId": 1001865,
+        "noBid": false
+      },
+      {
+        "vqLineId": 2308257,
+        "line": 170,
+        "mpn": "TPS2400DBVR",
+        "vendor": "HK Firsttop Technology Ltd",
+        "cost": 1.63,
+        "qty": 2244,
+        "fuzzyMatch": false,
+        "originalVendorLabel": "Firsttop",
+        "bpId": 1003256,
+        "noBid": false
+      },
+      {
+        "vqLineId": 2308258,
+        "line": 170,
+        "mpn": "TPS2400DBVR",
+        "vendor": "HK Firsttop Technology Ltd",
+        "cost": 2.38,
+        "qty": 3000,
+        "fuzzyMatch": false,
+        "originalVendorLabel": "Firsttop",
+        "bpId": 1003256,
+        "noBid": false
+      },
+      {
+        "vqLineId": 2308261,
+        "line": 170,
+        "mpn": "TPS2400DBVR",
+        "vendor": "Xinshop Electronics Co., Ltd ",
+        "cost": 1.53,
+        "qty": 2244,
+        "fuzzyMatch": false,
+        "originalVendorLabel": "XINSHOP",
+        "bpId": 1002647,
+        "noBid": false
+      },
+      {
+        "vqLineId": 2308262,
+        "line": 170,
+        "mpn": "TPS2400DBVR",
+        "vendor": "Xinshop Electronics Co., Ltd ",
+        "cost": 2.29,
+        "qty": 3000,
+        "fuzzyMatch": false,
+        "originalVendorLabel": "XINSHOP",
+        "bpId": 1002647,
+        "noBid": false
+      },
+      {
+        "vqLineId": 2308267,
+        "line": 170,
+        "mpn": "TPS2400DBVR",
+        "vendor": "3A Components Limited",
+        "cost": 2.2,
+        "qty": 3000,
+        "fuzzyMatch": false,
+        "originalVendorLabel": "3A",
+        "bpId": 1000605,
+        "noBid": false
+      },
+      {
+        "vqLineId": 2308272,
+        "line": 210,
+        "mpn": "STM32L151CBU6A",
+        "vendor": "Valley Electronics(HK) Limited",
+        "cost": 2.76,
+        "qty": 1000,
+        "fuzzyMatch": false,
+        "originalVendorLabel": "Valley",
+        "bpId": 1009499,
+        "noBid": false
+      },
+      {
+        "vqLineId": 2308277,
+        "line": 210,
+        "mpn": "STM32L151CBU6A",
+        "vendor": "PGC-IC Ltd",
+        "cost": 3.02,
+        "qty": 1000,
+        "fuzzyMatch": false,
+        "originalVendorLabel": "PGC",
+        "bpId": 1001639,
+        "noBid": false
+      },
+      {
+        "vqLineId": 2308282,
+        "line": 210,
+        "mpn": "STM32L151CBU6A",
+        "vendor": "Keming Electronics Development Co., Ltd",
+        "cost": 2.758,
+        "qty": 1000,
+        "fuzzyMatch": false,
+        "originalVendorLabel": "Keming",
+        "bpId": 1000313,
+        "noBid": false
+      },
+      {
+        "vqLineId": 2308283,
+        "line": 210,
+        "mpn": "STM32L151CBU6A",
+        "vendor": "HK Firsttop Technology Ltd",
+        "cost": 3.649,
+        "qty": 1000,
+        "fuzzyMatch": false,
+        "originalVendorLabel": "Firsttop",
+        "bpId": 1003256,
+        "noBid": false
+      },
+      {
+        "vqLineId": 2308287,
+        "line": 210,
+        "mpn": "STM32L151CBU6A",
+        "vendor": "Xinshop Electronics Co., Ltd ",
+        "cost": 2.747,
+        "qty": 1000,
+        "fuzzyMatch": false,
+        "originalVendorLabel": "XINSHOP",
+        "bpId": 1002647,
+        "noBid": false
+      },
+      {
+        "vqLineId": 2308288,
+        "line": 210,
+        "mpn": "STM32L151CBU6A",
+        "vendor": "Unix Electronics Technology Co., Ltd",
+        "cost": 2.79,
+        "qty": 1000,
+        "fuzzyMatch": false,
+        "originalVendorLabel": "Unix",
+        "bpId": 1001669,
+        "noBid": false
+      },
+      {
+        "vqLineId": 2308291,
+        "line": 210,
+        "mpn": "STM32L151CBU6A",
+        "vendor": "Fixchips Global Limited",
+        "cost": 2.81,
+        "qty": 1000,
+        "fuzzyMatch": false,
+        "originalVendorLabel": "Fixchips",
+        "bpId": 1000387,
+        "noBid": false
+      },
+      {
+        "vqLineId": 2308293,
+        "line": 210,
+        "mpn": "STM32L151CBU6A",
+        "vendor": "3A Components Limited",
+        "cost": 2.65,
+        "qty": 1000,
+        "fuzzyMatch": false,
+        "originalVendorLabel": "3A",
+        "bpId": 1000605,
+        "noBid": false
+      }
+    ],
+    "skipped": [
+      {
+        "vendorName": "Dragon",
+        "mpn": "TPS2400DBVR",
+        "vendorQuotedMpn": null,
+        "mfr": "TI",
+        "qty": 2244,
+        "cost": 1.37,
+        "leadTime": null,
+        "dateCode": "23+",
+        "coo": null,
+        "packaging": null,
+        "rohs": null,
+        "vendorNotes": null,
+        "reason": "PRE_EXISTING_DUPLICATE",
+        "detail": "Existing chuboe_vq_line 2308202 matches natural key (rfq_line × MPN × BP × cost × currency) — no new POST.",
+        "vqLineId": 2308202
+      },
+      {
+        "vendorName": "Dragon",
+        "mpn": "TPS2400DBVR",
+        "vendorQuotedMpn": null,
+        "mfr": "TI",
+        "qty": 3000,
+        "cost": 2.28,
+        "leadTime": null,
+        "dateCode": "23+",
+        "coo": null,
+        "packaging": null,
+        "rohs": null,
+        "vendorNotes": null,
+        "reason": "PRE_EXISTING_DUPLICATE",
+        "detail": "Existing chuboe_vq_line 2308207 matches natural key (rfq_line × MPN × BP × cost × currency) — no new POST.",
+        "vqLineId": 2308207
+      }
+    ],
+    "failed": [],
+    "coverage": [
+      {
+        "lineNo": 10,
+        "lineId": 3166564,
+        "rfqQty": 979,
+        "mpns": [
+          "766145191AP"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 20,
+        "lineId": 3166566,
+        "rfqQty": 200,
+        "mpns": [
+          "XC9572XL-7VQG64I"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 30,
+        "lineId": 3166565,
+        "rfqQty": 200,
+        "mpns": [
+          "XC9572XL-15VQ64Q"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 40,
+        "lineId": 3166567,
+        "rfqQty": 200,
+        "mpns": [
+          "XA9536XL-15VQG44Q"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 50,
+        "lineId": 3166568,
+        "rfqQty": 1000,
+        "mpns": [
+          "ADXL362BCCZ-RL7"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 60,
+        "lineId": 3166572,
+        "rfqQty": 15000,
+        "mpns": [
+          "BGA125N6E6327XTSA1"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 70,
+        "lineId": 3166571,
+        "rfqQty": 105,
+        "mpns": [
+          "ADA4896-2ACPZ-R7"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 80,
+        "lineId": 3166569,
+        "rfqQty": 21000,
+        "mpns": [
+          "STM32U083CCT6"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 90,
+        "lineId": 3166570,
+        "rfqQty": 21000,
+        "mpns": [
+          "STM32U083CCT3"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 100,
+        "lineId": 3166573,
+        "rfqQty": 21000,
+        "mpns": [
+          "STM32U083CCT6TR"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 110,
+        "lineId": 3166574,
+        "rfqQty": 21000,
+        "mpns": [
+          "STM32U083CCT3TR"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 120,
+        "lineId": 3166575,
+        "rfqQty": 36000,
+        "mpns": [
+          "STM32L476VGT6"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 130,
+        "lineId": 3166576,
+        "rfqQty": 2500,
+        "mpns": [
+          "MC34063ABD"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 140,
+        "lineId": 3166577,
+        "rfqQty": 2000,
+        "mpns": [
+          "ABM3B-8.000MHZ-10-1-U-T 5032"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 150,
+        "lineId": 3166578,
+        "rfqQty": 500,
+        "mpns": [
+          "522.719"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 160,
+        "lineId": 3166579,
+        "rfqQty": 5000,
+        "mpns": [
+          "STM32H573MIY3QTR"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 170,
+        "lineId": 3166580,
+        "rfqQty": 200000,
+        "mpns": [
+          "TPS2400DBVR"
+        ],
+        "vqsThisBatch": 10
+      },
+      {
+        "lineNo": 180,
+        "lineId": 3166581,
+        "rfqQty": 200000,
+        "mpns": [
+          "TPS2400DBVT"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 190,
+        "lineId": 3166582,
+        "rfqQty": 500,
+        "mpns": [
+          "PC95ER18/5/12-Z"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 200,
+        "lineId": 3166583,
+        "rfqQty": 500,
+        "mpns": [
+          "SG-210STF 29.4912ML3"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 210,
+        "lineId": 3166584,
+        "rfqQty": 1000,
+        "mpns": [
+          "STM32L151CBU6A"
+        ],
+        "vqsThisBatch": 8
+      },
+      {
+        "lineNo": 220,
+        "lineId": 3166585,
+        "rfqQty": 3600,
+        "mpns": [
+          "SN74AXC8T245RHLR"
+        ],
+        "vqsThisBatch": 0
+      }
+    ],
+    "gaps": [
+      10,
+      20,
+      30,
+      40,
+      50,
+      60,
+      70,
+      80,
+      90,
+      100,
+      110,
+      120,
+      130,
+      140,
+      150,
+      160,
+      180,
+      190,
+      200,
+      220
+    ]
+  }
+}

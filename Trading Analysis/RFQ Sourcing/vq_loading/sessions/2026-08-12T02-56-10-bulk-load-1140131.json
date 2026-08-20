@@ -1,0 +1,154 @@
+{
+  "rfqSearchKey": "1140131",
+  "buyerId": 1011159,
+  "runAt": "2026-08-12T02:56:10.473Z",
+  "sourceQuotes": "/tmp/vq_load_1140131.json",
+  "result": {
+    "written": [
+      {
+        "vqLineId": 2308669,
+        "line": 10,
+        "mpn": "EPM240T100I5N",
+        "vendor": "Haoxin Hk Electronic Technology Co., Limited",
+        "cost": 5.35,
+        "qty": 2160,
+        "fuzzyMatch": false,
+        "originalVendorLabel": "Haoxin",
+        "bpId": 1004036,
+        "noBid": false
+      },
+      {
+        "vqLineId": 2308670,
+        "line": 10,
+        "mpn": "EPM240T100I5N",
+        "vendor": "Ample Solutions Co., Ltd",
+        "cost": 5.4,
+        "qty": 2160,
+        "fuzzyMatch": false,
+        "originalVendorLabel": "Ample",
+        "bpId": 1004980,
+        "noBid": false
+      },
+      {
+        "vqLineId": 2308671,
+        "line": 10,
+        "mpn": "EPM240T100I5N",
+        "vendor": "Ample Solutions Co., Ltd",
+        "cost": 5.9,
+        "qty": 5000,
+        "fuzzyMatch": false,
+        "originalVendorLabel": "Ample",
+        "bpId": 1004980,
+        "noBid": false
+      },
+      {
+        "vqLineId": 2308672,
+        "line": 10,
+        "mpn": "EPM240T100I5N",
+        "vendor": "Valley Electronics(HK) Limited",
+        "cost": 5.85,
+        "qty": 4320,
+        "fuzzyMatch": false,
+        "originalVendorLabel": "Valley",
+        "bpId": 1009499,
+        "noBid": false
+      },
+      {
+        "vqLineId": 2308673,
+        "line": 10,
+        "mpn": "EPM240T100I5N",
+        "vendor": "Valley Electronics(HK) Limited",
+        "cost": 6.45,
+        "qty": 3265,
+        "fuzzyMatch": false,
+        "originalVendorLabel": "Valley",
+        "bpId": 1009499,
+        "noBid": false
+      },
+      {
+        "vqLineId": 2308674,
+        "line": 10,
+        "mpn": "EPM240T100I5N",
+        "vendor": "Keming Electronics Development Co., Ltd",
+        "cost": 5.82,
+        "qty": 5000,
+        "fuzzyMatch": false,
+        "originalVendorLabel": "Keming",
+        "bpId": 1000313,
+        "noBid": false
+      },
+      {
+        "vqLineId": 2308675,
+        "line": 10,
+        "mpn": "EPM240T100I5N",
+        "vendor": "PGC-IC Ltd",
+        "cost": 5.94,
+        "qty": 5000,
+        "fuzzyMatch": false,
+        "originalVendorLabel": "PGC",
+        "bpId": 1001639,
+        "noBid": false
+      },
+      {
+        "vqLineId": 2308676,
+        "line": 10,
+        "mpn": "EPM240T100I5N",
+        "vendor": "PGC-IC Ltd",
+        "cost": 5.74,
+        "qty": 2450,
+        "fuzzyMatch": false,
+        "originalVendorLabel": "PGC",
+        "bpId": 1001639,
+        "noBid": false
+      }
+    ],
+    "skipped": [
+      {
+        "vendorName": "Wetech",
+        "mpn": "EPM240T100I5N",
+        "vendorQuotedMpn": null,
+        "mfr": "Altera",
+        "qty": 5000,
+        "cost": 5.53,
+        "leadTime": null,
+        "dateCode": "25+",
+        "coo": null,
+        "packaging": null,
+        "rohs": null,
+        "vendorNotes": null,
+        "reason": "PRE_EXISTING_DUPLICATE",
+        "detail": "Existing chuboe_vq_line 2236456 matches natural key (rfq_line × MPN × BP × cost × currency) — no new POST.",
+        "vqLineId": 2236456
+      },
+      {
+        "vendorName": "Southchips",
+        "mpn": "EPM240T100I5N",
+        "vendorQuotedMpn": null,
+        "mfr": "ALTERA",
+        "qty": 5000,
+        "cost": 6.08,
+        "leadTime": null,
+        "dateCode": "26+",
+        "coo": null,
+        "packaging": null,
+        "rohs": null,
+        "vendorNotes": null,
+        "reason": "VENDOR_NOT_FOUND",
+        "detail": "Southchips not in BP table"
+      }
+    ],
+    "failed": [],
+    "coverage": [
+      {
+        "lineNo": 10,
+        "lineId": 3153484,
+        "rfqQty": 5000,
+        "mpns": [
+          " EPM240T100I5N"
+        ],
+        "vqsThisBatch": 8
+      }
+    ],
+    "gaps": []
+  }
+}

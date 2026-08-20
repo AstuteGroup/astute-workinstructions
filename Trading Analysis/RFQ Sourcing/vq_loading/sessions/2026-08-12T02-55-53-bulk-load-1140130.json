@@ -1,0 +1,379 @@
+{
+  "rfqSearchKey": "1140130",
+  "buyerId": 1011159,
+  "runAt": "2026-08-12T02:55:53.920Z",
+  "sourceQuotes": "/tmp/vq_load_1140130.json",
+  "result": {
+    "written": [
+      {
+        "vqLineId": 2308629,
+        "line": 30,
+        "mpn": "TPS54620RGYR",
+        "vendor": "Valley Electronics(HK) Limited",
+        "cost": 0.66,
+        "qty": 3000,
+        "fuzzyMatch": false,
+        "originalVendorLabel": "Valley",
+        "bpId": 1009499,
+        "noBid": false
+      },
+      {
+        "vqLineId": 2308631,
+        "line": 30,
+        "mpn": "TPS54620RGYR",
+        "vendor": "Keming Electronics Development Co., Ltd",
+        "cost": 0.64,
+        "qty": 3000,
+        "fuzzyMatch": false,
+        "originalVendorLabel": "Keming",
+        "bpId": 1000313,
+        "noBid": false
+      },
+      {
+        "vqLineId": 2308633,
+        "line": 30,
+        "mpn": "TPS54620RGYR",
+        "vendor": "Fixchips Global Limited",
+        "cost": 0.66,
+        "qty": 3000,
+        "fuzzyMatch": false,
+        "originalVendorLabel": "Fixchips",
+        "bpId": 1000387,
+        "noBid": false
+      },
+      {
+        "vqLineId": 2308634,
+        "line": 30,
+        "mpn": "TPS54620RGYR",
+        "vendor": "PGC-IC Ltd",
+        "cost": 0.66,
+        "qty": 3000,
+        "fuzzyMatch": false,
+        "originalVendorLabel": "PGC",
+        "bpId": 1001639,
+        "noBid": false
+      },
+      {
+        "vqLineId": 2308636,
+        "line": 30,
+        "mpn": "TPS54620RGYR",
+        "vendor": "HK Firsttop Technology Ltd",
+        "cost": 0.666,
+        "qty": 3000,
+        "fuzzyMatch": false,
+        "originalVendorLabel": "Firsttop",
+        "bpId": 1003256,
+        "noBid": false
+      },
+      {
+        "vqLineId": 2308638,
+        "line": 30,
+        "mpn": "TPS54620RGYR",
+        "vendor": "HK Firsttop Technology Ltd",
+        "cost": 0.682,
+        "qty": 3000,
+        "fuzzyMatch": false,
+        "originalVendorLabel": "Firsttop",
+        "bpId": 1003256,
+        "noBid": false
+      },
+      {
+        "vqLineId": 2308641,
+        "line": 30,
+        "mpn": "TPS54620RGYR",
+        "vendor": "Xinshop Electronics Co., Ltd ",
+        "cost": 0.641,
+        "qty": 3000,
+        "fuzzyMatch": false,
+        "originalVendorLabel": "XINSHOP",
+        "bpId": 1002647,
+        "noBid": false
+      },
+      {
+        "vqLineId": 2308644,
+        "line": 30,
+        "mpn": "TPS54620RGYR",
+        "vendor": "Unix Electronics Technology Co., Ltd",
+        "cost": 0.67,
+        "qty": 3000,
+        "fuzzyMatch": false,
+        "originalVendorLabel": "Unix",
+        "bpId": 1001669,
+        "noBid": false
+      },
+      {
+        "vqLineId": 2308647,
+        "line": 30,
+        "mpn": "TPS54620RGYR",
+        "vendor": "3A Components Limited",
+        "cost": 0.61,
+        "qty": 3000,
+        "fuzzyMatch": false,
+        "originalVendorLabel": "3A",
+        "bpId": 1000605,
+        "noBid": false
+      },
+      {
+        "vqLineId": 2308649,
+        "line": 30,
+        "mpn": "TPS54620RGYR",
+        "vendor": "Guiyu Electronics Group (HK) Ltd",
+        "cost": 0.74,
+        "qty": 3000,
+        "fuzzyMatch": false,
+        "originalVendorLabel": "GUIYU",
+        "bpId": 1001865,
+        "noBid": false
+      },
+      {
+        "vqLineId": 2308652,
+        "line": 30,
+        "mpn": "TPS54620RGYR",
+        "vendor": "Action (HK) Technology Ltd",
+        "cost": 0.68,
+        "qty": 3000,
+        "fuzzyMatch": false,
+        "originalVendorLabel": "ACTION",
+        "bpId": 1001460,
+        "noBid": false
+      },
+      {
+        "vqLineId": 2308653,
+        "line": 30,
+        "mpn": "TPS54620RGYR",
+        "vendor": "SMARTEL ELECTRONICS (ASIA) CO LTD",
+        "cost": 0.67,
+        "qty": 3000,
+        "fuzzyMatch": false,
+        "originalVendorLabel": "Smartel",
+        "bpId": 1004861,
+        "noBid": false
+      },
+      {
+        "vqLineId": 2308655,
+        "line": 40,
+        "mpn": "DAC7558IRHBR",
+        "vendor": "Unix Electronics Technology Co., Ltd",
+        "cost": 7.74,
+        "qty": 3000,
+        "fuzzyMatch": false,
+        "originalVendorLabel": "Unix",
+        "bpId": 1001669,
+        "noBid": false
+      },
+      {
+        "vqLineId": 2308656,
+        "line": 40,
+        "mpn": "DAC7558IRHBR",
+        "vendor": "Fixchips Global Limited",
+        "cost": 6.95,
+        "qty": 6000,
+        "fuzzyMatch": false,
+        "originalVendorLabel": "Fixchips",
+        "bpId": 1000387,
+        "noBid": false
+      },
+      {
+        "vqLineId": 2308658,
+        "line": 40,
+        "mpn": "DAC7558IRHBR",
+        "vendor": "3A Components Limited",
+        "cost": 8.8,
+        "qty": 3000,
+        "fuzzyMatch": false,
+        "originalVendorLabel": "3A",
+        "bpId": 1000605,
+        "noBid": false
+      },
+      {
+        "vqLineId": 2308661,
+        "line": 40,
+        "mpn": "DAC7558IRHBR",
+        "vendor": "SMARTEL ELECTRONICS (ASIA) CO LTD",
+        "cost": 6.99,
+        "qty": 6000,
+        "fuzzyMatch": false,
+        "originalVendorLabel": "Smartel",
+        "bpId": 1004861,
+        "noBid": false
+      },
+      {
+        "vqLineId": 2308663,
+        "line": 60,
+        "mpn": "TLV320AIC20KIPFBR",
+        "vendor": "Keming Electronics Development Co., Ltd",
+        "cost": 4.3,
+        "qty": 1513,
+        "fuzzyMatch": false,
+        "originalVendorLabel": "Keming",
+        "bpId": 1000313,
+        "noBid": false
+      },
+      {
+        "vqLineId": 2308664,
+        "line": 60,
+        "mpn": "TLV320AIC20KIPFBR",
+        "vendor": "3A Components Limited",
+        "cost": 3.8,
+        "qty": 1513,
+        "fuzzyMatch": false,
+        "originalVendorLabel": "3A",
+        "bpId": 1000605,
+        "noBid": false
+      },
+      {
+        "vqLineId": 2308665,
+        "line": 60,
+        "mpn": "TLV320AIC20KIPFBR",
+        "vendor": "SMARTEL ELECTRONICS (ASIA) CO LTD",
+        "cost": 3.95,
+        "qty": 1513,
+        "fuzzyMatch": false,
+        "originalVendorLabel": "Smartel",
+        "bpId": 1004861,
+        "noBid": false
+      },
+      {
+        "vqLineId": 2308666,
+        "line": 60,
+        "mpn": "TLV320AIC20KIPFBR",
+        "vendor": "SMARTEL ELECTRONICS (ASIA) CO LTD",
+        "cost": 3.85,
+        "qty": 850,
+        "fuzzyMatch": false,
+        "originalVendorLabel": "Smartel",
+        "bpId": 1004861,
+        "noBid": false
+      },
+      {
+        "vqLineId": 2308667,
+        "line": 80,
+        "mpn": "AQW210SZ",
+        "vendor": "Cybertech Electronics HK Co.,LTD",
+        "cost": 1.676,
+        "qty": 10000,
+        "fuzzyMatch": false,
+        "originalVendorLabel": "Cybertech",
+        "bpId": 1010634,
+        "noBid": false
+      },
+      {
+        "vqLineId": 2308668,
+        "line": 100,
+        "mpn": "MT62F2G32D4DS-023 IT:C TR",
+        "vendor": "Unix Electronics Technology Co., Ltd",
+        "cost": 2380,
+        "qty": 97,
+        "fuzzyMatch": false,
+        "originalVendorLabel": "Unix",
+        "bpId": 1001669,
+        "noBid": false
+      }
+    ],
+    "skipped": [],
+    "failed": [],
+    "coverage": [
+      {
+        "lineNo": 10,
+        "lineId": 3153474,
+        "rfqQty": 97,
+        "mpns": [
+          "SFEM256GB2ED1TB-I-VG-111-STD"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 20,
+        "lineId": 3153475,
+        "rfqQty": 4400,
+        "mpns": [
+          "IHLP6767GZEK820M11",
+          "IHLP6767GZER820M11"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 30,
+        "lineId": 3153476,
+        "rfqQty": 3000,
+        "mpns": [
+          "TPS54620RGYR",
+          "TPS54620RGYT"
+        ],
+        "vqsThisBatch": 12
+      },
+      {
+        "lineNo": 40,
+        "lineId": 3153477,
+        "rfqQty": 6000,
+        "mpns": [
+          "DAC7558IRHBR"
+        ],
+        "vqsThisBatch": 4
+      },
+      {
+        "lineNo": 50,
+        "lineId": 3153478,
+        "rfqQty": 5000,
+        "mpns": [
+          "SN412008DRE4"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 60,
+        "lineId": 3153479,
+        "rfqQty": 2750,
+        "mpns": [
+          "TLV320AIC20KIPFBR",
+          "TLV320AIC20KIPFBR"
+        ],
+        "vqsThisBatch": 4
+      },
+      {
+        "lineNo": 70,
+        "lineId": 3153480,
+        "rfqQty": 1237.5,
+        "mpns": [
+          "TMS320C6748BZWTA3",
+          "TMS320C6748ZWTA3"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 80,
+        "lineId": 3153481,
+        "rfqQty": 10250,
+        "mpns": [
+          "AQW210SZ"
+        ],
+        "vqsThisBatch": 1
+      },
+      {
+        "lineNo": 90,
+        "lineId": 3153482,
+        "rfqQty": 62.5,
+        "mpns": [
+          "ARD20012"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 100,
+        "lineId": 3153483,
+        "rfqQty": 97,
+        "mpns": [
+          "MT62F2G32D4DS-023 IT:C TR"
+        ],
+        "vqsThisBatch": 1
+      }
+    ],
+    "gaps": [
+      10,
+      20,
+      50,
+      70,
+      90
+    ]
+  }
+}

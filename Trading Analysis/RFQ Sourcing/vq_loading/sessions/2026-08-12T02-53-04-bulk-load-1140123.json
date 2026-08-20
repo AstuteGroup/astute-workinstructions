@@ -1,0 +1,126 @@
+{
+  "rfqSearchKey": "1140123",
+  "buyerId": 1011159,
+  "runAt": "2026-08-12T02:53:04.979Z",
+  "sourceQuotes": "/tmp/vq_load_1140123.json",
+  "result": {
+    "written": [
+      {
+        "vqLineId": 2308511,
+        "line": 10,
+        "mpn": "BAS40TW-7-F",
+        "vendor": "Hi-Hone Enterprises Ltd",
+        "cost": 0.37,
+        "qty": 6000,
+        "fuzzyMatch": false,
+        "originalVendorLabel": "Hi-hone",
+        "bpId": 1000223,
+        "noBid": false
+      },
+      {
+        "vqLineId": 2308512,
+        "line": 10,
+        "mpn": "BAS40TW-7-F",
+        "vendor": "Fixchips Global Limited",
+        "cost": 0.47,
+        "qty": 3000,
+        "fuzzyMatch": false,
+        "originalVendorLabel": "Fixchips",
+        "bpId": 1000387,
+        "noBid": false
+      },
+      {
+        "vqLineId": 2308513,
+        "line": 10,
+        "mpn": "BAS40TW-7-F",
+        "vendor": "PGC-IC Ltd",
+        "cost": 0.39,
+        "qty": 6000,
+        "fuzzyMatch": false,
+        "originalVendorLabel": "PGC",
+        "bpId": 1001639,
+        "noBid": false
+      },
+      {
+        "vqLineId": 2308514,
+        "line": 10,
+        "mpn": "BAS40TW-7-F",
+        "vendor": "PGC-IC Ltd",
+        "cost": 0.46,
+        "qty": 3000,
+        "fuzzyMatch": false,
+        "originalVendorLabel": "PGC",
+        "bpId": 1001639,
+        "noBid": false
+      },
+      {
+        "vqLineId": 2308515,
+        "line": 10,
+        "mpn": "BAS40TW-7-F",
+        "vendor": "Keming Electronics Development Co., Ltd",
+        "cost": 0.46,
+        "qty": 3000,
+        "fuzzyMatch": false,
+        "originalVendorLabel": "Keming",
+        "bpId": 1000313,
+        "noBid": false
+      },
+      {
+        "vqLineId": 2308516,
+        "line": 10,
+        "mpn": "BAS40TW-7-F",
+        "vendor": "HK Firsttop Technology Ltd",
+        "cost": 0.33,
+        "qty": 9000,
+        "fuzzyMatch": false,
+        "originalVendorLabel": "Firsttop",
+        "bpId": 1003256,
+        "noBid": false
+      },
+      {
+        "vqLineId": 2308517,
+        "line": 10,
+        "mpn": "BAS40TW-7-F",
+        "vendor": "3A Components Limited",
+        "cost": 0.43,
+        "qty": 3000,
+        "fuzzyMatch": false,
+        "originalVendorLabel": "3A",
+        "bpId": 1000605,
+        "noBid": false
+      }
+    ],
+    "skipped": [
+      {
+        "vendorName": "Smartel",
+        "mpn": "BAS40TW-7-F",
+        "vendorQuotedMpn": null,
+        "mfr": "DIODES",
+        "qty": 9000,
+        "cost": 0.48,
+        "leadTime": "stock",
+        "dateCode": "25+",
+        "coo": null,
+        "packaging": null,
+        "rohs": null,
+        "vendorNotes": null,
+        "reason": "PRE_EXISTING_DUPLICATE",
+        "detail": "Existing chuboe_vq_line 2263512 matches natural key (rfq_line × MPN × BP × cost × currency) — no new POST.",
+        "vqLineId": 2263512
+      }
+    ],
+    "failed": [],
+    "coverage": [
+      {
+        "lineNo": 10,
+        "lineId": 3153408,
+        "rfqQty": 9000,
+        "mpns": [
+          "BAS40TW-7-F"
+        ],
+        "vqsThisBatch": 7
+      }
+    ],
+    "gaps": []
+  }
+}

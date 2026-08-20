@@ -1,0 +1,96 @@
+{
+  "rfqSearchKey": "1140101",
+  "buyerId": 1011159,
+  "runAt": "2026-08-12T02:52:53.094Z",
+  "sourceQuotes": "/tmp/vq_load_1140101.json",
+  "result": {
+    "written": [
+      {
+        "vqLineId": 2308505,
+        "line": 10,
+        "mpn": "HSMS-2812-TR1G",
+        "vendor": "Xinshop Electronics Co., Ltd ",
+        "cost": 15.56,
+        "qty": 1531,
+        "fuzzyMatch": false,
+        "originalVendorLabel": "XINSHOP",
+        "bpId": 1002647,
+        "noBid": false
+      },
+      {
+        "vqLineId": 2308506,
+        "line": 10,
+        "mpn": "HSMS-2812-TR1G",
+        "vendor": "Xinshop Electronics Co., Ltd ",
+        "cost": 25.6,
+        "qty": 3114,
+        "fuzzyMatch": false,
+        "originalVendorLabel": "XINSHOP",
+        "bpId": 1002647,
+        "noBid": false
+      },
+      {
+        "vqLineId": 2308507,
+        "line": 10,
+        "mpn": "HSMS-2812-TR1G",
+        "vendor": "Fixchips Global Limited",
+        "cost": 15.6,
+        "qty": 1531,
+        "fuzzyMatch": false,
+        "originalVendorLabel": "Fixchips",
+        "bpId": 1000387,
+        "noBid": false
+      },
+      {
+        "vqLineId": 2308508,
+        "line": 10,
+        "mpn": "HSMS-2812-TR1G",
+        "vendor": "SMARTEL ELECTRONICS (ASIA) CO LTD",
+        "cost": 4.99,
+        "qty": 450,
+        "fuzzyMatch": false,
+        "originalVendorLabel": "Smartel",
+        "bpId": 1004861,
+        "noBid": false
+      },
+      {
+        "vqLineId": 2308509,
+        "line": 10,
+        "mpn": "HSMS-2812-TR1G",
+        "vendor": "SMARTEL ELECTRONICS (ASIA) CO LTD",
+        "cost": 15.5,
+        "qty": 1531,
+        "fuzzyMatch": false,
+        "originalVendorLabel": "Smartel",
+        "bpId": 1004861,
+        "noBid": false
+      },
+      {
+        "vqLineId": 2308510,
+        "line": 10,
+        "mpn": "HSMS-2812-TR1G",
+        "vendor": "SMARTEL ELECTRONICS (ASIA) CO LTD",
+        "cost": 24.62,
+        "qty": 3114,
+        "fuzzyMatch": false,
+        "originalVendorLabel": "Smartel",
+        "bpId": 1004861,
+        "noBid": false
+      }
+    ],
+    "skipped": [],
+    "failed": [],
+    "coverage": [
+      {
+        "lineNo": 10,
+        "lineId": 3153365,
+        "rfqQty": 5000,
+        "mpns": [
+          "HSMS-2812-TR1G"
+        ],
+        "vqsThisBatch": 6
+      }
+    ],
+    "gaps": []
+  }
+}

@@ -1,0 +1,2790 @@
+{
+  "rfqSearchKey": "1141380",
+  "buyerId": 1005190,
+  "runAt": "2026-08-11T10:40:34.367Z",
+  "sourceQuotes": "/tmp/remaining_quotes_cli.json",
+  "result": {
+    "written": [
+      {
+        "vqLineId": 2306959,
+        "line": 970,
+        "mpn": "LP2951CDR2G",
+        "vendor": "Keming Electronics Development Co., Ltd",
+        "cost": 0.097,
+        "qty": 10000,
+        "fuzzyMatch": false,
+        "originalVendorLabel": "Keming Electronics Development Co., Ltd",
+        "bpId": 1000313,
+        "noBid": false
+      },
+      {
+        "vqLineId": 2306960,
+        "line": 970,
+        "mpn": "LP2951CDR2G",
+        "vendor": "VVIP (HK) Electronics Co., Ltd",
+        "cost": 0.098,
+        "qty": 20000,
+        "fuzzyMatch": false,
+        "originalVendorLabel": "VVIP (HK) Electronics Co., Ltd",
+        "bpId": 1001689,
+        "noBid": false
+      },
+      {
+        "vqLineId": 2306961,
+        "line": 980,
+        "mpn": "LP2951-50DR",
+        "vendor": "Original Chip Source Electronics Co., Limited",
+        "cost": 0.094,
+        "qty": 2500,
+        "fuzzyMatch": false,
+        "originalVendorLabel": "Original Chip Source Electronics Co., Limited",
+        "bpId": 1009652,
+        "noBid": false
+      },
+      {
+        "vqLineId": 2306962,
+        "line": 980,
+        "mpn": "LP2951-50DR",
+        "vendor": "Guiyu Electronics Group (HK) Ltd",
+        "cost": 0.092,
+        "qty": 30000,
+        "fuzzyMatch": false,
+        "originalVendorLabel": "Guiyu Electronics Group (HK) Ltd",
+        "bpId": 1001865,
+        "noBid": false
+      },
+      {
+        "vqLineId": 2306963,
+        "line": 980,
+        "mpn": "LP2951-50DR",
+        "vendor": "PGC-IC Ltd",
+        "cost": 0.104,
+        "qty": 50000,
+        "fuzzyMatch": false,
+        "originalVendorLabel": "PGC-IC Ltd",
+        "bpId": 1001639,
+        "noBid": false
+      },
+      {
+        "vqLineId": 2306964,
+        "line": 980,
+        "mpn": "LP2951-50DR",
+        "vendor": "Xinshop Electronics Co., Ltd ",
+        "cost": 0.1011,
+        "qty": 40000,
+        "fuzzyMatch": false,
+        "originalVendorLabel": "Xinshop Electronics Co., Ltd",
+        "bpId": 1002647,
+        "noBid": false
+      },
+      {
+        "vqLineId": 2306965,
+        "line": 980,
+        "mpn": "LP2951-50DR",
+        "vendor": "Xinshop Electronics Co., Ltd ",
+        "cost": 0.1244,
+        "qty": 15000,
+        "fuzzyMatch": false,
+        "originalVendorLabel": "Xinshop Electronics Co., Ltd",
+        "bpId": 1002647,
+        "noBid": false
+      },
+      {
+        "vqLineId": 2306966,
+        "line": 980,
+        "mpn": "LP2951-50DR",
+        "vendor": "Xinshop Electronics Co., Ltd ",
+        "cost": 0.0934,
+        "qty": 25000,
+        "fuzzyMatch": false,
+        "originalVendorLabel": "Xinshop Electronics Co., Ltd",
+        "bpId": 1002647,
+        "noBid": false
+      },
+      {
+        "vqLineId": 2306967,
+        "line": 980,
+        "mpn": "LP2951-50DR",
+        "vendor": "Keming Electronics Development Co., Ltd",
+        "cost": 0.094,
+        "qty": 25000,
+        "fuzzyMatch": false,
+        "originalVendorLabel": "Keming Electronics Development Co., Ltd",
+        "bpId": 1000313,
+        "noBid": false
+      },
+      {
+        "vqLineId": 2306968,
+        "line": 980,
+        "mpn": "LP2951-50DR",
+        "vendor": "Keming Electronics Development Co., Ltd",
+        "cost": 0.104,
+        "qty": 60000,
+        "fuzzyMatch": false,
+        "originalVendorLabel": "Keming Electronics Development Co., Ltd",
+        "bpId": 1000313,
+        "noBid": false
+      },
+      {
+        "vqLineId": 2306969,
+        "line": 980,
+        "mpn": "LP2951-50DR",
+        "vendor": "Keming Electronics Development Co., Ltd",
+        "cost": 0.099,
+        "qty": 25000,
+        "fuzzyMatch": false,
+        "originalVendorLabel": "Keming Electronics Development Co., Ltd",
+        "bpId": 1000313,
+        "noBid": false
+      },
+      {
+        "vqLineId": 2306970,
+        "line": 980,
+        "mpn": "LP2951-50DR",
+        "vendor": "DelSheng Electronics Co., Ltd",
+        "cost": 0.095,
+        "qty": 50000,
+        "fuzzyMatch": false,
+        "originalVendorLabel": "DelSheng Electronics Co., Ltd",
+        "bpId": 1001589,
+        "noBid": false
+      },
+      {
+        "vqLineId": 2306971,
+        "line": 980,
+        "mpn": "LP2951-50DR",
+        "vendor": "VVIP (HK) Electronics Co., Ltd",
+        "cost": 0.093,
+        "qty": 25000,
+        "fuzzyMatch": false,
+        "originalVendorLabel": "VVIP (HK) Electronics Co., Ltd",
+        "bpId": 1001689,
+        "noBid": false
+      },
+      {
+        "vqLineId": 2306972,
+        "line": 980,
+        "mpn": "LP2951-50DR",
+        "vendor": "VVIP (HK) Electronics Co., Ltd",
+        "cost": 0.0905,
+        "qty": 25000,
+        "fuzzyMatch": false,
+        "originalVendorLabel": "VVIP (HK) Electronics Co., Ltd",
+        "bpId": 1001689,
+        "noBid": false
+      },
+      {
+        "vqLineId": 2306973,
+        "line": 980,
+        "mpn": "LP2951-50DR",
+        "vendor": "Skyeast International Group Ltd",
+        "cost": 0.096,
+        "qty": 60000,
+        "fuzzyMatch": false,
+        "originalVendorLabel": "Skyeast International Group Ltd",
+        "bpId": 1001659,
+        "noBid": false
+      },
+      {
+        "vqLineId": 2306974,
+        "line": 410,
+        "mpn": "TXS0108ENMER",
+        "vendor": "PGC-IC Ltd",
+        "cost": 0.978,
+        "qty": 10000,
+        "fuzzyMatch": false,
+        "originalVendorLabel": "PGC-IC Ltd",
+        "bpId": 1001639,
+        "noBid": false
+      },
+      {
+        "vqLineId": 2306975,
+        "line": 410,
+        "mpn": "TXS0108ENMER",
+        "vendor": "Guiyu Electronics Group (HK) Ltd",
+        "cost": 0.89,
+        "qty": 10000,
+        "fuzzyMatch": false,
+        "originalVendorLabel": "Guiyu Electronics Group (HK) Ltd",
+        "bpId": 1001865,
+        "noBid": false
+      },
+      {
+        "vqLineId": 2306976,
+        "line": 410,
+        "mpn": "TXS0108ENMER",
+        "vendor": "Xinshop Electronics Co., Ltd ",
+        "cost": 0.7778,
+        "qty": 10000,
+        "fuzzyMatch": false,
+        "originalVendorLabel": "Xinshop Electronics Co., Ltd",
+        "bpId": 1002647,
+        "noBid": false
+      },
+      {
+        "vqLineId": 2306977,
+        "line": 410,
+        "mpn": "TXS0108ENMER",
+        "vendor": "Keming Electronics Development Co., Ltd",
+        "cost": 0.951,
+        "qty": 10000,
+        "fuzzyMatch": false,
+        "originalVendorLabel": "Keming Electronics Development Co., Ltd",
+        "bpId": 1000313,
+        "noBid": false
+      },
+      {
+        "vqLineId": 2306978,
+        "line": 410,
+        "mpn": "TXS0108ENMER",
+        "vendor": "DelSheng Electronics Co., Ltd",
+        "cost": 2.35,
+        "qty": 10000,
+        "fuzzyMatch": false,
+        "originalVendorLabel": "DelSheng Electronics Co., Ltd",
+        "bpId": 1001589,
+        "noBid": false
+      },
+      {
+        "vqLineId": 2306979,
+        "line": 1010,
+        "mpn": "TLV07IDR",
+        "vendor": "PGC-IC Ltd",
+        "cost": 0.266,
+        "qty": 25000,
+        "fuzzyMatch": false,
+        "originalVendorLabel": "PGC-IC Ltd",
+        "bpId": 1001639,
+        "noBid": false
+      },
+      {
+        "vqLineId": 2306980,
+        "line": 1010,
+        "mpn": "TLV07IDR",
+        "vendor": "PGC-IC Ltd",
+        "cost": 0.3678,
+        "qty": 30000,
+        "fuzzyMatch": false,
+        "originalVendorLabel": "PGC-IC Ltd",
+        "bpId": 1001639,
+        "noBid": false
+      },
+      {
+        "vqLineId": 2306981,
+        "line": 1010,
+        "mpn": "TLV07IDR",
+        "vendor": "PGC-IC Ltd",
+        "cost": 0.3678,
+        "qty": 25000,
+        "fuzzyMatch": false,
+        "originalVendorLabel": "PGC-IC Ltd",
+        "bpId": 1001639,
+        "noBid": false
+      },
+      {
+        "vqLineId": 2306982,
+        "line": 1010,
+        "mpn": "TLV07IDR",
+        "vendor": "PGC-IC Ltd",
+        "cost": 0.3678,
+        "qty": 75000,
+        "fuzzyMatch": false,
+        "originalVendorLabel": "PGC-IC Ltd",
+        "bpId": 1001639,
+        "noBid": false
+      },
+      {
+        "vqLineId": 2306983,
+        "line": 1010,
+        "mpn": "TLV07IDR",
+        "vendor": "PGC-IC Ltd",
+        "cost": 0.3678,
+        "qty": 32500,
+        "fuzzyMatch": false,
+        "originalVendorLabel": "PGC-IC Ltd",
+        "bpId": 1001639,
+        "noBid": false
+      },
+      {
+        "vqLineId": 2306984,
+        "line": 1010,
+        "mpn": "TLV07IDR",
+        "vendor": "Xinshop Electronics Co., Ltd ",
+        "cost": 0.21,
+        "qty": 5000,
+        "fuzzyMatch": false,
+        "originalVendorLabel": "Xinshop Electronics Co., Ltd",
+        "bpId": 1002647,
+        "noBid": false
+      },
+      {
+        "vqLineId": 2306985,
+        "line": 1010,
+        "mpn": "TLV07IDR",
+        "vendor": "Xinshop Electronics Co., Ltd ",
+        "cost": 0.3963,
+        "qty": 37215,
+        "fuzzyMatch": false,
+        "originalVendorLabel": "Xinshop Electronics Co., Ltd",
+        "bpId": 1002647,
+        "noBid": false
+      },
+      {
+        "vqLineId": 2306986,
+        "line": 1010,
+        "mpn": "TLV07IDR",
+        "vendor": "Xinshop Electronics Co., Ltd ",
+        "cost": 0.2885,
+        "qty": 25499,
+        "fuzzyMatch": false,
+        "originalVendorLabel": "Xinshop Electronics Co., Ltd",
+        "bpId": 1002647,
+        "noBid": false
+      },
+      {
+        "vqLineId": 2306987,
+        "line": 1010,
+        "mpn": "TLV07IDR",
+        "vendor": "Xinshop Electronics Co., Ltd ",
+        "cost": 0.3646,
+        "qty": 12500,
+        "fuzzyMatch": false,
+        "originalVendorLabel": "Xinshop Electronics Co., Ltd",
+        "bpId": 1002647,
+        "noBid": false
+      },
+      {
+        "vqLineId": 2306988,
+        "line": 1010,
+        "mpn": "TLV07IDR",
+        "vendor": "Keming Electronics Development Co., Ltd",
+        "cost": 0.371,
+        "qty": 10000,
+        "fuzzyMatch": false,
+        "originalVendorLabel": "Keming Electronics Development Co., Ltd",
+        "bpId": 1000313,
+        "noBid": false
+      },
+      {
+        "vqLineId": 2306989,
+        "line": 1010,
+        "mpn": "TLV07IDR",
+        "vendor": "Keming Electronics Development Co., Ltd",
+        "cost": 0.386,
+        "qty": 37215,
+        "fuzzyMatch": false,
+        "originalVendorLabel": "Keming Electronics Development Co., Ltd",
+        "bpId": 1000313,
+        "noBid": false
+      },
+      {
+        "vqLineId": 2306990,
+        "line": 1010,
+        "mpn": "TLV07IDR",
+        "vendor": "DelSheng Electronics Co., Ltd",
+        "cost": 0.388,
+        "qty": 30000,
+        "fuzzyMatch": false,
+        "originalVendorLabel": "DelSheng Electronics Co., Ltd",
+        "bpId": 1001589,
+        "noBid": false
+      },
+      {
+        "vqLineId": 2306991,
+        "line": 1010,
+        "mpn": "TLV07IDR",
+        "vendor": "Skyeast International Group Ltd",
+        "cost": 0.4,
+        "qty": 15000,
+        "fuzzyMatch": false,
+        "originalVendorLabel": "Skyeast International Group Ltd",
+        "bpId": 1001659,
+        "noBid": false
+      },
+      {
+        "vqLineId": 2306992,
+        "line": 1010,
+        "mpn": "TLV07IDR",
+        "vendor": "Skyeast International Group Ltd",
+        "cost": 0.4,
+        "qty": 30000,
+        "fuzzyMatch": false,
+        "originalVendorLabel": "Skyeast International Group Ltd",
+        "bpId": 1001659,
+        "noBid": false
+      },
+      {
+        "vqLineId": 2306993,
+        "line": 1020,
+        "mpn": "TLV9161IDBVR",
+        "vendor": "PGC-IC Ltd",
+        "cost": 1.975,
+        "qty": 21000,
+        "fuzzyMatch": false,
+        "originalVendorLabel": "PGC-IC Ltd",
+        "bpId": 1001639,
+        "noBid": false
+      },
+      {
+        "vqLineId": 2306994,
+        "line": 1020,
+        "mpn": "TLV9161IDBVR",
+        "vendor": "PGC-IC Ltd",
+        "cost": 2.232,
+        "qty": 3000,
+        "fuzzyMatch": false,
+        "originalVendorLabel": "PGC-IC Ltd",
+        "bpId": 1001639,
+        "noBid": false
+      },
+      {
+        "vqLineId": 2306995,
+        "line": 1020,
+        "mpn": "TLV9161IDBVR",
+        "vendor": "Xinshop Electronics Co., Ltd ",
+        "cost": 2.1778,
+        "qty": 21000,
+        "fuzzyMatch": false,
+        "originalVendorLabel": "Xinshop Electronics Co., Ltd",
+        "bpId": 1002647,
+        "noBid": false
+      },
+      {
+        "vqLineId": 2306996,
+        "line": 1020,
+        "mpn": "TLV9161IDBVR",
+        "vendor": "DelSheng Electronics Co., Ltd",
+        "cost": 2.185,
+        "qty": 21000,
+        "fuzzyMatch": false,
+        "originalVendorLabel": "DelSheng Electronics Co., Ltd",
+        "bpId": 1001589,
+        "noBid": false
+      },
+      {
+        "vqLineId": 2306997,
+        "line": 1020,
+        "mpn": "TLV9161IDBVR",
+        "vendor": "Skyeast International Group Ltd",
+        "cost": 2.38,
+        "qty": 21000,
+        "fuzzyMatch": false,
+        "originalVendorLabel": "Skyeast International Group Ltd",
+        "bpId": 1001659,
+        "noBid": false
+      },
+      {
+        "vqLineId": 2306998,
+        "line": 1290,
+        "mpn": "PMEG3002AEL,315",
+        "vendor": "PGC-IC Ltd",
+        "cost": 0.015,
+        "qty": 10000,
+        "fuzzyMatch": false,
+        "originalVendorLabel": "PGC-IC Ltd",
+        "bpId": 1001639,
+        "noBid": false
+      },
+      {
+        "vqLineId": 2306999,
+        "line": 1290,
+        "mpn": "PMEG3002AEL,315",
+        "vendor": "Xinshop Electronics Co., Ltd ",
+        "cost": 0.0234,
+        "qty": 10000,
+        "fuzzyMatch": false,
+        "originalVendorLabel": "Xinshop Electronics Co., Ltd",
+        "bpId": 1002647,
+        "noBid": false
+      },
+      {
+        "vqLineId": 2307000,
+        "line": 1290,
+        "mpn": "PMEG3002AEL,315",
+        "vendor": "Keming Electronics Development Co., Ltd",
+        "cost": 0.016,
+        "qty": 10000,
+        "fuzzyMatch": false,
+        "originalVendorLabel": "Keming Electronics Development Co., Ltd",
+        "bpId": 1000313,
+        "noBid": false
+      },
+      {
+        "vqLineId": 2307001,
+        "line": 1290,
+        "mpn": "PMEG3002AEL,315",
+        "vendor": "VVIP (HK) Electronics Co., Ltd",
+        "cost": 0.015,
+        "qty": 10000,
+        "fuzzyMatch": false,
+        "originalVendorLabel": "VVIP (HK) Electronics Co., Ltd",
+        "bpId": 1001689,
+        "noBid": false
+      },
+      {
+        "vqLineId": 2307002,
+        "line": 1300,
+        "mpn": "IRFH5300TRPBF",
+        "vendor": "HD-KJ Group Electronic Co., Ltd",
+        "cost": 0.25,
+        "qty": 40000,
+        "fuzzyMatch": false,
+        "originalVendorLabel": "HD-KJ Group Electronic Co., Ltd",
+        "bpId": 1001810,
+        "noBid": false
+      },
+      {
+        "vqLineId": 2307003,
+        "line": 1300,
+        "mpn": "IRFH5300TRPBF",
+        "vendor": "E-Reach Industrial, Ltd",
+        "cost": 0.17,
+        "qty": 100000,
+        "fuzzyMatch": false,
+        "originalVendorLabel": "E-Reach Industrial, Ltd",
+        "bpId": 1001205,
+        "noBid": false
+      },
+      {
+        "vqLineId": 2307004,
+        "line": 1300,
+        "mpn": "IRFH5300TRPBF",
+        "vendor": "Tronix (HK) Ltd",
+        "cost": 0.25,
+        "qty": 100000,
+        "fuzzyMatch": false,
+        "originalVendorLabel": "Tronix (HK) Ltd",
+        "bpId": 1001902,
+        "noBid": false
+      },
+      {
+        "vqLineId": 2307005,
+        "line": 1300,
+        "mpn": "IRFH5300TRPBF",
+        "vendor": "PGC-IC Ltd",
+        "cost": 0.217,
+        "qty": 16000,
+        "fuzzyMatch": false,
+        "originalVendorLabel": "PGC-IC Ltd",
+        "bpId": 1001639,
+        "noBid": false
+      },
+      {
+        "vqLineId": 2307006,
+        "line": 1300,
+        "mpn": "IRFH5300TRPBF",
+        "vendor": "PGC-IC Ltd",
+        "cost": 0.268,
+        "qty": 32000,
+        "fuzzyMatch": false,
+        "originalVendorLabel": "PGC-IC Ltd",
+        "bpId": 1001639,
+        "noBid": false
+      },
+      {
+        "vqLineId": 2307007,
+        "line": 1300,
+        "mpn": "IRFH5300TRPBF",
+        "vendor": "PGC-IC Ltd",
+        "cost": 0.4464,
+        "qty": 30000,
+        "fuzzyMatch": false,
+        "originalVendorLabel": "PGC-IC Ltd",
+        "bpId": 1001639,
+        "noBid": false
+      },
+      {
+        "vqLineId": 2307008,
+        "line": 1300,
+        "mpn": "IRFH5300TRPBF",
+        "vendor": "Xinshop Electronics Co., Ltd ",
+        "cost": 0.28,
+        "qty": 8000,
+        "fuzzyMatch": false,
+        "originalVendorLabel": "Xinshop Electronics Co., Ltd",
+        "bpId": 1002647,
+        "noBid": false
+      },
+      {
+        "vqLineId": 2307009,
+        "line": 1300,
+        "mpn": "IRFH5300TRPBF",
+        "vendor": "Xinshop Electronics Co., Ltd ",
+        "cost": 0.2738,
+        "qty": 48000,
+        "fuzzyMatch": false,
+        "originalVendorLabel": "Xinshop Electronics Co., Ltd",
+        "bpId": 1002647,
+        "noBid": false
+      },
+      {
+        "vqLineId": 2307010,
+        "line": 1300,
+        "mpn": "IRFH5300TRPBF",
+        "vendor": "Xinshop Electronics Co., Ltd ",
+        "cost": 0.28,
+        "qty": 32000,
+        "fuzzyMatch": false,
+        "originalVendorLabel": "Xinshop Electronics Co., Ltd",
+        "bpId": 1002647,
+        "noBid": false
+      },
+      {
+        "vqLineId": 2307011,
+        "line": 1300,
+        "mpn": "IRFH5300TRPBF",
+        "vendor": "Valley Electronics(HK) Limited",
+        "cost": 0.28,
+        "qty": 33250,
+        "fuzzyMatch": false,
+        "originalVendorLabel": "Valley",
+        "bpId": 1009499,
+        "noBid": false
+      },
+      {
+        "vqLineId": 2307012,
+        "line": 1300,
+        "mpn": "IRFH5300TRPBF",
+        "vendor": "Keming Electronics Development Co., Ltd",
+        "cost": 0.275,
+        "qty": 52000,
+        "fuzzyMatch": false,
+        "originalVendorLabel": "Keming Electronics Development Co., Ltd",
+        "bpId": 1000313,
+        "noBid": false
+      },
+      {
+        "vqLineId": 2307013,
+        "line": 1300,
+        "mpn": "IRFH5300TRPBF",
+        "vendor": "Keming Electronics Development Co., Ltd",
+        "cost": 0.278,
+        "qty": 33250,
+        "fuzzyMatch": false,
+        "originalVendorLabel": "Keming Electronics Development Co., Ltd",
+        "bpId": 1000313,
+        "noBid": false
+      },
+      {
+        "vqLineId": 2307014,
+        "line": 1300,
+        "mpn": "IRFH5300TRPBF",
+        "vendor": "Keming Electronics Development Co., Ltd",
+        "cost": 0.386,
+        "qty": 18000,
+        "fuzzyMatch": false,
+        "originalVendorLabel": "Keming Electronics Development Co., Ltd",
+        "bpId": 1000313,
+        "noBid": false
+      },
+      {
+        "vqLineId": 2307015,
+        "line": 1310,
+        "mpn": "SIRA60DP-T1-GE3",
+        "vendor": "PGC-IC Ltd",
+        "cost": 0.391,
+        "qty": 11000,
+        "fuzzyMatch": false,
+        "originalVendorLabel": "PGC-IC Ltd",
+        "bpId": 1001639,
+        "noBid": false
+      },
+      {
+        "vqLineId": 2307016,
+        "line": 1310,
+        "mpn": "SIRA60DP-T1-GE3",
+        "vendor": "PGC-IC Ltd",
+        "cost": 0.406,
+        "qty": 44000,
+        "fuzzyMatch": false,
+        "originalVendorLabel": "PGC-IC Ltd",
+        "bpId": 1001639,
+        "noBid": false
+      },
+      {
+        "vqLineId": 2307017,
+        "line": 1310,
+        "mpn": "SIRA60DP-T1-GE3",
+        "vendor": "PGC-IC Ltd",
+        "cost": 0.49,
+        "qty": 12000,
+        "fuzzyMatch": false,
+        "originalVendorLabel": "PGC-IC Ltd",
+        "bpId": 1001639,
+        "noBid": false
+      },
+      {
+        "vqLineId": 2307018,
+        "line": 1310,
+        "mpn": "SIRA60DP-T1-GE3",
+        "vendor": "Xinshop Electronics Co., Ltd ",
+        "cost": 0.4667,
+        "qty": 11192,
+        "fuzzyMatch": false,
+        "originalVendorLabel": "Xinshop Electronics Co., Ltd",
+        "bpId": 1002647,
+        "noBid": false
+      },
+      {
+        "vqLineId": 2307019,
+        "line": 1310,
+        "mpn": "SIRA60DP-T1-GE3",
+        "vendor": "Xinshop Electronics Co., Ltd ",
+        "cost": 0.6222,
+        "qty": 13150,
+        "fuzzyMatch": false,
+        "originalVendorLabel": "Xinshop Electronics Co., Ltd",
+        "bpId": 1002647,
+        "noBid": false
+      },
+      {
+        "vqLineId": 2307020,
+        "line": 1310,
+        "mpn": "SIRA60DP-T1-GE3",
+        "vendor": "Xinshop Electronics Co., Ltd ",
+        "cost": 0.4978,
+        "qty": 12000,
+        "fuzzyMatch": false,
+        "originalVendorLabel": "Xinshop Electronics Co., Ltd",
+        "bpId": 1002647,
+        "noBid": false
+      },
+      {
+        "vqLineId": 2307021,
+        "line": 1310,
+        "mpn": "SIRA60DP-T1-GE3",
+        "vendor": "Xinshop Electronics Co., Ltd ",
+        "cost": 0.4122,
+        "qty": 30000,
+        "fuzzyMatch": false,
+        "originalVendorLabel": "Xinshop Electronics Co., Ltd",
+        "bpId": 1002647,
+        "noBid": false
+      },
+      {
+        "vqLineId": 2307022,
+        "line": 1310,
+        "mpn": "SIRA60DP-T1-GE3",
+        "vendor": "Keming Electronics Development Co., Ltd",
+        "cost": 0.42,
+        "qty": 30000,
+        "fuzzyMatch": false,
+        "originalVendorLabel": "Keming Electronics Development Co., Ltd",
+        "bpId": 1000313,
+        "noBid": false
+      },
+      {
+        "vqLineId": 2307023,
+        "line": 1310,
+        "mpn": "SIRA60DP-T1-GE3",
+        "vendor": "Keming Electronics Development Co., Ltd",
+        "cost": 0.445,
+        "qty": 18000,
+        "fuzzyMatch": false,
+        "originalVendorLabel": "Keming Electronics Development Co., Ltd",
+        "bpId": 1000313,
+        "noBid": false
+      },
+      {
+        "vqLineId": 2307024,
+        "line": 1310,
+        "mpn": "SIRA60DP-T1-GE3",
+        "vendor": "Keming Electronics Development Co., Ltd",
+        "cost": 0.452,
+        "qty": 30000,
+        "fuzzyMatch": false,
+        "originalVendorLabel": "Keming Electronics Development Co., Ltd",
+        "bpId": 1000313,
+        "noBid": false
+      },
+      {
+        "vqLineId": 2307025,
+        "line": 1310,
+        "mpn": "SIRA60DP-T1-GE3",
+        "vendor": "Keming Electronics Development Co., Ltd",
+        "cost": 0.634,
+        "qty": 23150,
+        "fuzzyMatch": false,
+        "originalVendorLabel": "Keming Electronics Development Co., Ltd",
+        "bpId": 1000313,
+        "noBid": false
+      },
+      {
+        "vqLineId": 2307026,
+        "line": 1330,
+        "mpn": "10M02SCU169C8G",
+        "vendor": "PGC-IC Ltd",
+        "cost": 14.078,
+        "qty": 12,
+        "fuzzyMatch": false,
+        "originalVendorLabel": "PGC-IC Ltd",
+        "bpId": 1001639,
+        "noBid": false
+      },
+      {
+        "vqLineId": 2307027,
+        "line": 1330,
+        "mpn": "10M02SCU169C8G",
+        "vendor": "Xinshop Electronics Co., Ltd ",
+        "cost": 15,
+        "qty": 12,
+        "fuzzyMatch": false,
+        "originalVendorLabel": "Xinshop Electronics Co., Ltd",
+        "bpId": 1002647,
+        "noBid": false
+      },
+      {
+        "vqLineId": 2307028,
+        "line": 1340,
+        "mpn": "LFE5U-12F-6BG256C",
+        "vendor": "Winlink industry HK Co Limited",
+        "cost": 44.8,
+        "qty": 722,
+        "fuzzyMatch": false,
+        "originalVendorLabel": "Winlink industry HK Co Limited",
+        "bpId": 1001494,
+        "noBid": false
+      },
+      {
+        "vqLineId": 2307029,
+        "line": 1340,
+        "mpn": "LFE5U-12F-6BG256C",
+        "vendor": "PGC-IC Ltd",
+        "cost": 65.18,
+        "qty": 269,
+        "fuzzyMatch": false,
+        "originalVendorLabel": "PGC-IC Ltd",
+        "bpId": 1001639,
+        "noBid": false
+      },
+      {
+        "vqLineId": 2307030,
+        "line": 1340,
+        "mpn": "LFE5U-12F-6BG256C",
+        "vendor": "PGC-IC Ltd",
+        "cost": 75.186,
+        "qty": 700,
+        "fuzzyMatch": false,
+        "originalVendorLabel": "PGC-IC Ltd",
+        "bpId": 1001639,
+        "noBid": false
+      },
+      {
+        "vqLineId": 2307031,
+        "line": 1340,
+        "mpn": "LFE5U-12F-6BG256C",
+        "vendor": "Xinshop Electronics Co., Ltd ",
+        "cost": 72,
+        "qty": 212,
+        "fuzzyMatch": false,
+        "originalVendorLabel": "Xinshop Electronics Co., Ltd",
+        "bpId": 1002647,
+        "noBid": false
+      },
+      {
+        "vqLineId": 2307032,
+        "line": 1340,
+        "mpn": "LFE5U-12F-6BG256C",
+        "vendor": "Keming Electronics Development Co., Ltd",
+        "cost": 77.626,
+        "qty": 722,
+        "fuzzyMatch": false,
+        "originalVendorLabel": "Keming Electronics Development Co., Ltd",
+        "bpId": 1000313,
+        "noBid": false
+      },
+      {
+        "vqLineId": 2307033,
+        "line": 1340,
+        "mpn": "LFE5U-12F-6BG256C",
+        "vendor": "SMARTEL ELECTRONICS (ASIA) CO LTD",
+        "cost": 71,
+        "qty": 212,
+        "fuzzyMatch": false,
+        "originalVendorLabel": "SMARTEL ELECTRONICS (ASIA) CO LTD",
+        "bpId": 1004861,
+        "noBid": false
+      },
+      {
+        "vqLineId": 2307034,
+        "line": 1340,
+        "mpn": "LFE5U-12F-6BG256C",
+        "vendor": "SMARTEL ELECTRONICS (ASIA) CO LTD",
+        "cost": 77,
+        "qty": 700,
+        "fuzzyMatch": false,
+        "originalVendorLabel": "SMARTEL ELECTRONICS (ASIA) CO LTD",
+        "bpId": 1004861,
+        "noBid": false
+      },
+      {
+        "vqLineId": 2307035,
+        "line": 1340,
+        "mpn": "LFE5U-12F-6BG256C",
+        "vendor": "VVIP (HK) Electronics Co., Ltd",
+        "cost": 70.52,
+        "qty": 212,
+        "fuzzyMatch": false,
+        "originalVendorLabel": "VVIP (HK) Electronics Co., Ltd",
+        "bpId": 1001689,
+        "noBid": false
+      }
+    ],
+    "skipped": [
+      {
+        "vendorName": "Exin",
+        "mpn": "TMP1075DGKR",
+        "mfr": "Texas Instruments",
+        "qty": 60000,
+        "cost": 0.14,
+        "dateCode": "25+",
+        "reason": "VENDOR_NOT_FOUND",
+        "detail": "Exin not in BP table"
+      },
+      {
+        "vendorName": "DelSheng Electronics Co., Ltd",
+        "mpn": "TPS54320RHLR",
+        "mfr": "Texas Instruments",
+        "qty": 21000,
+        "cost": 0.377,
+        "dateCode": "22+",
+        "vendorSearchKey": "1003593",
+        "reason": "PRE_EXISTING_DUPLICATE",
+        "detail": "Existing chuboe_vq_line 2264605 matches natural key (rfq_line × MPN × BP × cost × currency) — no new POST.",
+        "vqLineId": 2264605
+      },
+      {
+        "vendorName": "VVIP (HK) Electronics Co., Ltd",
+        "mpn": "TPS54320RHLR",
+        "mfr": "Texas Instruments",
+        "qty": 60000,
+        "cost": 0.373,
+        "dateCode": "22+",
+        "leadTime": "stock",
+        "vendorNotes": "New & Original",
+        "vendorSearchKey": "1003706",
+        "reason": "PRE_EXISTING_DUPLICATE",
+        "detail": "Existing chuboe_vq_line 2264602 matches natural key (rfq_line × MPN × BP × cost × currency) — no new POST.",
+        "vqLineId": 2264602
+      },
+      {
+        "vendorName": "Valley",
+        "mpn": "IRFH5300TRPBF",
+        "mfr": "Infineon",
+        "qty": 52000,
+        "cost": 0.28,
+        "dateCode": "23+",
+        "leadTime": "1-2days",
+        "reason": "PRE_EXISTING_DUPLICATE",
+        "detail": "Existing chuboe_vq_line 2307011 matches natural key (rfq_line × MPN × BP × cost × currency) — no new POST.",
+        "vqLineId": 2307011
+      },
+      {
+        "vendorName": "Newchip Electronics Limited",
+        "mpn": "SDSDQAD-016G",
+        "mfr": "SanDisk",
+        "qty": 635,
+        "cost": 9.34,
+        "dateCode": "22+",
+        "vendorSearchKey": "1007081",
+        "reason": "NO_MPN_MATCH",
+        "detail": "SDSDQAD-016G doesn't match any line MPN"
+      },
+      {
+        "vendorName": "Newchip Electronics Limited",
+        "mpn": "SDSDQAD-016G",
+        "mfr": "SanDisk",
+        "qty": 2400,
+        "cost": 15.6,
+        "dateCode": "24+",
+        "vendorSearchKey": "1007081",
+        "reason": "NO_MPN_MATCH",
+        "detail": "SDSDQAD-016G doesn't match any line MPN"
+      },
+      {
+        "vendorName": "Fixchips Global Limited",
+        "mpn": "SDSDQAD-016G",
+        "mfr": "SanDisk",
+        "qty": 635,
+        "cost": 9.42,
+        "dateCode": "22+",
+        "leadTime": "stock",
+        "vendorNotes": "short quantity",
+        "vendorSearchKey": "1002391",
+        "reason": "NO_MPN_MATCH",
+        "detail": "SDSDQAD-016G doesn't match any line MPN"
+      },
+      {
+        "vendorName": "Fixchips Global Limited",
+        "mpn": "SDSDQAD-016G",
+        "mfr": "SanDisk",
+        "qty": 3600,
+        "cost": 13.44,
+        "dateCode": "25+",
+        "leadTime": "stock",
+        "vendorSearchKey": "1002391",
+        "reason": "NO_MPN_MATCH",
+        "detail": "SDSDQAD-016G doesn't match any line MPN"
+      },
+      {
+        "vendorName": "SMARTEL ELECTRONICS (ASIA) CO LTD",
+        "mpn": "SDSDQAD-016G",
+        "mfr": "SanDisk",
+        "qty": 6000,
+        "cost": 9.988,
+        "dateCode": "25+",
+        "leadTime": "stock",
+        "vendorSearchKey": "1006857",
+        "reason": "NO_MPN_MATCH",
+        "detail": "SDSDQAD-016G doesn't match any line MPN"
+      },
+      {
+        "vendorName": "SMARTEL ELECTRONICS (ASIA) CO LTD",
+        "mpn": "SDSDQAD-016G",
+        "mfr": "SanDisk",
+        "qty": 3600,
+        "cost": 12.991,
+        "dateCode": "25+",
+        "leadTime": "stock",
+        "vendorSearchKey": "1006857",
+        "reason": "NO_MPN_MATCH",
+        "detail": "SDSDQAD-016G doesn't match any line MPN"
+      },
+      {
+        "vendorName": "SMARTEL ELECTRONICS (ASIA) CO LTD",
+        "mpn": "SDSDQAD-016G",
+        "mfr": "SanDisk",
+        "qty": 635,
+        "cost": 9.398,
+        "dateCode": "22+",
+        "leadTime": "stock",
+        "vendorSearchKey": "1006857",
+        "reason": "NO_MPN_MATCH",
+        "detail": "SDSDQAD-016G doesn't match any line MPN"
+      },
+      {
+        "vendorName": "Newchip Electronics Limited",
+        "mpn": "SDSDQAD-064G",
+        "mfr": "SanDisk",
+        "qty": 240,
+        "cost": 40.56,
+        "dateCode": "19+",
+        "vendorNotes": "SPQ 240, has label",
+        "vendorSearchKey": "1007081",
+        "reason": "NO_MPN_MATCH",
+        "detail": "SDSDQAD-064G doesn't match any line MPN"
+      }
+    ],
+    "failed": [],
+    "coverage": [
+      {
+        "lineNo": 10,
+        "lineId": 3164968,
+        "rfqQty": 50000,
+        "mpns": [
+          "NCP59744MN1ADJTBG"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 20,
+        "lineId": 3164969,
+        "rfqQty": 60000,
+        "mpns": [
+          "D12V0L1B2LP-7B"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 30,
+        "lineId": 3164970,
+        "rfqQty": 60000,
+        "mpns": [
+          "CSP12VLB-TP"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 40,
+        "lineId": 3164971,
+        "rfqQty": 5000,
+        "mpns": [
+          "GRM21BC80J476ME01K"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 50,
+        "lineId": 3164972,
+        "rfqQty": 38000,
+        "mpns": [
+          "1N4148WSF-7"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 60,
+        "lineId": 3164973,
+        "rfqQty": 38000,
+        "mpns": [
+          "BAT46WJ,115"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 70,
+        "lineId": 3164974,
+        "rfqQty": 5600,
+        "mpns": [
+          "HMC547ALP3ETR"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 80,
+        "lineId": 3164975,
+        "rfqQty": 17000,
+        "mpns": [
+          "MT40A1G8SA-062E:R TR"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 90,
+        "lineId": 3164976,
+        "rfqQty": 300,
+        "mpns": [
+          "CSTNE16M0V530000R0"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 100,
+        "lineId": 3164977,
+        "rfqQty": 1300,
+        "mpns": [
+          "MURS120T3G"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 110,
+        "lineId": 3164978,
+        "rfqQty": 350,
+        "mpns": [
+          "GRM31CR71H475KA12L"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 120,
+        "lineId": 3164979,
+        "rfqQty": 15000,
+        "mpns": [
+          "BSP52,115"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 130,
+        "lineId": 3164980,
+        "rfqQty": 15000,
+        "mpns": [
+          "BSP52T1G"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 140,
+        "lineId": 3164981,
+        "rfqQty": 23000,
+        "mpns": [
+          "WSL2512R0140FEA"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 150,
+        "lineId": 3164982,
+        "rfqQty": 23000,
+        "mpns": [
+          "WSL2512R0140FEA18"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 160,
+        "lineId": 3164983,
+        "rfqQty": 23000,
+        "mpns": [
+          "PE2512FKM7W0R014L"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 170,
+        "lineId": 3164984,
+        "rfqQty": 36000,
+        "mpns": [
+          "1812CC104KAT1A"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 180,
+        "lineId": 3164985,
+        "rfqQty": 36000,
+        "mpns": [
+          "1812CC104KAT2A"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 190,
+        "lineId": 3164986,
+        "rfqQty": 36000,
+        "mpns": [
+          "GRM43DR72J104KW01L"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 200,
+        "lineId": 3164987,
+        "rfqQty": 36000,
+        "mpns": [
+          "CL43B104KHISFNE"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 210,
+        "lineId": 3164988,
+        "rfqQty": 36000,
+        "mpns": [
+          "1812B104K631CT"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 220,
+        "lineId": 3164989,
+        "rfqQty": 20000,
+        "mpns": [
+          "GRM188R71A225KE15D",
+          "GRM188R71A225KE15D"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 230,
+        "lineId": 3164990,
+        "rfqQty": 20000,
+        "mpns": [
+          "CL10B225KP8NNNC"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 240,
+        "lineId": 3164991,
+        "rfqQty": 20000,
+        "mpns": [
+          "LMK107B7225KA-T"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 250,
+        "lineId": 3164992,
+        "rfqQty": 20000,
+        "mpns": [
+          "LMK107B7225KA-TR"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 260,
+        "lineId": 3164993,
+        "rfqQty": 1000,
+        "mpns": [
+          "REF5030AIDR"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 270,
+        "lineId": 3164994,
+        "rfqQty": 45000,
+        "mpns": [
+          "C0805C475K3RACTU"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 280,
+        "lineId": 3164995,
+        "rfqQty": 45000,
+        "mpns": [
+          "CL21B475KAFNNNE"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 290,
+        "lineId": 3164996,
+        "rfqQty": 45000,
+        "mpns": [
+          "0805B475K250CT"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 300,
+        "lineId": 3164997,
+        "rfqQty": 26000,
+        "mpns": [
+          "74ALVC244PW,118"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 310,
+        "lineId": 3164998,
+        "rfqQty": 26000,
+        "mpns": [
+          "SN74ALVC244PWR"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 320,
+        "lineId": 3164999,
+        "rfqQty": 25000,
+        "mpns": [
+          "TPS54320RHLR",
+          "TPS54320RHLR"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 330,
+        "lineId": 3165000,
+        "rfqQty": 25000,
+        "mpns": [
+          "TPS54320RHLT",
+          "TPS54320RHLT"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 340,
+        "lineId": 3165001,
+        "rfqQty": 250000,
+        "mpns": [
+          "0402CS-13NXGRQ"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 350,
+        "lineId": 3165002,
+        "rfqQty": 250000,
+        "mpns": [
+          "0402CS-13NXGRW"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 360,
+        "lineId": 3165003,
+        "rfqQty": 250000,
+        "mpns": [
+          "LQW15AN13NG00D"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 370,
+        "lineId": 3165004,
+        "rfqQty": 250000,
+        "mpns": [
+          "OWCWI100505-13N"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 380,
+        "lineId": 3165005,
+        "rfqQty": 250000,
+        "mpns": [
+          "744765113GA"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 390,
+        "lineId": 3165006,
+        "rfqQty": 15000,
+        "mpns": [
+          "20569"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 400,
+        "lineId": 3165007,
+        "rfqQty": 15000,
+        "mpns": [
+          "RL-11832"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 410,
+        "lineId": 3165008,
+        "rfqQty": 10000,
+        "mpns": [
+          "TXS0108ENMER",
+          "TXS0108ENMER"
+        ],
+        "vqsThisBatch": 5
+      },
+      {
+        "lineNo": 420,
+        "lineId": 3165009,
+        "rfqQty": 140000,
+        "mpns": [
+          "BLM03AG700SN1D"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 430,
+        "lineId": 3165010,
+        "rfqQty": 140000,
+        "mpns": [
+          "BMC1HY0070AN"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 440,
+        "lineId": 3165011,
+        "rfqQty": 120000,
+        "mpns": [
+          "TPS561201DDCR"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 450,
+        "lineId": 3165012,
+        "rfqQty": 100000,
+        "mpns": [
+          "MX66L1G45GMI-08G"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 460,
+        "lineId": 3165013,
+        "rfqQty": 100000,
+        "mpns": [
+          "MX66L1G45GMI-08G(TAPE & REEL)"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 470,
+        "lineId": 3165014,
+        "rfqQty": 100000,
+        "mpns": [
+          "MT25QL01GBBB8ESF-0SIT TR"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 480,
+        "lineId": 3165015,
+        "rfqQty": 7000,
+        "mpns": [
+          "EEFCX0J221YR"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 490,
+        "lineId": 3165016,
+        "rfqQty": 200000,
+        "mpns": [
+          "GRM155C81E105KE11D"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 500,
+        "lineId": 3165017,
+        "rfqQty": 200000,
+        "mpns": [
+          "CL05X105KA5NQNC"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 510,
+        "lineId": 3165018,
+        "rfqQty": 200000,
+        "mpns": [
+          "MSAST105AC6105KFNA01"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 520,
+        "lineId": 3165019,
+        "rfqQty": 200000,
+        "mpns": [
+          "TMK105AC6105KV-F"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 530,
+        "lineId": 3165020,
+        "rfqQty": 20000,
+        "mpns": [
+          "74LVC1G07GW,125"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 540,
+        "lineId": 3165021,
+        "rfqQty": 20000,
+        "mpns": [
+          "SN74LVC1G07DCKR"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 550,
+        "lineId": 3165022,
+        "rfqQty": 20000,
+        "mpns": [
+          "SN74LVC1G07DCKRG4"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 560,
+        "lineId": 3165023,
+        "rfqQty": 20000,
+        "mpns": [
+          "SN74LVC1G07DCKTG4"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 570,
+        "lineId": 3165024,
+        "rfqQty": 10000,
+        "mpns": [
+          "TPS54620RGYR"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 580,
+        "lineId": 3165025,
+        "rfqQty": 10000,
+        "mpns": [
+          "TPS54620RGYT"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 590,
+        "lineId": 3165026,
+        "rfqQty": 20000,
+        "mpns": [
+          "SI53108-A01AGMR"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 600,
+        "lineId": 3165027,
+        "rfqQty": 160000,
+        "mpns": [
+          "W25Q32JVSSIQ/REEL"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 610,
+        "lineId": 3165028,
+        "rfqQty": 160000,
+        "mpns": [
+          "W25Q32JVSSIQ-T"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 620,
+        "lineId": 3165029,
+        "rfqQty": 160000,
+        "mpns": [
+          "W25Q32JVSSIQT"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 630,
+        "lineId": 3165030,
+        "rfqQty": 160000,
+        "mpns": [
+          "W25Q32JVSSIQ TR"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 640,
+        "lineId": 3165031,
+        "rfqQty": 160000,
+        "mpns": [
+          "W25Q32JVSSIQTR"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 650,
+        "lineId": 3165032,
+        "rfqQty": 24000,
+        "mpns": [
+          "OPA835IDBVR"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 660,
+        "lineId": 3165033,
+        "rfqQty": 24000,
+        "mpns": [
+          "OPA835IDBVT"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 670,
+        "lineId": 3165034,
+        "rfqQty": 36000,
+        "mpns": [
+          "TPS62742DSSR"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 680,
+        "lineId": 3165035,
+        "rfqQty": 36000,
+        "mpns": [
+          "TPS62742DSST"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 690,
+        "lineId": 3165036,
+        "rfqQty": 212000,
+        "mpns": [
+          "LW Q38G-Q2OO-3K5L-1"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 700,
+        "lineId": 3165037,
+        "rfqQty": 152000,
+        "mpns": [
+          "500R07N470JV4T"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 710,
+        "lineId": 3165038,
+        "rfqQty": 0,
+        "mpns": [
+          "1339-31DCGI8",
+          "1339-31DCGI8"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 720,
+        "lineId": 3165039,
+        "rfqQty": 0,
+        "mpns": [
+          "PT7C4339DWEX"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 730,
+        "lineId": 3165040,
+        "rfqQty": 4100,
+        "mpns": [
+          "DRV5032FBDBZR"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 740,
+        "lineId": 3165041,
+        "rfqQty": 4100,
+        "mpns": [
+          "DRV5032FBDBZT"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 750,
+        "lineId": 3165042,
+        "rfqQty": 8500,
+        "mpns": [
+          "OPA836IDBVR"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 760,
+        "lineId": 3165043,
+        "rfqQty": 8500,
+        "mpns": [
+          "OPA836IDBVT"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 770,
+        "lineId": 3165044,
+        "rfqQty": 8000,
+        "mpns": [
+          "XFL3012-472MEC"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 780,
+        "lineId": 3165045,
+        "rfqQty": 12000,
+        "mpns": [
+          "LFE5U-45F-6BG256C"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 790,
+        "lineId": 3165046,
+        "rfqQty": 12000,
+        "mpns": [
+          "LFE5U-45F-6BG256I"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 800,
+        "lineId": 3165075,
+        "rfqQty": 336,
+        "mpns": [
+          "PCI12000C-I/ZUX"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 810,
+        "lineId": 3165076,
+        "rfqQty": 1900,
+        "mpns": [
+          "MTFDKBA480TFR-1BC1ZABYY�"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 820,
+        "lineId": 3165077,
+        "rfqQty": 3000,
+        "mpns": [
+          "MT60B2G8RZ-64B:H��"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 830,
+        "lineId": 3165078,
+        "rfqQty": 1900,
+        "mpns": [
+          "MZVL6240HFJD-00AAZ",
+          "MZVL6240HFJD-00AAZ"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 840,
+        "lineId": 3166002,
+        "rfqQty": 60000,
+        "mpns": [
+          "LM75BDP,118"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 850,
+        "lineId": 3166003,
+        "rfqQty": 60000,
+        "mpns": [
+          "TMP1075DGKR"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 860,
+        "lineId": 3166004,
+        "rfqQty": 60000,
+        "mpns": [
+          "TMP75BIDGKR"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 870,
+        "lineId": 3166005,
+        "rfqQty": 60000,
+        "mpns": [
+          "TMP75BIDGKT"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 880,
+        "lineId": 3166006,
+        "rfqQty": 60000,
+        "mpns": [
+          "TS3A5018PWR"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 890,
+        "lineId": 3166007,
+        "rfqQty": 300000,
+        "mpns": [
+          "74CBTLV3244PW,118"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 900,
+        "lineId": 3166008,
+        "rfqQty": 300000,
+        "mpns": [
+          "SN74CB3Q3244PWR"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 910,
+        "lineId": 3166009,
+        "rfqQty": 35000,
+        "mpns": [
+          "TPS548A20RVER"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 920,
+        "lineId": 3166010,
+        "rfqQty": 35000,
+        "mpns": [
+          "TPS548A20RVET"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 930,
+        "lineId": 3166011,
+        "rfqQty": 10000,
+        "mpns": [
+          "PCA9555PW,118"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 940,
+        "lineId": 3166012,
+        "rfqQty": 10000,
+        "mpns": [
+          "TCA9555PWR"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 950,
+        "lineId": 3166013,
+        "rfqQty": 126000,
+        "mpns": [
+          "TMP421AIDCNR"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 960,
+        "lineId": 3166014,
+        "rfqQty": 126000,
+        "mpns": [
+          "TMP421AIDCNT"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 970,
+        "lineId": 3166015,
+        "rfqQty": 300000,
+        "mpns": [
+          "LP2951CDR2G"
+        ],
+        "vqsThisBatch": 2
+      },
+      {
+        "lineNo": 980,
+        "lineId": 3166016,
+        "rfqQty": 300000,
+        "mpns": [
+          "LP2951-50DR"
+        ],
+        "vqsThisBatch": 13
+      },
+      {
+        "lineNo": 990,
+        "lineId": 3166017,
+        "rfqQty": 300000,
+        "mpns": [
+          "LP2951-50DRG4"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 1000,
+        "lineId": 3166018,
+        "rfqQty": 309000,
+        "mpns": [
+          "NTE00100229"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 1010,
+        "lineId": 3166019,
+        "rfqQty": 309000,
+        "mpns": [
+          "TLV07IDR"
+        ],
+        "vqsThisBatch": 14
+      },
+      {
+        "lineNo": 1020,
+        "lineId": 3166020,
+        "rfqQty": 78000,
+        "mpns": [
+          "TLV9161IDBVR"
+        ],
+        "vqsThisBatch": 5
+      },
+      {
+        "lineNo": 1030,
+        "lineId": 3166021,
+        "rfqQty": 2995,
+        "mpns": [
+          "AMK212BC6476MG-T"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 1040,
+        "lineId": 3166022,
+        "rfqQty": 141900,
+        "mpns": [
+          "GRM21BR60J476ME01L"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 1050,
+        "lineId": 3166023,
+        "rfqQty": 151000,
+        "mpns": [
+          "0805X476M6R3CT"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 1060,
+        "lineId": 3166024,
+        "rfqQty": 5200,
+        "mpns": [
+          "MSASJ21GBB5476MTNA01"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 1070,
+        "lineId": 3166025,
+        "rfqQty": 26000,
+        "mpns": [
+          "GRM188R61A106MAALD"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 1080,
+        "lineId": 3166026,
+        "rfqQty": 1342000,
+        "mpns": [
+          "CL10A106MP8NNNC"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 1090,
+        "lineId": 3166027,
+        "rfqQty": 1152000,
+        "mpns": [
+          "0603X106M100CT"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 1100,
+        "lineId": 3166028,
+        "rfqQty": 298100,
+        "mpns": [
+          "CL21A476MQYNNNE"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 1110,
+        "lineId": 3166029,
+        "rfqQty": 298100,
+        "mpns": [
+          "JMK212BJ476MG-T"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 1120,
+        "lineId": 3166030,
+        "rfqQty": 298100,
+        "mpns": [
+          "C2012X5R0J476MT"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 1130,
+        "lineId": 3166031,
+        "rfqQty": 298100,
+        "mpns": [
+          "CC0805MKX5R5BB476"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 1140,
+        "lineId": 3166032,
+        "rfqQty": 90000,
+        "mpns": [
+          "CL21X106KAYNNNE"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 1150,
+        "lineId": 3166033,
+        "rfqQty": 90000,
+        "mpns": [
+          "MSAST21GBC6106MTNA01"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 1160,
+        "lineId": 3166034,
+        "rfqQty": 90000,
+        "mpns": [
+          "0805S106M250CT"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 1170,
+        "lineId": 3166035,
+        "rfqQty": 686995,
+        "mpns": [
+          "GRM21BC80G476ME15L"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 1180,
+        "lineId": 3166036,
+        "rfqQty": 1342000,
+        "mpns": [
+          "GRM188R61A106ME69D"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 1190,
+        "lineId": 3166037,
+        "rfqQty": 164000,
+        "mpns": [
+          "MSASL168BB5106MTNB33"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 1200,
+        "lineId": 3166038,
+        "rfqQty": 1342000,
+        "mpns": [
+          "CC0603MRX5R6BB106"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 1210,
+        "lineId": 3166039,
+        "rfqQty": 298100,
+        "mpns": [
+          "GRM21BR60J476ME15L"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 1220,
+        "lineId": 3166040,
+        "rfqQty": 298100,
+        "mpns": [
+          "JMK212BBJ476MG-T"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 1230,
+        "lineId": 3166041,
+        "rfqQty": 90000,
+        "mpns": [
+          "GRM21BC81E106ME11L"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 1240,
+        "lineId": 3166042,
+        "rfqQty": 90000,
+        "mpns": [
+          "CL21X106MAYNNNE"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 1250,
+        "lineId": 3166043,
+        "rfqQty": 90000,
+        "mpns": [
+          "TMK212BC6106MG-T"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 1260,
+        "lineId": 3166044,
+        "rfqQty": 90000,
+        "mpns": [
+          "CC0805MKX6S8BB106"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 1270,
+        "lineId": 3166045,
+        "rfqQty": 684000,
+        "mpns": [
+          "CL21X476MRYNNNE"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 1280,
+        "lineId": 3166046,
+        "rfqQty": 686995,
+        "mpns": [
+          "MSASA21GBC6476MTNA01"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 1290,
+        "lineId": 3166047,
+        "rfqQty": 10000,
+        "mpns": [
+          "PMEG3002AEL,315"
+        ],
+        "vqsThisBatch": 4
+      },
+      {
+        "lineNo": 1300,
+        "lineId": 3166048,
+        "rfqQty": 100000,
+        "mpns": [
+          "IRFH5300TRPBF"
+        ],
+        "vqsThisBatch": 13
+      },
+      {
+        "lineNo": 1310,
+        "lineId": 3166049,
+        "rfqQty": 100000,
+        "mpns": [
+          "SIRA60DP-T1-GE3"
+        ],
+        "vqsThisBatch": 11
+      },
+      {
+        "lineNo": 1320,
+        "lineId": 3166050,
+        "rfqQty": 200,
+        "mpns": [
+          "A9967-ALD"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 1330,
+        "lineId": 3166051,
+        "rfqQty": 12,
+        "mpns": [
+          "10M02SCU169C8G"
+        ],
+        "vqsThisBatch": 2
+      },
+      {
+        "lineNo": 1340,
+        "lineId": 3166052,
+        "rfqQty": 3700,
+        "mpns": [
+          "LFE5U-12F-6BG256C"
+        ],
+        "vqsThisBatch": 8
+      },
+      {
+        "lineNo": 1350,
+        "lineId": 3166053,
+        "rfqQty": 45,
+        "mpns": [
+          "RJE59-188-5441"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 1360,
+        "lineId": 3166054,
+        "rfqQty": 1000,
+        "mpns": [
+          "LM4041DADJFTA"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 1370,
+        "lineId": 3166055,
+        "rfqQty": 5000,
+        "mpns": [
+          "KLM4G1FETE-B041"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 1380,
+        "lineId": 3166056,
+        "rfqQty": 64,
+        "mpns": [
+          "MT62F2G32D8DR-031 WT:B"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 1390,
+        "lineId": 3166057,
+        "rfqQty": 25000,
+        "mpns": [
+          "LCMXO3LF-1300C-5BG256C"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 1400,
+        "lineId": 3166058,
+        "rfqQty": 25000,
+        "mpns": [
+          "LCMXO3LF-1300C-5BG256I"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 1410,
+        "lineId": 3166059,
+        "rfqQty": 35000,
+        "mpns": [
+          "LCMXO3LF-2100C-5BG324C"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 1420,
+        "lineId": 3166060,
+        "rfqQty": 35000,
+        "mpns": [
+          "LCMXO3LF-2100C-5BG324I"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 1430,
+        "lineId": 3166061,
+        "rfqQty": 6000,
+        "mpns": [
+          "LCMXO3LF-4300C-5BG256C"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 1440,
+        "lineId": 3166062,
+        "rfqQty": 18000,
+        "mpns": [
+          "LCMXO3LF-9400C-5BG400C"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 1450,
+        "lineId": 3166063,
+        "rfqQty": 14000,
+        "mpns": [
+          "LCMXO3LF-9400C-5BG256C"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 1460,
+        "lineId": 3166064,
+        "rfqQty": 1400,
+        "mpns": [
+          "SLF7055T-220M1R7-3PF"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 1470,
+        "lineId": 3166065,
+        "rfqQty": 70000,
+        "mpns": [
+          "INA240A1QDRQ1"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 1480,
+        "lineId": 3166066,
+        "rfqQty": 30000,
+        "mpns": [
+          "DRV3256AEPAPRQ1"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 1490,
+        "lineId": 3166067,
+        "rfqQty": 20000,
+        "mpns": [
+          "LM5575QMHX/NOPB"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 1500,
+        "lineId": 3166068,
+        "rfqQty": 30000,
+        "mpns": [
+          "ISO7741FEDWRQ1"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 1510,
+        "lineId": 3166069,
+        "rfqQty": 80000,
+        "mpns": [
+          "TPS7B8850QKVURQ1"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 1520,
+        "lineId": 3166070,
+        "rfqQty": 20000,
+        "mpns": [
+          "TL431LIBQDBZRQ1"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 1530,
+        "lineId": 3166071,
+        "rfqQty": 4000,
+        "mpns": [
+          "ISL80102IRAJZ-T"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 1540,
+        "lineId": 3166072,
+        "rfqQty": 180,
+        "mpns": [
+          "XC7A50T-2FGG484C"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 1550,
+        "lineId": 3166073,
+        "rfqQty": 10000,
+        "mpns": [
+          "EEFGX0D561L"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 1560,
+        "lineId": 3166074,
+        "rfqQty": 64,
+        "mpns": [
+          "MX66L51235FMI-10G"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 1570,
+        "lineId": 3166075,
+        "rfqQty": 64,
+        "mpns": [
+          "MT25QL512ABB8ESF-0SIT"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 1580,
+        "lineId": 3166076,
+        "rfqQty": 210,
+        "mpns": [
+          "CD8069504344500 SRG24 999H5K"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 1590,
+        "lineId": 3166077,
+        "rfqQty": 6000,
+        "mpns": [
+          "SWPA4018S100MT"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 1600,
+        "lineId": 3166078,
+        "rfqQty": 9000,
+        "mpns": [
+          "SWPA4018S1R5MT"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 1610,
+        "lineId": 3166079,
+        "rfqQty": 50000,
+        "mpns": [
+          "1210AA102JAT4A"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 1620,
+        "lineId": 3166080,
+        "rfqQty": 50000,
+        "mpns": [
+          "C1210C102JDGACTU"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 1630,
+        "lineId": 3166081,
+        "rfqQty": 50000,
+        "mpns": [
+          "C1210C102JDGACAUTO"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 1640,
+        "lineId": 3166082,
+        "rfqQty": 5800,
+        "mpns": [
+          "2225Y1K50223KXT"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 1650,
+        "lineId": 3166083,
+        "rfqQty": 5800,
+        "mpns": [
+          "2225SC223KAZ2A"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 1660,
+        "lineId": 3166084,
+        "rfqQty": 7500,
+        "mpns": [
+          "019-7344-02R"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 1670,
+        "lineId": 3166085,
+        "rfqQty": 5600,
+        "mpns": [
+          "ZXGD3002E6TA"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 1680,
+        "lineId": 3166086,
+        "rfqQty": 280,
+        "mpns": [
+          "56-724-003-LI"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 1690,
+        "lineId": 3166087,
+        "rfqQty": 72500,
+        "mpns": [
+          "CSD95565PVBRR"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 1700,
+        "lineId": 3166103,
+        "rfqQty": 10000,
+        "mpns": [
+          "SCANSTA112SM/NOPB"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 1710,
+        "lineId": 3166104,
+        "rfqQty": 10000,
+        "mpns": [
+          "SCANSTA112SMX/NOPB"
+        ],
+        "vqsThisBatch": 0
+      }
+    ],
+    "gaps": [
+      10,
+      20,
+      30,
+      40,
+      50,
+      60,
+      70,
+      80,
+      90,
+      100,
+      110,
+      120,
+      130,
+      140,
+      150,
+      160,
+      170,
+      180,
+      190,
+      200,
+      210,
+      220,
+      230,
+      240,
+      250,
+      260,
+      270,
+      280,
+      290,
+      300,
+      310,
+      320,
+      330,
+      340,
+      350,
+      360,
+      370,
+      380,
+      390,
+      400,
+      420,
+      430,
+      440,
+      450,
+      460,
+      470,
+      480,
+      490,
+      500,
+      510,
+      520,
+      530,
+      540,
+      550,
+      560,
+      570,
+      580,
+      590,
+      600,
+      610,
+      620,
+      630,
+      640,
+      650,
+      660,
+      670,
+      680,
+      690,
+      700,
+      710,
+      720,
+      730,
+      740,
+      750,
+      760,
+      770,
+      780,
+      790,
+      800,
+      810,
+      820,
+      830,
+      840,
+      850,
+      860,
+      870,
+      880,
+      890,
+      900,
+      910,
+      920,
+      930,
+      940,
+      950,
+      960,
+      990,
+      1000,
+      1030,
+      1040,
+      1050,
+      1060,
+      1070,
+      1080,
+      1090,
+      1100,
+      1110,
+      1120,
+      1130,
+      1140,
+      1150,
+      1160,
+      1170,
+      1180,
+      1190,
+      1200,
+      1210,
+      1220,
+      1230,
+      1240,
+      1250,
+      1260,
+      1270,
+      1280,
+      1320,
+      1350,
+      1360,
+      1370,
+      1380,
+      1390,
+      1400,
+      1410,
+      1420,
+      1430,
+      1440,
+      1450,
+      1460,
+      1470,
+      1480,
+      1490,
+      1500,
+      1510,
+      1520,
+      1530,
+      1540,
+      1550,
+      1560,
+      1570,
+      1580,
+      1590,
+      1600,
+      1610,
+      1620,
+      1630,
+      1640,
+      1650,
+      1660,
+      1670,
+      1680,
+      1690,
+      1700,
+      1710
+    ]
+  }
+}

@@ -1,0 +1,473 @@
+{
+  "rfqSearchKey": "1141572",
+  "buyerId": 1011159,
+  "runAt": "2026-08-12T02:48:56.042Z",
+  "sourceQuotes": "/tmp/vq_load_1141572_chunk3.json",
+  "result": {
+    "written": [
+      {
+        "vqLineId": 2308107,
+        "line": 120,
+        "mpn": "STM32L476VGT6",
+        "vendor": "PGC-IC Ltd",
+        "cost": 8,
+        "qty": 2000,
+        "fuzzyMatch": false,
+        "originalVendorLabel": "PGC",
+        "bpId": 1001639,
+        "noBid": false
+      },
+      {
+        "vqLineId": 2308110,
+        "line": 120,
+        "mpn": "STM32L476VGT6",
+        "vendor": "Keming Electronics Development Co., Ltd",
+        "cost": 7.35,
+        "qty": 2000,
+        "fuzzyMatch": false,
+        "originalVendorLabel": "Keming",
+        "bpId": 1000313,
+        "noBid": false
+      },
+      {
+        "vqLineId": 2308113,
+        "line": 120,
+        "mpn": "STM32L476VGT6",
+        "vendor": "HK Firsttop Technology Ltd",
+        "cost": 7.767,
+        "qty": 2000,
+        "fuzzyMatch": false,
+        "originalVendorLabel": "Firsttop",
+        "bpId": 1003256,
+        "noBid": false
+      },
+      {
+        "vqLineId": 2308117,
+        "line": 120,
+        "mpn": "STM32L476VGT6",
+        "vendor": "HK Firsttop Technology Ltd",
+        "cost": 9.289,
+        "qty": 5000,
+        "fuzzyMatch": false,
+        "originalVendorLabel": "Firsttop",
+        "bpId": 1003256,
+        "noBid": false
+      },
+      {
+        "vqLineId": 2308122,
+        "line": 120,
+        "mpn": "STM32L476VGT6",
+        "vendor": "Xinshop Electronics Co., Ltd ",
+        "cost": 6.409,
+        "qty": 1000,
+        "fuzzyMatch": false,
+        "originalVendorLabel": "XINSHOP",
+        "bpId": 1002647,
+        "noBid": false
+      },
+      {
+        "vqLineId": 2308129,
+        "line": 120,
+        "mpn": "STM32L476VGT6",
+        "vendor": "Xinshop Electronics Co., Ltd ",
+        "cost": 7.935,
+        "qty": 1000,
+        "fuzzyMatch": false,
+        "originalVendorLabel": "XINSHOP",
+        "bpId": 1002647,
+        "noBid": false
+      },
+      {
+        "vqLineId": 2308132,
+        "line": 120,
+        "mpn": "STM32L476VGT6",
+        "vendor": "Xinshop Electronics Co., Ltd ",
+        "cost": 10.376,
+        "qty": 5000,
+        "fuzzyMatch": false,
+        "originalVendorLabel": "XINSHOP",
+        "bpId": 1002647,
+        "noBid": false
+      },
+      {
+        "vqLineId": 2308136,
+        "line": 120,
+        "mpn": "STM32L476VGT6",
+        "vendor": "Unix Electronics Technology Co., Ltd",
+        "cost": 8.83,
+        "qty": 5000,
+        "fuzzyMatch": false,
+        "originalVendorLabel": "Unix",
+        "bpId": 1001669,
+        "noBid": false
+      },
+      {
+        "vqLineId": 2308143,
+        "line": 120,
+        "mpn": "STM32L476VGT6",
+        "vendor": "3A Components Limited",
+        "cost": 7,
+        "qty": 2000,
+        "fuzzyMatch": false,
+        "originalVendorLabel": "3A",
+        "bpId": 1000605,
+        "noBid": false
+      },
+      {
+        "vqLineId": 2308150,
+        "line": 120,
+        "mpn": "STM32L476VGT6",
+        "vendor": "Action (HK) Technology Ltd",
+        "cost": 7.369,
+        "qty": 2000,
+        "fuzzyMatch": false,
+        "originalVendorLabel": "ACTION",
+        "bpId": 1001460,
+        "noBid": false
+      },
+      {
+        "vqLineId": 2308155,
+        "line": 120,
+        "mpn": "STM32L476VGT6",
+        "vendor": "SMARTEL ELECTRONICS (ASIA) CO LTD",
+        "cost": 8.49,
+        "qty": 1000,
+        "fuzzyMatch": false,
+        "originalVendorLabel": "Smartel",
+        "bpId": 1004861,
+        "noBid": false
+      },
+      {
+        "vqLineId": 2308161,
+        "line": 120,
+        "mpn": "STM32L476VGT6",
+        "vendor": "SMARTEL ELECTRONICS (ASIA) CO LTD",
+        "cost": 7.55,
+        "qty": 2000,
+        "fuzzyMatch": false,
+        "originalVendorLabel": "Smartel",
+        "bpId": 1004861,
+        "noBid": false
+      },
+      {
+        "vqLineId": 2308167,
+        "line": 130,
+        "mpn": "MC34063ABD",
+        "vendor": "PGC-IC Ltd",
+        "cost": 0.229,
+        "qty": 2500,
+        "fuzzyMatch": false,
+        "originalVendorLabel": "PGC",
+        "bpId": 1001639,
+        "noBid": false
+      },
+      {
+        "vqLineId": 2308173,
+        "line": 130,
+        "mpn": "MC34063ABD",
+        "vendor": "Keming Electronics Development Co., Ltd",
+        "cost": 0.199,
+        "qty": 2500,
+        "fuzzyMatch": false,
+        "originalVendorLabel": "Keming",
+        "bpId": 1000313,
+        "noBid": false
+      },
+      {
+        "vqLineId": 2308179,
+        "line": 130,
+        "mpn": "MC34063ABD",
+        "vendor": "HK Firsttop Technology Ltd",
+        "cost": 0.238,
+        "qty": 2500,
+        "fuzzyMatch": false,
+        "originalVendorLabel": "Firsttop",
+        "bpId": 1003256,
+        "noBid": false
+      },
+      {
+        "vqLineId": 2308185,
+        "line": 130,
+        "mpn": "MC34063ABD",
+        "vendor": "Xinshop Electronics Co., Ltd ",
+        "cost": 0.229,
+        "qty": 2500,
+        "fuzzyMatch": false,
+        "originalVendorLabel": "XINSHOP",
+        "bpId": 1002647,
+        "noBid": false
+      },
+      {
+        "vqLineId": 2308189,
+        "line": 130,
+        "mpn": "MC34063ABD",
+        "vendor": "3A Components Limited",
+        "cost": 0.22,
+        "qty": 2500,
+        "fuzzyMatch": false,
+        "originalVendorLabel": "3A",
+        "bpId": 1000605,
+        "noBid": false
+      },
+      {
+        "vqLineId": 2308191,
+        "line": 130,
+        "mpn": "MC34063ABD",
+        "vendor": "Action (HK) Technology Ltd",
+        "cost": 0.239,
+        "qty": 2500,
+        "fuzzyMatch": false,
+        "originalVendorLabel": "ACTION",
+        "bpId": 1001460,
+        "noBid": false
+      },
+      {
+        "vqLineId": 2308195,
+        "line": 130,
+        "mpn": "MC34063ABD",
+        "vendor": "SMARTEL ELECTRONICS (ASIA) CO LTD",
+        "cost": 0.215,
+        "qty": 2500,
+        "fuzzyMatch": false,
+        "originalVendorLabel": "Smartel",
+        "bpId": 1004861,
+        "noBid": false
+      },
+      {
+        "vqLineId": 2308197,
+        "line": 170,
+        "mpn": "TPS2400DBVR",
+        "vendor": "Original Chip Source Electronics Co., Limited",
+        "cost": 0.9,
+        "qty": 200000,
+        "fuzzyMatch": false,
+        "originalVendorLabel": "Original chip",
+        "bpId": 1009652,
+        "noBid": false
+      }
+    ],
+    "skipped": [],
+    "failed": [],
+    "coverage": [
+      {
+        "lineNo": 10,
+        "lineId": 3166564,
+        "rfqQty": 979,
+        "mpns": [
+          "766145191AP"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 20,
+        "lineId": 3166566,
+        "rfqQty": 200,
+        "mpns": [
+          "XC9572XL-7VQG64I"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 30,
+        "lineId": 3166565,
+        "rfqQty": 200,
+        "mpns": [
+          "XC9572XL-15VQ64Q"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 40,
+        "lineId": 3166567,
+        "rfqQty": 200,
+        "mpns": [
+          "XA9536XL-15VQG44Q"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 50,
+        "lineId": 3166568,
+        "rfqQty": 1000,
+        "mpns": [
+          "ADXL362BCCZ-RL7"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 60,
+        "lineId": 3166572,
+        "rfqQty": 15000,
+        "mpns": [
+          "BGA125N6E6327XTSA1"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 70,
+        "lineId": 3166571,
+        "rfqQty": 105,
+        "mpns": [
+          "ADA4896-2ACPZ-R7"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 80,
+        "lineId": 3166569,
+        "rfqQty": 21000,
+        "mpns": [
+          "STM32U083CCT6"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 90,
+        "lineId": 3166570,
+        "rfqQty": 21000,
+        "mpns": [
+          "STM32U083CCT3"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 100,
+        "lineId": 3166573,
+        "rfqQty": 21000,
+        "mpns": [
+          "STM32U083CCT6TR"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 110,
+        "lineId": 3166574,
+        "rfqQty": 21000,
+        "mpns": [
+          "STM32U083CCT3TR"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 120,
+        "lineId": 3166575,
+        "rfqQty": 36000,
+        "mpns": [
+          "STM32L476VGT6"
+        ],
+        "vqsThisBatch": 12
+      },
+      {
+        "lineNo": 130,
+        "lineId": 3166576,
+        "rfqQty": 2500,
+        "mpns": [
+          "MC34063ABD"
+        ],
+        "vqsThisBatch": 7
+      },
+      {
+        "lineNo": 140,
+        "lineId": 3166577,
+        "rfqQty": 2000,
+        "mpns": [
+          "ABM3B-8.000MHZ-10-1-U-T 5032"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 150,
+        "lineId": 3166578,
+        "rfqQty": 500,
+        "mpns": [
+          "522.719"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 160,
+        "lineId": 3166579,
+        "rfqQty": 5000,
+        "mpns": [
+          "STM32H573MIY3QTR"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 170,
+        "lineId": 3166580,
+        "rfqQty": 200000,
+        "mpns": [
+          "TPS2400DBVR"
+        ],
+        "vqsThisBatch": 1
+      },
+      {
+        "lineNo": 180,
+        "lineId": 3166581,
+        "rfqQty": 200000,
+        "mpns": [
+          "TPS2400DBVT"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 190,
+        "lineId": 3166582,
+        "rfqQty": 500,
+        "mpns": [
+          "PC95ER18/5/12-Z"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 200,
+        "lineId": 3166583,
+        "rfqQty": 500,
+        "mpns": [
+          "SG-210STF 29.4912ML3"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 210,
+        "lineId": 3166584,
+        "rfqQty": 1000,
+        "mpns": [
+          "STM32L151CBU6A"
+        ],
+        "vqsThisBatch": 0
+      },
+      {
+        "lineNo": 220,
+        "lineId": 3166585,
+        "rfqQty": 3600,
+        "mpns": [
+          "SN74AXC8T245RHLR"
+        ],
+        "vqsThisBatch": 0
+      }
+    ],
+    "gaps": [
+      10,
+      20,
+      30,
+      40,
+      50,
+      60,
+      70,
+      80,
+      90,
+      100,
+      110,
+      140,
+      150,
+      160,
+      180,
+      190,
+      200,
+      210,
+      220
+    ]
+  }
+}
