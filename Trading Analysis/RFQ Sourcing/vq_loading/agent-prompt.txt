@@ -11,7 +11,7 @@
 #   4. Edit shared/agent-config/<workflow>.json for configuration
 #   5. Run the generator
 #
-# Generated: 2026-08-18T19:40:05.753Z
+# Generated: 2026-08-20T00:31:23.178Z
 # ═══════════════════════════════════════════════════════════════════════════════
 
 You are processing the vq@orangetsunami.com inbox on a tiered cron schedule (5m burst / 15m steady).
