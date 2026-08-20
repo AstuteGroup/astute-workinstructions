@@ -207,7 +207,9 @@ function extractLineItems(text) {
     const endPos = matches[i + 1] ? matches[i + 1].index : text.indexOf('Total:', startPos);
     const detailText = text.substring(startPos, endPos > startPos ? endPos : startPos + 500);
 
-    const descMatch = detailText.match(/\n([A-Z][^\n]+?)(?=\nPromised Date:|\nItem Revision:|\nManufacturer:|\nDrawing|\nRoHS:|\n\d+\s+EA|\n[A-Z0-9-]+\s*\n\s*[\d,]+)/);
+    // Description is the first non-empty line that starts with a capital letter
+    // Handle multiple blank lines with \n+ and lookahead for \n+ before keywords
+    const descMatch = detailText.match(/\n+([A-Z][^\n]+?)(?=\n+Promised Date:|\n+Item Revision:|\n+Manufacturer:|\n+Drawing|\n+RoHS:|\n+\d+\s+EA|\n+[A-Z0-9-]+\s*\n\s*[\d,]+)/);
     if (descMatch) {
       item.description = descMatch[1].trim();
     }
@@ -231,10 +233,12 @@ function extractLineItems(text) {
     if (rohsMatch) item.rohs = rohsMatch[1].charAt(0).toUpperCase() + rohsMatch[1].slice(1).toLowerCase();
 
     // Line Notes - freeform text after Manufacturer/RoHS
+    // Skip the manufacturer value line (first non-empty line after "Manufacturer:")
     const noteLines = [];
     const lines = detailText.split('\n');
     let foundManufacturer = false;
     let foundRoHS = false;
+    let skippedMfrValue = false;
 
     for (const line of lines) {
       const trimmed = line.trim();
@@ -242,10 +246,20 @@ function extractLineItems(text) {
 
       if (trimmed.startsWith('Manufacturer:')) {
         foundManufacturer = true;
+        // If manufacturer value is on the same line, mark as already skipped
+        if (trimmed.length > 13) {  // "Manufacturer:" is 13 chars
+          skippedMfrValue = true;
+        }
         continue;
       }
       if (trimmed.startsWith('RoHS:')) {
         foundRoHS = true;
+        continue;
+      }
+
+      if (foundManufacturer && !skippedMfrValue) {
+        // This is the manufacturer value line (when on separate line) - skip it
+        skippedMfrValue = true;
         continue;
       }
 
