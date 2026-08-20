@@ -1,0 +1,2306 @@
+{
+  "generatedAt": "2026-08-17T21:33:21.193Z",
+  "summary": {
+    "mfrsWithSuffixRules": 13,
+    "mfrsWithoutSuffixRules": 87,
+    "mfrsWithUncoveredMpns": 50
+  },
+  "priorityMfrsForRules": [
+    {
+      "mfr": "Vishay",
+      "totalMpns": 1809,
+      "totalRfqs": 394,
+      "potentialSuffixes": [
+        {
+          "suffix1": "3",
+          "suffix2": "E3",
+          "count": 117
+        },
+        {
+          "suffix1": "A",
+          "suffix2": "EA",
+          "count": 72
+        },
+        {
+          "suffix1": "8",
+          "suffix2": "08",
+          "count": 41
+        },
+        {
+          "suffix1": "0",
+          "suffix2": "00",
+          "count": 32
+        },
+        {
+          "suffix1": "1",
+          "suffix2": "01",
+          "count": 25
+        },
+        {
+          "suffix1": "C",
+          "suffix2": "BC",
+          "count": 23
+        },
+        {
+          "suffix1": "D",
+          "suffix2": "ED",
+          "count": 21
+        },
+        {
+          "suffix1": "H",
+          "suffix2": "/H",
+          "count": 21
+        },
+        {
+          "suffix1": "F",
+          "suffix2": "BF",
+          "count": 20
+        },
+        {
+          "suffix1": "T",
+          "suffix2": "AT",
+          "count": 19
+        }
+      ]
+    },
+    {
+      "mfr": "Nexperia",
+      "totalMpns": 1190,
+      "totalRfqs": 495,
+      "potentialSuffixes": [
+        {
+          "suffix1": "5",
+          "suffix2": "15",
+          "count": 246
+        },
+        {
+          "suffix1": "5",
+          "suffix2": "25",
+          "count": 25
+        },
+        {
+          "suffix1": "8",
+          "suffix2": "18",
+          "count": 23
+        },
+        {
+          "suffix1": "Q",
+          "suffix2": "-Q",
+          "count": 15
+        },
+        {
+          "suffix1": "5",
+          "suffix2": "35",
+          "count": 12
+        },
+        {
+          "suffix1": "X",
+          "suffix2": "QX",
+          "count": 9
+        },
+        {
+          "suffix1": "L",
+          "suffix2": "YL",
+          "count": 9
+        },
+        {
+          "suffix1": "1",
+          "suffix2": "11",
+          "count": 8
+        },
+        {
+          "suffix1": "R",
+          "suffix2": "QR",
+          "count": 6
+        },
+        {
+          "suffix1": "X",
+          "suffix2": "EX",
+          "count": 6
+        }
+      ]
+    },
+    {
+      "mfr": "Murata",
+      "totalMpns": 1046,
+      "totalRfqs": 246,
+      "potentialSuffixes": [
+        {
+          "suffix1": "D",
+          "suffix2": "1D",
+          "count": 88
+        },
+        {
+          "suffix1": "L",
+          "suffix2": "1L",
+          "count": 40
+        },
+        {
+          "suffix1": "L",
+          "suffix2": "5L",
+          "count": 27
+        },
+        {
+          "suffix1": "D",
+          "suffix2": "2D",
+          "count": 20
+        },
+        {
+          "suffix1": "L",
+          "suffix2": "2L",
+          "count": 17
+        },
+        {
+          "suffix1": "K",
+          "suffix2": "5K",
+          "count": 17
+        },
+        {
+          "suffix1": "D",
+          "suffix2": "4D",
+          "count": 14
+        },
+        {
+          "suffix1": "D",
+          "suffix2": "3D",
+          "count": 11
+        },
+        {
+          "suffix1": "D",
+          "suffix2": "5D",
+          "count": 11
+        },
+        {
+          "suffix1": "K",
+          "suffix2": "1K",
+          "count": 10
+        }
+      ]
+    },
+    {
+      "mfr": "Yageo Corp",
+      "totalMpns": 858,
+      "totalRfqs": 62,
+      "potentialSuffixes": [
+        {
+          "suffix1": "L",
+          "suffix2": "KL",
+          "count": 9
+        },
+        {
+          "suffix1": "L",
+          "suffix2": "1L",
+          "count": 6
+        },
+        {
+          "suffix1": "L",
+          "suffix2": "2L",
+          "count": 5
+        }
+      ]
+    },
+    {
+      "mfr": "Cisco",
+      "totalMpns": 813,
+      "totalRfqs": 8,
+      "potentialSuffixes": [
+        {
+          "suffix1": "I",
+          "suffix2": "-I",
+          "count": 68
+        },
+        {
+          "suffix1": "D",
+          "suffix2": "GD",
+          "count": 61
+        },
+        {
+          "suffix1": "0",
+          "suffix2": "80",
+          "count": 60
+        },
+        {
+          "suffix1": "0",
+          "suffix2": "40",
+          "count": 57
+        },
+        {
+          "suffix1": "M",
+          "suffix2": "5M",
+          "count": 51
+        },
+        {
+          "suffix1": "M",
+          "suffix2": "0M",
+          "count": 46
+        },
+        {
+          "suffix1": "S",
+          "suffix2": "-S",
+          "count": 42
+        },
+        {
+          "suffix1": "0",
+          "suffix2": "20",
+          "count": 36
+        },
+        {
+          "suffix1": "4",
+          "suffix2": "R4",
+          "count": 20
+        },
+        {
+          "suffix1": "M",
+          "suffix2": "1M",
+          "count": 20
+        }
+      ]
+    },
+    {
+      "mfr": "Panasonic",
+      "totalMpns": 809,
+      "totalRfqs": 252,
+      "potentialSuffixes": [
+        {
+          "suffix1": "X",
+          "suffix2": "1X",
+          "count": 17
+        },
+        {
+          "suffix1": "X",
+          "suffix2": "2X",
+          "count": 15
+        },
+        {
+          "suffix1": "V",
+          "suffix2": "1V",
+          "count": 13
+        },
+        {
+          "suffix1": "V",
+          "suffix2": "2V",
+          "count": 13
+        },
+        {
+          "suffix1": "M",
+          "suffix2": "0M",
+          "count": 10
+        },
+        {
+          "suffix1": "X",
+          "suffix2": "3X",
+          "count": 9
+        },
+        {
+          "suffix1": "V",
+          "suffix2": "3V",
+          "count": 9
+        },
+        {
+          "suffix1": "P",
+          "suffix2": "AP",
+          "count": 8
+        },
+        {
+          "suffix1": "V",
+          "suffix2": "0V",
+          "count": 8
+        },
+        {
+          "suffix1": "X",
+          "suffix2": "0X",
+          "count": 7
+        }
+      ]
+    },
+    {
+      "mfr": "Diodes Inc",
+      "totalMpns": 607,
+      "totalRfqs": 198,
+      "potentialSuffixes": [
+        {
+          "suffix1": "F",
+          "suffix2": "-F",
+          "count": 89
+        },
+        {
+          "suffix1": "7",
+          "suffix2": "-7",
+          "count": 75
+        },
+        {
+          "suffix1": "3",
+          "suffix2": "13",
+          "count": 28
+        },
+        {
+          "suffix1": "A",
+          "suffix2": "TA",
+          "count": 21
+        },
+        {
+          "suffix1": "T",
+          "suffix2": "-T",
+          "count": 12
+        },
+        {
+          "suffix1": "B",
+          "suffix2": "7B",
+          "count": 11
+        },
+        {
+          "suffix1": "X",
+          "suffix2": "EX",
+          "count": 11
+        },
+        {
+          "suffix1": "1",
+          "suffix2": "G1",
+          "count": 6
+        },
+        {
+          "suffix1": "C",
+          "suffix2": "NC",
+          "count": 5
+        }
+      ]
+    },
+    {
+      "mfr": "Vishay Intertechnology Inc",
+      "totalMpns": 588,
+      "totalRfqs": 180,
+      "potentialSuffixes": [
+        {
+          "suffix1": "D",
+          "suffix2": "ED",
+          "count": 36
+        },
+        {
+          "suffix1": "3",
+          "suffix2": "E3",
+          "count": 26
+        },
+        {
+          "suffix1": "A",
+          "suffix2": "EA",
+          "count": 25
+        },
+        {
+          "suffix1": "E",
+          "suffix2": "EE",
+          "count": 11
+        },
+        {
+          "suffix1": "8",
+          "suffix2": "08",
+          "count": 7
+        },
+        {
+          "suffix1": "C",
+          "suffix2": "BC",
+          "count": 7
+        },
+        {
+          "suffix1": "1",
+          "suffix2": "T1",
+          "count": 5
+        }
+      ]
+    },
+    {
+      "mfr": "Samtec",
+      "totalMpns": 555,
+      "totalRfqs": 107,
+      "potentialSuffixes": [
+        {
+          "suffix1": "R",
+          "suffix2": "TR",
+          "count": 163
+        },
+        {
+          "suffix1": "1",
+          "suffix2": "01",
+          "count": 22
+        },
+        {
+          "suffix1": "D",
+          "suffix2": "-D",
+          "count": 17
+        },
+        {
+          "suffix1": "K",
+          "suffix2": "-K",
+          "count": 15
+        },
+        {
+          "suffix1": "A",
+          "suffix2": "-A",
+          "count": 13
+        },
+        {
+          "suffix1": "2",
+          "suffix2": "02",
+          "count": 11
+        },
+        {
+          "suffix1": "S",
+          "suffix2": "-S",
+          "count": 11
+        },
+        {
+          "suffix1": ")",
+          "suffix2": "L)",
+          "count": 11
+        },
+        {
+          "suffix1": "R",
+          "suffix2": "FR",
+          "count": 7
+        },
+        {
+          "suffix1": "P",
+          "suffix2": "-P",
+          "count": 6
+        }
+      ]
+    },
+    {
+      "mfr": "Micron Technology Inc",
+      "totalMpns": 537,
+      "totalRfqs": 937,
+      "potentialSuffixes": [
+        {
+          "suffix1": "R",
+          "suffix2": "TR",
+          "count": 75
+        },
+        {
+          "suffix1": "T",
+          "suffix2": "IT",
+          "count": 26
+        },
+        {
+          "suffix1": "E",
+          "suffix2": ":E",
+          "count": 19
+        },
+        {
+          "suffix1": "B",
+          "suffix2": ":B",
+          "count": 16
+        },
+        {
+          "suffix1": "T",
+          "suffix2": "AT",
+          "count": 15
+        },
+        {
+          "suffix1": "G",
+          "suffix2": ":G",
+          "count": 14
+        },
+        {
+          "suffix1": "C",
+          "suffix2": ":C",
+          "count": 13
+        },
+        {
+          "suffix1": "A",
+          "suffix2": ":A",
+          "count": 11
+        },
+        {
+          "suffix1": "D",
+          "suffix2": ":D",
+          "count": 11
+        },
+        {
+          "suffix1": "F",
+          "suffix2": ":F",
+          "count": 9
+        }
+      ]
+    },
+    {
+      "mfr": "Sei Electronics",
+      "totalMpns": 528,
+      "totalRfqs": 18,
+      "potentialSuffixes": [
+        {
+          "suffix1": "0",
+          "suffix2": "K0",
+          "count": 28
+        },
+        {
+          "suffix1": "K",
+          "suffix2": "0K",
+          "count": 24
+        },
+        {
+          "suffix1": "R",
+          "suffix2": "0R",
+          "count": 23
+        },
+        {
+          "suffix1": "0",
+          "suffix2": "00",
+          "count": 16
+        },
+        {
+          "suffix1": "0",
+          "suffix2": "50",
+          "count": 9
+        },
+        {
+          "suffix1": "1",
+          "suffix2": "K1",
+          "count": 8
+        },
+        {
+          "suffix1": "0",
+          "suffix2": "R0",
+          "count": 8
+        },
+        {
+          "suffix1": "7",
+          "suffix2": "K7",
+          "count": 8
+        },
+        {
+          "suffix1": "0",
+          "suffix2": "20",
+          "count": 7
+        },
+        {
+          "suffix1": "5",
+          "suffix2": "K5",
+          "count": 6
+        }
+      ]
+    },
+    {
+      "mfr": "Samsung",
+      "totalMpns": 511,
+      "totalRfqs": 194,
+      "potentialSuffixes": [
+        {
+          "suffix1": "C",
+          "suffix2": "NC",
+          "count": 45
+        },
+        {
+          "suffix1": "E",
+          "suffix2": "NE",
+          "count": 16
+        },
+        {
+          "suffix1": "S",
+          "suffix2": "CS",
+          "count": 14
+        },
+        {
+          "suffix1": "E",
+          "suffix2": "WE",
+          "count": 11
+        },
+        {
+          "suffix1": "7",
+          "suffix2": "07",
+          "count": 7
+        },
+        {
+          "suffix1": "D",
+          "suffix2": "ND",
+          "count": 6
+        },
+        {
+          "suffix1": "S",
+          "suffix2": "AS",
+          "count": 6
+        },
+        {
+          "suffix1": "P",
+          "suffix2": "CP",
+          "count": 5
+        }
+      ]
+    },
+    {
+      "mfr": "Huawei",
+      "totalMpns": 476,
+      "totalRfqs": 3,
+      "potentialSuffixes": [
+        {
+          "suffix1": "W",
+          "suffix2": "HW",
+          "count": 107
+        },
+        {
+          "suffix1": "M",
+          "suffix2": "5M",
+          "count": 17
+        },
+        {
+          "suffix1": "0",
+          "suffix2": "10",
+          "count": 15
+        },
+        {
+          "suffix1": "P",
+          "suffix2": "FP",
+          "count": 13
+        },
+        {
+          "suffix1": "0",
+          "suffix2": "50",
+          "count": 11
+        },
+        {
+          "suffix1": "I",
+          "suffix2": "-I",
+          "count": 9
+        },
+        {
+          "suffix1": "M",
+          "suffix2": "0M",
+          "count": 9
+        },
+        {
+          "suffix1": "I",
+          "suffix2": "DI",
+          "count": 8
+        },
+        {
+          "suffix1": "W",
+          "suffix2": "CW",
+          "count": 8
+        },
+        {
+          "suffix1": "P",
+          "suffix2": "MP",
+          "count": 6
+        }
+      ]
+    },
+    {
+      "mfr": "Diodes Incorporated",
+      "totalMpns": 476,
+      "totalRfqs": 215,
+      "potentialSuffixes": [
+        {
+          "suffix1": "7",
+          "suffix2": "-7",
+          "count": 87
+        },
+        {
+          "suffix1": "F",
+          "suffix2": "-F",
+          "count": 53
+        },
+        {
+          "suffix1": "3",
+          "suffix2": "13",
+          "count": 35
+        },
+        {
+          "suffix1": "X",
+          "suffix2": "EX",
+          "count": 19
+        },
+        {
+          "suffix1": "A",
+          "suffix2": "TA",
+          "count": 10
+        },
+        {
+          "suffix1": "B",
+          "suffix2": "7B",
+          "count": 6
+        }
+      ]
+    },
+    {
+      "mfr": "Arista Networks, Inc.",
+      "totalMpns": 461,
+      "totalRfqs": 3,
+      "potentialSuffixes": [
+        {
+          "suffix1": "R",
+          "suffix2": "AR",
+          "count": 112
+        },
+        {
+          "suffix1": "M",
+          "suffix2": "5M",
+          "count": 76
+        },
+        {
+          "suffix1": "M",
+          "suffix2": "0M",
+          "count": 44
+        },
+        {
+          "suffix1": "M",
+          "suffix2": "1M",
+          "count": 42
+        },
+        {
+          "suffix1": "M",
+          "suffix2": "2M",
+          "count": 37
+        },
+        {
+          "suffix1": "M",
+          "suffix2": "3M",
+          "count": 37
+        },
+        {
+          "suffix1": "4",
+          "suffix2": "R4",
+          "count": 18
+        },
+        {
+          "suffix1": "M",
+          "suffix2": "7M",
+          "count": 15
+        },
+        {
+          "suffix1": "I",
+          "suffix2": "-I",
+          "count": 9
+        },
+        {
+          "suffix1": "T",
+          "suffix2": "-T",
+          "count": 6
+        }
+      ]
+    },
+    {
+      "mfr": "KOA Speer Electronics Inc",
+      "totalMpns": 445,
+      "totalRfqs": 47,
+      "potentialSuffixes": [
+        {
+          "suffix1": "N",
+          "suffix2": "ON",
+          "count": 73
+        },
+        {
+          "suffix1": "I",
+          "suffix2": "NI",
+          "count": 23
+        },
+        {
+          "suffix1": "F",
+          "suffix2": "1F",
+          "count": 15
+        },
+        {
+          "suffix1": "F",
+          "suffix2": "0F",
+          "count": 14
+        },
+        {
+          "suffix1": "F",
+          "suffix2": "2F",
+          "count": 12
+        },
+        {
+          "suffix1": "F",
+          "suffix2": "3F",
+          "count": 11
+        },
+        {
+          "suffix1": "A",
+          "suffix2": "OA",
+          "count": 10
+        },
+        {
+          "suffix1": "J",
+          "suffix2": "1J",
+          "count": 9
+        },
+        {
+          "suffix1": "J",
+          "suffix2": "2J",
+          "count": 9
+        },
+        {
+          "suffix1": "0",
+          "suffix2": "50",
+          "count": 7
+        }
+      ]
+    },
+    {
+      "mfr": "Renesas",
+      "totalMpns": 410,
+      "totalRfqs": 206,
+      "potentialSuffixes": [
+        {
+          "suffix1": "0",
+          "suffix2": "B0",
+          "count": 23
+        },
+        {
+          "suffix1": "T",
+          "suffix2": "-T",
+          "count": 21
+        },
+        {
+          "suffix1": "8",
+          "suffix2": "I8",
+          "count": 19
+        },
+        {
+          "suffix1": "0",
+          "suffix2": "10",
+          "count": 17
+        },
+        {
+          "suffix1": "0",
+          "suffix2": "A0",
+          "count": 15
+        },
+        {
+          "suffix1": "0",
+          "suffix2": "30",
+          "count": 11
+        },
+        {
+          "suffix1": "T",
+          "suffix2": "FT",
+          "count": 9
+        },
+        {
+          "suffix1": "I",
+          "suffix2": "GI",
+          "count": 8
+        },
+        {
+          "suffix1": "8",
+          "suffix2": "G8",
+          "count": 8
+        },
+        {
+          "suffix1": "0",
+          "suffix2": "50",
+          "count": 5
+        }
+      ]
+    },
+    {
+      "mfr": "Taiyo Yuden",
+      "totalMpns": 373,
+      "totalRfqs": 80,
+      "potentialSuffixes": [
+        {
+          "suffix1": "T",
+          "suffix2": "-T",
+          "count": 70
+        },
+        {
+          "suffix1": "1",
+          "suffix2": "01",
+          "count": 60
+        },
+        {
+          "suffix1": "F",
+          "suffix2": "-F",
+          "count": 30
+        },
+        {
+          "suffix1": "P",
+          "suffix2": "-P",
+          "count": 9
+        },
+        {
+          "suffix1": "T",
+          "suffix2": "HT",
+          "count": 6
+        },
+        {
+          "suffix1": "5",
+          "suffix2": "25",
+          "count": 5
+        }
+      ]
+    },
+    {
+      "mfr": "TE Connectivity Ltd",
+      "totalMpns": 347,
+      "totalRfqs": 202,
+      "potentialSuffixes": [
+        {
+          "suffix1": "1",
+          "suffix2": "-1",
+          "count": 16
+        },
+        {
+          "suffix1": "0",
+          "suffix2": "-0",
+          "count": 12
+        },
+        {
+          "suffix1": "4",
+          "suffix2": "-4",
+          "count": 10
+        },
+        {
+          "suffix1": "2",
+          "suffix2": "-2",
+          "count": 9
+        },
+        {
+          "suffix1": "9",
+          "suffix2": "-9",
+          "count": 6
+        }
+      ]
+    },
+    {
+      "mfr": "Yazaki",
+      "totalMpns": 331,
+      "totalRfqs": 8,
+      "potentialSuffixes": [
+        {
+          "suffix1": "0",
+          "suffix2": "30",
+          "count": 97
+        },
+        {
+          "suffix1": "2",
+          "suffix2": "02",
+          "count": 45
+        },
+        {
+          "suffix1": "0",
+          "suffix2": "40",
+          "count": 32
+        },
+        {
+          "suffix1": "0",
+          "suffix2": "90",
+          "count": 10
+        },
+        {
+          "suffix1": "0",
+          "suffix2": "60",
+          "count": 9
+        },
+        {
+          "suffix1": "0",
+          "suffix2": "50",
+          "count": 7
+        },
+        {
+          "suffix1": "W",
+          "suffix2": "3W",
+          "count": 7
+        },
+        {
+          "suffix1": "7",
+          "suffix2": "47",
+          "count": 5
+        },
+        {
+          "suffix1": "0",
+          "suffix2": "80",
+          "count": 5
+        }
+      ]
+    }
+  ],
+  "mfrsWithUncoveredMpns": [
+    {
+      "mfr": "UNKNOWN",
+      "uncoveredMpnCount": 39587,
+      "rfqsAffected": 1735,
+      "sampleMpns": [
+        "\tPIC12F1822T-I/SN",
+        "\tPIC16F628T-20I/SO",
+        "\nJMV0402S140T850XXR",
+        " 280 MESH",
+        " 2821224-7",
+        " 43650-0627",
+        " A-2",
+        " DAC7612U/2K5",
+        " DS2502P-E48+",
+        " GRADE C"
+      ],
+      "hasSuffixRules": false
+    },
+    {
+      "mfr": "Texas Instruments",
+      "uncoveredMpnCount": 1859,
+      "rfqsAffected": 586,
+      "sampleMpns": [
+        "\tSN74LVC1GX04DCKR",
+        "\tTM4C129LNCZADT3",
+        "\tTM4C129XNCZADT3",
+        "\nCC2340R53E0RKPR\n",
+        " CSD17579Q3A ",
+        "5962-8774001EA",
+        "74ACT16245DLRG4",
+        "74ACT16374DLG4",
+        "74ACT16652DL",
+        "74AHCT1G00DCK"
+      ],
+      "hasSuffixRules": true
+    },
+    {
+      "mfr": "Vishay",
+      "uncoveredMpnCount": 913,
+      "rfqsAffected": 234,
+      "sampleMpns": [
+        " RNC55H5560FS",
+        "(FA) IDCS2512ER470M",
+        "02W5000JP?",
+        "0382090",
+        "1.5KE47C-E3",
+        "1.5KE47CA-E3",
+        "1.5KE47CA-E3/51",
+        "1.5KE47CA-E3/54",
+        "1.5KE47CA-E3/73",
+        "1.5KE47CAHE3_A/C"
+      ],
+      "hasSuffixRules": false
+    },
+    {
+      "mfr": "Cisco",
+      "uncoveredMpnCount": 809,
+      "rfqsAffected": 6,
+      "sampleMpns": [
+        "100G QSFP28 LOOPBACK",
+        "100GQSFP-LR4-4",
+        "25G-SR-SFP100M",
+        "C21 DWDM-SFP10G-60.61",
+        "C22 DWDM-SFP10G-59.79",
+        "C23 DWDM-SFP10G-58.98",
+        "C53 DWDM-SFP10G-35.04",
+        "C54 DWDM-SFP10G-34.25",
+        "C55 DWDM-SFP10G-33.47",
+        "C56 DWDM-SFP10G-32.68"
+      ],
+      "hasSuffixRules": false
+    },
+    {
+      "mfr": "Analog Devices Inc",
+      "uncoveredMpnCount": 732,
+      "rfqsAffected": 351,
+      "sampleMpns": [
+        " LTC2449IUHF#PBF",
+        "AD185JSTV101531110",
+        "AD4110-1BCPZ-RL7",
+        "AD420AR-32-REEL",
+        "AD45335KBCZ",
+        "AD5242BRUZ100-RL7",
+        "AD5252BRUZ10-RL7",
+        "AD5258BRMZ50",
+        "AD5258BRMZ50-R7",
+        "AD5259BRMZ100"
+      ],
+      "hasSuffixRules": true
+    },
+    {
+      "mfr": "Huawei",
+      "uncoveredMpnCount": 476,
+      "rfqsAffected": 3,
+      "sampleMpns": [
+        "02310CNF",
+        "02310CRM",
+        "02310JFE",
+        "02310KVU",
+        "02310KVV",
+        "02310LJH",
+        "02310MHR",
+        "02310MHS",
+        "02310MNW",
+        "02310MUJ"
+      ],
+      "hasSuffixRules": false
+    },
+    {
+      "mfr": "Arista Networks, Inc.",
+      "uncoveredMpnCount": 460,
+      "rfqsAffected": 2,
+      "sampleMpns": [
+        "40GBASE-XSR4-AR",
+        "A-D400-2Q200-10M",
+        "A-D400-2Q200-15M",
+        "A-D400-2Q200-1M",
+        "A-D400-2Q200-20M",
+        "A-D400-2Q200-25M",
+        "A-D400-2Q200-30M",
+        "A-D400-2Q200-3M",
+        "A-D400-2Q200-5M",
+        "A-D400-2Q200-7M"
+      ],
+      "hasSuffixRules": false
+    },
+    {
+      "mfr": "Murata",
+      "uncoveredMpnCount": 415,
+      "rfqsAffected": 128,
+      "sampleMpns": [
+        "     GRM022R60J474ME15L   ",
+        " GRM033Z71C104KE14D ",
+        "#919AS-100M",
+        "#A915AY-6R8M P3 ( NO TOKO )",
+        "#A920CY-1R0M=P3",
+        "120-11428A-TM7050BMFT44Q",
+        "1217AS-H-4R7N=P3",
+        "1225AS-H-1R5N=P2",
+        "1248AS-H-2R2N=P3",
+        "1433507C"
+      ],
+      "hasSuffixRules": false
+    },
+    {
+      "mfr": "Nexperia",
+      "uncoveredMpnCount": 411,
+      "rfqsAffected": 197,
+      "sampleMpns": [
+        " PESD12VS2UT,215",
+        "13705384-1",
+        "2N7002,235",
+        "2N7002P,235\n",
+        "2N7002PV_115",
+        "35-300267-AAA-RV2 \n",
+        "35-307154-AAA-RV1 \n",
+        "74AHC1G66GV",
+        "74AHC2G126DP,125",
+        "74AHCT1G07GW,125"
+      ],
+      "hasSuffixRules": false
+    },
+    {
+      "mfr": "MicroChip",
+      "uncoveredMpnCount": 342,
+      "rfqsAffected": 108,
+      "sampleMpns": [
+        "1ED3121MU12HXUMA1;SP005353276",
+        "23LCV1024T-I/SN",
+        "24FC128T-I/SN",
+        "24FC64T-I/MC",
+        "24LC00T-I/SN",
+        "24LC024T-E/SN",
+        "24LC16BT-I/SN",
+        "24LC256T-E/SMRVF",
+        "24LC512-I/SN",
+        "24LC64T-I/ST"
+      ],
+      "hasSuffixRules": true
+    },
+    {
+      "mfr": "Yazaki",
+      "uncoveredMpnCount": 328,
+      "rfqsAffected": 6,
+      "sampleMpns": [
+        "\t18009604450",
+        "18000004543",
+        "18001404830",
+        "18001404835",
+        "18005604530",
+        "18005605930",
+        "18006304730",
+        "18006304740",
+        "18006804340",
+        "18007704291"
+      ],
+      "hasSuffixRules": false
+    },
+    {
+      "mfr": "Panasonic",
+      "uncoveredMpnCount": 310,
+      "rfqsAffected": 114,
+      "sampleMpns": [
+        "10TPB150ML",
+        "10TPE330M",
+        "1120-00265",
+        "16SVP180MX",
+        "16SVPH330MAE",
+        "16TQC10M",
+        "25SVP33M",
+        "25SVPF330M",
+        "25SVPF47M",
+        "2R5SVPE330MY"
+      ],
+      "hasSuffixRules": false
+    },
+    {
+      "mfr": "Samtec",
+      "uncoveredMpnCount": 288,
+      "rfqsAffected": 56,
+      "sampleMpns": [
+        "1PL1-102-01-L-S-K",
+        "2SN-BK-G",
+        "A-SFML-115-02-L-D-A-K-FR",
+        "A-SFML-115-02-L-D-A-K-TR",
+        "A-TFML-115-02-L-D-A-K-FR",
+        "A-TFML-115-02-L-D-A-K-TR",
+        "ASP-102810-01",
+        "ASP-102810-02",
+        "ASP-126988-01",
+        "ASP-126988-01 (ROHS)"
+      ],
+      "hasSuffixRules": false
+    },
+    {
+      "mfr": "Lantronix",
+      "uncoveredMpnCount": 286,
+      "rfqsAffected": 2,
+      "sampleMpns": [
+        "A06-155G1-SU-NE",
+        "AF6-155G1-LU-NE",
+        "DAC-10G-SFP-01M",
+        "FP-10K-T13-R14",
+        "FP-10K-T14-R13",
+        "NLANSRLU1",
+        "SFP-100M-COPPER",
+        "SFP-10K-DUPL",
+        "SFP-10K-T13-R14",
+        "SFP-10K-T14-R13"
+      ],
+      "hasSuffixRules": false
+    },
+    {
+      "mfr": "Analog Devices",
+      "uncoveredMpnCount": 275,
+      "rfqsAffected": 42,
+      "sampleMpns": [
+        "AD5449YRUZ,AD5449YRUZ-REEL7,AD5449YRUZ-REEL",
+        "AD5541ABRMZ-REEL7",
+        "AD558JP",
+        "AD5724AREZ,AD5724AREZ-REEL7",
+        "AD5724AREZ-REEL7",
+        "AD620ARZ-REEL",
+        "AD623ARMZ-REEL,AD623ARMZ-REEL7,AD623ARMZ",
+        "AD623ARZ-R7",
+        "AD633JRZ-RL",
+        "AD678BD"
+      ],
+      "hasSuffixRules": true
+    },
+    {
+      "mfr": "Omnitron",
+      "uncoveredMpnCount": 272,
+      "rfqsAffected": 1,
+      "sampleMpns": [
+        "7.631",
+        "7.634",
+        "7006-0Z",
+        "7006-6Z",
+        "7007-1",
+        "7007-1Z",
+        "7007-2",
+        "7007-2Z",
+        "7206-0",
+        "7206-0Z"
+      ],
+      "hasSuffixRules": false
+    },
+    {
+      "mfr": "Renesas",
+      "uncoveredMpnCount": 258,
+      "rfqsAffected": 110,
+      "sampleMpns": [
+        " IDT71V016SA15YG8",
+        "2SJ606-Z-E1-AZ",
+        "2SK2225-80-E#T2",
+        "5962-8513103EX",
+        "5P49V5908B509NDGI@ (/8)",
+        "5P49V6901A552NLGI",
+        "5PB1102PGGI8",
+        "5PB1104CMG18",
+        "5PB1104CMGK",
+        "5PB1104CMGK8"
+      ],
+      "hasSuffixRules": false
+    },
+    {
+      "mfr": "On Semiconductor",
+      "uncoveredMpnCount": 257,
+      "rfqsAffected": 124,
+      "sampleMpns": [
+        "0HISS-002-XTP",
+        "1.5SMC6.8AT3G",
+        "12045-502-XTP",
+        "1N4001G",
+        "1N5346B**G",
+        "1N5363B**G",
+        "1N5406RLG",
+        "1N5818**G",
+        "1SMB15AT3G",
+        "1SMB40AT3G"
+      ],
+      "hasSuffixRules": true
+    },
+    {
+      "mfr": "Diodes Inc",
+      "uncoveredMpnCount": 256,
+      "rfqsAffected": 84,
+      "sampleMpns": [
+        " PT7C4339WEX",
+        "0603YC104JAT4A",
+        "10A01-B",
+        "10A03-T",
+        "1N4004-T",
+        "1N4006-T",
+        "1N4007-T",
+        "1N4148WT-13",
+        "1N4744A-*",
+        "1N5231B-*"
+      ],
+      "hasSuffixRules": false
+    },
+    {
+      "mfr": "Micron Technology Inc",
+      "uncoveredMpnCount": 253,
+      "rfqsAffected": 170,
+      "sampleMpns": [
+        " MT25QL128ABA1ESE-0SIT TR",
+        " MT29F64G08AJABAWP-IT:B",
+        " MT40A1G8AG-062EAUT:R",
+        " MTFC32GBCAQDQ",
+        " MTFC32GBCAQDQ-AAT",
+        " MTFC32GBCAQDQ-AAT TR",
+        "AD797ARZ-REEL7\n",
+        "EDB5432BEBH-1DIT-F",
+        "EDB5432BEBH-1DIT-F-R",
+        "EDB8132B4PM-1D-F-D"
+      ],
+      "hasSuffixRules": false
+    },
+    {
+      "mfr": "Infineon",
+      "uncoveredMpnCount": 248,
+      "rfqsAffected": 108,
+      "sampleMpns": [
+        " SP000272323",
+        "16SCYQ060CSCX",
+        "1ED3491MC12MXUMA1,SP003244294",
+        "1EDI60N12AFXUMA1,SP001037224",
+        "1EDN7550BXTSA1\n",
+        "25LC1024-I/SM;25LC1024T-I/SM",
+        "2DIB0400F",
+        "2EDF7275K",
+        "2EDL8124GXUMA1",
+        "5962-9459902MYA"
+      ],
+      "hasSuffixRules": true
+    },
+    {
+      "mfr": "Vishay Intertechnology Inc",
+      "uncoveredMpnCount": 239,
+      "rfqsAffected": 75,
+      "sampleMpns": [
+        "1.5KE15CA-E3/54",
+        "199D106X9035DXV1-E3",
+        "2322 156 36802",
+        "2322-329-03109BC",
+        "293D106X9016B2TE3",
+        "293D227X96R3C2TE3",
+        "2N7002-T1-E3",
+        "300S-19",
+        "30LVD47JR-R",
+        "511D226M035AA2DE3"
+      ],
+      "hasSuffixRules": false
+    },
+    {
+      "mfr": "Toshiba",
+      "uncoveredMpnCount": 233,
+      "rfqsAffected": 72,
+      "sampleMpns": [
+        "1SV305(TPH3,F)",
+        "1SV305(TPH3,F)\n",
+        "1SV305,H3F(T",
+        "1SV305,H3F(T\n",
+        "1SV308,H3F(T",
+        "2SC5976(TE85L,F)",
+        "2SK3566(STA4,Q,M)",
+        "4N35(SHORT-LF1,F)",
+        "6N136",
+        "6N137(F)"
+      ],
+      "hasSuffixRules": false
+    },
+    {
+      "mfr": "KOA Speer Electronics Inc",
+      "uncoveredMpnCount": 231,
+      "rfqsAffected": 32,
+      "sampleMpns": [
+        "BSR5CN271J (ROHS)",
+        "CF1/2C473J",
+        "CF1/4CT52R103J",
+        "CF1/4CT52R224J",
+        "CF1/4CT52R273J",
+        "CF1/4CT52R681J",
+        "CF1/4CT52R8R2J",
+        "CN1J4TTD221J",
+        "CN2B4TE102J",
+        "CW2CT52R112J"
+      ],
+      "hasSuffixRules": false
+    },
+    {
+      "mfr": "NXP Semiconductors",
+      "uncoveredMpnCount": 228,
+      "rfqsAffected": 102,
+      "sampleMpns": [
+        " ",
+        "12062R104K9BB2",
+        "74ABT16543BB",
+        "74HC00D-T",
+        "74HC32D653",
+        "74HCT259D-653",
+        "74LV4052PW",
+        "74LV4052PW,118",
+        "74LVC162245ADGG:11",
+        "74LVCH1T45GW, 125"
+      ],
+      "hasSuffixRules": true
+    },
+    {
+      "mfr": "Samsung",
+      "uncoveredMpnCount": 209,
+      "rfqsAffected": 90,
+      "sampleMpns": [
+        " K4A8G165WC-BCTD",
+        " KLMAG1JETD-B041",
+        " PM9A1 ",
+        "CIGT252010LMR47MNE?",
+        "CL02A105MQ2NQN",
+        "CL03X225MQ5N6WC",
+        "CL05B152KA5NNNC",
+        "CL05B222KB5NFNC",
+        "CL05C220JB5NGNC",
+        "CL05C221JB5NFNC"
+      ],
+      "hasSuffixRules": false
+    },
+    {
+      "mfr": "STMicroelectronics",
+      "uncoveredMpnCount": 203,
+      "rfqsAffected": 55,
+      "sampleMpns": [
+        "077-0201-455",
+        "1.5KE6V8CA",
+        "2N6036",
+        "2N6039",
+        "2N6388",
+        "74LCX02TTR",
+        "74LCX08TTR",
+        "74LCX125YMTR",
+        "74LCX573TTR",
+        "74LVC08AMTR"
+      ],
+      "hasSuffixRules": true
+    },
+    {
+      "mfr": "TI",
+      "uncoveredMpnCount": 197,
+      "rfqsAffected": 100,
+      "sampleMpns": [
+        "54F00LMQB",
+        "?LM1117MPX-3.3/NOPB",
+        "?XIO3130INMH",
+        "ADC08D1520CIYB/NOPB",
+        "ADC121S021CIMF/NOPB",
+        "ADS130E08IPAG",
+        "AM26LV31ESDREP?",
+        "AM26LV32EMDREP?",
+        "AM26LV32IDR?",
+        "AM5746ABZXAS"
+      ],
+      "hasSuffixRules": true
+    },
+    {
+      "mfr": "Adtran",
+      "uncoveredMpnCount": 183,
+      "rfqsAffected": 1,
+      "sampleMpns": [
+        "1184543P-BX45",
+        "1184543P-BX45-120",
+        "1184543P-BX53",
+        "1184543P-BX54",
+        "1184543P-BX54-120",
+        "1184543P3",
+        "1184561P1",
+        "1184561P3",
+        "1184561P4",
+        "1184561PG1"
+      ],
+      "hasSuffixRules": false
+    },
+    {
+      "mfr": "Sei Electronics",
+      "uncoveredMpnCount": 179,
+      "rfqsAffected": 8,
+      "sampleMpns": [
+        "CF 1/4 200K 5% *",
+        "CF12JT15K0",
+        "CF12JT270R",
+        "CF12JT27R0",
+        "CF12JT2K00",
+        "CF12JT2K70",
+        "CF12JT3R00",
+        "CF12JT4R70",
+        "CF12JT56K0",
+        "CF12JT680R"
+      ],
+      "hasSuffixRules": false
+    },
+    {
+      "mfr": "TDK Corp",
+      "uncoveredMpnCount": 152,
+      "rfqsAffected": 33,
+      "sampleMpns": [
+        "ACF321825-223-TD01\n",
+        "ACF451832-222-TD01",
+        "ACH3218-103-TD01\n",
+        "ACM0706-102-2P",
+        "ACM1211-701-2PL-TL01",
+        "ACM1513-551-2PL-T",
+        "ACM1513-551-2PL-TLHF",
+        "ACM4532-601-2P-T001",
+        "ACM7060-701-2PL-T01",
+        "ACM7060-701-2PL-TL01"
+      ],
+      "hasSuffixRules": false
+    },
+    {
+      "mfr": "Diodes Incorporated",
+      "uncoveredMpnCount": 151,
+      "rfqsAffected": 78,
+      "sampleMpns": [
+        "1N4004-T",
+        "1N4004TR",
+        "1N4148-A",
+        "1N4148WSF-7",
+        "1N5237B-T",
+        "1N5819-T",
+        "AH1815-W-7",
+        "AH3322Q-SA-7",
+        "AL5801W6-7",
+        "AP2127N-3.3TRG1"
+      ],
+      "hasSuffixRules": false
+    },
+    {
+      "mfr": "Issi",
+      "uncoveredMpnCount": 148,
+      "rfqsAffected": 117,
+      "sampleMpns": [
+        "?IS62WV51216GBLL-45TLI",
+        "IS21EF08G-JCLI",
+        "IS21ES08G-JCLI-TR",
+        "IS21ES08GA-JCLI-TR",
+        "IS21TF16G-JCLI\n",
+        "IS21TF16G-JQLI",
+        "IS21TF32G-JCLI-TR",
+        "IS21TF32G-JCLI?",
+        "IS21TF32G-JQLI",
+        "IS22TF08G-JCLA2-TR"
+      ],
+      "hasSuffixRules": false
+    },
+    {
+      "mfr": "Palo Alto",
+      "uncoveredMpnCount": 147,
+      "rfqsAffected": 1,
+      "sampleMpns": [
+        "PAN-40G-QSFP-LR4",
+        "PAN-Q/SFP-DACBO-1M",
+        "PAN-QSFP-40GBASE-BIDI",
+        "PAN-QSFP-40GBASE-ER4",
+        "PAN-QSFP-40GBASE-LM4",
+        "PAN-QSFP-40GBASE-LR4",
+        "PAN-QSFP-40GBASE-LR4-20",
+        "PAN-QSFP-40GBASE-SR4",
+        "PAN-QSFP-40GBASE-SWDM4",
+        "PAN-QSFP-AOC-10M"
+      ],
+      "hasSuffixRules": false
+    },
+    {
+      "mfr": "Analog",
+      "uncoveredMpnCount": 133,
+      "rfqsAffected": 29,
+      "sampleMpns": [
+        "AD5644RBRMZ-5REEL7",
+        "AD633ARZ-RL",
+        "AD680JRZ",
+        "AD680JRZ-REEL7",
+        "AD680JT",
+        "AD680JTZ",
+        "AD7172-2BRUZ-RL7",
+        "AD7172-4BCPZ",
+        "AD7172-4BCPZ-RL",
+        "AD7172-4BCPZ-RL7"
+      ],
+      "hasSuffixRules": false
+    },
+    {
+      "mfr": "Microchip Technology Inc",
+      "uncoveredMpnCount": 132,
+      "rfqsAffected": 91,
+      "sampleMpns": [
+        "1N6677-1JAN",
+        "1N6677-1JANTX",
+        "24AA64T-I/MC",
+        "24FC256T-I/SN",
+        "24LC01BI/MS",
+        "24LC01BT-I/OT",
+        "24LC04B-I/SN",
+        "24LC512-E/SN",
+        "25C040T-I/SN",
+        "93LC86CT-I/SN"
+      ],
+      "hasSuffixRules": false
+    },
+    {
+      "mfr": "ADI",
+      "uncoveredMpnCount": 132,
+      "rfqsAffected": 71,
+      "sampleMpns": [
+        "5962-8958101PA?",
+        "5962-9470301MYA",
+        "AD3552RBCPZ16",
+        "AD390TD",
+        "AD4110-1BCPZ-RL7",
+        "AD5522JSVUZ-RL\n",
+        "AD558JPZ-REEL7",
+        "AD5667BRMZ",
+        "AD5667BRMZ-REEL7",
+        "AD5780BCPZ-REEL7"
+      ],
+      "hasSuffixRules": true
+    },
+    {
+      "mfr": "Edgecore",
+      "uncoveredMpnCount": 130,
+      "rfqsAffected": 1,
+      "sampleMpns": [
+        "ET3203-BX20",
+        "ET3203-BX20D",
+        "ET4201-LHX",
+        "ET4201-LX",
+        "ET4201-RJ45",
+        "ET4201-SX",
+        "ET4201-ZX",
+        "ET4202-EX",
+        "ET4202-LX",
+        "ET4202-RJ45"
+      ],
+      "hasSuffixRules": false
+    },
+    {
+      "mfr": "Broadcom",
+      "uncoveredMpnCount": 124,
+      "rfqsAffected": 56,
+      "sampleMpns": [
+        " BCM88852A2KFLGG",
+        "05-50170-00",
+        "4N26",
+        "4N27",
+        "4N28",
+        "4N29",
+        "4N30",
+        "4N31",
+        "4N32",
+        "4N33"
+      ],
+      "hasSuffixRules": false
+    },
+    {
+      "mfr": "Taiyo Yuden",
+      "uncoveredMpnCount": 110,
+      "rfqsAffected": 43,
+      "sampleMpns": [
+        "ADK105CC6226MV-F",
+        "AMK316BBJ227ML-T",
+        "BK1005HS100-T",
+        "BK2125HS102-T",
+        "BK2125LM152-T",
+        "CBC3225T101KR",
+        "CE EMK316BBJ476ML-T",
+        "CE UMK316AB7475KL-T",
+        "CK2125100M-T",
+        "CKP2012N4R7M-T"
+      ],
+      "hasSuffixRules": false
+    },
+    {
+      "mfr": "Infineon Technologies",
+      "uncoveredMpnCount": 107,
+      "rfqsAffected": 51,
+      "sampleMpns": [
+        "1ED020I12FFXUMA1",
+        "2EDN7524RXUMA1",
+        "5962-8867004LA",
+        "BAR 64-05W H6327",
+        "BAR6405WH6327XTSA1",
+        "BAR66E6327HTSA1",
+        "BAT 54-05W H6327",
+        "BBY 58-02-VH6327",
+        "BCX53-10AK",
+        "BGS12SN6"
+      ],
+      "hasSuffixRules": true
+    },
+    {
+      "mfr": "TE Connectivity Ltd",
+      "uncoveredMpnCount": 106,
+      "rfqsAffected": 71,
+      "sampleMpns": [
+        " 1-1600238-2",
+        "044846-E",
+        "1-1337482-0",
+        "1-1634688-4\n",
+        "1-2013522-0",
+        "1-533091-1",
+        "1-5747708-9",
+        "1-5748831-0",
+        "1-641211-0",
+        "1-826853-1"
+      ],
+      "hasSuffixRules": false
+    },
+    {
+      "mfr": "Ibm",
+      "uncoveredMpnCount": 106,
+      "rfqsAffected": 7,
+      "sampleMpns": [
+        "00AY240",
+        "00AY764",
+        "00AY765",
+        "00D6151",
+        "00D6222",
+        "00D6288",
+        "00FE333",
+        "00FE333B",
+        "00VN654",
+        "03GH958"
+      ],
+      "hasSuffixRules": false
+    },
+    {
+      "mfr": "TA-I Technology Co. Ltd",
+      "uncoveredMpnCount": 103,
+      "rfqsAffected": 7,
+      "sampleMpns": [
+        "RASA10FTN1001",
+        "RB04BTP6801",
+        "RB04BTP7502",
+        "RB04B_P1502",
+        "RB06BTP1001",
+        "RB06BTP1503",
+        "RB06BTP2401",
+        "RB06BTP4301",
+        "RB06BTP4991",
+        "RB06BTP5620"
+      ],
+      "hasSuffixRules": false
+    },
+    {
+      "mfr": "Hirose Electric Co Ltd",
+      "uncoveredMpnCount": 102,
+      "rfqsAffected": 19,
+      "sampleMpns": [
+        "BK22C07-4DS/2-0.4V(800)",
+        "DF11-16DS-2C",
+        "DF11-6DS-2C",
+        "DF11C-14DP-2V(57)",
+        "DF12-50DS-0.5V(86)",
+        "DF12D(5.0)-50DP-0.5V(81)",
+        "DF12NB(5.0)-50DP-0.5V(51)",
+        "DF12NB-50DS-0.5V(51)",
+        "DF12NC(3.0)-10DP-0.5V(51)",
+        "DF12NC(3.0)-10DS-0.5V(51)"
+      ],
+      "hasSuffixRules": false
+    },
+    {
+      "mfr": "Fortinet",
+      "uncoveredMpnCount": 101,
+      "rfqsAffected": 1,
+      "sampleMpns": [
+        "FG-TRAN-CFP2-LR4",
+        "FG-TRAN-GC",
+        "FG-TRAN-LX",
+        "FG-TRAN-QSFP+LR",
+        "FG-TRAN-QSFP+SR",
+        "FG-TRAN-QSFP+SR BIDI",
+        "FG-TRAN-QSFP+SR-BIDI",
+        "FG-TRAN-QSFP-4SFP-5",
+        "FG-TRAN-QSFP-4XSFP",
+        "FG-TRAN-QSFP-4XSFP-2M"
+      ],
+      "hasSuffixRules": false
+    },
+    {
+      "mfr": "Planet Platforms",
+      "uncoveredMpnCount": 100,
+      "rfqsAffected": 1,
+      "sampleMpns": [
+        "CB-DAQSFP-0.5M",
+        "CB-DAQSFP-2M",
+        "CB-DASFP-0.5M",
+        "CB-DASFP-2M",
+        "CB-QSFP4X10G-1M",
+        "CB-QSFP4X10G-3M",
+        "CB-QSFP4X10G-5M",
+        "MFB-F20",
+        "MFB-F40",
+        "MFB-F60"
+      ],
+      "hasSuffixRules": false
+    },
+    {
+      "mfr": "Walsin",
+      "uncoveredMpnCount": 98,
+      "rfqsAffected": 43,
+      "sampleMpns": [
+        "0201B103K100CT",
+        "0201N101J500CG",
+        "0201S105M6R3CT",
+        "0201X225K100CT",
+        "0402A225K100CT",
+        "0402B474K6R3CT",
+        "0402N102J500CG",
+        "0402N102J500CT",
+        "0402N330J500CG",
+        "0402N470J500CG"
+      ],
+      "hasSuffixRules": false
+    },
+    {
+      "mfr": "NIC Components Corp",
+      "uncoveredMpnCount": 97,
+      "rfqsAffected": 15,
+      "sampleMpns": [
+        "NACE100M50V6.3X5.5TR13F",
+        "NACE101M16V6.3X5.5TR13F",
+        "NACE2R2M50V4X5.5TR15F (T&R,12X8MM)",
+        "NACE470M35V8X6.5TR15F",
+        "NACE470M63V8X10.5TR15F",
+        "NACE4R7M35V4X5.5TR15F",
+        "NACZ470M50V6.3X8TR13F",
+        "NCB-H0603R471TR100F",
+        "NCB-H1206B121TR400F",
+        "NCB0805C222TR020F"
+      ],
+      "hasSuffixRules": false
+    },
+    {
+      "mfr": "Fairchild",
+      "uncoveredMpnCount": 95,
+      "rfqsAffected": 31,
+      "sampleMpns": [
+        "1N 4749A",
+        "1N4148**",
+        "1N5231B**",
+        "1N5248B**",
+        "2N5401_D81Z",
+        "2N7002-T1-E3",
+        "74AC541PC",
+        "74AC574PC",
+        "74ACQ574PC",
+        "74ACTQ245SCX"
+      ],
+      "hasSuffixRules": false
+    }
+  ],
+  "coveredMfrs": [
+    {
+      "mfr": "Texas Instruments",
+      "totalMpns": 3596,
+      "totalRfqs": 1315
+    },
+    {
+      "mfr": "Analog Devices Inc",
+      "totalMpns": 1106,
+      "totalRfqs": 703
+    },
+    {
+      "mfr": "On Semiconductor",
+      "totalMpns": 1099,
+      "totalRfqs": 471
+    },
+    {
+      "mfr": "STMicroelectronics",
+      "totalMpns": 669,
+      "totalRfqs": 358
+    },
+    {
+      "mfr": "Infineon",
+      "totalMpns": 626,
+      "totalRfqs": 222
+    },
+    {
+      "mfr": "MicroChip",
+      "totalMpns": 551,
+      "totalRfqs": 161
+    },
+    {
+      "mfr": "TI",
+      "totalMpns": 510,
+      "totalRfqs": 167
+    },
+    {
+      "mfr": "NXP Semiconductors",
+      "totalMpns": 503,
+      "totalRfqs": 298
+    },
+    {
+      "mfr": "Analog Devices",
+      "totalMpns": 438,
+      "totalRfqs": 53
+    },
+    {
+      "mfr": "Onsemi",
+      "totalMpns": 347,
+      "totalRfqs": 147
+    },
+    {
+      "mfr": "Infineon Technologies",
+      "totalMpns": 297,
+      "totalRfqs": 269
+    },
+    {
+      "mfr": "ADI",
+      "totalMpns": 249,
+      "totalRfqs": 110
+    },
+    {
+      "mfr": "St",
+      "totalMpns": 248,
+      "totalRfqs": 72
+    }
+  ],
+  "discoveredSuffixPatterns": [
+    {
+      "mfr": "AD",
+      "topSuffixes": [
+        {
+          "suffix1": "F",
+          "suffix2": "BF",
+          "count": 10
+        }
+      ]
+    },
+    {
+      "mfr": "AMD",
+      "topSuffixes": [
+        {
+          "suffix1": "I",
+          "suffix2": "6I",
+          "count": 5
+        }
+      ]
+    },
+    {
+      "mfr": "AMG Systems",
+      "topSuffixes": [
+        {
+          "suffix1": "1",
+          "suffix2": "31",
+          "count": 19
+        },
+        {
+          "suffix1": "5",
+          "suffix2": "55",
+          "count": 13
+        }
+      ]
+    },
+    {
+      "mfr": "ASPEED Technology Inc",
+      "topSuffixes": [
+        {
+          "suffix1": "P",
+          "suffix2": "GP",
+          "count": 6
+        }
+      ]
+    },
+    {
+      "mfr": "AVX Corporation",
+      "topSuffixes": [
+        {
+          "suffix1": "A",
+          "suffix2": "2A",
+          "count": 7
+        },
+        {
+          "suffix1": "R",
+          "suffix2": "TR",
+          "count": 6
+        }
+      ]
+    },
+    {
+      "mfr": "Abracon",
+      "topSuffixes": [
+        {
+          "suffix1": "T",
+          "suffix2": "-T",
+          "count": 35
+        },
+        {
+          "suffix1": "3",
+          "suffix2": "T3",
+          "count": 5
+        }
+      ]
+    },
+    {
+      "mfr": "Adtran",
+      "topSuffixes": [
+        {
+          "suffix1": "1",
+          "suffix2": "G1",
+          "count": 19
+        },
+        {
+          "suffix1": "0",
+          "suffix2": "40",
+          "count": 13
+        },
+        {
+          "suffix1": "C",
+          "suffix2": "1C",
+          "count": 12
+        },
+        {
+          "suffix1": "1",
+          "suffix2": "F1",
+          "count": 12
+        },
+        {
+          "suffix1": "T",
+          "suffix2": "NT",
+          "count": 12
+        }
+      ]
+    },
+    {
+      "mfr": "Advantech",
+      "topSuffixes": [
+        {
+          "suffix1": "E",
+          "suffix2": "0E",
+          "count": 14
+        },
+        {
+          "suffix1": "K",
+          "suffix2": "0K",
+          "count": 9
+        },
+        {
+          "suffix1": "E",
+          "suffix2": "AE",
+          "count": 5
+        }
+      ]
+    },
+    {
+      "mfr": "Alliance Memory Inc",
+      "topSuffixes": [
+        {
+          "suffix1": "N",
+          "suffix2": "IN",
+          "count": 7
+        }
+      ]
+    },
+    {
+      "mfr": "Allied Telesis",
+      "topSuffixes": [
+        {
+          "suffix1": "I",
+          "suffix2": "/I",
+          "count": 11
+        },
+        {
+          "suffix1": "U",
+          "suffix2": "CU",
+          "count": 6
+        }
+      ]
+    },
+    {
+      "mfr": "Altera",
+      "topSuffixes": [
+        {
+          "suffix1": "N",
+          "suffix2": "7N",
+          "count": 21
+        },
+        {
+          "suffix1": "G",
+          "suffix2": "8G",
+          "count": 13
+        },
+        {
+          "suffix1": "N",
+          "suffix2": "5N",
+          "count": 12
+        },
+        {
+          "suffix1": "G",
+          "suffix2": "7G",
+          "count": 10
+        },
+        {
+          "suffix1": "N",
+          "suffix2": "8N",
+          "count": 8
+        }
+      ]
+    },
+    {
+      "mfr": "Amphenol FCI",
+      "topSuffixes": [
+        {
+          "suffix1": "F",
+          "suffix2": "LF",
+          "count": 12
+        }
+      ]
+    },
+    {
+      "mfr": "Amphenol PCD",
+      "topSuffixes": [
+        {
+          "suffix1": "3",
+          "suffix2": "03",
+          "count": 9
+        }
+      ]
+    },
+    {
+      "mfr": "Analog",
+      "topSuffixes": [
+        {
+          "suffix1": "F",
+          "suffix2": "BF",
+          "count": 32
+        },
+        {
+          "suffix1": "7",
+          "suffix2": "L7",
+          "count": 29
+        },
+        {
+          "suffix1": "Z",
+          "suffix2": "RZ",
+          "count": 19
+        },
+        {
+          "suffix1": "7",
+          "suffix2": "R7",
+          "count": 15
+        },
+        {
+          "suffix1": "L",
+          "suffix2": "RL",
+          "count": 12
+        }
+      ]
+    },
+    {
+      "mfr": "Arista Networks, Inc.",
+      "topSuffixes": [
+        {
+          "suffix1": "R",
+          "suffix2": "AR",
+          "count": 112
+        },
+        {
+          "suffix1": "M",
+          "suffix2": "5M",
+          "count": 76
+        },
+        {
+          "suffix1": "M",
+          "suffix2": "0M",
+          "count": 44
+        },
+        {
+          "suffix1": "M",
+          "suffix2": "1M",
+          "count": 42
+        },
+        {
+          "suffix1": "M",
+          "suffix2": "2M",
+          "count": 37
+        }
+      ]
+    },
+    {
+      "mfr": "Avago Technologies",
+      "topSuffixes": [
+        {
+          "suffix1": "E",
+          "suffix2": "0E",
+          "count": 20
+        }
+      ]
+    },
+    {
+      "mfr": "Bel Fuse",
+      "topSuffixes": [
+        {
+          "suffix1": "F",
+          "suffix2": "-F",
+          "count": 5
+        }
+      ]
+    },
+    {
+      "mfr": "Bi Technologies",
+      "topSuffixes": [
+        {
+          "suffix1": "F",
+          "suffix2": "LF",
+          "count": 8
+        }
+      ]
+    },
+    {
+      "mfr": "Bourns Inc",
+      "topSuffixes": [
+        {
+          "suffix1": "F",
+          "suffix2": "LF",
+          "count": 10
+        }
+      ]
+    },
+    {
+      "mfr": "Broadcom",
+      "topSuffixes": [
+        {
+          "suffix1": "G",
+          "suffix2": "BG",
+          "count": 22
+        },
+        {
+          "suffix1": "E",
+          "suffix2": "0E",
+          "count": 19
+        },
+        {
+          "suffix1": "0",
+          "suffix2": "30",
+          "count": 5
+        }
+      ]
+    }
+  ]
+}
