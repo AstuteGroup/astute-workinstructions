@@ -381,16 +381,81 @@ ${result.errors.length > 5 ? `  ... +${result.errors.length - 5} more` : ''}
     log(`  Failure rate evaluation error: ${e.message}`);
   }
 
-  // ── Send confirmation email to internal Astute people ─────────────────────
+  // ── Send confirmation OR failure notification ─────────────────────────────
   // Mirrors the excess.js pattern: reply with the RFQ # so the forwarder knows
   // it was loaded successfully.
   //
-  // IMPORTANT: Only send confirmation if actually loaded. Rate-limiting or
-  // header-POST failures should NOT trigger a "success" email with null values.
-  // Bug fix 2026-06-11: was sending "RFQ loaded, Customer: (unknown), RFQ #: null"
-  // when rate-limited because errors[] was empty and we didn't check rfqId.
+  // IMPORTANT: If job failed completely, send failure notification to operator.
+  // Bug fix 2026-08-19: jobs failing with API errors (e.g., "Foreign ID not found")
+  // were silently discarded with no notification — operator never knew the RFQ
+  // didn't load.
   if (!actuallyLoaded) {
-    log(`  Skipping confirmation email — job ${finalStatus}, rfqId=${result.rfqId}, lines=${totalWritten}`);
+    log(`  Job failed — sending failure notification, finalStatus=${finalStatus}, rfqId=${result.rfqId}, lines=${totalWritten}`);
+    try {
+      const customerName = payload.partnerName || lookupPartnerName(payload.bpartnerId) || '(unknown)';
+      const trackingId = item.trackingId || payload.trackingId || null;
+      const trackingPrefix = trackingId ? `[${trackingId}] ` : '';
+      const failSubject = payload.originalSubject
+        ? `⚠️ FAILED: Re: ${payload.originalSubject}`
+        : `${trackingPrefix}⚠️ RFQ Load FAILED`;
+
+      const errorSummary = result.errors.length > 0
+        ? result.errors.slice(0, 5).map(e => `  • ${e}`).join('\n')
+        : '  (no error details captured)';
+
+      const failBody = `RFQ load FAILED — manual intervention required.
+
+Customer: ${customerName}
+Tracking ID: ${trackingId || '(none)'}
+Job ID: ${item.id}
+External sender: ${payload.originalSender || '(unknown)'}
+
+Errors:
+${errorSummary}
+${result.errors.length > 5 ? `  ... +${result.errors.length - 5} more` : ''}
+
+Lines in queue: ${payload.lines ? payload.lines.length : 0}
+
+This RFQ was NOT loaded. Please review and re-submit manually if needed.
+
+— RFQ Loader Daemon (automated alert)`;
+
+      // Resolve recipients same as success path
+      const failEnvelope = resolveOutreachRecipients({
+        outerFrom: payload.originalSender,
+        salesrepId: payload.salesrepId,
+      }, {
+        jakeEmail: 'jake.harris@astutegroup.com',
+        inbox: 'rfqloading@orangetsunami.com',
+        currentFrom: payload.originalSender,
+        currentCc: payload.originalCc,
+      }, { workflow: 'rfq-loading' });
+
+      const failToEmail = failEnvelope.recipientList[0] || 'jake.harris@astutegroup.com';
+      const failCcList = failEnvelope.recipientList.slice(1);
+      const failOpts = failCcList.length > 0 ? { cc: failCcList } : {};
+      if (payload.messageId) {
+        failOpts.inReplyTo = payload.messageId;
+        failOpts.references = payload.messageId;
+      }
+
+      await notifier.sendEmail(failToEmail, failSubject, failBody, failOpts);
+      log(`  Failure notification sent to ${failEnvelope.recipientList.join(', ')}`);
+
+      breadcrumbs.write({
+        cog: 'rfq-loader-daemon',
+        event: 'failure-notification-sent',
+        jobId: item.id,
+        trackingId: trackingId,
+        customer: customerName,
+        errorCount: result.errors.length,
+        sampleErrors: result.errors.slice(0, 3),
+        to: failToEmail,
+        cc: failCcList,
+      });
+    } catch (failNotifyErr) {
+      log(`  Failed to send failure notification: ${failNotifyErr.message}`);
+    }
   } else try {
     // payload already declared above in failure rate section
     const envelope = resolveOutreachRecipients({

@@ -168,9 +168,14 @@ the business partner (bpartnerId):
       LIMIT 5;
 
   **Decision logic:**
-    - 1 match → use it
+    - 1 match → use `c_bpartner_id` as `bpartnerId` in the payload
     - >1 matches after tiebreaker → `need_info` with candidates
     - 0 matches → `need_info` with `missing: ['customer']`
+
+  **CRITICAL: bpartnerId MUST be c_bpartner_id (the database PK), NOT value (the search_key).**
+  The `value` column is the human-readable search key (e.g., "1013322"); the API requires the
+  actual database ID (`c_bpartner_id`, e.g., 1011527). Using `value` will cause a 500 error:
+  "Foreign ID not found in C_BPartner_ID".
 
 ────────────────────────────────────────
 3.7 — TWO-AGENT VALIDATION (recommended for complex RFQs)
