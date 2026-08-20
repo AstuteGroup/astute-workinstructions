@@ -207,11 +207,12 @@ function extractLineItems(text) {
     const endPos = matches[i + 1] ? matches[i + 1].index : text.indexOf('Total:', startPos);
     const detailText = text.substring(startPos, endPos > startPos ? endPos : startPos + 500);
 
-    // Description is the first non-empty line that starts with a capital letter
-    // Handle multiple blank lines with \n+ and lookahead for \n+ before keywords
-    const descMatch = detailText.match(/\n+([A-Z][^\n]+?)(?=\n+Promised Date:|\n+Item Revision:|\n+Manufacturer:|\n+Drawing|\n+RoHS:|\n+\d+\s+EA|\n+[A-Z0-9-]+\s*\n\s*[\d,]+)/);
+    // Description may span multiple lines before Promised Date/Manufacturer/RoHS
+    // Capture all text between the due date and the first keyword
+    const descMatch = detailText.match(/\n+([\s\S]+?)(?=\n+Promised Date:|\n+Item Revision:|\n+Manufacturer:|\n+Drawing|\n+RoHS:)/);
     if (descMatch) {
-      item.description = descMatch[1].trim();
+      // Join multiple lines into single description, removing extra whitespace
+      item.description = descMatch[1].replace(/\n+/g, ' ').replace(/\s+/g, ' ').trim();
     }
 
     const promisedMatch = detailText.match(/Promised Date:\s*(\d{1,2}\s+\w{3}\s+\d{4})?/);
@@ -233,12 +234,13 @@ function extractLineItems(text) {
     if (rohsMatch) item.rohs = rohsMatch[1].charAt(0).toUpperCase() + rohsMatch[1].slice(1).toLowerCase();
 
     // Line Notes - freeform text after Manufacturer/RoHS
-    // Skip the manufacturer value line (first non-empty line after "Manufacturer:")
+    // Skip the manufacturer value line and RoHS value line
     const noteLines = [];
     const lines = detailText.split('\n');
     let foundManufacturer = false;
     let foundRoHS = false;
     let skippedMfrValue = false;
+    let skippedRohsValue = false;
 
     for (const line of lines) {
       const trimmed = line.trim();
@@ -254,6 +256,10 @@ function extractLineItems(text) {
       }
       if (trimmed.startsWith('RoHS:')) {
         foundRoHS = true;
+        // If RoHS value is on the same line, mark as already skipped
+        if (trimmed.length > 5) {  // "RoHS:" is 5 chars
+          skippedRohsValue = true;
+        }
         continue;
       }
 
@@ -261,6 +267,14 @@ function extractLineItems(text) {
         // This is the manufacturer value line (when on separate line) - skip it
         skippedMfrValue = true;
         continue;
+      }
+
+      if (foundRoHS && !skippedRohsValue) {
+        // This is the RoHS value line (when on separate line, e.g., "Yes" or "No") - skip it
+        if (trimmed.match(/^(Yes|No)$/i)) {
+          skippedRohsValue = true;
+          continue;
+        }
       }
 
       if (foundManufacturer || foundRoHS) {
