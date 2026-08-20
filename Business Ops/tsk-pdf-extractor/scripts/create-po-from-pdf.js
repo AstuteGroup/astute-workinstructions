@@ -127,6 +127,55 @@ async function lookupMfr(mfrName) {
   return null;
 }
 
+// Buyer cache (populated dynamically via API lookup)
+const BUYER_CACHE = {};
+
+async function lookupBuyer(buyerName, buyerEmail) {
+  if (!buyerName && !buyerEmail) return LOOKUPS.buyerId;  // Default to Jake Harris
+
+  const cacheKey = buyerEmail || buyerName;
+  if (BUYER_CACHE[cacheKey] !== undefined) {
+    return BUYER_CACHE[cacheKey];
+  }
+
+  // Try email lookup first (more reliable)
+  if (buyerEmail) {
+    try {
+      const filter = encodeURIComponent(`EMail eq '${buyerEmail.replace(/'/g, "''")}'`);
+      const result = await apiGet(`ad_user?$filter=${filter}`);
+      if (result.records && result.records.length > 0) {
+        const user = result.records[0];
+        BUYER_CACHE[cacheKey] = user.id;
+        console.log(`  Buyer lookup: "${buyerEmail}" -> ${user.Name} (ID ${user.id})`);
+        return user.id;
+      }
+    } catch (err) {
+      console.log(`  Buyer email lookup error: ${err.message}`);
+    }
+  }
+
+  // Try name lookup as fallback
+  if (buyerName) {
+    try {
+      const filter = encodeURIComponent(`Name eq '${buyerName.replace(/'/g, "''")}'`);
+      const result = await apiGet(`ad_user?$filter=${filter}`);
+      if (result.records && result.records.length > 0) {
+        const user = result.records[0];
+        BUYER_CACHE[cacheKey] = user.id;
+        console.log(`  Buyer lookup: "${buyerName}" -> ID ${user.id}`);
+        return user.id;
+      }
+    } catch (err) {
+      console.log(`  Buyer name lookup error: ${err.message}`);
+    }
+  }
+
+  // Fall back to default buyer (Jake Harris)
+  console.log(`  Buyer not found: "${buyerName}" <${buyerEmail}> - using default (Jake Harris)`);
+  BUYER_CACHE[cacheKey] = LOOKUPS.buyerId;
+  return LOOKUPS.buyerId;
+}
+
 // Warehouse mapping (chuboe_warehouse_id)
 const WAREHOUSE_MAP = {
   'W111': 1000015,  // W111: LAM KITTING
@@ -243,6 +292,9 @@ async function createPurchaseOrder(poData) {
   const isDomestic = isDomesticShipment(poData.vendor.address, poData.deliver_to.address);
   console.log(`Domestic Shipping: ${isDomestic ? 'Yes' : 'No'}`);
 
+  // Look up buyer from PDF data
+  const buyerId = await lookupBuyer(poData.buyer?.name, poData.buyer?.email);
+
   // Build PO header payload
   const poHeader = {
     IsSOTrx: 'N',  // Purchase Order
@@ -256,8 +308,8 @@ async function createPurchaseOrder(poData) {
     C_Currency_ID: LOOKUPS.currencyId,
     M_Warehouse_ID: LOOKUPS.warehouseId,
     M_PriceList_ID: LOOKUPS.priceListId,
-    // Buyer
-    SalesRep_ID: LOOKUPS.buyerId,
+    // Buyer (looked up from PDF)
+    SalesRep_ID: buyerId,
     // Incoterm (Ex-Works, etc.)
     Chuboe_Inco_Term_ID: incotermId,
     // Delivery via Shipper (always 'S')
