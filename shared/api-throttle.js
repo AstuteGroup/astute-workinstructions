@@ -80,7 +80,7 @@ const LIMITS = {
   tti:      { perMinute: 15 },
   newark:   { perMinute: 15 },
   rutronik: { perMinute: 10 },
-  master:   { perMinute: 15 },
+  master:   { perMinute: 6 },   // Reduced 2026-08-18: returns 401 (not 429) when rate-limited
   sager:    { perMinute: 20 },
   waldom:   { perMinute: 20 },
 };
