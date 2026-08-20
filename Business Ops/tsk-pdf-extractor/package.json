@@ -2,9 +2,9 @@
   "name": "po-pdf-extractor",
   "version": "1.0.0",
   "description": "Extracts structured data from Astute Electronics Purchase Order PDFs",
-  "main": "extractor.js",
+  "main": "scripts/extractor.js",
   "scripts": {
-    "extract": "node extractor.js"
+    "extract": "node scripts/extractor.js"
   },
   "keywords": [
     "pdf",
