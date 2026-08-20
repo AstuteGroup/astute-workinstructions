@@ -1101,7 +1101,24 @@ async function main() {
     }
     const result = execSync(`node ${customerOfferArgs.join(' ')}`, {
       encoding: 'utf-8',
-      timeout: 600000, // 10 min — 945 line POSTs at ~200ms each = ~3 min, plus deactivation
+      // 20 min. Was 10 min (stale estimate from a 945-line roster ignoring
+      // rate-limit throttling). Root-caused 2026-08-20: offer-writeback is
+      // priority 1 (shared/ot-api-budget.js) with no burst-limit exemption,
+      // so a >600-line offer self-saturates the global 600-writes/5-min
+      // budget and must wait for the window to roll off (~5 min per
+      // rollover, regardless of other OT traffic — confirmed via
+      // .ot-rate-limit-events.ndjson that the denials during the 2026-08-10
+      // and 2026-08-17 cron failures were 38 self-denials vs only 3 from
+      // any other caller). The old 10-min timeout was killing the write
+      // mid-flight every week at chunk 7/9 (1,050 of 1,263 lines), silently
+      // truncating the live customer-facing offer.
+      // Verified fix 2026-08-20: full 1,263-line write completed in 11m25s
+      // (2 window-clear stalls, ~10 min of which is the theoretical floor
+      // for a 1,263-line write against a 600/5-min budget). 20 min gives
+      // ~1.75x headroom over the measured run — matches the precedent set
+      // by the sourcing step above (line ~1021, also 20 min) rather than
+      // padding further. Matches sibling lam-kitting-source.js sizing.
+      timeout: 1200000,
     });
     console.log(result);
     // Pull the sidecar JSON for status reporting in the email
