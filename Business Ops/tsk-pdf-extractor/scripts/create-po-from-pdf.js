@@ -57,7 +57,7 @@ const SHIPPER_MAP = {
   'FedEx Standard Overnight': 1000007,
   'FedEx 2Day': 1000009,
   'UPS Ground': 1000026,
-  'UPS': 100,
+  'UPS': 1000026,  // Default to UPS Ground
   'DHL': 1000036,
   'Courier/Local Delivery': 1000045,
 };
@@ -66,6 +66,7 @@ const SHIPPER_MAP = {
 const VENDOR_MAP = {
   'Avnet EM': { bpartnerId: 1000336, locationId: 1001693 },
   'Arrow Electronics International Inc (NY)': { bpartnerId: 1000386, locationId: 1001110 },
+  'GE Aviation Systems': { bpartnerId: 1000062, locationId: 1004724 },  // TEST: GE Aerospace
 };
 
 // Check if running against TEST environment
