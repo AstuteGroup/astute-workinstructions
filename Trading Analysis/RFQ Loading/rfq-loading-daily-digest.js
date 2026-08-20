@@ -26,6 +26,7 @@ const { isKnownBuyer, isKnownSupport, isKnownRfqSupport } = require('../../share
 
 const BREADCRUMBS = path.join(process.env.HOME, 'workspace', '.offer-pipeline', 'breadcrumbs.jsonl');
 const PENDING_DIR = path.join(process.env.HOME, 'workspace', '.rfq-loading-pending');
+const RFQ_LOAD_QUEUE = path.join(process.env.HOME, 'workspace', '.rfq-load-queue.json');
 const RECIPIENTS = [
   'jake.harris@astutegroup.com',
 ];
@@ -77,6 +78,55 @@ function loadPendingSidecars() {
     } catch (_) { /* skip malformed */ }
   }
   return sidecars;
+}
+
+// Load failed jobs from the RFQ load queue
+function loadFailedQueueItems() {
+  if (!fs.existsSync(RFQ_LOAD_QUEUE)) return [];
+  try {
+    const data = JSON.parse(fs.readFileSync(RFQ_LOAD_QUEUE, 'utf8'));
+    const items = data.items || [];
+    return items.filter(item => item.status === 'error').map(item => ({
+      id: item.id,
+      trackingId: item.trackingId || item.payload?.trackingId || '(none)',
+      enqueuedAt: item.enqueuedAt,
+      lineCount: item.lineCount || item.payload?.lines?.length || 0,
+      errors: item.errors || [],
+      lastError: item.lastError,
+      bpartnerId: item.payload?.bpartnerId,
+      description: item.payload?.description,
+      originalSender: item.payload?.originalSender,
+    }));
+  } catch (_) {
+    return [];
+  }
+}
+
+// Render failed jobs section as HTML
+function renderFailedJobs(failedItems) {
+  const rows = failedItems.map(item => {
+    const errorText = item.lastError || (item.errors[0] || '').substring(0, 100);
+    const enqueuedDate = item.enqueuedAt ? new Date(item.enqueuedAt).toISOString().slice(0, 16).replace('T', ' ') : '?';
+    return `<tr>
+<td><b>${esc(item.trackingId)}</b></td>
+<td>${esc(enqueuedDate)}</td>
+<td style="text-align:right">${item.lineCount}</td>
+<td style="color:#800;font-size:11px">${esc(errorText)}${errorText.length >= 100 ? '...' : ''}</td>
+<td>${esc(item.originalSender || '(unknown)')}</td>
+</tr>`;
+  }).join('\n');
+
+  return `
+<h3 style="margin-bottom:4px;color:#b00">⚠️ FAILED QUEUE JOBS (${failedItems.length})</h3>
+<p style="margin-top:0;color:#b00;font-size:12px"><b>These RFQs were NOT loaded and require manual intervention.</b></p>
+<table border="1" cellpadding="6" cellspacing="0" style="border-collapse:collapse;font-size:12px;width:100%;background:#fff5f5">
+<thead style="background:#fdd"><tr><th>Tracking</th><th>Enqueued</th><th>Lines</th><th>Error</th><th>Sender</th></tr></thead>
+<tbody>
+${rows}
+</tbody>
+</table>
+<p style="color:#666;font-size:11px;margin-top:4px">Review via: <code>cat ~/.rfq-load-queue.json | jq '.items[] | select(.status=="error")'</code></p>
+`;
 }
 
 // Look up RFQ metadata from OT using searchKeys — authoritative source
@@ -187,6 +237,9 @@ function roleFor(userId) {
   // Pending sidecars
   const pendingSidecars = loadPendingSidecars();
 
+  // Failed queue items — CRITICAL, show prominently
+  const failedQueueItems = loadFailedQueueItems();
+
   // ─── Render HTML ─────────────────────────────────────────────────────────
   const dispWindow = `${sinceTs} CT → ${untilTs} CT (${SINCE_HOURS}h)`;
 
@@ -199,7 +252,10 @@ function roleFor(userId) {
 <tr><td><b>RFQs created:</b></td><td>${totalRfqs}</td></tr>
 <tr><td><b>Lines written:</b></td><td>${totalLines.toLocaleString()}</td></tr>
 <tr><td><b>Emails processed:</b></td><td>${totalEmails} (stock: ${stockEmails}, customer: ${customerEmails})</td></tr>
+${failedQueueItems.length > 0 ? `<tr><td><b style="color:#b00">⚠️ Failed jobs:</b></td><td style="color:#b00"><b>${failedQueueItems.length}</b> (see below)</td></tr>` : ''}
 </table>
+
+${failedQueueItems.length > 0 ? renderFailedJobs(failedQueueItems) : ''}
 
 <h3 style="margin-bottom:4px">Activity by Loader</h3>
 <table border="1" cellpadding="6" cellspacing="0" style="border-collapse:collapse;font-size:12px;min-width:500px">
