@@ -65,6 +65,7 @@ const SHIPPER_MAP = {
 // Vendor mapping (should be dynamic lookup in production)
 const VENDOR_MAP = {
   'Avnet EM': { bpartnerId: 1000336, locationId: 1001693 },
+  'Arrow Electronics International Inc (NY)': { bpartnerId: 1000386, locationId: 1001110 },
 };
 
 // Manufacturer mapping
