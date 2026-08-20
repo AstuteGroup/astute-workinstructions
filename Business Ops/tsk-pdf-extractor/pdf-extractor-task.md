@@ -168,3 +168,47 @@ This extractor handles Astute Electronics Purchase Order PDFs with the standard 
 - Line notes/comments
 
 > **Note** - The extractor is designed for Astute's specific PO template. Other PO formats may require modifications to the parsing logic.
+
+## Create PO in OT
+
+The `create-po-from-pdf.js` script creates a Purchase Order in OT from extracted PDF data.
+
+**Usage:**
+
+```bash
+node scripts/create-po-from-pdf.js "path/to/PO.pdf"
+node scripts/create-po-from-pdf.js "path/to/extracted.json"
+```
+
+**Fields populated:**
+
+| OT Field | Source |
+|----------|--------|
+| Vendor (BP + Location) | `vendor.company` → VENDOR_MAP lookup |
+| Order Date | `date` |
+| Due Date | `line_items[].due_date` |
+| Incoterm | `delivery_terms` → INCOTERM_MAP |
+| Shipper | `ship_via` → SHIPPER_MAP |
+| MPN | `line_items[].item_number` |
+| Description | `line_items[].description` |
+| Internal Notes | `line_items[].line_notes` |
+| Warehouse | `warehouse_code` → WAREHOUSE_MAP |
+| Warehouse Group | `deliver_to.company` (Brownsville detection) |
+| Domestic Shipping | Vendor + delivery address country comparison |
+| Infor PO | `order_number` |
+| MFR | `line_items[].manufacturer` → API lookup |
+
+**Vendor/MFR Mapping:**
+
+New vendors must be added to `VENDOR_MAP` in the script. MFR is looked up dynamically via the OT API.
+
+## Known Limitations
+
+### MFR in TEST Environment
+
+> **TODO: Test MFR population when moving to PROD**
+>
+> The TEST environment rejects system-level MFR records (ad_client_id=0) as foreign keys. The script skips MFR population in TEST. When deploying to PROD, verify that:
+> 1. MFR lookup returns valid IDs
+> 2. MFR is correctly set on PO lines
+> 3. Common manufacturers (Vishay, Molex, etc.) resolve correctly

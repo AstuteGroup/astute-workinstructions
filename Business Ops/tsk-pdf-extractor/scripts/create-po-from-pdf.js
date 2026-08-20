@@ -68,12 +68,63 @@ const VENDOR_MAP = {
   'Arrow Electronics International Inc (NY)': { bpartnerId: 1000386, locationId: 1001110 },
 };
 
-// Manufacturer mapping
-const MFR_MAP = {
-  'Vishay Intertechnology, Inc.': 1000019,
-  'Vishay Intertechnology Inc': 1000019,
-  'Vishay': 1000019,
-};
+// Check if running against TEST environment
+function isTestEnvironment() {
+  const baseUrl = process.env.IDEMPIERE_BASE_URL || '';
+  return baseUrl.includes('172.31.28.106');  // TEST server IP
+}
+
+// MFR cache (populated dynamically via API lookup)
+const MFR_CACHE = {};
+
+async function lookupMfr(mfrName) {
+  if (!mfrName) return null;
+
+  // Skip MFR lookup in TEST - system records not allowed as FK
+  // TODO: Test MFR population when moving to PROD
+  if (isTestEnvironment()) {
+    console.log(`    MFR skipped in TEST: "${mfrName}" (system records not allowed)`);
+    return null;
+  }
+
+  // Check cache first
+  if (MFR_CACHE[mfrName] !== undefined) {
+    return MFR_CACHE[mfrName];
+  }
+
+  // Try exact match first
+  try {
+    const filter = encodeURIComponent(`Name eq '${mfrName.replace(/'/g, "''")}'`);
+    const result = await apiGet(`chuboe_mfr?$filter=${filter}`);
+    if (result.records && result.records.length > 0) {
+      const mfr = result.records[0];
+      MFR_CACHE[mfrName] = mfr.id;
+      console.log(`    MFR lookup: "${mfrName}" -> ID ${mfr.id}`);
+      return mfr.id;
+    }
+  } catch (err) {
+    console.log(`    MFR lookup error: ${err.message}`);
+  }
+
+  // Try fuzzy match (contains)
+  try {
+    const filter = encodeURIComponent(`contains(Name,'${mfrName.split(' ')[0].replace(/'/g, "''")}')`);
+    const result = await apiGet(`chuboe_mfr?$filter=${filter}&$top=5`);
+    if (result.records && result.records.length > 0) {
+      // Prefer exact match if available
+      const exact = result.records.find(r => r.Name === mfrName);
+      const mfr = exact || result.records[0];
+      MFR_CACHE[mfrName] = mfr.id;
+      console.log(`    MFR fuzzy lookup: "${mfrName}" -> "${mfr.Name}" (ID ${mfr.id})`);
+      return mfr.id;
+    }
+  } catch (err) {
+    // Ignore fuzzy match errors
+  }
+
+  MFR_CACHE[mfrName] = null;
+  return null;
+}
 
 // Warehouse mapping (chuboe_warehouse_id)
 const WAREHOUSE_MAP = {
@@ -234,6 +285,9 @@ async function createPurchaseOrder(poData) {
     const description = item.description || extractDescription(item.line_notes, item.manufacturer);
     const internalNotes = extractInternalNotes(item.line_notes, item.manufacturer);
 
+    // Look up manufacturer ID via API
+    const mfrId = await lookupMfr(item.manufacturer);
+
     const linePayload = {
       C_Order_ID: createdPO.id,
       Line: item.line_number * 10,
@@ -252,8 +306,8 @@ async function createPurchaseOrder(poData) {
       M_Product_ID: LOOKUPS.productId,
       // MPN
       Chuboe_MPN: item.item_number,
-      // Note: Chuboe_MFR_ID can't be set for system MFR records (ad_client_id=0)
-      // and c_orderline has no Chuboe_MFR_Text fallback, so MFR is omitted
+      // Manufacturer (client-level record required)
+      ...(mfrId && { Chuboe_MFR_ID: mfrId }),
       // Description (from PDF description or line notes)
       Description: description,
       // Internal notes
@@ -270,7 +324,7 @@ async function createPurchaseOrder(poData) {
 
     console.log(`  Line ${item.line_number}: ${item.item_number}`);
     console.log(`    Qty: ${item.quantity_ordered}, Price: $${item.unit_price}`);
-    console.log(`    MFR: ${item.manufacturer}`);
+    console.log(`    MFR: ${item.manufacturer} (ID ${mfrId || 'NOT MAPPED'})`);
     console.log(`    Description: ${description}`);
     console.log(`    Internal Notes: ${internalNotes}`);
     console.log(`    Warehouse: ${poData.warehouse_code} (ID ${warehouseId})`);
