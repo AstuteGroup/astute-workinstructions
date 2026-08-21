@@ -55,6 +55,41 @@ const {
 
 const LOG_FILE = '/tmp/vq-enrichment-roi.log';
 
+// Per-VQ attribution log written EXCLUSIVELY by shared/workflow-actions/
+// vq-loading.js (the email-digitization handler) — one JSONL row per
+// successfully-written VQ, tying vqLineId back to the source email. Presence
+// in this file is a clean, zero-false-positive signal that a VQ is Claude
+// transcribing a broker quote that was already sitting in a human buyer's
+// inbox — not autonomous sourcing. (Absence is NOT proof of autonomy — other
+// write paths, e.g. manual corrections, aren't logged here — so exclusion
+// via this file is a conservative floor, not a complete correction.)
+// This report is specifically about Claude's sourcing/enrichment value —
+// general Claude VQ activity (including email-digitized loads) is already
+// tracked in the separate VQ Loading daily digest — so those VQs are
+// excluded from the population here entirely, not just from attribution.
+const VQ_ATTRIBUTION_LOG = path.join(
+  process.env.HOME || '/home/analytics_user',
+  'workspace',
+  '.vq-batch-attribution.jsonl',
+);
+
+function loadEmailDigitizedVqIds() {
+  try {
+    const text = fs.readFileSync(VQ_ATTRIBUTION_LOG, 'utf8');
+    const ids = new Set();
+    for (const line of text.split('\n')) {
+      if (!line.trim()) continue;
+      try {
+        const row = JSON.parse(line);
+        if (row && row.vqLineId) ids.add(Number(row.vqLineId));
+      } catch (_) { /* skip malformed line */ }
+    }
+    return [...ids];
+  } catch (_) {
+    return []; // best-effort — missing/unreadable log means no exclusions, never fail the run
+  }
+}
+
 const NOTIFY_EMAIL = process.env.NOTIFY_EMAIL || 'jake.harris@astutegroup.com';
 const FROM_EMAIL = 'rfqloading@orangetsunami.com';
 
@@ -100,12 +135,13 @@ const pool = new Pool({
  * One row per enriched RFQ line in the window, with both procurement and
  * sales metrics joined. Per-line classification happens in aggregate().
  */
-async function queryEnrichedLines(windowDays, apiCoverageBps) {
+async function queryEnrichedLines(windowDays, apiCoverageBps, excludedVqIds) {
   const sql = `
     WITH api_vq AS (
       -- Claude-as-Buyer activity only: API enrichment, NetComp broker agent,
-      -- LAM Kitting, distributor scrapes. Two filters that exclude
-      -- Claude-as-VQ-Support / backfill writes that aren't sourcing:
+      -- LAM Kitting, distributor scrapes. Three filters that exclude
+      -- Claude-as-VQ-Support / backfill / clerical writes that aren't
+      -- genuine sourcing:
       --
       --  (1) Email-load echo: non-franchise Claude VQ written AFTER any
       --      human VQ on the same line. The email-loader processing an
@@ -115,6 +151,15 @@ async function queryEnrichedLines(windowDays, apiCoverageBps) {
       --      already exists on the line. Desktop scrape (Heilind etc.)
       --      catching up with a line whose deal is closed. Cannot have
       --      influenced sourcing — drop.
+      --
+      --  (3) Confirmed email-digitization: VQs present in the VQ Loading
+      --      handler's per-write attribution log (.vq-batch-attribution.jsonl)
+      --      — Claude transcribing a broker quote that was already sitting in
+      --      a human buyer's inbox, not autonomous sourcing. This is a floor,
+      --      not a complete correction — other write paths (manual
+      --      corrections, etc.) aren't logged there and can't be excluded
+      --      this way. General Claude VQ activity (including these lines) is
+      --      tracked separately in the VQ Loading daily digest.
       SELECT DISTINCT vl.chuboe_rfq_line_id,
              vl.chuboe_vq_line_id,
              vl.ispurchased,
@@ -130,6 +175,8 @@ async function queryEnrichedLines(windowDays, apiCoverageBps) {
         AND (vl.created AT TIME ZONE 'America/Chicago' AT TIME ZONE 'UTC')
             > NOW() - ($2 || ' days')::interval
         AND vl.chuboe_rfq_line_id IS NOT NULL
+        -- Filter (3): confirmed email-digitization (see header note above)
+        AND NOT (vl.chuboe_vq_line_id = ANY($4::bigint[]))
         -- Filter (1): email-load echo
         AND NOT (
           vl.chuboe_vendortype_id IS DISTINCT FROM 1000001
@@ -317,30 +364,14 @@ async function queryEnrichedLines(windowDays, apiCoverageBps) {
         AND vq.createdby <> $1
         AND vq.chuboe_rfq_line_id IN (SELECT chuboe_rfq_line_id FROM api_lines)
       GROUP BY 1
-    ),
-    -- Claude's cheapest VQ on each line where qty covers the RFQ ask
-    -- (qty-applicable cheaper option). Used for "GP lost" calc — i.e. Claude
-    -- offered a cheaper VQ that could have actually filled the order.
-    claude_applicable AS (
-      SELECT av.chuboe_rfq_line_id, MIN(av.cost) AS claude_applicable_cost
-      FROM api_vq av
-      JOIN adempiere.chuboe_rfq_line rl_inner ON rl_inner.chuboe_rfq_line_id = av.chuboe_rfq_line_id
-      WHERE av.cost IS NOT NULL AND av.cost > 0
-        AND av.qty IS NOT NULL AND av.qty >= COALESCE(rl_inner.qty, 0)
-      GROUP BY av.chuboe_rfq_line_id
-    ),
-    -- Cost of the IsPurchased VQ on the line + whether a non-Claude purchase
-    -- happened (gates the "GP lost" attribution — Claude winning isn't a miss).
-    purchased_cost AS (
-      SELECT vl.chuboe_rfq_line_id,
-             MIN(vl.cost) AS purchased_cost,
-             BOOL_OR(vl.createdby <> $1) AS non_claude_won
-      FROM adempiere.chuboe_vq_line vl
-      WHERE vl.isactive='Y' AND vl.ispurchased='Y'
-        AND vl.chuboe_rfq_line_id IN (SELECT chuboe_rfq_line_id FROM api_lines)
-        AND vl.cost IS NOT NULL AND vl.cost > 0
-      GROUP BY vl.chuboe_rfq_line_id
     )
+    -- NOTE: a "Claude's cheapest qty-applicable VQ vs. purchased cost" CTE
+    -- pair (claude_applicable / purchased_cost, MFR-aware) used to live here,
+    -- feeding a "GP lost" claim in the process-order table. Removed
+    -- 2026-08-21 after 2/2 manually spot-checked claims turned out to be
+    -- false positives (cross-MFR same-MPN comparison; Shortage-RFQ
+    -- lead-time-vs-stock comparison) — that comparison now belongs to
+    -- ad-hoc manual review (see e.g. oneoffs/), not this recurring query.
     SELECT rl.chuboe_rfq_line_id,
            r.chuboe_rfq_id,
            r.value AS rfq_value,
@@ -383,10 +414,7 @@ async function queryEnrichedLines(windowDays, apiCoverageBps) {
            COALESCE(hv.alternate_won_franchise, false) AS alternate_won_franchise,
            COALESCE(hv.alternate_won_api_covered, false) AS alternate_won_api_covered,
            COALESCE(hv.mirror_won_franchise, false) AS mirror_won_franchise,
-           hv.first_human_vq_created           AS first_human_vq_created,
-           ca.claude_applicable_cost           AS claude_applicable_cost,
-           pc.purchased_cost                   AS purchased_cost,
-           COALESCE(pc.non_claude_won, false)  AS non_claude_won
+           hv.first_human_vq_created           AS first_human_vq_created
     FROM api_lines al
     JOIN adempiere.chuboe_rfq_line rl ON rl.chuboe_rfq_line_id = al.chuboe_rfq_line_id
     JOIN adempiere.chuboe_rfq r ON r.chuboe_rfq_id = rl.chuboe_rfq_id
@@ -398,11 +426,9 @@ async function queryEnrichedLines(windowDays, apiCoverageBps) {
     LEFT JOIN cq_agg cq   ON cq.chuboe_rfq_line_id = al.chuboe_rfq_line_id
     LEFT JOIN so_via_cq sc ON sc.chuboe_rfq_line_id = al.chuboe_rfq_line_id
     LEFT JOIN human_vqs_by_line hv ON hv.chuboe_rfq_line_id = al.chuboe_rfq_line_id
-    LEFT JOIN claude_applicable ca ON ca.chuboe_rfq_line_id = al.chuboe_rfq_line_id
-    LEFT JOIN purchased_cost pc ON pc.chuboe_rfq_line_id = al.chuboe_rfq_line_id
     WHERE rl.isactive = 'Y' AND r.isactive = 'Y'
   `;
-  const { rows } = await pool.query(sql, [API_WRITER_USER_ID, String(windowDays), apiCoverageBps]);
+  const { rows } = await pool.query(sql, [API_WRITER_USER_ID, String(windowDays), apiCoverageBps, excludedVqIds || []]);
   return rows;
 }
 
@@ -517,11 +543,20 @@ function aggregate(rows) {
     missNoApiNet: 0,
     altWonBroker: 0,
     altWonBrokerNet: 0,
-    // Headline rollup: revenue Claude generated (human took over OR copied Claude's VQ)
-    // = winBotSoleAdoptedHandoff + winMirrorClaudeFirst (Adoption segment + Real Sourcing window only)
+    // Headline rollup: revenue Claude generated = sum of ALL FOUR Adoption win
+    // paths below (handoff + competingVq + solo + mirrorClaudeFirst), not just
+    // handoff/mirrorClaudeFirst — see the drill-in table for the full split.
     revenueClaudeGeneratedLines: 0,
     revenueClaudeGeneratedNet: 0,
     revenueClaudeGeneratedPoNet: 0,  // procurement cost on those same lines — used for GP
+    // Own-VQ subset of the above: lines where CLAUDE'S OWN VQ (not a human's
+    // mirror copy) was the one purchased AND sold — handoff + competingVq +
+    // solo, i.e. winBotSoleAdoptedNet + winBotSoleSoloNet. Excludes
+    // mirrorClaudeFirst (a different VQ, the human's, was actually purchased).
+    // This is the population that reconciles with the "Procurement (Adoption)"
+    // table — same lines, narrowed to the ones that also sold. Used as the
+    // Overview headline "Revenue" row so it's directly comparable to Procurement.
+    ownVqSoldPoNet: 0,
     // Sourcing-window classification for Adoption sold lines.
     // Customer sourcing decisions take hours-to-days, NOT minutes. Anything
     // sold within 60 min of RFQ creation = RFQ created to process an order
@@ -730,6 +765,7 @@ function aggregate(rows) {
             totals.revenueClaudeGeneratedLines++;
             totals.revenueClaudeGeneratedNet += cqSoldNetHere;
             totals.revenueClaudeGeneratedPoNet += poNetHere;
+            totals.ownVqSoldPoNet += poNetHere;
             flagLists.botSoleAdopted.push(r);
             flagLists.botSoleAdoptedHandoff.push(r);
           } else if (humanCompeted) {
@@ -743,6 +779,7 @@ function aggregate(rows) {
             totals.revenueClaudeGeneratedLines++;
             totals.revenueClaudeGeneratedNet += cqSoldNetHere;
             totals.revenueClaudeGeneratedPoNet += poNetHere;
+            totals.ownVqSoldPoNet += poNetHere;
             flagLists.botSoleAdopted.push(r);
             flagLists.botSoleAdoptedCompetingVq.push(r);
           } else {
@@ -754,6 +791,7 @@ function aggregate(rows) {
             totals.revenueClaudeGeneratedLines++;
             totals.revenueClaudeGeneratedNet += cqSoldNetHere;
             totals.revenueClaudeGeneratedPoNet += poNetHere;
+            totals.ownVqSoldPoNet += poNetHere;
             flagLists.botSoleSolo.push(r);
           }
         }
@@ -1019,6 +1057,7 @@ function renderEmail({ totals, flagLists, byCustomer, byType, rfqRollup }, windo
   const allFlagLists = aggAll?.flagLists || null;
   const inceptionDate = opts.inceptionDate || null;
   const orgProcessOrder = opts.orgProcessOrder || null;
+  const excludedVqCount = opts.excludedVqCount || 0;
   const rfqCount = totals.rfqs.size;
   const soldLines = totals.linesWithSoldCq;
   const allTimeLabel = inceptionDate ? `since ${inceptionDate}` : 'all-time';
@@ -1026,7 +1065,7 @@ function renderEmail({ totals, flagLists, byCustomer, byType, rfqRollup }, windo
   let html = `<html><body style="font-family:Arial,sans-serif;max-width:1200px">
 <h3>Claude Harris Sourcing ROI — trailing ${windowDays} days</h3>
 <p style="color:#666;font-size:13px">
-  <b>Scope:</b> Claude as <b>sourcing buyer</b> — API enrichment (franchise/catalog distributors), NetComp broker agent, LAM Kitting cron, distributor scrapes. Two exclusions to keep this measure of <i>sourcing</i> clean: email-load echoes (non-franchise Claude VQs written after a human already had one on the line — digitization of inbound broker emails) and post-SO backfills (any Claude VQ written after a sold CQ already exists on the line — scrape catching up after the deal closed).<br/>
+  <b>Scope:</b> Claude as <b>sourcing buyer</b> — API enrichment (franchise/catalog distributors), NetComp broker agent, LAM Kitting cron, distributor scrapes. Three exclusions to keep this measure of <i>sourcing</i> clean: email-load echoes (non-franchise Claude VQs written after a human already had one on the line — digitization of inbound broker emails), post-SO backfills (any Claude VQ written after a sold CQ already exists on the line — scrape catching up after the deal closed), and confirmed email-digitized VQs (${fmtInt(excludedVqCount)} VQs in the exclusion list all-time, per the VQ Loading handler's own write-attribution log — only the subset falling in each window below actually gets filtered out) — Claude transcribing a broker quote that was already sitting in a human buyer's inbox is clerical, not sourcing, and is already tracked in the separate VQ Loading daily digest. This is a floor, not a complete correction — some human-inbox-sourced VQs written through other paths aren't in that log and may still be counted here.<br/>
   Two funnels are tracked separately because attribution differs:
   <b>procurement</b> is direct (buyer ticked Claude Harris's VQ), <b>sales</b> is correlative
   (Claude Harris sourced the line; CQ may have been written off any VQ).
@@ -1040,10 +1079,14 @@ ${allTotals ? `<p style="background:#eef4ff;border-left:4px solid #3498db;paddin
 <tr style="background:#f0f0f0"><th>Metric</th><th>Count</th><th>Revenue</th><th>GP</th></tr>
 <tr><td>RFQs touched by Claude Harris</td><td style="text-align:right">${fmtInt(rfqCount)}</td><td></td><td></td></tr>
 <tr><td>Enriched lines</td><td style="text-align:right">${fmtInt(totals.lines)}</td><td></td><td></td></tr>
-<tr style="background:#dfd"><td>🏆 Winning business (Adoption) — revenue Claude generated</td>
-    <td style="text-align:right">${fmtInt(totals.revenueClaudeGeneratedLines)}</td>
-    <td style="text-align:right"><b>${fmtUsd(totals.revenueClaudeGeneratedNet)}</b></td>
-    <td style="text-align:right"><b>${fmtGp(totals.revenueClaudeGeneratedNet, totals.revenueClaudeGeneratedPoNet)}</b></td></tr>
+<tr style="background:#dfd"><td>🏆 Procurement (Adoption) — buyer ticked Claude Harris's VQ</td>
+    <td style="text-align:right">${fmtInt(totals.adoption.purchasedLines)} lines (${fmtInt(totals.adoption.poCount)} POs)</td>
+    <td style="text-align:right"><b>${fmtUsd(totals.adoption.poNet)}</b></td>
+    <td style="text-align:right">—</td></tr>
+<tr style="background:#dfd"><td>&nbsp;&nbsp;&nbsp;↳ 💰 Revenue — same lines, sold (Claude's own VQ purchased <i>and</i> sold)</td>
+    <td style="text-align:right">${fmtInt(totals.winBotSoleAdopted + totals.winBotSoleSolo)}</td>
+    <td style="text-align:right"><b>${fmtUsd(totals.winBotSoleAdoptedNet + totals.winBotSoleSoloNet)}</b></td>
+    <td style="text-align:right"><b>${fmtGp(totals.winBotSoleAdoptedNet + totals.winBotSoleSoloNet, totals.ownVqSoldPoNet)}</b></td></tr>
 <tr style="background:#eef"><td>⚙️ Process efficiency (LAM + Stock) — POs cut by autonomous flows</td>
     <td style="text-align:right">${fmtInt(totals.lam.poCount + totals.stock.poCount)} POs (${fmtInt(totals.lam.poLines + totals.stock.poLines)} lines)</td>
     <td style="text-align:right">${fmtUsd(totals.lam.poNet + totals.stock.poNet)}</td>
@@ -1051,7 +1094,8 @@ ${allTotals ? `<p style="background:#eef4ff;border-left:4px solid #3498db;paddin
 </table>
 
 <p style="color:#666;font-size:12px;margin-top:8px">
-  <b>Framing:</b> Standard Astute purchasing only buys when a customer order exists. The Adoption segment is the only one where Claude's quote is competing for a real win. LAM Kitting (autonomous Mon cron) and Stock RFQ (broker-to-broker, sales-from-inventory) are exceptions to the buy-on-customer-order rule — operationally valuable, but reported separately under Process Efficiency, not framed as wins. (Source: <code>shared/business-segments.js</code>.)
+  <b>Framing:</b> Standard Astute purchasing only buys when a customer order exists. The Adoption segment is the only one where Claude's quote is competing for a real win. LAM Kitting (autonomous Mon cron) and Stock RFQ (broker-to-broker, sales-from-inventory) are exceptions to the buy-on-customer-order rule — operationally valuable, but reported separately under Process Efficiency, not framed as wins. (Source: <code>shared/business-segments.js</code>.)<br/>
+  <b>Note:</b> Procurement and Revenue above are both scoped to Claude's <i>own</i> VQ being the one purchased — no causal "human took over" story attached, just "Claude's quote won the buy."${totals.winMirrorClaudeFirst > 0 ? ` A further ${fmtUsd(totals.winMirrorClaudeFirstNet)} across ${fmtInt(totals.winMirrorClaudeFirst)} line(s) comes from a human copying Claude's vendor onto a separate VQ that they ticked instead —` : ' See'} "Sold-line win attribution" below for the full breakdown, including which sub-labels (e.g. "human took over") are backed by a verified audit trail vs. an unverified proxy signal.
 </p>
 
 <h3 style="background:#dfd;padding:10px;border-left:6px solid #27ae60;margin-top:24px">🏆 Winning business — Adoption segment</h3>
@@ -1073,104 +1117,6 @@ ${allTotals ? `<p style="background:#eef4ff;border-left:4px solid #3498db;paddin
     <td style="text-align:right">${fmtUsd(totals.realSourcingNet)}</td>
     <td style="font-size:12px">Real competitive window where Claude's quote was one of several competing for the buy. Win attribution applies below.</td></tr>
 </table>
-
-${totals.processOrderLines > 0 ? `
-<h4 style="background:#fee;padding:8px;border-left:4px solid #c0392b">📋 RFQ created to process an order — by salesperson</h4>
-<p style="color:#666;font-size:12px">
-  Adoption sold lines where the entire RFQ→sold-CQ flow completed in under 60 minutes. These aren't sourcing events — the customer had already committed to the buy before the RFQ existed in OT. Surfaced by salesperson so the workflow pattern (RFQ-as-order-documentation) is visible. "Claude cheaper applicable" = Claude wrote a VQ with both lower cost AND qty ≥ RFQ qty than what was actually bought; "GP lost" = (purchased cost − Claude cost) × RFQ qty across those lines.
-</p>
-${orgProcessOrder ? `<p style="color:#666;font-size:11px;font-style:italic;background:#fafafa;padding:6px 10px;border-left:3px solid #ccc">
-  <b>Workflow context</b> — org-wide Adoption RFQ→sold-CQ &lt;60min pattern: <b>${fmtInt(orgProcessOrder.d30.lines)}</b> lines / <b>${fmtUsd(orgProcessOrder.d30.net)}</b> in the trailing ${windowDays}d (<b>${fmtInt(orgProcessOrder.all.lines)}</b> / <b>${fmtUsd(orgProcessOrder.all.net)}</b> ${allTimeLabel}). Per-seller attribution below is scoped to lines where Claude was active pre-sale (${fmtInt(totals.processOrderLines)} of ${fmtInt(orgProcessOrder.d30.lines)} in ${windowDays}d) — the rest is "what-if" without measurable money-on-table. Revisit granularity if this org-level count grows or trend shifts.
-</p>` : ''}
-${(() => {
-  function bucketProcessOrder(rows) {
-    const m = new Map();
-    for (const r of rows) {
-      const seller = r.salesrep_name || '(unassigned)';
-      if (!m.has(seller)) m.set(seller, { lines: 0, revenue: 0, minWindow: Infinity, maxWindow: 0, claudeBetterLines: 0, gpLost: 0, nonClaudeVqs: 0 });
-      const s = m.get(seller);
-      const win = (new Date(r.first_sold_cq_created).getTime() - new Date(r.rfq_created).getTime()) / 60000;
-      s.lines++;
-      s.revenue += Number(r.cq_sold_net) || 0;
-      s.minWindow = Math.min(s.minWindow, win);
-      s.maxWindow = Math.max(s.maxWindow, win);
-      s.nonClaudeVqs += Number(r.human_vq_count) || 0;
-      const claudeAppl = r.claude_applicable_cost !== null && r.claude_applicable_cost !== undefined ? Number(r.claude_applicable_cost) : null;
-      const boughtCost = r.purchased_cost !== null && r.purchased_cost !== undefined ? Number(r.purchased_cost) : null;
-      const nonClaudeWon = r.non_claude_won === true || r.non_claude_won === 't';
-      if (claudeAppl !== null && boughtCost !== null && nonClaudeWon && claudeAppl < boughtCost) {
-        s.claudeBetterLines++;
-        s.gpLost += (boughtCost - claudeAppl) * (Number(r.rfq_qty) || 0);
-      }
-    }
-    return m;
-  }
-  const bySeller30 = bucketProcessOrder(flagLists.processOrderLines);
-  const bySellerAll = allFlagLists ? bucketProcessOrder(allFlagLists.processOrderLines) : new Map();
-  const blank = () => ({ lines: 0, revenue: 0, minWindow: Infinity, maxWindow: 0, claudeBetterLines: 0, gpLost: 0, nonClaudeVqs: 0 });
-  const sellerNames = new Set([...bySeller30.keys(), ...bySellerAll.keys()]);
-  const merged = [...sellerNames].map(name => ({
-    name,
-    d30: bySeller30.get(name) || blank(),
-    all: bySellerAll.get(name) || blank(),
-  }));
-  // Sort by 30d GP-lost first, then 30d revenue
-  merged.sort((a, b) => (b.d30.gpLost - a.d30.gpLost) || (b.d30.revenue - a.d30.revenue) || (b.all.revenue - a.all.revenue));
-  const totalNonClaude30 = merged.reduce((a, m) => a + m.d30.nonClaudeVqs, 0);
-  const totalNonClaudeAll = merged.reduce((a, m) => a + m.all.nonClaudeVqs, 0);
-  const totalClaudeBetter30 = merged.reduce((a, m) => a + m.d30.claudeBetterLines, 0);
-  const totalClaudeBetterAll = merged.reduce((a, m) => a + m.all.claudeBetterLines, 0);
-  const totalGpLost30 = merged.reduce((a, m) => a + m.d30.gpLost, 0);
-  const totalGpLostAll = merged.reduce((a, m) => a + m.all.gpLost, 0);
-  const fmtAvg = (n, lines) => lines > 0 ? (n / lines).toFixed(1) : '—';
-  const cell = (val, sub) => `<td style="text-align:right">${val}${sub ? ` <span style="color:#888;font-size:11px">${sub}</span>` : ''}</td>`;
-  const gpCell = (val) => val > 0 ? `<td style="text-align:right;background:#fee;font-weight:bold">${fmtUsd(val)}</td>` : `<td style="text-align:right;color:#888">$0.00</td>`;
-  const claudeBetterCell = (val) => val > 0 ? `<td style="text-align:right"><b>${fmtInt(val)}</b></td>` : `<td style="text-align:right;color:#888">0</td>`;
-  const windowCell = (s) => `<td style="text-align:right;font-size:11px">${s.lines > 0 ? `${Math.round(s.minWindow)}–${Math.round(s.maxWindow)} min` : '—'}</td>`;
-  let html = `<table border="1" cellpadding="4" cellspacing="0" style="border-collapse:collapse;font-size:11px">
-<tr style="background:#f0f0f0">
-  <th rowspan="2">Salesperson</th>
-  <th colspan="${allTotals ? 2 : 1}">Lines</th>
-  <th colspan="${allTotals ? 2 : 1}">Revenue</th>
-  <th colspan="${allTotals ? 2 : 1}">Window range</th>
-  <th colspan="${allTotals ? 2 : 1}">Non-Claude VQs</th>
-  <th colspan="${allTotals ? 2 : 1}">🔎 Claude cheaper applicable</th>
-  <th colspan="${allTotals ? 2 : 1}">💸 GP lost</th>
-</tr>
-<tr style="background:#f0f0f0;font-size:10px">
-  <th>${windowDays}d</th>${allTotals ? `<th>${allTimeLabel}</th>` : ''}
-  <th>${windowDays}d</th>${allTotals ? `<th>${allTimeLabel}</th>` : ''}
-  <th>${windowDays}d</th>${allTotals ? `<th>${allTimeLabel}</th>` : ''}
-  <th>${windowDays}d</th>${allTotals ? `<th>${allTimeLabel}</th>` : ''}
-  <th>${windowDays}d</th>${allTotals ? `<th>${allTimeLabel}</th>` : ''}
-  <th>${windowDays}d</th>${allTotals ? `<th>${allTimeLabel}</th>` : ''}
-</tr>`;
-  for (const m of merged) {
-    html += `<tr><td>${esc(m.name)}</td>` +
-      cell(fmtInt(m.d30.lines)) + (allTotals ? cell(fmtInt(m.all.lines)) : '') +
-      cell(fmtUsd(m.d30.revenue)) + (allTotals ? cell(fmtUsd(m.all.revenue)) : '') +
-      windowCell(m.d30) + (allTotals ? windowCell(m.all) : '') +
-      cell(fmtInt(m.d30.nonClaudeVqs), `(${fmtAvg(m.d30.nonClaudeVqs, m.d30.lines)}/line)`) +
-      (allTotals ? cell(fmtInt(m.all.nonClaudeVqs), `(${fmtAvg(m.all.nonClaudeVqs, m.all.lines)}/line)`) : '') +
-      claudeBetterCell(m.d30.claudeBetterLines) + (allTotals ? claudeBetterCell(m.all.claudeBetterLines) : '') +
-      gpCell(m.d30.gpLost) + (allTotals ? gpCell(m.all.gpLost) : '') +
-      `</tr>`;
-  }
-  const allLinesTotal = allTotals ? allTotals.processOrderLines : 0;
-  const allNetTotal = allTotals ? allTotals.processOrderNet : 0;
-  html += `<tr style="background:#f0f0f0;font-weight:bold"><td>Total</td>` +
-    cell(fmtInt(totals.processOrderLines)) + (allTotals ? cell(fmtInt(allLinesTotal)) : '') +
-    cell(fmtUsd(totals.processOrderNet)) + (allTotals ? cell(fmtUsd(allNetTotal)) : '') +
-    `<td></td>` + (allTotals ? `<td></td>` : '') +
-    cell(fmtInt(totalNonClaude30), `<span style="font-weight:normal">(${fmtAvg(totalNonClaude30, totals.processOrderLines)}/line)</span>`) +
-    (allTotals ? cell(fmtInt(totalNonClaudeAll), `<span style="font-weight:normal">(${fmtAvg(totalNonClaudeAll, allLinesTotal)}/line)</span>`) : '') +
-    cell(fmtInt(totalClaudeBetter30)) + (allTotals ? cell(fmtInt(totalClaudeBetterAll)) : '') +
-    cell(fmtUsd(totalGpLost30)) + (allTotals ? cell(fmtUsd(totalGpLostAll)) : '') +
-    `</tr>`;
-  html += `</table>`;
-  return html;
-})()}
-` : ''}
 
 <h4>Procurement (Adoption — direct attribution: buyer ticked Claude Harris's VQ)</h4>
 <table border="1" cellpadding="6" cellspacing="0" style="border-collapse:collapse">
@@ -1214,9 +1160,9 @@ ${(() => {
     ${allTotals ? `<td style="text-align:right">${fmtUsd(allTotals.poVoidedNet)}</td>` : ''}</tr>
 </table>
 
-<h4>💰 Revenue Claude generated (human took over or copied Claude's work)</h4>
+<h4>💰 Revenue Claude generated — full path breakdown</h4>
 <p style="color:#666;font-size:12px">
-  Sold lines where Claude's quote drove the outcome — either a human reassigned the buyer slot on Claude's VQ to process it (handoff), or a human re-keyed Claude's vendor onto a second VQ and ticked that one (copy). Both flows = Claude's research → revenue.
+  All four Adoption-segment paths that count toward "revenue Claude generated." <b>⚠️ Caveat on the first path ("human took over"):</b> the buyer-field signal it relies on (<code>chuboe_buyer_id</code>) is set mechanically by region/rep routing at VQ <i>creation</i> time, not by a verified reassignment event — <code>ad_changelog</code> shows no buyer-field edits on sampled lines. Treat it as "this Adoption line happened to route to a human buyer, and Claude's VQ still won," not as proof a human took over mid-flight. The other three paths are backed by direct record inspection (own VQ ticked + sold, or a human's separate VQ on Claude's exact vendor, with real timestamp ordering).
 </p>
 <table border="1" cellpadding="6" cellspacing="0" style="border-collapse:collapse">
 <tr style="background:#f0f0f0">
@@ -1236,15 +1182,31 @@ ${(() => {
     ${allTotals ? `<td style="text-align:right"><b>${fmtUsd(allTotals.revenueClaudeGeneratedPoNet)}</b></td>` : ''}
     <td style="text-align:right"><b>${fmtGp(totals.revenueClaudeGeneratedNet, totals.revenueClaudeGeneratedPoNet)}</b></td>
     ${allTotals ? `<td style="text-align:right"><b>${fmtGp(allTotals.revenueClaudeGeneratedNet, allTotals.revenueClaudeGeneratedPoNet)}</b></td>` : ''}
-    <td style="font-size:12px">Sum of the two paths below. GP blank when sold-pending-PO or procured-pending-sale leaves either side at $0.</td></tr>
-<tr><td>&nbsp;&nbsp;&nbsp;↳ <b>Human took over Claude's VQ (buyer reassigned)</b></td>
+    <td style="font-size:12px">Sum of the four paths below. GP blank when sold-pending-PO or procured-pending-sale leaves either side at $0.</td></tr>
+<tr><td>&nbsp;&nbsp;&nbsp;↳ <b>Human took over Claude's VQ (buyer field is human)</b> ⚠️</td>
     <td style="text-align:right">${fmtInt(totals.winBotSoleAdoptedHandoff)}</td>
     ${allTotals ? `<td style="text-align:right">${fmtInt(allTotals.winBotSoleAdoptedHandoff)}</td>` : ''}
     <td style="text-align:right">${fmtUsd(totals.winBotSoleAdoptedHandoffNet)}</td>
     ${allTotals ? `<td style="text-align:right">${fmtUsd(allTotals.winBotSoleAdoptedHandoffNet)}</td>` : ''}
     <td style="text-align:right;color:#888">—</td>${allTotals ? `<td style="text-align:right;color:#888">—</td>` : ''}
     <td style="text-align:right;color:#888">—</td>${allTotals ? `<td style="text-align:right;color:#888">—</td>` : ''}
-    <td style="font-size:12px">Claude's VQ was ticked. Buyer field was switched from Claude to a human for processing.</td></tr>
+    <td style="font-size:12px">Claude's own VQ was ticked and sold. Buyer field shows a human — likely set at VQ creation by region routing, unverified as a mid-flight reassignment. See caveat above.</td></tr>
+<tr><td>&nbsp;&nbsp;&nbsp;↳ <b>Human wrote a competing VQ (Claude's still ticked)</b></td>
+    <td style="text-align:right">${fmtInt(totals.winBotSoleAdoptedCompetingVq)}</td>
+    ${allTotals ? `<td style="text-align:right">${fmtInt(allTotals.winBotSoleAdoptedCompetingVq)}</td>` : ''}
+    <td style="text-align:right">${fmtUsd(totals.winBotSoleAdoptedCompetingVqNet)}</td>
+    ${allTotals ? `<td style="text-align:right">${fmtUsd(allTotals.winBotSoleAdoptedCompetingVqNet)}</td>` : ''}
+    <td style="text-align:right;color:#888">—</td>${allTotals ? `<td style="text-align:right;color:#888">—</td>` : ''}
+    <td style="text-align:right;color:#888">—</td>${allTotals ? `<td style="text-align:right;color:#888">—</td>` : ''}
+    <td style="font-size:12px">Claude's own VQ was ticked and sold. A human wrote a separate VQ on the line but it wasn't the one purchased — Claude stayed buyer.</td></tr>
+<tr><td>&nbsp;&nbsp;&nbsp;↳ <b>Solo (no human signal at all)</b></td>
+    <td style="text-align:right">${fmtInt(totals.winBotSoleSolo)}</td>
+    ${allTotals ? `<td style="text-align:right">${fmtInt(allTotals.winBotSoleSolo)}</td>` : ''}
+    <td style="text-align:right">${fmtUsd(totals.winBotSoleSoloNet)}</td>
+    ${allTotals ? `<td style="text-align:right">${fmtUsd(allTotals.winBotSoleSoloNet)}</td>` : ''}
+    <td style="text-align:right;color:#888">—</td>${allTotals ? `<td style="text-align:right;color:#888">—</td>` : ''}
+    <td style="text-align:right;color:#888">—</td>${allTotals ? `<td style="text-align:right;color:#888">—</td>` : ''}
+    <td style="font-size:12px">Claude's own VQ was ticked and sold. No human VQ on the line at all.</td></tr>
 <tr><td>&nbsp;&nbsp;&nbsp;↳ <b>Human copied Claude's VQ to push the purchase through</b></td>
     <td style="text-align:right">${fmtInt(totals.winMirrorClaudeFirst)}</td>
     ${allTotals ? `<td style="text-align:right">${fmtInt(allTotals.winMirrorClaudeFirst)}</td>` : ''}
@@ -1252,7 +1214,7 @@ ${(() => {
     ${allTotals ? `<td style="text-align:right">${fmtUsd(allTotals.winMirrorClaudeFirstNet)}</td>` : ''}
     <td style="text-align:right;color:#888">—</td>${allTotals ? `<td style="text-align:right;color:#888">—</td>` : ''}
     <td style="text-align:right;color:#888">—</td>${allTotals ? `<td style="text-align:right;color:#888">—</td>` : ''}
-    <td style="font-size:12px">Claude wrote VQ first. Buyer re-keyed the same vendor onto a second VQ and ticked that one.</td></tr>
+    <td style="font-size:12px">Claude wrote VQ first; a human's <i>separate</i> VQ on the same vendor is the one that was actually ticked and sold — not Claude's own VQ.</td></tr>
 </table>
 
 ${totals.needsReviewLines > 0 ? `
@@ -1302,9 +1264,9 @@ ${(() => {
     ${intPairExpr(t30.winBotSoleAdopted + t30.winBotSoleSolo, tA ? tA.winBotSoleAdopted + tA.winBotSoleSolo : 0)}
     ${usdPairExpr(t30.winBotSoleAdoptedNet + t30.winBotSoleSoloNet, tA ? tA.winBotSoleAdoptedNet + tA.winBotSoleSoloNet : 0)}
     <td style="font-size:12px">Claude Harris wrote the VQ that buyer ticked. Direct attribution.</td></tr>
-<tr style="background:#dfd"><td>&nbsp;&nbsp;&nbsp;↳ 🤝 <b>Adopted — human took over Claude's VQ (buyer reassigned)</b></td>
+<tr style="background:#dfd"><td>&nbsp;&nbsp;&nbsp;↳ 🤝 <b>Adopted — buyer field is human</b> ⚠️</td>
     ${intPair('winBotSoleAdoptedHandoff')}${usdPair('winBotSoleAdoptedHandoffNet')}
-    <td style="font-size:12px">Bucket 1b — counts toward "revenue Claude generated".</td></tr>
+    <td style="font-size:12px">Bucket 1b — counts toward "revenue Claude generated". ⚠️ Unverified signal: buyer field is likely set by region routing at VQ creation, not a confirmed mid-flight reassignment — see caveat in the drill-in table below.</td></tr>
 <tr style="background:#dfd"><td>&nbsp;&nbsp;&nbsp;↳ 👥 <b>Adopted — human wrote a competing VQ (no buyer handoff)</b></td>
     ${intPair('winBotSoleAdoptedCompetingVq')}${usdPair('winBotSoleAdoptedCompetingVqNet')}
     <td style="font-size:12px">Human shadowed Claude but Claude's row got the tick; Claude stayed as buyer. Soft adoption signal.</td></tr>
@@ -1465,6 +1427,85 @@ ${flagTable(flagLists.botSoleAdoptedCompetingVq, [
       return parts.join(' · ') || '—';
     }, raw: false },
 ])}` : ''}
+
+${totals.processOrderLines > 0 ? `
+<h4 style="background:#fee;padding:8px;border-left:4px solid #c0392b">📋 RFQ created to process an order — by salesperson</h4>
+<p style="color:#666;font-size:12px">
+  Adoption sold lines where the entire RFQ→sold-CQ flow completed in under 60 minutes — the customer had already committed to the buy before the RFQ existed in OT. This is primarily a <b>workflow-visibility</b> table (which salespeople load RFQs purely to document already-decided orders, not to source) — Claude's role in these lines is secondary, which is why this now sits below the Claude-attribution sections rather than at the top.
+</p>
+<p style="color:#888;font-size:11px;font-style:italic">
+  Note: a "Claude cheaper applicable / GP lost" column used to run here automatically. Removed 2026-08-21 after 2 of 2 manually spot-checked claims turned out to be false positives (a cross-manufacturer same-MPN comparison, and a Shortage-RFQ lead-time-vs-stock comparison) — the underlying signal (Claude wrote a lower-cost, qty-applicable VQ that wasn't purchased) doesn't account for MFR or lead-time/urgency compatibility, and getting it wrong is worse than not showing it. Given the line count is small, this now belongs to manual, case-by-case review rather than automated digest reporting.
+</p>
+${orgProcessOrder ? `<p style="color:#666;font-size:11px;font-style:italic;background:#fafafa;padding:6px 10px;border-left:3px solid #ccc">
+  <b>Workflow context</b> — org-wide Adoption RFQ→sold-CQ &lt;60min pattern: <b>${fmtInt(orgProcessOrder.d30.lines)}</b> lines / <b>${fmtUsd(orgProcessOrder.d30.net)}</b> in the trailing ${windowDays}d (<b>${fmtInt(orgProcessOrder.all.lines)}</b> / <b>${fmtUsd(orgProcessOrder.all.net)}</b> ${allTimeLabel}). Per-seller attribution below is scoped to lines where Claude was active pre-sale (${fmtInt(totals.processOrderLines)} of ${fmtInt(orgProcessOrder.d30.lines)} in ${windowDays}d) — the rest is "what-if" without measurable money-on-table. Revisit granularity if this org-level count grows or trend shifts.
+</p>` : ''}
+${(() => {
+  function bucketProcessOrder(rows) {
+    const m = new Map();
+    for (const r of rows) {
+      const seller = r.salesrep_name || '(unassigned)';
+      if (!m.has(seller)) m.set(seller, { lines: 0, revenue: 0, minWindow: Infinity, maxWindow: 0, nonClaudeVqs: 0 });
+      const s = m.get(seller);
+      const win = (new Date(r.first_sold_cq_created).getTime() - new Date(r.rfq_created).getTime()) / 60000;
+      s.lines++;
+      s.revenue += Number(r.cq_sold_net) || 0;
+      s.minWindow = Math.min(s.minWindow, win);
+      s.maxWindow = Math.max(s.maxWindow, win);
+      s.nonClaudeVqs += Number(r.human_vq_count) || 0;
+    }
+    return m;
+  }
+  const bySeller30 = bucketProcessOrder(flagLists.processOrderLines);
+  const bySellerAll = allFlagLists ? bucketProcessOrder(allFlagLists.processOrderLines) : new Map();
+  const blank = () => ({ lines: 0, revenue: 0, minWindow: Infinity, maxWindow: 0, nonClaudeVqs: 0 });
+  const sellerNames = new Set([...bySeller30.keys(), ...bySellerAll.keys()]);
+  const merged = [...sellerNames].map(name => ({
+    name,
+    d30: bySeller30.get(name) || blank(),
+    all: bySellerAll.get(name) || blank(),
+  }));
+  merged.sort((a, b) => (b.d30.revenue - a.d30.revenue) || (b.all.revenue - a.all.revenue));
+  const totalNonClaude30 = merged.reduce((a, m) => a + m.d30.nonClaudeVqs, 0);
+  const totalNonClaudeAll = merged.reduce((a, m) => a + m.all.nonClaudeVqs, 0);
+  const fmtAvg = (n, lines) => lines > 0 ? (n / lines).toFixed(1) : '—';
+  const cell = (val, sub) => `<td style="text-align:right">${val}${sub ? ` <span style="color:#888;font-size:11px">${sub}</span>` : ''}</td>`;
+  const windowCell = (s) => `<td style="text-align:right;font-size:11px">${s.lines > 0 ? `${Math.round(s.minWindow)}–${Math.round(s.maxWindow)} min` : '—'}</td>`;
+  let html = `<table border="1" cellpadding="4" cellspacing="0" style="border-collapse:collapse;font-size:11px">
+<tr style="background:#f0f0f0">
+  <th rowspan="2">Salesperson</th>
+  <th colspan="${allTotals ? 2 : 1}">Lines</th>
+  <th colspan="${allTotals ? 2 : 1}">Revenue</th>
+  <th colspan="${allTotals ? 2 : 1}">Window range</th>
+  <th colspan="${allTotals ? 2 : 1}">Non-Claude VQs</th>
+</tr>
+<tr style="background:#f0f0f0;font-size:10px">
+  <th>${windowDays}d</th>${allTotals ? `<th>${allTimeLabel}</th>` : ''}
+  <th>${windowDays}d</th>${allTotals ? `<th>${allTimeLabel}</th>` : ''}
+  <th>${windowDays}d</th>${allTotals ? `<th>${allTimeLabel}</th>` : ''}
+  <th>${windowDays}d</th>${allTotals ? `<th>${allTimeLabel}</th>` : ''}
+</tr>`;
+  for (const m of merged) {
+    html += `<tr><td>${esc(m.name)}</td>` +
+      cell(fmtInt(m.d30.lines)) + (allTotals ? cell(fmtInt(m.all.lines)) : '') +
+      cell(fmtUsd(m.d30.revenue)) + (allTotals ? cell(fmtUsd(m.all.revenue)) : '') +
+      windowCell(m.d30) + (allTotals ? windowCell(m.all) : '') +
+      cell(fmtInt(m.d30.nonClaudeVqs), `(${fmtAvg(m.d30.nonClaudeVqs, m.d30.lines)}/line)`) +
+      (allTotals ? cell(fmtInt(m.all.nonClaudeVqs), `(${fmtAvg(m.all.nonClaudeVqs, m.all.lines)}/line)`) : '') +
+      `</tr>`;
+  }
+  const allLinesTotal = allTotals ? allTotals.processOrderLines : 0;
+  const allNetTotal = allTotals ? allTotals.processOrderNet : 0;
+  html += `<tr style="background:#f0f0f0;font-weight:bold"><td>Total</td>` +
+    cell(fmtInt(totals.processOrderLines)) + (allTotals ? cell(fmtInt(allLinesTotal)) : '') +
+    cell(fmtUsd(totals.processOrderNet)) + (allTotals ? cell(fmtUsd(allNetTotal)) : '') +
+    `<td></td>` + (allTotals ? `<td></td>` : '') +
+    cell(fmtInt(totalNonClaude30), `<span style="font-weight:normal">(${fmtAvg(totalNonClaude30, totals.processOrderLines)}/line)</span>`) +
+    (allTotals ? cell(fmtInt(totalNonClaudeAll), `<span style="font-weight:normal">(${fmtAvg(totalNonClaudeAll, allLinesTotal)}/line)</span>`) : '') +
+    `</tr>`;
+  html += `</table>`;
+  return html;
+})()}
+` : ''}
 
 <h3 style="background:#eef;padding:10px;border-left:6px solid #3498db;margin-top:32px">⚙️ Process efficiency — LAM + Stock (NOT framed as wins)</h3>
 <p style="color:#666;font-size:12px">
@@ -1674,17 +1715,22 @@ async function main() {
   const dryRun = argv.includes('--dry-run');
   const windowIdx = argv.indexOf('--window');
   const windowDays = windowIdx >= 0 ? parseInt(argv[windowIdx + 1], 10) : DEFAULT_WINDOW_DAYS;
+  const renderOnlyIdx = argv.indexOf('--render-only');
+  const renderOnlyPath = renderOnlyIdx >= 0 ? argv[renderOnlyIdx + 1] : null;
 
   log(`VQ Enrichment ROI Tracker starting (window=${windowDays}d${dryRun ? ', DRY RUN' : ''})`);
 
   const apiCoverageBps = getApiCoverageBps();
   log(`API coverage BPs: ${apiCoverageBps.length} distributors (${apiCoverageBps.join(',')})`);
 
+  const excludedVqIds = loadEmailDigitizedVqIds();
+  log(`Excluding ${excludedVqIds.length} confirmed email-digitized VQs (VQ Loading handler) from the sourcing population — see VQ Loading daily digest for that activity`);
+
   // Two windows: trailing N days (action focus) and all-time since inception.
   // 99999d is effectively "no time filter" — pre-dates the 2026-04-07 first VQ.
   const [rows, rowsAll] = await Promise.all([
-    queryEnrichedLines(windowDays, apiCoverageBps),
-    queryEnrichedLines(99999, apiCoverageBps),
+    queryEnrichedLines(windowDays, apiCoverageBps, excludedVqIds),
+    queryEnrichedLines(99999, apiCoverageBps, excludedVqIds),
   ]);
   log(`Enriched lines: ${windowDays}d=${rows.length}, all-time=${rowsAll.length}`);
 
@@ -1743,7 +1789,11 @@ async function main() {
     `Adoption=${totals.adoption.poCount}/${totals.adoption.poNet.toFixed(2)})`
   );
 
-  if (dryRun) {
+  if (renderOnlyPath) {
+    const html = renderEmail(agg, windowDays, { aggAll, inceptionDate, orgProcessOrder, excludedVqCount: excludedVqIds.length });
+    fs.writeFileSync(renderOnlyPath, html);
+    log(`RENDER-ONLY — wrote HTML to ${renderOnlyPath}, no email sent`);
+  } else if (dryRun) {
     log('DRY RUN — skipping email');
   } else if (rows.length > 0) {
     const notifier = createNotifier({ fromEmail: FROM_EMAIL, fromName: 'Claude Harris Enrichment ROI' });
@@ -1759,7 +1809,7 @@ async function main() {
       (totals.needsReviewLines > 0 ? ` · ⚠️ ${totals.needsReviewLines} needs review` : '') +
       (missTotal > 0 ? ` · ⚠️ ${missTotal} misses (${fmtUsd(missTotalNet)})` : '') +
       (totals.soldButPoVoided > 0 ? ` · 🔴 ${totals.soldButPoVoided} PO-voided` : '');
-    const html = renderEmail(agg, windowDays, { aggAll, inceptionDate, orgProcessOrder });
+    const html = renderEmail(agg, windowDays, { aggAll, inceptionDate, orgProcessOrder, excludedVqCount: excludedVqIds.length });
     try {
       await notifier.sendEmail(NOTIFY_EMAIL, subject, html, { html: true });
       log('Digest email sent');

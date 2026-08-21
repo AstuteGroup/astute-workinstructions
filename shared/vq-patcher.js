@@ -81,11 +81,13 @@ async function tickVQForPurchase(vqId, opts = {}) {
   // This query runs before we apply extras so we see the current DB state.
   const preflight = await validateVQForPurchase(vqId, { program, allowCompetingTicked });
   if (preflight.vq) {
-    const currentBuyer = preflight.vq.chuboe_buyer_id;
+    // pg returns numeric columns (chuboe_buyer_id) as strings — cast before
+    // comparing against the numeric ID constants, or these checks never fire.
+    const currentBuyer = preflight.vq.chuboe_buyer_id != null ? Number(preflight.vq.chuboe_buyer_id) : null;
     if (currentBuyer === CLAUDE_HARRIS_USER_ID) {
       patchPayload.Chuboe_Buyer_ID = buyerId || JAKE_HARRIS_USER_ID;
       buyerCorrected = true;
-    } else if (buyerId && currentBuyer !== buyerId) {
+    } else if (buyerId && currentBuyer !== Number(buyerId)) {
       // Caller explicitly specified a different buyer
       patchPayload.Chuboe_Buyer_ID = buyerId;
       buyerCorrected = true;
