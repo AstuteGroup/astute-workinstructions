@@ -33,6 +33,18 @@ window's start date). The report groups commits by project and shows:
 - Project description
 - Key updates (deduplicated, max 6 per project)
 
+### Quiet weeks still send
+
+A window with zero commits produces a report anyway, subject
+`Weekly Project Report - Week NN — no commits`, with an explicit "No commits in
+this window" note in the body. The prefix is unchanged so existing inbox filters
+still match.
+
+> ⚠️ **Do not restore the early return on an empty week.** Before 2026-08-21
+> `main()` returned at `commits.length === 0` before reaching the `--send`
+> branch, so a quiet week sent nothing and looked identical to a dead cron —
+> the sentinel still recorded success. The zero-commit email *is* the heartbeat.
+
 ## Manual Execution
 
 ```bash

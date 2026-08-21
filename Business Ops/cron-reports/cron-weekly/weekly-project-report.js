@@ -235,6 +235,9 @@ function generateConsoleReport(dateRange, projects, commits) {
   console.log(`${'═'.repeat(70)}`);
   console.log();
   console.log(`  ${BOLD}${commits.length} commits${RESET} across ${BOLD}${Object.keys(projects).length} projects${RESET}`);
+  if (commits.length === 0) {
+    console.log(`  ${DIM}No commits in this window.${RESET}`);
+  }
   console.log();
 
   const sortedProjects = Object.entries(projects)
@@ -359,6 +362,15 @@ function generateHtmlReport(dateRange, projects, commits) {
   </div>
 `;
 
+  if (commits.length === 0) {
+    html += `
+  <p style="color:#555;font-size:15px;margin:0 0 8px;">No commits in this window.</p>
+  <p style="color:#888;font-size:13px;margin-top:0;">
+    This report still sends on a quiet week &mdash; if it stops arriving, the job itself has stopped.
+  </p>
+`;
+  }
+
   for (const [name, data] of sortedProjects) {
     const meta = PROJECT_META[name] || { description: '' };
     const highlights = extractHighlights(data.commits);
@@ -397,7 +409,10 @@ async function sendReport(dateRange, projects, commits) {
 
   const weekNum = getWeekNumber(dateRange.since);
   const htmlContent = generateHtmlReport(dateRange, projects, commits);
-  const subject = `Weekly Project Report - Week ${weekNum}`;
+  // Keep the prefix stable so existing inbox filters still match a quiet week.
+  const subject = commits.length === 0
+    ? `Weekly Project Report - Week ${weekNum} — no commits`
+    : `Weekly Project Report - Week ${weekNum}`;
 
   // Build plain text fallback
   const sortedProjects = Object.entries(projects)
@@ -411,6 +426,11 @@ async function sendReport(dateRange, projects, commits) {
   let textBody = `Weekly Project Report - Week ${weekNum}\n`;
   textBody += `${formatDate(dateRange.since)} - ${formatDate(dateRange.until)}\n\n`;
   textBody += `${commits.length} commits across ${Object.keys(projects).length} projects\n\n`;
+
+  if (commits.length === 0) {
+    textBody += 'No commits in this window. This report still sends on a quiet week —\n';
+    textBody += 'if it stops arriving, the job itself has stopped.\n\n';
+  }
 
   for (const [name, data] of sortedProjects) {
     const meta = PROJECT_META[name] || { description: '' };
@@ -456,9 +476,10 @@ async function main() {
   const projects = categorizeCommits(logOutput);
   const commits = getGitLog(dateRange.since, dateRange.until);
 
+  // No early return on an empty week — a zero-commit report still sends, so a
+  // quiet week and a cron that never fired are distinguishable from the inbox.
   if (commits.length === 0) {
     console.log('No commits found in the specified date range.');
-    return;
   }
 
   if (args.includes('--send')) {
