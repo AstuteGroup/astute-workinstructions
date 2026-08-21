@@ -26,6 +26,35 @@ The SessionStart greeting reads this file and surfaces all open items, sorted by
 
 ### Active workstreams (next session pickup)
 
+- [ ] 🟢 **NC Listing / carryover reconciliation — GE Consignment open orders & other consignment POV cleanup**
+  - **Context:** 2026-08-21 session root-caused and fixed `nc-listing.js` (execSync timeout truncating the LAM customer-offer write; carryover-registry double-subtraction bug; missing CSV-review emails to Jake since a 2026-06-08 refactor). Added GM_Stock_US/HK groups (W121/W122) to both `nc-listing.js` and `workflows/free-stock-inventory.js`, and built `shared/carryover-reconciler.js` — automatic weekly reconciliation of carryover-registry files (LAM/Eaton/Philippines/GM) against the live Infor cache, with a new per-warehouse-tab xlsx report emailed to jake.harris@ only.
+  - **What's still open:**
+    1. **GE Consignment open orders** — operator flagged this needs review; not yet investigated this session (scope/specifics TBD next session).
+    2. **Reconciliation cleanup** — 234 lines are currently "still outstanding" across LAM (60) / Eaton (93) / Free Stock Philippines (74) / GM Stock (7) after the 2026-08-21 catch-up (down from 560). Operator wants to slowly audit these week-over-week using the new xlsx report (per-warehouse tabs) rather than all at once. Checked and confirmed: no completed sales/shipments in OT explain any of the 234 as sold-through — they read as genuine partial/pending receipt against still-open purchase orders.
+    3. **Close out other consignment open POVs** — broader than GE; other consignment groups (Taxan, Spartronics, Eaton) may have similar open-PO cleanup needed. Not yet scoped.
+  - **Why blocked:** end of session — operator wants to pick this up fresh next time.
+  - **Ready when:** next session.
+  - **How:** Start with GE Consignment (W103) open orders/POVs — pull open PO status via `c_orderline`/`c_order` (issotrx='N', docstatus not 'CO') filtered to GE's bpartner, cross-reference against carryover-registry if relevant. Then repeat pattern for Taxan/Spartronics/Eaton. Reconciliation report (`Carryover_Reconciliation_<date>.xlsx`, sent weekly once cron resumes) is the ongoing audit tool for item 2.
+  - **cron status:** `nc-listing.js` is still PAUSED in `cron-jobs.js` (commented out since 2026-06-18) — everything above was verified via manual dry-run/live runs this session, not yet re-enabled on schedule. Re-enabling is a separate decision (add-cron-job.js / install-crons.js) not yet made.
+  - **Created / source:** 2026-08-21, NC Listing / carryover reconciliation review session.
+
+- [ ] ⏸️ **LAM Kitting RFQ 1141867 — vendor tariffs to apply**
+  - **Context:** Operator is collecting tariff amounts per vendor/line for the RFQ 1141867 (RPMSR-00272) LAM Kitting purchase batch, to be applied together once the full list is in hand.
+  - **Captured so far:**
+    - Coilcraft (VQ 2320953, MSS1278-124KLD, POV/PO not yet confirmed) — tariff **$117.60**
+    - Digi-Key (VQ 2320957, 10-737585-178, PO812009 / POV0077907) — tariff **$123.10**
+    - Mouser (VQ 2320950, CRCW12101K78FKTA) — **no tariff**
+    - Mouser (VQ 2320955, C0603C271J5RACTU) — **no tariff**
+    - Master Electronics (VQ 2320951, HVCB2512FTD499K / PO812017 / POV0077914) — **nothing showing yet**; operator will recheck once it ships.
+    - Arrow (VQ 2320956, 2484639-1) — **no tariff**
+  - **Still outstanding:** Master Electronics recheck at ship time is the only open item.
+  - **Done (2026-08-21):** Coilcraft ($117.60) and Digi-Key ($123.10) tariffs requested via `postGeneralRequest()` against the actual OT POs (not VQs) — R_Request 1173683 (PO812020/POV0077918, Coilcraft) and R_Request 1173684 (PO812009/POV0077907, Digi-Key).
+  - **Why blocked:** Operator said "we'll capture them all and then we'll set up VQs for them" — waiting on the rest of the list before creating tariff VQs / writing anything.
+  - **Ready when:** Operator finishes providing remaining tariff amounts, then says to proceed.
+  - **How:** Operator's plan is to set up VQs for the tariffs once the full list is captured (not a plain field PATCH like tracking/due-date) — likely a manual VQ per tariff line via `createManualVQ()`, pending operator confirmation on structure. No dedicated tariff writer identified yet in `shared/`.
+  - **Related:** tracking number 539787364872 added to PO812009/POV0077907 (Digi-Key, 10-737585-178) same session, via `patchRecord('c_orderline', ...)`.
+  - **Created / source:** 2026-08-21, LAM Kitting VQ purchase session (RFQ 1141867 batch: Mouser/Coilcraft/Master/Arrow/Digi-Key).
+
 - [x] ~~**PRIORITY: Unified Email Tracking — Phase 3**~~ *(opened 2026-08-05, DONE 2026-08-06)*
   - **Resolution:** Implemented in commit `3986395`. All 10 workflow handlers now show `Tracking ID: VQ-12345` instead of `UID: 12345` in escalation emails, with fallback to `(UID 12345)` if tracking ID not available. Breadcrumb writes include `trackingId` field. Design doc updated to mark Phase 3 complete.
 
