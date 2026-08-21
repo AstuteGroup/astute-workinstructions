@@ -197,12 +197,48 @@ node scripts/create-po-from-pdf.js "path/to/extracted.json"
 | Domestic Shipping | Vendor + delivery address country comparison |
 | Infor PO | `order_number` |
 | MFR | `line_items[].manufacturer` → API lookup |
+| Buyer (`SalesRep_ID`) | `buyer.email` → `ad_user` lookup, `buyer.name` fallback |
 
 **Vendor/MFR Mapping:**
 
 New vendors must be added to `VENDOR_MAP` in the script. MFR is looked up dynamically via the OT API.
 
+**Buyer Mapping:**
+
+The PO's Buyer (`SalesRep_ID`) is resolved from the buyer named on the PDF — it is **not** hardcoded.
+`lookupBuyer()` tries three things in order, caching the result per email/name:
+
+1. `ad_user` filtered on `EMail eq '<buyer.email>'` — the reliable key
+2. `ad_user` filtered on `Name eq '<buyer.name>'`
+3. `LOOKUPS.buyerId` (Jake Harris, 1000004) as the default, so a missing buyer never blocks a load
+
+**One email can match several `ad_user` rows.** A person gets one employee record plus a contact row
+on every vendor/customer BP they are attached to — `jake.harris@astutegroup.com` returns **6** active
+rows in TEST, and the API's first row is a vendor-contact row (1028155), not the employee record.
+`pickEmployeeUser()` disambiguates: the employee row is the one whose Business Partner is the person
+themselves (`C_BPartner_ID.identifier === Name`); contact rows carry a company BP. Ties or no match
+fall back to the lowest `id`.
+
+`IsSalesRep` is **not** returned by the REST API for `ad_user`, so it cannot be used as the filter.
+
+> **Verify on PROD before first use:** duplicate-row counts in PROD are unknown, and the
+> `C_BPartner_ID.identifier === Name` test has only been validated against TEST.
+
 ## Known Limitations
+
+### Unmapped Warehouse Code Creates a Header With No Lines
+
+> **Open defect (found 2026-08-21).** `WAREHOUSE_MAP` covers W111, W103, W106 and W107 only. Any
+> other code — or a `warehouse_code` the extractor returns as `null` — resolves to `null`, and every
+> `c_orderline` POST then fails with `500 Could not convert value null for Chuboe_Warehouse`. The PO
+> **header is already created** at that point, so the run leaves an empty PO behind.
+>
+> Reproduces with `POV0060812.pdf`: the PDF carries **W080**, the extractor's
+> `orderNum + '\s+(W\d+)'` regex does not match that layout so `warehouse_code` comes back `null`,
+> and the load produced header-only POs (PO806325, PO806328).
+>
+> Two things to fix: add the missing warehouse codes to `WAREHOUSE_MAP`, and validate the mapping
+> **before** POSTing the header so an unmapped code aborts the run instead of littering.
 
 ### MFR in TEST Environment
 

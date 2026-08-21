@@ -130,6 +130,20 @@ async function lookupMfr(mfrName) {
 // Buyer cache (populated dynamically via API lookup)
 const BUYER_CACHE = {};
 
+// One email/name can match several ad_user rows: one employee record plus a
+// contact row on each vendor/customer BP the person is attached to. The employee
+// row is the one whose Business Partner is the person themselves
+// (C_BPartner_ID.identifier === Name); contact rows carry a company BP.
+// Falls back to the lowest id (oldest record) when nothing matches.
+function pickEmployeeUser(records) {
+  const norm = (s) => (s || '').trim().toLowerCase();
+  const employee = records.find(
+    (u) => u.C_BPartner_ID && norm(u.C_BPartner_ID.identifier) === norm(u.Name)
+  );
+  if (employee) return employee;
+  return records.reduce((lowest, u) => (u.id < lowest.id ? u : lowest), records[0]);
+}
+
 async function lookupBuyer(buyerName, buyerEmail) {
   if (!buyerName && !buyerEmail) return LOOKUPS.buyerId;  // Default to Jake Harris
 
@@ -144,9 +158,12 @@ async function lookupBuyer(buyerName, buyerEmail) {
       const filter = encodeURIComponent(`EMail eq '${buyerEmail.replace(/'/g, "''")}'`);
       const result = await apiGet(`ad_user?$filter=${filter}`);
       if (result.records && result.records.length > 0) {
-        const user = result.records[0];
+        const user = pickEmployeeUser(result.records);
+        const dupes = result.records.length > 1
+          ? ` [${result.records.length} rows matched; picked BP "${user.C_BPartner_ID && user.C_BPartner_ID.identifier}"]`
+          : '';
         BUYER_CACHE[cacheKey] = user.id;
-        console.log(`  Buyer lookup: "${buyerEmail}" -> ${user.Name} (ID ${user.id})`);
+        console.log(`  Buyer lookup: "${buyerEmail}" -> ${user.Name} (ID ${user.id})${dupes}`);
         return user.id;
       }
     } catch (err) {
@@ -160,9 +177,12 @@ async function lookupBuyer(buyerName, buyerEmail) {
       const filter = encodeURIComponent(`Name eq '${buyerName.replace(/'/g, "''")}'`);
       const result = await apiGet(`ad_user?$filter=${filter}`);
       if (result.records && result.records.length > 0) {
-        const user = result.records[0];
+        const user = pickEmployeeUser(result.records);
+        const dupes = result.records.length > 1
+          ? ` [${result.records.length} rows matched; picked BP "${user.C_BPartner_ID && user.C_BPartner_ID.identifier}"]`
+          : '';
         BUYER_CACHE[cacheKey] = user.id;
-        console.log(`  Buyer lookup: "${buyerName}" -> ID ${user.id}`);
+        console.log(`  Buyer lookup: "${buyerName}" -> ID ${user.id}${dupes}`);
         return user.id;
       }
     } catch (err) {
