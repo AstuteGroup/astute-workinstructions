@@ -31,7 +31,7 @@ The purpose of this task is to maintain the Inspection Queue by fixing records t
 This is important because Weighted Priority determines inspection urgency. Records without a score do not appear in the correct priority order, which can delay critical inspections.
 
 **Two approaches:**
-- **Automated** — runs daily at 3am CT, auto-fixes straightforward cases, escalates ambiguous ones
+- **Automated** — runs daily at 18:30 UTC (1:30pm CT), auto-fixes straightforward cases, escalates ambiguous ones
 - **Manual** — UI workflow for handling escalations or ad-hoc fixes
 
 ## Problem Statement
@@ -135,6 +135,22 @@ AllocID,LotID,MPN,LotQty,RFQ,Type,CandidateCount,Recommendation
 2130858,1777832,"XE232-1024-FB374-C40",420,1137235,ESCALATE_QTY_MISMATCH,1,"SO507486 Line 10 (avail: 0)"
 ```
 
+**6. Notification (always sent in live mode)**
+
+Every live run emails `justin.oberhofer@astutegroup.com` — **including runs that find nothing**.
+
+| Result | Subject |
+|--------|---------|
+| Fixes and/or escalations | `Inspection Queue: N fixed, N escalations` |
+| Only skip-list matches | `Inspection Queue: N skipped (no action needed)` |
+| Nothing missing a score | `Inspection Queue: clean — no lots missing weighted priority` |
+
+> ⚠️ **Do not restore the early return on an empty queue.** Before 2026-08-21 the script returned at
+> `lots.length === 0` without notifying, so a clean day and a dead cron looked identical from the
+> inbox. The zero-lot email *is* the heartbeat — if it stops arriving, the job has stopped running.
+
+`--dry-run` never emails, regardless of result.
+
 **Output Example:**
 
 ```
@@ -160,7 +176,8 @@ Escalation report written to: ./output/escalations-2026-08-10T17-02-25.csv
 
 ### Cron Schedule
 
-Runs daily at 3am CT (8 UTC) as `analytics_user`.
+Runs daily at **18:30 UTC** (1:30pm CDT / 12:30pm CST) as `analytics_user`.
+Registry entry: `cron-jobs.js` → `inspection-queue-maintenance`. Log: `/tmp/inspection-queue-maintenance.log`.
 
 ```bash
 # Verify cron is installed

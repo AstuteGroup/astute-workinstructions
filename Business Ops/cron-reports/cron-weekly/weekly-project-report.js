@@ -2,12 +2,12 @@
 /**
  * Weekly Project Report Generator
  *
- * Run every Monday morning to summarize work from the previous week.
+ * Run every Friday morning to summarize the previous seven days (Fri -> Thu).
  *
  * Usage:
  *   node scripts/weekly-project-report.js           # Last 7 days (console)
- *   node scripts/weekly-project-report.js --week    # Previous Mon-Sun (console)
- *   node scripts/weekly-project-report.js --send    # Previous Mon-Sun + email
+ *   node scripts/weekly-project-report.js --week    # Previous Fri-Thu (console)
+ *   node scripts/weekly-project-report.js --send    # Previous Fri-Thu + email
  *   node scripts/weekly-project-report.js --days 14 # Last 14 days (console)
  */
 
@@ -80,14 +80,14 @@ function getDateRange(args) {
   let since, until;
 
   if (args.includes('--week') || args.includes('--send')) {
-    const dayOfWeek = today.getDay();
-    const daysToLastMonday = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
-    const lastMonday = new Date(today);
-    lastMonday.setDate(today.getDate() - daysToLastMonday - 7);
-    const lastSunday = new Date(lastMonday);
-    lastSunday.setDate(lastMonday.getDate() + 6);
-    since = lastMonday;
-    until = lastSunday;
+    // Reporting week runs Friday -> Thursday. The job fires Friday morning and
+    // covers the seven days ending yesterday: last Friday through Thursday.
+    // Anchored to `today` rather than to a fixed weekday, so a late or
+    // catch-up run still reports the seven days behind it.
+    since = new Date(today);
+    since.setDate(today.getDate() - 7);
+    until = new Date(today);
+    until.setDate(today.getDate() - 1);
   } else {
     const daysArg = args.indexOf('--days');
     const days = daysArg >= 0 ? parseInt(args[daysArg + 1]) || 7 : 7;
@@ -120,18 +120,19 @@ function getWeekNumber(dateStr) {
   return Math.ceil((diff + start.getDay() * 86400000) / oneWeek);
 }
 
-function getGitLog(since) {
+function getGitLog(since, until) {
   try {
-    const cmd = `git -C "${REPO_PATH}" log --since="${since}" --author="${AUTHOR}" --pretty=format:"%h|%ad|%s" --date=short`;
+    // --until is a date at 00:00, so push it to end-of-day to include that day.
+    const cmd = `git -C "${REPO_PATH}" log --since="${since}" --until="${until} 23:59:59" --author="${AUTHOR}" --pretty=format:"%h|%ad|%s" --date=short`;
     return execSync(cmd, { encoding: 'utf8' }).trim().split('\n').filter(Boolean);
   } catch (e) {
     return [];
   }
 }
 
-function getFilesChanged(since) {
+function getFilesChanged(since, until) {
   try {
-    const cmd = `git -C "${REPO_PATH}" log --since="${since}" --author="${AUTHOR}" --name-only --pretty=format:"COMMIT|%h|%ad|%s" --date=short`;
+    const cmd = `git -C "${REPO_PATH}" log --since="${since}" --until="${until} 23:59:59" --author="${AUTHOR}" --name-only --pretty=format:"COMMIT|%h|%ad|%s" --date=short`;
     return execSync(cmd, { encoding: 'utf8' });
   } catch (e) {
     return '';
@@ -451,9 +452,9 @@ async function sendReport(dateRange, projects, commits) {
 async function main() {
   const args = process.argv.slice(2);
   const dateRange = getDateRange(args);
-  const logOutput = getFilesChanged(dateRange.since);
+  const logOutput = getFilesChanged(dateRange.since, dateRange.until);
   const projects = categorizeCommits(logOutput);
-  const commits = getGitLog(dateRange.since);
+  const commits = getGitLog(dateRange.since, dateRange.until);
 
   if (commits.length === 0) {
     console.log('No commits found in the specified date range.');

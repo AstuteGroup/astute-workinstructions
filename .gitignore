@@ -47,3 +47,10 @@ shared/data/*.bak-*
 
 # Node deps
 node_modules/
+
+# Working data — Business Ops outputs (mirrors the Trading Analysis rule)
+Business Ops/**/output/
+
+# Python bytecode
+__pycache__/
+*.pyc
