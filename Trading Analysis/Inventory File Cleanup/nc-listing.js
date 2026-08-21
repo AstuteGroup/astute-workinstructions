@@ -26,8 +26,10 @@
 
 const fs = require('fs');
 const path = require('path');
+const XLSX = require('xlsx');
 const { createNotifier } = require('../../shared/notifier');
 const { loadCachedInventory } = require('../../shared/inventory-fetch-and-parse');
+const { reconcileCarryoverFile } = require('../../shared/carryover-reconciler');
 
 // =============================================================================
 // CONFIGURATION
@@ -68,6 +70,8 @@ const NC_GROUPS = {
     LAM_Dead_Inventory:       { warehouses: ['W115'] },
     LAM_Consignment:          { warehouses: ['W118'] },
     Eaton_Consignment:        { warehouses: ['W117'] },
+    GM_Stock_US:              { warehouses: ['W121'] }, // Astute Electronics Inc (GM Stock) — added 2026-08-21
+    GM_Stock_HK:              { warehouses: ['W122'] }, // Astute Electronics HK LTD (GM Stock) — added 2026-08-21, minimal data so far
 
     // Franchised account #1126121 (separate)
     Franchise_Stock:          { warehouses: ['W104'], includeMfrOnly: ['positronic'] },
@@ -179,49 +183,89 @@ function loadInventoryFromCache() {
 }
 
 // =============================================================================
-// LOAD CARRYOVER DATA
+// LOAD CARRYOVER DATA (with weekly reconciliation)
 // =============================================================================
 
-async function loadCarryoverLines() {
+// Which warehouse(s) each carryover-registry file should be checked for
+// arrival against. This is what makes reconciliation automatic instead of
+// a manual weekly task someone has to remember to run — see
+// shared/carryover-reconciler.js for the full rationale.
+const CARRYOVER_RECONCILE_MAP = {
+    'lam-consignment.json':        ['W118'],
+    'eaton-consignment.json':      ['W117'],
+    'free-stock-philippines.json': ['W109', 'W114'],
+    'gm-stock.json':                ['W121'], // US site only — confirmed 2026-08-21 no overlap with W122/HK
+};
+
+async function loadCarryoverLines(cache, opts = {}) {
+    const { write = true } = opts;
+
     // Load carryover lines from the registry files
     const carryoverDir = path.join(__dirname, 'carryover-registry');
     const carryoverLines = [];
+    const reconciliationAudit = [];
 
     if (!fs.existsSync(carryoverDir)) {
         console.log('  No carryover registry directory found');
-        return carryoverLines;
+        return { carryoverLines, reconciliationAudit };
     }
 
     const files = fs.readdirSync(carryoverDir).filter(f => f.endsWith('.json'));
 
     for (const file of files) {
         try {
-            const data = JSON.parse(fs.readFileSync(path.join(carryoverDir, file), 'utf8'));
-            if (data.lines && Array.isArray(data.lines)) {
-                for (const line of data.lines) {
-                    carryoverLines.push({
-                        'MPN':          String(line.Chuboe_MPN || line.mpn || '').trim(),
-                        'Description':  String(line.Description || line.description || '').trim(),
-                        'Manufacturer': String(line.Chuboe_MFR_Text || line.mfr || '').trim(),
-                        'Qty':          String(line.Qty != null ? line.Qty : (line.qty || '')),
-                        'D/C':          String(line.Chuboe_Date_Code || line.dateCode || '').trim(),
-                        '_source':      file.replace('.json', ''),
-                    });
+            const filePath = path.join(carryoverDir, file);
+            const warehouses = CARRYOVER_RECONCILE_MAP[file];
+
+            let outputLines;
+            if (warehouses && cache) {
+                // Reconcile against live cache — drops fully-arrived lines
+                // from the registry (persisted). Partial-arrival lines keep
+                // their ORIGINAL qty in the registry (never mutated — see
+                // shared/carryover-reconciler.js for why); use
+                // audit.linesForOutput (reduced qty on partials) for the CSV
+                // so the portal doesn't double-count the arrived portion.
+                const audit = reconcileCarryoverFile(filePath, warehouses, cache, { write });
+                if (audit) {
+                    reconciliationAudit.push(audit);
+                    log(`  Reconciled ${file}: ${audit.dropped.length} arrived (dropped), ` +
+                        `${audit.reduced.length} partial (reduced for output only), ${audit.stillPending.length} still pending`);
+                    outputLines = audit.linesForOutput;
                 }
+            } else if (!warehouses) {
+                log(`  WARNING: ${file} has no reconciliation mapping — loading as-is, never auto-reconciled`);
+            }
+
+            // Fall back to the raw file if there's no reconciliation mapping
+            // (unmapped future file) or reconciliation didn't run (no cache).
+            if (!outputLines) {
+                const data = JSON.parse(fs.readFileSync(filePath, 'utf8'));
+                outputLines = data.lines || [];
+            }
+
+            for (const line of outputLines) {
+                carryoverLines.push({
+                    'MPN':          String(line.Chuboe_MPN || line.mpn || '').trim(),
+                    'Description':  String(line.Description || line.description || '').trim(),
+                    'Manufacturer': String(line.Chuboe_MFR_Text || line.mfr || '').trim(),
+                    'Qty':          String(line.Qty != null ? line.Qty : (line.qty || '')),
+                    'D/C':          String(line.Chuboe_Date_Code || line.dateCode || '').trim(),
+                    '_source':      file.replace('.json', ''),
+                });
             }
         } catch (e) {
             console.warn(`  Warning: Could not load carryover file ${file}: ${e.message}`);
         }
     }
 
-    return carryoverLines;
+    return { carryoverLines, reconciliationAudit };
 }
 
 // =============================================================================
 // GENERATE NC PORTAL FILES
 // =============================================================================
 
-async function generateNCFiles(groupedRows, outputDir, dryRun) {
+async function generateNCFiles(groupedRows, outputDir, dryRun, cache) {
     const today = new Date();
     const mmdd = `${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
 
@@ -266,9 +310,12 @@ async function generateNCFiles(groupedRows, outputDir, dryRun) {
     const nonAuthPortalRows = nonAuthSourceRows.map(toPortalRow);
     const franchisePortalRows = franchiseSourceRows.map(toPortalRow);
 
-    // Load and append carryover lines to non-auth
+    // Load and append carryover lines to non-auth (reconciling against the
+    // live cache first — see shared/carryover-reconciler.js). In dry-run
+    // mode we preview the reconciliation but don't write it back, so a
+    // --dry-run doesn't mutate the carryover-registry files.
     log('Loading carryover lines...');
-    const carryoverLines = await loadCarryoverLines();
+    const { carryoverLines, reconciliationAudit } = await loadCarryoverLines(cache, { write: !dryRun });
     if (carryoverLines.length > 0) {
         log(`  Appending ${carryoverLines.length} carryover lines to non-auth CSV`);
         // Filter carryovers by exclusions too
@@ -301,13 +348,140 @@ async function generateNCFiles(groupedRows, outputDir, dryRun) {
         portalFile,
         franchisePortalFile,
         nonAuthRows: nonAuthPortalRows,
-        franchiseRows: franchisePortalRows
+        franchiseRows: franchisePortalRows,
+        reconciliationAudit,
     };
+}
+
+// =============================================================================
+// RECONCILIATION AUDIT REPORT (partial + never-arrived, for operator review)
+// =============================================================================
+
+function formatReconciliationAudit(reconciliationAudit) {
+    const lines = [];
+    let totalDropped = 0, totalReduced = 0, totalPending = 0;
+
+    for (const audit of reconciliationAudit) {
+        totalDropped += audit.dropped.length;
+        totalReduced += audit.reduced.length;
+        totalPending += audit.stillPending.length;
+
+        lines.push(`\n=== ${audit.label || audit.file} ===`);
+        lines.push(`  Arrived (dropped): ${audit.dropped.length} | Partial (reduced): ${audit.reduced.length} | Still outstanding: ${audit.stillPending.length}`);
+
+        if (audit.stillPending.length > 0) {
+            lines.push(`  --- Still outstanding (needs audit) ---`);
+            for (const p of audit.stillPending) {
+                lines.push(`    [${p.status}] ${p.mpn} (${p.mfr || 'unknown mfr'}) — qty ${p.expected}`);
+            }
+        }
+    }
+
+    lines.unshift(`Reconciliation summary: ${totalDropped} arrived (dropped), ${totalReduced} partial (reduced), ${totalPending} still outstanding across ${reconciliationAudit.length} carryover file(s)`);
+    return lines.join('\n');
+}
+
+/**
+ * Build the weekly reconciliation workbook — one tab per warehouse/carryover
+ * group showing what's still outstanding (partial + never-arrived), plus a
+ * Summary tab. This is a separate deliverable from the NC portal CSVs —
+ * operator asked (2026-08-21) for a standalone weekly report to slowly audit
+ * against, broken out by warehouse.
+ *
+ * @param {Array} reconciliationAudit - from generateNCFiles / loadCarryoverLines
+ * @param {string} outputDir
+ * @param {string} dateStr - YYYY-MM-DD
+ * @returns {string|null} path to the written xlsx, or null if nothing to report
+ */
+function buildReconciliationReport(reconciliationAudit, outputDir, dateStr) {
+    const withPending = reconciliationAudit.filter(a => a.stillPending.length > 0);
+    if (withPending.length === 0) return null;
+
+    const wb = XLSX.utils.book_new();
+
+    // Summary tab first
+    const summaryRows = reconciliationAudit.map(a => ({
+        'Group':               a.label || path.basename(a.file, '.json'),
+        'Total Before':        a.totalBefore,
+        'Arrived (dropped)':   a.dropped.length,
+        'Partial (reduced)':   a.reduced.length,
+        'Still Outstanding':   a.stillPending.length,
+    }));
+    const summaryWs = XLSX.utils.json_to_sheet(summaryRows);
+    summaryWs['!cols'] = [{ wch: 26 }, { wch: 13 }, { wch: 16 }, { wch: 16 }, { wch: 16 }];
+    XLSX.utils.book_append_sheet(wb, summaryWs, 'Summary');
+
+    // One tab per group with pending lines
+    for (const audit of withPending) {
+        const rows = audit.stillPending.map(p => ({
+            'MPN':              p.mpn,
+            'Manufacturer':     p.mfr || '',
+            'Status':           p.status === 'NEVER_ARRIVED' ? 'Never Arrived' : 'Partial',
+            'Qty Outstanding':  p.expected,
+        }));
+        const ws = XLSX.utils.json_to_sheet(rows);
+        ws['!cols'] = [{ wch: 28 }, { wch: 24 }, { wch: 14 }, { wch: 16 }];
+
+        // Sheet names capped at 31 chars, no special chars — reuse the label
+        let sheetName = (audit.label || path.basename(audit.file, '.json')).slice(0, 31);
+        XLSX.utils.book_append_sheet(wb, ws, sheetName);
+    }
+
+    const outPath = path.join(outputDir, `Carryover_Reconciliation_${dateStr}.xlsx`);
+    XLSX.writeFile(wb, outPath);
+    return outPath;
 }
 
 // =============================================================================
 // EMAIL SENDING
 // =============================================================================
+
+/**
+ * Send Jake his own review copies of the two portal CSVs directly.
+ *
+ * RESTORED 2026-08-21. Removed 2026-06-08 (commit 1011461) on the assumption
+ * that CC'ing jake@ on the NetComponents-direct emails made this redundant.
+ * That assumption was wrong: shared/notifier.js aborts the ENTIRE send
+ * (including cc) whenever `to` has zero allowed internal recipients — and
+ * `to` there is datamaster@netcomponents.com, always external, always
+ * blocked. So since 2026-06-08, Jake has never actually received the CSVs
+ * through the CC path — this was live-broken for ~10 days before nc-listing
+ * itself got paused for an unrelated reason, so nobody noticed. This
+ * function is the pre-2026-06-08 mechanism, confirmed by the operator as
+ * the one that used to actually work — restoring it, not inventing a new
+ * path. Always sent (independent of NC_UPLOAD_CONFIG.enabled, which only
+ * gates the separate direct-to-NetComponents send below).
+ */
+async function sendReviewEmails(portalFile, franchisePortalFile, dryRun) {
+    if (dryRun) {
+        log(`  [dry-run] Would send review copies to ${EMAIL_CONFIG.recipient}`);
+        return true;
+    }
+
+    const notifier = createNotifier({
+        fromEmail: `${EMAIL_CONFIG.account}@orangetsunami.com`,
+        fromName: 'NC Listing',
+        smtpPass: process.env.WORKMAIL_PASS || process.env.SMTP_PASS,
+    });
+
+    log(`  Sending non-auth CSV to ${EMAIL_CONFIG.recipient}...`);
+    await notifier.sendWithAttachment(
+        EMAIL_CONFIG.recipient,
+        'Data Upload - Non Authorized Account #1167233',
+        'Hello,\n\nPlease find attached updated stock inventory for NetComponents upload.\n\nBest regards,\nAstute Electronics',
+        [{ filename: path.basename(portalFile), path: portalFile }]
+    );
+
+    log(`  Sending franchise CSV to ${EMAIL_CONFIG.recipient}...`);
+    await notifier.sendWithAttachment(
+        EMAIL_CONFIG.recipient,
+        'Data Upload - Franchised Account #1126121',
+        'Hello,\n\nPlease find attached updated franchise inventory for NetComponents upload.\n\nBest regards,\nAstute Electronics',
+        [{ filename: path.basename(franchisePortalFile), path: franchisePortalFile }]
+    );
+
+    return true;
+}
 
 async function sendNCEmails(portalFile, franchisePortalFile, dryRun) {
     // Send directly to NetComponents (CC to jake for visibility)
@@ -380,15 +554,52 @@ async function main(opts = {}) {
 
         // Step 3: Generate NC portal files
         log('\nStep 2: Generating NetComponents portal files...');
-        const { portalFile, franchisePortalFile, nonAuthRows, franchiseRows } =
-            await generateNCFiles(groupedRows, outputDir, dryRun);
+        const { portalFile, franchisePortalFile, nonAuthRows, franchiseRows, reconciliationAudit } =
+            await generateNCFiles(groupedRows, outputDir, dryRun, cache);
 
         // Step 4: Send emails
         log('\nStep 3: Sending notification emails...');
+        await sendReviewEmails(portalFile, franchisePortalFile, dryRun);
         if (dryRun) {
-            log('  [DRY-RUN] Skipping email send');
+            log('  [DRY-RUN] Skipping NetComponents-direct email send');
         } else {
             await sendNCEmails(portalFile, franchisePortalFile, dryRun);
+        }
+
+        // Reconciliation audit — surfaced every run so "still outstanding"
+        // carryover lines get regular operator eyes instead of rotting
+        // silently (see shared/carryover-reconciler.js for why this exists).
+        let reconciliationReportFile = null;
+        if (reconciliationAudit.length > 0) {
+            log('\n' + formatReconciliationAudit(reconciliationAudit));
+
+            // Standalone weekly report — separate deliverable from the NC
+            // portal CSVs, one tab per warehouse group (operator ask,
+            // 2026-08-21). Sent every run that has anything outstanding,
+            // live runs only (dry-run previews but doesn't email).
+            reconciliationReportFile = buildReconciliationReport(reconciliationAudit, outputDir, dateStr);
+            if (reconciliationReportFile) {
+                log(`\nReconciliation report: ${path.basename(reconciliationReportFile)}`);
+                if (dryRun) {
+                    log('  [DRY-RUN] Skipping reconciliation report email');
+                } else {
+                    const reportNotifier = createNotifier({
+                        fromEmail: `${EMAIL_CONFIG.account}@orangetsunami.com`,
+                        fromName: 'Inventory Reconciliation',
+                    });
+                    const totalPending = reconciliationAudit.reduce((s, a) => s + a.stillPending.length, 0);
+                    await reportNotifier.sendWithAttachment(
+                        EMAIL_CONFIG.recipient,
+                        `Carryover Reconciliation — ${totalPending} still outstanding — ${dateStr}`,
+                        `Hi Jake,\n\nWeekly carryover reconciliation report attached — one tab per warehouse group, ` +
+                        `showing parts still outstanding (partial or never-arrived) after checking against this week's ` +
+                        `Infor cache.\n\n${totalPending} lines still need review across ${reconciliationAudit.length} group(s). ` +
+                        `See the Summary tab for the breakdown.\n\nBest,\nInventory Reconciliation`,
+                        [{ filename: path.basename(reconciliationReportFile), path: reconciliationReportFile }]
+                    );
+                    log(`  Sent to ${EMAIL_CONFIG.recipient}`);
+                }
+            }
         }
 
         // Summary
@@ -398,9 +609,10 @@ async function main(opts = {}) {
         log(`Cache date: ${cache.metadata.cachedAt}`);
         log(`Non-auth CSV: ${portalFile} (${nonAuthRows.length} rows)`);
         log(`Franchise CSV: ${franchisePortalFile} (${franchiseRows.length} rows)`);
+        log(`Reconciliation report: ${reconciliationReportFile ? path.basename(reconciliationReportFile) : 'none (nothing outstanding)'}`);
         log(`Emails sent: ${dryRun ? 'No (dry-run)' : 'Yes'}`);
 
-        return { success: true, portalFile, franchisePortalFile };
+        return { success: true, portalFile, franchisePortalFile, reconciliationAudit, reconciliationReportFile };
 
     } catch (err) {
         log('='.repeat(60));
@@ -449,4 +661,4 @@ Output:
         });
 }
 
-module.exports = { main, generateNCFiles, loadCarryoverLines };
+module.exports = { main, generateNCFiles, loadCarryoverLines, formatReconciliationAudit, buildReconciliationReport, sendReviewEmails };

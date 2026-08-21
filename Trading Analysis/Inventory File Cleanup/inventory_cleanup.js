@@ -281,6 +281,19 @@ const STATIC_CARRYOVER_OFFERS = [
         // No paired Infor warehouse — this stock lives outside the weekly
         // export and propagates forward as-is until retired. NO mergeIntoGroup
         // — this carryover remains a standalone `[Carryover]` offer in OT.
+        //
+        // SUPERSEDED 2026-08-21: Infor now has dedicated GM warehouses
+        // (W121 US, W122 HK) — the "no paired Infor warehouse" premise above
+        // no longer holds. GM is now wired into free-stock-inventory.js
+        // (GM_Stock_US/GM_Stock_HK groups) and nc-listing.js (NC_GROUPS)
+        // exactly like LAM/Eaton/Philippines, and carryover-registry/
+        // gm-stock.json is reconciled weekly by shared/carryover-reconciler.js
+        // the same way theirs is. The standalone [Carryover] GM Stock OT
+        // offer (last refreshed 2026-06-01, offer 1026356) is dead — its
+        // content matched gm-stock.json's pre-reconciliation snapshot
+        // exactly, confirmed 2026-08-21, so nothing was lost. This
+        // inventory_cleanup.js file is itself deprecated/not scheduled;
+        // this entry is kept for history only.
     },
 ];
 

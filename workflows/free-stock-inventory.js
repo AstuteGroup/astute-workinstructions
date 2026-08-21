@@ -11,6 +11,8 @@
  *   - Free_Stock_Hong_Kong (W108, W113)
  *   - Free_Stock_Philippines (W109, W114)
  *   - Franchise_Stock (W104 Positronic only)
+ *   - GM_Stock_US (W121)
+ *   - GM_Stock_HK (W122)
  *
  * Usage:
  *   node free-stock-inventory.js             # Write all offers
@@ -62,6 +64,25 @@ const FREE_STOCK_GROUPS = {
     offerTypeId: 1000008,     // Austin
     description: 'Franchise Stock',
     includeMfrOnly: ['positronic'],  // Only Positronic
+  },
+  GM_Stock_US: {
+    // Added 2026-08-21. GM is Astute-owned free stock (not consignment) —
+    // Infor's warehouseName for W121 is literally "Astute Electronics Inc
+    // (GM Stock)", matching bpartner 1000332 used by every other Free_Stock_*
+    // group. Offer type inferred by elimination (only US-location type tied
+    // to this bpartner) and confirmed with operator 2026-08-21.
+    warehouses: ['W121'],
+    bpartnerId: 1000332,      // Astute Electronics Inc
+    offerTypeId: 1000008,     // Austin
+    description: 'GM Stock - US',
+  },
+  GM_Stock_HK: {
+    // W122 has minimal data so far (1 row as of 2026-08-21) but wired in
+    // now for consistency — same bpartner as the rest, Hong Kong offer type.
+    warehouses: ['W122'],
+    bpartnerId: 1000332,      // Astute Electronics Inc
+    offerTypeId: 1000009,     // Hong Kong
+    description: 'GM Stock - Hong Kong',
   },
 };
 
@@ -252,6 +273,8 @@ Groups:
   Free_Stock_Hong_Kong   W108, W113
   Free_Stock_Philippines W109, W114
   Franchise_Stock        W104 (Positronic only)
+  GM_Stock_US            W121
+  GM_Stock_HK            W122
 `);
     process.exit(0);
   }
