@@ -439,18 +439,25 @@ function buildReconciliationReport(reconciliationAudit, outputDir, dateStr) {
 /**
  * Send Jake his own review copies of the two portal CSVs directly.
  *
- * RESTORED 2026-08-21. Removed 2026-06-08 (commit 1011461) on the assumption
- * that CC'ing jake@ on the NetComponents-direct emails made this redundant.
- * That assumption was wrong: shared/notifier.js aborts the ENTIRE send
- * (including cc) whenever `to` has zero allowed internal recipients — and
- * `to` there is datamaster@netcomponents.com, always external, always
- * blocked. So since 2026-06-08, Jake has never actually received the CSVs
- * through the CC path — this was live-broken for ~10 days before nc-listing
- * itself got paused for an unrelated reason, so nobody noticed. This
- * function is the pre-2026-06-08 mechanism, confirmed by the operator as
- * the one that used to actually work — restoring it, not inventing a new
- * path. Always sent (independent of NC_UPLOAD_CONFIG.enabled, which only
- * gates the separate direct-to-NetComponents send below).
+ * NOT CURRENTLY CALLED (see main()) — kept defined + exported for history
+ * and in case it's needed again.
+ *
+ * Timeline: existed originally; removed 2026-06-08 (commit 1011461) on the
+ * assumption that CC'ing jake@ on the NetComponents-direct emails made this
+ * redundant. That assumption was wrong AT THE TIME: shared/notifier.js
+ * aborted the ENTIRE send (including cc) whenever `to` had zero allowed
+ * internal recipients — and `to` there was datamaster@netcomponents.com,
+ * external and blocked (netcomponents.com wasn't yet an allowlist
+ * exception). So Jake never actually received the CSVs through the CC path
+ * for ~10 days before nc-listing itself got paused for an unrelated reason.
+ * Restored 2026-08-21 as a stopgap while that was true.
+ *
+ * netcomponents.com was added to shared/notifier.js's ALLOWED_DOMAINS the
+ * same day, which makes the CC path actually work now — so the original
+ * 2026-06-08 rationale is correct again, and this function's call in main()
+ * was removed to stop double-sending Jake both copies. If netcomponents.com
+ * is ever removed from the allowlist, re-add the call in main() (see the
+ * commented-out line there) rather than assuming the CC still works.
  */
 async function sendReviewEmails(portalFile, franchisePortalFile, dryRun) {
     if (dryRun) {
@@ -558,8 +565,13 @@ async function main(opts = {}) {
             await generateNCFiles(groupedRows, outputDir, dryRun, cache);
 
         // Step 4: Send emails
+        // NOTE: sendReviewEmails() (direct-to-Jake CSV copies) is intentionally
+        // NOT called here — netcomponents.com is now an allowlist exception
+        // (shared/notifier.js), so Jake's CC on the NetComponents email below
+        // actually delivers. Calling both would double-send him every CSV.
+        // See sendReviewEmails()'s docstring before re-adding this call.
+        //   await sendReviewEmails(portalFile, franchisePortalFile, dryRun);
         log('\nStep 3: Sending notification emails...');
-        await sendReviewEmails(portalFile, franchisePortalFile, dryRun);
         if (dryRun) {
             log('  [DRY-RUN] Skipping NetComponents-direct email send');
         } else {
