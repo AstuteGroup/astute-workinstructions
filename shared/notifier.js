@@ -26,9 +26,12 @@ const logger = require('./logger');
 
 // ─── EXTERNAL EMAIL BLOCK ────────────────────────────────────────────────────
 // orangetsunami.com should NEVER send to external addresses.
-// Only @astutegroup.com recipients are allowed.
-// plantos.co is Tyler Dennis (analytics_user maintainer) - trusted for CLI handoffs.
-const ALLOWED_DOMAINS = ['astutegroup.com', 'orangetsunami.com', 'plantos.co'];
+// Only @astutegroup.com recipients are allowed by default.
+// Exceptions are explicit, per-domain, and documented here:
+//   plantos.co       - Tyler Dennis (analytics_user maintainer) - trusted for CLI handoffs.
+//   netcomponents.com - NC Listing (nc-listing.js) direct portal-upload emails
+//                       to datamaster@netcomponents.com. Approved 2026-08-21.
+const ALLOWED_DOMAINS = ['astutegroup.com', 'orangetsunami.com', 'plantos.co', 'netcomponents.com'];
 
 function isInternalEmail(email) {
   if (!email) return false;
