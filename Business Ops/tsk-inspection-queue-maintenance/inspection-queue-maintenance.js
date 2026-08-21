@@ -347,9 +347,10 @@ async function processLots(opts) {
   const lots = findProblemLots(limit);
   console.log(`Found ${lots.length} lots with missing weighted priority\n`);
 
+  // No early return on an empty queue — fall through so the run still emails and
+  // writes a breadcrumb. A silent success is indistinguishable from a dead cron.
   if (lots.length === 0) {
     console.log('Nothing to process.');
-    return { autoFixed: 0, escalations: 0, skipped: 0 };
   }
 
   const results = {
@@ -502,15 +503,20 @@ function writeEscalationReport(escalations, outputDir, dryRun) {
 // ─── NOTIFICATION ─────────────────────────────────────────────────────────────
 
 /**
- * Send HTML email notification for auto-fixes, escalations, or skip-only runs.
+ * Send HTML email notification for auto-fixes, escalations, skip-only runs, or a
+ * clean queue. Always sends in live mode, including the zero-lot case, so a quiet
+ * day is distinguishable from a cron that never fired.
  */
 async function sendNotification(results) {
   const { autoFixed, escalations, skipped } = results;
+  const isClean = autoFixed.length === 0 && escalations.length === 0 && skipped.length === 0;
 
   // Determine subject based on results
   let subject;
   if (autoFixed.length > 0 || escalations.length > 0) {
     subject = `Inspection Queue: ${autoFixed.length} fixed, ${escalations.length} escalations`;
+  } else if (isClean) {
+    subject = 'Inspection Queue: clean — no lots missing weighted priority';
   } else {
     subject = `Inspection Queue: ${skipped.length} skipped (no action needed)`;
   }
@@ -523,10 +529,22 @@ async function sendNotification(results) {
   </h2>
 
   <!-- Summary -->
-  <div style="background: #f5f5f5; padding: 12px 16px; border-radius: 6px; margin-bottom: 20px;">
+  <div style="background: ${isClean ? '#e8f5e9' : '#f5f5f5'}; padding: 12px 16px; border-radius: 6px; margin-bottom: 20px;">
     <strong>Summary:</strong> ${autoFixed.length} auto-fixed, ${escalations.length} escalations, ${skipped.length} skipped
   </div>
 `;
+
+  // Clean run — nothing in the queue was missing a weighted priority.
+  if (isClean) {
+    html += `
+  <p style="color: #2e7d32; font-size: 15px; margin: 0 0 8px;">
+    <strong>&#10003; Queue is clean.</strong> Every open MI QUEUE lot has a weighted priority.
+  </p>
+  <p style="color: #666; font-size: 13px; margin-top: 0;">
+    No allocations needed fixing. This email confirms the daily run completed &mdash;
+    if you stop receiving it, the job itself has stopped.
+  </p>`;
+  }
 
   // Auto-fixes section
   if (autoFixed.length > 0) {
