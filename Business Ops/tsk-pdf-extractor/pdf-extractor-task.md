@@ -178,6 +178,10 @@ The `create-po-from-pdf.js` script creates a Purchase Order in OT from extracted
 ```bash
 node scripts/create-po-from-pdf.js "path/to/PO.pdf"
 node scripts/create-po-from-pdf.js "path/to/extracted.json"
+
+# When the PDF carries no warehouse code (see Known Limitations):
+node scripts/create-po-from-pdf.js "path/to/PO.pdf" --warehouse W111
+node scripts/create-po-from-pdf.js "path/to/PO.pdf" --warehouse W111 --warehouse-group BROWNSVILLE
 ```
 
 **Fields populated:**
@@ -192,8 +196,8 @@ node scripts/create-po-from-pdf.js "path/to/extracted.json"
 | MPN | `line_items[].item_number` |
 | Description | `line_items[].description` |
 | Internal Notes | `line_items[].line_notes` |
-| Warehouse | `warehouse_code` → WAREHOUSE_MAP |
-| Warehouse Group | `deliver_to.company` (Brownsville detection) |
+| Warehouse | `warehouse_code` → WAREHOUSE_MAP (or `--warehouse`) |
+| Warehouse Group | `deliver_to` address → WAREHOUSE_GROUP_MAP (or `--warehouse-group`) |
 | Domestic Shipping | Vendor + delivery address country comparison |
 | Infor PO | `order_number` |
 | MFR | `line_items[].manufacturer` → API lookup |
@@ -206,11 +210,15 @@ New vendors must be added to `VENDOR_MAP` in the script. MFR is looked up dynami
 **Buyer Mapping:**
 
 The PO's Buyer (`SalesRep_ID`) is resolved from the buyer named on the PDF — it is **not** hardcoded.
-`lookupBuyer()` tries three things in order, caching the result per email/name:
+`lookupBuyer()` tries two things in order, caching the result per email/name:
 
 1. `ad_user` filtered on `EMail eq '<buyer.email>'` — the reliable key
 2. `ad_user` filtered on `Name eq '<buyer.name>'`
-3. `LOOKUPS.buyerId` (Jake Harris, 1000004) as the default, so a missing buyer never blocks a load
+
+**There is no default buyer.** If neither lookup matches, `SalesRep_ID` is omitted from the header
+and the PO is created with **Buyer blank** for a human to fill in — the load is not blocked, and the
+order is never attributed to someone who did not raise it. The run prints
+`Buyer: BLANK - "<name>" did not match an ad_user` so the gap is visible in the log.
 
 **One email can match several `ad_user` rows.** A person gets one employee record plus a contact row
 on every vendor/customer BP they are attached to — `jake.harris@astutegroup.com` returns **6** active
@@ -226,19 +234,27 @@ fall back to the lowest `id`.
 
 ## Known Limitations
 
-### Unmapped Warehouse Code Creates a Header With No Lines
+### PDFs With No Warehouse Code (fixed 2026-08-21)
 
-> **Open defect (found 2026-08-21).** `WAREHOUSE_MAP` covers W111, W103, W106 and W107 only. Any
-> other code — or a `warehouse_code` the extractor returns as `null` — resolves to `null`, and every
-> `c_orderline` POST then fails with `500 Could not convert value null for Chuboe_Warehouse`. The PO
-> **header is already created** at that point, so the run leaves an empty PO behind.
->
-> Reproduces with `POV0060812.pdf`: the PDF carries **W080**, the extractor's
-> `orderNum + '\s+(W\d+)'` regex does not match that layout so `warehouse_code` comes back `null`,
-> and the load produced header-only POs (PO806325, PO806328).
->
-> Two things to fix: add the missing warehouse codes to `WAREHOUSE_MAP`, and validate the mapping
-> **before** POSTing the header so an unmapped code aborts the run instead of littering.
+Not every PO PDF carries a warehouse code. `POV0060812.pdf` has none — its header is just
+`Order No: POV0060812` — and the extractor returns `warehouse_code: null`.
+
+Both `Chuboe_Warehouse_ID` and `Chuboe_Warehouse_Group_ID` are **required** on `c_orderline`; a null
+fails the POST with `500 Could not convert value null for Chuboe_Warehouse[_Group]`. Because the
+header is POSTed first, the old code left an empty PO behind every time (PO806325, PO806328).
+
+The script now resolves and validates **both** before the header POST and aborts with a usable
+message if either is unresolved. Supply them on the command line when the PDF cannot:
+
+```bash
+node scripts/create-po-from-pdf.js "POV0060812.pdf" --warehouse W111
+node scripts/create-po-from-pdf.js "POV0060812.pdf" --warehouse W111 --warehouse-group BROWNSVILLE
+```
+
+`WAREHOUSE_MAP` now covers all 16 Infor codes that resolve to a `chuboe_warehouse` row. The
+warehouse group is the receiving **region** and is independent of the warehouse — `c_orderline`
+pairs W111 with BROWNSVILLE (1,241 lines), HONG KONG (65), AUSTIN (35) and STEVENAGE (25) — so it is
+detected from the delivery address, not from the warehouse.
 
 ### MFR in TEST Environment
 

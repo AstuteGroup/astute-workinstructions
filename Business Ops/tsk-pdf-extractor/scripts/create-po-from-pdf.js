@@ -35,8 +35,6 @@ const LOOKUPS = {
   taxId: 1000000,
   // Product: Receiving Clearing Product
   productId: 1000033,
-  // Jake Harris (default buyer)
-  buyerId: 1000004,
 };
 
 // Incoterm mapping
@@ -145,7 +143,12 @@ function pickEmployeeUser(records) {
 }
 
 async function lookupBuyer(buyerName, buyerEmail) {
-  if (!buyerName && !buyerEmail) return LOOKUPS.buyerId;  // Default to Jake Harris
+  // There is no default buyer: an unrecognised buyer leaves the PO's Buyer blank rather
+  // than attributing the order to someone who did not raise it.
+  if (!buyerName && !buyerEmail) {
+    console.log('  Buyer: no name or email on the PDF - leaving Buyer blank');
+    return null;
+  }
 
   const cacheKey = buyerEmail || buyerName;
   if (BUYER_CACHE[cacheKey] !== undefined) {
@@ -190,18 +193,37 @@ async function lookupBuyer(buyerName, buyerEmail) {
     }
   }
 
-  // Fall back to default buyer (Jake Harris)
-  console.log(`  Buyer not found: "${buyerName}" <${buyerEmail}> - using default (Jake Harris)`);
-  BUYER_CACHE[cacheKey] = LOOKUPS.buyerId;
-  return LOOKUPS.buyerId;
+  // No match — leave the Buyer blank for a human to fill in
+  console.log(`  Buyer not found: "${buyerName}" <${buyerEmail}> - leaving Buyer blank`);
+  BUYER_CACHE[cacheKey] = null;
+  return null;
 }
 
-// Warehouse mapping (chuboe_warehouse_id)
+// Warehouse mapping: Infor warehouse code -> chuboe_warehouse_id.
+// Sourced from adempiere.chuboe_warehouse (name + description) — several chuboe
+// warehouses cover a set of Infor codes, and their description spells the set out
+// verbatim ("FOR INFOR: Austin-MAIN, HK-W105, PH-W109, STEVENAGE-W102").
+// IDs verified identical on TEST and PROD for every row present in both.
 const WAREHOUSE_MAP = {
-  'W111': 1000015,  // W111: LAM KITTING
+  'W101': 1000002,  // W101: OFF SITE TESTING
   'W103': 1000005,  // W103: GE AEROSPACE EXCESS
   'W106': 1000004,  // W106: TAXAN EXCESS
   'W107': 1000009,  // W107: SPARTRONICS EXCESS
+  'W111': 1000015,  // W111: LAM KITTING
+  'W117': 1000018,  // W117: Eaton Consignment (PROD only — absent from TEST)
+  'W118': 1000019,  // W118: LAM Consignment (PROD only — absent from TEST)
+  // ALLOCATED/PRESOLD
+  'MAIN': 1000000,
+  'W102': 1000000,
+  'W105': 1000000,
+  'W109': 1000000,
+  // UNALLOCATED/STRANDED
+  'W104': 1000006,
+  'W108': 1000006,
+  // SPEC BUY: TRADING TEAM MANAGEMENT
+  'W112': 1000017,
+  'W113': 1000017,
+  'W114': 1000017,
 };
 
 // Warehouse group mapping (chuboe_warehouse_group_id)
@@ -211,7 +233,30 @@ const WAREHOUSE_GROUP_MAP = {
   'HONG KONG': 1000001,
   'STEVENAGE': 1000007,
   'PHILIPPINES': 1000006,
+  'GERMANY': 1000005,
+  'DROP-SHIP': 1000009,
 };
+
+// The warehouse group is the receiving *region*, independent of the warehouse:
+// c_orderline pairs W111 with BROWNSVILLE (1241 lines), HONG KONG (65), AUSTIN (35)
+// and STEVENAGE (25), so it must come from the delivery address, not the warehouse.
+// Ordered — Brownsville is checked before Austin, since both are Astute US sites.
+const WAREHOUSE_GROUP_HINTS = [
+  ['BROWNSVILLE', ['brownsville']],
+  ['HONG KONG', ['hong kong', 'kowloon', 'kwun tong']],
+  ['PHILIPPINES', ['philippines', 'manila', 'laguna']],
+  ['STEVENAGE', ['stevenage', 'united kingdom']],
+  ['GERMANY', ['germany', 'holzkirchen']],
+  ['AUSTIN', ['austin']],
+];
+
+function detectWarehouseGroup(deliverTo) {
+  const haystack = `${deliverTo?.company || ''} ${deliverTo?.address || ''}`.toLowerCase();
+  for (const [group, hints] of WAREHOUSE_GROUP_HINTS) {
+    if (hints.some(h => haystack.includes(h))) return group;
+  }
+  return null;
+}
 
 // ─── HELPER FUNCTIONS ───────────────────────────────────────────────────────
 
@@ -297,16 +342,47 @@ async function createPurchaseOrder(poData) {
   const shipperId = SHIPPER_MAP[poData.ship_via] || SHIPPER_MAP['FedEx Ground'];
   console.log(`Shipper: ${poData.ship_via} -> ID ${shipperId}`);
 
-  // Determine warehouse group from delivery address
-  let warehouseGroupId = null;
-  if (poData.deliver_to.company && poData.deliver_to.company.includes('Brownsville')) {
-    warehouseGroupId = WAREHOUSE_GROUP_MAP['BROWNSVILLE'];
+  // Determine warehouse group from delivery address. Like the warehouse below, a null
+  // group fails every c_orderline POST, so an unrecognised address stops the run before
+  // the header is created.
+  const warehouseGroup = poData.warehouse_group || detectWarehouseGroup(poData.deliver_to);
+  const warehouseGroupId = WAREHOUSE_GROUP_MAP[warehouseGroup] || null;
+  if (!warehouseGroupId) {
+    if (poData.warehouse_group) {
+      throw new Error(
+        `Unknown warehouse group "${poData.warehouse_group}" — ` +
+        `valid: ${Object.keys(WAREHOUSE_GROUP_MAP).join(', ')}.`
+      );
+    }
+    throw new Error(
+      `Could not determine warehouse group for ${poData.order_number} from delivery address ` +
+      `"${`${poData.deliver_to?.company || ''} ${poData.deliver_to?.address || ''}`.trim()}" — ` +
+      `re-run with --warehouse-group <${Object.keys(WAREHOUSE_GROUP_MAP).join('|')}>.`
+    );
   }
-  console.log(`Warehouse Group: BROWNSVILLE -> ID ${warehouseGroupId}`);
+  console.log(`Warehouse Group: ${warehouseGroup} -> ID ${warehouseGroupId}`);
 
-  // Determine warehouse from warehouse code
-  const warehouseId = WAREHOUSE_MAP[poData.warehouse_code] || null;
-  console.log(`Warehouse: ${poData.warehouse_code} -> ID ${warehouseId}`);
+  // Determine warehouse from warehouse code.
+  // Every c_orderline POST sets Chuboe_Warehouse_ID, and the API rejects null with
+  // "Could not convert value null for Chuboe_Warehouse" — so an unresolved code must
+  // stop the run HERE, before the header is created. Otherwise the header lands, every
+  // line fails, and an empty PO is left behind.
+  const warehouseCode = poData.warehouse_code;
+  if (!warehouseCode) {
+    throw new Error(
+      `No warehouse code on ${poData.order_number} — the PDF header carries none. ` +
+      `Re-run with --warehouse <code> (e.g. --warehouse W111) to supply it.`
+    );
+  }
+  const warehouseId = WAREHOUSE_MAP[warehouseCode] || null;
+  if (!warehouseId) {
+    throw new Error(
+      `Unmapped warehouse code "${warehouseCode}" on ${poData.order_number}. ` +
+      `Add it to WAREHOUSE_MAP (known: ${Object.keys(WAREHOUSE_MAP).join(', ')}) ` +
+      `or re-run with --warehouse <code>.`
+    );
+  }
+  console.log(`Warehouse: ${warehouseCode} -> ID ${warehouseId}`);
 
   // Check domestic shipping
   const isDomestic = isDomesticShipment(poData.vendor.address, poData.deliver_to.address);
@@ -328,8 +404,8 @@ async function createPurchaseOrder(poData) {
     C_Currency_ID: LOOKUPS.currencyId,
     M_Warehouse_ID: LOOKUPS.warehouseId,
     M_PriceList_ID: LOOKUPS.priceListId,
-    // Buyer (looked up from PDF)
-    SalesRep_ID: buyerId,
+    // Buyer (looked up from PDF; omitted entirely when unrecognised)
+    ...(buyerId ? { SalesRep_ID: buyerId } : {}),
     // Incoterm (Ex-Works, etc.)
     Chuboe_Inco_Term_ID: incotermId,
     // Delivery via Shipper (always 'S')
@@ -410,7 +486,11 @@ async function createPurchaseOrder(poData) {
   console.log('\n=== Purchase Order Created Successfully ===');
   console.log(`Document: ${createdPO.DocumentNo}`);
   console.log(`Infor PO: ${poData.order_number}`);
-  console.log(`Buyer: Jake Harris`);
+  console.log(
+    buyerId
+      ? `Buyer: ${poData.buyer?.name} (ad_user ${buyerId})`
+      : `Buyer: BLANK - "${poData.buyer?.name || 'none on PDF'}" did not match an ad_user`
+  );
   console.log(`Total: $${poData.total}`);
 
   return createdPO;
@@ -423,16 +503,40 @@ async function main() {
     console.log('Create Purchase Order in OT from PDF');
     console.log('');
     console.log('Usage:');
-    console.log('  node create-po-from-pdf.js <pdf_file>');
-    console.log('  node create-po-from-pdf.js <json_file>');
+    console.log('  node create-po-from-pdf.js <pdf_file> [--warehouse <code>]');
+    console.log('  node create-po-from-pdf.js <json_file> [--warehouse <code>]');
+    console.log('');
+    console.log('  --warehouse <code>        Warehouse code to use when the PDF header');
+    console.log('                            carries none (or to override it).');
+    console.log('  --warehouse-group <name>  Receiving region when it cannot be read from');
+    console.log('                            the delivery address (e.g. BROWNSVILLE).');
     console.log('');
     console.log('Examples:');
     console.log('  node create-po-from-pdf.js POV0077469.pdf');
+    console.log('  node create-po-from-pdf.js POV0060812.pdf --warehouse W111');
     console.log('  node create-po-from-pdf.js extracted.json');
     process.exit(1);
   }
 
-  const inputPath = args[0];
+  function flagValue(flag, example) {
+    const i = args.indexOf(flag);
+    if (i < 0) return null;
+    const value = args[i + 1];
+    if (!value || value.startsWith('--')) {
+      console.error(`ERROR: ${flag} requires a value (e.g. ${flag} ${example})`);
+      process.exit(1);
+    }
+    return value;
+  }
+
+  const warehouseOverride = flagValue('--warehouse', 'W111');
+  const warehouseGroupOverride = flagValue('--warehouse-group', 'BROWNSVILLE');
+  const flagValues = new Set([warehouseOverride, warehouseGroupOverride].filter(Boolean));
+  const inputPath = args.find(a => !a.startsWith('--') && !flagValues.has(a));
+  if (!inputPath) {
+    console.error('ERROR: no PDF or JSON file given');
+    process.exit(1);
+  }
   let poData;
 
   if (inputPath.endsWith('.json')) {
@@ -443,6 +547,17 @@ async function main() {
     // Extract from PDF
     console.log(`Extracting data from PDF: ${inputPath}`);
     poData = await extractPdfData(inputPath);
+  }
+
+  if (warehouseOverride) {
+    console.log(
+      `\nWarehouse override: ${poData.warehouse_code || '(none on PDF)'} -> ${warehouseOverride}`
+    );
+    poData.warehouse_code = warehouseOverride;
+  }
+  if (warehouseGroupOverride) {
+    console.log(`Warehouse group override: -> ${warehouseGroupOverride.toUpperCase()}`);
+    poData.warehouse_group = warehouseGroupOverride.toUpperCase();
   }
 
   console.log('\nExtracted PO data:');
