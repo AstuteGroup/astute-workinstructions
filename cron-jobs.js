@@ -454,6 +454,21 @@ module.exports = [
   },
 
   {
+    name: 'tracking-loading-daily-digest',
+    cadence: 'fixed',
+    // 12:10 UTC = 8:10am EDT — runs 5 min after RFQ Loading digest.
+    // 24h window. Mirrors RFQ/VQ Loading digest structure, but queries OT
+    // directly (c_orderline.Chuboe_TrackingNumbers) rather than scoping to
+    // agent breadcrumbs — so it covers ALL tracking loaded, not just Claude's.
+    cadenceCron: '10 12 * * *',
+    command: `node "${ASTUTE}/Trading Analysis/Tracking Loading/tracking-loading-daily-digest.js" --send`,
+    cwd: ASTUTE,
+    needsOT: false,
+    logFile: '/tmp/tracking-loading-daily-digest.log',
+    description: 'Daily 8:10am EDT (12:10 UTC) — Tracking Loading digest to operator (jake.harris@). 24h window. Tracking numbers written to OT by anyone (loader breakdown, not just Claude), detail table, activity-by-route (Processed/NeedsReview/NotTracking) with live backlog counts, and Tracking Compliance by Buyer (30d rolling window: overdue open PO lines with no tracking, by c_order.SalesRep_ID; Claude/LAM Kitting autonomous purchasing tracked separately).',
+  },
+
+  {
     name: 'apac-vq-digest',
     cadence: 'fixed',
     // 6 PM Shenzhen local (UTC+8, no DST) = 10:00 UTC. APAC team VQ digest.

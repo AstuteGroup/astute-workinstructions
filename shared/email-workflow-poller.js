@@ -554,7 +554,8 @@ async function cmdDownloadAttachments(uid, { includeImages = false, folder = nul
 
 // ─── COMMAND: route ──────────────────────────────────────────────────────────
 
-async function cmdRoute(uid, actionName, payload) {
+async function cmdRoute(uid, actionName, payload, { folder: sourceFolderOverride = null } = {}) {
+  const sourceFolder = sourceFolderOverride || SOURCE_FOLDER;
   const action = workflow.actions[actionName];
   if (!action) {
     console.error(`Unknown action '${actionName}' for workflow '${WORKFLOW_NAME}'.`);
@@ -583,7 +584,7 @@ async function cmdRoute(uid, actionName, payload) {
   let currentFrom = null;
   let currentCc = '';
   try {
-    await withInbox(async (client) => {
+    await withFolder(sourceFolder, async (client) => {
       const msg = await client.fetchOne(String(uid), { source: true }, { uid: true });
       if (msg && !msg.source) {
         console.error(`[poller] WARNING: UID ${uid} fetched but msg.source is null/undefined — sidecar cannot be created (reply-stitching will fail)`);
@@ -685,13 +686,31 @@ async function cmdRoute(uid, actionName, payload) {
     return; // Exit without moving email or clearing sidecar
   }
 
+  // If the handler reported an error, do NOT silently file this as if it
+  // succeeded — that masks real failures (multi-line MPN ambiguity, PO not
+  // found, etc.) as done. Leave the message in place (marked seen, so a
+  // dumb unseen-poll loop doesn't retry it forever) and surface the error
+  // so the caller/agent can decide on a follow-up action (e.g. needs_review).
+  if (result.error) {
+    result.needs_manual_routing = true;
+    console.error(`[poller] WARNING: action '${actionName}' returned an error — NOT moving to '${folder}'. Call a follow-up action (e.g. needs_review) to file this message.`);
+    if (!DRY_RUN) {
+      await withFolder(sourceFolder, async (client) => {
+        await client.messageFlagsAdd(String(uid), ['\\Seen'], { uid: true });
+      });
+      result.marked_seen = true;
+    }
+    console.log(JSON.stringify(result, null, 2));
+    return;
+  }
+
   // Move email and mark as SEEN (so it won't be re-processed if moved back)
   if (folder) {
     if (DRY_RUN) {
       result.would_move_to = folder;
       result.dry_run = true;
     } else {
-      await withInbox(async (client) => {
+      await withFolder(sourceFolder, async (client) => {
         // Mark as SEEN before moving — this prevents re-processing if the email
         // is ever moved back to INBOX (manually or via requeue). The SEEN flag
         // travels with the message to the destination folder.
@@ -1067,7 +1086,9 @@ async function cmdRequeue(uid) {
         if (raw && fs.existsSync(raw)) payload = JSON.parse(fs.readFileSync(raw, 'utf-8'));
         else payload = JSON.parse(raw || '{}');
       }
-      return await cmdRoute(uid, actionName, payload);
+      const folderIdx = argv.indexOf('--folder');
+      const folder = folderIdx >= 0 ? argv[folderIdx + 1] : null;
+      return await cmdRoute(uid, actionName, payload, { folder });
     }
     if (cmd === 'recover-stuck') return await cmdRecoverStuck();
     if (cmd === 'check-stuck') return await cmdCheckStuck();
@@ -1088,7 +1109,7 @@ async function cmdRequeue(uid) {
     console.error('Options:');
     console.error('  --workflow <name>              Required; resolves to workflow-actions/<name>.js');
     console.error('  --dry-run                      Preview without modifying state');
-    console.error('  --folder <name>                For search: folder to search (default: source folder)');
+    console.error('  --folder <name>                For search/read/route: folder to operate on (default: source folder)');
     console.error('  --subject <pattern>            For search: filter by subject (case-insensitive)');
     console.error('  --from <pattern>               For search: filter by sender (case-insensitive)');
     console.error('  --body <pattern>               For search: filter by body content (e.g., MPN)');

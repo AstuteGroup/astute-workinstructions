@@ -166,6 +166,15 @@ function findLineByMPN(lines, mpn) {
  * @param {string[]} newTracking - New tracking numbers to add
  * @returns {string}
  */
+// SF Express (顺丰) numbers are commonly quoted with an "SF" prefix
+// (e.g. "SF1566916505820"). Per operator request, strip it before writing —
+// OT should hold the bare carrier number, matching how other carriers are
+// stored (no "FX"/"UPS" prefix on those).
+function stripCarrierPrefix(token) {
+  const m = /^SF(\d{8,})$/i.exec(String(token || '').trim());
+  return m ? m[1] : token;
+}
+
 function mergeTracking(existing, newTracking) {
   const existingSet = new Set(
     (existing || '').split(',').map(s => s.trim()).filter(Boolean)
@@ -345,11 +354,14 @@ async function handleMultiPOV(povs, tracking, carrier, ctx) {
  * - Multi-line order: MPN required to identify which line; returns error if missing
  */
 async function action_patch_tracking(payload, ctx) {
-  const { documentno, pov, povs, tracking, carrier, mpn } = payload;
+  const { documentno, pov, povs, carrier, mpn } = payload;
+  let { tracking } = payload;
 
   if (!Array.isArray(tracking) || tracking.length === 0) {
     return { error: 'Missing tracking array' };
   }
+
+  tracking = tracking.map(stripCarrierPrefix);
 
   // ─── MULTI-POV MODE ─────────────────────────────────────────────────────────
   // When povs[] is provided, look up all POs and verify same vendor

@@ -28,6 +28,9 @@ Operators forward shipping confirmations. The agent extracts:
 | 20-22 digits | FedEx Ground |
 | 10 digits | DHL |
 | `EZ*US` or `9` + 19-21 digits | USPS |
+| `SF` + digits | SF Express |
+
+**Storage note:** SF Express numbers are commonly quoted with an `SF` prefix (e.g. `SF1566916505820`). The `patch_tracking` handler strips the prefix before writing (`stripCarrierPrefix()` in `shared/workflow-actions/tracking-loading.js`) so OT holds the bare carrier number — matching how FedEx/UPS/DHL numbers are stored with no carrier-code prefix. Pass the number to the handler either way; normalization happens centrally.
 
 ### Exclusion Rules
 
