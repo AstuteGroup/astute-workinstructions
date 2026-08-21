@@ -6,13 +6,28 @@ This is important because it provides visibility into work completed each week w
 
 ## Schedule
 
-- **Cron:** Mondays at 9am CT (14:00 UTC)
+- **Cron:** Fridays at 13:00 UTC (`0 13 * * 5`)
+- **Reporting window:** Friday -> Thursday — the run covers the seven days
+  ending the day before it fires. A Friday run reports last Friday through
+  Thursday; commits made on the Friday it runs land in *next* week's report.
 - **Recipient:** justin.oberhofer@astutegroup.com
 - **Author filter:** Justin Oberhofer commits only
 
+The window is anchored to the run date, not to a fixed weekday, so a
+catch-up run still reports the seven days behind it.
+
+> **Changing the schedule is two edits, not one.** `cadenceCron` in
+> `cron-jobs.js` only takes effect after the job next succeeds under the *old*
+> schedule — `nextDue` is written solely by `markSuccess()` in
+> `shared/cron-sentinel.js`, and `--force` deliberately skips it. After
+> changing the cron expression, also rewrite
+> `~/workspace/.cron-sentinels/weekly-project-report.json` so `nextDue`
+> matches the new schedule, or the job stays on the old cadence for one cycle.
+
 ## Output
 
-The report groups commits by project and shows:
+Subject line: `Weekly Project Report - Week NN` (week number derived from the
+window's start date). The report groups commits by project and shows:
 - Project name and commit count
 - Folder location (e.g., `Business Ops/tsk-inspection-queue-maintenance/`)
 - Project description

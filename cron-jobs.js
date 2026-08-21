@@ -768,12 +768,12 @@ module.exports = [
     name: 'weekly-project-report',
     owner: 'justin.oberhofer',
     cadence: 'weekly',
-    cadenceCron: '0 13 * * 5',  // 13:00 UTC = 8am EST on Fridays
+    cadenceCron: '0 13 * * 5',  // 13:00 UTC Fridays = 9am EDT / 8am EST
     command: `node "${ASTUTE}/Business Ops/cron-reports/cron-weekly/weekly-project-report.js" --send`,
     cwd: ASTUTE,
     needsOT: false,
     logFile: '/tmp/weekly-project-report.log',
-    description: 'Fri 13:00 UTC (8am EST) — Weekly project report summarizing commits by project from the previous week',
+    description: 'Fri 13:00 UTC (9am EDT) — Weekly project report summarizing commits by project for the previous Fri-Thu window',
   },
 
   // ─── TARIFF TRACKER (FedEx customs invoice PDF extraction) ───────────────────
