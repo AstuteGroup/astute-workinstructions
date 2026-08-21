@@ -309,7 +309,42 @@ async function extractPdfData(pdfPath) {
 
 // ─── MAIN FUNCTION ──────────────────────────────────────────────────────────
 
-async function createPurchaseOrder(poData) {
+// Find every order already carrying this Infor PO number. The number lives on the LINE
+// (c_orderline.Chuboe_PO_String), not the header, so this pages the lines and collects
+// their distinct parent orders — ~16 calls / 0.6s for a 700-line PO.
+async function findOrdersForInforPO(inforPO) {
+  const filter = encodeURIComponent(`Chuboe_PO_String eq '${inforPO.replace(/'/g, "''")}'`);
+  const lineCounts = {};
+  let scanned = 0;
+  let total = null;
+
+  while (total === null || scanned < total) {
+    const page = await apiGet(`c_orderline?$filter=${filter}&$select=C_Order_ID&$skip=${scanned}`);
+    total = page['row-count'] || 0;
+    if (!page.records || page.records.length === 0) break;
+    for (const line of page.records) {
+      if (line.C_Order_ID) {
+        lineCounts[line.C_Order_ID.id] = (lineCounts[line.C_Order_ID.id] || 0) + 1;
+      }
+    }
+    scanned += page.records.length;
+  }
+
+  const orders = [];
+  for (const orderId of Object.keys(lineCounts)) {
+    const order = await apiGet(`c_order/${orderId}`);
+    orders.push({
+      id: Number(orderId),
+      documentNo: order.DocumentNo,
+      docStatus: order.DocStatus && order.DocStatus.id,
+      created: order.Created,
+      lines: lineCounts[orderId],
+    });
+  }
+  return orders;
+}
+
+async function createPurchaseOrder(poData, options = {}) {
   console.log('\n=== Creating Purchase Order in OT TEST ===\n');
 
   // Login to API
@@ -317,6 +352,32 @@ async function createPurchaseOrder(poData) {
   const auth = await login();
   console.log(`  Logged in as user ID: ${auth.userId}`);
   console.log(`  Base URL: ${process.env.IDEMPIERE_BASE_URL}`);
+
+  // Has this Infor PO already been loaded? There is no unique constraint on
+  // Chuboe_PO_String, so nothing at the database level stops a second load — before this
+  // check, every re-run silently created another copy of the whole order.
+  if (poData.order_number) {
+    const existing = await findOrdersForInforPO(poData.order_number);
+    if (existing.length > 0) {
+      const listing = existing
+        .map(o => `    ${o.documentNo} (id ${o.id}, ${o.lines} lines, ${o.docStatus}, created ${o.created})`)
+        .join('\n');
+      if (!options.allowDuplicate) {
+        throw new Error(
+          `${poData.order_number} is already loaded — ${existing.length} order(s) carry it:\n${listing}\n` +
+          `  Nothing was created. Re-run with --allow-duplicate if this PO genuinely splits ` +
+          `across several OT orders (one Infor PO legitimately maps to many c_order records, ` +
+          `e.g. one per vendor).`
+        );
+      }
+      console.log(
+        `\n--allow-duplicate: ${poData.order_number} already exists on ${existing.length} order(s), ` +
+        `creating another anyway:\n${listing}`
+      );
+    } else {
+      console.log(`\nInfor PO ${poData.order_number}: not yet loaded`);
+    }
+  }
 
   // Resolve vendor
   const vendorKey = poData.vendor.company;
@@ -510,6 +571,8 @@ async function main() {
     console.log('                            carries none (or to override it).');
     console.log('  --warehouse-group <name>  Receiving region when it cannot be read from');
     console.log('                            the delivery address (e.g. BROWNSVILLE).');
+    console.log('  --allow-duplicate         Load even though the Infor PO is already on an');
+    console.log('                            OT order (for POs that split across orders).');
     console.log('');
     console.log('Examples:');
     console.log('  node create-po-from-pdf.js POV0077469.pdf');
@@ -575,7 +638,7 @@ async function main() {
   console.log('Press Ctrl+C to cancel, or wait 3 seconds to proceed...\n');
   await new Promise(resolve => setTimeout(resolve, 3000));
 
-  await createPurchaseOrder(poData);
+  await createPurchaseOrder(poData, { allowDuplicate: args.includes('--allow-duplicate') });
 }
 
 main().catch(err => {

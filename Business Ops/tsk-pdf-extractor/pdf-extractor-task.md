@@ -182,7 +182,30 @@ node scripts/create-po-from-pdf.js "path/to/extracted.json"
 # When the PDF carries no warehouse code (see Known Limitations):
 node scripts/create-po-from-pdf.js "path/to/PO.pdf" --warehouse W111
 node scripts/create-po-from-pdf.js "path/to/PO.pdf" --warehouse W111 --warehouse-group BROWNSVILLE
+
+# Load a PO whose Infor number is already on an OT order (see Duplicate Check):
+node scripts/create-po-from-pdf.js "path/to/PO.pdf" --allow-duplicate
 ```
+
+**Duplicate check (runs first, before anything is created):**
+
+The Infor PO number is written to **`c_orderline.Chuboe_PO_String`** — on the line, not the header —
+and nothing in the database enforces uniqueness on it. Before this check existed, every re-run
+silently created another full copy of the order; three copies of POV0060812 accumulated on TEST
+that way.
+
+The script now pages `c_orderline` for the PO's Infor number, collects the distinct parent orders,
+and **aborts before creating the header** if any exist, listing each one (document no, line count,
+doc status, created date). ~16 API calls / under a second for a 700-line PO.
+
+> **One Infor PO can legitimately map to several OT orders** — usually one per vendor. In PROD,
+> POV0067150 sits on 19 orders across Mouser and Digi-Key, and `STOCK` is used as a sentinel on 311.
+> So this is a stop-and-look guard, not a uniqueness constraint: pass `--allow-duplicate` when the
+> split is genuine, and the run proceeds after logging what already exists.
+
+Stopping is the right default for a **CLI** run, where the person typing the command is present to
+decide. For the planned `bizops@` email intake the decision belongs to the submitter instead — the
+duplicate becomes a question emailed back to them rather than an abort. See "Email intake" below.
 
 **Fields populated:**
 
