@@ -17,6 +17,14 @@ metadata:
 - [Quick Start](#quick-start)
 - [Output Fields](#output-fields)
 - [Supported PO Formats](#supported-po-formats)
+- [Create PO in OT](#create-po-in-ot)
+  - [End-to-End Workflow](#end-to-end-workflow)
+  - [Duplicate Check](#duplicate-check)
+  - [Field Mapping](#field-mapping)
+  - [Buyer Mapping](#buyer-mapping)
+- [Known Limitations](#known-limitations)
+  - [PDFs With No Warehouse Code](#pdfs-with-no-warehouse-code)
+  - [MFR in TEST Environment](#mfr-in-test-environment)
 
 ## Purpose
 
@@ -173,41 +181,57 @@ This extractor handles Astute Electronics Purchase Order PDFs with the standard 
 
 The `create-po-from-pdf.js` script creates a Purchase Order in OT from extracted PDF data.
 
-**Usage:**
-
 ```bash
 node scripts/create-po-from-pdf.js "path/to/PO.pdf"
 node scripts/create-po-from-pdf.js "path/to/extracted.json"
 
-# When the PDF carries no warehouse code (see Known Limitations):
+# When the PDF carries no warehouse code — see PDFs With No Warehouse Code:
 node scripts/create-po-from-pdf.js "path/to/PO.pdf" --warehouse W111
 node scripts/create-po-from-pdf.js "path/to/PO.pdf" --warehouse W111 --warehouse-group BROWNSVILLE
 
-# Load a PO whose Infor number is already on an OT order (see Duplicate Check):
+# When the Infor PO is already on an OT order — see Duplicate Check:
 node scripts/create-po-from-pdf.js "path/to/PO.pdf" --allow-duplicate
 ```
 
-**Duplicate check (runs first, before anything is created):**
+### End-to-End Workflow
 
-The Infor PO number is written to **`c_orderline.Chuboe_PO_String`** — on the line, not the header —
-and nothing in the database enforces uniqueness on it. Before this check existed, every re-run
-silently created another full copy of the order; three copies of POV0060812 accumulated on TEST
-that way.
+Steps 1-4 all run **before** anything is written. Any of them can stop the load, and nothing exists
+in OT until step 5 — do not skip them.
 
-The script now pages `c_orderline` for the PO's Infor number, collects the distinct parent orders,
-and **aborts before creating the header** if any exist, listing each one (document no, line count,
-doc status, created date). ~16 API calls / under a second for a 700-line PO.
+1. [ ] **Extract** the PDF (or read pre-extracted JSON). Output: `poData` with buyer, warehouse code,
+   delivery address, and line items.
+1. [ ] **Resolve the vendor** from `vendor.company` via `VENDOR_MAP`. An unknown vendor stops the run
+   — add it to the map, do not guess a Business Partner.
+1. [ ] **Resolve warehouse and warehouse group.** Both are required on every line. Unresolved stops
+   the run; supply `--warehouse` / `--warehouse-group` when the PDF carries neither.
+1. [ ] **Run the duplicate check** — see [Duplicate Check](#duplicate-check). An already-loaded Infor
+   PO stops the run unless `--allow-duplicate` is passed.
+1. [ ] **Create the header** (`c_order`), then **create each line** (`c_orderline`).
+1. [ ] **Confirm the result** — document number, line count, and buyer are printed on completion.
+   A blank buyer is reported explicitly and needs a human to fill it in.
 
-> **One Infor PO can legitimately map to several OT orders** — usually one per vendor. In PROD,
-> POV0067150 sits on 19 orders across Mouser and Digi-Key, and `STOCK` is used as a sentinel on 311.
-> So this is a stop-and-look guard, not a uniqueness constraint: pass `--allow-duplicate` when the
-> split is genuine, and the run proceeds after logging what already exists.
+### Duplicate Check
 
-Stopping is the right default for a **CLI** run, where the person typing the command is present to
-decide. For the planned `bizops@` email intake the decision belongs to the submitter instead — the
-duplicate becomes a question emailed back to them rather than an abort. See "Email intake" below.
+The purpose of this check is to stop a re-run from silently creating a second copy of an order.
 
-**Fields populated:**
+This is important because the Infor PO number is written to **`c_orderline.Chuboe_PO_String`** — on
+the line, not the header — and nothing in the database enforces uniqueness on it. Before this check
+existed, three copies of the same PO accumulated on TEST from repeat runs.
+
+The script pages `c_orderline` for the PO's Infor number, collects the distinct parent orders, and
+**stops before creating the header** if any exist, listing each one (document number, line count,
+doc status, created date). Roughly 16 API calls and under a second for a 700-line PO.
+
+> ⚠️ **Warning** - One Infor PO can legitimately map to several OT orders, usually one per vendor.
+> In PROD the busiest example sits on 19 orders across two franchise distributors, and `STOCK` is
+> used as a sentinel on 311. This is a stop-and-look guard, not a uniqueness constraint: pass
+> `--allow-duplicate` when the split is genuine and the run proceeds after logging what exists.
+
+Stopping suits a CLI run, where the person typing the command is present to decide. For email
+intake the decision belongs to the submitter instead — the duplicate becomes a question emailed
+back to them rather than a stop.
+
+### Field Mapping
 
 | OT Field | Source |
 |----------|--------|
@@ -226,11 +250,9 @@ duplicate becomes a question emailed back to them rather than an abort. See "Ema
 | MFR | `line_items[].manufacturer` → API lookup |
 | Buyer (`SalesRep_ID`) | `buyer.email` → `ad_user` lookup, `buyer.name` fallback |
 
-**Vendor/MFR Mapping:**
-
 New vendors must be added to `VENDOR_MAP` in the script. MFR is looked up dynamically via the OT API.
 
-**Buyer Mapping:**
+### Buyer Mapping
 
 The PO's Buyer (`SalesRep_ID`) is resolved from the buyer named on the PDF — it is **not** hardcoded.
 `lookupBuyer()` tries two things in order, caching the result per email/name:
@@ -244,46 +266,49 @@ order is never attributed to someone who did not raise it. The run prints
 `Buyer: BLANK - "<name>" did not match an ad_user` so the gap is visible in the log.
 
 **One email can match several `ad_user` rows.** A person gets one employee record plus a contact row
-on every vendor/customer BP they are attached to — `jake.harris@astutegroup.com` returns **6** active
-rows in TEST, and the API's first row is a vendor-contact row (1028155), not the employee record.
+on every vendor or customer BP they are attached to — one buyer's address returns **6** active rows
+in TEST, and the row the API returns first is a vendor-contact row, not the employee record.
 `pickEmployeeUser()` disambiguates: the employee row is the one whose Business Partner is the person
 themselves (`C_BPartner_ID.identifier === Name`); contact rows carry a company BP. Ties or no match
 fall back to the lowest `id`.
 
 `IsSalesRep` is **not** returned by the REST API for `ad_user`, so it cannot be used as the filter.
 
-> **Verify on PROD before first use:** duplicate-row counts in PROD are unknown, and the
-> `C_BPartner_ID.identifier === Name` test has only been validated against TEST.
+> ⚠️ **Warning** - Verify on PROD before first use. Duplicate-row counts in PROD are unknown, and
+> the `C_BPartner_ID.identifier === Name` test has only been validated against TEST.
 
 ## Known Limitations
 
-### PDFs With No Warehouse Code (fixed 2026-08-21)
+### PDFs With No Warehouse Code
 
-Not every PO PDF carries a warehouse code. `POV0060812.pdf` has none — its header is just
-`Order No: POV0060812` — and the extractor returns `warehouse_code: null`.
+Not every PO PDF carries a warehouse code — some headers are just `Order No: <POV number>`, and the
+extractor returns `warehouse_code: null`.
 
 Both `Chuboe_Warehouse_ID` and `Chuboe_Warehouse_Group_ID` are **required** on `c_orderline`; a null
-fails the POST with `500 Could not convert value null for Chuboe_Warehouse[_Group]`. Because the
-header is POSTed first, the old code left an empty PO behind every time (PO806325, PO806328).
+fails the POST with `500 Could not convert value null for Chuboe_Warehouse[_Group]`. The header is
+POSTed first, so before this was fixed such a PDF left an empty PO behind every time.
 
-The script now resolves and validates **both** before the header POST and aborts with a usable
-message if either is unresolved. Supply them on the command line when the PDF cannot:
+The script resolves and validates **both** before the header POST and stops with a usable message if
+either is unresolved. Supply them on the command line when the PDF cannot:
 
 ```bash
-node scripts/create-po-from-pdf.js "POV0060812.pdf" --warehouse W111
-node scripts/create-po-from-pdf.js "POV0060812.pdf" --warehouse W111 --warehouse-group BROWNSVILLE
+node scripts/create-po-from-pdf.js "path/to/PO.pdf" --warehouse W111
+node scripts/create-po-from-pdf.js "path/to/PO.pdf" --warehouse W111 --warehouse-group BROWNSVILLE
 ```
 
-`WAREHOUSE_MAP` now covers all 16 Infor codes that resolve to a `chuboe_warehouse` row. The
-warehouse group is the receiving **region** and is independent of the warehouse — `c_orderline`
-pairs W111 with BROWNSVILLE (1,241 lines), HONG KONG (65), AUSTIN (35) and STEVENAGE (25) — so it is
-detected from the delivery address, not from the warehouse.
+`WAREHOUSE_MAP` covers the 16 Infor codes that resolve to a `chuboe_warehouse` row.
+
+> 📝 **Note** - The warehouse group is the receiving **region** and is independent of the warehouse:
+> `c_orderline` pairs the LAM kitting warehouse with four different groups. It is detected from the
+> delivery address, never derived from the warehouse.
 
 ### MFR in TEST Environment
 
-> **TODO: Test MFR population when moving to PROD**
+> ⚠️ **Warning** - MFR population is unverified in PROD.
 >
-> The TEST environment rejects system-level MFR records (ad_client_id=0) as foreign keys. The script skips MFR population in TEST. When deploying to PROD, verify that:
-> 1. MFR lookup returns valid IDs
-> 2. MFR is correctly set on PO lines
-> 3. Common manufacturers (Vishay, Molex, etc.) resolve correctly
+> The TEST environment rejects system-level MFR records (`ad_client_id=0`) as foreign keys, so the
+> script skips MFR population there. Before the first PROD load, verify that:
+>
+> 1. [ ] MFR lookup returns valid IDs
+> 1. [ ] MFR is set correctly on PO lines
+> 1. [ ] Common manufacturers resolve to the right record
