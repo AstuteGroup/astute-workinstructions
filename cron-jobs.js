@@ -117,19 +117,24 @@ module.exports = [
   //   logFile: '/tmp/inventory-cleanup.log',
   //   description: 'Mon 11 UTC — pull Infor xlsx, clean, write offers via OT API',
   // },
-  // PAUSED 2026-06-18 by operator — inventory sourcing paused
-  // Note: nc-listing.js has been refactored to use the fetch-and-parse cache
-  // instead of parsing the xlsx directly. Re-enable when ready.
-  // {
-  //   name: 'nc-listing',
-  //   cadence: 'twice-weekly',
-  //   cadenceCron: '0 12 * * 1,4',
-  //   command: `node "${ASTUTE}/Trading Analysis/Inventory File Cleanup/nc-listing.js"`,
-  //   cwd: ASTUTE,
-  //   needsOT: false,
-  //   logFile: '/tmp/nc-listing.log',
-  //   description: 'Mon/Thu 12 UTC — generate NC portal CSVs from cache, apply exclusions, send upload emails',
-  // },
+  // RE-ENABLED 2026-08-21 — was paused 2026-06-18 pending verification of the
+  // cache-based refactor. Verified this session: cache/field mapping intact,
+  // GM_Stock_US/HK added, carryover reconciliation fixed (was double-
+  // subtracting — non-idempotent — now confirmed idempotent) and automated,
+  // Jake's CSV review emails restored (broken since 2026-06-08, unnoticed).
+  // active-sourcing (feeds .sourcing-exclusions.json) remains paused
+  // separately — needs more work, operator will move it upstream once fixed.
+  // nc-listing runs fine without it; MPN exclusions just won't apply yet.
+  {
+    name: 'nc-listing',
+    cadence: 'twice-weekly',
+    cadenceCron: '0 12 * * 1,4',
+    command: `node "${ASTUTE}/Trading Analysis/Inventory File Cleanup/nc-listing.js"`,
+    cwd: ASTUTE,
+    needsOT: false,
+    logFile: '/tmp/nc-listing.log',
+    description: 'Mon/Thu 12 UTC — generate NC portal CSVs from cache, reconcile carryovers, send upload + reconciliation emails to Jake',
+  },
   {
     name: 'lam-kitting-runner',
     cadence: 'fixed',

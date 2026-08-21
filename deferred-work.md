@@ -34,8 +34,8 @@ The SessionStart greeting reads this file and surfaces all open items, sorted by
     3. **Close out other consignment open POVs** — broader than GE; other consignment groups (Taxan, Spartronics, Eaton) may have similar open-PO cleanup needed. Not yet scoped.
   - **Why blocked:** end of session — operator wants to pick this up fresh next time.
   - **Ready when:** next session.
-  - **How:** Start with GE Consignment (W103) open orders/POVs — pull open PO status via `c_orderline`/`c_order` (issotrx='N', docstatus not 'CO') filtered to GE's bpartner, cross-reference against carryover-registry if relevant. Then repeat pattern for Taxan/Spartronics/Eaton. Reconciliation report (`Carryover_Reconciliation_<date>.xlsx`, sent weekly once cron resumes) is the ongoing audit tool for item 2.
-  - **cron status:** `nc-listing.js` is still PAUSED in `cron-jobs.js` (commented out since 2026-06-18) — everything above was verified via manual dry-run/live runs this session, not yet re-enabled on schedule. Re-enabling is a separate decision (add-cron-job.js / install-crons.js) not yet made.
+  - **How:** Start with GE Consignment (W103) open orders/POVs — pull open PO status via `c_orderline`/`c_order` (issotrx='N', docstatus not 'CO') filtered to GE's bpartner, cross-reference against carryover-registry if relevant. Then repeat pattern for Taxan/Spartronics/Eaton. Reconciliation report (`Carryover_Reconciliation_<date>.xlsx`, sent weekly via the now-live cron) is the ongoing audit tool for item 2.
+  - **cron status:** `nc-listing.js` RE-ENABLED 2026-08-21 (`0 12 * * 1,4`, Mon/Thu 12 UTC) — installed and verified in crontab, first live fire is the coming Monday. `active-sourcing` (feeds `.sourcing-exclusions.json`) remains paused separately per operator — needs more work, will move upstream once fixed; nc-listing runs fine without it, MPN exclusions just don't apply yet.
   - **Created / source:** 2026-08-21, NC Listing / carryover reconciliation review session.
 
 - [ ] ⏸️ **LAM Kitting RFQ 1141867 — vendor tariffs to apply**
